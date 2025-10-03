@@ -1,38 +1,58 @@
 # Suspicious
 
-Suspicious is a powerful web application designed to help users submit and analyze various types of data—including emails, files, IP addresses, and URLs—to detect and investigate potentially malicious content. 
-By leveraging external APIs through [StrangeBee's Cortex](https://github.com/TheHive-Project/Cortex) jobs and a modular processing workflow, Suspicious streamlines the analysis process with a user-friendly interface.
+Phishing is a widespread form of social engineering attack aimed at stealing sensitive data such as login credentials, payment information, or personal details. 
+Attackers impersonate trusted entities to deceive victims into opening emails, messages, or links that may lead to malware installation, ransomware, or data exposure. 
+These attacks have become increasingly sophisticated, making detection and prevention critical.
 
-## Features
+**Suspicious** is a web application designed to support this need by providing automated analysis of potentially malicious content. 
+It allows users to submit and investigate different types of data, including:
 
-- **Multi-Data Analysis:** Analyze emails, files, IP addresses, and URLs.
-- **Modular Workflow:** Process submissions through a dedicated pipeline that includes data fetching, processing, artifact extraction, and API-driven analysis.
-- **Containerized Deployment:** Simplified setup and scalability with Docker and Docker Compose.
-- **User & Admin Interfaces:**
-  - **My Submissions:** Users can view the status and results of their past submissions.
-  - **Submit an Item:** Easily submit new data for analysis.
-  - **Investigation:** Administrators have access to monitor all submissions and validate analysis outcomes.
-- **Dashboard:** Statistics and KPIs are easily readable.
-- **Profiles:** Profiles to change preferences for each users and customize the interface.
+- Emails (MSG /EML format)
+- Files (PDF, DOC/DOCX, XLS/XLSX, EXE, MSI, HTML, ZIP, etc.)
+- IP addresses
+- URLs
+- Hashes
+
+### How It Works
+
+#### Mail submission
+
+1. Users send a suspicious email as an attachment to the dedicated address (e.g., `suspicious@test.com`).
+2. The system splits the submission into individual components (headers, body, attachments, links, etc.).  
+3. Each component is analyzed using **Cortex analyzers** (external APIs and rulesets such as YARA).  
+4. Results are aggregated, scored, and classified.  
+5. The frontend provides users with access to reports, detailed analysis, and final conclusions. 
+6. Using the configured SMTP server it sends back a quick report / answer to the User
+
+#### Web form
+
+1. Users goes to the web platform and uses the `Submit an Item` page to send an Item to analyze (File, IP, Url, Hash)
+2. If the Item is an MSG or EML File, the system splits the submission into individual components (headers, body, attachments, links, etc.).  
+3. Each component is analyzed using **Cortex analyzers** (external APIs and rulesets such as YARA).  
+4. Results are aggregated, scored, and classified.  
+5. The frontend provides users with access to reports, detailed analysis, and final conclusions.  
+
+### Classification
+Based on the analysis score, submissions are categorized into four levels:
+
+- **Dangerous** – Cannot be opened; content must not be trusted.  
+- **Suspicious** – Should not be opened; content is risky.  
+- **Inconclusive** – Can be opened, but content should not be trusted.  
+- **Safe** – Can be opened; content is considered trustworthy.  
 
 ## Architecture & Workflow
 
-Suspicious is built using Django and uses a MariaDB database coupled with a MinIO bucket for storage. Its backend architecture emphasizes modularity and scalability
+**Suspicious** is designed as a modular and containerized web application that can be deployed easily using Docker.  
+The core application is built with **Django (Python)**, ensuring flexibility, maintainability, and straightforward setup.  
 
-- **Email Reading:**
-  An Email feeder is included, this feeder helps the suspicious app to retrieve emails. The process is simple, it reads from a mailbox and then upload the new email in a Bucket.
+A database is mandatory for the application to run, while additional services can be integrated to enhance its capabilities.  
 
-- **Email Workflow:**
-  Suspicious incorporates a comprehensive email processing pipeline. The workflow involves:
-  - **Reading:** The bucket is read to retrieve the new email and attachments.
-  - **Processing:** Emails are processed for headers, attachments, and content using methods and various utilities that validate and analyze the email components.
-  - **Artifact Extraction:** Extracted observables (e.g., attachments, URLs, IP addresses) are analyzed further by launching Cortex jobs.
+### Core Requirements
 
-- **Containerization & Deployment:**
-  The entire application, including its job processing components, is containerized. This ensures consistent environments across development, testing, and production.
-
-- **Cortex Integration:**
-  As part of its modular design, Suspicious uses Cortex jobs to call different external APIs, analyze the submitted data, and return the results to the backend for further processing.
+- **Database** (MySQL, MariaDB, or PostgreSQL) – Stores submissions, reports, and analysis results.  
+- **Elasticsearch** – Provides fast and efficient search capabilities across stored data.  
+- **[StrangeBee's Cortex](https://github.com/TheHive-Project/Cortex)** – Executes analyzer jobs for processing emails, files, IP addresses, and URLs.  
+- **MinIO S3** – Handles object storage for uploaded files and extracted artifacts. 
 
 ## Installation
 
