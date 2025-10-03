@@ -47,4 +47,4 @@ Suspicious is licensed under the MIT License. For more details, see the [LICENSE
 
 ## Contact
 
-For questions, feedback, or support, please open an issue on GitHub or contact the project maintainers at [email@example.com](mailto:email@example.com).
+For questions, feedback, or support, please open an issue on GitHub
