@@ -1,6 +1,7 @@
 # Suspicious
 
-Suspicious is a powerful web application designed to help users submit and analyze various types of data—including emails, files, IP addresses, and URLs—to detect and investigate potentially malicious content. By leveraging external APIs through Cortex jobs and a modular processing workflow, Suspicious streamlines the analysis process with a user-friendly interface.
+Suspicious is a powerful web application designed to help users submit and analyze various types of data—including emails, files, IP addresses, and URLs—to detect and investigate potentially malicious content. 
+By leveraging external APIs through [StrangeBee's Cortex](https://github.com/TheHive-Project/Cortex) jobs and a modular processing workflow, Suspicious streamlines the analysis process with a user-friendly interface.
 
 ## Features
 
@@ -43,7 +44,7 @@ Contributions are welcome! If you'd like to contribute to Suspicious, please rev
 
 ## License
 
-Suspicious is licensed under the MIT License. For more details, see the [LICENSE](LICENSE) file.
+Suspicious is licensed under the GNU AFFERO GENERAL PUBLIC License. For more details, see the [LICENSE](LICENSE) file.
 
 ## Contact
 
