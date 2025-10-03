@@ -21,7 +21,7 @@ email-validator==2.2.0
 msg_parser==1.2.0
 
 # Natural Language Processing and Similarity Checking
-nltk==3.8.1
+nltk==3.9
 simhash==2.1.2
 
 # Image and Font Utilities
