@@ -1,0 +1,46 @@
+# Global
+*.log
+*.log.*
+*.log-*
+mainlog
+# Environment
+*.env
+db_suspicious.env
+*.old
+chromadb
+*.sqlite
+*.sqlite3
+
+config.json
+settings.json
+
+# System
+.vscode
+docs
+.DS_Store
+Thumbs.db
+
+# Node.js
+node_modules
+
+# Python
+__pycache__
+
+backup
+backups
+
+elasticsearch
+
+# Cortex
+cortex
+
+db_suspicious/data
+
+minio
+
+# Certificate
+*.crt
+*.csr
+*.key
+*.pem
+*.jks

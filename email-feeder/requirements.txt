@@ -1,0 +1,5 @@
+beautifulsoup4
+requests
+python-dateutil
+minio
+chardet==5.2.0

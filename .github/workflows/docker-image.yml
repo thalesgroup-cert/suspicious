@@ -1,0 +1,43 @@
+name: Docker Image Latest
+
+on: 
+  push:
+    paths:
+    - 'Suspicious/**'
+    branches: [ master ]
+  workflow_dispatch:
+
+permissions:
+  contents: write
+  packages: write
+
+jobs:
+
+  build:
+
+    runs-on: ubuntu-latest
+
+    steps:
+    - name: Set up QEMU
+      uses: docker/setup-qemu-action@v3
+
+    - name: Set up Docker Buildx
+      uses: docker/setup-buildx-action@v3
+
+    - name: Login to GitHub Container Registry
+      run: echo "${{ secrets.GITHUB_TOKEN }}" | docker login ghcr.io -u ${{ github.actor }} --password-stdin
+
+    - name: Determine Docker tag
+      id: docker_tag
+      run: |
+        TAG_DATE=$(date +'%y%m%d%H%M')
+        echo "::set-output name=tag::snapshot-${TAG_DATE}"
+
+
+    - name: Build and push
+      id: docker_build
+      uses: docker/build-push-action@v5
+      with:
+        context:  "{{defaultContext}}:Suspicious"
+        push: true
+        tags: ghcr.io/thalesgroup-cert/suspicious:${{ steps.docker_tag.outputs.tag }}

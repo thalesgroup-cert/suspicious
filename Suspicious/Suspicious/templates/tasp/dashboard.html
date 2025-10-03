@@ -1,0 +1,309 @@
+{% extends 'base.html' %}
+{% block title %}Dashboard{% endblock %}
+{% block content%}
+  {% load utils %}
+
+    {% load static %}
+
+    <div class="info mt-6">
+      <h1 class="title is-1">Monthly Dashboard :</h1>
+      {% if user|has_group_elevated  %}
+      <h2 id="subtitle" class="subtitle ml-6 is-3 is-flex">Dashboard for : {{ month | month_name}} {{ year }}</h2>
+      {% endif %}
+    </div>
+    {% if user|has_group_elevated  %}
+    <div id="param">
+      <button id="parameters" class="js-modal-triggers fa fa-gear" data-target="1"></button>
+      <div class="modal" id="1">
+        <div class="modal-background"></div>
+        <div class="modal-card">
+          <header class="modal-card-head">
+            <p class="modal-card-title">Change Dashboard parameters</p>
+            <button class="delete" aria-label="close"></button>
+          </header>
+          <section class="modal-card-body">
+            <div>
+              <div class="card-content">
+                <div class="content">
+                  <div class="field" >
+                    <label class="label">Select Month</label>
+                    <div class="control">
+                      <div class="select">
+                        <select id="monthc">
+                          <option class="month" value="1">January</option>
+                          <option class="month" value="2">February</option>
+                          <option class="month" value="3">March</option>
+                          <option class="month" value="4">April</option>
+                          <option class="month" value="5">May</option>
+                          <option class="month" value="6">June</option>
+                          <option class="month" value="7">July</option>
+                          <option class="month" value="8">August</option>
+                          <option class="month" value="9">September</option>
+                          <option class="month" value="10">October</option>
+                          <option class="month" value="11">November</option>
+                          <option class="month" value="12">December</option>
+                        </select>
+
+                      </div>
+                    </div>
+                  </div>
+                  <div class="field">
+                    <label class="label">Select Year</label>
+                    <div class="control">
+                      <div class="select">
+                        <select id="yearc">
+                          <option class="year" value="2022">2022</option>
+                          <option class="year"  value="2023">2023</option>
+                          <option class="year"  value="2024">2024</option>
+                          <option class="year"  value="2025">2025</option>
+                        </select>
+                      </div>
+                    </div>
+                  </div>
+                  {% with groups=user|get_groups %}
+                  {% for group in groups %}
+                    {% if group == "CISO" %}
+                    <div class="field">
+                      <label class="label">Select Scope</label>
+                      <div class="control">
+                        <div class="select">
+                          <select id="scopec">
+                            <option class="scope"  value="ALL">Everyone</option>
+                            <option class="scope"  value="{{ user|ciso_scope}}">{{ user|ciso_scope}}</option>
+                          </select>
+                        </div>
+                      </div>
+                    </div>
+                    <div class="change field">
+                      <div class="control button">
+                        <button class="button is-link" onclick="CisoChangeDashboard()" id="submit">Change</button>
+                      </div>
+                    </div>
+                    <script>
+                      function CisoChangeDashboard(){
+
+                        const scopeNew = document.getElementById("scopec").value;
+                        if (scopeNew == "ALL"){
+                          changeDashboard();
+                        }
+                        else{
+                          const chart = document.getElementById("myChart");
+                          // get value of select
+                          const monthNew = parseInt(document.getElementById("monthc").value);
+                          const yearNew = parseInt(document.getElementById("yearc").value);
+                          const newUser = document.getElementById("newUsers");
+                          const totalUser = document.getElementById("totalUsers");
+                          const totalCases = document.getElementById("totalCases");
+
+                          const failure = document.getElementById("failurep");
+                          const safe = document.getElementById("safep");
+                          const suspicious = document.getElementById("suspiciousp");
+                          const malicious = document.getElementById("maliciousp");
+                          const inconclusive = document.getElementById("inconclusivep");
+                          const dangerous = document.getElementById("dangerousp");
+
+                          fetch(`/dashboard-change-scope/${monthNew}/${yearNew}/${scopeNew}`)
+                            .then((response) => response.json())
+                            .then((data) => {
+                              $('#myChart').remove();
+                              $('.content.chart').prepend('<canvas id = "myChart"></canvas>');
+                              const print = "true";
+                              // get labels
+                              const labels = data.labels;
+                              // get data
+                              const dataValues = data.data;
+                              // draw chart
+                              h2 = document.getElementById("subtitle");
+                              h2.innerHTML = `Dashboard for : ${monthNew}/${yearNew}`;
+                              drawDashboard(print, dataValues, labels);
+
+                              newUser.innerHTML = data.new_users;
+                              totalUser.innerHTML = data.total_reporters;
+                              totalCases.innerHTML = data.total_cases;
+
+                              failure.innerHTML = data.stats.failure;
+                              safe.innerHTML = data.stats.safe;
+                              suspicious.innerHTML = data.stats.suspicious;
+                              malicious.innerHTML = data.stats.malicious;
+                              inconclusive.innerHTML = data.stats.inconclusive;
+                              dangerous.innerHTML = data.stats.dangerous;
+                            });
+                        }
+                      }
+                    </script>
+                    {% endif %}
+                    {% if group == "CERT" %}
+                    <div class="change field">
+                      <div class="control button">
+                        <button class="button is-link" onclick="changeDashboard()" id="submit">Change</button>
+                      </div>
+                    </div>
+                    {% endif %}
+                  {% endfor %}
+                  {% endwith %}
+                </div>
+              </div>
+            </div>
+          </section>
+        </div>
+      </div>
+        {% endif %}
+      </div>
+    </div>
+    <div class="section pt-0 pb-0">
+      <div class="container">
+        <div class="columns is-centered is-multiline dash mt-5">
+          <div class="main column is-narrow">
+            <div class="card">
+              <div class="card-content">
+                <div class="content">
+                  <h2 class="title is-4">New Users</h2>
+                  <p id="newUsers" class="subtitle is-6">{% monthly_new_reporters %}</p>
+                </div>
+              </div>
+            </div>
+          </div>
+          <div class="main column is-narrow">
+            <div class="card">
+              <div class="card-content">
+                <div class="content">
+                  <h2 class="title is-4">Total Reporters</h2>
+                  <p id="totalUsers" class="subtitle is-6">{% monthly_reporters_count %}</p>
+                </div>
+              </div>
+            </div>
+          </div>
+          <div class="main column is-narrow ">
+            <div class="card">
+              <div class="card-content">
+                <div class="content">
+                  <h2 class="title is-4">Total Submissions</h2>
+                  <p id="totalCases" class="subtitle is-6">{% total_cases_this_month %}</p>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+      <div class="block container mt-6 mb-6">
+        <div class="columns danger is-multiline dash">
+          <div class="column is-narrow">
+            <div class="card">
+              <div class="card-content" id="failure">
+                <div class="content" >
+                  <h2 class="title is-4">Failure</h2>
+                  <p id="failurep" class="subtitle is-6">{{"failure" | total_cases_by_danger_level}}</p>
+                </div>
+              </div>
+            </div>
+          </div>
+          <div class="column is-narrow">
+            <div class="card">
+              <div class="card-content" id="safe">
+                <div class="content" >
+                  <h2 class="title is-4">Safe</h2>
+                  <p id="safep" class="subtitle is-6">{{ "safe" | total_cases_by_danger_level }}</p>
+                </div>
+              </div>
+            </div>
+          </div>
+          <div class="column is-narrow">
+            <div class="card">
+              <div class="card-content" id="inconclusive">
+                <div class="content"  >
+                  <h2 class="title is-4">Inconclusive</h2>
+                  <p id="inconclusivep" class="subtitle is-6">{{"inconclusive" | total_cases_by_danger_level}}</p>
+                </div>
+              </div>
+            </div>
+          </div>
+          <div class="column is-narrow">
+            <div class="card">
+              <div class="card-content" id="suspicious">
+                <div class="content" >
+                  <h2 class="title is-4">Suspicious</h2>
+                  <p id="suspiciousp" class="subtitle is-6">{{ "suspicious" | total_cases_by_danger_level }}</p>
+                </div>
+              </div>
+            </div>
+          </div>
+          <div class="column is-narrow">
+            <div class="card">
+              <div class="card-content" id="dangerous">
+                <div class="content" >
+                  <h2 class="title is-4">Dangerous</h2>
+                  <p id="dangerousp" class="subtitle is-6">{{"dangerous" | total_cases_by_danger_level}}</p>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+    <div class="block columns top">
+      <div class="column is-8 is-centered">
+        <div>
+          <div class="card-content chart">
+            <div class="content chart">
+              <canvas id="myChart"></canvas>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+    <script src="{% static 'js/jquery.js' %}"></script>
+    <script src="{% static 'js/loader.js' %}"></script>
+    <script src="{% static 'js/navbar.js' %}"></script>
+    <script src="{% static 'js/dashboard.js' %}"></script>
+    <script>
+      let month = {{ month }};
+      let year = {{ year }};
+      let data = [
+        "{% get_dashboard_score 1 11 month year  %}",
+        "{% get_dashboard_score 2 11 month year  %}",
+        "{% get_dashboard_score 3 11 month year  %}",
+        "{% get_dashboard_score 4 11 month year  %}" ,
+        "{% get_dashboard_score 5 11 month year  %}" ,
+        "{% get_dashboard_score 6 11 month year  %}",
+        "{% get_dashboard_score 7 11 month year  %}",
+        "{% get_dashboard_score 8 11 month year  %}",
+        "{% get_dashboard_score 9 11 month year  %}",
+        "{% get_dashboard_score 10 11 month year  %}"
+      ];
+      let labels = [
+        "{% get_dashboard_email_prefix 1 11 month year %}" ,
+        "{% get_dashboard_email_prefix 2 11 month year %}" ,
+        "{% get_dashboard_email_prefix 3 11 month year %}" ,
+        "{% get_dashboard_email_prefix 4 11 month year %}" ,
+        "{% get_dashboard_email_prefix 5 11 month year %}" ,
+        "{% get_dashboard_email_prefix 6 11 month year %}" ,
+        "{% get_dashboard_email_prefix 7 11 month year %}" ,
+        "{% get_dashboard_email_prefix 8 11 month year %}" ,
+        "{% get_dashboard_email_prefix 9 11 month year %}" ,
+        "{% get_dashboard_email_prefix 10 11 month year %}"
+      ];
+      let print = "myChart";
+      drawDashboard(print, data, labels);
+
+      month_options_input = document.getElementsByClassName("month");
+      year_options_input = document.getElementsByClassName("year");
+
+      for (let i = 0; i < month_options_input.length; i++) {
+        if (month_options_input[i].value == month) {
+          month_options_input[i].selected = true;
+        }
+      }
+      for (let i = 0; i < year_options_input.length; i++) {
+        if (year_options_input[i].value == year) {
+          year_options_input[i].selected = true;
+        }
+      }
+
+      </script>
+    {% if user|has_group_elevated  %}
+    <script>
+
+    </script>
+    {% endif %}
+{% endblock %}

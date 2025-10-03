@@ -1,0 +1,118 @@
+{
+    "suspicious": {
+        "allowed_host": "suspicious",
+        "csrf_trusted_origins": "https://suspicious.test",
+        "django_debug": "False",
+        "django_secret_key": "django-insecure-test",
+        "trace_level": "INFO",
+        "email": "suspicious@test.com",
+        "tz": "Europe/Paris",
+        "pattern": "pattern to match your company mail addresses",
+        "footer": "Your Group",
+        "link" : "link to your intranet",
+        "ico" : "data:image/png;base64,Base64 text of your company logo",
+        "logo": "data:image/png;base64,Base64 text of your company logo",
+        "banner": "data:image/png;base64,Base64 text of your company logo",
+        "sign": "data:image/png;base64,Base64 text of your company logo"
+    },
+    "thehive": {
+        "enabled": false,
+        "url": "https://thehive",
+        "api_key": "superpassword",
+        "the_hive_verify_ssl" : false,
+        "the_hive_custom_field" : "",
+        "the_hive_email_sender" : "",
+        "the_hive_tags" : "",
+        "certificate_path" : "/app/cert.pem",
+        "user": "exemple@user.com"
+    },
+    "cortex": {
+        "url": "http://cortex:9001",
+        "api_key": "your cortex api key",
+        "header_analyzer" : "MailHeader_4_0",
+        "ai_analyzer" : "AI_Mail_Analyzer_1_4",
+        "sandbox_analyzer" : "ThreatGridOnPrem_1_0",
+        "yara_analyzer" : "Yara_Boosted_3_2",
+        "file_info_analyzer" : "FileInfo_8_0"
+    },
+    "company_domains": [
+        "testgroup.com"
+    ],
+    "database": {
+        "mysql_database": "db_suspicious",
+        "mysql_host": "db_suspicious",
+        "mysql_password": "password",
+        "mysql_port": 3306,
+        "mysql_root_password": "strongpassword",
+        "mysql_user": "suspicious",
+        "db_use_ssl": "NO",
+        "db_use_connection_pooling": "NO",
+        "db_use_persistent_connections": "NO"
+    },
+    "ldap": {
+        "auth_ldap_base_dn": "ou=People,o=group",
+        "auth_ldap_bind_dn": "ou=Applications,ou=Gresources,o=Group",
+        "auth_ldap_bind_password": "test",
+        "auth_ldap_filter": "(&(mail=%(user)s)(Tpresent=true)(!(ou=admin))(!(TpreferredFirstName=Test)))",
+        "auth_ldap_server_uri": "ldaps://ldap",
+        "auth_ldap_verify_ssl": "False"
+    },
+    "misp" : {
+        "tags" : {
+            "tlp" : "clear",
+            "pap" : "clear",
+            "test" : {
+                "distribution" : "customers"
+            },
+            "other" : "MalSpam,Phishing"
+        },
+        "suspicious" : {
+            "url": "http://misp:80",
+            "key": "your misp api key",
+            "ssl_verify": "False",
+            "ssl_ca_certs": "/etc/ssl/certs/ca-certificates.crt"
+        },
+        "security" : {
+            "url": "https://secondary-misp",
+            "key": "your second misp api key",
+            "ssl_verify": "False",
+            "ssl_ca_certs": "/etc/ssl/certs/ca-certificates.crt"
+        }
+    },
+    "minio": {
+        "access_key": "the minio access key",
+        "endpoint": "minio:9000",
+        "secret_key": "the minio secret key",
+        "secure": false
+    },
+    "mail": {
+        "server" : "the smtp serve to allow the app to send mails",
+        "port" : 25,
+        "username" : "SUSPICIOUS",
+        "footer" : "Limited Distribution",
+        "group" : "Your Cybersecurity Team Name",
+        "suspicious_web" : "https://suspicious.test/submissions/",
+        "global" : "test.com",
+        "global_url" : "https://www.test.com/en",
+        "socials" : {
+            "facebook" : "https://fr-fr.facebook.com/test",
+            "twitter" : "https://x.com/test",
+            "instagram" : "https://www.instagram.com/test",
+            "linkedin" : "https://www.linkedin.com/company/test",
+            "youtube" : "https://www.youtube.com/test"
+        },
+        "glossary" : "https://glossary_to_cyber terms",
+        "inquiry" : "mailto:inquryemail@yourcompany.com",
+        "inquiry_text" : "inquryemail@yourcompany.com",
+        "submissions" : "https://suspicious.corp.test/submissions/",
+        "security" : "mailto:yoursecuritymail@yourcompany.com",
+        "security_msg" : "yoursecuritymail@yourcompany.com",
+        "logos" : {
+            "company" : "data:image/png;base64,Base64 text of your company logo",
+            "acknowledge" : "data:image/png;base64,The Base 64 image for the acknowledge mail",
+            "final" : "data:image/png;base64,The Base 64 image for the final mail",
+            "challenge" : "data:image/png;base64,The Base 64 image for the challenge mail",
+            "modif" : "data:image/png;base64,The Base 64 image for the modif mail"
+        }
+    }
+}

@@ -1,0 +1,126 @@
+{% extends 'base.html' %} 
+{% block title %}Menu{% endblock %} 
+{% block content%}
+  {% if user.is_authenticated %} 
+    {% load utils %} 
+    {% load static %}
+    <header class="header">
+      <div class="container">
+        <h1 class="title is-1 mb-6">Hi {{ user.first_name }} {{ user.last_name }} ! </h1>
+      </div>
+    </header>
+    {% if show_modal %}
+    <!-- Modal code goes here -->
+    <div class="modal js-auto-trigger-modal" id="updateProfile">
+      <div class="modal-background"></div>
+      <div class="modal-card">
+        <header class="modal-card-head">
+          <h2 class="modal-card-title">Welcome to Suspicious {{ user.email | email_username }} !</h2>
+          <button class="delete" aria-label="Close" title="Close" data-dismiss="modal"></button>
+        </header>
+        <section class="modal-card-body">
+          <div class="anlysis_result">
+            <h3 class="title is-3">With your LDAP Informations you have been identified as a CISO</h3>
+            <div class="cards">
+              <p class="title is-4">As you know : "With great power comes great responsability"...</p>
+              <p class="title is-4">...So we need you to choose your scope !</p>
+              <p>This will let you see scope based dashboards and submissions </p>
+              <div class="card">
+                <div class="card-content">
+                  <div class="content" id="scope">
+                      {% with region=user_groups|get_region %}
+                        {% with country=user_groups|get_country %}
+                          {% with gbu=user_groups|get_gbu %}
+                            <table>
+                              <tr>
+                                <th>Region</th>
+                                <th>Country</th>
+                                <th>GBU</th>
+                              </tr>
+                              <tr>
+                                <td><input type="checkbox" name="group" value="{{ region }}" id="region" /> {{ region }}</td>
+                                <td><input type="checkbox" name="group" value="{{ country }}" id="country" /> {{ country }}</td>
+                                <td><input type="checkbox" name="group" value="{{ gbu }}" id="gbu" /> {{ gbu }}</td>
+                              </tr>
+                            </table>
+                          {% endwith %}
+                        {% endwith %}
+                      {% endwith %}
+                  <div class="button">
+                    <button type="submit" class="button is-link is-light" onclick="addScope()" >Choose</button>
+                  </div>
+                </div>
+            </div>
+          </div>
+        </section>
+      </div>
+    </div>
+
+
+
+    {% endif %}
+    <div class="columns is-variable is-4 px-6">
+      <div class="column is-flex is-flex-direction-column">
+        <a class="box column mx-6 mt-4 mb-5 is-flex is-flex-direction-column has-background-link-dark" href="/submissions/" aria-label="My Submissions">
+          <div class="content has-text-centered">
+            <h2 class="title is-3 has-text-light">My Submissions</h2>
+            <img class="is-align-self-center mt-4 image" src="{% static 'Images/My_Submissions.png' %}" alt="Submissions logo" width="125" />
+          </div>
+        </a>
+      </div>
+      <div class="column is-flex is-flex-direction-column">
+        <a class="box column mx-6 mt-4 mb-5 is-flex is-flex-direction-column has-background-link-dark" href="/submit/" aria-label="Submit an Item">
+          <div class="content has-text-centered">
+            <h2 class="title is-3 has-text-light">Submit an Item</h2>
+            <img class="is-align-self-center mt-4 image" src="{% static 'Images/Submit_Item.png' %}" alt="Submissions logo" width="125" />
+          </div>
+        </a>
+      </div>
+      {% if user|has_group_elevated %}
+      <div class="column is-flex is-flex-direction-column">
+        <a class="box column mx-6 mt-4 mb-5 is-flex is-flex-direction-column has-background-link-dark" href="/tasp-admin/" aria-label="Investigation">
+          <div class="content has-text-centered">
+            <h2 class="title is-3 has-text-light">Investigation</h2>
+            <img class="is-align-self-center mt-4 image" src="{% static 'Images/Submitted_Items.png' %}" alt="Submissions logo" width="150"/>
+          </div>
+        </a>
+      </div>
+      {% endif %}
+    </div>
+    {% if user|has_group_elevated %}
+    <div class="columns mt-6  ml-6 mb-0 " >
+      <div class="column is-flex is-flex-direction-column monthly ">
+        <div class="title is-5 p-3">
+          <h2 class="title is-3 has-text-light mt-3 mb-4">This Month</h2>
+          <ul class="monthly-list">
+            {% with groups=user|get_groups %}
+            {% for group in groups %}
+              {% if group == "CISO" %}
+              <li class="monthly-item">
+                <p class="has-text-weight-bold mb-1">The members of your scope ({{ user|ciso_scope}}) have published {{user|get_scope_cases_number}} items</p>
+              </li>
+              {% endif %}
+              {% if group == "CERT" %}
+                <li class="monthly-item mt-2">
+                  <p class="has-text-weight-bold mb-1">Everyone has published {% total_cases_this_month %} items</p>
+                </li>
+              {% endif %}
+            {% endfor %}
+            {% endwith %}
+          </ul>
+        </div>
+      </div>
+    </div>
+    <script type="text/javascript" src="{% static 'js/jquery.js' %}"></script>
+    <script type="text/javascript" src="{% static 'js/navbar.js' %}"></script>
+  {% endif %}
+  {% else %}
+    <section class="section">
+      <div class="container">
+        <p>You are not logged in</p>
+        <script> window.location.replace("{% url 'login' %}"); </script>
+      </div>
+    </section>
+    
+  {% endif %}
+{% endblock %}

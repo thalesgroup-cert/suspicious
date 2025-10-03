@@ -1,0 +1,300 @@
+{% extends 'base.html' %}
+{% load static %}
+{% load utils %}
+
+{% block title %}Settings{% endblock %}
+
+{% block content %}
+{% if user|has_group:"Admin" or user|has_group:"CERT" %}
+  <script src="{% static 'js/jquery.js' %}"></script>
+  <script src="{% static 'js/settings/settings.js' %}"></script>
+  <script src="{% static 'js/settings/analyzers.js' %}"></script>
+  <script src="{% static 'js/settings/campaign_domain_wl.js' %}"></script>
+  <script src="{% static 'js/settings/ciso.js' %}"></script>
+  <script src="{% static 'js/settings/domain_bl.js' %}"></script>
+  <script src="{% static 'js/settings/domain_wl.js' %}"></script>
+  <script src="{% static 'js/settings/feeder.js' %}"></script>
+  <script src="{% static 'js/settings/file_wl.js' %}"></script>
+  <script src="{% static 'js/settings/filetype_wl.js' %}"></script>
+  <script src="{% static 'js/settings/file_wl.js' %}"></script>
+  <script src="{% static 'js/navbar.js' %}"></script>
+  <div class="info mt-4">
+
+    <div class="tabs is-centered mb-2" role="tablist">
+      <ul>
+        <li role="tab" class="tabslinks is-active" id="DOMAINS" aria-controls="DOMAINS" onclick="openTabs(event, 'Domains')">
+          <a>Domains AllowList</a>
+        </li>
+        <li role="tab" class="tabslinks is-active" id="BDOMAINS" aria-controls="BDOMAINS" onclick="openTabs(event, 'BDomains')">
+          <a>Domains DenyList</a>
+        </li>
+        <li role="tab" class="tabslinks" id="CAMPAIGNS_DOMAINS" aria-controls="CAMPAIGNS_DOMAINS" onclick="openTabs(event, 'Campaigns_Domains')">
+          <a>Campaigns Domains AllowList</a>
+        </li>
+        <li role="tab" class="tabslinks" id="EMAILS_FILES" aria-controls="EMAILS_FILES" onclick="openTabs(event, 'Emails_Files')">
+          <a>Emails / Files AllowList</a>
+        </li>
+        <li role="tab" class="tabslinks" id="FILES_TYPE" aria-controls="FILES_TYPE" onclick="openTabs(event, 'Files_type')">
+          <a>Filetypes AllowList</a>
+        </li>
+        <li role="tab" class="tabslinks" id="CISO_USERS" aria-controls="CISO_USERS" onclick="openTabs(event, 'Ciso_users')">
+          <a>CISO Users</a>
+        </li>
+        <li role="tab" class="tabslinks" id="EMAIL" aria-controls="EMAIL" onclick="openTabs(event, 'Email')">
+          <a>Email Settings</a>
+        </li>
+        <li role="tab" class="tabslinks" id="SCORING" aria-controls="SCORING" onclick="openTabs(event, 'Scoring')">
+          <a>Analysis Scoring</a>
+        </li>
+      </ul>
+    </div>
+
+    <!-- Domains AllowList -->
+    <div id="Domains" class="info mt-5 tabcontent" role="tabpanel">
+      <h2 class="title is-3">Add or Remove Domains to AllowList</h2>
+      <div id="domainsform">
+        <input type="text" id="id_domain" name="domain" placeholder="Domain to allow_list">
+        <button type="button" onclick="addDomain()" class="button domain" id="submitdomains">Add domain(s)</button>
+        <p class="title is-3 ml-3">Send a file with domains to allow_list them:</p>
+        <input type="file" id="file-domain" class="mt-6" name="file" accept=".txt,.csv,application/json">
+        <button type="button" onclick="addDomains()" class="button domain" id="submitdomains-file">Add from file</button>
+      </div>
+      <div id="domainList" class="card">
+        <div class="card-content">
+          <div class="content">
+            <h3 class="title is-4">AllowListed Domains</h3>
+            <div id="list">
+              {% if domains %}
+                {% for domain in domains %}
+                  <div id="div-{{ domain }}" class="domainList">
+                    <p class='allDomains' id="{{ domain }}"><i class="fas fa-globe"></i> {{ domain }}</p>
+                  </div>
+                  <div id="buttonDiv-{{ domain }}" class="domain">
+                    <button  type="submit" onclick="removeDomain('{{ domain }}')" class="button is-danger ddB" id="button_{{ domain }}" >Remove</button>
+                  </div>
+                {% endfor %}
+              {% else %}
+                <p id="noDomains">No domains to show</p>
+              {% endif %}
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Domains DenyList -->
+    <div id="BDomains" class="info mt-5 tabcontent" role="tabpanel">
+      <h2 class="title is-3">Add or Remove Domains to DenyList</h2>
+      <div id="domainsBform">
+        <input type="text" id="id_Bdomain" name="domain" placeholder="Domain to deny_list">
+        <button type="button" onclick="addBDomain()" class="button domain" id="submitBdomains">Add domain(s)</button>
+        <p class="title is-3 ml-3">Send a file with domains to deny_list them:</p>
+        <input type="file" id="file-Bdomain" class="mt-6" name="file" accept=".txt,.csv,application/json">
+        <button type="button" onclick="addBDomains()" class="button domain" id="submitBdomains-file">Add from file</button>
+      </div>
+      <div id="domainBList" class="card">
+        <div class="card-content">
+          <div class="content">
+            <h3 class="title is-4">DenyListed Domains</h3>
+            <div id="Blist">
+              {% if domainsB %}
+                {% for domain in domainsB %}
+                  <div id="div-B{{ domain }}" class="domainBList">
+                    <p class='allBDomains' id="{{ domain }}"><i class="fas fa-globe"></i> {{ domain }}</p>
+                  </div>
+                  <div id="buttonDiv-B{{ domain }}" class="domain">
+                    <button  type="submit" onclick="removeBDomain('{{ domain }}')" class="button is-danger ddB" id="button_B{{ domain }}" >Remove</button>
+                  </div>
+                {% endfor %}
+              {% else %}
+                <p id="noBDomains">No domains to show</p>
+              {% endif %}
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Campaigns Domains AllowList -->
+    <div id="Campaigns_Domains" class="info mt-5 tabcontent" role="tabpanel">
+      <h2 class="title is-3">Add or Remove Campaigns Domains to AllowList</h2>
+      <div id="campaignsform">
+        <input type="text" id="id_campaign_domain" name="campaign_domain" placeholder="Campaign Domain to allow_list">
+        <button type="button" onclick="addCampaignDomain()" class="button campaign-domain" id="submitcampaigndomains">Add campaign domain(s)</button>
+        <p class="title is-3 ml-3">Send a file with campaign domains to allow_list them:</p>
+        <input type="file" id="file-campaign-domain" class="mt-6" name="file" accept=".txt,.csv,application/json">
+        <button type="button" onclick="addCampaignDomains()" class="button campaign-domain" id="submitcampaigndomains-file">Add from file</button>
+      </div>
+      <div id="campaignDomainList" class="card">
+        <div class="card-content">
+          <div class="content">
+            <h3 class="title is-4">AllowListed Campaign Domains</h3>
+            <div id="list-campaign-domain">
+              {% if campaign_domains %}
+                {% for campaign_domain in campaign_domains %}
+                  <div id="div-{{ campaign_domain }}" class="campaignDomainList">
+                    <p class='allCampaignDomains' id="{{ campaign_domain }}"><i class="fas fa-globe"></i> {{ campaign_domain }}</p>
+                  </div>
+                  <div id="buttonDiv-{{ campaign_domain }}" class="domain">
+                    <button type="button" onclick="removeCampaignDomain('{{ campaign_domain }}')" class="button is-danger ddB" id="button_{{ campaign_domain }}">Remove</button>
+                  </div>
+                {% endfor %}
+              {% else %}
+                <p id="noCampaignDomains">No Campaign Domains to show</p>
+              {% endif %}
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Emails / Files AllowList -->
+    <div id="Emails_Files" class="info mt-5 tabcontent" role="tabpanel" hidden>
+      <h2 class="title is-3">Add or Remove Files to AllowList</h2>
+      <div id="filesform">
+        <input type="text" id="id_file" name="file" placeholder="File to allow_list">
+        <button type="button" onclick="addFile()" class="button file" id="submitfiles">Add file(s)</button>
+        <p class="title is-3 ml-3">Send a file or email file to allow_list it:</p>
+        <input type="file" id="file" class="mt-6" name="file" accept=".txt,.csv,application/json,.eml">
+        <button type="button" onclick="addFiles()" class="button file" id="submitfiles-file">Add from file</button>
+      </div>
+      <div id="fileList" class="card">
+        <div class="card-content">
+          <div class="content">
+            <h3 class="title is-4">AllowListed Files</h3>
+            <div id="list-file">
+              {% if files %}
+                {% for file in files %}
+                  <div id="div-{{ file.linked_file_hash.value }}" class="fileList">
+                    <p class="allFiles" id="{{ file.linked_file_hash.value }}"><i class="fas fa-file"></i> {{ file.linked_file_hash.value }}</p>
+                    
+                  </div>
+                  <div id="buttonDiv-{{ file.linked_file_hash.value }}" class="domain">
+                    <button type="button" onclick="removeFile('{{ file.linked_file_hash.value }}')" class="button is-danger ddB" id="button_{{ file.linked_file_hash.value }}">Remove</button>
+                  </div>
+                {% endfor %}
+              {% else %}
+                <p id="noFiles">No files to show</p>
+              {% endif %}
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Filetypes AllowList -->
+    <div id="Files_type" class="info mt-5 tabcontent" role="tabpanel" hidden>
+      <h2 class="title is-3">Add or Remove Filetypes to AllowList</h2>
+      <div id="filesform">
+        <input type="text" id="id_filetype" name="filetype" placeholder="Filetype to allow_list">
+        <button type="button" onclick="addFiletype()" class="button filetype" id="submitfiletypes">Add filetype(s)</button>
+        <p class="title is-3 ml-3">Send a file with filetypes to allow_list them:</p>
+        <input type="file" id="file-filetype" class="mt-6" name="file" accept=".txt,.csv,application/json,.eml">
+        <button type="button" onclick="addFiletypes()" class="button filetype" id="submitfiletypes-file">Add from file</button>
+      </div>
+      <div id="filetypeList" class="card">
+        <div class="card-content">
+          <div class="content">
+            <h3 class="title is-4">AllowListed Filetypes</h3>
+            <div id="list-filetype">
+              {% if filetypes %}
+                {% for filetype in filetypes %}
+                  <div id="div-{{ filetype }}" class="filetypeList">
+                    <p class="allfiletypes" id="{{ filetype }}"><i class="fas fa-file"></i> {{ filetype }}</p>
+                  </div>
+                  <div id="buttonDiv-{{ filetype }}" class="domain">
+                    <button type="button" onclick="removeFiletype('{{ filetype }}')" class="button is-danger ddB" id="button_{{ filetype }}">Remove</button>
+                  </div>
+                {% endfor %}
+              {% else %}
+                <p id="noFileTypes">No filetypes to show</p>
+              {% endif %}
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- CISO Users -->
+    <div id="Ciso_users" class="info mt-5 tabcontent" role="tabpanel" hidden>
+      <h2 class="title is-3">Add or Remove CISO Users</h2>
+      <div id="ciso_usersform">
+        <input  class="input" type="text" id="id_ciso" name="ciso" placeholder="CISO to allow_list">
+        <button type="button" onclick="addCiso()" class="button ciso" id="submitcisos">Add CISO(s)</button>
+        <p class="title is-3 ml-3">Send a file with CISOs to add them:</p>
+        <input type="file" id="file-ciso" class="mt-6" name="file" accept=".txt,.csv,application/json">
+        <button type="button" onclick="addCisos()" class="button ciso" id="submitcisos-file">Add from file</button>
+      </div>
+      <div id="cisoList" class="card">
+        <div class="card-content">
+          <div class="content">
+            <h3 class="title is-4">CISO Users</h3>
+            <div id="list-ciso">
+              {% if cisos %}
+                {% for ciso in cisos %}
+                  <div id="div-{{ ciso }}" class="cisoList">
+                    <p class="allCisos" id="{{ ciso }}"><i class="fas fa-globe"></i> {{ ciso }}</p>
+                  </div>
+                  <div id="buttonDiv-{{ ciso }}" class="domain">
+                    <button type="button" onclick="removeCiso('{{ ciso }}')" class="button is-danger ddB" id="button_{{ ciso }}">Remove</button>
+                  </div>
+                {% endfor %}
+              {% else %}
+                <p id="noCisos">No CISO users to show</p>
+              {% endif %}
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Email Settings -->
+    <div id="Email" class="info mt-5 tabcontent" role="tabpanel" hidden>
+      <h2 class="title is-3">Email Feeder</h2>
+      <div class="control mb-4" style="display: flex; align-items: center;">
+        <p class="analyzername" style="margin-right: 8px; font-weight: normal;">Status:</p>
+        <label class="switch toggle-switch">
+          <input type="checkbox" id="email-feeder-toggle">
+          <span class="slider round"></span>
+        </label>
+        <p id="feeder-status" class="ml-2">Current Status: Unknown</p>
+      </div>
+    </div>
+
+    <!-- Analysis Scoring -->
+    <div id="Scoring" class="mt-6 tabcontent" role="tabpanel" hidden>
+      <h2 class="title is-3">Change Weight of Analyzers</h2>
+      <div id="analyzersList" class="card">
+        <div class="card-content">
+          <div class="content">
+            <div id="list">
+              {% if analyzers|length == 0 %}
+                <p id="noAnalyzers">No Analyzers</p>
+              {% else %}
+                {% for analyzer in analyzers %}
+                  <div class="card">
+                    <p class="analyzername">{{ analyzer.name }}</p>
+                    <div class="container">
+                      <button type="button" id="{{ analyzer.analyzer_cortex_id }}-decrement" onclick="updateAnalyzerWeight('{{ analyzer.analyzer_cortex_id }}', -1)"> - </button>
+                      <input type="number" value="{{ analyzer.weight }}" class="input input-box" id="{{ analyzer.analyzer_cortex_id }}" step="0.1">
+                      <button type="button" id="{{ analyzer.analyzer_cortex_id }}-increment" onclick="updateAnalyzerWeight('{{ analyzer.analyzer_cortex_id }}', 1)"> + </button>
+                    </div>
+                    <script>
+                      createAnalyzerInputs("{{ analyzer.analyzer_cortex_id }}");
+                    </script>
+                  </div>
+                {% endfor %}
+              {% endif %}
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+{% else %}
+  <p>You are not an Admin</p>
+  <script>window.location.href = "{% url 'home' %}";</script>
+{% endif %}
+{% endblock %}
+

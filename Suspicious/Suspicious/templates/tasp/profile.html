@@ -1,0 +1,77 @@
+{% extends 'base.html' %}
+{% load static %}
+{% load utils %}
+
+{% block title %}Profile{% endblock %}
+
+{% block content %}
+{% if user.is_authenticated %}
+  <script src="{% static 'js/jquery.js' %}"></script>
+  <script src="{% static 'js/profile/preferences.js' %}"></script>
+  <script src="{% static 'js/profile/theme.js' %}"></script>
+  <script src="{% static 'js/navbar.js' %}"></script>
+  <div class="info mt-4">
+
+    <div class="tabs is-centered mb-2" role="tablist">
+      <ul>
+        {% if user_profile %}
+        <li role="tab" class="tabslinks is-active" id="PREFERENCES" aria-controls="PREFERENCES" onclick="openTabs(event, 'Preferences')">
+          <a>Preferences</a>
+        </li>
+        {% endif %}
+        <li role="tab" class="tabslinks is-active" id="APPEARANCE" aria-controls="APPEARANCE" onclick="openTabs(event, 'Appearance')">
+          <a>Appearance</a>
+        </li>
+      </ul>
+    </div>
+{% if user_profile %}
+    <div id="Preferences" class="tabcontent">
+      <h1 class="title is-4 has-text-centered">Preferences</h1>
+        <div class="field">
+          <input type="checkbox" id="ack" name="wants_acknowledgement" {% if user_profile.wants_acknowledgement %}checked{% endif %}>
+          <label class="checkbox">I want to receive acknowledgements for my reports</label>
+        </div>
+        <div class="field">
+          <input type="checkbox" id="res" name="wants_results" {% if user_profile.wants_results %}checked{% endif %}>
+          <label class="checkbox">I want to receive results for my reports</label>
+        </div>
+        <div class="field is-grouped is-grouped-centered">
+          <div class="control">
+            <button class="button is-link" id="saveBtn" type="submit">Save Preferences</button>
+          </div>
+        </div>
+    </div>
+{% endif %}
+    <div id="Appearance" class="tabcontent" style="display:none">
+      <h1 class="title is-4 has-text-centered">Appearance</h1>
+        <div class="field">
+          <label class="label">Theme</label>
+          <div class="control">
+            <div class="select">
+              <select name="theme" id="themeSelect" required>
+                <option value="default" {% if user_profile.theme == 'default' %}selected{% endif %}>Default</option>
+                <option value="light" {% if user_profile.theme == 'light' %}selected{% endif %}>Light</option>
+                <option value="dark" {% if user_profile.theme == 'dark' %}selected{% endif %}>Dark</option>
+                <option value="valentine" {% if user_profile.theme == 'valentine' %}selected{% endif %}>Valentine</option>
+                <option value="sunrise" {% if user_profile.theme == 'sunrise' %}selected{% endif %}>Sunrise</option>
+                <option value="midnight" {% if user_profile.theme == 'midnight' %}selected{% endif %}>Midnight</option>
+                <option value="cyber" {% if user_profile.theme == 'cyber' %}selected{% endif %}>Cyber</option>
+              </select>
+            </div>
+          </div>
+        </div>
+        <div class="field is-grouped is-grouped-centered">
+          <div class="control">
+            <button class="button is-link" id="saveTheme" type="submit">Save Appearance</button>
+          </div>
+        </div>
+    </div>
+  </div>
+
+
+{% else %}
+  <p>You are not logged in</p>
+  <script>window.location.replace("{% url 'login' %}");</script>
+{% endif %}
+{% endblock %}
+

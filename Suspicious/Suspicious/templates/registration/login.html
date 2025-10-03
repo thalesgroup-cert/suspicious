@@ -1,0 +1,67 @@
+<!DOCTYPE html>
+<html lang="en">
+    {% load static %}
+    {% load utils %}   
+  <head>
+    <meta charset="utf-8">
+    <title>{% block title %}Registration{% endblock %}</title>
+    <link rel="icon" type="image/x-icon" href="{% get_ico %}">
+    <link rel="stylesheet" href="{% static 'bulma/css/bulma.css' %}">
+    <link rel="stylesheet" href="{% static 'fontawesomefree/css/fontawesome.css' %}" />
+    <link href="{% static 'fontawesomefree/css/solid.css' %}" rel="stylesheet" type="text/css">
+    <link rel="stylesheet" href="{% static 'registration/style.css' %}">
+  </head>
+  <style>
+    html, body {
+      height: 100%;
+      margin: 0;
+    }
+
+    body {
+      background-image: url("{% get_banner %}");
+      background-size: cover;
+      background-repeat: no-repeat;
+      background-position: center;
+      background-color: transparent !important;
+    }
+
+    .login-root {
+      background: transparent !important;
+    }
+  </style>
+  <body>
+    <main class="content is-vcentered">
+      <div class="login-root">
+        <div class="box-root flex-flex flex-direction--column" style="min-height: 100vh;flex-grow: 1;">
+          <div class="box-root padding-top--24 flex-flex flex-direction--column" style="flex-grow: 1; z-index: 9;">
+            <div class="box-root padding-top--48 padding-bottom--24 flex-flex flex-justifyContent--center">
+              <h1><a href="{% site_link %}" rel="dofollow"><img alt="logo" src="{% get_logo %}"/></a></h1>
+            </div>
+            <div class="formbg-outer">
+              <div class="box formbg">
+                <div class="formbg-inner">
+                  <span class="padding-bottom--15"></span>
+                  <form id="stripe-login" method="post">
+                    <div class="field padding-bottom--24">
+                      {% csrf_token %}
+                      {{ form.as_p }}
+                    <div class="field padding-bottom--24">
+                      <input class="button" type="submit" name="submit" value="Continue">
+                    </div>
+                  </form>
+                </div>
+              </div>
+              <div class="footer-link padding-top--24">
+                <div class="listing padding-top--24 padding-bottom--24 flex-flex center-center">
+                  <span>{% footer_text %}</span>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+      <script src="{% static 'js/jquery.js' %}"></script>
+      <script src="{% static 'js/registration.js' %}"></script>
+    </main>
+  </body>
+</html>

@@ -1,0 +1,194 @@
+/* ===============================
+   Variables globales
+================================== */
+:root {
+  --color-primary: rgb(84, 105, 212);
+  --color-text-dark: #1a1f36;
+  --color-text-light: lightslategray;
+  --color-link: #5469d4;
+  --color-accent: #AE2573;
+  --color-bg-light: #fff;
+  --radius-small: 4px;
+  --radius-large: 15px;
+}
+
+/* ===============================
+   Bloc Application
+================================== */
+div.myapp {
+  border: var(--color-text-dark);
+  width: 200px;
+  height: 200px;
+  text-align: center;
+  box-shadow:
+    rgba(50, 50, 93, 0.25) 0 50px 100px -20px,
+    rgba(0, 0, 0, 0.3) 0 30px 60px -30px,
+    rgba(10, 37, 64, 0.35) 0 -2px 6px inset;
+}
+div.myapp p {
+  margin: auto 0;
+}
+
+/* ===============================
+   Layout principal
+================================== */
+html, main {
+  height: 100%;
+  width: 100%;
+  margin-top: 0 !important;
+}
+
+a {
+  color: var(--color-link);
+  text-decoration: none;
+}
+a img {
+  width: 25%;
+}
+
+h1{
+  text-align: center;
+}
+
+.login-root {
+  background: var(--color-bg-light);
+  display: flex;
+  width: 100%;
+  min-height: 100%;
+  overflow: hidden;
+}
+.loginbackground {
+  position: fixed;
+  inset: 0;
+  min-height: 692px;
+  z-index: 0;
+  overflow: hidden;
+}
+
+/* ===============================
+   Utilitaires Flex/Grid
+================================== */
+.flex-flex { display: flex; }
+.align-center { align-items: center; }
+.center-center {
+  align-items: center;
+  justify-content: center;
+}
+.flex-direction--column { flex-direction: column; }
+.flex-justifyContent--center { justify-content: center; }
+.box-root { box-sizing: border-box; }
+
+.grid--50-50 {
+  display: grid;
+  grid-template-columns: 50% 50%;
+  align-items: center;
+}
+
+/* ===============================
+   Padding / Margins utilitaires
+================================== */
+.padding-top--64 { padding-top: 64px; }
+.padding-top--24 { padding-top: 24px; }
+.padding-top--48 {
+  padding-top: 3vh;
+  margin: 0 3vw;
+}
+.padding-bottom--24 { padding-bottom: 24px; }
+.padding-bottom--15 { padding-bottom: 15px; }
+.padding-horizontal--48 { padding: 48px; }
+
+/* ===============================
+   Formulaires
+================================== */
+.formbg {
+  margin: 0 auto;
+  width: 100%;
+  min-width: 400px;
+  max-width: 448px;
+  border-radius: var(--radius-small);
+  box-shadow:
+    rgba(60, 66, 87, 0.12) 0 7px 14px,
+    rgba(0, 0, 0, 0.12) 0 3px 6px;
+}
+.formbg-inner {
+    padding: 40px;
+    padding-bottom: 0;
+    padding-top: 0;
+}
+
+.field input {
+  margin-top: 5%;
+  font-size: 16px;
+  line-height: 28px;
+  width: 100%;
+  min-height: 44px;
+  border-radius: var(--radius-small);
+  outline-color: rgb(84 105 212 / 0.5);
+  box-shadow:
+    rgba(60, 66, 87, 0.16) 0 0 0 1px;
+  text-align: center;
+}
+
+input[type="submit"] {
+  background-color: var(--color-primary);
+  color: #fff;
+  font-weight: 600;
+  cursor: pointer;
+  margin-top: 10%;
+  box-shadow:
+    rgb(84, 105, 212) 0 0 0 1px,
+    rgba(60, 66, 87, 0.08) 0 2px 5px;
+}
+
+/* ===============================
+   Contenu et textes
+================================== */
+.content ul:not(:first-child) {
+  margin-top: 1em;
+  margin-left: 0;
+  font-size: 1.1em;
+  font-weight: bold;
+  color: var(--color-accent);
+}
+
+span {
+  display: block;
+  font-size: 20px;
+  line-height: 28px;
+}
+
+label {
+  margin: 5% 0 10px;
+  font-size: 18px;
+  font-weight: 600;
+  display: block;
+}
+
+.reset-pass a,
+.reset-pass > a {
+  font-size: 18px;
+  font-weight: 600;
+  display: block;
+}
+.reset-pass > a {
+  text-align: right;
+  margin-bottom: 10px;
+}
+
+.footer-link span {
+  font-size: 14px;
+  text-align: center;
+}
+.listing a {
+  color: #697386;
+  font-weight: 600;
+  margin: 0 10px;
+}
+
+/* ===============================
+   Divers
+================================== */
+.formbg-inner,
+.formbg-outer {
+  margin-top: 0;
+}

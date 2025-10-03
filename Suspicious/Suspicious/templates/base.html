@@ -1,0 +1,152 @@
+<!DOCTYPE html>
+{% load static %}
+{% load utils %}
+{% if user.is_authenticated %}
+<html lang="en" data-theme="{{ user | get_theme}}">
+{% else %}
+<html lang="en">
+{% endif %}
+  <head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <title>{% block title %}Registration{% endblock %}</title>
+    <link rel="stylesheet" href="{% static 'main/style.css' %}">
+    <link rel="icon" type="image/x-icon" href="{% get_ico %}">
+    <link rel="stylesheet" href="{% static 'bulma/css/bulma.css' %}">
+    <link rel="stylesheet" href="{% static 'fontawesomefree/css/fontawesome.css' %}">
+    <link rel="stylesheet" href="{% static 'AwesomeFonts/css/all.css' %}">
+    <link rel="stylesheet" href="{% static 'fontawesomefree/css/solid.css' %}" type="text/css">
+    {% block extra_css %}{% endblock %}
+  </head>
+  <body>
+
+    <nav class="navigation navbar mr-4" role="navigation" aria-label="main navigation">
+      <div class="navbar-brand">
+        <a class="logo-nav" href="/"><img src="{% get_sign %}" alt="Logo" class="image"/></a>
+        <a role="button" class="navbar-burger" aria-label="menu" aria-expanded="false" data-target="navbarBasicExample">
+          <span aria-hidden="true"></span>
+          <span aria-hidden="true"></span>
+          <span aria-hidden="true"></span>
+        </a>
+      </div>
+      <div id="navbar" class="navbar-menu-burger">
+        <div class="navbar-end">
+          <div class="navbar-item-burger navbar-dropdown is-hoverable">
+            <div class="buttons">
+              <a href="/" class="button has-background-link has-text-white"><i class="fas fa-home"></i> Home</a>
+              <a href="/submissions/" class="button has-background-link has-text-white"><i class="fa-solid fa-laptop-file"></i> My Submissions</a>
+              <a href="/submit/" class="button has-background-link has-text-white"><i class="fa-solid fa-paper-plane"></i> Submit an Item</a>
+              {% if user|has_group_elevated  %}
+              <a href="/tasp-admin/" class="button has-background-link has-text-white"><i class="fa-regular fa-window-restore"></i> Investigation</a>
+              {% endif %}
+              <a href="/dashboard/" class="button has-background-link has-text-white"><i class="fa-solid fa-chart-line"></i> Dashboard</a>
+              <a href="/dashboard/campaigns/" class="button has-background-link has-text-white"><i class="fa-solid fa-bullhorn"></i> Campaigns</a>
+              {% if user|has_group:"Admin" or user|has_group:"CERT" %}
+              <a href="/settings/" class="button has-background-link has-text-white"><i class="fa-solid fa-gears"></i> Settings</a>
+              {% endif %}
+              <a href="/about/" class="button has-background-link has-text-white"><i class="fas fa-info-circle"></i> About</a>
+              <a href="/profile/" class="button has-background-link has-text-white"><i class="fas fa-user"></i> Profile</a>
+              <a href="/logout/" class="button has-background-link has-text-white" ><i class="fas fa-sign-out-alt"></i> Log Out</a>
+            </div>
+          </div>
+        </div>
+      </div>
+      <div id="navbarBasicExample" class="navbar-menu">
+        <div class="navbar-end">
+          <div class="navbar-item">
+            <ul>
+              <li class="home">
+                <a href="/">
+                  <span class="icon">
+                    <i class="fas fa-home"></i>
+                  </span>
+                  <span class="text">Home</span>
+                </a>
+              </li>
+              <li>
+                <a href="/submissions/">
+                  <span class="icon">
+                    <i class="fa-solid fa-laptop-file"></i>
+                  </span>
+                  <span class="text">My Submissions</span>
+                </a>
+              </li>
+              <li>
+                <a href="/submit/">
+                  <span class="icon">
+                    <i class="fa-solid fa-paper-plane"></i>
+                  </span>
+                  <span class="text">Submit an Item</span>
+                </a>
+              </li>
+              {% if user|has_group_elevated  %} 
+              <li>
+                <a href="/tasp-admin/">
+                  <span class="icon">
+                    <i class="fa-regular fa-window-restore"></i>
+                  </span>
+                  <span class="text">Investigation</span>
+                </a>
+              </li>
+              {% endif %}
+              <li>
+                <a href="/dashboard/">
+                  <span class="icon">
+                    <i class="fa-solid fa-chart-line"></i>
+                  </span>
+                  <span class="text">Dashboard</span>
+                </a>
+              </li>
+              <li>
+                <a href="/dashboard/campaigns/">
+                  <span class="icon">
+                    <i class="fa-solid fa-bullhorn"></i>
+                  </span>
+                  <span class="text">Campaigns</span>
+                </a>
+              </li>
+              {% if user|has_group:"Admin" or user|has_group:"CERT" %}
+              <li>
+                <a href="/settings/">
+                  <span class="icon">
+                    <i class="fa-solid fa-gears"></i>
+                  </span>
+                  <span class="text">Settings</span>
+                </a>
+              </li>
+              {% endif %}
+              <li>
+                <a href="/about/">
+                  <span class="icon">
+                    <i class="fas fa-info-circle"></i>
+                  </span>
+                  <span class="text">About</span>
+                </a>
+              </li>
+              <li>
+                <a href="/profile/">
+                  <span class="icon">
+                    <i class="fas fa-user"></i>
+                  </span>
+                  <span class="text">Profile</span>
+                </a>
+              </li>
+              <li>
+                <a href="/logout/">
+                  <span class="icon">
+                    <i class="fas fa-sign-out-alt"></i>
+                  </span>
+                  <span class="text">Log Out</span>
+                </a>
+              </li>
+            </ul>
+          </div>
+        </div>
+      </div>
+    </nav>
+
+    <main class="content is-vcentered">
+      {% block content %}{% endblock %}
+    </main>
+  </body>
+</html>

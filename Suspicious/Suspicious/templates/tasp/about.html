@@ -1,0 +1,146 @@
+{% extends 'base.html' %} 
+{% block title %}About{% endblock %} 
+{% block content%}
+    {% if user.is_authenticated %} 
+        {% load utils %}
+        {% load static %}
+        <main class="about">
+           
+
+            <header class="about__header">
+              <h1 class="title is-1 mt-6">Informations:</h1>
+            </header>
+            <section class="about__section">
+              <div class="columns">
+                <div class="column is-3">
+                  <div class="card">
+                    <div class="card-content">
+                      <div class="content">
+                        <button class="button js-modal-triggers" data-target="1">What is Suspicious?</button>
+                      </div>
+                    </div>
+                  </div>
+                  <div class="modal" id="1">
+                    <div class="modal-background"></div>
+                    <div class="modal-card">
+                      <header class="modal-card-head">
+                        <p class="modal-card-title">What is Suspicious?</p>
+                        <button class="delete" aria-label="close"></button>
+                      </header>
+                      <section class="modal-card-body">
+                        <div class="cards">
+                          <div class="card">
+                            <div class="card-content">
+                              <div>
+                                <h1 class="title is-4">Suspicious</h1>
+                                <p>Suspicious is a web application that allows users to submit and analyze various types of data, such as emails, files, IP addresses, and URLs.</p>
+                                <h1 class="title is-4">How does it work ?</h1>
+                                <p>Suspicious uses Cortex an open source application that launches analysis on various objects.</p>
+                                <p>When a Reporter sends a mail to the Suspicious mail address ({% suspicious_email %}) the mail is splitted in multiple parts and each part is analyzed</p>
+                                <p>For example the mail body is analyzed by the Yara Rules that searches for any malicious content that could define the mail as Phishing or Spam</p>
+                                <p>Then all the mail parts are sent to the Cortex Analyzers that will analyze the mail and return a report for each</p>
+                                <p>Finally the Suspicious app will calculate a score from the reports of cortex and make a conclusion on the overall</p>
+                                <p>Note that it works exactly the same for files, IP addresses, Hashes and URLs</p>
+                                <h1 class="title is-4">Classification</h1>
+                                <p>Suspicious 
+                                  <ul>
+                                    <li>Dangerous</li>
+                                    <li>Suspicious</li>
+                                    <li>Inconclusive</li>
+                                    <li>Safe</li>
+                                  </ul>
+                                </p>
+                                <p>The classification is made by the score of the reports</p>
+                                <p>For example if a mail is classified as Dangerous it means that the mail has a high score of malicious content</p>
+                                <p>On the other hand if a mail is classified as Safe it means that the mail has a low score of malicious content</p>
+                                <p>Mails classed as Inconclusive are mails that have a score of malicious content that is neither high nor low and also it can be that their sources are not known</p>
+                                <p>Finally mails classed as Suspicious are mails that have a score of malicious content that is neither high nor low but their sources are known and that it tends to be dangerous</p>
+                                <br/>
+                                <h1 class="title is-4">Dangerosity</h1>
+                                <p>Each classification has a dangerosity</p>
+                                <p>Dangerous means that the Mail / File can not be opened and that anything in it can not be trusted</p>
+                                <p>Suspicious means that the Mail / File should not be opened and that anything in it should not be trusted</p>
+                                <p>Inconclusive means that the Mail / File can be opened but that anything in it should not be trusted</p>
+                                <p>Safe means that the Mail / File can be opened and that anything in it can be trusted</p>
+                                <p>The classification and dangerosity are the same also for Ip Addresses and Urls</p>
+                              </div>
+                            </div>
+                          </div>
+                        </div>
+                       
+                      </section>
+                    </div>
+                  </div>
+                </div>
+                <div class="column is-3">
+                    <div class="card">
+                      <div class="card-content">
+                        <div class="content">
+                          <button class="button js-modal-triggers" data-target="2">What is phishing ?</button>
+                        </div>
+                      </div>
+                    </div>
+                    <div class="modal" id="2">
+                      <div class="modal-background"></div>
+                      <div class="modal-card">
+                        <header class="modal-card-head">
+                          <p class="modal-card-title">What is phishing ?</p>
+                          <button class="delete" aria-label="close"></button>
+                        </header>
+                        <section class="modal-card-body">
+                          <div class="card">
+                            <div class="card-content">
+                              <div>
+                                <h1 class="title is-4">A way of getting your informations</h1>
+                                <p>Phishing is a type of social engineering attack used to steal user data, such as login credentials and credit card numbers. The attacker pretends to be a trusted entity and tricks the victim into opening an email, instant message, or text message. The victim is then deceived into clicking a malicious link, which can result in malware installation, ransomware attacks, or the disclosure of sensitive information.</p>
+                                <p>Phishing attacks have become increasingly sophisticated and difficult to identify</p>
+                                <p>That is the reason to use Suspicious and to have help on how to categorize a mail you receive</p>
+                              </div>
+                            </div>
+                          </div>
+                        </section>
+                      </div>
+                    </div>
+                  </div>
+                  <div class="column is-3">
+                    <div class="card">
+                      <div class="card-content">
+                        <div class="content">
+                          <button class="button js-modal-triggers" data-target="3">File analysis ?</button>
+                        </div>
+                      </div>
+                    </div>
+                    <div class="modal" id="3">
+                      <div class="modal-background"></div>
+                      <div class="modal-card">
+                        <header class="modal-card-head">
+                          <p class="modal-card-title">File analysis ?</p>
+                          <button class="delete" aria-label="close"></button>
+                        </header>
+                        <section class="modal-card-body">
+                          <div class="card">
+                            <div class="card-content">
+                              <div>
+                                <h1 class="title is-4">How are file analyzed</h1>
+                                <p>When a file is sent to Suspicious, we calculate its Hash (A unique identifier for a file) that we compare and search for in various global databases to retrieve informations if it was already submitted elsewhere</p>
+                                <p>It also is compared to our own database to see it it was already submitted by a Reporter</p>
+                                <p>The file is never opened or executed, it is only analyzed by its Hash and Metadatas (informations on the file to see its type, date of creation, last moodification date, ect)</p> 
+                              </div>
+                            </div>
+                          </div>
+                        </section>
+                      </div>
+                    </div>
+                  </div>
+
+              </div>
+            </section>
+          </main>
+        <script type="text/javascript" src="{% static 'js/jquery.js' %}"></script>
+        <script type="text/javascript" src="{% static 'js/about.js' %}"></script>
+        <script type="text/javascript" src="{% static 'js/navbar.js' %}"></script>
+    {% else %}
+        <p>You are not logged in</p>
+        <script>window.location.replace("/accounts/login");</script>
+    {% endif %}
+{% endblock %}

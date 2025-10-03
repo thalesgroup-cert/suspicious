@@ -1,0 +1,71 @@
+{
+    "mail-connectors": {
+        "imap": {
+            "imap-dev": {
+                "enable": false,
+                "host": "imap.test",
+                "port": 143,
+                "login": "user@organisation.com",
+                "password": "secret",
+                "mailbox_to_monitor": "TEST"
+            }
+        },
+        "imaps": {
+            "imaps-dev": {
+                "enable": true,
+                "host": "imaps.test",
+                "port": 993,
+                "login": "user@organisation.com",
+                "password": "secret",
+                "certfile": false,
+                "keyfile": false,
+                "mailbox_to_monitor": "TEST"
+            },
+            "imaps-prod": {
+                "enable": true,
+                "host": "imaps.test2",
+                "port": 993,
+                "login": "user@organisation.com",
+                "password": "secret",
+                "certfile": false,
+                "keyfile": false,
+                "mailbox_to_monitor": "TEST"
+            }
+        }
+    },
+    "working-path": "/app/case",
+    "timer-inbox-emails": 10,
+    "minio": {
+        "endpoint": "minio:9000",
+        "access_key": "access-key",
+        "secret_key": "secret-key",
+        "secure": false
+    },
+    "mail": {
+        "server" : "the smtp serve to allow the app to send mails",
+        "port" : 25,
+        "username" : "SUSPICIOUS",
+        "footer" : "Limited Distribution",
+        "group" : "Your Cybersecurity Team Name",
+        "suspicious_web" : "https://suspicious.test/submissions/",
+        "global" : "test.com",
+        "global_url" : "https://www.test.com/en",
+        "socials" : {
+            "facebook" : "https://fr-fr.facebook.com/test",
+            "twitter" : "https://x.com/test",
+            "instagram" : "https://www.instagram.com/test",
+            "linkedin" : "https://www.linkedin.com/company/test",
+            "youtube" : "https://www.youtube.com/test"
+        },
+        "glossary" : "https://glossary_to_cyber terms",
+        "inquiry" : "mailto:inquryemail@yourcompany.com",
+        "inquiry_text" : "inquryemail@yourcompany.com",
+        "submissions" : "https://suspicious.test/submissions/",
+        "security" : "mailto:yoursecuritymail@yourcompany.com",
+        "security_msg" : "yoursecuritymail@yourcompany.com",
+        "logos" : {
+            "company" : "data:image/png;base64,Base64 text of your company logo",
+            "acknowledge-badmail" : "data:image/png;base64,The Base 64 image for the bad acknowledge mail"
+        }
+    }
+}

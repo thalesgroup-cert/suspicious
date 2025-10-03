@@ -1,0 +1,614 @@
+{% extends 'base.html' %}
+{% block title %}Campaigns{% endblock %}
+{% block content %}
+  {% load static %}
+  <link rel="stylesheet" href="{% static 'main/campaigns.css' %}" />
+
+  <div class="info mt-2 page-gutters">
+    <h1 class="title is-1">Campaign Dashboard</h1>
+  </div>
+
+  <div class="page-gutters">
+    <!-- Row 1: Graphs 1 & 2 forced same line -->
+    <div class="campaign-row">
+      <div class="graph-col-1">
+        <div class="graph-placeholder h-6">
+          <canvas id="classificationChart" aria-label="Classification repartition" role="img"></canvas>
+        </div>
+      </div>
+      <div class="graph-col-2">
+        <div class="graph-placeholder h-6">
+          <canvas id="pcaChart" aria-label="PCA of embeddings" role="img"></canvas>
+        </div>
+      </div>
+    </div>
+
+    <!-- Row 2: Graph 3 full width -->
+    <div class="columns is-variable is-4 mt-4">
+      <div class="column is-12">
+        <div class="graph-placeholder h-6">
+          <canvas id="mailVolumeChart" aria-label="Mail volume last 15 days" role="img"></canvas>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <script src="{% static 'js/loader.js' %}"></script>
+  <script>
+    (function() {
+      // Graph 1: Bar chart
+      const ctx = document.getElementById('classificationChart');
+      if (ctx) {
+        fetch('{% url "dashboard:dashboard_campaigns_classification_counts" %}', { credentials: 'same-origin' })
+          .then(r => r.json())
+          .then(data => {
+            const labels = ['SAFE', 'UNWANTED', 'DANGEROUS'];
+            const values = labels.map(l => data[l] || 0);
+            const colors = ['#48c774', '#ffdd57', '#f14668'];
+            const borderColors = ['#3ec46d', '#f2cf49', '#e03f60'];
+            new Chart(ctx, {
+              type: 'bar',
+              data: {
+                labels,
+                datasets: [{
+                  label: 'Count',
+                  data: values,
+                  backgroundColor: colors,
+                  borderColor: borderColors,
+                  borderWidth: 1
+                }]
+              },
+              options: {
+                responsive: true,
+                maintainAspectRatio: false,
+                plugins: {
+                  legend: { display: false },
+                  title: { display: true, text: 'Classification repartition' }
+                },
+                scales: {
+                  y: { beginAtZero: true, ticks: { precision: 0 } }
+                }
+              }
+            });
+          })
+          .catch(err => console.error('Failed to load classification counts', err));
+      }
+
+      // Graph 2: PCA scatter
+      const pctx = document.getElementById('pcaChart');
+      if (pctx) {
+        fetch('{% url "dashboard:dashboard_campaigns_pca" %}?limit=1500', { credentials: 'same-origin' })
+          .then(r => r.json())
+          .then(({ points, explained_variance }) => {
+            const classColors = {
+              SAFE: '#48c774',
+              UNWANTED: '#ffdd57',
+              DANGEROUS: '#f14668',
+              SUSPICIOUS: '#ffdd57',
+              UNKNOWN: '#7a7a7a'
+            };
+            const datasetsMap = {};
+            const campaignMap = new Map();
+            const sortRefs = (refs) => refs.slice().sort((a, b) => a.localeCompare(b));
+            const formatCampaignName = (refs) => {
+              if (!Array.isArray(refs) || !refs.length) return '';
+              if (refs.length <= 3) return refs.join(', ');
+              return `${refs.slice(0, 3).join(', ')}…`;
+            };
+
+            for (const pt of points) {
+              const label = (pt.label || 'UNKNOWN').toUpperCase();
+              if (!datasetsMap[label]) {
+                datasetsMap[label] = {
+                  type: 'scatter',
+                  label,
+                  data: [],
+                  backgroundColor: classColors[label] || '#7a7a7a',
+                  pointRadius: 3,
+                };
+              }
+              const caseId = pt.suspicious_case_id ?? pt.suspiciousCaseId ?? null;
+              datasetsMap[label].data.push({ x: pt.x, y: pt.y, suspiciousCaseId: caseId });
+
+              const sourceRefs = Array.isArray(pt.sourceRefs) ? pt.sourceRefs.filter(Boolean) : [];
+              if (sourceRefs.length) {
+                const sortedRefs = sortRefs(sourceRefs);
+                const key = sortedRefs.join(' | ');
+                if (!campaignMap.has(key)) {
+                  campaignMap.set(key, { refs: sortedRefs, points: [] });
+                }
+                campaignMap.get(key).points.push({ x: pt.x, y: pt.y });
+              }
+            }
+            const datasets = Object.values(datasetsMap);
+
+            const highlightColors = [
+              'rgba(59, 130, 246, 0.45)',
+              'rgba(16, 185, 129, 0.45)',
+              'rgba(249, 115, 22, 0.45)',
+              'rgba(139, 92, 246, 0.45)',
+              'rgba(236, 72, 153, 0.45)',
+              'rgba(56, 189, 248, 0.45)'
+            ];
+            const strokeColors = [
+              'rgba(59, 130, 246, 0.85)',
+              'rgba(16, 185, 129, 0.85)',
+              'rgba(249, 115, 22, 0.85)',
+              'rgba(139, 92, 246, 0.85)',
+              'rgba(236, 72, 153, 0.85)',
+              'rgba(56, 189, 248, 0.85)'
+            ];
+
+            const campaignGroups = Array.from(campaignMap.values())
+              .map((entry, idx) => {
+                const refs = entry.refs || [];
+                const label = formatCampaignName(refs) || `Campaign ${idx + 1}`;
+                const strokeStyle = strokeColors[idx % strokeColors.length];
+                const fillStyle = highlightColors[idx % highlightColors.length];
+                return {
+                  label,
+                  points: entry.points,
+                  strokeStyle,
+                  fillStyle,
+                  fillAlpha: 0.12,
+                  dash: [6, 4],
+                  lineWidth: 2,
+                  padding: 14,
+                  minRadius: 10,
+                  labelColor: strokeStyle,
+                };
+              })
+              .filter(group => Array.isArray(group.points) && group.points.length);
+
+            const campaignCirclesPlugin = {
+              id: 'campaignCircles',
+              beforeDatasetsDraw(chart, args, opts) {
+                const groups = (opts && opts.groups) || [];
+                const state = chart.$campaignCirclesState || (chart.$campaignCirclesState = { hoveredIndex: null, layout: [] });
+                state.layout = [];
+                if (!groups.length) return;
+                const xScale = chart.scales?.x;
+                const yScale = chart.scales?.y;
+                if (!xScale || !yScale) return;
+                groups.forEach((group, idx) => {
+                  const pts = Array.isArray(group.points) ? group.points : [];
+                  if (!pts.length) return;
+                  const xs = pts.map(p => xScale.getPixelForValue(p.x));
+                  const ys = pts.map(p => yScale.getPixelForValue(p.y));
+                  if (!xs.length || !ys.length) return;
+                  const minX = Math.min(...xs);
+                  const maxX = Math.max(...xs);
+                  const minY = Math.min(...ys);
+                  const maxY = Math.max(...ys);
+                  const padding = typeof group.padding === 'number' ? group.padding : 12;
+                  const minRadius = typeof group.minRadius === 'number' ? group.minRadius : 10;
+                  const centerX = (minX + maxX) / 2;
+                  const centerY = (minY + maxY) / 2;
+                  const radiusX = Math.max((maxX - minX) / 2 + padding, minRadius);
+                  const radiusY = Math.max((maxY - minY) / 2 + padding, minRadius);
+
+                  state.layout.push({
+                    idx,
+                    centerX,
+                    centerY,
+                    radiusX,
+                    radiusY,
+                    group,
+                  });
+                });
+              },
+              afterDraw(chart) {
+                const state = chart.$campaignCirclesState;
+                if (!state || !Array.isArray(state.layout) || !state.layout.length) return;
+                const { ctx, chartArea } = chart;
+                if (!ctx || !chartArea) return;
+                ctx.save();
+                state.layout.forEach(entry => {
+                  const { idx, centerX, centerY, radiusX, radiusY, group } = entry;
+                  if (!group) return;
+                  ctx.save();
+                  ctx.beginPath();
+                  ctx.ellipse(centerX, centerY, radiusX, radiusY, 0, 0, Math.PI * 2);
+                  if (group.fillStyle) {
+                    const originalAlpha = ctx.globalAlpha;
+                    const alpha = typeof group.fillAlpha === 'number' ? group.fillAlpha : 0.1;
+                    ctx.fillStyle = group.fillStyle;
+                    ctx.globalAlpha = alpha;
+                    ctx.fill();
+                    ctx.globalAlpha = originalAlpha;
+                  }
+                  const hovered = state.hoveredIndex === idx;
+                  ctx.strokeStyle = group.strokeStyle || 'rgba(239, 68, 68, 0.8)';
+                  ctx.lineWidth = hovered ? (group.lineWidth ?? 2) + 1 : (group.lineWidth ?? 2);
+                  if (Array.isArray(group.dash)) {
+                    ctx.setLineDash(group.dash);
+                  }
+                  ctx.stroke();
+                  ctx.setLineDash([]);
+                  ctx.restore();
+
+                  if (hovered && group.label) {
+                    ctx.save();
+                    ctx.fillStyle = group.labelColor || '#111827';
+                    ctx.font = group.labelFont || '12px system-ui, -apple-system, Segoe UI, Roboto, Ubuntu, Cantarell, Noto Sans, Helvetica Neue, Arial';
+                    ctx.textAlign = 'center';
+                    ctx.textBaseline = 'bottom';
+                    const desiredY = centerY - radiusY - 6;
+                    const labelY = Math.max(chartArea.top + 6, desiredY);
+                    const labelX = Math.min(Math.max(centerX, chartArea.left + 6), chartArea.right - 6);
+                    ctx.fillText(group.label, labelX, labelY);
+                    ctx.restore();
+                  }
+                });
+                ctx.restore();
+              },
+              afterEvent(chart, args, opts) {
+                const groups = (opts && opts.groups) || [];
+                if (!groups.length) return;
+                const event = args?.event;
+                if (!event) return;
+                const state = chart.$campaignCirclesState || (chart.$campaignCirclesState = { hoveredIndex: null, layout: [] });
+                if (!state.layout || !state.layout.length) return;
+
+                let nextHovered = state.hoveredIndex;
+                if (event.type === 'mousemove') {
+                  const { x, y } = event;
+                  nextHovered = null;
+                  for (const entry of state.layout) {
+                    const rx = entry.radiusX || 1;
+                    const ry = entry.radiusY || 1;
+                    if (!rx || !ry) continue;
+                    const norm = ((x - entry.centerX) ** 2) / (rx ** 2) + ((y - entry.centerY) ** 2) / (ry ** 2);
+                    if (norm <= 1) {
+                      nextHovered = entry.idx;
+                      break;
+                    }
+                  }
+                } else if (event.type === 'mouseout' || event.type === 'mouseleave') {
+                  nextHovered = null;
+                }
+
+                if (nextHovered !== state.hoveredIndex) {
+                  state.hoveredIndex = nextHovered;
+                  chart.canvas.style.cursor = nextHovered !== null ? 'pointer' : 'default';
+                  chart.draw();
+                }
+              }
+            };
+            if (!window.__campaignCirclesRegistered) {
+              Chart.register(campaignCirclesPlugin);
+              window.__campaignCirclesRegistered = true;
+            }
+
+            new Chart(pctx, {
+              data: { datasets },
+              options: {
+                responsive: true,
+                maintainAspectRatio: false,
+                plugins: {
+                  title: { display: true, text: `PCA of embeddings (PC1 ${(explained_variance?.[0]||0).toFixed(2)}, PC2 ${(explained_variance?.[1]||0).toFixed(2)})` },
+                  tooltip: {
+                    callbacks: {
+                      label(context) {
+                        const datasetLabel = context.dataset?.label || 'UNKNOWN';
+                        const raw = context.raw || {};
+                        const caseId = raw.suspiciousCaseId ?? raw.suspicious_case_id;
+                        if (caseId) {
+                          return `${datasetLabel} (${caseId})`;
+                        }
+                        return datasetLabel;
+                      },
+                      afterLabel(context) {
+                        if (typeof context.formattedValue === 'string') {
+                          return context.formattedValue;
+                        }
+                        const x = context.parsed?.x;
+                        const y = context.parsed?.y;
+                        if (typeof x === 'number' && typeof y === 'number') {
+                          return `(${x.toFixed(2)}, ${y.toFixed(2)})`;
+                        }
+                        return '';
+                      },
+                    }
+                  },
+                  campaignCircles: { groups: campaignGroups },
+                },
+                scales: {
+                  x: { type: 'linear', title: { display: true, text: 'PC1' } },
+                  y: { type: 'linear', title: { display: true, text: 'PC2' } },
+                }
+              }
+            });
+          })
+          .catch(err => console.error('Failed to load PCA data', err));
+      }
+
+      // Graph 3: Mail volume last 15 days (stacked bars + phishing campaign shading)
+      const mvctx = document.getElementById('mailVolumeChart');
+      if (mvctx) {
+        fetch('{% url "dashboard:dashboard_campaigns_mail_volume" %}', { credentials: 'same-origin' })
+          .then(r => r.json())
+          .then(({ dates, non_danger, dangerous, campaigns = [] }) => {
+            // Utility: parse ISO (with TZ) and date-only strings; return Date
+            const parseDate = (s) => {
+              if (!s) return null;
+              if (typeof s === 'number') return new Date(s * (s < 1e11 ? 1000 : 1));
+              if (/^\d{4}-\d{2}-\d{2}$/.test(s)) return new Date(s + 'T00:00:00Z');
+              return new Date(s);
+            };
+            const dayStartUTC = (d) => new Date(d + 'T00:00:00Z');
+            const dayEndUTC = (d) => new Date(d + 'T23:59:59.999Z');
+
+            // Colors for bars
+            const ndColor = 'rgba(59, 130, 246, 1)'; // blue
+            const dColor  = '#f14668';  // match classification red
+            const campaignFill = 'rgba(241, 70, 104, 0.18)'; // translucent matching red
+            const campaignStroke = 'rgba(241, 70, 104, 0.85)'; // matching red line
+
+            // Labels for display, keep raw dates for mapping
+            const rawDates = Array.isArray(dates) ? dates : [];
+            const labels = rawDates.map(d => {
+              const dt = new Date(d + 'T00:00:00Z');
+              const opts = { month: 'short', day: '2-digit' };
+              return dt.toLocaleDateString(undefined, opts);
+            });
+
+            // Build campaign ranges with intra-day fractions on first/last day
+            const ranges = [];
+            if (Array.isArray(campaigns)) {
+              campaigns.forEach((c, idx) => {
+                const sdt = parseDate(c.start || c.start_date || c.startDate);
+                const edt = parseDate(c.end || c.end_date || c.endDate);
+                if (!sdt || isNaN(sdt) || !edt || isNaN(edt)) return;
+                let startDT = sdt, endDT = edt;
+                if (endDT < startDT) [startDT, endDT] = [endDT, startDT];
+
+                // Determine overlapping day indices
+                let startIndex = -1, endIndex = -1;
+                for (let i = 0; i < rawDates.length; i++) {
+                  const d0 = dayStartUTC(rawDates[i]);
+                  const d1 = dayEndUTC(rawDates[i]);
+                  if (endDT < d0 || startDT > d1) continue; // no overlap with this day
+                  if (startIndex === -1) startIndex = i;
+                  endIndex = i;
+                }
+                if (startIndex === -1 || endIndex === -1) return;
+
+                // Fractions within day (0 = 00:00 at left edge, 0.5 = 12:00 center, 1 = 24:00 right edge)
+                const firstDayStart = dayStartUTC(rawDates[startIndex]);
+                const firstDayMs = 24 * 60 * 60 * 1000;
+                let startFrac = (startDT - firstDayStart) / firstDayMs;
+                if (startIndex !== endIndex) startFrac = Math.max(0, Math.min(1, startFrac));
+                if (!isFinite(startFrac)) startFrac = 0;
+
+                const lastDayStart = dayStartUTC(rawDates[endIndex]);
+                let endFrac = (endDT - lastDayStart) / firstDayMs;
+                endFrac = Math.max(0, Math.min(1, endFrac));
+                if (!isFinite(endFrac)) endFrac = 1;
+
+                ranges.push({
+                  start: startIndex,
+                  end: endIndex,
+                  startFrac,
+                  endFrac,
+                  name: c.name || `Campaign ${idx + 1}`,
+                });
+              });
+            }
+
+            const rowAllocations = [];
+            let maxRowIndex = 0;
+            ranges.forEach(range => {
+              let row = 0;
+              while (
+                rowAllocations[row] &&
+                rowAllocations[row].some(other => !(range.end < other.start || range.start > other.end))
+              ) {
+                row += 1;
+              }
+              if (!rowAllocations[row]) {
+                rowAllocations[row] = [];
+              }
+              rowAllocations[row].push(range);
+              range.row = row;
+              if (row > maxRowIndex) {
+                maxRowIndex = row;
+              }
+            });
+            const labelLineHeight = 14;
+            const labelTopOffset = 4;
+            const topPadding = Math.max(24, labelTopOffset + (maxRowIndex + 1) * labelLineHeight);
+
+            // Custom plugin: shade phishing campaigns (always red) with intra-day precision
+            const campaignShadingPlugin = {
+              id: 'campaignShading',
+              // Helper to compute full category bounds independent of bar width or dataset presence
+              _catBounds(chart, index) {
+                const x = chart.scales?.x;
+                const labels = chart.data?.labels || [];
+                if (!x || !labels.length) return null;
+                const n = labels.length;
+                const center = x.getPixelForTick ? x.getPixelForTick(index) : x.getPixelForValue(index);
+                let left, right;
+                if (index === 0) {
+                  const nextC = (x.getPixelForTick ? x.getPixelForTick(1) : x.getPixelForValue(1));
+                  const w = nextC - center;
+                  left = center - w / 2;
+                } else {
+                  const prevC = (x.getPixelForTick ? x.getPixelForTick(index - 1) : x.getPixelForValue(index - 1));
+                  left = (prevC + center) / 2;
+                }
+                if (index === n - 1) {
+                  const prevC = (x.getPixelForTick ? x.getPixelForTick(index - 1) : x.getPixelForValue(index - 1));
+                  const w = center - prevC;
+                  right = center + w / 2;
+                } else {
+                  const nextC = (x.getPixelForTick ? x.getPixelForTick(index + 1) : x.getPixelForValue(index + 1));
+                  right = (center + nextC) / 2;
+                }
+                const { left: caLeft, right: caRight } = chart.chartArea || {};
+                // Clamp to chart area just in case
+                const L = Math.max(left, caLeft ?? left);
+                const R = Math.min(right, caRight ?? right);
+                return { left: L, right: R, width: Math.max(0, R - L) };
+              },
+              beforeDatasetsDraw(chart, args, opts) {
+                const ranges = (opts && opts.ranges) || [];
+                if (!ranges.length) return;
+                const { ctx, chartArea } = chart;
+                if (!chartArea) return;
+                const labelsLen = chart.data?.labels?.length || 0;
+                const eps = (window.devicePixelRatio || 1) >= 2 ? 0.75 : 0.5; // avoid visible 1px gaps
+                ctx.save();
+                // Shaded backgrounds per day (behind bars)
+                for (const r of ranges) {
+                  for (let i = r.start; i <= r.end; i++) {
+                    if (i < 0 || i >= labelsLen) continue;
+                    const b = this._catBounds(chart, i);
+                    if (!b || b.width <= 0) continue;
+                    let x0 = b.left, x1 = b.right;
+                    if (r.start === r.end) {
+                      x0 = b.left + b.width * Math.max(0, Math.min(1, r.startFrac ?? 0));
+                      x1 = b.left + b.width * Math.max(0, Math.min(1, r.endFrac ?? 1));
+                    } else if (i === r.start) {
+                      x0 = b.left + b.width * Math.max(0, Math.min(1, r.startFrac ?? 0));
+                      x1 = b.right;
+                    } else if (i === r.end) {
+                      x0 = b.left;
+                      x1 = b.left + b.width * Math.max(0, Math.min(1, r.endFrac ?? 1));
+                    }
+                    // Expand slightly to overlap neighbors and avoid thin gaps
+                    x0 = Math.max(chartArea.left, x0 - eps);
+                    x1 = Math.min(chartArea.right, x1 + eps);
+                    const w = Math.max(0, x1 - x0);
+                    if (w <= 0) continue;
+                    ctx.fillStyle = 'rgba(239, 68, 68, 0.18)';
+                    ctx.fillRect(x0, chartArea.top, w, chartArea.bottom - chartArea.top);
+                  }
+                }
+                // Boundary strokes (also behind bars)
+                ctx.strokeStyle = 'rgba(239, 68, 68, 0.85)';
+                ctx.lineWidth = 2;
+                for (const r of ranges) {
+                  if (r.start < 0 || r.end >= labelsLen) continue;
+                  const bs = this._catBounds(chart, r.start);
+                  const be = this._catBounds(chart, r.end);
+                  if (!bs || !be) continue;
+                  const xStart = bs.left + bs.width * Math.max(0, Math.min(1, r.startFrac ?? 0));
+                  const xEnd   = be.left + be.width * Math.max(0, Math.min(1, r.endFrac ?? 1));
+                  // Start line
+                  ctx.beginPath();
+                  ctx.moveTo(xStart, chartArea.top);
+                  ctx.lineTo(xStart, chartArea.bottom);
+                  ctx.stroke();
+                  // End line
+                  ctx.beginPath();
+                  ctx.moveTo(xEnd, chartArea.top);
+                  ctx.lineTo(xEnd, chartArea.bottom);
+                  ctx.stroke();
+                }
+                ctx.restore();
+              },
+              afterDatasetsDraw(chart, args, opts) {
+                const ranges = (opts && opts.ranges) || [];
+                if (!ranges.length) return;
+                const { ctx, chartArea } = chart;
+                if (!chartArea) return;
+                const labelsLen = chart.data?.labels?.length || 0;
+                const lineHeight = (opts && opts.labelLineHeight) || 14;
+                const topOffset = (opts && opts.labelTopOffset) || 4;
+                const maxLabelWidth = (opts && opts.labelMaxWidth) || (chartArea.right - chartArea.left);
+                ctx.save();
+                // Labels on top of bars
+                ctx.fillStyle = 'rgba(0,0,0,0.85)';
+                ctx.textAlign = 'center';
+                ctx.textBaseline = 'top';
+                ctx.font = '12px system-ui, -apple-system, Segoe UI, Roboto, Ubuntu, Cantarell, Noto Sans, Helvetica Neue, Arial, "Apple Color Emoji", "Segoe UI Emoji"';
+                for (const r of ranges) {
+                  if (r.start < 0 || r.end >= labelsLen) continue;
+                  const bs = this._catBounds(chart, r.start);
+                  const be = this._catBounds(chart, r.end);
+                  if (!bs || !be) continue;
+                  const xStart = bs.left + bs.width * Math.max(0, Math.min(1, r.startFrac ?? 0));
+                  const xEnd   = be.left + be.width * Math.max(0, Math.min(1, r.endFrac ?? 1));
+                  const centerX = (xStart + xEnd) / 2;
+                  const row = typeof r.row === 'number' && r.row >= 0 ? r.row : 0;
+                  const labelY = chartArea.top + topOffset + row * lineHeight;
+                  const label = String(r.name ?? '').trim() || `Campaign`;
+                  if (ctx.measureText(label).width <= maxLabelWidth) {
+                    ctx.fillText(label, centerX, labelY);
+                  } else {
+                    const parts = label.split(/,\s*/).filter(Boolean);
+                    const lines = [];
+                    let current = '';
+                    parts.forEach((part, idx) => {
+                      const candidate = current ? `${current}, ${part}` : part;
+                      if (ctx.measureText(candidate).width > maxLabelWidth && current) {
+                        lines.push(current);
+                        current = part;
+                      } else {
+                        current = candidate;
+                      }
+                      if (idx === parts.length - 1 && current) {
+                        lines.push(current);
+                        current = '';
+                      }
+                    });
+                    if (!lines.length) {
+                      lines.push(label);
+                    }
+                    lines.forEach((line, lineIdx) => {
+                      ctx.fillText(line, centerX, labelY + lineIdx * lineHeight);
+                    });
+                  }
+                }
+                ctx.restore();
+              }
+            };
+            // Register once (avoid relying on Chart.registry which may differ by version)
+            if (!window.__campaignShadingRegistered) {
+              Chart.register(campaignShadingPlugin);
+              window.__campaignShadingRegistered = true;
+            }
+
+            // Ensure bars colors are set
+            new Chart(mvctx, {
+              type: 'bar',
+              data: {
+                labels: (Array.isArray(dates) ? dates : []).map(d => {
+                  const dt = new Date(d + 'T00:00:00Z');
+                  return dt.toLocaleDateString(undefined, { month: 'short', day: '2-digit' });
+                }),
+                datasets: [
+                  { label: 'Safe/Unwanted Mails', data: non_danger, backgroundColor: ndColor, stack: 'stack1' },
+                  { label: 'Dangerous Mails', data: dangerous, backgroundColor: dColor, stack: 'stack1' }
+                ]
+              },
+              options: {
+                responsive: true,
+                maintainAspectRatio: false,
+                plugins: {
+                  title: { display: true, text: 'Mail Volume - Last 15 Days' },
+                  legend: { position: 'top' },
+                  campaignShading: { ranges, labelLineHeight, labelTopOffset }
+                },
+                layout: {
+                  padding: {
+                    top: topPadding,
+                    right: 16,
+                    left: 8,
+                    bottom: 8,
+                  },
+                },
+                scales: {
+                  x: { stacked: true, ticks: { maxRotation: 45, minRotation: 45 } },
+                  y: { stacked: true, beginAtZero: true, ticks: { precision: 0 } }
+                }
+              }
+            });
+          })
+          .catch(err => console.error('Failed to load mail volume data', err));
+      }
+    })();
+  </script>
+{% endblock %}

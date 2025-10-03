@@ -1,0 +1,114 @@
+{% extends 'base.html' %}
+{% load static %}
+{% load utils %}
+
+{% block title %}Submit{% endblock %}
+
+
+{% block content %}
+{% if user.is_authenticated %}
+<div class="info mt-6">
+  <header>
+    <h1 class="title is-1">Submit What You Want</h1>
+  </header>
+
+  <div class="tabs is-centered mt-6 mb-3">
+    <ul role="tablist">
+      <li role="tab" class="tabslinks" id="FILES" aria-controls="Files">
+        <a href="#Files">Files</a>
+      </li>
+      <li role="tab" class="tabslinks" id="URLS" aria-controls="Urls">
+        <a href="#Urls">Urls</a>
+      </li>
+      <li role="tab" class="tabslinks is-active" id="OTHER" aria-controls="Other">
+        <a href="#Other">Hash &amp; IP</a>
+      </li>
+    </ul>
+  </div>
+
+  <!-- Hash & IP Form -->
+  <div id="Other" class="tabcontent info mt-6" role="tabpanel">
+    <form id="other" method="post" novalidate>
+      {% csrf_token %}
+      <div class="form-field">
+        <label for="other-input">Hash and IP Input:</label>
+        {{ otherform.as_p }}
+      </div>
+      <div class="submit mt-6">
+        <button type="submit" class="js-modal-triggers button is-link" id="submit-other" data-target="myLoadingPopup">
+          Submit
+        </button>
+      </div>
+    </form>
+  </div>
+
+  <!-- Files Form -->
+  <div id="Files" class="tabcontent info mt-6 drop-zone" role="tabpanel" hidden>
+    <form id="file" method="post" enctype="multipart/form-data" novalidate>
+      {% csrf_token %}
+      <div class="drop-zone__prompt">Drop file here or click to upload</div>
+      <div class="form-field">
+        {{ form.as_p }}
+      </div>
+      <p id="file-result"></p>
+      <div class="submit" style="background-color: transparent !important;">
+        <button type="submit" class="js-modal-triggers button is-link" id="submit" data-target="myLoadingPopup">
+          Submit
+        </button>
+      </div>
+    </form>
+  </div>
+
+  <!-- Urls Form -->
+  <div id="Urls" class="tabcontent info mt-6" role="tabpanel" hidden>
+    <form id="url" method="post" novalidate>
+      {% csrf_token %}
+      <div class="form-field">
+        <label for="url-input">Url Input:</label>
+        {{ formurl.as_p }}
+      </div>
+      <div class="submit mt-6">
+        <button type="submit" class="js-modal-triggers button is-link" id="submit-url" data-target="myLoadingPopup">
+          Submit
+        </button>
+      </div>
+    </form>
+  </div>
+
+  <!-- Loading Modal -->
+  <div class="modal" id="myLoadingPopup" role="dialog" aria-modal="true" hidden>
+    <div class="modal-background"></div>
+    <div class="modal-card">
+      <header class="modal-card-head">
+        <p class="modal-card-title">Loading...</p>
+      </header>
+      <section class="modal-card-body">
+        <p class="title is-4">Waiting for your submission to be uploaded:</p>
+        <progress class="progress is-medium is-info" max="100">60%</progress>
+      </section>
+    </div>
+  </div>
+
+  <footer class="footer footerT">
+    <div class="content has-text-centered">
+      <p>
+        You can also send a suspicious email you have received to our address 
+        <strong id="mail" class="copy-mail" aria-label="Copy email address" data-email="{% suspicious_email %}">
+          {% suspicious_email %}
+        </strong>
+      </p>
+      <p><i>Click on the address to copy it!</i></p>
+    </div>
+  </footer>
+</div>
+
+{% block extra_js %}
+<script src="{% static 'js/jquery.js' %}"></script>
+<script src="{% static 'js/dragNdrop.js' %}"></script>
+<script src="{% static 'js/navbar.js' %}"></script>
+{% endblock %}
+{% else %}
+  <p>You are not logged in</p>
+  <script>window.location.replace("{% url 'login' %}");</script>
+{% endif %}
+{% endblock %}
