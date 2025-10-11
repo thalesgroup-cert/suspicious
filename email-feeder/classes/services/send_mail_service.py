@@ -1,6 +1,10 @@
+import email.mime.multipart
+import email.mime.text
 import smtplib
-from email.mime.text import MIMEText
-from email.mime.multipart import MIMEMultipart
+
+
+DEFAULT_MAX_RETRIES = 3
+DEFAULT_BASE_DELAY = 1  # in seconds
 
 
 class SendMailService:
@@ -20,13 +24,13 @@ class SendMailService:
         recipient: str,
         html: str,
     ) -> str:
-        msg = MIMEMultipart()
+        msg = email.mime.multipart.MIMEMultipart()
         msg["From"] = sender
         msg["To"] = str(recipient)
         msg["Subject"] = str(subject)
 
         # Attach the HTML content to the email
-        msg.attach(MIMEText(html, "html"))
+        msg.attach(email.mime.text.MIMEText(html, "html"))
 
         return msg.as_string()
 

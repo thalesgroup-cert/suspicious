@@ -1,0 +1,39 @@
+services:
+  greenmail:
+    image: greenmail/standalone:latest
+    container_name: greenmail
+    ports:
+      - "3025:3025" # SMTP
+      - "3110:3110" # POP3
+      - "3143:3143" # IMAP
+      - "3465:3465" # SMTPS
+      - "3995:3995" # POP3S
+      - "3993:3993" # IMAPS
+    environment:
+      GREENMAIL_OPTS: >
+        -Dgreenmail.setup.test.all
+        -Dgreenmail.users=imap_user:imap_password@localhost
+        -Dgreenmail.verbose
+        -Dgreenmail.starttls.enable=false
+        -Dgreenmail.hostname=0.0.0.0
+    volumes:
+      - greenmail_data:/data
+    restart: unless-stopped
+
+  minio:
+    image: quay.io/minio/minio:latest
+    container_name: minio
+    command: server /data --console-address ":9001"
+    ports:
+      - "9000:9000" # S3 API
+      - "9001:9001" # Web console
+    environment:
+      MINIO_ROOT_USER: minioadmin
+      MINIO_ROOT_PASSWORD: minioadmin
+    volumes:
+      - minio_data:/data
+    restart: unless-stopped
+
+volumes:
+  minio_data:
+  greenmail_data:
