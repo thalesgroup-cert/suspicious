@@ -4,3 +4,4 @@ python-dateutil
 minio
 chardet==5.2.0
 jinja2
+pydantic
