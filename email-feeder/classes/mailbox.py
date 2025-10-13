@@ -1,5 +1,9 @@
+import typing
 import email
+import email.utils
 import email.message
+import email.header
+import email.policy
 import hashlib
 import imaplib
 import mimetypes
@@ -8,12 +12,9 @@ import re
 import shutil
 import ssl
 import uuid
-from collections import defaultdict
 from datetime import datetime
-from email import header, policy, utils
 from email.message import EmailMessage
 from email.parser import HeaderParser
-from typing import List, Optional, Tuple
 
 import chardet
 from bs4 import BeautifulSoup
@@ -43,19 +44,42 @@ class MailboxOperationError(Exception):
     pass
 
 
-class Mailbox:
+class Attachment(typing.TypedDict):
+    filename: str
+    file_path: str
+    content: bytes
+    headers: dict[str, list[typing.Any]]
+    file_sha256: str | None
+    parent: str
 
+
+class MailboxParsedEmailData(typing.TypedDict):
+    to: list[str]
+    cc: list[str]
+    bcc: list[str]
+    date: str | None
+    subject: str | None
+    from_address: str | None
+    from_header_raw: str | None
+    attachments: list[Attachment]
+    body_text: str
+    body_html: str
+    headers_parsed: email.message.Message | dict[str, str]
+    raw_eml_bytes: bytes
+
+
+class Mailbox:
     def __init__(
         self,
-        server,
-        port,
-        username,
-        password,
-        tmp_dir,
-        use_ssl=True,
-        certfile=None,
-        keyfile=None,
-        mailbox_to_monitor="TEST",
+        server: str,
+        port: int,
+        username: str,
+        password: str,
+        tmp_dir: str,
+        use_ssl: bool = True,
+        certfile: str | None = None,
+        keyfile: str | None = None,
+        mailbox_to_monitor: str = "TEST",
     ):
         self.server = server
         self.port = int(port)
@@ -69,7 +93,7 @@ class Mailbox:
         self.mailbox_to_monitor = mailbox_to_monitor
 
         self.imap_server: imaplib.IMAP4 | imaplib.IMAP4_SSL | None = None
-        self.fetched_unseen_email_ids = []
+        self.fetched_unseen_email_ids: list[str] = []
 
     # --- Connection Management (Context Manager) ---
     def __enter__(self):
@@ -77,7 +101,7 @@ class Mailbox:
         self.login()
         return self
 
-    def __exit__(self, exc_type, exc_val, exc_tb):
+    def __exit__(self):
         """Exits the runtime context, calls logout."""
         self.logout()
 
@@ -114,6 +138,7 @@ class Mailbox:
     def _imaps_login(self):
         """Handles SSL IMAP login."""
         ssl_context_to_use = None
+
         if self.certfile and self.keyfile:
             try:
                 ssl_context_to_use = ssl.create_default_context(ssl.Purpose.CLIENT_AUTH)
@@ -148,7 +173,7 @@ class Mailbox:
                 self.imap_server = None
 
     # --- Email Operations ---
-    def mark_emails_as_seen(self, email_ids_to_mark=None):
+    def mark_emails_as_seen(self, email_ids_to_mark: list[str] | None = None):
         """Marks the specified email IDs (or cached fetched unseen emails) as seen."""
         if not self.imap_server or self.imap_server.state not in ["AUTH", "SELECTED"]:
             raise MailboxConnectionError(
@@ -178,7 +203,7 @@ class Mailbox:
                 f"Marking {len(valid_byte_ids)} emails as seen in '{self.mailbox_to_monitor}'."
             )
             typ, response = self.imap_server.store(
-                formatted_ids_str, "+FLAGS", "\\Seen"
+                formatted_ids_str.decode("utf-8"), "+FLAGS", "\\Seen"
             )
 
             if typ != "OK":
@@ -205,7 +230,7 @@ class Mailbox:
             logger.error(error_msg)
             raise MailboxOperationError(error_msg) from e
 
-    def fetch_unseen_emails_and_process(self):
+    def fetch_unseen_emails_and_process(self) -> list[Mail]:
         """
         Fetches unseen emails, processes them (including EML attachments),
         and caches their IDs to be potentially marked as seen later.
@@ -216,7 +241,7 @@ class Mailbox:
                 "Not connected. Call login() first or use as context manager."
             )
 
-        processed_mail_objects = []
+        processed_mail_objects: list[Mail] = []
         try:
             # Select the mailbox (readonly=False allows subsequent STORE operations in the same session)
             typ, data = self.imap_server.select(self.mailbox_to_monitor, readonly=False)
@@ -269,7 +294,9 @@ class Mailbox:
         for email_id_bytes in self.fetched_unseen_email_ids:
             try:
                 source_ref = self.generate_object_reference()
-                processed_main_email = self.process_inbox_email(email_id_bytes, source_ref)
+                processed_main_email = self.process_inbox_email(
+                    email_id_bytes, source_ref
+                )
 
                 if isinstance(processed_main_email, list):
                     eml_attachments_metadata, base_tmp_path, main_email_source_ref = (
@@ -288,7 +315,7 @@ class Mailbox:
 
                             with open(eml_file_path, "rb") as f_eml:
                                 attached_msg = email.message_from_binary_file(
-                                    f_eml, policy=policy.default
+                                    f_eml, policy=email.policy.default
                                 )
 
                             processed_attached_mail_obj = self.process_attachment_email(
@@ -335,30 +362,33 @@ class Mailbox:
         msg: email.message.EmailMessage,
         base_path_for_attachments: str,
         source_ref_for_attachments: str,
-    ) -> dict:
+    ) -> MailboxParsedEmailData:
         """
         Extracts common fields, attachments, body, and headers from an email message.
         Attachments are saved relative to base_path_for_attachments.
         """
-        data = {}
-        data["to"] = self.process_recipients_field(msg.get("To"))
-        data["cc"] = self.process_recipients_field(msg.get("Cc"))
-        data["bcc"] = self.process_recipients_field(msg.get("Bcc"))
-        data["date"] = self.process_date_field(msg.get("Date"))
+        data_to = self.process_recipients_field(msg.get("To"))
+        data_cc = self.process_recipients_field(msg.get("Cc"))
+        data_bcc = self.process_recipients_field(msg.get("Bcc"))
+
+        data_date = msg.get("Date")
+        if data_date is not None:
+            data_date = self.process_date_field(data_date)
 
         # Decode potentially encoded headers like Subject and From
-        data["subject"] = self.process_subject_field(
-            self._decode_header_str(msg.get("Subject"))
-        )
+        data_subject = msg.get("Subject")
+        if data_subject is not None:
+            data_subject = self.process_subject_field(
+                self._decode_header_str(data_subject)
+            )
 
-        from_header_raw = msg.get("From")
-        if from_header_raw:
-            from_decoded = self._decode_header_str(from_header_raw)
-            data["from_address"] = email.utils.parseaddr(from_decoded)[1]
-        else:
-            data["from_address"] = None
+        data_from_header_raw = msg.get("From")
+        data_from_address = None
+        if data_from_header_raw:
+            from_decoded = self._decode_header_str(data_from_header_raw)
+            data_from_address = email.utils.parseaddr(from_decoded)[1]
 
-        data["attachments"] = self.extract_attachments(
+        data_attachments = self.extract_attachments(
             msg, base_path_for_attachments, source_ref_for_attachments
         )
 
@@ -368,46 +398,71 @@ class Mailbox:
             )
             shutil.rmtree(base_path_for_attachments, ignore_errors=True)
         text_body_raw, html_body_raw = self.extract_body(msg)
-        data["body_text"] = self.process_body(text_body_raw)
-        data["body_html"] = html_body_raw
+        data_body_text = self.process_body(text_body_raw)
+        data_body_html = html_body_raw
 
         raw_eml_bytes = msg.as_bytes()
         header_separator = b"\r\n\r\n" if b"\r\n\r\n" in raw_eml_bytes else b"\n\n"
         try:
             raw_headers_block_bytes = raw_eml_bytes.split(header_separator, 1)[0]
             raw_headers_string = raw_headers_block_bytes.decode("ascii", "replace")
-            data["headers_parsed"] = HeaderParser().parsestr(raw_headers_string)
+            data_headers_parsed = HeaderParser().parsestr(raw_headers_string)
         except Exception as e:
             logger.warning(
                 f"Could not extract/parse headers for ref {source_ref_for_attachments}: {e}"
             )
-            data["headers_parsed"] = {
+            data_headers_parsed = {
                 k: self._decode_header_str(v) for k, v in msg.items()
             }
 
-        data["raw_eml_bytes"] = raw_eml_bytes
-        return data
+        data_raw_eml_bytes = raw_eml_bytes
+
+        return MailboxParsedEmailData(
+            to=data_to,
+            cc=data_cc,
+            bcc=data_bcc,
+            date=data_date,
+            subject=data_subject,
+            from_address=data_from_address,
+            from_header_raw=data_from_header_raw,
+            body_text=data_body_text,
+            body_html=data_body_html,
+            headers_parsed=data_headers_parsed,
+            raw_eml_bytes=data_raw_eml_bytes,
+            attachments=data_attachments,
+        )
 
     def process_inbox_email(self, email_id: str, source_ref: str):
+        if self.imap_server is None:
+            raise Exception("The IMAP server is not instantiated.")
+
         try:
             status, email_data_list = self.imap_server.fetch(email_id, "(RFC822)")
-            if (
-                status != "OK"
-                or not email_data_list
-                or not isinstance(email_data_list[0], tuple)
-            ):
-                logger.error(
-                    f"Failed to fetch email data for ID {email_id}. Status: {status}"
-                )
-                return None
-            msg_bytes = email_data_list[0][1]
-            msg = email.message_from_bytes(msg_bytes, policy=policy.default)
         except Exception as e:
             logger.error(
                 f"Error fetching or parsing email ID {email_id} (Ref: {source_ref}): {repr(e)}"
             )
             return None
 
+        is_request_successful = (
+            status == "OK"
+            and email_data_list
+            and len(email_data_list) >= 1
+            and isinstance(email_data_list[0], tuple)
+        )
+        if not is_request_successful:
+            logger.error(
+                f"Failed to fetch email data for ID {email_id}. Status: {status}"
+            )
+            return None
+
+        email_data_list = typing.cast(list[tuple[bytes, bytes]], email_data_list)
+        msg_bytes = email_data_list[0][1]
+        msg = email.message_from_bytes(msg_bytes, policy=email.policy.default)
+
+        # TODO: 'From' should always be set, it makes no sense otherwise, thus
+        # the message should be dropped and an error must be raised to simplify
+        # the logic.
         from_header_raw = msg.get("From")
         if from_header_raw:
             from_decoded = self._decode_header_str(from_header_raw)
@@ -431,9 +486,7 @@ class Mailbox:
         main_eml_temp_path = os.path.join(processing_root_dir, main_eml_temp_filename)
         try:
             with open(main_eml_temp_path, "wb") as eml_file:
-                eml_file.write(
-                    msg.as_bytes()
-                )
+                eml_file.write(msg.as_bytes())
         except IOError as e:
             logger.error(
                 f"Failed to write temporary EML '{main_eml_temp_path}': {repr(e)}"
@@ -476,9 +529,7 @@ class Mailbox:
             )
             return None
 
-        final_main_eml_path = os.path.join(
-            analysis_target_dir, f"{source_ref}.eml"
-        )
+        final_main_eml_path = os.path.join(analysis_target_dir, f"{source_ref}.eml")
 
         temp_attachments_dir = os.path.join(processing_root_dir, ATTACHMENTS_DIR_NAME)
         final_attachments_dir = os.path.join(analysis_target_dir, ATTACHMENTS_DIR_NAME)
@@ -544,7 +595,11 @@ class Mailbox:
         parent_dir_for_analysis: str,
         source_ref: str,
     ):
-        attached_email_file_ref = str(source_ref.split("-",maxsplit=1)[0])+"-"+str(self.generate_object_reference().split("-", maxsplit=1)[1])
+        attached_email_file_ref = (
+            str(source_ref.split("-", maxsplit=1)[0])
+            + "-"
+            + str(self.generate_object_reference().split("-", maxsplit=1)[1])
+        )
 
         analysis_dir_name = attached_email_file_ref
         current_analysis_path = os.path.join(parent_dir_for_analysis, analysis_dir_name)
@@ -637,7 +692,7 @@ class Mailbox:
 
     #################################### Email processing ####################################
 
-    def extract_body(self, msg: EmailMessage) -> Tuple[str, str]:
+    def extract_body(self, msg: EmailMessage) -> typing.Tuple[str, str]:
         """
         Extrait le corps plain-text et HTML.
         - Préfère 'plain', puis 'html' pour plain-text.
@@ -647,7 +702,9 @@ class Mailbox:
         part_plain = msg.get_body(preferencelist=("plain"))
         part_html = msg.get_body(preferencelist=("html"))
 
-        def _get_content(part: Optional[EmailMessage]) -> Optional[bytes | str]:
+        def _get_content(
+            part: typing.Optional[EmailMessage],
+        ) -> typing.Optional[bytes | str]:
             if part is None:
                 return None
             payload = part.get_payload(decode=True)
@@ -656,7 +713,7 @@ class Mailbox:
         raw_plain = _get_content(part_plain)
         raw_html = _get_content(part_html)
 
-        def _to_str(raw: bytes | str | None) -> Optional[str]:
+        def _to_str(raw: bytes | str | None) -> typing.Optional[str]:
             if raw is None:
                 return None
             if isinstance(raw, bytes):
@@ -685,16 +742,16 @@ class Mailbox:
 
         return body_plain or "", body_html or ""
 
-    def process_recipients_field(self, raw: Optional[str]) -> List[str]:
+    def process_recipients_field(self, raw: typing.Optional[str]) -> list[str]:
         """
         Sépare et normalise la liste d'adresses.
         Gère les formats 'Nom <mail>' et les virgules internes via getaddresses :contentReference[oaicite:8]{index=8}.
         """
         if not raw:
             return []
-        return [addr for _, addr in utils.getaddresses([raw])]
+        return [addr for _, addr in email.utils.getaddresses([raw])]
 
-    def process_date_field(self, raw: str) -> Optional[str]:
+    def process_date_field(self, raw: str) -> typing.Optional[str]:
         """
         Parse une date libre et la convertit en Europe/Paris.
         Format de sortie : 'lundi 1 janvier 2025 13:45:00'.
@@ -708,14 +765,14 @@ class Mailbox:
             logger.error("Date invalide '%s' : %s", raw, e)
             return None
 
-    def process_subject_field(self, raw: Optional[str]) -> Optional[str]:
+    def process_subject_field(self, raw: typing.Optional[str]) -> typing.Optional[str]:
         """
         Décodage RFC2047 du sujet.
         Nettoie retours chariot superflus.
         """
         if raw is None:
             return None
-        subj, enc = header.decode_header(raw)[0]
+        subj, enc = email.header.decode_header(raw)[0]
         if isinstance(subj, bytes):
             subj = subj.decode(enc or "utf-8", errors="replace")
         return subj.replace("\r", "").replace("\n", "")
@@ -741,7 +798,7 @@ class Mailbox:
             text = re.sub(pat, repl, text, flags=re.MULTILINE)
         return text
 
-    def get_sha256(self, file_path: str) -> Optional[str]:
+    def get_sha256(self, file_path: str) -> typing.Optional[str]:
         """
         Calcule le SHA‑256 en lecture par blocs (8 KiB).
         Limite mémoire pour gros fichiers :contentReference[oaicite:9]{index=9}.
@@ -790,16 +847,19 @@ class Mailbox:
         max_name_len = 200 - len(ext_part)
         return name_part[:max_name_len] + ext_part
 
-    def get_header_dict_list(self, msg):
-        headers = defaultdict(list)
+    def get_header_dict_list(self, msg: email.message.EmailMessage):
+        headers: dict[str, list[typing.Any]] = {}
         for key, value in msg.items():
-            headers[key].append(value)
+            if key not in headers:
+                headers[key] = [value]
+            else:
+                headers[key].append(value)
         return headers
 
     def extract_attachments(
         self, msg: email.message.EmailMessage, tmp_path: str, source_ref: str
-    ):
-        attachments = []
+    ) -> list[Attachment]:
+        attachments: list[Attachment] = []
 
         attachments_output_dir = os.path.join(tmp_path, "attachments")
         try:
@@ -819,14 +879,21 @@ class Mailbox:
             processed_filename = ""
 
             # --- Skip detached signatures ---
-            if content_type in {"application/pgp-signature", "application/pkcs7-signature"}:
-                logger.info(f"Skipping detached signature part of type '{content_type}'.")
+            if content_type in {
+                "application/pgp-signature",
+                "application/pkcs7-signature",
+            }:
+                logger.info(
+                    f"Skipping detached signature part of type '{content_type}'."
+                )
                 continue
 
             # --- 1. Determine Filename ---
             if original_filename:
                 decoded_original_filename = self._decode_header_str(original_filename)
-                processed_filename = self._sanitize_filename(decoded_original_filename, i)
+                processed_filename = self._sanitize_filename(
+                    decoded_original_filename, i
+                )
             elif content_type == "message/rfc822":
                 default_eml_name = f"embedded_email_{i}"
                 subject = default_eml_name
@@ -859,14 +926,16 @@ class Mailbox:
 
             # --- 2. Get Attachment Data and Write to File ---
             try:
-                attachment_bytes = None
+                attachment_bytes: bytes | None = None
                 if content_type == "message/rfc822":
                     payload_to_write = part.get_payload()
                     msg_to_write = None
                     if isinstance(payload_to_write, list) and payload_to_write:
                         msg_to_write = (
                             payload_to_write[0]
-                            if isinstance(payload_to_write[0], email.message.EmailMessage)
+                            if isinstance(
+                                payload_to_write[0], email.message.EmailMessage
+                            )
                             else None
                         )
                     elif isinstance(payload_to_write, email.message.EmailMessage):
@@ -929,14 +998,14 @@ class Mailbox:
 
                 file_sha256 = self.get_sha256(file_path)
 
-                attachment_details = {
-                    "filename": processed_filename,
-                    "content": attachment_bytes,
-                    "headers": self.get_header_dict_list(part),
-                    "file_path": file_path,
-                    "file_sha256": file_sha256,
-                    "parent": source_ref,
-                }
+                attachment_details = Attachment(
+                    filename=processed_filename,
+                    content=attachment_bytes,
+                    headers=self.get_header_dict_list(part),
+                    file_path=file_path,
+                    file_sha256=file_sha256,
+                    parent=source_ref,
+                )
                 attachments.append(attachment_details)
 
             except Exception as e:

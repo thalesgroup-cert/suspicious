@@ -14,7 +14,14 @@ from setup import (
     setup_mailboxes,
 )
 
-from classes.template.ackowledge_bad_mail import AcknowledgeBadMail
+from classes.acknowledge_bad_mail_service import (
+    AcknowledgeBadMailService,
+    AcknowledgeBadMailServiceConfigSocial,
+    SOCIAL_LOGOS,
+)
+
+import classes.send_mail_service as send_mail_service
+
 
 # --- Configuration & Constants ---
 setup_logging()
@@ -31,9 +38,10 @@ BASE_DELAY = 1  # in seconds
 
 # Default application paths and settings
 DEFAULT_CASE_BASE_PATH = Path("/app/case")
-DEFAULT_SLEEP_INTERVAL = 10 # seconds
+DEFAULT_SLEEP_INTERVAL = 10  # seconds
 
 # --- Helper Functions ---
+
 
 def ensure_bucket_exists_and_tagged(
     client: Minio, bucket_name: str, tags_to_set: Optional[Dict[str, str]] = None
@@ -70,7 +78,9 @@ def ensure_bucket_exists_and_tagged(
     except S3Error as e:
         logger.error(f"MinIO S3Error concerning bucket '{bucket_name}': {e}")
     except Exception as e:
-        logger.error(f"Unexpected error concerning bucket '{bucket_name}': {e}", exc_info=True)
+        logger.error(
+            f"Unexpected error concerning bucket '{bucket_name}': {e}", exc_info=True
+        )
     return False
 
 
@@ -101,13 +111,21 @@ def upload_directory_to_minio(
 
     bucket_creation_tags = {TAG_KEY_STATUS: TAG_STATUS_TODO}
     if not ensure_bucket_exists_and_tagged(client, bucket_name, bucket_creation_tags):
-        logger.error(f"Cannot upload to MinIO bucket '{bucket_name}' as it could not be ensured/created.")
+        logger.error(
+            f"Cannot upload to MinIO bucket '{bucket_name}' as it could not be ensured/created."
+        )
         return
 
     for file_path in source_dir.rglob("*"):
         if file_path.is_file():
-            relative_path_str = str(file_path.relative_to(source_dir)).replace("\\", "/")
-            object_name = f"{base_object_path.rstrip('/')}/{relative_path_str}" if base_object_path else relative_path_str
+            relative_path_str = str(file_path.relative_to(source_dir)).replace(
+                "\\", "/"
+            )
+            object_name = (
+                f"{base_object_path.rstrip('/')}/{relative_path_str}"
+                if base_object_path
+                else relative_path_str
+            )
 
             object_tags = Tags(for_object=True)
             if default_tags:
@@ -125,11 +143,18 @@ def upload_directory_to_minio(
                         content_type="application/octet-stream",
                         tags=object_tags if default_tags else None,
                     )
-                logger.info(f"Uploaded '{file_path.name}' to '{bucket_name}/{object_name}' with tags: {default_tags or 'None'}.")
+                logger.info(
+                    f"Uploaded '{file_path.name}' to '{bucket_name}/{object_name}' with tags: {default_tags or 'None'}."
+                )
             except S3Error as e:
-                logger.error(f"MinIO S3Error uploading '{file_path.name}' as '{object_name}': {e}")
+                logger.error(
+                    f"MinIO S3Error uploading '{file_path.name}' as '{object_name}': {e}"
+                )
             except Exception as e:
-                logger.error(f"Failed to upload '{file_path.name}' as '{object_name}': {e}", exc_info=True)
+                logger.error(
+                    f"Failed to upload '{file_path.name}' as '{object_name}': {e}",
+                    exc_info=True,
+                )
 
 
 def cleanup_directory(dir_path: Path, remove_parent_if_empty: bool = False):
@@ -154,16 +179,23 @@ def cleanup_directory(dir_path: Path, remove_parent_if_empty: bool = False):
             if parent_dir.exists() and not any(parent_dir.iterdir()):
                 try:
                     parent_dir.rmdir()
-                    logger.info(f"Successfully removed empty parent directory: {parent_dir}")
+                    logger.info(
+                        f"Successfully removed empty parent directory: {parent_dir}"
+                    )
                 except OSError as e:
-                    logger.warning(f"Could not remove parent directory {parent_dir} (it might not be empty or permission issue): {e}")
+                    logger.warning(
+                        f"Could not remove parent directory {parent_dir} (it might not be empty or permission issue): {e}"
+                    )
     except OSError as e:
         logger.error(f"Failed to delete directory '{dir_path}'. Reason: {e}")
     except Exception as e:
-        logger.error(f"Unexpected error during cleanup of '{dir_path}': {e}", exc_info=True)
+        logger.error(
+            f"Unexpected error during cleanup of '{dir_path}': {e}", exc_info=True
+        )
 
 
 # --- Email Processing ---
+
 
 def process_single_email(mail: Any, case_base_path: Path):
     """
@@ -175,33 +207,40 @@ def process_single_email(mail: Any, case_base_path: Path):
 
     case_path = Path(mail.case_path)
 
-    logger.info(f"Processing mail ID: {mail_id} from sender: {sender} with case path: {case_path}")
+    logger.info(
+        f"Processing mail ID: {mail_id} from sender: {sender} with case path: {case_path}"
+    )
 
     if not case_path.is_dir():
-        logger.error(f"Mail {mail_id}: Case path '{case_path}' does not exist or is not a directory. Skipping.")
+        logger.error(
+            f"Mail {mail_id}: Case path '{case_path}' does not exist or is not a directory. Skipping."
+        )
         return
 
     if mail_tags == TAG_RESEND:
         # If the mail is tagged for resend, we prepare it for reprocessing.
-        logger.info(f"Mail {mail_id} is tagged for resend. Preparing case files for reprocessing.")
+        logger.info(
+            f"Mail {mail_id} is tagged for resend. Preparing case files for reprocessing."
+        )
         user_acknowledge(sender)
         logger.info(f"Mail {mail_id} tagged for resend. Notifying {sender}.")
         cleanup_directory(case_path, remove_parent_if_empty=True)
     else:
         # TODO: Acknowledment email
-        logger.info(f"Mail {mail_id}: Standard processing. Uploading case files from '{case_path}'.")
-
+        logger.info(
+            f"Mail {mail_id}: Standard processing. Uploading case files from '{case_path}'."
+        )
 
 
 def send_with_retry(send_callable, max_retries=MAX_RETRIES, base_delay=BASE_DELAY):
     """
     Helper function to attempt sending an email with retries using exponential backoff.
-    
+
     Args:
         send_callable (callable): A callable that sends an email.
         max_retries (int): Maximum number of attempts.
         base_delay (int): Base delay (in seconds) before retrying.
-    
+
     Returns:
         bool: True if send_callable() succeeds, False otherwise.
     """
@@ -218,13 +257,11 @@ def send_with_retry(send_callable, max_retries=MAX_RETRIES, base_delay=BASE_DELA
                 time.sleep(wait_time)
     return False
 
-def user_acknowledge(user):
+
+def user_acknowledge(user: str):
     """
     Send an acknowledgement email to the user if the mail is received
     and the user hasn't been informed yet.
-    
-    Args:
-        mail: The mail object.
     """
     try:
         config = setup_config()
@@ -237,30 +274,85 @@ def user_acknowledge(user):
     except Exception as e:
         logger.critical(f"Failed to load configuration: {e}", exc_info=True)
         return
+
     mail_config = config.get("mail", {})
-    SUSPICIOUS_EMAIL = mail_config.get('username')
+    logos = mail_config.get("logos", {})
+    socials = mail_config.get("socials", {})
+
+    acknowledge_bad_mail_service = AcknowledgeBadMailService(
+        {
+            "compagny_name": mail_config.get("group", "Your Compagny Team Name"),
+            "compagny_logo": logos.get("compagny", "#"),
+            "acknowledge_bad_mail_logo": logos.get("acknowledge-badmail", "#"),
+            "compagny_global_security_team": mail_config.get(
+                "global", "Global Security Team"
+            ),
+            "compagny_global_security_url": mail_config.get(
+                "global_url", "https://example.com/global-security"
+            ),
+            "compagny_online_portal": mail_config.get(
+                "submissions", "https://example.com/online-portal"
+            ),
+            "compagny_socials": [
+                AcknowledgeBadMailServiceConfigSocial(
+                    name=social,
+                    url=socials.get(social, f"https://{social}.com"),
+                    logo=SOCIAL_LOGOS.get(social, "#"),
+                )
+                for social in socials.keys()
+            ],
+            "glossary": mail_config.get("glossary", "https://glossary_to_cyber terms"),
+            "inquiry": mail_config.get("inquiry", "mailto:inquryemail@yourcompany.com"),
+            "inquiry_details": mail_config.get(
+                "inquiry_text", "inquryemail@yourcompany.com"
+            ),
+        }
+    )
+
+    SUSPICIOUS_EMAIL = mail_config.get("username")
     try:
         # Build user info string if available
         user_ = user.split("@")[0]
         user_first_name = user_.split(".")[0] if "." in user_ else user_
         user_last_name = user_.split(".")[1] if "." in user_ else ""
         user_infos = f"{user_first_name} {user_last_name}"
-        logger.info("Sending acknowledgement email to user with user_infos: %s", user_infos)
+        logger.info(
+            "Sending acknowledgement email to user with user_infos: %s", user_infos
+        )
         # Check user validity (ensuring user is not marked as "suspicious")
         if user is not None and user != "suspicious":
+
             def send_action():
-                AcknowledgeBadMail(
-                    "SUSPICIOUS EMAIL ANALYSIS - There is a problem with your submission",
-                    str(SUSPICIOUS_EMAIL),
-                    user,
-                    user_infos
-                ).send()
+                subject = "SUSPICIOUS EMAIL ANALYSIS - There is a problem with your submission"
+                html = acknowledge_bad_mail_service.get_html(
+                    subject=subject,
+                    sender=str(SUSPICIOUS_EMAIL),
+                    recipient=user,
+                    infos=user_infos,
+                )
+
+                _service = send_mail_service.SendMailService(
+                    host=mail_config["server"], port=mail_config.get("port", 587)
+                )
+
+                _service.connect()
+
+                _service.publish_email(
+                    subject=subject,
+                    sender=str(SUSPICIOUS_EMAIL),
+                    recipient=user,
+                    html=html,
+                )
+
+                _service.close()
+
             if send_with_retry(send_action):
                 logger.info("Acknowledgement email sent successfully")
             else:
                 logger.error("Failed to send acknowledgement email.")
     except Exception as e:
         logger.error("Error sending acknowledgement email: %s", e, exc_info=True)
+
 
 def process_emails_from_mailboxes(mailboxes: List[Any], case_processing_path: Path):
     """
@@ -271,16 +363,22 @@ def process_emails_from_mailboxes(mailboxes: List[Any], case_processing_path: Pa
         return
 
     for mailbox in mailboxes:
-        mailbox_identifier = getattr(mailbox, "username", getattr(mailbox, "server", "UnknownMailbox"))
+        mailbox_identifier = getattr(
+            mailbox, "username", getattr(mailbox, "server", "UnknownMailbox")
+        )
         logger.info(f"Checking mailbox: {mailbox_identifier}")
         try:
             email_list = mailbox.fetch_unseen_emails_and_process()
 
             if not email_list:
-                logger.info(f"No new emails to process in mailbox: {mailbox_identifier}")
+                logger.info(
+                    f"No new emails to process in mailbox: {mailbox_identifier}"
+                )
                 continue
 
-            logger.info(f"Fetched {len(email_list)} email(s) from {mailbox_identifier}.")
+            logger.info(
+                f"Fetched {len(email_list)} email(s) from {mailbox_identifier}."
+            )
             for mail in email_list:
                 process_single_email(mail, case_processing_path)
             for case_dir in DEFAULT_CASE_BASE_PATH.iterdir():
@@ -293,7 +391,9 @@ def process_emails_from_mailboxes(mailboxes: List[Any], case_processing_path: Pa
                 mailbox.mark_emails_as_seen()
                 logger.info(f"Marked emails as seen for mailbox: {mailbox_identifier}.")
             else:
-                logger.warning(f"Mailbox {mailbox_identifier} does not have 'mark_emails_as_seen' method.")
+                logger.warning(
+                    f"Mailbox {mailbox_identifier} does not have 'mark_emails_as_seen' method."
+                )
 
         except Exception as e:
             logger.error(
@@ -304,6 +404,7 @@ def process_emails_from_mailboxes(mailboxes: List[Any], case_processing_path: Pa
 
 
 # --- Main Application Logic ---
+
 
 def main():
     """
@@ -341,14 +442,18 @@ def main():
         minio_client = None
 
     if not minio_client:
-        logger.critical("MinIO client is not available. Email processing that requires MinIO will fail. Exiting.")
+        logger.critical(
+            "MinIO client is not available. Email processing that requires MinIO will fail. Exiting."
+        )
         return
 
     try:
         logger.info("Setting up mailboxes...")
         mailboxes = setup_mailboxes(config)
         if not mailboxes:
-            logger.warning("No mailboxes configured or failed to connect. Check logs from setup_mailboxes. Exiting.")
+            logger.warning(
+                "No mailboxes configured or failed to connect. Check logs from setup_mailboxes. Exiting."
+            )
             return
         logger.info(f"Successfully connected to {len(mailboxes)} mailboxes.")
     except Exception as e:
@@ -360,25 +465,33 @@ def main():
         case_processing_path.mkdir(parents=True, exist_ok=True)
         logger.info(f"Using case processing path: {case_processing_path}")
     except OSError as e:
-        logger.error(f"Could not create or access case processing path '{case_processing_path}': {e}. Check permissions.")
+        logger.error(
+            f"Could not create or access case processing path '{case_processing_path}': {e}. Check permissions."
+        )
 
     sleep_interval = config.get("timer-inbox-emails", DEFAULT_SLEEP_INTERVAL)
     if not isinstance(sleep_interval, (int, float)) or sleep_interval <= 0:
-        logger.warning(f"Invalid 'timer-inbox-emails' value ({sleep_interval}). Using default: {DEFAULT_SLEEP_INTERVAL}s.")
+        logger.warning(
+            f"Invalid 'timer-inbox-emails' value ({sleep_interval}). Using default: {DEFAULT_SLEEP_INTERVAL}s."
+        )
         sleep_interval = DEFAULT_SLEEP_INTERVAL
-
 
     logger.info(f"Starting email processing loop. Interval: {sleep_interval}s")
     try:
         while True:
             logger.info("Starting new email processing cycle...")
             process_emails_from_mailboxes(mailboxes, case_processing_path)
-            logger.info(f"Email processing cycle complete. Sleeping for {sleep_interval}s.")
+            logger.info(
+                f"Email processing cycle complete. Sleeping for {sleep_interval}s."
+            )
             time.sleep(sleep_interval)
     except KeyboardInterrupt:
         logger.info("Keyboard interrupt received. Shutting down application...")
     except Exception as e:
-        logger.critical(f"An unexpected critical error occurred in the main loop: {e}", exc_info=True)
+        logger.critical(
+            f"An unexpected critical error occurred in the main loop: {e}",
+            exc_info=True,
+        )
     finally:
         logger.info("Application finished.")
 
