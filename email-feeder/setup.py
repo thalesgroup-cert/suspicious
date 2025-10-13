@@ -1,4 +1,6 @@
 import logging
+import pathlib
+import classes.config_service as config_service
 
 # import os
 import json
@@ -49,7 +51,9 @@ def setup_logging(
         else (
             file_log_level
             if log_to_file
-            else console_log_level if log_to_console else logging.WARNING
+            else console_log_level
+            if log_to_console
+            else logging.WARNING
         )
     )
 
@@ -106,7 +110,9 @@ def get_logger(logger_name: str = DEFAULT_LOGGER_NAME) -> logging.Logger:
 
 
 # Return config file in dict type
-def setup_config(config_path: str = "config.json") -> dict:
+def setup_config(
+    config_path: pathlib.Path = pathlib.Path("config.json"),
+) -> config_service.ConfigServiceGlobalConfig:
     """
     Reads and parses a JSON configuration file.
 
@@ -125,19 +131,19 @@ def setup_config(config_path: str = "config.json") -> dict:
     logger = get_logger()
     logger.info(f"Attempting to read configuration file from: {config_path}")
     try:
-        with open(config_path, "r") as json_file:
-            config = json.load(json_file)
-        logger.info("Configuration file read successfully.")
-        return config
-    except FileNotFoundError:
-        logger.error(f"Configuration file not found at: {config_path}")
-        raise
-    except json.JSONDecodeError as e:
-        logger.error(f"Error decoding JSON from {config_path}: {e}")
-        raise
-    except Exception as e:
-        logger.error(f"An unexpected error occurred while reading {config_path}: {e}")
-        raise
+        return config_service.ConfigService(
+            config_file_path=config_path
+        ).read_config_file()
+    except (FileNotFoundError, json.JSONDecodeError, Exception) as e:
+        if isinstance(e, FileNotFoundError):
+            logger.error(f"Configuration file not found at: {config_path}")
+        elif isinstance(e, json.JSONDecodeError):
+            logger.error(f"Error decoding JSON from {config_path}: {e}")
+        else:
+            logger.error(
+                f"An unexpected error occurred while reading {config_path}: {e}"
+            )
+        raise e
 
     # logger.info("Reading config from Vault")
 
@@ -257,21 +263,15 @@ def setup_mailboxes(config: Dict[str, Any]) -> List[Mailbox]:
                     f"Successfully connected and logged into mailbox: {instance_name}."
                 )
 
-            except (
-                ConnectionError
-            ) as e:
+            except ConnectionError as e:
                 logger.error(
                     f"Failed to connect or login to mailbox '{instance_name}': {e}"
                 )
-            except (
-                KeyError
-            ) as e:
+            except KeyError as e:
                 logger.error(
                     f"Configuration error for Mailbox '{instance_name}': Missing key {e}"
                 )
-            except (
-                Exception
-            ) as e:
+            except Exception as e:
                 logger.error(
                     f"An unexpected error occurred while setting up mailbox '{instance_name}': {e}",
                     exc_info=True,
