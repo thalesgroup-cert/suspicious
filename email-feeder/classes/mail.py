@@ -1,34 +1,19 @@
+import dataclasses
+
+
+@dataclasses.dataclass(eq=False, repr=False)
 class Mail:
-    def __init__(
-        self,
-        sender,
-        recipients,
-        bcc,
-        date,
-        body,
-        headers,
-        subject,
-        cc,
-        attachments,
-        eml,
-        html,
-        new_id,
-        case_path,
-        tags=None,
-    ):
-        self.sender = sender
-        self.recipients = recipients
-        self.date = date
-        self.headers = headers
-        self.body = body
-        self.subject = subject
-        self.cc = cc
-        self.bcc = bcc
-        self.attachments = attachments
-        self.eml = eml
-        self.html = html
-
-        self.tags = tags
-
-        self.new_id = new_id
-        self.case_path = case_path
+    sender: str
+    recipients: str
+    bcc: str
+    date: str
+    body: str
+    headers: str
+    subject: str
+    cc: str
+    attachments: str
+    eml: str
+    html: str
+    new_id: str
+    case_path: str
+    tags: str | None = dataclasses.field(default=None)
