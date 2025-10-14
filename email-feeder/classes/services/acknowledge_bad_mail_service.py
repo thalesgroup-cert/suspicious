@@ -1,7 +1,16 @@
 import os
+import logging
 import pathlib
-import typing
+
+import pydantic
 import jinja2  # python3 -m pip install jinja2
+
+import classes.models.configs.internals.mail
+import classes.models.mail
+import classes.models.mail_tags
+import classes.services.send_mail_service
+import classes.services.try_callback_service
+
 
 SOCIAL_LOGOS = {
     "linkedin": "data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAEIAAABCCAYAAADjVADoAAABS2lUWHRYTUw6Y29tLmFkb2JlLnhtcAAAAAAAPD94cGFja2V0IGJlZ2luPSLvu78iIGlkPSJXNU0wTXBDZWhpSHpyZVN6TlRjemtjOWQiPz4KPHg6eG1wbWV0YSB4bWxuczp4PSJhZG9iZTpuczptZXRhLyIgeDp4bXB0az0iQWRvYmUgWE1QIENvcmUgNS42LWMxNDIgNzkuMTYwOTI0LCAyMDE3LzA3LzEzLTAxOjA2OjM5ICAgICAgICAiPgogPHJkZjpSREYgeG1sbnM6cmRmPSJodHRwOi8vd3d3LnczLm9yZy8xOTk5LzAyLzIyLXJkZi1zeW50YXgtbnMjIj4KICA8cmRmOkRlc2NyaXB0aW9uIHJkZjphYm91dD0iIi8+CiA8L3JkZjpSREY+CjwveDp4bXBtZXRhPgo8P3hwYWNrZXQgZW5kPSJyIj8+nhxg7wAAA09JREFUeJzt3EuoHEUUxvHftEJEiVcwiigE34oomQtXBI0xiojgUlH3rlyYhUIkoCCIm5gs1IVuVQTFTdyKRBME8YU3vsDHIosEhGuUCC4kyS0XVa2TsacncWrSfdP9h15M1Zk+p7853VNV3acHIQQ1LOJh3IVrcUmdcQtZwc/Yh3ewPMlwMEGIRezG3fOIrkE+wpP4aryjqDDejs+cfSLAVvHYto93jGbEAC/hiTMWVrO8gm3lh9GM2KE7IhCP9Z/MKDNiEZ/jnIaCaooTWMJymRG7dU8E4jG/SMyIoYqraMcYFuI4oes8UmBL01G0gC2DEMIKNjQdScOsDEIIq+IYosusFnoRoKgaYneSczPv7xj24zCux23WSMblFOIAHhKnvSW3411cntHPXBiEKQsSp8hR3IhfKvqW8KnqmW5ryBXcG6pFgC/EhZFWk0uI76f0f5vJz9zIJcS0AVnrB2y5rhHfYIjVir4FHMRFGfzMjVwZcQt2+u9f5Tq8qeUikC8jSvbhdRzCDXgcN2Xc/9zILcSapdX/7WeSnCPLPeIQe5zz8cBY24f4tcJ2g39vIxzFa3gP3+EPrMfVuF9cfL1i5qhLQj4WQggqto0Vtpsn2G5O/XtCCBdPsCm3dSGEnbmCb+Op8RYexJEpdn+Jy/HP5nDaNiEO4jFxmf1UeQGfzOq4bUIcEn/p0yHg+Vkdt02I/8v7+H2WHbRViGvwqpjyH+M5XFBjfwJfzuIw9wpVDjaJI9SFkbY70nafeCpUcXgWp23MiF1OFqHkXvWPKvw2i9O2CbEe99T01/Wd7kX2JNomxFXqY9o4L8dtE+LCKf1zu2PfNiEaoxci0QuR6IVI9EIkeiESvRCJXohEL0SiFyKRcxq+FX9WtF9a0baE8yrab57i4zJxFlrFlVO+W0t/gyfRnxqJXohEL0SiFyLRC5EoTF4V7hKrhen3GLvAkQI/NB1FC/ixEB8Z7jr7+1KmyLAQy4T3Nh1Jg3yAA2W541B8VLhrlX7HcauRcsdlPNNcPI2xQyqcHy+Sf1l3qoEnlkRLHU+LKXO2clw8xm2jjXWvTdil/u7zWmQvnlLxHolJQpRswqO4E9eJL9JYE6VJ4tRhBT+JY6W38fUk478BGKWaSGldMyAAAAAASUVORK5CYII=",
@@ -12,16 +21,19 @@ SOCIAL_LOGOS = {
 }
 
 CURRENT_FILE_PATH = pathlib.Path(os.path.abspath(__file__))
-TEMPLATES_DIR = CURRENT_FILE_PATH.parent / "templates"
+TEMPLATES_DIR = CURRENT_FILE_PATH.parent / ".." / "templates"
 
 
-class AcknowledgeBadMailServiceConfigSocial(typing.TypedDict):
+class AcknowledgeBadMailServiceConfigSocial(pydantic.BaseModel):
     name: str
     url: str
     logo: str
 
 
-class AcknowledgeBadMailServiceConfig(typing.TypedDict):
+class AcknowledgeBadMailServiceConfig(pydantic.BaseModel):
+    username: str
+    server: str
+    port: int
     compagny_name: str
     compagny_logo: str
     compagny_online_portal: str
@@ -33,8 +45,35 @@ class AcknowledgeBadMailServiceConfig(typing.TypedDict):
     inquiry: str
     inquiry_details: str
 
+    @staticmethod
+    def from_mail_config(
+        mail_config: classes.models.configs.internals.mail.MailConfig,
+    ) -> "AcknowledgeBadMailServiceConfig":
+        return AcknowledgeBadMailServiceConfig(
+            username=mail_config.username,
+            server=mail_config.server,
+            port=mail_config.port,
+            compagny_name=mail_config.group,
+            compagny_logo=mail_config.logos.get("compagny", "#"),
+            acknowledge_bad_mail_logo=mail_config.logos.get("acknowledge-badmail", "#"),
+            compagny_global_security_team=mail_config.compagny_name,
+            compagny_global_security_url=mail_config.compagny_url,
+            compagny_online_portal=mail_config.security,
+            compagny_socials=[
+                AcknowledgeBadMailServiceConfigSocial(
+                    name=social,
+                    url=mail_config.socials.get(social, f"https://{social}.com"),
+                    logo=SOCIAL_LOGOS.get(social, "#"),
+                )
+                for social in mail_config.socials.keys()
+            ],
+            glossary=mail_config.glossary,
+            inquiry=mail_config.inquiry,
+            inquiry_details=mail_config.inquiry_text,
+        )
 
-class AcknowledgeBadMailTemplateVariables(AcknowledgeBadMailServiceConfig):
+
+class AcknowledgeBadMailTemplateVariables(pydantic.BaseModel):
     subject: str
     sender: str
     recipient: str
@@ -44,10 +83,12 @@ class AcknowledgeBadMailTemplateVariables(AcknowledgeBadMailServiceConfig):
 class AcknowledgeBadMailService:
     def __init__(
         self,
-        config: AcknowledgeBadMailServiceConfig,
+        config: classes.models.configs.internals.mail.MailConfig,
+        logger: logging.Logger,
     ) -> None:
         self.__config = config
         self.__template = self.__load_template()
+        self.__logger = logger
 
     @staticmethod
     def __load_template() -> jinja2.Template:
@@ -58,53 +99,93 @@ class AcknowledgeBadMailService:
 
     def get_html(self, subject: str, sender: str, recipient: str, infos: str) -> str:
         template_variables = AcknowledgeBadMailTemplateVariables(
-            **self.__config,
             subject=subject,
             sender=sender,
             recipient=recipient,
             infos=infos,
         )
 
-        return self.__template.render(**template_variables)
+        return self.__template.render(
+            {**self.__config.model_dump(), **template_variables.model_dump()}
+        )
 
+    def __send_action(self, user: str, user_infos: str):
+        subject = "SUSPICIOUS EMAIL ANALYSIS - There is a problem with your submission"
+        html = self.get_html(
+            subject=subject,
+            sender=self.__config.username,
+            recipient=user,
+            infos=user_infos,
+        )
 
-if __name__ == "__main__":
-    socials = {
-        "facebook": "https://fr-fr.facebook.com/test",
-        "twitter": "https://x.com/test",
-        "instagram": "https://www.instagram.com/test",
-        "linkedin": "https://www.linkedin.com/company/test",
-        "youtube": "https://www.youtube.com/test",
-    }
-    service = AcknowledgeBadMailService(
-        {
-            "compagny_name": "Your Compagny Team Name",
-            "compagny_logo": "#",
-            "acknowledge_bad_mail_logo": "#",
-            "compagny_global_security_team": "Global Security Team",
-            "compagny_global_security_url": "https://example.com/global-security",
-            "compagny_online_portal": "https://example.com/online-portal",
-            "compagny_socials": [
-                AcknowledgeBadMailServiceConfigSocial(
-                    name=social,
-                    url=socials.get(social, f"https://{social}.com"),
-                    logo=SOCIAL_LOGOS.get(social, "#"),
-                )
-                for social in socials.keys()
-            ],
-            "glossary": "https://glossary_to_cyber terms",
-            "inquiry": "mailto:inquryemail@yourcompany.com",
-            "inquiry_details": "inquryemail@yourcompany.com",
-        }
-    )
+        send_mail_service = classes.services.send_mail_service.SendMailService(
+            host=self.__config.server, port=self.__config.port
+        )
 
-    subject = "SUSPICIOUS EMAIL ANALYSIS - There is a problem with your submission"
+        send_mail_service.connect()
 
-    html = service.get_html(
-        subject=subject,
-        sender=str("suspicious@email.com"),
-        recipient="user@recipient.com",
-        infos="user info here",
-    )
+        send_mail_service.publish_email(
+            subject=subject,
+            sender=str(self.__config.username),
+            recipient=user,
+            html=html,
+        )
 
-    print(html)
+        send_mail_service.close()
+
+    def send_user_acknowledgement_email(self, user: str) -> None:
+        if user == "suspicious":
+            return None
+
+        user_identity = user.split("@")[0]
+        user_fragments = user_identity.split(".")
+        user_first_name = user_fragments[0] if "." in user_identity else user_identity
+        user_last_name = user_fragments[1] if "." in user_identity else ""
+        user_infos = f"{user_first_name} {user_last_name}"
+
+        self.__logger.info(
+            "Sending acknowledgement email to user with user_infos: %s", user_infos
+        )
+
+        success = classes.services.try_callback_service.try_callback(
+            logger=self.__logger,
+            callback=lambda: self.__send_action(user=user, user_infos=user_infos),
+        )
+        if success:
+            self.__logger.info("Acknowledgement email sent successfully")
+        else:
+            self.__logger.error("Failed to send acknowledgement email.")
+
+    def process_single_email(
+        self, mail: classes.models.mail.SuspiciousMailResponse, case_path: pathlib.Path
+    ):
+        """
+        Processes a single email: uploads its case files to MinIO or prepares for resend, then cleans up.
+        """
+        self.__logger.info(
+            f"Processing mail ID: {mail.id} from sender: {mail.original_mail.from_address or 'UnknownSender'} with case path: {case_path}"
+        )
+
+        if not case_path.is_dir():
+            self.__logger.error(
+                f"Mail {mail.id}: Case path '{case_path}' does not exist or is not a directory. Skipping."
+            )
+            return
+
+        if mail.tags == classes.models.mail_tags.MailTag.RESEND:
+            # If the mail is tagged for resend, we prepare it for reprocessing.
+            self.__logger.info(
+                f"Mail {mail.id} is tagged for resend. Preparing case files for reprocessing."
+            )
+            self.send_user_acknowledgement_email(
+                mail.original_mail.from_address or "UnknownSender"
+            )
+            self.__logger.info(
+                f"Mail {mail.id} tagged for resend. Notifying {mail.original_mail.from_address or 'UnknownSender'}."
+            )
+
+        else:
+            # TODO: Acknowledment email
+            self.__logger.info(
+                f"Mail {mail.id}: Standard processing. Uploading case files from '{case_path}'."
+            )
