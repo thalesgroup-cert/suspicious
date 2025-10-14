@@ -36,7 +36,8 @@ class MinioService:
     def __make_bucket(self, bucket_name: str) -> None:
         if self.__minio_client is None:
             raise Exception(f"MinIO client not available for bucket '{bucket_name}'.")
-
+        if len(bucket_name) > 63:
+            bucket_name = bucket_name[:63]
         self.__minio_client.make_bucket(bucket_name)
 
     def __assign_bucket_tags(self, bucket_name: str, tags_to_set: dict[str, str]):
@@ -82,6 +83,7 @@ class MinioService:
         self,
         bucket_name: str,
         file_path: pathlib.Path,
+        object_name: typing.Optional[str] = None,
         default_tags: typing.Optional[dict[str, str]] = None,
     ):
         if self.__minio_client is None:
@@ -93,7 +95,8 @@ class MinioService:
         if not file_path.is_file():
             raise Exception(f"{file_path} is not a file.")
 
-        object_name = file_path.as_posix()
+        if object_name is None:
+            object_name = file_path.as_posix()
 
         object_tags: minio.commonconfig.Tags | None = None
         if default_tags is not None:
@@ -107,7 +110,7 @@ class MinioService:
             try:
                 self.__minio_client.put_object(
                     bucket_name=bucket_name,
-                    object_name=object_name,  # Minio uses POSIX paths.
+                    object_name=object_name,
                     data=f_data,
                     length=file_stat.st_size,
                     content_type="application/octet-stream",
@@ -170,7 +173,8 @@ class MinioService:
             try:
                 self.upload_file(
                     bucket_name=bucket_name,
-                    file_path=minio_file_path,
+                    file_path=file_path,
+                    object_name=minio_file_path.as_posix(),
                     default_tags=default_tags,
                 )
 

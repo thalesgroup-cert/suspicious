@@ -82,7 +82,7 @@ class MailClient:
                 "Trying to use SSL although no certfile / keyfile were provided."
             )
 
-        ssl_context = ssl.create_default_context(ssl.Purpose.CLIENT_AUTH)
+        ssl_context=ssl.create_default_context(ssl.Purpose.SERVER_AUTH, cafile="/etc/private/ca-bundle.crt")
         try:
             ssl_context.load_cert_chain(
                 self.__instance_config.certfile, self.__instance_config.keyfile

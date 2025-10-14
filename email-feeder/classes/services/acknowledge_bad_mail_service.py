@@ -34,12 +34,12 @@ class AcknowledgeBadMailServiceConfig(pydantic.BaseModel):
     username: str
     server: str
     port: int
-    compagny_name: str
-    compagny_logo: str
-    compagny_online_portal: str
-    compagny_global_security_team: str
-    compagny_global_security_url: str
-    compagny_socials: list[AcknowledgeBadMailServiceConfigSocial]
+    company_name: str
+    company_logo: str
+    company_online_portal: str
+    company_global_security_team: str
+    company_global_security_url: str
+    company_socials: list[AcknowledgeBadMailServiceConfigSocial]
     acknowledge_bad_mail_logo: str
     glossary: str
     inquiry: str
@@ -53,13 +53,13 @@ class AcknowledgeBadMailServiceConfig(pydantic.BaseModel):
             username=mail_config.username,
             server=mail_config.server,
             port=mail_config.port,
-            compagny_name=mail_config.group,
-            compagny_logo=mail_config.logos.get("compagny", "#"),
+            company_name=mail_config.group,
+            company_logo=mail_config.logos.get("company", "#"),
             acknowledge_bad_mail_logo=mail_config.logos.get("acknowledge-badmail", "#"),
-            compagny_global_security_team=mail_config.compagny_name,
-            compagny_global_security_url=mail_config.compagny_url,
-            compagny_online_portal=mail_config.security,
-            compagny_socials=[
+            company_global_security_team=mail_config.company_name,
+            company_global_security_url=mail_config.company_url,
+            company_online_portal=mail_config.suspicious_web,
+            company_socials=[
                 AcknowledgeBadMailServiceConfigSocial(
                     name=social,
                     url=mail_config.socials.get(social, f"https://{social}.com"),
@@ -86,7 +86,7 @@ class AcknowledgeBadMailService:
         config: classes.models.configs.internals.mail.MailConfig,
         logger: logging.Logger,
     ) -> None:
-        self.__config = config
+        self.__config = AcknowledgeBadMailServiceConfig.from_mail_config(config)
         self.__template = self.__load_template()
         self.__logger = logger
 

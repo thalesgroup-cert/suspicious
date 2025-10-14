@@ -12,13 +12,13 @@
     },
     "imaps": {
       "imaps-dev": {
-        "enable": true,
+        "enable": false,
         "host": "imaps.test",
         "port": 993,
         "login": "user@organisation.com",
         "password": "secret",
-        "certfile": null,
-        "keyfile": null,
+        "certfile": "path/to/certificate.pem",
+        "keyfile": "path/to/key.pem",
         "mailbox_to_monitor": "TEST"
       },
       "imaps-prod": {
@@ -48,8 +48,8 @@
     "footer": "Limited Distribution",
     "group": "Your Cybersecurity Team Name",
     "suspicious_web": "https://suspicious.test/submissions/",
-    "global": "test.com",
-    "global_url": "https://www.test.com/en",
+    "company_name": "test.com",
+    "company_url": "https://www.test.com/en",
     "socials": {
       "facebook": "https://fr-fr.facebook.com/test",
       "twitter": "https://x.com/test",
@@ -60,7 +60,6 @@
     "glossary": "https://glossary_to_cyber terms",
     "inquiry": "mailto:inquryemail@yourcompany.com",
     "inquiry_text": "inquryemail@yourcompany.com",
-    "submissions": "https://suspicious.test/submissions/",
     "security": "mailto:yoursecuritymail@yourcompany.com",
     "security_msg": "yoursecuritymail@yourcompany.com",
     "logos": {

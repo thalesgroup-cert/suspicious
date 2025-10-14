@@ -93,7 +93,6 @@ def process_emails_from_mailboxes(
                 acknowledge_bad_mail_service.process_single_email(
                     mail=mail, case_path=case_path
                 )
-                cleanup_directory(case_path, remove_parent_if_empty=True)
 
             for case_dir in config.working_path.iterdir():
                 if case_dir.is_dir():

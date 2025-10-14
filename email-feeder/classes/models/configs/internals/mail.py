@@ -28,29 +28,29 @@ class MailConfig(pydantic.BaseModel):
     suspicious_web: str = "https://suspicious.test/submissions/"
     """The URL to the Suspicious web interface."""
 
-    compagny_name: str = "test.com"
-    """The name of the compagny hosting the Suspicious service."""
+    company_name: str = "test.com"
+    """The name of the company hosting the Suspicious service."""
 
-    compagny_url: str = "https://www.test.com/en"
-    """The URL to the compagny's website."""
+    company_url: str = "https://www.test.com/en"
+    """The URL to the company's website."""
 
     socials: dict[str, str] = pydantic.Field(default_factory=dict[str, str])
-    """The social URLs to the compagny's pages. (facebook, twitter, ...)"""
+    """The social URLs to the company's pages. (facebook, twitter, ...)"""
 
     glossary: str = "https://glossary_to_cyber terms"
     """The URL to the glossary page."""
 
     inquiry: str = "mailto:inquryemail@yourcompany.com"
-    """The compagny's email address to write to for inquiry request."""
+    """The company's email address to write to for inquiry request."""
 
     inquiry_text: str = "inquryemail@yourcompany.com"
     """The label text for the inquiry email address button."""
 
     security: str = "mailto:yoursecuritymail@yourcompany.com"
-    """The compagny's email address to write to for security concerns."""
+    """The company's email address to write to for security concerns."""
 
     security_msg: str = "yoursecuritymail@yourcompany.com"
     """The label text for the security email address button."""
 
     logos: dict[str, str] = pydantic.Field(default_factory=dict[str, str])
-    """The compagny and acknowledge-badmail logos. (format: data:image/png;base64)"""
+    """The company and acknowledge-badmail logos. (format: data:image/png;base64)"""
