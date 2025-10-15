@@ -1,7 +1,7 @@
-beautifulsoup4
-requests
-python-dateutil
-minio
+beautifulsoup4==4.14.2
+requests==2.32.5
+python-dateutil==2.9.0.post0
+minio==7.2.18
 chardet==5.2.0
-jinja2
-pydantic
+jinja2==3.1.6
+pydantic==2.12.2

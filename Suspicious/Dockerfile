@@ -7,7 +7,7 @@ ARG HTTPS_PROXY
 # BUILDER #
 ###########
 # Use a specific version of the base image for reproducibility
-FROM python:3.10 AS builder
+FROM python:3.11 AS builder
 
 # Set proxies ENV vars only within this stage using the build ARGs
 ENV http_proxy=${HTTP_PROXY}
@@ -46,7 +46,7 @@ RUN pip install --no-cache-dir --upgrade pip \
 # FINAL #
 #########
 # Use the same slim base image
-FROM python:3.10-slim
+FROM python:3.11-slim
 
 # Set ARG/ENV for proxies again if needed *during this stage's build* (e.g., for nltk download)
 ENV http_proxy=${HTTP_PROXY}
