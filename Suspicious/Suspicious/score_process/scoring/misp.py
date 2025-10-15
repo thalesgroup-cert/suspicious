@@ -169,9 +169,9 @@ class MISPHandler:
         """
         Parse tags from configuration and return a list of tag dictionaries.
         Args:
-            tags_config (dict): Configuration dictionary for tags.
+        tags_config (dict): Configuration dictionary for tags.
         Returns:
-            list: List of tag dictionaries.
+        list: List of tag dictionaries.
         """
         tags = []
         for key, value in tags_config.items():

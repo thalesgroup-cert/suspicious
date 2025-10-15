@@ -233,14 +233,16 @@ def dashboard_campaigns_classification_counts(request: HttpRequest) -> JsonRespo
 # New endpoint: PCA of all embeddings in ChromaDB
 @login_required
 def dashboard_campaigns_pca(request: HttpRequest) -> JsonResponse:
-    """Compute 2D PCA on all ChromaDB embeddings and return scatter points.
+    """
+    Compute 2D PCA on all ChromaDB embeddings and return scatter points.
 
     Response format:
     {
-      "points": [ {"x": float, "y": float, "label": str}, ... ],
-      "explained_variance": [ pc1_ratio, pc2_ratio ]
+    "points": [ {"x": float, "y": float, "label": str}, ... ],
+    "explained_variance": [ pc1_ratio, pc2_ratio ]
     }
     Optional query param: ?limit=1500 to subsample points if needed.
+
     """
     # Limit points for payload size
     try:
@@ -680,15 +682,17 @@ def dashboard_change_scope(request: HttpRequest, month: str, year: str, scope: s
 # New endpoint: mail volume data for last 14 days
 @login_required
 def dashboard_campaigns_mail_volume(request: HttpRequest) -> JsonResponse:
-    """Return stacked mail volume for the last 15 days.
+    """
+    Return stacked mail volume for the last 15 days.
 
     Response format:
     {
-      "dates": ["YYYY-MM-DD", ...],
-      "non_danger": [int, ...],
-      "dangerous": [int, ...],
-      "campaigns": [ {"name": str, "start": "YYYY-MM-DD", "end": "YYYY-MM-DD"}, ... ]
+    "dates": ["YYYY-MM-DD", ...],
+    "non_danger": [int, ...],
+    "dangerous": [int, ...],
+    "campaigns": [ {"name": str, "start": "YYYY-MM-DD", "end": "YYYY-MM-DD"}, ... ]
     }
+
     """
     # Define 15-day window by UTC dates (inclusive of today)
     today_utc = datetime.now(timezone.utc).date()

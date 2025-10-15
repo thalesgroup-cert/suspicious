@@ -125,13 +125,13 @@ def update_file_with_scores(file_obj: Any, is_malicious: bool) -> bool:
     Update a file object with scores based on its malicious status.
 
     Args:
-        file_obj: The file object (not path) to update scores for.
-                Must have 'file_level', 'file_score', 'file_confidence' attributes
-                and a .save() method.
-        is_malicious: True if the file is considered malicious.
+    file_obj: The file object (not path) to update scores for.
+    Must have 'file_level', 'file_score', 'file_confidence' attributes
+    and a .save() method.
+    is_malicious: True if the file is considered malicious.
 
     Returns:
-        bool: True if the update and save were successful, False otherwise.
+    bool: True if the update and save were successful, False otherwise.
     """
     update_cases_logger.info("Updating scores for file object %r (malicious=%s)", file_obj, is_malicious)
     return update_scores(file_obj, 'file_level', 'file_score', 'file_confidence', is_malicious)

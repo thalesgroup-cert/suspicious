@@ -159,9 +159,9 @@ def decode_mime_header(value):
     """Decode a MIME encoded (RFC 2047) header value if needed.
     Falls back gracefully if decoding fails.
     Args:
-        value (str | list): Raw header value (possibly list from parser)
+    value (str \| list): Raw header value (possibly list from parser)
     Returns:
-        str: Decoded unicode string
+    str: Decoded unicode string
     """
     try:
         if isinstance(value, list):

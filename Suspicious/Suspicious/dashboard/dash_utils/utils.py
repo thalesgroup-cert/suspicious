@@ -484,6 +484,7 @@ def total_by_danger_dash_scope(
     :param year: The year.
     :param scope: Group scope string.
     :return: Total count for the specified danger level.
+
     """
     if danger not in VALID_DANGER_LEVELS:
         logger.warning(f"Invalid danger level provided: {danger}")
@@ -657,7 +658,7 @@ def total_by_danger_dash(
     - int: The total number of cases based on the danger level, or 0 if not found or an error occurs.
 
     Example usage in Django Template:
-    {{ "safe"|total_by_danger_dash:5:2022 }}  {# Returns the total number of safe cases for May 2022 #}
+    {{ "safe"\|total_by_danger_dash:5:2022 }}  {# Returns the total number of safe cases for May 2022 #}
     """
     try:
         month_int = int(month)
