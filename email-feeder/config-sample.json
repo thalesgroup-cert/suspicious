@@ -19,6 +19,7 @@
         "password": "secret",
         "certfile": "path/to/certificate.pem",
         "keyfile": "path/to/key.pem",
+        "rootcafile": "/path/to/ca-bundle.crt",
         "mailbox_to_monitor": "TEST"
       },
       "imaps-prod": {
@@ -29,6 +30,7 @@
         "password": "secret",
         "certfile": null,
         "keyfile": null,
+        "rootcafile": null,
         "mailbox_to_monitor": "TEST"
       }
     }

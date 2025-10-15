@@ -74,15 +74,12 @@ class MailClient:
         """Handles SSL IMAP login."""
         ssl_context = None
 
-        if (
-            self.__instance_config.certfile is None
-            or self.__instance_config.keyfile is None
-        ):
+        if (not self.__use_ssl):
             raise Exception(
                 "Trying to use SSL although no certfile / keyfile were provided."
             )
 
-        ssl_context=ssl.create_default_context(ssl.Purpose.SERVER_AUTH, cafile="/etc/private/ca-bundle.crt")
+        ssl_context=ssl.create_default_context(ssl.Purpose.SERVER_AUTH, cafile=self.__instance_config.rootcafile)
         try:
             ssl_context.load_cert_chain(
                 self.__instance_config.certfile, self.__instance_config.keyfile

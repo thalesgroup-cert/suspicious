@@ -33,3 +33,6 @@ class IMAPConfig(pydantic.BaseModel):
 
     keyfile: str | None = pydantic.Field(default=None)
     """The keyfile to use during SSL handshake with the IMAP server. (file path)"""
+
+    rootcafile: str | None = pydantic.Field(default=None)
+    """The root CA file to use during SSL handshake with the IMAP server. (file path)"""
