@@ -91,7 +91,7 @@ RUN pip install --no-cache-dir --upgrade pip \
     && pip install --no-cache-dir --no-index --find-links=/wheels -r requirements.txt
 
 # Download NLTK data
-RUN python -m nltk.downloader -d /usr/local/share/nltk_data stopwords punkt
+RUN python -m nltk.downloader -d /usr/local/share/nltk_data stopwords punkt punkt_tab
 
 # Copy project code *after* dependency installation to leverage caching
 COPY . .
