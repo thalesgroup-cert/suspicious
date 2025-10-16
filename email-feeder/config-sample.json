@@ -2,50 +2,50 @@
   "mail-connectors": {
     "imap": {
       "imap-dev": {
-        "enable": false,
-        "host": "imap.test",
-        "port": 143,
-        "login": "user@organisation.com",
-        "password": "secret",
-        "mailbox_to_monitor": "TEST"
+        "enable": true,
+        "host": "localhost",
+        "port": 3143,
+        "login": "imap_user",
+        "password": "imap_password",
+        "mailbox_to_monitor": "INBOX"
       }
     },
     "imaps": {
       "imaps-dev": {
         "enable": false,
-        "host": "imaps.test",
-        "port": 993,
-        "login": "user@organisation.com",
-        "password": "secret",
-        "certfile": "path/to/certificate.pem",
-        "keyfile": "path/to/key.pem",
-        "rootcafile": "/path/to/ca-bundle.crt",
-        "mailbox_to_monitor": "TEST"
+        "host": "localhost",
+        "port": 3993,
+        "login": "imap_user",
+        "password": "imap_password",
+        "certfile": "/path/to/dev/certfile.pem",
+        "keyfile": "/path/to/dev/keyfile.pem",
+        "rootcafile": "/path/to/dev/rootcafile.pem",
+        "mailbox_to_monitor": "INBOX"
       },
       "imaps-prod": {
-        "enable": true,
-        "host": "imaps.test2",
-        "port": 993,
-        "login": "user@organisation.com",
-        "password": "secret",
-        "certfile": null,
-        "keyfile": null,
-        "rootcafile": null,
-        "mailbox_to_monitor": "TEST"
+        "enable": false,
+        "host": "localhost",
+        "port": 3993,
+        "login": "imap_user",
+        "password": "imap_password",
+        "certfile": "/path/to/prod/certfile.pem",
+        "keyfile": "/path/to/prod/keyfile.pem",
+        "rootcafile": "/path/to/prod/rootcafile.pem",
+        "mailbox_to_monitor": "INBOX"
       }
     }
   },
-  "working-path": "/app/case",
+  "working-path": "/tmp/suspicious",
   "timer-inbox-emails": 10,
   "minio": {
-    "endpoint": "minio:9000",
-    "access_key": "access-key",
-    "secret_key": "secret-key",
+    "endpoint": "localhost:9000",
+    "access_key": "minioadmin",
+    "secret_key": "minioadmin",
     "secure": false
   },
   "mail": {
-    "server": "the smtp serve to allow the app to send mails",
-    "port": 25,
+    "server": "localhost",
+    "port": 3025,
     "username": "SUSPICIOUS",
     "footer": "Limited Distribution",
     "group": "Your Cybersecurity Team Name",
