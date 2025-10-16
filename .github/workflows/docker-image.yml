@@ -40,4 +40,4 @@ jobs:
       with:
         context:  "{{defaultContext}}:Suspicious"
         push: true
-        tags: ghcr.io/thalesgroup-cert/suspicious:${{ steps.docker_tag.outputs.tag }}
+        tags: ghcr.io/thalesgroup-cert/suspicious:latest
