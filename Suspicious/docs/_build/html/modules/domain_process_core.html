@@ -1,0 +1,605 @@
+
+
+<!DOCTYPE html>
+<html class="writer-html5" lang="en" data-content_root="../">
+<head>
+  <meta charset="utf-8" /><meta name="viewport" content="width=device-width, initial-scale=1" />
+
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Domain Process Module &mdash; Suspicious 1.0.0 documentation</title>
+      <link rel="stylesheet" type="text/css" href="../_static/pygments.css?v=b86133f3" />
+      <link rel="stylesheet" type="text/css" href="../_static/css/theme.css?v=e59714d7" />
+
+  
+      <script src="../_static/jquery.js?v=5d32c60e"></script>
+      <script src="../_static/_sphinx_javascript_frameworks_compat.js?v=2cd50e6c"></script>
+      <script src="../_static/documentation_options.js?v=8d563738"></script>
+      <script src="../_static/doctools.js?v=9bcbadda"></script>
+      <script src="../_static/sphinx_highlight.js?v=dc90522c"></script>
+    <script src="../_static/js/theme.js"></script>
+    <link rel="index" title="Index" href="../genindex.html" />
+    <link rel="search" title="Search" href="../search.html" />
+    <link rel="next" title="email_process_core module" href="email_process_core.html" />
+    <link rel="prev" title="Dashboard module" href="dashboard_core.html" /> 
+</head>
+
+<body class="wy-body-for-nav"> 
+  <div class="wy-grid-for-nav">
+    <nav data-toggle="wy-nav-shift" class="wy-nav-side">
+      <div class="wy-side-scroll">
+        <div class="wy-side-nav-search" >
+
+          
+          
+          <a href="../index.html" class="icon icon-home">
+            Suspicious
+          </a>
+<div role="search">
+  <form id="rtd-search-form" class="wy-form" action="../search.html" method="get">
+    <input type="text" name="q" placeholder="Search docs" aria-label="Search docs" />
+    <input type="hidden" name="check_keywords" value="yes" />
+    <input type="hidden" name="area" value="default" />
+  </form>
+</div>
+        </div><div class="wy-menu wy-menu-vertical" data-spy="affix" role="navigation" aria-label="Navigation menu">
+              <p class="caption" role="heading"><span class="caption-text">Contents:</span></p>
+<ul class="current">
+<li class="toctree-l1 current"><a class="reference internal" href="index.html">Modules (API Reference)</a><ul class="current">
+<li class="toctree-l2"><a class="reference internal" href="case_handler_core.html">case_handler_core module</a></li>
+<li class="toctree-l2"><a class="reference internal" href="cortex_job_core.html">cortex_job_core module</a></li>
+<li class="toctree-l2"><a class="reference internal" href="dashboard_core.html">Dashboard module</a></li>
+<li class="toctree-l2 current"><a class="current reference internal" href="#">Domain Process Module</a><ul>
+<li class="toctree-l3"><a class="reference internal" href="#domain_process.models.Domain"><code class="docutils literal notranslate"><span class="pre">Domain</span></code></a><ul>
+<li class="toctree-l4"><a class="reference internal" href="#domain_process.models.Domain.DoesNotExist"><code class="docutils literal notranslate"><span class="pre">Domain.DoesNotExist</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="#domain_process.models.Domain.MultipleObjectsReturned"><code class="docutils literal notranslate"><span class="pre">Domain.MultipleObjectsReturned</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="#domain_process.models.Domain.allow_lists"><code class="docutils literal notranslate"><span class="pre">Domain.allow_lists</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="#domain_process.models.Domain.analyzer_reports"><code class="docutils literal notranslate"><span class="pre">Domain.analyzer_reports</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="#domain_process.models.Domain.campaign_allow_lists"><code class="docutils literal notranslate"><span class="pre">Domain.campaign_allow_lists</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="#domain_process.models.Domain.category"><code class="docutils literal notranslate"><span class="pre">Domain.category</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="#domain_process.models.Domain.creation_date"><code class="docutils literal notranslate"><span class="pre">Domain.creation_date</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="#domain_process.models.Domain.deny_lists"><code class="docutils literal notranslate"><span class="pre">Domain.deny_lists</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="#domain_process.models.Domain.domain_artifacts"><code class="docutils literal notranslate"><span class="pre">Domain.domain_artifacts</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="#domain_process.models.Domain.domain_iocs"><code class="docutils literal notranslate"><span class="pre">Domain.domain_iocs</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="#domain_process.models.Domain.get_next_by_creation_date"><code class="docutils literal notranslate"><span class="pre">Domain.get_next_by_creation_date()</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="#domain_process.models.Domain.get_next_by_last_update"><code class="docutils literal notranslate"><span class="pre">Domain.get_next_by_last_update()</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="#domain_process.models.Domain.get_previous_by_creation_date"><code class="docutils literal notranslate"><span class="pre">Domain.get_previous_by_creation_date()</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="#domain_process.models.Domain.get_previous_by_last_update"><code class="docutils literal notranslate"><span class="pre">Domain.get_previous_by_last_update()</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="#domain_process.models.Domain.id"><code class="docutils literal notranslate"><span class="pre">Domain.id</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="#domain_process.models.Domain.ioc_confidence"><code class="docutils literal notranslate"><span class="pre">Domain.ioc_confidence</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="#domain_process.models.Domain.ioc_level"><code class="docutils literal notranslate"><span class="pre">Domain.ioc_level</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="#domain_process.models.Domain.ioc_score"><code class="docutils literal notranslate"><span class="pre">Domain.ioc_score</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="#domain_process.models.Domain.last_update"><code class="docutils literal notranslate"><span class="pre">Domain.last_update</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="#domain_process.models.Domain.linked_mail_addresses"><code class="docutils literal notranslate"><span class="pre">Domain.linked_mail_addresses</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="#domain_process.models.Domain.linked_urls"><code class="docutils literal notranslate"><span class="pre">Domain.linked_urls</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="#domain_process.models.Domain.objects"><code class="docutils literal notranslate"><span class="pre">Domain.objects</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="#domain_process.models.Domain.times_sent"><code class="docutils literal notranslate"><span class="pre">Domain.times_sent</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="#domain_process.models.Domain.value"><code class="docutils literal notranslate"><span class="pre">Domain.value</span></code></a></li>
+</ul>
+</li>
+<li class="toctree-l3"><a class="reference internal" href="#domain_process.models.DomainInIocs"><code class="docutils literal notranslate"><span class="pre">DomainInIocs</span></code></a><ul>
+<li class="toctree-l4"><a class="reference internal" href="#domain_process.models.DomainInIocs.DoesNotExist"><code class="docutils literal notranslate"><span class="pre">DomainInIocs.DoesNotExist</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="#domain_process.models.DomainInIocs.MultipleObjectsReturned"><code class="docutils literal notranslate"><span class="pre">DomainInIocs.MultipleObjectsReturned</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="#domain_process.models.DomainInIocs.creation_date"><code class="docutils literal notranslate"><span class="pre">DomainInIocs.creation_date</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="#domain_process.models.DomainInIocs.domain"><code class="docutils literal notranslate"><span class="pre">DomainInIocs.domain</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="#domain_process.models.DomainInIocs.domain_id"><code class="docutils literal notranslate"><span class="pre">DomainInIocs.domain_id</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="#domain_process.models.DomainInIocs.get_next_by_creation_date"><code class="docutils literal notranslate"><span class="pre">DomainInIocs.get_next_by_creation_date()</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="#domain_process.models.DomainInIocs.get_next_by_last_update"><code class="docutils literal notranslate"><span class="pre">DomainInIocs.get_next_by_last_update()</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="#domain_process.models.DomainInIocs.get_previous_by_creation_date"><code class="docutils literal notranslate"><span class="pre">DomainInIocs.get_previous_by_creation_date()</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="#domain_process.models.DomainInIocs.get_previous_by_last_update"><code class="docutils literal notranslate"><span class="pre">DomainInIocs.get_previous_by_last_update()</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="#domain_process.models.DomainInIocs.id"><code class="docutils literal notranslate"><span class="pre">DomainInIocs.id</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="#domain_process.models.DomainInIocs.last_update"><code class="docutils literal notranslate"><span class="pre">DomainInIocs.last_update</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="#domain_process.models.DomainInIocs.mail_address"><code class="docutils literal notranslate"><span class="pre">DomainInIocs.mail_address</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="#domain_process.models.DomainInIocs.mail_address_id"><code class="docutils literal notranslate"><span class="pre">DomainInIocs.mail_address_id</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="#domain_process.models.DomainInIocs.objects"><code class="docutils literal notranslate"><span class="pre">DomainInIocs.objects</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="#domain_process.models.DomainInIocs.url"><code class="docutils literal notranslate"><span class="pre">DomainInIocs.url</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="#domain_process.models.DomainInIocs.url_id"><code class="docutils literal notranslate"><span class="pre">DomainInIocs.url_id</span></code></a></li>
+</ul>
+</li>
+<li class="toctree-l3"><a class="reference internal" href="#domain_process.domain_utils.domain_handler.DomainHandler"><code class="docutils literal notranslate"><span class="pre">DomainHandler</span></code></a><ul>
+<li class="toctree-l4"><a class="reference internal" href="#domain_process.domain_utils.domain_handler.DomainHandler.handle_domain"><code class="docutils literal notranslate"><span class="pre">DomainHandler.handle_domain()</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="#domain_process.domain_utils.domain_handler.DomainHandler.validate_domain"><code class="docutils literal notranslate"><span class="pre">DomainHandler.validate_domain()</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="#domain_process.domain_utils.domain_handler.DomainHandler.validate_email"><code class="docutils literal notranslate"><span class="pre">DomainHandler.validate_email()</span></code></a></li>
+</ul>
+</li>
+<li class="toctree-l3"><a class="reference internal" href="#domain_process.domain_utils.domain_handler.load_config"><code class="docutils literal notranslate"><span class="pre">load_config()</span></code></a></li>
+<li class="toctree-l3"><a class="reference internal" href="#domain_process.domain_utils.domain_handler.normalize_domain"><code class="docutils literal notranslate"><span class="pre">normalize_domain()</span></code></a></li>
+</ul>
+</li>
+<li class="toctree-l2"><a class="reference internal" href="email_process_core.html">email_process_core module</a></li>
+<li class="toctree-l2"><a class="reference internal" href="file_process_core.html">file_process_core module</a></li>
+<li class="toctree-l2"><a class="reference internal" href="hash_process_core.html">hash_process_core module</a></li>
+<li class="toctree-l2"><a class="reference internal" href="ip_process_core.html">ip_process_core module</a></li>
+<li class="toctree-l2"><a class="reference internal" href="mail_feeder_core.html">mail_feeder_core module</a></li>
+<li class="toctree-l2"><a class="reference internal" href="profiles_core.html">profiles_core module</a></li>
+<li class="toctree-l2"><a class="reference internal" href="score_process_core.html">score_process_core module</a></li>
+<li class="toctree-l2"><a class="reference internal" href="settings_core.html">settings_core module</a></li>
+<li class="toctree-l2"><a class="reference internal" href="tasp_core.html">tasp_core module</a></li>
+<li class="toctree-l2"><a class="reference internal" href="url_process_core.html">url_process_core module</a></li>
+</ul>
+</li>
+</ul>
+
+        </div>
+      </div>
+    </nav>
+
+    <section data-toggle="wy-nav-shift" class="wy-nav-content-wrap"><nav class="wy-nav-top" aria-label="Mobile navigation menu" >
+          <i data-toggle="wy-nav-top" class="fa fa-bars"></i>
+          <a href="../index.html">Suspicious</a>
+      </nav>
+
+      <div class="wy-nav-content">
+        <div class="rst-content">
+          <div role="navigation" aria-label="Page navigation">
+  <ul class="wy-breadcrumbs">
+      <li><a href="../index.html" class="icon icon-home" aria-label="Home"></a></li>
+          <li class="breadcrumb-item"><a href="index.html">Modules (API Reference)</a></li>
+      <li class="breadcrumb-item active">Domain Process Module</li>
+      <li class="wy-breadcrumbs-aside">
+            <a href="../_sources/modules/domain_process_core.rst.txt" rel="nofollow"> View page source</a>
+      </li>
+  </ul>
+  <hr/>
+</div>
+          <div role="main" class="document" itemscope="itemscope" itemtype="http://schema.org/Article">
+           <div itemprop="articleBody">
+             
+  <section id="module-domain_process.models">
+<span id="domain-process-module"></span><h1>Domain Process Module<a class="headerlink" href="#module-domain_process.models" title="Link to this heading"></a></h1>
+<dl class="py class">
+<dt class="sig sig-object py" id="domain_process.models.Domain">
+<em class="property"><span class="k"><span class="pre">class</span></span><span class="w"> </span></em><span class="sig-prename descclassname"><span class="pre">domain_process.models.</span></span><span class="sig-name descname"><span class="pre">Domain</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">id</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">ioc_score</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">ioc_confidence</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">ioc_level</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">value</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">category</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">times_sent</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">creation_date</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">last_update</span></span></em><span class="sig-paren">)</span><a class="reference internal" href="../_modules/domain_process/models.html#Domain"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#domain_process.models.Domain" title="Link to this definition"></a></dt>
+<dd><p>Bases: <code class="xref py py-class docutils literal notranslate"><span class="pre">Model</span></code></p>
+<dl class="py exception">
+<dt class="sig sig-object py" id="domain_process.models.Domain.DoesNotExist">
+<em class="property"><span class="k"><span class="pre">exception</span></span><span class="w"> </span></em><span class="sig-name descname"><span class="pre">DoesNotExist</span></span><a class="headerlink" href="#domain_process.models.Domain.DoesNotExist" title="Link to this definition"></a></dt>
+<dd><p>Bases: <code class="xref py py-class docutils literal notranslate"><span class="pre">ObjectDoesNotExist</span></code></p>
+</dd></dl>
+
+<dl class="py exception">
+<dt class="sig sig-object py" id="domain_process.models.Domain.MultipleObjectsReturned">
+<em class="property"><span class="k"><span class="pre">exception</span></span><span class="w"> </span></em><span class="sig-name descname"><span class="pre">MultipleObjectsReturned</span></span><a class="headerlink" href="#domain_process.models.Domain.MultipleObjectsReturned" title="Link to this definition"></a></dt>
+<dd><p>Bases: <code class="xref py py-class docutils literal notranslate"><span class="pre">MultipleObjectsReturned</span></code></p>
+</dd></dl>
+
+<dl class="py attribute">
+<dt class="sig sig-object py" id="domain_process.models.Domain.allow_lists">
+<span class="sig-name descname"><span class="pre">allow_lists</span></span><a class="headerlink" href="#domain_process.models.Domain.allow_lists" title="Link to this definition"></a></dt>
+<dd><p>Accessor to the related objects manager on the reverse side of a
+many-to-one relation.</p>
+<p>In the example:</p>
+<div class="highlight-default notranslate"><div class="highlight"><pre><span></span><span class="k">class</span><span class="w"> </span><span class="nc">Child</span><span class="p">(</span><span class="n">Model</span><span class="p">):</span>
+    <span class="n">parent</span> <span class="o">=</span> <span class="n">ForeignKey</span><span class="p">(</span><span class="n">Parent</span><span class="p">,</span> <span class="n">related_name</span><span class="o">=</span><span class="s1">&#39;children&#39;</span><span class="p">)</span>
+</pre></div>
+</div>
+<p><code class="docutils literal notranslate"><span class="pre">Parent.children</span></code> is a <code class="docutils literal notranslate"><span class="pre">ReverseManyToOneDescriptor</span></code> instance.</p>
+<p>Most of the implementation is delegated to a dynamically defined manager
+class built by <code class="docutils literal notranslate"><span class="pre">create_forward_many_to_many_manager()</span></code> defined below.</p>
+</dd></dl>
+
+<dl class="py attribute">
+<dt class="sig sig-object py" id="domain_process.models.Domain.analyzer_reports">
+<span class="sig-name descname"><span class="pre">analyzer_reports</span></span><a class="headerlink" href="#domain_process.models.Domain.analyzer_reports" title="Link to this definition"></a></dt>
+<dd><p>Accessor to the related objects manager on the reverse side of a
+many-to-one relation.</p>
+<p>In the example:</p>
+<div class="highlight-default notranslate"><div class="highlight"><pre><span></span><span class="k">class</span><span class="w"> </span><span class="nc">Child</span><span class="p">(</span><span class="n">Model</span><span class="p">):</span>
+    <span class="n">parent</span> <span class="o">=</span> <span class="n">ForeignKey</span><span class="p">(</span><span class="n">Parent</span><span class="p">,</span> <span class="n">related_name</span><span class="o">=</span><span class="s1">&#39;children&#39;</span><span class="p">)</span>
+</pre></div>
+</div>
+<p><code class="docutils literal notranslate"><span class="pre">Parent.children</span></code> is a <code class="docutils literal notranslate"><span class="pre">ReverseManyToOneDescriptor</span></code> instance.</p>
+<p>Most of the implementation is delegated to a dynamically defined manager
+class built by <code class="docutils literal notranslate"><span class="pre">create_forward_many_to_many_manager()</span></code> defined below.</p>
+</dd></dl>
+
+<dl class="py attribute">
+<dt class="sig sig-object py" id="domain_process.models.Domain.campaign_allow_lists">
+<span class="sig-name descname"><span class="pre">campaign_allow_lists</span></span><a class="headerlink" href="#domain_process.models.Domain.campaign_allow_lists" title="Link to this definition"></a></dt>
+<dd><p>Accessor to the related objects manager on the reverse side of a
+many-to-one relation.</p>
+<p>In the example:</p>
+<div class="highlight-default notranslate"><div class="highlight"><pre><span></span><span class="k">class</span><span class="w"> </span><span class="nc">Child</span><span class="p">(</span><span class="n">Model</span><span class="p">):</span>
+    <span class="n">parent</span> <span class="o">=</span> <span class="n">ForeignKey</span><span class="p">(</span><span class="n">Parent</span><span class="p">,</span> <span class="n">related_name</span><span class="o">=</span><span class="s1">&#39;children&#39;</span><span class="p">)</span>
+</pre></div>
+</div>
+<p><code class="docutils literal notranslate"><span class="pre">Parent.children</span></code> is a <code class="docutils literal notranslate"><span class="pre">ReverseManyToOneDescriptor</span></code> instance.</p>
+<p>Most of the implementation is delegated to a dynamically defined manager
+class built by <code class="docutils literal notranslate"><span class="pre">create_forward_many_to_many_manager()</span></code> defined below.</p>
+</dd></dl>
+
+<dl class="py attribute">
+<dt class="sig sig-object py" id="domain_process.models.Domain.category">
+<span class="sig-name descname"><span class="pre">category</span></span><a class="headerlink" href="#domain_process.models.Domain.category" title="Link to this definition"></a></dt>
+<dd><p>A wrapper for a deferred-loading field. When the value is read from this
+object the first time, the query is executed.</p>
+</dd></dl>
+
+<dl class="py attribute">
+<dt class="sig sig-object py" id="domain_process.models.Domain.creation_date">
+<span class="sig-name descname"><span class="pre">creation_date</span></span><a class="headerlink" href="#domain_process.models.Domain.creation_date" title="Link to this definition"></a></dt>
+<dd><p>A wrapper for a deferred-loading field. When the value is read from this
+object the first time, the query is executed.</p>
+</dd></dl>
+
+<dl class="py attribute">
+<dt class="sig sig-object py" id="domain_process.models.Domain.deny_lists">
+<span class="sig-name descname"><span class="pre">deny_lists</span></span><a class="headerlink" href="#domain_process.models.Domain.deny_lists" title="Link to this definition"></a></dt>
+<dd><p>Accessor to the related objects manager on the reverse side of a
+many-to-one relation.</p>
+<p>In the example:</p>
+<div class="highlight-default notranslate"><div class="highlight"><pre><span></span><span class="k">class</span><span class="w"> </span><span class="nc">Child</span><span class="p">(</span><span class="n">Model</span><span class="p">):</span>
+    <span class="n">parent</span> <span class="o">=</span> <span class="n">ForeignKey</span><span class="p">(</span><span class="n">Parent</span><span class="p">,</span> <span class="n">related_name</span><span class="o">=</span><span class="s1">&#39;children&#39;</span><span class="p">)</span>
+</pre></div>
+</div>
+<p><code class="docutils literal notranslate"><span class="pre">Parent.children</span></code> is a <code class="docutils literal notranslate"><span class="pre">ReverseManyToOneDescriptor</span></code> instance.</p>
+<p>Most of the implementation is delegated to a dynamically defined manager
+class built by <code class="docutils literal notranslate"><span class="pre">create_forward_many_to_many_manager()</span></code> defined below.</p>
+</dd></dl>
+
+<dl class="py attribute">
+<dt class="sig sig-object py" id="domain_process.models.Domain.domain_artifacts">
+<span class="sig-name descname"><span class="pre">domain_artifacts</span></span><a class="headerlink" href="#domain_process.models.Domain.domain_artifacts" title="Link to this definition"></a></dt>
+<dd><p>Accessor to the related objects manager on the reverse side of a
+many-to-one relation.</p>
+<p>In the example:</p>
+<div class="highlight-default notranslate"><div class="highlight"><pre><span></span><span class="k">class</span><span class="w"> </span><span class="nc">Child</span><span class="p">(</span><span class="n">Model</span><span class="p">):</span>
+    <span class="n">parent</span> <span class="o">=</span> <span class="n">ForeignKey</span><span class="p">(</span><span class="n">Parent</span><span class="p">,</span> <span class="n">related_name</span><span class="o">=</span><span class="s1">&#39;children&#39;</span><span class="p">)</span>
+</pre></div>
+</div>
+<p><code class="docutils literal notranslate"><span class="pre">Parent.children</span></code> is a <code class="docutils literal notranslate"><span class="pre">ReverseManyToOneDescriptor</span></code> instance.</p>
+<p>Most of the implementation is delegated to a dynamically defined manager
+class built by <code class="docutils literal notranslate"><span class="pre">create_forward_many_to_many_manager()</span></code> defined below.</p>
+</dd></dl>
+
+<dl class="py attribute">
+<dt class="sig sig-object py" id="domain_process.models.Domain.domain_iocs">
+<span class="sig-name descname"><span class="pre">domain_iocs</span></span><a class="headerlink" href="#domain_process.models.Domain.domain_iocs" title="Link to this definition"></a></dt>
+<dd><p>Accessor to the related objects manager on the reverse side of a
+many-to-one relation.</p>
+<p>In the example:</p>
+<div class="highlight-default notranslate"><div class="highlight"><pre><span></span><span class="k">class</span><span class="w"> </span><span class="nc">Child</span><span class="p">(</span><span class="n">Model</span><span class="p">):</span>
+    <span class="n">parent</span> <span class="o">=</span> <span class="n">ForeignKey</span><span class="p">(</span><span class="n">Parent</span><span class="p">,</span> <span class="n">related_name</span><span class="o">=</span><span class="s1">&#39;children&#39;</span><span class="p">)</span>
+</pre></div>
+</div>
+<p><code class="docutils literal notranslate"><span class="pre">Parent.children</span></code> is a <code class="docutils literal notranslate"><span class="pre">ReverseManyToOneDescriptor</span></code> instance.</p>
+<p>Most of the implementation is delegated to a dynamically defined manager
+class built by <code class="docutils literal notranslate"><span class="pre">create_forward_many_to_many_manager()</span></code> defined below.</p>
+</dd></dl>
+
+<dl class="py method">
+<dt class="sig sig-object py" id="domain_process.models.Domain.get_next_by_creation_date">
+<span class="sig-name descname"><span class="pre">get_next_by_creation_date</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">*</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">field=&lt;django.db.models.fields.DateTimeField:</span> <span class="pre">creation_date&gt;</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">is_next=True</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">**kwargs</span></span></em><span class="sig-paren">)</span><a class="headerlink" href="#domain_process.models.Domain.get_next_by_creation_date" title="Link to this definition"></a></dt>
+<dd></dd></dl>
+
+<dl class="py method">
+<dt class="sig sig-object py" id="domain_process.models.Domain.get_next_by_last_update">
+<span class="sig-name descname"><span class="pre">get_next_by_last_update</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">*</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">field=&lt;django.db.models.fields.DateTimeField:</span> <span class="pre">last_update&gt;</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">is_next=True</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">**kwargs</span></span></em><span class="sig-paren">)</span><a class="headerlink" href="#domain_process.models.Domain.get_next_by_last_update" title="Link to this definition"></a></dt>
+<dd></dd></dl>
+
+<dl class="py method">
+<dt class="sig sig-object py" id="domain_process.models.Domain.get_previous_by_creation_date">
+<span class="sig-name descname"><span class="pre">get_previous_by_creation_date</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">*</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">field=&lt;django.db.models.fields.DateTimeField:</span> <span class="pre">creation_date&gt;</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">is_next=False</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">**kwargs</span></span></em><span class="sig-paren">)</span><a class="headerlink" href="#domain_process.models.Domain.get_previous_by_creation_date" title="Link to this definition"></a></dt>
+<dd></dd></dl>
+
+<dl class="py method">
+<dt class="sig sig-object py" id="domain_process.models.Domain.get_previous_by_last_update">
+<span class="sig-name descname"><span class="pre">get_previous_by_last_update</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">*</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">field=&lt;django.db.models.fields.DateTimeField:</span> <span class="pre">last_update&gt;</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">is_next=False</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">**kwargs</span></span></em><span class="sig-paren">)</span><a class="headerlink" href="#domain_process.models.Domain.get_previous_by_last_update" title="Link to this definition"></a></dt>
+<dd></dd></dl>
+
+<dl class="py attribute">
+<dt class="sig sig-object py" id="domain_process.models.Domain.id">
+<span class="sig-name descname"><span class="pre">id</span></span><a class="headerlink" href="#domain_process.models.Domain.id" title="Link to this definition"></a></dt>
+<dd><p>A wrapper for a deferred-loading field. When the value is read from this
+object the first time, the query is executed.</p>
+</dd></dl>
+
+<dl class="py attribute">
+<dt class="sig sig-object py" id="domain_process.models.Domain.ioc_confidence">
+<span class="sig-name descname"><span class="pre">ioc_confidence</span></span><a class="headerlink" href="#domain_process.models.Domain.ioc_confidence" title="Link to this definition"></a></dt>
+<dd><p>A wrapper for a deferred-loading field. When the value is read from this
+object the first time, the query is executed.</p>
+</dd></dl>
+
+<dl class="py attribute">
+<dt class="sig sig-object py" id="domain_process.models.Domain.ioc_level">
+<span class="sig-name descname"><span class="pre">ioc_level</span></span><a class="headerlink" href="#domain_process.models.Domain.ioc_level" title="Link to this definition"></a></dt>
+<dd><p>A wrapper for a deferred-loading field. When the value is read from this
+object the first time, the query is executed.</p>
+</dd></dl>
+
+<dl class="py attribute">
+<dt class="sig sig-object py" id="domain_process.models.Domain.ioc_score">
+<span class="sig-name descname"><span class="pre">ioc_score</span></span><a class="headerlink" href="#domain_process.models.Domain.ioc_score" title="Link to this definition"></a></dt>
+<dd><p>A wrapper for a deferred-loading field. When the value is read from this
+object the first time, the query is executed.</p>
+</dd></dl>
+
+<dl class="py attribute">
+<dt class="sig sig-object py" id="domain_process.models.Domain.last_update">
+<span class="sig-name descname"><span class="pre">last_update</span></span><a class="headerlink" href="#domain_process.models.Domain.last_update" title="Link to this definition"></a></dt>
+<dd><p>A wrapper for a deferred-loading field. When the value is read from this
+object the first time, the query is executed.</p>
+</dd></dl>
+
+<dl class="py attribute">
+<dt class="sig sig-object py" id="domain_process.models.Domain.linked_mail_addresses">
+<span class="sig-name descname"><span class="pre">linked_mail_addresses</span></span><a class="headerlink" href="#domain_process.models.Domain.linked_mail_addresses" title="Link to this definition"></a></dt>
+<dd><p>Accessor to the related objects manager on the forward and reverse sides of
+a many-to-many relation.</p>
+<p>In the example:</p>
+<div class="highlight-default notranslate"><div class="highlight"><pre><span></span><span class="k">class</span><span class="w"> </span><span class="nc">Pizza</span><span class="p">(</span><span class="n">Model</span><span class="p">):</span>
+    <span class="n">toppings</span> <span class="o">=</span> <span class="n">ManyToManyField</span><span class="p">(</span><span class="n">Topping</span><span class="p">,</span> <span class="n">related_name</span><span class="o">=</span><span class="s1">&#39;pizzas&#39;</span><span class="p">)</span>
+</pre></div>
+</div>
+<p><code class="docutils literal notranslate"><span class="pre">Pizza.toppings</span></code> and <code class="docutils literal notranslate"><span class="pre">Topping.pizzas</span></code> are <code class="docutils literal notranslate"><span class="pre">ManyToManyDescriptor</span></code>
+instances.</p>
+<p>Most of the implementation is delegated to a dynamically defined manager
+class built by <code class="docutils literal notranslate"><span class="pre">create_forward_many_to_many_manager()</span></code> defined below.</p>
+</dd></dl>
+
+<dl class="py attribute">
+<dt class="sig sig-object py" id="domain_process.models.Domain.linked_urls">
+<span class="sig-name descname"><span class="pre">linked_urls</span></span><a class="headerlink" href="#domain_process.models.Domain.linked_urls" title="Link to this definition"></a></dt>
+<dd><p>Accessor to the related objects manager on the forward and reverse sides of
+a many-to-many relation.</p>
+<p>In the example:</p>
+<div class="highlight-default notranslate"><div class="highlight"><pre><span></span><span class="k">class</span><span class="w"> </span><span class="nc">Pizza</span><span class="p">(</span><span class="n">Model</span><span class="p">):</span>
+    <span class="n">toppings</span> <span class="o">=</span> <span class="n">ManyToManyField</span><span class="p">(</span><span class="n">Topping</span><span class="p">,</span> <span class="n">related_name</span><span class="o">=</span><span class="s1">&#39;pizzas&#39;</span><span class="p">)</span>
+</pre></div>
+</div>
+<p><code class="docutils literal notranslate"><span class="pre">Pizza.toppings</span></code> and <code class="docutils literal notranslate"><span class="pre">Topping.pizzas</span></code> are <code class="docutils literal notranslate"><span class="pre">ManyToManyDescriptor</span></code>
+instances.</p>
+<p>Most of the implementation is delegated to a dynamically defined manager
+class built by <code class="docutils literal notranslate"><span class="pre">create_forward_many_to_many_manager()</span></code> defined below.</p>
+</dd></dl>
+
+<dl class="py attribute">
+<dt class="sig sig-object py" id="domain_process.models.Domain.objects">
+<span class="sig-name descname"><span class="pre">objects</span></span><em class="property"><span class="w"> </span><span class="p"><span class="pre">=</span></span><span class="w"> </span><span class="pre">&lt;django.db.models.manager.Manager</span> <span class="pre">object&gt;</span></em><a class="headerlink" href="#domain_process.models.Domain.objects" title="Link to this definition"></a></dt>
+<dd></dd></dl>
+
+<dl class="py attribute">
+<dt class="sig sig-object py" id="domain_process.models.Domain.times_sent">
+<span class="sig-name descname"><span class="pre">times_sent</span></span><a class="headerlink" href="#domain_process.models.Domain.times_sent" title="Link to this definition"></a></dt>
+<dd><p>A wrapper for a deferred-loading field. When the value is read from this
+object the first time, the query is executed.</p>
+</dd></dl>
+
+<dl class="py attribute">
+<dt class="sig sig-object py" id="domain_process.models.Domain.value">
+<span class="sig-name descname"><span class="pre">value</span></span><a class="headerlink" href="#domain_process.models.Domain.value" title="Link to this definition"></a></dt>
+<dd><p>A wrapper for a deferred-loading field. When the value is read from this
+object the first time, the query is executed.</p>
+</dd></dl>
+
+</dd></dl>
+
+<dl class="py class">
+<dt class="sig sig-object py" id="domain_process.models.DomainInIocs">
+<em class="property"><span class="k"><span class="pre">class</span></span><span class="w"> </span></em><span class="sig-prename descclassname"><span class="pre">domain_process.models.</span></span><span class="sig-name descname"><span class="pre">DomainInIocs</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">id</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">domain</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">url</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">mail_address</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">creation_date</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">last_update</span></span></em><span class="sig-paren">)</span><a class="reference internal" href="../_modules/domain_process/models.html#DomainInIocs"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#domain_process.models.DomainInIocs" title="Link to this definition"></a></dt>
+<dd><p>Bases: <code class="xref py py-class docutils literal notranslate"><span class="pre">Model</span></code></p>
+<dl class="py exception">
+<dt class="sig sig-object py" id="domain_process.models.DomainInIocs.DoesNotExist">
+<em class="property"><span class="k"><span class="pre">exception</span></span><span class="w"> </span></em><span class="sig-name descname"><span class="pre">DoesNotExist</span></span><a class="headerlink" href="#domain_process.models.DomainInIocs.DoesNotExist" title="Link to this definition"></a></dt>
+<dd><p>Bases: <code class="xref py py-class docutils literal notranslate"><span class="pre">ObjectDoesNotExist</span></code></p>
+</dd></dl>
+
+<dl class="py exception">
+<dt class="sig sig-object py" id="domain_process.models.DomainInIocs.MultipleObjectsReturned">
+<em class="property"><span class="k"><span class="pre">exception</span></span><span class="w"> </span></em><span class="sig-name descname"><span class="pre">MultipleObjectsReturned</span></span><a class="headerlink" href="#domain_process.models.DomainInIocs.MultipleObjectsReturned" title="Link to this definition"></a></dt>
+<dd><p>Bases: <code class="xref py py-class docutils literal notranslate"><span class="pre">MultipleObjectsReturned</span></code></p>
+</dd></dl>
+
+<dl class="py attribute">
+<dt class="sig sig-object py" id="domain_process.models.DomainInIocs.creation_date">
+<span class="sig-name descname"><span class="pre">creation_date</span></span><a class="headerlink" href="#domain_process.models.DomainInIocs.creation_date" title="Link to this definition"></a></dt>
+<dd><p>A wrapper for a deferred-loading field. When the value is read from this
+object the first time, the query is executed.</p>
+</dd></dl>
+
+<dl class="py attribute">
+<dt class="sig sig-object py" id="domain_process.models.DomainInIocs.domain">
+<span class="sig-name descname"><span class="pre">domain</span></span><a class="headerlink" href="#domain_process.models.DomainInIocs.domain" title="Link to this definition"></a></dt>
+<dd><p>Accessor to the related object on the forward side of a many-to-one or
+one-to-one (via ForwardOneToOneDescriptor subclass) relation.</p>
+<p>In the example:</p>
+<div class="highlight-default notranslate"><div class="highlight"><pre><span></span><span class="k">class</span><span class="w"> </span><span class="nc">Child</span><span class="p">(</span><span class="n">Model</span><span class="p">):</span>
+    <span class="n">parent</span> <span class="o">=</span> <span class="n">ForeignKey</span><span class="p">(</span><span class="n">Parent</span><span class="p">,</span> <span class="n">related_name</span><span class="o">=</span><span class="s1">&#39;children&#39;</span><span class="p">)</span>
+</pre></div>
+</div>
+<p><code class="docutils literal notranslate"><span class="pre">Child.parent</span></code> is a <code class="docutils literal notranslate"><span class="pre">ForwardManyToOneDescriptor</span></code> instance.</p>
+</dd></dl>
+
+<dl class="py attribute">
+<dt class="sig sig-object py" id="domain_process.models.DomainInIocs.domain_id">
+<span class="sig-name descname"><span class="pre">domain_id</span></span><a class="headerlink" href="#domain_process.models.DomainInIocs.domain_id" title="Link to this definition"></a></dt>
+<dd></dd></dl>
+
+<dl class="py method">
+<dt class="sig sig-object py" id="domain_process.models.DomainInIocs.get_next_by_creation_date">
+<span class="sig-name descname"><span class="pre">get_next_by_creation_date</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">*</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">field=&lt;django.db.models.fields.DateTimeField:</span> <span class="pre">creation_date&gt;</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">is_next=True</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">**kwargs</span></span></em><span class="sig-paren">)</span><a class="headerlink" href="#domain_process.models.DomainInIocs.get_next_by_creation_date" title="Link to this definition"></a></dt>
+<dd></dd></dl>
+
+<dl class="py method">
+<dt class="sig sig-object py" id="domain_process.models.DomainInIocs.get_next_by_last_update">
+<span class="sig-name descname"><span class="pre">get_next_by_last_update</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">*</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">field=&lt;django.db.models.fields.DateTimeField:</span> <span class="pre">last_update&gt;</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">is_next=True</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">**kwargs</span></span></em><span class="sig-paren">)</span><a class="headerlink" href="#domain_process.models.DomainInIocs.get_next_by_last_update" title="Link to this definition"></a></dt>
+<dd></dd></dl>
+
+<dl class="py method">
+<dt class="sig sig-object py" id="domain_process.models.DomainInIocs.get_previous_by_creation_date">
+<span class="sig-name descname"><span class="pre">get_previous_by_creation_date</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">*</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">field=&lt;django.db.models.fields.DateTimeField:</span> <span class="pre">creation_date&gt;</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">is_next=False</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">**kwargs</span></span></em><span class="sig-paren">)</span><a class="headerlink" href="#domain_process.models.DomainInIocs.get_previous_by_creation_date" title="Link to this definition"></a></dt>
+<dd></dd></dl>
+
+<dl class="py method">
+<dt class="sig sig-object py" id="domain_process.models.DomainInIocs.get_previous_by_last_update">
+<span class="sig-name descname"><span class="pre">get_previous_by_last_update</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">*</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">field=&lt;django.db.models.fields.DateTimeField:</span> <span class="pre">last_update&gt;</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">is_next=False</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">**kwargs</span></span></em><span class="sig-paren">)</span><a class="headerlink" href="#domain_process.models.DomainInIocs.get_previous_by_last_update" title="Link to this definition"></a></dt>
+<dd></dd></dl>
+
+<dl class="py attribute">
+<dt class="sig sig-object py" id="domain_process.models.DomainInIocs.id">
+<span class="sig-name descname"><span class="pre">id</span></span><a class="headerlink" href="#domain_process.models.DomainInIocs.id" title="Link to this definition"></a></dt>
+<dd><p>A wrapper for a deferred-loading field. When the value is read from this
+object the first time, the query is executed.</p>
+</dd></dl>
+
+<dl class="py attribute">
+<dt class="sig sig-object py" id="domain_process.models.DomainInIocs.last_update">
+<span class="sig-name descname"><span class="pre">last_update</span></span><a class="headerlink" href="#domain_process.models.DomainInIocs.last_update" title="Link to this definition"></a></dt>
+<dd><p>A wrapper for a deferred-loading field. When the value is read from this
+object the first time, the query is executed.</p>
+</dd></dl>
+
+<dl class="py attribute">
+<dt class="sig sig-object py" id="domain_process.models.DomainInIocs.mail_address">
+<span class="sig-name descname"><span class="pre">mail_address</span></span><a class="headerlink" href="#domain_process.models.DomainInIocs.mail_address" title="Link to this definition"></a></dt>
+<dd><p>Accessor to the related object on the forward side of a many-to-one or
+one-to-one (via ForwardOneToOneDescriptor subclass) relation.</p>
+<p>In the example:</p>
+<div class="highlight-default notranslate"><div class="highlight"><pre><span></span><span class="k">class</span><span class="w"> </span><span class="nc">Child</span><span class="p">(</span><span class="n">Model</span><span class="p">):</span>
+    <span class="n">parent</span> <span class="o">=</span> <span class="n">ForeignKey</span><span class="p">(</span><span class="n">Parent</span><span class="p">,</span> <span class="n">related_name</span><span class="o">=</span><span class="s1">&#39;children&#39;</span><span class="p">)</span>
+</pre></div>
+</div>
+<p><code class="docutils literal notranslate"><span class="pre">Child.parent</span></code> is a <code class="docutils literal notranslate"><span class="pre">ForwardManyToOneDescriptor</span></code> instance.</p>
+</dd></dl>
+
+<dl class="py attribute">
+<dt class="sig sig-object py" id="domain_process.models.DomainInIocs.mail_address_id">
+<span class="sig-name descname"><span class="pre">mail_address_id</span></span><a class="headerlink" href="#domain_process.models.DomainInIocs.mail_address_id" title="Link to this definition"></a></dt>
+<dd></dd></dl>
+
+<dl class="py attribute">
+<dt class="sig sig-object py" id="domain_process.models.DomainInIocs.objects">
+<span class="sig-name descname"><span class="pre">objects</span></span><em class="property"><span class="w"> </span><span class="p"><span class="pre">=</span></span><span class="w"> </span><span class="pre">&lt;django.db.models.manager.Manager</span> <span class="pre">object&gt;</span></em><a class="headerlink" href="#domain_process.models.DomainInIocs.objects" title="Link to this definition"></a></dt>
+<dd></dd></dl>
+
+<dl class="py attribute">
+<dt class="sig sig-object py" id="domain_process.models.DomainInIocs.url">
+<span class="sig-name descname"><span class="pre">url</span></span><a class="headerlink" href="#domain_process.models.DomainInIocs.url" title="Link to this definition"></a></dt>
+<dd><p>Accessor to the related object on the forward side of a many-to-one or
+one-to-one (via ForwardOneToOneDescriptor subclass) relation.</p>
+<p>In the example:</p>
+<div class="highlight-default notranslate"><div class="highlight"><pre><span></span><span class="k">class</span><span class="w"> </span><span class="nc">Child</span><span class="p">(</span><span class="n">Model</span><span class="p">):</span>
+    <span class="n">parent</span> <span class="o">=</span> <span class="n">ForeignKey</span><span class="p">(</span><span class="n">Parent</span><span class="p">,</span> <span class="n">related_name</span><span class="o">=</span><span class="s1">&#39;children&#39;</span><span class="p">)</span>
+</pre></div>
+</div>
+<p><code class="docutils literal notranslate"><span class="pre">Child.parent</span></code> is a <code class="docutils literal notranslate"><span class="pre">ForwardManyToOneDescriptor</span></code> instance.</p>
+</dd></dl>
+
+<dl class="py attribute">
+<dt class="sig sig-object py" id="domain_process.models.DomainInIocs.url_id">
+<span class="sig-name descname"><span class="pre">url_id</span></span><a class="headerlink" href="#domain_process.models.DomainInIocs.url_id" title="Link to this definition"></a></dt>
+<dd></dd></dl>
+
+</dd></dl>
+
+<dl class="py class" id="module-domain_process.domain_utils.domain_handler">
+<dt class="sig sig-object py" id="domain_process.domain_utils.domain_handler.DomainHandler">
+<em class="property"><span class="k"><span class="pre">class</span></span><span class="w"> </span></em><span class="sig-prename descclassname"><span class="pre">domain_process.domain_utils.domain_handler.</span></span><span class="sig-name descname"><span class="pre">DomainHandler</span></span><a class="reference internal" href="../_modules/domain_process/domain_utils/domain_handler.html#DomainHandler"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#domain_process.domain_utils.domain_handler.DomainHandler" title="Link to this definition"></a></dt>
+<dd><p>Bases: <code class="xref py py-class docutils literal notranslate"><span class="pre">object</span></code></p>
+<p>Handles domain parsing, validation, normalization and persistence using Django models.</p>
+<dl class="py method">
+<dt class="sig sig-object py" id="domain_process.domain_utils.domain_handler.DomainHandler.handle_domain">
+<span class="sig-name descname"><span class="pre">handle_domain</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">domain</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">str</span></span></em><span class="sig-paren">)</span> <span class="sig-return"><span class="sig-return-icon">&#x2192;</span> <span class="sig-return-typehint"><a class="reference internal" href="#domain_process.models.Domain" title="domain_process.models.Domain"><span class="pre">Domain</span></a><span class="w"> </span><span class="p"><span class="pre">|</span></span><span class="w"> </span><span class="pre">None</span></span></span><a class="reference internal" href="../_modules/domain_process/domain_utils/domain_handler.html#DomainHandler.handle_domain"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#domain_process.domain_utils.domain_handler.DomainHandler.handle_domain" title="Link to this definition"></a></dt>
+<dd><p>Normalize and register a domain in the database. Updates timestamp if already present.</p>
+<dl class="simple">
+<dt>Args:</dt><dd><p>domain (str): The input domain string (can be full URL or raw domain).</p>
+</dd>
+<dt>Returns:</dt><dd><p>Domain | None: The Domain model instance, or None if invalid or on failure.</p>
+</dd>
+</dl>
+</dd></dl>
+
+<dl class="py method">
+<dt class="sig sig-object py" id="domain_process.domain_utils.domain_handler.DomainHandler.validate_domain">
+<span class="sig-name descname"><span class="pre">validate_domain</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">domain</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">str</span></span></em><span class="sig-paren">)</span> <span class="sig-return"><span class="sig-return-icon">&#x2192;</span> <span class="sig-return-typehint"><span class="pre">str</span><span class="w"> </span><span class="p"><span class="pre">|</span></span><span class="w"> </span><span class="pre">None</span></span></span><a class="reference internal" href="../_modules/domain_process/domain_utils/domain_handler.html#DomainHandler.validate_domain"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#domain_process.domain_utils.domain_handler.DomainHandler.validate_domain" title="Link to this definition"></a></dt>
+<dd><p>Validate a domain string. Supports full URLs and plain domains.</p>
+<dl class="simple">
+<dt>Args:</dt><dd><p>domain (str): The domain or URL to validate.</p>
+</dd>
+<dt>Returns:</dt><dd><dl class="simple">
+<dt>str | None:</dt><dd><ul class="simple">
+<li><p>“Url” for valid URLs.</p></li>
+<li><p>“Domain” for valid plain domains.</p></li>
+<li><p>“Invalid Domain” if invalid.</p></li>
+<li><p>None on unexpected error.</p></li>
+</ul>
+</dd>
+</dl>
+</dd>
+</dl>
+</dd></dl>
+
+<dl class="py method">
+<dt class="sig sig-object py" id="domain_process.domain_utils.domain_handler.DomainHandler.validate_email">
+<em class="property"><span class="k"><span class="pre">static</span></span><span class="w"> </span></em><span class="sig-name descname"><span class="pre">validate_email</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">email</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">str</span></span></em><span class="sig-paren">)</span> <span class="sig-return"><span class="sig-return-icon">&#x2192;</span> <span class="sig-return-typehint"><span class="pre">str</span><span class="w"> </span><span class="p"><span class="pre">|</span></span><span class="w"> </span><span class="pre">None</span></span></span><a class="reference internal" href="../_modules/domain_process/domain_utils/domain_handler.html#DomainHandler.validate_email"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#domain_process.domain_utils.domain_handler.DomainHandler.validate_email" title="Link to this definition"></a></dt>
+<dd><p>Validate an email address using the <cite>validators</cite> library.</p>
+<dl class="simple">
+<dt>Args:</dt><dd><p>email (str): The email address to validate.</p>
+</dd>
+<dt>Returns:</dt><dd><p>str | None: “Mail” if valid, otherwise None.</p>
+</dd>
+</dl>
+</dd></dl>
+
+</dd></dl>
+
+<dl class="py function">
+<dt class="sig sig-object py" id="domain_process.domain_utils.domain_handler.load_config">
+<span class="sig-prename descclassname"><span class="pre">domain_process.domain_utils.domain_handler.</span></span><span class="sig-name descname"><span class="pre">load_config</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">path</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">Path</span></span></em><span class="sig-paren">)</span> <span class="sig-return"><span class="sig-return-icon">&#x2192;</span> <span class="sig-return-typehint"><span class="pre">dict</span></span></span><a class="reference internal" href="../_modules/domain_process/domain_utils/domain_handler.html#load_config"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#domain_process.domain_utils.domain_handler.load_config" title="Link to this definition"></a></dt>
+<dd><p>Load the configuration JSON file from the specified path.</p>
+<dl class="simple">
+<dt>Args:</dt><dd><p>path (Path): Path to the JSON configuration file.</p>
+</dd>
+<dt>Returns:</dt><dd><p>dict: Parsed configuration dictionary, or empty dict if error.</p>
+</dd>
+</dl>
+</dd></dl>
+
+<dl class="py function">
+<dt class="sig sig-object py" id="domain_process.domain_utils.domain_handler.normalize_domain">
+<span class="sig-prename descclassname"><span class="pre">domain_process.domain_utils.domain_handler.</span></span><span class="sig-name descname"><span class="pre">normalize_domain</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">domain</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">str</span></span></em><span class="sig-paren">)</span> <span class="sig-return"><span class="sig-return-icon">&#x2192;</span> <span class="sig-return-typehint"><span class="pre">str</span><span class="w"> </span><span class="p"><span class="pre">|</span></span><span class="w"> </span><span class="pre">None</span></span></span><a class="reference internal" href="../_modules/domain_process/domain_utils/domain_handler.html#normalize_domain"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#domain_process.domain_utils.domain_handler.normalize_domain" title="Link to this definition"></a></dt>
+<dd><p>Normalize a domain by extracting its registered form (eTLD+1).</p>
+<dl class="simple">
+<dt>Example:</dt><dd><p>‘www.example.co.uk’ -&gt; ‘example.co.uk’</p>
+</dd>
+<dt>Args:</dt><dd><p>domain (str): The input domain.</p>
+</dd>
+<dt>Returns:</dt><dd><p>str | None: Normalized registered domain, or None on error.</p>
+</dd>
+</dl>
+</dd></dl>
+
+</section>
+
+
+           </div>
+          </div>
+          <footer><div class="rst-footer-buttons" role="navigation" aria-label="Footer">
+        <a href="dashboard_core.html" class="btn btn-neutral float-left" title="Dashboard module" accesskey="p" rel="prev"><span class="fa fa-arrow-circle-left" aria-hidden="true"></span> Previous</a>
+        <a href="email_process_core.html" class="btn btn-neutral float-right" title="email_process_core module" accesskey="n" rel="next">Next <span class="fa fa-arrow-circle-right" aria-hidden="true"></span></a>
+    </div>
+
+  <hr/>
+
+  <div role="contentinfo">
+    <p>&#169; Copyright 2025, Theo Bhang, Esteban Crispel.</p>
+  </div>
+
+  Built with <a href="https://www.sphinx-doc.org/">Sphinx</a> using a
+    <a href="https://github.com/readthedocs/sphinx_rtd_theme">theme</a>
+    provided by <a href="https://readthedocs.org">Read the Docs</a>.
+   
+
+</footer>
+        </div>
+      </div>
+    </section>
+  </div>
+  <script>
+      jQuery(function () {
+          SphinxRtdTheme.Navigation.enable(true);
+      });
+  </script> 
+
+</body>
+</html>

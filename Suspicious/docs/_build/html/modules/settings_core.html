@@ -1,0 +1,1373 @@
+
+
+<!DOCTYPE html>
+<html class="writer-html5" lang="en" data-content_root="../">
+<head>
+  <meta charset="utf-8" /><meta name="viewport" content="width=device-width, initial-scale=1" />
+
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Settings module &mdash; Suspicious 1.0.0 documentation</title>
+      <link rel="stylesheet" type="text/css" href="../_static/pygments.css?v=b86133f3" />
+      <link rel="stylesheet" type="text/css" href="../_static/css/theme.css?v=e59714d7" />
+
+  
+      <script src="../_static/jquery.js?v=5d32c60e"></script>
+      <script src="../_static/_sphinx_javascript_frameworks_compat.js?v=2cd50e6c"></script>
+      <script src="../_static/documentation_options.js?v=8d563738"></script>
+      <script src="../_static/doctools.js?v=9bcbadda"></script>
+      <script src="../_static/sphinx_highlight.js?v=dc90522c"></script>
+    <script src="../_static/js/theme.js"></script>
+    <link rel="index" title="Index" href="../genindex.html" />
+    <link rel="search" title="Search" href="../search.html" />
+    <link rel="next" title="TASP module" href="tasp_core.html" />
+    <link rel="prev" title="Score Process module" href="score_process_core.html" /> 
+</head>
+
+<body class="wy-body-for-nav"> 
+  <div class="wy-grid-for-nav">
+    <nav data-toggle="wy-nav-shift" class="wy-nav-side">
+      <div class="wy-side-scroll">
+        <div class="wy-side-nav-search" >
+
+          
+          
+          <a href="../index.html" class="icon icon-home">
+            Suspicious
+          </a>
+<div role="search">
+  <form id="rtd-search-form" class="wy-form" action="../search.html" method="get">
+    <input type="text" name="q" placeholder="Search docs" aria-label="Search docs" />
+    <input type="hidden" name="check_keywords" value="yes" />
+    <input type="hidden" name="area" value="default" />
+  </form>
+</div>
+        </div><div class="wy-menu wy-menu-vertical" data-spy="affix" role="navigation" aria-label="Navigation menu">
+              <p class="caption" role="heading"><span class="caption-text">Contents:</span></p>
+<ul class="current">
+<li class="toctree-l1 current"><a class="reference internal" href="index.html">Modules (API Reference)</a><ul class="current">
+<li class="toctree-l2"><a class="reference internal" href="case_handler_core.html">case_handler_core module</a></li>
+<li class="toctree-l2"><a class="reference internal" href="cortex_job_core.html">cortex_job_core module</a></li>
+<li class="toctree-l2"><a class="reference internal" href="dashboard_core.html">Dashboard module</a></li>
+<li class="toctree-l2"><a class="reference internal" href="domain_process_core.html">Domain Process Module</a></li>
+<li class="toctree-l2"><a class="reference internal" href="email_process_core.html">Email Process module</a></li>
+<li class="toctree-l2"><a class="reference internal" href="file_process_core.html">File Process module</a></li>
+<li class="toctree-l2"><a class="reference internal" href="hash_process_core.html">Hash Process module</a></li>
+<li class="toctree-l2"><a class="reference internal" href="ip_process_core.html">IP Process module</a></li>
+<li class="toctree-l2"><a class="reference internal" href="mail_feeder_core.html">Mail Feeder module</a></li>
+<li class="toctree-l2"><a class="reference internal" href="profiles_core.html">Profiles module</a></li>
+<li class="toctree-l2"><a class="reference internal" href="score_process_core.html">Score Process module</a></li>
+<li class="toctree-l2 current"><a class="current reference internal" href="#">Settings module</a><ul>
+<li class="toctree-l3"><a class="reference internal" href="#settings.models.AllowListDomain"><code class="docutils literal notranslate"><span class="pre">AllowListDomain</span></code></a><ul>
+<li class="toctree-l4"><a class="reference internal" href="#settings.models.AllowListDomain.DoesNotExist"><code class="docutils literal notranslate"><span class="pre">AllowListDomain.DoesNotExist</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="#settings.models.AllowListDomain.MultipleObjectsReturned"><code class="docutils literal notranslate"><span class="pre">AllowListDomain.MultipleObjectsReturned</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="#settings.models.AllowListDomain.creation_date"><code class="docutils literal notranslate"><span class="pre">AllowListDomain.creation_date</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="#settings.models.AllowListDomain.domain"><code class="docutils literal notranslate"><span class="pre">AllowListDomain.domain</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="#settings.models.AllowListDomain.domain_id"><code class="docutils literal notranslate"><span class="pre">AllowListDomain.domain_id</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="#settings.models.AllowListDomain.get_next_by_creation_date"><code class="docutils literal notranslate"><span class="pre">AllowListDomain.get_next_by_creation_date()</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="#settings.models.AllowListDomain.get_next_by_last_update"><code class="docutils literal notranslate"><span class="pre">AllowListDomain.get_next_by_last_update()</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="#settings.models.AllowListDomain.get_previous_by_creation_date"><code class="docutils literal notranslate"><span class="pre">AllowListDomain.get_previous_by_creation_date()</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="#settings.models.AllowListDomain.get_previous_by_last_update"><code class="docutils literal notranslate"><span class="pre">AllowListDomain.get_previous_by_last_update()</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="#settings.models.AllowListDomain.id"><code class="docutils literal notranslate"><span class="pre">AllowListDomain.id</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="#settings.models.AllowListDomain.last_update"><code class="docutils literal notranslate"><span class="pre">AllowListDomain.last_update</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="#settings.models.AllowListDomain.objects"><code class="docutils literal notranslate"><span class="pre">AllowListDomain.objects</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="#settings.models.AllowListDomain.user"><code class="docutils literal notranslate"><span class="pre">AllowListDomain.user</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="#settings.models.AllowListDomain.user_id"><code class="docutils literal notranslate"><span class="pre">AllowListDomain.user_id</span></code></a></li>
+</ul>
+</li>
+<li class="toctree-l3"><a class="reference internal" href="#settings.models.AllowListFile"><code class="docutils literal notranslate"><span class="pre">AllowListFile</span></code></a><ul>
+<li class="toctree-l4"><a class="reference internal" href="#settings.models.AllowListFile.DoesNotExist"><code class="docutils literal notranslate"><span class="pre">AllowListFile.DoesNotExist</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="#settings.models.AllowListFile.MultipleObjectsReturned"><code class="docutils literal notranslate"><span class="pre">AllowListFile.MultipleObjectsReturned</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="#settings.models.AllowListFile.creation_date"><code class="docutils literal notranslate"><span class="pre">AllowListFile.creation_date</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="#settings.models.AllowListFile.get_next_by_creation_date"><code class="docutils literal notranslate"><span class="pre">AllowListFile.get_next_by_creation_date()</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="#settings.models.AllowListFile.get_next_by_last_update"><code class="docutils literal notranslate"><span class="pre">AllowListFile.get_next_by_last_update()</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="#settings.models.AllowListFile.get_previous_by_creation_date"><code class="docutils literal notranslate"><span class="pre">AllowListFile.get_previous_by_creation_date()</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="#settings.models.AllowListFile.get_previous_by_last_update"><code class="docutils literal notranslate"><span class="pre">AllowListFile.get_previous_by_last_update()</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="#settings.models.AllowListFile.id"><code class="docutils literal notranslate"><span class="pre">AllowListFile.id</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="#settings.models.AllowListFile.last_update"><code class="docutils literal notranslate"><span class="pre">AllowListFile.last_update</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="#settings.models.AllowListFile.linked_file_hash"><code class="docutils literal notranslate"><span class="pre">AllowListFile.linked_file_hash</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="#settings.models.AllowListFile.linked_file_hash_id"><code class="docutils literal notranslate"><span class="pre">AllowListFile.linked_file_hash_id</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="#settings.models.AllowListFile.objects"><code class="docutils literal notranslate"><span class="pre">AllowListFile.objects</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="#settings.models.AllowListFile.user"><code class="docutils literal notranslate"><span class="pre">AllowListFile.user</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="#settings.models.AllowListFile.user_id"><code class="docutils literal notranslate"><span class="pre">AllowListFile.user_id</span></code></a></li>
+</ul>
+</li>
+<li class="toctree-l3"><a class="reference internal" href="#settings.models.AllowListFiletype"><code class="docutils literal notranslate"><span class="pre">AllowListFiletype</span></code></a><ul>
+<li class="toctree-l4"><a class="reference internal" href="#settings.models.AllowListFiletype.DoesNotExist"><code class="docutils literal notranslate"><span class="pre">AllowListFiletype.DoesNotExist</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="#settings.models.AllowListFiletype.MultipleObjectsReturned"><code class="docutils literal notranslate"><span class="pre">AllowListFiletype.MultipleObjectsReturned</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="#settings.models.AllowListFiletype.creation_date"><code class="docutils literal notranslate"><span class="pre">AllowListFiletype.creation_date</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="#settings.models.AllowListFiletype.filetype"><code class="docutils literal notranslate"><span class="pre">AllowListFiletype.filetype</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="#settings.models.AllowListFiletype.get_next_by_creation_date"><code class="docutils literal notranslate"><span class="pre">AllowListFiletype.get_next_by_creation_date()</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="#settings.models.AllowListFiletype.get_next_by_last_update"><code class="docutils literal notranslate"><span class="pre">AllowListFiletype.get_next_by_last_update()</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="#settings.models.AllowListFiletype.get_previous_by_creation_date"><code class="docutils literal notranslate"><span class="pre">AllowListFiletype.get_previous_by_creation_date()</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="#settings.models.AllowListFiletype.get_previous_by_last_update"><code class="docutils literal notranslate"><span class="pre">AllowListFiletype.get_previous_by_last_update()</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="#settings.models.AllowListFiletype.id"><code class="docutils literal notranslate"><span class="pre">AllowListFiletype.id</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="#settings.models.AllowListFiletype.last_update"><code class="docutils literal notranslate"><span class="pre">AllowListFiletype.last_update</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="#settings.models.AllowListFiletype.objects"><code class="docutils literal notranslate"><span class="pre">AllowListFiletype.objects</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="#settings.models.AllowListFiletype.user"><code class="docutils literal notranslate"><span class="pre">AllowListFiletype.user</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="#settings.models.AllowListFiletype.user_id"><code class="docutils literal notranslate"><span class="pre">AllowListFiletype.user_id</span></code></a></li>
+</ul>
+</li>
+<li class="toctree-l3"><a class="reference internal" href="#settings.models.CampaignDomainAllowList"><code class="docutils literal notranslate"><span class="pre">CampaignDomainAllowList</span></code></a><ul>
+<li class="toctree-l4"><a class="reference internal" href="#settings.models.CampaignDomainAllowList.DoesNotExist"><code class="docutils literal notranslate"><span class="pre">CampaignDomainAllowList.DoesNotExist</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="#settings.models.CampaignDomainAllowList.MultipleObjectsReturned"><code class="docutils literal notranslate"><span class="pre">CampaignDomainAllowList.MultipleObjectsReturned</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="#settings.models.CampaignDomainAllowList.creation_date"><code class="docutils literal notranslate"><span class="pre">CampaignDomainAllowList.creation_date</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="#settings.models.CampaignDomainAllowList.domain"><code class="docutils literal notranslate"><span class="pre">CampaignDomainAllowList.domain</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="#settings.models.CampaignDomainAllowList.domain_id"><code class="docutils literal notranslate"><span class="pre">CampaignDomainAllowList.domain_id</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="#settings.models.CampaignDomainAllowList.get_next_by_creation_date"><code class="docutils literal notranslate"><span class="pre">CampaignDomainAllowList.get_next_by_creation_date()</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="#settings.models.CampaignDomainAllowList.get_next_by_last_update"><code class="docutils literal notranslate"><span class="pre">CampaignDomainAllowList.get_next_by_last_update()</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="#settings.models.CampaignDomainAllowList.get_previous_by_creation_date"><code class="docutils literal notranslate"><span class="pre">CampaignDomainAllowList.get_previous_by_creation_date()</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="#settings.models.CampaignDomainAllowList.get_previous_by_last_update"><code class="docutils literal notranslate"><span class="pre">CampaignDomainAllowList.get_previous_by_last_update()</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="#settings.models.CampaignDomainAllowList.id"><code class="docutils literal notranslate"><span class="pre">CampaignDomainAllowList.id</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="#settings.models.CampaignDomainAllowList.last_update"><code class="docutils literal notranslate"><span class="pre">CampaignDomainAllowList.last_update</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="#settings.models.CampaignDomainAllowList.objects"><code class="docutils literal notranslate"><span class="pre">CampaignDomainAllowList.objects</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="#settings.models.CampaignDomainAllowList.user"><code class="docutils literal notranslate"><span class="pre">CampaignDomainAllowList.user</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="#settings.models.CampaignDomainAllowList.user_id"><code class="docutils literal notranslate"><span class="pre">CampaignDomainAllowList.user_id</span></code></a></li>
+</ul>
+</li>
+<li class="toctree-l3"><a class="reference internal" href="#settings.models.DenyListDomain"><code class="docutils literal notranslate"><span class="pre">DenyListDomain</span></code></a><ul>
+<li class="toctree-l4"><a class="reference internal" href="#settings.models.DenyListDomain.DoesNotExist"><code class="docutils literal notranslate"><span class="pre">DenyListDomain.DoesNotExist</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="#settings.models.DenyListDomain.MultipleObjectsReturned"><code class="docutils literal notranslate"><span class="pre">DenyListDomain.MultipleObjectsReturned</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="#settings.models.DenyListDomain.creation_date"><code class="docutils literal notranslate"><span class="pre">DenyListDomain.creation_date</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="#settings.models.DenyListDomain.domain"><code class="docutils literal notranslate"><span class="pre">DenyListDomain.domain</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="#settings.models.DenyListDomain.domain_id"><code class="docutils literal notranslate"><span class="pre">DenyListDomain.domain_id</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="#settings.models.DenyListDomain.get_next_by_creation_date"><code class="docutils literal notranslate"><span class="pre">DenyListDomain.get_next_by_creation_date()</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="#settings.models.DenyListDomain.get_next_by_last_update"><code class="docutils literal notranslate"><span class="pre">DenyListDomain.get_next_by_last_update()</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="#settings.models.DenyListDomain.get_previous_by_creation_date"><code class="docutils literal notranslate"><span class="pre">DenyListDomain.get_previous_by_creation_date()</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="#settings.models.DenyListDomain.get_previous_by_last_update"><code class="docutils literal notranslate"><span class="pre">DenyListDomain.get_previous_by_last_update()</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="#settings.models.DenyListDomain.id"><code class="docutils literal notranslate"><span class="pre">DenyListDomain.id</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="#settings.models.DenyListDomain.last_update"><code class="docutils literal notranslate"><span class="pre">DenyListDomain.last_update</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="#settings.models.DenyListDomain.objects"><code class="docutils literal notranslate"><span class="pre">DenyListDomain.objects</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="#settings.models.DenyListDomain.user"><code class="docutils literal notranslate"><span class="pre">DenyListDomain.user</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="#settings.models.DenyListDomain.user_id"><code class="docutils literal notranslate"><span class="pre">DenyListDomain.user_id</span></code></a></li>
+</ul>
+</li>
+<li class="toctree-l3"><a class="reference internal" href="#settings.models.DenyListFile"><code class="docutils literal notranslate"><span class="pre">DenyListFile</span></code></a><ul>
+<li class="toctree-l4"><a class="reference internal" href="#settings.models.DenyListFile.DoesNotExist"><code class="docutils literal notranslate"><span class="pre">DenyListFile.DoesNotExist</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="#settings.models.DenyListFile.MultipleObjectsReturned"><code class="docutils literal notranslate"><span class="pre">DenyListFile.MultipleObjectsReturned</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="#settings.models.DenyListFile.creation_date"><code class="docutils literal notranslate"><span class="pre">DenyListFile.creation_date</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="#settings.models.DenyListFile.get_next_by_creation_date"><code class="docutils literal notranslate"><span class="pre">DenyListFile.get_next_by_creation_date()</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="#settings.models.DenyListFile.get_next_by_last_update"><code class="docutils literal notranslate"><span class="pre">DenyListFile.get_next_by_last_update()</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="#settings.models.DenyListFile.get_previous_by_creation_date"><code class="docutils literal notranslate"><span class="pre">DenyListFile.get_previous_by_creation_date()</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="#settings.models.DenyListFile.get_previous_by_last_update"><code class="docutils literal notranslate"><span class="pre">DenyListFile.get_previous_by_last_update()</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="#settings.models.DenyListFile.id"><code class="docutils literal notranslate"><span class="pre">DenyListFile.id</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="#settings.models.DenyListFile.last_update"><code class="docutils literal notranslate"><span class="pre">DenyListFile.last_update</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="#settings.models.DenyListFile.linked_file_hash"><code class="docutils literal notranslate"><span class="pre">DenyListFile.linked_file_hash</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="#settings.models.DenyListFile.linked_file_hash_id"><code class="docutils literal notranslate"><span class="pre">DenyListFile.linked_file_hash_id</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="#settings.models.DenyListFile.objects"><code class="docutils literal notranslate"><span class="pre">DenyListFile.objects</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="#settings.models.DenyListFile.user"><code class="docutils literal notranslate"><span class="pre">DenyListFile.user</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="#settings.models.DenyListFile.user_id"><code class="docutils literal notranslate"><span class="pre">DenyListFile.user_id</span></code></a></li>
+</ul>
+</li>
+<li class="toctree-l3"><a class="reference internal" href="#settings.models.EmailFeederState"><code class="docutils literal notranslate"><span class="pre">EmailFeederState</span></code></a><ul>
+<li class="toctree-l4"><a class="reference internal" href="#settings.models.EmailFeederState.DoesNotExist"><code class="docutils literal notranslate"><span class="pre">EmailFeederState.DoesNotExist</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="#settings.models.EmailFeederState.MultipleObjectsReturned"><code class="docutils literal notranslate"><span class="pre">EmailFeederState.MultipleObjectsReturned</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="#settings.models.EmailFeederState.get_next_by_updated_at"><code class="docutils literal notranslate"><span class="pre">EmailFeederState.get_next_by_updated_at()</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="#settings.models.EmailFeederState.get_previous_by_updated_at"><code class="docutils literal notranslate"><span class="pre">EmailFeederState.get_previous_by_updated_at()</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="#settings.models.EmailFeederState.id"><code class="docutils literal notranslate"><span class="pre">EmailFeederState.id</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="#settings.models.EmailFeederState.is_running"><code class="docutils literal notranslate"><span class="pre">EmailFeederState.is_running</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="#settings.models.EmailFeederState.objects"><code class="docutils literal notranslate"><span class="pre">EmailFeederState.objects</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="#settings.models.EmailFeederState.updated_at"><code class="docutils literal notranslate"><span class="pre">EmailFeederState.updated_at</span></code></a></li>
+</ul>
+</li>
+<li class="toctree-l3"><a class="reference internal" href="#settings.models.Mailbox"><code class="docutils literal notranslate"><span class="pre">Mailbox</span></code></a><ul>
+<li class="toctree-l4"><a class="reference internal" href="#settings.models.Mailbox.DoesNotExist"><code class="docutils literal notranslate"><span class="pre">Mailbox.DoesNotExist</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="#settings.models.Mailbox.MultipleObjectsReturned"><code class="docutils literal notranslate"><span class="pre">Mailbox.MultipleObjectsReturned</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="#settings.models.Mailbox.creation_date"><code class="docutils literal notranslate"><span class="pre">Mailbox.creation_date</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="#settings.models.Mailbox.get_next_by_creation_date"><code class="docutils literal notranslate"><span class="pre">Mailbox.get_next_by_creation_date()</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="#settings.models.Mailbox.get_next_by_last_update"><code class="docutils literal notranslate"><span class="pre">Mailbox.get_next_by_last_update()</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="#settings.models.Mailbox.get_previous_by_creation_date"><code class="docutils literal notranslate"><span class="pre">Mailbox.get_previous_by_creation_date()</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="#settings.models.Mailbox.get_previous_by_last_update"><code class="docutils literal notranslate"><span class="pre">Mailbox.get_previous_by_last_update()</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="#settings.models.Mailbox.id"><code class="docutils literal notranslate"><span class="pre">Mailbox.id</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="#settings.models.Mailbox.last_update"><code class="docutils literal notranslate"><span class="pre">Mailbox.last_update</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="#settings.models.Mailbox.name"><code class="docutils literal notranslate"><span class="pre">Mailbox.name</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="#settings.models.Mailbox.objects"><code class="docutils literal notranslate"><span class="pre">Mailbox.objects</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="#settings.models.Mailbox.password"><code class="docutils literal notranslate"><span class="pre">Mailbox.password</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="#settings.models.Mailbox.port"><code class="docutils literal notranslate"><span class="pre">Mailbox.port</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="#settings.models.Mailbox.save"><code class="docutils literal notranslate"><span class="pre">Mailbox.save()</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="#settings.models.Mailbox.server"><code class="docutils literal notranslate"><span class="pre">Mailbox.server</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="#settings.models.Mailbox.username"><code class="docutils literal notranslate"><span class="pre">Mailbox.username</span></code></a></li>
+</ul>
+</li>
+<li class="toctree-l3"><a class="reference internal" href="#settings.settings_utils.domain.generate_message_domain"><code class="docutils literal notranslate"><span class="pre">generate_message_domain()</span></code></a></li>
+<li class="toctree-l3"><a class="reference internal" href="#settings.settings_utils.domain.handle_bdomain_csv_file"><code class="docutils literal notranslate"><span class="pre">handle_bdomain_csv_file()</span></code></a></li>
+<li class="toctree-l3"><a class="reference internal" href="#settings.settings_utils.domain.handle_bdomain_file"><code class="docutils literal notranslate"><span class="pre">handle_bdomain_file()</span></code></a></li>
+<li class="toctree-l3"><a class="reference internal" href="#settings.settings_utils.domain.handle_bdomain_json_file"><code class="docutils literal notranslate"><span class="pre">handle_bdomain_json_file()</span></code></a></li>
+<li class="toctree-l3"><a class="reference internal" href="#settings.settings_utils.domain.handle_bdomain_txt_file"><code class="docutils literal notranslate"><span class="pre">handle_bdomain_txt_file()</span></code></a></li>
+<li class="toctree-l3"><a class="reference internal" href="#settings.settings_utils.domain.handle_campaign_domain_csv_file"><code class="docutils literal notranslate"><span class="pre">handle_campaign_domain_csv_file()</span></code></a></li>
+<li class="toctree-l3"><a class="reference internal" href="#settings.settings_utils.domain.handle_campaign_domain_file"><code class="docutils literal notranslate"><span class="pre">handle_campaign_domain_file()</span></code></a></li>
+<li class="toctree-l3"><a class="reference internal" href="#settings.settings_utils.domain.handle_campaign_domain_json_file"><code class="docutils literal notranslate"><span class="pre">handle_campaign_domain_json_file()</span></code></a></li>
+<li class="toctree-l3"><a class="reference internal" href="#settings.settings_utils.domain.handle_campaign_domain_txt_file"><code class="docutils literal notranslate"><span class="pre">handle_campaign_domain_txt_file()</span></code></a></li>
+<li class="toctree-l3"><a class="reference internal" href="#settings.settings_utils.domain.handle_domain_csv_file"><code class="docutils literal notranslate"><span class="pre">handle_domain_csv_file()</span></code></a></li>
+<li class="toctree-l3"><a class="reference internal" href="#settings.settings_utils.domain.handle_domain_file"><code class="docutils literal notranslate"><span class="pre">handle_domain_file()</span></code></a></li>
+<li class="toctree-l3"><a class="reference internal" href="#settings.settings_utils.domain.handle_domain_json_file"><code class="docutils literal notranslate"><span class="pre">handle_domain_json_file()</span></code></a></li>
+<li class="toctree-l3"><a class="reference internal" href="#settings.settings_utils.domain.handle_domain_txt_file"><code class="docutils literal notranslate"><span class="pre">handle_domain_txt_file()</span></code></a></li>
+<li class="toctree-l3"><a class="reference internal" href="#settings.settings_utils.domain.preprocess_domains"><code class="docutils literal notranslate"><span class="pre">preprocess_domains()</span></code></a></li>
+<li class="toctree-l3"><a class="reference internal" href="#settings.settings_utils.domain.process_bdomains"><code class="docutils literal notranslate"><span class="pre">process_bdomains()</span></code></a></li>
+<li class="toctree-l3"><a class="reference internal" href="#settings.settings_utils.domain.process_campaign_domains"><code class="docutils literal notranslate"><span class="pre">process_campaign_domains()</span></code></a></li>
+<li class="toctree-l3"><a class="reference internal" href="#settings.settings_utils.domain.process_domains"><code class="docutils literal notranslate"><span class="pre">process_domains()</span></code></a></li>
+<li class="toctree-l3"><a class="reference internal" href="#settings.settings_utils.feeder_email.check_if_feeder_is_running"><code class="docutils literal notranslate"><span class="pre">check_if_feeder_is_running()</span></code></a></li>
+<li class="toctree-l3"><a class="reference internal" href="#settings.settings_utils.feeder_email.disable_email_feeder"><code class="docutils literal notranslate"><span class="pre">disable_email_feeder()</span></code></a></li>
+<li class="toctree-l3"><a class="reference internal" href="#settings.settings_utils.feeder_email.enable_email_feeder"><code class="docutils literal notranslate"><span class="pre">enable_email_feeder()</span></code></a></li>
+<li class="toctree-l3"><a class="reference internal" href="#settings.settings_utils.filetype.generate_filetype_message"><code class="docutils literal notranslate"><span class="pre">generate_filetype_message()</span></code></a></li>
+<li class="toctree-l3"><a class="reference internal" href="#settings.settings_utils.filetype.handle_filetype_csv_file"><code class="docutils literal notranslate"><span class="pre">handle_filetype_csv_file()</span></code></a></li>
+<li class="toctree-l3"><a class="reference internal" href="#settings.settings_utils.filetype.handle_filetype_json_file"><code class="docutils literal notranslate"><span class="pre">handle_filetype_json_file()</span></code></a></li>
+<li class="toctree-l3"><a class="reference internal" href="#settings.settings_utils.filetype.handle_filetype_txt_file"><code class="docutils literal notranslate"><span class="pre">handle_filetype_txt_file()</span></code></a></li>
+<li class="toctree-l3"><a class="reference internal" href="#settings.settings_utils.filetype.process_filetypes"><code class="docutils literal notranslate"><span class="pre">process_filetypes()</span></code></a></li>
+<li class="toctree-l3"><a class="reference internal" href="#settings.settings_utils.filetype.validate_filetype"><code class="docutils literal notranslate"><span class="pre">validate_filetype()</span></code></a></li>
+<li class="toctree-l3"><a class="reference internal" href="#settings.settings_utils.filetype.validate_value"><code class="docutils literal notranslate"><span class="pre">validate_value()</span></code></a></li>
+</ul>
+</li>
+<li class="toctree-l2"><a class="reference internal" href="tasp_core.html">TASP module</a></li>
+<li class="toctree-l2"><a class="reference internal" href="url_process_core.html">Url Process module</a></li>
+</ul>
+</li>
+</ul>
+
+        </div>
+      </div>
+    </nav>
+
+    <section data-toggle="wy-nav-shift" class="wy-nav-content-wrap"><nav class="wy-nav-top" aria-label="Mobile navigation menu" >
+          <i data-toggle="wy-nav-top" class="fa fa-bars"></i>
+          <a href="../index.html">Suspicious</a>
+      </nav>
+
+      <div class="wy-nav-content">
+        <div class="rst-content">
+          <div role="navigation" aria-label="Page navigation">
+  <ul class="wy-breadcrumbs">
+      <li><a href="../index.html" class="icon icon-home" aria-label="Home"></a></li>
+          <li class="breadcrumb-item"><a href="index.html">Modules (API Reference)</a></li>
+      <li class="breadcrumb-item active">Settings module</li>
+      <li class="wy-breadcrumbs-aside">
+            <a href="../_sources/modules/settings_core.rst.txt" rel="nofollow"> View page source</a>
+      </li>
+  </ul>
+  <hr/>
+</div>
+          <div role="main" class="document" itemscope="itemscope" itemtype="http://schema.org/Article">
+           <div itemprop="articleBody">
+             
+  <section id="module-settings.models">
+<span id="settings-module"></span><h1>Settings module<a class="headerlink" href="#module-settings.models" title="Link to this heading"></a></h1>
+<dl class="py class">
+<dt class="sig sig-object py" id="settings.models.AllowListDomain">
+<em class="property"><span class="k"><span class="pre">class</span></span><span class="w"> </span></em><span class="sig-prename descclassname"><span class="pre">settings.models.</span></span><span class="sig-name descname"><span class="pre">AllowListDomain</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">id</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">domain</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">user</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">creation_date</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">last_update</span></span></em><span class="sig-paren">)</span><a class="reference internal" href="../_modules/settings/models.html#AllowListDomain"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#settings.models.AllowListDomain" title="Link to this definition"></a></dt>
+<dd><p>Bases: <code class="xref py py-class docutils literal notranslate"><span class="pre">Model</span></code></p>
+<dl class="py exception">
+<dt class="sig sig-object py" id="settings.models.AllowListDomain.DoesNotExist">
+<em class="property"><span class="k"><span class="pre">exception</span></span><span class="w"> </span></em><span class="sig-name descname"><span class="pre">DoesNotExist</span></span><a class="headerlink" href="#settings.models.AllowListDomain.DoesNotExist" title="Link to this definition"></a></dt>
+<dd><p>Bases: <code class="xref py py-class docutils literal notranslate"><span class="pre">ObjectDoesNotExist</span></code></p>
+</dd></dl>
+
+<dl class="py exception">
+<dt class="sig sig-object py" id="settings.models.AllowListDomain.MultipleObjectsReturned">
+<em class="property"><span class="k"><span class="pre">exception</span></span><span class="w"> </span></em><span class="sig-name descname"><span class="pre">MultipleObjectsReturned</span></span><a class="headerlink" href="#settings.models.AllowListDomain.MultipleObjectsReturned" title="Link to this definition"></a></dt>
+<dd><p>Bases: <code class="xref py py-class docutils literal notranslate"><span class="pre">MultipleObjectsReturned</span></code></p>
+</dd></dl>
+
+<dl class="py attribute">
+<dt class="sig sig-object py" id="settings.models.AllowListDomain.creation_date">
+<span class="sig-name descname"><span class="pre">creation_date</span></span><a class="headerlink" href="#settings.models.AllowListDomain.creation_date" title="Link to this definition"></a></dt>
+<dd><p>A wrapper for a deferred-loading field. When the value is read from this
+object the first time, the query is executed.</p>
+</dd></dl>
+
+<dl class="py attribute">
+<dt class="sig sig-object py" id="settings.models.AllowListDomain.domain">
+<span class="sig-name descname"><span class="pre">domain</span></span><a class="headerlink" href="#settings.models.AllowListDomain.domain" title="Link to this definition"></a></dt>
+<dd><p>Accessor to the related object on the forward side of a many-to-one or
+one-to-one (via ForwardOneToOneDescriptor subclass) relation.</p>
+<p>In the example:</p>
+<div class="highlight-default notranslate"><div class="highlight"><pre><span></span><span class="k">class</span><span class="w"> </span><span class="nc">Child</span><span class="p">(</span><span class="n">Model</span><span class="p">):</span>
+    <span class="n">parent</span> <span class="o">=</span> <span class="n">ForeignKey</span><span class="p">(</span><span class="n">Parent</span><span class="p">,</span> <span class="n">related_name</span><span class="o">=</span><span class="s1">&#39;children&#39;</span><span class="p">)</span>
+</pre></div>
+</div>
+<p><code class="docutils literal notranslate"><span class="pre">Child.parent</span></code> is a <code class="docutils literal notranslate"><span class="pre">ForwardManyToOneDescriptor</span></code> instance.</p>
+</dd></dl>
+
+<dl class="py attribute">
+<dt class="sig sig-object py" id="settings.models.AllowListDomain.domain_id">
+<span class="sig-name descname"><span class="pre">domain_id</span></span><a class="headerlink" href="#settings.models.AllowListDomain.domain_id" title="Link to this definition"></a></dt>
+<dd></dd></dl>
+
+<dl class="py method">
+<dt class="sig sig-object py" id="settings.models.AllowListDomain.get_next_by_creation_date">
+<span class="sig-name descname"><span class="pre">get_next_by_creation_date</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">*</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">field=&lt;django.db.models.fields.DateTimeField:</span> <span class="pre">creation_date&gt;</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">is_next=True</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">**kwargs</span></span></em><span class="sig-paren">)</span><a class="headerlink" href="#settings.models.AllowListDomain.get_next_by_creation_date" title="Link to this definition"></a></dt>
+<dd></dd></dl>
+
+<dl class="py method">
+<dt class="sig sig-object py" id="settings.models.AllowListDomain.get_next_by_last_update">
+<span class="sig-name descname"><span class="pre">get_next_by_last_update</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">*</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">field=&lt;django.db.models.fields.DateTimeField:</span> <span class="pre">last_update&gt;</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">is_next=True</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">**kwargs</span></span></em><span class="sig-paren">)</span><a class="headerlink" href="#settings.models.AllowListDomain.get_next_by_last_update" title="Link to this definition"></a></dt>
+<dd></dd></dl>
+
+<dl class="py method">
+<dt class="sig sig-object py" id="settings.models.AllowListDomain.get_previous_by_creation_date">
+<span class="sig-name descname"><span class="pre">get_previous_by_creation_date</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">*</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">field=&lt;django.db.models.fields.DateTimeField:</span> <span class="pre">creation_date&gt;</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">is_next=False</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">**kwargs</span></span></em><span class="sig-paren">)</span><a class="headerlink" href="#settings.models.AllowListDomain.get_previous_by_creation_date" title="Link to this definition"></a></dt>
+<dd></dd></dl>
+
+<dl class="py method">
+<dt class="sig sig-object py" id="settings.models.AllowListDomain.get_previous_by_last_update">
+<span class="sig-name descname"><span class="pre">get_previous_by_last_update</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">*</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">field=&lt;django.db.models.fields.DateTimeField:</span> <span class="pre">last_update&gt;</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">is_next=False</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">**kwargs</span></span></em><span class="sig-paren">)</span><a class="headerlink" href="#settings.models.AllowListDomain.get_previous_by_last_update" title="Link to this definition"></a></dt>
+<dd></dd></dl>
+
+<dl class="py attribute">
+<dt class="sig sig-object py" id="settings.models.AllowListDomain.id">
+<span class="sig-name descname"><span class="pre">id</span></span><a class="headerlink" href="#settings.models.AllowListDomain.id" title="Link to this definition"></a></dt>
+<dd><p>A wrapper for a deferred-loading field. When the value is read from this
+object the first time, the query is executed.</p>
+</dd></dl>
+
+<dl class="py attribute">
+<dt class="sig sig-object py" id="settings.models.AllowListDomain.last_update">
+<span class="sig-name descname"><span class="pre">last_update</span></span><a class="headerlink" href="#settings.models.AllowListDomain.last_update" title="Link to this definition"></a></dt>
+<dd><p>A wrapper for a deferred-loading field. When the value is read from this
+object the first time, the query is executed.</p>
+</dd></dl>
+
+<dl class="py attribute">
+<dt class="sig sig-object py" id="settings.models.AllowListDomain.objects">
+<span class="sig-name descname"><span class="pre">objects</span></span><em class="property"><span class="w"> </span><span class="p"><span class="pre">=</span></span><span class="w"> </span><span class="pre">&lt;django.db.models.manager.Manager</span> <span class="pre">object&gt;</span></em><a class="headerlink" href="#settings.models.AllowListDomain.objects" title="Link to this definition"></a></dt>
+<dd></dd></dl>
+
+<dl class="py attribute">
+<dt class="sig sig-object py" id="settings.models.AllowListDomain.user">
+<span class="sig-name descname"><span class="pre">user</span></span><a class="headerlink" href="#settings.models.AllowListDomain.user" title="Link to this definition"></a></dt>
+<dd><p>Accessor to the related object on the forward side of a many-to-one or
+one-to-one (via ForwardOneToOneDescriptor subclass) relation.</p>
+<p>In the example:</p>
+<div class="highlight-default notranslate"><div class="highlight"><pre><span></span><span class="k">class</span><span class="w"> </span><span class="nc">Child</span><span class="p">(</span><span class="n">Model</span><span class="p">):</span>
+    <span class="n">parent</span> <span class="o">=</span> <span class="n">ForeignKey</span><span class="p">(</span><span class="n">Parent</span><span class="p">,</span> <span class="n">related_name</span><span class="o">=</span><span class="s1">&#39;children&#39;</span><span class="p">)</span>
+</pre></div>
+</div>
+<p><code class="docutils literal notranslate"><span class="pre">Child.parent</span></code> is a <code class="docutils literal notranslate"><span class="pre">ForwardManyToOneDescriptor</span></code> instance.</p>
+</dd></dl>
+
+<dl class="py attribute">
+<dt class="sig sig-object py" id="settings.models.AllowListDomain.user_id">
+<span class="sig-name descname"><span class="pre">user_id</span></span><a class="headerlink" href="#settings.models.AllowListDomain.user_id" title="Link to this definition"></a></dt>
+<dd></dd></dl>
+
+</dd></dl>
+
+<dl class="py class">
+<dt class="sig sig-object py" id="settings.models.AllowListFile">
+<em class="property"><span class="k"><span class="pre">class</span></span><span class="w"> </span></em><span class="sig-prename descclassname"><span class="pre">settings.models.</span></span><span class="sig-name descname"><span class="pre">AllowListFile</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">id</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">linked_file_hash</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">user</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">creation_date</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">last_update</span></span></em><span class="sig-paren">)</span><a class="reference internal" href="../_modules/settings/models.html#AllowListFile"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#settings.models.AllowListFile" title="Link to this definition"></a></dt>
+<dd><p>Bases: <code class="xref py py-class docutils literal notranslate"><span class="pre">Model</span></code></p>
+<dl class="py exception">
+<dt class="sig sig-object py" id="settings.models.AllowListFile.DoesNotExist">
+<em class="property"><span class="k"><span class="pre">exception</span></span><span class="w"> </span></em><span class="sig-name descname"><span class="pre">DoesNotExist</span></span><a class="headerlink" href="#settings.models.AllowListFile.DoesNotExist" title="Link to this definition"></a></dt>
+<dd><p>Bases: <code class="xref py py-class docutils literal notranslate"><span class="pre">ObjectDoesNotExist</span></code></p>
+</dd></dl>
+
+<dl class="py exception">
+<dt class="sig sig-object py" id="settings.models.AllowListFile.MultipleObjectsReturned">
+<em class="property"><span class="k"><span class="pre">exception</span></span><span class="w"> </span></em><span class="sig-name descname"><span class="pre">MultipleObjectsReturned</span></span><a class="headerlink" href="#settings.models.AllowListFile.MultipleObjectsReturned" title="Link to this definition"></a></dt>
+<dd><p>Bases: <code class="xref py py-class docutils literal notranslate"><span class="pre">MultipleObjectsReturned</span></code></p>
+</dd></dl>
+
+<dl class="py attribute">
+<dt class="sig sig-object py" id="settings.models.AllowListFile.creation_date">
+<span class="sig-name descname"><span class="pre">creation_date</span></span><a class="headerlink" href="#settings.models.AllowListFile.creation_date" title="Link to this definition"></a></dt>
+<dd><p>A wrapper for a deferred-loading field. When the value is read from this
+object the first time, the query is executed.</p>
+</dd></dl>
+
+<dl class="py method">
+<dt class="sig sig-object py" id="settings.models.AllowListFile.get_next_by_creation_date">
+<span class="sig-name descname"><span class="pre">get_next_by_creation_date</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">*</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">field=&lt;django.db.models.fields.DateTimeField:</span> <span class="pre">creation_date&gt;</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">is_next=True</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">**kwargs</span></span></em><span class="sig-paren">)</span><a class="headerlink" href="#settings.models.AllowListFile.get_next_by_creation_date" title="Link to this definition"></a></dt>
+<dd></dd></dl>
+
+<dl class="py method">
+<dt class="sig sig-object py" id="settings.models.AllowListFile.get_next_by_last_update">
+<span class="sig-name descname"><span class="pre">get_next_by_last_update</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">*</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">field=&lt;django.db.models.fields.DateTimeField:</span> <span class="pre">last_update&gt;</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">is_next=True</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">**kwargs</span></span></em><span class="sig-paren">)</span><a class="headerlink" href="#settings.models.AllowListFile.get_next_by_last_update" title="Link to this definition"></a></dt>
+<dd></dd></dl>
+
+<dl class="py method">
+<dt class="sig sig-object py" id="settings.models.AllowListFile.get_previous_by_creation_date">
+<span class="sig-name descname"><span class="pre">get_previous_by_creation_date</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">*</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">field=&lt;django.db.models.fields.DateTimeField:</span> <span class="pre">creation_date&gt;</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">is_next=False</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">**kwargs</span></span></em><span class="sig-paren">)</span><a class="headerlink" href="#settings.models.AllowListFile.get_previous_by_creation_date" title="Link to this definition"></a></dt>
+<dd></dd></dl>
+
+<dl class="py method">
+<dt class="sig sig-object py" id="settings.models.AllowListFile.get_previous_by_last_update">
+<span class="sig-name descname"><span class="pre">get_previous_by_last_update</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">*</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">field=&lt;django.db.models.fields.DateTimeField:</span> <span class="pre">last_update&gt;</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">is_next=False</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">**kwargs</span></span></em><span class="sig-paren">)</span><a class="headerlink" href="#settings.models.AllowListFile.get_previous_by_last_update" title="Link to this definition"></a></dt>
+<dd></dd></dl>
+
+<dl class="py attribute">
+<dt class="sig sig-object py" id="settings.models.AllowListFile.id">
+<span class="sig-name descname"><span class="pre">id</span></span><a class="headerlink" href="#settings.models.AllowListFile.id" title="Link to this definition"></a></dt>
+<dd><p>A wrapper for a deferred-loading field. When the value is read from this
+object the first time, the query is executed.</p>
+</dd></dl>
+
+<dl class="py attribute">
+<dt class="sig sig-object py" id="settings.models.AllowListFile.last_update">
+<span class="sig-name descname"><span class="pre">last_update</span></span><a class="headerlink" href="#settings.models.AllowListFile.last_update" title="Link to this definition"></a></dt>
+<dd><p>A wrapper for a deferred-loading field. When the value is read from this
+object the first time, the query is executed.</p>
+</dd></dl>
+
+<dl class="py attribute">
+<dt class="sig sig-object py" id="settings.models.AllowListFile.linked_file_hash">
+<span class="sig-name descname"><span class="pre">linked_file_hash</span></span><a class="headerlink" href="#settings.models.AllowListFile.linked_file_hash" title="Link to this definition"></a></dt>
+<dd><p>Accessor to the related object on the forward side of a many-to-one or
+one-to-one (via ForwardOneToOneDescriptor subclass) relation.</p>
+<p>In the example:</p>
+<div class="highlight-default notranslate"><div class="highlight"><pre><span></span><span class="k">class</span><span class="w"> </span><span class="nc">Child</span><span class="p">(</span><span class="n">Model</span><span class="p">):</span>
+    <span class="n">parent</span> <span class="o">=</span> <span class="n">ForeignKey</span><span class="p">(</span><span class="n">Parent</span><span class="p">,</span> <span class="n">related_name</span><span class="o">=</span><span class="s1">&#39;children&#39;</span><span class="p">)</span>
+</pre></div>
+</div>
+<p><code class="docutils literal notranslate"><span class="pre">Child.parent</span></code> is a <code class="docutils literal notranslate"><span class="pre">ForwardManyToOneDescriptor</span></code> instance.</p>
+</dd></dl>
+
+<dl class="py attribute">
+<dt class="sig sig-object py" id="settings.models.AllowListFile.linked_file_hash_id">
+<span class="sig-name descname"><span class="pre">linked_file_hash_id</span></span><a class="headerlink" href="#settings.models.AllowListFile.linked_file_hash_id" title="Link to this definition"></a></dt>
+<dd></dd></dl>
+
+<dl class="py attribute">
+<dt class="sig sig-object py" id="settings.models.AllowListFile.objects">
+<span class="sig-name descname"><span class="pre">objects</span></span><em class="property"><span class="w"> </span><span class="p"><span class="pre">=</span></span><span class="w"> </span><span class="pre">&lt;django.db.models.manager.Manager</span> <span class="pre">object&gt;</span></em><a class="headerlink" href="#settings.models.AllowListFile.objects" title="Link to this definition"></a></dt>
+<dd></dd></dl>
+
+<dl class="py attribute">
+<dt class="sig sig-object py" id="settings.models.AllowListFile.user">
+<span class="sig-name descname"><span class="pre">user</span></span><a class="headerlink" href="#settings.models.AllowListFile.user" title="Link to this definition"></a></dt>
+<dd><p>Accessor to the related object on the forward side of a many-to-one or
+one-to-one (via ForwardOneToOneDescriptor subclass) relation.</p>
+<p>In the example:</p>
+<div class="highlight-default notranslate"><div class="highlight"><pre><span></span><span class="k">class</span><span class="w"> </span><span class="nc">Child</span><span class="p">(</span><span class="n">Model</span><span class="p">):</span>
+    <span class="n">parent</span> <span class="o">=</span> <span class="n">ForeignKey</span><span class="p">(</span><span class="n">Parent</span><span class="p">,</span> <span class="n">related_name</span><span class="o">=</span><span class="s1">&#39;children&#39;</span><span class="p">)</span>
+</pre></div>
+</div>
+<p><code class="docutils literal notranslate"><span class="pre">Child.parent</span></code> is a <code class="docutils literal notranslate"><span class="pre">ForwardManyToOneDescriptor</span></code> instance.</p>
+</dd></dl>
+
+<dl class="py attribute">
+<dt class="sig sig-object py" id="settings.models.AllowListFile.user_id">
+<span class="sig-name descname"><span class="pre">user_id</span></span><a class="headerlink" href="#settings.models.AllowListFile.user_id" title="Link to this definition"></a></dt>
+<dd></dd></dl>
+
+</dd></dl>
+
+<dl class="py class">
+<dt class="sig sig-object py" id="settings.models.AllowListFiletype">
+<em class="property"><span class="k"><span class="pre">class</span></span><span class="w"> </span></em><span class="sig-prename descclassname"><span class="pre">settings.models.</span></span><span class="sig-name descname"><span class="pre">AllowListFiletype</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">id</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">filetype</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">user</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">creation_date</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">last_update</span></span></em><span class="sig-paren">)</span><a class="reference internal" href="../_modules/settings/models.html#AllowListFiletype"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#settings.models.AllowListFiletype" title="Link to this definition"></a></dt>
+<dd><p>Bases: <code class="xref py py-class docutils literal notranslate"><span class="pre">Model</span></code></p>
+<dl class="py exception">
+<dt class="sig sig-object py" id="settings.models.AllowListFiletype.DoesNotExist">
+<em class="property"><span class="k"><span class="pre">exception</span></span><span class="w"> </span></em><span class="sig-name descname"><span class="pre">DoesNotExist</span></span><a class="headerlink" href="#settings.models.AllowListFiletype.DoesNotExist" title="Link to this definition"></a></dt>
+<dd><p>Bases: <code class="xref py py-class docutils literal notranslate"><span class="pre">ObjectDoesNotExist</span></code></p>
+</dd></dl>
+
+<dl class="py exception">
+<dt class="sig sig-object py" id="settings.models.AllowListFiletype.MultipleObjectsReturned">
+<em class="property"><span class="k"><span class="pre">exception</span></span><span class="w"> </span></em><span class="sig-name descname"><span class="pre">MultipleObjectsReturned</span></span><a class="headerlink" href="#settings.models.AllowListFiletype.MultipleObjectsReturned" title="Link to this definition"></a></dt>
+<dd><p>Bases: <code class="xref py py-class docutils literal notranslate"><span class="pre">MultipleObjectsReturned</span></code></p>
+</dd></dl>
+
+<dl class="py attribute">
+<dt class="sig sig-object py" id="settings.models.AllowListFiletype.creation_date">
+<span class="sig-name descname"><span class="pre">creation_date</span></span><a class="headerlink" href="#settings.models.AllowListFiletype.creation_date" title="Link to this definition"></a></dt>
+<dd><p>A wrapper for a deferred-loading field. When the value is read from this
+object the first time, the query is executed.</p>
+</dd></dl>
+
+<dl class="py attribute">
+<dt class="sig sig-object py" id="settings.models.AllowListFiletype.filetype">
+<span class="sig-name descname"><span class="pre">filetype</span></span><a class="headerlink" href="#settings.models.AllowListFiletype.filetype" title="Link to this definition"></a></dt>
+<dd><p>A wrapper for a deferred-loading field. When the value is read from this
+object the first time, the query is executed.</p>
+</dd></dl>
+
+<dl class="py method">
+<dt class="sig sig-object py" id="settings.models.AllowListFiletype.get_next_by_creation_date">
+<span class="sig-name descname"><span class="pre">get_next_by_creation_date</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">*</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">field=&lt;django.db.models.fields.DateTimeField:</span> <span class="pre">creation_date&gt;</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">is_next=True</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">**kwargs</span></span></em><span class="sig-paren">)</span><a class="headerlink" href="#settings.models.AllowListFiletype.get_next_by_creation_date" title="Link to this definition"></a></dt>
+<dd></dd></dl>
+
+<dl class="py method">
+<dt class="sig sig-object py" id="settings.models.AllowListFiletype.get_next_by_last_update">
+<span class="sig-name descname"><span class="pre">get_next_by_last_update</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">*</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">field=&lt;django.db.models.fields.DateTimeField:</span> <span class="pre">last_update&gt;</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">is_next=True</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">**kwargs</span></span></em><span class="sig-paren">)</span><a class="headerlink" href="#settings.models.AllowListFiletype.get_next_by_last_update" title="Link to this definition"></a></dt>
+<dd></dd></dl>
+
+<dl class="py method">
+<dt class="sig sig-object py" id="settings.models.AllowListFiletype.get_previous_by_creation_date">
+<span class="sig-name descname"><span class="pre">get_previous_by_creation_date</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">*</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">field=&lt;django.db.models.fields.DateTimeField:</span> <span class="pre">creation_date&gt;</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">is_next=False</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">**kwargs</span></span></em><span class="sig-paren">)</span><a class="headerlink" href="#settings.models.AllowListFiletype.get_previous_by_creation_date" title="Link to this definition"></a></dt>
+<dd></dd></dl>
+
+<dl class="py method">
+<dt class="sig sig-object py" id="settings.models.AllowListFiletype.get_previous_by_last_update">
+<span class="sig-name descname"><span class="pre">get_previous_by_last_update</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">*</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">field=&lt;django.db.models.fields.DateTimeField:</span> <span class="pre">last_update&gt;</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">is_next=False</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">**kwargs</span></span></em><span class="sig-paren">)</span><a class="headerlink" href="#settings.models.AllowListFiletype.get_previous_by_last_update" title="Link to this definition"></a></dt>
+<dd></dd></dl>
+
+<dl class="py attribute">
+<dt class="sig sig-object py" id="settings.models.AllowListFiletype.id">
+<span class="sig-name descname"><span class="pre">id</span></span><a class="headerlink" href="#settings.models.AllowListFiletype.id" title="Link to this definition"></a></dt>
+<dd><p>A wrapper for a deferred-loading field. When the value is read from this
+object the first time, the query is executed.</p>
+</dd></dl>
+
+<dl class="py attribute">
+<dt class="sig sig-object py" id="settings.models.AllowListFiletype.last_update">
+<span class="sig-name descname"><span class="pre">last_update</span></span><a class="headerlink" href="#settings.models.AllowListFiletype.last_update" title="Link to this definition"></a></dt>
+<dd><p>A wrapper for a deferred-loading field. When the value is read from this
+object the first time, the query is executed.</p>
+</dd></dl>
+
+<dl class="py attribute">
+<dt class="sig sig-object py" id="settings.models.AllowListFiletype.objects">
+<span class="sig-name descname"><span class="pre">objects</span></span><em class="property"><span class="w"> </span><span class="p"><span class="pre">=</span></span><span class="w"> </span><span class="pre">&lt;django.db.models.manager.Manager</span> <span class="pre">object&gt;</span></em><a class="headerlink" href="#settings.models.AllowListFiletype.objects" title="Link to this definition"></a></dt>
+<dd></dd></dl>
+
+<dl class="py attribute">
+<dt class="sig sig-object py" id="settings.models.AllowListFiletype.user">
+<span class="sig-name descname"><span class="pre">user</span></span><a class="headerlink" href="#settings.models.AllowListFiletype.user" title="Link to this definition"></a></dt>
+<dd><p>Accessor to the related object on the forward side of a many-to-one or
+one-to-one (via ForwardOneToOneDescriptor subclass) relation.</p>
+<p>In the example:</p>
+<div class="highlight-default notranslate"><div class="highlight"><pre><span></span><span class="k">class</span><span class="w"> </span><span class="nc">Child</span><span class="p">(</span><span class="n">Model</span><span class="p">):</span>
+    <span class="n">parent</span> <span class="o">=</span> <span class="n">ForeignKey</span><span class="p">(</span><span class="n">Parent</span><span class="p">,</span> <span class="n">related_name</span><span class="o">=</span><span class="s1">&#39;children&#39;</span><span class="p">)</span>
+</pre></div>
+</div>
+<p><code class="docutils literal notranslate"><span class="pre">Child.parent</span></code> is a <code class="docutils literal notranslate"><span class="pre">ForwardManyToOneDescriptor</span></code> instance.</p>
+</dd></dl>
+
+<dl class="py attribute">
+<dt class="sig sig-object py" id="settings.models.AllowListFiletype.user_id">
+<span class="sig-name descname"><span class="pre">user_id</span></span><a class="headerlink" href="#settings.models.AllowListFiletype.user_id" title="Link to this definition"></a></dt>
+<dd></dd></dl>
+
+</dd></dl>
+
+<dl class="py class">
+<dt class="sig sig-object py" id="settings.models.CampaignDomainAllowList">
+<em class="property"><span class="k"><span class="pre">class</span></span><span class="w"> </span></em><span class="sig-prename descclassname"><span class="pre">settings.models.</span></span><span class="sig-name descname"><span class="pre">CampaignDomainAllowList</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">id</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">domain</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">user</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">creation_date</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">last_update</span></span></em><span class="sig-paren">)</span><a class="reference internal" href="../_modules/settings/models.html#CampaignDomainAllowList"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#settings.models.CampaignDomainAllowList" title="Link to this definition"></a></dt>
+<dd><p>Bases: <code class="xref py py-class docutils literal notranslate"><span class="pre">Model</span></code></p>
+<dl class="py exception">
+<dt class="sig sig-object py" id="settings.models.CampaignDomainAllowList.DoesNotExist">
+<em class="property"><span class="k"><span class="pre">exception</span></span><span class="w"> </span></em><span class="sig-name descname"><span class="pre">DoesNotExist</span></span><a class="headerlink" href="#settings.models.CampaignDomainAllowList.DoesNotExist" title="Link to this definition"></a></dt>
+<dd><p>Bases: <code class="xref py py-class docutils literal notranslate"><span class="pre">ObjectDoesNotExist</span></code></p>
+</dd></dl>
+
+<dl class="py exception">
+<dt class="sig sig-object py" id="settings.models.CampaignDomainAllowList.MultipleObjectsReturned">
+<em class="property"><span class="k"><span class="pre">exception</span></span><span class="w"> </span></em><span class="sig-name descname"><span class="pre">MultipleObjectsReturned</span></span><a class="headerlink" href="#settings.models.CampaignDomainAllowList.MultipleObjectsReturned" title="Link to this definition"></a></dt>
+<dd><p>Bases: <code class="xref py py-class docutils literal notranslate"><span class="pre">MultipleObjectsReturned</span></code></p>
+</dd></dl>
+
+<dl class="py attribute">
+<dt class="sig sig-object py" id="settings.models.CampaignDomainAllowList.creation_date">
+<span class="sig-name descname"><span class="pre">creation_date</span></span><a class="headerlink" href="#settings.models.CampaignDomainAllowList.creation_date" title="Link to this definition"></a></dt>
+<dd><p>A wrapper for a deferred-loading field. When the value is read from this
+object the first time, the query is executed.</p>
+</dd></dl>
+
+<dl class="py attribute">
+<dt class="sig sig-object py" id="settings.models.CampaignDomainAllowList.domain">
+<span class="sig-name descname"><span class="pre">domain</span></span><a class="headerlink" href="#settings.models.CampaignDomainAllowList.domain" title="Link to this definition"></a></dt>
+<dd><p>Accessor to the related object on the forward side of a many-to-one or
+one-to-one (via ForwardOneToOneDescriptor subclass) relation.</p>
+<p>In the example:</p>
+<div class="highlight-default notranslate"><div class="highlight"><pre><span></span><span class="k">class</span><span class="w"> </span><span class="nc">Child</span><span class="p">(</span><span class="n">Model</span><span class="p">):</span>
+    <span class="n">parent</span> <span class="o">=</span> <span class="n">ForeignKey</span><span class="p">(</span><span class="n">Parent</span><span class="p">,</span> <span class="n">related_name</span><span class="o">=</span><span class="s1">&#39;children&#39;</span><span class="p">)</span>
+</pre></div>
+</div>
+<p><code class="docutils literal notranslate"><span class="pre">Child.parent</span></code> is a <code class="docutils literal notranslate"><span class="pre">ForwardManyToOneDescriptor</span></code> instance.</p>
+</dd></dl>
+
+<dl class="py attribute">
+<dt class="sig sig-object py" id="settings.models.CampaignDomainAllowList.domain_id">
+<span class="sig-name descname"><span class="pre">domain_id</span></span><a class="headerlink" href="#settings.models.CampaignDomainAllowList.domain_id" title="Link to this definition"></a></dt>
+<dd></dd></dl>
+
+<dl class="py method">
+<dt class="sig sig-object py" id="settings.models.CampaignDomainAllowList.get_next_by_creation_date">
+<span class="sig-name descname"><span class="pre">get_next_by_creation_date</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">*</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">field=&lt;django.db.models.fields.DateTimeField:</span> <span class="pre">creation_date&gt;</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">is_next=True</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">**kwargs</span></span></em><span class="sig-paren">)</span><a class="headerlink" href="#settings.models.CampaignDomainAllowList.get_next_by_creation_date" title="Link to this definition"></a></dt>
+<dd></dd></dl>
+
+<dl class="py method">
+<dt class="sig sig-object py" id="settings.models.CampaignDomainAllowList.get_next_by_last_update">
+<span class="sig-name descname"><span class="pre">get_next_by_last_update</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">*</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">field=&lt;django.db.models.fields.DateTimeField:</span> <span class="pre">last_update&gt;</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">is_next=True</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">**kwargs</span></span></em><span class="sig-paren">)</span><a class="headerlink" href="#settings.models.CampaignDomainAllowList.get_next_by_last_update" title="Link to this definition"></a></dt>
+<dd></dd></dl>
+
+<dl class="py method">
+<dt class="sig sig-object py" id="settings.models.CampaignDomainAllowList.get_previous_by_creation_date">
+<span class="sig-name descname"><span class="pre">get_previous_by_creation_date</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">*</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">field=&lt;django.db.models.fields.DateTimeField:</span> <span class="pre">creation_date&gt;</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">is_next=False</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">**kwargs</span></span></em><span class="sig-paren">)</span><a class="headerlink" href="#settings.models.CampaignDomainAllowList.get_previous_by_creation_date" title="Link to this definition"></a></dt>
+<dd></dd></dl>
+
+<dl class="py method">
+<dt class="sig sig-object py" id="settings.models.CampaignDomainAllowList.get_previous_by_last_update">
+<span class="sig-name descname"><span class="pre">get_previous_by_last_update</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">*</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">field=&lt;django.db.models.fields.DateTimeField:</span> <span class="pre">last_update&gt;</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">is_next=False</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">**kwargs</span></span></em><span class="sig-paren">)</span><a class="headerlink" href="#settings.models.CampaignDomainAllowList.get_previous_by_last_update" title="Link to this definition"></a></dt>
+<dd></dd></dl>
+
+<dl class="py attribute">
+<dt class="sig sig-object py" id="settings.models.CampaignDomainAllowList.id">
+<span class="sig-name descname"><span class="pre">id</span></span><a class="headerlink" href="#settings.models.CampaignDomainAllowList.id" title="Link to this definition"></a></dt>
+<dd><p>A wrapper for a deferred-loading field. When the value is read from this
+object the first time, the query is executed.</p>
+</dd></dl>
+
+<dl class="py attribute">
+<dt class="sig sig-object py" id="settings.models.CampaignDomainAllowList.last_update">
+<span class="sig-name descname"><span class="pre">last_update</span></span><a class="headerlink" href="#settings.models.CampaignDomainAllowList.last_update" title="Link to this definition"></a></dt>
+<dd><p>A wrapper for a deferred-loading field. When the value is read from this
+object the first time, the query is executed.</p>
+</dd></dl>
+
+<dl class="py attribute">
+<dt class="sig sig-object py" id="settings.models.CampaignDomainAllowList.objects">
+<span class="sig-name descname"><span class="pre">objects</span></span><em class="property"><span class="w"> </span><span class="p"><span class="pre">=</span></span><span class="w"> </span><span class="pre">&lt;django.db.models.manager.Manager</span> <span class="pre">object&gt;</span></em><a class="headerlink" href="#settings.models.CampaignDomainAllowList.objects" title="Link to this definition"></a></dt>
+<dd></dd></dl>
+
+<dl class="py attribute">
+<dt class="sig sig-object py" id="settings.models.CampaignDomainAllowList.user">
+<span class="sig-name descname"><span class="pre">user</span></span><a class="headerlink" href="#settings.models.CampaignDomainAllowList.user" title="Link to this definition"></a></dt>
+<dd><p>Accessor to the related object on the forward side of a many-to-one or
+one-to-one (via ForwardOneToOneDescriptor subclass) relation.</p>
+<p>In the example:</p>
+<div class="highlight-default notranslate"><div class="highlight"><pre><span></span><span class="k">class</span><span class="w"> </span><span class="nc">Child</span><span class="p">(</span><span class="n">Model</span><span class="p">):</span>
+    <span class="n">parent</span> <span class="o">=</span> <span class="n">ForeignKey</span><span class="p">(</span><span class="n">Parent</span><span class="p">,</span> <span class="n">related_name</span><span class="o">=</span><span class="s1">&#39;children&#39;</span><span class="p">)</span>
+</pre></div>
+</div>
+<p><code class="docutils literal notranslate"><span class="pre">Child.parent</span></code> is a <code class="docutils literal notranslate"><span class="pre">ForwardManyToOneDescriptor</span></code> instance.</p>
+</dd></dl>
+
+<dl class="py attribute">
+<dt class="sig sig-object py" id="settings.models.CampaignDomainAllowList.user_id">
+<span class="sig-name descname"><span class="pre">user_id</span></span><a class="headerlink" href="#settings.models.CampaignDomainAllowList.user_id" title="Link to this definition"></a></dt>
+<dd></dd></dl>
+
+</dd></dl>
+
+<dl class="py class">
+<dt class="sig sig-object py" id="settings.models.DenyListDomain">
+<em class="property"><span class="k"><span class="pre">class</span></span><span class="w"> </span></em><span class="sig-prename descclassname"><span class="pre">settings.models.</span></span><span class="sig-name descname"><span class="pre">DenyListDomain</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">id</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">domain</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">user</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">creation_date</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">last_update</span></span></em><span class="sig-paren">)</span><a class="reference internal" href="../_modules/settings/models.html#DenyListDomain"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#settings.models.DenyListDomain" title="Link to this definition"></a></dt>
+<dd><p>Bases: <code class="xref py py-class docutils literal notranslate"><span class="pre">Model</span></code></p>
+<dl class="py exception">
+<dt class="sig sig-object py" id="settings.models.DenyListDomain.DoesNotExist">
+<em class="property"><span class="k"><span class="pre">exception</span></span><span class="w"> </span></em><span class="sig-name descname"><span class="pre">DoesNotExist</span></span><a class="headerlink" href="#settings.models.DenyListDomain.DoesNotExist" title="Link to this definition"></a></dt>
+<dd><p>Bases: <code class="xref py py-class docutils literal notranslate"><span class="pre">ObjectDoesNotExist</span></code></p>
+</dd></dl>
+
+<dl class="py exception">
+<dt class="sig sig-object py" id="settings.models.DenyListDomain.MultipleObjectsReturned">
+<em class="property"><span class="k"><span class="pre">exception</span></span><span class="w"> </span></em><span class="sig-name descname"><span class="pre">MultipleObjectsReturned</span></span><a class="headerlink" href="#settings.models.DenyListDomain.MultipleObjectsReturned" title="Link to this definition"></a></dt>
+<dd><p>Bases: <code class="xref py py-class docutils literal notranslate"><span class="pre">MultipleObjectsReturned</span></code></p>
+</dd></dl>
+
+<dl class="py attribute">
+<dt class="sig sig-object py" id="settings.models.DenyListDomain.creation_date">
+<span class="sig-name descname"><span class="pre">creation_date</span></span><a class="headerlink" href="#settings.models.DenyListDomain.creation_date" title="Link to this definition"></a></dt>
+<dd><p>A wrapper for a deferred-loading field. When the value is read from this
+object the first time, the query is executed.</p>
+</dd></dl>
+
+<dl class="py attribute">
+<dt class="sig sig-object py" id="settings.models.DenyListDomain.domain">
+<span class="sig-name descname"><span class="pre">domain</span></span><a class="headerlink" href="#settings.models.DenyListDomain.domain" title="Link to this definition"></a></dt>
+<dd><p>Accessor to the related object on the forward side of a many-to-one or
+one-to-one (via ForwardOneToOneDescriptor subclass) relation.</p>
+<p>In the example:</p>
+<div class="highlight-default notranslate"><div class="highlight"><pre><span></span><span class="k">class</span><span class="w"> </span><span class="nc">Child</span><span class="p">(</span><span class="n">Model</span><span class="p">):</span>
+    <span class="n">parent</span> <span class="o">=</span> <span class="n">ForeignKey</span><span class="p">(</span><span class="n">Parent</span><span class="p">,</span> <span class="n">related_name</span><span class="o">=</span><span class="s1">&#39;children&#39;</span><span class="p">)</span>
+</pre></div>
+</div>
+<p><code class="docutils literal notranslate"><span class="pre">Child.parent</span></code> is a <code class="docutils literal notranslate"><span class="pre">ForwardManyToOneDescriptor</span></code> instance.</p>
+</dd></dl>
+
+<dl class="py attribute">
+<dt class="sig sig-object py" id="settings.models.DenyListDomain.domain_id">
+<span class="sig-name descname"><span class="pre">domain_id</span></span><a class="headerlink" href="#settings.models.DenyListDomain.domain_id" title="Link to this definition"></a></dt>
+<dd></dd></dl>
+
+<dl class="py method">
+<dt class="sig sig-object py" id="settings.models.DenyListDomain.get_next_by_creation_date">
+<span class="sig-name descname"><span class="pre">get_next_by_creation_date</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">*</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">field=&lt;django.db.models.fields.DateTimeField:</span> <span class="pre">creation_date&gt;</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">is_next=True</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">**kwargs</span></span></em><span class="sig-paren">)</span><a class="headerlink" href="#settings.models.DenyListDomain.get_next_by_creation_date" title="Link to this definition"></a></dt>
+<dd></dd></dl>
+
+<dl class="py method">
+<dt class="sig sig-object py" id="settings.models.DenyListDomain.get_next_by_last_update">
+<span class="sig-name descname"><span class="pre">get_next_by_last_update</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">*</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">field=&lt;django.db.models.fields.DateTimeField:</span> <span class="pre">last_update&gt;</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">is_next=True</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">**kwargs</span></span></em><span class="sig-paren">)</span><a class="headerlink" href="#settings.models.DenyListDomain.get_next_by_last_update" title="Link to this definition"></a></dt>
+<dd></dd></dl>
+
+<dl class="py method">
+<dt class="sig sig-object py" id="settings.models.DenyListDomain.get_previous_by_creation_date">
+<span class="sig-name descname"><span class="pre">get_previous_by_creation_date</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">*</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">field=&lt;django.db.models.fields.DateTimeField:</span> <span class="pre">creation_date&gt;</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">is_next=False</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">**kwargs</span></span></em><span class="sig-paren">)</span><a class="headerlink" href="#settings.models.DenyListDomain.get_previous_by_creation_date" title="Link to this definition"></a></dt>
+<dd></dd></dl>
+
+<dl class="py method">
+<dt class="sig sig-object py" id="settings.models.DenyListDomain.get_previous_by_last_update">
+<span class="sig-name descname"><span class="pre">get_previous_by_last_update</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">*</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">field=&lt;django.db.models.fields.DateTimeField:</span> <span class="pre">last_update&gt;</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">is_next=False</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">**kwargs</span></span></em><span class="sig-paren">)</span><a class="headerlink" href="#settings.models.DenyListDomain.get_previous_by_last_update" title="Link to this definition"></a></dt>
+<dd></dd></dl>
+
+<dl class="py attribute">
+<dt class="sig sig-object py" id="settings.models.DenyListDomain.id">
+<span class="sig-name descname"><span class="pre">id</span></span><a class="headerlink" href="#settings.models.DenyListDomain.id" title="Link to this definition"></a></dt>
+<dd><p>A wrapper for a deferred-loading field. When the value is read from this
+object the first time, the query is executed.</p>
+</dd></dl>
+
+<dl class="py attribute">
+<dt class="sig sig-object py" id="settings.models.DenyListDomain.last_update">
+<span class="sig-name descname"><span class="pre">last_update</span></span><a class="headerlink" href="#settings.models.DenyListDomain.last_update" title="Link to this definition"></a></dt>
+<dd><p>A wrapper for a deferred-loading field. When the value is read from this
+object the first time, the query is executed.</p>
+</dd></dl>
+
+<dl class="py attribute">
+<dt class="sig sig-object py" id="settings.models.DenyListDomain.objects">
+<span class="sig-name descname"><span class="pre">objects</span></span><em class="property"><span class="w"> </span><span class="p"><span class="pre">=</span></span><span class="w"> </span><span class="pre">&lt;django.db.models.manager.Manager</span> <span class="pre">object&gt;</span></em><a class="headerlink" href="#settings.models.DenyListDomain.objects" title="Link to this definition"></a></dt>
+<dd></dd></dl>
+
+<dl class="py attribute">
+<dt class="sig sig-object py" id="settings.models.DenyListDomain.user">
+<span class="sig-name descname"><span class="pre">user</span></span><a class="headerlink" href="#settings.models.DenyListDomain.user" title="Link to this definition"></a></dt>
+<dd><p>Accessor to the related object on the forward side of a many-to-one or
+one-to-one (via ForwardOneToOneDescriptor subclass) relation.</p>
+<p>In the example:</p>
+<div class="highlight-default notranslate"><div class="highlight"><pre><span></span><span class="k">class</span><span class="w"> </span><span class="nc">Child</span><span class="p">(</span><span class="n">Model</span><span class="p">):</span>
+    <span class="n">parent</span> <span class="o">=</span> <span class="n">ForeignKey</span><span class="p">(</span><span class="n">Parent</span><span class="p">,</span> <span class="n">related_name</span><span class="o">=</span><span class="s1">&#39;children&#39;</span><span class="p">)</span>
+</pre></div>
+</div>
+<p><code class="docutils literal notranslate"><span class="pre">Child.parent</span></code> is a <code class="docutils literal notranslate"><span class="pre">ForwardManyToOneDescriptor</span></code> instance.</p>
+</dd></dl>
+
+<dl class="py attribute">
+<dt class="sig sig-object py" id="settings.models.DenyListDomain.user_id">
+<span class="sig-name descname"><span class="pre">user_id</span></span><a class="headerlink" href="#settings.models.DenyListDomain.user_id" title="Link to this definition"></a></dt>
+<dd></dd></dl>
+
+</dd></dl>
+
+<dl class="py class">
+<dt class="sig sig-object py" id="settings.models.DenyListFile">
+<em class="property"><span class="k"><span class="pre">class</span></span><span class="w"> </span></em><span class="sig-prename descclassname"><span class="pre">settings.models.</span></span><span class="sig-name descname"><span class="pre">DenyListFile</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">id</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">linked_file_hash</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">user</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">creation_date</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">last_update</span></span></em><span class="sig-paren">)</span><a class="reference internal" href="../_modules/settings/models.html#DenyListFile"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#settings.models.DenyListFile" title="Link to this definition"></a></dt>
+<dd><p>Bases: <code class="xref py py-class docutils literal notranslate"><span class="pre">Model</span></code></p>
+<dl class="py exception">
+<dt class="sig sig-object py" id="settings.models.DenyListFile.DoesNotExist">
+<em class="property"><span class="k"><span class="pre">exception</span></span><span class="w"> </span></em><span class="sig-name descname"><span class="pre">DoesNotExist</span></span><a class="headerlink" href="#settings.models.DenyListFile.DoesNotExist" title="Link to this definition"></a></dt>
+<dd><p>Bases: <code class="xref py py-class docutils literal notranslate"><span class="pre">ObjectDoesNotExist</span></code></p>
+</dd></dl>
+
+<dl class="py exception">
+<dt class="sig sig-object py" id="settings.models.DenyListFile.MultipleObjectsReturned">
+<em class="property"><span class="k"><span class="pre">exception</span></span><span class="w"> </span></em><span class="sig-name descname"><span class="pre">MultipleObjectsReturned</span></span><a class="headerlink" href="#settings.models.DenyListFile.MultipleObjectsReturned" title="Link to this definition"></a></dt>
+<dd><p>Bases: <code class="xref py py-class docutils literal notranslate"><span class="pre">MultipleObjectsReturned</span></code></p>
+</dd></dl>
+
+<dl class="py attribute">
+<dt class="sig sig-object py" id="settings.models.DenyListFile.creation_date">
+<span class="sig-name descname"><span class="pre">creation_date</span></span><a class="headerlink" href="#settings.models.DenyListFile.creation_date" title="Link to this definition"></a></dt>
+<dd><p>A wrapper for a deferred-loading field. When the value is read from this
+object the first time, the query is executed.</p>
+</dd></dl>
+
+<dl class="py method">
+<dt class="sig sig-object py" id="settings.models.DenyListFile.get_next_by_creation_date">
+<span class="sig-name descname"><span class="pre">get_next_by_creation_date</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">*</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">field=&lt;django.db.models.fields.DateTimeField:</span> <span class="pre">creation_date&gt;</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">is_next=True</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">**kwargs</span></span></em><span class="sig-paren">)</span><a class="headerlink" href="#settings.models.DenyListFile.get_next_by_creation_date" title="Link to this definition"></a></dt>
+<dd></dd></dl>
+
+<dl class="py method">
+<dt class="sig sig-object py" id="settings.models.DenyListFile.get_next_by_last_update">
+<span class="sig-name descname"><span class="pre">get_next_by_last_update</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">*</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">field=&lt;django.db.models.fields.DateTimeField:</span> <span class="pre">last_update&gt;</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">is_next=True</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">**kwargs</span></span></em><span class="sig-paren">)</span><a class="headerlink" href="#settings.models.DenyListFile.get_next_by_last_update" title="Link to this definition"></a></dt>
+<dd></dd></dl>
+
+<dl class="py method">
+<dt class="sig sig-object py" id="settings.models.DenyListFile.get_previous_by_creation_date">
+<span class="sig-name descname"><span class="pre">get_previous_by_creation_date</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">*</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">field=&lt;django.db.models.fields.DateTimeField:</span> <span class="pre">creation_date&gt;</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">is_next=False</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">**kwargs</span></span></em><span class="sig-paren">)</span><a class="headerlink" href="#settings.models.DenyListFile.get_previous_by_creation_date" title="Link to this definition"></a></dt>
+<dd></dd></dl>
+
+<dl class="py method">
+<dt class="sig sig-object py" id="settings.models.DenyListFile.get_previous_by_last_update">
+<span class="sig-name descname"><span class="pre">get_previous_by_last_update</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">*</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">field=&lt;django.db.models.fields.DateTimeField:</span> <span class="pre">last_update&gt;</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">is_next=False</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">**kwargs</span></span></em><span class="sig-paren">)</span><a class="headerlink" href="#settings.models.DenyListFile.get_previous_by_last_update" title="Link to this definition"></a></dt>
+<dd></dd></dl>
+
+<dl class="py attribute">
+<dt class="sig sig-object py" id="settings.models.DenyListFile.id">
+<span class="sig-name descname"><span class="pre">id</span></span><a class="headerlink" href="#settings.models.DenyListFile.id" title="Link to this definition"></a></dt>
+<dd><p>A wrapper for a deferred-loading field. When the value is read from this
+object the first time, the query is executed.</p>
+</dd></dl>
+
+<dl class="py attribute">
+<dt class="sig sig-object py" id="settings.models.DenyListFile.last_update">
+<span class="sig-name descname"><span class="pre">last_update</span></span><a class="headerlink" href="#settings.models.DenyListFile.last_update" title="Link to this definition"></a></dt>
+<dd><p>A wrapper for a deferred-loading field. When the value is read from this
+object the first time, the query is executed.</p>
+</dd></dl>
+
+<dl class="py attribute">
+<dt class="sig sig-object py" id="settings.models.DenyListFile.linked_file_hash">
+<span class="sig-name descname"><span class="pre">linked_file_hash</span></span><a class="headerlink" href="#settings.models.DenyListFile.linked_file_hash" title="Link to this definition"></a></dt>
+<dd><p>Accessor to the related object on the forward side of a many-to-one or
+one-to-one (via ForwardOneToOneDescriptor subclass) relation.</p>
+<p>In the example:</p>
+<div class="highlight-default notranslate"><div class="highlight"><pre><span></span><span class="k">class</span><span class="w"> </span><span class="nc">Child</span><span class="p">(</span><span class="n">Model</span><span class="p">):</span>
+    <span class="n">parent</span> <span class="o">=</span> <span class="n">ForeignKey</span><span class="p">(</span><span class="n">Parent</span><span class="p">,</span> <span class="n">related_name</span><span class="o">=</span><span class="s1">&#39;children&#39;</span><span class="p">)</span>
+</pre></div>
+</div>
+<p><code class="docutils literal notranslate"><span class="pre">Child.parent</span></code> is a <code class="docutils literal notranslate"><span class="pre">ForwardManyToOneDescriptor</span></code> instance.</p>
+</dd></dl>
+
+<dl class="py attribute">
+<dt class="sig sig-object py" id="settings.models.DenyListFile.linked_file_hash_id">
+<span class="sig-name descname"><span class="pre">linked_file_hash_id</span></span><a class="headerlink" href="#settings.models.DenyListFile.linked_file_hash_id" title="Link to this definition"></a></dt>
+<dd></dd></dl>
+
+<dl class="py attribute">
+<dt class="sig sig-object py" id="settings.models.DenyListFile.objects">
+<span class="sig-name descname"><span class="pre">objects</span></span><em class="property"><span class="w"> </span><span class="p"><span class="pre">=</span></span><span class="w"> </span><span class="pre">&lt;django.db.models.manager.Manager</span> <span class="pre">object&gt;</span></em><a class="headerlink" href="#settings.models.DenyListFile.objects" title="Link to this definition"></a></dt>
+<dd></dd></dl>
+
+<dl class="py attribute">
+<dt class="sig sig-object py" id="settings.models.DenyListFile.user">
+<span class="sig-name descname"><span class="pre">user</span></span><a class="headerlink" href="#settings.models.DenyListFile.user" title="Link to this definition"></a></dt>
+<dd><p>Accessor to the related object on the forward side of a many-to-one or
+one-to-one (via ForwardOneToOneDescriptor subclass) relation.</p>
+<p>In the example:</p>
+<div class="highlight-default notranslate"><div class="highlight"><pre><span></span><span class="k">class</span><span class="w"> </span><span class="nc">Child</span><span class="p">(</span><span class="n">Model</span><span class="p">):</span>
+    <span class="n">parent</span> <span class="o">=</span> <span class="n">ForeignKey</span><span class="p">(</span><span class="n">Parent</span><span class="p">,</span> <span class="n">related_name</span><span class="o">=</span><span class="s1">&#39;children&#39;</span><span class="p">)</span>
+</pre></div>
+</div>
+<p><code class="docutils literal notranslate"><span class="pre">Child.parent</span></code> is a <code class="docutils literal notranslate"><span class="pre">ForwardManyToOneDescriptor</span></code> instance.</p>
+</dd></dl>
+
+<dl class="py attribute">
+<dt class="sig sig-object py" id="settings.models.DenyListFile.user_id">
+<span class="sig-name descname"><span class="pre">user_id</span></span><a class="headerlink" href="#settings.models.DenyListFile.user_id" title="Link to this definition"></a></dt>
+<dd></dd></dl>
+
+</dd></dl>
+
+<dl class="py class">
+<dt class="sig sig-object py" id="settings.models.EmailFeederState">
+<em class="property"><span class="k"><span class="pre">class</span></span><span class="w"> </span></em><span class="sig-prename descclassname"><span class="pre">settings.models.</span></span><span class="sig-name descname"><span class="pre">EmailFeederState</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">id</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">is_running</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">updated_at</span></span></em><span class="sig-paren">)</span><a class="reference internal" href="../_modules/settings/models.html#EmailFeederState"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#settings.models.EmailFeederState" title="Link to this definition"></a></dt>
+<dd><p>Bases: <code class="xref py py-class docutils literal notranslate"><span class="pre">Model</span></code></p>
+<dl class="py exception">
+<dt class="sig sig-object py" id="settings.models.EmailFeederState.DoesNotExist">
+<em class="property"><span class="k"><span class="pre">exception</span></span><span class="w"> </span></em><span class="sig-name descname"><span class="pre">DoesNotExist</span></span><a class="headerlink" href="#settings.models.EmailFeederState.DoesNotExist" title="Link to this definition"></a></dt>
+<dd><p>Bases: <code class="xref py py-class docutils literal notranslate"><span class="pre">ObjectDoesNotExist</span></code></p>
+</dd></dl>
+
+<dl class="py exception">
+<dt class="sig sig-object py" id="settings.models.EmailFeederState.MultipleObjectsReturned">
+<em class="property"><span class="k"><span class="pre">exception</span></span><span class="w"> </span></em><span class="sig-name descname"><span class="pre">MultipleObjectsReturned</span></span><a class="headerlink" href="#settings.models.EmailFeederState.MultipleObjectsReturned" title="Link to this definition"></a></dt>
+<dd><p>Bases: <code class="xref py py-class docutils literal notranslate"><span class="pre">MultipleObjectsReturned</span></code></p>
+</dd></dl>
+
+<dl class="py method">
+<dt class="sig sig-object py" id="settings.models.EmailFeederState.get_next_by_updated_at">
+<span class="sig-name descname"><span class="pre">get_next_by_updated_at</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">*</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">field=&lt;django.db.models.fields.DateTimeField:</span> <span class="pre">updated_at&gt;</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">is_next=True</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">**kwargs</span></span></em><span class="sig-paren">)</span><a class="headerlink" href="#settings.models.EmailFeederState.get_next_by_updated_at" title="Link to this definition"></a></dt>
+<dd></dd></dl>
+
+<dl class="py method">
+<dt class="sig sig-object py" id="settings.models.EmailFeederState.get_previous_by_updated_at">
+<span class="sig-name descname"><span class="pre">get_previous_by_updated_at</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">*</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">field=&lt;django.db.models.fields.DateTimeField:</span> <span class="pre">updated_at&gt;</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">is_next=False</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">**kwargs</span></span></em><span class="sig-paren">)</span><a class="headerlink" href="#settings.models.EmailFeederState.get_previous_by_updated_at" title="Link to this definition"></a></dt>
+<dd></dd></dl>
+
+<dl class="py attribute">
+<dt class="sig sig-object py" id="settings.models.EmailFeederState.id">
+<span class="sig-name descname"><span class="pre">id</span></span><a class="headerlink" href="#settings.models.EmailFeederState.id" title="Link to this definition"></a></dt>
+<dd><p>A wrapper for a deferred-loading field. When the value is read from this
+object the first time, the query is executed.</p>
+</dd></dl>
+
+<dl class="py attribute">
+<dt class="sig sig-object py" id="settings.models.EmailFeederState.is_running">
+<span class="sig-name descname"><span class="pre">is_running</span></span><a class="headerlink" href="#settings.models.EmailFeederState.is_running" title="Link to this definition"></a></dt>
+<dd><p>A wrapper for a deferred-loading field. When the value is read from this
+object the first time, the query is executed.</p>
+</dd></dl>
+
+<dl class="py attribute">
+<dt class="sig sig-object py" id="settings.models.EmailFeederState.objects">
+<span class="sig-name descname"><span class="pre">objects</span></span><em class="property"><span class="w"> </span><span class="p"><span class="pre">=</span></span><span class="w"> </span><span class="pre">&lt;django.db.models.manager.Manager</span> <span class="pre">object&gt;</span></em><a class="headerlink" href="#settings.models.EmailFeederState.objects" title="Link to this definition"></a></dt>
+<dd></dd></dl>
+
+<dl class="py attribute">
+<dt class="sig sig-object py" id="settings.models.EmailFeederState.updated_at">
+<span class="sig-name descname"><span class="pre">updated_at</span></span><a class="headerlink" href="#settings.models.EmailFeederState.updated_at" title="Link to this definition"></a></dt>
+<dd><p>A wrapper for a deferred-loading field. When the value is read from this
+object the first time, the query is executed.</p>
+</dd></dl>
+
+</dd></dl>
+
+<dl class="py class">
+<dt class="sig sig-object py" id="settings.models.Mailbox">
+<em class="property"><span class="k"><span class="pre">class</span></span><span class="w"> </span></em><span class="sig-prename descclassname"><span class="pre">settings.models.</span></span><span class="sig-name descname"><span class="pre">Mailbox</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">id</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">name</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">username</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">password</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">server</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">port</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">creation_date</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">last_update</span></span></em><span class="sig-paren">)</span><a class="reference internal" href="../_modules/settings/models.html#Mailbox"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#settings.models.Mailbox" title="Link to this definition"></a></dt>
+<dd><p>Bases: <code class="xref py py-class docutils literal notranslate"><span class="pre">Model</span></code></p>
+<dl class="py exception">
+<dt class="sig sig-object py" id="settings.models.Mailbox.DoesNotExist">
+<em class="property"><span class="k"><span class="pre">exception</span></span><span class="w"> </span></em><span class="sig-name descname"><span class="pre">DoesNotExist</span></span><a class="headerlink" href="#settings.models.Mailbox.DoesNotExist" title="Link to this definition"></a></dt>
+<dd><p>Bases: <code class="xref py py-class docutils literal notranslate"><span class="pre">ObjectDoesNotExist</span></code></p>
+</dd></dl>
+
+<dl class="py exception">
+<dt class="sig sig-object py" id="settings.models.Mailbox.MultipleObjectsReturned">
+<em class="property"><span class="k"><span class="pre">exception</span></span><span class="w"> </span></em><span class="sig-name descname"><span class="pre">MultipleObjectsReturned</span></span><a class="headerlink" href="#settings.models.Mailbox.MultipleObjectsReturned" title="Link to this definition"></a></dt>
+<dd><p>Bases: <code class="xref py py-class docutils literal notranslate"><span class="pre">MultipleObjectsReturned</span></code></p>
+</dd></dl>
+
+<dl class="py attribute">
+<dt class="sig sig-object py" id="settings.models.Mailbox.creation_date">
+<span class="sig-name descname"><span class="pre">creation_date</span></span><a class="headerlink" href="#settings.models.Mailbox.creation_date" title="Link to this definition"></a></dt>
+<dd><p>A wrapper for a deferred-loading field. When the value is read from this
+object the first time, the query is executed.</p>
+</dd></dl>
+
+<dl class="py method">
+<dt class="sig sig-object py" id="settings.models.Mailbox.get_next_by_creation_date">
+<span class="sig-name descname"><span class="pre">get_next_by_creation_date</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">*</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">field=&lt;django.db.models.fields.DateTimeField:</span> <span class="pre">creation_date&gt;</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">is_next=True</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">**kwargs</span></span></em><span class="sig-paren">)</span><a class="headerlink" href="#settings.models.Mailbox.get_next_by_creation_date" title="Link to this definition"></a></dt>
+<dd></dd></dl>
+
+<dl class="py method">
+<dt class="sig sig-object py" id="settings.models.Mailbox.get_next_by_last_update">
+<span class="sig-name descname"><span class="pre">get_next_by_last_update</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">*</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">field=&lt;django.db.models.fields.DateTimeField:</span> <span class="pre">last_update&gt;</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">is_next=True</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">**kwargs</span></span></em><span class="sig-paren">)</span><a class="headerlink" href="#settings.models.Mailbox.get_next_by_last_update" title="Link to this definition"></a></dt>
+<dd></dd></dl>
+
+<dl class="py method">
+<dt class="sig sig-object py" id="settings.models.Mailbox.get_previous_by_creation_date">
+<span class="sig-name descname"><span class="pre">get_previous_by_creation_date</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">*</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">field=&lt;django.db.models.fields.DateTimeField:</span> <span class="pre">creation_date&gt;</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">is_next=False</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">**kwargs</span></span></em><span class="sig-paren">)</span><a class="headerlink" href="#settings.models.Mailbox.get_previous_by_creation_date" title="Link to this definition"></a></dt>
+<dd></dd></dl>
+
+<dl class="py method">
+<dt class="sig sig-object py" id="settings.models.Mailbox.get_previous_by_last_update">
+<span class="sig-name descname"><span class="pre">get_previous_by_last_update</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">*</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">field=&lt;django.db.models.fields.DateTimeField:</span> <span class="pre">last_update&gt;</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">is_next=False</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">**kwargs</span></span></em><span class="sig-paren">)</span><a class="headerlink" href="#settings.models.Mailbox.get_previous_by_last_update" title="Link to this definition"></a></dt>
+<dd></dd></dl>
+
+<dl class="py attribute">
+<dt class="sig sig-object py" id="settings.models.Mailbox.id">
+<span class="sig-name descname"><span class="pre">id</span></span><a class="headerlink" href="#settings.models.Mailbox.id" title="Link to this definition"></a></dt>
+<dd><p>A wrapper for a deferred-loading field. When the value is read from this
+object the first time, the query is executed.</p>
+</dd></dl>
+
+<dl class="py attribute">
+<dt class="sig sig-object py" id="settings.models.Mailbox.last_update">
+<span class="sig-name descname"><span class="pre">last_update</span></span><a class="headerlink" href="#settings.models.Mailbox.last_update" title="Link to this definition"></a></dt>
+<dd><p>A wrapper for a deferred-loading field. When the value is read from this
+object the first time, the query is executed.</p>
+</dd></dl>
+
+<dl class="py attribute">
+<dt class="sig sig-object py" id="settings.models.Mailbox.name">
+<span class="sig-name descname"><span class="pre">name</span></span><a class="headerlink" href="#settings.models.Mailbox.name" title="Link to this definition"></a></dt>
+<dd><p>A wrapper for a deferred-loading field. When the value is read from this
+object the first time, the query is executed.</p>
+</dd></dl>
+
+<dl class="py attribute">
+<dt class="sig sig-object py" id="settings.models.Mailbox.objects">
+<span class="sig-name descname"><span class="pre">objects</span></span><em class="property"><span class="w"> </span><span class="p"><span class="pre">=</span></span><span class="w"> </span><span class="pre">&lt;django.db.models.manager.Manager</span> <span class="pre">object&gt;</span></em><a class="headerlink" href="#settings.models.Mailbox.objects" title="Link to this definition"></a></dt>
+<dd></dd></dl>
+
+<dl class="py attribute">
+<dt class="sig sig-object py" id="settings.models.Mailbox.password">
+<span class="sig-name descname"><span class="pre">password</span></span><a class="headerlink" href="#settings.models.Mailbox.password" title="Link to this definition"></a></dt>
+<dd><p>A wrapper for a deferred-loading field. When the value is read from this
+object the first time, the query is executed.</p>
+</dd></dl>
+
+<dl class="py attribute">
+<dt class="sig sig-object py" id="settings.models.Mailbox.port">
+<span class="sig-name descname"><span class="pre">port</span></span><a class="headerlink" href="#settings.models.Mailbox.port" title="Link to this definition"></a></dt>
+<dd><p>A wrapper for a deferred-loading field. When the value is read from this
+object the first time, the query is executed.</p>
+</dd></dl>
+
+<dl class="py method">
+<dt class="sig sig-object py" id="settings.models.Mailbox.save">
+<span class="sig-name descname"><span class="pre">save</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="o"><span class="pre">*</span></span><span class="n"><span class="pre">args</span></span></em>, <em class="sig-param"><span class="o"><span class="pre">**</span></span><span class="n"><span class="pre">kwargs</span></span></em><span class="sig-paren">)</span><a class="reference internal" href="../_modules/settings/models.html#Mailbox.save"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#settings.models.Mailbox.save" title="Link to this definition"></a></dt>
+<dd><p>Save the current instance. Override this in a subclass if you want to
+control the saving process.</p>
+<p>The ‘force_insert’ and ‘force_update’ parameters can be used to insist
+that the “save” must be an SQL insert or update (or equivalent for
+non-SQL backends), respectively. Normally, they should not be set.</p>
+</dd></dl>
+
+<dl class="py attribute">
+<dt class="sig sig-object py" id="settings.models.Mailbox.server">
+<span class="sig-name descname"><span class="pre">server</span></span><a class="headerlink" href="#settings.models.Mailbox.server" title="Link to this definition"></a></dt>
+<dd><p>A wrapper for a deferred-loading field. When the value is read from this
+object the first time, the query is executed.</p>
+</dd></dl>
+
+<dl class="py attribute">
+<dt class="sig sig-object py" id="settings.models.Mailbox.username">
+<span class="sig-name descname"><span class="pre">username</span></span><a class="headerlink" href="#settings.models.Mailbox.username" title="Link to this definition"></a></dt>
+<dd><p>A wrapper for a deferred-loading field. When the value is read from this
+object the first time, the query is executed.</p>
+</dd></dl>
+
+</dd></dl>
+
+<dl class="py function" id="module-settings.settings_utils.domain">
+<dt class="sig sig-object py" id="settings.settings_utils.domain.generate_message_domain">
+<span class="sig-prename descclassname"><span class="pre">settings.settings_utils.domain.</span></span><span class="sig-name descname"><span class="pre">generate_message_domain</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">user</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">good_domains</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">error_domains</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">count</span></span></em><span class="sig-paren">)</span><a class="reference internal" href="../_modules/settings/settings_utils/domain.html#generate_message_domain"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#settings.settings_utils.domain.generate_message_domain" title="Link to this definition"></a></dt>
+<dd><p>Generate a message based on the user, good domains, error domains, and count.</p>
+<dl class="simple">
+<dt>Args:</dt><dd><p>user (str): The user for whom the message is generated.
+good_domains (list): A list of good domains added to the database.
+error_domains (list): A list of error domains that were not added to the database.
+count (int): The number of domains already in the database.</p>
+</dd>
+<dt>Returns:</dt><dd><p>str: The generated message.</p>
+</dd>
+</dl>
+</dd></dl>
+
+<dl class="py function">
+<dt class="sig sig-object py" id="settings.settings_utils.domain.handle_bdomain_csv_file">
+<span class="sig-prename descclassname"><span class="pre">settings.settings_utils.domain.</span></span><span class="sig-name descname"><span class="pre">handle_bdomain_csv_file</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">file</span></span></em><span class="sig-paren">)</span><a class="reference internal" href="../_modules/settings/settings_utils/domain.html#handle_bdomain_csv_file"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#settings.settings_utils.domain.handle_bdomain_csv_file" title="Link to this definition"></a></dt>
+<dd><p>Reads and processes a CSV file containing domain data.</p>
+<dl class="simple">
+<dt>Args:</dt><dd><p>file (file-like object): The CSV file to be processed.</p>
+</dd>
+<dt>Returns:</dt><dd><p>list: A list of dictionaries representing each row in the CSV file.</p>
+</dd>
+</dl>
+</dd></dl>
+
+<dl class="py function">
+<dt class="sig sig-object py" id="settings.settings_utils.domain.handle_bdomain_file">
+<span class="sig-prename descclassname"><span class="pre">settings.settings_utils.domain.</span></span><span class="sig-name descname"><span class="pre">handle_bdomain_file</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">file</span></span></em><span class="sig-paren">)</span><a class="reference internal" href="../_modules/settings/settings_utils/domain.html#handle_bdomain_file"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#settings.settings_utils.domain.handle_bdomain_file" title="Link to this definition"></a></dt>
+<dd><p>Handles the domain file based on its content type.</p>
+<dl class="simple">
+<dt>Args:</dt><dd><p>file (File): The domain file to be handled.</p>
+</dd>
+<dt>Raises:</dt><dd><p>ValueError: If the content type of the file is invalid.</p>
+</dd>
+<dt>Returns:</dt><dd><p>Result: The result of handling the domain file.</p>
+</dd>
+</dl>
+</dd></dl>
+
+<dl class="py function">
+<dt class="sig sig-object py" id="settings.settings_utils.domain.handle_bdomain_json_file">
+<span class="sig-prename descclassname"><span class="pre">settings.settings_utils.domain.</span></span><span class="sig-name descname"><span class="pre">handle_bdomain_json_file</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">file</span></span></em><span class="sig-paren">)</span><a class="reference internal" href="../_modules/settings/settings_utils/domain.html#handle_bdomain_json_file"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#settings.settings_utils.domain.handle_bdomain_json_file" title="Link to this definition"></a></dt>
+<dd><p>Reads a JSON file and returns a list of domain names.</p>
+<dl class="simple">
+<dt>Args:</dt><dd><p>file (file-like object): The JSON file to be read.</p>
+</dd>
+<dt>Returns:</dt><dd><p>list: A list of domain names extracted from the JSON file.</p>
+</dd>
+</dl>
+</dd></dl>
+
+<dl class="py function">
+<dt class="sig sig-object py" id="settings.settings_utils.domain.handle_bdomain_txt_file">
+<span class="sig-prename descclassname"><span class="pre">settings.settings_utils.domain.</span></span><span class="sig-name descname"><span class="pre">handle_bdomain_txt_file</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">file</span></span></em><span class="sig-paren">)</span><a class="reference internal" href="../_modules/settings/settings_utils/domain.html#handle_bdomain_txt_file"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#settings.settings_utils.domain.handle_bdomain_txt_file" title="Link to this definition"></a></dt>
+<dd><p>This function handles a domain text file.</p>
+<dl class="simple">
+<dt>Args:</dt><dd><p>file (file): The domain text file to be processed.</p>
+</dd>
+<dt>Returns:</dt><dd><p>list: A list of strings, where each string represents a line from the file.</p>
+</dd>
+</dl>
+</dd></dl>
+
+<dl class="py function">
+<dt class="sig sig-object py" id="settings.settings_utils.domain.handle_campaign_domain_csv_file">
+<span class="sig-prename descclassname"><span class="pre">settings.settings_utils.domain.</span></span><span class="sig-name descname"><span class="pre">handle_campaign_domain_csv_file</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">file</span></span></em><span class="sig-paren">)</span><a class="reference internal" href="../_modules/settings/settings_utils/domain.html#handle_campaign_domain_csv_file"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#settings.settings_utils.domain.handle_campaign_domain_csv_file" title="Link to this definition"></a></dt>
+<dd><p>Reads and processes a CSV file containing campaign domain data.</p>
+<dl class="simple">
+<dt>Args:</dt><dd><p>file (file-like object): The CSV file to be processed.</p>
+</dd>
+<dt>Returns:</dt><dd><p>list: A list of dictionaries representing each row in the CSV file.</p>
+</dd>
+</dl>
+</dd></dl>
+
+<dl class="py function">
+<dt class="sig sig-object py" id="settings.settings_utils.domain.handle_campaign_domain_file">
+<span class="sig-prename descclassname"><span class="pre">settings.settings_utils.domain.</span></span><span class="sig-name descname"><span class="pre">handle_campaign_domain_file</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">file</span></span></em><span class="sig-paren">)</span><a class="reference internal" href="../_modules/settings/settings_utils/domain.html#handle_campaign_domain_file"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#settings.settings_utils.domain.handle_campaign_domain_file" title="Link to this definition"></a></dt>
+<dd><p>Handles the campaign domain file based on its content type.</p>
+<dl class="simple">
+<dt>Args:</dt><dd><p>file (File): The campaign domain file to be handled.</p>
+</dd>
+<dt>Raises:</dt><dd><p>ValueError: If the content type of the file is invalid.</p>
+</dd>
+<dt>Returns:</dt><dd><p>Result: The result of handling the campaign domain file.</p>
+</dd>
+</dl>
+</dd></dl>
+
+<dl class="py function">
+<dt class="sig sig-object py" id="settings.settings_utils.domain.handle_campaign_domain_json_file">
+<span class="sig-prename descclassname"><span class="pre">settings.settings_utils.domain.</span></span><span class="sig-name descname"><span class="pre">handle_campaign_domain_json_file</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">file</span></span></em><span class="sig-paren">)</span><a class="reference internal" href="../_modules/settings/settings_utils/domain.html#handle_campaign_domain_json_file"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#settings.settings_utils.domain.handle_campaign_domain_json_file" title="Link to this definition"></a></dt>
+<dd><p>Reads a JSON file and returns a list of campaign domain names.</p>
+<dl class="simple">
+<dt>Args:</dt><dd><p>file (file-like object): The JSON file to be read.</p>
+</dd>
+<dt>Returns:</dt><dd><p>list: A list of campaign domain names extracted from the JSON file.</p>
+</dd>
+</dl>
+</dd></dl>
+
+<dl class="py function">
+<dt class="sig sig-object py" id="settings.settings_utils.domain.handle_campaign_domain_txt_file">
+<span class="sig-prename descclassname"><span class="pre">settings.settings_utils.domain.</span></span><span class="sig-name descname"><span class="pre">handle_campaign_domain_txt_file</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">file</span></span></em><span class="sig-paren">)</span><a class="reference internal" href="../_modules/settings/settings_utils/domain.html#handle_campaign_domain_txt_file"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#settings.settings_utils.domain.handle_campaign_domain_txt_file" title="Link to this definition"></a></dt>
+<dd><p>This function handles a campaign domain text file.</p>
+<dl class="simple">
+<dt>Args:</dt><dd><p>file (file): The campaign domain text file to be processed.</p>
+</dd>
+<dt>Returns:</dt><dd><p>list: A list of strings, where each string represents a line from the file.</p>
+</dd>
+</dl>
+</dd></dl>
+
+<dl class="py function">
+<dt class="sig sig-object py" id="settings.settings_utils.domain.handle_domain_csv_file">
+<span class="sig-prename descclassname"><span class="pre">settings.settings_utils.domain.</span></span><span class="sig-name descname"><span class="pre">handle_domain_csv_file</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">file</span></span></em><span class="sig-paren">)</span><a class="reference internal" href="../_modules/settings/settings_utils/domain.html#handle_domain_csv_file"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#settings.settings_utils.domain.handle_domain_csv_file" title="Link to this definition"></a></dt>
+<dd><p>Reads and processes a CSV file containing domain data.</p>
+<dl class="simple">
+<dt>Args:</dt><dd><p>file (file-like object): The CSV file to be processed.</p>
+</dd>
+<dt>Returns:</dt><dd><p>list: A list of dictionaries representing each row in the CSV file.</p>
+</dd>
+</dl>
+</dd></dl>
+
+<dl class="py function">
+<dt class="sig sig-object py" id="settings.settings_utils.domain.handle_domain_file">
+<span class="sig-prename descclassname"><span class="pre">settings.settings_utils.domain.</span></span><span class="sig-name descname"><span class="pre">handle_domain_file</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">file</span></span></em><span class="sig-paren">)</span><a class="reference internal" href="../_modules/settings/settings_utils/domain.html#handle_domain_file"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#settings.settings_utils.domain.handle_domain_file" title="Link to this definition"></a></dt>
+<dd><p>Handles the domain file based on its content type.</p>
+<dl class="simple">
+<dt>Args:</dt><dd><p>file (File): The domain file to be handled.</p>
+</dd>
+<dt>Raises:</dt><dd><p>ValueError: If the content type of the file is invalid.</p>
+</dd>
+<dt>Returns:</dt><dd><p>Result: The result of handling the domain file.</p>
+</dd>
+</dl>
+</dd></dl>
+
+<dl class="py function">
+<dt class="sig sig-object py" id="settings.settings_utils.domain.handle_domain_json_file">
+<span class="sig-prename descclassname"><span class="pre">settings.settings_utils.domain.</span></span><span class="sig-name descname"><span class="pre">handle_domain_json_file</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">file</span></span></em><span class="sig-paren">)</span><a class="reference internal" href="../_modules/settings/settings_utils/domain.html#handle_domain_json_file"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#settings.settings_utils.domain.handle_domain_json_file" title="Link to this definition"></a></dt>
+<dd><p>Reads a JSON file and returns a list of domain names.</p>
+<dl class="simple">
+<dt>Args:</dt><dd><p>file (file-like object): The JSON file to be read.</p>
+</dd>
+<dt>Returns:</dt><dd><p>list: A list of domain names extracted from the JSON file.</p>
+</dd>
+</dl>
+</dd></dl>
+
+<dl class="py function">
+<dt class="sig sig-object py" id="settings.settings_utils.domain.handle_domain_txt_file">
+<span class="sig-prename descclassname"><span class="pre">settings.settings_utils.domain.</span></span><span class="sig-name descname"><span class="pre">handle_domain_txt_file</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">file</span></span></em><span class="sig-paren">)</span><a class="reference internal" href="../_modules/settings/settings_utils/domain.html#handle_domain_txt_file"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#settings.settings_utils.domain.handle_domain_txt_file" title="Link to this definition"></a></dt>
+<dd><p>This function handles a domain text file.</p>
+<dl class="simple">
+<dt>Args:</dt><dd><p>file (file): The domain text file to be processed.</p>
+</dd>
+<dt>Returns:</dt><dd><p>list: A list of strings, where each string represents a line from the file.</p>
+</dd>
+</dl>
+</dd></dl>
+
+<dl class="py function">
+<dt class="sig sig-object py" id="settings.settings_utils.domain.preprocess_domains">
+<span class="sig-prename descclassname"><span class="pre">settings.settings_utils.domain.</span></span><span class="sig-name descname"><span class="pre">preprocess_domains</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">domains</span></span></em><span class="sig-paren">)</span><a class="reference internal" href="../_modules/settings/settings_utils/domain.html#preprocess_domains"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#settings.settings_utils.domain.preprocess_domains" title="Link to this definition"></a></dt>
+<dd><p>Preprocesses a list of domains.</p>
+<p>This function removes empty lines and splits lines with multiple operators.</p>
+<dl class="simple">
+<dt>Args:</dt><dd><p>domains (list): A list of domains.</p>
+</dd>
+<dt>Returns:</dt><dd><p>list: A list of preprocessed domains.</p>
+</dd>
+</dl>
+</dd></dl>
+
+<dl class="py function">
+<dt class="sig sig-object py" id="settings.settings_utils.domain.process_bdomains">
+<span class="sig-prename descclassname"><span class="pre">settings.settings_utils.domain.</span></span><span class="sig-name descname"><span class="pre">process_bdomains</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">domains</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">user</span></span></em><span class="sig-paren">)</span><a class="reference internal" href="../_modules/settings/settings_utils/domain.html#process_bdomains"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#settings.settings_utils.domain.process_bdomains" title="Link to this definition"></a></dt>
+<dd><p>Process a list of domains and associate them with a user.</p>
+<p>This function takes a list of domains and a user as input. It iterates over each domain in the list,
+converts it to lowercase, and checks if it is a valid domain using the Validator class. If the domain
+is valid and not already present in the DenyListDomain table, it creates a new entry in the Domain
+table and associates it with the user in the DenyListDomain table. The function returns two lists:
+good_domains, which contains the domains that were successfully processed, and error_domains, which
+contains the domains that encountered an error during processing.</p>
+<dl class="simple">
+<dt>Args:</dt><dd><p>domains (list): A list of domains to process.
+user (User): The user to associate the domains with.</p>
+</dd>
+<dt>Returns:</dt><dd><p>tuple: A tuple containing two lists - good_domains and error_domains.</p>
+</dd>
+</dl>
+</dd></dl>
+
+<dl class="py function">
+<dt class="sig sig-object py" id="settings.settings_utils.domain.process_campaign_domains">
+<span class="sig-prename descclassname"><span class="pre">settings.settings_utils.domain.</span></span><span class="sig-name descname"><span class="pre">process_campaign_domains</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">domains</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">user</span></span></em><span class="sig-paren">)</span><a class="reference internal" href="../_modules/settings/settings_utils/domain.html#process_campaign_domains"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#settings.settings_utils.domain.process_campaign_domains" title="Link to this definition"></a></dt>
+<dd><p>Process a list of campaign domains and associate them with a user.</p>
+<p>This function takes a list of domains and a user as input. It iterates over each domain in the list,
+converts it to lowercase, and checks if it is a valid domain using the Validator class. If the domain
+is valid and not already present in the CampaignDomainAllowList table, it creates a new entry in the Domain
+table and associates it with the user in the CampaignDomainAllowList table. The function returns two lists:
+good_domains, which contains the domains that were successfully processed, and error_domains, which
+contains the domains that encountered an error during processing.</p>
+<dl class="simple">
+<dt>Args:</dt><dd><p>domains (list): A list of domains to process.
+user (User): The user to associate the domains with.</p>
+</dd>
+<dt>Returns:</dt><dd><p>tuple: A tuple containing two lists - good_domains and error_domains.</p>
+</dd>
+</dl>
+</dd></dl>
+
+<dl class="py function">
+<dt class="sig sig-object py" id="settings.settings_utils.domain.process_domains">
+<span class="sig-prename descclassname"><span class="pre">settings.settings_utils.domain.</span></span><span class="sig-name descname"><span class="pre">process_domains</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">domains</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">user</span></span></em><span class="sig-paren">)</span><a class="reference internal" href="../_modules/settings/settings_utils/domain.html#process_domains"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#settings.settings_utils.domain.process_domains" title="Link to this definition"></a></dt>
+<dd><p>Process a list of domains and associate them with a user.</p>
+<p>This function takes a list of domains and a user as input. It iterates over each domain in the list,
+converts it to lowercase, and checks if it is a valid domain using the Validator class. If the domain
+is valid and not already present in the AllowListDomain table, it creates a new entry in the Domain
+table and associates it with the user in the AllowListDomain table. The function returns two lists:
+good_domains, which contains the domains that were successfully processed, and error_domains, which
+contains the domains that encountered an error during processing.</p>
+<dl class="simple">
+<dt>Args:</dt><dd><p>domains (list): A list of domains to process.
+user (User): The user to associate the domains with.</p>
+</dd>
+<dt>Returns:</dt><dd><p>tuple: A tuple containing two lists - good_domains and error_domains.</p>
+</dd>
+</dl>
+</dd></dl>
+
+<dl class="py function" id="module-settings.settings_utils.feeder_email">
+<dt class="sig sig-object py" id="settings.settings_utils.feeder_email.check_if_feeder_is_running">
+<span class="sig-prename descclassname"><span class="pre">settings.settings_utils.feeder_email.</span></span><span class="sig-name descname"><span class="pre">check_if_feeder_is_running</span></span><span class="sig-paren">(</span><span class="sig-paren">)</span> <span class="sig-return"><span class="sig-return-icon">&#x2192;</span> <span class="sig-return-typehint"><span class="pre">bool</span></span></span><a class="reference internal" href="../_modules/settings/settings_utils/feeder_email.html#check_if_feeder_is_running"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#settings.settings_utils.feeder_email.check_if_feeder_is_running" title="Link to this definition"></a></dt>
+<dd><p>Check whether the Docker container for the email feeder is currently running.</p>
+</dd></dl>
+
+<dl class="py function">
+<dt class="sig sig-object py" id="settings.settings_utils.feeder_email.disable_email_feeder">
+<span class="sig-prename descclassname"><span class="pre">settings.settings_utils.feeder_email.</span></span><span class="sig-name descname"><span class="pre">disable_email_feeder</span></span><span class="sig-paren">(</span><span class="sig-paren">)</span> <span class="sig-return"><span class="sig-return-icon">&#x2192;</span> <span class="sig-return-typehint"><span class="pre">bool</span></span></span><a class="reference internal" href="../_modules/settings/settings_utils/feeder_email.html#disable_email_feeder"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#settings.settings_utils.feeder_email.disable_email_feeder" title="Link to this definition"></a></dt>
+<dd><p>Stop the Docker container running the email feeder logic.
+Returns True if the container was stopped successfully or was already stopped.</p>
+</dd></dl>
+
+<dl class="py function">
+<dt class="sig sig-object py" id="settings.settings_utils.feeder_email.enable_email_feeder">
+<span class="sig-prename descclassname"><span class="pre">settings.settings_utils.feeder_email.</span></span><span class="sig-name descname"><span class="pre">enable_email_feeder</span></span><span class="sig-paren">(</span><span class="sig-paren">)</span> <span class="sig-return"><span class="sig-return-icon">&#x2192;</span> <span class="sig-return-typehint"><span class="pre">bool</span></span></span><a class="reference internal" href="../_modules/settings/settings_utils/feeder_email.html#enable_email_feeder"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#settings.settings_utils.feeder_email.enable_email_feeder" title="Link to this definition"></a></dt>
+<dd><p>Start the Docker container running the email feeder logic.
+Returns True if the container was started successfully or is already running.</p>
+</dd></dl>
+
+<dl class="py function" id="module-settings.settings_utils.filetype">
+<dt class="sig sig-object py" id="settings.settings_utils.filetype.generate_filetype_message">
+<span class="sig-prename descclassname"><span class="pre">settings.settings_utils.filetype.</span></span><span class="sig-name descname"><span class="pre">generate_filetype_message</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">good_filetypes</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">error_filetypes</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">count</span></span></em><span class="sig-paren">)</span><a class="reference internal" href="../_modules/settings/settings_utils/filetype.html#generate_filetype_message"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#settings.settings_utils.filetype.generate_filetype_message" title="Link to this definition"></a></dt>
+<dd><p>Generates a message based on the filetypes added to the database.</p>
+<dl class="simple">
+<dt>Args:</dt><dd><p>good_filetypes (list): A list of filetypes that were successfully added to the database.
+error_filetypes (list): A list of filetypes that were not added to the database.
+count (int): The number of filetypes already present in the database.</p>
+</dd>
+<dt>Returns:</dt><dd><p>str: A message summarizing the number of filetypes added and any errors encountered.</p>
+</dd>
+</dl>
+</dd></dl>
+
+<dl class="py function">
+<dt class="sig sig-object py" id="settings.settings_utils.filetype.handle_filetype_csv_file">
+<span class="sig-prename descclassname"><span class="pre">settings.settings_utils.filetype.</span></span><span class="sig-name descname"><span class="pre">handle_filetype_csv_file</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">file</span></span></em><span class="sig-paren">)</span><a class="reference internal" href="../_modules/settings/settings_utils/filetype.html#handle_filetype_csv_file"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#settings.settings_utils.filetype.handle_filetype_csv_file" title="Link to this definition"></a></dt>
+<dd><p>Handle CSV file.</p>
+<p>This function takes a file object representing a CSV file and reads its contents.
+It returns a list containing the values from the first column of each row in the CSV file.</p>
+<dl class="simple">
+<dt>Args:</dt><dd><p>file (file-like object): The file object representing the CSV file.</p>
+</dd>
+<dt>Returns:</dt><dd><p>list: A list containing the values from the first column of each row in the CSV file.</p>
+</dd>
+</dl>
+</dd></dl>
+
+<dl class="py function">
+<dt class="sig sig-object py" id="settings.settings_utils.filetype.handle_filetype_json_file">
+<span class="sig-prename descclassname"><span class="pre">settings.settings_utils.filetype.</span></span><span class="sig-name descname"><span class="pre">handle_filetype_json_file</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">file</span></span></em><span class="sig-paren">)</span><a class="reference internal" href="../_modules/settings/settings_utils/filetype.html#handle_filetype_json_file"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#settings.settings_utils.filetype.handle_filetype_json_file" title="Link to this definition"></a></dt>
+<dd><p>Handle JSON file and extract filetypes.</p>
+<p>This function takes a JSON file object, reads its contents, and extracts the filetypes from the data.</p>
+<dl class="simple">
+<dt>Args:</dt><dd><p>file (file-like object): The JSON file object to be processed.</p>
+</dd>
+<dt>Returns:</dt><dd><p>list: A list of filetypes extracted from the JSON data.</p>
+</dd>
+</dl>
+</dd></dl>
+
+<dl class="py function">
+<dt class="sig sig-object py" id="settings.settings_utils.filetype.handle_filetype_txt_file">
+<span class="sig-prename descclassname"><span class="pre">settings.settings_utils.filetype.</span></span><span class="sig-name descname"><span class="pre">handle_filetype_txt_file</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">file</span></span></em><span class="sig-paren">)</span><a class="reference internal" href="../_modules/settings/settings_utils/filetype.html#handle_filetype_txt_file"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#settings.settings_utils.filetype.handle_filetype_txt_file" title="Link to this definition"></a></dt>
+<dd><p>Handle a text file.</p>
+<p>This function takes a file object as input and returns a list of strings,
+where each string represents a line in the file.</p>
+<dl class="simple">
+<dt>Args:</dt><dd><p>file (file-like object): The text file to be processed.</p>
+</dd>
+<dt>Returns:</dt><dd><p>list: A list of strings, where each string represents a line in the file.</p>
+</dd>
+</dl>
+</dd></dl>
+
+<dl class="py function">
+<dt class="sig sig-object py" id="settings.settings_utils.filetype.process_filetypes">
+<span class="sig-prename descclassname"><span class="pre">settings.settings_utils.filetype.</span></span><span class="sig-name descname"><span class="pre">process_filetypes</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">filetypes</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">user</span></span></em><span class="sig-paren">)</span><a class="reference internal" href="../_modules/settings/settings_utils/filetype.html#process_filetypes"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#settings.settings_utils.filetype.process_filetypes" title="Link to this definition"></a></dt>
+<dd><p>Process a list of filetypes and filter out the allow_listed ones.</p>
+<dl class="simple">
+<dt>Args:</dt><dd><p>filetypes (list): A list of filetypes to process.
+user (User): The user object associated with the filetypes.</p>
+</dd>
+<dt>Returns:</dt><dd><p>tuple: A tuple containing two lists - the list of good filetypes (not in the allow_list) and the list of error filetypes (already in the allow_list).</p>
+</dd>
+</dl>
+</dd></dl>
+
+<dl class="py function">
+<dt class="sig sig-object py" id="settings.settings_utils.filetype.validate_filetype">
+<span class="sig-prename descclassname"><span class="pre">settings.settings_utils.filetype.</span></span><span class="sig-name descname"><span class="pre">validate_filetype</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">filetype</span></span></em><span class="sig-paren">)</span><a class="reference internal" href="../_modules/settings/settings_utils/filetype.html#validate_filetype"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#settings.settings_utils.filetype.validate_filetype" title="Link to this definition"></a></dt>
+<dd><p>Validate filetype value and return filetype type</p>
+</dd></dl>
+
+<dl class="py function">
+<dt class="sig sig-object py" id="settings.settings_utils.filetype.validate_value">
+<span class="sig-prename descclassname"><span class="pre">settings.settings_utils.filetype.</span></span><span class="sig-name descname"><span class="pre">validate_value</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">value</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">patterns</span></span></em><span class="sig-paren">)</span><a class="reference internal" href="../_modules/settings/settings_utils/filetype.html#validate_value"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#settings.settings_utils.filetype.validate_value" title="Link to this definition"></a></dt>
+<dd><p>Validate value using patterns and return the matched type</p>
+</dd></dl>
+
+</section>
+
+
+           </div>
+          </div>
+          <footer><div class="rst-footer-buttons" role="navigation" aria-label="Footer">
+        <a href="score_process_core.html" class="btn btn-neutral float-left" title="Score Process module" accesskey="p" rel="prev"><span class="fa fa-arrow-circle-left" aria-hidden="true"></span> Previous</a>
+        <a href="tasp_core.html" class="btn btn-neutral float-right" title="TASP module" accesskey="n" rel="next">Next <span class="fa fa-arrow-circle-right" aria-hidden="true"></span></a>
+    </div>
+
+  <hr/>
+
+  <div role="contentinfo">
+    <p>&#169; Copyright 2025, Theo Bhang, Esteban Crispel.</p>
+  </div>
+
+  Built with <a href="https://www.sphinx-doc.org/">Sphinx</a> using a
+    <a href="https://github.com/readthedocs/sphinx_rtd_theme">theme</a>
+    provided by <a href="https://readthedocs.org">Read the Docs</a>.
+   
+
+</footer>
+        </div>
+      </div>
+    </section>
+  </div>
+  <script>
+      jQuery(function () {
+          SphinxRtdTheme.Navigation.enable(true);
+      });
+  </script> 
+
+</body>
+</html>

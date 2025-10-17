@@ -1,0 +1,305 @@
+
+
+<!DOCTYPE html>
+<html class="writer-html5" lang="en" data-content_root="../../../">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>score_process.scoring.updating &mdash; Suspicious 1.0.0 documentation</title>
+      <link rel="stylesheet" type="text/css" href="../../../_static/pygments.css?v=b86133f3" />
+      <link rel="stylesheet" type="text/css" href="../../../_static/css/theme.css?v=e59714d7" />
+
+  
+      <script src="../../../_static/jquery.js?v=5d32c60e"></script>
+      <script src="../../../_static/_sphinx_javascript_frameworks_compat.js?v=2cd50e6c"></script>
+      <script src="../../../_static/documentation_options.js?v=8d563738"></script>
+      <script src="../../../_static/doctools.js?v=9bcbadda"></script>
+      <script src="../../../_static/sphinx_highlight.js?v=dc90522c"></script>
+    <script src="../../../_static/js/theme.js"></script>
+    <link rel="index" title="Index" href="../../../genindex.html" />
+    <link rel="search" title="Search" href="../../../search.html" /> 
+</head>
+
+<body class="wy-body-for-nav"> 
+  <div class="wy-grid-for-nav">
+    <nav data-toggle="wy-nav-shift" class="wy-nav-side">
+      <div class="wy-side-scroll">
+        <div class="wy-side-nav-search" >
+
+          
+          
+          <a href="../../../index.html" class="icon icon-home">
+            Suspicious
+          </a>
+<div role="search">
+  <form id="rtd-search-form" class="wy-form" action="../../../search.html" method="get">
+    <input type="text" name="q" placeholder="Search docs" aria-label="Search docs" />
+    <input type="hidden" name="check_keywords" value="yes" />
+    <input type="hidden" name="area" value="default" />
+  </form>
+</div>
+        </div><div class="wy-menu wy-menu-vertical" data-spy="affix" role="navigation" aria-label="Navigation menu">
+              <p class="caption" role="heading"><span class="caption-text">Contents:</span></p>
+<ul>
+<li class="toctree-l1"><a class="reference internal" href="../../../modules/index.html">Modules (API Reference)</a></li>
+</ul>
+
+        </div>
+      </div>
+    </nav>
+
+    <section data-toggle="wy-nav-shift" class="wy-nav-content-wrap"><nav class="wy-nav-top" aria-label="Mobile navigation menu" >
+          <i data-toggle="wy-nav-top" class="fa fa-bars"></i>
+          <a href="../../../index.html">Suspicious</a>
+      </nav>
+
+      <div class="wy-nav-content">
+        <div class="rst-content">
+          <div role="navigation" aria-label="Page navigation">
+  <ul class="wy-breadcrumbs">
+      <li><a href="../../../index.html" class="icon icon-home" aria-label="Home"></a></li>
+          <li class="breadcrumb-item"><a href="../../index.html">Module code</a></li>
+      <li class="breadcrumb-item active">score_process.scoring.updating</li>
+      <li class="wy-breadcrumbs-aside">
+      </li>
+  </ul>
+  <hr/>
+</div>
+          <div role="main" class="document" itemscope="itemscope" itemtype="http://schema.org/Article">
+           <div itemprop="articleBody">
+             
+  <h1>Source code for score_process.scoring.updating</h1><div class="highlight"><pre>
+<span></span><span class="kn">import</span><span class="w"> </span><span class="nn">logging</span>
+<span class="kn">from</span><span class="w"> </span><span class="nn">typing</span><span class="w"> </span><span class="kn">import</span> <span class="n">Any</span><span class="p">,</span> <span class="n">Dict</span><span class="p">,</span> <span class="n">Tuple</span><span class="p">,</span> <span class="n">Optional</span> <span class="c1"># Import necessary typing modules</span>
+<span class="kn">from</span><span class="w"> </span><span class="nn">enum</span><span class="w"> </span><span class="kn">import</span> <span class="n">Enum</span> <span class="c1"># Added for potential use in update_mail_part_with_scores</span>
+
+<span class="c1"># Assuming get_score_level is importable from the correct location</span>
+<span class="kn">from</span><span class="w"> </span><span class="nn">score_process.scoring.case_score_calculation</span><span class="w"> </span><span class="kn">import</span> <span class="n">get_score_level</span>
+<span class="c1"># --- Constants ---</span>
+<span class="n">MALICIOUS_LEVEL_NAME</span><span class="p">:</span> <span class="nb">str</span> <span class="o">=</span> <span class="s2">&quot;malicious&quot;</span>
+<span class="n">MALICIOUS_SCORE</span><span class="p">:</span> <span class="nb">int</span> <span class="o">=</span> <span class="mi">10</span>
+<span class="n">MALICIOUS_CONFIDENCE</span><span class="p">:</span> <span class="nb">int</span> <span class="o">=</span> <span class="mi">100</span>
+
+
+<span class="c1"># --- Loggers ---</span>
+<span class="c1"># It&#39;s conventional to get loggers at the module level</span>
+<span class="c1"># Keep your original logger names if they are standard in your project</span>
+<span class="n">script_logger</span> <span class="o">=</span> <span class="n">logging</span><span class="o">.</span><span class="n">getLogger</span><span class="p">(</span><span class="vm">__name__</span><span class="p">)</span> <span class="c1"># General logger for this script module</span>
+<span class="n">update_cases_logger</span> <span class="o">=</span> <span class="n">logging</span><span class="o">.</span><span class="n">getLogger</span><span class="p">(</span><span class="s1">&#39;tasp.cron.update_ongoing_case_jobs&#39;</span><span class="p">)</span> <span class="c1"># Specific logger</span>
+
+
+<span class="c1"># --- Core Update Function ---</span>
+<div class="viewcode-block" id="update_scores">
+<a class="viewcode-back" href="../../../modules/score_process_core.html#score_process.scoring.updating.update_scores">[docs]</a>
+<span class="k">def</span><span class="w"> </span><span class="nf">update_scores</span><span class="p">(</span>
+    <span class="n">obj</span><span class="p">:</span> <span class="n">Any</span><span class="p">,</span> <span class="c1"># Use Any or a specific Protocol/Base Class if available</span>
+    <span class="n">level_attr</span><span class="p">:</span> <span class="nb">str</span><span class="p">,</span>
+    <span class="n">score_attr</span><span class="p">:</span> <span class="nb">str</span><span class="p">,</span>
+    <span class="n">confidence_attr</span><span class="p">:</span> <span class="nb">str</span><span class="p">,</span>
+    <span class="n">is_malicious</span><span class="p">:</span> <span class="nb">bool</span>
+<span class="p">)</span> <span class="o">-&gt;</span> <span class="nb">bool</span><span class="p">:</span>
+<span class="w">    </span><span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">    Update score, level, and confidence attributes of an object.</span>
+
+<span class="sd">    Sets predefined values if malicious, otherwise calculates the level</span>
+<span class="sd">    based on the *existing* score attribute. Assumes score/confidence</span>
+<span class="sd">    are already set correctly in the non-malicious case before calling this.</span>
+
+<span class="sd">    Args:</span>
+<span class="sd">        obj: The object to update (must have specified attributes and a .save() method).</span>
+<span class="sd">        level_attr: The attribute name for the score level (e.g., &#39;ioc_level&#39;).</span>
+<span class="sd">        score_attr: The attribute name for the score (e.g., &#39;ioc_score&#39;).</span>
+<span class="sd">        confidence_attr: The attribute name for the confidence (e.g., &#39;ioc_confidence&#39;).</span>
+<span class="sd">        is_malicious: True if the object is considered malicious.</span>
+
+<span class="sd">    Returns:</span>
+<span class="sd">        bool: True if the update and save were successful, False otherwise.</span>
+<span class="sd">    &quot;&quot;&quot;</span>
+    <span class="k">try</span><span class="p">:</span>
+        <span class="k">if</span> <span class="n">is_malicious</span><span class="p">:</span>
+            <span class="n">update_cases_logger</span><span class="o">.</span><span class="n">debug</span><span class="p">(</span><span class="s2">&quot;Object identified as malicious. Setting attributes on </span><span class="si">%r</span><span class="s2">.&quot;</span><span class="p">,</span> <span class="n">obj</span><span class="p">)</span>
+            <span class="nb">setattr</span><span class="p">(</span><span class="n">obj</span><span class="p">,</span> <span class="n">level_attr</span><span class="p">,</span> <span class="n">MALICIOUS_LEVEL_NAME</span><span class="p">)</span>
+            <span class="nb">setattr</span><span class="p">(</span><span class="n">obj</span><span class="p">,</span> <span class="n">score_attr</span><span class="p">,</span> <span class="n">MALICIOUS_SCORE</span><span class="p">)</span>
+            <span class="nb">setattr</span><span class="p">(</span><span class="n">obj</span><span class="p">,</span> <span class="n">confidence_attr</span><span class="p">,</span> <span class="n">MALICIOUS_CONFIDENCE</span><span class="p">)</span>
+            <span class="n">update_cases_logger</span><span class="o">.</span><span class="n">debug</span><span class="p">(</span>
+                <span class="s2">&quot;Set malicious attributes: </span><span class="si">%s</span><span class="s2">=</span><span class="si">%s</span><span class="s2">, </span><span class="si">%s</span><span class="s2">=</span><span class="si">%s</span><span class="s2">, </span><span class="si">%s</span><span class="s2">=</span><span class="si">%s</span><span class="s2">&quot;</span><span class="p">,</span>
+                <span class="n">level_attr</span><span class="p">,</span> <span class="n">MALICIOUS_LEVEL_NAME</span><span class="p">,</span>
+                <span class="n">score_attr</span><span class="p">,</span> <span class="n">MALICIOUS_SCORE</span><span class="p">,</span>
+                <span class="n">confidence_attr</span><span class="p">,</span> <span class="n">MALICIOUS_CONFIDENCE</span>
+            <span class="p">)</span>
+        <span class="k">else</span><span class="p">:</span>
+            <span class="n">update_cases_logger</span><span class="o">.</span><span class="n">debug</span><span class="p">(</span><span class="s2">&quot;Object not malicious. Updating level based on existing score for </span><span class="si">%r</span><span class="s2">.&quot;</span><span class="p">,</span> <span class="n">obj</span><span class="p">)</span>
+            <span class="n">current_score</span> <span class="o">=</span> <span class="nb">getattr</span><span class="p">(</span><span class="n">obj</span><span class="p">,</span> <span class="n">score_attr</span><span class="p">)</span>
+            <span class="c1"># Ensure score is int if get_score_level expects int</span>
+            <span class="k">if</span> <span class="ow">not</span> <span class="nb">isinstance</span><span class="p">(</span><span class="n">current_score</span><span class="p">,</span> <span class="nb">int</span><span class="p">):</span>
+                <span class="k">try</span><span class="p">:</span>
+                    <span class="n">current_score</span> <span class="o">=</span> <span class="nb">int</span><span class="p">(</span><span class="nb">round</span><span class="p">(</span><span class="n">current_score</span><span class="p">))</span> <span class="c1"># Or handle float scores if needed</span>
+                <span class="k">except</span> <span class="p">(</span><span class="ne">ValueError</span><span class="p">,</span> <span class="ne">TypeError</span><span class="p">):</span>
+                    <span class="n">update_cases_logger</span><span class="o">.</span><span class="n">error</span><span class="p">(</span>
+                        <span class="s2">&quot;Cannot determine level: score attribute &#39;</span><span class="si">%s</span><span class="s2">&#39; on </span><span class="si">%r</span><span class="s2"> has non-numeric value </span><span class="si">%r</span><span class="s2">.&quot;</span><span class="p">,</span>
+                        <span class="n">score_attr</span><span class="p">,</span> <span class="n">obj</span><span class="p">,</span> <span class="nb">getattr</span><span class="p">(</span><span class="n">obj</span><span class="p">,</span> <span class="n">score_attr</span><span class="p">)</span>
+                    <span class="p">)</span>
+                    <span class="k">return</span> <span class="kc">False</span> <span class="c1"># Cannot proceed</span>
+
+            <span class="k">try</span><span class="p">:</span>
+                <span class="c1"># Calculate level based on current score</span>
+                <span class="n">calculated_level</span> <span class="o">=</span> <span class="n">get_score_level</span><span class="p">(</span><span class="n">current_score</span><span class="p">)</span>
+                <span class="nb">setattr</span><span class="p">(</span><span class="n">obj</span><span class="p">,</span> <span class="n">level_attr</span><span class="p">,</span> <span class="n">calculated_level</span><span class="p">)</span>
+                <span class="n">update_cases_logger</span><span class="o">.</span><span class="n">debug</span><span class="p">(</span>
+                    <span class="s2">&quot;Set non-malicious level: </span><span class="si">%s</span><span class="s2">=</span><span class="si">%s</span><span class="s2"> (derived from </span><span class="si">%s</span><span class="s2">=</span><span class="si">%s</span><span class="s2">)&quot;</span><span class="p">,</span>
+                    <span class="n">level_attr</span><span class="p">,</span> <span class="n">calculated_level</span><span class="p">,</span> <span class="n">score_attr</span><span class="p">,</span> <span class="n">current_score</span>
+                <span class="p">)</span>
+            <span class="k">except</span> <span class="ne">ValueError</span> <span class="k">as</span> <span class="n">e</span><span class="p">:</span>
+                <span class="c1"># Handle case where score is out of range for get_score_level</span>
+                <span class="n">update_cases_logger</span><span class="o">.</span><span class="n">warning</span><span class="p">(</span>
+                    <span class="s2">&quot;Could not determine level for score </span><span class="si">%s</span><span class="s2"> on </span><span class="si">%r</span><span class="s2"> using attribute &#39;</span><span class="si">%s</span><span class="s2">&#39;: </span><span class="si">%s</span><span class="s2">&quot;</span><span class="p">,</span>
+                    <span class="n">current_score</span><span class="p">,</span> <span class="n">obj</span><span class="p">,</span> <span class="n">score_attr</span><span class="p">,</span> <span class="n">e</span>
+                <span class="p">)</span>
+                <span class="c1"># Decide if you should proceed to save or return False</span>
+                <span class="c1"># For now, we log a warning and proceed to save potentially unchanged obj.</span>
+                <span class="c1"># Alternatively, set a default level or return False:</span>
+                <span class="c1"># setattr(obj, level_attr, &quot;unknown&quot;) # Example default</span>
+                <span class="c1"># return False</span>
+
+        <span class="c1"># Save the object</span>
+        <span class="n">obj</span><span class="o">.</span><span class="n">save</span><span class="p">()</span>
+        <span class="n">update_cases_logger</span><span class="o">.</span><span class="n">debug</span><span class="p">(</span><span class="s2">&quot;Object </span><span class="si">%r</span><span class="s2"> saved successfully.&quot;</span><span class="p">,</span> <span class="n">obj</span><span class="p">)</span>
+        <span class="k">return</span> <span class="kc">True</span>
+
+    <span class="k">except</span> <span class="ne">AttributeError</span> <span class="k">as</span> <span class="n">e</span><span class="p">:</span>
+        <span class="n">update_cases_logger</span><span class="o">.</span><span class="n">error</span><span class="p">(</span><span class="s2">&quot;Attribute error updating scores for </span><span class="si">%r</span><span class="s2">: </span><span class="si">%s</span><span class="s2">&quot;</span><span class="p">,</span> <span class="n">obj</span><span class="p">,</span> <span class="n">e</span><span class="p">)</span>
+        <span class="k">return</span> <span class="kc">False</span>
+    <span class="k">except</span> <span class="ne">Exception</span> <span class="k">as</span> <span class="n">e</span><span class="p">:</span>
+        <span class="c1"># Catch other potential errors during save or processing</span>
+        <span class="n">update_cases_logger</span><span class="o">.</span><span class="n">exception</span><span class="p">(</span><span class="s2">&quot;Unexpected error updating scores for </span><span class="si">%r</span><span class="s2">: </span><span class="si">%s</span><span class="s2">&quot;</span><span class="p">,</span> <span class="n">obj</span><span class="p">,</span> <span class="n">e</span><span class="p">)</span>
+        <span class="k">return</span> <span class="kc">False</span></div>
+
+
+
+<span class="c1"># --- Wrapper Functions ---</span>
+
+<div class="viewcode-block" id="update_artifact_with_scores">
+<a class="viewcode-back" href="../../../modules/score_process_core.html#score_process.scoring.updating.update_artifact_with_scores">[docs]</a>
+<span class="k">def</span><span class="w"> </span><span class="nf">update_artifact_with_scores</span><span class="p">(</span><span class="n">artifact</span><span class="p">:</span> <span class="n">Any</span><span class="p">,</span> <span class="n">is_malicious</span><span class="p">:</span> <span class="nb">bool</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="nb">bool</span><span class="p">:</span>
+<span class="w">    </span><span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">    Update an artifact with scores based on its malicious status.</span>
+
+<span class="sd">    Args:</span>
+<span class="sd">        artifact: The artifact object to be updated.</span>
+<span class="sd">        is_malicious: True if the artifact is considered malicious.</span>
+
+<span class="sd">    Returns:</span>
+<span class="sd">        bool: True if the update and save were successful, False otherwise.</span>
+<span class="sd">    &quot;&quot;&quot;</span>
+    <span class="n">update_cases_logger</span><span class="o">.</span><span class="n">info</span><span class="p">(</span><span class="s2">&quot;Updating scores for artifact </span><span class="si">%r</span><span class="s2"> (malicious=</span><span class="si">%s</span><span class="s2">)&quot;</span><span class="p">,</span> <span class="n">artifact</span><span class="p">,</span> <span class="n">is_malicious</span><span class="p">)</span>
+    <span class="k">return</span> <span class="n">update_scores</span><span class="p">(</span><span class="n">artifact</span><span class="p">,</span> <span class="s1">&#39;ioc_level&#39;</span><span class="p">,</span> <span class="s1">&#39;ioc_score&#39;</span><span class="p">,</span> <span class="s1">&#39;ioc_confidence&#39;</span><span class="p">,</span> <span class="n">is_malicious</span><span class="p">)</span></div>
+
+
+
+<span class="c1"># Corrected type hint and parameter name</span>
+<div class="viewcode-block" id="update_file_with_scores">
+<a class="viewcode-back" href="../../../modules/score_process_core.html#score_process.scoring.updating.update_file_with_scores">[docs]</a>
+<span class="k">def</span><span class="w"> </span><span class="nf">update_file_with_scores</span><span class="p">(</span><span class="n">file_obj</span><span class="p">:</span> <span class="n">Any</span><span class="p">,</span> <span class="n">is_malicious</span><span class="p">:</span> <span class="nb">bool</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="nb">bool</span><span class="p">:</span>
+<span class="w">    </span><span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">    Update a file object with scores based on its malicious status.</span>
+
+<span class="sd">    Args:</span>
+<span class="sd">    file_obj: The file object (not path) to update scores for.</span>
+<span class="sd">    Must have &#39;file_level&#39;, &#39;file_score&#39;, &#39;file_confidence&#39; attributes</span>
+<span class="sd">    and a .save() method.</span>
+<span class="sd">    is_malicious: True if the file is considered malicious.</span>
+
+<span class="sd">    Returns:</span>
+<span class="sd">    bool: True if the update and save were successful, False otherwise.</span>
+<span class="sd">    &quot;&quot;&quot;</span>
+    <span class="n">update_cases_logger</span><span class="o">.</span><span class="n">info</span><span class="p">(</span><span class="s2">&quot;Updating scores for file object </span><span class="si">%r</span><span class="s2"> (malicious=</span><span class="si">%s</span><span class="s2">)&quot;</span><span class="p">,</span> <span class="n">file_obj</span><span class="p">,</span> <span class="n">is_malicious</span><span class="p">)</span>
+    <span class="k">return</span> <span class="n">update_scores</span><span class="p">(</span><span class="n">file_obj</span><span class="p">,</span> <span class="s1">&#39;file_level&#39;</span><span class="p">,</span> <span class="s1">&#39;file_score&#39;</span><span class="p">,</span> <span class="s1">&#39;file_confidence&#39;</span><span class="p">,</span> <span class="n">is_malicious</span><span class="p">)</span></div>
+
+
+
+<span class="c1"># Optional: Define an Enum for mail part types</span>
+<div class="viewcode-block" id="MailPartType">
+<a class="viewcode-back" href="../../../modules/score_process_core.html#score_process.scoring.updating.MailPartType">[docs]</a>
+<span class="k">class</span><span class="w"> </span><span class="nc">MailPartType</span><span class="p">(</span><span class="n">Enum</span><span class="p">):</span>
+    <span class="n">BODY</span> <span class="o">=</span> <span class="s2">&quot;mail_body&quot;</span>
+    <span class="n">HEADER</span> <span class="o">=</span> <span class="s2">&quot;mail_header&quot;</span>
+
+<div class="viewcode-block" id="MailPartType.get_attributes">
+<a class="viewcode-back" href="../../../modules/score_process_core.html#score_process.scoring.updating.MailPartType.get_attributes">[docs]</a>
+    <span class="nd">@classmethod</span>
+    <span class="k">def</span><span class="w"> </span><span class="nf">get_attributes</span><span class="p">(</span><span class="bp">cls</span><span class="p">,</span> <span class="n">part_type</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="n">Optional</span><span class="p">[</span><span class="n">Tuple</span><span class="p">[</span><span class="nb">str</span><span class="p">,</span> <span class="nb">str</span><span class="p">,</span> <span class="nb">str</span><span class="p">]]:</span>
+<span class="w">        </span><span class="sd">&quot;&quot;&quot; Helper to get attribute names based on Enum member &quot;&quot;&quot;</span>
+        <span class="n">_attribute_map</span><span class="p">:</span> <span class="n">Dict</span><span class="p">[</span><span class="n">MailPartType</span><span class="p">,</span> <span class="n">Tuple</span><span class="p">[</span><span class="nb">str</span><span class="p">,</span> <span class="nb">str</span><span class="p">,</span> <span class="nb">str</span><span class="p">]]</span> <span class="o">=</span> <span class="p">{</span>
+            <span class="n">MailPartType</span><span class="o">.</span><span class="n">BODY</span><span class="p">:</span> <span class="p">(</span><span class="s1">&#39;body_level&#39;</span><span class="p">,</span> <span class="s1">&#39;body_score&#39;</span><span class="p">,</span> <span class="s1">&#39;body_confidence&#39;</span><span class="p">),</span>
+            <span class="n">MailPartType</span><span class="o">.</span><span class="n">HEADER</span><span class="p">:</span> <span class="p">(</span><span class="s1">&#39;header_level&#39;</span><span class="p">,</span> <span class="s1">&#39;header_score&#39;</span><span class="p">,</span> <span class="s1">&#39;header_confidence&#39;</span><span class="p">),</span>
+        <span class="p">}</span>
+        <span class="k">return</span> <span class="n">_attribute_map</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="n">part_type</span><span class="p">)</span></div>
+</div>
+
+
+
+<div class="viewcode-block" id="update_mail_part_with_scores">
+<a class="viewcode-back" href="../../../modules/score_process_core.html#score_process.scoring.updating.update_mail_part_with_scores">[docs]</a>
+<span class="k">def</span><span class="w"> </span><span class="nf">update_mail_part_with_scores</span><span class="p">(</span>
+    <span class="n">mail_part</span><span class="p">:</span> <span class="n">Any</span><span class="p">,</span>
+    <span class="n">part_type</span><span class="p">:</span> <span class="nb">str</span><span class="p">,</span>
+    <span class="n">is_malicious</span><span class="p">:</span> <span class="nb">bool</span>
+<span class="p">)</span> <span class="o">-&gt;</span> <span class="nb">bool</span><span class="p">:</span>
+<span class="w">    </span><span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">    Update a mail part object with scores based on its type and malicious status.</span>
+
+<span class="sd">    Args:</span>
+<span class="sd">        mail_part: The mail part object to update scores for.</span>
+<span class="sd">        part_type: The type of the mail part (MailPartType.BODY or MailPartType.HEADER).</span>
+<span class="sd">        is_malicious: True if the mail part is considered malicious.</span>
+
+<span class="sd">    Returns:</span>
+<span class="sd">        bool: True if the update and save were successful, False otherwise.</span>
+<span class="sd">    &quot;&quot;&quot;</span>
+    <span class="n">update_cases_logger</span><span class="o">.</span><span class="n">info</span><span class="p">(</span>
+        <span class="s2">&quot;Updating scores for mail part </span><span class="si">%r</span><span class="s2"> (type=</span><span class="si">%s</span><span class="s2">, malicious=</span><span class="si">%s</span><span class="s2">)&quot;</span><span class="p">,</span>
+        <span class="n">mail_part</span><span class="p">,</span> <span class="n">part_type</span><span class="p">,</span> <span class="n">is_malicious</span>
+    <span class="p">)</span>
+
+    <span class="n">attributes</span> <span class="o">=</span> <span class="n">MailPartType</span><span class="o">.</span><span class="n">get_attributes</span><span class="p">(</span><span class="n">part_type</span><span class="p">)</span>
+
+    <span class="k">if</span> <span class="n">attributes</span><span class="p">:</span>
+        <span class="n">level_attr</span><span class="p">,</span> <span class="n">score_attr</span><span class="p">,</span> <span class="n">confidence_attr</span> <span class="o">=</span> <span class="n">attributes</span>
+        <span class="k">return</span> <span class="n">update_scores</span><span class="p">(</span><span class="n">mail_part</span><span class="p">,</span> <span class="n">level_attr</span><span class="p">,</span> <span class="n">score_attr</span><span class="p">,</span> <span class="n">confidence_attr</span><span class="p">,</span> <span class="n">is_malicious</span><span class="p">)</span>
+    <span class="k">else</span><span class="p">:</span>
+        <span class="c1"># This case should be less likely if using the Enum correctly</span>
+        <span class="n">update_cases_logger</span><span class="o">.</span><span class="n">warning</span><span class="p">(</span>
+            <span class="s2">&quot;Cannot update mail part </span><span class="si">%r</span><span class="s2">: unknown type enum member </span><span class="si">%s</span><span class="s2">.&quot;</span><span class="p">,</span> <span class="n">mail_part</span><span class="p">,</span> <span class="n">part_type</span>
+        <span class="p">)</span>
+        <span class="k">return</span> <span class="kc">False</span></div>
+
+</pre></div>
+
+           </div>
+          </div>
+          <footer>
+
+  <hr/>
+
+  <div role="contentinfo">
+    <p>&#169; Copyright 2025, Theo Bhang, Esteban Crispel.</p>
+  </div>
+
+  Built with <a href="https://www.sphinx-doc.org/">Sphinx</a> using a
+    <a href="https://github.com/readthedocs/sphinx_rtd_theme">theme</a>
+    provided by <a href="https://readthedocs.org">Read the Docs</a>.
+   
+
+</footer>
+        </div>
+      </div>
+    </section>
+  </div>
+  <script>
+      jQuery(function () {
+          SphinxRtdTheme.Navigation.enable(true);
+      });
+  </script> 
+
+</body>
+</html>

@@ -1,0 +1,1134 @@
+<!DOCTYPE html>
+
+<html lang="en" data-content_root="../../">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>dashboard.views &#8212; Suspicious 1.0.0 documentation</title>
+    <link rel="stylesheet" type="text/css" href="../../_static/pygments.css?v=5ecbeea2" />
+    <link rel="stylesheet" type="text/css" href="../../_static/basic.css?v=b08954a9" />
+    <link rel="stylesheet" type="text/css" href="../../_static/alabaster.css?v=27fed22d" />
+    <script src="../../_static/documentation_options.js?v=8d563738"></script>
+    <script src="../../_static/doctools.js?v=9bcbadda"></script>
+    <script src="../../_static/sphinx_highlight.js?v=dc90522c"></script>
+    <link rel="index" title="Index" href="../../genindex.html" />
+    <link rel="search" title="Search" href="../../search.html" />
+   
+  <link rel="stylesheet" href="../../_static/custom.css" type="text/css" />
+  
+
+  
+  
+
+  </head><body>
+  
+
+    <div class="document">
+      <div class="documentwrapper">
+        <div class="bodywrapper">
+          
+
+          <div class="body" role="main">
+            
+  <h1>Source code for dashboard.views</h1><div class="highlight"><pre>
+<span></span><span class="kn">import</span><span class="w"> </span><span class="nn">ast</span>
+<span class="kn">import</span><span class="w"> </span><span class="nn">json</span>
+<span class="kn">import</span><span class="w"> </span><span class="nn">logging</span>
+<span class="kn">from</span><span class="w"> </span><span class="nn">datetime</span><span class="w"> </span><span class="kn">import</span> <span class="n">date</span><span class="p">,</span> <span class="n">timedelta</span>
+<span class="kn">from</span><span class="w"> </span><span class="nn">django.contrib.auth.decorators</span><span class="w"> </span><span class="kn">import</span> <span class="n">login_required</span>
+<span class="kn">from</span><span class="w"> </span><span class="nn">django.contrib.auth</span><span class="w"> </span><span class="kn">import</span> <span class="n">logout</span> <span class="k">as</span> <span class="n">auth_logout</span>
+<span class="kn">from</span><span class="w"> </span><span class="nn">django.contrib.auth.models</span><span class="w"> </span><span class="kn">import</span> <span class="n">User</span>
+<span class="kn">from</span><span class="w"> </span><span class="nn">django.http</span><span class="w"> </span><span class="kn">import</span> <span class="n">JsonResponse</span><span class="p">,</span> <span class="n">HttpRequest</span><span class="p">,</span> <span class="n">HttpResponse</span>
+<span class="kn">from</span><span class="w"> </span><span class="nn">django.shortcuts</span><span class="w"> </span><span class="kn">import</span> <span class="n">redirect</span><span class="p">,</span> <span class="n">render</span><span class="p">,</span> <span class="n">get_object_or_404</span>
+
+<span class="kn">from</span><span class="w"> </span><span class="nn">dashboard.dash_utils.dashboard</span><span class="w"> </span><span class="kn">import</span> <span class="p">(</span>
+    <span class="n">update_all_kpi_stats</span><span class="p">,</span>
+    <span class="n">update_monthly_cases_summary</span><span class="p">,</span>
+    <span class="n">update_total_cases_stats</span>
+<span class="p">)</span>
+<span class="kn">from</span><span class="w"> </span><span class="nn">dashboard.dash_utils.utils</span><span class="w"> </span><span class="kn">import</span> <span class="p">(</span>
+    <span class="n">get_dashboard_score</span><span class="p">,</span>
+    <span class="n">get_dashboard_email_prefix</span><span class="p">,</span>
+    <span class="n">new_reporters_dash</span><span class="p">,</span>
+    <span class="n">total_reporters_dash</span><span class="p">,</span>
+    <span class="n">total_by_danger_dash</span><span class="p">,</span>
+    <span class="n">get_case_all_dash</span><span class="p">,</span>
+    <span class="n">dashboard_score_scope</span><span class="p">,</span>
+    <span class="n">dashboard_mail_scope</span><span class="p">,</span>
+    <span class="n">new_reporters_dash_scope</span><span class="p">,</span>
+    <span class="n">total_reporters_dash_scope</span><span class="p">,</span>
+    <span class="n">total_by_danger_dash_scope</span><span class="p">,</span>
+    <span class="n">get_case_all_dash_scope</span><span class="p">,</span>
+<span class="p">)</span>
+
+<span class="kn">from</span><span class="w"> </span><span class="nn">.models</span><span class="w"> </span><span class="kn">import</span> <span class="p">(</span>
+    <span class="n">Kpi</span><span class="p">,</span>
+    <span class="n">MonthlyReporterStats</span><span class="p">,</span>
+    <span class="n">MonthlyCasesSummary</span><span class="p">,</span>
+    <span class="n">TotalCasesStats</span><span class="p">,</span>
+<span class="p">)</span>
+
+<span class="kn">import</span><span class="w"> </span><span class="nn">numpy</span><span class="w"> </span><span class="k">as</span><span class="w"> </span><span class="nn">np</span>  <span class="c1"># For PCA computation without sklearn</span>
+<span class="kn">from</span><span class="w"> </span><span class="nn">datetime</span><span class="w"> </span><span class="kn">import</span> <span class="n">datetime</span><span class="p">,</span> <span class="n">timezone</span>
+<span class="kn">import</span><span class="w"> </span><span class="nn">re</span>
+<span class="kn">from</span><span class="w"> </span><span class="nn">email.utils</span><span class="w"> </span><span class="kn">import</span> <span class="n">parsedate_to_datetime</span>
+
+<span class="kn">from</span><span class="w"> </span><span class="nn">score_process.score_utils.utils</span><span class="w"> </span><span class="kn">import</span> <span class="n">parse_and_decode_defaultdict</span><span class="p">,</span> <span class="n">parse_headers</span>
+
+<span class="n">logger</span> <span class="o">=</span> <span class="n">logging</span><span class="o">.</span><span class="n">getLogger</span><span class="p">(</span><span class="vm">__name__</span><span class="p">)</span>
+
+
+<span class="k">def</span><span class="w"> </span><span class="nf">_disable_chromadb_telemetry</span><span class="p">():</span>
+<span class="w">    </span><span class="sd">&quot;&quot;&quot;Force-disable ChromaDB telemetry (PostHog) to avoid noisy logs.&quot;&quot;&quot;</span>
+    <span class="k">try</span><span class="p">:</span>
+        <span class="kn">import</span><span class="w"> </span><span class="nn">os</span>
+
+        <span class="n">os</span><span class="o">.</span><span class="n">environ</span><span class="o">.</span><span class="n">setdefault</span><span class="p">(</span><span class="s2">&quot;CHROMADB_TELEMETRY_ENABLED&quot;</span><span class="p">,</span> <span class="s2">&quot;false&quot;</span><span class="p">)</span>
+        <span class="n">os</span><span class="o">.</span><span class="n">environ</span><span class="o">.</span><span class="n">setdefault</span><span class="p">(</span><span class="s2">&quot;ANONYMIZED_TELEMETRY&quot;</span><span class="p">,</span> <span class="s2">&quot;false&quot;</span><span class="p">)</span>
+        <span class="n">os</span><span class="o">.</span><span class="n">environ</span><span class="o">.</span><span class="n">setdefault</span><span class="p">(</span><span class="s2">&quot;CHROMADB_DISABLE_TELEMETRY&quot;</span><span class="p">,</span> <span class="s2">&quot;true&quot;</span><span class="p">)</span>
+        <span class="n">os</span><span class="o">.</span><span class="n">environ</span><span class="o">.</span><span class="n">setdefault</span><span class="p">(</span><span class="s2">&quot;CHROMADB_TELEMETRY&quot;</span><span class="p">,</span> <span class="s2">&quot;false&quot;</span><span class="p">)</span>
+    <span class="k">except</span> <span class="ne">Exception</span><span class="p">:</span>
+        <span class="k">pass</span>
+
+    <span class="c1"># Monkey-patch telemetry capture routines if the modules are available.</span>
+    <span class="k">try</span><span class="p">:</span>
+        <span class="kn">from</span><span class="w"> </span><span class="nn">chromadb.telemetry</span><span class="w"> </span><span class="kn">import</span> <span class="n">telemetry</span> <span class="k">as</span> <span class="n">_telemetry</span>  <span class="c1"># type: ignore</span>
+
+        <span class="k">if</span> <span class="nb">hasattr</span><span class="p">(</span><span class="n">_telemetry</span><span class="p">,</span> <span class="s2">&quot;TELEMETRY_ENABLED&quot;</span><span class="p">):</span>
+            <span class="k">try</span><span class="p">:</span>
+                <span class="n">_telemetry</span><span class="o">.</span><span class="n">TELEMETRY_ENABLED</span> <span class="o">=</span> <span class="kc">False</span>  <span class="c1"># type: ignore[attr-defined]</span>
+            <span class="k">except</span> <span class="ne">Exception</span><span class="p">:</span>
+                <span class="k">pass</span>
+
+        <span class="n">inst</span> <span class="o">=</span> <span class="nb">getattr</span><span class="p">(</span><span class="n">_telemetry</span><span class="p">,</span> <span class="s2">&quot;telemetry_instance&quot;</span><span class="p">,</span> <span class="kc">None</span><span class="p">)</span>
+        <span class="k">if</span> <span class="n">inst</span> <span class="ow">is</span> <span class="ow">not</span> <span class="kc">None</span><span class="p">:</span>
+            <span class="k">for</span> <span class="n">attr</span> <span class="ow">in</span> <span class="p">(</span><span class="s2">&quot;capture&quot;</span><span class="p">,</span> <span class="s2">&quot;capture_event&quot;</span><span class="p">,</span> <span class="s2">&quot;capture_span&quot;</span><span class="p">,</span> <span class="s2">&quot;flush&quot;</span><span class="p">):</span>
+                <span class="k">if</span> <span class="nb">hasattr</span><span class="p">(</span><span class="n">inst</span><span class="p">,</span> <span class="n">attr</span><span class="p">):</span>
+                    <span class="nb">setattr</span><span class="p">(</span><span class="n">inst</span><span class="p">,</span> <span class="n">attr</span><span class="p">,</span> <span class="k">lambda</span> <span class="o">*</span><span class="n">a</span><span class="p">,</span> <span class="o">**</span><span class="n">k</span><span class="p">:</span> <span class="kc">None</span><span class="p">)</span>
+    <span class="k">except</span> <span class="ne">Exception</span><span class="p">:</span>
+        <span class="k">pass</span>
+
+    <span class="k">try</span><span class="p">:</span>
+        <span class="kn">from</span><span class="w"> </span><span class="nn">chromadb.telemetry</span><span class="w"> </span><span class="kn">import</span> <span class="n">product</span> <span class="k">as</span> <span class="n">_product</span>  <span class="c1"># type: ignore</span>
+
+        <span class="n">posthog_mod</span> <span class="o">=</span> <span class="nb">getattr</span><span class="p">(</span><span class="n">_product</span><span class="p">,</span> <span class="s2">&quot;posthog&quot;</span><span class="p">,</span> <span class="kc">None</span><span class="p">)</span>
+        <span class="k">if</span> <span class="n">posthog_mod</span> <span class="ow">is</span> <span class="ow">not</span> <span class="kc">None</span><span class="p">:</span>
+            <span class="k">def</span><span class="w"> </span><span class="nf">_noop_capture</span><span class="p">(</span><span class="o">*</span><span class="n">args</span><span class="p">,</span> <span class="o">**</span><span class="n">kwargs</span><span class="p">):</span>
+                <span class="k">return</span> <span class="kc">None</span>
+
+            <span class="k">if</span> <span class="nb">hasattr</span><span class="p">(</span><span class="n">posthog_mod</span><span class="p">,</span> <span class="s2">&quot;capture&quot;</span><span class="p">):</span>
+                <span class="n">posthog_mod</span><span class="o">.</span><span class="n">capture</span> <span class="o">=</span> <span class="n">_noop_capture</span>  <span class="c1"># type: ignore[assignment]</span>
+            <span class="n">client_cls</span> <span class="o">=</span> <span class="nb">getattr</span><span class="p">(</span><span class="n">posthog_mod</span><span class="p">,</span> <span class="s2">&quot;Posthog&quot;</span><span class="p">,</span> <span class="kc">None</span><span class="p">)</span>
+            <span class="k">if</span> <span class="n">client_cls</span> <span class="ow">is</span> <span class="ow">not</span> <span class="kc">None</span> <span class="ow">and</span> <span class="nb">hasattr</span><span class="p">(</span><span class="n">client_cls</span><span class="p">,</span> <span class="s2">&quot;capture&quot;</span><span class="p">):</span>
+                <span class="n">client_cls</span><span class="o">.</span><span class="n">capture</span> <span class="o">=</span> <span class="n">_noop_capture</span>  <span class="c1"># type: ignore[assignment]</span>
+    <span class="k">except</span> <span class="ne">Exception</span><span class="p">:</span>
+        <span class="k">pass</span>
+
+
+<div class="viewcode-block" id="logout_view">
+<a class="viewcode-back" href="../../modules/dashboard_core.html#dashboard.views.logout_view">[docs]</a>
+<span class="k">def</span><span class="w"> </span><span class="nf">logout_view</span><span class="p">(</span><span class="n">request</span><span class="p">:</span> <span class="n">HttpRequest</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="n">HttpResponse</span><span class="p">:</span>
+<span class="w">    </span><span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">    Log out the user and redirect to the login page.</span>
+<span class="sd">    Always redirects (or returns a JSON message) regardless of logout success.</span>
+<span class="sd">    &quot;&quot;&quot;</span>
+    <span class="k">try</span><span class="p">:</span>
+        <span class="k">if</span> <span class="n">request</span><span class="o">.</span><span class="n">user</span><span class="o">.</span><span class="n">is_authenticated</span><span class="p">:</span>
+            <span class="n">logger</span><span class="o">.</span><span class="n">info</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;User </span><span class="si">{</span><span class="n">request</span><span class="o">.</span><span class="n">user</span><span class="si">}</span><span class="s2"> is logging out&quot;</span><span class="p">)</span>
+            <span class="n">auth_logout</span><span class="p">(</span><span class="n">request</span><span class="p">)</span>
+            <span class="n">logger</span><span class="o">.</span><span class="n">info</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;User </span><span class="si">{</span><span class="n">request</span><span class="o">.</span><span class="n">user</span><span class="si">}</span><span class="s2"> logged out successfully&quot;</span><span class="p">)</span>
+        <span class="k">else</span><span class="p">:</span>
+            <span class="n">logger</span><span class="o">.</span><span class="n">warning</span><span class="p">(</span><span class="s2">&quot;Unauthenticated user attempted to log out&quot;</span><span class="p">)</span>
+    <span class="k">except</span> <span class="ne">Exception</span> <span class="k">as</span> <span class="n">e</span><span class="p">:</span>
+        <span class="n">logger</span><span class="o">.</span><span class="n">error</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;Error logging out user: </span><span class="si">{</span><span class="n">e</span><span class="si">}</span><span class="s2">&quot;</span><span class="p">,</span> <span class="n">exc_info</span><span class="o">=</span><span class="kc">True</span><span class="p">)</span>
+    <span class="c1"># Always redirect to the login page (or you can return a JSON response if needed)</span>
+    <span class="k">return</span> <span class="n">redirect</span><span class="p">(</span><span class="s1">&#39;login&#39;</span><span class="p">)</span></div>
+
+
+
+<span class="c1"># --- ChromaDB helper utilities ---</span>
+
+<span class="k">def</span><span class="w"> </span><span class="nf">_get_chroma_collection</span><span class="p">(</span><span class="n">collection_name</span><span class="p">:</span> <span class="nb">str</span> <span class="o">=</span> <span class="s2">&quot;suspicious_mails&quot;</span><span class="p">):</span>
+<span class="w">    </span><span class="sd">&quot;&quot;&quot;Best-effort ChromaDB collection getter handling API/tenant differences.</span>
+
+<span class="sd">    Returns the collection object or None if unavailable.</span>
+<span class="sd">    &quot;&quot;&quot;</span>
+    <span class="k">try</span><span class="p">:</span>
+        <span class="kn">import</span><span class="w"> </span><span class="nn">os</span>
+        <span class="kn">import</span><span class="w"> </span><span class="nn">chromadb</span>  <span class="c1"># type: ignore</span>
+        <span class="kn">from</span><span class="w"> </span><span class="nn">chromadb.config</span><span class="w"> </span><span class="kn">import</span> <span class="n">Settings</span>  <span class="c1"># type: ignore</span>
+    <span class="k">except</span> <span class="ne">Exception</span> <span class="k">as</span> <span class="n">e</span><span class="p">:</span>
+        <span class="n">logger</span><span class="o">.</span><span class="n">warning</span><span class="p">(</span><span class="s2">&quot;ChromaDB not available in environment: </span><span class="si">%s</span><span class="s2">&quot;</span><span class="p">,</span> <span class="n">e</span><span class="p">)</span>
+        <span class="k">return</span> <span class="kc">None</span>
+
+    <span class="n">_disable_chromadb_telemetry</span><span class="p">()</span>
+
+    <span class="n">persist_path</span> <span class="o">=</span> <span class="s2">&quot;/app/Suspicious/chromadb&quot;</span>
+    <span class="n">errors</span> <span class="o">=</span> <span class="p">[]</span>
+
+    <span class="c1"># Attempt matrix for different versions</span>
+    <span class="n">attempts</span> <span class="o">=</span> <span class="p">[]</span>
+    <span class="k">try</span><span class="p">:</span>
+        <span class="n">attempts</span><span class="o">.</span><span class="n">append</span><span class="p">(</span><span class="k">lambda</span><span class="p">:</span> <span class="n">chromadb</span><span class="o">.</span><span class="n">PersistentClient</span><span class="p">(</span><span class="n">path</span><span class="o">=</span><span class="n">persist_path</span><span class="p">,</span> <span class="n">tenant</span><span class="o">=</span><span class="s2">&quot;default_tenant&quot;</span><span class="p">,</span> <span class="n">database</span><span class="o">=</span><span class="s2">&quot;default_database&quot;</span><span class="p">,</span> <span class="n">settings</span><span class="o">=</span><span class="n">Settings</span><span class="p">(</span><span class="n">anonymized_telemetry</span><span class="o">=</span><span class="kc">False</span><span class="p">)))</span>
+    <span class="k">except</span> <span class="ne">Exception</span><span class="p">:</span>
+        <span class="c1"># Signature may not support tenant/database</span>
+        <span class="n">attempts</span><span class="o">.</span><span class="n">append</span><span class="p">(</span><span class="k">lambda</span><span class="p">:</span> <span class="n">chromadb</span><span class="o">.</span><span class="n">PersistentClient</span><span class="p">(</span><span class="n">path</span><span class="o">=</span><span class="n">persist_path</span><span class="p">,</span> <span class="n">settings</span><span class="o">=</span><span class="n">Settings</span><span class="p">(</span><span class="n">anonymized_telemetry</span><span class="o">=</span><span class="kc">False</span><span class="p">)))</span>
+
+    <span class="c1"># Older API fallback: Client with Settings(is_persistent=True)</span>
+    <span class="k">def</span><span class="w"> </span><span class="nf">_legacy_client</span><span class="p">():</span>
+        <span class="k">try</span><span class="p">:</span>
+            <span class="n">s</span> <span class="o">=</span> <span class="n">Settings</span><span class="p">(</span><span class="n">is_persistent</span><span class="o">=</span><span class="kc">True</span><span class="p">,</span> <span class="n">persist_directory</span><span class="o">=</span><span class="n">persist_path</span><span class="p">,</span> <span class="n">anonymized_telemetry</span><span class="o">=</span><span class="kc">False</span><span class="p">)</span>  <span class="c1"># type: ignore[arg-type]</span>
+            <span class="k">return</span> <span class="n">chromadb</span><span class="o">.</span><span class="n">Client</span><span class="p">(</span><span class="n">s</span><span class="p">)</span>
+        <span class="k">except</span> <span class="ne">Exception</span> <span class="k">as</span> <span class="n">e</span><span class="p">:</span>
+            <span class="n">errors</span><span class="o">.</span><span class="n">append</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;Legacy client failed init: </span><span class="si">{</span><span class="n">e</span><span class="si">}</span><span class="s2">&quot;</span><span class="p">)</span>
+            <span class="k">raise</span>
+
+    <span class="n">attempts</span><span class="o">.</span><span class="n">append</span><span class="p">(</span><span class="n">_legacy_client</span><span class="p">)</span>
+
+    <span class="n">client</span> <span class="o">=</span> <span class="kc">None</span>
+    <span class="k">for</span> <span class="n">factory</span> <span class="ow">in</span> <span class="n">attempts</span><span class="p">:</span>
+        <span class="k">try</span><span class="p">:</span>
+            <span class="n">client</span> <span class="o">=</span> <span class="n">factory</span><span class="p">()</span>
+            <span class="k">break</span>
+        <span class="k">except</span> <span class="ne">Exception</span> <span class="k">as</span> <span class="n">e</span><span class="p">:</span>
+            <span class="n">errors</span><span class="o">.</span><span class="n">append</span><span class="p">(</span><span class="nb">str</span><span class="p">(</span><span class="n">e</span><span class="p">))</span>
+            <span class="n">client</span> <span class="o">=</span> <span class="kc">None</span>
+            <span class="k">continue</span>
+
+    <span class="k">if</span> <span class="n">client</span> <span class="ow">is</span> <span class="kc">None</span><span class="p">:</span>
+        <span class="n">logger</span><span class="o">.</span><span class="n">error</span><span class="p">(</span><span class="s2">&quot;Failed to init ChromaDB client: </span><span class="si">%s</span><span class="s2">&quot;</span><span class="p">,</span> <span class="s2">&quot; | &quot;</span><span class="o">.</span><span class="n">join</span><span class="p">(</span><span class="n">errors</span><span class="p">))</span>
+        <span class="k">return</span> <span class="kc">None</span>
+
+    <span class="k">try</span><span class="p">:</span>
+        <span class="k">return</span> <span class="n">client</span><span class="o">.</span><span class="n">get_collection</span><span class="p">(</span><span class="n">name</span><span class="o">=</span><span class="n">collection_name</span><span class="p">)</span>
+    <span class="k">except</span> <span class="ne">Exception</span> <span class="k">as</span> <span class="n">e</span><span class="p">:</span>
+        <span class="n">logger</span><span class="o">.</span><span class="n">warning</span><span class="p">(</span><span class="s2">&quot;ChromaDB collection &#39;</span><span class="si">%s</span><span class="s2">&#39; not accessible: </span><span class="si">%s</span><span class="s2">&quot;</span><span class="p">,</span> <span class="n">collection_name</span><span class="p">,</span> <span class="n">e</span><span class="p">)</span>
+        <span class="k">return</span> <span class="kc">None</span>
+
+
+<div class="viewcode-block" id="dashboard">
+<a class="viewcode-back" href="../../modules/dashboard_core.html#dashboard.views.dashboard">[docs]</a>
+<span class="nd">@login_required</span>
+<span class="k">def</span><span class="w"> </span><span class="nf">dashboard</span><span class="p">(</span><span class="n">request</span><span class="p">:</span> <span class="n">HttpRequest</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="n">HttpResponse</span><span class="p">:</span>
+<span class="w">    </span><span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">    Render the dashboard page.</span>
+<span class="sd">    Retrieves the current month and year, and loads KPI data via a cron job import.</span>
+<span class="sd">    &quot;&quot;&quot;</span>
+    <span class="n">today</span> <span class="o">=</span> <span class="n">date</span><span class="o">.</span><span class="n">today</span><span class="p">()</span>
+    <span class="n">current_month</span> <span class="o">=</span> <span class="n">today</span><span class="o">.</span><span class="n">strftime</span><span class="p">(</span><span class="s1">&#39;%m&#39;</span><span class="p">)</span>
+    <span class="n">current_year</span> <span class="o">=</span> <span class="n">today</span><span class="o">.</span><span class="n">year</span>
+    <span class="c1"># Importing here to avoid circular imports or to ensure it runs on-demand.</span>
+    <span class="kn">from</span><span class="w"> </span><span class="nn">tasp.cron</span><span class="w"> </span><span class="kn">import</span> <span class="n">sync_monthly_kpi</span>  
+    <span class="n">kpi</span> <span class="o">=</span> <span class="n">sync_monthly_kpi</span><span class="p">()</span>  <span class="c1"># Although kpi isn&#39;t used in context, it might trigger needed side effects.</span>
+    <span class="n">context</span> <span class="o">=</span> <span class="p">{</span>
+        <span class="s1">&#39;month&#39;</span><span class="p">:</span> <span class="n">current_month</span><span class="p">,</span>
+        <span class="s1">&#39;year&#39;</span><span class="p">:</span> <span class="n">current_year</span><span class="p">,</span>
+    <span class="p">}</span>
+    <span class="n">logger</span><span class="o">.</span><span class="n">info</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;User </span><span class="si">{</span><span class="n">request</span><span class="o">.</span><span class="n">user</span><span class="si">}</span><span class="s2"> is on the dashboard page&quot;</span><span class="p">)</span>
+    <span class="k">return</span> <span class="n">render</span><span class="p">(</span><span class="n">request</span><span class="p">,</span> <span class="s1">&#39;tasp/dashboard.html&#39;</span><span class="p">,</span> <span class="n">context</span><span class="p">)</span></div>
+
+
+<div class="viewcode-block" id="dashboard_campaigns">
+<a class="viewcode-back" href="../../modules/dashboard_core.html#dashboard.views.dashboard_campaigns">[docs]</a>
+<span class="nd">@login_required</span>
+<span class="k">def</span><span class="w"> </span><span class="nf">dashboard_campaigns</span><span class="p">(</span><span class="n">request</span><span class="p">:</span> <span class="n">HttpRequest</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="n">HttpResponse</span><span class="p">:</span>
+<span class="w">    </span><span class="sd">&quot;&quot;&quot;Simple page for /dashboard/campaigns.&quot;&quot;&quot;</span>
+    <span class="n">logger</span><span class="o">.</span><span class="n">info</span><span class="p">(</span><span class="s2">&quot;User </span><span class="si">%s</span><span class="s2"> visited dashboard campaigns page&quot;</span><span class="p">,</span> <span class="n">request</span><span class="o">.</span><span class="n">user</span><span class="p">)</span>
+    <span class="k">return</span> <span class="n">render</span><span class="p">(</span><span class="n">request</span><span class="p">,</span> <span class="s1">&#39;tasp/campaigns.html&#39;</span><span class="p">)</span></div>
+
+
+<span class="c1"># New endpoint: provide classification counts for campaigns page</span>
+<div class="viewcode-block" id="dashboard_campaigns_classification_counts">
+<a class="viewcode-back" href="../../modules/dashboard_core.html#dashboard.views.dashboard_campaigns_classification_counts">[docs]</a>
+<span class="nd">@login_required</span>
+<span class="k">def</span><span class="w"> </span><span class="nf">dashboard_campaigns_classification_counts</span><span class="p">(</span><span class="n">request</span><span class="p">:</span> <span class="n">HttpRequest</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="n">JsonResponse</span><span class="p">:</span>
+<span class="w">    </span><span class="sd">&quot;&quot;&quot;Return counts for main classifications from ChromaDB.</span>
+
+<span class="sd">    Returns a JSON object: { &#39;SAFE&#39;: int, &#39;UNWANTED&#39;: int, &#39;DANGEROUS&#39;: int }</span>
+<span class="sd">    If ChromaDB is unavailable, zeros are returned.</span>
+<span class="sd">    &quot;&quot;&quot;</span>
+    <span class="n">counts</span> <span class="o">=</span> <span class="p">{</span><span class="s1">&#39;SAFE&#39;</span><span class="p">:</span> <span class="mi">0</span><span class="p">,</span> <span class="s1">&#39;UNWANTED&#39;</span><span class="p">:</span> <span class="mi">0</span><span class="p">,</span> <span class="s1">&#39;DANGEROUS&#39;</span><span class="p">:</span> <span class="mi">0</span><span class="p">}</span>
+
+    <span class="n">collection</span> <span class="o">=</span> <span class="n">_get_chroma_collection</span><span class="p">()</span>
+    <span class="k">if</span> <span class="n">collection</span> <span class="ow">is</span> <span class="kc">None</span><span class="p">:</span>
+        <span class="k">return</span> <span class="n">JsonResponse</span><span class="p">(</span><span class="n">counts</span><span class="p">)</span>
+
+    <span class="k">def</span><span class="w"> </span><span class="nf">count_for</span><span class="p">(</span><span class="n">value</span><span class="p">:</span> <span class="nb">str</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="nb">int</span><span class="p">:</span>
+        <span class="k">try</span><span class="p">:</span>
+            <span class="n">res</span> <span class="o">=</span> <span class="n">collection</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="n">where</span><span class="o">=</span><span class="p">{</span><span class="s2">&quot;classification&quot;</span><span class="p">:</span> <span class="n">value</span><span class="p">})</span>
+            <span class="n">ids</span> <span class="o">=</span> <span class="n">res</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="s1">&#39;ids&#39;</span><span class="p">,</span> <span class="p">[])</span> <span class="k">if</span> <span class="nb">isinstance</span><span class="p">(</span><span class="n">res</span><span class="p">,</span> <span class="nb">dict</span><span class="p">)</span> <span class="k">else</span> <span class="p">[]</span>
+            <span class="k">return</span> <span class="nb">len</span><span class="p">(</span><span class="n">ids</span><span class="p">)</span>
+        <span class="k">except</span> <span class="ne">Exception</span> <span class="k">as</span> <span class="n">e</span><span class="p">:</span>
+            <span class="n">logger</span><span class="o">.</span><span class="n">error</span><span class="p">(</span><span class="s2">&quot;Error counting classification </span><span class="si">%s</span><span class="s2">: </span><span class="si">%s</span><span class="s2">&quot;</span><span class="p">,</span> <span class="n">value</span><span class="p">,</span> <span class="n">e</span><span class="p">,</span> <span class="n">exc_info</span><span class="o">=</span><span class="kc">True</span><span class="p">)</span>
+            <span class="k">return</span> <span class="mi">0</span>
+
+    <span class="n">counts</span><span class="p">[</span><span class="s1">&#39;SAFE&#39;</span><span class="p">]</span> <span class="o">=</span> <span class="n">count_for</span><span class="p">(</span><span class="s1">&#39;SAFE&#39;</span><span class="p">)</span>
+    <span class="n">counts</span><span class="p">[</span><span class="s1">&#39;UNWANTED&#39;</span><span class="p">]</span> <span class="o">=</span> <span class="n">count_for</span><span class="p">(</span><span class="s1">&#39;UNWANTED&#39;</span><span class="p">)</span>
+    <span class="n">counts</span><span class="p">[</span><span class="s1">&#39;DANGEROUS&#39;</span><span class="p">]</span> <span class="o">=</span> <span class="n">count_for</span><span class="p">(</span><span class="s1">&#39;DANGEROUS&#39;</span><span class="p">)</span>
+
+    <span class="c1"># Fallback mapping if &#39;UNWANTED&#39; is not used but &#39;SUSPICIOUS&#39; is</span>
+    <span class="k">if</span> <span class="n">counts</span><span class="p">[</span><span class="s1">&#39;UNWANTED&#39;</span><span class="p">]</span> <span class="o">==</span> <span class="mi">0</span><span class="p">:</span>
+        <span class="n">suspicious</span> <span class="o">=</span> <span class="n">count_for</span><span class="p">(</span><span class="s1">&#39;SUSPICIOUS&#39;</span><span class="p">)</span>
+        <span class="k">if</span> <span class="n">suspicious</span><span class="p">:</span>
+            <span class="n">counts</span><span class="p">[</span><span class="s1">&#39;UNWANTED&#39;</span><span class="p">]</span> <span class="o">=</span> <span class="n">suspicious</span>
+
+    <span class="k">return</span> <span class="n">JsonResponse</span><span class="p">(</span><span class="n">counts</span><span class="p">)</span></div>
+
+
+<span class="c1"># New endpoint: PCA of all embeddings in ChromaDB</span>
+<div class="viewcode-block" id="dashboard_campaigns_pca">
+<a class="viewcode-back" href="../../modules/dashboard_core.html#dashboard.views.dashboard_campaigns_pca">[docs]</a>
+<span class="nd">@login_required</span>
+<span class="k">def</span><span class="w"> </span><span class="nf">dashboard_campaigns_pca</span><span class="p">(</span><span class="n">request</span><span class="p">:</span> <span class="n">HttpRequest</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="n">JsonResponse</span><span class="p">:</span>
+<span class="w">    </span><span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">    Compute 2D PCA on all ChromaDB embeddings and return scatter points.</span>
+
+<span class="sd">    Response format:</span>
+<span class="sd">    {</span>
+<span class="sd">    &quot;points&quot;: [ {&quot;x&quot;: float, &quot;y&quot;: float, &quot;label&quot;: str}, ... ],</span>
+<span class="sd">    &quot;explained_variance&quot;: [ pc1_ratio, pc2_ratio ]</span>
+<span class="sd">    }</span>
+<span class="sd">    Optional query param: ?limit=1500 to subsample points if needed.</span>
+
+<span class="sd">    &quot;&quot;&quot;</span>
+    <span class="c1"># Limit points for payload size</span>
+    <span class="k">try</span><span class="p">:</span>
+        <span class="n">limit</span> <span class="o">=</span> <span class="nb">int</span><span class="p">(</span><span class="n">request</span><span class="o">.</span><span class="n">GET</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="s2">&quot;limit&quot;</span><span class="p">,</span> <span class="s2">&quot;1500&quot;</span><span class="p">))</span>
+    <span class="k">except</span> <span class="ne">Exception</span><span class="p">:</span>
+        <span class="n">limit</span> <span class="o">=</span> <span class="mi">1500</span>
+
+    <span class="k">def</span><span class="w"> </span><span class="nf">_parse_source_refs</span><span class="p">(</span><span class="n">raw</span><span class="p">):</span>
+        <span class="k">if</span> <span class="n">raw</span> <span class="ow">is</span> <span class="kc">None</span><span class="p">:</span>
+            <span class="k">return</span> <span class="p">()</span>
+        <span class="n">iterable</span> <span class="o">=</span> <span class="kc">None</span>
+        <span class="k">if</span> <span class="nb">isinstance</span><span class="p">(</span><span class="n">raw</span><span class="p">,</span> <span class="p">(</span><span class="nb">list</span><span class="p">,</span> <span class="nb">tuple</span><span class="p">,</span> <span class="nb">set</span><span class="p">)):</span>
+            <span class="n">iterable</span> <span class="o">=</span> <span class="nb">list</span><span class="p">(</span><span class="n">raw</span><span class="p">)</span>
+        <span class="k">else</span><span class="p">:</span>
+            <span class="n">text</span> <span class="o">=</span> <span class="nb">str</span><span class="p">(</span><span class="n">raw</span><span class="p">)</span><span class="o">.</span><span class="n">strip</span><span class="p">()</span>
+            <span class="k">if</span> <span class="ow">not</span> <span class="n">text</span><span class="p">:</span>
+                <span class="k">return</span> <span class="p">()</span>
+            <span class="k">for</span> <span class="n">parser</span> <span class="ow">in</span> <span class="p">(</span><span class="n">json</span><span class="o">.</span><span class="n">loads</span><span class="p">,</span> <span class="n">ast</span><span class="o">.</span><span class="n">literal_eval</span><span class="p">):</span>
+                <span class="k">try</span><span class="p">:</span>
+                    <span class="n">parsed</span> <span class="o">=</span> <span class="n">parser</span><span class="p">(</span><span class="n">text</span><span class="p">)</span>
+                <span class="k">except</span> <span class="ne">Exception</span><span class="p">:</span>
+                    <span class="k">continue</span>
+                <span class="k">if</span> <span class="nb">isinstance</span><span class="p">(</span><span class="n">parsed</span><span class="p">,</span> <span class="p">(</span><span class="nb">list</span><span class="p">,</span> <span class="nb">tuple</span><span class="p">,</span> <span class="nb">set</span><span class="p">)):</span>
+                    <span class="n">iterable</span> <span class="o">=</span> <span class="nb">list</span><span class="p">(</span><span class="n">parsed</span><span class="p">)</span>
+                    <span class="k">break</span>
+                <span class="k">if</span> <span class="nb">isinstance</span><span class="p">(</span><span class="n">parsed</span><span class="p">,</span> <span class="nb">str</span><span class="p">):</span>
+                    <span class="n">iterable</span> <span class="o">=</span> <span class="p">[</span><span class="n">parsed</span><span class="p">]</span>
+                    <span class="k">break</span>
+            <span class="k">if</span> <span class="n">iterable</span> <span class="ow">is</span> <span class="kc">None</span><span class="p">:</span>
+                <span class="n">stripped</span> <span class="o">=</span> <span class="n">text</span><span class="o">.</span><span class="n">strip</span><span class="p">(</span><span class="s2">&quot;[]()</span><span class="si">{}</span><span class="s2">&quot;</span><span class="p">)</span>
+                <span class="k">if</span> <span class="ow">not</span> <span class="n">stripped</span><span class="p">:</span>
+                    <span class="k">return</span> <span class="p">()</span>
+                <span class="n">parts</span> <span class="o">=</span> <span class="p">[</span><span class="n">segment</span> <span class="k">for</span> <span class="n">segment</span> <span class="ow">in</span> <span class="n">re</span><span class="o">.</span><span class="n">split</span><span class="p">(</span><span class="sa">r</span><span class="s2">&quot;[;,]&quot;</span><span class="p">,</span> <span class="n">stripped</span><span class="p">)</span> <span class="k">if</span> <span class="n">segment</span><span class="p">]</span>
+                <span class="n">iterable</span> <span class="o">=</span> <span class="p">[</span><span class="n">seg</span><span class="o">.</span><span class="n">strip</span><span class="p">()</span><span class="o">.</span><span class="n">strip</span><span class="p">(</span><span class="s2">&quot;&#39;</span><span class="se">\&quot;</span><span class="s2">&quot;</span><span class="p">)</span> <span class="k">for</span> <span class="n">seg</span> <span class="ow">in</span> <span class="n">parts</span><span class="p">]</span>
+        <span class="k">if</span> <span class="n">iterable</span> <span class="ow">is</span> <span class="kc">None</span><span class="p">:</span>
+            <span class="k">return</span> <span class="p">()</span>
+        <span class="n">cleaned</span> <span class="o">=</span> <span class="p">[]</span>
+        <span class="k">for</span> <span class="n">item</span> <span class="ow">in</span> <span class="n">iterable</span><span class="p">:</span>
+            <span class="n">sval</span> <span class="o">=</span> <span class="nb">str</span><span class="p">(</span><span class="n">item</span><span class="p">)</span><span class="o">.</span><span class="n">strip</span><span class="p">()</span><span class="o">.</span><span class="n">strip</span><span class="p">(</span><span class="s2">&quot;&#39;</span><span class="se">\&quot;</span><span class="s2">&quot;</span><span class="p">)</span>
+            <span class="k">if</span> <span class="n">sval</span><span class="p">:</span>
+                <span class="n">cleaned</span><span class="o">.</span><span class="n">append</span><span class="p">(</span><span class="n">sval</span><span class="p">)</span>
+        <span class="k">if</span> <span class="ow">not</span> <span class="n">cleaned</span><span class="p">:</span>
+            <span class="k">return</span> <span class="p">()</span>
+        <span class="c1"># Preserve order but deduplicate</span>
+        <span class="n">seen</span> <span class="o">=</span> <span class="p">{}</span>
+        <span class="k">for</span> <span class="n">val</span> <span class="ow">in</span> <span class="n">cleaned</span><span class="p">:</span>
+            <span class="k">if</span> <span class="n">val</span> <span class="ow">not</span> <span class="ow">in</span> <span class="n">seen</span><span class="p">:</span>
+                <span class="n">seen</span><span class="p">[</span><span class="n">val</span><span class="p">]</span> <span class="o">=</span> <span class="kc">None</span>
+        <span class="k">return</span> <span class="nb">tuple</span><span class="p">(</span><span class="nb">sorted</span><span class="p">(</span><span class="n">seen</span><span class="o">.</span><span class="n">keys</span><span class="p">()))</span>
+
+    <span class="n">collection</span> <span class="o">=</span> <span class="n">_get_chroma_collection</span><span class="p">()</span>
+    <span class="k">if</span> <span class="n">collection</span> <span class="ow">is</span> <span class="kc">None</span><span class="p">:</span>
+        <span class="k">return</span> <span class="n">JsonResponse</span><span class="p">({</span><span class="s2">&quot;points&quot;</span><span class="p">:</span> <span class="p">[],</span> <span class="s2">&quot;explained_variance&quot;</span><span class="p">:</span> <span class="p">[</span><span class="mf">0.0</span><span class="p">,</span> <span class="mf">0.0</span><span class="p">]})</span>
+
+    <span class="k">try</span><span class="p">:</span>
+        <span class="c1"># Fetch embeddings and labels</span>
+        <span class="k">try</span><span class="p">:</span>
+            <span class="n">res</span> <span class="o">=</span> <span class="n">collection</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="n">include</span><span class="o">=</span><span class="p">[</span><span class="s2">&quot;embeddings&quot;</span><span class="p">,</span> <span class="s2">&quot;metadatas&quot;</span><span class="p">])</span>  <span class="c1"># type: ignore[arg-type]</span>
+        <span class="k">except</span> <span class="ne">Exception</span><span class="p">:</span>
+            <span class="n">res</span> <span class="o">=</span> <span class="n">collection</span><span class="o">.</span><span class="n">get</span><span class="p">()</span>
+
+        <span class="k">if</span> <span class="ow">not</span> <span class="nb">isinstance</span><span class="p">(</span><span class="n">res</span><span class="p">,</span> <span class="nb">dict</span><span class="p">):</span>
+            <span class="n">logger</span><span class="o">.</span><span class="n">warning</span><span class="p">(</span><span class="s2">&quot;Unexpected ChromaDB get() result type: </span><span class="si">%s</span><span class="s2">&quot;</span><span class="p">,</span> <span class="nb">type</span><span class="p">(</span><span class="n">res</span><span class="p">))</span>
+            <span class="k">return</span> <span class="n">JsonResponse</span><span class="p">({</span><span class="s2">&quot;points&quot;</span><span class="p">:</span> <span class="p">[],</span> <span class="s2">&quot;explained_variance&quot;</span><span class="p">:</span> <span class="p">[</span><span class="mf">0.0</span><span class="p">,</span> <span class="mf">0.0</span><span class="p">]})</span>
+
+        <span class="n">ids</span> <span class="o">=</span> <span class="n">res</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="s2">&quot;ids&quot;</span><span class="p">)</span> <span class="ow">or</span> <span class="p">[]</span>
+
+        <span class="k">def</span><span class="w"> </span><span class="nf">_ensure_list</span><span class="p">(</span><span class="n">obj</span><span class="p">):</span>
+            <span class="k">if</span> <span class="n">obj</span> <span class="ow">is</span> <span class="kc">None</span><span class="p">:</span>
+                <span class="k">return</span> <span class="p">[]</span>
+            <span class="k">if</span> <span class="nb">isinstance</span><span class="p">(</span><span class="n">obj</span><span class="p">,</span> <span class="nb">list</span><span class="p">):</span>
+                <span class="k">return</span> <span class="n">obj</span>
+            <span class="k">try</span><span class="p">:</span>
+                <span class="k">return</span> <span class="nb">list</span><span class="p">(</span><span class="n">obj</span><span class="p">)</span>
+            <span class="k">except</span> <span class="ne">TypeError</span><span class="p">:</span>
+                <span class="k">return</span> <span class="p">[</span><span class="n">obj</span><span class="p">]</span>
+
+        <span class="n">embeddings</span> <span class="o">=</span> <span class="n">_ensure_list</span><span class="p">(</span><span class="n">res</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="s2">&quot;embeddings&quot;</span><span class="p">))</span>
+        <span class="n">metadatas</span> <span class="o">=</span> <span class="n">_ensure_list</span><span class="p">(</span><span class="n">res</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="s2">&quot;metadatas&quot;</span><span class="p">))</span>
+
+        <span class="k">if</span> <span class="n">ids</span> <span class="ow">and</span> <span class="ow">not</span> <span class="n">embeddings</span><span class="p">:</span>
+            <span class="n">logger</span><span class="o">.</span><span class="n">warning</span><span class="p">(</span><span class="s2">&quot;PCA: initial get() returned </span><span class="si">%d</span><span class="s2"> ids but no embeddings. Attempting chunked refetch.&quot;</span><span class="p">,</span> <span class="nb">len</span><span class="p">(</span><span class="n">ids</span><span class="p">))</span>
+            <span class="n">chunk_size</span> <span class="o">=</span> <span class="mi">200</span>
+
+            <span class="k">def</span><span class="w"> </span><span class="nf">_fetch_chunk</span><span class="p">(</span><span class="n">id_slice</span><span class="p">,</span> <span class="n">depth</span><span class="o">=</span><span class="mi">0</span><span class="p">):</span>
+                <span class="k">if</span> <span class="ow">not</span> <span class="n">id_slice</span><span class="p">:</span>
+                    <span class="k">return</span> <span class="p">[],</span> <span class="p">[]</span>
+                <span class="k">try</span><span class="p">:</span>
+                    <span class="n">chunk_res</span> <span class="o">=</span> <span class="n">collection</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="n">ids</span><span class="o">=</span><span class="n">id_slice</span><span class="p">,</span> <span class="n">include</span><span class="o">=</span><span class="p">[</span><span class="s2">&quot;embeddings&quot;</span><span class="p">,</span> <span class="s2">&quot;metadatas&quot;</span><span class="p">])</span>  <span class="c1"># type: ignore[arg-type]</span>
+                <span class="k">except</span> <span class="ne">Exception</span> <span class="k">as</span> <span class="n">chunk_err</span><span class="p">:</span>
+                    <span class="k">if</span> <span class="nb">len</span><span class="p">(</span><span class="n">id_slice</span><span class="p">)</span> <span class="o">==</span> <span class="mi">1</span><span class="p">:</span>
+                        <span class="n">logger</span><span class="o">.</span><span class="n">error</span><span class="p">(</span><span class="s2">&quot;PCA: failed to fetch embedding for id </span><span class="si">%s</span><span class="s2">: </span><span class="si">%s</span><span class="s2">&quot;</span><span class="p">,</span> <span class="n">id_slice</span><span class="p">[</span><span class="mi">0</span><span class="p">],</span> <span class="n">chunk_err</span><span class="p">)</span>
+                        <span class="k">return</span> <span class="p">[],</span> <span class="p">[]</span>
+                    <span class="k">if</span> <span class="n">depth</span> <span class="o">&gt;</span> <span class="mi">10</span><span class="p">:</span>
+                        <span class="n">logger</span><span class="o">.</span><span class="n">error</span><span class="p">(</span><span class="s2">&quot;PCA: giving up fetching </span><span class="si">%d</span><span class="s2"> ids after deep recursion: </span><span class="si">%s</span><span class="s2">&quot;</span><span class="p">,</span> <span class="nb">len</span><span class="p">(</span><span class="n">id_slice</span><span class="p">),</span> <span class="n">chunk_err</span><span class="p">)</span>
+                        <span class="k">return</span> <span class="p">[],</span> <span class="p">[]</span>
+                    <span class="n">mid</span> <span class="o">=</span> <span class="nb">len</span><span class="p">(</span><span class="n">id_slice</span><span class="p">)</span> <span class="o">//</span> <span class="mi">2</span> <span class="ow">or</span> <span class="mi">1</span>
+                    <span class="n">left_emb</span><span class="p">,</span> <span class="n">left_meta</span> <span class="o">=</span> <span class="n">_fetch_chunk</span><span class="p">(</span><span class="n">id_slice</span><span class="p">[:</span><span class="n">mid</span><span class="p">],</span> <span class="n">depth</span> <span class="o">+</span> <span class="mi">1</span><span class="p">)</span>
+                    <span class="n">right_emb</span><span class="p">,</span> <span class="n">right_meta</span> <span class="o">=</span> <span class="n">_fetch_chunk</span><span class="p">(</span><span class="n">id_slice</span><span class="p">[</span><span class="n">mid</span><span class="p">:],</span> <span class="n">depth</span> <span class="o">+</span> <span class="mi">1</span><span class="p">)</span>
+                    <span class="k">return</span> <span class="n">left_emb</span> <span class="o">+</span> <span class="n">right_emb</span><span class="p">,</span> <span class="n">left_meta</span> <span class="o">+</span> <span class="n">right_meta</span>
+                <span class="n">chunk_embeddings</span> <span class="o">=</span> <span class="n">_ensure_list</span><span class="p">(</span><span class="n">chunk_res</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="s2">&quot;embeddings&quot;</span><span class="p">))</span>
+                <span class="n">chunk_metadatas</span> <span class="o">=</span> <span class="n">_ensure_list</span><span class="p">(</span><span class="n">chunk_res</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="s2">&quot;metadatas&quot;</span><span class="p">))</span>
+                <span class="k">return</span> <span class="n">chunk_embeddings</span><span class="p">,</span> <span class="n">chunk_metadatas</span>
+
+            <span class="n">embeddings_chunks</span> <span class="o">=</span> <span class="p">[]</span>
+            <span class="n">metadatas_chunks</span> <span class="o">=</span> <span class="p">[]</span>
+            <span class="k">for</span> <span class="n">start</span> <span class="ow">in</span> <span class="nb">range</span><span class="p">(</span><span class="mi">0</span><span class="p">,</span> <span class="nb">len</span><span class="p">(</span><span class="n">ids</span><span class="p">),</span> <span class="n">chunk_size</span><span class="p">):</span>
+                <span class="n">chunk_ids</span> <span class="o">=</span> <span class="n">ids</span><span class="p">[</span><span class="n">start</span><span class="p">:</span><span class="n">start</span> <span class="o">+</span> <span class="n">chunk_size</span><span class="p">]</span>
+                <span class="n">chunk_embeddings</span><span class="p">,</span> <span class="n">chunk_metadatas</span> <span class="o">=</span> <span class="n">_fetch_chunk</span><span class="p">(</span><span class="n">chunk_ids</span><span class="p">)</span>
+                <span class="k">if</span> <span class="n">chunk_embeddings</span><span class="p">:</span>
+                    <span class="n">embeddings_chunks</span><span class="o">.</span><span class="n">extend</span><span class="p">(</span><span class="n">chunk_embeddings</span><span class="p">)</span>
+                    <span class="n">metadatas_chunks</span><span class="o">.</span><span class="n">extend</span><span class="p">(</span><span class="n">chunk_metadatas</span><span class="p">)</span>
+            <span class="k">if</span> <span class="n">embeddings_chunks</span><span class="p">:</span>
+                <span class="n">embeddings</span> <span class="o">=</span> <span class="n">embeddings_chunks</span>
+                <span class="n">metadatas</span> <span class="o">=</span> <span class="n">metadatas_chunks</span>
+            <span class="k">else</span><span class="p">:</span>
+                <span class="n">logger</span><span class="o">.</span><span class="n">warning</span><span class="p">(</span><span class="s2">&quot;PCA: chunked refetch still yielded zero embeddings (ids=</span><span class="si">%d</span><span class="s2">)&quot;</span><span class="p">,</span> <span class="nb">len</span><span class="p">(</span><span class="n">ids</span><span class="p">))</span>
+
+        <span class="k">if</span> <span class="nb">len</span><span class="p">(</span><span class="n">metadatas</span><span class="p">)</span> <span class="o">&lt;</span> <span class="nb">len</span><span class="p">(</span><span class="n">embeddings</span><span class="p">):</span>
+            <span class="n">metadatas</span> <span class="o">=</span> <span class="n">metadatas</span> <span class="o">+</span> <span class="p">[</span><span class="kc">None</span><span class="p">]</span> <span class="o">*</span> <span class="p">(</span><span class="nb">len</span><span class="p">(</span><span class="n">embeddings</span><span class="p">)</span> <span class="o">-</span> <span class="nb">len</span><span class="p">(</span><span class="n">metadatas</span><span class="p">))</span>
+
+        <span class="n">dim_buckets</span> <span class="o">=</span> <span class="p">{}</span>
+        <span class="n">total_embeddings</span> <span class="o">=</span> <span class="mi">0</span>
+        <span class="n">skipped_non_finite</span> <span class="o">=</span> <span class="mi">0</span>
+        <span class="n">skipped_errors</span> <span class="o">=</span> <span class="mi">0</span>
+        <span class="c1"># Some APIs may return numpy arrays; iterate safely</span>
+        <span class="k">try</span><span class="p">:</span>
+            <span class="n">emb_iter</span> <span class="o">=</span> <span class="nb">list</span><span class="p">(</span><span class="n">embeddings</span><span class="p">)</span>
+        <span class="k">except</span> <span class="ne">Exception</span><span class="p">:</span>
+            <span class="n">emb_iter</span> <span class="o">=</span> <span class="p">[]</span>
+        <span class="k">for</span> <span class="n">i</span><span class="p">,</span> <span class="n">emb</span> <span class="ow">in</span> <span class="nb">enumerate</span><span class="p">(</span><span class="n">emb_iter</span><span class="p">):</span>
+            <span class="k">try</span><span class="p">:</span>
+                <span class="n">vec</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">asarray</span><span class="p">(</span><span class="n">emb</span><span class="p">,</span> <span class="n">dtype</span><span class="o">=</span><span class="n">np</span><span class="o">.</span><span class="n">float32</span><span class="p">)</span><span class="o">.</span><span class="n">reshape</span><span class="p">(</span><span class="o">-</span><span class="mi">1</span><span class="p">)</span>
+                <span class="k">if</span> <span class="n">vec</span><span class="o">.</span><span class="n">size</span> <span class="o">==</span> <span class="mi">0</span><span class="p">:</span>
+                    <span class="k">continue</span>
+                <span class="n">total_embeddings</span> <span class="o">+=</span> <span class="mi">1</span>
+                <span class="k">if</span> <span class="ow">not</span> <span class="n">np</span><span class="o">.</span><span class="n">all</span><span class="p">(</span><span class="n">np</span><span class="o">.</span><span class="n">isfinite</span><span class="p">(</span><span class="n">vec</span><span class="p">)):</span>
+                    <span class="n">skipped_non_finite</span> <span class="o">+=</span> <span class="mi">1</span>
+                    <span class="k">continue</span>
+                <span class="n">meta</span> <span class="o">=</span> <span class="p">{}</span>
+                <span class="k">if</span> <span class="n">i</span> <span class="o">&lt;</span> <span class="nb">len</span><span class="p">(</span><span class="n">metadatas</span><span class="p">)</span> <span class="ow">and</span> <span class="n">metadatas</span> <span class="ow">is</span> <span class="ow">not</span> <span class="kc">None</span><span class="p">:</span>
+                    <span class="k">try</span><span class="p">:</span>
+                        <span class="n">meta</span> <span class="o">=</span> <span class="n">metadatas</span><span class="p">[</span><span class="n">i</span><span class="p">]</span> <span class="ow">or</span> <span class="p">{}</span>
+                    <span class="k">except</span> <span class="ne">Exception</span><span class="p">:</span>
+                        <span class="n">meta</span> <span class="o">=</span> <span class="p">{}</span>
+                <span class="n">label</span> <span class="o">=</span> <span class="nb">str</span><span class="p">((</span><span class="n">meta</span> <span class="ow">or</span> <span class="p">{})</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="s2">&quot;classification&quot;</span><span class="p">,</span> <span class="s2">&quot;UNKNOWN&quot;</span><span class="p">))</span>
+                <span class="n">dim</span> <span class="o">=</span> <span class="nb">int</span><span class="p">(</span><span class="n">vec</span><span class="o">.</span><span class="n">size</span><span class="p">)</span>
+                <span class="n">bucket</span> <span class="o">=</span> <span class="n">dim_buckets</span><span class="o">.</span><span class="n">setdefault</span><span class="p">(</span><span class="n">dim</span><span class="p">,</span> <span class="p">[])</span>
+                <span class="n">bucket</span><span class="o">.</span><span class="n">append</span><span class="p">((</span><span class="n">vec</span><span class="p">,</span> <span class="n">label</span><span class="p">,</span> <span class="n">meta</span><span class="p">))</span>
+            <span class="k">except</span> <span class="ne">Exception</span><span class="p">:</span>
+                <span class="n">skipped_errors</span> <span class="o">+=</span> <span class="mi">1</span>
+                <span class="k">continue</span>
+
+        <span class="k">if</span> <span class="ow">not</span> <span class="n">dim_buckets</span><span class="p">:</span>
+            <span class="k">if</span> <span class="n">total_embeddings</span> <span class="o">&gt;</span> <span class="mi">0</span><span class="p">:</span>
+                <span class="n">logger</span><span class="o">.</span><span class="n">warning</span><span class="p">(</span><span class="s2">&quot;PCA: all </span><span class="si">%d</span><span class="s2"> embeddings were filtered out&quot;</span><span class="p">,</span> <span class="n">total_embeddings</span><span class="p">)</span>
+            <span class="k">return</span> <span class="n">JsonResponse</span><span class="p">({</span><span class="s2">&quot;points&quot;</span><span class="p">:</span> <span class="p">[],</span> <span class="s2">&quot;explained_variance&quot;</span><span class="p">:</span> <span class="p">[</span><span class="mf">0.0</span><span class="p">,</span> <span class="mf">0.0</span><span class="p">]})</span>
+
+        <span class="c1"># Choose the dimension with the most vectors; tie-breaker prefers larger dimension</span>
+        <span class="n">chosen_dim</span> <span class="o">=</span> <span class="nb">max</span><span class="p">(</span><span class="n">dim_buckets</span><span class="o">.</span><span class="n">keys</span><span class="p">(),</span> <span class="n">key</span><span class="o">=</span><span class="k">lambda</span> <span class="n">d</span><span class="p">:</span> <span class="p">(</span><span class="nb">len</span><span class="p">(</span><span class="n">dim_buckets</span><span class="p">[</span><span class="n">d</span><span class="p">]),</span> <span class="n">d</span><span class="p">))</span>
+        <span class="k">if</span> <span class="nb">len</span><span class="p">(</span><span class="n">dim_buckets</span><span class="p">)</span> <span class="o">&gt;</span> <span class="mi">1</span><span class="p">:</span>
+            <span class="n">skipped</span> <span class="o">=</span> <span class="nb">sum</span><span class="p">(</span><span class="nb">len</span><span class="p">(</span><span class="n">v</span><span class="p">)</span> <span class="k">for</span> <span class="n">dim</span><span class="p">,</span> <span class="n">v</span> <span class="ow">in</span> <span class="n">dim_buckets</span><span class="o">.</span><span class="n">items</span><span class="p">()</span> <span class="k">if</span> <span class="n">dim</span> <span class="o">!=</span> <span class="n">chosen_dim</span><span class="p">)</span>
+            <span class="k">if</span> <span class="n">skipped</span><span class="p">:</span>
+                <span class="n">logger</span><span class="o">.</span><span class="n">info</span><span class="p">(</span>
+                    <span class="s2">&quot;PCA: selected dimension </span><span class="si">%d</span><span class="s2"> with </span><span class="si">%d</span><span class="s2"> vectors; skipped </span><span class="si">%d</span><span class="s2"> vectors from other dimensions&quot;</span><span class="p">,</span>
+                    <span class="n">chosen_dim</span><span class="p">,</span>
+                    <span class="nb">len</span><span class="p">(</span><span class="n">dim_buckets</span><span class="p">[</span><span class="n">chosen_dim</span><span class="p">]),</span>
+                    <span class="n">skipped</span><span class="p">,</span>
+                <span class="p">)</span>
+        <span class="k">if</span> <span class="n">skipped_non_finite</span><span class="p">:</span>
+            <span class="n">logger</span><span class="o">.</span><span class="n">warning</span><span class="p">(</span><span class="s2">&quot;PCA: skipped </span><span class="si">%d</span><span class="s2"> embeddings with non-finite values&quot;</span><span class="p">,</span> <span class="n">skipped_non_finite</span><span class="p">)</span>
+        <span class="k">if</span> <span class="n">skipped_errors</span><span class="p">:</span>
+            <span class="n">logger</span><span class="o">.</span><span class="n">warning</span><span class="p">(</span><span class="s2">&quot;PCA: failed to process </span><span class="si">%d</span><span class="s2"> embeddings due to errors&quot;</span><span class="p">,</span> <span class="n">skipped_errors</span><span class="p">)</span>
+
+        <span class="n">selected</span> <span class="o">=</span> <span class="n">dim_buckets</span><span class="p">[</span><span class="n">chosen_dim</span><span class="p">]</span>
+        <span class="n">X</span> <span class="o">=</span> <span class="p">[</span><span class="n">entry</span><span class="p">[</span><span class="mi">0</span><span class="p">]</span> <span class="k">for</span> <span class="n">entry</span> <span class="ow">in</span> <span class="n">selected</span><span class="p">]</span>
+        <span class="n">labels</span> <span class="o">=</span> <span class="p">[</span><span class="n">entry</span><span class="p">[</span><span class="mi">1</span><span class="p">]</span> <span class="k">for</span> <span class="n">entry</span> <span class="ow">in</span> <span class="n">selected</span><span class="p">]</span>
+        <span class="n">metas</span> <span class="o">=</span> <span class="p">[</span><span class="n">entry</span><span class="p">[</span><span class="mi">2</span><span class="p">]</span> <span class="k">for</span> <span class="n">entry</span> <span class="ow">in</span> <span class="n">selected</span><span class="p">]</span>
+
+        <span class="k">def</span><span class="w"> </span><span class="nf">_extract_case_id</span><span class="p">(</span><span class="n">meta_obj</span><span class="p">):</span>
+            <span class="k">if</span> <span class="ow">not</span> <span class="nb">isinstance</span><span class="p">(</span><span class="n">meta_obj</span><span class="p">,</span> <span class="nb">dict</span><span class="p">):</span>
+                <span class="k">return</span> <span class="kc">None</span>
+            <span class="n">raw</span> <span class="o">=</span> <span class="n">meta_obj</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="s2">&quot;suspicious_case_id&quot;</span><span class="p">)</span>
+            <span class="k">if</span> <span class="n">raw</span> <span class="ow">is</span> <span class="kc">None</span><span class="p">:</span>
+                <span class="n">raw</span> <span class="o">=</span> <span class="n">meta_obj</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="s2">&quot;case_id&quot;</span><span class="p">)</span>
+            <span class="k">if</span> <span class="n">raw</span> <span class="ow">is</span> <span class="kc">None</span><span class="p">:</span>
+                <span class="k">return</span> <span class="kc">None</span>
+            <span class="k">if</span> <span class="nb">isinstance</span><span class="p">(</span><span class="n">raw</span><span class="p">,</span> <span class="p">(</span><span class="nb">list</span><span class="p">,</span> <span class="nb">tuple</span><span class="p">)):</span>
+                <span class="n">raw</span> <span class="o">=</span> <span class="n">raw</span><span class="p">[</span><span class="mi">0</span><span class="p">]</span> <span class="k">if</span> <span class="n">raw</span> <span class="k">else</span> <span class="kc">None</span>
+            <span class="k">if</span> <span class="n">raw</span> <span class="ow">is</span> <span class="kc">None</span><span class="p">:</span>
+                <span class="k">return</span> <span class="kc">None</span>
+            <span class="k">try</span><span class="p">:</span>
+                <span class="c1"># Normalize to simple string without whitespace</span>
+                <span class="n">text</span> <span class="o">=</span> <span class="nb">str</span><span class="p">(</span><span class="n">raw</span><span class="p">)</span><span class="o">.</span><span class="n">strip</span><span class="p">()</span>
+            <span class="k">except</span> <span class="ne">Exception</span><span class="p">:</span>
+                <span class="k">return</span> <span class="kc">None</span>
+            <span class="k">return</span> <span class="n">text</span> <span class="ow">or</span> <span class="kc">None</span>
+
+        <span class="n">n</span> <span class="o">=</span> <span class="nb">len</span><span class="p">(</span><span class="n">X</span><span class="p">)</span>
+        <span class="k">if</span> <span class="n">n</span> <span class="o">==</span> <span class="mi">0</span><span class="p">:</span>
+            <span class="k">return</span> <span class="n">JsonResponse</span><span class="p">({</span><span class="s2">&quot;points&quot;</span><span class="p">:</span> <span class="p">[],</span> <span class="s2">&quot;explained_variance&quot;</span><span class="p">:</span> <span class="p">[</span><span class="mf">0.0</span><span class="p">,</span> <span class="mf">0.0</span><span class="p">]})</span>
+
+        <span class="k">if</span> <span class="n">n</span> <span class="o">==</span> <span class="mi">1</span><span class="p">:</span>
+            <span class="n">single_meta</span> <span class="o">=</span> <span class="n">metas</span><span class="p">[</span><span class="mi">0</span><span class="p">]</span> <span class="k">if</span> <span class="n">metas</span> <span class="k">else</span> <span class="p">{}</span>
+            <span class="n">single_label</span> <span class="o">=</span> <span class="n">labels</span><span class="p">[</span><span class="mi">0</span><span class="p">]</span> <span class="k">if</span> <span class="n">labels</span> <span class="k">else</span> <span class="s2">&quot;UNKNOWN&quot;</span>
+            <span class="n">single_point</span> <span class="o">=</span> <span class="p">{</span>
+                <span class="s2">&quot;x&quot;</span><span class="p">:</span> <span class="mf">0.0</span><span class="p">,</span>
+                <span class="s2">&quot;y&quot;</span><span class="p">:</span> <span class="mf">0.0</span><span class="p">,</span>
+                <span class="s2">&quot;label&quot;</span><span class="p">:</span> <span class="nb">str</span><span class="p">(</span><span class="n">single_label</span> <span class="ow">or</span> <span class="s2">&quot;UNKNOWN&quot;</span><span class="p">),</span>
+                <span class="s2">&quot;suspicious_case_id&quot;</span><span class="p">:</span> <span class="n">_extract_case_id</span><span class="p">(</span><span class="n">single_meta</span><span class="p">),</span>
+                <span class="s2">&quot;sourceRefs&quot;</span><span class="p">:</span> <span class="nb">list</span><span class="p">(</span><span class="n">_parse_source_refs</span><span class="p">((</span><span class="n">single_meta</span> <span class="ow">or</span> <span class="p">{})</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="s2">&quot;sourceRefs&quot;</span><span class="p">)))</span> <span class="k">if</span> <span class="n">single_meta</span> <span class="k">else</span> <span class="p">[],</span>
+            <span class="p">}</span>
+            <span class="k">return</span> <span class="n">JsonResponse</span><span class="p">({</span><span class="s2">&quot;points&quot;</span><span class="p">:</span> <span class="p">[</span><span class="n">single_point</span><span class="p">],</span> <span class="s2">&quot;explained_variance&quot;</span><span class="p">:</span> <span class="p">[</span><span class="mf">0.0</span><span class="p">,</span> <span class="mf">0.0</span><span class="p">]})</span>
+
+        <span class="n">X</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">stack</span><span class="p">(</span><span class="n">X</span><span class="p">,</span> <span class="n">axis</span><span class="o">=</span><span class="mi">0</span><span class="p">)</span>
+        <span class="c1"># Subsample if exceeding limit</span>
+        <span class="k">if</span> <span class="n">n</span> <span class="o">&gt;</span> <span class="n">limit</span> <span class="o">&gt;</span> <span class="mi">0</span><span class="p">:</span>
+            <span class="n">idx</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">random</span><span class="o">.</span><span class="n">default_rng</span><span class="p">(</span><span class="n">seed</span><span class="o">=</span><span class="mi">42</span><span class="p">)</span><span class="o">.</span><span class="n">choice</span><span class="p">(</span><span class="n">n</span><span class="p">,</span> <span class="n">size</span><span class="o">=</span><span class="n">limit</span><span class="p">,</span> <span class="n">replace</span><span class="o">=</span><span class="kc">False</span><span class="p">)</span>
+            <span class="n">X</span> <span class="o">=</span> <span class="n">X</span><span class="p">[</span><span class="n">idx</span><span class="p">]</span>
+            <span class="n">labels</span> <span class="o">=</span> <span class="p">[</span><span class="n">labels</span><span class="p">[</span><span class="nb">int</span><span class="p">(</span><span class="n">i</span><span class="p">)]</span> <span class="k">for</span> <span class="n">i</span> <span class="ow">in</span> <span class="n">idx</span><span class="p">]</span>
+            <span class="n">metas</span> <span class="o">=</span> <span class="p">[</span><span class="n">metas</span><span class="p">[</span><span class="nb">int</span><span class="p">(</span><span class="n">i</span><span class="p">)]</span> <span class="k">for</span> <span class="n">i</span> <span class="ow">in</span> <span class="n">idx</span><span class="p">]</span>
+            <span class="n">n</span> <span class="o">=</span> <span class="n">X</span><span class="o">.</span><span class="n">shape</span><span class="p">[</span><span class="mi">0</span><span class="p">]</span>
+
+        <span class="c1"># Center data</span>
+        <span class="n">Xc</span> <span class="o">=</span> <span class="n">X</span> <span class="o">-</span> <span class="n">X</span><span class="o">.</span><span class="n">mean</span><span class="p">(</span><span class="n">axis</span><span class="o">=</span><span class="mi">0</span><span class="p">,</span> <span class="n">keepdims</span><span class="o">=</span><span class="kc">True</span><span class="p">)</span>
+        <span class="c1"># SVD-based PCA</span>
+        <span class="k">try</span><span class="p">:</span>
+            <span class="n">U</span><span class="p">,</span> <span class="n">S</span><span class="p">,</span> <span class="n">Vt</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">linalg</span><span class="o">.</span><span class="n">svd</span><span class="p">(</span><span class="n">Xc</span><span class="p">,</span> <span class="n">full_matrices</span><span class="o">=</span><span class="kc">False</span><span class="p">)</span>
+        <span class="k">except</span> <span class="ne">Exception</span> <span class="k">as</span> <span class="n">e</span><span class="p">:</span>
+            <span class="n">logger</span><span class="o">.</span><span class="n">error</span><span class="p">(</span><span class="s2">&quot;SVD failed for PCA: </span><span class="si">%s</span><span class="s2">&quot;</span><span class="p">,</span> <span class="n">e</span><span class="p">,</span> <span class="n">exc_info</span><span class="o">=</span><span class="kc">True</span><span class="p">)</span>
+            <span class="k">return</span> <span class="n">JsonResponse</span><span class="p">({</span><span class="s2">&quot;points&quot;</span><span class="p">:</span> <span class="p">[],</span> <span class="s2">&quot;explained_variance&quot;</span><span class="p">:</span> <span class="p">[</span><span class="mf">0.0</span><span class="p">,</span> <span class="mf">0.0</span><span class="p">]})</span>
+
+        <span class="c1"># Project onto first two principal components</span>
+        <span class="n">comps</span> <span class="o">=</span> <span class="n">Vt</span><span class="p">[:</span><span class="mi">2</span><span class="p">]</span>  <span class="c1"># (2, d)</span>
+        <span class="n">scores</span> <span class="o">=</span> <span class="n">Xc</span> <span class="o">@</span> <span class="n">comps</span><span class="o">.</span><span class="n">T</span>  <span class="c1"># (n, 2)</span>
+
+        <span class="c1"># Explained variance ratio for first two components</span>
+        <span class="n">ev</span> <span class="o">=</span> <span class="p">(</span><span class="n">S</span> <span class="o">**</span> <span class="mi">2</span><span class="p">)</span>
+        <span class="n">denom</span> <span class="o">=</span> <span class="nb">float</span><span class="p">(</span><span class="n">ev</span><span class="o">.</span><span class="n">sum</span><span class="p">())</span> <span class="k">if</span> <span class="n">ev</span><span class="o">.</span><span class="n">size</span> <span class="k">else</span> <span class="mf">0.0</span>
+        <span class="k">if</span> <span class="n">denom</span> <span class="o">&lt;=</span> <span class="mf">0.0</span><span class="p">:</span>
+            <span class="n">ratios</span> <span class="o">=</span> <span class="p">[</span><span class="mf">0.0</span><span class="p">,</span> <span class="mf">0.0</span><span class="p">]</span>
+        <span class="k">else</span><span class="p">:</span>
+            <span class="n">ratios</span> <span class="o">=</span> <span class="p">[</span><span class="nb">float</span><span class="p">(</span><span class="n">ev</span><span class="p">[</span><span class="mi">0</span><span class="p">]</span> <span class="o">/</span> <span class="n">denom</span><span class="p">),</span> <span class="nb">float</span><span class="p">(</span><span class="n">ev</span><span class="p">[</span><span class="mi">1</span><span class="p">]</span> <span class="o">/</span> <span class="n">denom</span><span class="p">)</span> <span class="k">if</span> <span class="n">ev</span><span class="o">.</span><span class="n">size</span> <span class="o">&gt;</span> <span class="mi">1</span> <span class="k">else</span> <span class="mf">0.0</span><span class="p">]</span>
+
+        <span class="n">points</span> <span class="o">=</span> <span class="p">[</span>
+            <span class="p">{</span>
+                <span class="s2">&quot;x&quot;</span><span class="p">:</span> <span class="nb">float</span><span class="p">(</span><span class="n">scores</span><span class="p">[</span><span class="n">i</span><span class="p">,</span> <span class="mi">0</span><span class="p">]),</span>
+                <span class="s2">&quot;y&quot;</span><span class="p">:</span> <span class="nb">float</span><span class="p">(</span><span class="n">scores</span><span class="p">[</span><span class="n">i</span><span class="p">,</span> <span class="mi">1</span><span class="p">]),</span>
+                <span class="s2">&quot;label&quot;</span><span class="p">:</span> <span class="nb">str</span><span class="p">(</span><span class="n">labels</span><span class="p">[</span><span class="n">i</span><span class="p">]</span> <span class="ow">or</span> <span class="s2">&quot;UNKNOWN&quot;</span><span class="p">),</span>
+                <span class="s2">&quot;suspicious_case_id&quot;</span><span class="p">:</span> <span class="n">_extract_case_id</span><span class="p">(</span><span class="n">metas</span><span class="p">[</span><span class="n">i</span><span class="p">]</span> <span class="k">if</span> <span class="n">i</span> <span class="o">&lt;</span> <span class="nb">len</span><span class="p">(</span><span class="n">metas</span><span class="p">)</span> <span class="k">else</span> <span class="kc">None</span><span class="p">),</span>
+                <span class="s2">&quot;sourceRefs&quot;</span><span class="p">:</span> <span class="nb">list</span><span class="p">(</span><span class="n">_parse_source_refs</span><span class="p">((</span><span class="n">metas</span><span class="p">[</span><span class="n">i</span><span class="p">]</span> <span class="ow">or</span> <span class="p">{})</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="s2">&quot;sourceRefs&quot;</span><span class="p">)))</span> <span class="k">if</span> <span class="n">i</span> <span class="o">&lt;</span> <span class="nb">len</span><span class="p">(</span><span class="n">metas</span><span class="p">)</span> <span class="k">else</span> <span class="p">[],</span>
+            <span class="p">}</span>
+            <span class="k">for</span> <span class="n">i</span> <span class="ow">in</span> <span class="nb">range</span><span class="p">(</span><span class="n">n</span><span class="p">)</span>
+        <span class="p">]</span>
+        <span class="k">return</span> <span class="n">JsonResponse</span><span class="p">({</span><span class="s2">&quot;points&quot;</span><span class="p">:</span> <span class="n">points</span><span class="p">,</span> <span class="s2">&quot;explained_variance&quot;</span><span class="p">:</span> <span class="n">ratios</span><span class="p">})</span>
+
+    <span class="k">except</span> <span class="ne">Exception</span> <span class="k">as</span> <span class="n">e</span><span class="p">:</span>
+        <span class="n">logger</span><span class="o">.</span><span class="n">error</span><span class="p">(</span><span class="s2">&quot;Error computing PCA points: </span><span class="si">%s</span><span class="s2">&quot;</span><span class="p">,</span> <span class="n">e</span><span class="p">,</span> <span class="n">exc_info</span><span class="o">=</span><span class="kc">True</span><span class="p">)</span>
+        <span class="k">return</span> <span class="n">JsonResponse</span><span class="p">({</span><span class="s2">&quot;points&quot;</span><span class="p">:</span> <span class="p">[],</span> <span class="s2">&quot;explained_variance&quot;</span><span class="p">:</span> <span class="p">[</span><span class="mf">0.0</span><span class="p">,</span> <span class="mf">0.0</span><span class="p">]})</span></div>
+
+
+
+<span class="c1"># Helper for KPI input parsing</span>
+
+<span class="k">def</span><span class="w"> </span><span class="nf">_coerce_int</span><span class="p">(</span><span class="n">value</span><span class="p">,</span> <span class="n">default_val</span><span class="p">:</span> <span class="nb">int</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="nb">int</span><span class="p">:</span>
+<span class="w">    </span><span class="sd">&quot;&quot;&quot;Convert various request values (str/list/tuple/int) to int with fallback.&quot;&quot;&quot;</span>
+    <span class="k">try</span><span class="p">:</span>
+        <span class="n">v</span> <span class="o">=</span> <span class="n">value</span>
+        <span class="k">if</span> <span class="nb">isinstance</span><span class="p">(</span><span class="n">v</span><span class="p">,</span> <span class="p">(</span><span class="nb">list</span><span class="p">,</span> <span class="nb">tuple</span><span class="p">)):</span>
+            <span class="n">v</span> <span class="o">=</span> <span class="n">v</span><span class="p">[</span><span class="mi">0</span><span class="p">]</span> <span class="k">if</span> <span class="n">v</span> <span class="k">else</span> <span class="n">default_val</span>
+        <span class="k">return</span> <span class="nb">int</span><span class="p">(</span><span class="n">v</span><span class="p">)</span>
+    <span class="k">except</span> <span class="ne">Exception</span><span class="p">:</span>
+        <span class="k">return</span> <span class="n">default_val</span>
+
+
+<div class="viewcode-block" id="create_new_kpi">
+<a class="viewcode-back" href="../../modules/dashboard_core.html#dashboard.views.create_new_kpi">[docs]</a>
+<span class="nd">@login_required</span>
+<span class="k">def</span><span class="w"> </span><span class="nf">create_new_kpi</span><span class="p">(</span><span class="n">request</span><span class="p">:</span> <span class="n">HttpRequest</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="n">JsonResponse</span><span class="p">:</span>
+<span class="w">    </span><span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">    Create a new Kpi object using data from the request.</span>
+<span class="sd">    Expects POST requests with KPI data (JSON or form data) and returns the new Kpi details.</span>
+<span class="sd">    &quot;&quot;&quot;</span>
+    <span class="k">if</span> <span class="n">request</span><span class="o">.</span><span class="n">method</span> <span class="o">!=</span> <span class="s1">&#39;POST&#39;</span><span class="p">:</span>
+        <span class="n">logger</span><span class="o">.</span><span class="n">warning</span><span class="p">(</span><span class="s2">&quot;Method </span><span class="si">%s</span><span class="s2"> not allowed on create_new_kpi by user </span><span class="si">%s</span><span class="s2">&quot;</span><span class="p">,</span> <span class="n">request</span><span class="o">.</span><span class="n">method</span><span class="p">,</span> <span class="n">request</span><span class="o">.</span><span class="n">user</span><span class="p">)</span>
+        <span class="k">return</span> <span class="n">JsonResponse</span><span class="p">({</span><span class="s1">&#39;success&#39;</span><span class="p">:</span> <span class="kc">False</span><span class="p">,</span> <span class="s1">&#39;message&#39;</span><span class="p">:</span> <span class="s1">&#39;Method not allowed&#39;</span><span class="p">},</span> <span class="n">status</span><span class="o">=</span><span class="mi">405</span><span class="p">)</span>
+
+    <span class="k">try</span><span class="p">:</span>
+        <span class="n">data</span> <span class="o">=</span> <span class="n">json</span><span class="o">.</span><span class="n">loads</span><span class="p">(</span><span class="n">request</span><span class="o">.</span><span class="n">body</span><span class="o">.</span><span class="n">decode</span><span class="p">(</span><span class="s1">&#39;utf-8&#39;</span><span class="p">))</span> <span class="k">if</span> <span class="n">request</span><span class="o">.</span><span class="n">body</span> <span class="k">else</span> <span class="n">request</span><span class="o">.</span><span class="n">POST</span><span class="o">.</span><span class="n">dict</span><span class="p">()</span>
+    <span class="k">except</span> <span class="ne">ValueError</span> <span class="k">as</span> <span class="n">e</span><span class="p">:</span>
+        <span class="n">logger</span><span class="o">.</span><span class="n">error</span><span class="p">(</span><span class="s2">&quot;Invalid JSON data in create_new_kpi: </span><span class="si">%s</span><span class="s2">&quot;</span><span class="p">,</span> <span class="n">e</span><span class="p">,</span> <span class="n">exc_info</span><span class="o">=</span><span class="kc">True</span><span class="p">)</span>
+        <span class="k">return</span> <span class="n">JsonResponse</span><span class="p">({</span><span class="s1">&#39;success&#39;</span><span class="p">:</span> <span class="kc">False</span><span class="p">,</span> <span class="s1">&#39;message&#39;</span><span class="p">:</span> <span class="s1">&#39;Invalid JSON data&#39;</span><span class="p">},</span> <span class="n">status</span><span class="o">=</span><span class="mi">400</span><span class="p">)</span>
+
+    <span class="c1"># Parse month/year safely</span>
+    <span class="n">month_int</span> <span class="o">=</span> <span class="n">_coerce_int</span><span class="p">(</span><span class="n">data</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="s1">&#39;month&#39;</span><span class="p">,</span> <span class="n">date</span><span class="o">.</span><span class="n">today</span><span class="p">()</span><span class="o">.</span><span class="n">month</span><span class="p">),</span> <span class="n">date</span><span class="o">.</span><span class="n">today</span><span class="p">()</span><span class="o">.</span><span class="n">month</span><span class="p">)</span>
+    <span class="n">year_int</span> <span class="o">=</span> <span class="n">_coerce_int</span><span class="p">(</span><span class="n">data</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="s1">&#39;year&#39;</span><span class="p">,</span> <span class="n">date</span><span class="o">.</span><span class="n">today</span><span class="p">()</span><span class="o">.</span><span class="n">year</span><span class="p">),</span> <span class="n">date</span><span class="o">.</span><span class="n">today</span><span class="p">()</span><span class="o">.</span><span class="n">year</span><span class="p">)</span>
+
+    <span class="c1"># Create KPI record with normalized fields</span>
+    <span class="n">kpi</span> <span class="o">=</span> <span class="n">Kpi</span><span class="o">.</span><span class="n">objects</span><span class="o">.</span><span class="n">create</span><span class="p">(</span><span class="n">month</span><span class="o">=</span><span class="sa">f</span><span class="s2">&quot;</span><span class="si">{</span><span class="n">month_int</span><span class="si">:</span><span class="s2">02d</span><span class="si">}</span><span class="s2">&quot;</span><span class="p">,</span> <span class="n">year</span><span class="o">=</span><span class="nb">str</span><span class="p">(</span><span class="n">year_int</span><span class="p">))</span>
+
+    <span class="c1"># Delegate related objects creation/updating to dashboard utils</span>
+    <span class="k">try</span><span class="p">:</span>
+        <span class="n">update_all_kpi_stats</span><span class="p">(</span><span class="n">kpi</span><span class="p">,</span> <span class="n">month_int</span><span class="p">,</span> <span class="n">year_int</span><span class="p">)</span>
+    <span class="k">except</span> <span class="ne">Exception</span> <span class="k">as</span> <span class="n">e</span><span class="p">:</span>
+        <span class="n">logger</span><span class="o">.</span><span class="n">exception</span><span class="p">(</span><span class="s2">&quot;Failed to update KPI stats on create: </span><span class="si">%s</span><span class="s2">&quot;</span><span class="p">,</span> <span class="n">e</span><span class="p">)</span>
+        <span class="k">return</span> <span class="n">JsonResponse</span><span class="p">({</span><span class="s1">&#39;success&#39;</span><span class="p">:</span> <span class="kc">False</span><span class="p">,</span> <span class="s1">&#39;message&#39;</span><span class="p">:</span> <span class="s1">&#39;Failed to compute KPI stats&#39;</span><span class="p">},</span> <span class="n">status</span><span class="o">=</span><span class="mi">500</span><span class="p">)</span>
+
+    <span class="n">logger</span><span class="o">.</span><span class="n">info</span><span class="p">(</span><span class="s2">&quot;New KPI created successfully by user </span><span class="si">%s</span><span class="s2">&quot;</span><span class="p">,</span> <span class="n">request</span><span class="o">.</span><span class="n">user</span><span class="p">)</span>
+    <span class="k">return</span> <span class="n">JsonResponse</span><span class="p">({</span><span class="s1">&#39;success&#39;</span><span class="p">:</span> <span class="kc">True</span><span class="p">,</span> <span class="s1">&#39;kpi_id&#39;</span><span class="p">:</span> <span class="n">kpi</span><span class="o">.</span><span class="n">id</span><span class="p">})</span></div>
+
+
+
+<div class="viewcode-block" id="update_existing_kpi">
+<a class="viewcode-back" href="../../modules/dashboard_core.html#dashboard.views.update_existing_kpi">[docs]</a>
+<span class="nd">@login_required</span>
+<span class="k">def</span><span class="w"> </span><span class="nf">update_existing_kpi</span><span class="p">(</span><span class="n">request</span><span class="p">:</span> <span class="n">HttpRequest</span><span class="p">,</span> <span class="n">kpi_id</span><span class="p">:</span> <span class="nb">int</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="n">JsonResponse</span><span class="p">:</span>
+<span class="w">    </span><span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">    Update an existing Kpi object using data from the request.</span>
+<span class="sd">    Expects POST requests with updated KPI data and returns the updated details.</span>
+<span class="sd">    &quot;&quot;&quot;</span>
+    <span class="k">if</span> <span class="n">request</span><span class="o">.</span><span class="n">method</span> <span class="o">!=</span> <span class="s1">&#39;POST&#39;</span><span class="p">:</span>
+        <span class="n">logger</span><span class="o">.</span><span class="n">warning</span><span class="p">(</span><span class="s2">&quot;Method </span><span class="si">%s</span><span class="s2"> not allowed on update_existing_kpi by user </span><span class="si">%s</span><span class="s2">&quot;</span><span class="p">,</span> <span class="n">request</span><span class="o">.</span><span class="n">method</span><span class="p">,</span> <span class="n">request</span><span class="o">.</span><span class="n">user</span><span class="p">)</span>
+        <span class="k">return</span> <span class="n">JsonResponse</span><span class="p">({</span><span class="s1">&#39;success&#39;</span><span class="p">:</span> <span class="kc">False</span><span class="p">,</span> <span class="s1">&#39;message&#39;</span><span class="p">:</span> <span class="s1">&#39;Method not allowed&#39;</span><span class="p">},</span> <span class="n">status</span><span class="o">=</span><span class="mi">405</span><span class="p">)</span>
+
+    <span class="n">kpi</span> <span class="o">=</span> <span class="n">get_object_or_404</span><span class="p">(</span><span class="n">Kpi</span><span class="p">,</span> <span class="nb">id</span><span class="o">=</span><span class="n">kpi_id</span><span class="p">)</span>
+
+    <span class="k">try</span><span class="p">:</span>
+        <span class="n">data</span> <span class="o">=</span> <span class="n">json</span><span class="o">.</span><span class="n">loads</span><span class="p">(</span><span class="n">request</span><span class="o">.</span><span class="n">body</span><span class="o">.</span><span class="n">decode</span><span class="p">(</span><span class="s1">&#39;utf-8&#39;</span><span class="p">))</span> <span class="k">if</span> <span class="n">request</span><span class="o">.</span><span class="n">body</span> <span class="k">else</span> <span class="n">request</span><span class="o">.</span><span class="n">POST</span><span class="o">.</span><span class="n">dict</span><span class="p">()</span>
+    <span class="k">except</span> <span class="ne">ValueError</span> <span class="k">as</span> <span class="n">e</span><span class="p">:</span>
+        <span class="n">logger</span><span class="o">.</span><span class="n">error</span><span class="p">(</span><span class="s2">&quot;Invalid JSON data in update_existing_kpi: </span><span class="si">%s</span><span class="s2">&quot;</span><span class="p">,</span> <span class="n">e</span><span class="p">,</span> <span class="n">exc_info</span><span class="o">=</span><span class="kc">True</span><span class="p">)</span>
+        <span class="k">return</span> <span class="n">JsonResponse</span><span class="p">({</span><span class="s1">&#39;success&#39;</span><span class="p">:</span> <span class="kc">False</span><span class="p">,</span> <span class="s1">&#39;message&#39;</span><span class="p">:</span> <span class="s1">&#39;Invalid JSON data&#39;</span><span class="p">},</span> <span class="n">status</span><span class="o">=</span><span class="mi">400</span><span class="p">)</span>
+
+    <span class="c1"># Parse month/year and persist on KPI</span>
+    <span class="n">month_int</span> <span class="o">=</span> <span class="n">_coerce_int</span><span class="p">(</span><span class="n">data</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="s1">&#39;month&#39;</span><span class="p">,</span> <span class="n">kpi</span><span class="o">.</span><span class="n">month</span><span class="p">),</span> <span class="nb">int</span><span class="p">(</span><span class="n">kpi</span><span class="o">.</span><span class="n">month</span><span class="p">)</span> <span class="k">if</span> <span class="nb">str</span><span class="p">(</span><span class="n">kpi</span><span class="o">.</span><span class="n">month</span><span class="p">)</span><span class="o">.</span><span class="n">isdigit</span><span class="p">()</span> <span class="k">else</span> <span class="n">date</span><span class="o">.</span><span class="n">today</span><span class="p">()</span><span class="o">.</span><span class="n">month</span><span class="p">)</span>
+    <span class="n">year_int</span> <span class="o">=</span> <span class="n">_coerce_int</span><span class="p">(</span><span class="n">data</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="s1">&#39;year&#39;</span><span class="p">,</span> <span class="n">kpi</span><span class="o">.</span><span class="n">year</span><span class="p">),</span> <span class="nb">int</span><span class="p">(</span><span class="n">kpi</span><span class="o">.</span><span class="n">year</span><span class="p">)</span> <span class="k">if</span> <span class="nb">str</span><span class="p">(</span><span class="n">kpi</span><span class="o">.</span><span class="n">year</span><span class="p">)</span><span class="o">.</span><span class="n">isdigit</span><span class="p">()</span> <span class="k">else</span> <span class="n">date</span><span class="o">.</span><span class="n">today</span><span class="p">()</span><span class="o">.</span><span class="n">year</span><span class="p">)</span>
+
+    <span class="n">kpi</span><span class="o">.</span><span class="n">month</span> <span class="o">=</span> <span class="sa">f</span><span class="s2">&quot;</span><span class="si">{</span><span class="n">month_int</span><span class="si">:</span><span class="s2">02d</span><span class="si">}</span><span class="s2">&quot;</span>
+    <span class="n">kpi</span><span class="o">.</span><span class="n">year</span> <span class="o">=</span> <span class="nb">str</span><span class="p">(</span><span class="n">year_int</span><span class="p">)</span>
+    <span class="n">kpi</span><span class="o">.</span><span class="n">save</span><span class="p">()</span>
+
+    <span class="c1"># Recompute and save related stats</span>
+    <span class="k">try</span><span class="p">:</span>
+        <span class="n">update_all_kpi_stats</span><span class="p">(</span><span class="n">kpi</span><span class="p">,</span> <span class="n">month_int</span><span class="p">,</span> <span class="n">year_int</span><span class="p">)</span>
+    <span class="k">except</span> <span class="ne">Exception</span> <span class="k">as</span> <span class="n">e</span><span class="p">:</span>
+        <span class="n">logger</span><span class="o">.</span><span class="n">exception</span><span class="p">(</span><span class="s2">&quot;Failed to update KPI stats on update: </span><span class="si">%s</span><span class="s2">&quot;</span><span class="p">,</span> <span class="n">e</span><span class="p">)</span>
+        <span class="k">return</span> <span class="n">JsonResponse</span><span class="p">({</span><span class="s1">&#39;success&#39;</span><span class="p">:</span> <span class="kc">False</span><span class="p">,</span> <span class="s1">&#39;message&#39;</span><span class="p">:</span> <span class="s1">&#39;Failed to compute KPI stats&#39;</span><span class="p">},</span> <span class="n">status</span><span class="o">=</span><span class="mi">500</span><span class="p">)</span>
+
+    <span class="n">logger</span><span class="o">.</span><span class="n">info</span><span class="p">(</span><span class="s2">&quot;KPI ID </span><span class="si">%d</span><span class="s2"> updated successfully by user </span><span class="si">%s</span><span class="s2">&quot;</span><span class="p">,</span> <span class="n">kpi</span><span class="o">.</span><span class="n">id</span><span class="p">,</span> <span class="n">request</span><span class="o">.</span><span class="n">user</span><span class="p">)</span>
+    <span class="k">return</span> <span class="n">JsonResponse</span><span class="p">({</span><span class="s1">&#39;success&#39;</span><span class="p">:</span> <span class="kc">True</span><span class="p">,</span> <span class="s1">&#39;kpi_id&#39;</span><span class="p">:</span> <span class="n">kpi</span><span class="o">.</span><span class="n">id</span><span class="p">})</span></div>
+
+
+
+<div class="viewcode-block" id="dashboard_change">
+<a class="viewcode-back" href="../../modules/dashboard_core.html#dashboard.views.dashboard_change">[docs]</a>
+<span class="nd">@login_required</span>
+<span class="k">def</span><span class="w"> </span><span class="nf">dashboard_change</span><span class="p">(</span><span class="n">request</span><span class="p">:</span> <span class="n">HttpRequest</span><span class="p">,</span> <span class="n">month</span><span class="p">:</span> <span class="nb">str</span><span class="p">,</span> <span class="n">year</span><span class="p">:</span> <span class="nb">str</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="n">JsonResponse</span><span class="p">:</span>
+<span class="w">    </span><span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">    Change the dashboard month and year.</span>
+<span class="sd">    Returns JSON data with updated scores, mail labels, new users, total reporters, total cases, and stats.</span>
+<span class="sd">    &quot;&quot;&quot;</span>
+    <span class="k">try</span><span class="p">:</span>
+        <span class="n">new_month</span> <span class="o">=</span> <span class="nb">int</span><span class="p">(</span><span class="n">month</span><span class="p">)</span>
+        <span class="n">new_year</span> <span class="o">=</span> <span class="nb">int</span><span class="p">(</span><span class="n">year</span><span class="p">)</span>
+    <span class="k">except</span> <span class="ne">ValueError</span><span class="p">:</span>
+        <span class="k">return</span> <span class="n">JsonResponse</span><span class="p">({</span><span class="s1">&#39;success&#39;</span><span class="p">:</span> <span class="kc">False</span><span class="p">,</span> <span class="s1">&#39;message&#39;</span><span class="p">:</span> <span class="s1">&#39;Invalid month or year&#39;</span><span class="p">},</span> <span class="n">status</span><span class="o">=</span><span class="mi">400</span><span class="p">)</span>
+    
+    <span class="n">data</span> <span class="o">=</span> <span class="p">[]</span>
+    <span class="n">labels</span> <span class="o">=</span> <span class="p">[]</span>
+    <span class="n">stats</span> <span class="o">=</span> <span class="p">{</span>
+        <span class="s1">&#39;failure&#39;</span><span class="p">:</span> <span class="mi">0</span><span class="p">,</span>
+        <span class="s1">&#39;safe&#39;</span><span class="p">:</span> <span class="mi">0</span><span class="p">,</span>
+        <span class="s1">&#39;inconclusive&#39;</span><span class="p">:</span> <span class="mi">0</span><span class="p">,</span>
+        <span class="s1">&#39;suspicious&#39;</span><span class="p">:</span> <span class="mi">0</span><span class="p">,</span>
+        <span class="s1">&#39;dangerous&#39;</span><span class="p">:</span> <span class="mi">0</span>
+    <span class="p">}</span>
+    
+    <span class="c1"># Retrieve data for the top 10 ranks.</span>
+    <span class="k">for</span> <span class="n">rank</span> <span class="ow">in</span> <span class="nb">range</span><span class="p">(</span><span class="mi">1</span><span class="p">,</span> <span class="mi">11</span><span class="p">):</span>
+        <span class="n">data</span><span class="o">.</span><span class="n">append</span><span class="p">(</span><span class="n">get_dashboard_score</span><span class="p">(</span><span class="n">rank</span><span class="p">,</span> <span class="mi">10</span><span class="p">,</span> <span class="n">new_month</span><span class="p">,</span> <span class="n">new_year</span><span class="p">))</span>
+        <span class="n">labels</span><span class="o">.</span><span class="n">append</span><span class="p">(</span><span class="n">get_dashboard_email_prefix</span><span class="p">(</span><span class="n">rank</span><span class="p">,</span> <span class="mi">10</span><span class="p">,</span> <span class="n">new_month</span><span class="p">,</span> <span class="n">new_year</span><span class="p">))</span>
+    
+    <span class="n">new_users</span> <span class="o">=</span> <span class="n">new_reporters_dash</span><span class="p">(</span><span class="n">new_month</span><span class="p">,</span> <span class="n">new_year</span><span class="p">)</span>
+    <span class="n">total_reporters</span> <span class="o">=</span> <span class="n">total_reporters_dash</span><span class="p">(</span><span class="n">new_month</span><span class="p">,</span> <span class="n">new_year</span><span class="p">)</span>
+    <span class="n">total_cases</span> <span class="o">=</span> <span class="n">get_case_all_dash</span><span class="p">(</span><span class="n">new_month</span><span class="p">,</span> <span class="n">new_year</span><span class="p">)</span>
+    
+    <span class="k">for</span> <span class="n">danger</span> <span class="ow">in</span> <span class="n">stats</span><span class="p">:</span>
+        <span class="n">stats</span><span class="p">[</span><span class="n">danger</span><span class="p">]</span> <span class="o">=</span> <span class="n">total_by_danger_dash</span><span class="p">(</span><span class="n">danger</span><span class="p">,</span> <span class="n">new_month</span><span class="p">,</span> <span class="n">new_year</span><span class="p">)</span>
+    
+    <span class="n">logger</span><span class="o">.</span><span class="n">info</span><span class="p">(</span><span class="s2">&quot;User </span><span class="si">%s</span><span class="s2"> changed dashboard month/year to </span><span class="si">%d</span><span class="s2">/</span><span class="si">%d</span><span class="s2">&quot;</span><span class="p">,</span> <span class="n">request</span><span class="o">.</span><span class="n">user</span><span class="p">,</span> <span class="n">new_month</span><span class="p">,</span> <span class="n">new_year</span><span class="p">)</span>
+    <span class="k">return</span> <span class="n">JsonResponse</span><span class="p">({</span>
+        <span class="s1">&#39;success&#39;</span><span class="p">:</span> <span class="kc">True</span><span class="p">,</span>
+        <span class="s1">&#39;data&#39;</span><span class="p">:</span> <span class="n">data</span><span class="p">,</span>
+        <span class="s1">&#39;labels&#39;</span><span class="p">:</span> <span class="n">labels</span><span class="p">,</span>
+        <span class="s1">&#39;new_users&#39;</span><span class="p">:</span> <span class="n">new_users</span><span class="p">,</span>
+        <span class="s1">&#39;total_reporters&#39;</span><span class="p">:</span> <span class="n">total_reporters</span><span class="p">,</span>
+        <span class="s1">&#39;total_cases&#39;</span><span class="p">:</span> <span class="n">total_cases</span><span class="p">,</span>
+        <span class="s1">&#39;stats&#39;</span><span class="p">:</span> <span class="n">stats</span>
+    <span class="p">})</span></div>
+
+
+
+<div class="viewcode-block" id="dashboard_change_scope">
+<a class="viewcode-back" href="../../modules/dashboard_core.html#dashboard.views.dashboard_change_scope">[docs]</a>
+<span class="nd">@login_required</span>
+<span class="k">def</span><span class="w"> </span><span class="nf">dashboard_change_scope</span><span class="p">(</span><span class="n">request</span><span class="p">:</span> <span class="n">HttpRequest</span><span class="p">,</span> <span class="n">month</span><span class="p">:</span> <span class="nb">str</span><span class="p">,</span> <span class="n">year</span><span class="p">:</span> <span class="nb">str</span><span class="p">,</span> <span class="n">scope</span><span class="p">:</span> <span class="nb">str</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="n">JsonResponse</span><span class="p">:</span>
+<span class="w">    </span><span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">    Change the scope of the dashboard and retrieve corresponding data.</span>
+<span class="sd">    Returns JSON data with updated scores, mail labels, new users, total reporters, total cases, and stats based on the given scope.</span>
+<span class="sd">    &quot;&quot;&quot;</span>
+    <span class="k">try</span><span class="p">:</span>
+        <span class="n">new_month</span> <span class="o">=</span> <span class="nb">int</span><span class="p">(</span><span class="n">month</span><span class="p">)</span>
+        <span class="n">new_year</span> <span class="o">=</span> <span class="nb">int</span><span class="p">(</span><span class="n">year</span><span class="p">)</span>
+    <span class="k">except</span> <span class="ne">ValueError</span><span class="p">:</span>
+        <span class="k">return</span> <span class="n">JsonResponse</span><span class="p">({</span><span class="s1">&#39;success&#39;</span><span class="p">:</span> <span class="kc">False</span><span class="p">,</span> <span class="s1">&#39;message&#39;</span><span class="p">:</span> <span class="s1">&#39;Invalid month or year&#39;</span><span class="p">},</span> <span class="n">status</span><span class="o">=</span><span class="mi">400</span><span class="p">)</span>
+    
+    <span class="n">new_scope</span> <span class="o">=</span> <span class="n">scope</span>  <span class="c1"># Keeping naming as provided</span>
+    <span class="n">data</span> <span class="o">=</span> <span class="p">[]</span>
+    <span class="n">labels</span> <span class="o">=</span> <span class="p">[]</span>
+    <span class="n">stats</span> <span class="o">=</span> <span class="p">{</span>
+        <span class="s1">&#39;failure&#39;</span><span class="p">:</span> <span class="mi">0</span><span class="p">,</span>
+        <span class="s1">&#39;safe&#39;</span><span class="p">:</span> <span class="mi">0</span><span class="p">,</span>
+        <span class="s1">&#39;inconclusive&#39;</span><span class="p">:</span> <span class="mi">0</span><span class="p">,</span>
+        <span class="s1">&#39;suspicious&#39;</span><span class="p">:</span> <span class="mi">0</span><span class="p">,</span>
+        <span class="s1">&#39;dangerous&#39;</span><span class="p">:</span> <span class="mi">0</span>
+    <span class="p">}</span>
+    
+    <span class="k">for</span> <span class="n">rank</span> <span class="ow">in</span> <span class="nb">range</span><span class="p">(</span><span class="mi">1</span><span class="p">,</span> <span class="mi">11</span><span class="p">):</span>
+        <span class="n">data</span><span class="o">.</span><span class="n">append</span><span class="p">(</span><span class="n">dashboard_score_scope</span><span class="p">(</span><span class="n">rank</span><span class="p">,</span> <span class="mi">10</span><span class="p">,</span> <span class="n">new_month</span><span class="p">,</span> <span class="n">new_year</span><span class="p">,</span> <span class="n">new_scope</span><span class="p">))</span>
+        <span class="n">labels</span><span class="o">.</span><span class="n">append</span><span class="p">(</span><span class="n">dashboard_mail_scope</span><span class="p">(</span><span class="n">rank</span><span class="p">,</span> <span class="mi">10</span><span class="p">,</span> <span class="n">new_month</span><span class="p">,</span> <span class="n">new_year</span><span class="p">,</span> <span class="n">new_scope</span><span class="p">))</span>
+    
+    <span class="n">new_users</span> <span class="o">=</span> <span class="n">new_reporters_dash_scope</span><span class="p">(</span><span class="n">new_scope</span><span class="p">,</span> <span class="n">new_month</span><span class="p">,</span> <span class="n">new_year</span><span class="p">)</span>
+    <span class="n">total_reporters</span> <span class="o">=</span> <span class="n">total_reporters_dash_scope</span><span class="p">(</span><span class="n">new_scope</span><span class="p">,</span> <span class="n">new_month</span><span class="p">,</span> <span class="n">new_year</span><span class="p">)</span>
+    <span class="n">total_cases</span> <span class="o">=</span> <span class="n">get_case_all_dash_scope</span><span class="p">(</span><span class="n">new_scope</span><span class="p">,</span> <span class="n">new_month</span><span class="p">,</span> <span class="n">new_year</span><span class="p">)</span>
+    
+    <span class="k">for</span> <span class="n">danger</span> <span class="ow">in</span> <span class="n">stats</span><span class="p">:</span>
+        <span class="n">stats</span><span class="p">[</span><span class="n">danger</span><span class="p">]</span> <span class="o">=</span> <span class="n">total_by_danger_dash_scope</span><span class="p">(</span><span class="n">danger</span><span class="p">,</span> <span class="n">new_month</span><span class="p">,</span> <span class="n">new_year</span><span class="p">,</span> <span class="n">new_scope</span><span class="p">)</span>
+    
+    <span class="n">logger</span><span class="o">.</span><span class="n">info</span><span class="p">(</span><span class="s2">&quot;User </span><span class="si">%s</span><span class="s2"> changed dashboard scope to </span><span class="si">%s</span><span class="s2"> for </span><span class="si">%d</span><span class="s2">/</span><span class="si">%d</span><span class="s2">&quot;</span><span class="p">,</span> <span class="n">request</span><span class="o">.</span><span class="n">user</span><span class="p">,</span> <span class="n">new_scope</span><span class="p">,</span> <span class="n">new_month</span><span class="p">,</span> <span class="n">new_year</span><span class="p">)</span>
+    <span class="k">return</span> <span class="n">JsonResponse</span><span class="p">({</span>
+        <span class="s1">&#39;success&#39;</span><span class="p">:</span> <span class="kc">True</span><span class="p">,</span>
+        <span class="s1">&#39;data&#39;</span><span class="p">:</span> <span class="n">data</span><span class="p">,</span>
+        <span class="s1">&#39;labels&#39;</span><span class="p">:</span> <span class="n">labels</span><span class="p">,</span>
+        <span class="s1">&#39;new_users&#39;</span><span class="p">:</span> <span class="n">new_users</span><span class="p">,</span>
+        <span class="s1">&#39;total_reporters&#39;</span><span class="p">:</span> <span class="n">total_reporters</span><span class="p">,</span>
+        <span class="s1">&#39;total_cases&#39;</span><span class="p">:</span> <span class="n">total_cases</span><span class="p">,</span>
+        <span class="s1">&#39;stats&#39;</span><span class="p">:</span> <span class="n">stats</span>
+    <span class="p">})</span></div>
+
+
+<span class="c1"># New endpoint: mail volume data for last 14 days</span>
+<div class="viewcode-block" id="dashboard_campaigns_mail_volume">
+<a class="viewcode-back" href="../../modules/dashboard_core.html#dashboard.views.dashboard_campaigns_mail_volume">[docs]</a>
+<span class="nd">@login_required</span>
+<span class="k">def</span><span class="w"> </span><span class="nf">dashboard_campaigns_mail_volume</span><span class="p">(</span><span class="n">request</span><span class="p">:</span> <span class="n">HttpRequest</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="n">JsonResponse</span><span class="p">:</span>
+<span class="w">    </span><span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">    Return stacked mail volume for the last 15 days.</span>
+
+<span class="sd">    Response format:</span>
+<span class="sd">    {</span>
+<span class="sd">    &quot;dates&quot;: [&quot;YYYY-MM-DD&quot;, ...],</span>
+<span class="sd">    &quot;non_danger&quot;: [int, ...],</span>
+<span class="sd">    &quot;dangerous&quot;: [int, ...],</span>
+<span class="sd">    &quot;campaigns&quot;: [ {&quot;name&quot;: str, &quot;start&quot;: &quot;YYYY-MM-DD&quot;, &quot;end&quot;: &quot;YYYY-MM-DD&quot;}, ... ]</span>
+<span class="sd">    }</span>
+
+<span class="sd">    &quot;&quot;&quot;</span>
+    <span class="c1"># Define 15-day window by UTC dates (inclusive of today)</span>
+    <span class="n">today_utc</span> <span class="o">=</span> <span class="n">datetime</span><span class="o">.</span><span class="n">now</span><span class="p">(</span><span class="n">timezone</span><span class="o">.</span><span class="n">utc</span><span class="p">)</span><span class="o">.</span><span class="n">date</span><span class="p">()</span>
+    <span class="n">start_utc</span> <span class="o">=</span> <span class="n">today_utc</span> <span class="o">-</span> <span class="n">timedelta</span><span class="p">(</span><span class="n">days</span><span class="o">=</span><span class="mi">14</span><span class="p">)</span>
+
+    <span class="c1"># Ordered list of day buckets</span>
+    <span class="n">all_days</span> <span class="o">=</span> <span class="p">[</span><span class="n">start_utc</span> <span class="o">+</span> <span class="n">timedelta</span><span class="p">(</span><span class="n">days</span><span class="o">=</span><span class="n">i</span><span class="p">)</span> <span class="k">for</span> <span class="n">i</span> <span class="ow">in</span> <span class="nb">range</span><span class="p">(</span><span class="mi">15</span><span class="p">)]</span>
+    <span class="n">idx</span> <span class="o">=</span> <span class="p">{</span><span class="n">d</span><span class="p">:</span> <span class="n">i</span> <span class="k">for</span> <span class="n">i</span><span class="p">,</span> <span class="n">d</span> <span class="ow">in</span> <span class="nb">enumerate</span><span class="p">(</span><span class="n">all_days</span><span class="p">)}</span>
+    <span class="n">non_danger</span> <span class="o">=</span> <span class="p">[</span><span class="mi">0</span><span class="p">]</span> <span class="o">*</span> <span class="nb">len</span><span class="p">(</span><span class="n">all_days</span><span class="p">)</span>
+    <span class="n">dangerous</span> <span class="o">=</span> <span class="p">[</span><span class="mi">0</span><span class="p">]</span> <span class="o">*</span> <span class="nb">len</span><span class="p">(</span><span class="n">all_days</span><span class="p">)</span>
+
+    <span class="n">collection</span> <span class="o">=</span> <span class="n">_get_chroma_collection</span><span class="p">()</span>
+    <span class="k">if</span> <span class="n">collection</span> <span class="ow">is</span> <span class="kc">None</span><span class="p">:</span>
+        <span class="k">return</span> <span class="n">JsonResponse</span><span class="p">({</span>
+            <span class="s2">&quot;dates&quot;</span><span class="p">:</span> <span class="p">[</span><span class="n">d</span><span class="o">.</span><span class="n">isoformat</span><span class="p">()</span> <span class="k">for</span> <span class="n">d</span> <span class="ow">in</span> <span class="n">all_days</span><span class="p">],</span>
+            <span class="s2">&quot;non_danger&quot;</span><span class="p">:</span> <span class="n">non_danger</span><span class="p">,</span>
+            <span class="s2">&quot;dangerous&quot;</span><span class="p">:</span> <span class="n">dangerous</span><span class="p">,</span>
+            <span class="s2">&quot;campaigns&quot;</span><span class="p">:</span> <span class="p">[],</span>
+        <span class="p">})</span>
+
+    <span class="c1"># Helper to parse datetime-like values and return UTC date</span>
+    <span class="k">def</span><span class="w"> </span><span class="nf">_parse_to_utc_date</span><span class="p">(</span><span class="n">val</span><span class="p">):</span>
+        <span class="k">if</span> <span class="n">val</span> <span class="ow">is</span> <span class="kc">None</span><span class="p">:</span>
+            <span class="k">return</span> <span class="kc">None</span>
+        <span class="k">try</span><span class="p">:</span>
+            <span class="c1"># Numeric epoch? seconds or milliseconds</span>
+            <span class="k">if</span> <span class="nb">isinstance</span><span class="p">(</span><span class="n">val</span><span class="p">,</span> <span class="p">(</span><span class="nb">int</span><span class="p">,</span> <span class="nb">float</span><span class="p">)):</span>
+                <span class="k">try</span><span class="p">:</span>
+                    <span class="c1"># Heuristic: milliseconds if large</span>
+                    <span class="n">ts</span> <span class="o">=</span> <span class="nb">float</span><span class="p">(</span><span class="n">val</span><span class="p">)</span>
+                    <span class="k">if</span> <span class="n">ts</span> <span class="o">&gt;</span> <span class="mf">1e12</span><span class="p">:</span>
+                        <span class="n">ts</span> <span class="o">=</span> <span class="n">ts</span> <span class="o">/</span> <span class="mf">1000.0</span>
+                    <span class="n">dt</span> <span class="o">=</span> <span class="n">datetime</span><span class="o">.</span><span class="n">fromtimestamp</span><span class="p">(</span><span class="n">ts</span><span class="p">,</span> <span class="n">tz</span><span class="o">=</span><span class="n">timezone</span><span class="o">.</span><span class="n">utc</span><span class="p">)</span>
+                    <span class="k">return</span> <span class="n">dt</span><span class="o">.</span><span class="n">date</span><span class="p">()</span>
+                <span class="k">except</span> <span class="ne">Exception</span><span class="p">:</span>
+                    <span class="k">return</span> <span class="kc">None</span>
+            <span class="n">s</span> <span class="o">=</span> <span class="nb">str</span><span class="p">(</span><span class="n">val</span><span class="p">)</span><span class="o">.</span><span class="n">strip</span><span class="p">()</span>
+            <span class="k">if</span> <span class="ow">not</span> <span class="n">s</span><span class="p">:</span>
+                <span class="k">return</span> <span class="kc">None</span>
+            <span class="c1"># Try ISO-like formats</span>
+            <span class="n">s</span> <span class="o">=</span> <span class="n">s</span><span class="o">.</span><span class="n">replace</span><span class="p">(</span><span class="s2">&quot;Z&quot;</span><span class="p">,</span> <span class="s2">&quot;+00:00&quot;</span><span class="p">)</span>
+            <span class="n">dt</span> <span class="o">=</span> <span class="kc">None</span>
+            <span class="k">try</span><span class="p">:</span>
+                <span class="n">dt</span> <span class="o">=</span> <span class="n">datetime</span><span class="o">.</span><span class="n">fromisoformat</span><span class="p">(</span><span class="n">s</span><span class="p">)</span>
+            <span class="k">except</span> <span class="ne">Exception</span><span class="p">:</span>
+                <span class="c1"># Common email date formats often have &#39;GMT&#39; or commas; try a few fixes</span>
+                <span class="n">s2</span> <span class="o">=</span> <span class="n">s</span><span class="o">.</span><span class="n">replace</span><span class="p">(</span><span class="s2">&quot;GMT&quot;</span><span class="p">,</span> <span class="s2">&quot;+00:00&quot;</span><span class="p">)</span><span class="o">.</span><span class="n">replace</span><span class="p">(</span><span class="s2">&quot;,&quot;</span><span class="p">,</span> <span class="s2">&quot;&quot;</span><span class="p">)</span>
+                <span class="k">try</span><span class="p">:</span>
+                    <span class="n">dt</span> <span class="o">=</span> <span class="n">datetime</span><span class="o">.</span><span class="n">fromisoformat</span><span class="p">(</span><span class="n">s2</span><span class="p">)</span>
+                <span class="k">except</span> <span class="ne">Exception</span><span class="p">:</span>
+                    <span class="c1"># Try truncate to seconds</span>
+                    <span class="n">core</span> <span class="o">=</span> <span class="n">s</span>
+                    <span class="k">if</span> <span class="s2">&quot;T&quot;</span> <span class="ow">in</span> <span class="n">s</span><span class="p">:</span>
+                        <span class="n">core</span> <span class="o">=</span> <span class="n">s</span><span class="o">.</span><span class="n">split</span><span class="p">(</span><span class="s2">&quot;T&quot;</span><span class="p">,</span> <span class="mi">1</span><span class="p">)[</span><span class="mi">0</span><span class="p">]</span> <span class="o">+</span> <span class="s2">&quot;T&quot;</span> <span class="o">+</span> <span class="n">s</span><span class="o">.</span><span class="n">split</span><span class="p">(</span><span class="s2">&quot;T&quot;</span><span class="p">,</span> <span class="mi">1</span><span class="p">)[</span><span class="mi">1</span><span class="p">][:</span><span class="mi">8</span><span class="p">]</span>
+                    <span class="n">core</span> <span class="o">=</span> <span class="n">core</span><span class="p">[:</span><span class="mi">19</span><span class="p">]</span>
+                    <span class="k">try</span><span class="p">:</span>
+                        <span class="n">dt</span> <span class="o">=</span> <span class="n">datetime</span><span class="o">.</span><span class="n">fromisoformat</span><span class="p">(</span><span class="n">core</span><span class="p">)</span>
+                    <span class="k">except</span> <span class="ne">Exception</span><span class="p">:</span>
+                        <span class="c1"># Fallback: regex date-only</span>
+                        <span class="n">m</span> <span class="o">=</span> <span class="n">re</span><span class="o">.</span><span class="n">search</span><span class="p">(</span><span class="sa">r</span><span class="s2">&quot;(\d</span><span class="si">{4}</span><span class="s2">-\d</span><span class="si">{2}</span><span class="s2">-\d</span><span class="si">{2}</span><span class="s2">)&quot;</span><span class="p">,</span> <span class="n">s</span><span class="p">)</span>
+                        <span class="k">if</span> <span class="n">m</span><span class="p">:</span>
+                            <span class="k">try</span><span class="p">:</span>
+                                <span class="k">return</span> <span class="n">datetime</span><span class="o">.</span><span class="n">fromisoformat</span><span class="p">(</span><span class="n">m</span><span class="o">.</span><span class="n">group</span><span class="p">(</span><span class="mi">1</span><span class="p">))</span><span class="o">.</span><span class="n">date</span><span class="p">()</span>
+                            <span class="k">except</span> <span class="ne">Exception</span><span class="p">:</span>
+                                <span class="k">return</span> <span class="kc">None</span>
+                        <span class="k">return</span> <span class="kc">None</span>
+            <span class="c1"># Assume naive timestamps are UTC</span>
+            <span class="k">if</span> <span class="n">dt</span><span class="o">.</span><span class="n">tzinfo</span> <span class="ow">is</span> <span class="kc">None</span><span class="p">:</span>
+                <span class="k">return</span> <span class="n">dt</span><span class="o">.</span><span class="n">date</span><span class="p">()</span>
+            <span class="k">return</span> <span class="n">dt</span><span class="o">.</span><span class="n">astimezone</span><span class="p">(</span><span class="n">timezone</span><span class="o">.</span><span class="n">utc</span><span class="p">)</span><span class="o">.</span><span class="n">date</span><span class="p">()</span>
+        <span class="k">except</span> <span class="ne">Exception</span><span class="p">:</span>
+            <span class="k">return</span> <span class="kc">None</span>
+
+    <span class="k">def</span><span class="w"> </span><span class="nf">_parse_source_refs</span><span class="p">(</span><span class="n">raw</span><span class="p">):</span>
+        <span class="k">if</span> <span class="n">raw</span> <span class="ow">is</span> <span class="kc">None</span><span class="p">:</span>
+            <span class="k">return</span> <span class="p">()</span>
+        <span class="n">iterable</span> <span class="o">=</span> <span class="kc">None</span>
+        <span class="k">if</span> <span class="nb">isinstance</span><span class="p">(</span><span class="n">raw</span><span class="p">,</span> <span class="p">(</span><span class="nb">list</span><span class="p">,</span> <span class="nb">tuple</span><span class="p">,</span> <span class="nb">set</span><span class="p">)):</span>
+            <span class="n">iterable</span> <span class="o">=</span> <span class="nb">list</span><span class="p">(</span><span class="n">raw</span><span class="p">)</span>
+        <span class="k">else</span><span class="p">:</span>
+            <span class="n">text</span> <span class="o">=</span> <span class="nb">str</span><span class="p">(</span><span class="n">raw</span><span class="p">)</span><span class="o">.</span><span class="n">strip</span><span class="p">()</span>
+            <span class="k">if</span> <span class="ow">not</span> <span class="n">text</span><span class="p">:</span>
+                <span class="k">return</span> <span class="p">()</span>
+            <span class="k">for</span> <span class="n">parser</span> <span class="ow">in</span> <span class="p">(</span><span class="n">json</span><span class="o">.</span><span class="n">loads</span><span class="p">,</span> <span class="n">ast</span><span class="o">.</span><span class="n">literal_eval</span><span class="p">):</span>
+                <span class="k">try</span><span class="p">:</span>
+                    <span class="n">parsed</span> <span class="o">=</span> <span class="n">parser</span><span class="p">(</span><span class="n">text</span><span class="p">)</span>
+                <span class="k">except</span> <span class="ne">Exception</span><span class="p">:</span>
+                    <span class="k">continue</span>
+                <span class="k">if</span> <span class="nb">isinstance</span><span class="p">(</span><span class="n">parsed</span><span class="p">,</span> <span class="p">(</span><span class="nb">list</span><span class="p">,</span> <span class="nb">tuple</span><span class="p">,</span> <span class="nb">set</span><span class="p">)):</span>
+                    <span class="n">iterable</span> <span class="o">=</span> <span class="nb">list</span><span class="p">(</span><span class="n">parsed</span><span class="p">)</span>
+                    <span class="k">break</span>
+                <span class="k">if</span> <span class="nb">isinstance</span><span class="p">(</span><span class="n">parsed</span><span class="p">,</span> <span class="nb">str</span><span class="p">):</span>
+                    <span class="n">iterable</span> <span class="o">=</span> <span class="p">[</span><span class="n">parsed</span><span class="p">]</span>
+                    <span class="k">break</span>
+            <span class="k">if</span> <span class="n">iterable</span> <span class="ow">is</span> <span class="kc">None</span><span class="p">:</span>
+                <span class="n">stripped</span> <span class="o">=</span> <span class="n">text</span><span class="o">.</span><span class="n">strip</span><span class="p">(</span><span class="s2">&quot;[]()</span><span class="si">{}</span><span class="s2">&quot;</span><span class="p">)</span>
+                <span class="k">if</span> <span class="ow">not</span> <span class="n">stripped</span><span class="p">:</span>
+                    <span class="k">return</span> <span class="p">()</span>
+                <span class="n">parts</span> <span class="o">=</span> <span class="p">[</span><span class="n">segment</span> <span class="k">for</span> <span class="n">segment</span> <span class="ow">in</span> <span class="n">re</span><span class="o">.</span><span class="n">split</span><span class="p">(</span><span class="sa">r</span><span class="s2">&quot;[;,]&quot;</span><span class="p">,</span> <span class="n">stripped</span><span class="p">)</span> <span class="k">if</span> <span class="n">segment</span><span class="p">]</span>
+                <span class="n">iterable</span> <span class="o">=</span> <span class="p">[</span><span class="n">seg</span><span class="o">.</span><span class="n">strip</span><span class="p">()</span><span class="o">.</span><span class="n">strip</span><span class="p">(</span><span class="s2">&quot;&#39;</span><span class="se">\&quot;</span><span class="s2">&quot;</span><span class="p">)</span> <span class="k">for</span> <span class="n">seg</span> <span class="ow">in</span> <span class="n">parts</span><span class="p">]</span>
+        <span class="k">if</span> <span class="n">iterable</span> <span class="ow">is</span> <span class="kc">None</span><span class="p">:</span>
+            <span class="k">return</span> <span class="p">()</span>
+        <span class="n">cleaned</span> <span class="o">=</span> <span class="p">[]</span>
+        <span class="k">for</span> <span class="n">item</span> <span class="ow">in</span> <span class="n">iterable</span><span class="p">:</span>
+            <span class="n">sval</span> <span class="o">=</span> <span class="nb">str</span><span class="p">(</span><span class="n">item</span><span class="p">)</span><span class="o">.</span><span class="n">strip</span><span class="p">()</span><span class="o">.</span><span class="n">strip</span><span class="p">(</span><span class="s2">&quot;&#39;</span><span class="se">\&quot;</span><span class="s2">&quot;</span><span class="p">)</span>
+            <span class="k">if</span> <span class="n">sval</span><span class="p">:</span>
+                <span class="n">cleaned</span><span class="o">.</span><span class="n">append</span><span class="p">(</span><span class="n">sval</span><span class="p">)</span>
+        <span class="k">if</span> <span class="ow">not</span> <span class="n">cleaned</span><span class="p">:</span>
+            <span class="k">return</span> <span class="p">()</span>
+        <span class="c1"># Preserve order but deduplicate</span>
+        <span class="n">seen</span> <span class="o">=</span> <span class="p">{}</span>
+        <span class="k">for</span> <span class="n">val</span> <span class="ow">in</span> <span class="n">cleaned</span><span class="p">:</span>
+            <span class="k">if</span> <span class="n">val</span> <span class="ow">not</span> <span class="ow">in</span> <span class="n">seen</span><span class="p">:</span>
+                <span class="n">seen</span><span class="p">[</span><span class="n">val</span><span class="p">]</span> <span class="o">=</span> <span class="kc">None</span>
+        <span class="k">return</span> <span class="nb">tuple</span><span class="p">(</span><span class="nb">sorted</span><span class="p">(</span><span class="n">seen</span><span class="o">.</span><span class="n">keys</span><span class="p">()))</span>
+
+    <span class="k">def</span><span class="w"> </span><span class="nf">_extract_headers_dict</span><span class="p">(</span><span class="n">raw</span><span class="p">):</span>
+        <span class="k">if</span> <span class="ow">not</span> <span class="n">raw</span><span class="p">:</span>
+            <span class="k">return</span> <span class="kc">None</span>
+        <span class="k">if</span> <span class="nb">isinstance</span><span class="p">(</span><span class="n">raw</span><span class="p">,</span> <span class="nb">dict</span><span class="p">):</span>
+            <span class="k">return</span> <span class="n">raw</span>
+        <span class="n">text</span> <span class="o">=</span> <span class="nb">str</span><span class="p">(</span><span class="n">raw</span><span class="p">)</span>
+        <span class="k">if</span> <span class="ow">not</span> <span class="n">text</span><span class="p">:</span>
+            <span class="k">return</span> <span class="kc">None</span>
+        <span class="k">if</span> <span class="s2">&quot;defaultdict&quot;</span> <span class="ow">in</span> <span class="n">text</span><span class="p">:</span>
+            <span class="k">try</span><span class="p">:</span>
+                <span class="n">parsed</span> <span class="o">=</span> <span class="n">parse_and_decode_defaultdict</span><span class="p">(</span><span class="n">text</span><span class="p">)</span>
+                <span class="k">if</span> <span class="nb">isinstance</span><span class="p">(</span><span class="n">parsed</span><span class="p">,</span> <span class="nb">dict</span><span class="p">):</span>
+                    <span class="k">return</span> <span class="n">parsed</span>
+            <span class="k">except</span> <span class="ne">Exception</span><span class="p">:</span>
+                <span class="k">pass</span>
+        <span class="k">for</span> <span class="n">parser</span> <span class="ow">in</span> <span class="p">(</span><span class="n">json</span><span class="o">.</span><span class="n">loads</span><span class="p">,</span> <span class="n">ast</span><span class="o">.</span><span class="n">literal_eval</span><span class="p">):</span>
+            <span class="k">try</span><span class="p">:</span>
+                <span class="n">parsed</span> <span class="o">=</span> <span class="n">parser</span><span class="p">(</span><span class="n">text</span><span class="p">)</span>
+                <span class="k">if</span> <span class="nb">isinstance</span><span class="p">(</span><span class="n">parsed</span><span class="p">,</span> <span class="nb">dict</span><span class="p">):</span>
+                    <span class="k">return</span> <span class="n">parsed</span>
+            <span class="k">except</span> <span class="ne">Exception</span><span class="p">:</span>
+                <span class="k">continue</span>
+        <span class="k">try</span><span class="p">:</span>
+            <span class="n">parsed</span> <span class="o">=</span> <span class="n">parse_headers</span><span class="p">(</span><span class="n">text</span><span class="p">)</span>
+            <span class="k">if</span> <span class="nb">isinstance</span><span class="p">(</span><span class="n">parsed</span><span class="p">,</span> <span class="nb">dict</span><span class="p">):</span>
+                <span class="k">return</span> <span class="nb">dict</span><span class="p">(</span><span class="n">parsed</span><span class="p">)</span>
+        <span class="k">except</span> <span class="ne">Exception</span><span class="p">:</span>
+            <span class="k">pass</span>
+        <span class="k">return</span> <span class="kc">None</span>
+
+    <span class="k">def</span><span class="w"> </span><span class="nf">_parse_header_datetime</span><span class="p">(</span><span class="n">value</span><span class="p">):</span>
+        <span class="k">if</span> <span class="ow">not</span> <span class="n">value</span><span class="p">:</span>
+            <span class="k">return</span> <span class="kc">None</span>
+        <span class="k">try</span><span class="p">:</span>
+            <span class="n">dt</span> <span class="o">=</span> <span class="n">parsedate_to_datetime</span><span class="p">(</span><span class="nb">str</span><span class="p">(</span><span class="n">value</span><span class="p">))</span>
+            <span class="k">if</span> <span class="n">dt</span> <span class="ow">is</span> <span class="kc">None</span><span class="p">:</span>
+                <span class="k">return</span> <span class="kc">None</span>
+            <span class="k">if</span> <span class="n">dt</span><span class="o">.</span><span class="n">tzinfo</span> <span class="ow">is</span> <span class="kc">None</span><span class="p">:</span>
+                <span class="k">return</span> <span class="n">dt</span><span class="o">.</span><span class="n">replace</span><span class="p">(</span><span class="n">tzinfo</span><span class="o">=</span><span class="n">timezone</span><span class="o">.</span><span class="n">utc</span><span class="p">)</span>
+            <span class="k">return</span> <span class="n">dt</span><span class="o">.</span><span class="n">astimezone</span><span class="p">(</span><span class="n">timezone</span><span class="o">.</span><span class="n">utc</span><span class="p">)</span>
+        <span class="k">except</span> <span class="ne">Exception</span><span class="p">:</span>
+            <span class="k">pass</span>
+        <span class="n">fallback_day</span> <span class="o">=</span> <span class="n">_parse_to_utc_date</span><span class="p">(</span><span class="n">value</span><span class="p">)</span>
+        <span class="k">if</span> <span class="n">fallback_day</span> <span class="ow">is</span> <span class="kc">None</span><span class="p">:</span>
+            <span class="k">return</span> <span class="kc">None</span>
+        <span class="k">return</span> <span class="n">datetime</span><span class="p">(</span><span class="n">fallback_day</span><span class="o">.</span><span class="n">year</span><span class="p">,</span> <span class="n">fallback_day</span><span class="o">.</span><span class="n">month</span><span class="p">,</span> <span class="n">fallback_day</span><span class="o">.</span><span class="n">day</span><span class="p">,</span> <span class="n">tzinfo</span><span class="o">=</span><span class="n">timezone</span><span class="o">.</span><span class="n">utc</span><span class="p">)</span>
+
+    <span class="k">def</span><span class="w"> </span><span class="nf">_extract_sent_datetime</span><span class="p">(</span><span class="n">meta</span><span class="p">):</span>
+        <span class="n">headers_dict</span> <span class="o">=</span> <span class="n">_extract_headers_dict</span><span class="p">(</span><span class="n">meta</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="s2">&quot;headers&quot;</span><span class="p">))</span>
+        <span class="k">if</span> <span class="ow">not</span> <span class="nb">isinstance</span><span class="p">(</span><span class="n">headers_dict</span><span class="p">,</span> <span class="nb">dict</span><span class="p">):</span>
+            <span class="k">return</span> <span class="kc">None</span>
+        <span class="n">candidates</span> <span class="o">=</span> <span class="p">[]</span>
+        <span class="k">for</span> <span class="n">key</span> <span class="ow">in</span> <span class="p">(</span><span class="s2">&quot;Date&quot;</span><span class="p">,</span> <span class="s2">&quot;date&quot;</span><span class="p">,</span> <span class="s2">&quot;Sent&quot;</span><span class="p">,</span> <span class="s2">&quot;Sent-Date&quot;</span><span class="p">,</span> <span class="s2">&quot;Sent-date&quot;</span><span class="p">,</span> <span class="s2">&quot;sent_date&quot;</span><span class="p">):</span>
+            <span class="n">val</span> <span class="o">=</span> <span class="n">headers_dict</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="n">key</span><span class="p">)</span>
+            <span class="k">if</span> <span class="ow">not</span> <span class="n">val</span><span class="p">:</span>
+                <span class="k">continue</span>
+            <span class="k">if</span> <span class="nb">isinstance</span><span class="p">(</span><span class="n">val</span><span class="p">,</span> <span class="p">(</span><span class="nb">list</span><span class="p">,</span> <span class="nb">tuple</span><span class="p">)):</span>
+                <span class="n">candidates</span><span class="o">.</span><span class="n">extend</span><span class="p">(</span><span class="n">val</span><span class="p">)</span>
+            <span class="k">else</span><span class="p">:</span>
+                <span class="n">candidates</span><span class="o">.</span><span class="n">append</span><span class="p">(</span><span class="n">val</span><span class="p">)</span>
+        <span class="k">for</span> <span class="n">candidate</span> <span class="ow">in</span> <span class="n">candidates</span><span class="p">:</span>
+            <span class="n">dt</span> <span class="o">=</span> <span class="n">_parse_header_datetime</span><span class="p">(</span><span class="n">candidate</span><span class="p">)</span>
+            <span class="k">if</span> <span class="n">dt</span> <span class="ow">is</span> <span class="ow">not</span> <span class="kc">None</span><span class="p">:</span>
+                <span class="k">return</span> <span class="n">dt</span>
+        <span class="k">return</span> <span class="kc">None</span>
+
+    <span class="k">def</span><span class="w"> </span><span class="nf">_ensure_utc</span><span class="p">(</span><span class="n">dt</span><span class="p">):</span>
+        <span class="k">if</span> <span class="n">dt</span> <span class="ow">is</span> <span class="kc">None</span><span class="p">:</span>
+            <span class="k">return</span> <span class="kc">None</span>
+        <span class="k">if</span> <span class="n">dt</span><span class="o">.</span><span class="n">tzinfo</span> <span class="ow">is</span> <span class="kc">None</span><span class="p">:</span>
+            <span class="k">return</span> <span class="n">dt</span><span class="o">.</span><span class="n">replace</span><span class="p">(</span><span class="n">tzinfo</span><span class="o">=</span><span class="n">timezone</span><span class="o">.</span><span class="n">utc</span><span class="p">)</span>
+        <span class="k">return</span> <span class="n">dt</span><span class="o">.</span><span class="n">astimezone</span><span class="p">(</span><span class="n">timezone</span><span class="o">.</span><span class="n">utc</span><span class="p">)</span>
+
+    <span class="k">def</span><span class="w"> </span><span class="nf">_format_campaign_name</span><span class="p">(</span><span class="n">refs_key</span><span class="p">,</span> <span class="n">fallback_index</span><span class="p">):</span>
+        <span class="k">if</span> <span class="ow">not</span> <span class="n">refs_key</span><span class="p">:</span>
+            <span class="k">return</span> <span class="sa">f</span><span class="s2">&quot;Campaign </span><span class="si">{</span><span class="n">fallback_index</span><span class="si">}</span><span class="s2">&quot;</span>
+        <span class="n">parts</span> <span class="o">=</span> <span class="p">[</span><span class="n">ref</span> <span class="k">for</span> <span class="n">ref</span> <span class="ow">in</span> <span class="n">refs_key</span> <span class="k">if</span> <span class="n">ref</span><span class="p">]</span>
+        <span class="k">if</span> <span class="ow">not</span> <span class="n">parts</span><span class="p">:</span>
+            <span class="k">return</span> <span class="sa">f</span><span class="s2">&quot;Campaign </span><span class="si">{</span><span class="n">fallback_index</span><span class="si">}</span><span class="s2">&quot;</span>
+        <span class="k">if</span> <span class="nb">len</span><span class="p">(</span><span class="n">parts</span><span class="p">)</span> <span class="o">&lt;=</span> <span class="mi">3</span><span class="p">:</span>
+            <span class="k">return</span> <span class="s2">&quot;, &quot;</span><span class="o">.</span><span class="n">join</span><span class="p">(</span><span class="n">parts</span><span class="p">)</span>
+        <span class="k">return</span> <span class="s2">&quot;, &quot;</span><span class="o">.</span><span class="n">join</span><span class="p">(</span><span class="n">parts</span><span class="p">[:</span><span class="mi">3</span><span class="p">])</span> <span class="o">+</span> <span class="s2">&quot;…&quot;</span>
+
+    <span class="n">campaign_windows</span> <span class="o">=</span> <span class="p">{}</span>
+
+    <span class="k">try</span><span class="p">:</span>
+        <span class="c1"># Fetch only metadatas to reduce payload; some versions support &#39;limit&#39;</span>
+        <span class="k">try</span><span class="p">:</span>
+            <span class="n">res</span> <span class="o">=</span> <span class="n">collection</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="n">include</span><span class="o">=</span><span class="p">[</span><span class="s2">&quot;metadatas&quot;</span><span class="p">],</span> <span class="n">limit</span><span class="o">=</span><span class="mi">100000</span><span class="p">)</span>  <span class="c1"># type: ignore[arg-type]</span>
+        <span class="k">except</span> <span class="ne">Exception</span><span class="p">:</span>
+            <span class="k">try</span><span class="p">:</span>
+                <span class="n">res</span> <span class="o">=</span> <span class="n">collection</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="n">include</span><span class="o">=</span><span class="p">[</span><span class="s2">&quot;metadatas&quot;</span><span class="p">])</span>  <span class="c1"># type: ignore[arg-type]</span>
+            <span class="k">except</span> <span class="ne">Exception</span><span class="p">:</span>
+                <span class="n">res</span> <span class="o">=</span> <span class="n">collection</span><span class="o">.</span><span class="n">get</span><span class="p">()</span>
+
+        <span class="k">if</span> <span class="ow">not</span> <span class="nb">isinstance</span><span class="p">(</span><span class="n">res</span><span class="p">,</span> <span class="nb">dict</span><span class="p">):</span>
+            <span class="k">raise</span> <span class="ne">ValueError</span><span class="p">(</span><span class="s2">&quot;Unexpected ChromaDB get() result type&quot;</span><span class="p">)</span>
+
+        <span class="n">metadatas</span> <span class="o">=</span> <span class="n">res</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="s2">&quot;metadatas&quot;</span><span class="p">,</span> <span class="p">[])</span> <span class="ow">or</span> <span class="p">[]</span>
+        <span class="c1"># Accept multiple possible metadata keys for date and classification</span>
+        <span class="n">date_keys</span> <span class="o">=</span> <span class="p">(</span>
+            <span class="s2">&quot;sent_date&quot;</span><span class="p">,</span> <span class="s2">&quot;date&quot;</span><span class="p">,</span> <span class="s2">&quot;received_at&quot;</span><span class="p">,</span> <span class="s2">&quot;created_at&quot;</span><span class="p">,</span>
+            <span class="s2">&quot;created&quot;</span><span class="p">,</span> <span class="s2">&quot;timestamp&quot;</span><span class="p">,</span> <span class="s2">&quot;date_received&quot;</span><span class="p">,</span> <span class="s2">&quot;mail_date&quot;</span><span class="p">,</span>
+            <span class="s2">&quot;headers_date&quot;</span><span class="p">,</span> <span class="s2">&quot;date_header&quot;</span><span class="p">,</span> <span class="s2">&quot;ingested_at&quot;</span><span class="p">,</span> <span class="s2">&quot;submitted_at&quot;</span><span class="p">,</span>
+            <span class="s2">&quot;time&quot;</span><span class="p">,</span> <span class="s2">&quot;ts&quot;</span>
+        <span class="p">)</span>
+        <span class="n">class_key</span> <span class="o">=</span> <span class="s2">&quot;classification&quot;</span>
+
+        <span class="k">for</span> <span class="n">meta</span> <span class="ow">in</span> <span class="n">metadatas</span><span class="p">:</span>
+            <span class="k">try</span><span class="p">:</span>
+                <span class="n">meta</span> <span class="o">=</span> <span class="n">meta</span> <span class="ow">or</span> <span class="p">{}</span>
+                <span class="n">refs_key</span> <span class="o">=</span> <span class="n">_parse_source_refs</span><span class="p">(</span><span class="n">meta</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="s2">&quot;sourceRefs&quot;</span><span class="p">))</span>
+                <span class="n">sent_dt</span> <span class="o">=</span> <span class="n">_extract_sent_datetime</span><span class="p">(</span><span class="n">meta</span><span class="p">)</span>
+                <span class="n">day</span> <span class="o">=</span> <span class="n">sent_dt</span><span class="o">.</span><span class="n">date</span><span class="p">()</span> <span class="k">if</span> <span class="n">sent_dt</span> <span class="k">else</span> <span class="kc">None</span>
+
+                <span class="n">dval</span> <span class="o">=</span> <span class="kc">None</span>
+                <span class="k">if</span> <span class="n">day</span> <span class="ow">is</span> <span class="kc">None</span><span class="p">:</span>
+                    <span class="c1"># 1) Known keys</span>
+                    <span class="k">for</span> <span class="n">k</span> <span class="ow">in</span> <span class="n">date_keys</span><span class="p">:</span>
+                        <span class="k">if</span> <span class="n">k</span> <span class="ow">in</span> <span class="n">meta</span> <span class="ow">and</span> <span class="n">meta</span><span class="p">[</span><span class="n">k</span><span class="p">]:</span>
+                            <span class="n">dval</span> <span class="o">=</span> <span class="n">meta</span><span class="p">[</span><span class="n">k</span><span class="p">]</span>
+                            <span class="k">break</span>
+                    <span class="c1"># 2) If not found, scan values for date-looking strings or epochs</span>
+                    <span class="k">if</span> <span class="n">dval</span> <span class="ow">is</span> <span class="kc">None</span><span class="p">:</span>
+                        <span class="k">for</span> <span class="n">v</span> <span class="ow">in</span> <span class="n">meta</span><span class="o">.</span><span class="n">values</span><span class="p">():</span>
+                            <span class="n">potential_day</span> <span class="o">=</span> <span class="n">_parse_to_utc_date</span><span class="p">(</span><span class="n">v</span><span class="p">)</span>
+                            <span class="k">if</span> <span class="n">potential_day</span> <span class="ow">is</span> <span class="ow">not</span> <span class="kc">None</span><span class="p">:</span>
+                                <span class="n">dval</span> <span class="o">=</span> <span class="n">v</span>
+                                <span class="k">break</span>
+                    <span class="k">if</span> <span class="n">dval</span> <span class="ow">is</span> <span class="ow">not</span> <span class="kc">None</span><span class="p">:</span>
+                        <span class="n">day</span> <span class="o">=</span> <span class="n">_parse_to_utc_date</span><span class="p">(</span><span class="n">dval</span><span class="p">)</span>
+
+                <span class="k">if</span> <span class="n">refs_key</span><span class="p">:</span>
+                    <span class="k">if</span> <span class="n">sent_dt</span> <span class="ow">is</span> <span class="kc">None</span> <span class="ow">and</span> <span class="n">day</span> <span class="ow">is</span> <span class="ow">not</span> <span class="kc">None</span><span class="p">:</span>
+                        <span class="n">sent_dt</span> <span class="o">=</span> <span class="n">datetime</span><span class="p">(</span><span class="n">day</span><span class="o">.</span><span class="n">year</span><span class="p">,</span> <span class="n">day</span><span class="o">.</span><span class="n">month</span><span class="p">,</span> <span class="n">day</span><span class="o">.</span><span class="n">day</span><span class="p">,</span> <span class="n">tzinfo</span><span class="o">=</span><span class="n">timezone</span><span class="o">.</span><span class="n">utc</span><span class="p">)</span>
+                    <span class="k">if</span> <span class="n">sent_dt</span> <span class="ow">is</span> <span class="ow">not</span> <span class="kc">None</span><span class="p">:</span>
+                        <span class="n">window</span> <span class="o">=</span> <span class="n">campaign_windows</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="n">refs_key</span><span class="p">)</span>
+                        <span class="k">if</span> <span class="n">window</span> <span class="ow">is</span> <span class="kc">None</span><span class="p">:</span>
+                            <span class="n">campaign_windows</span><span class="p">[</span><span class="n">refs_key</span><span class="p">]</span> <span class="o">=</span> <span class="p">{</span><span class="s2">&quot;first&quot;</span><span class="p">:</span> <span class="n">sent_dt</span><span class="p">,</span> <span class="s2">&quot;last&quot;</span><span class="p">:</span> <span class="n">sent_dt</span><span class="p">}</span>
+                        <span class="k">else</span><span class="p">:</span>
+                            <span class="k">if</span> <span class="n">sent_dt</span> <span class="o">&lt;</span> <span class="n">window</span><span class="p">[</span><span class="s2">&quot;first&quot;</span><span class="p">]:</span>
+                                <span class="n">window</span><span class="p">[</span><span class="s2">&quot;first&quot;</span><span class="p">]</span> <span class="o">=</span> <span class="n">sent_dt</span>
+                            <span class="k">if</span> <span class="n">sent_dt</span> <span class="o">&gt;</span> <span class="n">window</span><span class="p">[</span><span class="s2">&quot;last&quot;</span><span class="p">]:</span>
+                                <span class="n">window</span><span class="p">[</span><span class="s2">&quot;last&quot;</span><span class="p">]</span> <span class="o">=</span> <span class="n">sent_dt</span>
+
+                <span class="k">if</span> <span class="n">day</span> <span class="ow">is</span> <span class="kc">None</span><span class="p">:</span>
+                    <span class="k">continue</span>
+                <span class="k">if</span> <span class="ow">not</span> <span class="p">(</span><span class="n">start_utc</span> <span class="o">&lt;=</span> <span class="n">day</span> <span class="o">&lt;=</span> <span class="n">today_utc</span><span class="p">):</span>
+                    <span class="k">continue</span>
+                <span class="n">pos</span> <span class="o">=</span> <span class="n">idx</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="n">day</span><span class="p">)</span>
+                <span class="k">if</span> <span class="n">pos</span> <span class="ow">is</span> <span class="kc">None</span><span class="p">:</span>
+                    <span class="k">continue</span>
+                <span class="bp">cls</span> <span class="o">=</span> <span class="nb">str</span><span class="p">(</span><span class="n">meta</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="n">class_key</span><span class="p">,</span> <span class="s2">&quot;UNKNOWN&quot;</span><span class="p">))</span><span class="o">.</span><span class="n">upper</span><span class="p">()</span>
+                <span class="k">if</span> <span class="bp">cls</span> <span class="o">==</span> <span class="s2">&quot;DANGEROUS&quot;</span><span class="p">:</span>
+                    <span class="n">dangerous</span><span class="p">[</span><span class="n">pos</span><span class="p">]</span> <span class="o">+=</span> <span class="mi">1</span>
+                <span class="k">else</span><span class="p">:</span>
+                    <span class="n">non_danger</span><span class="p">[</span><span class="n">pos</span><span class="p">]</span> <span class="o">+=</span> <span class="mi">1</span>
+            <span class="k">except</span> <span class="ne">Exception</span><span class="p">:</span>
+                <span class="k">continue</span>
+
+    <span class="k">except</span> <span class="ne">Exception</span> <span class="k">as</span> <span class="n">e</span><span class="p">:</span>
+        <span class="n">logger</span><span class="o">.</span><span class="n">error</span><span class="p">(</span><span class="s2">&quot;Error computing mail volume: </span><span class="si">%s</span><span class="s2">&quot;</span><span class="p">,</span> <span class="n">e</span><span class="p">,</span> <span class="n">exc_info</span><span class="o">=</span><span class="kc">True</span><span class="p">)</span>
+
+    <span class="c1"># Build UTC datetime window [start_of_first_day, start_of_day_after_last_day)</span>
+    <span class="n">window_start_dt</span> <span class="o">=</span> <span class="n">datetime</span><span class="p">(</span><span class="n">start_utc</span><span class="o">.</span><span class="n">year</span><span class="p">,</span> <span class="n">start_utc</span><span class="o">.</span><span class="n">month</span><span class="p">,</span> <span class="n">start_utc</span><span class="o">.</span><span class="n">day</span><span class="p">,</span> <span class="n">tzinfo</span><span class="o">=</span><span class="n">timezone</span><span class="o">.</span><span class="n">utc</span><span class="p">)</span>
+    <span class="n">window_end_dt</span> <span class="o">=</span> <span class="n">datetime</span><span class="p">(</span><span class="n">today_utc</span><span class="o">.</span><span class="n">year</span><span class="p">,</span> <span class="n">today_utc</span><span class="o">.</span><span class="n">month</span><span class="p">,</span> <span class="n">today_utc</span><span class="o">.</span><span class="n">day</span><span class="p">,</span> <span class="n">tzinfo</span><span class="o">=</span><span class="n">timezone</span><span class="o">.</span><span class="n">utc</span><span class="p">)</span> <span class="o">+</span> <span class="n">timedelta</span><span class="p">(</span><span class="n">days</span><span class="o">=</span><span class="mi">1</span><span class="p">)</span>
+
+    <span class="n">campaigns_out</span> <span class="o">=</span> <span class="p">[]</span>
+    <span class="k">for</span> <span class="n">idx_num</span><span class="p">,</span> <span class="p">(</span><span class="n">refs_key</span><span class="p">,</span> <span class="n">bounds</span><span class="p">)</span> <span class="ow">in</span> <span class="nb">enumerate</span><span class="p">(</span><span class="n">campaign_windows</span><span class="o">.</span><span class="n">items</span><span class="p">(),</span> <span class="n">start</span><span class="o">=</span><span class="mi">1</span><span class="p">):</span>
+        <span class="n">start_dt</span> <span class="o">=</span> <span class="n">_ensure_utc</span><span class="p">(</span><span class="n">bounds</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="s2">&quot;first&quot;</span><span class="p">))</span>
+        <span class="n">end_dt</span> <span class="o">=</span> <span class="n">_ensure_utc</span><span class="p">(</span><span class="n">bounds</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="s2">&quot;last&quot;</span><span class="p">))</span>
+        <span class="k">if</span> <span class="n">start_dt</span> <span class="ow">is</span> <span class="kc">None</span> <span class="ow">or</span> <span class="n">end_dt</span> <span class="ow">is</span> <span class="kc">None</span><span class="p">:</span>
+            <span class="k">continue</span>
+        <span class="k">if</span> <span class="n">end_dt</span> <span class="o">&lt;</span> <span class="n">start_dt</span><span class="p">:</span>
+            <span class="n">start_dt</span><span class="p">,</span> <span class="n">end_dt</span> <span class="o">=</span> <span class="n">end_dt</span><span class="p">,</span> <span class="n">start_dt</span>
+        <span class="k">if</span> <span class="n">end_dt</span> <span class="o">&lt;</span> <span class="n">window_start_dt</span> <span class="ow">or</span> <span class="n">start_dt</span> <span class="o">&gt;</span> <span class="n">window_end_dt</span><span class="p">:</span>
+            <span class="k">continue</span>
+        <span class="n">clamped_start</span> <span class="o">=</span> <span class="nb">max</span><span class="p">(</span><span class="n">start_dt</span><span class="p">,</span> <span class="n">window_start_dt</span><span class="p">)</span>
+        <span class="n">clamped_end</span> <span class="o">=</span> <span class="nb">min</span><span class="p">(</span><span class="n">end_dt</span><span class="p">,</span> <span class="n">window_end_dt</span><span class="p">)</span>
+        <span class="k">if</span> <span class="n">clamped_end</span> <span class="o">&lt;</span> <span class="n">clamped_start</span><span class="p">:</span>
+            <span class="k">continue</span>
+        <span class="n">campaigns_out</span><span class="o">.</span><span class="n">append</span><span class="p">({</span>
+            <span class="s2">&quot;name&quot;</span><span class="p">:</span> <span class="n">_format_campaign_name</span><span class="p">(</span><span class="n">refs_key</span><span class="p">,</span> <span class="n">idx_num</span><span class="p">),</span>
+            <span class="s2">&quot;start&quot;</span><span class="p">:</span> <span class="n">clamped_start</span><span class="o">.</span><span class="n">isoformat</span><span class="p">(),</span>
+            <span class="s2">&quot;end&quot;</span><span class="p">:</span> <span class="n">clamped_end</span><span class="o">.</span><span class="n">isoformat</span><span class="p">(),</span>
+        <span class="p">})</span>
+
+    <span class="k">return</span> <span class="n">JsonResponse</span><span class="p">({</span>
+        <span class="s2">&quot;dates&quot;</span><span class="p">:</span> <span class="p">[</span><span class="n">d</span><span class="o">.</span><span class="n">isoformat</span><span class="p">()</span> <span class="k">for</span> <span class="n">d</span> <span class="ow">in</span> <span class="n">all_days</span><span class="p">],</span>
+        <span class="s2">&quot;non_danger&quot;</span><span class="p">:</span> <span class="n">non_danger</span><span class="p">,</span>
+        <span class="s2">&quot;dangerous&quot;</span><span class="p">:</span> <span class="n">dangerous</span><span class="p">,</span>
+        <span class="s2">&quot;campaigns&quot;</span><span class="p">:</span> <span class="n">campaigns_out</span><span class="p">,</span>
+    <span class="p">})</span></div>
+
+</pre></div>
+
+          </div>
+          
+        </div>
+      </div>
+      <div class="sphinxsidebar" role="navigation" aria-label="Main">
+        <div class="sphinxsidebarwrapper">
+<h1 class="logo"><a href="../../index.html">Suspicious</a></h1>
+
+
+
+
+
+
+
+
+
+<search id="searchbox" style="display: none" role="search">
+    <div class="searchformwrapper">
+    <form class="search" action="../../search.html" method="get">
+      <input type="text" name="q" aria-labelledby="searchlabel" autocomplete="off" autocorrect="off" autocapitalize="off" spellcheck="false" placeholder="Search"/>
+      <input type="submit" value="Go" />
+    </form>
+    </div>
+</search>
+<script>document.getElementById('searchbox').style.display = "block"</script><h3>Navigation</h3>
+<p class="caption" role="heading"><span class="caption-text">Contents:</span></p>
+<ul>
+<li class="toctree-l1"><a class="reference internal" href="../../modules/index.html">Modules (API Reference)</a></li>
+</ul>
+
+<div class="relations">
+<h3>Related Topics</h3>
+<ul>
+  <li><a href="../../index.html">Documentation overview</a><ul>
+  <li><a href="../index.html">Module code</a><ul>
+  </ul></li>
+  </ul></li>
+</ul>
+</div>
+
+
+
+
+
+
+
+
+        </div>
+      </div>
+      <div class="clearer"></div>
+    </div>
+    <div class="footer">
+      &#169;2025, Theo Bhang, Esteban Crispel.
+      
+      |
+      Powered by <a href="https://www.sphinx-doc.org/">Sphinx 8.2.3</a>
+      &amp; <a href="https://alabaster.readthedocs.io">Alabaster 1.0.0</a>
+      
+    </div>
+
+    
+
+    
+  </body>
+</html>

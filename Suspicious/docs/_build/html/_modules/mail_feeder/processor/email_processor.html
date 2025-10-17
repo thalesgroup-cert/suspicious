@@ -1,0 +1,265 @@
+
+
+<!DOCTYPE html>
+<html class="writer-html5" lang="en" data-content_root="../../../">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>mail_feeder.processor.email_processor &mdash; Suspicious 1.0.0 documentation</title>
+      <link rel="stylesheet" type="text/css" href="../../../_static/pygments.css?v=b86133f3" />
+      <link rel="stylesheet" type="text/css" href="../../../_static/css/theme.css?v=e59714d7" />
+
+  
+      <script src="../../../_static/jquery.js?v=5d32c60e"></script>
+      <script src="../../../_static/_sphinx_javascript_frameworks_compat.js?v=2cd50e6c"></script>
+      <script src="../../../_static/documentation_options.js?v=8d563738"></script>
+      <script src="../../../_static/doctools.js?v=9bcbadda"></script>
+      <script src="../../../_static/sphinx_highlight.js?v=dc90522c"></script>
+    <script src="../../../_static/js/theme.js"></script>
+    <link rel="index" title="Index" href="../../../genindex.html" />
+    <link rel="search" title="Search" href="../../../search.html" /> 
+</head>
+
+<body class="wy-body-for-nav"> 
+  <div class="wy-grid-for-nav">
+    <nav data-toggle="wy-nav-shift" class="wy-nav-side">
+      <div class="wy-side-scroll">
+        <div class="wy-side-nav-search" >
+
+          
+          
+          <a href="../../../index.html" class="icon icon-home">
+            Suspicious
+          </a>
+<div role="search">
+  <form id="rtd-search-form" class="wy-form" action="../../../search.html" method="get">
+    <input type="text" name="q" placeholder="Search docs" aria-label="Search docs" />
+    <input type="hidden" name="check_keywords" value="yes" />
+    <input type="hidden" name="area" value="default" />
+  </form>
+</div>
+        </div><div class="wy-menu wy-menu-vertical" data-spy="affix" role="navigation" aria-label="Navigation menu">
+              <p class="caption" role="heading"><span class="caption-text">Contents:</span></p>
+<ul>
+<li class="toctree-l1"><a class="reference internal" href="../../../modules/index.html">Modules (API Reference)</a></li>
+</ul>
+
+        </div>
+      </div>
+    </nav>
+
+    <section data-toggle="wy-nav-shift" class="wy-nav-content-wrap"><nav class="wy-nav-top" aria-label="Mobile navigation menu" >
+          <i data-toggle="wy-nav-top" class="fa fa-bars"></i>
+          <a href="../../../index.html">Suspicious</a>
+      </nav>
+
+      <div class="wy-nav-content">
+        <div class="rst-content">
+          <div role="navigation" aria-label="Page navigation">
+  <ul class="wy-breadcrumbs">
+      <li><a href="../../../index.html" class="icon icon-home" aria-label="Home"></a></li>
+          <li class="breadcrumb-item"><a href="../../index.html">Module code</a></li>
+      <li class="breadcrumb-item active">mail_feeder.processor.email_processor</li>
+      <li class="wy-breadcrumbs-aside">
+      </li>
+  </ul>
+  <hr/>
+</div>
+          <div role="main" class="document" itemscope="itemscope" itemtype="http://schema.org/Article">
+           <div itemprop="articleBody">
+             
+  <h1>Source code for mail_feeder.processor.email_processor</h1><div class="highlight"><pre>
+<span></span><span class="kn">import</span><span class="w"> </span><span class="nn">os</span>
+<span class="kn">import</span><span class="w"> </span><span class="nn">logging</span>
+<span class="kn">import</span><span class="w"> </span><span class="nn">uuid</span>
+<span class="kn">from</span><span class="w"> </span><span class="nn">datetime</span><span class="w"> </span><span class="kn">import</span> <span class="n">datetime</span>
+<span class="kn">from</span><span class="w"> </span><span class="nn">email.header</span><span class="w"> </span><span class="kn">import</span> <span class="n">decode_header</span><span class="p">,</span> <span class="n">make_header</span>
+<span class="kn">from</span><span class="w"> </span><span class="nn">email.utils</span><span class="w"> </span><span class="kn">import</span> <span class="n">parseaddr</span>
+<span class="kn">from</span><span class="w"> </span><span class="nn">email.message</span><span class="w"> </span><span class="kn">import</span> <span class="n">Message</span>
+<span class="kn">from</span><span class="w"> </span><span class="nn">typing</span><span class="w"> </span><span class="kn">import</span> <span class="n">Optional</span><span class="p">,</span> <span class="n">List</span><span class="p">,</span> <span class="n">Dict</span><span class="p">,</span> <span class="n">Any</span>
+
+
+<div class="viewcode-block" id="parse_email">
+<a class="viewcode-back" href="../../../modules/mail_feeder_core.html#mail_feeder.processor.email_processor.parse_email">[docs]</a>
+<span class="k">def</span><span class="w"> </span><span class="nf">parse_email</span><span class="p">(</span><span class="n">email_message</span><span class="p">:</span> <span class="n">Message</span><span class="p">,</span> <span class="n">working_dir</span><span class="p">:</span> <span class="nb">str</span><span class="p">,</span> <span class="n">email_reference</span><span class="p">:</span> <span class="nb">str</span><span class="p">,</span> <span class="n">reported_by</span><span class="p">:</span> <span class="n">Optional</span><span class="p">[</span><span class="nb">str</span><span class="p">]</span> <span class="o">=</span> <span class="kc">None</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="n">Dict</span><span class="p">[</span><span class="nb">str</span><span class="p">,</span> <span class="n">Any</span><span class="p">]:</span>
+<span class="w">    </span><span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">    Parse an email message, extract key information and attachments, and return as a dictionary.</span>
+
+<span class="sd">    Args:</span>
+<span class="sd">        email_message (Message): The email message object to process.</span>
+<span class="sd">        working_dir (str): Directory where attachments will be saved.</span>
+<span class="sd">        email_reference (str): Unique reference for this email.</span>
+<span class="sd">        reported_by (Optional[str]): Email address of the reporter, if different from &#39;From&#39; header.</span>
+
+<span class="sd">    Returns:</span>
+<span class="sd">        Dict[str, Any]: Parsed email data including headers, text, attachments, and metadata.</span>
+<span class="sd">    &quot;&quot;&quot;</span>
+    <span class="k">try</span><span class="p">:</span>
+        <span class="n">os</span><span class="o">.</span><span class="n">makedirs</span><span class="p">(</span><span class="n">working_dir</span><span class="p">,</span> <span class="n">exist_ok</span><span class="o">=</span><span class="kc">True</span><span class="p">)</span>
+        <span class="n">attachments</span> <span class="o">=</span> <span class="n">extract_email_attachments</span><span class="p">(</span><span class="n">email_message</span><span class="p">,</span> <span class="n">working_dir</span><span class="p">,</span> <span class="n">email_reference</span><span class="p">)</span>
+
+        <span class="n">from_addr</span> <span class="o">=</span> <span class="n">decode_email_header</span><span class="p">(</span><span class="n">parseaddr</span><span class="p">(</span><span class="n">email_message</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="s1">&#39;From&#39;</span><span class="p">,</span> <span class="s1">&#39;&#39;</span><span class="p">))[</span><span class="mi">1</span><span class="p">])</span>
+        <span class="n">to_addr</span> <span class="o">=</span> <span class="n">decode_email_header</span><span class="p">(</span><span class="n">parseaddr</span><span class="p">(</span><span class="n">email_message</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="s1">&#39;To&#39;</span><span class="p">,</span> <span class="s1">&#39;&#39;</span><span class="p">))[</span><span class="mi">1</span><span class="p">])</span>
+        <span class="n">cc_addr</span> <span class="o">=</span> <span class="n">decode_email_header</span><span class="p">(</span><span class="n">parseaddr</span><span class="p">(</span><span class="n">email_message</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="s1">&#39;Cc&#39;</span><span class="p">,</span> <span class="s1">&#39;&#39;</span><span class="p">))[</span><span class="mi">1</span><span class="p">])</span>
+        <span class="n">bcc_addr</span> <span class="o">=</span> <span class="n">decode_email_header</span><span class="p">(</span><span class="n">parseaddr</span><span class="p">(</span><span class="n">email_message</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="s1">&#39;Bcc&#39;</span><span class="p">,</span> <span class="s1">&#39;&#39;</span><span class="p">))[</span><span class="mi">1</span><span class="p">])</span>
+        <span class="n">subject</span> <span class="o">=</span> <span class="n">decode_email_header</span><span class="p">(</span><span class="n">email_message</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="s1">&#39;Subject&#39;</span><span class="p">,</span> <span class="s1">&#39;&#39;</span><span class="p">))</span>
+
+        <span class="n">reporter</span> <span class="o">=</span> <span class="n">reported_by</span> <span class="k">if</span> <span class="n">reported_by</span> <span class="k">else</span> <span class="n">from_addr</span>
+
+        <span class="n">email_text_parts</span> <span class="o">=</span> <span class="p">[</span>
+            <span class="n">part</span><span class="o">.</span><span class="n">get_payload</span><span class="p">(</span><span class="n">decode</span><span class="o">=</span><span class="kc">True</span><span class="p">)</span><span class="o">.</span><span class="n">decode</span><span class="p">(</span><span class="n">part</span><span class="o">.</span><span class="n">get_content_charset</span><span class="p">(</span><span class="s1">&#39;utf-8&#39;</span><span class="p">),</span> <span class="n">errors</span><span class="o">=</span><span class="s1">&#39;replace&#39;</span><span class="p">)</span>
+            <span class="k">for</span> <span class="n">part</span> <span class="ow">in</span> <span class="n">email_message</span><span class="o">.</span><span class="n">walk</span><span class="p">()</span>
+            <span class="k">if</span> <span class="n">part</span><span class="o">.</span><span class="n">get_content_type</span><span class="p">()</span> <span class="ow">in</span> <span class="p">[</span><span class="s1">&#39;text/plain&#39;</span><span class="p">,</span> <span class="s1">&#39;text/html&#39;</span><span class="p">]</span>
+        <span class="p">]</span>
+
+        <span class="n">email_info</span> <span class="o">=</span> <span class="p">{</span>
+            <span class="s1">&#39;reportedBy&#39;</span><span class="p">:</span> <span class="n">reporter</span><span class="p">,</span>
+            <span class="s1">&#39;from&#39;</span><span class="p">:</span> <span class="n">from_addr</span><span class="p">,</span>
+            <span class="s1">&#39;to&#39;</span><span class="p">:</span> <span class="n">to_addr</span><span class="p">,</span>
+            <span class="s1">&#39;cc&#39;</span><span class="p">:</span> <span class="n">cc_addr</span><span class="p">,</span>
+            <span class="s1">&#39;bcc&#39;</span><span class="p">:</span> <span class="n">bcc_addr</span><span class="p">,</span>
+            <span class="s1">&#39;reportedSubject&#39;</span><span class="p">:</span> <span class="n">subject</span><span class="p">,</span>
+            <span class="s1">&#39;reportedText&#39;</span><span class="p">:</span> <span class="n">email_text_parts</span><span class="p">,</span>
+            <span class="s1">&#39;date&#39;</span><span class="p">:</span> <span class="n">email_message</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="s1">&#39;Date&#39;</span><span class="p">,</span> <span class="s1">&#39;&#39;</span><span class="p">),</span>
+            <span class="s1">&#39;headers&#39;</span><span class="p">:</span> <span class="n">get_header_dict_list</span><span class="p">(</span><span class="n">email_message</span><span class="p">),</span>
+            <span class="s1">&#39;id&#39;</span><span class="p">:</span> <span class="n">email_reference</span><span class="p">,</span>
+            <span class="s1">&#39;attachments&#39;</span><span class="p">:</span> <span class="n">attachments</span>
+        <span class="p">}</span>
+
+        <span class="n">logging</span><span class="o">.</span><span class="n">debug</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;Processed email &#39;</span><span class="si">{</span><span class="n">subject</span><span class="si">}</span><span class="s2">&#39; with reference </span><span class="si">{</span><span class="n">email_reference</span><span class="si">}</span><span class="s2">&quot;</span><span class="p">)</span>
+
+        <span class="k">return</span> <span class="n">email_info</span>
+    <span class="k">except</span> <span class="ne">Exception</span> <span class="k">as</span> <span class="n">e</span><span class="p">:</span>
+        <span class="n">logging</span><span class="o">.</span><span class="n">error</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;Failed to parse email: </span><span class="si">{</span><span class="n">e</span><span class="si">}</span><span class="s2">&quot;</span><span class="p">)</span>
+        <span class="k">return</span> <span class="kc">None</span></div>
+
+
+
+<div class="viewcode-block" id="extract_email_attachments">
+<a class="viewcode-back" href="../../../modules/mail_feeder_core.html#mail_feeder.processor.email_processor.extract_email_attachments">[docs]</a>
+<span class="k">def</span><span class="w"> </span><span class="nf">extract_email_attachments</span><span class="p">(</span><span class="n">email_message</span><span class="p">:</span> <span class="n">Message</span><span class="p">,</span> <span class="n">save_dir</span><span class="p">:</span> <span class="nb">str</span><span class="p">,</span> <span class="n">email_reference</span><span class="p">:</span> <span class="nb">str</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="n">List</span><span class="p">[</span><span class="n">Dict</span><span class="p">[</span><span class="nb">str</span><span class="p">,</span> <span class="n">Any</span><span class="p">]]:</span>
+<span class="w">    </span><span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">    Extract attachments from an email message and save them in the given directory.</span>
+
+<span class="sd">    Args:</span>
+<span class="sd">        email_message (Message): Email message object.</span>
+<span class="sd">        save_dir (str): Directory path to save attachments.</span>
+<span class="sd">        email_reference (str): Reference ID for the parent email.</span>
+
+<span class="sd">    Returns:</span>
+<span class="sd">        List[Dict[str, Any]]: List of dictionaries representing attachments with metadata.</span>
+<span class="sd">    &quot;&quot;&quot;</span>
+    <span class="n">attachments</span> <span class="o">=</span> <span class="p">[]</span>
+
+    <span class="k">for</span> <span class="n">part</span> <span class="ow">in</span> <span class="n">email_message</span><span class="o">.</span><span class="n">walk</span><span class="p">():</span>
+        <span class="k">if</span> <span class="n">part</span><span class="o">.</span><span class="n">get_content_maintype</span><span class="p">()</span> <span class="o">==</span> <span class="s1">&#39;multipart&#39;</span><span class="p">:</span>
+            <span class="k">continue</span>
+        <span class="n">content_disposition</span> <span class="o">=</span> <span class="n">part</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="s1">&#39;Content-Disposition&#39;</span><span class="p">,</span> <span class="s1">&#39;&#39;</span><span class="p">)</span>
+        <span class="k">if</span> <span class="ow">not</span> <span class="n">content_disposition</span> <span class="ow">or</span> <span class="s1">&#39;attachment&#39;</span> <span class="ow">not</span> <span class="ow">in</span> <span class="n">content_disposition</span><span class="o">.</span><span class="n">lower</span><span class="p">():</span>
+            <span class="k">continue</span>
+
+        <span class="n">raw_filename</span> <span class="o">=</span> <span class="n">part</span><span class="o">.</span><span class="n">get_filename</span><span class="p">()</span>
+        <span class="k">if</span> <span class="n">raw_filename</span><span class="p">:</span>
+            <span class="n">decoded_filename</span> <span class="o">=</span> <span class="n">decode_email_header</span><span class="p">(</span><span class="n">raw_filename</span><span class="p">)</span>
+            <span class="n">filepath</span> <span class="o">=</span> <span class="n">os</span><span class="o">.</span><span class="n">path</span><span class="o">.</span><span class="n">join</span><span class="p">(</span><span class="n">save_dir</span><span class="p">,</span> <span class="n">decoded_filename</span><span class="p">)</span>
+
+            <span class="k">try</span><span class="p">:</span>
+                <span class="k">with</span> <span class="nb">open</span><span class="p">(</span><span class="n">filepath</span><span class="p">,</span> <span class="s2">&quot;wb&quot;</span><span class="p">)</span> <span class="k">as</span> <span class="n">f</span><span class="p">:</span>
+                    <span class="n">f</span><span class="o">.</span><span class="n">write</span><span class="p">(</span><span class="n">part</span><span class="o">.</span><span class="n">get_payload</span><span class="p">(</span><span class="n">decode</span><span class="o">=</span><span class="kc">True</span><span class="p">))</span>
+            <span class="k">except</span> <span class="ne">Exception</span> <span class="k">as</span> <span class="n">e</span><span class="p">:</span>
+                <span class="n">logging</span><span class="o">.</span><span class="n">error</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;Failed to save attachment </span><span class="si">{</span><span class="n">decoded_filename</span><span class="si">}</span><span class="s2">: </span><span class="si">{</span><span class="n">e</span><span class="si">}</span><span class="s2">&quot;</span><span class="p">)</span>
+                <span class="k">continue</span>
+
+            <span class="n">attachment_data</span> <span class="o">=</span> <span class="p">{</span>
+                <span class="s1">&#39;filename&#39;</span><span class="p">:</span> <span class="n">decoded_filename</span><span class="p">,</span>
+                <span class="s1">&#39;content&#39;</span><span class="p">:</span> <span class="n">part</span><span class="o">.</span><span class="n">get_payload</span><span class="p">(</span><span class="n">decode</span><span class="o">=</span><span class="kc">True</span><span class="p">),</span>
+                <span class="s1">&#39;headers&#39;</span><span class="p">:</span> <span class="nb">dict</span><span class="p">(</span><span class="n">part</span><span class="o">.</span><span class="n">items</span><span class="p">()),</span>
+                <span class="s1">&#39;parent&#39;</span><span class="p">:</span> <span class="n">email_reference</span>
+            <span class="p">}</span>
+            <span class="n">attachments</span><span class="o">.</span><span class="n">append</span><span class="p">(</span><span class="n">attachment_data</span><span class="p">)</span>
+
+    <span class="k">return</span> <span class="n">attachments</span></div>
+
+
+
+<div class="viewcode-block" id="decode_email_header">
+<a class="viewcode-back" href="../../../modules/mail_feeder_core.html#mail_feeder.processor.email_processor.decode_email_header">[docs]</a>
+<span class="k">def</span><span class="w"> </span><span class="nf">decode_email_header</span><span class="p">(</span><span class="n">header_value</span><span class="p">:</span> <span class="nb">str</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="nb">str</span><span class="p">:</span>
+<span class="w">    </span><span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">    Decode an encoded email header to a readable string.</span>
+
+<span class="sd">    Args:</span>
+<span class="sd">        header_value (str): The encoded header string.</span>
+
+<span class="sd">    Returns:</span>
+<span class="sd">        str: Decoded header string.</span>
+<span class="sd">    &quot;&quot;&quot;</span>
+    <span class="k">try</span><span class="p">:</span>
+        <span class="n">decoded_header</span> <span class="o">=</span> <span class="nb">str</span><span class="p">(</span><span class="n">make_header</span><span class="p">(</span><span class="n">decode_header</span><span class="p">(</span><span class="n">header_value</span><span class="p">)))</span>
+        <span class="k">return</span> <span class="n">decoded_header</span>
+    <span class="k">except</span> <span class="ne">Exception</span> <span class="k">as</span> <span class="n">e</span><span class="p">:</span>
+        <span class="n">logging</span><span class="o">.</span><span class="n">error</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;Failed to decode header &#39;</span><span class="si">{</span><span class="n">header_value</span><span class="si">}</span><span class="s2">&#39;: </span><span class="si">{</span><span class="n">e</span><span class="si">}</span><span class="s2">&quot;</span><span class="p">)</span>
+        <span class="k">return</span> <span class="n">header_value</span></div>
+
+
+
+<div class="viewcode-block" id="generate_unique_email_reference">
+<a class="viewcode-back" href="../../../modules/mail_feeder_core.html#mail_feeder.processor.email_processor.generate_unique_email_reference">[docs]</a>
+<span class="k">def</span><span class="w"> </span><span class="nf">generate_unique_email_reference</span><span class="p">()</span> <span class="o">-&gt;</span> <span class="nb">str</span><span class="p">:</span>
+<span class="w">    </span><span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">    Generate a unique reference string for emails.</span>
+
+<span class="sd">    Returns:</span>
+<span class="sd">        str: Unique reference string formatted as YYMMDDHHMMSS-12hexchars</span>
+<span class="sd">    &quot;&quot;&quot;</span>
+    <span class="n">now</span> <span class="o">=</span> <span class="n">datetime</span><span class="o">.</span><span class="n">now</span><span class="p">()</span>
+    <span class="n">ref_date</span> <span class="o">=</span> <span class="n">now</span><span class="o">.</span><span class="n">strftime</span><span class="p">(</span><span class="s2">&quot;%y%m</span><span class="si">%d</span><span class="s2">%H%M%S&quot;</span><span class="p">)</span>
+    <span class="n">formatted_uuid</span> <span class="o">=</span> <span class="n">uuid</span><span class="o">.</span><span class="n">uuid4</span><span class="p">()</span><span class="o">.</span><span class="n">hex</span><span class="p">[:</span><span class="mi">12</span><span class="p">]</span>
+    <span class="k">return</span> <span class="sa">f</span><span class="s2">&quot;</span><span class="si">{</span><span class="n">ref_date</span><span class="si">}</span><span class="s2">-</span><span class="si">{</span><span class="n">formatted_uuid</span><span class="si">}</span><span class="s2">&quot;</span></div>
+
+
+
+<div class="viewcode-block" id="get_header_dict_list">
+<a class="viewcode-back" href="../../../modules/mail_feeder_core.html#mail_feeder.processor.email_processor.get_header_dict_list">[docs]</a>
+<span class="k">def</span><span class="w"> </span><span class="nf">get_header_dict_list</span><span class="p">(</span><span class="n">email_message</span><span class="p">:</span> <span class="n">Message</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="n">Dict</span><span class="p">[</span><span class="nb">str</span><span class="p">,</span> <span class="nb">str</span><span class="p">]:</span>
+<span class="w">    </span><span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">    Convert email headers into a dictionary.</span>
+
+<span class="sd">    Args:</span>
+<span class="sd">        email_message (Message): The email message object.</span>
+
+<span class="sd">    Returns:</span>
+<span class="sd">        Dict[str, str]: Dictionary of header names and their values.</span>
+<span class="sd">    &quot;&quot;&quot;</span>
+    <span class="k">return</span> <span class="p">{</span><span class="n">k</span><span class="p">:</span> <span class="n">decode_email_header</span><span class="p">(</span><span class="n">v</span><span class="p">)</span> <span class="k">for</span> <span class="n">k</span><span class="p">,</span> <span class="n">v</span> <span class="ow">in</span> <span class="n">email_message</span><span class="o">.</span><span class="n">items</span><span class="p">()}</span></div>
+
+</pre></div>
+
+           </div>
+          </div>
+          <footer>
+
+  <hr/>
+
+  <div role="contentinfo">
+    <p>&#169; Copyright 2025, Theo Bhang, Esteban Crispel.</p>
+  </div>
+
+  Built with <a href="https://www.sphinx-doc.org/">Sphinx</a> using a
+    <a href="https://github.com/readthedocs/sphinx_rtd_theme">theme</a>
+    provided by <a href="https://readthedocs.org">Read the Docs</a>.
+   
+
+</footer>
+        </div>
+      </div>
+    </section>
+  </div>
+  <script>
+      jQuery(function () {
+          SphinxRtdTheme.Navigation.enable(true);
+      });
+  </script> 
+
+</body>
+</html>

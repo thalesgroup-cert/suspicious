@@ -1,0 +1,971 @@
+
+
+<!DOCTYPE html>
+<html class="writer-html5" lang="en" data-content_root="../../">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>tasp.views &mdash; Suspicious 1.0.0 documentation</title>
+      <link rel="stylesheet" type="text/css" href="../../_static/pygments.css?v=b86133f3" />
+      <link rel="stylesheet" type="text/css" href="../../_static/css/theme.css?v=e59714d7" />
+
+  
+      <script src="../../_static/jquery.js?v=5d32c60e"></script>
+      <script src="../../_static/_sphinx_javascript_frameworks_compat.js?v=2cd50e6c"></script>
+      <script src="../../_static/documentation_options.js?v=8d563738"></script>
+      <script src="../../_static/doctools.js?v=9bcbadda"></script>
+      <script src="../../_static/sphinx_highlight.js?v=dc90522c"></script>
+    <script src="../../_static/js/theme.js"></script>
+    <link rel="index" title="Index" href="../../genindex.html" />
+    <link rel="search" title="Search" href="../../search.html" /> 
+</head>
+
+<body class="wy-body-for-nav"> 
+  <div class="wy-grid-for-nav">
+    <nav data-toggle="wy-nav-shift" class="wy-nav-side">
+      <div class="wy-side-scroll">
+        <div class="wy-side-nav-search" >
+
+          
+          
+          <a href="../../index.html" class="icon icon-home">
+            Suspicious
+          </a>
+<div role="search">
+  <form id="rtd-search-form" class="wy-form" action="../../search.html" method="get">
+    <input type="text" name="q" placeholder="Search docs" aria-label="Search docs" />
+    <input type="hidden" name="check_keywords" value="yes" />
+    <input type="hidden" name="area" value="default" />
+  </form>
+</div>
+        </div><div class="wy-menu wy-menu-vertical" data-spy="affix" role="navigation" aria-label="Navigation menu">
+              <p class="caption" role="heading"><span class="caption-text">Contents:</span></p>
+<ul>
+<li class="toctree-l1"><a class="reference internal" href="../../modules/index.html">Modules (API Reference)</a></li>
+</ul>
+
+        </div>
+      </div>
+    </nav>
+
+    <section data-toggle="wy-nav-shift" class="wy-nav-content-wrap"><nav class="wy-nav-top" aria-label="Mobile navigation menu" >
+          <i data-toggle="wy-nav-top" class="fa fa-bars"></i>
+          <a href="../../index.html">Suspicious</a>
+      </nav>
+
+      <div class="wy-nav-content">
+        <div class="rst-content">
+          <div role="navigation" aria-label="Page navigation">
+  <ul class="wy-breadcrumbs">
+      <li><a href="../../index.html" class="icon icon-home" aria-label="Home"></a></li>
+          <li class="breadcrumb-item"><a href="../index.html">Module code</a></li>
+      <li class="breadcrumb-item active">tasp.views</li>
+      <li class="wy-breadcrumbs-aside">
+      </li>
+  </ul>
+  <hr/>
+</div>
+          <div role="main" class="document" itemscope="itemscope" itemtype="http://schema.org/Article">
+           <div itemprop="articleBody">
+             
+  <h1>Source code for tasp.views</h1><div class="highlight"><pre>
+<span></span><span class="c1"># Python Standard Library Imports</span>
+<span class="kn">import</span><span class="w"> </span><span class="nn">logging</span>
+<span class="kn">import</span><span class="w"> </span><span class="nn">json</span>
+<span class="kn">from</span><span class="w"> </span><span class="nn">typing</span><span class="w"> </span><span class="kn">import</span> <span class="n">Callable</span><span class="p">,</span> <span class="n">Dict</span>
+
+<span class="c1"># Django Core Imports</span>
+<span class="kn">from</span><span class="w"> </span><span class="nn">django.conf</span><span class="w"> </span><span class="kn">import</span> <span class="n">settings</span>
+<span class="kn">from</span><span class="w"> </span><span class="nn">django.contrib.auth</span><span class="w"> </span><span class="kn">import</span> <span class="n">logout</span>
+<span class="kn">from</span><span class="w"> </span><span class="nn">django.contrib.auth.decorators</span><span class="w"> </span><span class="kn">import</span> <span class="n">login_required</span>
+<span class="kn">from</span><span class="w"> </span><span class="nn">django.contrib</span><span class="w"> </span><span class="kn">import</span> <span class="n">messages</span>
+<span class="kn">from</span><span class="w"> </span><span class="nn">django.contrib.auth.models</span><span class="w"> </span><span class="kn">import</span> <span class="n">User</span>
+<span class="kn">from</span><span class="w"> </span><span class="nn">django.db</span><span class="w"> </span><span class="kn">import</span> <span class="n">transaction</span><span class="p">,</span> <span class="n">IntegrityError</span>
+<span class="kn">from</span><span class="w"> </span><span class="nn">django.db.models</span><span class="w"> </span><span class="kn">import</span> <span class="n">Q</span><span class="p">,</span> <span class="n">QuerySet</span><span class="p">,</span> <span class="n">F</span>
+<span class="kn">from</span><span class="w"> </span><span class="nn">django.http</span><span class="w"> </span><span class="kn">import</span> <span class="n">JsonResponse</span><span class="p">,</span> <span class="n">HttpRequest</span><span class="p">,</span> <span class="n">HttpResponse</span><span class="p">,</span> <span class="n">HttpResponseRedirect</span>
+<span class="kn">from</span><span class="w"> </span><span class="nn">django.shortcuts</span><span class="w"> </span><span class="kn">import</span> <span class="n">redirect</span><span class="p">,</span> <span class="n">render</span><span class="p">,</span> <span class="n">get_object_or_404</span>
+<span class="kn">from</span><span class="w"> </span><span class="nn">django.utils</span><span class="w"> </span><span class="kn">import</span> <span class="n">timezone</span>
+<span class="kn">from</span><span class="w"> </span><span class="nn">django.views.decorators.csrf</span><span class="w"> </span><span class="kn">import</span> <span class="n">csrf_exempt</span><span class="p">,</span> <span class="n">csrf_protect</span>
+<span class="kn">from</span><span class="w"> </span><span class="nn">django.views.decorators.http</span><span class="w"> </span><span class="kn">import</span> <span class="n">require_GET</span>
+
+<span class="c1"># Local Application/Project Imports</span>
+
+<span class="kn">from</span><span class="w"> </span><span class="nn">tasp.forms</span><span class="w"> </span><span class="kn">import</span> <span class="n">UploadFileForm</span><span class="p">,</span> <span class="n">UploadURLForm</span><span class="p">,</span> <span class="n">UploadOtherForm</span>
+<span class="kn">from</span><span class="w"> </span><span class="nn">tasp.utils.popup</span><span class="w"> </span><span class="kn">import</span> <span class="n">generate_html</span>
+
+<span class="kn">from</span><span class="w"> </span><span class="nn">case_handler.case_utils.case_handler</span><span class="w"> </span><span class="kn">import</span> <span class="n">CaseHandler</span>
+<span class="kn">from</span><span class="w"> </span><span class="nn">case_handler.models</span><span class="w"> </span><span class="kn">import</span> <span class="n">Case</span>
+<span class="kn">from</span><span class="w"> </span><span class="nn">case_handler.update_case.update_handler</span><span class="w"> </span><span class="kn">import</span> <span class="p">(</span>
+    <span class="n">handle_attachment</span><span class="p">,</span>
+    <span class="n">handle_artifact</span><span class="p">,</span>
+    <span class="n">handle_mail</span><span class="p">,</span>
+    <span class="n">handle_file</span><span class="p">,</span>
+    <span class="n">handle_ioc</span><span class="p">,</span>
+<span class="p">)</span>
+<span class="kn">from</span><span class="w"> </span><span class="nn">score_process.score_utils.templates.challenge</span><span class="w"> </span><span class="kn">import</span> <span class="n">ChallengeEmail</span>
+<span class="kn">from</span><span class="w"> </span><span class="nn">score_process.score_utils.templates.modification</span><span class="w"> </span><span class="kn">import</span> <span class="n">ModifEmail</span>
+
+<span class="kn">from</span><span class="w"> </span><span class="nn">cortex_job.models</span><span class="w"> </span><span class="kn">import</span> <span class="n">AnalyzerReport</span>
+
+<span class="kn">from</span><span class="w"> </span><span class="nn">profiles.models</span><span class="w"> </span><span class="kn">import</span> <span class="n">CISOProfile</span>
+<span class="kn">from</span><span class="w"> </span><span class="nn">dashboard.models</span><span class="w"> </span><span class="kn">import</span> <span class="n">UserCasesMonthlyStats</span>
+
+<span class="c1"># --- Constants ---</span>
+<span class="n">ERROR_CASE_NOT_FOUND</span> <span class="o">=</span> <span class="s2">&quot;Case does not exist.&quot;</span>
+<span class="n">ERROR_INVALID_PARAMETERS</span> <span class="o">=</span> <span class="s2">&quot;Invalid input parameters provided.&quot;</span>
+<span class="n">ERROR_JSON_DECODING</span> <span class="o">=</span> <span class="s2">&quot;Error decoding JSON file.&quot;</span>
+<span class="n">ERROR_NO_ANALYZER_DATA_FOUND</span> <span class="o">=</span> <span class="s2">&quot;No analyzer data found for the given IOC.&quot;</span>
+<span class="n">ERROR_INVALID_REQUEST_METHOD</span> <span class="o">=</span> <span class="s2">&quot;Invalid request method.&quot;</span>
+<span class="n">ERROR_INVALID_LEVEL_FORMAT</span> <span class="o">=</span> <span class="s2">&quot;Invalid format for level. It must be an integer.&quot;</span>
+<span class="n">ERROR_UNEXPECTED</span> <span class="o">=</span> <span class="s2">&quot;An unexpected error occurred. Please try again later.&quot;</span>
+<span class="c1"># ALLOWED_IOC_TYPES_ANALYZER = [&#39;attachment&#39;, &#39;artifact&#39;, &#39;body&#39;, &#39;header&#39;] # For stricter validation</span>
+
+
+<span class="n">CONFIG_PATH</span> <span class="o">=</span> <span class="s2">&quot;/app/settings.json&quot;</span>
+<span class="k">with</span> <span class="nb">open</span><span class="p">(</span><span class="n">CONFIG_PATH</span><span class="p">)</span> <span class="k">as</span> <span class="n">config_file</span><span class="p">:</span>
+    <span class="n">config</span> <span class="o">=</span> <span class="n">json</span><span class="o">.</span><span class="n">load</span><span class="p">(</span><span class="n">config_file</span><span class="p">)</span>
+
+<span class="n">suspicious_config</span> <span class="o">=</span> <span class="n">config</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="s2">&quot;suspicious&quot;</span><span class="p">,</span> <span class="p">{})</span>
+<span class="n">thehive_config</span> <span class="o">=</span> <span class="n">config</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="s2">&quot;thehive&quot;</span><span class="p">,</span> <span class="p">{})</span>
+
+<span class="c1"># Email configuration (safer to get from Django settings or handle None)</span>
+<span class="n">EMAIL_SENDER_DEFAULT</span> <span class="o">=</span> <span class="n">suspicious_config</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="s2">&quot;email&quot;</span><span class="p">,</span> <span class="s2">&quot;SUSPICIOUS&quot;</span><span class="p">)</span>
+
+<span class="n">CSV_CONTENT_TYPE</span> <span class="o">=</span> <span class="s2">&quot;text/csv&quot;</span>
+<span class="n">JSON_CONTENT_TYPE</span> <span class="o">=</span> <span class="s2">&quot;application/json&quot;</span>
+<span class="n">TXT_CONTENT_TYPE</span> <span class="o">=</span> <span class="s2">&quot;text/plain&quot;</span>
+<span class="n">CASE_NOT_EXIST_ERROR</span> <span class="o">=</span> <span class="s2">&quot;Case does not exist&quot;</span>
+<span class="n">JSON_DECODING_ERROR</span> <span class="o">=</span> <span class="s2">&quot;Error decoding JSON file.&quot;</span>
+<span class="n">INVALID_REQUEST_OR_NO_FILE_ERROR</span> <span class="o">=</span> <span class="s2">&quot;Invalid request method or no file uploaded.&quot;</span>
+<span class="n">INVALID_PARAMETER_ERROR</span> <span class="o">=</span> <span class="s2">&quot;Invalid parameter&quot;</span>
+<span class="n">INVALID_FILETYPE_ERROR</span> <span class="o">=</span> <span class="s2">&quot;Invalid file type.&quot;</span>
+<span class="n">INVALID_TYPE_ERROR</span> <span class="o">=</span> <span class="s2">&quot;Invalid type&quot;</span>
+<span class="n">CSV</span> <span class="o">=</span> <span class="s2">&quot;csv&quot;</span>
+<span class="n">JSON</span> <span class="o">=</span> <span class="s2">&quot;json&quot;</span>
+<span class="n">TXT</span> <span class="o">=</span> <span class="s2">&quot;txt&quot;</span>
+
+<span class="n">IOC_HANDLER_MAP</span><span class="p">:</span> <span class="n">Dict</span><span class="p">[</span><span class="nb">str</span><span class="p">,</span> <span class="n">Callable</span><span class="p">]</span> <span class="o">=</span> <span class="p">{</span>
+    <span class="s2">&quot;attachment&quot;</span><span class="p">:</span> <span class="n">handle_attachment</span><span class="p">,</span>
+    <span class="s2">&quot;artifact&quot;</span><span class="p">:</span> <span class="n">handle_artifact</span><span class="p">,</span>
+    <span class="s2">&quot;body&quot;</span><span class="p">:</span> <span class="n">handle_mail</span><span class="p">,</span>
+    <span class="s2">&quot;header&quot;</span><span class="p">:</span> <span class="n">handle_mail</span><span class="p">,</span>
+    <span class="s2">&quot;file&quot;</span><span class="p">:</span> <span class="n">handle_file</span><span class="p">,</span>
+    <span class="s2">&quot;ip&quot;</span><span class="p">:</span> <span class="n">handle_ioc</span><span class="p">,</span>
+    <span class="s2">&quot;url&quot;</span><span class="p">:</span> <span class="n">handle_ioc</span><span class="p">,</span>
+    <span class="s2">&quot;hash&quot;</span><span class="p">:</span> <span class="n">handle_ioc</span><span class="p">,</span>
+<span class="p">}</span>
+<span class="n">IOC_TYPES_NEEDING_TYPE_ARG</span> <span class="o">=</span> <span class="p">{</span><span class="s2">&quot;body&quot;</span><span class="p">,</span> <span class="s2">&quot;header&quot;</span><span class="p">,</span> <span class="s2">&quot;ip&quot;</span><span class="p">,</span> <span class="s2">&quot;url&quot;</span><span class="p">,</span> <span class="s2">&quot;hash&quot;</span><span class="p">}</span>
+
+<span class="c1"># --- Logger Configuration ---</span>
+<span class="n">logger</span> <span class="o">=</span> <span class="n">logging</span><span class="o">.</span><span class="n">getLogger</span><span class="p">(</span><span class="vm">__name__</span><span class="p">)</span>
+
+
+<span class="c1"># --- Authentication Views ---</span>
+<div class="viewcode-block" id="logout_view">
+<a class="viewcode-back" href="../../modules/tasp_core.html#tasp.views.logout_view">[docs]</a>
+<span class="nd">@require_GET</span>
+<span class="nd">@csrf_protect</span>
+<span class="k">def</span><span class="w"> </span><span class="nf">logout_view</span><span class="p">(</span><span class="n">request</span><span class="p">:</span> <span class="n">HttpRequest</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="n">HttpResponseRedirect</span><span class="p">:</span>
+<span class="w">    </span><span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">    Log out the user and redirect to the login page.</span>
+<span class="sd">    Ensures logout is done via POST and handles cases where user might not be authenticated.</span>
+<span class="sd">    &quot;&quot;&quot;</span>
+    <span class="n">user_display</span> <span class="o">=</span> <span class="nb">str</span><span class="p">(</span><span class="n">request</span><span class="o">.</span><span class="n">user</span><span class="p">)</span>
+    <span class="k">try</span><span class="p">:</span>
+        <span class="k">if</span> <span class="n">request</span><span class="o">.</span><span class="n">user</span><span class="o">.</span><span class="n">is_authenticated</span><span class="p">:</span>
+            <span class="n">logout</span><span class="p">(</span><span class="n">request</span><span class="p">)</span>
+            <span class="n">logger</span><span class="o">.</span><span class="n">info</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;User &#39;</span><span class="si">{</span><span class="n">user_display</span><span class="si">}</span><span class="s2">&#39; logged out successfully.&quot;</span><span class="p">)</span>
+        <span class="k">else</span><span class="p">:</span>
+            <span class="n">logger</span><span class="o">.</span><span class="n">warning</span><span class="p">(</span><span class="s2">&quot;Attempt to logout by an unauthenticated user.&quot;</span><span class="p">)</span>
+    <span class="k">except</span> <span class="ne">Exception</span> <span class="k">as</span> <span class="n">e</span><span class="p">:</span>
+        <span class="n">logger</span><span class="o">.</span><span class="n">error</span><span class="p">(</span>
+            <span class="sa">f</span><span class="s2">&quot;Error during logout for user &#39;</span><span class="si">{</span><span class="n">user_display</span><span class="si">}</span><span class="s2">&#39;: </span><span class="si">{</span><span class="n">e</span><span class="si">}</span><span class="s2">&quot;</span><span class="p">,</span> <span class="n">exc_info</span><span class="o">=</span><span class="kc">True</span>
+        <span class="p">)</span>
+    <span class="k">return</span> <span class="n">redirect</span><span class="p">(</span><span class="s2">&quot;login&quot;</span><span class="p">)</span></div>
+
+
+
+<span class="c1"># --- Page Views ---</span>
+<div class="viewcode-block" id="home">
+<a class="viewcode-back" href="../../modules/tasp_core.html#tasp.views.home">[docs]</a>
+<span class="nd">@login_required</span>
+<span class="nd">@require_GET</span>
+<span class="k">def</span><span class="w"> </span><span class="nf">home</span><span class="p">(</span><span class="n">request</span><span class="p">:</span> <span class="n">HttpRequest</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="n">HttpResponse</span><span class="p">:</span>
+<span class="w">    </span><span class="sd">&quot;&quot;&quot;Render the home page, potentially showing a modal based on CISOProfile.&quot;&quot;&quot;</span>
+    <span class="n">context</span> <span class="o">=</span> <span class="p">{</span><span class="s2">&quot;show_modal&quot;</span><span class="p">:</span> <span class="kc">False</span><span class="p">,</span> <span class="s2">&quot;user_groups&quot;</span><span class="p">:</span> <span class="n">request</span><span class="o">.</span><span class="n">user</span><span class="o">.</span><span class="n">groups</span><span class="o">.</span><span class="n">all</span><span class="p">()}</span>
+    <span class="k">try</span><span class="p">:</span>
+        <span class="n">user_profile</span> <span class="o">=</span> <span class="n">CISOProfile</span><span class="o">.</span><span class="n">objects</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="n">user</span><span class="o">=</span><span class="n">request</span><span class="o">.</span><span class="n">user</span><span class="p">)</span>
+        <span class="k">if</span> <span class="p">(</span>
+            <span class="n">user_profile</span><span class="o">.</span><span class="n">scope</span> <span class="o">==</span> <span class="s2">&quot;Not defined&quot;</span>
+        <span class="p">):</span>  <span class="c1"># Consider making &#39;Not defined&#39; a constant</span>
+            <span class="n">context</span><span class="p">[</span><span class="s2">&quot;show_modal&quot;</span><span class="p">]</span> <span class="o">=</span> <span class="kc">True</span>
+    <span class="k">except</span> <span class="n">CISOProfile</span><span class="o">.</span><span class="n">DoesNotExist</span><span class="p">:</span>
+        <span class="n">logger</span><span class="o">.</span><span class="n">debug</span><span class="p">(</span>
+            <span class="sa">f</span><span class="s2">&quot;CISOProfile does not exist for user &#39;</span><span class="si">{</span><span class="n">request</span><span class="o">.</span><span class="n">user</span><span class="si">}</span><span class="s2">&#39;. Modal not shown.&quot;</span>
+        <span class="p">)</span>
+    <span class="k">except</span> <span class="ne">Exception</span> <span class="k">as</span> <span class="n">e</span><span class="p">:</span>  <span class="c1"># Catch other potential errors during profile access</span>
+        <span class="n">logger</span><span class="o">.</span><span class="n">error</span><span class="p">(</span>
+            <span class="sa">f</span><span class="s2">&quot;Error fetching CISOProfile for user &#39;</span><span class="si">{</span><span class="n">request</span><span class="o">.</span><span class="n">user</span><span class="si">}</span><span class="s2">&#39;: </span><span class="si">{</span><span class="n">e</span><span class="si">}</span><span class="s2">&quot;</span><span class="p">,</span> <span class="n">exc_info</span><span class="o">=</span><span class="kc">True</span>
+        <span class="p">)</span>
+
+    <span class="n">logger</span><span class="o">.</span><span class="n">info</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;User &#39;</span><span class="si">{</span><span class="n">request</span><span class="o">.</span><span class="n">user</span><span class="si">}</span><span class="s2">&#39; accessed home page.&quot;</span><span class="p">)</span>
+    <span class="k">return</span> <span class="n">render</span><span class="p">(</span><span class="n">request</span><span class="p">,</span> <span class="s2">&quot;home.html&quot;</span><span class="p">,</span> <span class="n">context</span><span class="p">)</span></div>
+
+
+
+<div class="viewcode-block" id="submissions">
+<a class="viewcode-back" href="../../modules/tasp_core.html#tasp.views.submissions">[docs]</a>
+<span class="nd">@login_required</span>
+<span class="nd">@require_GET</span>
+<span class="k">def</span><span class="w"> </span><span class="nf">submissions</span><span class="p">(</span><span class="n">request</span><span class="p">:</span> <span class="n">HttpRequest</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="n">HttpResponse</span><span class="p">:</span>
+<span class="w">    </span><span class="sd">&quot;&quot;&quot;Render the submissions page displaying the user&#39;s latest cases.&quot;&quot;&quot;</span>
+    <span class="n">context</span> <span class="o">=</span> <span class="p">{}</span>
+    <span class="k">try</span><span class="p">:</span>
+        <span class="n">latest_cases</span> <span class="o">=</span> <span class="n">Case</span><span class="o">.</span><span class="n">objects</span><span class="o">.</span><span class="n">filter</span><span class="p">(</span><span class="n">reporter</span><span class="o">=</span><span class="n">request</span><span class="o">.</span><span class="n">user</span><span class="p">)</span><span class="o">.</span><span class="n">order_by</span><span class="p">(</span>
+            <span class="s2">&quot;-creation_date&quot;</span>
+        <span class="p">)</span>
+        <span class="k">if</span> <span class="n">latest_cases</span><span class="p">:</span>
+            <span class="n">context</span><span class="p">[</span><span class="s2">&quot;latest_cases&quot;</span><span class="p">]</span> <span class="o">=</span> <span class="n">latest_cases</span>
+        <span class="n">logger</span><span class="o">.</span><span class="n">info</span><span class="p">(</span>
+            <span class="sa">f</span><span class="s2">&quot;User &#39;</span><span class="si">{</span><span class="n">request</span><span class="o">.</span><span class="n">user</span><span class="si">}</span><span class="s2">&#39; accessed submissions page. Found </span><span class="si">{</span><span class="n">latest_cases</span><span class="o">.</span><span class="n">count</span><span class="p">()</span><span class="si">}</span><span class="s2"> cases.&quot;</span>
+        <span class="p">)</span>
+    <span class="k">except</span> <span class="n">django</span><span class="o">.</span><span class="n">db</span><span class="o">.</span><span class="n">Error</span> <span class="k">as</span> <span class="n">e</span><span class="p">:</span>
+        <span class="n">logger</span><span class="o">.</span><span class="n">error</span><span class="p">(</span>
+            <span class="sa">f</span><span class="s2">&quot;Database error fetching cases for user &#39;</span><span class="si">{</span><span class="n">request</span><span class="o">.</span><span class="n">user</span><span class="si">}</span><span class="s2">&#39;: </span><span class="si">{</span><span class="n">e</span><span class="si">}</span><span class="s2">&quot;</span><span class="p">,</span>
+            <span class="n">exc_info</span><span class="o">=</span><span class="kc">True</span><span class="p">,</span>
+        <span class="p">)</span>
+    <span class="k">except</span> <span class="ne">Exception</span> <span class="k">as</span> <span class="n">e</span><span class="p">:</span>
+        <span class="n">logger</span><span class="o">.</span><span class="n">error</span><span class="p">(</span>
+            <span class="sa">f</span><span class="s2">&quot;Unexpected error fetching cases for user &#39;</span><span class="si">{</span><span class="n">request</span><span class="o">.</span><span class="n">user</span><span class="si">}</span><span class="s2">&#39;: </span><span class="si">{</span><span class="n">e</span><span class="si">}</span><span class="s2">&quot;</span><span class="p">,</span>
+            <span class="n">exc_info</span><span class="o">=</span><span class="kc">True</span><span class="p">,</span>
+        <span class="p">)</span>
+    <span class="k">return</span> <span class="n">render</span><span class="p">(</span><span class="n">request</span><span class="p">,</span> <span class="s2">&quot;tasp/index.html&quot;</span><span class="p">,</span> <span class="n">context</span><span class="p">)</span></div>
+
+
+
+<span class="k">def</span><span class="w"> </span><span class="nf">_get_admin_cases</span><span class="p">(</span><span class="n">user</span><span class="p">:</span> <span class="n">User</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="n">Q</span><span class="p">:</span>
+<span class="w">    </span><span class="sd">&quot;&quot;&quot;Helper to construct the Q object for filtering cases for admins/CERT based on scope.</span>
+<span class="sd">    Restricts to reporters who belong to all groups defined in scope.</span>
+<span class="sd">    &quot;&quot;&quot;</span>
+    <span class="n">user_profile</span> <span class="o">=</span> <span class="n">CISOProfile</span><span class="o">.</span><span class="n">objects</span><span class="o">.</span><span class="n">filter</span><span class="p">(</span><span class="n">user</span><span class="o">=</span><span class="n">user</span><span class="p">)</span><span class="o">.</span><span class="n">first</span><span class="p">()</span>
+    <span class="n">query</span> <span class="o">=</span> <span class="n">Q</span><span class="p">()</span>
+
+    <span class="k">if</span> <span class="n">user_profile</span> <span class="ow">and</span> <span class="n">user_profile</span><span class="o">.</span><span class="n">scope</span> <span class="ow">and</span> <span class="n">user_profile</span><span class="o">.</span><span class="n">scope</span> <span class="o">!=</span> <span class="s2">&quot;Not defined&quot;</span><span class="p">:</span>
+        <span class="n">group_names</span> <span class="o">=</span> <span class="p">[</span><span class="n">g</span><span class="o">.</span><span class="n">strip</span><span class="p">()</span> <span class="k">for</span> <span class="n">g</span> <span class="ow">in</span> <span class="n">user_profile</span><span class="o">.</span><span class="n">scope</span><span class="o">.</span><span class="n">split</span><span class="p">(</span><span class="s2">&quot;|&quot;</span><span class="p">)</span> <span class="k">if</span> <span class="n">g</span><span class="o">.</span><span class="n">strip</span><span class="p">()]</span>
+        <span class="k">if</span> <span class="n">group_names</span><span class="p">:</span>
+            <span class="n">users_in_scope</span> <span class="o">=</span> <span class="n">User</span><span class="o">.</span><span class="n">objects</span><span class="o">.</span><span class="n">all</span><span class="p">()</span>
+            <span class="k">for</span> <span class="n">g</span> <span class="ow">in</span> <span class="n">group_names</span><span class="p">:</span>
+                <span class="n">users_in_scope</span> <span class="o">=</span> <span class="n">users_in_scope</span><span class="o">.</span><span class="n">filter</span><span class="p">(</span><span class="n">groups__name</span><span class="o">=</span><span class="n">g</span><span class="p">)</span>
+            <span class="n">query</span> <span class="o">=</span> <span class="n">Q</span><span class="p">(</span><span class="n">reporter__in</span><span class="o">=</span><span class="n">users_in_scope</span><span class="p">)</span>
+    <span class="k">return</span> <span class="n">query</span>
+
+
+
+<div class="viewcode-block" id="tasp">
+<a class="viewcode-back" href="../../modules/tasp_core.html#tasp.views.tasp">[docs]</a>
+<span class="nd">@login_required</span>
+<span class="nd">@require_GET</span>
+<span class="k">def</span><span class="w"> </span><span class="nf">tasp</span><span class="p">(</span><span class="n">request</span><span class="p">):</span>
+    <span class="k">try</span><span class="p">:</span>
+        <span class="n">service</span> <span class="o">=</span> <span class="n">TaspService</span><span class="p">(</span><span class="n">request</span><span class="o">.</span><span class="n">user</span><span class="p">)</span>
+        <span class="n">latest_cases</span> <span class="o">=</span> <span class="n">service</span><span class="o">.</span><span class="n">get_latest_cases</span><span class="p">()</span>
+    <span class="k">except</span> <span class="ne">Exception</span> <span class="k">as</span> <span class="n">e</span><span class="p">:</span>
+        <span class="n">logger</span><span class="o">.</span><span class="n">error</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;Unexpected error on TASP page for user &#39;</span><span class="si">{</span><span class="n">request</span><span class="o">.</span><span class="n">user</span><span class="si">}</span><span class="s2">&#39;: </span><span class="si">{</span><span class="n">e</span><span class="si">}</span><span class="s2">&quot;</span><span class="p">,</span> <span class="n">exc_info</span><span class="o">=</span><span class="kc">True</span><span class="p">)</span>
+        <span class="n">latest_cases</span> <span class="o">=</span> <span class="n">Case</span><span class="o">.</span><span class="n">objects</span><span class="o">.</span><span class="n">none</span><span class="p">()</span>
+
+    <span class="k">return</span> <span class="n">render</span><span class="p">(</span><span class="n">request</span><span class="p">,</span> <span class="s2">&quot;tasp/tasp.html&quot;</span><span class="p">,</span> <span class="p">{</span><span class="s2">&quot;latest_cases&quot;</span><span class="p">:</span> <span class="n">latest_cases</span><span class="p">})</span></div>
+
+
+
+<div class="viewcode-block" id="TaspService">
+<a class="viewcode-back" href="../../modules/tasp_core.html#tasp.views.TaspService">[docs]</a>
+<span class="k">class</span><span class="w"> </span><span class="nc">TaspService</span><span class="p">:</span>
+    <span class="k">def</span><span class="w"> </span><span class="fm">__init__</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">user</span><span class="p">):</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">user</span> <span class="o">=</span> <span class="n">user</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">seven_days_ago</span> <span class="o">=</span> <span class="n">timezone</span><span class="o">.</span><span class="n">now</span><span class="p">()</span> <span class="o">-</span> <span class="n">timezone</span><span class="o">.</span><span class="n">timedelta</span><span class="p">(</span><span class="n">days</span><span class="o">=</span><span class="mi">7</span><span class="p">)</span>
+
+<div class="viewcode-block" id="TaspService.is_admin_or_cert">
+<a class="viewcode-back" href="../../modules/tasp_core.html#tasp.views.TaspService.is_admin_or_cert">[docs]</a>
+    <span class="k">def</span><span class="w"> </span><span class="nf">is_admin_or_cert</span><span class="p">(</span><span class="bp">self</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="nb">bool</span><span class="p">:</span>
+        <span class="k">return</span> <span class="p">(</span>
+            <span class="bp">self</span><span class="o">.</span><span class="n">user</span><span class="o">.</span><span class="n">is_superuser</span>
+            <span class="ow">or</span> <span class="bp">self</span><span class="o">.</span><span class="n">user</span><span class="o">.</span><span class="n">groups</span><span class="o">.</span><span class="n">filter</span><span class="p">(</span><span class="n">name__in</span><span class="o">=</span><span class="p">[</span><span class="s2">&quot;Admin&quot;</span><span class="p">,</span> <span class="s2">&quot;CERT&quot;</span><span class="p">,</span> <span class="s2">&quot;Champions&quot;</span><span class="p">])</span><span class="o">.</span><span class="n">exists</span><span class="p">()</span>
+        <span class="p">)</span></div>
+
+
+<div class="viewcode-block" id="TaspService.get_ciso_profile">
+<a class="viewcode-back" href="../../modules/tasp_core.html#tasp.views.TaspService.get_ciso_profile">[docs]</a>
+    <span class="k">def</span><span class="w"> </span><span class="nf">get_ciso_profile</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
+        <span class="k">return</span> <span class="n">CISOProfile</span><span class="o">.</span><span class="n">objects</span><span class="o">.</span><span class="n">filter</span><span class="p">(</span><span class="n">user</span><span class="o">=</span><span class="bp">self</span><span class="o">.</span><span class="n">user</span><span class="p">)</span><span class="o">.</span><span class="n">exists</span><span class="p">()</span></div>
+
+
+<div class="viewcode-block" id="TaspService.get_cases_for_admin">
+<a class="viewcode-back" href="../../modules/tasp_core.html#tasp.views.TaspService.get_cases_for_admin">[docs]</a>
+    <span class="k">def</span><span class="w"> </span><span class="nf">get_cases_for_admin</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
+        <span class="n">query</span> <span class="o">=</span> <span class="n">Q</span><span class="p">(</span><span class="n">creation_date__gte</span><span class="o">=</span><span class="bp">self</span><span class="o">.</span><span class="n">seven_days_ago</span><span class="p">)</span>
+        <span class="k">return</span> <span class="n">Case</span><span class="o">.</span><span class="n">objects</span><span class="o">.</span><span class="n">filter</span><span class="p">(</span><span class="n">query</span><span class="p">)</span><span class="o">.</span><span class="n">order_by</span><span class="p">(</span><span class="s2">&quot;-creation_date&quot;</span><span class="p">)</span></div>
+
+
+<div class="viewcode-block" id="TaspService.get_cases_for_ciso">
+<a class="viewcode-back" href="../../modules/tasp_core.html#tasp.views.TaspService.get_cases_for_ciso">[docs]</a>
+    <span class="k">def</span><span class="w"> </span><span class="nf">get_cases_for_ciso</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
+        <span class="n">scope_query</span> <span class="o">=</span> <span class="n">_get_admin_cases</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">user</span><span class="p">)</span>
+        <span class="k">if</span> <span class="n">scope_query</span><span class="p">:</span>
+            <span class="k">return</span> <span class="n">Case</span><span class="o">.</span><span class="n">objects</span><span class="o">.</span><span class="n">filter</span><span class="p">(</span><span class="n">scope_query</span><span class="p">,</span> <span class="n">creation_date__gte</span><span class="o">=</span><span class="bp">self</span><span class="o">.</span><span class="n">seven_days_ago</span><span class="p">)</span><span class="o">.</span><span class="n">order_by</span><span class="p">(</span><span class="s2">&quot;-creation_date&quot;</span><span class="p">)</span>
+        <span class="k">return</span> <span class="n">Case</span><span class="o">.</span><span class="n">objects</span><span class="o">.</span><span class="n">none</span><span class="p">()</span></div>
+
+
+<div class="viewcode-block" id="TaspService.get_latest_cases">
+<a class="viewcode-back" href="../../modules/tasp_core.html#tasp.views.TaspService.get_latest_cases">[docs]</a>
+    <span class="k">def</span><span class="w"> </span><span class="nf">get_latest_cases</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
+        <span class="k">if</span> <span class="bp">self</span><span class="o">.</span><span class="n">is_admin_or_cert</span><span class="p">():</span>
+            <span class="n">cases</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">get_cases_for_admin</span><span class="p">()</span>
+            <span class="n">logger</span><span class="o">.</span><span class="n">info</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;Admin/CERT user &#39;</span><span class="si">{</span><span class="bp">self</span><span class="o">.</span><span class="n">user</span><span class="si">}</span><span class="s2">&#39; accessed TASP page. Found </span><span class="si">{</span><span class="n">cases</span><span class="o">.</span><span class="n">count</span><span class="p">()</span><span class="si">}</span><span class="s2"> cases.&quot;</span><span class="p">)</span>
+            <span class="k">return</span> <span class="n">cases</span>
+
+        <span class="n">ciso_profile</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">get_ciso_profile</span><span class="p">()</span>
+        <span class="k">if</span> <span class="n">ciso_profile</span><span class="p">:</span>
+            <span class="n">cases</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">get_cases_for_ciso</span><span class="p">()</span>
+            <span class="n">logger</span><span class="o">.</span><span class="n">info</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;CISO user &#39;</span><span class="si">{</span><span class="bp">self</span><span class="o">.</span><span class="n">user</span><span class="si">}</span><span class="s2">&#39; accessed TASP page. Found </span><span class="si">{</span><span class="n">cases</span><span class="o">.</span><span class="n">count</span><span class="p">()</span><span class="si">}</span><span class="s2"> cases.&quot;</span><span class="p">)</span>
+            <span class="k">return</span> <span class="n">cases</span>
+
+        <span class="n">logger</span><span class="o">.</span><span class="n">warning</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;User &#39;</span><span class="si">{</span><span class="bp">self</span><span class="o">.</span><span class="n">user</span><span class="si">}</span><span class="s2">&#39; without sufficient permissions attempted to access TASP page.&quot;</span><span class="p">)</span>
+        <span class="k">return</span> <span class="n">Case</span><span class="o">.</span><span class="n">objects</span><span class="o">.</span><span class="n">none</span><span class="p">()</span></div>
+</div>
+
+
+
+<span class="c1"># --- API-like Views (Modifying Data) ---</span>
+
+
+<div class="viewcode-block" id="edit_global">
+<a class="viewcode-back" href="../../modules/tasp_core.html#tasp.views.edit_global">[docs]</a>
+<span class="nd">@login_required</span>
+<span class="nd">@csrf_protect</span>
+<span class="nd">@transaction</span><span class="o">.</span><span class="n">atomic</span>
+<span class="k">def</span><span class="w"> </span><span class="nf">edit_global</span><span class="p">(</span><span class="n">request</span><span class="p">:</span> <span class="n">HttpRequest</span><span class="p">,</span> <span class="n">case_id</span><span class="p">:</span> <span class="nb">int</span><span class="p">,</span> <span class="n">score</span><span class="p">:</span> <span class="nb">float</span><span class="p">,</span> <span class="n">confidence</span><span class="p">:</span> <span class="nb">float</span><span class="p">,</span> <span class="n">classification</span><span class="p">:</span> <span class="nb">str</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="n">JsonResponse</span><span class="p">:</span>
+    <span class="n">old_status</span> <span class="o">=</span> <span class="s2">&quot;&quot;</span>
+    <span class="k">try</span><span class="p">:</span>
+        <span class="n">case</span> <span class="o">=</span> <span class="n">Case</span><span class="o">.</span><span class="n">objects</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="nb">id</span><span class="o">=</span><span class="n">case_id</span><span class="p">)</span>
+        <span class="n">old_status</span> <span class="o">=</span> <span class="n">case</span><span class="o">.</span><span class="n">results</span>
+    <span class="k">except</span> <span class="n">Case</span><span class="o">.</span><span class="n">DoesNotExist</span><span class="p">:</span>
+        <span class="k">return</span> <span class="n">JsonResponse</span><span class="p">({</span><span class="s2">&quot;success&quot;</span><span class="p">:</span> <span class="kc">False</span><span class="p">,</span> <span class="s2">&quot;error&quot;</span><span class="p">:</span> <span class="s2">&quot;Case does not exist&quot;</span><span class="p">},</span> <span class="n">status</span><span class="o">=</span><span class="mi">404</span><span class="p">)</span>
+
+    <span class="k">if</span> <span class="n">old_status</span> <span class="o">==</span> <span class="n">classification</span><span class="p">:</span>
+        <span class="k">return</span> <span class="n">JsonResponse</span><span class="p">({</span><span class="s2">&quot;success&quot;</span><span class="p">:</span> <span class="kc">True</span><span class="p">,</span> <span class="s2">&quot;message&quot;</span><span class="p">:</span> <span class="s2">&quot;Case results is the same&quot;</span><span class="p">,</span> <span class="s2">&quot;score&quot;</span><span class="p">:</span> <span class="n">case</span><span class="o">.</span><span class="n">finalScore</span><span class="p">,</span> <span class="s2">&quot;confidence&quot;</span><span class="p">:</span> <span class="n">case</span><span class="o">.</span><span class="n">finalConfidence</span><span class="p">,</span> <span class="s2">&quot;classification&quot;</span><span class="p">:</span> <span class="n">classification</span><span class="p">})</span>
+
+    <span class="n">service</span> <span class="o">=</span> <span class="n">CaseEditService</span><span class="p">(</span><span class="n">case</span><span class="p">,</span> <span class="n">logger</span><span class="p">)</span>
+    <span class="k">try</span><span class="p">:</span>
+        <span class="n">service</span><span class="o">.</span><span class="n">update_global_attributes</span><span class="p">(</span><span class="n">score</span><span class="p">,</span> <span class="n">confidence</span><span class="p">,</span> <span class="n">classification</span><span class="p">,</span> <span class="n">request</span><span class="o">.</span><span class="n">user</span><span class="p">)</span>
+    <span class="k">except</span> <span class="ne">ValueError</span> <span class="k">as</span> <span class="n">e</span><span class="p">:</span>
+        <span class="k">return</span> <span class="n">JsonResponse</span><span class="p">({</span><span class="s2">&quot;success&quot;</span><span class="p">:</span> <span class="kc">False</span><span class="p">,</span> <span class="s2">&quot;error&quot;</span><span class="p">:</span> <span class="nb">str</span><span class="p">(</span><span class="n">e</span><span class="p">)},</span> <span class="n">status</span><span class="o">=</span><span class="mi">400</span><span class="p">)</span>
+
+    <span class="k">try</span><span class="p">:</span>
+
+        <span class="n">service</span><span class="o">.</span><span class="n">notify_reporter</span><span class="p">()</span>
+    <span class="k">except</span> <span class="ne">Exception</span> <span class="k">as</span> <span class="n">e</span><span class="p">:</span>
+        <span class="n">logger</span><span class="o">.</span><span class="n">error</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;Failed to send modification email for case ID </span><span class="si">{</span><span class="n">case</span><span class="o">.</span><span class="n">id</span><span class="si">}</span><span class="s2">: </span><span class="si">{</span><span class="n">e</span><span class="si">}</span><span class="s2">&quot;</span><span class="p">,</span> <span class="n">exc_info</span><span class="o">=</span><span class="kc">True</span><span class="p">)</span>
+
+    <span class="n">logger</span><span class="o">.</span><span class="n">info</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;User &#39;</span><span class="si">{</span><span class="n">request</span><span class="o">.</span><span class="n">user</span><span class="si">}</span><span class="s2">&#39; edited case </span><span class="si">{</span><span class="n">case</span><span class="o">.</span><span class="n">id</span><span class="si">}</span><span class="s2">&quot;</span><span class="p">)</span>
+    <span class="k">return</span> <span class="n">JsonResponse</span><span class="p">({</span>
+        <span class="s2">&quot;success&quot;</span><span class="p">:</span> <span class="kc">True</span><span class="p">,</span>
+        <span class="s2">&quot;score&quot;</span><span class="p">:</span> <span class="n">case</span><span class="o">.</span><span class="n">finalScore</span><span class="p">,</span>
+        <span class="s2">&quot;confidence&quot;</span><span class="p">:</span> <span class="n">case</span><span class="o">.</span><span class="n">finalConfidence</span><span class="p">,</span>
+        <span class="s2">&quot;classification&quot;</span><span class="p">:</span> <span class="n">classification</span>
+    <span class="p">})</span></div>
+
+
+
+<div class="viewcode-block" id="CaseEditService">
+<a class="viewcode-back" href="../../modules/tasp_core.html#tasp.views.CaseEditService">[docs]</a>
+<span class="k">class</span><span class="w"> </span><span class="nc">CaseEditService</span><span class="p">:</span>
+    <span class="k">def</span><span class="w"> </span><span class="fm">__init__</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">case</span><span class="p">,</span> <span class="n">logger</span><span class="p">):</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">case</span> <span class="o">=</span> <span class="n">case</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">logger</span> <span class="o">=</span> <span class="n">logger</span>
+
+<div class="viewcode-block" id="CaseEditService.update_global_attributes">
+<a class="viewcode-back" href="../../modules/tasp_core.html#tasp.views.CaseEditService.update_global_attributes">[docs]</a>
+    <span class="k">def</span><span class="w"> </span><span class="nf">update_global_attributes</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">score</span><span class="p">,</span> <span class="n">confidence</span><span class="p">,</span> <span class="n">classification</span><span class="p">,</span> <span class="n">updated_by</span><span class="p">):</span>
+        <span class="k">try</span><span class="p">:</span>
+            <span class="bp">self</span><span class="o">.</span><span class="n">case</span><span class="o">.</span><span class="n">finalScore</span> <span class="o">=</span> <span class="nb">float</span><span class="p">(</span><span class="n">score</span><span class="p">)</span>
+            <span class="bp">self</span><span class="o">.</span><span class="n">case</span><span class="o">.</span><span class="n">finalConfidence</span> <span class="o">=</span> <span class="nb">float</span><span class="p">(</span><span class="n">confidence</span><span class="p">)</span>
+        <span class="k">except</span> <span class="p">(</span><span class="ne">TypeError</span><span class="p">,</span> <span class="ne">ValueError</span><span class="p">):</span>
+            <span class="k">raise</span> <span class="ne">ValueError</span><span class="p">(</span><span class="s2">&quot;Score and confidence must be valid floats&quot;</span><span class="p">)</span>
+
+        <span class="bp">self</span><span class="o">.</span><span class="n">case</span><span class="o">.</span><span class="n">results</span> <span class="o">=</span> <span class="n">classification</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">case</span><span class="o">.</span><span class="n">last_update_by</span> <span class="o">=</span> <span class="n">updated_by</span>
+
+        <span class="k">if</span> <span class="bp">self</span><span class="o">.</span><span class="n">case</span><span class="o">.</span><span class="n">status</span> <span class="o">==</span> <span class="n">CaseStatus</span><span class="o">.</span><span class="n">CHALLENGED</span><span class="p">:</span>
+            <span class="bp">self</span><span class="o">.</span><span class="n">case</span><span class="o">.</span><span class="n">status</span> <span class="o">=</span> <span class="n">CaseStatus</span><span class="o">.</span><span class="n">DONE</span>
+
+        <span class="bp">self</span><span class="o">.</span><span class="n">case</span><span class="o">.</span><span class="n">save</span><span class="p">(</span><span class="n">update_fields</span><span class="o">=</span><span class="p">[</span><span class="s2">&quot;finalScore&quot;</span><span class="p">,</span> <span class="s2">&quot;finalConfidence&quot;</span><span class="p">,</span> <span class="s2">&quot;results&quot;</span><span class="p">,</span> <span class="s2">&quot;last_update_by&quot;</span><span class="p">,</span> <span class="s2">&quot;status&quot;</span><span class="p">])</span></div>
+
+
+<div class="viewcode-block" id="CaseEditService.notify_reporter">
+<a class="viewcode-back" href="../../modules/tasp_core.html#tasp.views.CaseEditService.notify_reporter">[docs]</a>
+    <span class="k">def</span><span class="w"> </span><span class="nf">notify_reporter</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
+        <span class="n">user_reporter</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">case</span><span class="o">.</span><span class="n">reporter</span>
+        <span class="n">user_infos</span> <span class="o">=</span> <span class="p">(</span><span class="sa">f</span><span class="s2">&quot;</span><span class="si">{</span><span class="n">user_reporter</span><span class="o">.</span><span class="n">first_name</span><span class="si">}</span><span class="s2"> </span><span class="si">{</span><span class="n">user_reporter</span><span class="o">.</span><span class="n">last_name</span><span class="si">}</span><span class="s2">&quot;</span><span class="o">.</span><span class="n">strip</span><span class="p">()</span>
+                      <span class="ow">or</span> <span class="n">user_reporter</span><span class="o">.</span><span class="n">username</span><span class="p">)</span>
+        <span class="n">mail_header</span> <span class="o">=</span> <span class="sa">f</span><span class="s2">&quot;Your submission n° </span><span class="si">{</span><span class="bp">self</span><span class="o">.</span><span class="n">case</span><span class="o">.</span><span class="n">id</span><span class="si">}</span><span class="s2"> has been reviewed: </span><span class="si">{</span><span class="bp">self</span><span class="o">.</span><span class="n">case</span><span class="o">.</span><span class="n">results</span><span class="si">}</span><span class="s2">&quot;</span>
+        <span class="n">ModifEmail</span><span class="p">(</span><span class="n">mail_header</span><span class="p">,</span> <span class="n">EMAIL_SENDER_DEFAULT</span><span class="p">,</span> <span class="n">user_reporter</span><span class="p">,</span> <span class="bp">self</span><span class="o">.</span><span class="n">case</span><span class="p">,</span> <span class="n">user_infos</span><span class="p">)</span><span class="o">.</span><span class="n">send</span><span class="p">()</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">logger</span><span class="o">.</span><span class="n">info</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;Modification email sent for case ID </span><span class="si">{</span><span class="bp">self</span><span class="o">.</span><span class="n">case</span><span class="o">.</span><span class="n">id</span><span class="si">}</span><span class="s2"> to &#39;</span><span class="si">{</span><span class="n">user_reporter</span><span class="si">}</span><span class="s2">&#39;.&quot;</span><span class="p">)</span></div>
+</div>
+
+
+<div class="viewcode-block" id="CaseStatus">
+<a class="viewcode-back" href="../../modules/tasp_core.html#tasp.views.CaseStatus">[docs]</a>
+<span class="k">class</span><span class="w"> </span><span class="nc">CaseStatus</span><span class="p">():</span>
+    <span class="n">CHALLENGED</span> <span class="o">=</span> <span class="s2">&quot;Challenged&quot;</span>
+    <span class="n">DONE</span> <span class="o">=</span> <span class="s2">&quot;Done&quot;</span></div>
+
+
+
+<div class="viewcode-block" id="challenge">
+<a class="viewcode-back" href="../../modules/tasp_core.html#tasp.views.challenge">[docs]</a>
+<span class="nd">@login_required</span>
+<span class="nd">@csrf_protect</span>
+<span class="nd">@transaction</span><span class="o">.</span><span class="n">atomic</span>
+<span class="k">def</span><span class="w"> </span><span class="nf">challenge</span><span class="p">(</span><span class="n">request</span><span class="p">:</span> <span class="n">HttpRequest</span><span class="p">,</span> <span class="n">case_id</span><span class="p">:</span> <span class="nb">int</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="n">JsonResponse</span><span class="p">:</span>
+    <span class="k">try</span><span class="p">:</span>
+        <span class="n">case</span> <span class="o">=</span> <span class="n">_get_case_or_404</span><span class="p">(</span><span class="n">case_id</span><span class="p">,</span> <span class="n">request</span><span class="o">.</span><span class="n">user</span><span class="p">)</span>
+
+        <span class="n">service</span> <span class="o">=</span> <span class="n">CaseChallengeService</span><span class="p">(</span><span class="n">case</span><span class="p">,</span> <span class="n">logger</span><span class="p">)</span>
+        <span class="n">service</span><span class="o">.</span><span class="n">validate</span><span class="p">()</span>
+        <span class="n">service</span><span class="o">.</span><span class="n">mark_challenged</span><span class="p">()</span>
+        <span class="n">service</span><span class="o">.</span><span class="n">update_user_stats</span><span class="p">()</span>
+        <span class="n">service</span><span class="o">.</span><span class="n">notify</span><span class="p">()</span>
+
+        <span class="k">return</span> <span class="n">JsonResponse</span><span class="p">({</span><span class="s2">&quot;success&quot;</span><span class="p">:</span> <span class="kc">True</span><span class="p">,</span> <span class="s2">&quot;message&quot;</span><span class="p">:</span> <span class="sa">f</span><span class="s2">&quot;Case </span><span class="si">{</span><span class="n">case_id</span><span class="si">}</span><span class="s2"> successfully challenged.&quot;</span><span class="p">})</span>
+
+    <span class="k">except</span> <span class="ne">ValueError</span> <span class="k">as</span> <span class="n">e</span><span class="p">:</span>
+        <span class="k">return</span> <span class="n">JsonResponse</span><span class="p">({</span><span class="s2">&quot;success&quot;</span><span class="p">:</span> <span class="kc">False</span><span class="p">,</span> <span class="s2">&quot;error&quot;</span><span class="p">:</span> <span class="nb">str</span><span class="p">(</span><span class="n">e</span><span class="p">)},</span> <span class="n">status</span><span class="o">=</span><span class="mi">400</span><span class="p">)</span>
+    <span class="k">except</span> <span class="n">Case</span><span class="o">.</span><span class="n">DoesNotExist</span><span class="p">:</span>
+        <span class="k">return</span> <span class="n">JsonResponse</span><span class="p">({</span><span class="s2">&quot;success&quot;</span><span class="p">:</span> <span class="kc">False</span><span class="p">,</span> <span class="s2">&quot;error&quot;</span><span class="p">:</span> <span class="n">ERROR_CASE_NOT_FOUND</span><span class="p">},</span> <span class="n">status</span><span class="o">=</span><span class="mi">404</span><span class="p">)</span>
+    <span class="k">except</span> <span class="n">IntegrityError</span><span class="p">:</span>
+        <span class="n">logger</span><span class="o">.</span><span class="n">exception</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;Database integrity error for case </span><span class="si">{</span><span class="n">case_id</span><span class="si">}</span><span class="s2">&quot;</span><span class="p">)</span>
+        <span class="k">return</span> <span class="n">JsonResponse</span><span class="p">({</span><span class="s2">&quot;success&quot;</span><span class="p">:</span> <span class="kc">False</span><span class="p">,</span> <span class="s2">&quot;error&quot;</span><span class="p">:</span> <span class="s2">&quot;Database error processing challenge.&quot;</span><span class="p">},</span> <span class="n">status</span><span class="o">=</span><span class="mi">500</span><span class="p">)</span>
+    <span class="k">except</span> <span class="ne">Exception</span><span class="p">:</span>
+        <span class="n">logger</span><span class="o">.</span><span class="n">exception</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;Unexpected error for case </span><span class="si">{</span><span class="n">case_id</span><span class="si">}</span><span class="s2">&quot;</span><span class="p">)</span>
+        <span class="k">return</span> <span class="n">JsonResponse</span><span class="p">({</span><span class="s2">&quot;success&quot;</span><span class="p">:</span> <span class="kc">False</span><span class="p">,</span> <span class="s2">&quot;error&quot;</span><span class="p">:</span> <span class="n">ERROR_UNEXPECTED</span><span class="p">},</span> <span class="n">status</span><span class="o">=</span><span class="mi">500</span><span class="p">)</span></div>
+
+
+
+<div class="viewcode-block" id="CaseChallengeService">
+<a class="viewcode-back" href="../../modules/tasp_core.html#tasp.views.CaseChallengeService">[docs]</a>
+<span class="k">class</span><span class="w"> </span><span class="nc">CaseChallengeService</span><span class="p">:</span>
+    <span class="k">def</span><span class="w"> </span><span class="fm">__init__</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">case</span><span class="p">,</span> <span class="n">logger</span><span class="p">):</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">case</span> <span class="o">=</span> <span class="n">case</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">logger</span> <span class="o">=</span> <span class="n">logger</span>
+
+<div class="viewcode-block" id="CaseChallengeService.validate">
+<a class="viewcode-back" href="../../modules/tasp_core.html#tasp.views.CaseChallengeService.validate">[docs]</a>
+    <span class="k">def</span><span class="w"> </span><span class="nf">validate</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
+        <span class="k">if</span> <span class="bp">self</span><span class="o">.</span><span class="n">case</span><span class="o">.</span><span class="n">is_challenged</span> <span class="ow">or</span> <span class="bp">self</span><span class="o">.</span><span class="n">case</span><span class="o">.</span><span class="n">status</span> <span class="o">==</span> <span class="s2">&quot;Challenged&quot;</span><span class="p">:</span>
+            <span class="k">raise</span> <span class="ne">ValueError</span><span class="p">(</span><span class="s2">&quot;Case already challenged&quot;</span><span class="p">)</span></div>
+
+
+<div class="viewcode-block" id="CaseChallengeService.mark_challenged">
+<a class="viewcode-back" href="../../modules/tasp_core.html#tasp.views.CaseChallengeService.mark_challenged">[docs]</a>
+    <span class="k">def</span><span class="w"> </span><span class="nf">mark_challenged</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">case</span><span class="o">.</span><span class="n">is_challenged</span> <span class="o">=</span> <span class="kc">True</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">case</span><span class="o">.</span><span class="n">status</span> <span class="o">=</span> <span class="s2">&quot;Challenged&quot;</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">case</span><span class="o">.</span><span class="n">save</span><span class="p">(</span><span class="n">update_fields</span><span class="o">=</span><span class="p">[</span><span class="s2">&quot;is_challenged&quot;</span><span class="p">,</span> <span class="s2">&quot;status&quot;</span><span class="p">])</span></div>
+
+
+<div class="viewcode-block" id="CaseChallengeService.update_user_stats">
+<a class="viewcode-back" href="../../modules/tasp_core.html#tasp.views.CaseChallengeService.update_user_stats">[docs]</a>
+    <span class="k">def</span><span class="w"> </span><span class="nf">update_user_stats</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
+        <span class="n">_update_case_challenge_stats</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">case</span><span class="o">.</span><span class="n">reporter</span><span class="p">)</span></div>
+
+
+<div class="viewcode-block" id="CaseChallengeService.notify">
+<a class="viewcode-back" href="../../modules/tasp_core.html#tasp.views.CaseChallengeService.notify">[docs]</a>
+    <span class="k">def</span><span class="w"> </span><span class="nf">notify</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
+        <span class="n">send_to_thehive</span> <span class="o">=</span> <span class="n">thehive_config</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="s2">&quot;enabled&quot;</span><span class="p">,</span> <span class="kc">False</span><span class="p">)</span>
+        <span class="n">mail_header</span> <span class="o">=</span> <span class="sa">f</span><span class="s2">&quot;Case ID </span><span class="si">{</span><span class="bp">self</span><span class="o">.</span><span class="n">case</span><span class="o">.</span><span class="n">id</span><span class="si">}</span><span class="s2"> challenged by </span><span class="si">{</span><span class="bp">self</span><span class="o">.</span><span class="n">case</span><span class="o">.</span><span class="n">reporter</span><span class="o">.</span><span class="n">username</span><span class="si">}</span><span class="s2">&quot;</span>
+        <span class="k">if</span> <span class="n">send_to_thehive</span><span class="p">:</span>
+            <span class="n">ChallengeEmail</span><span class="p">(</span><span class="n">mail_header</span><span class="p">,</span> <span class="bp">self</span><span class="o">.</span><span class="n">case</span><span class="o">.</span><span class="n">reporter</span><span class="p">,</span> <span class="n">EMAIL_SENDER_DEFAULT</span><span class="p">,</span> <span class="kc">None</span><span class="p">,</span> <span class="bp">self</span><span class="o">.</span><span class="n">case</span><span class="p">,</span> <span class="kc">None</span><span class="p">)</span><span class="o">.</span><span class="n">send_to_thehive</span><span class="p">()</span>
+        <span class="k">else</span><span class="p">:</span>
+            <span class="n">cert_users</span> <span class="o">=</span> <span class="n">User</span><span class="o">.</span><span class="n">objects</span><span class="o">.</span><span class="n">filter</span><span class="p">(</span><span class="n">groups__name</span><span class="o">=</span><span class="s2">&quot;CERT&quot;</span><span class="p">,</span> <span class="n">is_active</span><span class="o">=</span><span class="kc">True</span><span class="p">)</span><span class="o">.</span><span class="n">exclude</span><span class="p">(</span><span class="n">email</span><span class="o">=</span><span class="s2">&quot;&quot;</span><span class="p">)</span>
+            <span class="k">for</span> <span class="n">cert_user</span> <span class="ow">in</span> <span class="n">cert_users</span><span class="p">:</span>
+                <span class="n">name</span> <span class="o">=</span> <span class="sa">f</span><span class="s2">&quot;</span><span class="si">{</span><span class="n">cert_user</span><span class="o">.</span><span class="n">first_name</span><span class="si">}</span><span class="s2"> </span><span class="si">{</span><span class="n">cert_user</span><span class="o">.</span><span class="n">last_name</span><span class="si">}</span><span class="s2">&quot;</span><span class="o">.</span><span class="n">strip</span><span class="p">()</span> <span class="ow">or</span> <span class="n">cert_user</span><span class="o">.</span><span class="n">username</span>
+                <span class="n">ChallengeEmail</span><span class="p">(</span><span class="n">mail_header</span><span class="p">,</span> <span class="bp">self</span><span class="o">.</span><span class="n">case</span><span class="o">.</span><span class="n">reporter</span><span class="p">,</span> <span class="n">EMAIL_SENDER_DEFAULT</span><span class="p">,</span> <span class="n">cert_user</span><span class="p">,</span> <span class="bp">self</span><span class="o">.</span><span class="n">case</span><span class="p">,</span> <span class="n">name</span><span class="p">)</span><span class="o">.</span><span class="n">send</span><span class="p">()</span></div>
+</div>
+
+
+<span class="k">def</span><span class="w"> </span><span class="nf">_get_case_or_404</span><span class="p">(</span><span class="n">case_id</span><span class="p">,</span> <span class="n">user</span><span class="p">):</span>
+    <span class="k">return</span> <span class="n">get_object_or_404</span><span class="p">(</span>
+        <span class="n">Case</span><span class="o">.</span><span class="n">objects</span><span class="o">.</span><span class="n">select_related</span><span class="p">(</span><span class="s2">&quot;reporter&quot;</span><span class="p">),</span>
+        <span class="nb">id</span><span class="o">=</span><span class="n">case_id</span><span class="p">,</span>
+        <span class="n">reporter</span><span class="o">=</span><span class="n">user</span>
+    <span class="p">)</span>
+
+<span class="k">def</span><span class="w"> </span><span class="nf">_update_case_challenge_stats</span><span class="p">(</span><span class="n">user</span><span class="p">):</span>
+    <span class="n">now</span> <span class="o">=</span> <span class="n">timezone</span><span class="o">.</span><span class="n">now</span><span class="p">()</span>
+    <span class="n">stats</span><span class="p">,</span> <span class="n">_</span> <span class="o">=</span> <span class="n">UserCasesMonthlyStats</span><span class="o">.</span><span class="n">objects</span><span class="o">.</span><span class="n">get_or_create</span><span class="p">(</span>
+        <span class="n">user</span><span class="o">=</span><span class="n">user</span><span class="p">,</span>
+        <span class="n">month</span><span class="o">=</span><span class="n">now</span><span class="o">.</span><span class="n">strftime</span><span class="p">(</span><span class="s2">&quot;%m&quot;</span><span class="p">),</span>
+        <span class="n">year</span><span class="o">=</span><span class="n">now</span><span class="o">.</span><span class="n">year</span><span class="p">,</span>
+        <span class="n">defaults</span><span class="o">=</span><span class="p">{</span><span class="s2">&quot;challenged_cases&quot;</span><span class="p">:</span> <span class="mi">0</span><span class="p">,</span> <span class="s2">&quot;total_cases&quot;</span><span class="p">:</span> <span class="mi">0</span><span class="p">},</span>
+    <span class="p">)</span>
+    <span class="n">stats</span><span class="o">.</span><span class="n">challenged_cases</span> <span class="o">=</span> <span class="n">F</span><span class="p">(</span><span class="s2">&quot;challenged_cases&quot;</span><span class="p">)</span> <span class="o">+</span> <span class="mi">1</span>
+    <span class="n">stats</span><span class="o">.</span><span class="n">save</span><span class="p">(</span><span class="n">update_fields</span><span class="o">=</span><span class="p">[</span><span class="s2">&quot;challenged_cases&quot;</span><span class="p">])</span>
+
+
+<span class="c1"># --- Pop-up View ---</span>
+<div class="viewcode-block" id="create_case_popup">
+<a class="viewcode-back" href="../../modules/tasp_core.html#tasp.views.create_case_popup">[docs]</a>
+<span class="nd">@login_required</span>
+<span class="nd">@require_GET</span>
+<span class="k">def</span><span class="w"> </span><span class="nf">create_case_popup</span><span class="p">(</span><span class="n">request</span><span class="p">:</span> <span class="n">HttpRequest</span><span class="p">,</span> <span class="n">case_id</span><span class="p">:</span> <span class="nb">int</span><span class="p">,</span> <span class="n">user</span><span class="p">:</span> <span class="nb">str</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="n">JsonResponse</span><span class="p">:</span>
+<span class="w">    </span><span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">    Generates and returns HTML for a case details pop-up.</span>
+<span class="sd">    Ensures the requesting user is the reporter or has specific permission to view.</span>
+
+<span class="sd">    Args:</span>
+<span class="sd">        request: The HTTP request object.</span>
+<span class="sd">        case_id: The ID of the case for which to generate the pop-up.</span>
+<span class="sd">        The &#39;user&#39; (username) parameter from URL is removed for security;</span>
+<span class="sd">        authorization is based on request.user.</span>
+<span class="sd">    &quot;&quot;&quot;</span>
+    <span class="k">try</span><span class="p">:</span>
+        <span class="n">case</span> <span class="o">=</span> <span class="n">get_object_or_404</span><span class="p">(</span><span class="n">Case</span><span class="o">.</span><span class="n">objects</span><span class="o">.</span><span class="n">select_related</span><span class="p">(</span><span class="s2">&quot;reporter&quot;</span><span class="p">),</span> <span class="nb">id</span><span class="o">=</span><span class="n">case_id</span><span class="p">)</span>
+
+        <span class="n">is_admin_or_cert</span> <span class="o">=</span> <span class="p">(</span>
+            <span class="n">request</span><span class="o">.</span><span class="n">user</span><span class="o">.</span><span class="n">is_superuser</span>
+            <span class="ow">or</span> <span class="n">request</span><span class="o">.</span><span class="n">user</span><span class="o">.</span><span class="n">groups</span><span class="o">.</span><span class="n">filter</span><span class="p">(</span><span class="n">name__in</span><span class="o">=</span><span class="p">[</span><span class="s2">&quot;Admin&quot;</span><span class="p">,</span> <span class="s2">&quot;CERT&quot;</span><span class="p">])</span><span class="o">.</span><span class="n">exists</span><span class="p">()</span>
+        <span class="p">)</span>
+        <span class="n">is_ciso</span> <span class="o">=</span> <span class="n">CISOProfile</span><span class="o">.</span><span class="n">objects</span><span class="o">.</span><span class="n">filter</span><span class="p">(</span><span class="n">user</span><span class="o">=</span><span class="n">request</span><span class="o">.</span><span class="n">user</span><span class="p">)</span><span class="o">.</span><span class="n">first</span><span class="p">()</span>
+
+        <span class="c1"># If user is Admin/CERT, they can view any case pop-up.</span>
+        <span class="k">if</span> <span class="n">is_admin_or_cert</span><span class="p">:</span>
+            <span class="n">can_view_any_popup</span> <span class="o">=</span> <span class="kc">True</span>
+        <span class="c1"># If user is CISO, check if they have a profile with a defined scope.</span>
+        <span class="k">elif</span> <span class="n">is_ciso</span><span class="p">:</span>
+            <span class="n">can_view_any_popup</span> <span class="o">=</span> <span class="n">is_ciso</span><span class="o">.</span><span class="n">scope</span> <span class="o">!=</span> <span class="s2">&quot;Not defined&quot;</span>
+        <span class="k">else</span><span class="p">:</span>
+            <span class="n">can_view_any_popup</span> <span class="o">=</span> <span class="kc">False</span>
+        <span class="k">if</span> <span class="ow">not</span> <span class="p">(</span><span class="n">request</span><span class="o">.</span><span class="n">user</span> <span class="o">==</span> <span class="n">case</span><span class="o">.</span><span class="n">reporter</span> <span class="ow">or</span> <span class="n">can_view_any_popup</span><span class="p">):</span>
+            <span class="n">logger</span><span class="o">.</span><span class="n">warning</span><span class="p">(</span>
+                <span class="sa">f</span><span class="s2">&quot;User &#39;</span><span class="si">{</span><span class="n">request</span><span class="o">.</span><span class="n">user</span><span class="si">}</span><span class="s2">&#39; denied access to popup for case ID </span><span class="si">{</span><span class="n">case</span><span class="o">.</span><span class="n">id</span><span class="si">}</span><span class="s2"> &quot;</span>
+                <span class="sa">f</span><span class="s2">&quot;owned by &#39;</span><span class="si">{</span><span class="n">case</span><span class="o">.</span><span class="n">reporter</span><span class="si">}</span><span class="s2">&#39;.&quot;</span>
+            <span class="p">)</span>
+            <span class="k">return</span> <span class="n">JsonResponse</span><span class="p">(</span>
+                <span class="p">{</span>
+                    <span class="s2">&quot;success&quot;</span><span class="p">:</span> <span class="kc">False</span><span class="p">,</span>
+                    <span class="s2">&quot;error&quot;</span><span class="p">:</span> <span class="s2">&quot;Permission denied to view this case pop-up.&quot;</span><span class="p">,</span>
+                <span class="p">},</span>
+                <span class="n">status</span><span class="o">=</span><span class="mi">403</span><span class="p">,</span>
+            <span class="p">)</span>
+
+        <span class="n">html_content</span> <span class="o">=</span> <span class="n">generate_html</span><span class="p">(</span><span class="n">case</span><span class="p">)</span>
+        <span class="n">logger</span><span class="o">.</span><span class="n">info</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;User &#39;</span><span class="si">{</span><span class="n">request</span><span class="o">.</span><span class="n">user</span><span class="si">}</span><span class="s2">&#39; accessed pop-up for case ID </span><span class="si">{</span><span class="n">case</span><span class="o">.</span><span class="n">id</span><span class="si">}</span><span class="s2">.&quot;</span><span class="p">)</span>
+        <span class="k">return</span> <span class="n">JsonResponse</span><span class="p">({</span><span class="s2">&quot;success&quot;</span><span class="p">:</span> <span class="kc">True</span><span class="p">,</span> <span class="s2">&quot;html&quot;</span><span class="p">:</span> <span class="n">html_content</span><span class="p">})</span>
+
+    <span class="k">except</span> <span class="n">Case</span><span class="o">.</span><span class="n">DoesNotExist</span><span class="p">:</span>
+        <span class="n">logger</span><span class="o">.</span><span class="n">warning</span><span class="p">(</span>
+            <span class="sa">f</span><span class="s2">&quot;Case pop-up requested for non-existent case ID </span><span class="si">{</span><span class="n">case_id</span><span class="si">}</span><span class="s2"> by user &#39;</span><span class="si">{</span><span class="n">request</span><span class="o">.</span><span class="n">user</span><span class="si">}</span><span class="s2">&#39;.&quot;</span>
+        <span class="p">)</span>
+        <span class="k">return</span> <span class="n">JsonResponse</span><span class="p">(</span>
+            <span class="p">{</span><span class="s2">&quot;success&quot;</span><span class="p">:</span> <span class="kc">False</span><span class="p">,</span> <span class="s2">&quot;error&quot;</span><span class="p">:</span> <span class="n">ERROR_CASE_NOT_FOUND</span><span class="p">},</span> <span class="n">status</span><span class="o">=</span><span class="mi">404</span>
+        <span class="p">)</span>
+    <span class="k">except</span> <span class="ne">Exception</span> <span class="k">as</span> <span class="n">e</span><span class="p">:</span>
+        <span class="n">logger</span><span class="o">.</span><span class="n">error</span><span class="p">(</span>
+            <span class="sa">f</span><span class="s2">&quot;Error generating pop-up for case ID </span><span class="si">{</span><span class="n">case_id</span><span class="si">}</span><span class="s2"> for user &#39;</span><span class="si">{</span><span class="n">request</span><span class="o">.</span><span class="n">user</span><span class="si">}</span><span class="s2">&#39;: </span><span class="si">{</span><span class="n">e</span><span class="si">}</span><span class="s2">&quot;</span><span class="p">,</span>
+            <span class="n">exc_info</span><span class="o">=</span><span class="kc">True</span><span class="p">,</span>
+        <span class="p">)</span>
+        <span class="k">return</span> <span class="n">JsonResponse</span><span class="p">(</span>
+            <span class="p">{</span><span class="s2">&quot;success&quot;</span><span class="p">:</span> <span class="kc">False</span><span class="p">,</span> <span class="s2">&quot;error&quot;</span><span class="p">:</span> <span class="s2">&quot;Failed to generate case pop-up.&quot;</span><span class="p">},</span> <span class="n">status</span><span class="o">=</span><span class="mi">500</span>
+        <span class="p">)</span></div>
+
+
+
+<span class="c1"># --- Submission View ---</span>
+<div class="viewcode-block" id="submit">
+<a class="viewcode-back" href="../../modules/tasp_core.html#tasp.views.submit">[docs]</a>
+<span class="nd">@login_required</span>
+<span class="k">def</span><span class="w"> </span><span class="nf">submit</span><span class="p">(</span><span class="n">request</span><span class="p">):</span>
+<span class="w">    </span><span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">    Handle the submission of new cases (file, URL, IP/hash, or email).</span>
+<span class="sd">    Utilizes CaseHandler to validate inputs, process submissions,</span>
+<span class="sd">    launch analysis if needed, and create cases.</span>
+<span class="sd">    &quot;&quot;&quot;</span>
+    <span class="n">file_form</span> <span class="o">=</span> <span class="n">UploadFileForm</span><span class="p">(</span><span class="n">request</span><span class="o">.</span><span class="n">POST</span> <span class="ow">or</span> <span class="kc">None</span><span class="p">,</span> <span class="n">request</span><span class="o">.</span><span class="n">FILES</span> <span class="ow">or</span> <span class="kc">None</span><span class="p">)</span>
+    <span class="n">url_form</span> <span class="o">=</span> <span class="n">UploadURLForm</span><span class="p">(</span><span class="n">request</span><span class="o">.</span><span class="n">POST</span> <span class="ow">or</span> <span class="kc">None</span><span class="p">)</span>
+    <span class="n">other_form</span> <span class="o">=</span> <span class="n">UploadOtherForm</span><span class="p">(</span><span class="n">request</span><span class="o">.</span><span class="n">POST</span> <span class="ow">or</span> <span class="kc">None</span><span class="p">)</span>
+
+    <span class="k">if</span> <span class="n">request</span><span class="o">.</span><span class="n">method</span> <span class="o">==</span> <span class="s2">&quot;POST&quot;</span><span class="p">:</span>
+        <span class="n">logger</span><span class="o">.</span><span class="n">info</span><span class="p">(</span><span class="s2">&quot;User &#39;</span><span class="si">%s</span><span class="s2">&#39; submitted a case&quot;</span><span class="p">,</span> <span class="n">request</span><span class="o">.</span><span class="n">user</span><span class="p">)</span>
+        <span class="n">handler</span> <span class="o">=</span> <span class="n">CaseHandler</span><span class="p">(</span><span class="n">request</span><span class="p">,</span> <span class="n">file_form</span><span class="p">,</span> <span class="n">url_form</span><span class="p">,</span> <span class="n">other_form</span><span class="p">)</span>
+        <span class="n">results</span> <span class="o">=</span> <span class="n">handler</span><span class="o">.</span><span class="n">validate_forms</span><span class="p">()</span>
+        <span class="n">logger</span><span class="o">.</span><span class="n">debug</span><span class="p">(</span><span class="s2">&quot;Validation results: </span><span class="si">%s</span><span class="s2">&quot;</span><span class="p">,</span> <span class="n">results</span><span class="p">)</span>
+
+        <span class="c1"># Unpack results</span>
+        <span class="n">file_inst</span> <span class="o">=</span> <span class="n">results</span><span class="p">[</span><span class="s2">&quot;file_instance&quot;</span><span class="p">]</span>
+        <span class="n">mail_inst</span> <span class="o">=</span> <span class="n">results</span><span class="p">[</span><span class="s2">&quot;mail_instance&quot;</span><span class="p">]</span>
+        <span class="n">ip_inst</span> <span class="o">=</span> <span class="n">results</span><span class="p">[</span><span class="s2">&quot;ip_instance&quot;</span><span class="p">]</span>
+        <span class="n">url_inst</span> <span class="o">=</span> <span class="n">results</span><span class="p">[</span><span class="s2">&quot;url_instance&quot;</span><span class="p">]</span>
+        <span class="n">hash_inst</span> <span class="o">=</span> <span class="n">results</span><span class="p">[</span><span class="s2">&quot;hash_instance&quot;</span><span class="p">]</span>
+        <span class="n">allow_listed</span> <span class="o">=</span> <span class="n">results</span><span class="p">[</span><span class="s2">&quot;allow_listed&quot;</span><span class="p">]</span>
+
+        <span class="c1"># Ensure we have something to process</span>
+        <span class="k">if</span> <span class="nb">any</span><span class="p">([</span><span class="n">file_inst</span><span class="p">,</span> <span class="n">ip_inst</span><span class="p">,</span> <span class="n">url_inst</span><span class="p">,</span> <span class="n">hash_inst</span><span class="p">]):</span>
+            <span class="c1"># Attempt case creation</span>
+            <span class="n">case</span> <span class="o">=</span> <span class="n">handler</span><span class="o">.</span><span class="n">handle_case</span><span class="p">(</span>
+                <span class="n">file_inst</span><span class="o">=</span><span class="n">file_inst</span><span class="p">,</span>
+                <span class="n">mail_inst</span><span class="o">=</span><span class="n">mail_inst</span><span class="p">,</span>
+                <span class="n">ip_inst</span><span class="o">=</span><span class="n">ip_inst</span><span class="p">,</span>
+                <span class="n">url_inst</span><span class="o">=</span><span class="n">url_inst</span><span class="p">,</span>
+                <span class="n">hash_inst</span><span class="o">=</span><span class="n">hash_inst</span><span class="p">,</span>
+                <span class="n">allow_listed</span><span class="o">=</span><span class="n">allow_listed</span><span class="p">,</span>
+            <span class="p">)</span>
+            <span class="k">if</span> <span class="n">case</span><span class="p">:</span>
+                <span class="n">msg_type</span> <span class="o">=</span> <span class="s2">&quot;email file&quot;</span> <span class="k">if</span> <span class="n">mail_inst</span> <span class="k">else</span> <span class="s2">&quot;indicator/file&quot;</span>
+                <span class="n">logger</span><span class="o">.</span><span class="n">info</span><span class="p">(</span><span class="s2">&quot;Case created by &#39;</span><span class="si">%s</span><span class="s2">&#39; (type: </span><span class="si">%s</span><span class="s2">).&quot;</span><span class="p">,</span> <span class="n">request</span><span class="o">.</span><span class="n">user</span><span class="p">,</span> <span class="n">msg_type</span><span class="p">)</span>
+                <span class="n">messages</span><span class="o">.</span><span class="n">success</span><span class="p">(</span><span class="n">request</span><span class="p">,</span> <span class="s2">&quot;Case submitted successfully.&quot;</span><span class="p">)</span>
+                <span class="k">return</span> <span class="n">redirect</span><span class="p">(</span><span class="s2">&quot;tasp:submissions&quot;</span><span class="p">)</span>
+
+            <span class="n">logger</span><span class="o">.</span><span class="n">error</span><span class="p">(</span><span class="s2">&quot;Case creation failed unexpectedly for user &#39;</span><span class="si">%s</span><span class="s2">&#39;.&quot;</span><span class="p">,</span> <span class="n">request</span><span class="o">.</span><span class="n">user</span><span class="p">)</span>
+            <span class="n">messages</span><span class="o">.</span><span class="n">error</span><span class="p">(</span><span class="n">request</span><span class="p">,</span> <span class="s2">&quot;Submission failed during processing. Please try again.&quot;</span><span class="p">)</span>
+        <span class="k">elif</span> <span class="n">mail_inst</span><span class="p">:</span>
+            <span class="n">logger</span><span class="o">.</span><span class="n">info</span><span class="p">(</span><span class="s2">&quot;Email case submitted by &#39;</span><span class="si">%s</span><span class="s2">&#39;.&quot;</span><span class="p">,</span> <span class="n">request</span><span class="o">.</span><span class="n">user</span><span class="p">)</span>
+            <span class="k">return</span> <span class="n">redirect</span><span class="p">(</span><span class="s2">&quot;tasp:submissions&quot;</span><span class="p">)</span>
+        <span class="k">else</span><span class="p">:</span>
+            <span class="c1"># No actionable input or forms invalid</span>
+            <span class="k">if</span> <span class="n">file_form</span><span class="o">.</span><span class="n">errors</span> <span class="ow">or</span> <span class="n">url_form</span><span class="o">.</span><span class="n">errors</span> <span class="ow">or</span> <span class="n">other_form</span><span class="o">.</span><span class="n">errors</span><span class="p">:</span>
+                <span class="n">logger</span><span class="o">.</span><span class="n">warning</span><span class="p">(</span><span class="s2">&quot;Form errors on submission by &#39;</span><span class="si">%s</span><span class="s2">&#39;: file </span><span class="si">%s</span><span class="s2">, url </span><span class="si">%s</span><span class="s2">, other </span><span class="si">%s</span><span class="s2">&quot;</span><span class="p">,</span>
+                               <span class="n">request</span><span class="o">.</span><span class="n">user</span><span class="p">,</span> <span class="n">file_form</span><span class="o">.</span><span class="n">errors</span><span class="p">,</span> <span class="n">url_form</span><span class="o">.</span><span class="n">errors</span><span class="p">,</span> <span class="n">other_form</span><span class="o">.</span><span class="n">errors</span><span class="p">)</span>
+                <span class="n">messages</span><span class="o">.</span><span class="n">error</span><span class="p">(</span><span class="n">request</span><span class="p">,</span> <span class="s2">&quot;Please correct the highlighted form errors.&quot;</span><span class="p">)</span>
+            <span class="k">else</span><span class="p">:</span>
+                <span class="n">logger</span><span class="o">.</span><span class="n">warning</span><span class="p">(</span><span class="s2">&quot;Empty or invalid submission by &#39;</span><span class="si">%s</span><span class="s2">&#39;.&quot;</span><span class="p">,</span> <span class="n">request</span><span class="o">.</span><span class="n">user</span><span class="p">)</span>
+                <span class="n">messages</span><span class="o">.</span><span class="n">warning</span><span class="p">(</span><span class="n">request</span><span class="p">,</span> <span class="s2">&quot;No data provided. Please fill at least one form field.&quot;</span><span class="p">)</span>
+
+    <span class="k">else</span><span class="p">:</span>
+        <span class="n">logger</span><span class="o">.</span><span class="n">info</span><span class="p">(</span><span class="s2">&quot;User &#39;</span><span class="si">%s</span><span class="s2">&#39; accessed submission page.&quot;</span><span class="p">,</span> <span class="n">request</span><span class="o">.</span><span class="n">user</span><span class="p">)</span>
+
+    <span class="n">context</span> <span class="o">=</span> <span class="p">{</span>
+        <span class="s2">&quot;form&quot;</span><span class="p">:</span> <span class="n">file_form</span><span class="p">,</span>
+        <span class="s2">&quot;formurl&quot;</span><span class="p">:</span> <span class="n">url_form</span><span class="p">,</span>
+        <span class="s2">&quot;otherform&quot;</span><span class="p">:</span> <span class="n">other_form</span><span class="p">,</span>
+    <span class="p">}</span>
+    <span class="k">return</span> <span class="n">render</span><span class="p">(</span><span class="n">request</span><span class="p">,</span> <span class="s2">&quot;tasp/submit.html&quot;</span><span class="p">,</span> <span class="n">context</span><span class="p">)</span></div>
+
+
+
+<span class="c1"># --- Static Page View ---</span>
+<div class="viewcode-block" id="about">
+<a class="viewcode-back" href="../../modules/tasp_core.html#tasp.views.about">[docs]</a>
+<span class="nd">@login_required</span>
+<span class="nd">@require_GET</span>
+<span class="k">def</span><span class="w"> </span><span class="nf">about</span><span class="p">(</span><span class="n">request</span><span class="p">:</span> <span class="n">HttpRequest</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="n">HttpResponse</span><span class="p">:</span>
+<span class="w">    </span><span class="sd">&quot;&quot;&quot;Render the about page.&quot;&quot;&quot;</span>
+    <span class="n">logger</span><span class="o">.</span><span class="n">info</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;User &#39;</span><span class="si">{</span><span class="n">request</span><span class="o">.</span><span class="n">user</span><span class="si">}</span><span class="s2">&#39; accessed the about page.&quot;</span><span class="p">)</span>
+    <span class="k">return</span> <span class="n">render</span><span class="p">(</span><span class="n">request</span><span class="p">,</span> <span class="s2">&quot;tasp/about.html&quot;</span><span class="p">)</span></div>
+
+
+
+<div class="viewcode-block" id="get_link_analyzer">
+<a class="viewcode-back" href="../../modules/tasp_core.html#tasp.views.get_link_analyzer">[docs]</a>
+<span class="nd">@login_required</span>
+<span class="nd">@require_GET</span>  <span class="c1"># This endpoint retrieves data, so GET is appropriate.</span>
+<span class="k">def</span><span class="w"> </span><span class="nf">get_link_analyzer</span><span class="p">(</span><span class="n">request</span><span class="p">:</span> <span class="n">HttpRequest</span><span class="p">,</span> <span class="n">value</span><span class="p">:</span> <span class="nb">str</span><span class="p">,</span> <span class="n">ioc_type</span><span class="p">:</span> <span class="nb">str</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="n">JsonResponse</span><span class="p">:</span>
+<span class="w">    </span><span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">    Retrieves and returns a list of analyzer report details based on the provided</span>
+<span class="sd">    IOC value and type.</span>
+
+<span class="sd">    Args:</span>
+<span class="sd">        request: The HTTP request object.</span>
+<span class="sd">        value: The IOC value to search for.</span>
+<span class="sd">        ioc_type: The type of IOC (e.g., &#39;attachment&#39;, &#39;artifact&#39;, &#39;body&#39;, &#39;header&#39;).</span>
+
+<span class="sd">    Returns:</span>
+<span class="sd">        JsonResponse: Contains a list of analyzer reports if found,</span>
+<span class="sd">                    or an error message.</span>
+<span class="sd">    &quot;&quot;&quot;</span>
+    <span class="k">if</span> <span class="ow">not</span> <span class="n">value</span> <span class="ow">or</span> <span class="ow">not</span> <span class="n">ioc_type</span><span class="p">:</span>
+        <span class="n">logger</span><span class="o">.</span><span class="n">warning</span><span class="p">(</span>
+            <span class="sa">f</span><span class="s2">&quot;User &#39;</span><span class="si">{</span><span class="n">request</span><span class="o">.</span><span class="n">user</span><span class="si">}</span><span class="s2">&#39; called get_link_analyzer with missing value or ioc_type.&quot;</span>
+        <span class="p">)</span>
+        <span class="k">return</span> <span class="n">JsonResponse</span><span class="p">(</span>
+            <span class="p">{</span><span class="s2">&quot;success&quot;</span><span class="p">:</span> <span class="kc">False</span><span class="p">,</span> <span class="s2">&quot;error&quot;</span><span class="p">:</span> <span class="n">ERROR_INVALID_PARAMETERS</span><span class="p">},</span> <span class="n">status</span><span class="o">=</span><span class="mi">400</span>
+        <span class="p">)</span>
+
+    <span class="n">cleaned_ioc_type</span> <span class="o">=</span> <span class="n">ioc_type</span><span class="o">.</span><span class="n">strip</span><span class="p">()</span><span class="o">.</span><span class="n">replace</span><span class="p">(</span><span class="s1">&#39;&quot;&#39;</span><span class="p">,</span> <span class="s2">&quot;&quot;</span><span class="p">)</span><span class="o">.</span><span class="n">lower</span><span class="p">()</span>
+    <span class="k">if</span> <span class="ow">not</span> <span class="n">cleaned_ioc_type</span><span class="p">:</span>
+        <span class="n">logger</span><span class="o">.</span><span class="n">warning</span><span class="p">(</span>
+            <span class="sa">f</span><span class="s2">&quot;User &#39;</span><span class="si">{</span><span class="n">request</span><span class="o">.</span><span class="n">user</span><span class="si">}</span><span class="s2">&#39; provided an empty or invalid ioc_type after cleaning: &#39;</span><span class="si">{</span><span class="n">ioc_type</span><span class="si">}</span><span class="s2">&#39;.&quot;</span>
+        <span class="p">)</span>
+        <span class="k">return</span> <span class="n">JsonResponse</span><span class="p">(</span>
+            <span class="p">{</span><span class="s2">&quot;success&quot;</span><span class="p">:</span> <span class="kc">False</span><span class="p">,</span> <span class="s2">&quot;error&quot;</span><span class="p">:</span> <span class="n">ERROR_INVALID_PARAMETERS</span><span class="p">},</span> <span class="n">status</span><span class="o">=</span><span class="mi">400</span>
+        <span class="p">)</span>
+
+    <span class="n">analyzer_reports_qs</span><span class="p">:</span> <span class="n">QuerySet</span><span class="p">[</span><span class="n">AnalyzerReport</span><span class="p">]</span> <span class="o">=</span> <span class="n">AnalyzerReport</span><span class="o">.</span><span class="n">objects</span><span class="o">.</span><span class="n">none</span><span class="p">()</span>
+
+    <span class="k">try</span><span class="p">:</span>
+        <span class="n">base_query</span> <span class="o">=</span> <span class="n">AnalyzerReport</span><span class="o">.</span><span class="n">objects</span><span class="o">.</span><span class="n">select_related</span><span class="p">(</span><span class="s2">&quot;analyzer&quot;</span><span class="p">)</span>
+
+        <span class="k">if</span> <span class="n">cleaned_ioc_type</span> <span class="o">==</span> <span class="s2">&quot;attachment&quot;</span><span class="p">:</span>
+            <span class="n">analyzer_reports_qs</span> <span class="o">=</span> <span class="n">base_query</span><span class="o">.</span><span class="n">filter</span><span class="p">(</span><span class="n">file__linked_hash__value</span><span class="o">=</span><span class="n">value</span><span class="p">)</span>
+        <span class="k">elif</span> <span class="n">cleaned_ioc_type</span> <span class="o">==</span> <span class="s2">&quot;artifact&quot;</span><span class="p">:</span>
+            <span class="n">analyzer_reports_qs</span> <span class="o">=</span> <span class="n">base_query</span><span class="o">.</span><span class="n">filter</span><span class="p">(</span>
+                <span class="n">Q</span><span class="p">(</span><span class="n">ip__address</span><span class="o">=</span><span class="n">value</span><span class="p">)</span> <span class="o">|</span> <span class="n">Q</span><span class="p">(</span><span class="n">url__address</span><span class="o">=</span><span class="n">value</span><span class="p">)</span> <span class="o">|</span> <span class="n">Q</span><span class="p">(</span><span class="n">hash__value</span><span class="o">=</span><span class="n">value</span><span class="p">)</span>
+            <span class="p">)</span><span class="o">.</span><span class="n">distinct</span><span class="p">()</span>
+        <span class="k">elif</span> <span class="n">cleaned_ioc_type</span> <span class="o">==</span> <span class="s2">&quot;body&quot;</span><span class="p">:</span>
+            <span class="n">analyzer_reports_qs</span> <span class="o">=</span> <span class="n">base_query</span><span class="o">.</span><span class="n">filter</span><span class="p">(</span><span class="n">mail_body__fuzzy_hash</span><span class="o">=</span><span class="n">value</span><span class="p">)</span>
+        <span class="k">elif</span> <span class="n">cleaned_ioc_type</span> <span class="o">==</span> <span class="s2">&quot;header&quot;</span><span class="p">:</span>
+            <span class="n">analyzer_reports_qs</span> <span class="o">=</span> <span class="n">base_query</span><span class="o">.</span><span class="n">filter</span><span class="p">(</span><span class="n">mail_header__fuzzy_hash</span><span class="o">=</span><span class="n">value</span><span class="p">)</span>
+        <span class="k">else</span><span class="p">:</span>
+            <span class="n">logger</span><span class="o">.</span><span class="n">warning</span><span class="p">(</span>
+                <span class="sa">f</span><span class="s2">&quot;User &#39;</span><span class="si">{</span><span class="n">request</span><span class="o">.</span><span class="n">user</span><span class="si">}</span><span class="s2">&#39; provided an unsupported ioc_type: &#39;</span><span class="si">{</span><span class="n">cleaned_ioc_type</span><span class="si">}</span><span class="s2">&#39;.&quot;</span>
+            <span class="p">)</span>
+            <span class="k">return</span> <span class="n">JsonResponse</span><span class="p">(</span>
+                <span class="p">{</span>
+                    <span class="s2">&quot;success&quot;</span><span class="p">:</span> <span class="kc">False</span><span class="p">,</span>
+                    <span class="s2">&quot;error&quot;</span><span class="p">:</span> <span class="sa">f</span><span class="s2">&quot;Unsupported IOC type: </span><span class="si">{</span><span class="n">cleaned_ioc_type</span><span class="si">}</span><span class="s2">&quot;</span><span class="p">,</span>
+                <span class="p">},</span>
+                <span class="n">status</span><span class="o">=</span><span class="mi">400</span><span class="p">,</span>
+            <span class="p">)</span>
+
+        <span class="k">if</span> <span class="ow">not</span> <span class="n">analyzer_reports_qs</span><span class="o">.</span><span class="n">exists</span><span class="p">():</span>
+            <span class="n">logger</span><span class="o">.</span><span class="n">info</span><span class="p">(</span>
+                <span class="sa">f</span><span class="s2">&quot;No analyzer reports found for user &#39;</span><span class="si">{</span><span class="n">request</span><span class="o">.</span><span class="n">user</span><span class="si">}</span><span class="s2">&#39;, value: &#39;</span><span class="si">{</span><span class="n">value</span><span class="si">}</span><span class="s2">&#39;, ioc_type: &#39;</span><span class="si">{</span><span class="n">cleaned_ioc_type</span><span class="si">}</span><span class="s2">&#39;.&quot;</span>
+            <span class="p">)</span>
+            <span class="k">return</span> <span class="n">JsonResponse</span><span class="p">(</span>
+                <span class="p">{</span><span class="s2">&quot;success&quot;</span><span class="p">:</span> <span class="kc">False</span><span class="p">,</span> <span class="s2">&quot;error&quot;</span><span class="p">:</span> <span class="n">ERROR_NO_ANALYZER_DATA_FOUND</span><span class="p">},</span> <span class="n">status</span><span class="o">=</span><span class="mi">404</span>
+            <span class="p">)</span>
+
+        <span class="n">reports_data</span> <span class="o">=</span> <span class="p">[]</span>
+        <span class="k">for</span> <span class="n">report</span> <span class="ow">in</span> <span class="n">analyzer_reports_qs</span><span class="p">:</span>
+            <span class="n">analyzer_name</span> <span class="o">=</span> <span class="p">(</span>
+                <span class="n">report</span><span class="o">.</span><span class="n">analyzer</span><span class="o">.</span><span class="n">name</span> <span class="k">if</span> <span class="n">report</span><span class="o">.</span><span class="n">analyzer</span> <span class="k">else</span> <span class="s2">&quot;Unknown Analyzer&quot;</span>
+            <span class="p">)</span>
+            <span class="n">reports_data</span><span class="o">.</span><span class="n">append</span><span class="p">(</span>
+                <span class="p">{</span>
+                    <span class="s2">&quot;analyzer_name&quot;</span><span class="p">:</span> <span class="n">analyzer_name</span><span class="p">,</span>
+                    <span class="s2">&quot;score&quot;</span><span class="p">:</span> <span class="n">report</span><span class="o">.</span><span class="n">score</span><span class="p">,</span>
+                    <span class="s2">&quot;confidence&quot;</span><span class="p">:</span> <span class="n">report</span><span class="o">.</span><span class="n">confidence</span><span class="p">,</span>
+                    <span class="s2">&quot;level&quot;</span><span class="p">:</span> <span class="n">report</span><span class="o">.</span><span class="n">level</span><span class="p">,</span>
+                    <span class="s2">&quot;category&quot;</span><span class="p">:</span> <span class="n">report</span><span class="o">.</span><span class="n">get_category</span><span class="p">(),</span>
+                    <span class="s2">&quot;summary&quot;</span><span class="p">:</span> <span class="n">report</span><span class="o">.</span><span class="n">report_summary</span><span class="p">,</span>
+                <span class="p">}</span>
+            <span class="p">)</span>
+
+        <span class="n">logger</span><span class="o">.</span><span class="n">info</span><span class="p">(</span>
+            <span class="sa">f</span><span class="s2">&quot;Successfully retrieved </span><span class="si">{</span><span class="nb">len</span><span class="p">(</span><span class="n">reports_data</span><span class="p">)</span><span class="si">}</span><span class="s2"> analyzer report(s) for user &#39;</span><span class="si">{</span><span class="n">request</span><span class="o">.</span><span class="n">user</span><span class="si">}</span><span class="s2">&#39;, &quot;</span>
+            <span class="sa">f</span><span class="s2">&quot;value: &#39;</span><span class="si">{</span><span class="n">value</span><span class="si">}</span><span class="s2">&#39;, ioc_type: &#39;</span><span class="si">{</span><span class="n">cleaned_ioc_type</span><span class="si">}</span><span class="s2">&#39;.&quot;</span>
+        <span class="p">)</span>
+        <span class="k">return</span> <span class="n">JsonResponse</span><span class="p">({</span><span class="s2">&quot;success&quot;</span><span class="p">:</span> <span class="kc">True</span><span class="p">,</span> <span class="s2">&quot;reports&quot;</span><span class="p">:</span> <span class="n">reports_data</span><span class="p">})</span>
+
+    <span class="k">except</span> <span class="n">django</span><span class="o">.</span><span class="n">db</span><span class="o">.</span><span class="n">Error</span> <span class="k">as</span> <span class="n">db_e</span><span class="p">:</span>
+        <span class="n">logger</span><span class="o">.</span><span class="n">error</span><span class="p">(</span>
+            <span class="sa">f</span><span class="s2">&quot;Database error retrieving analyzer data for user &#39;</span><span class="si">{</span><span class="n">request</span><span class="o">.</span><span class="n">user</span><span class="si">}</span><span class="s2">&#39;, value: &#39;</span><span class="si">{</span><span class="n">value</span><span class="si">}</span><span class="s2">&#39;, ioc_type: &#39;</span><span class="si">{</span><span class="n">cleaned_ioc_type</span><span class="si">}</span><span class="s2">&#39;: </span><span class="si">{</span><span class="n">db_e</span><span class="si">}</span><span class="s2">&quot;</span><span class="p">,</span>
+            <span class="n">exc_info</span><span class="o">=</span><span class="kc">True</span><span class="p">,</span>
+        <span class="p">)</span>
+        <span class="k">return</span> <span class="n">JsonResponse</span><span class="p">(</span>
+            <span class="p">{</span><span class="s2">&quot;success&quot;</span><span class="p">:</span> <span class="kc">False</span><span class="p">,</span> <span class="s2">&quot;error&quot;</span><span class="p">:</span> <span class="s2">&quot;A database error occurred.&quot;</span><span class="p">},</span> <span class="n">status</span><span class="o">=</span><span class="mi">500</span>
+        <span class="p">)</span>
+    <span class="k">except</span> <span class="ne">AttributeError</span> <span class="k">as</span> <span class="n">attr_e</span><span class="p">:</span>
+        <span class="n">logger</span><span class="o">.</span><span class="n">error</span><span class="p">(</span>
+            <span class="sa">f</span><span class="s2">&quot;Attribute error processing analyzer data for user &#39;</span><span class="si">{</span><span class="n">request</span><span class="o">.</span><span class="n">user</span><span class="si">}</span><span class="s2">&#39;, value: &#39;</span><span class="si">{</span><span class="n">value</span><span class="si">}</span><span class="s2">&#39;, ioc_type: &#39;</span><span class="si">{</span><span class="n">cleaned_ioc_type</span><span class="si">}</span><span class="s2">&#39;: </span><span class="si">{</span><span class="n">attr_e</span><span class="si">}</span><span class="s2">&quot;</span><span class="p">,</span>
+            <span class="n">exc_info</span><span class="o">=</span><span class="kc">True</span><span class="p">,</span>
+        <span class="p">)</span>
+        <span class="k">return</span> <span class="n">JsonResponse</span><span class="p">(</span>
+            <span class="p">{</span><span class="s2">&quot;success&quot;</span><span class="p">:</span> <span class="kc">False</span><span class="p">,</span> <span class="s2">&quot;error&quot;</span><span class="p">:</span> <span class="s2">&quot;Error processing report data.&quot;</span><span class="p">},</span> <span class="n">status</span><span class="o">=</span><span class="mi">500</span>
+        <span class="p">)</span>
+    <span class="k">except</span> <span class="ne">Exception</span> <span class="k">as</span> <span class="n">e</span><span class="p">:</span>
+        <span class="n">logger</span><span class="o">.</span><span class="n">error</span><span class="p">(</span>
+            <span class="sa">f</span><span class="s2">&quot;Unexpected error retrieving analyzer data for user &#39;</span><span class="si">{</span><span class="n">request</span><span class="o">.</span><span class="n">user</span><span class="si">}</span><span class="s2">&#39;, value: &#39;</span><span class="si">{</span><span class="n">value</span><span class="si">}</span><span class="s2">&#39;, ioc_type: &#39;</span><span class="si">{</span><span class="n">cleaned_ioc_type</span><span class="si">}</span><span class="s2">&#39;: </span><span class="si">{</span><span class="n">e</span><span class="si">}</span><span class="s2">&quot;</span><span class="p">,</span>
+            <span class="n">exc_info</span><span class="o">=</span><span class="kc">True</span><span class="p">,</span>
+        <span class="p">)</span>
+        <span class="k">return</span> <span class="n">JsonResponse</span><span class="p">({</span><span class="s2">&quot;success&quot;</span><span class="p">:</span> <span class="kc">False</span><span class="p">,</span> <span class="s2">&quot;error&quot;</span><span class="p">:</span> <span class="n">ERROR_UNEXPECTED</span><span class="p">},</span> <span class="n">status</span><span class="o">=</span><span class="mi">500</span><span class="p">)</span></div>
+
+
+
+<div class="viewcode-block" id="set_ioc_level">
+<a class="viewcode-back" href="../../modules/tasp_core.html#tasp.views.set_ioc_level">[docs]</a>
+<span class="nd">@login_required</span>
+<span class="nd">@csrf_protect</span>
+<span class="k">def</span><span class="w"> </span><span class="nf">set_ioc_level</span><span class="p">(</span><span class="n">request</span><span class="p">:</span> <span class="n">HttpRequest</span><span class="p">,</span> <span class="nb">id</span><span class="p">,</span> <span class="nb">type</span><span class="p">,</span> <span class="n">level</span><span class="p">,</span> <span class="n">case_id</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="n">JsonResponse</span><span class="p">:</span>
+<span class="w">    </span><span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">    Update the IOC level for a given IOC ID and type.</span>
+<span class="sd">    Expects POST with: ioc_id, ioc_type, level, case_id</span>
+<span class="sd">    &quot;&quot;&quot;</span>
+    <span class="k">try</span><span class="p">:</span>
+        <span class="c1"># Extract POST params</span>
+        <span class="n">ioc_id_str</span> <span class="o">=</span> <span class="nb">str</span><span class="p">(</span><span class="nb">id</span><span class="p">)</span>
+        <span class="n">ioc_type</span> <span class="o">=</span> <span class="nb">type</span>
+        <span class="n">level_str</span> <span class="o">=</span> <span class="n">level</span>
+        <span class="n">case_id_str</span> <span class="o">=</span> <span class="nb">int</span><span class="p">(</span><span class="n">case_id</span><span class="p">)</span>
+
+        <span class="k">if</span> <span class="ow">not</span> <span class="nb">all</span><span class="p">([</span><span class="n">ioc_id_str</span><span class="p">,</span> <span class="n">ioc_type</span><span class="p">,</span> <span class="n">level_str</span><span class="p">,</span> <span class="n">case_id_str</span><span class="p">]):</span>
+            <span class="n">logger</span><span class="o">.</span><span class="n">warning</span><span class="p">(</span>
+                <span class="sa">f</span><span class="s2">&quot;User=</span><span class="si">{</span><span class="n">request</span><span class="o">.</span><span class="n">user</span><span class="si">}</span><span class="s2"> missing params: &quot;</span>
+                <span class="sa">f</span><span class="s2">&quot;</span><span class="si">{</span><span class="n">KEY_IOC_ID</span><span class="si">}</span><span class="s2">=</span><span class="si">{</span><span class="n">ioc_id_str</span><span class="si">}</span><span class="s2">, </span><span class="si">{</span><span class="n">KEY_IOC_TYPE</span><span class="si">}</span><span class="s2">=</span><span class="si">{</span><span class="n">ioc_type</span><span class="si">}</span><span class="s2">, &quot;</span>
+                <span class="sa">f</span><span class="s2">&quot;</span><span class="si">{</span><span class="n">KEY_LEVEL</span><span class="si">}</span><span class="s2">=</span><span class="si">{</span><span class="n">level_str</span><span class="si">}</span><span class="s2">, </span><span class="si">{</span><span class="n">KEY_CASE_ID</span><span class="si">}</span><span class="s2">=</span><span class="si">{</span><span class="n">case_id_str</span><span class="si">}</span><span class="s2">&quot;</span>
+            <span class="p">)</span>
+            <span class="k">return</span> <span class="n">JsonResponse</span><span class="p">(</span>
+                <span class="p">{</span><span class="s2">&quot;success&quot;</span><span class="p">:</span> <span class="kc">False</span><span class="p">,</span> <span class="s2">&quot;error&quot;</span><span class="p">:</span> <span class="n">ERROR_MISSING_PARAMETERS</span><span class="p">},</span> <span class="n">status</span><span class="o">=</span><span class="mi">400</span>
+            <span class="p">)</span>
+
+        <span class="c1"># Validate ints</span>
+        <span class="k">try</span><span class="p">:</span>
+            <span class="n">ioc_id</span><span class="p">,</span> <span class="n">level</span><span class="p">,</span> <span class="n">case_id</span> <span class="o">=</span> <span class="nb">str</span><span class="p">(</span><span class="n">ioc_id_str</span><span class="p">),</span> <span class="nb">str</span><span class="p">(</span><span class="n">level_str</span><span class="p">),</span> <span class="nb">int</span><span class="p">(</span><span class="n">case_id_str</span><span class="p">)</span>
+        <span class="k">except</span> <span class="ne">ValueError</span><span class="p">:</span>
+            <span class="n">logger</span><span class="o">.</span><span class="n">warning</span><span class="p">(</span>
+                <span class="sa">f</span><span class="s2">&quot;User=</span><span class="si">{</span><span class="n">request</span><span class="o">.</span><span class="n">user</span><span class="si">}</span><span class="s2"> provided invalid numeric values: &quot;</span>
+                <span class="sa">f</span><span class="s2">&quot;ioc_id=</span><span class="si">{</span><span class="n">ioc_id_str</span><span class="si">}</span><span class="s2">, level=</span><span class="si">{</span><span class="n">level_str</span><span class="si">}</span><span class="s2">, case_id=</span><span class="si">{</span><span class="n">case_id_str</span><span class="si">}</span><span class="s2">&quot;</span>
+            <span class="p">)</span>
+            <span class="k">return</span> <span class="n">JsonResponse</span><span class="p">(</span>
+                <span class="p">{</span><span class="s2">&quot;success&quot;</span><span class="p">:</span> <span class="kc">False</span><span class="p">,</span> <span class="s2">&quot;error&quot;</span><span class="p">:</span> <span class="n">ERROR_INVALID_LEVEL_FORMAT</span><span class="p">},</span> <span class="n">status</span><span class="o">=</span><span class="mi">400</span>
+            <span class="p">)</span>
+
+        <span class="c1"># Resolve handler</span>
+        <span class="n">handler_func</span> <span class="o">=</span> <span class="n">IOC_HANDLER_MAP</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="n">ioc_type</span><span class="p">)</span>
+        <span class="k">if</span> <span class="ow">not</span> <span class="n">handler_func</span><span class="p">:</span>
+            <span class="n">logger</span><span class="o">.</span><span class="n">warning</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;User=</span><span class="si">{</span><span class="n">request</span><span class="o">.</span><span class="n">user</span><span class="si">}</span><span class="s2"> invalid ioc_type=&#39;</span><span class="si">{</span><span class="n">ioc_type</span><span class="si">}</span><span class="s2">&#39;&quot;</span><span class="p">)</span>
+            <span class="k">return</span> <span class="n">JsonResponse</span><span class="p">(</span>
+                <span class="p">{</span><span class="s2">&quot;success&quot;</span><span class="p">:</span> <span class="kc">False</span><span class="p">,</span> <span class="s2">&quot;error&quot;</span><span class="p">:</span> <span class="n">ERROR_UNSUPPORTED_IOC_TYPE</span><span class="p">},</span> <span class="n">status</span><span class="o">=</span><span class="mi">400</span>
+            <span class="p">)</span>
+
+        <span class="n">logger</span><span class="o">.</span><span class="n">info</span><span class="p">(</span>
+            <span class="sa">f</span><span class="s2">&quot;User=</span><span class="si">{</span><span class="n">request</span><span class="o">.</span><span class="n">user</span><span class="si">}</span><span class="s2"> updating IOC id=</span><span class="si">{</span><span class="n">ioc_id</span><span class="si">}</span><span class="s2">, type=</span><span class="si">{</span><span class="n">ioc_type</span><span class="si">}</span><span class="s2">, &quot;</span>
+            <span class="sa">f</span><span class="s2">&quot;level=</span><span class="si">{</span><span class="n">level</span><span class="si">}</span><span class="s2">, case_id=</span><span class="si">{</span><span class="n">case_id</span><span class="si">}</span><span class="s2">&quot;</span>
+        <span class="p">)</span>
+
+        <span class="c1"># Dispatch to handler</span>
+        <span class="k">if</span> <span class="n">ioc_type</span> <span class="ow">in</span> <span class="n">IOC_TYPES_NEEDING_TYPE_ARG</span><span class="p">:</span>
+            <span class="n">response</span> <span class="o">=</span> <span class="n">handler_func</span><span class="p">(</span><span class="n">ioc_id</span><span class="p">,</span> <span class="n">ioc_type</span><span class="p">,</span> <span class="n">level</span><span class="p">,</span> <span class="n">case_id</span><span class="p">)</span>
+        <span class="k">else</span><span class="p">:</span>
+            <span class="n">response</span> <span class="o">=</span> <span class="n">handler_func</span><span class="p">(</span><span class="n">ioc_id</span><span class="p">,</span> <span class="n">level</span><span class="p">,</span> <span class="n">case_id</span><span class="p">)</span>
+
+        <span class="c1"># Validate response</span>
+        <span class="k">if</span> <span class="ow">not</span> <span class="nb">isinstance</span><span class="p">(</span><span class="n">response</span><span class="p">,</span> <span class="n">JsonResponse</span><span class="p">):</span>
+            <span class="n">logger</span><span class="o">.</span><span class="n">error</span><span class="p">(</span>
+                <span class="sa">f</span><span class="s2">&quot;Handler for type=</span><span class="si">{</span><span class="n">ioc_type</span><span class="si">}</span><span class="s2"> returned invalid response (not JsonResponse)&quot;</span>
+            <span class="p">)</span>
+            <span class="k">return</span> <span class="n">JsonResponse</span><span class="p">(</span>
+                <span class="p">{</span><span class="s2">&quot;success&quot;</span><span class="p">:</span> <span class="kc">False</span><span class="p">,</span> <span class="s2">&quot;error&quot;</span><span class="p">:</span> <span class="s2">&quot;Internal handler error.&quot;</span><span class="p">},</span> <span class="n">status</span><span class="o">=</span><span class="mi">500</span>
+            <span class="p">)</span>
+
+        <span class="k">return</span> <span class="n">response</span>
+
+    <span class="k">except</span> <span class="ne">Exception</span> <span class="k">as</span> <span class="n">e</span><span class="p">:</span>
+        <span class="n">logger</span><span class="o">.</span><span class="n">critical</span><span class="p">(</span>
+            <span class="sa">f</span><span class="s2">&quot;Unexpected error in set_ioc_level for user=</span><span class="si">{</span><span class="n">request</span><span class="o">.</span><span class="n">user</span><span class="si">}</span><span class="s2">: </span><span class="si">{</span><span class="n">e</span><span class="si">}</span><span class="s2">&quot;</span><span class="p">,</span>
+            <span class="n">exc_info</span><span class="o">=</span><span class="kc">True</span><span class="p">,</span>
+        <span class="p">)</span>
+        <span class="k">return</span> <span class="n">JsonResponse</span><span class="p">({</span><span class="s2">&quot;success&quot;</span><span class="p">:</span> <span class="kc">False</span><span class="p">,</span> <span class="s2">&quot;error&quot;</span><span class="p">:</span> <span class="n">ERROR_UNEXPECTED</span><span class="p">},</span> <span class="n">status</span><span class="o">=</span><span class="mi">500</span><span class="p">)</span></div>
+
+
+<div class="viewcode-block" id="update_ciso_profile_scope">
+<a class="viewcode-back" href="../../modules/tasp_core.html#tasp.views.update_ciso_profile_scope">[docs]</a>
+<span class="nd">@csrf_exempt</span>
+<span class="k">def</span><span class="w"> </span><span class="nf">update_ciso_profile_scope</span><span class="p">(</span><span class="n">request</span><span class="p">,</span> <span class="n">scope</span><span class="p">):</span>
+<span class="w">    </span><span class="sd">&quot;&quot;&quot;Update the CISO profile scope.</span>
+
+<span class="sd">    This function updates the scope of the CISO profile for the current user.</span>
+
+<span class="sd">    Args:</span>
+<span class="sd">        request (HttpRequest): The HTTP request object.</span>
+<span class="sd">        scope (str): The new scope value to be set for the CISO profile.</span>
+
+<span class="sd">    Returns:</span>
+<span class="sd">        JsonResponse: A JSON response indicating the success or failure of the update operation.</span>
+
+<span class="sd">    Raises:</span>
+<span class="sd">        None</span>
+
+<span class="sd">    &quot;&quot;&quot;</span>
+    <span class="n">SUCCESS_MESSAGE</span> <span class="o">=</span> <span class="s2">&quot;CISO profile scope updated successfully.&quot;</span>
+    <span class="n">NOT_FOUND_MESSAGE</span> <span class="o">=</span> <span class="s2">&quot;CISO profile not found.&quot;</span>
+
+    <span class="k">try</span><span class="p">:</span>
+        <span class="n">user_profile</span> <span class="o">=</span> <span class="n">CISOProfile</span><span class="o">.</span><span class="n">objects</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="n">user</span><span class="o">=</span><span class="n">request</span><span class="o">.</span><span class="n">user</span><span class="p">)</span>
+        <span class="n">user_profile</span><span class="o">.</span><span class="n">scope</span> <span class="o">=</span> <span class="n">scope</span>
+        <span class="n">user_profile</span><span class="o">.</span><span class="n">save</span><span class="p">()</span>
+        <span class="n">logger</span><span class="o">.</span><span class="n">info</span><span class="p">(</span>
+            <span class="sa">f</span><span class="s2">&quot;CISO profile scope updated to &#39;</span><span class="si">{</span><span class="n">scope</span><span class="si">}</span><span class="s2">&#39; for user &#39;</span><span class="si">{</span><span class="n">request</span><span class="o">.</span><span class="n">user</span><span class="si">}</span><span class="s2">&#39;.&quot;</span>
+        <span class="p">)</span>
+        <span class="k">return</span> <span class="n">JsonResponse</span><span class="p">({</span><span class="s2">&quot;success&quot;</span><span class="p">:</span> <span class="kc">True</span><span class="p">,</span> <span class="s2">&quot;message&quot;</span><span class="p">:</span> <span class="n">SUCCESS_MESSAGE</span><span class="p">})</span>
+    <span class="k">except</span> <span class="n">CISOProfile</span><span class="o">.</span><span class="n">DoesNotExist</span><span class="p">:</span>
+        <span class="n">logger</span><span class="o">.</span><span class="n">warning</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;CISO profile not found for user &#39;</span><span class="si">{</span><span class="n">request</span><span class="o">.</span><span class="n">user</span><span class="si">}</span><span class="s2">&#39;.&quot;</span><span class="p">)</span>
+        <span class="k">return</span> <span class="n">JsonResponse</span><span class="p">({</span><span class="s2">&quot;success&quot;</span><span class="p">:</span> <span class="kc">False</span><span class="p">,</span> <span class="s2">&quot;error&quot;</span><span class="p">:</span> <span class="n">NOT_FOUND_MESSAGE</span><span class="p">},</span> <span class="n">status</span><span class="o">=</span><span class="mi">404</span><span class="p">)</span></div>
+
+
+
+<div class="viewcode-block" id="compute">
+<a class="viewcode-back" href="../../modules/tasp_core.html#tasp.views.compute">[docs]</a>
+<span class="nd">@csrf_exempt</span>
+<span class="k">def</span><span class="w"> </span><span class="nf">compute</span><span class="p">(</span><span class="n">request</span><span class="p">,</span> <span class="nb">id</span><span class="p">,</span> <span class="n">user</span><span class="p">):</span>
+<span class="w">    </span><span class="sd">&quot;&quot;&quot;Compute function to retrieve analysis information for a given case.</span>
+
+<span class="sd">    Args:</span>
+<span class="sd">        request (HttpRequest): The HTTP request object.</span>
+<span class="sd">        id (int): The ID of the case.</span>
+<span class="sd">        user (str): The username of the user.</span>
+
+<span class="sd">    Returns:</span>
+<span class="sd">        JsonResponse: A JSON response containing the analysis information for the case.</span>
+
+<span class="sd">    Raises:</span>
+<span class="sd">        ValueError: If the provided case ID is invalid.</span>
+<span class="sd">        Exception: If an error occurs while retrieving the analysis information.</span>
+<span class="sd">    &quot;&quot;&quot;</span>
+    <span class="k">try</span><span class="p">:</span>
+        <span class="n">case_id</span> <span class="o">=</span> <span class="nb">int</span><span class="p">(</span><span class="nb">id</span><span class="p">)</span>
+    <span class="k">except</span> <span class="ne">ValueError</span> <span class="k">as</span> <span class="n">e</span><span class="p">:</span>
+        <span class="n">logger</span><span class="o">.</span><span class="n">warning</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;Invalid case id: </span><span class="si">{</span><span class="nb">id</span><span class="si">}</span><span class="s2">&quot;</span><span class="p">)</span>
+        <span class="k">return</span> <span class="n">JsonResponse</span><span class="p">({</span><span class="s2">&quot;success&quot;</span><span class="p">:</span> <span class="kc">False</span><span class="p">,</span> <span class="s2">&quot;error&quot;</span><span class="p">:</span> <span class="nb">str</span><span class="p">(</span><span class="n">e</span><span class="p">)})</span>
+
+    <span class="n">case</span> <span class="o">=</span> <span class="n">Case</span><span class="o">.</span><span class="n">objects</span><span class="o">.</span><span class="n">filter</span><span class="p">(</span><span class="nb">id</span><span class="o">=</span><span class="n">case_id</span><span class="p">)</span><span class="o">.</span><span class="n">first</span><span class="p">()</span>
+    <span class="k">if</span> <span class="ow">not</span> <span class="n">case</span><span class="p">:</span>
+        <span class="n">logger</span><span class="o">.</span><span class="n">warning</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;Case </span><span class="si">{</span><span class="n">case_id</span><span class="si">}</span><span class="s2"> not found&quot;</span><span class="p">)</span>
+        <span class="k">return</span> <span class="n">JsonResponse</span><span class="p">({</span><span class="s2">&quot;success&quot;</span><span class="p">:</span> <span class="kc">False</span><span class="p">,</span> <span class="s2">&quot;error&quot;</span><span class="p">:</span> <span class="n">CASE_NOT_EXIST_ERROR</span><span class="p">})</span>
+
+    <span class="k">if</span> <span class="n">case</span><span class="o">.</span><span class="n">reporter</span> <span class="ow">and</span> <span class="nb">str</span><span class="p">(</span><span class="n">case</span><span class="o">.</span><span class="n">reporter</span><span class="p">)</span> <span class="o">==</span> <span class="n">user</span><span class="p">:</span>
+        <span class="c1"># CortexJobManager().manage_jobs(case)</span>
+        <span class="n">logger</span><span class="o">.</span><span class="n">info</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;Analysis infos retrieved successfully for case </span><span class="si">{</span><span class="n">case_id</span><span class="si">}</span><span class="s2">&quot;</span><span class="p">)</span>
+        <span class="n">context</span> <span class="o">=</span> <span class="p">{</span>
+            <span class="s2">&quot;analysis_done&quot;</span><span class="p">:</span> <span class="n">case</span><span class="o">.</span><span class="n">analysis_done</span><span class="p">,</span>
+            <span class="s2">&quot;status&quot;</span><span class="p">:</span> <span class="n">case</span><span class="o">.</span><span class="n">status</span><span class="p">,</span>
+            <span class="s2">&quot;results&quot;</span><span class="p">:</span> <span class="n">case</span><span class="o">.</span><span class="n">results</span><span class="p">,</span>
+            <span class="s2">&quot;case_score&quot;</span><span class="p">:</span> <span class="n">case</span><span class="o">.</span><span class="n">finalScore</span><span class="p">,</span>
+            <span class="s2">&quot;confidence&quot;</span><span class="p">:</span> <span class="n">case</span><span class="o">.</span><span class="n">finalConfidence</span><span class="p">,</span>
+        <span class="p">}</span>
+        <span class="n">logger</span><span class="o">.</span><span class="n">info</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;Analysis done retrieved successfully for case </span><span class="si">{</span><span class="n">case_id</span><span class="si">}</span><span class="s2">&quot;</span><span class="p">)</span>
+        <span class="k">return</span> <span class="n">JsonResponse</span><span class="p">({</span><span class="s2">&quot;success&quot;</span><span class="p">:</span> <span class="kc">True</span><span class="p">,</span> <span class="s2">&quot;context&quot;</span><span class="p">:</span> <span class="n">context</span><span class="p">})</span>
+    <span class="k">else</span><span class="p">:</span>
+        <span class="n">logger</span><span class="o">.</span><span class="n">warning</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;Case </span><span class="si">{</span><span class="n">case_id</span><span class="si">}</span><span class="s2"> not found&quot;</span><span class="p">)</span>
+        <span class="k">return</span> <span class="n">JsonResponse</span><span class="p">({</span><span class="s2">&quot;success&quot;</span><span class="p">:</span> <span class="kc">False</span><span class="p">,</span> <span class="s2">&quot;error&quot;</span><span class="p">:</span> <span class="s2">&quot;Case not found&quot;</span><span class="p">})</span></div>
+
+</pre></div>
+
+           </div>
+          </div>
+          <footer>
+
+  <hr/>
+
+  <div role="contentinfo">
+    <p>&#169; Copyright 2025, Theo Bhang, Esteban Crispel.</p>
+  </div>
+
+  Built with <a href="https://www.sphinx-doc.org/">Sphinx</a> using a
+    <a href="https://github.com/readthedocs/sphinx_rtd_theme">theme</a>
+    provided by <a href="https://readthedocs.org">Read the Docs</a>.
+   
+
+</footer>
+        </div>
+      </div>
+    </section>
+  </div>
+  <script>
+      jQuery(function () {
+          SphinxRtdTheme.Navigation.enable(true);
+      });
+  </script> 
+
+</body>
+</html>

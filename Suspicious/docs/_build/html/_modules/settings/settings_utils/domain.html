@@ -1,0 +1,484 @@
+
+
+<!DOCTYPE html>
+<html class="writer-html5" lang="en" data-content_root="../../../">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>settings.settings_utils.domain &mdash; Suspicious 1.0.0 documentation</title>
+      <link rel="stylesheet" type="text/css" href="../../../_static/pygments.css?v=b86133f3" />
+      <link rel="stylesheet" type="text/css" href="../../../_static/css/theme.css?v=e59714d7" />
+
+  
+      <script src="../../../_static/jquery.js?v=5d32c60e"></script>
+      <script src="../../../_static/_sphinx_javascript_frameworks_compat.js?v=2cd50e6c"></script>
+      <script src="../../../_static/documentation_options.js?v=8d563738"></script>
+      <script src="../../../_static/doctools.js?v=9bcbadda"></script>
+      <script src="../../../_static/sphinx_highlight.js?v=dc90522c"></script>
+    <script src="../../../_static/js/theme.js"></script>
+    <link rel="index" title="Index" href="../../../genindex.html" />
+    <link rel="search" title="Search" href="../../../search.html" /> 
+</head>
+
+<body class="wy-body-for-nav"> 
+  <div class="wy-grid-for-nav">
+    <nav data-toggle="wy-nav-shift" class="wy-nav-side">
+      <div class="wy-side-scroll">
+        <div class="wy-side-nav-search" >
+
+          
+          
+          <a href="../../../index.html" class="icon icon-home">
+            Suspicious
+          </a>
+<div role="search">
+  <form id="rtd-search-form" class="wy-form" action="../../../search.html" method="get">
+    <input type="text" name="q" placeholder="Search docs" aria-label="Search docs" />
+    <input type="hidden" name="check_keywords" value="yes" />
+    <input type="hidden" name="area" value="default" />
+  </form>
+</div>
+        </div><div class="wy-menu wy-menu-vertical" data-spy="affix" role="navigation" aria-label="Navigation menu">
+              <p class="caption" role="heading"><span class="caption-text">Contents:</span></p>
+<ul>
+<li class="toctree-l1"><a class="reference internal" href="../../../modules/index.html">Modules (API Reference)</a></li>
+</ul>
+
+        </div>
+      </div>
+    </nav>
+
+    <section data-toggle="wy-nav-shift" class="wy-nav-content-wrap"><nav class="wy-nav-top" aria-label="Mobile navigation menu" >
+          <i data-toggle="wy-nav-top" class="fa fa-bars"></i>
+          <a href="../../../index.html">Suspicious</a>
+      </nav>
+
+      <div class="wy-nav-content">
+        <div class="rst-content">
+          <div role="navigation" aria-label="Page navigation">
+  <ul class="wy-breadcrumbs">
+      <li><a href="../../../index.html" class="icon icon-home" aria-label="Home"></a></li>
+          <li class="breadcrumb-item"><a href="../../index.html">Module code</a></li>
+      <li class="breadcrumb-item active">settings.settings_utils.domain</li>
+      <li class="wy-breadcrumbs-aside">
+      </li>
+  </ul>
+  <hr/>
+</div>
+          <div role="main" class="document" itemscope="itemscope" itemtype="http://schema.org/Article">
+           <div itemprop="articleBody">
+             
+  <h1>Source code for settings.settings_utils.domain</h1><div class="highlight"><pre>
+<span></span><span class="kn">import</span><span class="w"> </span><span class="nn">csv</span>
+<span class="kn">import</span><span class="w"> </span><span class="nn">json</span>
+<span class="kn">import</span><span class="w"> </span><span class="nn">re</span>
+<span class="kn">from</span><span class="w"> </span><span class="nn">domain_process.models</span><span class="w"> </span><span class="kn">import</span> <span class="n">Domain</span>
+<span class="kn">from</span><span class="w"> </span><span class="nn">settings.models</span><span class="w"> </span><span class="kn">import</span> <span class="n">AllowListDomain</span><span class="p">,</span> <span class="n">DenyListDomain</span><span class="p">,</span> <span class="n">CampaignDomainAllowList</span>
+<span class="kn">from</span><span class="w"> </span><span class="nn">domain_process.domain_utils.domain_handler</span><span class="w"> </span><span class="kn">import</span> <span class="n">DomainHandler</span>
+
+<span class="n">CSV_CONTENT_TYPE</span> <span class="o">=</span> <span class="s1">&#39;text/csv&#39;</span>
+<span class="n">JSON_CONTENT_TYPE</span> <span class="o">=</span> <span class="s1">&#39;application/json&#39;</span>
+<span class="n">TXT_CONTENT_TYPE</span> <span class="o">=</span> <span class="s1">&#39;text/plain&#39;</span>
+<span class="n">INVALID_FILETYPE_ERROR</span> <span class="o">=</span> <span class="s1">&#39;Invalid file type.&#39;</span>
+
+<div class="viewcode-block" id="handle_domain_file">
+<a class="viewcode-back" href="../../../modules/settings_core.html#settings.settings_utils.domain.handle_domain_file">[docs]</a>
+<span class="k">def</span><span class="w"> </span><span class="nf">handle_domain_file</span><span class="p">(</span><span class="n">file</span><span class="p">):</span>
+<span class="w">    </span><span class="sd">&quot;&quot;&quot;Handles the domain file based on its content type.</span>
+
+<span class="sd">    Args:</span>
+<span class="sd">        file (File): The domain file to be handled.</span>
+
+<span class="sd">    Raises:</span>
+<span class="sd">        ValueError: If the content type of the file is invalid.</span>
+
+<span class="sd">    Returns:</span>
+<span class="sd">        Result: The result of handling the domain file.</span>
+<span class="sd">    &quot;&quot;&quot;</span>
+    <span class="k">if</span> <span class="n">file</span><span class="o">.</span><span class="n">content_type</span> <span class="o">==</span> <span class="n">CSV_CONTENT_TYPE</span><span class="p">:</span>
+        <span class="k">return</span> <span class="n">handle_domain_csv_file</span><span class="p">(</span><span class="n">file</span><span class="p">)</span>
+    <span class="k">elif</span> <span class="n">file</span><span class="o">.</span><span class="n">content_type</span> <span class="o">==</span> <span class="n">JSON_CONTENT_TYPE</span><span class="p">:</span>
+        <span class="k">return</span> <span class="n">handle_domain_json_file</span><span class="p">(</span><span class="n">file</span><span class="p">)</span>
+    <span class="k">elif</span> <span class="n">file</span><span class="o">.</span><span class="n">content_type</span> <span class="o">==</span> <span class="n">TXT_CONTENT_TYPE</span><span class="p">:</span>
+        <span class="k">return</span> <span class="n">handle_domain_txt_file</span><span class="p">(</span><span class="n">file</span><span class="p">)</span>
+    <span class="k">else</span><span class="p">:</span>
+        <span class="k">raise</span> <span class="ne">ValueError</span><span class="p">(</span><span class="n">INVALID_FILETYPE_ERROR</span><span class="p">)</span></div>
+
+
+<div class="viewcode-block" id="handle_bdomain_file">
+<a class="viewcode-back" href="../../../modules/settings_core.html#settings.settings_utils.domain.handle_bdomain_file">[docs]</a>
+<span class="k">def</span><span class="w"> </span><span class="nf">handle_bdomain_file</span><span class="p">(</span><span class="n">file</span><span class="p">):</span>
+<span class="w">    </span><span class="sd">&quot;&quot;&quot;Handles the domain file based on its content type.</span>
+
+<span class="sd">    Args:</span>
+<span class="sd">        file (File): The domain file to be handled.</span>
+
+<span class="sd">    Raises:</span>
+<span class="sd">        ValueError: If the content type of the file is invalid.</span>
+
+<span class="sd">    Returns:</span>
+<span class="sd">        Result: The result of handling the domain file.</span>
+<span class="sd">    &quot;&quot;&quot;</span>
+    <span class="k">if</span> <span class="n">file</span><span class="o">.</span><span class="n">content_type</span> <span class="o">==</span> <span class="n">CSV_CONTENT_TYPE</span><span class="p">:</span>
+        <span class="k">return</span> <span class="n">handle_bdomain_csv_file</span><span class="p">(</span><span class="n">file</span><span class="p">)</span>
+    <span class="k">elif</span> <span class="n">file</span><span class="o">.</span><span class="n">content_type</span> <span class="o">==</span> <span class="n">JSON_CONTENT_TYPE</span><span class="p">:</span>
+        <span class="k">return</span> <span class="n">handle_bdomain_json_file</span><span class="p">(</span><span class="n">file</span><span class="p">)</span>
+    <span class="k">elif</span> <span class="n">file</span><span class="o">.</span><span class="n">content_type</span> <span class="o">==</span> <span class="n">TXT_CONTENT_TYPE</span><span class="p">:</span>
+        <span class="k">return</span> <span class="n">handle_bdomain_txt_file</span><span class="p">(</span><span class="n">file</span><span class="p">)</span>
+    <span class="k">else</span><span class="p">:</span>
+        <span class="k">raise</span> <span class="ne">ValueError</span><span class="p">(</span><span class="n">INVALID_FILETYPE_ERROR</span><span class="p">)</span></div>
+
+
+<div class="viewcode-block" id="handle_campaign_domain_file">
+<a class="viewcode-back" href="../../../modules/settings_core.html#settings.settings_utils.domain.handle_campaign_domain_file">[docs]</a>
+<span class="k">def</span><span class="w"> </span><span class="nf">handle_campaign_domain_file</span><span class="p">(</span><span class="n">file</span><span class="p">):</span>
+<span class="w">    </span><span class="sd">&quot;&quot;&quot;Handles the campaign domain file based on its content type.</span>
+
+<span class="sd">    Args:</span>
+<span class="sd">        file (File): The campaign domain file to be handled.</span>
+
+<span class="sd">    Raises:</span>
+<span class="sd">        ValueError: If the content type of the file is invalid.</span>
+
+<span class="sd">    Returns:</span>
+<span class="sd">        Result: The result of handling the campaign domain file.</span>
+<span class="sd">    &quot;&quot;&quot;</span>
+    <span class="k">if</span> <span class="n">file</span><span class="o">.</span><span class="n">content_type</span> <span class="o">==</span> <span class="n">CSV_CONTENT_TYPE</span><span class="p">:</span>
+        <span class="k">return</span> <span class="n">handle_campaign_domain_csv_file</span><span class="p">(</span><span class="n">file</span><span class="p">)</span>
+    <span class="k">elif</span> <span class="n">file</span><span class="o">.</span><span class="n">content_type</span> <span class="o">==</span> <span class="n">JSON_CONTENT_TYPE</span><span class="p">:</span>
+        <span class="k">return</span> <span class="n">handle_campaign_domain_json_file</span><span class="p">(</span><span class="n">file</span><span class="p">)</span>
+    <span class="k">elif</span> <span class="n">file</span><span class="o">.</span><span class="n">content_type</span> <span class="o">==</span> <span class="n">TXT_CONTENT_TYPE</span><span class="p">:</span>
+        <span class="k">return</span> <span class="n">handle_campaign_domain_txt_file</span><span class="p">(</span><span class="n">file</span><span class="p">)</span>
+    <span class="k">else</span><span class="p">:</span>
+        <span class="k">raise</span> <span class="ne">ValueError</span><span class="p">(</span><span class="n">INVALID_FILETYPE_ERROR</span><span class="p">)</span></div>
+
+
+<div class="viewcode-block" id="process_domains">
+<a class="viewcode-back" href="../../../modules/settings_core.html#settings.settings_utils.domain.process_domains">[docs]</a>
+<span class="k">def</span><span class="w"> </span><span class="nf">process_domains</span><span class="p">(</span><span class="n">domains</span><span class="p">,</span> <span class="n">user</span><span class="p">):</span>
+<span class="w">    </span><span class="sd">&quot;&quot;&quot;Process a list of domains and associate them with a user.</span>
+
+<span class="sd">    This function takes a list of domains and a user as input. It iterates over each domain in the list,</span>
+<span class="sd">    converts it to lowercase, and checks if it is a valid domain using the Validator class. If the domain</span>
+<span class="sd">    is valid and not already present in the AllowListDomain table, it creates a new entry in the Domain</span>
+<span class="sd">    table and associates it with the user in the AllowListDomain table. The function returns two lists:</span>
+<span class="sd">    good_domains, which contains the domains that were successfully processed, and error_domains, which</span>
+<span class="sd">    contains the domains that encountered an error during processing.</span>
+
+<span class="sd">    Args:</span>
+<span class="sd">        domains (list): A list of domains to process.</span>
+<span class="sd">        user (User): The user to associate the domains with.</span>
+
+<span class="sd">    Returns:</span>
+<span class="sd">        tuple: A tuple containing two lists - good_domains and error_domains.</span>
+<span class="sd">    &quot;&quot;&quot;</span>
+    <span class="n">good_domains</span> <span class="o">=</span> <span class="p">[]</span>
+    <span class="n">error_domains</span> <span class="o">=</span> <span class="p">[]</span>
+    <span class="k">for</span> <span class="n">domain</span> <span class="ow">in</span> <span class="n">domains</span><span class="p">:</span>
+        <span class="n">domain</span> <span class="o">=</span> <span class="n">domain</span><span class="o">.</span><span class="n">lower</span><span class="p">()</span>
+
+        <span class="k">if</span> <span class="n">DomainHandler</span><span class="p">()</span><span class="o">.</span><span class="n">validate_domain</span><span class="p">(</span><span class="n">domain</span><span class="p">)</span> <span class="o">==</span> <span class="s2">&quot;Domain&quot;</span><span class="p">:</span>
+            <span class="k">try</span><span class="p">:</span>
+                <span class="n">domain_db</span> <span class="o">=</span> <span class="n">Domain</span><span class="o">.</span><span class="n">objects</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="n">value</span><span class="o">=</span><span class="n">domain</span><span class="p">)</span>
+            <span class="k">except</span> <span class="n">Domain</span><span class="o">.</span><span class="n">DoesNotExist</span><span class="p">:</span>
+                <span class="n">domain_db</span> <span class="o">=</span> <span class="n">Domain</span><span class="o">.</span><span class="n">objects</span><span class="o">.</span><span class="n">create</span><span class="p">(</span><span class="n">value</span><span class="o">=</span><span class="n">domain</span><span class="p">)</span>
+
+            <span class="k">if</span> <span class="n">domain_db</span> <span class="ow">and</span> <span class="ow">not</span> <span class="n">AllowListDomain</span><span class="o">.</span><span class="n">objects</span><span class="o">.</span><span class="n">filter</span><span class="p">(</span><span class="n">domain</span><span class="o">=</span><span class="n">domain_db</span><span class="p">)</span><span class="o">.</span><span class="n">exists</span><span class="p">():</span>
+                <span class="n">AllowListDomain</span><span class="o">.</span><span class="n">objects</span><span class="o">.</span><span class="n">create</span><span class="p">(</span><span class="n">domain</span><span class="o">=</span><span class="n">domain_db</span><span class="p">,</span> <span class="n">user</span><span class="o">=</span><span class="n">user</span><span class="p">)</span>
+                <span class="n">good_domains</span><span class="o">.</span><span class="n">append</span><span class="p">(</span><span class="n">domain</span><span class="p">)</span>
+            <span class="k">else</span><span class="p">:</span>
+                <span class="n">error_domains</span><span class="o">.</span><span class="n">append</span><span class="p">(</span><span class="n">domain</span><span class="p">)</span>
+
+    <span class="k">return</span> <span class="n">good_domains</span><span class="p">,</span> <span class="n">error_domains</span></div>
+
+
+<div class="viewcode-block" id="process_bdomains">
+<a class="viewcode-back" href="../../../modules/settings_core.html#settings.settings_utils.domain.process_bdomains">[docs]</a>
+<span class="k">def</span><span class="w"> </span><span class="nf">process_bdomains</span><span class="p">(</span><span class="n">domains</span><span class="p">,</span> <span class="n">user</span><span class="p">):</span>
+<span class="w">    </span><span class="sd">&quot;&quot;&quot;Process a list of domains and associate them with a user.</span>
+
+<span class="sd">    This function takes a list of domains and a user as input. It iterates over each domain in the list,</span>
+<span class="sd">    converts it to lowercase, and checks if it is a valid domain using the Validator class. If the domain</span>
+<span class="sd">    is valid and not already present in the DenyListDomain table, it creates a new entry in the Domain</span>
+<span class="sd">    table and associates it with the user in the DenyListDomain table. The function returns two lists:</span>
+<span class="sd">    good_domains, which contains the domains that were successfully processed, and error_domains, which</span>
+<span class="sd">    contains the domains that encountered an error during processing.</span>
+
+<span class="sd">    Args:</span>
+<span class="sd">        domains (list): A list of domains to process.</span>
+<span class="sd">        user (User): The user to associate the domains with.</span>
+
+<span class="sd">    Returns:</span>
+<span class="sd">        tuple: A tuple containing two lists - good_domains and error_domains.</span>
+<span class="sd">    &quot;&quot;&quot;</span>
+    <span class="n">good_domains</span> <span class="o">=</span> <span class="p">[]</span>
+    <span class="n">error_domains</span> <span class="o">=</span> <span class="p">[]</span>
+    <span class="k">for</span> <span class="n">domain</span> <span class="ow">in</span> <span class="n">domains</span><span class="p">:</span>
+        <span class="n">domain</span> <span class="o">=</span> <span class="n">domain</span><span class="o">.</span><span class="n">lower</span><span class="p">()</span>
+
+        <span class="k">if</span> <span class="n">DomainHandler</span><span class="p">()</span><span class="o">.</span><span class="n">validate_domain</span><span class="p">(</span><span class="n">domain</span><span class="p">)</span> <span class="o">==</span> <span class="s2">&quot;Domain&quot;</span><span class="p">:</span>
+            <span class="k">try</span><span class="p">:</span>
+                <span class="n">domain_db</span> <span class="o">=</span> <span class="n">Domain</span><span class="o">.</span><span class="n">objects</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="n">value</span><span class="o">=</span><span class="n">domain</span><span class="p">)</span>
+            <span class="k">except</span> <span class="n">Domain</span><span class="o">.</span><span class="n">DoesNotExist</span><span class="p">:</span>
+                <span class="n">domain_db</span> <span class="o">=</span> <span class="n">Domain</span><span class="o">.</span><span class="n">objects</span><span class="o">.</span><span class="n">create</span><span class="p">(</span><span class="n">value</span><span class="o">=</span><span class="n">domain</span><span class="p">)</span>
+
+            <span class="k">if</span> <span class="n">domain_db</span> <span class="ow">and</span> <span class="ow">not</span> <span class="n">DenyListDomain</span><span class="o">.</span><span class="n">objects</span><span class="o">.</span><span class="n">filter</span><span class="p">(</span><span class="n">domain</span><span class="o">=</span><span class="n">domain_db</span><span class="p">)</span><span class="o">.</span><span class="n">exists</span><span class="p">():</span>
+                <span class="n">DenyListDomain</span><span class="o">.</span><span class="n">objects</span><span class="o">.</span><span class="n">create</span><span class="p">(</span><span class="n">domain</span><span class="o">=</span><span class="n">domain_db</span><span class="p">,</span> <span class="n">user</span><span class="o">=</span><span class="n">user</span><span class="p">)</span>
+                <span class="n">good_domains</span><span class="o">.</span><span class="n">append</span><span class="p">(</span><span class="n">domain</span><span class="p">)</span>
+            <span class="k">else</span><span class="p">:</span>
+                <span class="n">error_domains</span><span class="o">.</span><span class="n">append</span><span class="p">(</span><span class="n">domain</span><span class="p">)</span>
+
+    <span class="k">return</span> <span class="n">good_domains</span><span class="p">,</span> <span class="n">error_domains</span></div>
+
+
+<div class="viewcode-block" id="process_campaign_domains">
+<a class="viewcode-back" href="../../../modules/settings_core.html#settings.settings_utils.domain.process_campaign_domains">[docs]</a>
+<span class="k">def</span><span class="w"> </span><span class="nf">process_campaign_domains</span><span class="p">(</span><span class="n">domains</span><span class="p">,</span> <span class="n">user</span><span class="p">):</span>
+<span class="w">    </span><span class="sd">&quot;&quot;&quot;Process a list of campaign domains and associate them with a user.</span>
+
+<span class="sd">    This function takes a list of domains and a user as input. It iterates over each domain in the list,</span>
+<span class="sd">    converts it to lowercase, and checks if it is a valid domain using the Validator class. If the domain</span>
+<span class="sd">    is valid and not already present in the CampaignDomainAllowList table, it creates a new entry in the Domain</span>
+<span class="sd">    table and associates it with the user in the CampaignDomainAllowList table. The function returns two lists:</span>
+<span class="sd">    good_domains, which contains the domains that were successfully processed, and error_domains, which</span>
+<span class="sd">    contains the domains that encountered an error during processing.</span>
+
+<span class="sd">    Args:</span>
+<span class="sd">        domains (list): A list of domains to process.</span>
+<span class="sd">        user (User): The user to associate the domains with.</span>
+
+<span class="sd">    Returns:</span>
+<span class="sd">        tuple: A tuple containing two lists - good_domains and error_domains.</span>
+<span class="sd">    &quot;&quot;&quot;</span>
+    <span class="n">good_domains</span> <span class="o">=</span> <span class="p">[]</span>
+    <span class="n">error_domains</span> <span class="o">=</span> <span class="p">[]</span>
+    <span class="k">for</span> <span class="n">domain</span> <span class="ow">in</span> <span class="n">domains</span><span class="p">:</span>
+        <span class="n">domain</span> <span class="o">=</span> <span class="n">domain</span><span class="o">.</span><span class="n">lower</span><span class="p">()</span>
+
+        <span class="k">if</span> <span class="n">DomainHandler</span><span class="p">()</span><span class="o">.</span><span class="n">validate_domain</span><span class="p">(</span><span class="n">domain</span><span class="p">)</span> <span class="o">==</span> <span class="s2">&quot;Domain&quot;</span><span class="p">:</span>
+            <span class="k">try</span><span class="p">:</span>
+                <span class="n">domain_db</span> <span class="o">=</span> <span class="n">Domain</span><span class="o">.</span><span class="n">objects</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="n">value</span><span class="o">=</span><span class="n">domain</span><span class="p">)</span>
+            <span class="k">except</span> <span class="n">Domain</span><span class="o">.</span><span class="n">DoesNotExist</span><span class="p">:</span>
+                <span class="n">domain_db</span> <span class="o">=</span> <span class="n">Domain</span><span class="o">.</span><span class="n">objects</span><span class="o">.</span><span class="n">create</span><span class="p">(</span><span class="n">value</span><span class="o">=</span><span class="n">domain</span><span class="p">)</span>
+
+            <span class="k">if</span> <span class="n">domain_db</span> <span class="ow">and</span> <span class="ow">not</span> <span class="n">CampaignDomainAllowList</span><span class="o">.</span><span class="n">objects</span><span class="o">.</span><span class="n">filter</span><span class="p">(</span><span class="n">domain</span><span class="o">=</span><span class="n">domain_db</span><span class="p">)</span><span class="o">.</span><span class="n">exists</span><span class="p">():</span>
+                <span class="n">CampaignDomainAllowList</span><span class="o">.</span><span class="n">objects</span><span class="o">.</span><span class="n">create</span><span class="p">(</span><span class="n">domain</span><span class="o">=</span><span class="n">domain_db</span><span class="p">,</span> <span class="n">user</span><span class="o">=</span><span class="n">user</span><span class="p">)</span>
+                <span class="n">good_domains</span><span class="o">.</span><span class="n">append</span><span class="p">(</span><span class="n">domain</span><span class="p">)</span>
+            <span class="k">else</span><span class="p">:</span>
+                <span class="n">error_domains</span><span class="o">.</span><span class="n">append</span><span class="p">(</span><span class="n">domain</span><span class="p">)</span>
+
+    <span class="k">return</span> <span class="n">good_domains</span><span class="p">,</span> <span class="n">error_domains</span></div>
+
+
+<div class="viewcode-block" id="generate_message_domain">
+<a class="viewcode-back" href="../../../modules/settings_core.html#settings.settings_utils.domain.generate_message_domain">[docs]</a>
+<span class="k">def</span><span class="w"> </span><span class="nf">generate_message_domain</span><span class="p">(</span><span class="n">user</span><span class="p">,</span> <span class="n">good_domains</span><span class="p">,</span> <span class="n">error_domains</span><span class="p">,</span> <span class="n">count</span><span class="p">):</span>
+<span class="w">    </span><span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">    Generate a message based on the user, good domains, error domains, and count.</span>
+
+<span class="sd">    Args:</span>
+<span class="sd">        user (str): The user for whom the message is generated.</span>
+<span class="sd">        good_domains (list): A list of good domains added to the database.</span>
+<span class="sd">        error_domains (list): A list of error domains that were not added to the database.</span>
+<span class="sd">        count (int): The number of domains already in the database.</span>
+
+<span class="sd">    Returns:</span>
+<span class="sd">        str: The generated message.</span>
+<span class="sd">    &quot;&quot;&quot;</span>
+    <span class="n">message</span> <span class="o">=</span> <span class="sa">f</span><span class="s1">&#39;User : </span><span class="si">{</span><span class="n">user</span><span class="si">}</span><span class="s1"> - </span><span class="si">{</span><span class="nb">len</span><span class="p">(</span><span class="n">good_domains</span><span class="p">)</span><span class="si">}</span><span class="s1"> domains added to the database. </span><span class="si">{</span><span class="n">count</span><span class="si">}</span><span class="s1"> domains already in the database.&#39;</span>
+    <span class="k">if</span> <span class="n">error_domains</span><span class="p">:</span>
+        <span class="n">message</span> <span class="o">+=</span> <span class="sa">f</span><span class="s1">&#39; </span><span class="si">{</span><span class="nb">len</span><span class="p">(</span><span class="n">error_domains</span><span class="p">)</span><span class="si">}</span><span class="s1"> domains not added to the database: </span><span class="si">{</span><span class="s2">&quot;, &quot;</span><span class="o">.</span><span class="n">join</span><span class="p">(</span><span class="n">error_domains</span><span class="p">)</span><span class="si">}</span><span class="s1">.&#39;</span>
+    <span class="k">return</span> <span class="n">message</span></div>
+
+
+
+<div class="viewcode-block" id="preprocess_domains">
+<a class="viewcode-back" href="../../../modules/settings_core.html#settings.settings_utils.domain.preprocess_domains">[docs]</a>
+<span class="k">def</span><span class="w"> </span><span class="nf">preprocess_domains</span><span class="p">(</span><span class="n">domains</span><span class="p">):</span>
+<span class="w">    </span><span class="sd">&quot;&quot;&quot;Preprocesses a list of domains.</span>
+
+<span class="sd">    This function removes empty lines and splits lines with multiple operators.</span>
+
+<span class="sd">    Args:</span>
+<span class="sd">        domains (list): A list of domains.</span>
+
+<span class="sd">    Returns:</span>
+<span class="sd">        list: A list of preprocessed domains.</span>
+<span class="sd">    &quot;&quot;&quot;</span>
+    <span class="n">processed</span> <span class="o">=</span> <span class="p">[]</span>
+    <span class="k">for</span> <span class="n">domain</span> <span class="ow">in</span> <span class="n">domains</span><span class="p">:</span>
+        <span class="k">if</span> <span class="nb">isinstance</span><span class="p">(</span><span class="n">domain</span><span class="p">,</span> <span class="nb">str</span><span class="p">):</span>
+            <span class="n">split_domains</span> <span class="o">=</span> <span class="n">re</span><span class="o">.</span><span class="n">split</span><span class="p">(</span><span class="sa">r</span><span class="s1">&#39;[ ,;\n]+&#39;</span><span class="p">,</span> <span class="n">domain</span><span class="p">)</span>
+            <span class="n">processed</span><span class="o">.</span><span class="n">extend</span><span class="p">(</span><span class="n">d</span><span class="o">.</span><span class="n">strip</span><span class="p">()</span> <span class="k">for</span> <span class="n">d</span> <span class="ow">in</span> <span class="n">split_domains</span> <span class="k">if</span> <span class="n">d</span><span class="o">.</span><span class="n">strip</span><span class="p">())</span>
+        <span class="k">elif</span> <span class="nb">isinstance</span><span class="p">(</span><span class="n">domain</span><span class="p">,</span> <span class="nb">dict</span><span class="p">):</span>
+            <span class="n">split_domains</span> <span class="o">=</span> <span class="n">re</span><span class="o">.</span><span class="n">split</span><span class="p">(</span><span class="sa">r</span><span class="s1">&#39;[ ,;\n]+&#39;</span><span class="p">,</span> <span class="n">domain</span><span class="p">[</span><span class="s2">&quot;domain__value&quot;</span><span class="p">])</span>
+            <span class="n">processed</span><span class="o">.</span><span class="n">extend</span><span class="p">(</span><span class="n">d</span><span class="o">.</span><span class="n">strip</span><span class="p">()</span> <span class="k">for</span> <span class="n">d</span> <span class="ow">in</span> <span class="n">split_domains</span> <span class="k">if</span> <span class="n">d</span><span class="o">.</span><span class="n">strip</span><span class="p">())</span>
+        <span class="k">else</span><span class="p">:</span>
+            <span class="nb">print</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;Warning: Skipping non-string item </span><span class="si">{</span><span class="n">domain</span><span class="si">}</span><span class="s2">&quot;</span><span class="p">)</span>
+    <span class="k">return</span> <span class="n">processed</span></div>
+
+
+<div class="viewcode-block" id="handle_domain_csv_file">
+<a class="viewcode-back" href="../../../modules/settings_core.html#settings.settings_utils.domain.handle_domain_csv_file">[docs]</a>
+<span class="k">def</span><span class="w"> </span><span class="nf">handle_domain_csv_file</span><span class="p">(</span><span class="n">file</span><span class="p">):</span>
+<span class="w">    </span><span class="sd">&quot;&quot;&quot;Reads and processes a CSV file containing domain data.</span>
+
+<span class="sd">    Args:</span>
+<span class="sd">        file (file-like object): The CSV file to be processed.</span>
+
+<span class="sd">    Returns:</span>
+<span class="sd">        list: A list of dictionaries representing each row in the CSV file.</span>
+<span class="sd">    &quot;&quot;&quot;</span>
+    <span class="n">reader</span> <span class="o">=</span> <span class="n">csv</span><span class="o">.</span><span class="n">DictReader</span><span class="p">(</span><span class="n">file</span><span class="o">.</span><span class="n">read</span><span class="p">()</span><span class="o">.</span><span class="n">decode</span><span class="p">(</span><span class="s1">&#39;utf-8&#39;</span><span class="p">)</span><span class="o">.</span><span class="n">splitlines</span><span class="p">())</span>
+    <span class="k">return</span> <span class="p">[</span><span class="n">row</span> <span class="k">for</span> <span class="n">row</span> <span class="ow">in</span> <span class="n">reader</span><span class="p">]</span></div>
+
+
+<div class="viewcode-block" id="handle_domain_json_file">
+<a class="viewcode-back" href="../../../modules/settings_core.html#settings.settings_utils.domain.handle_domain_json_file">[docs]</a>
+<span class="k">def</span><span class="w"> </span><span class="nf">handle_domain_json_file</span><span class="p">(</span><span class="n">file</span><span class="p">):</span>
+<span class="w">    </span><span class="sd">&quot;&quot;&quot;Reads a JSON file and returns a list of domain names.</span>
+
+<span class="sd">    Args:</span>
+<span class="sd">        file (file-like object): The JSON file to be read.</span>
+
+<span class="sd">    Returns:</span>
+<span class="sd">        list: A list of domain names extracted from the JSON file.</span>
+<span class="sd">    &quot;&quot;&quot;</span>
+    <span class="n">data</span> <span class="o">=</span> <span class="n">json</span><span class="o">.</span><span class="n">loads</span><span class="p">(</span><span class="n">file</span><span class="o">.</span><span class="n">read</span><span class="p">()</span><span class="o">.</span><span class="n">decode</span><span class="p">(</span><span class="s1">&#39;utf-8&#39;</span><span class="p">))</span>
+    <span class="k">return</span> <span class="p">[</span><span class="n">item</span><span class="p">[</span><span class="s1">&#39;domain&#39;</span><span class="p">]</span> <span class="k">for</span> <span class="n">item</span> <span class="ow">in</span> <span class="n">data</span><span class="p">]</span></div>
+
+
+<div class="viewcode-block" id="handle_domain_txt_file">
+<a class="viewcode-back" href="../../../modules/settings_core.html#settings.settings_utils.domain.handle_domain_txt_file">[docs]</a>
+<span class="k">def</span><span class="w"> </span><span class="nf">handle_domain_txt_file</span><span class="p">(</span><span class="n">file</span><span class="p">):</span>
+<span class="w">    </span><span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">    This function handles a domain text file.</span>
+
+<span class="sd">    Args:</span>
+<span class="sd">        file (file): The domain text file to be processed.</span>
+
+<span class="sd">    Returns:</span>
+<span class="sd">        list: A list of strings, where each string represents a line from the file.</span>
+<span class="sd">    &quot;&quot;&quot;</span>
+    <span class="k">return</span> <span class="p">[</span><span class="n">line</span><span class="o">.</span><span class="n">decode</span><span class="p">(</span><span class="s1">&#39;utf-8&#39;</span><span class="p">)</span><span class="o">.</span><span class="n">strip</span><span class="p">()</span> <span class="k">for</span> <span class="n">line</span> <span class="ow">in</span> <span class="n">file</span><span class="p">]</span></div>
+
+
+<div class="viewcode-block" id="handle_bdomain_csv_file">
+<a class="viewcode-back" href="../../../modules/settings_core.html#settings.settings_utils.domain.handle_bdomain_csv_file">[docs]</a>
+<span class="k">def</span><span class="w"> </span><span class="nf">handle_bdomain_csv_file</span><span class="p">(</span><span class="n">file</span><span class="p">):</span>
+<span class="w">    </span><span class="sd">&quot;&quot;&quot;Reads and processes a CSV file containing domain data.</span>
+
+<span class="sd">    Args:</span>
+<span class="sd">        file (file-like object): The CSV file to be processed.</span>
+
+<span class="sd">    Returns:</span>
+<span class="sd">        list: A list of dictionaries representing each row in the CSV file.</span>
+<span class="sd">    &quot;&quot;&quot;</span>
+    <span class="n">reader</span> <span class="o">=</span> <span class="n">csv</span><span class="o">.</span><span class="n">DictReader</span><span class="p">(</span><span class="n">file</span><span class="o">.</span><span class="n">read</span><span class="p">()</span><span class="o">.</span><span class="n">decode</span><span class="p">(</span><span class="s1">&#39;utf-8&#39;</span><span class="p">)</span><span class="o">.</span><span class="n">splitlines</span><span class="p">())</span>
+    <span class="k">return</span> <span class="p">[</span><span class="n">row</span> <span class="k">for</span> <span class="n">row</span> <span class="ow">in</span> <span class="n">reader</span><span class="p">]</span></div>
+
+
+<div class="viewcode-block" id="handle_bdomain_json_file">
+<a class="viewcode-back" href="../../../modules/settings_core.html#settings.settings_utils.domain.handle_bdomain_json_file">[docs]</a>
+<span class="k">def</span><span class="w"> </span><span class="nf">handle_bdomain_json_file</span><span class="p">(</span><span class="n">file</span><span class="p">):</span>
+<span class="w">    </span><span class="sd">&quot;&quot;&quot;Reads a JSON file and returns a list of domain names.</span>
+
+<span class="sd">    Args:</span>
+<span class="sd">        file (file-like object): The JSON file to be read.</span>
+
+<span class="sd">    Returns:</span>
+<span class="sd">        list: A list of domain names extracted from the JSON file.</span>
+<span class="sd">    &quot;&quot;&quot;</span>
+    <span class="n">data</span> <span class="o">=</span> <span class="n">json</span><span class="o">.</span><span class="n">loads</span><span class="p">(</span><span class="n">file</span><span class="o">.</span><span class="n">read</span><span class="p">()</span><span class="o">.</span><span class="n">decode</span><span class="p">(</span><span class="s1">&#39;utf-8&#39;</span><span class="p">))</span>
+    <span class="k">return</span> <span class="p">[</span><span class="n">item</span><span class="p">[</span><span class="s1">&#39;domain&#39;</span><span class="p">]</span> <span class="k">for</span> <span class="n">item</span> <span class="ow">in</span> <span class="n">data</span><span class="p">]</span></div>
+
+
+<div class="viewcode-block" id="handle_bdomain_txt_file">
+<a class="viewcode-back" href="../../../modules/settings_core.html#settings.settings_utils.domain.handle_bdomain_txt_file">[docs]</a>
+<span class="k">def</span><span class="w"> </span><span class="nf">handle_bdomain_txt_file</span><span class="p">(</span><span class="n">file</span><span class="p">):</span>
+<span class="w">    </span><span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">    This function handles a domain text file.</span>
+
+<span class="sd">    Args:</span>
+<span class="sd">        file (file): The domain text file to be processed.</span>
+
+<span class="sd">    Returns:</span>
+<span class="sd">        list: A list of strings, where each string represents a line from the file.</span>
+<span class="sd">    &quot;&quot;&quot;</span>
+    <span class="k">return</span> <span class="p">[</span><span class="n">line</span><span class="o">.</span><span class="n">decode</span><span class="p">(</span><span class="s1">&#39;utf-8&#39;</span><span class="p">)</span><span class="o">.</span><span class="n">strip</span><span class="p">()</span> <span class="k">for</span> <span class="n">line</span> <span class="ow">in</span> <span class="n">file</span><span class="p">]</span></div>
+
+
+<div class="viewcode-block" id="handle_campaign_domain_csv_file">
+<a class="viewcode-back" href="../../../modules/settings_core.html#settings.settings_utils.domain.handle_campaign_domain_csv_file">[docs]</a>
+<span class="k">def</span><span class="w"> </span><span class="nf">handle_campaign_domain_csv_file</span><span class="p">(</span><span class="n">file</span><span class="p">):</span>
+<span class="w">    </span><span class="sd">&quot;&quot;&quot;Reads and processes a CSV file containing campaign domain data.</span>
+
+<span class="sd">    Args:</span>
+<span class="sd">        file (file-like object): The CSV file to be processed.</span>
+
+<span class="sd">    Returns:</span>
+<span class="sd">        list: A list of dictionaries representing each row in the CSV file.</span>
+<span class="sd">    &quot;&quot;&quot;</span>
+    <span class="n">reader</span> <span class="o">=</span> <span class="n">csv</span><span class="o">.</span><span class="n">DictReader</span><span class="p">(</span><span class="n">file</span><span class="o">.</span><span class="n">read</span><span class="p">()</span><span class="o">.</span><span class="n">decode</span><span class="p">(</span><span class="s1">&#39;utf-8&#39;</span><span class="p">)</span><span class="o">.</span><span class="n">splitlines</span><span class="p">())</span>
+    <span class="k">return</span> <span class="p">[</span><span class="n">row</span> <span class="k">for</span> <span class="n">row</span> <span class="ow">in</span> <span class="n">reader</span><span class="p">]</span></div>
+
+
+<div class="viewcode-block" id="handle_campaign_domain_json_file">
+<a class="viewcode-back" href="../../../modules/settings_core.html#settings.settings_utils.domain.handle_campaign_domain_json_file">[docs]</a>
+<span class="k">def</span><span class="w"> </span><span class="nf">handle_campaign_domain_json_file</span><span class="p">(</span><span class="n">file</span><span class="p">):</span>
+<span class="w">    </span><span class="sd">&quot;&quot;&quot;Reads a JSON file and returns a list of campaign domain names.</span>
+
+<span class="sd">    Args:</span>
+<span class="sd">        file (file-like object): The JSON file to be read.</span>
+
+<span class="sd">    Returns:</span>
+<span class="sd">        list: A list of campaign domain names extracted from the JSON file.</span>
+<span class="sd">    &quot;&quot;&quot;</span>
+    <span class="n">data</span> <span class="o">=</span> <span class="n">json</span><span class="o">.</span><span class="n">loads</span><span class="p">(</span><span class="n">file</span><span class="o">.</span><span class="n">read</span><span class="p">()</span><span class="o">.</span><span class="n">decode</span><span class="p">(</span><span class="s1">&#39;utf-8&#39;</span><span class="p">))</span>
+    <span class="k">return</span> <span class="p">[</span><span class="n">item</span><span class="p">[</span><span class="s1">&#39;domain&#39;</span><span class="p">]</span> <span class="k">for</span> <span class="n">item</span> <span class="ow">in</span> <span class="n">data</span><span class="p">]</span></div>
+
+
+<div class="viewcode-block" id="handle_campaign_domain_txt_file">
+<a class="viewcode-back" href="../../../modules/settings_core.html#settings.settings_utils.domain.handle_campaign_domain_txt_file">[docs]</a>
+<span class="k">def</span><span class="w"> </span><span class="nf">handle_campaign_domain_txt_file</span><span class="p">(</span><span class="n">file</span><span class="p">):</span>
+<span class="w">    </span><span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">    This function handles a campaign domain text file.</span>
+
+<span class="sd">    Args:</span>
+<span class="sd">        file (file): The campaign domain text file to be processed.</span>
+
+<span class="sd">    Returns:</span>
+<span class="sd">        list: A list of strings, where each string represents a line from the file.</span>
+<span class="sd">    &quot;&quot;&quot;</span>
+    <span class="k">return</span> <span class="p">[</span><span class="n">line</span><span class="o">.</span><span class="n">decode</span><span class="p">(</span><span class="s1">&#39;utf-8&#39;</span><span class="p">)</span><span class="o">.</span><span class="n">strip</span><span class="p">()</span> <span class="k">for</span> <span class="n">line</span> <span class="ow">in</span> <span class="n">file</span><span class="p">]</span></div>
+
+</pre></div>
+
+           </div>
+          </div>
+          <footer>
+
+  <hr/>
+
+  <div role="contentinfo">
+    <p>&#169; Copyright 2025, Theo Bhang, Esteban Crispel.</p>
+  </div>
+
+  Built with <a href="https://www.sphinx-doc.org/">Sphinx</a> using a
+    <a href="https://github.com/readthedocs/sphinx_rtd_theme">theme</a>
+    provided by <a href="https://readthedocs.org">Read the Docs</a>.
+   
+
+</footer>
+        </div>
+      </div>
+    </section>
+  </div>
+  <script>
+      jQuery(function () {
+          SphinxRtdTheme.Navigation.enable(true);
+      });
+  </script> 
+
+</body>
+</html>

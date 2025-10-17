@@ -1,0 +1,836 @@
+
+
+<!DOCTYPE html>
+<html class="writer-html5" lang="en" data-content_root="../../../../">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>score_process.score_utils.templates.challenge &mdash; Suspicious 1.0.0 documentation</title>
+      <link rel="stylesheet" type="text/css" href="../../../../_static/pygments.css?v=b86133f3" />
+      <link rel="stylesheet" type="text/css" href="../../../../_static/css/theme.css?v=e59714d7" />
+
+  
+      <script src="../../../../_static/jquery.js?v=5d32c60e"></script>
+      <script src="../../../../_static/_sphinx_javascript_frameworks_compat.js?v=2cd50e6c"></script>
+      <script src="../../../../_static/documentation_options.js?v=8d563738"></script>
+      <script src="../../../../_static/doctools.js?v=9bcbadda"></script>
+      <script src="../../../../_static/sphinx_highlight.js?v=dc90522c"></script>
+    <script src="../../../../_static/js/theme.js"></script>
+    <link rel="index" title="Index" href="../../../../genindex.html" />
+    <link rel="search" title="Search" href="../../../../search.html" /> 
+</head>
+
+<body class="wy-body-for-nav"> 
+  <div class="wy-grid-for-nav">
+    <nav data-toggle="wy-nav-shift" class="wy-nav-side">
+      <div class="wy-side-scroll">
+        <div class="wy-side-nav-search" >
+
+          
+          
+          <a href="../../../../index.html" class="icon icon-home">
+            Suspicious
+          </a>
+<div role="search">
+  <form id="rtd-search-form" class="wy-form" action="../../../../search.html" method="get">
+    <input type="text" name="q" placeholder="Search docs" aria-label="Search docs" />
+    <input type="hidden" name="check_keywords" value="yes" />
+    <input type="hidden" name="area" value="default" />
+  </form>
+</div>
+        </div><div class="wy-menu wy-menu-vertical" data-spy="affix" role="navigation" aria-label="Navigation menu">
+              <p class="caption" role="heading"><span class="caption-text">Contents:</span></p>
+<ul>
+<li class="toctree-l1"><a class="reference internal" href="../../../../modules/index.html">Modules (API Reference)</a></li>
+</ul>
+
+        </div>
+      </div>
+    </nav>
+
+    <section data-toggle="wy-nav-shift" class="wy-nav-content-wrap"><nav class="wy-nav-top" aria-label="Mobile navigation menu" >
+          <i data-toggle="wy-nav-top" class="fa fa-bars"></i>
+          <a href="../../../../index.html">Suspicious</a>
+      </nav>
+
+      <div class="wy-nav-content">
+        <div class="rst-content">
+          <div role="navigation" aria-label="Page navigation">
+  <ul class="wy-breadcrumbs">
+      <li><a href="../../../../index.html" class="icon icon-home" aria-label="Home"></a></li>
+          <li class="breadcrumb-item"><a href="../../../index.html">Module code</a></li>
+      <li class="breadcrumb-item active">score_process.score_utils.templates.challenge</li>
+      <li class="wy-breadcrumbs-aside">
+      </li>
+  </ul>
+  <hr/>
+</div>
+          <div role="main" class="document" itemscope="itemscope" itemtype="http://schema.org/Article">
+           <div itemprop="articleBody">
+             
+  <h1>Source code for score_process.score_utils.templates.challenge</h1><div class="highlight"><pre>
+<span></span><span class="kn">from</span><span class="w"> </span><span class="nn">mail_feeder.models</span><span class="w"> </span><span class="kn">import</span> <span class="n">MailArtifact</span><span class="p">,</span> <span class="n">MailAttachment</span>
+<span class="kn">import</span><span class="w"> </span><span class="nn">smtplib</span>
+<span class="kn">from</span><span class="w"> </span><span class="nn">email.mime.text</span><span class="w"> </span><span class="kn">import</span> <span class="n">MIMEText</span>
+<span class="kn">from</span><span class="w"> </span><span class="nn">email.mime.multipart</span><span class="w"> </span><span class="kn">import</span> <span class="n">MIMEMultipart</span>
+<span class="kn">import</span><span class="w"> </span><span class="nn">json</span>
+<span class="kn">from</span><span class="w"> </span><span class="nn">thehive4py</span><span class="w"> </span><span class="kn">import</span> <span class="n">TheHiveApi</span>
+<span class="kn">from</span><span class="w"> </span><span class="nn">minio</span><span class="w"> </span><span class="kn">import</span> <span class="n">Minio</span>
+<span class="kn">from</span><span class="w"> </span><span class="nn">minio.error</span><span class="w"> </span><span class="kn">import</span> <span class="n">S3Error</span>
+<span class="kn">import</span><span class="w"> </span><span class="nn">os</span>
+<span class="kn">from</span><span class="w"> </span><span class="nn">datetime</span><span class="w"> </span><span class="kn">import</span> <span class="n">datetime</span>
+<span class="kn">from</span><span class="w"> </span><span class="nn">secrets</span><span class="w"> </span><span class="kn">import</span> <span class="n">token_hex</span>
+
+<span class="n">CONFIG_PATH</span> <span class="o">=</span> <span class="s2">&quot;/app/settings.json&quot;</span>
+<span class="k">with</span> <span class="nb">open</span><span class="p">(</span><span class="n">CONFIG_PATH</span><span class="p">)</span> <span class="k">as</span> <span class="n">config_file</span><span class="p">:</span>
+    <span class="n">config</span> <span class="o">=</span> <span class="n">json</span><span class="o">.</span><span class="n">load</span><span class="p">(</span><span class="n">config_file</span><span class="p">)</span>
+<span class="n">minio_config</span> <span class="o">=</span> <span class="n">config</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="s2">&quot;minio&quot;</span><span class="p">,</span> <span class="p">{})</span>
+<span class="n">mail_config</span> <span class="o">=</span> <span class="n">config</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="s1">&#39;mail&#39;</span><span class="p">,</span> <span class="p">{})</span>
+<span class="n">thehive_config</span> <span class="o">=</span> <span class="n">config</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="s1">&#39;thehive&#39;</span><span class="p">,</span> <span class="p">{})</span>
+<div class="viewcode-block" id="ChallengeEmail">
+<a class="viewcode-back" href="../../../../modules/score_process_core.html#score_process.score_utils.templates.challenge.ChallengeEmail">[docs]</a>
+<span class="k">class</span><span class="w"> </span><span class="nc">ChallengeEmail</span><span class="p">:</span>
+    <span class="k">def</span><span class="w"> </span><span class="fm">__init__</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">subject</span><span class="p">,</span> <span class="n">challenger</span><span class="p">,</span> <span class="n">sender</span><span class="p">,</span> <span class="n">recipient</span><span class="p">,</span> <span class="n">case</span><span class="p">,</span> <span class="n">infos</span><span class="p">):</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">subject</span> <span class="o">=</span> <span class="nb">str</span><span class="p">(</span><span class="n">subject</span><span class="p">)</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">sender</span> <span class="o">=</span> <span class="nb">str</span><span class="p">(</span><span class="n">sender</span><span class="p">)</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">recipient</span> <span class="o">=</span> <span class="nb">str</span><span class="p">(</span><span class="n">recipient</span><span class="p">)</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">challenger</span> <span class="o">=</span> <span class="nb">str</span><span class="p">(</span><span class="n">challenger</span><span class="o">.</span><span class="n">email</span><span class="p">)</span><span class="o">.</span><span class="n">split</span><span class="p">(</span><span class="s1">&#39;@&#39;</span><span class="p">)[</span><span class="mi">0</span><span class="p">]</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">challenger_email</span> <span class="o">=</span> <span class="nb">str</span><span class="p">(</span><span class="n">challenger</span><span class="p">)</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">challenger_firstname</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">challenger</span><span class="o">.</span><span class="n">split</span><span class="p">(</span><span class="s1">&#39;.&#39;</span><span class="p">)[</span><span class="mi">0</span><span class="p">]</span><span class="o">.</span><span class="n">capitalize</span><span class="p">()</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">challenger_lastname</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">challenger</span><span class="o">.</span><span class="n">split</span><span class="p">(</span><span class="s1">&#39;.&#39;</span><span class="p">)[</span><span class="mi">1</span><span class="p">]</span><span class="o">.</span><span class="n">capitalize</span><span class="p">()</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">challenger_groups</span> <span class="o">=</span> <span class="s1">&#39;, &#39;</span><span class="o">.</span><span class="n">join</span><span class="p">([</span><span class="n">group</span><span class="o">.</span><span class="n">name</span> <span class="k">for</span> <span class="n">group</span> <span class="ow">in</span> <span class="n">challenger</span><span class="o">.</span><span class="n">groups</span><span class="o">.</span><span class="n">all</span><span class="p">()])</span> <span class="k">if</span> <span class="n">challenger</span><span class="o">.</span><span class="n">groups</span><span class="o">.</span><span class="n">exists</span><span class="p">()</span> <span class="k">else</span> <span class="s2">&quot;No Group&quot;</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">case</span> <span class="o">=</span> <span class="n">case</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">infos</span> <span class="o">=</span> <span class="n">infos</span>
+
+    <span class="k">def</span><span class="w"> </span><span class="nf">_html_header</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
+        <span class="k">return</span> <span class="s2">&quot;&quot;&quot;</span>
+<span class="s2">&lt;!DOCTYPE html&gt;</span>
+<span class="s2">&lt;html lang=&quot;en&quot;&gt;</span>
+<span class="s2">  &lt;head&gt;</span>
+<span class="s2">    &lt;meta charset=&quot;UTF-8&quot;&gt;</span>
+<span class="s2">    &lt;meta name=&quot;viewport&quot; content=&quot;width=device-width, initial-scale=1.0&quot;&gt;</span>
+<span class="s2">    &lt;title&gt;Suspicious: Submission Challenged&lt;/title&gt;</span>
+<span class="s2">    &lt;style type=&quot;text/css&quot;&gt;</span>
+<span class="s2">      /* Reset and base styles */</span>
+<span class="s2">      html, body {</span>
+<span class="s2">        margin: 0 auto;</span>
+<span class="s2">        padding: 0;</span>
+<span class="s2">        min-width: 260px;</span>
+<span class="s2">        width: 100% !important;</span>
+<span class="s2">        height: 100% !important;</span>
+<span class="s2">      }</span>
+
+<span class="s2">      a img {</span>
+<span class="s2">        border: none;</span>
+<span class="s2">      }</span>
+
+<span class="s2">      table, td {</span>
+<span class="s2">        border-collapse: collapse;</span>
+<span class="s2">        mso-table-lspace: 0pt;</span>
+<span class="s2">        mso-table-rspace: 0pt;</span>
+<span class="s2">      }</span>
+
+<span class="s2">      .ReadMsgBody, .ExternalClass {</span>
+<span class="s2">        width: 100%;</span>
+<span class="s2">      }</span>
+
+<span class="s2">      .ExternalClass * {</span>
+<span class="s2">        line-height: 100%;</span>
+<span class="s2">      }</span>
+
+<span class="s2">      ul {</span>
+<span class="s2">        padding: 0 !important;</span>
+<span class="s2">        margin: 0 0 0 40px !important;</span>
+<span class="s2">      }</span>
+
+<span class="s2">      li {</span>
+<span class="s2">        margin-bottom: 10px !important;</span>
+<span class="s2">      }</span>
+
+<span class="s2">      a {</span>
+<span class="s2">        color: #00BBDD;</span>
+<span class="s2">        text-decoration: none;</span>
+<span class="s2">      }</span>
+
+<span class="s2">      .button {</span>
+<span class="s2">        word-wrap: break-word;</span>
+<span class="s2">      }</span>
+
+<span class="s2">      sub, sup {</span>
+<span class="s2">        font-size: 70%;</span>
+<span class="s2">        line-height: 0;</span>
+<span class="s2">        position: relative;</span>
+<span class="s2">      }</span>
+
+<span class="s2">      sup {</span>
+<span class="s2">        mso-text-raise: 60%;</span>
+<span class="s2">        vertical-align: super;</span>
+<span class="s2">      }</span>
+
+<span class="s2">      sub {</span>
+<span class="s2">        bottom: -0.25em;</span>
+<span class="s2">      }</span>
+
+<span class="s2">      /* Responsive styles */</span>
+<span class="s2">      @media screen and (max-width: 520px) {</span>
+<span class="s2">        .tolkien-column {</span>
+<span class="s2">          width: 100% !important;</span>
+<span class="s2">          max-width: 100% !important;</span>
+<span class="s2">          min-width: auto !important;</span>
+<span class="s2">        }</span>
+
+<span class="s2">        .tolkien-column img.full {</span>
+<span class="s2">          width: 100% !important;</span>
+<span class="s2">          max-width: 100% !important;</span>
+<span class="s2">        }</span>
+
+<span class="s2">        .tolkien-column img[shrinktofit=true] {</span>
+<span class="s2">          width: auto !important;</span>
+<span class="s2">          max-width: 100% !important;</span>
+<span class="s2">        }</span>
+
+<span class="s2">        .hide-in-mobile {</span>
+<span class="s2">          display: none !important;</span>
+<span class="s2">          max-height: 0px !important;</span>
+<span class="s2">          overflow: hidden !important;</span>
+<span class="s2">          font-size: 0px !important;</span>
+<span class="s2">        }</span>
+
+<span class="s2">        .hide-in-desktop {</span>
+<span class="s2">          display: block !important;</span>
+<span class="s2">          max-height: none !important;</span>
+<span class="s2">        }</span>
+<span class="s2">      }</span>
+
+<span class="s2">      /* Optional image-specific overrides */</span>
+<span class="s2">      @media screen and (max-width: 767px) {</span>
+<span class="s2">        .row-0 .col-0 .cell-0 img {</span>
+<span class="s2">          width: min(100%, 100px) !important;</span>
+<span class="s2">        }</span>
+
+<span class="s2">        .row-0 .col-1 .cell-1 img {</span>
+<span class="s2">          width: min(100%, 50%) !important;</span>
+<span class="s2">        }</span>
+<span class="s2">      }</span>
+
+<span class="s2">      .hide-in-desktop {</span>
+<span class="s2">        display: none;</span>
+<span class="s2">        max-height: 0px;</span>
+<span class="s2">      }</span>
+<span class="s2">    &lt;/style&gt;</span>
+<span class="s2">    &lt;style&gt;</span>
+<span class="s2">      .email-container {</span>
+<span class="s2">        max-width: 600px;</span>
+<span class="s2">        min-width: 300px;</span>
+<span class="s2">        margin: 0 auto;</span>
+<span class="s2">        background-color: #242A75;</span>
+<span class="s2">        font-family: Arial, Helvetica, sans-serif;</span>
+<span class="s2">        color: #000;</span>
+<span class="s2">      }</span>
+
+<span class="s2">      .logo-cell {</span>
+<span class="s2">        padding: 30px 0 0 30px;</span>
+<span class="s2">        text-align: left;</span>
+<span class="s2">      }</span>
+
+<span class="s2">      .logo-cell img {</span>
+<span class="s2">        max-width: 100px;</span>
+<span class="s2">        height: auto;</span>
+<span class="s2">      }</span>
+
+<span class="s2">      .spacer-cell {</span>
+<span class="s2">        height: 70px;</span>
+<span class="s2">        line-height: 70px;</span>
+<span class="s2">      }</span>
+
+<span class="s2">      @media only screen and (max-width: 600px) {</span>
+<span class="s2">        .hide-mobile {</span>
+<span class="s2">          display: none !important;</span>
+<span class="s2">          max-height: 0;</span>
+<span class="s2">          overflow: hidden;</span>
+<span class="s2">          mso-hide: all;</span>
+<span class="s2">        }</span>
+<span class="s2">      }</span>
+<span class="s2">    &lt;/style&gt;</span>
+<span class="s2">    &lt;!--[if mso]&gt;</span>
+<span class="s2">    &lt;style type=&quot;text/css&quot;&gt;</span>
+<span class="s2">      .tolkien-column { width: 100% !important; }</span>
+<span class="s2">      ul &gt; li { text-indent: -1em; }</span>
+<span class="s2">      a { border: none !important; }</span>
+<span class="s2">    &lt;/style&gt;</span>
+<span class="s2">    &lt;![endif]--&gt;</span>
+<span class="s2">  &lt;/head&gt;</span>
+<span class="s2">&quot;&quot;&quot;</span>
+
+    <span class="k">def</span><span class="w"> </span><span class="nf">_html_body_start</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
+        <span class="k">return</span> <span class="s2">&quot;&quot;&quot;</span>
+<span class="s2">  &lt;body style=&quot;min-width:260px; min-height:100%; padding:0; margin:0 auto; background-color:#EDF1F4;&quot;&gt;</span>
+<span class="s2">    &lt;center&gt;</span>
+<span class="s2">      &lt;table border=&quot;0&quot; cellpadding=&quot;0&quot; cellspacing=&quot;0&quot; align=&quot;center&quot; role=&quot;presentation&quot;&gt;</span>
+<span class="s2">        &lt;tr&gt;</span>
+<span class="s2">          &lt;td width=&quot;600&quot;&gt;</span>
+<span class="s2">            &lt;table class=&quot;color-wrap&quot; width=&quot;100%&quot; cellpadding=&quot;0&quot; cellspacing=&quot;0&quot; style=&quot;background:#EDF1F4;&quot; role=&quot;presentation&quot;&gt;</span>
+<span class="s2">              &lt;tbody&gt;</span>
+<span class="s2">                &lt;tr&gt;</span>
+<span class="s2">                  &lt;td&gt;</span>
+<span class="s2">        &quot;&quot;&quot;</span>
+
+    <span class="k">def</span><span class="w"> </span><span class="nf">_logo_table</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
+        <span class="n">img</span> <span class="o">=</span> <span class="p">{</span>
+            <span class="s1">&#39;company_logo&#39;</span><span class="p">:</span> <span class="n">mail_config</span><span class="p">[</span><span class="s2">&quot;logos&quot;</span><span class="p">]</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="s2">&quot;company&quot;</span><span class="p">,</span> <span class="s2">&quot;https://example.com/default_logo.png&quot;</span><span class="p">)</span>
+        <span class="p">}</span>
+        <span class="k">return</span> <span class="sa">f</span><span class="s2">&quot;&quot;&quot;</span>
+<span class="s2">                    &lt;table class=&quot;email-container&quot; role=&quot;presentation&quot;&gt;</span>
+<span class="s2">                      &lt;tr&gt;</span>
+<span class="s2">                        &lt;td&gt;</span>
+<span class="s2">                          &lt;table role=&quot;presentation&quot; width=&quot;100%&quot;&gt;</span>
+<span class="s2">                            &lt;tr&gt;</span>
+<span class="s2">                              &lt;td class=&quot;logo-cell&quot;&gt;</span>
+<span class="s2">                                &lt;img src=&quot;</span><span class="si">{</span><span class="n">img</span><span class="p">[</span><span class="s1">&#39;company_logo&#39;</span><span class="p">]</span><span class="si">}</span><span class="s2">&quot; alt=&quot;Company Logo&quot;&gt;</span>
+<span class="s2">                              &lt;/td&gt;</span>
+<span class="s2">                              &lt;td class=&quot;spacer-cell hide-mobile&quot;&gt;&amp;nbsp;&lt;/td&gt;</span>
+<span class="s2">                            &lt;/tr&gt;</span>
+<span class="s2">                          &lt;/table&gt;</span>
+<span class="s2">                        &lt;/td&gt;</span>
+<span class="s2">                      &lt;/tr&gt;</span>
+<span class="s2">                    &lt;/table&gt;</span>
+<span class="s2">        &quot;&quot;&quot;</span>
+
+    <span class="k">def</span><span class="w"> </span><span class="nf">_type_mail_table</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
+        <span class="n">img</span> <span class="o">=</span> <span class="p">{</span>
+            <span class="s1">&#39;type_mail_logo&#39;</span><span class="p">:</span> <span class="n">mail_config</span><span class="p">[</span><span class="s2">&quot;logos&quot;</span><span class="p">]</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="s2">&quot;challenge&quot;</span><span class="p">,</span> <span class="s2">&quot;https://example.com/default_type_mail_logo.png&quot;</span><span class="p">)</span>
+        <span class="p">}</span>
+        <span class="k">return</span> <span class="sa">f</span><span class="s2">&quot;&quot;&quot;</span>
+<span class="s2">                    &lt;table width=&quot;100%&quot; cellpadding=&quot;0&quot; cellspacing=&quot;0&quot; style=&quot;max-width:600px;min-width:300px;margin:0 auto;&quot; role=&quot;presentation&quot;&gt;</span>
+<span class="s2">                      &lt;tbody&gt;</span>
+<span class="s2">                        &lt;tr&gt;</span>
+<span class="s2">                          &lt;td&gt;</span>
+<span class="s2">                            &lt;table width=&quot;100%&quot; cellpadding=&quot;0&quot; cellspacing=&quot;0&quot; role=&quot;presentation&quot;&gt;</span>
+<span class="s2">                              &lt;tbody&gt;</span>
+<span class="s2">                                &lt;tr&gt;</span>
+<span class="s2">                                  &lt;td&gt;</span>
+<span class="s2">                                    &lt;table width=&quot;100%&quot; cellpadding=&quot;0&quot; cellspacing=&quot;0&quot; role=&quot;presentation&quot;&gt;</span>
+<span class="s2">                                      &lt;tbody&gt;</span>
+<span class="s2">                                        &lt;tr&gt;</span>
+<span class="s2">                                          &lt;td style=&quot;text-align:left;vertical-align:top;font-size:0px&quot;&gt;</span>
+<span class="s2">                                            &lt;table cellpadding=&quot;0&quot; cellspacing=&quot;0&quot; style=&quot;display:inline-table;width:100%;min-width:480px;font-family:Arial,Helvetica,sans-serif;font-size:12px;color:#000000;background:transparent;&quot; role=&quot;presentation&quot;&gt;</span>
+<span class="s2">                                              &lt;tbody&gt;</span>
+<span class="s2">                                                &lt;tr&gt;</span>
+<span class="s2">                                                  &lt;td style=&quot;text-align:center;line-height:0;padding:0;height:140px;&quot;&gt;</span>
+<span class="s2">                                                    &lt;img src=&quot;</span><span class="si">{</span><span class="n">img</span><span class="p">[</span><span class="s1">&#39;type_mail_logo&#39;</span><span class="p">]</span><span class="si">}</span><span class="s2">&quot; alt=&quot;&quot; style=&quot;width:100%;max-width:600px;height:auto;display:block;&quot; /&gt;</span>
+<span class="s2">                                                  &lt;/td&gt;</span>
+<span class="s2">                                                &lt;/tr&gt;</span>
+<span class="s2">                                              &lt;/tbody&gt;</span>
+<span class="s2">                                            &lt;/table&gt;</span>
+<span class="s2">                                          &lt;/td&gt;</span>
+<span class="s2">                                        &lt;/tr&gt;</span>
+<span class="s2">                                      &lt;/tbody&gt;</span>
+<span class="s2">                                    &lt;/table&gt;</span>
+<span class="s2">                                  &lt;/td&gt;</span>
+<span class="s2">                                &lt;/tr&gt;</span>
+<span class="s2">                              &lt;/tbody&gt;</span>
+<span class="s2">                            &lt;/table&gt;</span>
+<span class="s2">                          &lt;/td&gt;</span>
+<span class="s2">                        &lt;/tr&gt;</span>
+<span class="s2">                      &lt;/tbody&gt;</span>
+<span class="s2">                    &lt;/table&gt;</span>
+<span class="s2">        &quot;&quot;&quot;</span>
+
+    <span class="k">def</span><span class="w"> </span><span class="nf">_body_table</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
+        <span class="n">case</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">case</span>
+        <span class="n">mail</span> <span class="o">=</span> <span class="n">case</span><span class="o">.</span><span class="n">fileOrMail</span><span class="o">.</span><span class="n">mail</span> <span class="k">if</span> <span class="n">case</span><span class="o">.</span><span class="n">fileOrMail</span> <span class="ow">and</span> <span class="n">case</span><span class="o">.</span><span class="n">fileOrMail</span><span class="o">.</span><span class="n">mail</span> <span class="k">else</span> <span class="kc">None</span>
+        <span class="n">mail_url</span> <span class="o">=</span> <span class="n">mail_config</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="s2">&quot;submissions&quot;</span><span class="p">,</span> <span class="s2">&quot;https://example.com/online&quot;</span><span class="p">)</span>
+        <span class="n">global_url</span> <span class="o">=</span> <span class="n">mail_config</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="s2">&quot;global&quot;</span><span class="p">,</span> <span class="s2">&quot;https://example.com/global&quot;</span><span class="p">)</span>
+
+        <span class="c1"># Résumé des artefacts</span>
+        <span class="n">artifacts</span> <span class="o">=</span> <span class="n">MailArtifact</span><span class="o">.</span><span class="n">objects</span><span class="o">.</span><span class="n">filter</span><span class="p">(</span><span class="n">mail</span><span class="o">=</span><span class="n">mail</span><span class="p">)</span> <span class="k">if</span> <span class="n">mail</span> <span class="k">else</span> <span class="p">[]</span>
+        <span class="n">artifact_summary</span> <span class="o">=</span> <span class="s2">&quot;&quot;</span>
+        <span class="k">for</span> <span class="n">a</span> <span class="ow">in</span> <span class="n">artifacts</span><span class="p">:</span>
+            <span class="n">artifact_summary</span> <span class="o">+=</span> <span class="sa">f</span><span class="s2">&quot;&lt;li&gt;&lt;strong&gt;</span><span class="si">{</span><span class="n">a</span><span class="o">.</span><span class="n">artifact_type</span><span class="si">}</span><span class="s2">&lt;/strong&gt; - Score: </span><span class="si">{</span><span class="n">a</span><span class="o">.</span><span class="n">artifact_score</span><span class="si">}</span><span class="s2">, Confidence: </span><span class="si">{</span><span class="n">a</span><span class="o">.</span><span class="n">artifact_confidence</span><span class="si">}</span><span class="s2">, Level: </span><span class="si">{</span><span class="n">a</span><span class="o">.</span><span class="n">artifact_level</span><span class="si">}</span><span class="s2">&lt;/li&gt;&quot;</span>
+        <span class="n">attachments</span> <span class="o">=</span> <span class="n">MailAttachment</span><span class="o">.</span><span class="n">objects</span><span class="o">.</span><span class="n">filter</span><span class="p">(</span><span class="n">mail</span><span class="o">=</span><span class="n">mail</span><span class="p">)</span> <span class="k">if</span> <span class="n">mail</span> <span class="k">else</span> <span class="p">[]</span>
+        <span class="n">attachments_summary</span> <span class="o">=</span> <span class="s2">&quot;&quot;</span>
+        <span class="k">for</span> <span class="n">a</span> <span class="ow">in</span> <span class="n">attachments</span><span class="p">:</span>
+            <span class="n">attachments_summary</span> <span class="o">+=</span> <span class="sa">f</span><span class="s2">&quot;&lt;li&gt;&lt;strong&gt;</span><span class="si">{</span><span class="n">a</span><span class="o">.</span><span class="n">file</span><span class="o">.</span><span class="n">file_path</span><span class="o">.</span><span class="n">name</span><span class="si">}</span><span class="s2">&lt;/strong&gt; - Score: </span><span class="si">{</span><span class="n">a</span><span class="o">.</span><span class="n">attachment_score</span><span class="si">}</span><span class="s2">, Confidence: </span><span class="si">{</span><span class="n">a</span><span class="o">.</span><span class="n">attachment_confidence</span><span class="si">}</span><span class="s2">, Level: </span><span class="si">{</span><span class="n">a</span><span class="o">.</span><span class="n">attachment_level</span><span class="si">}</span><span class="s2">&lt;/li&gt;&quot;</span>
+        <span class="n">color_map</span> <span class="o">=</span> <span class="p">{</span>
+            <span class="s2">&quot;Dangerous&quot;</span><span class="p">:</span> <span class="s2">&quot;rgb(239, 51, 64)&quot;</span><span class="p">,</span>
+            <span class="s2">&quot;Suspicious&quot;</span><span class="p">:</span> <span class="s2">&quot;rgb(255, 170, 77)&quot;</span><span class="p">,</span>
+            <span class="s2">&quot;Safe&quot;</span><span class="p">:</span> <span class="s2">&quot;rgb(0, 171, 132)&quot;</span><span class="p">,</span>
+            <span class="s2">&quot;Inconclusive&quot;</span><span class="p">:</span> <span class="s2">&quot;rgb(0, 133, 202)&quot;</span>
+        <span class="p">}</span>
+        <span class="k">if</span> <span class="n">case</span><span class="o">.</span><span class="n">results</span> <span class="o">==</span> <span class="s2">&quot;Dangerous&quot;</span><span class="p">:</span>
+          <span class="n">text</span> <span class="o">=</span> <span class="p">(</span>
+              <span class="sa">f</span><span class="s2">&quot;&lt;strong style=&#39;color: </span><span class="si">{</span><span class="n">color_map</span><span class="p">[</span><span class="n">case</span><span class="o">.</span><span class="n">results</span><span class="p">]</span><span class="si">}</span><span class="s2">;&#39;&gt;Dangerous&lt;/strong&gt;.&lt;/div&gt;&quot;</span>
+          <span class="p">)</span>
+        <span class="k">elif</span> <span class="n">case</span><span class="o">.</span><span class="n">results</span> <span class="o">==</span> <span class="s2">&quot;Suspicious&quot;</span><span class="p">:</span>
+          <span class="n">text</span> <span class="o">=</span> <span class="p">(</span>
+              <span class="sa">f</span><span class="s2">&quot;&lt;strong style=&#39;color: </span><span class="si">{</span><span class="n">color_map</span><span class="p">[</span><span class="n">case</span><span class="o">.</span><span class="n">results</span><span class="p">]</span><span class="si">}</span><span class="s2">;&#39;&gt;Suspicious&lt;/strong&gt;.&lt;/div&gt;&quot;</span>
+          <span class="p">)</span>
+        <span class="k">elif</span> <span class="n">case</span><span class="o">.</span><span class="n">results</span> <span class="o">==</span> <span class="s2">&quot;Safe&quot;</span><span class="p">:</span>
+          <span class="n">text</span> <span class="o">=</span> <span class="p">(</span>
+              <span class="sa">f</span><span class="s2">&quot;&lt;strong style=&#39;color: </span><span class="si">{</span><span class="n">color_map</span><span class="p">[</span><span class="n">case</span><span class="o">.</span><span class="n">results</span><span class="p">]</span><span class="si">}</span><span class="s2">;&#39;&gt;Safe&lt;/strong&gt;.&lt;/div&gt;&quot;</span>
+          <span class="p">)</span>
+        <span class="k">elif</span> <span class="n">case</span><span class="o">.</span><span class="n">results</span> <span class="o">==</span> <span class="s2">&quot;Inconclusive&quot;</span><span class="p">:</span>
+          <span class="n">text</span> <span class="o">=</span> <span class="p">(</span>
+              <span class="sa">f</span><span class="s2">&quot;&lt;strong style=&#39;color: </span><span class="si">{</span><span class="n">color_map</span><span class="p">[</span><span class="n">case</span><span class="o">.</span><span class="n">results</span><span class="p">]</span><span class="si">}</span><span class="s2">;&#39;&gt;Inconclusive&lt;/strong&gt;.&lt;/div&gt;&quot;</span>
+          <span class="p">)</span>
+
+        <span class="k">return</span> <span class="sa">f</span><span class="s2">&quot;&quot;&quot;</span>
+<span class="s2">          &lt;table width=&quot;100%&quot; cellpadding=&quot;0&quot; cellspacing=&quot;0&quot; style=&quot;max-width:600px;min-width:300px;margin:0 auto;background:#ffffff;border:1px solid #e0e0e0;border-radius:8px;font-family:Arial, Helvetica, sans-serif;&quot; role=&quot;presentation&quot;&gt;</span>
+<span class="s2">            &lt;tr&gt;</span>
+<span class="s2">              &lt;td style=&quot;padding:30px;color:#333333;font-size:15px;line-height:1.6;&quot;&gt;</span>
+<span class="s2">                </span>
+<span class="s2">                &lt;h2 style=&quot;color:#00bbdd;font-size:20px;margin:0 0 20px 0;&quot;&gt;Dear </span><span class="si">{</span><span class="bp">self</span><span class="o">.</span><span class="n">infos</span><span class="si">}</span><span class="s2">,&lt;/h2&gt;</span>
+
+<span class="s2">                &lt;p style=&quot;margin:0 0 20px 0;&quot;&gt;</span>
+<span class="s2">                  &lt;strong&gt;</span><span class="si">{</span><span class="bp">self</span><span class="o">.</span><span class="n">challenger_firstname</span><span class="si">}</span><span class="s2"> </span><span class="si">{</span><span class="bp">self</span><span class="o">.</span><span class="n">challenger_lastname</span><span class="si">}</span><span class="s2">&lt;/strong&gt; (&lt;a href=&quot;mailto:</span><span class="si">{</span><span class="bp">self</span><span class="o">.</span><span class="n">challenger_email</span><span class="si">}</span><span class="s2">&quot; style=&quot;color:#00bbdd;text-decoration:none;&quot;&gt;</span><span class="si">{</span><span class="bp">self</span><span class="o">.</span><span class="n">challenger_email</span><span class="si">}</span><span class="s2">&lt;/a&gt;)</span>
+<span class="s2">                  from group &lt;strong&gt;</span><span class="si">{</span><span class="bp">self</span><span class="o">.</span><span class="n">challenger_groups</span><span class="si">}</span><span class="s2">&lt;/strong&gt; has &lt;strong style=&quot;color:#d9534f;&quot;&gt;challenged&lt;/strong&gt; the result of &lt;strong&gt;case #</span><span class="si">{</span><span class="n">case</span><span class="o">.</span><span class="n">id</span><span class="si">}</span><span class="s2">&lt;/strong&gt; associated with mail ID &lt;strong&gt;</span><span class="si">{</span><span class="n">mail</span><span class="o">.</span><span class="n">pk</span><span class="w"> </span><span class="k">if</span><span class="w"> </span><span class="n">mail</span><span class="w"> </span><span class="k">else</span><span class="w"> </span><span class="s1">&#39;N/A&#39;</span><span class="si">}</span><span class="s2">&lt;/strong&gt;.</span>
+<span class="s2">                &lt;/p&gt;</span>
+
+<span class="s2">                &lt;hr style=&quot;border:none;border-top:1px solid #eee;margin:20px 0;&quot;/&gt;</span>
+
+<span class="s2">                &lt;table width=&quot;100%&quot; style=&quot;font-size:14px;color:#444;&quot;&gt;</span>
+<span class="s2">                  &lt;tr&gt;</span>
+<span class="s2">                    &lt;td style=&quot;padding:5px 0;&quot;&gt;&lt;strong&gt;Mail Subject:&lt;/strong&gt;&lt;/td&gt;</span>
+<span class="s2">                    &lt;td style=&quot;padding:5px 0;&quot;&gt;</span><span class="si">{</span><span class="n">mail</span><span class="o">.</span><span class="n">subject</span><span class="si">}</span><span class="s2">&lt;/td&gt;</span>
+<span class="s2">                  &lt;/tr&gt;</span>
+<span class="s2">                  &lt;tr&gt;</span>
+<span class="s2">                    &lt;td style=&quot;padding:5px 0;&quot;&gt;&lt;strong&gt;From:&lt;/strong&gt;&lt;/td&gt;</span>
+<span class="s2">                    &lt;td style=&quot;padding:5px 0;&quot;&gt;</span><span class="si">{</span><span class="n">mail</span><span class="o">.</span><span class="n">mail_from</span><span class="si">}</span><span class="s2">&lt;/td&gt;</span>
+<span class="s2">                  &lt;/tr&gt;</span>
+<span class="s2">                  &lt;tr&gt;</span>
+<span class="s2">                    &lt;td style=&quot;padding:5px 0;&quot;&gt;&lt;strong&gt;Case Score:&lt;/strong&gt;&lt;/td&gt;</span>
+<span class="s2">                    &lt;td style=&quot;padding:5px 0;&quot;&gt;</span><span class="si">{</span><span class="n">case</span><span class="o">.</span><span class="n">score</span><span class="si">}</span><span class="s2">&lt;/td&gt;</span>
+<span class="s2">                  &lt;/tr&gt;</span>
+<span class="s2">                  &lt;tr&gt;</span>
+<span class="s2">                    &lt;td style=&quot;padding:5px 0;&quot;&gt;&lt;strong&gt;Case Confidence:&lt;/strong&gt;&lt;/td&gt;</span>
+<span class="s2">                    &lt;td style=&quot;padding:5px 0;&quot;&gt;</span><span class="si">{</span><span class="n">case</span><span class="o">.</span><span class="n">confidence</span><span class="si">}</span><span class="s2">&lt;/td&gt;</span>
+<span class="s2">                  &lt;/tr&gt;</span>
+<span class="s2">                  &lt;tr&gt;</span>
+<span class="s2">                    &lt;td style=&quot;padding:5px 0;&quot;&gt;&lt;strong&gt;AI Suggestion:&lt;/strong&gt;&lt;/td&gt;</span>
+<span class="s2">                    &lt;td style=&quot;padding:5px 0;&quot;&gt;</span><span class="si">{</span><span class="n">case</span><span class="o">.</span><span class="n">categoryAI</span><span class="si">}</span><span class="s2"> / </span><span class="si">{</span><span class="n">case</span><span class="o">.</span><span class="n">resultsAI</span><span class="si">}</span><span class="s2"> (Score: </span><span class="si">{</span><span class="nb">round</span><span class="p">(</span><span class="n">case</span><span class="o">.</span><span class="n">scoreAI</span><span class="p">)</span><span class="si">}</span><span class="s2">, Confidence: </span><span class="si">{</span><span class="nb">round</span><span class="p">(</span><span class="n">case</span><span class="o">.</span><span class="n">confidenceAI</span><span class="p">)</span><span class="si">}</span><span class="s2">)&lt;/td&gt;</span>
+<span class="s2">                  &lt;/tr&gt;</span>
+<span class="s2">                  &lt;tr&gt;</span>
+<span class="s2">                    &lt;td style=&quot;padding:5px 0;vertical-align:top;&quot;&gt;&lt;strong&gt;Results:&lt;/strong&gt;&lt;/td&gt;</span>
+<span class="s2">                    &lt;td style=&quot;padding:5px 0;&quot;&gt;</span><span class="si">{</span><span class="n">text</span><span class="si">}</span><span class="s2">&lt;/td&gt;</span>
+<span class="s2">                  &lt;/tr&gt;</span>
+<span class="s2">                &lt;/table&gt;</span>
+
+<span class="s2">                &lt;hr style=&quot;border:none;border-top:1px solid #eee;margin:20px 20px 20px 0;&quot;/&gt;</span>
+
+<span class="s2">                &lt;p style=&quot;margin-bottom:10px;&quot;&gt;&lt;strong&gt;Extracted Artifacts:&lt;/strong&gt;&lt;/p&gt;</span>
+<span class="s2">                &lt;ul style=&quot;margin:0 0 20px 20px;padding:0;color:#555;&quot;&gt;</span>
+<span class="s2">                  </span><span class="si">{</span><span class="n">artifact_summary</span><span class="w"> </span><span class="ow">or</span><span class="w"> </span><span class="s2">&quot;&lt;li&gt;No artifacts found.&lt;/li&gt;&quot;</span><span class="si">}</span>
+<span class="s2">                &lt;/ul&gt;</span>
+
+<span class="s2">                &lt;p style=&quot;margin-bottom:10px;&quot;&gt;&lt;strong&gt;Attachments:&lt;/strong&gt;&lt;/p&gt;</span>
+<span class="s2">                &lt;ul style=&quot;margin:0 0 20px 20px;padding:0;color:#555;&quot;&gt;</span>
+<span class="s2">                  </span><span class="si">{</span><span class="n">attachments_summary</span><span class="w"> </span><span class="ow">or</span><span class="w"> </span><span class="s2">&quot;&lt;li&gt;No attachments found.&lt;/li&gt;&quot;</span><span class="si">}</span>
+<span class="s2">                &lt;/ul&gt;</span>
+
+<span class="s2">                &lt;p style=&quot;margin:0 0 20px 0;&quot;&gt;</span>
+<span class="s2">                  You can review and update the case via the</span>
+<span class="s2">                  &lt;a href=&quot;</span><span class="si">{</span><span class="n">mail_url</span><span class="si">}</span><span class="s2">&quot; target=&quot;_blank&quot; rel=&quot;noopener noreferrer&quot; style=&quot;color:#00bbdd;text-decoration:underline;&quot;&gt;dedicated portal&lt;/a&gt;.</span>
+<span class="s2">                &lt;/p&gt;</span>
+
+<span class="s2">                &lt;p style=&quot;margin:0 0 5px 0;&quot;&gt;Regards,&lt;/p&gt;</span>
+<span class="s2">                &lt;p style=&quot;margin:0;&quot;&gt;&lt;strong&gt;</span><span class="si">{</span><span class="n">mail_config</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="s2">&quot;group&quot;</span><span class="p">,</span><span class="w"> </span><span class="s2">&quot;Your Group&quot;</span><span class="p">)</span><span class="si">}</span><span class="s2"> Team&lt;/strong&gt;&lt;/p&gt;</span>
+
+<span class="s2">              &lt;/td&gt;</span>
+<span class="s2">            &lt;/tr&gt;</span>
+<span class="s2">          &lt;/table&gt;</span>
+
+<span class="s2">        &quot;&quot;&quot;</span>
+
+
+    <span class="k">def</span><span class="w"> </span><span class="nf">_html_footer_start</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
+        <span class="n">url</span> <span class="o">=</span> <span class="p">{</span>
+            <span class="s1">&#39;glossary&#39;</span><span class="p">:</span> <span class="n">mail_config</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="s2">&quot;glossary&quot;</span><span class="p">,</span> <span class="s2">&quot;https://example.com/glossary&quot;</span><span class="p">),</span>
+            <span class="s1">&#39;inquiry&#39;</span><span class="p">:</span> <span class="n">mail_config</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="s2">&quot;inquiry&quot;</span><span class="p">,</span> <span class="s2">&quot;https://example.com/inquiry&quot;</span><span class="p">)</span>
+        <span class="p">}</span>
+        <span class="n">msg</span> <span class="o">=</span> <span class="p">{</span>
+            <span class="s1">&#39;inquiry&#39;</span><span class="p">:</span> <span class="n">mail_config</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="s2">&quot;inquiry_text&quot;</span><span class="p">,</span> <span class="s2">&quot;contact us&quot;</span><span class="p">),</span>
+            <span class="s1">&#39;online&#39;</span><span class="p">:</span> <span class="n">mail_config</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="s2">&quot;submissions&quot;</span><span class="p">,</span> <span class="s2">&quot;https://example.com/online&quot;</span><span class="p">)</span>
+        <span class="p">}</span>
+        <span class="k">return</span> <span class="sa">f</span><span class="s2">&quot;&quot;&quot;</span>
+<span class="s2">                    &lt;table width=&quot;100%&quot; cellpadding=&quot;0&quot; cellspacing=&quot;0&quot; style=&quot;max-width:600px;min-width:300px;margin:0 auto;background:#242A75;&quot;&gt;</span>
+<span class="s2">                      &lt;tr&gt;</span>
+<span class="s2">                        &lt;td style=&quot;padding:30px 10px 30px 30px;font-family:Arial, Helvetica, sans-serif;font-size:12px;&quot;&gt;</span>
+<span class="s2">                          &lt;div style=&quot;text-align: center; font-style: italic; color: #ffffff;&quot;&gt;</span>
+<span class="s2">                            To see the definition of these conclusion terms, visit the cybersecurity glossary,</span>
+<span class="s2">                            &lt;a href=&quot;</span><span class="si">{</span><span class="n">url</span><span class="p">[</span><span class="s1">&#39;glossary&#39;</span><span class="p">]</span><span class="si">}</span><span class="s2">&quot; target=&quot;_blank&quot; style=&quot;color: #ffffff; text-decoration: underline;&quot;&gt;available here&lt;/a&gt;.</span>
+<span class="s2">                            In case of questions, do not hesitate to contact</span>
+<span class="s2">                            &lt;a href=&quot;</span><span class="si">{</span><span class="n">url</span><span class="p">[</span><span class="s1">&#39;inquiry&#39;</span><span class="p">]</span><span class="si">}</span><span class="s2">&quot; target=&quot;_blank&quot; style=&quot;color: #ffffff; text-decoration: underline;&quot;&gt;</span><span class="si">{</span><span class="n">msg</span><span class="p">[</span><span class="s1">&#39;inquiry&#39;</span><span class="p">]</span><span class="si">}</span><span class="s2">.&lt;/a&gt;</span>
+<span class="s2">                          &lt;/div&gt;</span>
+<span class="s2">                          &lt;div style=&quot;text-align: center; font-style: italic; color: #ffffff;&quot;&gt;</span>
+<span class="s2">                            You can also access the portal</span>
+<span class="s2">                            &lt;a href=&quot;</span><span class="si">{</span><span class="n">msg</span><span class="p">[</span><span class="s1">&#39;online&#39;</span><span class="p">]</span><span class="si">}</span><span class="s2">&quot; target=&quot;_blank&quot; style=&quot;color: #ffffff; text-decoration: underline;&quot;&gt;here&lt;/a&gt;,</span>
+<span class="s2">                            to have technical details about the analysis.</span>
+<span class="s2">                          &lt;/div&gt;</span>
+<span class="s2">                          &lt;div style=&quot;text-align: center; font-style: italic; color: #ffffff;&quot;&gt;</span>
+<span class="s2">                            Your contribution to the Group security is fundamental in order to reinforce the detection and response capabilities to new threats.</span>
+<span class="s2">                          &lt;/div&gt;</span>
+<span class="s2">                          &lt;br&gt;</span>
+<span class="s2">                          &lt;div style=&quot;text-align: center; font-style: italic; color: #ffffff;&quot;&gt;</span>
+<span class="s2">                            With our kindest regards,</span>
+<span class="s2">                          &lt;/div&gt;</span>
+<span class="s2">                        &lt;/td&gt;</span>
+<span class="s2">                      &lt;/tr&gt;</span>
+<span class="s2">                    &lt;/table&gt;</span>
+<span class="s2">        &quot;&quot;&quot;</span>
+
+    <span class="k">def</span><span class="w"> </span><span class="nf">_html_team_table</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
+        <span class="n">msg</span> <span class="o">=</span> <span class="p">{</span>
+            <span class="s1">&#39;group&#39;</span><span class="p">:</span> <span class="n">mail_config</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="s2">&quot;group&quot;</span><span class="p">,</span> <span class="s2">&quot;Your Group&quot;</span><span class="p">)</span>
+        <span class="p">}</span>
+        <span class="k">return</span> <span class="sa">f</span><span class="s2">&quot;&quot;&quot;</span>
+<span class="s2">                    &lt;table width=&quot;100%&quot; cellpadding=&quot;0&quot; cellspacing=&quot;0&quot; style=&quot;max-width:600px;min-width:300px;margin:0 auto;background:#ffffff;&quot;&gt;</span>
+<span class="s2">                      &lt;tr&gt;</span>
+<span class="s2">                        &lt;td style=&quot;background-color:#242A75;line-height:18px;padding:10px;border-top:2px solid #FFFFFF;border-bottom:2px solid #FFFFFF;&quot;&gt;</span>
+<span class="s2">                          &lt;div style=&quot;text-align: center;&quot;&gt;</span>
+<span class="s2">                            &lt;strong style=&quot;font-size:15px;color:#ffffff;&quot;&gt;</span><span class="si">{</span><span class="n">msg</span><span class="p">[</span><span class="s1">&#39;group&#39;</span><span class="p">]</span><span class="si">}</span><span class="s2"> Team&lt;/strong&gt;</span>
+<span class="s2">                          &lt;/div&gt;</span>
+<span class="s2">                        &lt;/td&gt;</span>
+<span class="s2">                      &lt;/tr&gt;</span>
+<span class="s2">                    &lt;/table&gt;</span>
+<span class="s2">        &quot;&quot;&quot;</span>
+
+    <span class="k">def</span><span class="w"> </span><span class="nf">_html_footer_global</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
+        <span class="n">msg</span> <span class="o">=</span> <span class="p">{</span>
+            <span class="s1">&#39;global&#39;</span><span class="p">:</span> <span class="n">mail_config</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="s1">&#39;global&#39;</span><span class="p">,</span> <span class="s1">&#39;Global Security Team&#39;</span><span class="p">)</span>
+        <span class="p">}</span>
+        <span class="n">url</span> <span class="o">=</span> <span class="p">{</span>
+            <span class="s1">&#39;global&#39;</span><span class="p">:</span> <span class="n">mail_config</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="s1">&#39;global_url&#39;</span><span class="p">,</span> <span class="s1">&#39;https://example.com/global-security&#39;</span><span class="p">)</span>
+        <span class="p">}</span>
+        <span class="k">return</span> <span class="sa">f</span><span class="s2">&quot;&quot;&quot;</span>
+<span class="s2">                    &lt;table width=&quot;100%&quot; cellpadding=&quot;0&quot; cellspacing=&quot;0&quot; style=&quot;max-width:600px;min-width:300px;margin:0 auto;background:#ffffff;&quot;&gt;</span>
+<span class="s2">                      &lt;tr&gt;</span>
+<span class="s2">                        &lt;td style=&quot;padding:35px 0;background-color:#242A75;text-align:center;&quot;&gt;</span>
+<span class="s2">                          &lt;a href=&quot;</span><span class="si">{</span><span class="n">url</span><span class="p">[</span><span class="s1">&#39;global&#39;</span><span class="p">]</span><span class="si">}</span><span class="s2">&quot; target=&quot;_blank&quot; style=&quot;text-decoration:none;color:#ffffff;font-family:Arial,sans-serif;font-size:14px;&quot;&gt;</span><span class="si">{</span><span class="n">msg</span><span class="p">[</span><span class="s1">&#39;global&#39;</span><span class="p">]</span><span class="si">}</span><span class="s2">&lt;/a&gt;</span>
+<span class="s2">                        &lt;/td&gt;</span>
+<span class="s2">                      &lt;/tr&gt;</span>
+<span class="s2">                    &lt;/table&gt;</span>
+<span class="s2">        &quot;&quot;&quot;</span>
+
+    <span class="k">def</span><span class="w"> </span><span class="nf">_html_social_media</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
+        <span class="n">url</span> <span class="o">=</span> <span class="p">{</span>
+            <span class="s1">&#39;linkedin&#39;</span><span class="p">:</span> <span class="n">mail_config</span><span class="p">[</span><span class="s1">&#39;socials&#39;</span><span class="p">]</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="s1">&#39;linkedin&#39;</span><span class="p">,</span> <span class="s1">&#39;https://www.linkedin.com/company/your-company&#39;</span><span class="p">),</span>
+            <span class="s1">&#39;twitter&#39;</span><span class="p">:</span> <span class="n">mail_config</span><span class="p">[</span><span class="s1">&#39;socials&#39;</span><span class="p">]</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="s1">&#39;twitter&#39;</span><span class="p">,</span> <span class="s1">&#39;https://twitter.com/your_company&#39;</span><span class="p">),</span>
+            <span class="s1">&#39;facebook&#39;</span><span class="p">:</span> <span class="n">mail_config</span><span class="p">[</span><span class="s1">&#39;socials&#39;</span><span class="p">]</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="s1">&#39;facebook&#39;</span><span class="p">,</span> <span class="s1">&#39;https://www.facebook.com/yourcompany&#39;</span><span class="p">),</span>
+            <span class="s1">&#39;instagram&#39;</span><span class="p">:</span> <span class="n">mail_config</span><span class="p">[</span><span class="s1">&#39;socials&#39;</span><span class="p">]</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="s1">&#39;instagram&#39;</span><span class="p">,</span> <span class="s1">&#39;https://www.instagram.com/yourcompany&#39;</span><span class="p">),</span>
+            <span class="s1">&#39;youtube&#39;</span><span class="p">:</span> <span class="n">mail_config</span><span class="p">[</span><span class="s1">&#39;socials&#39;</span><span class="p">]</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="s1">&#39;youtube&#39;</span><span class="p">,</span> <span class="s1">&#39;https://www.youtube.com/yourcompany&#39;</span><span class="p">)</span>
+        <span class="p">}</span>
+        <span class="n">img</span> <span class="o">=</span> <span class="p">{</span>
+            <span class="s1">&#39;linkedin&#39;</span><span class="p">:</span> <span class="s1">&#39;data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAEIAAABCCAYAAADjVADoAAABS2lUWHRYTUw6Y29tLmFkb2JlLnhtcAAAAAAAPD94cGFja2V0IGJlZ2luPSLvu78iIGlkPSJXNU0wTXBDZWhpSHpyZVN6TlRjemtjOWQiPz4KPHg6eG1wbWV0YSB4bWxuczp4PSJhZG9iZTpuczptZXRhLyIgeDp4bXB0az0iQWRvYmUgWE1QIENvcmUgNS42LWMxNDIgNzkuMTYwOTI0LCAyMDE3LzA3LzEzLTAxOjA2OjM5ICAgICAgICAiPgogPHJkZjpSREYgeG1sbnM6cmRmPSJodHRwOi8vd3d3LnczLm9yZy8xOTk5LzAyLzIyLXJkZi1zeW50YXgtbnMjIj4KICA8cmRmOkRlc2NyaXB0aW9uIHJkZjphYm91dD0iIi8+CiA8L3JkZjpSREY+CjwveDp4bXBtZXRhPgo8P3hwYWNrZXQgZW5kPSJyIj8+nhxg7wAAA09JREFUeJzt3EuoHEUUxvHftEJEiVcwiigE34oomQtXBI0xiojgUlH3rlyYhUIkoCCIm5gs1IVuVQTFTdyKRBME8YU3vsDHIosEhGuUCC4kyS0XVa2TsacncWrSfdP9h15M1Zk+p7853VNV3acHIQQ1LOJh3IVrcUmdcQtZwc/Yh3ewPMlwMEGIRezG3fOIrkE+wpP4aryjqDDejs+cfSLAVvHYto93jGbEAC/hiTMWVrO8gm3lh9GM2KE7IhCP9Z/MKDNiEZ/jnIaCaooTWMJymRG7dU8E4jG/SMyIoYqraMcYFuI4oes8UmBL01G0gC2DEMIKNjQdScOsDEIIq+IYosusFnoRoKgaYneSczPv7xj24zCux23WSMblFOIAHhKnvSW3411cntHPXBiEKQsSp8hR3IhfKvqW8KnqmW5ryBXcG6pFgC/EhZFWk0uI76f0f5vJz9zIJcS0AVnrB2y5rhHfYIjVir4FHMRFGfzMjVwZcQt2+u9f5Tq8qeUikC8jSvbhdRzCDXgcN2Xc/9zILcSapdX/7WeSnCPLPeIQe5zz8cBY24f4tcJ2g39vIxzFa3gP3+EPrMfVuF9cfL1i5qhLQj4WQggqto0Vtpsn2G5O/XtCCBdPsCm3dSGEnbmCb+Op8RYexJEpdn+Jy/HP5nDaNiEO4jFxmf1UeQGfzOq4bUIcEn/p0yHg+Vkdt02I/8v7+H2WHbRViGvwqpjyH+M5XFBjfwJfzuIw9wpVDjaJI9SFkbY70nafeCpUcXgWp23MiF1OFqHkXvWPKvw2i9O2CbEe99T01/Wd7kX2JNomxFXqY9o4L8dtE+LCKf1zu2PfNiEaoxci0QuR6IVI9EIkeiESvRCJXohEL0SiFyKRcxq+FX9WtF9a0baE8yrab57i4zJxFlrFlVO+W0t/gyfRnxqJXohEL0SiFyLRC5EoTF4V7hKrhen3GLvAkQI/NB1FC/ixEB8Z7jr7+1KmyLAQy4T3Nh1Jg3yAA2W541B8VLhrlX7HcauRcsdlPNNcPI2xQyqcHy+Sf1l3qoEnlkRLHU+LKXO2clw8xm2jjXWvTdil/u7zWmQvnlLxHolJQpRswqO4E9eJL9JYE6VJ4tRhBT+JY6W38fUk478BGKWaSGldMyAAAAAASUVORK5CYII=&#39;</span><span class="p">,</span>
+            <span class="s1">&#39;twitter&#39;</span><span class="p">:</span> <span class="s1">&#39;data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAEIAAABCCAYAAADjVADoAAAACXBIWXMAAAsTAAALEwEAmpwYAAAAAXNSR0IArs4c6QAAAARnQU1BAACxjwv8YQUAAAOkSURBVHgB7ZzfddowFIev0z70kRGcDRjBnaBkgpAJwgZ4A9IJQiaATgAbhA3EY9/aTnB7by1SImRZkq+UBPydo3ACIshfdH7WH5sCLCDiiB5uqVRUxlRK+NjsqOyprIuiePJ6B0mYUPmF54uicmse95Uh4YEeVlRGcL6UVJZ0rPXxky8i9Av3cDnM6ZgXh18K/kFPTOnhES6TG8qN9UGEgo8fiLH8pnL9SfeGKVwuX6j85Iz4BgMVixjDwLjgEysMvB5HXDKDCM0gQvM5oO4EmnNuKBWVGmThSdSs5bWSCk8VwqYJ6M8GIqH3LlEOhc3s2PY5pX49mBARzAIi4IZTecb+KCqltAQmVAQzi5TBDe0zvVfYLmGEPSQwMSL4YMaWxiyMegtLnQrj4M8sHRJ697YYEYwyG9bSoJml4TMMwyr+6O+tUIBYEcwG7N1fHdVp6z0h4TlxSHhAIfqIYGzdf2zUUejXe2zcOyTUKEhfEYxP92/rPa7wnOeSwEiIYKTDM6sERkqEQkuqY1x4uiRMMRFSIhg+6JHR8NDwfHRIiD31eiEpgmkLz+MsUHgqbISOUavlb4gjLYKJCk+HBLNXJSGFCKayHFBneL6VBCaVCOuQmJ7bGPVu34MEJpUIxhae5uSoLTx7T6JCSblCxQf4qvvTjhIv7NzA/wUeFrXClvWFrGB6astnmuOBmJGnKDlEMJXlQOdGHdupd4KZyCUiOjzxVFgScolgFMaHp8iag4ucy/lLHZYv6N+/Qnd43kFz6U86MA+PHW0wsyB7eOYQsfL4f9iyoPYQJkZqESeDqg4ZZhZkC8+UIhS6N2I26BeepYew3qQSodBvI8YnC7hul7DepBChMGwjprbUq4w6ycNTWkTsRoxPFtSWOmLhKSmiayNmGfpey3uShaekiL4bMQrtWXDci3yH6sFIiZDaiHmz8JQQIb0H4bP/sfIQFkRfEak2YnwWgGtLnSlG0kdEyo2YtvCcY5MHh9JWJ5hYETk2YhS2nIq7wIjwjBGxcjRAeiPmGSLAiPAMFdE6icJ0y++x120FhWfI5YW8ePKdCv/XzddYDje4BHk4JP/Q4xbC+QHNvWmdDNdia4YrbzWDCM0gQsMi9jCwYxE7GNiziC0MrAs9QOLbHc/57l8Xe9pour7Su013cLnU/OPfWYPvhIXmZo9Lo7Z+ewBm2nl+J7jnMNisJSg8X3gidrK+WriEQHOX8Dl8kcYemmHClsqTuSvP/AVkJTON13gofgAAAABJRU5ErkJggg==&#39;</span><span class="p">,</span>
+            <span class="s1">&#39;facebook&#39;</span><span class="p">:</span> <span class="s1">&#39;data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAEIAAABCCAYAAADjVADoAAABS2lUWHRYTUw6Y29tLmFkb2JlLnhtcAAAAAAAPD94cGFja2V0IGJlZ2luPSLvu78iIGlkPSJXNU0wTXBDZWhpSHpyZVN6TlRjemtjOWQiPz4KPHg6eG1wbWV0YSB4bWxuczp4PSJhZG9iZTpuczptZXRhLyIgeDp4bXB0az0iQWRvYmUgWE1QIENvcmUgNS42LWMxNDIgNzkuMTYwOTI0LCAyMDE3LzA3LzEzLTAxOjA2OjM5ICAgICAgICAiPgogPHJkZjpSREYgeG1sbnM6cmRmPSJodHRwOi8vd3d3LnczLm9yZy8xOTk5LzAyLzIyLXJkZi1zeW50YXgtbnMjIj4KICA8cmRmOkRlc2NyaXB0aW9uIHJkZjphYm91dD0iIi8+CiA8L3JkZjpSREY+CjwveDp4bXBtZXRhPgo8P3hwYWNrZXQgZW5kPSJyIj8+nhxg7wAAAndJREFUeJztnLuKFEEUhr8uB40EL7viCwhmjohi4gaGPoD6BiY6Bi5ewMBcMdBIn0AEUwORFTYQWRYcxcBLYuywqyKI4DBlUKdlpunLyG716bbPl1VPNfXXR1UxXTPVifeeEo4A54FTwCHgQFnlBvIF+ASsAo+At0UVkwIRR4E7wOkY6RRZAZaB19kPXE7lq8Aa/58ECH1aI/RxhuyIuAdcqimUNveBQVqYHhHX6Y4ECH1dTgvpiOgD68AOpVBajIHjwDAdEXfpngSAHnAbwojok7OKdoy+A85qp2gA5xywpJ2iASwl3vsRsKCdRJlR4r2fAIl2EmUmDpMA4HrKAX4CT4BnwDtgE/hRUPcpcDJWEE0Rj4GLwGjO+uOIWdREPAQuKLWdS97TZ2w+A5cV2i1FQ8QD4JdCu6VoiFhRaLMSDRHvFdqsJPEVm5bbzG9gZ0WdW4SFdFfm+m4iLu51i/gO7KmoswnsrSHLDBpTo4raJUAzRahgIgQTIcT+iv0KODNVnmdh3ldw/SVweMuJCogtYgx8/cd7iurv32KWUtoyNXpE3kVri4gFIm8gtUXEwdgNtEXEYuwGYi+WPWa/KXrgW8U9x3Kundi2RAU08Vmjzjx/acvUiI6JEEyEYCIEEyGYCMFECCZCMBGCiRBMhGAiBBMhmAjBRAgmQjARgokQ6v4zWYLSr91V1L1n2VgcSpulDWPigA3tFA1gwwEftFM0gI+OcDi066zaUaZA3wFD4IV2EkWeA2/suGPmuOMQuKmXR40bhL7bkei0kH3WGADXiHxIRJkxoY+D6YtdfG3CFWQ6TFMkIiX7Io1F2nMYzhOOSc31Io0//E2Kh1+bj7YAAAAASUVORK5CYII=&#39;</span><span class="p">,</span>
+            <span class="s1">&#39;youtube&#39;</span><span class="p">:</span> <span class="s1">&#39;data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAADgAAAA4CAYAAACohjseAAAACXBIWXMAABYlAAAWJQFJUiTwAAAAAXNSR0IArs4c6QAAAARnQU1BAACxjwv8YQUAAAJcSURBVHgB7ZrhUcIwGIbfoj/86QhxAmUCywY6gXUCdQJwAt1AnEA3ACYQJ7A//ScbxPejKVfuwAauTdLIc/ce0AtHX/Il35cmQOQkdQ201ilfROeUok7hl4XRnJolSfKOfRBj1ESHzxc1ojb+8ckGY9LwDUWvdYmcumaPzqsX1wzSnOLLBEUodpWMJl/LDyuDkZgrGdDkVN70KheHiMOc8FKOyaVBXcyUGeJBUXfyZhmiNCihmSIuJJWcHZmx94z4OKG+JURTxEsqBs8RLxdi0Hfp1Saqh8iJ3uAxdmNq5JMLFBOj3dBimnixrNgvEQiS2qg3i/vWtgYVAkNKMeqj7sZtxuCYhWuOwOA9SaXyUNfOxuB+K2Y3zOsa2BhcIFBML/7JIQ92ndYNciK7gkdc9OCTyaMKHnAVoor6MjlXwSGux2BGTWhyBEf4mGQUNTRhe4OW8TmLKmrcdtiGkCYyFGGr0AK+DUolMqL6bdW7u64Hm2RK3bZdyPvoQSmQUxobuFiluDQo4XhPUxKOMzjCVYjKg+VHm+q/aVwY7PswVtJ6iPo0JxyWS13HxqBCoOgtBw+q2BjMEC61i2kbg6mLqn9XTO06rGtnOwal6r9HIOhiy93qwEQiyxXYh2F5wiiHH2TMyd6Esv3CrolefiBFh/gXaSLYJ9cNkIvBT8RLnphk+YM4yXqmGJ4iTmblJPOI+Fjua1ZPG8oZUa/7CA2SozhxuGZQxuIH4jhx2C8Pxq7yoBmLA/irUpoiq576XUv05imXmByje+Qoeu7VqjVDNjP7B6HzQw31lrXhLyroqN+JpZsPAAAAAElFTkSuQmCC&#39;</span><span class="p">,</span>
+            <span class="s1">&#39;instagram&#39;</span><span class="p">:</span> <span class="s1">&#39;data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAEIAAABCCAYAAADjVADoAAAAGXRFWHRTb2Z0d2FyZQBBZG9iZSBJbWFnZVJlYWR5ccllPAAAAyZpVFh0WE1MOmNvbS5hZG9iZS54bXAAAAAAADw/eHBhY2tldCBiZWdpbj0i77u/IiBpZD0iVzVNME1wQ2VoaUh6cmVTek5UY3prYzlkIj8+IDx4OnhtcG1ldGEgeG1sbnM6eD0iYWRvYmU6bnM6bWV0YS8iIHg6eG1wdGs9IkFkb2JlIFhNUCBDb3JlIDUuNi1jMTQyIDc5LjE2MDkyNCwgMjAxNy8wNy8xMy0wMTowNjozOSAgICAgICAgIj4gPHJkZjpSREYgeG1sbnM6cmRmPSJodHRwOi8vd3d3LnczLm9yZy8xOTk5LzAyLzIyLXJkZi1zeW50YXgtbnMjIj4gPHJkZjpEZXNjcmlwdGlvbiByZGY6YWJvdXQ9IiIgeG1sbnM6eG1wPSJodHRwOi8vbnMuYWRvYmUuY29tL3hhcC8xLjAvIiB4bWxuczp4bXBNTT0iaHR0cDovL25zLmFkb2JlLmNvbS94YXAvMS4wL21tLyIgeG1sbnM6c3RSZWY9Imh0dHA6Ly9ucy5hZG9iZS5jb20veGFwLzEuMC9zVHlwZS9SZXNvdXJjZVJlZiMiIHhtcDpDcmVhdG9yVG9vbD0iQWRvYmUgUGhvdG9zaG9wIENDIDIwMTggKFdpbmRvd3MpIiB4bXBNTTpJbnN0YW5jZUlEPSJ4bXAuaWlkOkMxQjM0M0I2ODI1QjExRUI4NEVGRjE5MTJBQUYwMUFDIiB4bXBNTTpEb2N1bWVudElEPSJ4bXAuZGlkOkMxQjM0M0I3ODI1QjExRUI4NEVGRjE5MTJBQUYwMUFDIj4gPHhtcE1NOkRlcml2ZWRGcm9tIHN0UmVmOmluc3RhbmNlSUQ9InhtcC5paWQ6QzFCMzQzQjQ4MjVCMTFFQjg0RUZGMTkxMkFBRjAxQUMiIHN0UmVmOmRvY3VtZW50SUQ9InhtcC5kaWQ6QzFCMzQzQjU4MjVCMTFFQjg0RUZGMTkxMkFBRjAxQUMiLz4gPC9yZGY6RGVzY3JpcHRpb24+IDwvcmRmOlJERj4gPC94OnhtcG1ldGE+IDw/eHBhY2tldCBlbmQ9InIiPz7Mls4kAAAFsElEQVR42uxcaWxUVRS+HWhr2WpSQYFQGtA0CqJCwPgHUv8YN6wkIhoTG4P6w92IG4moccFoQlxiFGIlKuKGtmqKUkPFHySuRCIuMRaoOyVEqkhLZcbvOOfB6fG9N2/eNp15c5IvfffNvXfmnnf2e18rMpmMcaF64HKgCTgFGA9Um+Kgv4CfgN3Ah8CrwE6nzhUOjCAGrAQWAyNMaVCamXEn0OOFEQuBl4CxpjSJJOUaYL28mVKdbgLeKmEmEI0B1gG3OEnEpcylCpMMooVfxupyhBFkE3Ywt5JEpCYzyGZYqvFwAplgqckjlkRMxd9uG3uRFCJvMo0WvyTBTLAcxpIUB0tJpyZSDYq+JiecET8TI/qLKGyOig4RIzJlzTBmZIRzD3DS8yPQCwyy387XvVUCxwFTGNXFwIjfgbVAB7AV+Cfk+SkBPAs4H2gBTghr4rBUgxb8IAcnB2OS5hrgdmA5S03BGfEnsAj4oFCuD2gDxhWSESQJ5wCb1X3S5YuAMwCKXI/lJ3iM6lcrgjmK8Parz/tZwv7gGsI24G0utkg6G3gvkGRkgtF9xEeBUcAzwGAmOqK51wBj1HevCDJpEInYy0/7b26PY/WYG5NKfMGSsF94GMqZxvuNs/3Sc4IJRI9GyIR+NsaLuahCNBtYpVLq1YVQjXlCLCdHrA5XKTVoFWrSIO6f6fcLUgGe0OeivSji4Ox9hzZ958Xi/qd+3bdfRnwPHBbt0/L0NG8AVwCN7FFIr0812a2D1zkKldTo0j5d1RZ64lSNTiWqmzyOexeYpsbagcS9XYzrBpqAOqAFOCA+61JjO/0syC8j3lRfvj1H/zSwzAMDJMijLeexbrRdjVvnZ0F+9VrrYa5E6G72KpKqgPnAydz+FviIk7X/hJU9hfU3H9WLTTXWqKew26Vvh82Tvh7Ya9O3F7iB+8j+bS7z71TzPx2n1xj02I8M6m3qHvn6J4E6m/6Ubj8BPG+O7q+QRNxMxZMIYqFwJ3GhjcDXon0tsNTDuCuB60R7l8nuwEVawY2S5I+nhOj+PMbeq2xPWzEwosbh/lZxvQCYkMecdZxLyGDJjsYOJ0ZUOdz/VVzP9DFvo8NcRWcjqkKcq7oYVMPJok8S19/4mPc7ce1Un0wPJ0Y4JTpzxPUWYE8ec+4DukR7lkupcNirRrPKWO/J02v0O8xVdO7zXJM9hGbRs0Crh3EvAE+Jdj2n+sOOEV6LpCNtcoylHCnucyj/0WctHFFatMrF8IZiI/wmXaNsCjVOdJ7JnmRbKULmxznUplL8icIwbrGZ68Yc0qBtxOg4GaEDqIEc/R/irPAxZWA7XMZQrnEX8EAca/KrGjqa+y1H/wpWkXagwcP8VB3fwOl3rsNtej91QpwScbxqey2PLWQD2sb4hJlYyTHHLPYOzXkEY3qzZ0qcjDjJZDdkrbrll3ka2ksYYdBnSsLr41QN2rqbLdrtJvydb6/VqA2iPdclAYwsjmhWqtFaAEa8yLUKiy70O1GQLT/KBqeL8Jq2/DarsDpK2sbut+BbfhOBO0S7j2sOqyNWE7JLVMqbb4bunt/qlwlBJcLSUbtjAVPZQ8xhK17LEiNfeRhh/n+moc8M3Tg6zPf6zNFjAe1KHQwXcDYGSfvDOCjSx/aiyxSGFjBzaguddNFT3QSs8GuxA0S3lM12BmVCWBKhI8y1wDvAx0rMwyBSp3nABZyYTQpr4ijPWR4AfgB+4cToYI7kzCleqeGQfiInaKOj+LHlA6fCRgyU2WAOpbgYknTqJUbsKPPBfJWyCYaSSF1kLBvYuif5VabpKQ5XX0uwNNDad5Vfd1SvO1JCc7UZWkIvdcrwmnt0rvGKyb4mnE4IE5bxmo9ElrpTEl6Sp5M7L+fKPuk1gJnMrVKSjjSvaYZmgpNESJL/SIMmoD2DyiJZOB1428NOoIu9Q7dT538FGACUwCRHK00nRwAAAABJRU5ErkJggg==&#39;</span><span class="p">,</span>
+        <span class="p">}</span>
+        <span class="k">return</span> <span class="sa">f</span><span class="s2">&quot;&quot;&quot;</span>
+<span class="s2">                    &lt;table align=&quot;center&quot; bgcolor=&quot;#242A75&quot; cellpadding=&quot;0&quot; cellspacing=&quot;0&quot; style=&quot;margin: 15px auto 20px; text-align: center;&quot;&gt;</span>
+<span class="s2">                      &lt;tr&gt;</span>
+<span class="s2">                        &lt;td style=&quot;padding: 0 5px;&quot;&gt;</span>
+<span class="s2">                          &lt;a data-targettype=&quot;webpage&quot; href=&quot;</span><span class="si">{</span><span class="n">url</span><span class="p">[</span><span class="s1">&#39;linkedin&#39;</span><span class="p">]</span><span class="si">}</span><span class="s2">&quot; style=&quot;border: O; text-decoration: none;&quot; target=&quot;_blank&quot;&gt;</span>
+<span class="s2">                            &lt;img alt=&quot;LinkedIn logo&quot; height=&quot;20&quot; src=&quot;</span><span class="si">{</span><span class="n">img</span><span class="p">[</span><span class="s1">&#39;linkedin&#39;</span><span class="p">]</span><span class="si">}</span><span class="s2">&quot; style=&quot;border: 0px;&quot; title=&quot;LinkedIn&quot; width=&quot;20&quot;&gt;</span>
+<span class="s2">                          &lt;/a&gt;</span>
+<span class="s2">                        &lt;/td&gt;</span>
+<span class="s2">                        &lt;td style=&quot;padding: 0 5px;&quot;&gt;</span>
+<span class="s2">                          &lt;a href=&quot;</span><span class="si">{</span><span class="n">url</span><span class="p">[</span><span class="s1">&#39;twitter&#39;</span><span class="p">]</span><span class="si">}</span><span class="s2">&quot; style=&quot;border: 0; text-decoration: none;&quot; target=&quot;_blank&quot; title=&quot;Twitter&quot;&gt;</span>
+<span class="s2">                            &lt;img alt=&quot;Twitter logo&quot; height=&quot;20&quot; src=&quot;</span><span class="si">{</span><span class="n">img</span><span class="p">[</span><span class="s1">&#39;twitter&#39;</span><span class="p">]</span><span class="si">}</span><span class="s2">&quot; style=&quot;border: 0px;&quot; title=&quot;Twitter&quot; width=&quot;20&quot;&gt;</span>
+<span class="s2">                          &lt;/a&gt;</span>
+<span class="s2">                        &lt;/td&gt;</span>
+<span class="s2">                        &lt;td style=&quot;padding: 0 5px;&quot;&gt;</span>
+<span class="s2">                          &lt;a href=&quot;</span><span class="si">{</span><span class="n">url</span><span class="p">[</span><span class="s1">&#39;facebook&#39;</span><span class="p">]</span><span class="si">}</span><span class="s2">&quot; style=&quot;text-decoration: none;&quot; target=&quot;_blank&quot; title=&quot;&quot;&gt;</span>
+<span class="s2">                            &lt;img alt=&quot;Facebook logo&quot; height=&quot;20&quot; src=&quot;</span><span class="si">{</span><span class="n">img</span><span class="p">[</span><span class="s1">&#39;facebook&#39;</span><span class="p">]</span><span class="si">}</span><span class="s2">&quot; style=&quot;border: 0px;&quot; title=&quot;Facebook&quot; width=&quot;20&quot;&gt;</span>
+<span class="s2">                          &lt;/a&gt;</span>
+<span class="s2">                        &lt;/td&gt;</span>
+<span class="s2">                        &lt;td style=&quot;padding: 0 5px;&quot;&gt;</span>
+<span class="s2">                          &lt;a href=&quot;</span><span class="si">{</span><span class="n">url</span><span class="p">[</span><span class="s1">&#39;youtube&#39;</span><span class="p">]</span><span class="si">}</span><span class="s2">&quot; style=&quot;text-decoration: none;&quot; target=&quot;_blank&quot; title=&quot;&quot;&gt;</span>
+<span class="s2">                            &lt;img alt=&quot;YouTube logo&quot; height=&quot;20&quot; src=&quot;</span><span class="si">{</span><span class="n">img</span><span class="p">[</span><span class="s1">&#39;youtube&#39;</span><span class="p">]</span><span class="si">}</span><span class="s2">&quot; style=&quot;border: 0px;&quot; title=&quot;YouTube&quot; width=&quot;20&quot;&gt;</span>
+<span class="s2">                          &lt;/a&gt;</span>
+<span class="s2">                        &lt;/td&gt;</span>
+<span class="s2">                        &lt;td style=&quot;padding: 0 5px;&quot;&gt;</span>
+<span class="s2">                          &lt;a href=&quot;</span><span class="si">{</span><span class="n">url</span><span class="p">[</span><span class="s1">&#39;instagram&#39;</span><span class="p">]</span><span class="si">}</span><span class="s2">&quot; target=&quot;_blank&quot; style=&quot;text-decoration: none;&quot;&gt;</span>
+<span class="s2">                            &lt;img alt=&quot;Instagram logo&quot; height=&quot;20&quot; src=&quot;</span><span class="si">{</span><span class="n">img</span><span class="p">[</span><span class="s1">&#39;instagram&#39;</span><span class="p">]</span><span class="si">}</span><span class="s2">&quot; style=&quot;border: 0px;&quot; title=&quot;Instagram&quot; width=&quot;20&quot;&gt;</span>
+<span class="s2">                          &lt;/a&gt;</span>
+<span class="s2">                        &lt;/td&gt;</span>
+<span class="s2">                      &lt;/tr&gt;</span>
+<span class="s2">                    &lt;/table&gt;</span>
+<span class="s2">        &quot;&quot;&quot;</span>
+
+    <span class="k">def</span><span class="w"> </span><span class="nf">_html_footer_end</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
+        <span class="k">return</span> <span class="s2">&quot;&quot;&quot;</span>
+<span class="s2">                  &lt;/td&gt;</span>
+<span class="s2">                &lt;/tr&gt;</span>
+<span class="s2">              &lt;/tbody&gt;</span>
+<span class="s2">            &lt;/table&gt;</span>
+<span class="s2">          &lt;/td&gt;</span>
+<span class="s2">        &lt;/tr&gt;</span>
+<span class="s2">      &lt;/table&gt;</span>
+<span class="s2">  &lt;/body&gt;</span>
+<span class="s2">&lt;/html&gt;</span>
+<span class="s2">&quot;&quot;&quot;</span>
+
+    <span class="k">def</span><span class="w"> </span><span class="nf">_html_table</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
+        <span class="n">html</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">_logo_table</span><span class="p">()</span>
+        <span class="n">html</span> <span class="o">+=</span> <span class="bp">self</span><span class="o">.</span><span class="n">_type_mail_table</span><span class="p">()</span>
+        <span class="n">html</span> <span class="o">+=</span> <span class="bp">self</span><span class="o">.</span><span class="n">_body_table</span><span class="p">()</span>
+        <span class="n">html</span> <span class="o">+=</span> <span class="bp">self</span><span class="o">.</span><span class="n">_html_footer_start</span><span class="p">()</span>
+        <span class="n">html</span> <span class="o">+=</span> <span class="bp">self</span><span class="o">.</span><span class="n">_html_team_table</span><span class="p">()</span>
+        <span class="n">html</span> <span class="o">+=</span> <span class="bp">self</span><span class="o">.</span><span class="n">_html_footer_global</span><span class="p">()</span>
+        <span class="n">html</span> <span class="o">+=</span> <span class="bp">self</span><span class="o">.</span><span class="n">_html_social_media</span><span class="p">()</span>
+        <span class="n">html</span> <span class="o">+=</span> <span class="bp">self</span><span class="o">.</span><span class="n">_html_footer_end</span><span class="p">()</span>
+        <span class="k">return</span> <span class="n">html</span>
+
+<div class="viewcode-block" id="ChallengeEmail.send">
+<a class="viewcode-back" href="../../../../modules/score_process_core.html#score_process.score_utils.templates.challenge.ChallengeEmail.send">[docs]</a>
+    <span class="k">def</span><span class="w"> </span><span class="nf">send</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
+<span class="w">        </span><span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">        Send the email using the SMTP server.</span>
+<span class="sd">        &quot;&quot;&quot;</span>
+        <span class="n">msg</span> <span class="o">=</span> <span class="n">MIMEMultipart</span><span class="p">()</span>
+        <span class="n">msg</span><span class="p">[</span><span class="s1">&#39;From&#39;</span><span class="p">]</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">sender</span>
+        <span class="k">if</span> <span class="bp">self</span><span class="o">.</span><span class="n">infos</span> <span class="o">!=</span> <span class="s2">&quot;&quot;</span><span class="p">:</span>
+            <span class="n">msg</span><span class="p">[</span><span class="s1">&#39;To&#39;</span><span class="p">]</span> <span class="o">=</span> <span class="nb">str</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">infos</span><span class="p">)</span>
+        <span class="k">else</span><span class="p">:</span>
+            <span class="n">msg</span><span class="p">[</span><span class="s1">&#39;To&#39;</span><span class="p">]</span> <span class="o">=</span> <span class="nb">str</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">recipient</span><span class="p">)</span>
+        <span class="n">msg</span><span class="p">[</span><span class="s1">&#39;Subject&#39;</span><span class="p">]</span> <span class="o">=</span> <span class="nb">str</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">subject</span><span class="p">)</span>
+        <span class="c1"># Attach the HTML content to the email</span>
+        <span class="n">html_content</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">_html_table</span><span class="p">()</span>
+        <span class="n">msg</span><span class="o">.</span><span class="n">attach</span><span class="p">(</span><span class="n">MIMEText</span><span class="p">(</span><span class="n">html_content</span><span class="p">,</span> <span class="s1">&#39;html&#39;</span><span class="p">))</span>
+
+        <span class="c1"># Connect to the SMTP server</span>
+        <span class="n">server</span> <span class="o">=</span> <span class="n">smtplib</span><span class="o">.</span><span class="n">SMTP</span><span class="p">(</span><span class="n">mail_config</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="s2">&quot;server&quot;</span><span class="p">),</span> <span class="n">mail_config</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="s2">&quot;port&quot;</span><span class="p">,</span> <span class="mi">587</span><span class="p">))</span>
+        <span class="c1"># Send the email</span>
+        <span class="n">text</span> <span class="o">=</span> <span class="n">msg</span><span class="o">.</span><span class="n">as_string</span><span class="p">()</span>
+        <span class="n">server</span><span class="o">.</span><span class="n">sendmail</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">sender</span><span class="p">,</span> <span class="nb">str</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">recipient</span><span class="p">),</span> <span class="n">text</span><span class="p">)</span>
+
+        <span class="c1"># Close the connection</span>
+        <span class="n">server</span><span class="o">.</span><span class="n">quit</span><span class="p">()</span></div>
+
+
+
+<div class="viewcode-block" id="ChallengeEmail.send_to_thehive">
+<a class="viewcode-back" href="../../../../modules/score_process_core.html#score_process.score_utils.templates.challenge.ChallengeEmail.send_to_thehive">[docs]</a>
+    <span class="k">def</span><span class="w"> </span><span class="nf">send_to_thehive</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
+<span class="w">        </span><span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">        Send an alert to TheHive from a challenge.</span>
+
+<span class="sd">        Creates an alert in TheHive with the details of the challenge,</span>
+<span class="sd">        including case, mail, challenger info, and related artifacts/attachments.</span>
+<span class="sd">        &quot;&quot;&quot;</span>
+        <span class="k">def</span><span class="w"> </span><span class="nf">safe</span><span class="p">(</span><span class="n">value</span><span class="p">,</span> <span class="n">default</span><span class="o">=</span><span class="kc">None</span><span class="p">):</span>
+            <span class="k">return</span> <span class="n">value</span> <span class="k">if</span> <span class="n">value</span> <span class="ow">not</span> <span class="ow">in</span> <span class="p">(</span><span class="kc">None</span><span class="p">,</span> <span class="s2">&quot;&quot;</span><span class="p">)</span> <span class="k">else</span> <span class="n">default</span>
+
+        <span class="c1"># Challenger information</span>
+        <span class="n">challenger</span> <span class="o">=</span> <span class="p">{</span>
+            <span class="s2">&quot;firstname&quot;</span><span class="p">:</span> <span class="n">safe</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">challenger_firstname</span><span class="p">),</span>
+            <span class="s2">&quot;lastname&quot;</span><span class="p">:</span> <span class="n">safe</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">challenger_lastname</span><span class="p">),</span>
+            <span class="s2">&quot;email&quot;</span><span class="p">:</span> <span class="n">safe</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">challenger_email</span><span class="p">),</span>
+            <span class="s2">&quot;groups&quot;</span><span class="p">:</span> <span class="n">safe</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">challenger_groups</span><span class="p">,</span> <span class="p">[])</span>
+        <span class="p">}</span>
+
+        <span class="n">case</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">case</span>
+        <span class="n">mail</span> <span class="o">=</span> <span class="nb">getattr</span><span class="p">(</span><span class="nb">getattr</span><span class="p">(</span><span class="n">case</span><span class="p">,</span> <span class="s2">&quot;fileOrMail&quot;</span><span class="p">,</span> <span class="kc">None</span><span class="p">),</span> <span class="s2">&quot;mail&quot;</span><span class="p">,</span> <span class="kc">None</span><span class="p">)</span>
+
+        <span class="c1"># TheHive connection parameters</span>
+        <span class="n">THE_HIVE_URL</span> <span class="o">=</span> <span class="n">thehive_config</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="s2">&quot;url&quot;</span><span class="p">,</span> <span class="s2">&quot;&quot;</span><span class="p">)</span>
+        <span class="n">THE_HIVE_KEY</span> <span class="o">=</span> <span class="n">thehive_config</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="s2">&quot;api_key&quot;</span><span class="p">,</span> <span class="s2">&quot;&quot;</span><span class="p">)</span>
+
+        <span class="c1"># Prepare artifacts mapping</span>
+        <span class="n">artifact_type_map</span> <span class="o">=</span> <span class="p">{</span>
+            <span class="s2">&quot;ip&quot;</span><span class="p">:</span> <span class="k">lambda</span> <span class="n">a</span><span class="p">:</span> <span class="p">(</span><span class="n">safe</span><span class="p">(</span><span class="n">a</span><span class="o">.</span><span class="n">artifactIsIp</span><span class="o">.</span><span class="n">ip</span><span class="o">.</span><span class="n">address</span><span class="p">),</span> <span class="s2">&quot;ip&quot;</span><span class="p">),</span>
+            <span class="s2">&quot;url&quot;</span><span class="p">:</span> <span class="k">lambda</span> <span class="n">a</span><span class="p">:</span> <span class="p">(</span><span class="n">safe</span><span class="p">(</span><span class="n">a</span><span class="o">.</span><span class="n">artifactIsUrl</span><span class="o">.</span><span class="n">url</span><span class="o">.</span><span class="n">address</span><span class="p">),</span> <span class="s2">&quot;url&quot;</span><span class="p">),</span>
+            <span class="s2">&quot;mailaddress&quot;</span><span class="p">:</span> <span class="k">lambda</span> <span class="n">a</span><span class="p">:</span> <span class="p">(</span><span class="n">safe</span><span class="p">(</span><span class="n">a</span><span class="o">.</span><span class="n">artifactIsMailAddress</span><span class="o">.</span><span class="n">mail_address</span><span class="o">.</span><span class="n">address</span><span class="p">),</span> <span class="s2">&quot;mail&quot;</span><span class="p">),</span>
+            <span class="s2">&quot;domain&quot;</span><span class="p">:</span> <span class="k">lambda</span> <span class="n">a</span><span class="p">:</span> <span class="p">(</span><span class="n">safe</span><span class="p">(</span><span class="n">a</span><span class="o">.</span><span class="n">artifactIsDomain</span><span class="o">.</span><span class="n">domain</span><span class="o">.</span><span class="n">value</span><span class="p">),</span> <span class="s2">&quot;domain&quot;</span><span class="p">),</span>
+            <span class="s2">&quot;hash&quot;</span><span class="p">:</span> <span class="k">lambda</span> <span class="n">a</span><span class="p">:</span> <span class="p">(</span><span class="n">safe</span><span class="p">(</span><span class="n">a</span><span class="o">.</span><span class="n">artifactIsHash</span><span class="o">.</span><span class="n">hash</span><span class="o">.</span><span class="n">value</span><span class="p">),</span> <span class="s2">&quot;hash&quot;</span><span class="p">)</span>
+        <span class="p">}</span>
+
+        <span class="n">artifact_summary</span> <span class="o">=</span> <span class="p">[]</span>
+        <span class="k">for</span> <span class="n">artifact</span> <span class="ow">in</span> <span class="n">MailArtifact</span><span class="o">.</span><span class="n">objects</span><span class="o">.</span><span class="n">filter</span><span class="p">(</span><span class="n">mail</span><span class="o">=</span><span class="n">mail</span><span class="p">):</span>
+            <span class="k">if</span> <span class="n">artifact</span><span class="p">:</span>
+                <span class="n">artifact_type</span> <span class="o">=</span> <span class="n">safe</span><span class="p">(</span><span class="n">artifact</span><span class="o">.</span><span class="n">artifact_type</span><span class="p">,</span> <span class="s2">&quot;&quot;</span><span class="p">)</span><span class="o">.</span><span class="n">lower</span><span class="p">()</span>
+                <span class="k">if</span> <span class="n">artifact_type</span> <span class="ow">in</span> <span class="n">artifact_type_map</span><span class="p">:</span>
+                    <span class="n">data</span><span class="p">,</span> <span class="n">dtype</span> <span class="o">=</span> <span class="n">artifact_type_map</span><span class="p">[</span><span class="n">artifact_type</span><span class="p">](</span><span class="n">artifact</span><span class="p">)</span>
+                    <span class="k">if</span> <span class="n">data</span><span class="p">:</span>  <span class="c1"># Only add non-empty data</span>
+                        <span class="n">artifact_summary</span><span class="o">.</span><span class="n">append</span><span class="p">((</span><span class="n">data</span><span class="p">,</span> <span class="n">dtype</span><span class="p">))</span>
+
+        <span class="c1"># Prepare attachments</span>
+        <span class="n">attachments_summary</span> <span class="o">=</span> <span class="p">[</span>
+            <span class="n">safe</span><span class="p">(</span><span class="n">att</span><span class="o">.</span><span class="n">file</span><span class="o">.</span><span class="n">file_path</span><span class="o">.</span><span class="n">name</span><span class="p">)</span>
+            <span class="k">for</span> <span class="n">att</span> <span class="ow">in</span> <span class="n">MailAttachment</span><span class="o">.</span><span class="n">objects</span><span class="o">.</span><span class="n">filter</span><span class="p">(</span><span class="n">mail</span><span class="o">=</span><span class="n">mail</span><span class="p">)</span>
+            <span class="k">if</span> <span class="n">safe</span><span class="p">(</span><span class="n">att</span><span class="o">.</span><span class="n">file</span><span class="o">.</span><span class="n">file_path</span><span class="o">.</span><span class="n">name</span><span class="p">)</span>
+        <span class="p">]</span>
+
+        <span class="c1"># Send alert to TheHive</span>
+        <span class="k">try</span><span class="p">:</span>
+            <span class="n">create_alert_from_challenge</span><span class="p">(</span>
+                <span class="n">api_url</span><span class="o">=</span><span class="n">THE_HIVE_URL</span><span class="p">,</span>
+                <span class="n">api_key</span><span class="o">=</span><span class="n">THE_HIVE_KEY</span><span class="p">,</span>
+                <span class="n">case</span><span class="o">=</span><span class="n">case</span><span class="p">,</span>
+                <span class="n">mail</span><span class="o">=</span><span class="n">mail</span><span class="p">,</span>
+                <span class="n">challenger</span><span class="o">=</span><span class="n">challenger</span><span class="p">,</span>
+                <span class="n">artifact_summary</span><span class="o">=</span><span class="n">artifact_summary</span><span class="p">,</span>
+                <span class="n">attachments_summary</span><span class="o">=</span><span class="n">attachments_summary</span>
+            <span class="p">)</span>
+        <span class="k">except</span> <span class="ne">Exception</span> <span class="k">as</span> <span class="n">e</span><span class="p">:</span>
+            <span class="c1"># You might want to use logging instead of print in production</span>
+            <span class="nb">print</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;[ERROR] Failed to create TheHive alert for case #</span><span class="si">{</span><span class="n">safe</span><span class="p">(</span><span class="n">case</span><span class="o">.</span><span class="n">id</span><span class="p">)</span><span class="si">}</span><span class="s2">: </span><span class="si">{</span><span class="n">e</span><span class="si">}</span><span class="s2">&quot;</span><span class="p">)</span></div>
+</div>
+
+
+
+<div class="viewcode-block" id="create_alert_from_challenge">
+<a class="viewcode-back" href="../../../../modules/score_process_core.html#score_process.score_utils.templates.challenge.create_alert_from_challenge">[docs]</a>
+<span class="k">def</span><span class="w"> </span><span class="nf">create_alert_from_challenge</span><span class="p">(</span><span class="n">api_url</span><span class="p">,</span> <span class="n">api_key</span><span class="p">,</span> <span class="n">case</span><span class="p">,</span> <span class="n">mail</span><span class="p">,</span> <span class="n">challenger</span><span class="p">,</span> <span class="n">artifact_summary</span><span class="o">=</span><span class="kc">None</span><span class="p">,</span> <span class="n">attachments_summary</span><span class="o">=</span><span class="kc">None</span><span class="p">):</span>
+<span class="w">    </span><span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">    Create an alert in TheHive when a user challenges the result of a case.</span>
+
+<span class="sd">    :param api_url: TheHive API base URL</span>
+<span class="sd">    :param api_key: TheHive API key</span>
+<span class="sd">    :param case: Case object containing analysis results</span>
+<span class="sd">    :param mail: Mail object related to the case</span>
+<span class="sd">    :param challenger: dict with keys &#39;firstname&#39;, &#39;lastname&#39;, &#39;email&#39;</span>
+<span class="sd">    :param artifact_summary: list of tuples (value, type) for extracted artifacts</span>
+<span class="sd">    :param attachments_summary: list of filenames for attachments</span>
+<span class="sd">    &quot;&quot;&quot;</span>
+    <span class="n">api</span> <span class="o">=</span> <span class="n">TheHiveApi</span><span class="p">(</span><span class="n">url</span><span class="o">=</span><span class="n">api_url</span><span class="p">,</span> <span class="n">apikey</span><span class="o">=</span><span class="n">api_key</span><span class="p">,</span> <span class="n">verify</span><span class="o">=</span><span class="n">thehive_config</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="s1">&#39;the_hive_verify_ssl&#39;</span><span class="p">,</span> <span class="s1">&#39;&#39;</span><span class="p">))</span>
+    <span class="n">eml</span> <span class="o">=</span> <span class="s2">&quot;&quot;</span>
+    <span class="c1"># Utilitaires pour gérer les valeurs None</span>
+    <span class="k">def</span><span class="w"> </span><span class="nf">safe</span><span class="p">(</span><span class="n">value</span><span class="p">,</span> <span class="n">default</span><span class="o">=</span><span class="s2">&quot;N/A&quot;</span><span class="p">):</span>
+        <span class="k">return</span> <span class="n">value</span> <span class="k">if</span> <span class="n">value</span> <span class="ow">not</span> <span class="ow">in</span> <span class="p">(</span><span class="kc">None</span><span class="p">,</span> <span class="s2">&quot;&quot;</span><span class="p">)</span> <span class="k">else</span> <span class="n">default</span>
+    <span class="n">ticket_id</span> <span class="o">=</span> <span class="n">generate_ref</span><span class="p">()</span>
+    <span class="c1"># Construction du titre</span>
+    <span class="n">title</span> <span class="o">=</span> <span class="sa">f</span><span class="s2">&quot;Challenge: Case #</span><span class="si">{</span><span class="n">safe</span><span class="p">(</span><span class="n">case</span><span class="o">.</span><span class="n">id</span><span class="p">)</span><span class="si">}</span><span class="s2"> - </span><span class="si">{</span><span class="n">safe</span><span class="p">(</span><span class="nb">getattr</span><span class="p">(</span><span class="n">mail</span><span class="p">,</span><span class="w"> </span><span class="s1">&#39;subject&#39;</span><span class="p">,</span><span class="w"> </span><span class="kc">None</span><span class="p">),</span><span class="w"> </span><span class="s1">&#39;No Subject&#39;</span><span class="p">)</span><span class="si">}</span><span class="s2">&quot;</span>
+
+    <span class="c1"># Tableau récapitulatif</span>
+    <span class="n">summary_table</span> <span class="o">=</span> <span class="sa">f</span><span class="s2">&quot;&quot;&quot;|Value|Description|</span>
+<span class="s2">|---|---|</span>
+<span class="s2">|Mail Subject|</span><span class="si">{</span><span class="n">safe</span><span class="p">(</span><span class="nb">getattr</span><span class="p">(</span><span class="n">mail</span><span class="p">,</span><span class="w"> </span><span class="s1">&#39;subject&#39;</span><span class="p">,</span><span class="w"> </span><span class="kc">None</span><span class="p">))</span><span class="si">}</span><span class="s2">|</span>
+<span class="s2">|From|</span><span class="si">{</span><span class="n">safe</span><span class="p">(</span><span class="nb">getattr</span><span class="p">(</span><span class="n">mail</span><span class="p">,</span><span class="w"> </span><span class="s1">&#39;mail_from&#39;</span><span class="p">,</span><span class="w"> </span><span class="kc">None</span><span class="p">))</span><span class="si">}</span><span class="s2">|</span>
+<span class="s2">|Case Score|</span><span class="si">{</span><span class="n">safe</span><span class="p">(</span><span class="nb">getattr</span><span class="p">(</span><span class="n">case</span><span class="p">,</span><span class="w"> </span><span class="s1">&#39;score&#39;</span><span class="p">,</span><span class="w"> </span><span class="kc">None</span><span class="p">))</span><span class="si">}</span><span class="s2">|</span>
+<span class="s2">|Case Confidence|</span><span class="si">{</span><span class="n">safe</span><span class="p">(</span><span class="nb">getattr</span><span class="p">(</span><span class="n">case</span><span class="p">,</span><span class="w"> </span><span class="s1">&#39;confidence&#39;</span><span class="p">,</span><span class="w"> </span><span class="kc">None</span><span class="p">))</span><span class="si">}</span><span class="s2">|</span>
+<span class="s2">|AI Suggestion|</span><span class="si">{</span><span class="n">safe</span><span class="p">(</span><span class="nb">getattr</span><span class="p">(</span><span class="n">case</span><span class="p">,</span><span class="w"> </span><span class="s1">&#39;categoryAI&#39;</span><span class="p">,</span><span class="w"> </span><span class="kc">None</span><span class="p">))</span><span class="si">}</span><span class="s2"> / </span><span class="si">{</span><span class="n">safe</span><span class="p">(</span><span class="nb">getattr</span><span class="p">(</span><span class="n">case</span><span class="p">,</span><span class="w"> </span><span class="s1">&#39;resultsAI&#39;</span><span class="p">,</span><span class="w"> </span><span class="kc">None</span><span class="p">))</span><span class="si">}</span><span class="s2"> (Score: </span><span class="si">{</span><span class="nb">round</span><span class="p">(</span><span class="nb">getattr</span><span class="p">(</span><span class="n">case</span><span class="p">,</span><span class="w"> </span><span class="s1">&#39;scoreAI&#39;</span><span class="p">,</span><span class="w"> </span><span class="mi">0</span><span class="p">))</span><span class="si">}</span><span class="s2">, Confidence: </span><span class="si">{</span><span class="nb">round</span><span class="p">(</span><span class="nb">getattr</span><span class="p">(</span><span class="n">case</span><span class="p">,</span><span class="w"> </span><span class="s1">&#39;confidenceAI&#39;</span><span class="p">,</span><span class="w"> </span><span class="mi">0</span><span class="p">))</span><span class="si">}</span><span class="s2">)|</span>
+<span class="s2">|Results|</span><span class="si">{</span><span class="n">safe</span><span class="p">(</span><span class="nb">getattr</span><span class="p">(</span><span class="n">case</span><span class="p">,</span><span class="w"> </span><span class="s1">&#39;results&#39;</span><span class="p">,</span><span class="w"> </span><span class="kc">None</span><span class="p">))</span><span class="si">}</span><span class="s2">|&quot;&quot;&quot;</span>
+
+    <span class="c1"># Liste des artefacts</span>
+    <span class="n">artifacts_section</span> <span class="o">=</span> <span class="s2">&quot;</span><span class="se">\n</span><span class="s2">&quot;</span><span class="o">.</span><span class="n">join</span><span class="p">(</span>
+        <span class="sa">f</span><span class="s2">&quot;- </span><span class="si">{</span><span class="n">val</span><span class="p">[</span><span class="mi">0</span><span class="p">]</span><span class="o">.</span><span class="n">replace</span><span class="p">(</span><span class="s1">&#39;.&#39;</span><span class="p">,</span><span class="w"> </span><span class="s1">&#39;[.]&#39;</span><span class="p">)</span><span class="si">}</span><span class="s2"> (</span><span class="si">{</span><span class="n">val</span><span class="p">[</span><span class="mi">1</span><span class="p">]</span><span class="si">}</span><span class="s2">)&quot;</span> <span class="k">for</span> <span class="n">val</span> <span class="ow">in</span> <span class="p">(</span><span class="n">artifact_summary</span> <span class="ow">or</span> <span class="p">[])</span>
+    <span class="p">)</span> <span class="ow">or</span> <span class="s2">&quot;No artifacts found.&quot;</span>
+
+    <span class="c1"># Liste des pièces jointes</span>
+    <span class="n">attachments_section</span> <span class="o">=</span> <span class="s2">&quot;</span><span class="se">\n</span><span class="s2">&quot;</span><span class="o">.</span><span class="n">join</span><span class="p">(</span>
+        <span class="sa">f</span><span class="s2">&quot;- </span><span class="si">{</span><span class="n">val</span><span class="si">}</span><span class="s2">&quot;</span> <span class="k">for</span> <span class="n">val</span> <span class="ow">in</span> <span class="p">(</span><span class="n">attachments_summary</span> <span class="ow">or</span> <span class="p">[])</span>
+    <span class="p">)</span> <span class="ow">or</span> <span class="s2">&quot;No attachments found.&quot;</span>
+
+    <span class="c1"># Description complète</span>
+    <span class="n">description</span> <span class="o">=</span> <span class="p">(</span>
+        <span class="sa">f</span><span class="s2">&quot;# </span><span class="si">{</span><span class="n">safe</span><span class="p">(</span><span class="n">challenger</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="s1">&#39;firstname&#39;</span><span class="p">))</span><span class="si">}</span><span class="s2"> </span><span class="si">{</span><span class="n">safe</span><span class="p">(</span><span class="n">challenger</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="s1">&#39;lastname&#39;</span><span class="p">))</span><span class="si">}</span><span class="s2"> &quot;</span>
+        <span class="sa">f</span><span class="s2">&quot;(</span><span class="si">{</span><span class="n">safe</span><span class="p">(</span><span class="n">challenger</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="s1">&#39;email&#39;</span><span class="p">))</span><span class="si">}</span><span class="s2">) has challenged the result of case #</span><span class="si">{</span><span class="n">safe</span><span class="p">(</span><span class="n">case</span><span class="o">.</span><span class="n">id</span><span class="p">)</span><span class="si">}</span><span class="s2">.</span><span class="se">\n\n</span><span class="s2">&quot;</span>
+        <span class="sa">f</span><span class="s2">&quot;</span><span class="si">{</span><span class="n">summary_table</span><span class="si">}</span><span class="se">\n\n</span><span class="s2">&quot;</span>
+        <span class="sa">f</span><span class="s2">&quot;## Extracted Artifacts:</span><span class="se">\n</span><span class="si">{</span><span class="n">artifacts_section</span><span class="si">}</span><span class="se">\n\n</span><span class="s2">&quot;</span>
+        <span class="sa">f</span><span class="s2">&quot;## Attachments:</span><span class="se">\n</span><span class="si">{</span><span class="n">attachments_section</span><span class="si">}</span><span class="s2">&quot;</span>
+    <span class="p">)</span>
+    <span class="n">mail_id</span> <span class="o">=</span> <span class="n">safe</span><span class="p">(</span><span class="nb">getattr</span><span class="p">(</span><span class="n">mail</span><span class="p">,</span> <span class="s1">&#39;mail_id&#39;</span><span class="p">,</span> <span class="kc">None</span><span class="p">),</span> <span class="s1">&#39;unknown-mail-id&#39;</span><span class="p">)</span>
+    <span class="n">minio_client</span> <span class="o">=</span> <span class="n">Minio</span><span class="p">(</span>
+        <span class="n">minio_config</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="s2">&quot;endpoint&quot;</span><span class="p">),</span>
+        <span class="n">access_key</span><span class="o">=</span><span class="n">minio_config</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="s2">&quot;access_key&quot;</span><span class="p">),</span>
+        <span class="n">secret_key</span><span class="o">=</span><span class="n">minio_config</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="s2">&quot;secret_key&quot;</span><span class="p">),</span>
+        <span class="n">secure</span><span class="o">=</span><span class="kc">False</span>
+    <span class="p">)</span>
+    <span class="k">for</span> <span class="n">bucket</span> <span class="ow">in</span> <span class="n">minio_client</span><span class="o">.</span><span class="n">list_buckets</span><span class="p">():</span>
+        <span class="k">if</span> <span class="n">bucket</span><span class="o">.</span><span class="n">name</span><span class="o">.</span><span class="n">endswith</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;-</span><span class="si">{</span><span class="n">mail_id</span><span class="o">.</span><span class="n">split</span><span class="p">(</span><span class="s1">&#39;-&#39;</span><span class="p">)[</span><span class="mi">0</span><span class="p">]</span><span class="si">}</span><span class="s2">&quot;</span><span class="p">):</span>
+            <span class="k">try</span><span class="p">:</span>
+                <span class="n">objects</span> <span class="o">=</span> <span class="n">minio_client</span><span class="o">.</span><span class="n">list_objects</span><span class="p">(</span><span class="n">bucket</span><span class="o">.</span><span class="n">name</span><span class="p">,</span> <span class="n">prefix</span><span class="o">=</span><span class="n">mail_id</span><span class="p">,</span> <span class="n">recursive</span><span class="o">=</span><span class="kc">False</span><span class="p">)</span>
+                <span class="k">for</span> <span class="n">obj</span> <span class="ow">in</span> <span class="n">objects</span><span class="p">:</span>
+                    <span class="k">if</span> <span class="n">obj</span><span class="o">.</span><span class="n">object_name</span><span class="o">.</span><span class="n">startswith</span><span class="p">(</span><span class="n">mail_id</span><span class="p">):</span>
+                        <span class="n">expected_eml_key</span> <span class="o">=</span> <span class="sa">f</span><span class="s2">&quot;</span><span class="si">{</span><span class="n">mail_id</span><span class="si">}</span><span class="s2">/</span><span class="si">{</span><span class="n">mail_id</span><span class="si">}</span><span class="s2">.eml&quot;</span>
+                        <span class="n">data</span> <span class="o">=</span> <span class="n">minio_client</span><span class="o">.</span><span class="n">get_object</span><span class="p">(</span><span class="n">bucket</span><span class="o">.</span><span class="n">name</span><span class="p">,</span> <span class="n">expected_eml_key</span><span class="p">)</span>
+                        <span class="n">eml</span> <span class="o">=</span> <span class="n">data</span><span class="o">.</span><span class="n">read</span><span class="p">()</span><span class="o">.</span><span class="n">decode</span><span class="p">(</span><span class="s1">&#39;utf-8&#39;</span><span class="p">)</span>
+            <span class="k">except</span> <span class="n">S3Error</span> <span class="k">as</span> <span class="n">e</span><span class="p">:</span>
+                <span class="nb">print</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;Error listing objects in bucket </span><span class="si">{</span><span class="n">bucket</span><span class="o">.</span><span class="n">name</span><span class="si">}</span><span class="s2">: </span><span class="si">{</span><span class="n">e</span><span class="si">}</span><span class="s2">&quot;</span><span class="p">)</span>
+    <span class="n">tmp_path</span> <span class="o">=</span> <span class="n">build_mail_attachments_paths</span><span class="p">(</span><span class="n">eml</span><span class="p">,</span> <span class="n">ticket_id</span><span class="p">)</span>
+    
+    <span class="n">attachment_key</span> <span class="o">=</span> <span class="n">ticket_id</span>
+    <span class="n">attachment_map</span> <span class="o">=</span> <span class="p">{</span><span class="n">attachment_key</span><span class="p">:</span> <span class="n">tmp_path</span><span class="p">}</span>
+    <span class="c1"># Création des observables</span>
+    <span class="n">observables</span> <span class="o">=</span> <span class="p">[</span>
+        <span class="p">{</span><span class="s2">&quot;data&quot;</span><span class="p">:</span> <span class="n">val</span><span class="p">[</span><span class="mi">0</span><span class="p">],</span> <span class="s2">&quot;dataType&quot;</span><span class="p">:</span> <span class="n">val</span><span class="p">[</span><span class="mi">1</span><span class="p">]}</span>
+        <span class="k">for</span> <span class="n">val</span> <span class="ow">in</span> <span class="p">(</span><span class="n">artifact_summary</span> <span class="ow">or</span> <span class="p">[])</span>
+    <span class="p">]</span> <span class="o">+</span> <span class="p">[</span>
+        <span class="p">{</span><span class="s2">&quot;dataType&quot;</span><span class="p">:</span> <span class="s2">&quot;file&quot;</span><span class="p">,</span> <span class="s2">&quot;attachment&quot;</span><span class="p">:</span> <span class="n">attachment_key</span><span class="p">}</span> <span class="k">if</span> <span class="n">tmp_path</span> <span class="k">else</span> <span class="p">{}</span>
+    <span class="p">]</span>
+    <span class="c1"># Envoi de l&#39;alerte</span>
+    <span class="k">return</span> <span class="n">api</span><span class="o">.</span><span class="n">alert</span><span class="o">.</span><span class="n">create</span><span class="p">(</span>
+        <span class="n">alert</span><span class="o">=</span><span class="p">{</span>
+            <span class="s2">&quot;type&quot;</span><span class="p">:</span> <span class="s2">&quot;user_challenge&quot;</span><span class="p">,</span>
+            <span class="s2">&quot;source&quot;</span><span class="p">:</span> <span class="s2">&quot;suspicious&quot;</span><span class="p">,</span>
+            <span class="s2">&quot;sourceRef&quot;</span><span class="p">:</span> <span class="n">ticket_id</span><span class="p">,</span>
+            <span class="s2">&quot;title&quot;</span><span class="p">:</span> <span class="n">title</span><span class="p">,</span>
+            <span class="s2">&quot;description&quot;</span><span class="p">:</span> <span class="n">description</span><span class="p">,</span>
+            <span class="s2">&quot;observables&quot;</span><span class="p">:</span> <span class="n">observables</span><span class="p">,</span>
+            <span class="s2">&quot;severity&quot;</span><span class="p">:</span> <span class="mi">1</span><span class="p">,</span>  <span class="c1"># 1=Low, 2=Medium, 3=High</span>
+            <span class="s2">&quot;tlp&quot;</span><span class="p">:</span> <span class="mi">1</span><span class="p">,</span>
+            <span class="s2">&quot;pap&quot;</span><span class="p">:</span> <span class="mi">1</span><span class="p">,</span>
+            <span class="s2">&quot;tags&quot;</span><span class="p">:</span> <span class="p">[</span><span class="s2">&quot;challenge&quot;</span><span class="p">,</span> <span class="s2">&quot;mail&quot;</span><span class="p">,</span> <span class="s2">&quot;suspicious&quot;</span><span class="p">],</span>
+            <span class="s2">&quot;customFields&quot;</span><span class="p">:</span> <span class="p">{</span>
+                <span class="s2">&quot;tha-id&quot;</span><span class="p">:</span> <span class="n">ticket_id</span>
+            <span class="p">}</span>
+        <span class="p">},</span> <span class="n">attachment_map</span><span class="o">=</span><span class="n">attachment_map</span>
+    <span class="p">)</span></div>
+
+
+<div class="viewcode-block" id="generate_ref">
+<a class="viewcode-back" href="../../../../modules/score_process_core.html#score_process.score_utils.templates.challenge.generate_ref">[docs]</a>
+<span class="k">def</span><span class="w"> </span><span class="nf">generate_ref</span><span class="p">():</span>
+<span class="w">    </span><span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">    Generate unique &#39;sourceRef&#39; for an alert.</span>
+<span class="sd">    &quot;&quot;&quot;</span>
+    <span class="n">ref</span> <span class="o">=</span> <span class="n">datetime</span><span class="o">.</span><span class="n">now</span><span class="p">()</span><span class="o">.</span><span class="n">strftime</span><span class="p">(</span><span class="s2">&quot;%y%m</span><span class="si">%d</span><span class="s2">&quot;</span><span class="p">)</span> <span class="o">+</span> <span class="s2">&quot;-&quot;</span> <span class="o">+</span> <span class="nb">str</span><span class="p">(</span><span class="n">token_hex</span><span class="p">(</span><span class="mi">3</span><span class="p">))[:</span><span class="mi">5</span><span class="p">]</span>
+    <span class="k">return</span> <span class="n">ref</span></div>
+
+  
+<div class="viewcode-block" id="build_mail_attachments_paths">
+<a class="viewcode-back" href="../../../../modules/score_process_core.html#score_process.score_utils.templates.challenge.build_mail_attachments_paths">[docs]</a>
+<span class="k">def</span><span class="w"> </span><span class="nf">build_mail_attachments_paths</span><span class="p">(</span><span class="n">eml</span><span class="p">,</span> <span class="n">suspicious_case_id</span><span class="p">):</span>
+    <span class="n">attachments</span> <span class="o">=</span> <span class="s2">&quot;&quot;</span>
+
+    <span class="n">os</span><span class="o">.</span><span class="n">makedirs</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;/tmp/attachments&quot;</span><span class="p">,</span> <span class="n">exist_ok</span><span class="o">=</span><span class="kc">True</span><span class="p">)</span>
+
+    <span class="k">if</span> <span class="n">eml</span><span class="p">:</span>
+        <span class="k">with</span> <span class="nb">open</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;/tmp/attachments/</span><span class="si">{</span><span class="n">suspicious_case_id</span><span class="si">}</span><span class="s2">.eml&quot;</span><span class="p">,</span> <span class="s2">&quot;w&quot;</span><span class="p">)</span> <span class="k">as</span> <span class="n">f</span><span class="p">:</span>
+            <span class="n">f</span><span class="o">.</span><span class="n">write</span><span class="p">(</span><span class="n">eml</span><span class="p">)</span>
+        <span class="n">attachments</span> <span class="o">=</span> <span class="sa">f</span><span class="s2">&quot;/tmp/attachments/</span><span class="si">{</span><span class="n">suspicious_case_id</span><span class="si">}</span><span class="s2">.eml&quot;</span>
+    
+    <span class="k">return</span> <span class="n">attachments</span></div>
+
+</pre></div>
+
+           </div>
+          </div>
+          <footer>
+
+  <hr/>
+
+  <div role="contentinfo">
+    <p>&#169; Copyright 2025, Theo Bhang, Esteban Crispel.</p>
+  </div>
+
+  Built with <a href="https://www.sphinx-doc.org/">Sphinx</a> using a
+    <a href="https://github.com/readthedocs/sphinx_rtd_theme">theme</a>
+    provided by <a href="https://readthedocs.org">Read the Docs</a>.
+   
+
+</footer>
+        </div>
+      </div>
+    </section>
+  </div>
+  <script>
+      jQuery(function () {
+          SphinxRtdTheme.Navigation.enable(true);
+      });
+  </script> 
+
+</body>
+</html>

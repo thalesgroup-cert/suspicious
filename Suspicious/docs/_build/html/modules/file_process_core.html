@@ -1,0 +1,567 @@
+
+
+<!DOCTYPE html>
+<html class="writer-html5" lang="en" data-content_root="../">
+<head>
+  <meta charset="utf-8" /><meta name="viewport" content="width=device-width, initial-scale=1" />
+
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>File Process module &mdash; Suspicious 1.0.0 documentation</title>
+      <link rel="stylesheet" type="text/css" href="../_static/pygments.css?v=b86133f3" />
+      <link rel="stylesheet" type="text/css" href="../_static/css/theme.css?v=e59714d7" />
+
+  
+      <script src="../_static/jquery.js?v=5d32c60e"></script>
+      <script src="../_static/_sphinx_javascript_frameworks_compat.js?v=2cd50e6c"></script>
+      <script src="../_static/documentation_options.js?v=8d563738"></script>
+      <script src="../_static/doctools.js?v=9bcbadda"></script>
+      <script src="../_static/sphinx_highlight.js?v=dc90522c"></script>
+    <script src="../_static/js/theme.js"></script>
+    <link rel="index" title="Index" href="../genindex.html" />
+    <link rel="search" title="Search" href="../search.html" />
+    <link rel="next" title="Hash Process module" href="hash_process_core.html" />
+    <link rel="prev" title="Email Process module" href="email_process_core.html" /> 
+</head>
+
+<body class="wy-body-for-nav"> 
+  <div class="wy-grid-for-nav">
+    <nav data-toggle="wy-nav-shift" class="wy-nav-side">
+      <div class="wy-side-scroll">
+        <div class="wy-side-nav-search" >
+
+          
+          
+          <a href="../index.html" class="icon icon-home">
+            Suspicious
+          </a>
+<div role="search">
+  <form id="rtd-search-form" class="wy-form" action="../search.html" method="get">
+    <input type="text" name="q" placeholder="Search docs" aria-label="Search docs" />
+    <input type="hidden" name="check_keywords" value="yes" />
+    <input type="hidden" name="area" value="default" />
+  </form>
+</div>
+        </div><div class="wy-menu wy-menu-vertical" data-spy="affix" role="navigation" aria-label="Navigation menu">
+              <p class="caption" role="heading"><span class="caption-text">Contents:</span></p>
+<ul class="current">
+<li class="toctree-l1 current"><a class="reference internal" href="index.html">Modules (API Reference)</a><ul class="current">
+<li class="toctree-l2"><a class="reference internal" href="case_handler_core.html">case_handler_core module</a></li>
+<li class="toctree-l2"><a class="reference internal" href="cortex_job_core.html">cortex_job_core module</a></li>
+<li class="toctree-l2"><a class="reference internal" href="dashboard_core.html">Dashboard module</a></li>
+<li class="toctree-l2"><a class="reference internal" href="domain_process_core.html">Domain Process Module</a></li>
+<li class="toctree-l2"><a class="reference internal" href="email_process_core.html">Email Process module</a></li>
+<li class="toctree-l2 current"><a class="current reference internal" href="#">File Process module</a><ul>
+<li class="toctree-l3"><a class="reference internal" href="#file_process.models.File"><code class="docutils literal notranslate"><span class="pre">File</span></code></a><ul>
+<li class="toctree-l4"><a class="reference internal" href="#file_process.models.File.DoesNotExist"><code class="docutils literal notranslate"><span class="pre">File.DoesNotExist</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="#file_process.models.File.MultipleObjectsReturned"><code class="docutils literal notranslate"><span class="pre">File.MultipleObjectsReturned</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="#file_process.models.File.analyzer_reports"><code class="docutils literal notranslate"><span class="pre">File.analyzer_reports</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="#file_process.models.File.case_has_file_or_mail"><code class="docutils literal notranslate"><span class="pre">File.case_has_file_or_mail</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="#file_process.models.File.creation_date"><code class="docutils literal notranslate"><span class="pre">File.creation_date</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="#file_process.models.File.file_cases"><code class="docutils literal notranslate"><span class="pre">File.file_cases</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="#file_process.models.File.file_confidence"><code class="docutils literal notranslate"><span class="pre">File.file_confidence</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="#file_process.models.File.file_level"><code class="docutils literal notranslate"><span class="pre">File.file_level</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="#file_process.models.File.file_path"><code class="docutils literal notranslate"><span class="pre">File.file_path</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="#file_process.models.File.file_score"><code class="docutils literal notranslate"><span class="pre">File.file_score</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="#file_process.models.File.filetype"><code class="docutils literal notranslate"><span class="pre">File.filetype</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="#file_process.models.File.get_next_by_creation_date"><code class="docutils literal notranslate"><span class="pre">File.get_next_by_creation_date()</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="#file_process.models.File.get_next_by_last_update"><code class="docutils literal notranslate"><span class="pre">File.get_next_by_last_update()</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="#file_process.models.File.get_previous_by_creation_date"><code class="docutils literal notranslate"><span class="pre">File.get_previous_by_creation_date()</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="#file_process.models.File.get_previous_by_last_update"><code class="docutils literal notranslate"><span class="pre">File.get_previous_by_last_update()</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="#file_process.models.File.hash_files"><code class="docutils literal notranslate"><span class="pre">File.hash_files</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="#file_process.models.File.id"><code class="docutils literal notranslate"><span class="pre">File.id</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="#file_process.models.File.last_update"><code class="docutils literal notranslate"><span class="pre">File.last_update</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="#file_process.models.File.linked_hash"><code class="docutils literal notranslate"><span class="pre">File.linked_hash</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="#file_process.models.File.linked_hash_id"><code class="docutils literal notranslate"><span class="pre">File.linked_hash_id</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="#file_process.models.File.mail_archive"><code class="docutils literal notranslate"><span class="pre">File.mail_archive</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="#file_process.models.File.mail_attachments"><code class="docutils literal notranslate"><span class="pre">File.mail_attachments</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="#file_process.models.File.objects"><code class="docutils literal notranslate"><span class="pre">File.objects</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="#file_process.models.File.other_names"><code class="docutils literal notranslate"><span class="pre">File.other_names</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="#file_process.models.File.size"><code class="docutils literal notranslate"><span class="pre">File.size</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="#file_process.models.File.times_sent"><code class="docutils literal notranslate"><span class="pre">File.times_sent</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="#file_process.models.File.tmp_path"><code class="docutils literal notranslate"><span class="pre">File.tmp_path</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="#file_process.models.File.update_allow_listed"><code class="docutils literal notranslate"><span class="pre">File.update_allow_listed()</span></code></a></li>
+</ul>
+</li>
+<li class="toctree-l3"><a class="reference internal" href="#file_process.models.HashFromFile"><code class="docutils literal notranslate"><span class="pre">HashFromFile</span></code></a><ul>
+<li class="toctree-l4"><a class="reference internal" href="#file_process.models.HashFromFile.DoesNotExist"><code class="docutils literal notranslate"><span class="pre">HashFromFile.DoesNotExist</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="#file_process.models.HashFromFile.MultipleObjectsReturned"><code class="docutils literal notranslate"><span class="pre">HashFromFile.MultipleObjectsReturned</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="#file_process.models.HashFromFile.creation_date"><code class="docutils literal notranslate"><span class="pre">HashFromFile.creation_date</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="#file_process.models.HashFromFile.file"><code class="docutils literal notranslate"><span class="pre">HashFromFile.file</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="#file_process.models.HashFromFile.file_id"><code class="docutils literal notranslate"><span class="pre">HashFromFile.file_id</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="#file_process.models.HashFromFile.get_next_by_creation_date"><code class="docutils literal notranslate"><span class="pre">HashFromFile.get_next_by_creation_date()</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="#file_process.models.HashFromFile.get_next_by_last_update"><code class="docutils literal notranslate"><span class="pre">HashFromFile.get_next_by_last_update()</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="#file_process.models.HashFromFile.get_previous_by_creation_date"><code class="docutils literal notranslate"><span class="pre">HashFromFile.get_previous_by_creation_date()</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="#file_process.models.HashFromFile.get_previous_by_last_update"><code class="docutils literal notranslate"><span class="pre">HashFromFile.get_previous_by_last_update()</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="#file_process.models.HashFromFile.hash"><code class="docutils literal notranslate"><span class="pre">HashFromFile.hash</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="#file_process.models.HashFromFile.hash_id"><code class="docutils literal notranslate"><span class="pre">HashFromFile.hash_id</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="#file_process.models.HashFromFile.id"><code class="docutils literal notranslate"><span class="pre">HashFromFile.id</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="#file_process.models.HashFromFile.last_update"><code class="docutils literal notranslate"><span class="pre">HashFromFile.last_update</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="#file_process.models.HashFromFile.objects"><code class="docutils literal notranslate"><span class="pre">HashFromFile.objects</span></code></a></li>
+</ul>
+</li>
+<li class="toctree-l3"><a class="reference internal" href="#file_process.file_utils.file_handler.FileHandler"><code class="docutils literal notranslate"><span class="pre">FileHandler</span></code></a><ul>
+<li class="toctree-l4"><a class="reference internal" href="#file_process.file_utils.file_handler.FileHandler.handle_file"><code class="docutils literal notranslate"><span class="pre">FileHandler.handle_file()</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="#file_process.file_utils.file_handler.FileHandler.hash_file"><code class="docutils literal notranslate"><span class="pre">FileHandler.hash_file()</span></code></a></li>
+</ul>
+</li>
+</ul>
+</li>
+<li class="toctree-l2"><a class="reference internal" href="hash_process_core.html">Hash Process module</a></li>
+<li class="toctree-l2"><a class="reference internal" href="ip_process_core.html">ip_process_core module</a></li>
+<li class="toctree-l2"><a class="reference internal" href="mail_feeder_core.html">mail_feeder_core module</a></li>
+<li class="toctree-l2"><a class="reference internal" href="profiles_core.html">profiles_core module</a></li>
+<li class="toctree-l2"><a class="reference internal" href="score_process_core.html">score_process_core module</a></li>
+<li class="toctree-l2"><a class="reference internal" href="settings_core.html">settings_core module</a></li>
+<li class="toctree-l2"><a class="reference internal" href="tasp_core.html">tasp_core module</a></li>
+<li class="toctree-l2"><a class="reference internal" href="url_process_core.html">url_process_core module</a></li>
+</ul>
+</li>
+</ul>
+
+        </div>
+      </div>
+    </nav>
+
+    <section data-toggle="wy-nav-shift" class="wy-nav-content-wrap"><nav class="wy-nav-top" aria-label="Mobile navigation menu" >
+          <i data-toggle="wy-nav-top" class="fa fa-bars"></i>
+          <a href="../index.html">Suspicious</a>
+      </nav>
+
+      <div class="wy-nav-content">
+        <div class="rst-content">
+          <div role="navigation" aria-label="Page navigation">
+  <ul class="wy-breadcrumbs">
+      <li><a href="../index.html" class="icon icon-home" aria-label="Home"></a></li>
+          <li class="breadcrumb-item"><a href="index.html">Modules (API Reference)</a></li>
+      <li class="breadcrumb-item active">File Process module</li>
+      <li class="wy-breadcrumbs-aside">
+            <a href="../_sources/modules/file_process_core.rst.txt" rel="nofollow"> View page source</a>
+      </li>
+  </ul>
+  <hr/>
+</div>
+          <div role="main" class="document" itemscope="itemscope" itemtype="http://schema.org/Article">
+           <div itemprop="articleBody">
+             
+  <section id="module-file_process.models">
+<span id="file-process-module"></span><h1>File Process module<a class="headerlink" href="#module-file_process.models" title="Link to this heading"></a></h1>
+<dl class="py class">
+<dt class="sig sig-object py" id="file_process.models.File">
+<em class="property"><span class="k"><span class="pre">class</span></span><span class="w"> </span></em><span class="sig-prename descclassname"><span class="pre">file_process.models.</span></span><span class="sig-name descname"><span class="pre">File</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">id</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">linked_hash</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">file_path</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">file_score</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">file_confidence</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">file_level</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">tmp_path</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">filetype</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">size</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">other_names</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">times_sent</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">creation_date</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">last_update</span></span></em><span class="sig-paren">)</span><a class="reference internal" href="../_modules/file_process/models.html#File"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#file_process.models.File" title="Link to this definition"></a></dt>
+<dd><p>Bases: <code class="xref py py-class docutils literal notranslate"><span class="pre">Model</span></code></p>
+<dl class="py exception">
+<dt class="sig sig-object py" id="file_process.models.File.DoesNotExist">
+<em class="property"><span class="k"><span class="pre">exception</span></span><span class="w"> </span></em><span class="sig-name descname"><span class="pre">DoesNotExist</span></span><a class="headerlink" href="#file_process.models.File.DoesNotExist" title="Link to this definition"></a></dt>
+<dd><p>Bases: <code class="xref py py-class docutils literal notranslate"><span class="pre">ObjectDoesNotExist</span></code></p>
+</dd></dl>
+
+<dl class="py exception">
+<dt class="sig sig-object py" id="file_process.models.File.MultipleObjectsReturned">
+<em class="property"><span class="k"><span class="pre">exception</span></span><span class="w"> </span></em><span class="sig-name descname"><span class="pre">MultipleObjectsReturned</span></span><a class="headerlink" href="#file_process.models.File.MultipleObjectsReturned" title="Link to this definition"></a></dt>
+<dd><p>Bases: <code class="xref py py-class docutils literal notranslate"><span class="pre">MultipleObjectsReturned</span></code></p>
+</dd></dl>
+
+<dl class="py attribute">
+<dt class="sig sig-object py" id="file_process.models.File.analyzer_reports">
+<span class="sig-name descname"><span class="pre">analyzer_reports</span></span><a class="headerlink" href="#file_process.models.File.analyzer_reports" title="Link to this definition"></a></dt>
+<dd><p>Accessor to the related objects manager on the reverse side of a
+many-to-one relation.</p>
+<p>In the example:</p>
+<div class="highlight-default notranslate"><div class="highlight"><pre><span></span><span class="k">class</span><span class="w"> </span><span class="nc">Child</span><span class="p">(</span><span class="n">Model</span><span class="p">):</span>
+    <span class="n">parent</span> <span class="o">=</span> <span class="n">ForeignKey</span><span class="p">(</span><span class="n">Parent</span><span class="p">,</span> <span class="n">related_name</span><span class="o">=</span><span class="s1">&#39;children&#39;</span><span class="p">)</span>
+</pre></div>
+</div>
+<p><code class="docutils literal notranslate"><span class="pre">Parent.children</span></code> is a <code class="docutils literal notranslate"><span class="pre">ReverseManyToOneDescriptor</span></code> instance.</p>
+<p>Most of the implementation is delegated to a dynamically defined manager
+class built by <code class="docutils literal notranslate"><span class="pre">create_forward_many_to_many_manager()</span></code> defined below.</p>
+</dd></dl>
+
+<dl class="py attribute">
+<dt class="sig sig-object py" id="file_process.models.File.case_has_file_or_mail">
+<span class="sig-name descname"><span class="pre">case_has_file_or_mail</span></span><a class="headerlink" href="#file_process.models.File.case_has_file_or_mail" title="Link to this definition"></a></dt>
+<dd><p>Accessor to the related objects manager on the reverse side of a
+many-to-one relation.</p>
+<p>In the example:</p>
+<div class="highlight-default notranslate"><div class="highlight"><pre><span></span><span class="k">class</span><span class="w"> </span><span class="nc">Child</span><span class="p">(</span><span class="n">Model</span><span class="p">):</span>
+    <span class="n">parent</span> <span class="o">=</span> <span class="n">ForeignKey</span><span class="p">(</span><span class="n">Parent</span><span class="p">,</span> <span class="n">related_name</span><span class="o">=</span><span class="s1">&#39;children&#39;</span><span class="p">)</span>
+</pre></div>
+</div>
+<p><code class="docutils literal notranslate"><span class="pre">Parent.children</span></code> is a <code class="docutils literal notranslate"><span class="pre">ReverseManyToOneDescriptor</span></code> instance.</p>
+<p>Most of the implementation is delegated to a dynamically defined manager
+class built by <code class="docutils literal notranslate"><span class="pre">create_forward_many_to_many_manager()</span></code> defined below.</p>
+</dd></dl>
+
+<dl class="py attribute">
+<dt class="sig sig-object py" id="file_process.models.File.creation_date">
+<span class="sig-name descname"><span class="pre">creation_date</span></span><a class="headerlink" href="#file_process.models.File.creation_date" title="Link to this definition"></a></dt>
+<dd><p>A wrapper for a deferred-loading field. When the value is read from this
+object the first time, the query is executed.</p>
+</dd></dl>
+
+<dl class="py attribute">
+<dt class="sig sig-object py" id="file_process.models.File.file_cases">
+<span class="sig-name descname"><span class="pre">file_cases</span></span><a class="headerlink" href="#file_process.models.File.file_cases" title="Link to this definition"></a></dt>
+<dd><p>Accessor to the related objects manager on the reverse side of a
+many-to-one relation.</p>
+<p>In the example:</p>
+<div class="highlight-default notranslate"><div class="highlight"><pre><span></span><span class="k">class</span><span class="w"> </span><span class="nc">Child</span><span class="p">(</span><span class="n">Model</span><span class="p">):</span>
+    <span class="n">parent</span> <span class="o">=</span> <span class="n">ForeignKey</span><span class="p">(</span><span class="n">Parent</span><span class="p">,</span> <span class="n">related_name</span><span class="o">=</span><span class="s1">&#39;children&#39;</span><span class="p">)</span>
+</pre></div>
+</div>
+<p><code class="docutils literal notranslate"><span class="pre">Parent.children</span></code> is a <code class="docutils literal notranslate"><span class="pre">ReverseManyToOneDescriptor</span></code> instance.</p>
+<p>Most of the implementation is delegated to a dynamically defined manager
+class built by <code class="docutils literal notranslate"><span class="pre">create_forward_many_to_many_manager()</span></code> defined below.</p>
+</dd></dl>
+
+<dl class="py attribute">
+<dt class="sig sig-object py" id="file_process.models.File.file_confidence">
+<span class="sig-name descname"><span class="pre">file_confidence</span></span><a class="headerlink" href="#file_process.models.File.file_confidence" title="Link to this definition"></a></dt>
+<dd><p>A wrapper for a deferred-loading field. When the value is read from this
+object the first time, the query is executed.</p>
+</dd></dl>
+
+<dl class="py attribute">
+<dt class="sig sig-object py" id="file_process.models.File.file_level">
+<span class="sig-name descname"><span class="pre">file_level</span></span><a class="headerlink" href="#file_process.models.File.file_level" title="Link to this definition"></a></dt>
+<dd><p>A wrapper for a deferred-loading field. When the value is read from this
+object the first time, the query is executed.</p>
+</dd></dl>
+
+<dl class="py attribute">
+<dt class="sig sig-object py" id="file_process.models.File.file_path">
+<span class="sig-name descname"><span class="pre">file_path</span></span><a class="headerlink" href="#file_process.models.File.file_path" title="Link to this definition"></a></dt>
+<dd><p>The descriptor for the file attribute on the model instance. Return a
+FieldFile when accessed so you can write code like:</p>
+<div class="highlight-default notranslate"><div class="highlight"><pre><span></span><span class="gp">&gt;&gt;&gt; </span><span class="kn">from</span><span class="w"> </span><span class="nn">myapp.models</span><span class="w"> </span><span class="kn">import</span> <span class="n">MyModel</span>
+<span class="gp">&gt;&gt;&gt; </span><span class="n">instance</span> <span class="o">=</span> <span class="n">MyModel</span><span class="o">.</span><span class="n">objects</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="n">pk</span><span class="o">=</span><span class="mi">1</span><span class="p">)</span>
+<span class="gp">&gt;&gt;&gt; </span><span class="n">instance</span><span class="o">.</span><span class="n">file</span><span class="o">.</span><span class="n">size</span>
+</pre></div>
+</div>
+<p>Assign a file object on assignment so you can do:</p>
+<div class="highlight-default notranslate"><div class="highlight"><pre><span></span><span class="gp">&gt;&gt;&gt; </span><span class="k">with</span> <span class="nb">open</span><span class="p">(</span><span class="s1">&#39;/path/to/hello.world&#39;</span><span class="p">)</span> <span class="k">as</span> <span class="n">f</span><span class="p">:</span>
+<span class="gp">... </span>    <span class="n">instance</span><span class="o">.</span><span class="n">file</span> <span class="o">=</span> <span class="n">File</span><span class="p">(</span><span class="n">f</span><span class="p">)</span>
+</pre></div>
+</div>
+</dd></dl>
+
+<dl class="py attribute">
+<dt class="sig sig-object py" id="file_process.models.File.file_score">
+<span class="sig-name descname"><span class="pre">file_score</span></span><a class="headerlink" href="#file_process.models.File.file_score" title="Link to this definition"></a></dt>
+<dd><p>A wrapper for a deferred-loading field. When the value is read from this
+object the first time, the query is executed.</p>
+</dd></dl>
+
+<dl class="py attribute">
+<dt class="sig sig-object py" id="file_process.models.File.filetype">
+<span class="sig-name descname"><span class="pre">filetype</span></span><a class="headerlink" href="#file_process.models.File.filetype" title="Link to this definition"></a></dt>
+<dd><p>A wrapper for a deferred-loading field. When the value is read from this
+object the first time, the query is executed.</p>
+</dd></dl>
+
+<dl class="py method">
+<dt class="sig sig-object py" id="file_process.models.File.get_next_by_creation_date">
+<span class="sig-name descname"><span class="pre">get_next_by_creation_date</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">*</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">field=&lt;django.db.models.fields.DateTimeField:</span> <span class="pre">creation_date&gt;</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">is_next=True</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">**kwargs</span></span></em><span class="sig-paren">)</span><a class="headerlink" href="#file_process.models.File.get_next_by_creation_date" title="Link to this definition"></a></dt>
+<dd></dd></dl>
+
+<dl class="py method">
+<dt class="sig sig-object py" id="file_process.models.File.get_next_by_last_update">
+<span class="sig-name descname"><span class="pre">get_next_by_last_update</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">*</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">field=&lt;django.db.models.fields.DateTimeField:</span> <span class="pre">last_update&gt;</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">is_next=True</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">**kwargs</span></span></em><span class="sig-paren">)</span><a class="headerlink" href="#file_process.models.File.get_next_by_last_update" title="Link to this definition"></a></dt>
+<dd></dd></dl>
+
+<dl class="py method">
+<dt class="sig sig-object py" id="file_process.models.File.get_previous_by_creation_date">
+<span class="sig-name descname"><span class="pre">get_previous_by_creation_date</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">*</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">field=&lt;django.db.models.fields.DateTimeField:</span> <span class="pre">creation_date&gt;</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">is_next=False</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">**kwargs</span></span></em><span class="sig-paren">)</span><a class="headerlink" href="#file_process.models.File.get_previous_by_creation_date" title="Link to this definition"></a></dt>
+<dd></dd></dl>
+
+<dl class="py method">
+<dt class="sig sig-object py" id="file_process.models.File.get_previous_by_last_update">
+<span class="sig-name descname"><span class="pre">get_previous_by_last_update</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">*</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">field=&lt;django.db.models.fields.DateTimeField:</span> <span class="pre">last_update&gt;</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">is_next=False</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">**kwargs</span></span></em><span class="sig-paren">)</span><a class="headerlink" href="#file_process.models.File.get_previous_by_last_update" title="Link to this definition"></a></dt>
+<dd></dd></dl>
+
+<dl class="py attribute">
+<dt class="sig sig-object py" id="file_process.models.File.hash_files">
+<span class="sig-name descname"><span class="pre">hash_files</span></span><a class="headerlink" href="#file_process.models.File.hash_files" title="Link to this definition"></a></dt>
+<dd><p>Accessor to the related objects manager on the reverse side of a
+many-to-one relation.</p>
+<p>In the example:</p>
+<div class="highlight-default notranslate"><div class="highlight"><pre><span></span><span class="k">class</span><span class="w"> </span><span class="nc">Child</span><span class="p">(</span><span class="n">Model</span><span class="p">):</span>
+    <span class="n">parent</span> <span class="o">=</span> <span class="n">ForeignKey</span><span class="p">(</span><span class="n">Parent</span><span class="p">,</span> <span class="n">related_name</span><span class="o">=</span><span class="s1">&#39;children&#39;</span><span class="p">)</span>
+</pre></div>
+</div>
+<p><code class="docutils literal notranslate"><span class="pre">Parent.children</span></code> is a <code class="docutils literal notranslate"><span class="pre">ReverseManyToOneDescriptor</span></code> instance.</p>
+<p>Most of the implementation is delegated to a dynamically defined manager
+class built by <code class="docutils literal notranslate"><span class="pre">create_forward_many_to_many_manager()</span></code> defined below.</p>
+</dd></dl>
+
+<dl class="py attribute">
+<dt class="sig sig-object py" id="file_process.models.File.id">
+<span class="sig-name descname"><span class="pre">id</span></span><a class="headerlink" href="#file_process.models.File.id" title="Link to this definition"></a></dt>
+<dd><p>A wrapper for a deferred-loading field. When the value is read from this
+object the first time, the query is executed.</p>
+</dd></dl>
+
+<dl class="py attribute">
+<dt class="sig sig-object py" id="file_process.models.File.last_update">
+<span class="sig-name descname"><span class="pre">last_update</span></span><a class="headerlink" href="#file_process.models.File.last_update" title="Link to this definition"></a></dt>
+<dd><p>A wrapper for a deferred-loading field. When the value is read from this
+object the first time, the query is executed.</p>
+</dd></dl>
+
+<dl class="py attribute">
+<dt class="sig sig-object py" id="file_process.models.File.linked_hash">
+<span class="sig-name descname"><span class="pre">linked_hash</span></span><a class="headerlink" href="#file_process.models.File.linked_hash" title="Link to this definition"></a></dt>
+<dd><p>Accessor to the related object on the forward side of a many-to-one or
+one-to-one (via ForwardOneToOneDescriptor subclass) relation.</p>
+<p>In the example:</p>
+<div class="highlight-default notranslate"><div class="highlight"><pre><span></span><span class="k">class</span><span class="w"> </span><span class="nc">Child</span><span class="p">(</span><span class="n">Model</span><span class="p">):</span>
+    <span class="n">parent</span> <span class="o">=</span> <span class="n">ForeignKey</span><span class="p">(</span><span class="n">Parent</span><span class="p">,</span> <span class="n">related_name</span><span class="o">=</span><span class="s1">&#39;children&#39;</span><span class="p">)</span>
+</pre></div>
+</div>
+<p><code class="docutils literal notranslate"><span class="pre">Child.parent</span></code> is a <code class="docutils literal notranslate"><span class="pre">ForwardManyToOneDescriptor</span></code> instance.</p>
+</dd></dl>
+
+<dl class="py attribute">
+<dt class="sig sig-object py" id="file_process.models.File.linked_hash_id">
+<span class="sig-name descname"><span class="pre">linked_hash_id</span></span><a class="headerlink" href="#file_process.models.File.linked_hash_id" title="Link to this definition"></a></dt>
+<dd></dd></dl>
+
+<dl class="py attribute">
+<dt class="sig sig-object py" id="file_process.models.File.mail_archive">
+<span class="sig-name descname"><span class="pre">mail_archive</span></span><a class="headerlink" href="#file_process.models.File.mail_archive" title="Link to this definition"></a></dt>
+<dd><p>Accessor to the related objects manager on the reverse side of a
+many-to-one relation.</p>
+<p>In the example:</p>
+<div class="highlight-default notranslate"><div class="highlight"><pre><span></span><span class="k">class</span><span class="w"> </span><span class="nc">Child</span><span class="p">(</span><span class="n">Model</span><span class="p">):</span>
+    <span class="n">parent</span> <span class="o">=</span> <span class="n">ForeignKey</span><span class="p">(</span><span class="n">Parent</span><span class="p">,</span> <span class="n">related_name</span><span class="o">=</span><span class="s1">&#39;children&#39;</span><span class="p">)</span>
+</pre></div>
+</div>
+<p><code class="docutils literal notranslate"><span class="pre">Parent.children</span></code> is a <code class="docutils literal notranslate"><span class="pre">ReverseManyToOneDescriptor</span></code> instance.</p>
+<p>Most of the implementation is delegated to a dynamically defined manager
+class built by <code class="docutils literal notranslate"><span class="pre">create_forward_many_to_many_manager()</span></code> defined below.</p>
+</dd></dl>
+
+<dl class="py attribute">
+<dt class="sig sig-object py" id="file_process.models.File.mail_attachments">
+<span class="sig-name descname"><span class="pre">mail_attachments</span></span><a class="headerlink" href="#file_process.models.File.mail_attachments" title="Link to this definition"></a></dt>
+<dd><p>Accessor to the related objects manager on the reverse side of a
+many-to-one relation.</p>
+<p>In the example:</p>
+<div class="highlight-default notranslate"><div class="highlight"><pre><span></span><span class="k">class</span><span class="w"> </span><span class="nc">Child</span><span class="p">(</span><span class="n">Model</span><span class="p">):</span>
+    <span class="n">parent</span> <span class="o">=</span> <span class="n">ForeignKey</span><span class="p">(</span><span class="n">Parent</span><span class="p">,</span> <span class="n">related_name</span><span class="o">=</span><span class="s1">&#39;children&#39;</span><span class="p">)</span>
+</pre></div>
+</div>
+<p><code class="docutils literal notranslate"><span class="pre">Parent.children</span></code> is a <code class="docutils literal notranslate"><span class="pre">ReverseManyToOneDescriptor</span></code> instance.</p>
+<p>Most of the implementation is delegated to a dynamically defined manager
+class built by <code class="docutils literal notranslate"><span class="pre">create_forward_many_to_many_manager()</span></code> defined below.</p>
+</dd></dl>
+
+<dl class="py attribute">
+<dt class="sig sig-object py" id="file_process.models.File.objects">
+<span class="sig-name descname"><span class="pre">objects</span></span><em class="property"><span class="w"> </span><span class="p"><span class="pre">=</span></span><span class="w"> </span><span class="pre">&lt;django.db.models.manager.Manager</span> <span class="pre">object&gt;</span></em><a class="headerlink" href="#file_process.models.File.objects" title="Link to this definition"></a></dt>
+<dd></dd></dl>
+
+<dl class="py attribute">
+<dt class="sig sig-object py" id="file_process.models.File.other_names">
+<span class="sig-name descname"><span class="pre">other_names</span></span><a class="headerlink" href="#file_process.models.File.other_names" title="Link to this definition"></a></dt>
+<dd><p>A wrapper for a deferred-loading field. When the value is read from this
+object the first time, the query is executed.</p>
+</dd></dl>
+
+<dl class="py attribute">
+<dt class="sig sig-object py" id="file_process.models.File.size">
+<span class="sig-name descname"><span class="pre">size</span></span><a class="headerlink" href="#file_process.models.File.size" title="Link to this definition"></a></dt>
+<dd><p>A wrapper for a deferred-loading field. When the value is read from this
+object the first time, the query is executed.</p>
+</dd></dl>
+
+<dl class="py attribute">
+<dt class="sig sig-object py" id="file_process.models.File.times_sent">
+<span class="sig-name descname"><span class="pre">times_sent</span></span><a class="headerlink" href="#file_process.models.File.times_sent" title="Link to this definition"></a></dt>
+<dd><p>A wrapper for a deferred-loading field. When the value is read from this
+object the first time, the query is executed.</p>
+</dd></dl>
+
+<dl class="py attribute">
+<dt class="sig sig-object py" id="file_process.models.File.tmp_path">
+<span class="sig-name descname"><span class="pre">tmp_path</span></span><a class="headerlink" href="#file_process.models.File.tmp_path" title="Link to this definition"></a></dt>
+<dd><p>A wrapper for a deferred-loading field. When the value is read from this
+object the first time, the query is executed.</p>
+</dd></dl>
+
+<dl class="py method">
+<dt class="sig sig-object py" id="file_process.models.File.update_allow_listed">
+<span class="sig-name descname"><span class="pre">update_allow_listed</span></span><span class="sig-paren">(</span><span class="sig-paren">)</span><a class="reference internal" href="../_modules/file_process/models.html#File.update_allow_listed"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#file_process.models.File.update_allow_listed" title="Link to this definition"></a></dt>
+<dd><p>Mark this File instance as allow_listed (safe).</p>
+</dd></dl>
+
+</dd></dl>
+
+<dl class="py class">
+<dt class="sig sig-object py" id="file_process.models.HashFromFile">
+<em class="property"><span class="k"><span class="pre">class</span></span><span class="w"> </span></em><span class="sig-prename descclassname"><span class="pre">file_process.models.</span></span><span class="sig-name descname"><span class="pre">HashFromFile</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">id</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">hash</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">file</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">creation_date</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">last_update</span></span></em><span class="sig-paren">)</span><a class="reference internal" href="../_modules/file_process/models.html#HashFromFile"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#file_process.models.HashFromFile" title="Link to this definition"></a></dt>
+<dd><p>Bases: <code class="xref py py-class docutils literal notranslate"><span class="pre">Model</span></code></p>
+<dl class="py exception">
+<dt class="sig sig-object py" id="file_process.models.HashFromFile.DoesNotExist">
+<em class="property"><span class="k"><span class="pre">exception</span></span><span class="w"> </span></em><span class="sig-name descname"><span class="pre">DoesNotExist</span></span><a class="headerlink" href="#file_process.models.HashFromFile.DoesNotExist" title="Link to this definition"></a></dt>
+<dd><p>Bases: <code class="xref py py-class docutils literal notranslate"><span class="pre">ObjectDoesNotExist</span></code></p>
+</dd></dl>
+
+<dl class="py exception">
+<dt class="sig sig-object py" id="file_process.models.HashFromFile.MultipleObjectsReturned">
+<em class="property"><span class="k"><span class="pre">exception</span></span><span class="w"> </span></em><span class="sig-name descname"><span class="pre">MultipleObjectsReturned</span></span><a class="headerlink" href="#file_process.models.HashFromFile.MultipleObjectsReturned" title="Link to this definition"></a></dt>
+<dd><p>Bases: <code class="xref py py-class docutils literal notranslate"><span class="pre">MultipleObjectsReturned</span></code></p>
+</dd></dl>
+
+<dl class="py attribute">
+<dt class="sig sig-object py" id="file_process.models.HashFromFile.creation_date">
+<span class="sig-name descname"><span class="pre">creation_date</span></span><a class="headerlink" href="#file_process.models.HashFromFile.creation_date" title="Link to this definition"></a></dt>
+<dd><p>A wrapper for a deferred-loading field. When the value is read from this
+object the first time, the query is executed.</p>
+</dd></dl>
+
+<dl class="py attribute">
+<dt class="sig sig-object py" id="file_process.models.HashFromFile.file">
+<span class="sig-name descname"><span class="pre">file</span></span><a class="headerlink" href="#file_process.models.HashFromFile.file" title="Link to this definition"></a></dt>
+<dd><p>Accessor to the related object on the forward side of a many-to-one or
+one-to-one (via ForwardOneToOneDescriptor subclass) relation.</p>
+<p>In the example:</p>
+<div class="highlight-default notranslate"><div class="highlight"><pre><span></span><span class="k">class</span><span class="w"> </span><span class="nc">Child</span><span class="p">(</span><span class="n">Model</span><span class="p">):</span>
+    <span class="n">parent</span> <span class="o">=</span> <span class="n">ForeignKey</span><span class="p">(</span><span class="n">Parent</span><span class="p">,</span> <span class="n">related_name</span><span class="o">=</span><span class="s1">&#39;children&#39;</span><span class="p">)</span>
+</pre></div>
+</div>
+<p><code class="docutils literal notranslate"><span class="pre">Child.parent</span></code> is a <code class="docutils literal notranslate"><span class="pre">ForwardManyToOneDescriptor</span></code> instance.</p>
+</dd></dl>
+
+<dl class="py attribute">
+<dt class="sig sig-object py" id="file_process.models.HashFromFile.file_id">
+<span class="sig-name descname"><span class="pre">file_id</span></span><a class="headerlink" href="#file_process.models.HashFromFile.file_id" title="Link to this definition"></a></dt>
+<dd></dd></dl>
+
+<dl class="py method">
+<dt class="sig sig-object py" id="file_process.models.HashFromFile.get_next_by_creation_date">
+<span class="sig-name descname"><span class="pre">get_next_by_creation_date</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">*</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">field=&lt;django.db.models.fields.DateTimeField:</span> <span class="pre">creation_date&gt;</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">is_next=True</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">**kwargs</span></span></em><span class="sig-paren">)</span><a class="headerlink" href="#file_process.models.HashFromFile.get_next_by_creation_date" title="Link to this definition"></a></dt>
+<dd></dd></dl>
+
+<dl class="py method">
+<dt class="sig sig-object py" id="file_process.models.HashFromFile.get_next_by_last_update">
+<span class="sig-name descname"><span class="pre">get_next_by_last_update</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">*</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">field=&lt;django.db.models.fields.DateTimeField:</span> <span class="pre">last_update&gt;</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">is_next=True</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">**kwargs</span></span></em><span class="sig-paren">)</span><a class="headerlink" href="#file_process.models.HashFromFile.get_next_by_last_update" title="Link to this definition"></a></dt>
+<dd></dd></dl>
+
+<dl class="py method">
+<dt class="sig sig-object py" id="file_process.models.HashFromFile.get_previous_by_creation_date">
+<span class="sig-name descname"><span class="pre">get_previous_by_creation_date</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">*</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">field=&lt;django.db.models.fields.DateTimeField:</span> <span class="pre">creation_date&gt;</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">is_next=False</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">**kwargs</span></span></em><span class="sig-paren">)</span><a class="headerlink" href="#file_process.models.HashFromFile.get_previous_by_creation_date" title="Link to this definition"></a></dt>
+<dd></dd></dl>
+
+<dl class="py method">
+<dt class="sig sig-object py" id="file_process.models.HashFromFile.get_previous_by_last_update">
+<span class="sig-name descname"><span class="pre">get_previous_by_last_update</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">*</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">field=&lt;django.db.models.fields.DateTimeField:</span> <span class="pre">last_update&gt;</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">is_next=False</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">**kwargs</span></span></em><span class="sig-paren">)</span><a class="headerlink" href="#file_process.models.HashFromFile.get_previous_by_last_update" title="Link to this definition"></a></dt>
+<dd></dd></dl>
+
+<dl class="py attribute">
+<dt class="sig sig-object py" id="file_process.models.HashFromFile.hash">
+<span class="sig-name descname"><span class="pre">hash</span></span><a class="headerlink" href="#file_process.models.HashFromFile.hash" title="Link to this definition"></a></dt>
+<dd><p>Accessor to the related object on the forward side of a many-to-one or
+one-to-one (via ForwardOneToOneDescriptor subclass) relation.</p>
+<p>In the example:</p>
+<div class="highlight-default notranslate"><div class="highlight"><pre><span></span><span class="k">class</span><span class="w"> </span><span class="nc">Child</span><span class="p">(</span><span class="n">Model</span><span class="p">):</span>
+    <span class="n">parent</span> <span class="o">=</span> <span class="n">ForeignKey</span><span class="p">(</span><span class="n">Parent</span><span class="p">,</span> <span class="n">related_name</span><span class="o">=</span><span class="s1">&#39;children&#39;</span><span class="p">)</span>
+</pre></div>
+</div>
+<p><code class="docutils literal notranslate"><span class="pre">Child.parent</span></code> is a <code class="docutils literal notranslate"><span class="pre">ForwardManyToOneDescriptor</span></code> instance.</p>
+</dd></dl>
+
+<dl class="py attribute">
+<dt class="sig sig-object py" id="file_process.models.HashFromFile.hash_id">
+<span class="sig-name descname"><span class="pre">hash_id</span></span><a class="headerlink" href="#file_process.models.HashFromFile.hash_id" title="Link to this definition"></a></dt>
+<dd></dd></dl>
+
+<dl class="py attribute">
+<dt class="sig sig-object py" id="file_process.models.HashFromFile.id">
+<span class="sig-name descname"><span class="pre">id</span></span><a class="headerlink" href="#file_process.models.HashFromFile.id" title="Link to this definition"></a></dt>
+<dd><p>A wrapper for a deferred-loading field. When the value is read from this
+object the first time, the query is executed.</p>
+</dd></dl>
+
+<dl class="py attribute">
+<dt class="sig sig-object py" id="file_process.models.HashFromFile.last_update">
+<span class="sig-name descname"><span class="pre">last_update</span></span><a class="headerlink" href="#file_process.models.HashFromFile.last_update" title="Link to this definition"></a></dt>
+<dd><p>A wrapper for a deferred-loading field. When the value is read from this
+object the first time, the query is executed.</p>
+</dd></dl>
+
+<dl class="py attribute">
+<dt class="sig sig-object py" id="file_process.models.HashFromFile.objects">
+<span class="sig-name descname"><span class="pre">objects</span></span><em class="property"><span class="w"> </span><span class="p"><span class="pre">=</span></span><span class="w"> </span><span class="pre">&lt;django.db.models.manager.Manager</span> <span class="pre">object&gt;</span></em><a class="headerlink" href="#file_process.models.HashFromFile.objects" title="Link to this definition"></a></dt>
+<dd></dd></dl>
+
+</dd></dl>
+
+<dl class="py class" id="module-file_process.file_utils.file_handler">
+<dt class="sig sig-object py" id="file_process.file_utils.file_handler.FileHandler">
+<em class="property"><span class="k"><span class="pre">class</span></span><span class="w"> </span></em><span class="sig-prename descclassname"><span class="pre">file_process.file_utils.file_handler.</span></span><span class="sig-name descname"><span class="pre">FileHandler</span></span><a class="reference internal" href="../_modules/file_process/file_utils/file_handler.html#FileHandler"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#file_process.file_utils.file_handler.FileHandler" title="Link to this definition"></a></dt>
+<dd><p>Bases: <code class="xref py py-class docutils literal notranslate"><span class="pre">object</span></code></p>
+<dl class="py method">
+<dt class="sig sig-object py" id="file_process.file_utils.file_handler.FileHandler.handle_file">
+<em class="property"><span class="k"><span class="pre">classmethod</span></span><span class="w"> </span></em><span class="sig-name descname"><span class="pre">handle_file</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">file</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">None</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">mail</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">None</span></span></em><span class="sig-paren">)</span><a class="reference internal" href="../_modules/file_process/file_utils/file_handler.html#FileHandler.handle_file"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#file_process.file_utils.file_handler.FileHandler.handle_file" title="Link to this definition"></a></dt>
+<dd><p>Handle a file (or mail-based file path) and create or update a File instance
+along with its associated Hash instance.</p>
+<dl class="simple">
+<dt>Args:</dt><dd><p>file: A file-like object (must implement .name and .temporary_file_path()).
+mail: A string representing a mail file path.</p>
+</dd>
+<dt>Returns:</dt><dd><p>tuple: (file_instance, hash_instance) if successful, otherwise (None, None).</p>
+</dd>
+</dl>
+</dd></dl>
+
+<dl class="py method">
+<dt class="sig sig-object py" id="file_process.file_utils.file_handler.FileHandler.hash_file">
+<em class="property"><span class="k"><span class="pre">static</span></span><span class="w"> </span></em><span class="sig-name descname"><span class="pre">hash_file</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">file_path</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">str</span></span></em><span class="sig-paren">)</span> <span class="sig-return"><span class="sig-return-icon">&#x2192;</span> <span class="sig-return-typehint"><span class="pre">str</span><span class="w"> </span><span class="p"><span class="pre">|</span></span><span class="w"> </span><span class="pre">None</span></span></span><a class="reference internal" href="../_modules/file_process/file_utils/file_handler.html#FileHandler.hash_file"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#file_process.file_utils.file_handler.FileHandler.hash_file" title="Link to this definition"></a></dt>
+<dd><p>Calculate the SHA-256 hash of a file.</p>
+<dl class="simple">
+<dt>Args:</dt><dd><p>file_path (str): The path to the file.</p>
+</dd>
+<dt>Returns:</dt><dd><dl class="simple">
+<dt>str: The hexadecimal SHA-256 digest of the file,</dt><dd><p>or None if the file is not found.</p>
+</dd>
+</dl>
+</dd>
+</dl>
+</dd></dl>
+
+</dd></dl>
+
+</section>
+
+
+           </div>
+          </div>
+          <footer><div class="rst-footer-buttons" role="navigation" aria-label="Footer">
+        <a href="email_process_core.html" class="btn btn-neutral float-left" title="Email Process module" accesskey="p" rel="prev"><span class="fa fa-arrow-circle-left" aria-hidden="true"></span> Previous</a>
+        <a href="hash_process_core.html" class="btn btn-neutral float-right" title="Hash Process module" accesskey="n" rel="next">Next <span class="fa fa-arrow-circle-right" aria-hidden="true"></span></a>
+    </div>
+
+  <hr/>
+
+  <div role="contentinfo">
+    <p>&#169; Copyright 2025, Theo Bhang, Esteban Crispel.</p>
+  </div>
+
+  Built with <a href="https://www.sphinx-doc.org/">Sphinx</a> using a
+    <a href="https://github.com/readthedocs/sphinx_rtd_theme">theme</a>
+    provided by <a href="https://readthedocs.org">Read the Docs</a>.
+   
+
+</footer>
+        </div>
+      </div>
+    </section>
+  </div>
+  <script>
+      jQuery(function () {
+          SphinxRtdTheme.Navigation.enable(true);
+      });
+  </script> 
+
+</body>
+</html>

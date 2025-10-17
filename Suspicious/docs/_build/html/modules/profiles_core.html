@@ -1,0 +1,716 @@
+
+
+<!DOCTYPE html>
+<html class="writer-html5" lang="en" data-content_root="../">
+<head>
+  <meta charset="utf-8" /><meta name="viewport" content="width=device-width, initial-scale=1" />
+
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Profiles module &mdash; Suspicious 1.0.0 documentation</title>
+      <link rel="stylesheet" type="text/css" href="../_static/pygments.css?v=b86133f3" />
+      <link rel="stylesheet" type="text/css" href="../_static/css/theme.css?v=e59714d7" />
+
+  
+      <script src="../_static/jquery.js?v=5d32c60e"></script>
+      <script src="../_static/_sphinx_javascript_frameworks_compat.js?v=2cd50e6c"></script>
+      <script src="../_static/documentation_options.js?v=8d563738"></script>
+      <script src="../_static/doctools.js?v=9bcbadda"></script>
+      <script src="../_static/sphinx_highlight.js?v=dc90522c"></script>
+    <script src="../_static/js/theme.js"></script>
+    <link rel="index" title="Index" href="../genindex.html" />
+    <link rel="search" title="Search" href="../search.html" />
+    <link rel="next" title="Score Process module" href="score_process_core.html" />
+    <link rel="prev" title="Mail Feeder module" href="mail_feeder_core.html" /> 
+</head>
+
+<body class="wy-body-for-nav"> 
+  <div class="wy-grid-for-nav">
+    <nav data-toggle="wy-nav-shift" class="wy-nav-side">
+      <div class="wy-side-scroll">
+        <div class="wy-side-nav-search" >
+
+          
+          
+          <a href="../index.html" class="icon icon-home">
+            Suspicious
+          </a>
+<div role="search">
+  <form id="rtd-search-form" class="wy-form" action="../search.html" method="get">
+    <input type="text" name="q" placeholder="Search docs" aria-label="Search docs" />
+    <input type="hidden" name="check_keywords" value="yes" />
+    <input type="hidden" name="area" value="default" />
+  </form>
+</div>
+        </div><div class="wy-menu wy-menu-vertical" data-spy="affix" role="navigation" aria-label="Navigation menu">
+              <p class="caption" role="heading"><span class="caption-text">Contents:</span></p>
+<ul class="current">
+<li class="toctree-l1 current"><a class="reference internal" href="index.html">Modules (API Reference)</a><ul class="current">
+<li class="toctree-l2"><a class="reference internal" href="case_handler_core.html">case_handler_core module</a></li>
+<li class="toctree-l2"><a class="reference internal" href="cortex_job_core.html">cortex_job_core module</a></li>
+<li class="toctree-l2"><a class="reference internal" href="dashboard_core.html">Dashboard module</a></li>
+<li class="toctree-l2"><a class="reference internal" href="domain_process_core.html">Domain Process Module</a></li>
+<li class="toctree-l2"><a class="reference internal" href="email_process_core.html">Email Process module</a></li>
+<li class="toctree-l2"><a class="reference internal" href="file_process_core.html">File Process module</a></li>
+<li class="toctree-l2"><a class="reference internal" href="hash_process_core.html">Hash Process module</a></li>
+<li class="toctree-l2"><a class="reference internal" href="ip_process_core.html">IP Process module</a></li>
+<li class="toctree-l2"><a class="reference internal" href="mail_feeder_core.html">Mail Feeder module</a></li>
+<li class="toctree-l2 current"><a class="current reference internal" href="#">Profiles module</a><ul>
+<li class="toctree-l3"><a class="reference internal" href="#profiles.models.CISOProfile"><code class="docutils literal notranslate"><span class="pre">CISOProfile</span></code></a><ul>
+<li class="toctree-l4"><a class="reference internal" href="#profiles.models.CISOProfile.DoesNotExist"><code class="docutils literal notranslate"><span class="pre">CISOProfile.DoesNotExist</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="#profiles.models.CISOProfile.MultipleObjectsReturned"><code class="docutils literal notranslate"><span class="pre">CISOProfile.MultipleObjectsReturned</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="#profiles.models.CISOProfile.country"><code class="docutils literal notranslate"><span class="pre">CISOProfile.country</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="#profiles.models.CISOProfile.creation_date"><code class="docutils literal notranslate"><span class="pre">CISOProfile.creation_date</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="#profiles.models.CISOProfile.function"><code class="docutils literal notranslate"><span class="pre">CISOProfile.function</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="#profiles.models.CISOProfile.gbu"><code class="docutils literal notranslate"><span class="pre">CISOProfile.gbu</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="#profiles.models.CISOProfile.get_next_by_creation_date"><code class="docutils literal notranslate"><span class="pre">CISOProfile.get_next_by_creation_date()</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="#profiles.models.CISOProfile.get_next_by_last_update"><code class="docutils literal notranslate"><span class="pre">CISOProfile.get_next_by_last_update()</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="#profiles.models.CISOProfile.get_previous_by_creation_date"><code class="docutils literal notranslate"><span class="pre">CISOProfile.get_previous_by_creation_date()</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="#profiles.models.CISOProfile.get_previous_by_last_update"><code class="docutils literal notranslate"><span class="pre">CISOProfile.get_previous_by_last_update()</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="#profiles.models.CISOProfile.get_theme_display"><code class="docutils literal notranslate"><span class="pre">CISOProfile.get_theme_display()</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="#profiles.models.CISOProfile.id"><code class="docutils literal notranslate"><span class="pre">CISOProfile.id</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="#profiles.models.CISOProfile.last_update"><code class="docutils literal notranslate"><span class="pre">CISOProfile.last_update</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="#profiles.models.CISOProfile.objects"><code class="docutils literal notranslate"><span class="pre">CISOProfile.objects</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="#profiles.models.CISOProfile.region"><code class="docutils literal notranslate"><span class="pre">CISOProfile.region</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="#profiles.models.CISOProfile.scope"><code class="docutils literal notranslate"><span class="pre">CISOProfile.scope</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="#profiles.models.CISOProfile.theme"><code class="docutils literal notranslate"><span class="pre">CISOProfile.theme</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="#profiles.models.CISOProfile.user"><code class="docutils literal notranslate"><span class="pre">CISOProfile.user</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="#profiles.models.CISOProfile.user_id"><code class="docutils literal notranslate"><span class="pre">CISOProfile.user_id</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="#profiles.models.CISOProfile.wants_acknowledgement"><code class="docutils literal notranslate"><span class="pre">CISOProfile.wants_acknowledgement</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="#profiles.models.CISOProfile.wants_results"><code class="docutils literal notranslate"><span class="pre">CISOProfile.wants_results</span></code></a></li>
+</ul>
+</li>
+<li class="toctree-l3"><a class="reference internal" href="#profiles.models.Theme"><code class="docutils literal notranslate"><span class="pre">Theme</span></code></a><ul>
+<li class="toctree-l4"><a class="reference internal" href="#profiles.models.Theme.DARK"><code class="docutils literal notranslate"><span class="pre">Theme.DARK</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="#profiles.models.Theme.DEFAULT"><code class="docutils literal notranslate"><span class="pre">Theme.DEFAULT</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="#profiles.models.Theme.LIGHT"><code class="docutils literal notranslate"><span class="pre">Theme.LIGHT</span></code></a></li>
+</ul>
+</li>
+<li class="toctree-l3"><a class="reference internal" href="#profiles.models.UserProfile"><code class="docutils literal notranslate"><span class="pre">UserProfile</span></code></a><ul>
+<li class="toctree-l4"><a class="reference internal" href="#profiles.models.UserProfile.DoesNotExist"><code class="docutils literal notranslate"><span class="pre">UserProfile.DoesNotExist</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="#profiles.models.UserProfile.MultipleObjectsReturned"><code class="docutils literal notranslate"><span class="pre">UserProfile.MultipleObjectsReturned</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="#profiles.models.UserProfile.country"><code class="docutils literal notranslate"><span class="pre">UserProfile.country</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="#profiles.models.UserProfile.creation_date"><code class="docutils literal notranslate"><span class="pre">UserProfile.creation_date</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="#profiles.models.UserProfile.function"><code class="docutils literal notranslate"><span class="pre">UserProfile.function</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="#profiles.models.UserProfile.gbu"><code class="docutils literal notranslate"><span class="pre">UserProfile.gbu</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="#profiles.models.UserProfile.get_next_by_creation_date"><code class="docutils literal notranslate"><span class="pre">UserProfile.get_next_by_creation_date()</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="#profiles.models.UserProfile.get_next_by_last_update"><code class="docutils literal notranslate"><span class="pre">UserProfile.get_next_by_last_update()</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="#profiles.models.UserProfile.get_previous_by_creation_date"><code class="docutils literal notranslate"><span class="pre">UserProfile.get_previous_by_creation_date()</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="#profiles.models.UserProfile.get_previous_by_last_update"><code class="docutils literal notranslate"><span class="pre">UserProfile.get_previous_by_last_update()</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="#profiles.models.UserProfile.get_theme_display"><code class="docutils literal notranslate"><span class="pre">UserProfile.get_theme_display()</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="#profiles.models.UserProfile.id"><code class="docutils literal notranslate"><span class="pre">UserProfile.id</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="#profiles.models.UserProfile.last_update"><code class="docutils literal notranslate"><span class="pre">UserProfile.last_update</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="#profiles.models.UserProfile.objects"><code class="docutils literal notranslate"><span class="pre">UserProfile.objects</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="#profiles.models.UserProfile.region"><code class="docutils literal notranslate"><span class="pre">UserProfile.region</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="#profiles.models.UserProfile.theme"><code class="docutils literal notranslate"><span class="pre">UserProfile.theme</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="#profiles.models.UserProfile.user"><code class="docutils literal notranslate"><span class="pre">UserProfile.user</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="#profiles.models.UserProfile.user_id"><code class="docutils literal notranslate"><span class="pre">UserProfile.user_id</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="#profiles.models.UserProfile.wants_acknowledgement"><code class="docutils literal notranslate"><span class="pre">UserProfile.wants_acknowledgement</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="#profiles.models.UserProfile.wants_results"><code class="docutils literal notranslate"><span class="pre">UserProfile.wants_results</span></code></a></li>
+</ul>
+</li>
+<li class="toctree-l3"><a class="reference internal" href="#profiles.profiles_utils.ciso.generate_message"><code class="docutils literal notranslate"><span class="pre">generate_message()</span></code></a></li>
+<li class="toctree-l3"><a class="reference internal" href="#profiles.profiles_utils.ciso.handle_csv_file"><code class="docutils literal notranslate"><span class="pre">handle_csv_file()</span></code></a></li>
+<li class="toctree-l3"><a class="reference internal" href="#profiles.profiles_utils.ciso.handle_json_file"><code class="docutils literal notranslate"><span class="pre">handle_json_file()</span></code></a></li>
+<li class="toctree-l3"><a class="reference internal" href="#profiles.profiles_utils.ciso.handle_txt_file"><code class="docutils literal notranslate"><span class="pre">handle_txt_file()</span></code></a></li>
+<li class="toctree-l3"><a class="reference internal" href="#profiles.profiles_utils.ciso.process_cisos"><code class="docutils literal notranslate"><span class="pre">process_cisos()</span></code></a></li>
+<li class="toctree-l3"><a class="reference internal" href="#profiles.profiles_utils.ciso.search_ldap_server"><code class="docutils literal notranslate"><span class="pre">search_ldap_server()</span></code></a></li>
+<li class="toctree-l3"><a class="reference internal" href="#profiles.profiles_utils.ldap.Ldap"><code class="docutils literal notranslate"><span class="pre">Ldap</span></code></a><ul>
+<li class="toctree-l4"><a class="reference internal" href="#profiles.profiles_utils.ldap.Ldap.add_user_to_group"><code class="docutils literal notranslate"><span class="pre">Ldap.add_user_to_group()</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="#profiles.profiles_utils.ldap.Ldap.create_ciso_profile"><code class="docutils literal notranslate"><span class="pre">Ldap.create_ciso_profile()</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="#profiles.profiles_utils.ldap.Ldap.create_user"><code class="docutils literal notranslate"><span class="pre">Ldap.create_user()</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="#profiles.profiles_utils.ldap.Ldap.create_user_profile"><code class="docutils literal notranslate"><span class="pre">Ldap.create_user_profile()</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="#profiles.profiles_utils.ldap.Ldap.get_search_results"><code class="docutils literal notranslate"><span class="pre">Ldap.get_search_results()</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="#profiles.profiles_utils.ldap.Ldap.initialize_ldap"><code class="docutils literal notranslate"><span class="pre">Ldap.initialize_ldap()</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="#profiles.profiles_utils.ldap.Ldap.process_search_results"><code class="docutils literal notranslate"><span class="pre">Ldap.process_search_results()</span></code></a></li>
+</ul>
+</li>
+<li class="toctree-l3"><a class="reference internal" href="#profiles.views.logout_view"><code class="docutils literal notranslate"><span class="pre">logout_view()</span></code></a></li>
+<li class="toctree-l3"><a class="reference internal" href="#profiles.views.profile"><code class="docutils literal notranslate"><span class="pre">profile()</span></code></a></li>
+<li class="toctree-l3"><a class="reference internal" href="#profiles.views.update_appearance"><code class="docutils literal notranslate"><span class="pre">update_appearance()</span></code></a></li>
+<li class="toctree-l3"><a class="reference internal" href="#profiles.views.update_preferences"><code class="docutils literal notranslate"><span class="pre">update_preferences()</span></code></a></li>
+</ul>
+</li>
+<li class="toctree-l2"><a class="reference internal" href="score_process_core.html">Score Process module</a></li>
+<li class="toctree-l2"><a class="reference internal" href="settings_core.html">settings_core module</a></li>
+<li class="toctree-l2"><a class="reference internal" href="tasp_core.html">tasp_core module</a></li>
+<li class="toctree-l2"><a class="reference internal" href="url_process_core.html">url_process_core module</a></li>
+</ul>
+</li>
+</ul>
+
+        </div>
+      </div>
+    </nav>
+
+    <section data-toggle="wy-nav-shift" class="wy-nav-content-wrap"><nav class="wy-nav-top" aria-label="Mobile navigation menu" >
+          <i data-toggle="wy-nav-top" class="fa fa-bars"></i>
+          <a href="../index.html">Suspicious</a>
+      </nav>
+
+      <div class="wy-nav-content">
+        <div class="rst-content">
+          <div role="navigation" aria-label="Page navigation">
+  <ul class="wy-breadcrumbs">
+      <li><a href="../index.html" class="icon icon-home" aria-label="Home"></a></li>
+          <li class="breadcrumb-item"><a href="index.html">Modules (API Reference)</a></li>
+      <li class="breadcrumb-item active">Profiles module</li>
+      <li class="wy-breadcrumbs-aside">
+            <a href="../_sources/modules/profiles_core.rst.txt" rel="nofollow"> View page source</a>
+      </li>
+  </ul>
+  <hr/>
+</div>
+          <div role="main" class="document" itemscope="itemscope" itemtype="http://schema.org/Article">
+           <div itemprop="articleBody">
+             
+  <section id="module-profiles.models">
+<span id="profiles-module"></span><h1>Profiles module<a class="headerlink" href="#module-profiles.models" title="Link to this heading"></a></h1>
+<dl class="py class">
+<dt class="sig sig-object py" id="profiles.models.CISOProfile">
+<em class="property"><span class="k"><span class="pre">class</span></span><span class="w"> </span></em><span class="sig-prename descclassname"><span class="pre">profiles.models.</span></span><span class="sig-name descname"><span class="pre">CISOProfile</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">id</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">user</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">function</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">gbu</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">country</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">region</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">scope</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">wants_acknowledgement</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">wants_results</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">theme</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">creation_date</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">last_update</span></span></em><span class="sig-paren">)</span><a class="reference internal" href="../_modules/profiles/models.html#CISOProfile"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#profiles.models.CISOProfile" title="Link to this definition"></a></dt>
+<dd><p>Bases: <code class="xref py py-class docutils literal notranslate"><span class="pre">Model</span></code></p>
+<dl class="py exception">
+<dt class="sig sig-object py" id="profiles.models.CISOProfile.DoesNotExist">
+<em class="property"><span class="k"><span class="pre">exception</span></span><span class="w"> </span></em><span class="sig-name descname"><span class="pre">DoesNotExist</span></span><a class="headerlink" href="#profiles.models.CISOProfile.DoesNotExist" title="Link to this definition"></a></dt>
+<dd><p>Bases: <code class="xref py py-class docutils literal notranslate"><span class="pre">ObjectDoesNotExist</span></code></p>
+</dd></dl>
+
+<dl class="py exception">
+<dt class="sig sig-object py" id="profiles.models.CISOProfile.MultipleObjectsReturned">
+<em class="property"><span class="k"><span class="pre">exception</span></span><span class="w"> </span></em><span class="sig-name descname"><span class="pre">MultipleObjectsReturned</span></span><a class="headerlink" href="#profiles.models.CISOProfile.MultipleObjectsReturned" title="Link to this definition"></a></dt>
+<dd><p>Bases: <code class="xref py py-class docutils literal notranslate"><span class="pre">MultipleObjectsReturned</span></code></p>
+</dd></dl>
+
+<dl class="py attribute">
+<dt class="sig sig-object py" id="profiles.models.CISOProfile.country">
+<span class="sig-name descname"><span class="pre">country</span></span><a class="headerlink" href="#profiles.models.CISOProfile.country" title="Link to this definition"></a></dt>
+<dd><p>A wrapper for a deferred-loading field. When the value is read from this
+object the first time, the query is executed.</p>
+</dd></dl>
+
+<dl class="py attribute">
+<dt class="sig sig-object py" id="profiles.models.CISOProfile.creation_date">
+<span class="sig-name descname"><span class="pre">creation_date</span></span><a class="headerlink" href="#profiles.models.CISOProfile.creation_date" title="Link to this definition"></a></dt>
+<dd><p>A wrapper for a deferred-loading field. When the value is read from this
+object the first time, the query is executed.</p>
+</dd></dl>
+
+<dl class="py attribute">
+<dt class="sig sig-object py" id="profiles.models.CISOProfile.function">
+<span class="sig-name descname"><span class="pre">function</span></span><a class="headerlink" href="#profiles.models.CISOProfile.function" title="Link to this definition"></a></dt>
+<dd><p>A wrapper for a deferred-loading field. When the value is read from this
+object the first time, the query is executed.</p>
+</dd></dl>
+
+<dl class="py attribute">
+<dt class="sig sig-object py" id="profiles.models.CISOProfile.gbu">
+<span class="sig-name descname"><span class="pre">gbu</span></span><a class="headerlink" href="#profiles.models.CISOProfile.gbu" title="Link to this definition"></a></dt>
+<dd><p>A wrapper for a deferred-loading field. When the value is read from this
+object the first time, the query is executed.</p>
+</dd></dl>
+
+<dl class="py method">
+<dt class="sig sig-object py" id="profiles.models.CISOProfile.get_next_by_creation_date">
+<span class="sig-name descname"><span class="pre">get_next_by_creation_date</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">*</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">field=&lt;django.db.models.fields.DateTimeField:</span> <span class="pre">creation_date&gt;</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">is_next=True</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">**kwargs</span></span></em><span class="sig-paren">)</span><a class="headerlink" href="#profiles.models.CISOProfile.get_next_by_creation_date" title="Link to this definition"></a></dt>
+<dd></dd></dl>
+
+<dl class="py method">
+<dt class="sig sig-object py" id="profiles.models.CISOProfile.get_next_by_last_update">
+<span class="sig-name descname"><span class="pre">get_next_by_last_update</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">*</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">field=&lt;django.db.models.fields.DateTimeField:</span> <span class="pre">last_update&gt;</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">is_next=True</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">**kwargs</span></span></em><span class="sig-paren">)</span><a class="headerlink" href="#profiles.models.CISOProfile.get_next_by_last_update" title="Link to this definition"></a></dt>
+<dd></dd></dl>
+
+<dl class="py method">
+<dt class="sig sig-object py" id="profiles.models.CISOProfile.get_previous_by_creation_date">
+<span class="sig-name descname"><span class="pre">get_previous_by_creation_date</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">*</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">field=&lt;django.db.models.fields.DateTimeField:</span> <span class="pre">creation_date&gt;</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">is_next=False</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">**kwargs</span></span></em><span class="sig-paren">)</span><a class="headerlink" href="#profiles.models.CISOProfile.get_previous_by_creation_date" title="Link to this definition"></a></dt>
+<dd></dd></dl>
+
+<dl class="py method">
+<dt class="sig sig-object py" id="profiles.models.CISOProfile.get_previous_by_last_update">
+<span class="sig-name descname"><span class="pre">get_previous_by_last_update</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">*</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">field=&lt;django.db.models.fields.DateTimeField:</span> <span class="pre">last_update&gt;</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">is_next=False</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">**kwargs</span></span></em><span class="sig-paren">)</span><a class="headerlink" href="#profiles.models.CISOProfile.get_previous_by_last_update" title="Link to this definition"></a></dt>
+<dd></dd></dl>
+
+<dl class="py method">
+<dt class="sig sig-object py" id="profiles.models.CISOProfile.get_theme_display">
+<span class="sig-name descname"><span class="pre">get_theme_display</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">*</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">field=&lt;django.db.models.fields.CharField:</span> <span class="pre">theme&gt;</span></span></em><span class="sig-paren">)</span><a class="headerlink" href="#profiles.models.CISOProfile.get_theme_display" title="Link to this definition"></a></dt>
+<dd></dd></dl>
+
+<dl class="py attribute">
+<dt class="sig sig-object py" id="profiles.models.CISOProfile.id">
+<span class="sig-name descname"><span class="pre">id</span></span><a class="headerlink" href="#profiles.models.CISOProfile.id" title="Link to this definition"></a></dt>
+<dd><p>A wrapper for a deferred-loading field. When the value is read from this
+object the first time, the query is executed.</p>
+</dd></dl>
+
+<dl class="py attribute">
+<dt class="sig sig-object py" id="profiles.models.CISOProfile.last_update">
+<span class="sig-name descname"><span class="pre">last_update</span></span><a class="headerlink" href="#profiles.models.CISOProfile.last_update" title="Link to this definition"></a></dt>
+<dd><p>A wrapper for a deferred-loading field. When the value is read from this
+object the first time, the query is executed.</p>
+</dd></dl>
+
+<dl class="py attribute">
+<dt class="sig sig-object py" id="profiles.models.CISOProfile.objects">
+<span class="sig-name descname"><span class="pre">objects</span></span><em class="property"><span class="w"> </span><span class="p"><span class="pre">=</span></span><span class="w"> </span><span class="pre">&lt;django.db.models.manager.Manager</span> <span class="pre">object&gt;</span></em><a class="headerlink" href="#profiles.models.CISOProfile.objects" title="Link to this definition"></a></dt>
+<dd></dd></dl>
+
+<dl class="py attribute">
+<dt class="sig sig-object py" id="profiles.models.CISOProfile.region">
+<span class="sig-name descname"><span class="pre">region</span></span><a class="headerlink" href="#profiles.models.CISOProfile.region" title="Link to this definition"></a></dt>
+<dd><p>A wrapper for a deferred-loading field. When the value is read from this
+object the first time, the query is executed.</p>
+</dd></dl>
+
+<dl class="py attribute">
+<dt class="sig sig-object py" id="profiles.models.CISOProfile.scope">
+<span class="sig-name descname"><span class="pre">scope</span></span><a class="headerlink" href="#profiles.models.CISOProfile.scope" title="Link to this definition"></a></dt>
+<dd><p>A wrapper for a deferred-loading field. When the value is read from this
+object the first time, the query is executed.</p>
+</dd></dl>
+
+<dl class="py attribute">
+<dt class="sig sig-object py" id="profiles.models.CISOProfile.theme">
+<span class="sig-name descname"><span class="pre">theme</span></span><a class="headerlink" href="#profiles.models.CISOProfile.theme" title="Link to this definition"></a></dt>
+<dd><p>A wrapper for a deferred-loading field. When the value is read from this
+object the first time, the query is executed.</p>
+</dd></dl>
+
+<dl class="py attribute">
+<dt class="sig sig-object py" id="profiles.models.CISOProfile.user">
+<span class="sig-name descname"><span class="pre">user</span></span><a class="headerlink" href="#profiles.models.CISOProfile.user" title="Link to this definition"></a></dt>
+<dd><p>Accessor to the related object on the forward side of a one-to-one relation.</p>
+<p>In the example:</p>
+<div class="highlight-default notranslate"><div class="highlight"><pre><span></span><span class="k">class</span><span class="w"> </span><span class="nc">Restaurant</span><span class="p">(</span><span class="n">Model</span><span class="p">):</span>
+    <span class="n">place</span> <span class="o">=</span> <span class="n">OneToOneField</span><span class="p">(</span><span class="n">Place</span><span class="p">,</span> <span class="n">related_name</span><span class="o">=</span><span class="s1">&#39;restaurant&#39;</span><span class="p">)</span>
+</pre></div>
+</div>
+<p><code class="docutils literal notranslate"><span class="pre">Restaurant.place</span></code> is a <code class="docutils literal notranslate"><span class="pre">ForwardOneToOneDescriptor</span></code> instance.</p>
+</dd></dl>
+
+<dl class="py attribute">
+<dt class="sig sig-object py" id="profiles.models.CISOProfile.user_id">
+<span class="sig-name descname"><span class="pre">user_id</span></span><a class="headerlink" href="#profiles.models.CISOProfile.user_id" title="Link to this definition"></a></dt>
+<dd></dd></dl>
+
+<dl class="py attribute">
+<dt class="sig sig-object py" id="profiles.models.CISOProfile.wants_acknowledgement">
+<span class="sig-name descname"><span class="pre">wants_acknowledgement</span></span><a class="headerlink" href="#profiles.models.CISOProfile.wants_acknowledgement" title="Link to this definition"></a></dt>
+<dd><p>A wrapper for a deferred-loading field. When the value is read from this
+object the first time, the query is executed.</p>
+</dd></dl>
+
+<dl class="py attribute">
+<dt class="sig sig-object py" id="profiles.models.CISOProfile.wants_results">
+<span class="sig-name descname"><span class="pre">wants_results</span></span><a class="headerlink" href="#profiles.models.CISOProfile.wants_results" title="Link to this definition"></a></dt>
+<dd><p>A wrapper for a deferred-loading field. When the value is read from this
+object the first time, the query is executed.</p>
+</dd></dl>
+
+</dd></dl>
+
+<dl class="py class">
+<dt class="sig sig-object py" id="profiles.models.Theme">
+<em class="property"><span class="k"><span class="pre">class</span></span><span class="w"> </span></em><span class="sig-prename descclassname"><span class="pre">profiles.models.</span></span><span class="sig-name descname"><span class="pre">Theme</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">value</span></span></em><span class="sig-paren">)</span><a class="reference internal" href="../_modules/profiles/models.html#Theme"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#profiles.models.Theme" title="Link to this definition"></a></dt>
+<dd><p>Bases: <code class="xref py py-class docutils literal notranslate"><span class="pre">TextChoices</span></code></p>
+<p>Enumeration of possible suspicious theme.</p>
+<dl class="py attribute">
+<dt class="sig sig-object py" id="profiles.models.Theme.DARK">
+<span class="sig-name descname"><span class="pre">DARK</span></span><em class="property"><span class="w"> </span><span class="p"><span class="pre">=</span></span><span class="w"> </span><span class="pre">'dark'</span></em><a class="headerlink" href="#profiles.models.Theme.DARK" title="Link to this definition"></a></dt>
+<dd></dd></dl>
+
+<dl class="py attribute">
+<dt class="sig sig-object py" id="profiles.models.Theme.DEFAULT">
+<span class="sig-name descname"><span class="pre">DEFAULT</span></span><em class="property"><span class="w"> </span><span class="p"><span class="pre">=</span></span><span class="w"> </span><span class="pre">'default'</span></em><a class="headerlink" href="#profiles.models.Theme.DEFAULT" title="Link to this definition"></a></dt>
+<dd></dd></dl>
+
+<dl class="py attribute">
+<dt class="sig sig-object py" id="profiles.models.Theme.LIGHT">
+<span class="sig-name descname"><span class="pre">LIGHT</span></span><em class="property"><span class="w"> </span><span class="p"><span class="pre">=</span></span><span class="w"> </span><span class="pre">'light'</span></em><a class="headerlink" href="#profiles.models.Theme.LIGHT" title="Link to this definition"></a></dt>
+<dd></dd></dl>
+
+</dd></dl>
+
+<dl class="py class">
+<dt class="sig sig-object py" id="profiles.models.UserProfile">
+<em class="property"><span class="k"><span class="pre">class</span></span><span class="w"> </span></em><span class="sig-prename descclassname"><span class="pre">profiles.models.</span></span><span class="sig-name descname"><span class="pre">UserProfile</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">id</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">user</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">function</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">gbu</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">country</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">region</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">wants_acknowledgement</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">wants_results</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">theme</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">creation_date</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">last_update</span></span></em><span class="sig-paren">)</span><a class="reference internal" href="../_modules/profiles/models.html#UserProfile"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#profiles.models.UserProfile" title="Link to this definition"></a></dt>
+<dd><p>Bases: <code class="xref py py-class docutils literal notranslate"><span class="pre">Model</span></code></p>
+<dl class="py exception">
+<dt class="sig sig-object py" id="profiles.models.UserProfile.DoesNotExist">
+<em class="property"><span class="k"><span class="pre">exception</span></span><span class="w"> </span></em><span class="sig-name descname"><span class="pre">DoesNotExist</span></span><a class="headerlink" href="#profiles.models.UserProfile.DoesNotExist" title="Link to this definition"></a></dt>
+<dd><p>Bases: <code class="xref py py-class docutils literal notranslate"><span class="pre">ObjectDoesNotExist</span></code></p>
+</dd></dl>
+
+<dl class="py exception">
+<dt class="sig sig-object py" id="profiles.models.UserProfile.MultipleObjectsReturned">
+<em class="property"><span class="k"><span class="pre">exception</span></span><span class="w"> </span></em><span class="sig-name descname"><span class="pre">MultipleObjectsReturned</span></span><a class="headerlink" href="#profiles.models.UserProfile.MultipleObjectsReturned" title="Link to this definition"></a></dt>
+<dd><p>Bases: <code class="xref py py-class docutils literal notranslate"><span class="pre">MultipleObjectsReturned</span></code></p>
+</dd></dl>
+
+<dl class="py attribute">
+<dt class="sig sig-object py" id="profiles.models.UserProfile.country">
+<span class="sig-name descname"><span class="pre">country</span></span><a class="headerlink" href="#profiles.models.UserProfile.country" title="Link to this definition"></a></dt>
+<dd><p>A wrapper for a deferred-loading field. When the value is read from this
+object the first time, the query is executed.</p>
+</dd></dl>
+
+<dl class="py attribute">
+<dt class="sig sig-object py" id="profiles.models.UserProfile.creation_date">
+<span class="sig-name descname"><span class="pre">creation_date</span></span><a class="headerlink" href="#profiles.models.UserProfile.creation_date" title="Link to this definition"></a></dt>
+<dd><p>A wrapper for a deferred-loading field. When the value is read from this
+object the first time, the query is executed.</p>
+</dd></dl>
+
+<dl class="py attribute">
+<dt class="sig sig-object py" id="profiles.models.UserProfile.function">
+<span class="sig-name descname"><span class="pre">function</span></span><a class="headerlink" href="#profiles.models.UserProfile.function" title="Link to this definition"></a></dt>
+<dd><p>A wrapper for a deferred-loading field. When the value is read from this
+object the first time, the query is executed.</p>
+</dd></dl>
+
+<dl class="py attribute">
+<dt class="sig sig-object py" id="profiles.models.UserProfile.gbu">
+<span class="sig-name descname"><span class="pre">gbu</span></span><a class="headerlink" href="#profiles.models.UserProfile.gbu" title="Link to this definition"></a></dt>
+<dd><p>A wrapper for a deferred-loading field. When the value is read from this
+object the first time, the query is executed.</p>
+</dd></dl>
+
+<dl class="py method">
+<dt class="sig sig-object py" id="profiles.models.UserProfile.get_next_by_creation_date">
+<span class="sig-name descname"><span class="pre">get_next_by_creation_date</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">*</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">field=&lt;django.db.models.fields.DateTimeField:</span> <span class="pre">creation_date&gt;</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">is_next=True</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">**kwargs</span></span></em><span class="sig-paren">)</span><a class="headerlink" href="#profiles.models.UserProfile.get_next_by_creation_date" title="Link to this definition"></a></dt>
+<dd></dd></dl>
+
+<dl class="py method">
+<dt class="sig sig-object py" id="profiles.models.UserProfile.get_next_by_last_update">
+<span class="sig-name descname"><span class="pre">get_next_by_last_update</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">*</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">field=&lt;django.db.models.fields.DateTimeField:</span> <span class="pre">last_update&gt;</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">is_next=True</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">**kwargs</span></span></em><span class="sig-paren">)</span><a class="headerlink" href="#profiles.models.UserProfile.get_next_by_last_update" title="Link to this definition"></a></dt>
+<dd></dd></dl>
+
+<dl class="py method">
+<dt class="sig sig-object py" id="profiles.models.UserProfile.get_previous_by_creation_date">
+<span class="sig-name descname"><span class="pre">get_previous_by_creation_date</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">*</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">field=&lt;django.db.models.fields.DateTimeField:</span> <span class="pre">creation_date&gt;</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">is_next=False</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">**kwargs</span></span></em><span class="sig-paren">)</span><a class="headerlink" href="#profiles.models.UserProfile.get_previous_by_creation_date" title="Link to this definition"></a></dt>
+<dd></dd></dl>
+
+<dl class="py method">
+<dt class="sig sig-object py" id="profiles.models.UserProfile.get_previous_by_last_update">
+<span class="sig-name descname"><span class="pre">get_previous_by_last_update</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">*</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">field=&lt;django.db.models.fields.DateTimeField:</span> <span class="pre">last_update&gt;</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">is_next=False</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">**kwargs</span></span></em><span class="sig-paren">)</span><a class="headerlink" href="#profiles.models.UserProfile.get_previous_by_last_update" title="Link to this definition"></a></dt>
+<dd></dd></dl>
+
+<dl class="py method">
+<dt class="sig sig-object py" id="profiles.models.UserProfile.get_theme_display">
+<span class="sig-name descname"><span class="pre">get_theme_display</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">*</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">field=&lt;django.db.models.fields.CharField:</span> <span class="pre">theme&gt;</span></span></em><span class="sig-paren">)</span><a class="headerlink" href="#profiles.models.UserProfile.get_theme_display" title="Link to this definition"></a></dt>
+<dd></dd></dl>
+
+<dl class="py attribute">
+<dt class="sig sig-object py" id="profiles.models.UserProfile.id">
+<span class="sig-name descname"><span class="pre">id</span></span><a class="headerlink" href="#profiles.models.UserProfile.id" title="Link to this definition"></a></dt>
+<dd><p>A wrapper for a deferred-loading field. When the value is read from this
+object the first time, the query is executed.</p>
+</dd></dl>
+
+<dl class="py attribute">
+<dt class="sig sig-object py" id="profiles.models.UserProfile.last_update">
+<span class="sig-name descname"><span class="pre">last_update</span></span><a class="headerlink" href="#profiles.models.UserProfile.last_update" title="Link to this definition"></a></dt>
+<dd><p>A wrapper for a deferred-loading field. When the value is read from this
+object the first time, the query is executed.</p>
+</dd></dl>
+
+<dl class="py attribute">
+<dt class="sig sig-object py" id="profiles.models.UserProfile.objects">
+<span class="sig-name descname"><span class="pre">objects</span></span><em class="property"><span class="w"> </span><span class="p"><span class="pre">=</span></span><span class="w"> </span><span class="pre">&lt;django.db.models.manager.Manager</span> <span class="pre">object&gt;</span></em><a class="headerlink" href="#profiles.models.UserProfile.objects" title="Link to this definition"></a></dt>
+<dd></dd></dl>
+
+<dl class="py attribute">
+<dt class="sig sig-object py" id="profiles.models.UserProfile.region">
+<span class="sig-name descname"><span class="pre">region</span></span><a class="headerlink" href="#profiles.models.UserProfile.region" title="Link to this definition"></a></dt>
+<dd><p>A wrapper for a deferred-loading field. When the value is read from this
+object the first time, the query is executed.</p>
+</dd></dl>
+
+<dl class="py attribute">
+<dt class="sig sig-object py" id="profiles.models.UserProfile.theme">
+<span class="sig-name descname"><span class="pre">theme</span></span><a class="headerlink" href="#profiles.models.UserProfile.theme" title="Link to this definition"></a></dt>
+<dd><p>A wrapper for a deferred-loading field. When the value is read from this
+object the first time, the query is executed.</p>
+</dd></dl>
+
+<dl class="py attribute">
+<dt class="sig sig-object py" id="profiles.models.UserProfile.user">
+<span class="sig-name descname"><span class="pre">user</span></span><a class="headerlink" href="#profiles.models.UserProfile.user" title="Link to this definition"></a></dt>
+<dd><p>Accessor to the related object on the forward side of a one-to-one relation.</p>
+<p>In the example:</p>
+<div class="highlight-default notranslate"><div class="highlight"><pre><span></span><span class="k">class</span><span class="w"> </span><span class="nc">Restaurant</span><span class="p">(</span><span class="n">Model</span><span class="p">):</span>
+    <span class="n">place</span> <span class="o">=</span> <span class="n">OneToOneField</span><span class="p">(</span><span class="n">Place</span><span class="p">,</span> <span class="n">related_name</span><span class="o">=</span><span class="s1">&#39;restaurant&#39;</span><span class="p">)</span>
+</pre></div>
+</div>
+<p><code class="docutils literal notranslate"><span class="pre">Restaurant.place</span></code> is a <code class="docutils literal notranslate"><span class="pre">ForwardOneToOneDescriptor</span></code> instance.</p>
+</dd></dl>
+
+<dl class="py attribute">
+<dt class="sig sig-object py" id="profiles.models.UserProfile.user_id">
+<span class="sig-name descname"><span class="pre">user_id</span></span><a class="headerlink" href="#profiles.models.UserProfile.user_id" title="Link to this definition"></a></dt>
+<dd></dd></dl>
+
+<dl class="py attribute">
+<dt class="sig sig-object py" id="profiles.models.UserProfile.wants_acknowledgement">
+<span class="sig-name descname"><span class="pre">wants_acknowledgement</span></span><a class="headerlink" href="#profiles.models.UserProfile.wants_acknowledgement" title="Link to this definition"></a></dt>
+<dd><p>A wrapper for a deferred-loading field. When the value is read from this
+object the first time, the query is executed.</p>
+</dd></dl>
+
+<dl class="py attribute">
+<dt class="sig sig-object py" id="profiles.models.UserProfile.wants_results">
+<span class="sig-name descname"><span class="pre">wants_results</span></span><a class="headerlink" href="#profiles.models.UserProfile.wants_results" title="Link to this definition"></a></dt>
+<dd><p>A wrapper for a deferred-loading field. When the value is read from this
+object the first time, the query is executed.</p>
+</dd></dl>
+
+</dd></dl>
+
+<dl class="py function" id="module-profiles.profiles_utils.ciso">
+<dt class="sig sig-object py" id="profiles.profiles_utils.ciso.generate_message">
+<span class="sig-prename descclassname"><span class="pre">profiles.profiles_utils.ciso.</span></span><span class="sig-name descname"><span class="pre">generate_message</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">good_cisos</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">error_cisos</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">count</span></span></em><span class="sig-paren">)</span><a class="reference internal" href="../_modules/profiles/profiles_utils/ciso.html#generate_message"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#profiles.profiles_utils.ciso.generate_message" title="Link to this definition"></a></dt>
+<dd><p>Generate a message based on the CISO profiles added to the database.</p>
+<p>This function takes in three parameters: <cite>good_cisos</cite>, <cite>error_cisos</cite>, and <cite>count</cite>.
+It generates a message based on the number of CISO profiles added to the database and the number of profiles already in the database.</p>
+<dl class="simple">
+<dt>Args:</dt><dd><p>good_cisos (list): A list of CISO profiles that were successfully added to the database.
+error_cisos (list): A list of CISO profiles that were not added to the database.
+count (int): The number of CISO profiles already in the database.</p>
+</dd>
+<dt>Returns:</dt><dd><p>str: A message summarizing the number of CISO profiles added and any errors encountered.</p>
+</dd>
+</dl>
+</dd></dl>
+
+<dl class="py function">
+<dt class="sig sig-object py" id="profiles.profiles_utils.ciso.handle_csv_file">
+<span class="sig-prename descclassname"><span class="pre">profiles.profiles_utils.ciso.</span></span><span class="sig-name descname"><span class="pre">handle_csv_file</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">file</span></span></em><span class="sig-paren">)</span><a class="reference internal" href="../_modules/profiles/profiles_utils/ciso.html#handle_csv_file"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#profiles.profiles_utils.ciso.handle_csv_file" title="Link to this definition"></a></dt>
+<dd><p>Process a CSV file and return its contents as a list of dictionaries.</p>
+<dl class="simple">
+<dt>Args:</dt><dd><p>file (file-like object): The CSV file to be processed.</p>
+</dd>
+<dt>Returns:</dt><dd><p>list: A list of dictionaries representing the rows in the CSV file.</p>
+</dd>
+</dl>
+</dd></dl>
+
+<dl class="py function">
+<dt class="sig sig-object py" id="profiles.profiles_utils.ciso.handle_json_file">
+<span class="sig-prename descclassname"><span class="pre">profiles.profiles_utils.ciso.</span></span><span class="sig-name descname"><span class="pre">handle_json_file</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">file</span></span></em><span class="sig-paren">)</span><a class="reference internal" href="../_modules/profiles/profiles_utils/ciso.html#handle_json_file"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#profiles.profiles_utils.ciso.handle_json_file" title="Link to this definition"></a></dt>
+<dd><p>Read and process a JSON file.</p>
+<dl class="simple">
+<dt>Args:</dt><dd><p>file (file-like object): The JSON file to be processed.</p>
+</dd>
+<dt>Returns:</dt><dd><p>list: A list of ‘ciso’ values extracted from the JSON data.</p>
+</dd>
+</dl>
+</dd></dl>
+
+<dl class="py function">
+<dt class="sig sig-object py" id="profiles.profiles_utils.ciso.handle_txt_file">
+<span class="sig-prename descclassname"><span class="pre">profiles.profiles_utils.ciso.</span></span><span class="sig-name descname"><span class="pre">handle_txt_file</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">file</span></span></em><span class="sig-paren">)</span><a class="reference internal" href="../_modules/profiles/profiles_utils/ciso.html#handle_txt_file"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#profiles.profiles_utils.ciso.handle_txt_file" title="Link to this definition"></a></dt>
+<dd><p>Handles a text file.</p>
+<p>This function takes a file object as input and reads its contents line by line.
+Each line is decoded using UTF-8 encoding and stripped of leading and trailing whitespace.</p>
+<dl class="simple">
+<dt>Args:</dt><dd><p>file (file-like object): The text file to be processed.</p>
+</dd>
+<dt>Returns:</dt><dd><p>list: A list of strings, where each string represents a line from the text file.</p>
+</dd>
+</dl>
+</dd></dl>
+
+<dl class="py function">
+<dt class="sig sig-object py" id="profiles.profiles_utils.ciso.process_cisos">
+<span class="sig-prename descclassname"><span class="pre">profiles.profiles_utils.ciso.</span></span><span class="sig-name descname"><span class="pre">process_cisos</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">cisos</span></span></em><span class="sig-paren">)</span><a class="reference internal" href="../_modules/profiles/profiles_utils/ciso.html#process_cisos"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#profiles.profiles_utils.ciso.process_cisos" title="Link to this definition"></a></dt>
+<dd><p>Process a list of CISOs.</p>
+<p>This function takes a list of CISOs (Chief Information Security Officers) and performs the following actions:
+- Checks if each CISO exists as a user in the User model.
+- If the CISO does not exist, it logs a warning and adds it to the error_cisos list.
+- If the CISO exists, it checks if a CISOProfile already exists for the user.
+- If a CISOProfile does not exist, it searches for the user’s information in an LDAP server and creates a new CISOProfile.
+- If a CISOProfile already exists, it logs a warning and adds the CISO to the error_cisos list.</p>
+<dl class="simple">
+<dt>Args:</dt><dd><p>cisos (list): A list of CISOs.</p>
+</dd>
+<dt>Returns:</dt><dd><dl class="simple">
+<dt>tuple: A tuple containing two lists:</dt><dd><ul class="simple">
+<li><p>good_cisos: A list of CISOs for which CISOProfiles were successfully created.</p></li>
+<li><p>error_cisos: A list of CISOs for which errors occurred during processing.</p></li>
+</ul>
+</dd>
+</dl>
+</dd>
+</dl>
+</dd></dl>
+
+<dl class="py function">
+<dt class="sig sig-object py" id="profiles.profiles_utils.ciso.search_ldap_server">
+<span class="sig-prename descclassname"><span class="pre">profiles.profiles_utils.ciso.</span></span><span class="sig-name descname"><span class="pre">search_ldap_server</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">ldap_server</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">ciso</span></span></em><span class="sig-paren">)</span><a class="reference internal" href="../_modules/profiles/profiles_utils/ciso.html#search_ldap_server"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#profiles.profiles_utils.ciso.search_ldap_server" title="Link to this definition"></a></dt>
+<dd><p>Search the LDAP server for a given CISO.</p>
+<dl class="simple">
+<dt>Args:</dt><dd><p>ldap_server (ldap.LDAPObject): The LDAP server object.
+ciso (str): The CISO to search for.</p>
+</dd>
+<dt>Returns:</dt><dd><p>list: A list of search results matching the given CISO.</p>
+</dd>
+</dl>
+</dd></dl>
+
+<dl class="py class" id="module-profiles.profiles_utils.ldap">
+<dt class="sig sig-object py" id="profiles.profiles_utils.ldap.Ldap">
+<em class="property"><span class="k"><span class="pre">class</span></span><span class="w"> </span></em><span class="sig-prename descclassname"><span class="pre">profiles.profiles_utils.ldap.</span></span><span class="sig-name descname"><span class="pre">Ldap</span></span><a class="reference internal" href="../_modules/profiles/profiles_utils/ldap.html#Ldap"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#profiles.profiles_utils.ldap.Ldap" title="Link to this definition"></a></dt>
+<dd><p>Bases: <code class="xref py py-class docutils literal notranslate"><span class="pre">object</span></code></p>
+<dl class="py method">
+<dt class="sig sig-object py" id="profiles.profiles_utils.ldap.Ldap.add_user_to_group">
+<em class="property"><span class="k"><span class="pre">static</span></span><span class="w"> </span></em><span class="sig-name descname"><span class="pre">add_user_to_group</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">user</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">group_name</span></span></em><span class="sig-paren">)</span><a class="reference internal" href="../_modules/profiles/profiles_utils/ldap.html#Ldap.add_user_to_group"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#profiles.profiles_utils.ldap.Ldap.add_user_to_group" title="Link to this definition"></a></dt>
+<dd></dd></dl>
+
+<dl class="py method">
+<dt class="sig sig-object py" id="profiles.profiles_utils.ldap.Ldap.create_ciso_profile">
+<em class="property"><span class="k"><span class="pre">static</span></span><span class="w"> </span></em><span class="sig-name descname"><span class="pre">create_ciso_profile</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">instance</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">search_results</span></span></em><span class="sig-paren">)</span><a class="reference internal" href="../_modules/profiles/profiles_utils/ldap.html#Ldap.create_ciso_profile"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#profiles.profiles_utils.ldap.Ldap.create_ciso_profile" title="Link to this definition"></a></dt>
+<dd><p>Creates a CISO profile for the given instance.</p>
+<dl class="simple">
+<dt>Args:</dt><dd><p>instance: The instance of the user.
+search_results: The search results from the LDAP server.</p>
+</dd>
+<dt>Returns:</dt><dd><p>None</p>
+</dd>
+</dl>
+</dd></dl>
+
+<dl class="py method">
+<dt class="sig sig-object py" id="profiles.profiles_utils.ldap.Ldap.create_user">
+<em class="property"><span class="k"><span class="pre">static</span></span><span class="w"> </span></em><span class="sig-name descname"><span class="pre">create_user</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">instance</span></span></em><span class="sig-paren">)</span><a class="reference internal" href="../_modules/profiles/profiles_utils/ldap.html#Ldap.create_user"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#profiles.profiles_utils.ldap.Ldap.create_user" title="Link to this definition"></a></dt>
+<dd><p>Creates a user profile for the given instance.</p>
+<dl class="simple">
+<dt>Args:</dt><dd><p>instance: The instance of the user.</p>
+</dd>
+<dt>Returns:</dt><dd><p>None</p>
+</dd>
+</dl>
+</dd></dl>
+
+<dl class="py method">
+<dt class="sig sig-object py" id="profiles.profiles_utils.ldap.Ldap.create_user_profile">
+<em class="property"><span class="k"><span class="pre">static</span></span><span class="w"> </span></em><span class="sig-name descname"><span class="pre">create_user_profile</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">instance</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">search_results</span></span></em><span class="sig-paren">)</span><a class="reference internal" href="../_modules/profiles/profiles_utils/ldap.html#Ldap.create_user_profile"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#profiles.profiles_utils.ldap.Ldap.create_user_profile" title="Link to this definition"></a></dt>
+<dd><p>Creates a user profile for the given instance.</p>
+<dl class="simple">
+<dt>Args:</dt><dd><p>instance: The instance of the user.
+search_results: The search results from the LDAP server.</p>
+</dd>
+<dt>Returns:</dt><dd><p>None</p>
+</dd>
+</dl>
+</dd></dl>
+
+<dl class="py method">
+<dt class="sig sig-object py" id="profiles.profiles_utils.ldap.Ldap.get_search_results">
+<em class="property"><span class="k"><span class="pre">static</span></span><span class="w"> </span></em><span class="sig-name descname"><span class="pre">get_search_results</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">instance</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">ldap_server</span></span></em><span class="sig-paren">)</span><a class="reference internal" href="../_modules/profiles/profiles_utils/ldap.html#Ldap.get_search_results"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#profiles.profiles_utils.ldap.Ldap.get_search_results" title="Link to this definition"></a></dt>
+<dd><p>Get search results from the LDAP server.</p>
+<dl class="simple">
+<dt>Args:</dt><dd><p>instance: The instance of the user.
+ldap_server: The initialized LDAP server.</p>
+</dd>
+<dt>Returns:</dt><dd><p>search_results: The search results from the LDAP server.</p>
+</dd>
+</dl>
+</dd></dl>
+
+<dl class="py method">
+<dt class="sig sig-object py" id="profiles.profiles_utils.ldap.Ldap.initialize_ldap">
+<span class="sig-name descname"><span class="pre">initialize_ldap</span></span><span class="sig-paren">(</span><span class="sig-paren">)</span><a class="reference internal" href="../_modules/profiles/profiles_utils/ldap.html#Ldap.initialize_ldap"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#profiles.profiles_utils.ldap.Ldap.initialize_ldap" title="Link to this definition"></a></dt>
+<dd><p>Initializes and returns an LDAP server connection.</p>
+<p>This method sets the required TLS options, initializes an LDAP server connection,
+and performs a simple bind operation using the provided bind DN and password.</p>
+<dl class="simple">
+<dt>Returns:</dt><dd><p>ldap_server (ldap.LDAPObject): The initialized LDAP server connection.</p>
+</dd>
+<dt>Raises:</dt><dd><p>LDAPError: If there is an error while binding to the LDAP server.</p>
+</dd>
+</dl>
+</dd></dl>
+
+<dl class="py method">
+<dt class="sig sig-object py" id="profiles.profiles_utils.ldap.Ldap.process_search_results">
+<em class="property"><span class="k"><span class="pre">static</span></span><span class="w"> </span></em><span class="sig-name descname"><span class="pre">process_search_results</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">instance</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">search_results</span></span></em><span class="sig-paren">)</span><a class="reference internal" href="../_modules/profiles/profiles_utils/ldap.html#Ldap.process_search_results"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#profiles.profiles_utils.ldap.Ldap.process_search_results" title="Link to this definition"></a></dt>
+<dd><p>Process the search results and create user profiles.</p>
+<dl class="simple">
+<dt>Args:</dt><dd><p>instance: The instance of the user.
+search_results: The search results from the LDAP server.</p>
+</dd>
+<dt>Returns:</dt><dd><p>None</p>
+</dd>
+</dl>
+</dd></dl>
+
+</dd></dl>
+
+<dl class="py function" id="module-profiles.views">
+<dt class="sig sig-object py" id="profiles.views.logout_view">
+<span class="sig-prename descclassname"><span class="pre">profiles.views.</span></span><span class="sig-name descname"><span class="pre">logout_view</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">request</span></span></em><span class="sig-paren">)</span><a class="reference internal" href="../_modules/profiles/views.html#logout_view"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#profiles.views.logout_view" title="Link to this definition"></a></dt>
+<dd><p>Log out the user and redirect to the login page.</p>
+<dl class="simple">
+<dt>Args:</dt><dd><p>request (HttpRequest): The HTTP request object.</p>
+</dd>
+<dt>Returns:</dt><dd><p>HttpResponseRedirect: A redirect response to the login page.</p>
+</dd>
+</dl>
+</dd></dl>
+
+<dl class="py function">
+<dt class="sig sig-object py" id="profiles.views.profile">
+<span class="sig-prename descclassname"><span class="pre">profiles.views.</span></span><span class="sig-name descname"><span class="pre">profile</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">request</span></span></em><span class="sig-paren">)</span><a class="reference internal" href="../_modules/profiles/views.html#profile"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#profiles.views.profile" title="Link to this definition"></a></dt>
+<dd><p>Render the user profile page.</p>
+<dl class="simple">
+<dt>Args:</dt><dd><p>request (HttpRequest): The HTTP request object.</p>
+</dd>
+<dt>Returns:</dt><dd><p>HttpResponse: The rendered profile page.</p>
+</dd>
+</dl>
+</dd></dl>
+
+<dl class="py function">
+<dt class="sig sig-object py" id="profiles.views.update_appearance">
+<span class="sig-prename descclassname"><span class="pre">profiles.views.</span></span><span class="sig-name descname"><span class="pre">update_appearance</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">request</span></span></em><span class="sig-paren">)</span><a class="reference internal" href="../_modules/profiles/views.html#update_appearance"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#profiles.views.update_appearance" title="Link to this definition"></a></dt>
+<dd><p>Update user theme via AJAX (JSON).</p>
+</dd></dl>
+
+<dl class="py function">
+<dt class="sig sig-object py" id="profiles.views.update_preferences">
+<span class="sig-prename descclassname"><span class="pre">profiles.views.</span></span><span class="sig-name descname"><span class="pre">update_preferences</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">request</span></span></em><span class="sig-paren">)</span><a class="reference internal" href="../_modules/profiles/views.html#update_preferences"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#profiles.views.update_preferences" title="Link to this definition"></a></dt>
+<dd><p>Update user preferences via AJAX (JSON).</p>
+</dd></dl>
+
+</section>
+
+
+           </div>
+          </div>
+          <footer><div class="rst-footer-buttons" role="navigation" aria-label="Footer">
+        <a href="mail_feeder_core.html" class="btn btn-neutral float-left" title="Mail Feeder module" accesskey="p" rel="prev"><span class="fa fa-arrow-circle-left" aria-hidden="true"></span> Previous</a>
+        <a href="score_process_core.html" class="btn btn-neutral float-right" title="Score Process module" accesskey="n" rel="next">Next <span class="fa fa-arrow-circle-right" aria-hidden="true"></span></a>
+    </div>
+
+  <hr/>
+
+  <div role="contentinfo">
+    <p>&#169; Copyright 2025, Theo Bhang, Esteban Crispel.</p>
+  </div>
+
+  Built with <a href="https://www.sphinx-doc.org/">Sphinx</a> using a
+    <a href="https://github.com/readthedocs/sphinx_rtd_theme">theme</a>
+    provided by <a href="https://readthedocs.org">Read the Docs</a>.
+   
+
+</footer>
+        </div>
+      </div>
+    </section>
+  </div>
+  <script>
+      jQuery(function () {
+          SphinxRtdTheme.Navigation.enable(true);
+      });
+  </script> 
+
+</body>
+</html>
