@@ -14,7 +14,8 @@ from cortex_job.models import Analyzer, AnalyzerReport
 from dashboard.models import Kpi
 from django.contrib.auth.models import User
 from django.db import transaction
-from mail_feeder.mail_utils.mail import EmailHandler, EmailProcessor
+from mail_feeder.minio_submission.minio import MinioEmailService
+
 from minio import Minio
 from minio.commonconfig import Tags
 from profiles.profiles_utils.ldap import Ldap
@@ -65,8 +66,7 @@ def _process_minio_buckets(base_path):
     if not client:
         return
 
-    email_handler = EmailHandler()
-    processor = EmailProcessor(email_handler)
+    minio_processor = MinioEmailService()
 
     for bucket in client.list_buckets():
         try:
@@ -95,7 +95,7 @@ def _process_minio_buckets(base_path):
             if entry.is_dir() and re.match(r"^\d{12}-[a-f0-9]+$", entry.name):
                 shutil.copy(submission_path, os.path.join(entry.path, "user_submission.eml"))
                 shutil.make_archive(entry.path, 'gztar', entry.path)
-                processor.process_emails_from_minio_workdir(entry.path)
+                minio_processor.process_emails_from_minio_workdir(entry.path)
 
         try:
             tags = Tags.new_bucket_tags()
