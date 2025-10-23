@@ -3,7 +3,7 @@ import logging
 from pathlib import Path
 from typing import Dict, Any
 from profiles.profiles_utils.ldap import Ldap
-from mail_feeder.utils.email_validation.email_validation_service import EmailValidatorService
+from mail_feeder.utils.email_validation.validators import EmailValidatorService
 from mail_feeder.utils.email_validation.models import ConfigModel
 
 logger = logging.getLogger(__name__)
