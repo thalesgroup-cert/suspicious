@@ -6,8 +6,8 @@ from mail_feeder.case_creator.creator import CaseCreatorService
 from mail_feeder.models import MailInfo
 from score_process.score_utils.send_mail import user_acknowledge
 
-from email_info.utils import safe_execution
-from email_info.models import MailInstanceModel, MailInfoData
+from .utils import safe_execution
+from .models import MailInstanceModel, MailInfoData
 
 fetch_mail_logger = logging.getLogger("tasp.cron.fetch_and_process_emails")
 

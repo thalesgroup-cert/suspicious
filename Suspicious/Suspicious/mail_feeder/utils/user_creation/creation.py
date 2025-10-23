@@ -2,8 +2,8 @@ import logging
 from datetime import date
 from django.contrib.auth.models import User
 from django.core.exceptions import ObjectDoesNotExist
-from user_creation.models import UsernameModel
-from user_creation.utils import load_config, initialize_email_validator, create_ldap_user
+from .models import UsernameModel
+from .utils import load_config, initialize_email_validator, create_ldap_user
 from mail_feeder.kpi_updating.kpis import (
     KpiService
 )
