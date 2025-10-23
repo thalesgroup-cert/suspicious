@@ -17,7 +17,7 @@ from hash_process.hash_utils.hash_handler import HashHandler
 from ip_process.ip_utils.ip_handler import IPHandler
 from url_process.url_utils.url_handler import URLHandler
 from hash_process.models import Hash
-from mail_feeder.utils.email_validation.email_validation_service import EmailValidatorService
+from mail_feeder.utils.email_validation.validators import EmailValidatorService
 from mail_feeder.utils.user_creation.creation import UserCreationService
 
 
