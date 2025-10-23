@@ -6,7 +6,7 @@ from typing import Optional
 from mail_feeder.email_parser.parser import parse_email
 from mail_feeder.web_submission.models import WebSubmissionConfig
 
-from mail_feeder.case_creator.creator import CaseCreationService
+from mail_feeder.case_creator.creator import CaseCreatorService
 from mail_feeder.case_creator.models import CaseInputData
 
 from mail_feeder.email_handler.email_handler import EmailHandlerService
@@ -121,7 +121,7 @@ class GlobalSubmissionService:
         Handlers().handle_mail_body(instance, email_id)
 
         related_ids = flatten_id_lists(artifact_ids, attachment_ids)
-        CaseCreationService().create_case(CaseInputData(
+        CaseCreatorService().create_case(CaseInputData(
             mail_instance=instance,
             user=user,
             artifact_ids=related_ids,
