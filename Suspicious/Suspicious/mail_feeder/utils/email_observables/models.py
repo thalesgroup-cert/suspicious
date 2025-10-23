@@ -1,5 +1,6 @@
 from typing import List, Dict, BinaryIO, Optional
-from pydantic import BaseModel, Field, validator
+from pydantic import BaseModel, Field, ConfigDict, validator
+
 
 class Artifact(BaseModel):
     dataType: str = Field(..., description="Type of the observable (e.g., url, domain, ip, etc.)")
@@ -14,5 +15,7 @@ class Artifact(BaseModel):
 
 
 class ObservablesResult(BaseModel):
+    model_config = ConfigDict(arbitrary_types_allowed=True)
+
     artifacts: List[Artifact] = Field(default_factory=list)
     files: Dict[str, BinaryIO] = Field(default_factory=dict)
