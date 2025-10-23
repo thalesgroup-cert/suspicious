@@ -5,8 +5,8 @@ from typing import Dict, Any
 from .models import ObservablesResult
 from .utils import add_artifact, add_file_attachment, process_attachments
 from mail_feeder.mail_utils.meioc import email_analysis
-from mail_feeder.process_artifacts.artifacts import ArtifactService
-from mail_feeder.process_attachments.attachments import AttachmentService
+from mail_feeder.utils.process_artifacts.artifacts import ArtifactService
+from mail_feeder.utils.process_attachments.attachments import AttachmentService
 
 FILE_TEMP_PATH = "/tmp/files"
 logger = logging.getLogger("email_observables.extract")
