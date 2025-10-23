@@ -17,16 +17,4 @@ def safe_execution(context: str):
         raise
 
 
-def extract_email_address(from_header: str) -> Optional[str]:
-    """
-    Parses an email address from the 'From' header.
 
-    Args:
-        from_header: Raw string from the 'From' header.
-
-    Returns:
-        Parsed email address or None if invalid.
-    """
-    from email.utils import parseaddr
-    _, email_addr = parseaddr(from_header)
-    return email_addr if email_addr else None

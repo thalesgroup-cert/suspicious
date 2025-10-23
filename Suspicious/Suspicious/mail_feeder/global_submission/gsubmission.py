@@ -1,20 +1,10 @@
 import os
 import email
 import logging
-from typing import Optional, Tuple
+from typing import Optional
 
-from mail_feeder.models import MailArchive, MailArtifact, MailAttachment
-from mail_feeder.job_handler.artifacts.artifacts import ArtifactJobLauncherService
-from mail_feeder.job_handler.attachments.attachments import AttachmentJobLauncherService
-from cortex_job.cortex_utils.cortex_and_job_management import CortexJob
-from file_process.file_utils.file_handler import FileHandler
-
-from Suspicious.Suspicious.mail_feeder.email_parser.parser import parse_email
-from mail_feeder.web_submission.web import WebSubmissionService
+from mail_feeder.email_parser.parser import parse_email
 from mail_feeder.web_submission.models import WebSubmissionConfig
-
-from mail_feeder.minio_submission.minio import MinioEmailService
-from mail_feeder.mail_utils.mail_handler import MailHandler
 
 from mail_feeder.case_creator.creator import CaseCreationService
 from mail_feeder.case_creator.models import CaseInputData
@@ -26,13 +16,13 @@ from mail_feeder.email_info.email_info import MailInfoService
 from mail_feeder.utils.user_creation.creation import UserCreationService
 
 
-from .models import MailSubmissionData, ArtifactResult
-from .utils import safe_execution, flatten_id_lists
+from .models import MailSubmissionData
+from .utils import safe_execution, flatten_id_lists, extract_email_address
+from .handlers import Handlers
 
 
 logger = logging.getLogger("global_submissions")
 fetch_mail_logger = logging.getLogger("tasp.cron.fetch_and_process_emails")
-
 
 class GlobalSubmissionService:
     """
@@ -60,15 +50,55 @@ class GlobalSubmissionService:
 
             # Handle post-processing based on submission type
             if submission.is_submitted:
-                WebSubmissionService().finalize_submission(instance, WebSubmissionConfig(user_email=submission.user, workdir=submission.workdir))
+                self.finalize_submission(instance, WebSubmissionConfig(user_email=submission.user, workdir=submission.workdir))
             else:
-                MinioEmailService()._handle_instance_for_minio(instance, submission.email_id, submission.workdir)
+                self._handle_instance_for_minio(instance, submission.email_id, submission.workdir)
             
             MailInfoService().create_mail_info(instance)
             return instance
 
+    def finalize_submission(self, instance, config: WebSubmissionConfig):
+        """
+        Finalize a single email instance submitted via web.
+        """
+        email_id = os.path.basename(config.workdir)
+
+        with safe_execution(f"finalizing web submission {email_id}"):
+            instance.reportedBy = config.user_email
+            instance.save()
+
+            mail_zip = self._get_mail_zip_path(config.workdir, email_id)
+            self._handle_common_instance_tasks(instance, email_id, mail_zip)
+            fetch_mail_logger.info(f"Finalized web submission for email_id={email_id}")
+
     def _get_mail_zip_path(self, workdir: str, email_id: str) -> str:
         return os.path.join(os.path.dirname(workdir), f"{email_id}.tar.gz")
+
+    def _handle_instance_for_minio(self, instance, email_id: str, workdir: str):
+        """
+        Handle post-processing of a MinIO-parsed email instance.
+        """
+        with safe_execution(f"finalizing MinIO email {email_id}"):
+            user_email = self._extract_reported_by_from_user_submission(workdir)
+            instance.reportedBy = user_email
+            instance.save()
+
+            mail_zip = self._get_mail_zip_path(workdir, email_id)
+            self._handle_common_instance_tasks(instance, email_id, mail_zip)
+
+    def _extract_reported_by_from_user_submission(self, workdir: str) -> Optional[str]:
+        """
+        Extract the reporter's email address from 'user_submission.eml'.
+        """
+        path = os.path.join(workdir, "user_submission.eml")
+        with safe_execution("extracting reportedBy"):
+            with open(path, "r") as f:
+                user_submission = email.message_from_file(f)
+            from_header = user_submission.get("From")
+            email_addr = extract_email_address(from_header)
+            if not email_addr:
+                fetch_mail_logger.warning(f"No valid email found in {path}")
+            return email_addr
 
     def list_eml_files(self, workdir: str, prefix: str = "") -> list[str]:
         """
@@ -83,12 +113,12 @@ class GlobalSubmissionService:
         """
         user = UserCreationService().get_or_create_user(instance.reportedBy)
 
-        artifact_ids = self.handle_artifacts(instance)
-        attachment_result = self.handle_attachments(instance, mail_zip)
+        artifact_ids = Handlers().handle_artifacts(instance)
+        attachment_result = Handlers().handle_attachments(instance, mail_zip)
         attachment_ids, attachment_id_ai = attachment_result.ids, attachment_result.ai_ids
 
-        self.handle_mail_header(instance)
-        self.handle_mail_body(instance, email_id)
+        Handlers().handle_mail_header(instance)
+        Handlers().handle_mail_body(instance, email_id)
 
         related_ids = flatten_id_lists(artifact_ids, attachment_ids)
         CaseCreationService().create_case(CaseInputData(
@@ -98,59 +128,3 @@ class GlobalSubmissionService:
             attachment_ids=attachment_ids,
             attachment_ai_ids=attachment_id_ai
         ))
-
-    def handle_artifacts(self, instance) -> list[int]:
-        artifact_handler = ArtifactJobLauncherService()
-        instance_artifacts = MailArtifact.objects.filter(mail=instance)
-        artifact_ids = []
-        with safe_execution("handling artifacts"):
-            if instance_artifacts:
-                artifact_ids = artifact_handler.process_artifacts(instance_artifacts)
-        return artifact_ids
-
-    def handle_attachments(self, instance, mail_zip: Optional[str]) -> ArtifactResult:
-        attachment_handler = AttachmentJobLauncherService()
-        attachment_ids: list[int] = []
-        attachment_id_ai: list[int] = []
-
-        instance_attachments = MailAttachment.objects.filter(mail=instance)
-        for att in instance_attachments:
-            if att:
-                with safe_execution("processing attachment"):
-                    ids, id_ai = attachment_handler.process_attachment(att)
-                    if ids:
-                        attachment_ids.append(ids)
-                    if id_ai:
-                        attachment_id_ai.append(id_ai)
-
-        # Process archive
-        if mail_zip:
-            mail_archive = MailArchive.objects.filter(mail=instance).first()
-            if not mail_archive:
-                archive, _ = FileHandler.handle_file(file=None, mail=mail_zip)
-                mail_archive = MailArchive.objects.create(mail=instance, archive=archive)
-
-            with safe_execution("launching cortex AI jobs"):
-                cortex_job = CortexJob()
-                id_ai = cortex_job.launch_cortex_ai_jobs(mail_archive, "file")
-                if id_ai:
-                    attachment_id_ai.append(id_ai)
-
-        return ArtifactResult(ids=attachment_ids, ai_ids=attachment_id_ai)
-
-    def handle_mail_header(self, instance):
-        if hasattr(instance, "mail_header") and instance.mail_header:
-            with safe_execution("handling mail header"):
-                handler = CortexJob()
-                handler.launch_cortex_jobs(instance.mail_header, "mail_header")
-
-    def handle_mail_body(self, instance, email_id):
-        if hasattr(instance, "mail_body") and instance.mail_body:
-            with safe_execution("handling mail body"):
-                email_dir = os.path.join(self.email_handler.workdir, email_id)
-                os.makedirs(email_dir, exist_ok=True)
-                file_path = os.path.join(email_dir, f"{instance.mail_body.fuzzy_hash}.txt")
-                with open(file_path, "w") as f:
-                    f.write(instance.mail_body.body_value)
-                handler = CortexJob()
-                handler.launch_cortex_jobs(file_path, "mail_body")

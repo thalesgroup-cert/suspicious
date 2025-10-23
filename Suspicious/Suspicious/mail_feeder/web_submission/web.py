@@ -39,16 +39,4 @@ class WebSubmissionService:
                 ))
         return last_instance
 
-    def finalize_submission(self, instance, config: WebSubmissionConfig):
-        """
-        Finalize a single email instance submitted via web.
-        """
-        email_id = os.path.basename(config.workdir)
 
-        with safe_execution(f"finalizing web submission {email_id}"):
-            instance.reportedBy = config.user_email
-            instance.save()
-
-            mail_zip = glo._get_mail_zip_path(config.workdir, email_id)
-            glo._handle_common_instance_tasks(instance, email_id, mail_zip)
-            self.logger.info(f"Finalized web submission for email_id={email_id}")
