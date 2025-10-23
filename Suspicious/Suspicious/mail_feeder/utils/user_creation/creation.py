@@ -4,7 +4,7 @@ from django.contrib.auth.models import User
 from django.core.exceptions import ObjectDoesNotExist
 from .models import UsernameModel
 from .utils import load_config, initialize_email_validator, create_ldap_user
-from mail_feeder.kpi_updating.kpis import (
+from mail_feeder.utils.kpi_updating.kpis import (
     KpiService
 )
 
