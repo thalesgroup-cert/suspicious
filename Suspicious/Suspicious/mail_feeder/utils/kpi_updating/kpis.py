@@ -18,7 +18,7 @@ class KpiService:
         Update the KPI statistics for a given month and year.
         """
         period = Period(month=month, year=year)
-        from tasp.cron import sync_monthly_kpi
+        from tasp.cron.kpi import sync_monthly_kpi
         sync_monthly_kpi()
 
         kpi = Kpi.objects.get(month=period.month, year=period.year)
