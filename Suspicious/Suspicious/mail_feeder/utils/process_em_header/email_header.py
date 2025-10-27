@@ -51,13 +51,13 @@ class EmailHeaderService:
 
             return results
 
-    def create_mail_header_instance(self, email_data: dict) -> MailHeader:
+    def create_mail_header_instance(self, email_data: str) -> MailHeader:
         """
         Validates input and creates or retrieves a MailHeader instance.
         """
-        validated = EmailHeaderData(**email_data)
-        reported_text = validated.reportedText
-        fuzzy_hash = self.text_distance.get_hash(reported_text)
+        validated = EmailHeaderData(headers=str(email_data))
+        reported_text = validated.headers
+        fuzzy_hash = str(self.text_distance.get_hash(reported_text))
 
         with safe_execution("create_mail_header_instance"):
             mail_header, created = MailHeader.objects.get_or_create(

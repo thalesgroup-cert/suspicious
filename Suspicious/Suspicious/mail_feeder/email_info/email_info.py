@@ -2,7 +2,7 @@ import logging
 from email.utils import parseaddr
 from typing import Optional
 
-from mail_feeder.case_creator.creator import CaseCreatorService
+from mail_feeder.utils.user_creation.creation import UserCreationService
 from mail_feeder.models import MailInfo
 from score_process.score_utils.send_mail import user_acknowledge
 
@@ -17,8 +17,8 @@ class MailInfoService:
     Service for creating and managing MailInfo records.
     """
 
-    def __init__(self, case_creator: Optional[CaseCreatorService] = None):
-        self.case_creator = case_creator or CaseCreatorService()
+    def __init__(self, user_creator: Optional[UserCreationService] = None):
+        self.user_creator = user_creator or UserCreationService()
 
     def create_mail_info(self, mail_instance):
         """
@@ -65,7 +65,7 @@ class MailInfoService:
         """
         Save MailInfo to the database.
         """
-        user = self.case_creator.get_or_create_user(data.user_email)
+        user = self.user_creator.get_or_create_user(data.user_email)
 
         reception_ok = MailInfo(
             user=user,

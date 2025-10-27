@@ -3,8 +3,8 @@ from typing import List, Optional, Union
 
 
 class ArtifactResult(BaseModel):
-    ids: List[int] = Field(default_factory=list)
-    ai_ids: List[int] = Field(default_factory=list)
+    ids: List[str] = Field(default_factory=list)
+    ai_ids: List[str] = Field(default_factory=list)
 
 
 class MailSubmissionData(BaseModel):

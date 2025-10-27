@@ -13,7 +13,7 @@ class CaseCreatorService:
     def __init__(self):
         self.create_user_service = UserCreationService()
 
-    def create_case(self, data: dict) -> Optional[Any]:
+    def create_case(self, data: CaseInputData) -> Optional[Any]:
         """
         Main entry point for creating a case.
 
@@ -23,9 +23,9 @@ class CaseCreatorService:
         Returns:
             case instance if successfully created, else None
         """
-        validated = CaseInputData(**data)
+        validated = data
         self._merge_ids(validated)
-        user_instance = self.create_user_service.get_or_create_user(validated.user)
+        user_instance = self.create_user_service.get_or_create_user(validated.user.username)
 
         case_dict = self._prepare_case_dict(validated.instance)
         return self._execute_case_creation(case_dict, validated.instance, user_instance)

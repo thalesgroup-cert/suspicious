@@ -205,7 +205,7 @@ class CaseCreator:
             None
         """
         try:
-            from tasp.cron import sync_monthly_kpi
+            from tasp.cron.kpi import sync_monthly_kpi
             kpi = sync_monthly_kpi()
 
             # Only update the stats if the case results are "SAFE-ALLOW_LISTED"
@@ -230,7 +230,7 @@ class CaseCreator:
             None
         """
         try:
-            from tasp.cron import sync_monthly_kpi
+            from tasp.cron.kpi import sync_monthly_kpi
             kpi = sync_monthly_kpi()
 
             user_cases_monthly_stats = UserCasesMonthlyStats.objects.filter(user=self.user, month=kpi.month, year=kpi.year).first()

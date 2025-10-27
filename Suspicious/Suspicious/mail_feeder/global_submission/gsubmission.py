@@ -68,7 +68,7 @@ class GlobalSubmissionService:
             instance.save()
 
             mail_zip = self._get_mail_zip_path(config.workdir, email_id)
-            self._handle_common_instance_tasks(instance, email_id, mail_zip)
+            self._handle_common_tasks(instance, email_id, mail_zip)
             fetch_mail_logger.info(f"Finalized web submission for email_id={email_id}")
 
     def _get_mail_zip_path(self, workdir: str, email_id: str) -> str:
@@ -84,7 +84,7 @@ class GlobalSubmissionService:
             instance.save()
 
             mail_zip = self._get_mail_zip_path(workdir, email_id)
-            self._handle_common_instance_tasks(instance, email_id, mail_zip)
+            self._handle_common_tasks(instance, email_id, mail_zip)
 
     def _extract_reported_by_from_user_submission(self, workdir: str) -> Optional[str]:
         """

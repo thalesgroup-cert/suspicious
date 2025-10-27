@@ -51,13 +51,13 @@ class EmailBodyService:
 
             return results
 
-    def create_mail_body_instance(self, email_data: dict) -> MailBody:
+    def create_mail_body_instance(self, email_data: str) -> MailBody:
         """
         Validates input and creates or retrieves a MailBody instance.
         """
-        validated = EmailBodyData(**email_data)
+        validated = EmailBodyData(reportedText=str(email_data))
         reported_text = validated.reportedText
-        fuzzy_hash = self.text_distance.get_hash(reported_text)
+        fuzzy_hash = str(self.text_distance.get_hash(reported_text))
 
         with safe_execution("create_mail_body_instance"):
             mail_body, created = MailBody.objects.get_or_create(
