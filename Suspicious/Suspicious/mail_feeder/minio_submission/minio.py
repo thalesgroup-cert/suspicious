@@ -25,10 +25,10 @@ class MinioEmailService:
         email_id = os.path.basename(workdir)
         with safe_execution(f"processing MinIO emails {email_id}"):
             fetch_mail_logger.info(f"Processing MinIO emails in {workdir}")
-            eml_files = glo.list_eml_files(workdir, prefix="user_submission")
+            eml_files = glo().list_eml_files(workdir=workdir, prefix="user_submission")
             for filename in eml_files:
                 fetch_mail_logger.debug(f"Processing MinIO email file {filename}")
-                glo.process_single_email(MailSubmissionData(
+                glo().process_single_email(MailSubmissionData(
                     workdir=workdir,
                     filename=filename,
                     email_id=email_id,
