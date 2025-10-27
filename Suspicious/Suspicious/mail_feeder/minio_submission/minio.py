@@ -1,13 +1,10 @@
 import os
-import email
 import logging
-from typing import List, Optional
-from .models import MinioEmailData
 
 from mail_feeder.global_submission.gsubmission import GlobalSubmissionService as glo
 from mail_feeder.global_submission.models import MailSubmissionData
 
-from .utils import safe_execution, extract_email_address
+from .utils import safe_execution
 
 fetch_mail_logger = logging.getLogger("tasp.cron.fetch_and_process_emails")
 logger = logging.getLogger(__name__)
