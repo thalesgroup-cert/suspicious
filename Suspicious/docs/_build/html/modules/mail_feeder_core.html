@@ -19,7 +19,7 @@
     <script src="../_static/js/theme.js"></script>
     <link rel="index" title="Index" href="../genindex.html" />
     <link rel="search" title="Search" href="../search.html" />
-    <link rel="next" title="profiles_core module" href="profiles_core.html" />
+    <link rel="next" title="Profiles module" href="profiles_core.html" />
     <link rel="prev" title="IP Process module" href="ip_process_core.html" /> 
 </head>
 
@@ -44,9 +44,10 @@
         </div><div class="wy-menu wy-menu-vertical" data-spy="affix" role="navigation" aria-label="Navigation menu">
               <p class="caption" role="heading"><span class="caption-text">Contents:</span></p>
 <ul class="current">
+<li class="toctree-l1"><a class="reference internal" href="../README.html">Suspicious</a></li>
 <li class="toctree-l1 current"><a class="reference internal" href="index.html">Modules (API Reference)</a><ul class="current">
-<li class="toctree-l2"><a class="reference internal" href="case_handler_core.html">case_handler_core module</a></li>
-<li class="toctree-l2"><a class="reference internal" href="cortex_job_core.html">cortex_job_core module</a></li>
+<li class="toctree-l2"><a class="reference internal" href="case_handler_core.html">Case Handler module</a></li>
+<li class="toctree-l2"><a class="reference internal" href="cortex_job_core.html">Cortex Job module</a></li>
 <li class="toctree-l2"><a class="reference internal" href="dashboard_core.html">Dashboard module</a></li>
 <li class="toctree-l2"><a class="reference internal" href="domain_process_core.html">Domain Process Module</a></li>
 <li class="toctree-l2"><a class="reference internal" href="email_process_core.html">Email Process module</a></li>
@@ -342,115 +343,17 @@
 <li class="toctree-l4"><a class="reference internal" href="#mail_feeder.models.MailInfo.user_reception_informed"><code class="docutils literal notranslate"><span class="pre">MailInfo.user_reception_informed</span></code></a></li>
 </ul>
 </li>
-<li class="toctree-l3"><a class="reference internal" href="#mail_feeder.mail_utils.mail_handler.MailHandler"><code class="docutils literal notranslate"><span class="pre">MailHandler</span></code></a><ul>
-<li class="toctree-l4"><a class="reference internal" href="#mail_feeder.mail_utils.mail_handler.MailHandler.check_email_bodies"><code class="docutils literal notranslate"><span class="pre">MailHandler.check_email_bodies()</span></code></a></li>
-<li class="toctree-l4"><a class="reference internal" href="#mail_feeder.mail_utils.mail_handler.MailHandler.check_email_headers"><code class="docutils literal notranslate"><span class="pre">MailHandler.check_email_headers()</span></code></a></li>
-<li class="toctree-l4"><a class="reference internal" href="#mail_feeder.mail_utils.mail_handler.MailHandler.check_email_lists"><code class="docutils literal notranslate"><span class="pre">MailHandler.check_email_lists()</span></code></a></li>
-<li class="toctree-l4"><a class="reference internal" href="#mail_feeder.mail_utils.mail_handler.MailHandler.create_artifact_is_mail_address"><code class="docutils literal notranslate"><span class="pre">MailHandler.create_artifact_is_mail_address()</span></code></a></li>
-<li class="toctree-l4"><a class="reference internal" href="#mail_feeder.mail_utils.mail_handler.MailHandler.create_default_user"><code class="docutils literal notranslate"><span class="pre">MailHandler.create_default_user()</span></code></a></li>
-<li class="toctree-l4"><a class="reference internal" href="#mail_feeder.mail_utils.mail_handler.MailHandler.create_mail_body_instance"><code class="docutils literal notranslate"><span class="pre">MailHandler.create_mail_body_instance()</span></code></a></li>
-<li class="toctree-l4"><a class="reference internal" href="#mail_feeder.mail_utils.mail_handler.MailHandler.create_mail_header_instance"><code class="docutils literal notranslate"><span class="pre">MailHandler.create_mail_header_instance()</span></code></a></li>
-<li class="toctree-l4"><a class="reference internal" href="#mail_feeder.mail_utils.mail_handler.MailHandler.create_mail_instance"><code class="docutils literal notranslate"><span class="pre">MailHandler.create_mail_instance()</span></code></a></li>
-<li class="toctree-l4"><a class="reference internal" href="#mail_feeder.mail_utils.mail_handler.MailHandler.create_monthly_user_stats"><code class="docutils literal notranslate"><span class="pre">MailHandler.create_monthly_user_stats()</span></code></a></li>
-<li class="toctree-l4"><a class="reference internal" href="#mail_feeder.mail_utils.mail_handler.MailHandler.create_user"><code class="docutils literal notranslate"><span class="pre">MailHandler.create_user()</span></code></a></li>
-<li class="toctree-l4"><a class="reference internal" href="#mail_feeder.mail_utils.mail_handler.MailHandler.decode_subject"><code class="docutils literal notranslate"><span class="pre">MailHandler.decode_subject()</span></code></a></li>
-<li class="toctree-l4"><a class="reference internal" href="#mail_feeder.mail_utils.mail_handler.MailHandler.extract_observables_v3"><code class="docutils literal notranslate"><span class="pre">MailHandler.extract_observables_v3()</span></code></a></li>
-<li class="toctree-l4"><a class="reference internal" href="#mail_feeder.mail_utils.mail_handler.MailHandler.get_handler"><code class="docutils literal notranslate"><span class="pre">MailHandler.get_handler()</span></code></a></li>
-<li class="toctree-l4"><a class="reference internal" href="#mail_feeder.mail_utils.mail_handler.MailHandler.get_handler_method"><code class="docutils literal notranslate"><span class="pre">MailHandler.get_handler_method()</span></code></a></li>
-<li class="toctree-l4"><a class="reference internal" href="#mail_feeder.mail_utils.mail_handler.MailHandler.get_or_create_user"><code class="docutils literal notranslate"><span class="pre">MailHandler.get_or_create_user()</span></code></a></li>
-<li class="toctree-l4"><a class="reference internal" href="#mail_feeder.mail_utils.mail_handler.MailHandler.get_prime_and_decoded_url"><code class="docutils literal notranslate"><span class="pre">MailHandler.get_prime_and_decoded_url()</span></code></a></li>
-<li class="toctree-l4"><a class="reference internal" href="#mail_feeder.mail_utils.mail_handler.MailHandler.handle_existing_mail"><code class="docutils literal notranslate"><span class="pre">MailHandler.handle_existing_mail()</span></code></a></li>
-<li class="toctree-l4"><a class="reference internal" href="#mail_feeder.mail_utils.mail_handler.MailHandler.handle_mail"><code class="docutils literal notranslate"><span class="pre">MailHandler.handle_mail()</span></code></a></li>
-<li class="toctree-l4"><a class="reference internal" href="#mail_feeder.mail_utils.mail_handler.MailHandler.handle_mail_artifact_domain"><code class="docutils literal notranslate"><span class="pre">MailHandler.handle_mail_artifact_domain()</span></code></a></li>
-<li class="toctree-l4"><a class="reference internal" href="#mail_feeder.mail_utils.mail_handler.MailHandler.handle_mail_artifact_hash"><code class="docutils literal notranslate"><span class="pre">MailHandler.handle_mail_artifact_hash()</span></code></a></li>
-<li class="toctree-l4"><a class="reference internal" href="#mail_feeder.mail_utils.mail_handler.MailHandler.handle_mail_artifact_ip"><code class="docutils literal notranslate"><span class="pre">MailHandler.handle_mail_artifact_ip()</span></code></a></li>
-<li class="toctree-l4"><a class="reference internal" href="#mail_feeder.mail_utils.mail_handler.MailHandler.handle_mail_artifact_mail"><code class="docutils literal notranslate"><span class="pre">MailHandler.handle_mail_artifact_mail()</span></code></a></li>
-<li class="toctree-l4"><a class="reference internal" href="#mail_feeder.mail_utils.mail_handler.MailHandler.handle_mail_artifact_url"><code class="docutils literal notranslate"><span class="pre">MailHandler.handle_mail_artifact_url()</span></code></a></li>
-<li class="toctree-l4"><a class="reference internal" href="#mail_feeder.mail_utils.mail_handler.MailHandler.handle_mail_artifacts"><code class="docutils literal notranslate"><span class="pre">MailHandler.handle_mail_artifacts()</span></code></a></li>
-<li class="toctree-l4"><a class="reference internal" href="#mail_feeder.mail_utils.mail_handler.MailHandler.handle_mail_attachment"><code class="docutils literal notranslate"><span class="pre">MailHandler.handle_mail_attachment()</span></code></a></li>
-<li class="toctree-l4"><a class="reference internal" href="#mail_feeder.mail_utils.mail_handler.MailHandler.handle_new_mail"><code class="docutils literal notranslate"><span class="pre">MailHandler.handle_new_mail()</span></code></a></li>
-<li class="toctree-l4"><a class="reference internal" href="#mail_feeder.mail_utils.mail_handler.MailHandler.handle_rich_observables"><code class="docutils literal notranslate"><span class="pre">MailHandler.handle_rich_observables()</span></code></a></li>
-<li class="toctree-l4"><a class="reference internal" href="#mail_feeder.mail_utils.mail_handler.MailHandler.parse_date"><code class="docutils literal notranslate"><span class="pre">MailHandler.parse_date()</span></code></a></li>
-<li class="toctree-l4"><a class="reference internal" href="#mail_feeder.mail_utils.mail_handler.MailHandler.process_url"><code class="docutils literal notranslate"><span class="pre">MailHandler.process_url()</span></code></a></li>
-<li class="toctree-l4"><a class="reference internal" href="#mail_feeder.mail_utils.mail_handler.MailHandler.save_and_update_mail_instance"><code class="docutils literal notranslate"><span class="pre">MailHandler.save_and_update_mail_instance()</span></code></a></li>
-<li class="toctree-l4"><a class="reference internal" href="#mail_feeder.mail_utils.mail_handler.MailHandler.save_mail_artifact"><code class="docutils literal notranslate"><span class="pre">MailHandler.save_mail_artifact()</span></code></a></li>
-<li class="toctree-l4"><a class="reference internal" href="#mail_feeder.mail_utils.mail_handler.MailHandler.save_mail_body_instance"><code class="docutils literal notranslate"><span class="pre">MailHandler.save_mail_body_instance()</span></code></a></li>
-<li class="toctree-l4"><a class="reference internal" href="#mail_feeder.mail_utils.mail_handler.MailHandler.save_mail_header_instance"><code class="docutils literal notranslate"><span class="pre">MailHandler.save_mail_header_instance()</span></code></a></li>
-<li class="toctree-l4"><a class="reference internal" href="#mail_feeder.mail_utils.mail_handler.MailHandler.save_mail_instance"><code class="docutils literal notranslate"><span class="pre">MailHandler.save_mail_instance()</span></code></a></li>
-<li class="toctree-l4"><a class="reference internal" href="#mail_feeder.mail_utils.mail_handler.MailHandler.update_existing_mail_instance"><code class="docutils literal notranslate"><span class="pre">MailHandler.update_existing_mail_instance()</span></code></a></li>
-<li class="toctree-l4"><a class="reference internal" href="#mail_feeder.mail_utils.mail_handler.MailHandler.update_kpi_stats"><code class="docutils literal notranslate"><span class="pre">MailHandler.update_kpi_stats()</span></code></a></li>
-<li class="toctree-l4"><a class="reference internal" href="#mail_feeder.mail_utils.mail_handler.MailHandler.update_mail_body_times_sent"><code class="docutils literal notranslate"><span class="pre">MailHandler.update_mail_body_times_sent()</span></code></a></li>
-<li class="toctree-l4"><a class="reference internal" href="#mail_feeder.mail_utils.mail_handler.MailHandler.update_mail_times_sent"><code class="docutils literal notranslate"><span class="pre">MailHandler.update_mail_times_sent()</span></code></a></li>
-</ul>
-</li>
-<li class="toctree-l3"><a class="reference internal" href="#mail_feeder.mail_utils.mail_handler.is_valid_company_email"><code class="docutils literal notranslate"><span class="pre">is_valid_company_email()</span></code></a></li>
-<li class="toctree-l3"><a class="reference internal" href="#mail_feeder.mail_utils.mail_handler.is_valid_email"><code class="docutils literal notranslate"><span class="pre">is_valid_email()</span></code></a></li>
-<li class="toctree-l3"><a class="reference internal" href="#mail_feeder.mail_utils.mail.ArtifactHandler"><code class="docutils literal notranslate"><span class="pre">ArtifactHandler</span></code></a><ul>
-<li class="toctree-l4"><a class="reference internal" href="#mail_feeder.mail_utils.mail.ArtifactHandler.handle_artifact"><code class="docutils literal notranslate"><span class="pre">ArtifactHandler.handle_artifact()</span></code></a></li>
-<li class="toctree-l4"><a class="reference internal" href="#mail_feeder.mail_utils.mail.ArtifactHandler.handle_domain_artifact"><code class="docutils literal notranslate"><span class="pre">ArtifactHandler.handle_domain_artifact()</span></code></a></li>
-<li class="toctree-l4"><a class="reference internal" href="#mail_feeder.mail_utils.mail.ArtifactHandler.handle_hash_artifact"><code class="docutils literal notranslate"><span class="pre">ArtifactHandler.handle_hash_artifact()</span></code></a></li>
-<li class="toctree-l4"><a class="reference internal" href="#mail_feeder.mail_utils.mail.ArtifactHandler.handle_ip_artifact"><code class="docutils literal notranslate"><span class="pre">ArtifactHandler.handle_ip_artifact()</span></code></a></li>
-<li class="toctree-l4"><a class="reference internal" href="#mail_feeder.mail_utils.mail.ArtifactHandler.handle_mail_artifact"><code class="docutils literal notranslate"><span class="pre">ArtifactHandler.handle_mail_artifact()</span></code></a></li>
-<li class="toctree-l4"><a class="reference internal" href="#mail_feeder.mail_utils.mail.ArtifactHandler.handle_url_artifact"><code class="docutils literal notranslate"><span class="pre">ArtifactHandler.handle_url_artifact()</span></code></a></li>
-</ul>
-</li>
-<li class="toctree-l3"><a class="reference internal" href="#mail_feeder.mail_utils.mail.AttachmentHandler"><code class="docutils literal notranslate"><span class="pre">AttachmentHandler</span></code></a><ul>
-<li class="toctree-l4"><a class="reference internal" href="#mail_feeder.mail_utils.mail.AttachmentHandler.allow_list_file_and_hash"><code class="docutils literal notranslate"><span class="pre">AttachmentHandler.allow_list_file_and_hash()</span></code></a></li>
-<li class="toctree-l4"><a class="reference internal" href="#mail_feeder.mail_utils.mail.AttachmentHandler.create_and_link_hash_to_attachment"><code class="docutils literal notranslate"><span class="pre">AttachmentHandler.create_and_link_hash_to_attachment()</span></code></a></li>
-<li class="toctree-l4"><a class="reference internal" href="#mail_feeder.mail_utils.mail.AttachmentHandler.handle_attachment"><code class="docutils literal notranslate"><span class="pre">AttachmentHandler.handle_attachment()</span></code></a></li>
-<li class="toctree-l4"><a class="reference internal" href="#mail_feeder.mail_utils.mail.AttachmentHandler.handle_attachment_list"><code class="docutils literal notranslate"><span class="pre">AttachmentHandler.handle_attachment_list()</span></code></a></li>
-<li class="toctree-l4"><a class="reference internal" href="#mail_feeder.mail_utils.mail.AttachmentHandler.handle_hash_and_attachment"><code class="docutils literal notranslate"><span class="pre">AttachmentHandler.handle_hash_and_attachment()</span></code></a></li>
-<li class="toctree-l4"><a class="reference internal" href="#mail_feeder.mail_utils.mail.AttachmentHandler.hash_file"><code class="docutils literal notranslate"><span class="pre">AttachmentHandler.hash_file()</span></code></a></li>
-<li class="toctree-l4"><a class="reference internal" href="#mail_feeder.mail_utils.mail.AttachmentHandler.launch_jobs"><code class="docutils literal notranslate"><span class="pre">AttachmentHandler.launch_jobs()</span></code></a></li>
-<li class="toctree-l4"><a class="reference internal" href="#mail_feeder.mail_utils.mail.AttachmentHandler.launch_jobs_and_handle_exceptions"><code class="docutils literal notranslate"><span class="pre">AttachmentHandler.launch_jobs_and_handle_exceptions()</span></code></a></li>
-<li class="toctree-l4"><a class="reference internal" href="#mail_feeder.mail_utils.mail.AttachmentHandler.launch_jobs_or_allow_list"><code class="docutils literal notranslate"><span class="pre">AttachmentHandler.launch_jobs_or_allow_list()</span></code></a></li>
-<li class="toctree-l4"><a class="reference internal" href="#mail_feeder.mail_utils.mail.AttachmentHandler.link_hash_to_attachment"><code class="docutils literal notranslate"><span class="pre">AttachmentHandler.link_hash_to_attachment()</span></code></a></li>
-<li class="toctree-l4"><a class="reference internal" href="#mail_feeder.mail_utils.mail.AttachmentHandler.rename_attachment"><code class="docutils literal notranslate"><span class="pre">AttachmentHandler.rename_attachment()</span></code></a></li>
-</ul>
-</li>
-<li class="toctree-l3"><a class="reference internal" href="#mail_feeder.mail_utils.mail.EmailHandler"><code class="docutils literal notranslate"><span class="pre">EmailHandler</span></code></a></li>
-<li class="toctree-l3"><a class="reference internal" href="#mail_feeder.mail_utils.mail.EmailProcessor"><code class="docutils literal notranslate"><span class="pre">EmailProcessor</span></code></a><ul>
-<li class="toctree-l4"><a class="reference internal" href="#mail_feeder.mail_utils.mail.EmailProcessor.combine_ids"><code class="docutils literal notranslate"><span class="pre">EmailProcessor.combine_ids()</span></code></a></li>
-<li class="toctree-l4"><a class="reference internal" href="#mail_feeder.mail_utils.mail.EmailProcessor.create_case"><code class="docutils literal notranslate"><span class="pre">EmailProcessor.create_case()</span></code></a></li>
-<li class="toctree-l4"><a class="reference internal" href="#mail_feeder.mail_utils.mail.EmailProcessor.create_mail_info"><code class="docutils literal notranslate"><span class="pre">EmailProcessor.create_mail_info()</span></code></a></li>
-<li class="toctree-l4"><a class="reference internal" href="#mail_feeder.mail_utils.mail.EmailProcessor.handle_artifacts"><code class="docutils literal notranslate"><span class="pre">EmailProcessor.handle_artifacts()</span></code></a></li>
-<li class="toctree-l4"><a class="reference internal" href="#mail_feeder.mail_utils.mail.EmailProcessor.handle_attachments"><code class="docutils literal notranslate"><span class="pre">EmailProcessor.handle_attachments()</span></code></a></li>
-<li class="toctree-l4"><a class="reference internal" href="#mail_feeder.mail_utils.mail.EmailProcessor.handle_mail_body"><code class="docutils literal notranslate"><span class="pre">EmailProcessor.handle_mail_body()</span></code></a></li>
-<li class="toctree-l4"><a class="reference internal" href="#mail_feeder.mail_utils.mail.EmailProcessor.handle_mail_header"><code class="docutils literal notranslate"><span class="pre">EmailProcessor.handle_mail_header()</span></code></a></li>
-<li class="toctree-l4"><a class="reference internal" href="#mail_feeder.mail_utils.mail.EmailProcessor.process_emails_from_minio_workdir"><code class="docutils literal notranslate"><span class="pre">EmailProcessor.process_emails_from_minio_workdir()</span></code></a></li>
-<li class="toctree-l4"><a class="reference internal" href="#mail_feeder.mail_utils.mail.EmailProcessor.process_emails_from_web_submission"><code class="docutils literal notranslate"><span class="pre">EmailProcessor.process_emails_from_web_submission()</span></code></a></li>
-</ul>
-</li>
-<li class="toctree-l3"><a class="reference internal" href="#mail_feeder.mail_utils.mail.clean_workdir"><code class="docutils literal notranslate"><span class="pre">clean_workdir()</span></code></a></li>
 <li class="toctree-l3"><a class="reference internal" href="#mail_feeder.mail_utils.meioc.email_analysis"><code class="docutils literal notranslate"><span class="pre">email_analysis()</span></code></a></li>
 <li class="toctree-l3"><a class="reference internal" href="#mail_feeder.mail_utils.meioc.main"><code class="docutils literal notranslate"><span class="pre">main()</span></code></a></li>
 <li class="toctree-l3"><a class="reference internal" href="#mail_feeder.mail_utils.meioc.normalize_headers"><code class="docutils literal notranslate"><span class="pre">normalize_headers()</span></code></a></li>
 <li class="toctree-l3"><a class="reference internal" href="#mail_feeder.mail_utils.meioc.real_email"><code class="docutils literal notranslate"><span class="pre">real_email()</span></code></a></li>
-<li class="toctree-l3"><a class="reference internal" href="#mail_feeder.mail_utils.similarity_hash.TextDistance"><code class="docutils literal notranslate"><span class="pre">TextDistance</span></code></a><ul>
-<li class="toctree-l4"><a class="reference internal" href="#mail_feeder.mail_utils.similarity_hash.TextDistance.calculate_distance"><code class="docutils literal notranslate"><span class="pre">TextDistance.calculate_distance()</span></code></a></li>
-<li class="toctree-l4"><a class="reference internal" href="#mail_feeder.mail_utils.similarity_hash.TextDistance.carriage_return_chars"><code class="docutils literal notranslate"><span class="pre">TextDistance.carriage_return_chars</span></code></a></li>
-<li class="toctree-l4"><a class="reference internal" href="#mail_feeder.mail_utils.similarity_hash.TextDistance.hash_text"><code class="docutils literal notranslate"><span class="pre">TextDistance.hash_text()</span></code></a></li>
-<li class="toctree-l4"><a class="reference internal" href="#mail_feeder.mail_utils.similarity_hash.TextDistance.hash_text_mail"><code class="docutils literal notranslate"><span class="pre">TextDistance.hash_text_mail()</span></code></a></li>
-<li class="toctree-l4"><a class="reference internal" href="#mail_feeder.mail_utils.similarity_hash.TextDistance.html_tags"><code class="docutils literal notranslate"><span class="pre">TextDistance.html_tags</span></code></a></li>
-<li class="toctree-l4"><a class="reference internal" href="#mail_feeder.mail_utils.similarity_hash.TextDistance.newline_chars"><code class="docutils literal notranslate"><span class="pre">TextDistance.newline_chars</span></code></a></li>
-<li class="toctree-l4"><a class="reference internal" href="#mail_feeder.mail_utils.similarity_hash.TextDistance.preprocess_text"><code class="docutils literal notranslate"><span class="pre">TextDistance.preprocess_text()</span></code></a></li>
-<li class="toctree-l4"><a class="reference internal" href="#mail_feeder.mail_utils.similarity_hash.TextDistance.single_quotes"><code class="docutils literal notranslate"><span class="pre">TextDistance.single_quotes</span></code></a></li>
-<li class="toctree-l4"><a class="reference internal" href="#mail_feeder.mail_utils.similarity_hash.TextDistance.stopwords"><code class="docutils literal notranslate"><span class="pre">TextDistance.stopwords</span></code></a></li>
-<li class="toctree-l4"><a class="reference internal" href="#mail_feeder.mail_utils.similarity_hash.TextDistance.tokenize_text"><code class="docutils literal notranslate"><span class="pre">TextDistance.tokenize_text()</span></code></a></li>
 </ul>
 </li>
-<li class="toctree-l3"><a class="reference internal" href="#mail_feeder.processor.email_processor.decode_email_header"><code class="docutils literal notranslate"><span class="pre">decode_email_header()</span></code></a></li>
-<li class="toctree-l3"><a class="reference internal" href="#mail_feeder.processor.email_processor.extract_email_attachments"><code class="docutils literal notranslate"><span class="pre">extract_email_attachments()</span></code></a></li>
-<li class="toctree-l3"><a class="reference internal" href="#mail_feeder.processor.email_processor.generate_unique_email_reference"><code class="docutils literal notranslate"><span class="pre">generate_unique_email_reference()</span></code></a></li>
-<li class="toctree-l3"><a class="reference internal" href="#mail_feeder.processor.email_processor.get_header_dict_list"><code class="docutils literal notranslate"><span class="pre">get_header_dict_list()</span></code></a></li>
-<li class="toctree-l3"><a class="reference internal" href="#mail_feeder.processor.email_processor.parse_email"><code class="docutils literal notranslate"><span class="pre">parse_email()</span></code></a></li>
-</ul>
-</li>
-<li class="toctree-l2"><a class="reference internal" href="profiles_core.html">profiles_core module</a></li>
-<li class="toctree-l2"><a class="reference internal" href="score_process_core.html">score_process_core module</a></li>
-<li class="toctree-l2"><a class="reference internal" href="settings_core.html">settings_core module</a></li>
-<li class="toctree-l2"><a class="reference internal" href="tasp_core.html">tasp_core module</a></li>
-<li class="toctree-l2"><a class="reference internal" href="url_process_core.html">url_process_core module</a></li>
+<li class="toctree-l2"><a class="reference internal" href="profiles_core.html">Profiles module</a></li>
+<li class="toctree-l2"><a class="reference internal" href="score_process_core.html">Score Process module</a></li>
+<li class="toctree-l2"><a class="reference internal" href="settings_core.html">Settings module</a></li>
+<li class="toctree-l2"><a class="reference internal" href="tasp_core.html">TASP module</a></li>
+<li class="toctree-l2"><a class="reference internal" href="url_process_core.html">Url Process module</a></li>
 </ul>
 </li>
 </ul>
@@ -484,17 +387,17 @@
 <span id="mail-feeder-module"></span><h1>Mail Feeder module<a class="headerlink" href="#module-mail_feeder.models" title="Link to this heading"></a></h1>
 <dl class="py class">
 <dt class="sig sig-object py" id="mail_feeder.models.ArtifactIsDomain">
-<em class="property"><span class="k"><span class="pre">class</span></span><span class="w"> </span></em><span class="sig-prename descclassname"><span class="pre">mail_feeder.models.</span></span><span class="sig-name descname"><span class="pre">ArtifactIsDomain</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">id</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">domain</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">artifact</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">times_sent</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">creation_date</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">last_update</span></span></em><span class="sig-paren">)</span><a class="reference internal" href="../_modules/mail_feeder/models.html#ArtifactIsDomain"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#mail_feeder.models.ArtifactIsDomain" title="Link to this definition"></a></dt>
+<em class="property"><span class="pre">class</span><span class="w"> </span></em><span class="sig-prename descclassname"><span class="pre">mail_feeder.models.</span></span><span class="sig-name descname"><span class="pre">ArtifactIsDomain</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">id</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">domain</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">artifact</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">times_sent</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">creation_date</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">last_update</span></span></em><span class="sig-paren">)</span><a class="reference internal" href="../_modules/mail_feeder/models.html#ArtifactIsDomain"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#mail_feeder.models.ArtifactIsDomain" title="Link to this definition"></a></dt>
 <dd><p>Bases: <code class="xref py py-class docutils literal notranslate"><span class="pre">Model</span></code></p>
 <dl class="py exception">
 <dt class="sig sig-object py" id="mail_feeder.models.ArtifactIsDomain.DoesNotExist">
-<em class="property"><span class="k"><span class="pre">exception</span></span><span class="w"> </span></em><span class="sig-name descname"><span class="pre">DoesNotExist</span></span><a class="headerlink" href="#mail_feeder.models.ArtifactIsDomain.DoesNotExist" title="Link to this definition"></a></dt>
+<em class="property"><span class="pre">exception</span><span class="w"> </span></em><span class="sig-name descname"><span class="pre">DoesNotExist</span></span><a class="headerlink" href="#mail_feeder.models.ArtifactIsDomain.DoesNotExist" title="Link to this definition"></a></dt>
 <dd><p>Bases: <code class="xref py py-class docutils literal notranslate"><span class="pre">ObjectDoesNotExist</span></code></p>
 </dd></dl>
 
 <dl class="py exception">
 <dt class="sig sig-object py" id="mail_feeder.models.ArtifactIsDomain.MultipleObjectsReturned">
-<em class="property"><span class="k"><span class="pre">exception</span></span><span class="w"> </span></em><span class="sig-name descname"><span class="pre">MultipleObjectsReturned</span></span><a class="headerlink" href="#mail_feeder.models.ArtifactIsDomain.MultipleObjectsReturned" title="Link to this definition"></a></dt>
+<em class="property"><span class="pre">exception</span><span class="w"> </span></em><span class="sig-name descname"><span class="pre">MultipleObjectsReturned</span></span><a class="headerlink" href="#mail_feeder.models.ArtifactIsDomain.MultipleObjectsReturned" title="Link to this definition"></a></dt>
 <dd><p>Bases: <code class="xref py py-class docutils literal notranslate"><span class="pre">MultipleObjectsReturned</span></code></p>
 </dd></dl>
 
@@ -606,17 +509,17 @@ object the first time, the query is executed.</p>
 
 <dl class="py class">
 <dt class="sig sig-object py" id="mail_feeder.models.ArtifactIsHash">
-<em class="property"><span class="k"><span class="pre">class</span></span><span class="w"> </span></em><span class="sig-prename descclassname"><span class="pre">mail_feeder.models.</span></span><span class="sig-name descname"><span class="pre">ArtifactIsHash</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">id</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">hash</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">artifact</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">times_sent</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">creation_date</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">last_update</span></span></em><span class="sig-paren">)</span><a class="reference internal" href="../_modules/mail_feeder/models.html#ArtifactIsHash"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#mail_feeder.models.ArtifactIsHash" title="Link to this definition"></a></dt>
+<em class="property"><span class="pre">class</span><span class="w"> </span></em><span class="sig-prename descclassname"><span class="pre">mail_feeder.models.</span></span><span class="sig-name descname"><span class="pre">ArtifactIsHash</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">id</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">hash</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">artifact</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">times_sent</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">creation_date</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">last_update</span></span></em><span class="sig-paren">)</span><a class="reference internal" href="../_modules/mail_feeder/models.html#ArtifactIsHash"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#mail_feeder.models.ArtifactIsHash" title="Link to this definition"></a></dt>
 <dd><p>Bases: <code class="xref py py-class docutils literal notranslate"><span class="pre">Model</span></code></p>
 <dl class="py exception">
 <dt class="sig sig-object py" id="mail_feeder.models.ArtifactIsHash.DoesNotExist">
-<em class="property"><span class="k"><span class="pre">exception</span></span><span class="w"> </span></em><span class="sig-name descname"><span class="pre">DoesNotExist</span></span><a class="headerlink" href="#mail_feeder.models.ArtifactIsHash.DoesNotExist" title="Link to this definition"></a></dt>
+<em class="property"><span class="pre">exception</span><span class="w"> </span></em><span class="sig-name descname"><span class="pre">DoesNotExist</span></span><a class="headerlink" href="#mail_feeder.models.ArtifactIsHash.DoesNotExist" title="Link to this definition"></a></dt>
 <dd><p>Bases: <code class="xref py py-class docutils literal notranslate"><span class="pre">ObjectDoesNotExist</span></code></p>
 </dd></dl>
 
 <dl class="py exception">
 <dt class="sig sig-object py" id="mail_feeder.models.ArtifactIsHash.MultipleObjectsReturned">
-<em class="property"><span class="k"><span class="pre">exception</span></span><span class="w"> </span></em><span class="sig-name descname"><span class="pre">MultipleObjectsReturned</span></span><a class="headerlink" href="#mail_feeder.models.ArtifactIsHash.MultipleObjectsReturned" title="Link to this definition"></a></dt>
+<em class="property"><span class="pre">exception</span><span class="w"> </span></em><span class="sig-name descname"><span class="pre">MultipleObjectsReturned</span></span><a class="headerlink" href="#mail_feeder.models.ArtifactIsHash.MultipleObjectsReturned" title="Link to this definition"></a></dt>
 <dd><p>Bases: <code class="xref py py-class docutils literal notranslate"><span class="pre">MultipleObjectsReturned</span></code></p>
 </dd></dl>
 
@@ -728,17 +631,17 @@ object the first time, the query is executed.</p>
 
 <dl class="py class">
 <dt class="sig sig-object py" id="mail_feeder.models.ArtifactIsIp">
-<em class="property"><span class="k"><span class="pre">class</span></span><span class="w"> </span></em><span class="sig-prename descclassname"><span class="pre">mail_feeder.models.</span></span><span class="sig-name descname"><span class="pre">ArtifactIsIp</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">id</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">ip</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">artifact</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">times_sent</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">creation_date</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">last_update</span></span></em><span class="sig-paren">)</span><a class="reference internal" href="../_modules/mail_feeder/models.html#ArtifactIsIp"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#mail_feeder.models.ArtifactIsIp" title="Link to this definition"></a></dt>
+<em class="property"><span class="pre">class</span><span class="w"> </span></em><span class="sig-prename descclassname"><span class="pre">mail_feeder.models.</span></span><span class="sig-name descname"><span class="pre">ArtifactIsIp</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">id</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">ip</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">artifact</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">times_sent</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">creation_date</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">last_update</span></span></em><span class="sig-paren">)</span><a class="reference internal" href="../_modules/mail_feeder/models.html#ArtifactIsIp"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#mail_feeder.models.ArtifactIsIp" title="Link to this definition"></a></dt>
 <dd><p>Bases: <code class="xref py py-class docutils literal notranslate"><span class="pre">Model</span></code></p>
 <dl class="py exception">
 <dt class="sig sig-object py" id="mail_feeder.models.ArtifactIsIp.DoesNotExist">
-<em class="property"><span class="k"><span class="pre">exception</span></span><span class="w"> </span></em><span class="sig-name descname"><span class="pre">DoesNotExist</span></span><a class="headerlink" href="#mail_feeder.models.ArtifactIsIp.DoesNotExist" title="Link to this definition"></a></dt>
+<em class="property"><span class="pre">exception</span><span class="w"> </span></em><span class="sig-name descname"><span class="pre">DoesNotExist</span></span><a class="headerlink" href="#mail_feeder.models.ArtifactIsIp.DoesNotExist" title="Link to this definition"></a></dt>
 <dd><p>Bases: <code class="xref py py-class docutils literal notranslate"><span class="pre">ObjectDoesNotExist</span></code></p>
 </dd></dl>
 
 <dl class="py exception">
 <dt class="sig sig-object py" id="mail_feeder.models.ArtifactIsIp.MultipleObjectsReturned">
-<em class="property"><span class="k"><span class="pre">exception</span></span><span class="w"> </span></em><span class="sig-name descname"><span class="pre">MultipleObjectsReturned</span></span><a class="headerlink" href="#mail_feeder.models.ArtifactIsIp.MultipleObjectsReturned" title="Link to this definition"></a></dt>
+<em class="property"><span class="pre">exception</span><span class="w"> </span></em><span class="sig-name descname"><span class="pre">MultipleObjectsReturned</span></span><a class="headerlink" href="#mail_feeder.models.ArtifactIsIp.MultipleObjectsReturned" title="Link to this definition"></a></dt>
 <dd><p>Bases: <code class="xref py py-class docutils literal notranslate"><span class="pre">MultipleObjectsReturned</span></code></p>
 </dd></dl>
 
@@ -850,17 +753,17 @@ object the first time, the query is executed.</p>
 
 <dl class="py class">
 <dt class="sig sig-object py" id="mail_feeder.models.ArtifactIsMailAddress">
-<em class="property"><span class="k"><span class="pre">class</span></span><span class="w"> </span></em><span class="sig-prename descclassname"><span class="pre">mail_feeder.models.</span></span><span class="sig-name descname"><span class="pre">ArtifactIsMailAddress</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">id</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">mail_address</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">artifact</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">times_sent</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">creation_date</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">last_update</span></span></em><span class="sig-paren">)</span><a class="reference internal" href="../_modules/mail_feeder/models.html#ArtifactIsMailAddress"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#mail_feeder.models.ArtifactIsMailAddress" title="Link to this definition"></a></dt>
+<em class="property"><span class="pre">class</span><span class="w"> </span></em><span class="sig-prename descclassname"><span class="pre">mail_feeder.models.</span></span><span class="sig-name descname"><span class="pre">ArtifactIsMailAddress</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">id</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">mail_address</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">artifact</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">times_sent</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">creation_date</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">last_update</span></span></em><span class="sig-paren">)</span><a class="reference internal" href="../_modules/mail_feeder/models.html#ArtifactIsMailAddress"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#mail_feeder.models.ArtifactIsMailAddress" title="Link to this definition"></a></dt>
 <dd><p>Bases: <code class="xref py py-class docutils literal notranslate"><span class="pre">Model</span></code></p>
 <dl class="py exception">
 <dt class="sig sig-object py" id="mail_feeder.models.ArtifactIsMailAddress.DoesNotExist">
-<em class="property"><span class="k"><span class="pre">exception</span></span><span class="w"> </span></em><span class="sig-name descname"><span class="pre">DoesNotExist</span></span><a class="headerlink" href="#mail_feeder.models.ArtifactIsMailAddress.DoesNotExist" title="Link to this definition"></a></dt>
+<em class="property"><span class="pre">exception</span><span class="w"> </span></em><span class="sig-name descname"><span class="pre">DoesNotExist</span></span><a class="headerlink" href="#mail_feeder.models.ArtifactIsMailAddress.DoesNotExist" title="Link to this definition"></a></dt>
 <dd><p>Bases: <code class="xref py py-class docutils literal notranslate"><span class="pre">ObjectDoesNotExist</span></code></p>
 </dd></dl>
 
 <dl class="py exception">
 <dt class="sig sig-object py" id="mail_feeder.models.ArtifactIsMailAddress.MultipleObjectsReturned">
-<em class="property"><span class="k"><span class="pre">exception</span></span><span class="w"> </span></em><span class="sig-name descname"><span class="pre">MultipleObjectsReturned</span></span><a class="headerlink" href="#mail_feeder.models.ArtifactIsMailAddress.MultipleObjectsReturned" title="Link to this definition"></a></dt>
+<em class="property"><span class="pre">exception</span><span class="w"> </span></em><span class="sig-name descname"><span class="pre">MultipleObjectsReturned</span></span><a class="headerlink" href="#mail_feeder.models.ArtifactIsMailAddress.MultipleObjectsReturned" title="Link to this definition"></a></dt>
 <dd><p>Bases: <code class="xref py py-class docutils literal notranslate"><span class="pre">MultipleObjectsReturned</span></code></p>
 </dd></dl>
 
@@ -972,17 +875,17 @@ object the first time, the query is executed.</p>
 
 <dl class="py class">
 <dt class="sig sig-object py" id="mail_feeder.models.ArtifactIsUrl">
-<em class="property"><span class="k"><span class="pre">class</span></span><span class="w"> </span></em><span class="sig-prename descclassname"><span class="pre">mail_feeder.models.</span></span><span class="sig-name descname"><span class="pre">ArtifactIsUrl</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">id</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">url</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">artifact</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">times_sent</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">creation_date</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">last_update</span></span></em><span class="sig-paren">)</span><a class="reference internal" href="../_modules/mail_feeder/models.html#ArtifactIsUrl"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#mail_feeder.models.ArtifactIsUrl" title="Link to this definition"></a></dt>
+<em class="property"><span class="pre">class</span><span class="w"> </span></em><span class="sig-prename descclassname"><span class="pre">mail_feeder.models.</span></span><span class="sig-name descname"><span class="pre">ArtifactIsUrl</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">id</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">url</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">artifact</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">times_sent</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">creation_date</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">last_update</span></span></em><span class="sig-paren">)</span><a class="reference internal" href="../_modules/mail_feeder/models.html#ArtifactIsUrl"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#mail_feeder.models.ArtifactIsUrl" title="Link to this definition"></a></dt>
 <dd><p>Bases: <code class="xref py py-class docutils literal notranslate"><span class="pre">Model</span></code></p>
 <dl class="py exception">
 <dt class="sig sig-object py" id="mail_feeder.models.ArtifactIsUrl.DoesNotExist">
-<em class="property"><span class="k"><span class="pre">exception</span></span><span class="w"> </span></em><span class="sig-name descname"><span class="pre">DoesNotExist</span></span><a class="headerlink" href="#mail_feeder.models.ArtifactIsUrl.DoesNotExist" title="Link to this definition"></a></dt>
+<em class="property"><span class="pre">exception</span><span class="w"> </span></em><span class="sig-name descname"><span class="pre">DoesNotExist</span></span><a class="headerlink" href="#mail_feeder.models.ArtifactIsUrl.DoesNotExist" title="Link to this definition"></a></dt>
 <dd><p>Bases: <code class="xref py py-class docutils literal notranslate"><span class="pre">ObjectDoesNotExist</span></code></p>
 </dd></dl>
 
 <dl class="py exception">
 <dt class="sig sig-object py" id="mail_feeder.models.ArtifactIsUrl.MultipleObjectsReturned">
-<em class="property"><span class="k"><span class="pre">exception</span></span><span class="w"> </span></em><span class="sig-name descname"><span class="pre">MultipleObjectsReturned</span></span><a class="headerlink" href="#mail_feeder.models.ArtifactIsUrl.MultipleObjectsReturned" title="Link to this definition"></a></dt>
+<em class="property"><span class="pre">exception</span><span class="w"> </span></em><span class="sig-name descname"><span class="pre">MultipleObjectsReturned</span></span><a class="headerlink" href="#mail_feeder.models.ArtifactIsUrl.MultipleObjectsReturned" title="Link to this definition"></a></dt>
 <dd><p>Bases: <code class="xref py py-class docutils literal notranslate"><span class="pre">MultipleObjectsReturned</span></code></p>
 </dd></dl>
 
@@ -1094,17 +997,17 @@ one-to-one (via ForwardOneToOneDescriptor subclass) relation.</p>
 
 <dl class="py class">
 <dt class="sig sig-object py" id="mail_feeder.models.Mail">
-<em class="property"><span class="k"><span class="pre">class</span></span><span class="w"> </span></em><span class="sig-prename descclassname"><span class="pre">mail_feeder.models.</span></span><span class="sig-name descname"><span class="pre">Mail</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">id</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">subject</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">reportedBy</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">mail_header</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">mail_body</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">date</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">mail_from</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">to</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">cc</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">bcc</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">mail_id</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">times_sent</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">creation_date</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">last_update</span></span></em><span class="sig-paren">)</span><a class="reference internal" href="../_modules/mail_feeder/models.html#Mail"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#mail_feeder.models.Mail" title="Link to this definition"></a></dt>
+<em class="property"><span class="pre">class</span><span class="w"> </span></em><span class="sig-prename descclassname"><span class="pre">mail_feeder.models.</span></span><span class="sig-name descname"><span class="pre">Mail</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">id</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">subject</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">reportedBy</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">mail_header</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">mail_body</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">date</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">mail_from</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">to</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">cc</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">bcc</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">mail_id</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">times_sent</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">creation_date</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">last_update</span></span></em><span class="sig-paren">)</span><a class="reference internal" href="../_modules/mail_feeder/models.html#Mail"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#mail_feeder.models.Mail" title="Link to this definition"></a></dt>
 <dd><p>Bases: <code class="xref py py-class docutils literal notranslate"><span class="pre">Model</span></code></p>
 <dl class="py exception">
 <dt class="sig sig-object py" id="mail_feeder.models.Mail.DoesNotExist">
-<em class="property"><span class="k"><span class="pre">exception</span></span><span class="w"> </span></em><span class="sig-name descname"><span class="pre">DoesNotExist</span></span><a class="headerlink" href="#mail_feeder.models.Mail.DoesNotExist" title="Link to this definition"></a></dt>
+<em class="property"><span class="pre">exception</span><span class="w"> </span></em><span class="sig-name descname"><span class="pre">DoesNotExist</span></span><a class="headerlink" href="#mail_feeder.models.Mail.DoesNotExist" title="Link to this definition"></a></dt>
 <dd><p>Bases: <code class="xref py py-class docutils literal notranslate"><span class="pre">ObjectDoesNotExist</span></code></p>
 </dd></dl>
 
 <dl class="py exception">
 <dt class="sig sig-object py" id="mail_feeder.models.Mail.MultipleObjectsReturned">
-<em class="property"><span class="k"><span class="pre">exception</span></span><span class="w"> </span></em><span class="sig-name descname"><span class="pre">MultipleObjectsReturned</span></span><a class="headerlink" href="#mail_feeder.models.Mail.MultipleObjectsReturned" title="Link to this definition"></a></dt>
+<em class="property"><span class="pre">exception</span><span class="w"> </span></em><span class="sig-name descname"><span class="pre">MultipleObjectsReturned</span></span><a class="headerlink" href="#mail_feeder.models.Mail.MultipleObjectsReturned" title="Link to this definition"></a></dt>
 <dd><p>Bases: <code class="xref py py-class docutils literal notranslate"><span class="pre">MultipleObjectsReturned</span></code></p>
 </dd></dl>
 
@@ -1372,17 +1275,17 @@ object the first time, the query is executed.</p>
 
 <dl class="py class">
 <dt class="sig sig-object py" id="mail_feeder.models.MailAnalyzed">
-<em class="property"><span class="k"><span class="pre">class</span></span><span class="w"> </span></em><span class="sig-prename descclassname"><span class="pre">mail_feeder.models.</span></span><span class="sig-name descname"><span class="pre">MailAnalyzed</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">id</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">mail</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">is_phishing</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">is_dangerous</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">is_legitimate</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">is_spam</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">creation_date</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">last_update</span></span></em><span class="sig-paren">)</span><a class="reference internal" href="../_modules/mail_feeder/models.html#MailAnalyzed"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#mail_feeder.models.MailAnalyzed" title="Link to this definition"></a></dt>
+<em class="property"><span class="pre">class</span><span class="w"> </span></em><span class="sig-prename descclassname"><span class="pre">mail_feeder.models.</span></span><span class="sig-name descname"><span class="pre">MailAnalyzed</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">id</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">mail</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">is_phishing</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">is_dangerous</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">is_legitimate</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">is_spam</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">creation_date</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">last_update</span></span></em><span class="sig-paren">)</span><a class="reference internal" href="../_modules/mail_feeder/models.html#MailAnalyzed"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#mail_feeder.models.MailAnalyzed" title="Link to this definition"></a></dt>
 <dd><p>Bases: <code class="xref py py-class docutils literal notranslate"><span class="pre">Model</span></code></p>
 <dl class="py exception">
 <dt class="sig sig-object py" id="mail_feeder.models.MailAnalyzed.DoesNotExist">
-<em class="property"><span class="k"><span class="pre">exception</span></span><span class="w"> </span></em><span class="sig-name descname"><span class="pre">DoesNotExist</span></span><a class="headerlink" href="#mail_feeder.models.MailAnalyzed.DoesNotExist" title="Link to this definition"></a></dt>
+<em class="property"><span class="pre">exception</span><span class="w"> </span></em><span class="sig-name descname"><span class="pre">DoesNotExist</span></span><a class="headerlink" href="#mail_feeder.models.MailAnalyzed.DoesNotExist" title="Link to this definition"></a></dt>
 <dd><p>Bases: <code class="xref py py-class docutils literal notranslate"><span class="pre">ObjectDoesNotExist</span></code></p>
 </dd></dl>
 
 <dl class="py exception">
 <dt class="sig sig-object py" id="mail_feeder.models.MailAnalyzed.MultipleObjectsReturned">
-<em class="property"><span class="k"><span class="pre">exception</span></span><span class="w"> </span></em><span class="sig-name descname"><span class="pre">MultipleObjectsReturned</span></span><a class="headerlink" href="#mail_feeder.models.MailAnalyzed.MultipleObjectsReturned" title="Link to this definition"></a></dt>
+<em class="property"><span class="pre">exception</span><span class="w"> </span></em><span class="sig-name descname"><span class="pre">MultipleObjectsReturned</span></span><a class="headerlink" href="#mail_feeder.models.MailAnalyzed.MultipleObjectsReturned" title="Link to this definition"></a></dt>
 <dd><p>Bases: <code class="xref py py-class docutils literal notranslate"><span class="pre">MultipleObjectsReturned</span></code></p>
 </dd></dl>
 
@@ -1482,17 +1385,17 @@ one-to-one (via ForwardOneToOneDescriptor subclass) relation.</p>
 
 <dl class="py class">
 <dt class="sig sig-object py" id="mail_feeder.models.MailArchive">
-<em class="property"><span class="k"><span class="pre">class</span></span><span class="w"> </span></em><span class="sig-prename descclassname"><span class="pre">mail_feeder.models.</span></span><span class="sig-name descname"><span class="pre">MailArchive</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">id</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">mail</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">archive</span></span></em><span class="sig-paren">)</span><a class="reference internal" href="../_modules/mail_feeder/models.html#MailArchive"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#mail_feeder.models.MailArchive" title="Link to this definition"></a></dt>
+<em class="property"><span class="pre">class</span><span class="w"> </span></em><span class="sig-prename descclassname"><span class="pre">mail_feeder.models.</span></span><span class="sig-name descname"><span class="pre">MailArchive</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">id</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">mail</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">archive</span></span></em><span class="sig-paren">)</span><a class="reference internal" href="../_modules/mail_feeder/models.html#MailArchive"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#mail_feeder.models.MailArchive" title="Link to this definition"></a></dt>
 <dd><p>Bases: <code class="xref py py-class docutils literal notranslate"><span class="pre">Model</span></code></p>
 <dl class="py exception">
 <dt class="sig sig-object py" id="mail_feeder.models.MailArchive.DoesNotExist">
-<em class="property"><span class="k"><span class="pre">exception</span></span><span class="w"> </span></em><span class="sig-name descname"><span class="pre">DoesNotExist</span></span><a class="headerlink" href="#mail_feeder.models.MailArchive.DoesNotExist" title="Link to this definition"></a></dt>
+<em class="property"><span class="pre">exception</span><span class="w"> </span></em><span class="sig-name descname"><span class="pre">DoesNotExist</span></span><a class="headerlink" href="#mail_feeder.models.MailArchive.DoesNotExist" title="Link to this definition"></a></dt>
 <dd><p>Bases: <code class="xref py py-class docutils literal notranslate"><span class="pre">ObjectDoesNotExist</span></code></p>
 </dd></dl>
 
 <dl class="py exception">
 <dt class="sig sig-object py" id="mail_feeder.models.MailArchive.MultipleObjectsReturned">
-<em class="property"><span class="k"><span class="pre">exception</span></span><span class="w"> </span></em><span class="sig-name descname"><span class="pre">MultipleObjectsReturned</span></span><a class="headerlink" href="#mail_feeder.models.MailArchive.MultipleObjectsReturned" title="Link to this definition"></a></dt>
+<em class="property"><span class="pre">exception</span><span class="w"> </span></em><span class="sig-name descname"><span class="pre">MultipleObjectsReturned</span></span><a class="headerlink" href="#mail_feeder.models.MailArchive.MultipleObjectsReturned" title="Link to this definition"></a></dt>
 <dd><p>Bases: <code class="xref py py-class docutils literal notranslate"><span class="pre">MultipleObjectsReturned</span></code></p>
 </dd></dl>
 
@@ -1548,17 +1451,17 @@ one-to-one (via ForwardOneToOneDescriptor subclass) relation.</p>
 
 <dl class="py class">
 <dt class="sig sig-object py" id="mail_feeder.models.MailArtifact">
-<em class="property"><span class="k"><span class="pre">class</span></span><span class="w"> </span></em><span class="sig-prename descclassname"><span class="pre">mail_feeder.models.</span></span><span class="sig-name descname"><span class="pre">MailArtifact</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">id</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">mail</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">artifact_score</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">artifact_confidence</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">artifact_level</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">artifact_type</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">artifactIsIp</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">artifactIsUrl</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">artifactIsHash</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">artifactIsDomain</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">artifactIsMailAddress</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">creation_date</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">last_update</span></span></em><span class="sig-paren">)</span><a class="reference internal" href="../_modules/mail_feeder/models.html#MailArtifact"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#mail_feeder.models.MailArtifact" title="Link to this definition"></a></dt>
+<em class="property"><span class="pre">class</span><span class="w"> </span></em><span class="sig-prename descclassname"><span class="pre">mail_feeder.models.</span></span><span class="sig-name descname"><span class="pre">MailArtifact</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">id</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">mail</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">artifact_score</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">artifact_confidence</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">artifact_level</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">artifact_type</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">artifactIsIp</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">artifactIsUrl</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">artifactIsHash</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">artifactIsDomain</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">artifactIsMailAddress</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">creation_date</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">last_update</span></span></em><span class="sig-paren">)</span><a class="reference internal" href="../_modules/mail_feeder/models.html#MailArtifact"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#mail_feeder.models.MailArtifact" title="Link to this definition"></a></dt>
 <dd><p>Bases: <code class="xref py py-class docutils literal notranslate"><span class="pre">Model</span></code></p>
 <dl class="py exception">
 <dt class="sig sig-object py" id="mail_feeder.models.MailArtifact.DoesNotExist">
-<em class="property"><span class="k"><span class="pre">exception</span></span><span class="w"> </span></em><span class="sig-name descname"><span class="pre">DoesNotExist</span></span><a class="headerlink" href="#mail_feeder.models.MailArtifact.DoesNotExist" title="Link to this definition"></a></dt>
+<em class="property"><span class="pre">exception</span><span class="w"> </span></em><span class="sig-name descname"><span class="pre">DoesNotExist</span></span><a class="headerlink" href="#mail_feeder.models.MailArtifact.DoesNotExist" title="Link to this definition"></a></dt>
 <dd><p>Bases: <code class="xref py py-class docutils literal notranslate"><span class="pre">ObjectDoesNotExist</span></code></p>
 </dd></dl>
 
 <dl class="py exception">
 <dt class="sig sig-object py" id="mail_feeder.models.MailArtifact.MultipleObjectsReturned">
-<em class="property"><span class="k"><span class="pre">exception</span></span><span class="w"> </span></em><span class="sig-name descname"><span class="pre">MultipleObjectsReturned</span></span><a class="headerlink" href="#mail_feeder.models.MailArtifact.MultipleObjectsReturned" title="Link to this definition"></a></dt>
+<em class="property"><span class="pre">exception</span><span class="w"> </span></em><span class="sig-name descname"><span class="pre">MultipleObjectsReturned</span></span><a class="headerlink" href="#mail_feeder.models.MailArtifact.MultipleObjectsReturned" title="Link to this definition"></a></dt>
 <dd><p>Bases: <code class="xref py py-class docutils literal notranslate"><span class="pre">MultipleObjectsReturned</span></code></p>
 </dd></dl>
 
@@ -1833,17 +1736,17 @@ class built by <code class="docutils literal notranslate"><span class="pre">crea
 
 <dl class="py class">
 <dt class="sig sig-object py" id="mail_feeder.models.MailAttachment">
-<em class="property"><span class="k"><span class="pre">class</span></span><span class="w"> </span></em><span class="sig-prename descclassname"><span class="pre">mail_feeder.models.</span></span><span class="sig-name descname"><span class="pre">MailAttachment</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">id</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">mail</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">attachment_score</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">attachment_confidence</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">attachment_level</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">att_hash_score</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">att_hash_confidence</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">att_hash_level</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">file</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">creation_date</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">last_update</span></span></em><span class="sig-paren">)</span><a class="reference internal" href="../_modules/mail_feeder/models.html#MailAttachment"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#mail_feeder.models.MailAttachment" title="Link to this definition"></a></dt>
+<em class="property"><span class="pre">class</span><span class="w"> </span></em><span class="sig-prename descclassname"><span class="pre">mail_feeder.models.</span></span><span class="sig-name descname"><span class="pre">MailAttachment</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">id</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">mail</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">attachment_score</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">attachment_confidence</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">attachment_level</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">att_hash_score</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">att_hash_confidence</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">att_hash_level</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">file</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">creation_date</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">last_update</span></span></em><span class="sig-paren">)</span><a class="reference internal" href="../_modules/mail_feeder/models.html#MailAttachment"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#mail_feeder.models.MailAttachment" title="Link to this definition"></a></dt>
 <dd><p>Bases: <code class="xref py py-class docutils literal notranslate"><span class="pre">Model</span></code></p>
 <dl class="py exception">
 <dt class="sig sig-object py" id="mail_feeder.models.MailAttachment.DoesNotExist">
-<em class="property"><span class="k"><span class="pre">exception</span></span><span class="w"> </span></em><span class="sig-name descname"><span class="pre">DoesNotExist</span></span><a class="headerlink" href="#mail_feeder.models.MailAttachment.DoesNotExist" title="Link to this definition"></a></dt>
+<em class="property"><span class="pre">exception</span><span class="w"> </span></em><span class="sig-name descname"><span class="pre">DoesNotExist</span></span><a class="headerlink" href="#mail_feeder.models.MailAttachment.DoesNotExist" title="Link to this definition"></a></dt>
 <dd><p>Bases: <code class="xref py py-class docutils literal notranslate"><span class="pre">ObjectDoesNotExist</span></code></p>
 </dd></dl>
 
 <dl class="py exception">
 <dt class="sig sig-object py" id="mail_feeder.models.MailAttachment.MultipleObjectsReturned">
-<em class="property"><span class="k"><span class="pre">exception</span></span><span class="w"> </span></em><span class="sig-name descname"><span class="pre">MultipleObjectsReturned</span></span><a class="headerlink" href="#mail_feeder.models.MailAttachment.MultipleObjectsReturned" title="Link to this definition"></a></dt>
+<em class="property"><span class="pre">exception</span><span class="w"> </span></em><span class="sig-name descname"><span class="pre">MultipleObjectsReturned</span></span><a class="headerlink" href="#mail_feeder.models.MailAttachment.MultipleObjectsReturned" title="Link to this definition"></a></dt>
 <dd><p>Bases: <code class="xref py py-class docutils literal notranslate"><span class="pre">MultipleObjectsReturned</span></code></p>
 </dd></dl>
 
@@ -1975,17 +1878,17 @@ one-to-one (via ForwardOneToOneDescriptor subclass) relation.</p>
 
 <dl class="py class">
 <dt class="sig sig-object py" id="mail_feeder.models.MailBody">
-<em class="property"><span class="k"><span class="pre">class</span></span><span class="w"> </span></em><span class="sig-prename descclassname"><span class="pre">mail_feeder.models.</span></span><span class="sig-name descname"><span class="pre">MailBody</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">id</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">body_score</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">body_confidence</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">body_level</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">body_value</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">fuzzy_hash</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">times_sent</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">other_values</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">creation_date</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">last_update</span></span></em><span class="sig-paren">)</span><a class="reference internal" href="../_modules/mail_feeder/models.html#MailBody"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#mail_feeder.models.MailBody" title="Link to this definition"></a></dt>
+<em class="property"><span class="pre">class</span><span class="w"> </span></em><span class="sig-prename descclassname"><span class="pre">mail_feeder.models.</span></span><span class="sig-name descname"><span class="pre">MailBody</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">id</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">body_score</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">body_confidence</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">body_level</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">body_value</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">fuzzy_hash</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">times_sent</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">other_values</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">creation_date</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">last_update</span></span></em><span class="sig-paren">)</span><a class="reference internal" href="../_modules/mail_feeder/models.html#MailBody"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#mail_feeder.models.MailBody" title="Link to this definition"></a></dt>
 <dd><p>Bases: <code class="xref py py-class docutils literal notranslate"><span class="pre">Model</span></code></p>
 <dl class="py exception">
 <dt class="sig sig-object py" id="mail_feeder.models.MailBody.DoesNotExist">
-<em class="property"><span class="k"><span class="pre">exception</span></span><span class="w"> </span></em><span class="sig-name descname"><span class="pre">DoesNotExist</span></span><a class="headerlink" href="#mail_feeder.models.MailBody.DoesNotExist" title="Link to this definition"></a></dt>
+<em class="property"><span class="pre">exception</span><span class="w"> </span></em><span class="sig-name descname"><span class="pre">DoesNotExist</span></span><a class="headerlink" href="#mail_feeder.models.MailBody.DoesNotExist" title="Link to this definition"></a></dt>
 <dd><p>Bases: <code class="xref py py-class docutils literal notranslate"><span class="pre">ObjectDoesNotExist</span></code></p>
 </dd></dl>
 
 <dl class="py exception">
 <dt class="sig sig-object py" id="mail_feeder.models.MailBody.MultipleObjectsReturned">
-<em class="property"><span class="k"><span class="pre">exception</span></span><span class="w"> </span></em><span class="sig-name descname"><span class="pre">MultipleObjectsReturned</span></span><a class="headerlink" href="#mail_feeder.models.MailBody.MultipleObjectsReturned" title="Link to this definition"></a></dt>
+<em class="property"><span class="pre">exception</span><span class="w"> </span></em><span class="sig-name descname"><span class="pre">MultipleObjectsReturned</span></span><a class="headerlink" href="#mail_feeder.models.MailBody.MultipleObjectsReturned" title="Link to this definition"></a></dt>
 <dd><p>Bases: <code class="xref py py-class docutils literal notranslate"><span class="pre">MultipleObjectsReturned</span></code></p>
 </dd></dl>
 
@@ -2118,17 +2021,17 @@ object the first time, the query is executed.</p>
 
 <dl class="py class">
 <dt class="sig sig-object py" id="mail_feeder.models.MailHeader">
-<em class="property"><span class="k"><span class="pre">class</span></span><span class="w"> </span></em><span class="sig-prename descclassname"><span class="pre">mail_feeder.models.</span></span><span class="sig-name descname"><span class="pre">MailHeader</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">id</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">header_score</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">header_confidence</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">header_level</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">header_value</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">fuzzy_hash</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">times_sent</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">other_values</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">creation_date</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">last_update</span></span></em><span class="sig-paren">)</span><a class="reference internal" href="../_modules/mail_feeder/models.html#MailHeader"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#mail_feeder.models.MailHeader" title="Link to this definition"></a></dt>
+<em class="property"><span class="pre">class</span><span class="w"> </span></em><span class="sig-prename descclassname"><span class="pre">mail_feeder.models.</span></span><span class="sig-name descname"><span class="pre">MailHeader</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">id</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">header_score</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">header_confidence</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">header_level</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">header_value</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">fuzzy_hash</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">times_sent</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">other_values</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">creation_date</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">last_update</span></span></em><span class="sig-paren">)</span><a class="reference internal" href="../_modules/mail_feeder/models.html#MailHeader"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#mail_feeder.models.MailHeader" title="Link to this definition"></a></dt>
 <dd><p>Bases: <code class="xref py py-class docutils literal notranslate"><span class="pre">Model</span></code></p>
 <dl class="py exception">
 <dt class="sig sig-object py" id="mail_feeder.models.MailHeader.DoesNotExist">
-<em class="property"><span class="k"><span class="pre">exception</span></span><span class="w"> </span></em><span class="sig-name descname"><span class="pre">DoesNotExist</span></span><a class="headerlink" href="#mail_feeder.models.MailHeader.DoesNotExist" title="Link to this definition"></a></dt>
+<em class="property"><span class="pre">exception</span><span class="w"> </span></em><span class="sig-name descname"><span class="pre">DoesNotExist</span></span><a class="headerlink" href="#mail_feeder.models.MailHeader.DoesNotExist" title="Link to this definition"></a></dt>
 <dd><p>Bases: <code class="xref py py-class docutils literal notranslate"><span class="pre">ObjectDoesNotExist</span></code></p>
 </dd></dl>
 
 <dl class="py exception">
 <dt class="sig sig-object py" id="mail_feeder.models.MailHeader.MultipleObjectsReturned">
-<em class="property"><span class="k"><span class="pre">exception</span></span><span class="w"> </span></em><span class="sig-name descname"><span class="pre">MultipleObjectsReturned</span></span><a class="headerlink" href="#mail_feeder.models.MailHeader.MultipleObjectsReturned" title="Link to this definition"></a></dt>
+<em class="property"><span class="pre">exception</span><span class="w"> </span></em><span class="sig-name descname"><span class="pre">MultipleObjectsReturned</span></span><a class="headerlink" href="#mail_feeder.models.MailHeader.MultipleObjectsReturned" title="Link to this definition"></a></dt>
 <dd><p>Bases: <code class="xref py py-class docutils literal notranslate"><span class="pre">MultipleObjectsReturned</span></code></p>
 </dd></dl>
 
@@ -2261,17 +2164,17 @@ object the first time, the query is executed.</p>
 
 <dl class="py class">
 <dt class="sig sig-object py" id="mail_feeder.models.MailInfo">
-<em class="property"><span class="k"><span class="pre">class</span></span><span class="w"> </span></em><span class="sig-prename descclassname"><span class="pre">mail_feeder.models.</span></span><span class="sig-name descname"><span class="pre">MailInfo</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">id</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">user</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">mail</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">is_received</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">user_reception_informed</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">is_analyzed</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">user_analysis_informed</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">is_phishing</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">user_phishing_informed</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">is_dangerous</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">user_dangerous_informed</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">creation_date</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">last_update</span></span></em><span class="sig-paren">)</span><a class="reference internal" href="../_modules/mail_feeder/models.html#MailInfo"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#mail_feeder.models.MailInfo" title="Link to this definition"></a></dt>
+<em class="property"><span class="pre">class</span><span class="w"> </span></em><span class="sig-prename descclassname"><span class="pre">mail_feeder.models.</span></span><span class="sig-name descname"><span class="pre">MailInfo</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">id</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">user</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">mail</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">is_received</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">user_reception_informed</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">is_analyzed</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">user_analysis_informed</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">is_phishing</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">user_phishing_informed</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">is_dangerous</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">user_dangerous_informed</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">creation_date</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">last_update</span></span></em><span class="sig-paren">)</span><a class="reference internal" href="../_modules/mail_feeder/models.html#MailInfo"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#mail_feeder.models.MailInfo" title="Link to this definition"></a></dt>
 <dd><p>Bases: <code class="xref py py-class docutils literal notranslate"><span class="pre">Model</span></code></p>
 <dl class="py exception">
 <dt class="sig sig-object py" id="mail_feeder.models.MailInfo.DoesNotExist">
-<em class="property"><span class="k"><span class="pre">exception</span></span><span class="w"> </span></em><span class="sig-name descname"><span class="pre">DoesNotExist</span></span><a class="headerlink" href="#mail_feeder.models.MailInfo.DoesNotExist" title="Link to this definition"></a></dt>
+<em class="property"><span class="pre">exception</span><span class="w"> </span></em><span class="sig-name descname"><span class="pre">DoesNotExist</span></span><a class="headerlink" href="#mail_feeder.models.MailInfo.DoesNotExist" title="Link to this definition"></a></dt>
 <dd><p>Bases: <code class="xref py py-class docutils literal notranslate"><span class="pre">ObjectDoesNotExist</span></code></p>
 </dd></dl>
 
 <dl class="py exception">
 <dt class="sig sig-object py" id="mail_feeder.models.MailInfo.MultipleObjectsReturned">
-<em class="property"><span class="k"><span class="pre">exception</span></span><span class="w"> </span></em><span class="sig-name descname"><span class="pre">MultipleObjectsReturned</span></span><a class="headerlink" href="#mail_feeder.models.MailInfo.MultipleObjectsReturned" title="Link to this definition"></a></dt>
+<em class="property"><span class="pre">exception</span><span class="w"> </span></em><span class="sig-name descname"><span class="pre">MultipleObjectsReturned</span></span><a class="headerlink" href="#mail_feeder.models.MailInfo.MultipleObjectsReturned" title="Link to this definition"></a></dt>
 <dd><p>Bases: <code class="xref py py-class docutils literal notranslate"><span class="pre">MultipleObjectsReturned</span></code></p>
 </dd></dl>
 
@@ -2415,893 +2318,6 @@ object the first time, the query is executed.</p>
 
 </dd></dl>
 
-<dl class="py class" id="module-mail_feeder.mail_utils.mail_handler">
-<dt class="sig sig-object py" id="mail_feeder.mail_utils.mail_handler.MailHandler">
-<em class="property"><span class="k"><span class="pre">class</span></span><span class="w"> </span></em><span class="sig-prename descclassname"><span class="pre">mail_feeder.mail_utils.mail_handler.</span></span><span class="sig-name descname"><span class="pre">MailHandler</span></span><a class="reference internal" href="../_modules/mail_feeder/mail_utils/mail_handler.html#MailHandler"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#mail_feeder.mail_utils.mail_handler.MailHandler" title="Link to this definition"></a></dt>
-<dd><p>Bases: <code class="xref py py-class docutils literal notranslate"><span class="pre">object</span></code></p>
-<dl class="py method">
-<dt class="sig sig-object py" id="mail_feeder.mail_utils.mail_handler.MailHandler.check_email_bodies">
-<span class="sig-name descname"><span class="pre">check_email_bodies</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">email_data_body</span></span></em><span class="sig-paren">)</span><a class="reference internal" href="../_modules/mail_feeder/mail_utils/mail_handler.html#MailHandler.check_email_bodies"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#mail_feeder.mail_utils.mail_handler.MailHandler.check_email_bodies" title="Link to this definition"></a></dt>
-<dd><p>Check the email bodies for similarity with the given email data body.</p>
-<dl class="simple">
-<dt>Args:</dt><dd><p>email_data_body (str): The email data body to compare with.</p>
-</dd>
-<dt>Returns:</dt><dd><p>list: A list of email bodies that are similar to the given email data body.</p>
-</dd>
-</dl>
-</dd></dl>
-
-<dl class="py method">
-<dt class="sig sig-object py" id="mail_feeder.mail_utils.mail_handler.MailHandler.check_email_headers">
-<span class="sig-name descname"><span class="pre">check_email_headers</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">email_data_header</span></span></em><span class="sig-paren">)</span><a class="reference internal" href="../_modules/mail_feeder/mail_utils/mail_handler.html#MailHandler.check_email_headers"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#mail_feeder.mail_utils.mail_handler.MailHandler.check_email_headers" title="Link to this definition"></a></dt>
-<dd><p>Check and validate email headers.</p>
-<p>This method checks the email headers against the existing mail headers in the database.
-It calculates the distance between the email header and the headers in the database using a text distance algorithm.
-If the distance is less than 1, it adds the mail header to the email_header_list.
-If the distance is 0, it increments the times_sent counter of the email and breaks the loop.
-It also updates the other_values field of the mail header with preprocessed text and saves the changes.</p>
-<dl class="simple">
-<dt>Args:</dt><dd><p>email_data_header (str): The email header to be checked and validated.</p>
-</dd>
-<dt>Returns:</dt><dd><p>list: A list of mail headers that match the email_data_header.</p>
-</dd>
-<dt>Raises:</dt><dd><p>Exception: If there is an error while checking the email header lists.</p>
-</dd>
-</dl>
-</dd></dl>
-
-<dl class="py method">
-<dt class="sig sig-object py" id="mail_feeder.mail_utils.mail_handler.MailHandler.check_email_lists">
-<span class="sig-name descname"><span class="pre">check_email_lists</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">email_data</span></span></em><span class="sig-paren">)</span><a class="reference internal" href="../_modules/mail_feeder/mail_utils/mail_handler.html#MailHandler.check_email_lists"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#mail_feeder.mail_utils.mail_handler.MailHandler.check_email_lists" title="Link to this definition"></a></dt>
-<dd><p>Check the email lists for a given email data.</p>
-<dl class="simple">
-<dt>Args:</dt><dd><p>email_data (dict): A dictionary containing email data.</p>
-</dd>
-<dt>Returns:</dt><dd><dl class="simple">
-<dt>tuple: A tuple containing the following lists:</dt><dd><ul class="simple">
-<li><p>email_list: A list of Mail objects filtered by mail_id.</p></li>
-<li><p>email_body_list: A list of email bodies that passed the validation.</p></li>
-<li><p>email_header_list: A list of email headers that passed the validation.</p></li>
-</ul>
-</dd>
-</dl>
-</dd>
-</dl>
-</dd></dl>
-
-<dl class="py method">
-<dt class="sig sig-object py" id="mail_feeder.mail_utils.mail_handler.MailHandler.create_artifact_is_mail_address">
-<span class="sig-name descname"><span class="pre">create_artifact_is_mail_address</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">artifact</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">mail_artifact</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">data_value</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">mail_instance</span></span></em><span class="sig-paren">)</span><a class="reference internal" href="../_modules/mail_feeder/mail_utils/mail_handler.html#MailHandler.create_artifact_is_mail_address"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#mail_feeder.mail_utils.mail_handler.MailHandler.create_artifact_is_mail_address" title="Link to this definition"></a></dt>
-<dd><p>Creates an ArtifactIsMailAddress object and associates it with the given artifact and mail_artifact.
-If the ArtifactIsMailAddress object already exists for the given mail address, it updates the association with the mail_instance.</p>
-<dl class="simple">
-<dt>Args:</dt><dd><p>artifact: The mail address artifact.
-mail_artifact: The mail artifact.
-data_value: The mail address value.
-mail_instance: The mail instance to associate with the ArtifactIsMailAddress object.</p>
-</dd>
-<dt>Returns:</dt><dd><p>None</p>
-</dd>
-</dl>
-</dd></dl>
-
-<dl class="py method">
-<dt class="sig sig-object py" id="mail_feeder.mail_utils.mail_handler.MailHandler.create_default_user">
-<span class="sig-name descname"><span class="pre">create_default_user</span></span><span class="sig-paren">(</span><span class="sig-paren">)</span><a class="reference internal" href="../_modules/mail_feeder/mail_utils/mail_handler.html#MailHandler.create_default_user"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#mail_feeder.mail_utils.mail_handler.MailHandler.create_default_user" title="Link to this definition"></a></dt>
-<dd><p>Creates a default user if it doesn’t already exist.</p>
-<p>If a user with the username “<a class="reference external" href="mailto:suspicious&#37;&#52;&#48;cert&#46;local">suspicious<span>&#64;</span>cert<span>&#46;</span>local</a>” already exists, it returns that user.
-Otherwise, it creates a new user with the username “<a class="reference external" href="mailto:suspicious&#37;&#52;&#48;cert&#46;local">suspicious<span>&#64;</span>cert<span>&#46;</span>local</a>” and sets an unusable password.</p>
-<dl class="simple">
-<dt>Returns:</dt><dd><p>User: The default user.</p>
-</dd>
-</dl>
-</dd></dl>
-
-<dl class="py method">
-<dt class="sig sig-object py" id="mail_feeder.mail_utils.mail_handler.MailHandler.create_mail_body_instance">
-<span class="sig-name descname"><span class="pre">create_mail_body_instance</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">email_data</span></span></em><span class="sig-paren">)</span><a class="reference internal" href="../_modules/mail_feeder/mail_utils/mail_handler.html#MailHandler.create_mail_body_instance"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#mail_feeder.mail_utils.mail_handler.MailHandler.create_mail_body_instance" title="Link to this definition"></a></dt>
-<dd><p>Create a MailBody instance based on the provided email data.</p>
-<dl class="simple">
-<dt>Args:</dt><dd><p>email_data (dict): A dictionary containing the email data.</p>
-</dd>
-<dt>Returns:</dt><dd><p>MailBody: The created MailBody instance.</p>
-</dd>
-</dl>
-</dd></dl>
-
-<dl class="py method">
-<dt class="sig sig-object py" id="mail_feeder.mail_utils.mail_handler.MailHandler.create_mail_header_instance">
-<span class="sig-name descname"><span class="pre">create_mail_header_instance</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">email_data</span></span></em><span class="sig-paren">)</span><a class="reference internal" href="../_modules/mail_feeder/mail_utils/mail_handler.html#MailHandler.create_mail_header_instance"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#mail_feeder.mail_utils.mail_handler.MailHandler.create_mail_header_instance" title="Link to this definition"></a></dt>
-<dd><p>Create a MailHeader instance based on the provided email data.</p>
-<dl class="simple">
-<dt>Args:</dt><dd><p>email_data (dict): A dictionary containing email data.</p>
-</dd>
-<dt>Returns:</dt><dd><p>MailHeader: The created MailHeader instance.</p>
-</dd>
-<dt>Raises:</dt><dd><p>None.</p>
-</dd>
-</dl>
-</dd></dl>
-
-<dl class="py method">
-<dt class="sig sig-object py" id="mail_feeder.mail_utils.mail_handler.MailHandler.create_mail_instance">
-<span class="sig-name descname"><span class="pre">create_mail_instance</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">email_data</span></span></em><span class="sig-paren">)</span><a class="reference internal" href="../_modules/mail_feeder/mail_utils/mail_handler.html#MailHandler.create_mail_instance"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#mail_feeder.mail_utils.mail_handler.MailHandler.create_mail_instance" title="Link to this definition"></a></dt>
-<dd><p>Create a Mail instance based on the provided email data.</p>
-<dl class="simple">
-<dt>Args:</dt><dd><p>email_data (dict): A dictionary containing the email data.</p>
-</dd>
-<dt>Returns:</dt><dd><p>Mail or None: The created Mail instance, or None if creation failed.</p>
-</dd>
-</dl>
-</dd></dl>
-
-<dl class="py method">
-<dt class="sig sig-object py" id="mail_feeder.mail_utils.mail_handler.MailHandler.create_monthly_user_stats">
-<span class="sig-name descname"><span class="pre">create_monthly_user_stats</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">user</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">month</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">year</span></span></em><span class="sig-paren">)</span><a class="reference internal" href="../_modules/mail_feeder/mail_utils/mail_handler.html#MailHandler.create_monthly_user_stats"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#mail_feeder.mail_utils.mail_handler.MailHandler.create_monthly_user_stats" title="Link to this definition"></a></dt>
-<dd><p>Create or update the monthly user statistics for a given user, month, and year.</p>
-<dl class="simple">
-<dt>Args:</dt><dd><p>user (User): The user for whom the statistics are being created or updated.
-month (int): The month for which the statistics are being created or updated.
-year (int): The year for which the statistics are being created or updated.</p>
-</dd>
-<dt>Returns:</dt><dd><p>None</p>
-</dd>
-</dl>
-</dd></dl>
-
-<dl class="py method">
-<dt class="sig sig-object py" id="mail_feeder.mail_utils.mail_handler.MailHandler.create_user">
-<span class="sig-name descname"><span class="pre">create_user</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">username</span></span></em><span class="sig-paren">)</span><a class="reference internal" href="../_modules/mail_feeder/mail_utils/mail_handler.html#MailHandler.create_user"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#mail_feeder.mail_utils.mail_handler.MailHandler.create_user" title="Link to this definition"></a></dt>
-<dd><p>Creates a new user with the given username.</p>
-<dl class="simple">
-<dt>Args:</dt><dd><p>username (str): The username for the new user.</p>
-</dd>
-<dt>Returns:</dt><dd><p>User: The newly created user object.</p>
-</dd>
-</dl>
-</dd></dl>
-
-<dl class="py method">
-<dt class="sig sig-object py" id="mail_feeder.mail_utils.mail_handler.MailHandler.decode_subject">
-<em class="property"><span class="k"><span class="pre">static</span></span><span class="w"> </span></em><span class="sig-name descname"><span class="pre">decode_subject</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">subject</span></span></em><span class="sig-paren">)</span><a class="reference internal" href="../_modules/mail_feeder/mail_utils/mail_handler.html#MailHandler.decode_subject"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#mail_feeder.mail_utils.mail_handler.MailHandler.decode_subject" title="Link to this definition"></a></dt>
-<dd><p>Decode the subject of the email.</p>
-<dl class="simple">
-<dt>Args:</dt><dd><p>subject (str): The subject of the email.</p>
-</dd>
-<dt>Returns:</dt><dd><p>str: The decoded subject.</p>
-</dd>
-</dl>
-</dd></dl>
-
-<dl class="py method">
-<dt class="sig sig-object py" id="mail_feeder.mail_utils.mail_handler.MailHandler.extract_observables_v3">
-<span class="sig-name descname"><span class="pre">extract_observables_v3</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">filename</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">mail</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">workdir</span></span></em><span class="sig-paren">)</span><a class="reference internal" href="../_modules/mail_feeder/mail_utils/mail_handler.html#MailHandler.extract_observables_v3"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#mail_feeder.mail_utils.mail_handler.MailHandler.extract_observables_v3" title="Link to this definition"></a></dt>
-<dd><p>Extracts observables from an email and its attachments.</p>
-<dl class="simple">
-<dt>Args:</dt><dd><p>filename (str): The name of the email file.
-mail (dict): The metadata of the email.</p>
-</dd>
-<dt>Returns:</dt><dd><p>dict: A dictionary containing the extracted artifacts and files.</p>
-</dd>
-<dt>Raises:</dt><dd><p>FileNotFoundError: If the email file or any of its attachments are not found.</p>
-</dd>
-</dl>
-</dd></dl>
-
-<dl class="py method">
-<dt class="sig sig-object py" id="mail_feeder.mail_utils.mail_handler.MailHandler.get_handler">
-<span class="sig-name descname"><span class="pre">get_handler</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">data_type</span></span></em><span class="sig-paren">)</span><a class="reference internal" href="../_modules/mail_feeder/mail_utils/mail_handler.html#MailHandler.get_handler"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#mail_feeder.mail_utils.mail_handler.MailHandler.get_handler" title="Link to this definition"></a></dt>
-<dd></dd></dl>
-
-<dl class="py method">
-<dt class="sig sig-object py" id="mail_feeder.mail_utils.mail_handler.MailHandler.get_handler_method">
-<span class="sig-name descname"><span class="pre">get_handler_method</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">data_type</span></span></em><span class="sig-paren">)</span><a class="reference internal" href="../_modules/mail_feeder/mail_utils/mail_handler.html#MailHandler.get_handler_method"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#mail_feeder.mail_utils.mail_handler.MailHandler.get_handler_method" title="Link to this definition"></a></dt>
-<dd></dd></dl>
-
-<dl class="py method">
-<dt class="sig sig-object py" id="mail_feeder.mail_utils.mail_handler.MailHandler.get_or_create_user">
-<span class="sig-name descname"><span class="pre">get_or_create_user</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">username</span></span></em><span class="sig-paren">)</span><a class="reference internal" href="../_modules/mail_feeder/mail_utils/mail_handler.html#MailHandler.get_or_create_user"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#mail_feeder.mail_utils.mail_handler.MailHandler.get_or_create_user" title="Link to this definition"></a></dt>
-<dd><p>Retrieves an existing user from the database or creates a new user if not found.</p>
-<dl class="simple">
-<dt>Args:</dt><dd><p>username (str): The username of the user to retrieve or create.</p>
-</dd>
-<dt>Returns:</dt><dd><p>User: The retrieved or created user object.</p>
-</dd>
-<dt>Raises:</dt><dd><p>Exception: If an error occurs while retrieving the user from the database.</p>
-</dd>
-</dl>
-</dd></dl>
-
-<dl class="py method">
-<dt class="sig sig-object py" id="mail_feeder.mail_utils.mail_handler.MailHandler.get_prime_and_decoded_url">
-<span class="sig-name descname"><span class="pre">get_prime_and_decoded_url</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">url</span></span></em><span class="sig-paren">)</span><a class="reference internal" href="../_modules/mail_feeder/mail_utils/mail_handler.html#MailHandler.get_prime_and_decoded_url"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#mail_feeder.mail_utils.mail_handler.MailHandler.get_prime_and_decoded_url" title="Link to this definition"></a></dt>
-<dd><p>Retrieves the prime URL (without query parameters) and decodes the Base64-encoded ‘tid’ param from the URL.</p>
-<dl class="simple">
-<dt>Args:</dt><dd><p>url (str): The URL to process.</p>
-</dd>
-<dt>Returns:</dt><dd><p>tuple: A tuple containing the prime URL and the decoded URL (if any).</p>
-</dd>
-</dl>
-</dd></dl>
-
-<dl class="py method">
-<dt class="sig sig-object py" id="mail_feeder.mail_utils.mail_handler.MailHandler.handle_existing_mail">
-<span class="sig-name descname"><span class="pre">handle_existing_mail</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">email_data</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">email_list</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">workdir</span></span></em><span class="sig-paren">)</span><a class="reference internal" href="../_modules/mail_feeder/mail_utils/mail_handler.html#MailHandler.handle_existing_mail"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#mail_feeder.mail_utils.mail_handler.MailHandler.handle_existing_mail" title="Link to this definition"></a></dt>
-<dd><p>Handles an existing mail instance.</p>
-<dl class="simple">
-<dt>Args:</dt><dd><p>email_data (dict): The data of the email.
-email_list (list): List of existing email instances.
-email_body_list (list): List of email bodies.
-email_header_list (list): List of email headers.</p>
-</dd>
-<dt>Returns:</dt><dd><p>mail_instance: The updated or newly created mail instance.</p>
-</dd>
-</dl>
-</dd></dl>
-
-<dl class="py method">
-<dt class="sig sig-object py" id="mail_feeder.mail_utils.mail_handler.MailHandler.handle_mail">
-<span class="sig-name descname"><span class="pre">handle_mail</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">email_data</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">workdir</span></span></em><span class="sig-paren">)</span><a class="reference internal" href="../_modules/mail_feeder/mail_utils/mail_handler.html#MailHandler.handle_mail"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#mail_feeder.mail_utils.mail_handler.MailHandler.handle_mail" title="Link to this definition"></a></dt>
-<dd><p>Handles the email data by checking email lists and either handling a new mail or an existing mail.</p>
-<dl class="simple">
-<dt>Args:</dt><dd><p>email_data (dict): The email data to be handled.</p>
-</dd>
-<dt>Returns:</dt><dd><p>mail_instance: The instance of the mail that was handled.</p>
-</dd>
-</dl>
-</dd></dl>
-
-<dl class="py method">
-<dt class="sig sig-object py" id="mail_feeder.mail_utils.mail_handler.MailHandler.handle_mail_artifact_domain">
-<span class="sig-name descname"><span class="pre">handle_mail_artifact_domain</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">data_value</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">mail_instance</span></span></em><span class="sig-paren">)</span><a class="reference internal" href="../_modules/mail_feeder/mail_utils/mail_handler.html#MailHandler.handle_mail_artifact_domain"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#mail_feeder.mail_utils.mail_handler.MailHandler.handle_mail_artifact_domain" title="Link to this definition"></a></dt>
-<dd><p>Handles the mail artifact domain.</p>
-<dl class="simple">
-<dt>Args:</dt><dd><p>data_value (str): The data value of the domain.
-mail_instance (Mail): The mail instance.</p>
-</dd>
-<dt>Returns:</dt><dd><p>None</p>
-</dd>
-</dl>
-</dd></dl>
-
-<dl class="py method">
-<dt class="sig sig-object py" id="mail_feeder.mail_utils.mail_handler.MailHandler.handle_mail_artifact_hash">
-<span class="sig-name descname"><span class="pre">handle_mail_artifact_hash</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">data_value</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">mail_instance</span></span></em><span class="sig-paren">)</span><a class="reference internal" href="../_modules/mail_feeder/mail_utils/mail_handler.html#MailHandler.handle_mail_artifact_hash"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#mail_feeder.mail_utils.mail_handler.MailHandler.handle_mail_artifact_hash" title="Link to this definition"></a></dt>
-<dd><p>Handles the mail artifact hash by creating a mail artifact and associating it with the provided mail instance.</p>
-<dl class="simple">
-<dt>Args:</dt><dd><p>data_value (str): The value of the data to be hashed.
-mail_instance (Mail): The mail instance to associate the mail artifact with.</p>
-</dd>
-<dt>Returns:</dt><dd><p>None</p>
-</dd>
-</dl>
-</dd></dl>
-
-<dl class="py method">
-<dt class="sig sig-object py" id="mail_feeder.mail_utils.mail_handler.MailHandler.handle_mail_artifact_ip">
-<span class="sig-name descname"><span class="pre">handle_mail_artifact_ip</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">data_value</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">mail_instance</span></span></em><span class="sig-paren">)</span><a class="reference internal" href="../_modules/mail_feeder/mail_utils/mail_handler.html#MailHandler.handle_mail_artifact_ip"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#mail_feeder.mail_utils.mail_handler.MailHandler.handle_mail_artifact_ip" title="Link to this definition"></a></dt>
-<dd><p>Handles the mail artifact for IP addresses.</p>
-<dl class="simple">
-<dt>Args:</dt><dd><p>data_value (str): The IP address value.
-mail_instance (Mail): The mail instance.</p>
-</dd>
-<dt>Returns:</dt><dd><p>None</p>
-</dd>
-</dl>
-</dd></dl>
-
-<dl class="py method">
-<dt class="sig sig-object py" id="mail_feeder.mail_utils.mail_handler.MailHandler.handle_mail_artifact_mail">
-<span class="sig-name descname"><span class="pre">handle_mail_artifact_mail</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">data_value</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">mail_instance</span></span></em><span class="sig-paren">)</span><a class="reference internal" href="../_modules/mail_feeder/mail_utils/mail_handler.html#MailHandler.handle_mail_artifact_mail"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#mail_feeder.mail_utils.mail_handler.MailHandler.handle_mail_artifact_mail" title="Link to this definition"></a></dt>
-<dd><p>Handle the mail artifact for the given data value and mail instance.</p>
-<dl class="simple">
-<dt>Args:</dt><dd><p>data_value (str): The data value to handle.
-mail_instance (MailInstance): The mail instance object.</p>
-</dd>
-<dt>Returns:</dt><dd><p>None</p>
-</dd>
-</dl>
-</dd></dl>
-
-<dl class="py method">
-<dt class="sig sig-object py" id="mail_feeder.mail_utils.mail_handler.MailHandler.handle_mail_artifact_url">
-<span class="sig-name descname"><span class="pre">handle_mail_artifact_url</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">data_value</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">mail_instance</span></span></em><span class="sig-paren">)</span><a class="reference internal" href="../_modules/mail_feeder/mail_utils/mail_handler.html#MailHandler.handle_mail_artifact_url"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#mail_feeder.mail_utils.mail_handler.MailHandler.handle_mail_artifact_url" title="Link to this definition"></a></dt>
-<dd><p>Handles the mail artifact URL, processing both the prime URL and the decoded URL.</p>
-<dl class="simple">
-<dt>Args:</dt><dd><p>data_value (str): The data value of the URL.
-mail_instance (Mail): The mail instance.</p>
-</dd>
-<dt>Returns:</dt><dd><p>None</p>
-</dd>
-</dl>
-</dd></dl>
-
-<dl class="py method">
-<dt class="sig sig-object py" id="mail_feeder.mail_utils.mail_handler.MailHandler.handle_mail_artifacts">
-<span class="sig-name descname"><span class="pre">handle_mail_artifacts</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">artifacts</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">mail_instance</span></span></em><span class="sig-paren">)</span><a class="reference internal" href="../_modules/mail_feeder/mail_utils/mail_handler.html#MailHandler.handle_mail_artifacts"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#mail_feeder.mail_utils.mail_handler.MailHandler.handle_mail_artifacts" title="Link to this definition"></a></dt>
-<dd><p>Handle mail artifacts.</p>
-<dl class="simple">
-<dt>Args:</dt><dd><p>artifacts (list): List of artifacts.
-mail_instance (Mail): Mail instance.</p>
-</dd>
-<dt>Returns:</dt><dd><p>None</p>
-</dd>
-</dl>
-</dd></dl>
-
-<dl class="py method">
-<dt class="sig sig-object py" id="mail_feeder.mail_utils.mail_handler.MailHandler.handle_mail_attachment">
-<span class="sig-name descname"><span class="pre">handle_mail_attachment</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">files</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">mail_instance</span></span></em><span class="sig-paren">)</span><a class="reference internal" href="../_modules/mail_feeder/mail_utils/mail_handler.html#MailHandler.handle_mail_attachment"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#mail_feeder.mail_utils.mail_handler.MailHandler.handle_mail_attachment" title="Link to this definition"></a></dt>
-<dd><p>Handles mail attachments by saving them to the database and associating them with the given mail instance.</p>
-<dl class="simple">
-<dt>Args:</dt><dd><p>files (dict): A dictionary of file objects representing the attachments.
-mail_instance (Mail): The mail instance to associate the attachments with.</p>
-</dd>
-<dt>Returns:</dt><dd><p>None</p>
-</dd>
-</dl>
-</dd></dl>
-
-<dl class="py method">
-<dt class="sig sig-object py" id="mail_feeder.mail_utils.mail_handler.MailHandler.handle_new_mail">
-<span class="sig-name descname"><span class="pre">handle_new_mail</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">email_data</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">workdir</span></span></em><span class="sig-paren">)</span><a class="reference internal" href="../_modules/mail_feeder/mail_utils/mail_handler.html#MailHandler.handle_new_mail"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#mail_feeder.mail_utils.mail_handler.MailHandler.handle_new_mail" title="Link to this definition"></a></dt>
-<dd><p>Handles a new mail by creating a mail instance, saving and updating it,
-handling rich observables, updating mail times sent, and creating mail info.</p>
-<dl class="simple">
-<dt>Args:</dt><dd><p>email_data (dict): The data of the email.</p>
-</dd>
-<dt>Returns:</dt><dd><p>MailInstance: The saved mail instance.</p>
-</dd>
-<dt>Raises:</dt><dd><p>Exception: If an error occurs while handling the mail.</p>
-</dd>
-</dl>
-</dd></dl>
-
-<dl class="py method">
-<dt class="sig sig-object py" id="mail_feeder.mail_utils.mail_handler.MailHandler.handle_rich_observables">
-<span class="sig-name descname"><span class="pre">handle_rich_observables</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">filename</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">mail_instance</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">email_data</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">workdir</span></span></em><span class="sig-paren">)</span><a class="reference internal" href="../_modules/mail_feeder/mail_utils/mail_handler.html#MailHandler.handle_rich_observables"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#mail_feeder.mail_utils.mail_handler.MailHandler.handle_rich_observables" title="Link to this definition"></a></dt>
-<dd><p>Handles rich observables extracted from an email.</p>
-<dl class="simple">
-<dt>Args:</dt><dd><p>filename (str): The name of the file.
-mail_instance: An instance of the mail.
-email_data: The data of the email.</p>
-</dd>
-<dt>Raises:</dt><dd><p>Exception: If there is an error handling rich observables.</p>
-</dd>
-<dt>Returns:</dt><dd><p>None</p>
-</dd>
-</dl>
-</dd></dl>
-
-<dl class="py method">
-<dt class="sig sig-object py" id="mail_feeder.mail_utils.mail_handler.MailHandler.parse_date">
-<em class="property"><span class="k"><span class="pre">static</span></span><span class="w"> </span></em><span class="sig-name descname"><span class="pre">parse_date</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">date_string</span></span></em><span class="sig-paren">)</span><a class="reference internal" href="../_modules/mail_feeder/mail_utils/mail_handler.html#MailHandler.parse_date"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#mail_feeder.mail_utils.mail_handler.MailHandler.parse_date" title="Link to this definition"></a></dt>
-<dd><p>Parse the date string into a datetime object.</p>
-<dl class="simple">
-<dt>Args:</dt><dd><p>date_string (str): The date string.</p>
-</dd>
-<dt>Returns:</dt><dd><p>datetime: The parsed datetime object.</p>
-</dd>
-</dl>
-</dd></dl>
-
-<dl class="py method">
-<dt class="sig sig-object py" id="mail_feeder.mail_utils.mail_handler.MailHandler.process_url">
-<span class="sig-name descname"><span class="pre">process_url</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">url</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">mail_instance</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">artifact_type</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">'URL'</span></span></em><span class="sig-paren">)</span><a class="reference internal" href="../_modules/mail_feeder/mail_utils/mail_handler.html#MailHandler.process_url"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#mail_feeder.mail_utils.mail_handler.MailHandler.process_url" title="Link to this definition"></a></dt>
-<dd><p>Processes the URL, creates or updates the MailArtifact, and associates it with the mail instance.</p>
-<dl class="simple">
-<dt>Args:</dt><dd><p>url (str): The URL to be processed.
-mail_instance (Mail): The mail instance to associate the artifact with.
-artifact_type (str): The type of artifact (default is ‘URL’).</p>
-</dd>
-<dt>Returns:</dt><dd><p>None</p>
-</dd>
-</dl>
-</dd></dl>
-
-<dl class="py method">
-<dt class="sig sig-object py" id="mail_feeder.mail_utils.mail_handler.MailHandler.save_and_update_mail_instance">
-<span class="sig-name descname"><span class="pre">save_and_update_mail_instance</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">mail_instance</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">email_data</span></span></em><span class="sig-paren">)</span><a class="reference internal" href="../_modules/mail_feeder/mail_utils/mail_handler.html#MailHandler.save_and_update_mail_instance"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#mail_feeder.mail_utils.mail_handler.MailHandler.save_and_update_mail_instance" title="Link to this definition"></a></dt>
-<dd><p>Saves and updates the mail instance with the provided email data.</p>
-<dl class="simple">
-<dt>Args:</dt><dd><p>mail_instance (Mail): The mail instance to be saved and updated.
-email_data (dict): The email data used to create related instances.</p>
-</dd>
-<dt>Returns:</dt><dd><p>Mail: The saved and updated mail instance.</p>
-</dd>
-</dl>
-</dd></dl>
-
-<dl class="py method">
-<dt class="sig sig-object py" id="mail_feeder.mail_utils.mail_handler.MailHandler.save_mail_artifact">
-<span class="sig-name descname"><span class="pre">save_mail_artifact</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">mail_artifact</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">mail_instance</span></span></em><span class="sig-paren">)</span><a class="reference internal" href="../_modules/mail_feeder/mail_utils/mail_handler.html#MailHandler.save_mail_artifact"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#mail_feeder.mail_utils.mail_handler.MailHandler.save_mail_artifact" title="Link to this definition"></a></dt>
-<dd><p>Saves the mail artifact and associates it with the given mail instance.</p>
-<dl class="simple">
-<dt>Args:</dt><dd><p>mail_artifact (MailArtifact): The mail artifact to be saved.
-mail_instance (MailInstance): The mail instance to associate the artifact with.</p>
-</dd>
-<dt>Raises:</dt><dd><p>Exception: If there is an error while saving the mail artifact.</p>
-</dd>
-</dl>
-</dd></dl>
-
-<dl class="py method">
-<dt class="sig sig-object py" id="mail_feeder.mail_utils.mail_handler.MailHandler.save_mail_body_instance">
-<span class="sig-name descname"><span class="pre">save_mail_body_instance</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">mail_body_instance</span></span></em><span class="sig-paren">)</span><a class="reference internal" href="../_modules/mail_feeder/mail_utils/mail_handler.html#MailHandler.save_mail_body_instance"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#mail_feeder.mail_utils.mail_handler.MailHandler.save_mail_body_instance" title="Link to this definition"></a></dt>
-<dd><p>Saves the given mail body instance.</p>
-<dl class="simple">
-<dt>Args:</dt><dd><p>mail_body_instance: The mail body instance to be saved.</p>
-</dd>
-<dt>Raises:</dt><dd><p>Exception: If there is an error while saving the mail body instance.</p>
-</dd>
-</dl>
-</dd></dl>
-
-<dl class="py method">
-<dt class="sig sig-object py" id="mail_feeder.mail_utils.mail_handler.MailHandler.save_mail_header_instance">
-<span class="sig-name descname"><span class="pre">save_mail_header_instance</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">mail_header_instance</span></span></em><span class="sig-paren">)</span><a class="reference internal" href="../_modules/mail_feeder/mail_utils/mail_handler.html#MailHandler.save_mail_header_instance"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#mail_feeder.mail_utils.mail_handler.MailHandler.save_mail_header_instance" title="Link to this definition"></a></dt>
-<dd><p>Saves the given mail header instance.</p>
-<dl class="simple">
-<dt>Args:</dt><dd><p>mail_header_instance: The mail header instance to be saved.</p>
-</dd>
-<dt>Raises:</dt><dd><p>Exception: If there is an error while saving the mail header instance.</p>
-</dd>
-</dl>
-</dd></dl>
-
-<dl class="py method">
-<dt class="sig sig-object py" id="mail_feeder.mail_utils.mail_handler.MailHandler.save_mail_instance">
-<span class="sig-name descname"><span class="pre">save_mail_instance</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">mail_instance</span></span></em><span class="sig-paren">)</span><a class="reference internal" href="../_modules/mail_feeder/mail_utils/mail_handler.html#MailHandler.save_mail_instance"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#mail_feeder.mail_utils.mail_handler.MailHandler.save_mail_instance" title="Link to this definition"></a></dt>
-<dd><p>Saves the given mail instance and returns it if successful.</p>
-<dl class="simple">
-<dt>Args:</dt><dd><p>mail_instance: The mail instance to be saved.</p>
-</dd>
-<dt>Returns:</dt><dd><p>The saved mail instance if successful, None otherwise.</p>
-</dd>
-</dl>
-</dd></dl>
-
-<dl class="py method">
-<dt class="sig sig-object py" id="mail_feeder.mail_utils.mail_handler.MailHandler.update_existing_mail_instance">
-<span class="sig-name descname"><span class="pre">update_existing_mail_instance</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">mail_instance</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">email_data</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">email_body_list</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">email_header_list</span></span></em><span class="sig-paren">)</span><a class="reference internal" href="../_modules/mail_feeder/mail_utils/mail_handler.html#MailHandler.update_existing_mail_instance"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#mail_feeder.mail_utils.mail_handler.MailHandler.update_existing_mail_instance" title="Link to this definition"></a></dt>
-<dd><p>Updates an existing mail instance with the provided email data, email body list, and email header list.</p>
-<dl class="simple">
-<dt>Args:</dt><dd><p>mail_instance (Mail): The existing mail instance to be updated.
-email_data (dict): The email data containing information to update the mail instance.
-email_body_list (list): The list of existing email bodies.
-email_header_list (list): The list of existing email headers.</p>
-</dd>
-<dt>Returns:</dt><dd><p>Mail: The updated mail instance.</p>
-</dd>
-</dl>
-</dd></dl>
-
-<dl class="py method">
-<dt class="sig sig-object py" id="mail_feeder.mail_utils.mail_handler.MailHandler.update_kpi_stats">
-<span class="sig-name descname"><span class="pre">update_kpi_stats</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">month</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">year</span></span></em><span class="sig-paren">)</span><a class="reference internal" href="../_modules/mail_feeder/mail_utils/mail_handler.html#MailHandler.update_kpi_stats"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#mail_feeder.mail_utils.mail_handler.MailHandler.update_kpi_stats" title="Link to this definition"></a></dt>
-<dd><p>Update the KPI statistics for a given month and year.</p>
-<dl class="simple">
-<dt>Args:</dt><dd><p>month (int): The month for which the statistics are being updated.
-year (int): The year for which the statistics are being updated.</p>
-</dd>
-</dl>
-</dd></dl>
-
-<dl class="py method">
-<dt class="sig sig-object py" id="mail_feeder.mail_utils.mail_handler.MailHandler.update_mail_body_times_sent">
-<span class="sig-name descname"><span class="pre">update_mail_body_times_sent</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">existing_mail_body</span></span></em><span class="sig-paren">)</span><a class="reference internal" href="../_modules/mail_feeder/mail_utils/mail_handler.html#MailHandler.update_mail_body_times_sent"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#mail_feeder.mail_utils.mail_handler.MailHandler.update_mail_body_times_sent" title="Link to this definition"></a></dt>
-<dd><p>Updates the ‘times_sent’ attribute of an existing mail body object and saves it.</p>
-<p>Parameters:
-existing_mail_body (MailBody): The existing mail body object to update.</p>
-<p>Returns:
-None</p>
-</dd></dl>
-
-<dl class="py method">
-<dt class="sig sig-object py" id="mail_feeder.mail_utils.mail_handler.MailHandler.update_mail_times_sent">
-<span class="sig-name descname"><span class="pre">update_mail_times_sent</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">mail_instance</span></span></em><span class="sig-paren">)</span><a class="reference internal" href="../_modules/mail_feeder/mail_utils/mail_handler.html#MailHandler.update_mail_times_sent"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#mail_feeder.mail_utils.mail_handler.MailHandler.update_mail_times_sent" title="Link to this definition"></a></dt>
-<dd><p>Update the number of times a mail has been sent and save the changes.</p>
-<dl class="simple">
-<dt>Args:</dt><dd><p>mail_instance: An instance of the Mail model.</p>
-</dd>
-<dt>Raises:</dt><dd><p>Exception: If there is an error updating the mail times sent.</p>
-</dd>
-</dl>
-</dd></dl>
-
-</dd></dl>
-
-<dl class="py function">
-<dt class="sig sig-object py" id="mail_feeder.mail_utils.mail_handler.is_valid_company_email">
-<span class="sig-prename descclassname"><span class="pre">mail_feeder.mail_utils.mail_handler.</span></span><span class="sig-name descname"><span class="pre">is_valid_company_email</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">email</span></span></em><span class="sig-paren">)</span><a class="reference internal" href="../_modules/mail_feeder/mail_utils/mail_handler.html#is_valid_company_email"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#mail_feeder.mail_utils.mail_handler.is_valid_company_email" title="Link to this definition"></a></dt>
-<dd></dd></dl>
-
-<dl class="py function">
-<dt class="sig sig-object py" id="mail_feeder.mail_utils.mail_handler.is_valid_email">
-<span class="sig-prename descclassname"><span class="pre">mail_feeder.mail_utils.mail_handler.</span></span><span class="sig-name descname"><span class="pre">is_valid_email</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">email</span></span></em><span class="sig-paren">)</span><a class="reference internal" href="../_modules/mail_feeder/mail_utils/mail_handler.html#is_valid_email"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#mail_feeder.mail_utils.mail_handler.is_valid_email" title="Link to this definition"></a></dt>
-<dd></dd></dl>
-
-<dl class="py class" id="module-mail_feeder.mail_utils.mail">
-<dt class="sig sig-object py" id="mail_feeder.mail_utils.mail.ArtifactHandler">
-<em class="property"><span class="k"><span class="pre">class</span></span><span class="w"> </span></em><span class="sig-prename descclassname"><span class="pre">mail_feeder.mail_utils.mail.</span></span><span class="sig-name descname"><span class="pre">ArtifactHandler</span></span><a class="reference internal" href="../_modules/mail_feeder/mail_utils/mail.html#ArtifactHandler"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#mail_feeder.mail_utils.mail.ArtifactHandler" title="Link to this definition"></a></dt>
-<dd><p>Bases: <code class="xref py py-class docutils literal notranslate"><span class="pre">object</span></code></p>
-<dl class="py method">
-<dt class="sig sig-object py" id="mail_feeder.mail_utils.mail.ArtifactHandler.handle_artifact">
-<span class="sig-name descname"><span class="pre">handle_artifact</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">artifacts</span></span></em><span class="sig-paren">)</span><a class="reference internal" href="../_modules/mail_feeder/mail_utils/mail.html#ArtifactHandler.handle_artifact"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#mail_feeder.mail_utils.mail.ArtifactHandler.handle_artifact" title="Link to this definition"></a></dt>
-<dd><p>Handles the given artifacts by calling the appropriate handler based on the artifact type.</p>
-<dl class="simple">
-<dt>Args:</dt><dd><p>artifacts (QuerySet): A queryset of artifacts.</p>
-</dd>
-<dt>Returns:</dt><dd><p>list: A list of artifact IDs that were successfully handled.</p>
-</dd>
-</dl>
-</dd></dl>
-
-<dl class="py method">
-<dt class="sig sig-object py" id="mail_feeder.mail_utils.mail.ArtifactHandler.handle_domain_artifact">
-<span class="sig-name descname"><span class="pre">handle_domain_artifact</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">artifact</span></span></em><span class="sig-paren">)</span><a class="reference internal" href="../_modules/mail_feeder/mail_utils/mail.html#ArtifactHandler.handle_domain_artifact"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#mail_feeder.mail_utils.mail.ArtifactHandler.handle_domain_artifact" title="Link to this definition"></a></dt>
-<dd><p>Handles a domain artifact.</p>
-<dl class="simple">
-<dt>Args:</dt><dd><p>artifact: The domain artifact to be handled.</p>
-</dd>
-<dt>Returns:</dt><dd><p>The processed domain if successful, None otherwise.</p>
-</dd>
-</dl>
-</dd></dl>
-
-<dl class="py method">
-<dt class="sig sig-object py" id="mail_feeder.mail_utils.mail.ArtifactHandler.handle_hash_artifact">
-<span class="sig-name descname"><span class="pre">handle_hash_artifact</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">artifact</span></span></em><span class="sig-paren">)</span><a class="reference internal" href="../_modules/mail_feeder/mail_utils/mail.html#ArtifactHandler.handle_hash_artifact"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#mail_feeder.mail_utils.mail.ArtifactHandler.handle_hash_artifact" title="Link to this definition"></a></dt>
-<dd><p>Handles a hash artifact.</p>
-<dl class="simple">
-<dt>Args:</dt><dd><p>artifact: The artifact object containing the hash.</p>
-</dd>
-<dt>Returns:</dt><dd><p>The processed artifact hash.</p>
-</dd>
-<dt>Raises:</dt><dd><p>Exception: If there is an error while handling the hash artifact.</p>
-</dd>
-</dl>
-</dd></dl>
-
-<dl class="py method">
-<dt class="sig sig-object py" id="mail_feeder.mail_utils.mail.ArtifactHandler.handle_ip_artifact">
-<span class="sig-name descname"><span class="pre">handle_ip_artifact</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">artifact</span></span></em><span class="sig-paren">)</span><a class="reference internal" href="../_modules/mail_feeder/mail_utils/mail.html#ArtifactHandler.handle_ip_artifact"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#mail_feeder.mail_utils.mail.ArtifactHandler.handle_ip_artifact" title="Link to this definition"></a></dt>
-<dd><p>Handles the IP artifact.</p>
-<dl class="simple">
-<dt>Args:</dt><dd><p>artifact: The IP artifact to be handled.</p>
-</dd>
-<dt>Returns:</dt><dd><p>The processed IP or None if an exception occurs.</p>
-</dd>
-</dl>
-</dd></dl>
-
-<dl class="py method">
-<dt class="sig sig-object py" id="mail_feeder.mail_utils.mail.ArtifactHandler.handle_mail_artifact">
-<span class="sig-name descname"><span class="pre">handle_mail_artifact</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">artifact</span></span></em><span class="sig-paren">)</span><a class="reference internal" href="../_modules/mail_feeder/mail_utils/mail.html#ArtifactHandler.handle_mail_artifact"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#mail_feeder.mail_utils.mail.ArtifactHandler.handle_mail_artifact" title="Link to this definition"></a></dt>
-<dd><p>Handles a mail artifact.</p>
-<dl class="simple">
-<dt>Args:</dt><dd><p>artifact: The mail artifact to be handled.</p>
-</dd>
-<dt>Returns:</dt><dd><p>The handled mail object, or None if handling fails.</p>
-</dd>
-</dl>
-</dd></dl>
-
-<dl class="py method">
-<dt class="sig sig-object py" id="mail_feeder.mail_utils.mail.ArtifactHandler.handle_url_artifact">
-<span class="sig-name descname"><span class="pre">handle_url_artifact</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">artifact</span></span></em><span class="sig-paren">)</span><a class="reference internal" href="../_modules/mail_feeder/mail_utils/mail.html#ArtifactHandler.handle_url_artifact"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#mail_feeder.mail_utils.mail.ArtifactHandler.handle_url_artifact" title="Link to this definition"></a></dt>
-<dd><p>Handles a URL artifact.</p>
-<dl class="simple">
-<dt>Args:</dt><dd><p>artifact: The URL artifact to handle.</p>
-</dd>
-<dt>Returns:</dt><dd><p>The processed URL or None if an error occurred.</p>
-</dd>
-</dl>
-</dd></dl>
-
-</dd></dl>
-
-<dl class="py class">
-<dt class="sig sig-object py" id="mail_feeder.mail_utils.mail.AttachmentHandler">
-<em class="property"><span class="k"><span class="pre">class</span></span><span class="w"> </span></em><span class="sig-prename descclassname"><span class="pre">mail_feeder.mail_utils.mail.</span></span><span class="sig-name descname"><span class="pre">AttachmentHandler</span></span><a class="reference internal" href="../_modules/mail_feeder/mail_utils/mail.html#AttachmentHandler"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#mail_feeder.mail_utils.mail.AttachmentHandler" title="Link to this definition"></a></dt>
-<dd><p>Bases: <code class="xref py py-class docutils literal notranslate"><span class="pre">object</span></code></p>
-<dl class="py method">
-<dt class="sig sig-object py" id="mail_feeder.mail_utils.mail.AttachmentHandler.allow_list_file_and_hash">
-<span class="sig-name descname"><span class="pre">allow_list_file_and_hash</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">att</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><a class="reference internal" href="file_process_core.html#file_process.models.File" title="file_process.models.File"><span class="pre">File</span></a></span></em>, <em class="sig-param"><span class="n"><span class="pre">hash</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><a class="reference internal" href="hash_process_core.html#hash_process.models.Hash" title="hash_process.models.Hash"><span class="pre">Hash</span></a></span></em><span class="sig-paren">)</span><a class="reference internal" href="../_modules/mail_feeder/mail_utils/mail.html#AttachmentHandler.allow_list_file_and_hash"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#mail_feeder.mail_utils.mail.AttachmentHandler.allow_list_file_and_hash" title="Link to this definition"></a></dt>
-<dd><p>AllowLists a file and its hash.</p>
-<dl class="simple">
-<dt>Args:</dt><dd><p>att (File): The file to be allow_listed.
-hash (Hash): The hash of the file.</p>
-</dd>
-<dt>Returns:</dt><dd><p>None</p>
-</dd>
-</dl>
-</dd></dl>
-
-<dl class="py method">
-<dt class="sig sig-object py" id="mail_feeder.mail_utils.mail.AttachmentHandler.create_and_link_hash_to_attachment">
-<span class="sig-name descname"><span class="pre">create_and_link_hash_to_attachment</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">att</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><a class="reference internal" href="file_process_core.html#file_process.models.File" title="file_process.models.File"><span class="pre">File</span></a></span></em>, <em class="sig-param"><span class="n"><span class="pre">hash_of_file</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">str</span></span></em><span class="sig-paren">)</span><a class="reference internal" href="../_modules/mail_feeder/mail_utils/mail.html#AttachmentHandler.create_and_link_hash_to_attachment"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#mail_feeder.mail_utils.mail.AttachmentHandler.create_and_link_hash_to_attachment" title="Link to this definition"></a></dt>
-<dd><p>Creates and links a hash to the given attachment.</p>
-<dl class="simple">
-<dt>Args:</dt><dd><p>att (File): The attachment file object.
-hash_of_file (str): The hash of the file.</p>
-</dd>
-<dt>Raises:</dt><dd><p>Exception: If there is an error creating and linking the hash to the attachment.</p>
-</dd>
-</dl>
-</dd></dl>
-
-<dl class="py method">
-<dt class="sig sig-object py" id="mail_feeder.mail_utils.mail.AttachmentHandler.handle_attachment">
-<span class="sig-name descname"><span class="pre">handle_attachment</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">att</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><a class="reference internal" href="file_process_core.html#file_process.models.File" title="file_process.models.File"><span class="pre">File</span></a></span></em><span class="sig-paren">)</span><a class="reference internal" href="../_modules/mail_feeder/mail_utils/mail.html#AttachmentHandler.handle_attachment"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#mail_feeder.mail_utils.mail.AttachmentHandler.handle_attachment" title="Link to this definition"></a></dt>
-<dd><p>Handles the attachment file.</p>
-<dl class="simple">
-<dt>Args:</dt><dd><p>att (File): The attachment file to be handled.</p>
-</dd>
-<dt>Returns:</dt><dd><p>list: The list of attachment IDs.</p>
-</dd>
-<dt>Raises:</dt><dd><p>Exception: If there is an error while handling the attachment.</p>
-</dd>
-</dl>
-</dd></dl>
-
-<dl class="py method">
-<dt class="sig sig-object py" id="mail_feeder.mail_utils.mail.AttachmentHandler.handle_attachment_list">
-<span class="sig-name descname"><span class="pre">handle_attachment_list</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">att</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><a class="reference internal" href="file_process_core.html#file_process.models.File" title="file_process.models.File"><span class="pre">File</span></a></span></em>, <em class="sig-param"><span class="n"><span class="pre">attlist</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">List</span><span class="p"><span class="pre">[</span></span><a class="reference internal" href="file_process_core.html#file_process.models.File" title="file_process.models.File"><span class="pre">File</span></a><span class="p"><span class="pre">]</span></span></span></em>, <em class="sig-param"><span class="n"><span class="pre">hashlist</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">List</span><span class="p"><span class="pre">[</span></span><a class="reference internal" href="hash_process_core.html#hash_process.models.Hash" title="hash_process.models.Hash"><span class="pre">Hash</span></a><span class="p"><span class="pre">]</span></span></span></em>, <em class="sig-param"><span class="n"><span class="pre">hash_of_file</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">str</span></span></em><span class="sig-paren">)</span><a class="reference internal" href="../_modules/mail_feeder/mail_utils/mail.html#AttachmentHandler.handle_attachment_list"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#mail_feeder.mail_utils.mail.AttachmentHandler.handle_attachment_list" title="Link to this definition"></a></dt>
-<dd><p>Handles the attachment list by performing various operations based on the provided parameters.</p>
-<dl class="simple">
-<dt>Args:</dt><dd><p>att (File): The main attachment file.
-attlist (List[File]): A list of additional attachment files.
-hashlist (List[Hash]): A list of hash objects.
-hash_of_file (str): The hash of the main attachment file.</p>
-</dd>
-<dt>Raises:</dt><dd><p>Exception: If any error occurs during the handling of the attachment list.</p>
-</dd>
-<dt>Returns:</dt><dd><p>None</p>
-</dd>
-</dl>
-</dd></dl>
-
-<dl class="py method">
-<dt class="sig sig-object py" id="mail_feeder.mail_utils.mail.AttachmentHandler.handle_hash_and_attachment">
-<span class="sig-name descname"><span class="pre">handle_hash_and_attachment</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">att</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><a class="reference internal" href="file_process_core.html#file_process.models.File" title="file_process.models.File"><span class="pre">File</span></a></span></em>, <em class="sig-param"><span class="n"><span class="pre">hash_of_file</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">str</span></span></em><span class="sig-paren">)</span><a class="reference internal" href="../_modules/mail_feeder/mail_utils/mail.html#AttachmentHandler.handle_hash_and_attachment"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#mail_feeder.mail_utils.mail.AttachmentHandler.handle_hash_and_attachment" title="Link to this definition"></a></dt>
-<dd><p>Handles the hash and attachment by querying the database for hashes and files,
-converting the querysets to lists, and then calling the <cite>handle_attachment_list</cite> method.</p>
-<dl class="simple">
-<dt>Args:</dt><dd><p>att (File): The attachment file object.
-hash_of_file (str): The hash value of the file.</p>
-</dd>
-<dt>Raises:</dt><dd><p>Exception: If there is an error handling the attachment.</p>
-</dd>
-</dl>
-</dd></dl>
-
-<dl class="py method">
-<dt class="sig sig-object py" id="mail_feeder.mail_utils.mail.AttachmentHandler.hash_file">
-<span class="sig-name descname"><span class="pre">hash_file</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">att</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><a class="reference internal" href="file_process_core.html#file_process.models.File" title="file_process.models.File"><span class="pre">File</span></a></span></em><span class="sig-paren">)</span><a class="reference internal" href="../_modules/mail_feeder/mail_utils/mail.html#AttachmentHandler.hash_file"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#mail_feeder.mail_utils.mail.AttachmentHandler.hash_file" title="Link to this definition"></a></dt>
-<dd><p>Hashes the given file.</p>
-<dl class="simple">
-<dt>Args:</dt><dd><p>att (File): The file to be hashed.</p>
-</dd>
-<dt>Returns:</dt><dd><p>str: The hash value of the file.</p>
-</dd>
-<dt>Raises:</dt><dd><p>Exception: If there is an error while hashing the file.</p>
-</dd>
-</dl>
-</dd></dl>
-
-<dl class="py method">
-<dt class="sig sig-object py" id="mail_feeder.mail_utils.mail.AttachmentHandler.launch_jobs">
-<span class="sig-name descname"><span class="pre">launch_jobs</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">att</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><a class="reference internal" href="file_process_core.html#file_process.models.File" title="file_process.models.File"><span class="pre">File</span></a></span></em>, <em class="sig-param"><span class="n"><span class="pre">hash</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><a class="reference internal" href="hash_process_core.html#hash_process.models.Hash" title="hash_process.models.Hash"><span class="pre">Hash</span></a></span></em><span class="sig-paren">)</span><a class="reference internal" href="../_modules/mail_feeder/mail_utils/mail.html#AttachmentHandler.launch_jobs"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#mail_feeder.mail_utils.mail.AttachmentHandler.launch_jobs" title="Link to this definition"></a></dt>
-<dd><p>Launches Cortex jobs for the given attachment and hash.</p>
-<dl class="simple">
-<dt>Args:</dt><dd><p>att (File): The attachment file to be processed.
-hash (Hash): The hash value to be processed.</p>
-</dd>
-<dt>Returns:</dt><dd><p>None</p>
-</dd>
-<dt>Raises:</dt><dd><p>Exception: If there is an error while launching the Cortex jobs.</p>
-</dd>
-</dl>
-</dd></dl>
-
-<dl class="py method">
-<dt class="sig sig-object py" id="mail_feeder.mail_utils.mail.AttachmentHandler.launch_jobs_and_handle_exceptions">
-<span class="sig-name descname"><span class="pre">launch_jobs_and_handle_exceptions</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">att</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><a class="reference internal" href="file_process_core.html#file_process.models.File" title="file_process.models.File"><span class="pre">File</span></a></span></em>, <em class="sig-param"><span class="n"><span class="pre">hash</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><a class="reference internal" href="hash_process_core.html#hash_process.models.Hash" title="hash_process.models.Hash"><span class="pre">Hash</span></a></span></em><span class="sig-paren">)</span><a class="reference internal" href="../_modules/mail_feeder/mail_utils/mail.html#AttachmentHandler.launch_jobs_and_handle_exceptions"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#mail_feeder.mail_utils.mail.AttachmentHandler.launch_jobs_and_handle_exceptions" title="Link to this definition"></a></dt>
-<dd><p>Launches jobs or allow_lists the attachment file and handles any exceptions that occur.</p>
-<dl class="simple">
-<dt>Args:</dt><dd><p>att (File): The attachment file.
-hash (Hash): The hash of the attachment file.</p>
-</dd>
-<dt>Raises:</dt><dd><p>Exception: If there is an error while launching the attachment file job.</p>
-</dd>
-</dl>
-</dd></dl>
-
-<dl class="py method">
-<dt class="sig sig-object py" id="mail_feeder.mail_utils.mail.AttachmentHandler.launch_jobs_or_allow_list">
-<span class="sig-name descname"><span class="pre">launch_jobs_or_allow_list</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">att</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><a class="reference internal" href="file_process_core.html#file_process.models.File" title="file_process.models.File"><span class="pre">File</span></a></span></em>, <em class="sig-param"><span class="n"><span class="pre">hash</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><a class="reference internal" href="hash_process_core.html#hash_process.models.Hash" title="hash_process.models.Hash"><span class="pre">Hash</span></a></span></em>, <em class="sig-param"><span class="n"><span class="pre">ext</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">str</span></span></em><span class="sig-paren">)</span><a class="reference internal" href="../_modules/mail_feeder/mail_utils/mail.html#AttachmentHandler.launch_jobs_or_allow_list"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#mail_feeder.mail_utils.mail.AttachmentHandler.launch_jobs_or_allow_list" title="Link to this definition"></a></dt>
-<dd><p>Launches jobs or allow_lists the file and hash based on certain conditions.</p>
-<dl class="simple">
-<dt>Args:</dt><dd><p>att (File): The file object to be processed.
-hash (Hash): The hash object associated with the file.
-ext (str): The file extension.</p>
-</dd>
-<dt>Raises:</dt><dd><p>Exception: If there is an error while launching jobs or allow_listing.</p>
-</dd>
-</dl>
-</dd></dl>
-
-<dl class="py method">
-<dt class="sig sig-object py" id="mail_feeder.mail_utils.mail.AttachmentHandler.link_hash_to_attachment">
-<span class="sig-name descname"><span class="pre">link_hash_to_attachment</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">att</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><a class="reference internal" href="file_process_core.html#file_process.models.File" title="file_process.models.File"><span class="pre">File</span></a></span></em>, <em class="sig-param"><span class="n"><span class="pre">hash</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><a class="reference internal" href="hash_process_core.html#hash_process.models.Hash" title="hash_process.models.Hash"><span class="pre">Hash</span></a></span></em><span class="sig-paren">)</span><a class="reference internal" href="../_modules/mail_feeder/mail_utils/mail.html#AttachmentHandler.link_hash_to_attachment"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#mail_feeder.mail_utils.mail.AttachmentHandler.link_hash_to_attachment" title="Link to this definition"></a></dt>
-<dd><p>Links a hash to an attachment.</p>
-<dl class="simple">
-<dt>Args:</dt><dd><p>att (File): The attachment to link the hash to.
-hash (Hash): The hash to be linked.</p>
-</dd>
-<dt>Raises:</dt><dd><p>Exception: If the linking process fails.</p>
-</dd>
-<dt>Returns:</dt><dd><p>None</p>
-</dd>
-</dl>
-</dd></dl>
-
-<dl class="py method">
-<dt class="sig sig-object py" id="mail_feeder.mail_utils.mail.AttachmentHandler.rename_attachment">
-<span class="sig-name descname"><span class="pre">rename_attachment</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">att</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><a class="reference internal" href="file_process_core.html#file_process.models.File" title="file_process.models.File"><span class="pre">File</span></a></span></em>, <em class="sig-param"><span class="n"><span class="pre">attlist</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">List</span><span class="p"><span class="pre">[</span></span><a class="reference internal" href="file_process_core.html#file_process.models.File" title="file_process.models.File"><span class="pre">File</span></a><span class="p"><span class="pre">]</span></span></span></em><span class="sig-paren">)</span><a class="reference internal" href="../_modules/mail_feeder/mail_utils/mail.html#AttachmentHandler.rename_attachment"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#mail_feeder.mail_utils.mail.AttachmentHandler.rename_attachment" title="Link to this definition"></a></dt>
-<dd><p>Renames the given attachment and updates its temporary path.</p>
-<dl class="simple">
-<dt>Args:</dt><dd><p>att (File): The attachment to be renamed.
-attlist (List[File]): The list of attachments.</p>
-</dd>
-<dt>Raises:</dt><dd><p>Exception: If there is an error while renaming the attachment.</p>
-</dd>
-<dt>Returns:</dt><dd><p>None</p>
-</dd>
-</dl>
-</dd></dl>
-
-</dd></dl>
-
-<dl class="py class">
-<dt class="sig sig-object py" id="mail_feeder.mail_utils.mail.EmailHandler">
-<em class="property"><span class="k"><span class="pre">class</span></span><span class="w"> </span></em><span class="sig-prename descclassname"><span class="pre">mail_feeder.mail_utils.mail.</span></span><span class="sig-name descname"><span class="pre">EmailHandler</span></span><a class="reference internal" href="../_modules/mail_feeder/mail_utils/mail.html#EmailHandler"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#mail_feeder.mail_utils.mail.EmailHandler" title="Link to this definition"></a></dt>
-<dd><p>Bases: <code class="xref py py-class docutils literal notranslate"><span class="pre">object</span></code></p>
-</dd></dl>
-
-<dl class="py class">
-<dt class="sig sig-object py" id="mail_feeder.mail_utils.mail.EmailProcessor">
-<em class="property"><span class="k"><span class="pre">class</span></span><span class="w"> </span></em><span class="sig-prename descclassname"><span class="pre">mail_feeder.mail_utils.mail.</span></span><span class="sig-name descname"><span class="pre">EmailProcessor</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">email_handler</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><a class="reference internal" href="#mail_feeder.mail_utils.mail.EmailHandler" title="mail_feeder.mail_utils.mail.EmailHandler"><span class="pre">EmailHandler</span></a></span></em><span class="sig-paren">)</span><a class="reference internal" href="../_modules/mail_feeder/mail_utils/mail.html#EmailProcessor"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#mail_feeder.mail_utils.mail.EmailProcessor" title="Link to this definition"></a></dt>
-<dd><p>Bases: <code class="xref py py-class docutils literal notranslate"><span class="pre">object</span></code></p>
-<dl class="py method">
-<dt class="sig sig-object py" id="mail_feeder.mail_utils.mail.EmailProcessor.combine_ids">
-<span class="sig-name descname"><span class="pre">combine_ids</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">artifact_ids</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">attachment_ids</span></span></em><span class="sig-paren">)</span><a class="reference internal" href="../_modules/mail_feeder/mail_utils/mail.html#EmailProcessor.combine_ids"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#mail_feeder.mail_utils.mail.EmailProcessor.combine_ids" title="Link to this definition"></a></dt>
-<dd><p>Combines the given artifact IDs and attachment IDs into a single list.</p>
-<dl class="simple">
-<dt>Args:</dt><dd><p>artifact_ids (list): A list of artifact IDs.
-attachment_ids (list): A list of attachment IDs.</p>
-</dd>
-<dt>Returns:</dt><dd><p>list: A combined list of artifact IDs and attachment IDs.</p>
-</dd>
-</dl>
-</dd></dl>
-
-<dl class="py method">
-<dt class="sig sig-object py" id="mail_feeder.mail_utils.mail.EmailProcessor.create_case">
-<span class="sig-name descname"><span class="pre">create_case</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">instance</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">user</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">artifact_ids</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">attachment_ids</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">attachment_id_ai</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">list_ids</span></span></em><span class="sig-paren">)</span><a class="reference internal" href="../_modules/mail_feeder/mail_utils/mail.html#EmailProcessor.create_case"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#mail_feeder.mail_utils.mail.EmailProcessor.create_case" title="Link to this definition"></a></dt>
-<dd><p>Create a case using the provided instance, user, artifact IDs, attachment IDs, and list IDs.</p>
-<dl class="simple">
-<dt>Args:</dt><dd><p>instance: The mail instance.
-user: The user creating the case.
-artifact_ids: A list of artifact IDs.
-attachment_ids: A list of attachment IDs.
-list_ids: A list of IDs to append to.</p>
-</dd>
-<dt>Returns:</dt><dd><p>None</p>
-</dd>
-</dl>
-</dd></dl>
-
-<dl class="py method">
-<dt class="sig sig-object py" id="mail_feeder.mail_utils.mail.EmailProcessor.create_mail_info">
-<span class="sig-name descname"><span class="pre">create_mail_info</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">mail_instance</span></span></em><span class="sig-paren">)</span><a class="reference internal" href="../_modules/mail_feeder/mail_utils/mail.html#EmailProcessor.create_mail_info"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#mail_feeder.mail_utils.mail.EmailProcessor.create_mail_info" title="Link to this definition"></a></dt>
-<dd><p>Creates a MailInfo object and saves it to the database.</p>
-<dl class="simple">
-<dt>Args:</dt><dd><p>mail_instance (Mail): The mail instance to create MailInfo for.</p>
-</dd>
-<dt>Returns:</dt><dd><p>None</p>
-</dd>
-</dl>
-</dd></dl>
-
-<dl class="py method">
-<dt class="sig sig-object py" id="mail_feeder.mail_utils.mail.EmailProcessor.handle_artifacts">
-<span class="sig-name descname"><span class="pre">handle_artifacts</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">instance</span></span></em><span class="sig-paren">)</span><a class="reference internal" href="../_modules/mail_feeder/mail_utils/mail.html#EmailProcessor.handle_artifacts"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#mail_feeder.mail_utils.mail.EmailProcessor.handle_artifacts" title="Link to this definition"></a></dt>
-<dd><p>Handles the artifacts associated with the given instance.</p>
-<dl class="simple">
-<dt>Args:</dt><dd><p>instance: The instance for which the artifacts need to be handled.</p>
-</dd>
-<dt>Returns:</dt><dd><p>A list of handled artifacts.</p>
-</dd>
-<dt>Raises:</dt><dd><p>Exception: If there is an error while handling the artifacts.</p>
-</dd>
-</dl>
-</dd></dl>
-
-<dl class="py method">
-<dt class="sig sig-object py" id="mail_feeder.mail_utils.mail.EmailProcessor.handle_attachments">
-<span class="sig-name descname"><span class="pre">handle_attachments</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">instance</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">mail_zip</span></span></em><span class="sig-paren">)</span><a class="reference internal" href="../_modules/mail_feeder/mail_utils/mail.html#EmailProcessor.handle_attachments"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#mail_feeder.mail_utils.mail.EmailProcessor.handle_attachments" title="Link to this definition"></a></dt>
-<dd><p>Handles the attachments of an instance.</p>
-<dl class="simple">
-<dt>Args:</dt><dd><p>instance: The instance for which attachments need to be handled.</p>
-</dd>
-<dt>Returns:</dt><dd><p>A list of attachment IDs that were successfully handled.</p>
-</dd>
-</dl>
-</dd></dl>
-
-<dl class="py method">
-<dt class="sig sig-object py" id="mail_feeder.mail_utils.mail.EmailProcessor.handle_mail_body">
-<span class="sig-name descname"><span class="pre">handle_mail_body</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">instance</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">email_id</span></span></em><span class="sig-paren">)</span><a class="reference internal" href="../_modules/mail_feeder/mail_utils/mail.html#EmailProcessor.handle_mail_body"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#mail_feeder.mail_utils.mail.EmailProcessor.handle_mail_body" title="Link to this definition"></a></dt>
-<dd><p>Handles the mail body by writing it to a file and launching Cortex jobs.</p>
-<dl class="simple">
-<dt>Args:</dt><dd><p>instance: The instance of the mail.
-email_id: The ID of the email.</p>
-</dd>
-<dt>Returns:</dt><dd><p>None</p>
-</dd>
-</dl>
-</dd></dl>
-
-<dl class="py method">
-<dt class="sig sig-object py" id="mail_feeder.mail_utils.mail.EmailProcessor.handle_mail_header">
-<span class="sig-name descname"><span class="pre">handle_mail_header</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">instance</span></span></em><span class="sig-paren">)</span><a class="reference internal" href="../_modules/mail_feeder/mail_utils/mail.html#EmailProcessor.handle_mail_header"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#mail_feeder.mail_utils.mail.EmailProcessor.handle_mail_header" title="Link to this definition"></a></dt>
-<dd><p>Handles the mail header of the given instance.</p>
-<dl class="simple">
-<dt>Args:</dt><dd><p>instance: The instance containing the mail header.</p>
-</dd>
-<dt>Returns:</dt><dd><p>None</p>
-</dd>
-</dl>
-</dd></dl>
-
-<dl class="py method">
-<dt class="sig sig-object py" id="mail_feeder.mail_utils.mail.EmailProcessor.process_emails_from_minio_workdir">
-<span class="sig-name descname"><span class="pre">process_emails_from_minio_workdir</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">workdir</span></span></em><span class="sig-paren">)</span><a class="reference internal" href="../_modules/mail_feeder/mail_utils/mail.html#EmailProcessor.process_emails_from_minio_workdir"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#mail_feeder.mail_utils.mail.EmailProcessor.process_emails_from_minio_workdir" title="Link to this definition"></a></dt>
-<dd><p>Process all regular emails present in the given MinIO work directory.</p>
-<dl class="simple">
-<dt>Args:</dt><dd><p>workdir (str): Path to the email directory in MinIO.</p>
-</dd>
-</dl>
-</dd></dl>
-
-<dl class="py method">
-<dt class="sig sig-object py" id="mail_feeder.mail_utils.mail.EmailProcessor.process_emails_from_web_submission">
-<span class="sig-name descname"><span class="pre">process_emails_from_web_submission</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">workdir</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">user</span></span></em><span class="sig-paren">)</span><a class="reference internal" href="../_modules/mail_feeder/mail_utils/mail.html#EmailProcessor.process_emails_from_web_submission"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#mail_feeder.mail_utils.mail.EmailProcessor.process_emails_from_web_submission" title="Link to this definition"></a></dt>
-<dd><p>Process all emails submitted via a web form within the given working directory.</p>
-<dl class="simple">
-<dt>Args:</dt><dd><p>workdir (str): Directory containing submitted email files.
-user (str): Email address of the user who submitted the email.</p>
-</dd>
-<dt>Returns:</dt><dd><p>instance (MailInstance or None): Last processed mail instance or None if failed.</p>
-</dd>
-</dl>
-</dd></dl>
-
-</dd></dl>
-
-<dl class="py function">
-<dt class="sig sig-object py" id="mail_feeder.mail_utils.mail.clean_workdir">
-<span class="sig-prename descclassname"><span class="pre">mail_feeder.mail_utils.mail.</span></span><span class="sig-name descname"><span class="pre">clean_workdir</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">folder</span></span></em><span class="sig-paren">)</span><a class="reference internal" href="../_modules/mail_feeder/mail_utils/mail.html#clean_workdir"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#mail_feeder.mail_utils.mail.clean_workdir" title="Link to this definition"></a></dt>
-<dd><p>This function cleans the working directory by deleting all files and directories within it.</p>
-<dl class="field-list simple">
-<dt class="field-odd">Parameters<span class="colon">:</span></dt>
-<dd class="field-odd"><p><strong>folder</strong> – The directory to be cleaned.</p>
-</dd>
-</dl>
-</dd></dl>
-
 <dl class="py function" id="module-mail_feeder.mail_utils.meioc">
 <dt class="sig sig-object py" id="mail_feeder.mail_utils.meioc.email_analysis">
 <span class="sig-prename descclassname"><span class="pre">mail_feeder.mail_utils.meioc.</span></span><span class="sig-name descname"><span class="pre">email_analysis</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">filename</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">exclude_private_ip</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">check_spf</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">check_dkim</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">file_output</span></span></em><span class="sig-paren">)</span><a class="reference internal" href="../_modules/mail_feeder/mail_utils/meioc.html#email_analysis"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#mail_feeder.mail_utils.meioc.email_analysis" title="Link to this definition"></a></dt>
@@ -3330,125 +2346,6 @@ while preserving multi-line header continuation.</p>
 <span class="sig-prename descclassname"><span class="pre">mail_feeder.mail_utils.meioc.</span></span><span class="sig-name descname"><span class="pre">real_email</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">string</span></span></em><span class="sig-paren">)</span><a class="reference internal" href="../_modules/mail_feeder/mail_utils/meioc.html#real_email"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#mail_feeder.mail_utils.meioc.real_email" title="Link to this definition"></a></dt>
 <dd></dd></dl>
 
-<dl class="py class" id="module-mail_feeder.mail_utils.similarity_hash">
-<dt class="sig sig-object py" id="mail_feeder.mail_utils.similarity_hash.TextDistance">
-<em class="property"><span class="k"><span class="pre">class</span></span><span class="w"> </span></em><span class="sig-prename descclassname"><span class="pre">mail_feeder.mail_utils.similarity_hash.</span></span><span class="sig-name descname"><span class="pre">TextDistance</span></span><a class="reference internal" href="../_modules/mail_feeder/mail_utils/similarity_hash.html#TextDistance"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#mail_feeder.mail_utils.similarity_hash.TextDistance" title="Link to this definition"></a></dt>
-<dd><p>Bases: <code class="xref py py-class docutils literal notranslate"><span class="pre">object</span></code></p>
-<dl class="py method">
-<dt class="sig sig-object py" id="mail_feeder.mail_utils.similarity_hash.TextDistance.calculate_distance">
-<span class="sig-name descname"><span class="pre">calculate_distance</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">hash1</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">hash2</span></span></em><span class="sig-paren">)</span><a class="reference internal" href="../_modules/mail_feeder/mail_utils/similarity_hash.html#TextDistance.calculate_distance"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#mail_feeder.mail_utils.similarity_hash.TextDistance.calculate_distance" title="Link to this definition"></a></dt>
-<dd></dd></dl>
-
-<dl class="py attribute">
-<dt class="sig sig-object py" id="mail_feeder.mail_utils.similarity_hash.TextDistance.carriage_return_chars">
-<span class="sig-name descname"><span class="pre">carriage_return_chars</span></span><a class="headerlink" href="#mail_feeder.mail_utils.similarity_hash.TextDistance.carriage_return_chars" title="Link to this definition"></a></dt>
-<dd></dd></dl>
-
-<dl class="py method">
-<dt class="sig sig-object py" id="mail_feeder.mail_utils.similarity_hash.TextDistance.hash_text">
-<span class="sig-name descname"><span class="pre">hash_text</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">text</span></span></em><span class="sig-paren">)</span><a class="reference internal" href="../_modules/mail_feeder/mail_utils/similarity_hash.html#TextDistance.hash_text"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#mail_feeder.mail_utils.similarity_hash.TextDistance.hash_text" title="Link to this definition"></a></dt>
-<dd></dd></dl>
-
-<dl class="py method">
-<dt class="sig sig-object py" id="mail_feeder.mail_utils.similarity_hash.TextDistance.hash_text_mail">
-<span class="sig-name descname"><span class="pre">hash_text_mail</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">text</span></span></em><span class="sig-paren">)</span><a class="reference internal" href="../_modules/mail_feeder/mail_utils/similarity_hash.html#TextDistance.hash_text_mail"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#mail_feeder.mail_utils.similarity_hash.TextDistance.hash_text_mail" title="Link to this definition"></a></dt>
-<dd></dd></dl>
-
-<dl class="py attribute">
-<dt class="sig sig-object py" id="mail_feeder.mail_utils.similarity_hash.TextDistance.html_tags">
-<span class="sig-name descname"><span class="pre">html_tags</span></span><a class="headerlink" href="#mail_feeder.mail_utils.similarity_hash.TextDistance.html_tags" title="Link to this definition"></a></dt>
-<dd></dd></dl>
-
-<dl class="py attribute">
-<dt class="sig sig-object py" id="mail_feeder.mail_utils.similarity_hash.TextDistance.newline_chars">
-<span class="sig-name descname"><span class="pre">newline_chars</span></span><a class="headerlink" href="#mail_feeder.mail_utils.similarity_hash.TextDistance.newline_chars" title="Link to this definition"></a></dt>
-<dd></dd></dl>
-
-<dl class="py method">
-<dt class="sig sig-object py" id="mail_feeder.mail_utils.similarity_hash.TextDistance.preprocess_text">
-<span class="sig-name descname"><span class="pre">preprocess_text</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">text</span></span></em><span class="sig-paren">)</span><a class="reference internal" href="../_modules/mail_feeder/mail_utils/similarity_hash.html#TextDistance.preprocess_text"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#mail_feeder.mail_utils.similarity_hash.TextDistance.preprocess_text" title="Link to this definition"></a></dt>
-<dd></dd></dl>
-
-<dl class="py attribute">
-<dt class="sig sig-object py" id="mail_feeder.mail_utils.similarity_hash.TextDistance.single_quotes">
-<span class="sig-name descname"><span class="pre">single_quotes</span></span><a class="headerlink" href="#mail_feeder.mail_utils.similarity_hash.TextDistance.single_quotes" title="Link to this definition"></a></dt>
-<dd></dd></dl>
-
-<dl class="py attribute">
-<dt class="sig sig-object py" id="mail_feeder.mail_utils.similarity_hash.TextDistance.stopwords">
-<span class="sig-name descname"><span class="pre">stopwords</span></span><a class="headerlink" href="#mail_feeder.mail_utils.similarity_hash.TextDistance.stopwords" title="Link to this definition"></a></dt>
-<dd></dd></dl>
-
-<dl class="py method">
-<dt class="sig sig-object py" id="mail_feeder.mail_utils.similarity_hash.TextDistance.tokenize_text">
-<span class="sig-name descname"><span class="pre">tokenize_text</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">text</span></span></em><span class="sig-paren">)</span><a class="reference internal" href="../_modules/mail_feeder/mail_utils/similarity_hash.html#TextDistance.tokenize_text"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#mail_feeder.mail_utils.similarity_hash.TextDistance.tokenize_text" title="Link to this definition"></a></dt>
-<dd></dd></dl>
-
-</dd></dl>
-
-<dl class="py function" id="module-mail_feeder.processor.email_processor">
-<dt class="sig sig-object py" id="mail_feeder.processor.email_processor.decode_email_header">
-<span class="sig-prename descclassname"><span class="pre">mail_feeder.processor.email_processor.</span></span><span class="sig-name descname"><span class="pre">decode_email_header</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">header_value</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">str</span></span></em><span class="sig-paren">)</span> <span class="sig-return"><span class="sig-return-icon">&#x2192;</span> <span class="sig-return-typehint"><span class="pre">str</span></span></span><a class="reference internal" href="../_modules/mail_feeder/processor/email_processor.html#decode_email_header"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#mail_feeder.processor.email_processor.decode_email_header" title="Link to this definition"></a></dt>
-<dd><p>Decode an encoded email header to a readable string.</p>
-<dl class="simple">
-<dt>Args:</dt><dd><p>header_value (str): The encoded header string.</p>
-</dd>
-<dt>Returns:</dt><dd><p>str: Decoded header string.</p>
-</dd>
-</dl>
-</dd></dl>
-
-<dl class="py function">
-<dt class="sig sig-object py" id="mail_feeder.processor.email_processor.extract_email_attachments">
-<span class="sig-prename descclassname"><span class="pre">mail_feeder.processor.email_processor.</span></span><span class="sig-name descname"><span class="pre">extract_email_attachments</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">email_message</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">Message</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">save_dir</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">str</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">email_reference</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">str</span></span></em><span class="sig-paren">)</span> <span class="sig-return"><span class="sig-return-icon">&#x2192;</span> <span class="sig-return-typehint"><span class="pre">List</span><span class="p"><span class="pre">[</span></span><span class="pre">Dict</span><span class="p"><span class="pre">[</span></span><span class="pre">str</span><span class="p"><span class="pre">,</span></span><span class="w"> </span><span class="pre">Any</span><span class="p"><span class="pre">]</span></span><span class="p"><span class="pre">]</span></span></span></span><a class="reference internal" href="../_modules/mail_feeder/processor/email_processor.html#extract_email_attachments"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#mail_feeder.processor.email_processor.extract_email_attachments" title="Link to this definition"></a></dt>
-<dd><p>Extract attachments from an email message and save them in the given directory.</p>
-<dl class="simple">
-<dt>Args:</dt><dd><p>email_message (Message): Email message object.
-save_dir (str): Directory path to save attachments.
-email_reference (str): Reference ID for the parent email.</p>
-</dd>
-<dt>Returns:</dt><dd><p>List[Dict[str, Any]]: List of dictionaries representing attachments with metadata.</p>
-</dd>
-</dl>
-</dd></dl>
-
-<dl class="py function">
-<dt class="sig sig-object py" id="mail_feeder.processor.email_processor.generate_unique_email_reference">
-<span class="sig-prename descclassname"><span class="pre">mail_feeder.processor.email_processor.</span></span><span class="sig-name descname"><span class="pre">generate_unique_email_reference</span></span><span class="sig-paren">(</span><span class="sig-paren">)</span> <span class="sig-return"><span class="sig-return-icon">&#x2192;</span> <span class="sig-return-typehint"><span class="pre">str</span></span></span><a class="reference internal" href="../_modules/mail_feeder/processor/email_processor.html#generate_unique_email_reference"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#mail_feeder.processor.email_processor.generate_unique_email_reference" title="Link to this definition"></a></dt>
-<dd><p>Generate a unique reference string for emails.</p>
-<dl class="simple">
-<dt>Returns:</dt><dd><p>str: Unique reference string formatted as YYMMDDHHMMSS-12hexchars</p>
-</dd>
-</dl>
-</dd></dl>
-
-<dl class="py function">
-<dt class="sig sig-object py" id="mail_feeder.processor.email_processor.get_header_dict_list">
-<span class="sig-prename descclassname"><span class="pre">mail_feeder.processor.email_processor.</span></span><span class="sig-name descname"><span class="pre">get_header_dict_list</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">email_message</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">Message</span></span></em><span class="sig-paren">)</span> <span class="sig-return"><span class="sig-return-icon">&#x2192;</span> <span class="sig-return-typehint"><span class="pre">Dict</span><span class="p"><span class="pre">[</span></span><span class="pre">str</span><span class="p"><span class="pre">,</span></span><span class="w"> </span><span class="pre">str</span><span class="p"><span class="pre">]</span></span></span></span><a class="reference internal" href="../_modules/mail_feeder/processor/email_processor.html#get_header_dict_list"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#mail_feeder.processor.email_processor.get_header_dict_list" title="Link to this definition"></a></dt>
-<dd><p>Convert email headers into a dictionary.</p>
-<dl class="simple">
-<dt>Args:</dt><dd><p>email_message (Message): The email message object.</p>
-</dd>
-<dt>Returns:</dt><dd><p>Dict[str, str]: Dictionary of header names and their values.</p>
-</dd>
-</dl>
-</dd></dl>
-
-<dl class="py function">
-<dt class="sig sig-object py" id="mail_feeder.processor.email_processor.parse_email">
-<span class="sig-prename descclassname"><span class="pre">mail_feeder.processor.email_processor.</span></span><span class="sig-name descname"><span class="pre">parse_email</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">email_message</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">Message</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">working_dir</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">str</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">email_reference</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">str</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">reported_by</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">str</span><span class="w"> </span><span class="p"><span class="pre">|</span></span><span class="w"> </span><span class="pre">None</span></span><span class="w"> </span><span class="o"><span class="pre">=</span></span><span class="w"> </span><span class="default_value"><span class="pre">None</span></span></em><span class="sig-paren">)</span> <span class="sig-return"><span class="sig-return-icon">&#x2192;</span> <span class="sig-return-typehint"><span class="pre">Dict</span><span class="p"><span class="pre">[</span></span><span class="pre">str</span><span class="p"><span class="pre">,</span></span><span class="w"> </span><span class="pre">Any</span><span class="p"><span class="pre">]</span></span></span></span><a class="reference internal" href="../_modules/mail_feeder/processor/email_processor.html#parse_email"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#mail_feeder.processor.email_processor.parse_email" title="Link to this definition"></a></dt>
-<dd><p>Parse an email message, extract key information and attachments, and return as a dictionary.</p>
-<dl class="simple">
-<dt>Args:</dt><dd><p>email_message (Message): The email message object to process.
-working_dir (str): Directory where attachments will be saved.
-email_reference (str): Unique reference for this email.
-reported_by (Optional[str]): Email address of the reporter, if different from ‘From’ header.</p>
-</dd>
-<dt>Returns:</dt><dd><p>Dict[str, Any]: Parsed email data including headers, text, attachments, and metadata.</p>
-</dd>
-</dl>
-</dd></dl>
-
 </section>
 
 
@@ -3456,7 +2353,7 @@ reported_by (Optional[str]): Email address of the reporter, if different from �
           </div>
           <footer><div class="rst-footer-buttons" role="navigation" aria-label="Footer">
         <a href="ip_process_core.html" class="btn btn-neutral float-left" title="IP Process module" accesskey="p" rel="prev"><span class="fa fa-arrow-circle-left" aria-hidden="true"></span> Previous</a>
-        <a href="profiles_core.html" class="btn btn-neutral float-right" title="profiles_core module" accesskey="n" rel="next">Next <span class="fa fa-arrow-circle-right" aria-hidden="true"></span></a>
+        <a href="profiles_core.html" class="btn btn-neutral float-right" title="Profiles module" accesskey="n" rel="next">Next <span class="fa fa-arrow-circle-right" aria-hidden="true"></span></a>
     </div>
 
   <hr/>

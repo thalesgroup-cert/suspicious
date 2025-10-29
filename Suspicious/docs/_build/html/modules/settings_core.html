@@ -44,9 +44,10 @@
         </div><div class="wy-menu wy-menu-vertical" data-spy="affix" role="navigation" aria-label="Navigation menu">
               <p class="caption" role="heading"><span class="caption-text">Contents:</span></p>
 <ul class="current">
+<li class="toctree-l1"><a class="reference internal" href="../README.html">Suspicious</a></li>
 <li class="toctree-l1 current"><a class="reference internal" href="index.html">Modules (API Reference)</a><ul class="current">
-<li class="toctree-l2"><a class="reference internal" href="case_handler_core.html">case_handler_core module</a></li>
-<li class="toctree-l2"><a class="reference internal" href="cortex_job_core.html">cortex_job_core module</a></li>
+<li class="toctree-l2"><a class="reference internal" href="case_handler_core.html">Case Handler module</a></li>
+<li class="toctree-l2"><a class="reference internal" href="cortex_job_core.html">Cortex Job module</a></li>
 <li class="toctree-l2"><a class="reference internal" href="dashboard_core.html">Dashboard module</a></li>
 <li class="toctree-l2"><a class="reference internal" href="domain_process_core.html">Domain Process Module</a></li>
 <li class="toctree-l2"><a class="reference internal" href="email_process_core.html">Email Process module</a></li>
@@ -252,17 +253,17 @@
 <span id="settings-module"></span><h1>Settings module<a class="headerlink" href="#module-settings.models" title="Link to this heading"></a></h1>
 <dl class="py class">
 <dt class="sig sig-object py" id="settings.models.AllowListDomain">
-<em class="property"><span class="k"><span class="pre">class</span></span><span class="w"> </span></em><span class="sig-prename descclassname"><span class="pre">settings.models.</span></span><span class="sig-name descname"><span class="pre">AllowListDomain</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">id</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">domain</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">user</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">creation_date</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">last_update</span></span></em><span class="sig-paren">)</span><a class="reference internal" href="../_modules/settings/models.html#AllowListDomain"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#settings.models.AllowListDomain" title="Link to this definition"></a></dt>
+<em class="property"><span class="pre">class</span><span class="w"> </span></em><span class="sig-prename descclassname"><span class="pre">settings.models.</span></span><span class="sig-name descname"><span class="pre">AllowListDomain</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">id</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">domain</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">user</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">creation_date</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">last_update</span></span></em><span class="sig-paren">)</span><a class="reference internal" href="../_modules/settings/models.html#AllowListDomain"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#settings.models.AllowListDomain" title="Link to this definition"></a></dt>
 <dd><p>Bases: <code class="xref py py-class docutils literal notranslate"><span class="pre">Model</span></code></p>
 <dl class="py exception">
 <dt class="sig sig-object py" id="settings.models.AllowListDomain.DoesNotExist">
-<em class="property"><span class="k"><span class="pre">exception</span></span><span class="w"> </span></em><span class="sig-name descname"><span class="pre">DoesNotExist</span></span><a class="headerlink" href="#settings.models.AllowListDomain.DoesNotExist" title="Link to this definition"></a></dt>
+<em class="property"><span class="pre">exception</span><span class="w"> </span></em><span class="sig-name descname"><span class="pre">DoesNotExist</span></span><a class="headerlink" href="#settings.models.AllowListDomain.DoesNotExist" title="Link to this definition"></a></dt>
 <dd><p>Bases: <code class="xref py py-class docutils literal notranslate"><span class="pre">ObjectDoesNotExist</span></code></p>
 </dd></dl>
 
 <dl class="py exception">
 <dt class="sig sig-object py" id="settings.models.AllowListDomain.MultipleObjectsReturned">
-<em class="property"><span class="k"><span class="pre">exception</span></span><span class="w"> </span></em><span class="sig-name descname"><span class="pre">MultipleObjectsReturned</span></span><a class="headerlink" href="#settings.models.AllowListDomain.MultipleObjectsReturned" title="Link to this definition"></a></dt>
+<em class="property"><span class="pre">exception</span><span class="w"> </span></em><span class="sig-name descname"><span class="pre">MultipleObjectsReturned</span></span><a class="headerlink" href="#settings.models.AllowListDomain.MultipleObjectsReturned" title="Link to this definition"></a></dt>
 <dd><p>Bases: <code class="xref py py-class docutils literal notranslate"><span class="pre">MultipleObjectsReturned</span></code></p>
 </dd></dl>
 
@@ -352,17 +353,17 @@ one-to-one (via ForwardOneToOneDescriptor subclass) relation.</p>
 
 <dl class="py class">
 <dt class="sig sig-object py" id="settings.models.AllowListFile">
-<em class="property"><span class="k"><span class="pre">class</span></span><span class="w"> </span></em><span class="sig-prename descclassname"><span class="pre">settings.models.</span></span><span class="sig-name descname"><span class="pre">AllowListFile</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">id</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">linked_file_hash</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">user</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">creation_date</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">last_update</span></span></em><span class="sig-paren">)</span><a class="reference internal" href="../_modules/settings/models.html#AllowListFile"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#settings.models.AllowListFile" title="Link to this definition"></a></dt>
+<em class="property"><span class="pre">class</span><span class="w"> </span></em><span class="sig-prename descclassname"><span class="pre">settings.models.</span></span><span class="sig-name descname"><span class="pre">AllowListFile</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">id</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">linked_file_hash</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">user</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">creation_date</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">last_update</span></span></em><span class="sig-paren">)</span><a class="reference internal" href="../_modules/settings/models.html#AllowListFile"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#settings.models.AllowListFile" title="Link to this definition"></a></dt>
 <dd><p>Bases: <code class="xref py py-class docutils literal notranslate"><span class="pre">Model</span></code></p>
 <dl class="py exception">
 <dt class="sig sig-object py" id="settings.models.AllowListFile.DoesNotExist">
-<em class="property"><span class="k"><span class="pre">exception</span></span><span class="w"> </span></em><span class="sig-name descname"><span class="pre">DoesNotExist</span></span><a class="headerlink" href="#settings.models.AllowListFile.DoesNotExist" title="Link to this definition"></a></dt>
+<em class="property"><span class="pre">exception</span><span class="w"> </span></em><span class="sig-name descname"><span class="pre">DoesNotExist</span></span><a class="headerlink" href="#settings.models.AllowListFile.DoesNotExist" title="Link to this definition"></a></dt>
 <dd><p>Bases: <code class="xref py py-class docutils literal notranslate"><span class="pre">ObjectDoesNotExist</span></code></p>
 </dd></dl>
 
 <dl class="py exception">
 <dt class="sig sig-object py" id="settings.models.AllowListFile.MultipleObjectsReturned">
-<em class="property"><span class="k"><span class="pre">exception</span></span><span class="w"> </span></em><span class="sig-name descname"><span class="pre">MultipleObjectsReturned</span></span><a class="headerlink" href="#settings.models.AllowListFile.MultipleObjectsReturned" title="Link to this definition"></a></dt>
+<em class="property"><span class="pre">exception</span><span class="w"> </span></em><span class="sig-name descname"><span class="pre">MultipleObjectsReturned</span></span><a class="headerlink" href="#settings.models.AllowListFile.MultipleObjectsReturned" title="Link to this definition"></a></dt>
 <dd><p>Bases: <code class="xref py py-class docutils literal notranslate"><span class="pre">MultipleObjectsReturned</span></code></p>
 </dd></dl>
 
@@ -452,17 +453,17 @@ one-to-one (via ForwardOneToOneDescriptor subclass) relation.</p>
 
 <dl class="py class">
 <dt class="sig sig-object py" id="settings.models.AllowListFiletype">
-<em class="property"><span class="k"><span class="pre">class</span></span><span class="w"> </span></em><span class="sig-prename descclassname"><span class="pre">settings.models.</span></span><span class="sig-name descname"><span class="pre">AllowListFiletype</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">id</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">filetype</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">user</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">creation_date</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">last_update</span></span></em><span class="sig-paren">)</span><a class="reference internal" href="../_modules/settings/models.html#AllowListFiletype"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#settings.models.AllowListFiletype" title="Link to this definition"></a></dt>
+<em class="property"><span class="pre">class</span><span class="w"> </span></em><span class="sig-prename descclassname"><span class="pre">settings.models.</span></span><span class="sig-name descname"><span class="pre">AllowListFiletype</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">id</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">filetype</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">user</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">creation_date</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">last_update</span></span></em><span class="sig-paren">)</span><a class="reference internal" href="../_modules/settings/models.html#AllowListFiletype"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#settings.models.AllowListFiletype" title="Link to this definition"></a></dt>
 <dd><p>Bases: <code class="xref py py-class docutils literal notranslate"><span class="pre">Model</span></code></p>
 <dl class="py exception">
 <dt class="sig sig-object py" id="settings.models.AllowListFiletype.DoesNotExist">
-<em class="property"><span class="k"><span class="pre">exception</span></span><span class="w"> </span></em><span class="sig-name descname"><span class="pre">DoesNotExist</span></span><a class="headerlink" href="#settings.models.AllowListFiletype.DoesNotExist" title="Link to this definition"></a></dt>
+<em class="property"><span class="pre">exception</span><span class="w"> </span></em><span class="sig-name descname"><span class="pre">DoesNotExist</span></span><a class="headerlink" href="#settings.models.AllowListFiletype.DoesNotExist" title="Link to this definition"></a></dt>
 <dd><p>Bases: <code class="xref py py-class docutils literal notranslate"><span class="pre">ObjectDoesNotExist</span></code></p>
 </dd></dl>
 
 <dl class="py exception">
 <dt class="sig sig-object py" id="settings.models.AllowListFiletype.MultipleObjectsReturned">
-<em class="property"><span class="k"><span class="pre">exception</span></span><span class="w"> </span></em><span class="sig-name descname"><span class="pre">MultipleObjectsReturned</span></span><a class="headerlink" href="#settings.models.AllowListFiletype.MultipleObjectsReturned" title="Link to this definition"></a></dt>
+<em class="property"><span class="pre">exception</span><span class="w"> </span></em><span class="sig-name descname"><span class="pre">MultipleObjectsReturned</span></span><a class="headerlink" href="#settings.models.AllowListFiletype.MultipleObjectsReturned" title="Link to this definition"></a></dt>
 <dd><p>Bases: <code class="xref py py-class docutils literal notranslate"><span class="pre">MultipleObjectsReturned</span></code></p>
 </dd></dl>
 
@@ -541,17 +542,17 @@ one-to-one (via ForwardOneToOneDescriptor subclass) relation.</p>
 
 <dl class="py class">
 <dt class="sig sig-object py" id="settings.models.CampaignDomainAllowList">
-<em class="property"><span class="k"><span class="pre">class</span></span><span class="w"> </span></em><span class="sig-prename descclassname"><span class="pre">settings.models.</span></span><span class="sig-name descname"><span class="pre">CampaignDomainAllowList</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">id</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">domain</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">user</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">creation_date</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">last_update</span></span></em><span class="sig-paren">)</span><a class="reference internal" href="../_modules/settings/models.html#CampaignDomainAllowList"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#settings.models.CampaignDomainAllowList" title="Link to this definition"></a></dt>
+<em class="property"><span class="pre">class</span><span class="w"> </span></em><span class="sig-prename descclassname"><span class="pre">settings.models.</span></span><span class="sig-name descname"><span class="pre">CampaignDomainAllowList</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">id</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">domain</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">user</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">creation_date</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">last_update</span></span></em><span class="sig-paren">)</span><a class="reference internal" href="../_modules/settings/models.html#CampaignDomainAllowList"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#settings.models.CampaignDomainAllowList" title="Link to this definition"></a></dt>
 <dd><p>Bases: <code class="xref py py-class docutils literal notranslate"><span class="pre">Model</span></code></p>
 <dl class="py exception">
 <dt class="sig sig-object py" id="settings.models.CampaignDomainAllowList.DoesNotExist">
-<em class="property"><span class="k"><span class="pre">exception</span></span><span class="w"> </span></em><span class="sig-name descname"><span class="pre">DoesNotExist</span></span><a class="headerlink" href="#settings.models.CampaignDomainAllowList.DoesNotExist" title="Link to this definition"></a></dt>
+<em class="property"><span class="pre">exception</span><span class="w"> </span></em><span class="sig-name descname"><span class="pre">DoesNotExist</span></span><a class="headerlink" href="#settings.models.CampaignDomainAllowList.DoesNotExist" title="Link to this definition"></a></dt>
 <dd><p>Bases: <code class="xref py py-class docutils literal notranslate"><span class="pre">ObjectDoesNotExist</span></code></p>
 </dd></dl>
 
 <dl class="py exception">
 <dt class="sig sig-object py" id="settings.models.CampaignDomainAllowList.MultipleObjectsReturned">
-<em class="property"><span class="k"><span class="pre">exception</span></span><span class="w"> </span></em><span class="sig-name descname"><span class="pre">MultipleObjectsReturned</span></span><a class="headerlink" href="#settings.models.CampaignDomainAllowList.MultipleObjectsReturned" title="Link to this definition"></a></dt>
+<em class="property"><span class="pre">exception</span><span class="w"> </span></em><span class="sig-name descname"><span class="pre">MultipleObjectsReturned</span></span><a class="headerlink" href="#settings.models.CampaignDomainAllowList.MultipleObjectsReturned" title="Link to this definition"></a></dt>
 <dd><p>Bases: <code class="xref py py-class docutils literal notranslate"><span class="pre">MultipleObjectsReturned</span></code></p>
 </dd></dl>
 
@@ -641,17 +642,17 @@ one-to-one (via ForwardOneToOneDescriptor subclass) relation.</p>
 
 <dl class="py class">
 <dt class="sig sig-object py" id="settings.models.DenyListDomain">
-<em class="property"><span class="k"><span class="pre">class</span></span><span class="w"> </span></em><span class="sig-prename descclassname"><span class="pre">settings.models.</span></span><span class="sig-name descname"><span class="pre">DenyListDomain</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">id</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">domain</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">user</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">creation_date</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">last_update</span></span></em><span class="sig-paren">)</span><a class="reference internal" href="../_modules/settings/models.html#DenyListDomain"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#settings.models.DenyListDomain" title="Link to this definition"></a></dt>
+<em class="property"><span class="pre">class</span><span class="w"> </span></em><span class="sig-prename descclassname"><span class="pre">settings.models.</span></span><span class="sig-name descname"><span class="pre">DenyListDomain</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">id</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">domain</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">user</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">creation_date</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">last_update</span></span></em><span class="sig-paren">)</span><a class="reference internal" href="../_modules/settings/models.html#DenyListDomain"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#settings.models.DenyListDomain" title="Link to this definition"></a></dt>
 <dd><p>Bases: <code class="xref py py-class docutils literal notranslate"><span class="pre">Model</span></code></p>
 <dl class="py exception">
 <dt class="sig sig-object py" id="settings.models.DenyListDomain.DoesNotExist">
-<em class="property"><span class="k"><span class="pre">exception</span></span><span class="w"> </span></em><span class="sig-name descname"><span class="pre">DoesNotExist</span></span><a class="headerlink" href="#settings.models.DenyListDomain.DoesNotExist" title="Link to this definition"></a></dt>
+<em class="property"><span class="pre">exception</span><span class="w"> </span></em><span class="sig-name descname"><span class="pre">DoesNotExist</span></span><a class="headerlink" href="#settings.models.DenyListDomain.DoesNotExist" title="Link to this definition"></a></dt>
 <dd><p>Bases: <code class="xref py py-class docutils literal notranslate"><span class="pre">ObjectDoesNotExist</span></code></p>
 </dd></dl>
 
 <dl class="py exception">
 <dt class="sig sig-object py" id="settings.models.DenyListDomain.MultipleObjectsReturned">
-<em class="property"><span class="k"><span class="pre">exception</span></span><span class="w"> </span></em><span class="sig-name descname"><span class="pre">MultipleObjectsReturned</span></span><a class="headerlink" href="#settings.models.DenyListDomain.MultipleObjectsReturned" title="Link to this definition"></a></dt>
+<em class="property"><span class="pre">exception</span><span class="w"> </span></em><span class="sig-name descname"><span class="pre">MultipleObjectsReturned</span></span><a class="headerlink" href="#settings.models.DenyListDomain.MultipleObjectsReturned" title="Link to this definition"></a></dt>
 <dd><p>Bases: <code class="xref py py-class docutils literal notranslate"><span class="pre">MultipleObjectsReturned</span></code></p>
 </dd></dl>
 
@@ -741,17 +742,17 @@ one-to-one (via ForwardOneToOneDescriptor subclass) relation.</p>
 
 <dl class="py class">
 <dt class="sig sig-object py" id="settings.models.DenyListFile">
-<em class="property"><span class="k"><span class="pre">class</span></span><span class="w"> </span></em><span class="sig-prename descclassname"><span class="pre">settings.models.</span></span><span class="sig-name descname"><span class="pre">DenyListFile</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">id</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">linked_file_hash</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">user</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">creation_date</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">last_update</span></span></em><span class="sig-paren">)</span><a class="reference internal" href="../_modules/settings/models.html#DenyListFile"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#settings.models.DenyListFile" title="Link to this definition"></a></dt>
+<em class="property"><span class="pre">class</span><span class="w"> </span></em><span class="sig-prename descclassname"><span class="pre">settings.models.</span></span><span class="sig-name descname"><span class="pre">DenyListFile</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">id</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">linked_file_hash</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">user</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">creation_date</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">last_update</span></span></em><span class="sig-paren">)</span><a class="reference internal" href="../_modules/settings/models.html#DenyListFile"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#settings.models.DenyListFile" title="Link to this definition"></a></dt>
 <dd><p>Bases: <code class="xref py py-class docutils literal notranslate"><span class="pre">Model</span></code></p>
 <dl class="py exception">
 <dt class="sig sig-object py" id="settings.models.DenyListFile.DoesNotExist">
-<em class="property"><span class="k"><span class="pre">exception</span></span><span class="w"> </span></em><span class="sig-name descname"><span class="pre">DoesNotExist</span></span><a class="headerlink" href="#settings.models.DenyListFile.DoesNotExist" title="Link to this definition"></a></dt>
+<em class="property"><span class="pre">exception</span><span class="w"> </span></em><span class="sig-name descname"><span class="pre">DoesNotExist</span></span><a class="headerlink" href="#settings.models.DenyListFile.DoesNotExist" title="Link to this definition"></a></dt>
 <dd><p>Bases: <code class="xref py py-class docutils literal notranslate"><span class="pre">ObjectDoesNotExist</span></code></p>
 </dd></dl>
 
 <dl class="py exception">
 <dt class="sig sig-object py" id="settings.models.DenyListFile.MultipleObjectsReturned">
-<em class="property"><span class="k"><span class="pre">exception</span></span><span class="w"> </span></em><span class="sig-name descname"><span class="pre">MultipleObjectsReturned</span></span><a class="headerlink" href="#settings.models.DenyListFile.MultipleObjectsReturned" title="Link to this definition"></a></dt>
+<em class="property"><span class="pre">exception</span><span class="w"> </span></em><span class="sig-name descname"><span class="pre">MultipleObjectsReturned</span></span><a class="headerlink" href="#settings.models.DenyListFile.MultipleObjectsReturned" title="Link to this definition"></a></dt>
 <dd><p>Bases: <code class="xref py py-class docutils literal notranslate"><span class="pre">MultipleObjectsReturned</span></code></p>
 </dd></dl>
 
@@ -841,17 +842,17 @@ one-to-one (via ForwardOneToOneDescriptor subclass) relation.</p>
 
 <dl class="py class">
 <dt class="sig sig-object py" id="settings.models.EmailFeederState">
-<em class="property"><span class="k"><span class="pre">class</span></span><span class="w"> </span></em><span class="sig-prename descclassname"><span class="pre">settings.models.</span></span><span class="sig-name descname"><span class="pre">EmailFeederState</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">id</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">is_running</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">updated_at</span></span></em><span class="sig-paren">)</span><a class="reference internal" href="../_modules/settings/models.html#EmailFeederState"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#settings.models.EmailFeederState" title="Link to this definition"></a></dt>
+<em class="property"><span class="pre">class</span><span class="w"> </span></em><span class="sig-prename descclassname"><span class="pre">settings.models.</span></span><span class="sig-name descname"><span class="pre">EmailFeederState</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">id</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">is_running</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">updated_at</span></span></em><span class="sig-paren">)</span><a class="reference internal" href="../_modules/settings/models.html#EmailFeederState"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#settings.models.EmailFeederState" title="Link to this definition"></a></dt>
 <dd><p>Bases: <code class="xref py py-class docutils literal notranslate"><span class="pre">Model</span></code></p>
 <dl class="py exception">
 <dt class="sig sig-object py" id="settings.models.EmailFeederState.DoesNotExist">
-<em class="property"><span class="k"><span class="pre">exception</span></span><span class="w"> </span></em><span class="sig-name descname"><span class="pre">DoesNotExist</span></span><a class="headerlink" href="#settings.models.EmailFeederState.DoesNotExist" title="Link to this definition"></a></dt>
+<em class="property"><span class="pre">exception</span><span class="w"> </span></em><span class="sig-name descname"><span class="pre">DoesNotExist</span></span><a class="headerlink" href="#settings.models.EmailFeederState.DoesNotExist" title="Link to this definition"></a></dt>
 <dd><p>Bases: <code class="xref py py-class docutils literal notranslate"><span class="pre">ObjectDoesNotExist</span></code></p>
 </dd></dl>
 
 <dl class="py exception">
 <dt class="sig sig-object py" id="settings.models.EmailFeederState.MultipleObjectsReturned">
-<em class="property"><span class="k"><span class="pre">exception</span></span><span class="w"> </span></em><span class="sig-name descname"><span class="pre">MultipleObjectsReturned</span></span><a class="headerlink" href="#settings.models.EmailFeederState.MultipleObjectsReturned" title="Link to this definition"></a></dt>
+<em class="property"><span class="pre">exception</span><span class="w"> </span></em><span class="sig-name descname"><span class="pre">MultipleObjectsReturned</span></span><a class="headerlink" href="#settings.models.EmailFeederState.MultipleObjectsReturned" title="Link to this definition"></a></dt>
 <dd><p>Bases: <code class="xref py py-class docutils literal notranslate"><span class="pre">MultipleObjectsReturned</span></code></p>
 </dd></dl>
 
@@ -895,17 +896,17 @@ object the first time, the query is executed.</p>
 
 <dl class="py class">
 <dt class="sig sig-object py" id="settings.models.Mailbox">
-<em class="property"><span class="k"><span class="pre">class</span></span><span class="w"> </span></em><span class="sig-prename descclassname"><span class="pre">settings.models.</span></span><span class="sig-name descname"><span class="pre">Mailbox</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">id</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">name</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">username</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">password</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">server</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">port</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">creation_date</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">last_update</span></span></em><span class="sig-paren">)</span><a class="reference internal" href="../_modules/settings/models.html#Mailbox"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#settings.models.Mailbox" title="Link to this definition"></a></dt>
+<em class="property"><span class="pre">class</span><span class="w"> </span></em><span class="sig-prename descclassname"><span class="pre">settings.models.</span></span><span class="sig-name descname"><span class="pre">Mailbox</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">id</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">name</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">username</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">password</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">server</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">port</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">creation_date</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">last_update</span></span></em><span class="sig-paren">)</span><a class="reference internal" href="../_modules/settings/models.html#Mailbox"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#settings.models.Mailbox" title="Link to this definition"></a></dt>
 <dd><p>Bases: <code class="xref py py-class docutils literal notranslate"><span class="pre">Model</span></code></p>
 <dl class="py exception">
 <dt class="sig sig-object py" id="settings.models.Mailbox.DoesNotExist">
-<em class="property"><span class="k"><span class="pre">exception</span></span><span class="w"> </span></em><span class="sig-name descname"><span class="pre">DoesNotExist</span></span><a class="headerlink" href="#settings.models.Mailbox.DoesNotExist" title="Link to this definition"></a></dt>
+<em class="property"><span class="pre">exception</span><span class="w"> </span></em><span class="sig-name descname"><span class="pre">DoesNotExist</span></span><a class="headerlink" href="#settings.models.Mailbox.DoesNotExist" title="Link to this definition"></a></dt>
 <dd><p>Bases: <code class="xref py py-class docutils literal notranslate"><span class="pre">ObjectDoesNotExist</span></code></p>
 </dd></dl>
 
 <dl class="py exception">
 <dt class="sig sig-object py" id="settings.models.Mailbox.MultipleObjectsReturned">
-<em class="property"><span class="k"><span class="pre">exception</span></span><span class="w"> </span></em><span class="sig-name descname"><span class="pre">MultipleObjectsReturned</span></span><a class="headerlink" href="#settings.models.Mailbox.MultipleObjectsReturned" title="Link to this definition"></a></dt>
+<em class="property"><span class="pre">exception</span><span class="w"> </span></em><span class="sig-name descname"><span class="pre">MultipleObjectsReturned</span></span><a class="headerlink" href="#settings.models.Mailbox.MultipleObjectsReturned" title="Link to this definition"></a></dt>
 <dd><p>Bases: <code class="xref py py-class docutils literal notranslate"><span class="pre">MultipleObjectsReturned</span></code></p>
 </dd></dl>
 
