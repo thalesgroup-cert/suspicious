@@ -1,11 +1,12 @@
-Case Handler Module
-===================
+Case Handler
+============
 
 .. toctree::
    :maxdepth: 2
-   :caption: Submodules
+   :caption: Case Handler Modules:
 
-   mail/index
+   case_utils/index
+   update_case/index
 
 .. automodule:: case_handler.models
    :members:
