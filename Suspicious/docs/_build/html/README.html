@@ -6,7 +6,7 @@
   <meta charset="utf-8" /><meta name="viewport" content="width=device-width, initial-scale=1" />
 
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <title>&lt;no title&gt; &mdash; Suspicious 1.0.0 documentation</title>
+  <title>Suspicious &mdash; Suspicious 1.0.0 documentation</title>
       <link rel="stylesheet" type="text/css" href="_static/pygments.css?v=b86133f3" />
       <link rel="stylesheet" type="text/css" href="_static/css/theme.css?v=e59714d7" />
 
@@ -43,7 +43,35 @@
 </div>
         </div><div class="wy-menu wy-menu-vertical" data-spy="affix" role="navigation" aria-label="Navigation menu">
               <p class="caption" role="heading"><span class="caption-text">Contents:</span></p>
-<ul>
+<ul class="current">
+<li class="toctree-l1 current"><a class="current reference internal" href="#">Suspicious</a><ul>
+<li class="toctree-l2"><a class="reference internal" href="#how-it-works">How It Works</a><ul>
+<li class="toctree-l3"><a class="reference internal" href="#mail-submission">Mail submission</a></li>
+<li class="toctree-l3"><a class="reference internal" href="#web-form">Web form</a></li>
+</ul>
+</li>
+<li class="toctree-l2"><a class="reference internal" href="#classification">Classification</a></li>
+<li class="toctree-l2"><a class="reference internal" href="#architecture-workflow">Architecture &amp; Workflow</a><ul>
+<li class="toctree-l3"><a class="reference internal" href="#core-requirements">Core Requirements</a></li>
+</ul>
+</li>
+<li class="toctree-l2"><a class="reference internal" href="#installation">Installation</a></li>
+<li class="toctree-l2"><a class="reference internal" href="#screenshots">Screenshots</a><ul>
+<li class="toctree-l3"><a class="reference internal" href="#home-page">Home page</a></li>
+<li class="toctree-l3"><a class="reference internal" href="#user-submissions-page">User Submissions page</a></li>
+<li class="toctree-l3"><a class="reference internal" href="#submit-page">Submit page</a></li>
+<li class="toctree-l3"><a class="reference internal" href="#dashboard-classic">Dashboard Classic</a></li>
+<li class="toctree-l3"><a class="reference internal" href="#dashboard-phishing-campaign">Dashboard Phishing Campaign</a></li>
+<li class="toctree-l3"><a class="reference internal" href="#settings">Settings</a></li>
+<li class="toctree-l3"><a class="reference internal" href="#profile">Profile</a></li>
+<li class="toctree-l3"><a class="reference internal" href="#admin-page">Admin Page</a></li>
+</ul>
+</li>
+<li class="toctree-l2"><a class="reference internal" href="#contributing">Contributing</a></li>
+<li class="toctree-l2"><a class="reference internal" href="#license">License</a></li>
+<li class="toctree-l2"><a class="reference internal" href="#contact">Contact</a></li>
+</ul>
+</li>
 <li class="toctree-l1"><a class="reference internal" href="modules/index.html">Modules (API Reference)</a></li>
 </ul>
 
@@ -61,7 +89,7 @@
           <div role="navigation" aria-label="Page navigation">
   <ul class="wy-breadcrumbs">
       <li><a href="index.html" class="icon icon-home" aria-label="Home"></a></li>
-      <li class="breadcrumb-item active">&lt;no title&gt;</li>
+      <li class="breadcrumb-item active">Suspicious</li>
       <li class="wy-breadcrumbs-aside">
             <a href="_sources/README.md.txt" rel="nofollow"> View page source</a>
       </li>
@@ -71,7 +99,121 @@
           <div role="main" class="document" itemscope="itemscope" itemtype="http://schema.org/Article">
            <div itemprop="articleBody">
              
-  <p>../../../../README.md</p>
+  <section id="suspicious">
+<h1>Suspicious<a class="headerlink" href="#suspicious" title="Link to this heading"></a></h1>
+<p>Phishing is a widespread form of social engineering attack aimed at stealing sensitive data such as login credentials, payment information, or personal details.
+Attackers impersonate trusted entities to deceive victims into opening emails, messages, or links that may lead to malware installation, ransomware, or data exposure.
+These attacks have become increasingly sophisticated, making detection and prevention critical.</p>
+<p><strong>Suspicious</strong> is a web application designed to support this need by providing automated analysis of potentially malicious content.
+It allows users to submit and investigate different types of data, including:</p>
+<ul class="simple">
+<li><p>Emails (MSG /EML format)</p></li>
+<li><p>Files (PDF, DOC/DOCX, XLS/XLSX, EXE, MSI, HTML, ZIP, etc.)</p></li>
+<li><p>IP addresses</p></li>
+<li><p>URLs</p></li>
+<li><p>Hashes</p></li>
+</ul>
+<section id="how-it-works">
+<h2>How It Works<a class="headerlink" href="#how-it-works" title="Link to this heading"></a></h2>
+<section id="mail-submission">
+<h3>Mail submission<a class="headerlink" href="#mail-submission" title="Link to this heading"></a></h3>
+<ol class="arabic simple">
+<li><p>Users send a suspicious email as an attachment to the dedicated address (e.g., <code class="docutils literal notranslate"><span class="pre">suspicious&#64;test.com</span></code>).</p></li>
+<li><p>The system splits the submission into individual components (headers, body, attachments, links, etc.).</p></li>
+<li><p>Each component is analyzed using <strong>Cortex analyzers</strong> (external APIs and rulesets such as YARA).</p></li>
+<li><p>Results are aggregated, scored, and classified.</p></li>
+<li><p>The frontend provides users with access to reports, detailed analysis, and final conclusions.</p></li>
+<li><p>Using the configured SMTP server it sends back a quick report / answer to the User</p></li>
+</ol>
+</section>
+<section id="web-form">
+<h3>Web form<a class="headerlink" href="#web-form" title="Link to this heading"></a></h3>
+<ol class="arabic simple">
+<li><p>Users goes to the web platform and uses the <code class="docutils literal notranslate"><span class="pre">Submit</span> <span class="pre">an</span> <span class="pre">Item</span></code> page to send an Item to analyze (File, IP, Url, Hash)</p></li>
+<li><p>If the Item is an MSG or EML File, the system splits the submission into individual components (headers, body, attachments, links, etc.).</p></li>
+<li><p>Each component is analyzed using <strong>Cortex analyzers</strong> (external APIs and rulesets such as YARA).</p></li>
+<li><p>Results are aggregated, scored, and classified.</p></li>
+<li><p>The frontend provides users with access to reports, detailed analysis, and final conclusions.</p></li>
+</ol>
+</section>
+</section>
+<section id="classification">
+<h2>Classification<a class="headerlink" href="#classification" title="Link to this heading"></a></h2>
+<p>Based on the analysis score, submissions are categorized into four levels:</p>
+<ul class="simple">
+<li><p><strong>Dangerous</strong> – Cannot be opened; content must not be trusted.</p></li>
+<li><p><strong>Suspicious</strong> – Should not be opened; content is risky.</p></li>
+<li><p><strong>Inconclusive</strong> – Can be opened, but content should not be trusted.</p></li>
+<li><p><strong>Safe</strong> – Can be opened; content is considered trustworthy.</p></li>
+</ul>
+</section>
+<section id="architecture-workflow">
+<h2>Architecture &amp; Workflow<a class="headerlink" href="#architecture-workflow" title="Link to this heading"></a></h2>
+<p><strong>Suspicious</strong> is designed as a modular and containerized web application that can be deployed easily using Docker.<br />
+The core application is built with <strong>Django (Python)</strong>, ensuring flexibility, maintainability, and straightforward setup.</p>
+<p>A database is mandatory for the application to run, while additional services can be integrated to enhance its capabilities.</p>
+<section id="core-requirements">
+<h3>Core Requirements<a class="headerlink" href="#core-requirements" title="Link to this heading"></a></h3>
+<ul class="simple">
+<li><p><strong>Database</strong> (MySQL, MariaDB, or PostgreSQL) – Stores submissions, reports, and analysis results.</p></li>
+<li><p><strong>Elasticsearch</strong> – Provides fast and efficient search capabilities across stored data.</p></li>
+<li><p><strong><a class="reference external" href="https://github.com/TheHive-Project/Cortex">StrangeBee’s Cortex</a></strong> – Executes analyzer jobs for processing emails, files, IP addresses, and URLs.</p></li>
+<li><p><strong>MinIO S3</strong> – Handles object storage for uploaded files and extracted artifacts.</p></li>
+</ul>
+</section>
+</section>
+<section id="installation">
+<h2>Installation<a class="headerlink" href="#installation" title="Link to this heading"></a></h2>
+<p>To install Suspicious, please review our <a class="reference internal" href="#CONFIG.md"><span class="xref myst">CONFIG.md</span></a> and <a class="reference internal" href="#SETUP.md"><span class="xref myst">SETUP.md</span></a></p>
+</section>
+<section id="screenshots">
+<h2>Screenshots<a class="headerlink" href="#screenshots" title="Link to this heading"></a></h2>
+<section id="home-page">
+<h3>Home page<a class="headerlink" href="#home-page" title="Link to this heading"></a></h3>
+<img width="1845" height="1072" alt="image" src="https://github.com/user-attachments/assets/51a1a6cb-d58b-4175-996f-dc6cf2fc8345" />
+</section>
+<section id="user-submissions-page">
+<h3>User Submissions page<a class="headerlink" href="#user-submissions-page" title="Link to this heading"></a></h3>
+<img width="1844" height="1053" alt="image" src="https://github.com/user-attachments/assets/23c61439-78d4-4aa3-aa54-db8fd21a028f" />
+</section>
+<section id="submit-page">
+<h3>Submit page<a class="headerlink" href="#submit-page" title="Link to this heading"></a></h3>
+<img width="1748" height="982" alt="image" src="https://github.com/user-attachments/assets/949d789b-b034-44e7-9a97-57361853c0a0" />
+</section>
+<section id="dashboard-classic">
+<h3>Dashboard Classic<a class="headerlink" href="#dashboard-classic" title="Link to this heading"></a></h3>
+<img width="1844" height="1067" alt="image" src="https://github.com/user-attachments/assets/a9b6200a-c6b5-4114-b77d-c36f3214a6af" />
+</section>
+<section id="dashboard-phishing-campaign">
+<h3>Dashboard Phishing Campaign<a class="headerlink" href="#dashboard-phishing-campaign" title="Link to this heading"></a></h3>
+<img width="1843" height="1066" alt="image" src="https://github.com/user-attachments/assets/afabf61c-ba64-4b55-8343-e4df2c3061a0" />
+</section>
+<section id="settings">
+<h3>Settings<a class="headerlink" href="#settings" title="Link to this heading"></a></h3>
+<img width="1843" height="1067" alt="image" src="https://github.com/user-attachments/assets/67548827-ca17-47f4-9d10-3f4ed8e75b4f" />
+</section>
+<section id="profile">
+<h3>Profile<a class="headerlink" href="#profile" title="Link to this heading"></a></h3>
+<img width="1845" height="1067" alt="image" src="https://github.com/user-attachments/assets/9c57dc60-0956-4822-89e0-7eef8551efa4" />
+</section>
+<section id="admin-page">
+<h3>Admin Page<a class="headerlink" href="#admin-page" title="Link to this heading"></a></h3>
+<img width="1846" height="1062" alt="image" src="https://github.com/user-attachments/assets/c32f4b66-e22e-4336-b65e-312a79aaa223" />
+</section>
+</section>
+<section id="contributing">
+<h2>Contributing<a class="headerlink" href="#contributing" title="Link to this heading"></a></h2>
+<p>Contributions are welcome! If you’d like to contribute to Suspicious, please review our <a class="reference internal" href="#CONTRIBUTING.md"><span class="xref myst">CONTRIBUTING.md</span></a> guidelines for information on our development process, coding standards, and how to submit pull requests.</p>
+</section>
+<section id="license">
+<h2>License<a class="headerlink" href="#license" title="Link to this heading"></a></h2>
+<p>Suspicious is licensed under the GNU AFFERO GENERAL PUBLIC License. For more details, see the <a class="reference internal" href="#LICENSE"><span class="xref myst">LICENSE</span></a> file.</p>
+</section>
+<section id="contact">
+<h2>Contact<a class="headerlink" href="#contact" title="Link to this heading"></a></h2>
+<p>For questions, feedback, or support, please open an issue on GitHub</p>
+</section>
+</section>
 
 
            </div>

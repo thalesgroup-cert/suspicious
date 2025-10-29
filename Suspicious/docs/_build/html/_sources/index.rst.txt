@@ -8,6 +8,10 @@ Suspicious is a framework for Mail Analysis
    :caption: Contents:
 
    /README.md
+   /CONFIG
+   /SETUP
+   /CONTRIBUTING
+   /LICENSE
    modules/index
 
 Indices and tables

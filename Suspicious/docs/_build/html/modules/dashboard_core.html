@@ -20,7 +20,7 @@
     <link rel="index" title="Index" href="../genindex.html" />
     <link rel="search" title="Search" href="../search.html" />
     <link rel="next" title="Domain Process Module" href="domain_process_core.html" />
-    <link rel="prev" title="cortex_job_core module" href="cortex_job_core.html" /> 
+    <link rel="prev" title="Cortex Job module" href="cortex_job_core.html" /> 
 </head>
 
 <body class="wy-body-for-nav"> 
@@ -44,9 +44,10 @@
         </div><div class="wy-menu wy-menu-vertical" data-spy="affix" role="navigation" aria-label="Navigation menu">
               <p class="caption" role="heading"><span class="caption-text">Contents:</span></p>
 <ul class="current">
+<li class="toctree-l1"><a class="reference internal" href="../README.html">Suspicious</a></li>
 <li class="toctree-l1 current"><a class="reference internal" href="index.html">Modules (API Reference)</a><ul class="current">
-<li class="toctree-l2"><a class="reference internal" href="case_handler_core.html">case_handler_core module</a></li>
-<li class="toctree-l2"><a class="reference internal" href="cortex_job_core.html">cortex_job_core module</a></li>
+<li class="toctree-l2"><a class="reference internal" href="case_handler_core.html">Case Handler module</a></li>
+<li class="toctree-l2"><a class="reference internal" href="cortex_job_core.html">Cortex Job module</a></li>
 <li class="toctree-l2 current"><a class="current reference internal" href="#">Dashboard module</a><ul>
 <li class="toctree-l3"><a class="reference internal" href="#dashboard.models.Kpi"><code class="docutils literal notranslate"><span class="pre">Kpi</span></code></a><ul>
 <li class="toctree-l4"><a class="reference internal" href="#dashboard.models.Kpi.DoesNotExist"><code class="docutils literal notranslate"><span class="pre">Kpi.DoesNotExist</span></code></a></li>
@@ -179,16 +180,16 @@
 </ul>
 </li>
 <li class="toctree-l2"><a class="reference internal" href="domain_process_core.html">Domain Process Module</a></li>
-<li class="toctree-l2"><a class="reference internal" href="email_process_core.html">email_process_core module</a></li>
-<li class="toctree-l2"><a class="reference internal" href="file_process_core.html">file_process_core module</a></li>
-<li class="toctree-l2"><a class="reference internal" href="hash_process_core.html">hash_process_core module</a></li>
-<li class="toctree-l2"><a class="reference internal" href="ip_process_core.html">ip_process_core module</a></li>
-<li class="toctree-l2"><a class="reference internal" href="mail_feeder_core.html">mail_feeder_core module</a></li>
-<li class="toctree-l2"><a class="reference internal" href="profiles_core.html">profiles_core module</a></li>
-<li class="toctree-l2"><a class="reference internal" href="score_process_core.html">score_process_core module</a></li>
-<li class="toctree-l2"><a class="reference internal" href="settings_core.html">settings_core module</a></li>
-<li class="toctree-l2"><a class="reference internal" href="tasp_core.html">tasp_core module</a></li>
-<li class="toctree-l2"><a class="reference internal" href="url_process_core.html">url_process_core module</a></li>
+<li class="toctree-l2"><a class="reference internal" href="email_process_core.html">Email Process module</a></li>
+<li class="toctree-l2"><a class="reference internal" href="file_process_core.html">File Process module</a></li>
+<li class="toctree-l2"><a class="reference internal" href="hash_process_core.html">Hash Process module</a></li>
+<li class="toctree-l2"><a class="reference internal" href="ip_process_core.html">IP Process module</a></li>
+<li class="toctree-l2"><a class="reference internal" href="mail_feeder_core.html">Mail Feeder module</a></li>
+<li class="toctree-l2"><a class="reference internal" href="profiles_core.html">Profiles module</a></li>
+<li class="toctree-l2"><a class="reference internal" href="score_process_core.html">Score Process module</a></li>
+<li class="toctree-l2"><a class="reference internal" href="settings_core.html">Settings module</a></li>
+<li class="toctree-l2"><a class="reference internal" href="tasp_core.html">TASP module</a></li>
+<li class="toctree-l2"><a class="reference internal" href="url_process_core.html">Url Process module</a></li>
 </ul>
 </li>
 </ul>
@@ -222,17 +223,17 @@
 <span id="dashboard-module"></span><h1>Dashboard module<a class="headerlink" href="#module-dashboard.models" title="Link to this heading"></a></h1>
 <dl class="py class">
 <dt class="sig sig-object py" id="dashboard.models.Kpi">
-<em class="property"><span class="k"><span class="pre">class</span></span><span class="w"> </span></em><span class="sig-prename descclassname"><span class="pre">dashboard.models.</span></span><span class="sig-name descname"><span class="pre">Kpi</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">id</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">month</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">year</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">monthly_cases_summary</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">monthly_reporter_stats</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">total_cases_stats</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">creation_date</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">last_update</span></span></em><span class="sig-paren">)</span><a class="reference internal" href="../_modules/dashboard/models.html#Kpi"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#dashboard.models.Kpi" title="Link to this definition"></a></dt>
+<em class="property"><span class="pre">class</span><span class="w"> </span></em><span class="sig-prename descclassname"><span class="pre">dashboard.models.</span></span><span class="sig-name descname"><span class="pre">Kpi</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">id</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">month</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">year</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">monthly_cases_summary</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">monthly_reporter_stats</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">total_cases_stats</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">creation_date</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">last_update</span></span></em><span class="sig-paren">)</span><a class="reference internal" href="../_modules/dashboard/models.html#Kpi"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#dashboard.models.Kpi" title="Link to this definition"></a></dt>
 <dd><p>Bases: <code class="xref py py-class docutils literal notranslate"><span class="pre">Model</span></code></p>
 <dl class="py exception">
 <dt class="sig sig-object py" id="dashboard.models.Kpi.DoesNotExist">
-<em class="property"><span class="k"><span class="pre">exception</span></span><span class="w"> </span></em><span class="sig-name descname"><span class="pre">DoesNotExist</span></span><a class="headerlink" href="#dashboard.models.Kpi.DoesNotExist" title="Link to this definition"></a></dt>
+<em class="property"><span class="pre">exception</span><span class="w"> </span></em><span class="sig-name descname"><span class="pre">DoesNotExist</span></span><a class="headerlink" href="#dashboard.models.Kpi.DoesNotExist" title="Link to this definition"></a></dt>
 <dd><p>Bases: <code class="xref py py-class docutils literal notranslate"><span class="pre">ObjectDoesNotExist</span></code></p>
 </dd></dl>
 
 <dl class="py exception">
 <dt class="sig sig-object py" id="dashboard.models.Kpi.MultipleObjectsReturned">
-<em class="property"><span class="k"><span class="pre">exception</span></span><span class="w"> </span></em><span class="sig-name descname"><span class="pre">MultipleObjectsReturned</span></span><a class="headerlink" href="#dashboard.models.Kpi.MultipleObjectsReturned" title="Link to this definition"></a></dt>
+<em class="property"><span class="pre">exception</span><span class="w"> </span></em><span class="sig-name descname"><span class="pre">MultipleObjectsReturned</span></span><a class="headerlink" href="#dashboard.models.Kpi.MultipleObjectsReturned" title="Link to this definition"></a></dt>
 <dd><p>Bases: <code class="xref py py-class docutils literal notranslate"><span class="pre">MultipleObjectsReturned</span></code></p>
 </dd></dl>
 
@@ -354,17 +355,17 @@ object the first time, the query is executed.</p>
 
 <dl class="py class">
 <dt class="sig sig-object py" id="dashboard.models.MonthlyCasesSummary">
-<em class="property"><span class="k"><span class="pre">class</span></span><span class="w"> </span></em><span class="sig-prename descclassname"><span class="pre">dashboard.models.</span></span><span class="sig-name descname"><span class="pre">MonthlyCasesSummary</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">id</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">suspicious_cases</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">inconclusive_cases</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">failure_cases</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">dangerous_cases</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">safe_cases</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">challenged_cases</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">allow_listed_cases</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">creation_date</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">last_update</span></span></em><span class="sig-paren">)</span><a class="reference internal" href="../_modules/dashboard/models.html#MonthlyCasesSummary"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#dashboard.models.MonthlyCasesSummary" title="Link to this definition"></a></dt>
+<em class="property"><span class="pre">class</span><span class="w"> </span></em><span class="sig-prename descclassname"><span class="pre">dashboard.models.</span></span><span class="sig-name descname"><span class="pre">MonthlyCasesSummary</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">id</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">suspicious_cases</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">inconclusive_cases</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">failure_cases</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">dangerous_cases</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">safe_cases</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">challenged_cases</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">allow_listed_cases</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">creation_date</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">last_update</span></span></em><span class="sig-paren">)</span><a class="reference internal" href="../_modules/dashboard/models.html#MonthlyCasesSummary"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#dashboard.models.MonthlyCasesSummary" title="Link to this definition"></a></dt>
 <dd><p>Bases: <code class="xref py py-class docutils literal notranslate"><span class="pre">Model</span></code></p>
 <dl class="py exception">
 <dt class="sig sig-object py" id="dashboard.models.MonthlyCasesSummary.DoesNotExist">
-<em class="property"><span class="k"><span class="pre">exception</span></span><span class="w"> </span></em><span class="sig-name descname"><span class="pre">DoesNotExist</span></span><a class="headerlink" href="#dashboard.models.MonthlyCasesSummary.DoesNotExist" title="Link to this definition"></a></dt>
+<em class="property"><span class="pre">exception</span><span class="w"> </span></em><span class="sig-name descname"><span class="pre">DoesNotExist</span></span><a class="headerlink" href="#dashboard.models.MonthlyCasesSummary.DoesNotExist" title="Link to this definition"></a></dt>
 <dd><p>Bases: <code class="xref py py-class docutils literal notranslate"><span class="pre">ObjectDoesNotExist</span></code></p>
 </dd></dl>
 
 <dl class="py exception">
 <dt class="sig sig-object py" id="dashboard.models.MonthlyCasesSummary.MultipleObjectsReturned">
-<em class="property"><span class="k"><span class="pre">exception</span></span><span class="w"> </span></em><span class="sig-name descname"><span class="pre">MultipleObjectsReturned</span></span><a class="headerlink" href="#dashboard.models.MonthlyCasesSummary.MultipleObjectsReturned" title="Link to this definition"></a></dt>
+<em class="property"><span class="pre">exception</span><span class="w"> </span></em><span class="sig-name descname"><span class="pre">MultipleObjectsReturned</span></span><a class="headerlink" href="#dashboard.models.MonthlyCasesSummary.MultipleObjectsReturned" title="Link to this definition"></a></dt>
 <dd><p>Bases: <code class="xref py py-class docutils literal notranslate"><span class="pre">MultipleObjectsReturned</span></code></p>
 </dd></dl>
 
@@ -487,17 +488,17 @@ object the first time, the query is executed.</p>
 
 <dl class="py class">
 <dt class="sig sig-object py" id="dashboard.models.MonthlyReporterStats">
-<em class="property"><span class="k"><span class="pre">class</span></span><span class="w"> </span></em><span class="sig-prename descclassname"><span class="pre">dashboard.models.</span></span><span class="sig-name descname"><span class="pre">MonthlyReporterStats</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">id</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">new_reporters</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">total_reporters</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">creation_date</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">last_update</span></span></em><span class="sig-paren">)</span><a class="reference internal" href="../_modules/dashboard/models.html#MonthlyReporterStats"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#dashboard.models.MonthlyReporterStats" title="Link to this definition"></a></dt>
+<em class="property"><span class="pre">class</span><span class="w"> </span></em><span class="sig-prename descclassname"><span class="pre">dashboard.models.</span></span><span class="sig-name descname"><span class="pre">MonthlyReporterStats</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">id</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">new_reporters</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">total_reporters</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">creation_date</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">last_update</span></span></em><span class="sig-paren">)</span><a class="reference internal" href="../_modules/dashboard/models.html#MonthlyReporterStats"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#dashboard.models.MonthlyReporterStats" title="Link to this definition"></a></dt>
 <dd><p>Bases: <code class="xref py py-class docutils literal notranslate"><span class="pre">Model</span></code></p>
 <dl class="py exception">
 <dt class="sig sig-object py" id="dashboard.models.MonthlyReporterStats.DoesNotExist">
-<em class="property"><span class="k"><span class="pre">exception</span></span><span class="w"> </span></em><span class="sig-name descname"><span class="pre">DoesNotExist</span></span><a class="headerlink" href="#dashboard.models.MonthlyReporterStats.DoesNotExist" title="Link to this definition"></a></dt>
+<em class="property"><span class="pre">exception</span><span class="w"> </span></em><span class="sig-name descname"><span class="pre">DoesNotExist</span></span><a class="headerlink" href="#dashboard.models.MonthlyReporterStats.DoesNotExist" title="Link to this definition"></a></dt>
 <dd><p>Bases: <code class="xref py py-class docutils literal notranslate"><span class="pre">ObjectDoesNotExist</span></code></p>
 </dd></dl>
 
 <dl class="py exception">
 <dt class="sig sig-object py" id="dashboard.models.MonthlyReporterStats.MultipleObjectsReturned">
-<em class="property"><span class="k"><span class="pre">exception</span></span><span class="w"> </span></em><span class="sig-name descname"><span class="pre">MultipleObjectsReturned</span></span><a class="headerlink" href="#dashboard.models.MonthlyReporterStats.MultipleObjectsReturned" title="Link to this definition"></a></dt>
+<em class="property"><span class="pre">exception</span><span class="w"> </span></em><span class="sig-name descname"><span class="pre">MultipleObjectsReturned</span></span><a class="headerlink" href="#dashboard.models.MonthlyReporterStats.MultipleObjectsReturned" title="Link to this definition"></a></dt>
 <dd><p>Bases: <code class="xref py py-class docutils literal notranslate"><span class="pre">MultipleObjectsReturned</span></code></p>
 </dd></dl>
 
@@ -580,17 +581,17 @@ object the first time, the query is executed.</p>
 
 <dl class="py class">
 <dt class="sig sig-object py" id="dashboard.models.TotalCasesStats">
-<em class="property"><span class="k"><span class="pre">class</span></span><span class="w"> </span></em><span class="sig-prename descclassname"><span class="pre">dashboard.models.</span></span><span class="sig-name descname"><span class="pre">TotalCasesStats</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">id</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">total_cases</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">creation_date</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">last_update</span></span></em><span class="sig-paren">)</span><a class="reference internal" href="../_modules/dashboard/models.html#TotalCasesStats"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#dashboard.models.TotalCasesStats" title="Link to this definition"></a></dt>
+<em class="property"><span class="pre">class</span><span class="w"> </span></em><span class="sig-prename descclassname"><span class="pre">dashboard.models.</span></span><span class="sig-name descname"><span class="pre">TotalCasesStats</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">id</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">total_cases</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">creation_date</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">last_update</span></span></em><span class="sig-paren">)</span><a class="reference internal" href="../_modules/dashboard/models.html#TotalCasesStats"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#dashboard.models.TotalCasesStats" title="Link to this definition"></a></dt>
 <dd><p>Bases: <code class="xref py py-class docutils literal notranslate"><span class="pre">Model</span></code></p>
 <dl class="py exception">
 <dt class="sig sig-object py" id="dashboard.models.TotalCasesStats.DoesNotExist">
-<em class="property"><span class="k"><span class="pre">exception</span></span><span class="w"> </span></em><span class="sig-name descname"><span class="pre">DoesNotExist</span></span><a class="headerlink" href="#dashboard.models.TotalCasesStats.DoesNotExist" title="Link to this definition"></a></dt>
+<em class="property"><span class="pre">exception</span><span class="w"> </span></em><span class="sig-name descname"><span class="pre">DoesNotExist</span></span><a class="headerlink" href="#dashboard.models.TotalCasesStats.DoesNotExist" title="Link to this definition"></a></dt>
 <dd><p>Bases: <code class="xref py py-class docutils literal notranslate"><span class="pre">ObjectDoesNotExist</span></code></p>
 </dd></dl>
 
 <dl class="py exception">
 <dt class="sig sig-object py" id="dashboard.models.TotalCasesStats.MultipleObjectsReturned">
-<em class="property"><span class="k"><span class="pre">exception</span></span><span class="w"> </span></em><span class="sig-name descname"><span class="pre">MultipleObjectsReturned</span></span><a class="headerlink" href="#dashboard.models.TotalCasesStats.MultipleObjectsReturned" title="Link to this definition"></a></dt>
+<em class="property"><span class="pre">exception</span><span class="w"> </span></em><span class="sig-name descname"><span class="pre">MultipleObjectsReturned</span></span><a class="headerlink" href="#dashboard.models.TotalCasesStats.MultipleObjectsReturned" title="Link to this definition"></a></dt>
 <dd><p>Bases: <code class="xref py py-class docutils literal notranslate"><span class="pre">MultipleObjectsReturned</span></code></p>
 </dd></dl>
 
@@ -666,17 +667,17 @@ object the first time, the query is executed.</p>
 
 <dl class="py class">
 <dt class="sig sig-object py" id="dashboard.models.UserCasesMonthlyStats">
-<em class="property"><span class="k"><span class="pre">class</span></span><span class="w"> </span></em><span class="sig-prename descclassname"><span class="pre">dashboard.models.</span></span><span class="sig-name descname"><span class="pre">UserCasesMonthlyStats</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">id</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">user</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">suspicious_cases</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">inconclusive_cases</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">failure_cases</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">dangerous_cases</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">safe_cases</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">challenged_cases</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">allow_listed_cases</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">total_cases</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">month</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">year</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">creation_date</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">last_update</span></span></em><span class="sig-paren">)</span><a class="reference internal" href="../_modules/dashboard/models.html#UserCasesMonthlyStats"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#dashboard.models.UserCasesMonthlyStats" title="Link to this definition"></a></dt>
+<em class="property"><span class="pre">class</span><span class="w"> </span></em><span class="sig-prename descclassname"><span class="pre">dashboard.models.</span></span><span class="sig-name descname"><span class="pre">UserCasesMonthlyStats</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">id</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">user</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">suspicious_cases</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">inconclusive_cases</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">failure_cases</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">dangerous_cases</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">safe_cases</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">challenged_cases</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">allow_listed_cases</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">total_cases</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">month</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">year</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">creation_date</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">last_update</span></span></em><span class="sig-paren">)</span><a class="reference internal" href="../_modules/dashboard/models.html#UserCasesMonthlyStats"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#dashboard.models.UserCasesMonthlyStats" title="Link to this definition"></a></dt>
 <dd><p>Bases: <code class="xref py py-class docutils literal notranslate"><span class="pre">Model</span></code></p>
 <dl class="py exception">
 <dt class="sig sig-object py" id="dashboard.models.UserCasesMonthlyStats.DoesNotExist">
-<em class="property"><span class="k"><span class="pre">exception</span></span><span class="w"> </span></em><span class="sig-name descname"><span class="pre">DoesNotExist</span></span><a class="headerlink" href="#dashboard.models.UserCasesMonthlyStats.DoesNotExist" title="Link to this definition"></a></dt>
+<em class="property"><span class="pre">exception</span><span class="w"> </span></em><span class="sig-name descname"><span class="pre">DoesNotExist</span></span><a class="headerlink" href="#dashboard.models.UserCasesMonthlyStats.DoesNotExist" title="Link to this definition"></a></dt>
 <dd><p>Bases: <code class="xref py py-class docutils literal notranslate"><span class="pre">ObjectDoesNotExist</span></code></p>
 </dd></dl>
 
 <dl class="py exception">
 <dt class="sig sig-object py" id="dashboard.models.UserCasesMonthlyStats.MultipleObjectsReturned">
-<em class="property"><span class="k"><span class="pre">exception</span></span><span class="w"> </span></em><span class="sig-name descname"><span class="pre">MultipleObjectsReturned</span></span><a class="headerlink" href="#dashboard.models.UserCasesMonthlyStats.MultipleObjectsReturned" title="Link to this definition"></a></dt>
+<em class="property"><span class="pre">exception</span><span class="w"> </span></em><span class="sig-name descname"><span class="pre">MultipleObjectsReturned</span></span><a class="headerlink" href="#dashboard.models.UserCasesMonthlyStats.MultipleObjectsReturned" title="Link to this definition"></a></dt>
 <dd><p>Bases: <code class="xref py py-class docutils literal notranslate"><span class="pre">MultipleObjectsReturned</span></code></p>
 </dd></dl>
 
@@ -1208,7 +1209,7 @@ belonging to ALL specified groups.</p>
            </div>
           </div>
           <footer><div class="rst-footer-buttons" role="navigation" aria-label="Footer">
-        <a href="cortex_job_core.html" class="btn btn-neutral float-left" title="cortex_job_core module" accesskey="p" rel="prev"><span class="fa fa-arrow-circle-left" aria-hidden="true"></span> Previous</a>
+        <a href="cortex_job_core.html" class="btn btn-neutral float-left" title="Cortex Job module" accesskey="p" rel="prev"><span class="fa fa-arrow-circle-left" aria-hidden="true"></span> Previous</a>
         <a href="domain_process_core.html" class="btn btn-neutral float-right" title="Domain Process Module" accesskey="n" rel="next">Next <span class="fa fa-arrow-circle-right" aria-hidden="true"></span></a>
     </div>
 
