@@ -12,4 +12,4 @@ class AttachmentFileModel(BaseModel):
 
 class AttachmentBatchModel(BaseModel):
     """Represents a batch of attachments to be processed."""
-    files: Dict[str, AttachmentFileModel]
+    files: Dict[str, Any]

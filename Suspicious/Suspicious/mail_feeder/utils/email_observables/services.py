@@ -77,23 +77,28 @@ class EmailObservablesService:
         raise FileNotFoundError(f"No email file found for {filename} in {workdir}")
 
     def _extract_basic_observables(self, iocextract: Dict[str, Any], artifacts: list) -> None:
-        url_data = iocextract.get("urls", {})
-        for _, url in url_data.items():
+        
+        # URLs
+        for _, url in (iocextract.get("urls") or {}).items():
             if not url.startswith("mailto"):
                 add_artifact(artifacts, "url", url)
 
-        domain_data = iocextract.get("domains", {})
-        for _, domain in domain_data.items():
+        # Domains
+        for _, domain in (iocextract.get("domains") or {}).items():
             add_artifact(artifacts, "domain", domain)
 
-        for ip in iocextract.get("body_ip", []):
+        # IPs
+        for ip in (iocextract.get("body_ip") or []):
             add_artifact(artifacts, "ip", str(ip), ["Body"])
 
-        for email in iocextract.get("body_email", []):
+        # Emails
+        for email in (iocextract.get("body_email") or []):
             add_artifact(artifacts, "mail", str(email), ["Body"])
 
-        for hash_val in iocextract.get("body_hash", []):
+        # Hashes
+        for hash_val in (iocextract.get("body_hash") or []):
             add_artifact(artifacts, "hash", str(hash_val), ["Body"])
+
 
     def _process_related_attachments(
         self,

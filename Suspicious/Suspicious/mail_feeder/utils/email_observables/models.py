@@ -1,4 +1,4 @@
-from typing import List, Dict, BinaryIO, Optional
+from typing import List, Dict, BinaryIO, Optional, Any
 from pydantic import BaseModel, Field, ConfigDict, validator
 
 
@@ -18,4 +18,4 @@ class ObservablesResult(BaseModel):
     model_config = ConfigDict(arbitrary_types_allowed=True)
 
     artifacts: List[Artifact] = Field(default_factory=list)
-    files: Dict[str, BinaryIO] = Field(default_factory=dict)
+    files: Dict[str, Any] = Field(default_factory=dict)
