@@ -5,7 +5,7 @@ Case Utilities
    :maxdepth: 2
    :caption: Case Utils:
 
-   form_handlers/mail/index
+   form_handler/mail/index
 
 .. automodule:: case_handler.case_utils.case_creator
    :members:
