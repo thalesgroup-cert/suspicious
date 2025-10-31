@@ -1,0 +1,327 @@
+
+
+<!DOCTYPE html>
+<html class="writer-html5" lang="en" data-content_root="../../../">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>case_handler.case_utils.case_handler &mdash; Suspicious 1.0.0 documentation</title>
+      <link rel="stylesheet" type="text/css" href="../../../_static/pygments.css?v=b86133f3" />
+      <link rel="stylesheet" type="text/css" href="../../../_static/css/theme.css?v=e59714d7" />
+
+  
+      <script src="../../../_static/jquery.js?v=5d32c60e"></script>
+      <script src="../../../_static/_sphinx_javascript_frameworks_compat.js?v=2cd50e6c"></script>
+      <script src="../../../_static/documentation_options.js?v=8d563738"></script>
+      <script src="../../../_static/doctools.js?v=9bcbadda"></script>
+      <script src="../../../_static/sphinx_highlight.js?v=dc90522c"></script>
+    <script src="../../../_static/js/theme.js"></script>
+    <link rel="index" title="Index" href="../../../genindex.html" />
+    <link rel="search" title="Search" href="../../../search.html" /> 
+</head>
+
+<body class="wy-body-for-nav"> 
+  <div class="wy-grid-for-nav">
+    <nav data-toggle="wy-nav-shift" class="wy-nav-side">
+      <div class="wy-side-scroll">
+        <div class="wy-side-nav-search" >
+
+          
+          
+          <a href="../../../index.html" class="icon icon-home">
+            Suspicious
+          </a>
+<div role="search">
+  <form id="rtd-search-form" class="wy-form" action="../../../search.html" method="get">
+    <input type="text" name="q" placeholder="Search docs" aria-label="Search docs" />
+    <input type="hidden" name="check_keywords" value="yes" />
+    <input type="hidden" name="area" value="default" />
+  </form>
+</div>
+        </div><div class="wy-menu wy-menu-vertical" data-spy="affix" role="navigation" aria-label="Navigation menu">
+              <p class="caption" role="heading"><span class="caption-text">Contents:</span></p>
+<ul>
+<li class="toctree-l1"><a class="reference internal" href="../../../README.html">Suspicious</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../../modules/index.html">Modules (API Reference)</a></li>
+</ul>
+
+        </div>
+      </div>
+    </nav>
+
+    <section data-toggle="wy-nav-shift" class="wy-nav-content-wrap"><nav class="wy-nav-top" aria-label="Mobile navigation menu" >
+          <i data-toggle="wy-nav-top" class="fa fa-bars"></i>
+          <a href="../../../index.html">Suspicious</a>
+      </nav>
+
+      <div class="wy-nav-content">
+        <div class="rst-content">
+          <div role="navigation" aria-label="Page navigation">
+  <ul class="wy-breadcrumbs">
+      <li><a href="../../../index.html" class="icon icon-home" aria-label="Home"></a></li>
+          <li class="breadcrumb-item"><a href="../../index.html">Module code</a></li>
+      <li class="breadcrumb-item active">case_handler.case_utils.case_handler</li>
+      <li class="wy-breadcrumbs-aside">
+      </li>
+  </ul>
+  <hr/>
+</div>
+          <div role="main" class="document" itemscope="itemscope" itemtype="http://schema.org/Article">
+           <div itemprop="articleBody">
+             
+  <h1>Source code for case_handler.case_utils.case_handler</h1><div class="highlight"><pre>
+<span></span><span class="c1"># case_handler.py</span>
+
+<span class="kn">import</span><span class="w"> </span><span class="nn">logging</span>
+<span class="kn">import</span><span class="w"> </span><span class="nn">json</span>
+<span class="kn">from</span><span class="w"> </span><span class="nn">pathlib</span><span class="w"> </span><span class="kn">import</span> <span class="n">Path</span>
+<span class="kn">from</span><span class="w"> </span><span class="nn">typing</span><span class="w"> </span><span class="kn">import</span> <span class="n">Optional</span><span class="p">,</span> <span class="n">Tuple</span><span class="p">,</span> <span class="n">Dict</span><span class="p">,</span> <span class="n">Union</span>
+
+<span class="kn">from</span><span class="w"> </span><span class="nn">cortex_job.models</span><span class="w"> </span><span class="kn">import</span> <span class="n">AnalyzerReport</span>
+<span class="kn">from</span><span class="w"> </span><span class="nn">case_handler.case_utils.case_creator</span><span class="w"> </span><span class="kn">import</span> <span class="n">CaseCreator</span>
+
+<span class="kn">from</span><span class="w"> </span><span class="nn">hash_process.hash_utils.hash_handler</span><span class="w"> </span><span class="kn">import</span> <span class="n">HashHandler</span>
+<span class="kn">from</span><span class="w"> </span><span class="nn">file_process.file_utils.file_handler</span><span class="w"> </span><span class="kn">import</span> <span class="n">FileHandler</span>
+<span class="kn">from</span><span class="w"> </span><span class="nn">ip_process.ip_utils.ip_handler</span><span class="w"> </span><span class="kn">import</span> <span class="n">IPHandler</span>
+<span class="kn">from</span><span class="w"> </span><span class="nn">url_process.url_utils.url_handler</span><span class="w"> </span><span class="kn">import</span> <span class="n">URLHandler</span>
+
+<span class="kn">from</span><span class="w"> </span><span class="nn">case_handler.case_utils.form_handlers.mail.mail_form</span><span class="w"> </span><span class="kn">import</span> <span class="n">MailFormHandler</span>
+
+<span class="kn">from</span><span class="w"> </span><span class="nn">settings.models</span><span class="w"> </span><span class="kn">import</span> <span class="p">(</span>
+    <span class="n">AllowListDomain</span><span class="p">,</span>
+    <span class="n">AllowListFile</span><span class="p">,</span>
+    <span class="n">AllowListFiletype</span><span class="p">,</span>
+<span class="p">)</span>
+<span class="kn">from</span><span class="w"> </span><span class="nn">cortex_job.cortex_utils.cortex_and_job_management</span><span class="w"> </span><span class="kn">import</span> <span class="n">CortexJob</span>
+
+<span class="n">logger</span> <span class="o">=</span> <span class="n">logging</span><span class="o">.</span><span class="n">getLogger</span><span class="p">(</span><span class="vm">__name__</span><span class="p">)</span>
+
+<span class="n">CONFIG_PATH</span> <span class="o">=</span> <span class="s2">&quot;/app/settings.json&quot;</span>
+<span class="k">with</span> <span class="nb">open</span><span class="p">(</span><span class="n">CONFIG_PATH</span><span class="p">)</span> <span class="k">as</span> <span class="n">config_file</span><span class="p">:</span>
+    <span class="n">config</span> <span class="o">=</span> <span class="n">json</span><span class="o">.</span><span class="n">load</span><span class="p">(</span><span class="n">config_file</span><span class="p">)</span>
+
+<span class="c1"># Tagging constants</span>
+<span class="n">TAG_STATUS_TODO</span> <span class="o">=</span> <span class="s2">&quot;To Do_User&quot;</span>
+<span class="n">TAG_KEY_STATUS</span> <span class="o">=</span> <span class="s2">&quot;Status&quot;</span>
+<span class="n">TAG_RESEND</span> <span class="o">=</span> <span class="s2">&quot;to_resend&quot;</span>
+
+<span class="n">DEFAULT_CASE_BASE_PATH</span> <span class="o">=</span> <span class="n">Path</span><span class="p">(</span><span class="s2">&quot;/app/case&quot;</span><span class="p">)</span>
+<span class="n">TEMP_DIR</span> <span class="o">=</span> <span class="n">Path</span><span class="p">(</span><span class="s2">&quot;/app/submissions&quot;</span><span class="p">)</span>
+
+
+<div class="viewcode-block" id="CaseHandler">
+<a class="viewcode-back" href="../../../case_handler/case_utils/index.html#case_handler.case_utils.case_handler.CaseHandler">[docs]</a>
+<span class="k">class</span><span class="w"> </span><span class="nc">CaseHandler</span><span class="p">:</span>
+<span class="w">    </span><span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">    Orchestrates processing of file, URL, IP, hash, and mail inputs,</span>
+<span class="sd">    including allow_listing, analysis, and case creation.</span>
+<span class="sd">    &quot;&quot;&quot;</span>
+
+    <span class="k">def</span><span class="w"> </span><span class="fm">__init__</span><span class="p">(</span>
+        <span class="bp">self</span><span class="p">,</span>
+        <span class="n">request</span><span class="p">,</span>
+        <span class="n">file_form</span><span class="p">,</span>
+        <span class="n">url_form</span><span class="p">,</span>
+        <span class="n">other_form</span><span class="p">,</span>
+        <span class="n">base_case_path</span><span class="p">:</span> <span class="n">Union</span><span class="p">[</span><span class="nb">str</span><span class="p">,</span> <span class="n">Path</span><span class="p">]</span> <span class="o">=</span> <span class="n">DEFAULT_CASE_BASE_PATH</span><span class="p">,</span>
+    <span class="p">):</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">request</span> <span class="o">=</span> <span class="n">request</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">file_form</span> <span class="o">=</span> <span class="n">file_form</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">url_form</span> <span class="o">=</span> <span class="n">url_form</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">other_form</span> <span class="o">=</span> <span class="n">other_form</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">base_case_path</span> <span class="o">=</span> <span class="n">Path</span><span class="p">(</span><span class="n">base_case_path</span><span class="p">)</span>
+
+<div class="viewcode-block" id="CaseHandler.validate_forms">
+<a class="viewcode-back" href="../../../case_handler/case_utils/index.html#case_handler.case_utils.case_handler.CaseHandler.validate_forms">[docs]</a>
+    <span class="k">def</span><span class="w"> </span><span class="nf">validate_forms</span><span class="p">(</span><span class="bp">self</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="n">Dict</span><span class="p">[</span><span class="nb">str</span><span class="p">,</span> <span class="n">Optional</span><span class="p">[</span><span class="nb">object</span><span class="p">]]:</span>
+<span class="w">        </span><span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">        Validate all forms and dispatch to handlers accordingly.</span>
+<span class="sd">        Returns instances of each processed item along with allow_listing status.</span>
+<span class="sd">        &quot;&quot;&quot;</span>
+        <span class="n">result</span> <span class="o">=</span> <span class="nb">dict</span><span class="p">(</span>
+            <span class="n">file_instance</span><span class="o">=</span><span class="kc">None</span><span class="p">,</span>
+            <span class="n">mail_instance</span><span class="o">=</span><span class="kc">None</span><span class="p">,</span>
+            <span class="n">ip_instance</span><span class="o">=</span><span class="kc">None</span><span class="p">,</span>
+            <span class="n">url_instance</span><span class="o">=</span><span class="kc">None</span><span class="p">,</span>
+            <span class="n">hash_instance</span><span class="o">=</span><span class="kc">None</span><span class="p">,</span>
+            <span class="n">allow_listed</span><span class="o">=</span><span class="kc">False</span><span class="p">,</span>
+        <span class="p">)</span>
+
+        <span class="k">if</span> <span class="bp">self</span><span class="o">.</span><span class="n">file_form</span><span class="o">.</span><span class="n">is_valid</span><span class="p">():</span>
+            <span class="n">file</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">file_form</span><span class="o">.</span><span class="n">cleaned_data</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="s2">&quot;file&quot;</span><span class="p">)</span>
+            <span class="k">if</span> <span class="n">file</span> <span class="ow">and</span> <span class="n">file</span><span class="o">.</span><span class="n">name</span><span class="o">.</span><span class="n">lower</span><span class="p">()</span><span class="o">.</span><span class="n">endswith</span><span class="p">((</span><span class="s2">&quot;.eml&quot;</span><span class="p">,</span> <span class="s2">&quot;.msg&quot;</span><span class="p">)):</span>
+                <span class="n">result</span><span class="p">[</span><span class="s2">&quot;mail_instance&quot;</span><span class="p">]</span> <span class="o">=</span> <span class="n">MailFormHandler</span><span class="p">(</span>
+                    <span class="bp">self</span><span class="o">.</span><span class="n">request</span><span class="o">.</span><span class="n">user</span><span class="p">,</span> <span class="n">base_path</span><span class="o">=</span><span class="bp">self</span><span class="o">.</span><span class="n">base_case_path</span>
+                <span class="p">)</span><span class="o">.</span><span class="n">handle</span><span class="p">(</span><span class="n">file</span><span class="p">)</span>
+            <span class="k">else</span><span class="p">:</span>
+                <span class="n">fi</span><span class="p">,</span> <span class="n">hi</span><span class="p">,</span> <span class="n">wl</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">_handle_file_form</span><span class="p">(</span><span class="n">result</span><span class="p">[</span><span class="s2">&quot;allow_listed&quot;</span><span class="p">])</span>
+                <span class="n">result</span><span class="o">.</span><span class="n">update</span><span class="p">(</span><span class="n">file_instance</span><span class="o">=</span><span class="n">fi</span><span class="p">,</span> <span class="n">hash_instance</span><span class="o">=</span><span class="n">hi</span><span class="p">,</span> <span class="n">allow_listed</span><span class="o">=</span><span class="n">wl</span><span class="p">)</span>
+
+        <span class="k">if</span> <span class="bp">self</span><span class="o">.</span><span class="n">url_form</span><span class="o">.</span><span class="n">is_valid</span><span class="p">():</span>
+            <span class="n">ui</span><span class="p">,</span> <span class="n">wl</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">_handle_url_form</span><span class="p">(</span><span class="n">result</span><span class="p">[</span><span class="s2">&quot;allow_listed&quot;</span><span class="p">])</span>
+            <span class="n">result</span><span class="o">.</span><span class="n">update</span><span class="p">(</span><span class="n">url_instance</span><span class="o">=</span><span class="n">ui</span><span class="p">,</span> <span class="n">allow_listed</span><span class="o">=</span><span class="n">wl</span><span class="p">)</span>
+
+        <span class="k">if</span> <span class="bp">self</span><span class="o">.</span><span class="n">other_form</span><span class="o">.</span><span class="n">is_valid</span><span class="p">():</span>
+            <span class="n">ii</span><span class="p">,</span> <span class="n">hi</span><span class="p">,</span> <span class="n">wl</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">_handle_other_form</span><span class="p">(</span><span class="n">result</span><span class="p">[</span><span class="s2">&quot;allow_listed&quot;</span><span class="p">])</span>
+            <span class="n">result</span><span class="o">.</span><span class="n">update</span><span class="p">(</span><span class="n">ip_instance</span><span class="o">=</span><span class="n">ii</span><span class="p">,</span> <span class="n">hash_instance</span><span class="o">=</span><span class="n">hi</span><span class="p">,</span> <span class="n">allow_listed</span><span class="o">=</span><span class="n">wl</span><span class="p">)</span>
+
+        <span class="k">return</span> <span class="n">result</span></div>
+
+
+    <span class="k">def</span><span class="w"> </span><span class="nf">_handle_file_form</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">allow_listed</span><span class="p">:</span> <span class="nb">bool</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="n">Tuple</span><span class="p">[</span><span class="n">Optional</span><span class="p">[</span><span class="nb">object</span><span class="p">],</span> <span class="n">Optional</span><span class="p">[</span><span class="nb">object</span><span class="p">],</span> <span class="nb">bool</span><span class="p">]:</span>
+<span class="w">        </span><span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">        Process non-email file input: scanning, hashing, allow_listing or analysis.</span>
+<span class="sd">        &quot;&quot;&quot;</span>
+        <span class="n">file</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">file_form</span><span class="o">.</span><span class="n">cleaned_data</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="s2">&quot;file&quot;</span><span class="p">)</span>
+        <span class="k">if</span> <span class="ow">not</span> <span class="n">file</span><span class="p">:</span>
+            <span class="k">return</span> <span class="kc">None</span><span class="p">,</span> <span class="kc">None</span><span class="p">,</span> <span class="n">allow_listed</span>
+
+        <span class="k">try</span><span class="p">:</span>
+            <span class="n">file_inst</span><span class="p">,</span> <span class="n">hash_inst</span> <span class="o">=</span> <span class="n">FileHandler</span><span class="o">.</span><span class="n">handle_file</span><span class="p">(</span><span class="n">file</span><span class="p">)</span>
+            <span class="k">if</span> <span class="ow">not</span> <span class="n">file_inst</span> <span class="ow">or</span> <span class="ow">not</span> <span class="n">hash_inst</span><span class="p">:</span>
+                <span class="k">return</span> <span class="n">file_inst</span><span class="p">,</span> <span class="n">hash_inst</span><span class="p">,</span> <span class="n">allow_listed</span>
+
+            <span class="k">if</span> <span class="n">AllowListFile</span><span class="o">.</span><span class="n">objects</span><span class="o">.</span><span class="n">filter</span><span class="p">(</span><span class="n">linked_file_hash</span><span class="o">=</span><span class="n">hash_inst</span><span class="p">)</span><span class="o">.</span><span class="n">exists</span><span class="p">()</span> <span class="ow">or</span> <span class="n">AllowListFiletype</span><span class="o">.</span><span class="n">objects</span><span class="o">.</span><span class="n">filter</span><span class="p">(</span><span class="n">filetype</span><span class="o">=</span><span class="n">file_inst</span><span class="o">.</span><span class="n">filetype</span><span class="p">)</span><span class="o">.</span><span class="n">exists</span><span class="p">():</span>
+                <span class="bp">self</span><span class="o">.</span><span class="n">_allow_list_file</span><span class="p">(</span><span class="n">file_inst</span><span class="p">,</span> <span class="n">hash_inst</span><span class="p">)</span>
+                <span class="k">return</span> <span class="n">file_inst</span><span class="p">,</span> <span class="n">hash_inst</span><span class="p">,</span> <span class="kc">True</span>
+
+            <span class="bp">self</span><span class="o">.</span><span class="n">_launch_analysis</span><span class="p">(</span><span class="n">file_inst</span><span class="p">,</span> <span class="n">hash_inst</span><span class="p">,</span> <span class="n">data_type</span><span class="o">=</span><span class="s2">&quot;file&quot;</span><span class="p">)</span>
+            <span class="k">return</span> <span class="n">file_inst</span><span class="p">,</span> <span class="n">hash_inst</span><span class="p">,</span> <span class="kc">False</span>
+
+        <span class="k">except</span> <span class="ne">Exception</span><span class="p">:</span>
+            <span class="n">logger</span><span class="o">.</span><span class="n">exception</span><span class="p">(</span><span class="s2">&quot;Error processing file form&quot;</span><span class="p">)</span>
+            <span class="k">return</span> <span class="kc">None</span><span class="p">,</span> <span class="kc">None</span><span class="p">,</span> <span class="n">allow_listed</span>
+
+    <span class="k">def</span><span class="w"> </span><span class="nf">_allow_list_file</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">file_inst</span><span class="p">,</span> <span class="n">hash_inst</span><span class="p">):</span>
+        <span class="n">file_inst</span><span class="o">.</span><span class="n">update_allow_listed</span><span class="p">()</span>
+        <span class="n">hash_inst</span><span class="o">.</span><span class="n">update_allow_listed</span><span class="p">()</span>
+        <span class="n">logger</span><span class="o">.</span><span class="n">info</span><span class="p">(</span><span class="s2">&quot;File and hash marked as allow_listed.&quot;</span><span class="p">)</span>
+
+    <span class="k">def</span><span class="w"> </span><span class="nf">_handle_url_form</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">allow_listed</span><span class="p">:</span> <span class="nb">bool</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="n">Tuple</span><span class="p">[</span><span class="n">Optional</span><span class="p">[</span><span class="nb">object</span><span class="p">],</span> <span class="nb">bool</span><span class="p">]:</span>
+<span class="w">        </span><span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">        Process URL submission: parse, check allow_list, or analyze.</span>
+<span class="sd">        &quot;&quot;&quot;</span>
+        <span class="n">url</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">url_form</span><span class="o">.</span><span class="n">cleaned_data</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="s2">&quot;url&quot;</span><span class="p">)</span>
+        <span class="k">if</span> <span class="ow">not</span> <span class="n">url</span><span class="p">:</span>
+            <span class="k">return</span> <span class="kc">None</span><span class="p">,</span> <span class="n">allow_listed</span>
+
+        <span class="k">try</span><span class="p">:</span>
+            <span class="n">url_inst</span><span class="p">,</span> <span class="n">domain</span> <span class="o">=</span> <span class="n">URLHandler</span><span class="p">()</span><span class="o">.</span><span class="n">handle_url</span><span class="p">(</span><span class="n">url</span><span class="p">)</span>
+            <span class="k">if</span> <span class="n">url_inst</span> <span class="ow">and</span> <span class="n">domain</span><span class="p">:</span>
+                <span class="k">if</span> <span class="ow">not</span> <span class="n">AllowListDomain</span><span class="o">.</span><span class="n">objects</span><span class="o">.</span><span class="n">filter</span><span class="p">(</span><span class="n">domain</span><span class="o">=</span><span class="n">domain</span><span class="p">)</span><span class="o">.</span><span class="n">exists</span><span class="p">():</span>
+                    <span class="bp">self</span><span class="o">.</span><span class="n">_launch_analysis</span><span class="p">(</span><span class="n">url_inst</span><span class="p">,</span> <span class="kc">None</span><span class="p">,</span> <span class="n">data_type</span><span class="o">=</span><span class="s2">&quot;url&quot;</span><span class="p">)</span>
+                    <span class="k">return</span> <span class="n">url_inst</span><span class="p">,</span> <span class="kc">False</span>
+                <span class="n">url_inst</span><span class="o">.</span><span class="n">update_allow_listed</span><span class="p">()</span>
+                <span class="k">return</span> <span class="n">url_inst</span><span class="p">,</span> <span class="kc">True</span>
+        <span class="k">except</span> <span class="ne">Exception</span><span class="p">:</span>
+            <span class="n">logger</span><span class="o">.</span><span class="n">exception</span><span class="p">(</span><span class="s2">&quot;Error processing URL form&quot;</span><span class="p">)</span>
+        <span class="k">return</span> <span class="kc">None</span><span class="p">,</span> <span class="n">allow_listed</span>
+
+    <span class="k">def</span><span class="w"> </span><span class="nf">_handle_other_form</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">allow_listed</span><span class="p">:</span> <span class="nb">bool</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="n">Tuple</span><span class="p">[</span><span class="n">Optional</span><span class="p">[</span><span class="nb">object</span><span class="p">],</span> <span class="n">Optional</span><span class="p">[</span><span class="nb">object</span><span class="p">],</span> <span class="nb">bool</span><span class="p">]:</span>
+<span class="w">        </span><span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">        Process IP or hash input depending on format.</span>
+<span class="sd">        &quot;&quot;&quot;</span>
+        <span class="n">other</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">other_form</span><span class="o">.</span><span class="n">cleaned_data</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="s2">&quot;other&quot;</span><span class="p">)</span>
+        <span class="k">if</span> <span class="ow">not</span> <span class="n">other</span><span class="p">:</span>
+            <span class="k">return</span> <span class="kc">None</span><span class="p">,</span> <span class="kc">None</span><span class="p">,</span> <span class="n">allow_listed</span>
+
+        <span class="k">try</span><span class="p">:</span>
+            <span class="n">is_ip</span> <span class="o">=</span> <span class="n">IPHandler</span><span class="p">()</span><span class="o">.</span><span class="n">validate_ip</span><span class="p">(</span><span class="n">other</span><span class="p">)</span>
+            <span class="n">is_hash</span> <span class="o">=</span> <span class="n">HashHandler</span><span class="p">()</span><span class="o">.</span><span class="n">validate_hash</span><span class="p">(</span><span class="n">other</span><span class="p">)</span>
+            <span class="k">if</span> <span class="n">is_ip</span><span class="p">:</span>
+                <span class="n">ip_inst</span> <span class="o">=</span> <span class="n">IPHandler</span><span class="p">()</span><span class="o">.</span><span class="n">handle_ip</span><span class="p">(</span><span class="n">other</span><span class="p">)</span>
+                <span class="k">if</span> <span class="n">ip_inst</span><span class="p">:</span>
+                    <span class="bp">self</span><span class="o">.</span><span class="n">_launch_analysis</span><span class="p">(</span><span class="n">ip_inst</span><span class="p">,</span> <span class="n">ip_inst</span><span class="p">,</span> <span class="n">data_type</span><span class="o">=</span><span class="s2">&quot;ip&quot;</span><span class="p">)</span>
+                <span class="k">return</span> <span class="n">ip_inst</span><span class="p">,</span> <span class="kc">None</span><span class="p">,</span> <span class="n">allow_listed</span>
+
+            <span class="k">if</span> <span class="n">is_hash</span><span class="p">:</span>
+                <span class="n">hash_inst</span> <span class="o">=</span> <span class="n">HashHandler</span><span class="p">()</span><span class="o">.</span><span class="n">handle_hash</span><span class="p">(</span><span class="n">other</span><span class="p">)</span>
+                <span class="k">if</span> <span class="n">hash_inst</span><span class="p">:</span>
+                    <span class="k">if</span> <span class="n">AllowListFile</span><span class="o">.</span><span class="n">objects</span><span class="o">.</span><span class="n">filter</span><span class="p">(</span><span class="n">linked_file_hash</span><span class="o">=</span><span class="n">hash_inst</span><span class="p">)</span><span class="o">.</span><span class="n">exists</span><span class="p">():</span>
+                        <span class="n">hash_inst</span><span class="o">.</span><span class="n">update_allow_listed</span><span class="p">()</span>
+                        <span class="k">return</span> <span class="kc">None</span><span class="p">,</span> <span class="n">hash_inst</span><span class="p">,</span> <span class="kc">True</span>
+                    <span class="bp">self</span><span class="o">.</span><span class="n">_launch_analysis</span><span class="p">(</span><span class="n">hash_inst</span><span class="p">,</span> <span class="kc">None</span><span class="p">,</span> <span class="n">data_type</span><span class="o">=</span><span class="s2">&quot;hash&quot;</span><span class="p">)</span>
+                <span class="k">return</span> <span class="kc">None</span><span class="p">,</span> <span class="n">hash_inst</span><span class="p">,</span> <span class="kc">False</span>
+
+        <span class="k">except</span> <span class="ne">Exception</span><span class="p">:</span>
+            <span class="n">logger</span><span class="o">.</span><span class="n">exception</span><span class="p">(</span><span class="s2">&quot;Error processing other form&quot;</span><span class="p">)</span>
+        <span class="k">return</span> <span class="kc">None</span><span class="p">,</span> <span class="kc">None</span><span class="p">,</span> <span class="n">allow_listed</span>
+
+<div class="viewcode-block" id="CaseHandler.handle_case">
+<a class="viewcode-back" href="../../../case_handler/case_utils/index.html#case_handler.case_utils.case_handler.CaseHandler.handle_case">[docs]</a>
+    <span class="k">def</span><span class="w"> </span><span class="nf">handle_case</span><span class="p">(</span>
+        <span class="bp">self</span><span class="p">,</span>
+        <span class="n">file_inst</span><span class="o">=</span><span class="kc">None</span><span class="p">,</span>
+        <span class="n">ip_inst</span><span class="o">=</span><span class="kc">None</span><span class="p">,</span>
+        <span class="n">url_inst</span><span class="o">=</span><span class="kc">None</span><span class="p">,</span>
+        <span class="n">hash_inst</span><span class="o">=</span><span class="kc">None</span><span class="p">,</span>
+        <span class="n">allow_listed</span><span class="o">=</span><span class="kc">False</span><span class="p">,</span>
+        <span class="n">mail_inst</span><span class="o">=</span><span class="kc">None</span><span class="p">,</span>
+    <span class="p">):</span>
+<span class="w">        </span><span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">        Create a case in the system using user and provided instances.</span>
+<span class="sd">        &quot;&quot;&quot;</span>
+        <span class="n">ctx</span> <span class="o">=</span> <span class="nb">dict</span><span class="p">(</span>
+            <span class="n">file_instance</span><span class="o">=</span><span class="n">file_inst</span><span class="p">,</span>
+            <span class="n">mail_instance</span><span class="o">=</span><span class="n">mail_inst</span><span class="p">,</span>
+            <span class="n">ip_instance</span><span class="o">=</span><span class="n">ip_inst</span><span class="p">,</span>
+            <span class="n">url_instance</span><span class="o">=</span><span class="n">url_inst</span><span class="p">,</span>
+            <span class="n">hash_instance</span><span class="o">=</span><span class="n">hash_inst</span><span class="p">,</span>
+            <span class="n">allow_listed</span><span class="o">=</span><span class="n">allow_listed</span><span class="p">,</span>
+        <span class="p">)</span>
+        <span class="n">logger</span><span class="o">.</span><span class="n">debug</span><span class="p">(</span><span class="s2">&quot;Creating case with: </span><span class="si">%s</span><span class="s2">&quot;</span><span class="p">,</span> <span class="n">ctx</span><span class="p">)</span>
+        <span class="k">try</span><span class="p">:</span>
+            <span class="n">case</span> <span class="o">=</span> <span class="n">CaseCreator</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">request</span><span class="o">.</span><span class="n">user</span><span class="p">)</span><span class="o">.</span><span class="n">create_case</span><span class="p">(</span><span class="o">**</span><span class="n">ctx</span><span class="p">)</span>
+            <span class="n">logger</span><span class="o">.</span><span class="n">info</span><span class="p">(</span><span class="s2">&quot;Case created: </span><span class="si">%s</span><span class="s2">&quot;</span><span class="p">,</span> <span class="n">case</span><span class="p">)</span>
+            <span class="k">return</span> <span class="n">case</span>
+        <span class="k">except</span> <span class="ne">Exception</span><span class="p">:</span>
+            <span class="n">logger</span><span class="o">.</span><span class="n">exception</span><span class="p">(</span><span class="s2">&quot;Failed to create case&quot;</span><span class="p">)</span>
+            <span class="k">return</span> <span class="kc">None</span></div>
+
+
+    <span class="k">def</span><span class="w"> </span><span class="nf">_launch_analysis</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">instance</span><span class="p">,</span> <span class="n">hash_inst</span><span class="p">,</span> <span class="n">data_type</span><span class="p">:</span> <span class="nb">str</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="nb">list</span><span class="p">:</span>
+<span class="w">        </span><span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">        Launch Cortex analysis and update AnalyzerReport accordingly.</span>
+<span class="sd">        &quot;&quot;&quot;</span> 
+        <span class="n">existing</span> <span class="o">=</span> <span class="n">AnalyzerReport</span><span class="o">.</span><span class="n">objects</span><span class="o">.</span><span class="n">filter</span><span class="p">(</span><span class="o">**</span><span class="p">{</span><span class="n">data_type</span><span class="p">:</span> <span class="n">instance</span><span class="p">})</span><span class="o">.</span><span class="n">values_list</span><span class="p">(</span><span class="s2">&quot;id&quot;</span><span class="p">,</span> <span class="n">flat</span><span class="o">=</span><span class="kc">True</span><span class="p">)</span>
+        <span class="k">if</span> <span class="n">existing</span><span class="p">:</span>
+            <span class="k">return</span> <span class="nb">list</span><span class="p">(</span><span class="n">existing</span><span class="p">)</span>
+
+        <span class="n">ids</span> <span class="o">=</span> <span class="n">CortexJob</span><span class="p">()</span><span class="o">.</span><span class="n">launch_cortex_jobs</span><span class="p">(</span><span class="n">value</span><span class="o">=</span><span class="n">instance</span><span class="p">,</span> <span class="n">data_type</span><span class="o">=</span><span class="n">data_type</span><span class="p">)</span>
+
+        <span class="k">if</span> <span class="n">data_type</span> <span class="o">==</span> <span class="s2">&quot;file&quot;</span> <span class="ow">and</span> <span class="n">hash_inst</span><span class="p">:</span>
+            <span class="bp">self</span><span class="o">.</span><span class="n">_launch_analysis</span><span class="p">(</span><span class="n">hash_inst</span><span class="p">,</span> <span class="kc">None</span><span class="p">,</span> <span class="s2">&quot;hash&quot;</span><span class="p">)</span>
+
+        <span class="n">AnalyzerReport</span><span class="o">.</span><span class="n">objects</span><span class="o">.</span><span class="n">filter</span><span class="p">(</span><span class="n">cortex_job_id__in</span><span class="o">=</span><span class="n">ids</span><span class="p">)</span><span class="o">.</span><span class="n">update</span><span class="p">(</span><span class="o">**</span><span class="p">{</span><span class="n">data_type</span><span class="p">:</span> <span class="n">instance</span><span class="p">})</span>
+        <span class="k">return</span> <span class="nb">list</span><span class="p">(</span><span class="n">ids</span><span class="p">)</span></div>
+
+</pre></div>
+
+           </div>
+          </div>
+          <footer>
+
+  <hr/>
+
+  <div role="contentinfo">
+    <p>&#169; Copyright 2025, Theo Bhang, Esteban Crispel.</p>
+  </div>
+
+  Built with <a href="https://www.sphinx-doc.org/">Sphinx</a> using a
+    <a href="https://github.com/readthedocs/sphinx_rtd_theme">theme</a>
+    provided by <a href="https://readthedocs.org">Read the Docs</a>.
+   
+
+</footer>
+        </div>
+      </div>
+    </section>
+  </div>
+  <script>
+      jQuery(function () {
+          SphinxRtdTheme.Navigation.enable(true);
+      });
+  </script> 
+
+</body>
+</html>

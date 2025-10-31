@@ -1,0 +1,432 @@
+
+
+<!DOCTYPE html>
+<html class="writer-html5" lang="en" data-content_root="../../../">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>case_handler.update_case.update_handler &mdash; Suspicious 1.0.0 documentation</title>
+      <link rel="stylesheet" type="text/css" href="../../../_static/pygments.css?v=b86133f3" />
+      <link rel="stylesheet" type="text/css" href="../../../_static/css/theme.css?v=e59714d7" />
+
+  
+      <script src="../../../_static/jquery.js?v=5d32c60e"></script>
+      <script src="../../../_static/_sphinx_javascript_frameworks_compat.js?v=2cd50e6c"></script>
+      <script src="../../../_static/documentation_options.js?v=8d563738"></script>
+      <script src="../../../_static/doctools.js?v=9bcbadda"></script>
+      <script src="../../../_static/sphinx_highlight.js?v=dc90522c"></script>
+    <script src="../../../_static/js/theme.js"></script>
+    <link rel="index" title="Index" href="../../../genindex.html" />
+    <link rel="search" title="Search" href="../../../search.html" /> 
+</head>
+
+<body class="wy-body-for-nav"> 
+  <div class="wy-grid-for-nav">
+    <nav data-toggle="wy-nav-shift" class="wy-nav-side">
+      <div class="wy-side-scroll">
+        <div class="wy-side-nav-search" >
+
+          
+          
+          <a href="../../../index.html" class="icon icon-home">
+            Suspicious
+          </a>
+<div role="search">
+  <form id="rtd-search-form" class="wy-form" action="../../../search.html" method="get">
+    <input type="text" name="q" placeholder="Search docs" aria-label="Search docs" />
+    <input type="hidden" name="check_keywords" value="yes" />
+    <input type="hidden" name="area" value="default" />
+  </form>
+</div>
+        </div><div class="wy-menu wy-menu-vertical" data-spy="affix" role="navigation" aria-label="Navigation menu">
+              <p class="caption" role="heading"><span class="caption-text">Contents:</span></p>
+<ul>
+<li class="toctree-l1"><a class="reference internal" href="../../../README.html">Suspicious</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../../modules/index.html">Modules (API Reference)</a></li>
+</ul>
+
+        </div>
+      </div>
+    </nav>
+
+    <section data-toggle="wy-nav-shift" class="wy-nav-content-wrap"><nav class="wy-nav-top" aria-label="Mobile navigation menu" >
+          <i data-toggle="wy-nav-top" class="fa fa-bars"></i>
+          <a href="../../../index.html">Suspicious</a>
+      </nav>
+
+      <div class="wy-nav-content">
+        <div class="rst-content">
+          <div role="navigation" aria-label="Page navigation">
+  <ul class="wy-breadcrumbs">
+      <li><a href="../../../index.html" class="icon icon-home" aria-label="Home"></a></li>
+          <li class="breadcrumb-item"><a href="../../index.html">Module code</a></li>
+      <li class="breadcrumb-item active">case_handler.update_case.update_handler</li>
+      <li class="wy-breadcrumbs-aside">
+      </li>
+  </ul>
+  <hr/>
+</div>
+          <div role="main" class="document" itemscope="itemscope" itemtype="http://schema.org/Article">
+           <div itemprop="articleBody">
+             
+  <h1>Source code for case_handler.update_case.update_handler</h1><div class="highlight"><pre>
+<span></span><span class="kn">from</span><span class="w"> </span><span class="nn">django.http</span><span class="w"> </span><span class="kn">import</span> <span class="n">JsonResponse</span>
+<span class="kn">from</span><span class="w"> </span><span class="nn">ip_process.models</span><span class="w"> </span><span class="kn">import</span> <span class="n">IP</span>
+<span class="kn">from</span><span class="w"> </span><span class="nn">url_process.models</span><span class="w"> </span><span class="kn">import</span> <span class="n">URL</span>
+<span class="kn">from</span><span class="w"> </span><span class="nn">hash_process.models</span><span class="w"> </span><span class="kn">import</span> <span class="n">Hash</span>
+<span class="kn">from</span><span class="w"> </span><span class="nn">file_process.models</span><span class="w"> </span><span class="kn">import</span> <span class="n">File</span>
+<span class="kn">from</span><span class="w"> </span><span class="nn">case_handler.models</span><span class="w"> </span><span class="kn">import</span> <span class="n">Case</span>
+<span class="kn">from</span><span class="w"> </span><span class="nn">case_handler.update_case.update_case</span><span class="w"> </span><span class="kn">import</span> <span class="n">update_ioc_level_and_cases</span>
+<span class="kn">import</span><span class="w"> </span><span class="nn">logging</span>
+<span class="kn">from</span><span class="w"> </span><span class="nn">django.apps</span><span class="w"> </span><span class="kn">import</span> <span class="n">apps</span>
+<span class="n">update_cases_logger</span> <span class="o">=</span> <span class="n">logging</span><span class="o">.</span><span class="n">getLogger</span><span class="p">(</span><span class="s1">&#39;tasp.cron.update_ongoing_case_jobs&#39;</span><span class="p">)</span>
+
+<div class="viewcode-block" id="get_attachments_and_artifacts">
+<a class="viewcode-back" href="../../../case_handler/update_case/index.html#case_handler.update_case.update_handler.get_attachments_and_artifacts">[docs]</a>
+<span class="k">def</span><span class="w"> </span><span class="nf">get_attachments_and_artifacts</span><span class="p">(</span><span class="n">case</span><span class="p">):</span>
+<span class="w">    </span><span class="sd">&quot;&quot;&quot;Get attachments and artifacts for a given case.</span>
+
+<span class="sd">    This function retrieves the attachments and artifacts associated with a given case.</span>
+
+<span class="sd">    Args:</span>
+<span class="sd">        case (Case): The case object for which to retrieve attachments and artifacts.</span>
+
+<span class="sd">    Returns:</span>
+<span class="sd">        tuple: A tuple containing two lists - attachments and artifacts.</span>
+<span class="sd">               The attachments list contains all the attachments associated with the case.</span>
+<span class="sd">               The artifacts list contains all the artifacts associated with the case,</span>
+<span class="sd">               excluding artifacts of type &#39;Domain&#39; and &#39;MailAddress&#39;.</span>
+<span class="sd">    &quot;&quot;&quot;</span>
+    <span class="n">attachments</span> <span class="o">=</span> <span class="p">[]</span>
+    <span class="n">artifacts</span> <span class="o">=</span> <span class="p">[]</span>
+    <span class="k">if</span> <span class="n">case</span><span class="o">.</span><span class="n">fileOrMail</span> <span class="ow">and</span> <span class="n">case</span><span class="o">.</span><span class="n">fileOrMail</span><span class="o">.</span><span class="n">mail</span><span class="p">:</span>
+        <span class="n">attachments</span> <span class="o">=</span> <span class="n">case</span><span class="o">.</span><span class="n">fileOrMail</span><span class="o">.</span><span class="n">mail</span><span class="o">.</span><span class="n">mail_attachments</span><span class="o">.</span><span class="n">all</span><span class="p">()</span>
+        <span class="n">artifacts</span> <span class="o">=</span> <span class="n">case</span><span class="o">.</span><span class="n">fileOrMail</span><span class="o">.</span><span class="n">mail</span><span class="o">.</span><span class="n">mail_artifacts</span><span class="o">.</span><span class="n">exclude</span><span class="p">(</span><span class="n">artifact_type__in</span><span class="o">=</span><span class="p">[</span><span class="s1">&#39;Domain&#39;</span><span class="p">,</span> <span class="s1">&#39;MailAddress&#39;</span><span class="p">])</span>
+    <span class="k">return</span> <span class="n">attachments</span><span class="p">,</span> <span class="n">artifacts</span></div>
+
+
+<div class="viewcode-block" id="handle_attachment">
+<a class="viewcode-back" href="../../../case_handler/update_case/index.html#case_handler.update_case.update_handler.handle_attachment">[docs]</a>
+<span class="k">def</span><span class="w"> </span><span class="nf">handle_attachment</span><span class="p">(</span><span class="nb">id</span><span class="p">,</span> <span class="n">level</span><span class="p">,</span> <span class="n">case_id</span><span class="p">):</span>
+<span class="w">    </span><span class="sd">&quot;&quot;&quot;Handles the attachment by updating the IOC level and cases.</span>
+
+<span class="sd">    Args:</span>
+<span class="sd">        id (int): The ID of the attachment.</span>
+<span class="sd">        level (str): The level of the IOC.</span>
+<span class="sd">        case_id (int): The ID of the case.</span>
+
+<span class="sd">    Returns:</span>
+<span class="sd">        dict: A JSON response containing the success status, scores, levels, and case information.</span>
+<span class="sd">    &quot;&quot;&quot;</span>
+    <span class="n">file</span> <span class="o">=</span> <span class="n">File</span><span class="o">.</span><span class="n">objects</span><span class="o">.</span><span class="n">filter</span><span class="p">(</span><span class="n">linked_hash__value</span><span class="o">=</span><span class="nb">id</span><span class="p">)</span><span class="o">.</span><span class="n">first</span><span class="p">()</span>
+    <span class="k">if</span> <span class="n">file</span><span class="p">:</span>
+        <span class="c1"># Update the file and its linked hash (handled within update_ioc_level_and_cases)</span>
+        <span class="n">obj</span> <span class="o">=</span> <span class="n">update_ioc_level_and_cases</span><span class="p">(</span><span class="n">file</span><span class="p">,</span> <span class="s2">&quot;file&quot;</span><span class="p">,</span> <span class="n">level</span><span class="p">)</span>
+        <span class="n">obj_score</span> <span class="o">=</span> <span class="n">obj</span><span class="o">.</span><span class="n">file_score</span>
+        <span class="n">obj_confidence</span> <span class="o">=</span> <span class="n">obj</span><span class="o">.</span><span class="n">file_confidence</span>
+        <span class="n">obj_level</span> <span class="o">=</span> <span class="n">obj</span><span class="o">.</span><span class="n">file_level</span>
+
+        <span class="c1"># Get the linked hash information directly from the updated file object</span>
+        <span class="n">linked_hash</span> <span class="o">=</span> <span class="n">file</span><span class="o">.</span><span class="n">linked_hash</span>
+        <span class="n">hash_obj_score</span> <span class="o">=</span> <span class="n">linked_hash</span><span class="o">.</span><span class="n">ioc_score</span>
+        <span class="n">hash_obj_confidence</span> <span class="o">=</span> <span class="n">linked_hash</span><span class="o">.</span><span class="n">ioc_confidence</span>
+        <span class="n">hash_obj_level</span> <span class="o">=</span> <span class="n">linked_hash</span><span class="o">.</span><span class="n">ioc_level</span>
+
+        <span class="n">case</span> <span class="o">=</span> <span class="n">Case</span><span class="o">.</span><span class="n">objects</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="nb">id</span><span class="o">=</span><span class="n">case_id</span><span class="p">)</span>
+        <span class="n">case_infos</span> <span class="o">=</span> <span class="p">{</span>
+            <span class="s2">&quot;id&quot;</span><span class="p">:</span> <span class="n">case</span><span class="o">.</span><span class="n">id</span><span class="p">,</span>
+            <span class="s2">&quot;score&quot;</span><span class="p">:</span> <span class="n">case</span><span class="o">.</span><span class="n">finalScore</span><span class="p">,</span>
+            <span class="s2">&quot;confidence&quot;</span><span class="p">:</span> <span class="n">case</span><span class="o">.</span><span class="n">finalConfidence</span><span class="p">,</span>
+            <span class="s2">&quot;results&quot;</span><span class="p">:</span> <span class="n">case</span><span class="o">.</span><span class="n">results</span><span class="p">,</span>
+        <span class="p">}</span>
+        <span class="n">update_cases_logger</span><span class="o">.</span><span class="n">info</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;Case updated with id </span><span class="si">{</span><span class="n">case</span><span class="o">.</span><span class="n">id</span><span class="si">}</span><span class="s2">, score </span><span class="si">{</span><span class="n">case</span><span class="o">.</span><span class="n">finalScore</span><span class="si">}</span><span class="s2">, confidence </span><span class="si">{</span><span class="n">case</span><span class="o">.</span><span class="n">finalConfidence</span><span class="si">}</span><span class="s2">, and results </span><span class="si">{</span><span class="n">case</span><span class="o">.</span><span class="n">results</span><span class="si">}</span><span class="s2">&quot;</span><span class="p">)</span>
+        <span class="k">return</span> <span class="n">JsonResponse</span><span class="p">({</span><span class="s1">&#39;success&#39;</span><span class="p">:</span> <span class="kc">True</span><span class="p">,</span> <span class="s1">&#39;score&#39;</span><span class="p">:</span> <span class="n">obj_score</span><span class="p">,</span> <span class="s1">&#39;confidence&#39;</span><span class="p">:</span> <span class="n">obj_confidence</span><span class="p">,</span> <span class="s1">&#39;level&#39;</span><span class="p">:</span> <span class="n">obj_level</span><span class="p">,</span> <span class="s1">&#39;hash_score&#39;</span><span class="p">:</span> <span class="n">hash_obj_score</span><span class="p">,</span> <span class="s1">&#39;hash_confidence&#39;</span><span class="p">:</span> <span class="n">hash_obj_confidence</span><span class="p">,</span> <span class="s1">&#39;hash_level&#39;</span><span class="p">:</span> <span class="n">hash_obj_level</span><span class="p">,</span> <span class="s1">&#39;case_infos&#39;</span><span class="p">:</span> <span class="n">case_infos</span><span class="p">})</span>
+    <span class="k">else</span><span class="p">:</span>
+        <span class="n">update_cases_logger</span><span class="o">.</span><span class="n">error</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;File with linked hash </span><span class="si">{</span><span class="nb">id</span><span class="si">}</span><span class="s2"> not found&quot;</span><span class="p">)</span>
+        <span class="k">return</span> <span class="n">JsonResponse</span><span class="p">({</span><span class="s1">&#39;success&#39;</span><span class="p">:</span> <span class="kc">False</span><span class="p">,</span> <span class="s1">&#39;error&#39;</span><span class="p">:</span> <span class="s1">&#39;File does not exist&#39;</span><span class="p">})</span></div>
+
+
+<div class="viewcode-block" id="handle_artifact">
+<a class="viewcode-back" href="../../../case_handler/update_case/index.html#case_handler.update_case.update_handler.handle_artifact">[docs]</a>
+<span class="k">def</span><span class="w"> </span><span class="nf">handle_artifact</span><span class="p">(</span><span class="nb">id</span><span class="p">,</span> <span class="n">level</span><span class="p">,</span> <span class="n">case_id</span><span class="p">):</span>
+<span class="w">    </span><span class="sd">&quot;&quot;&quot;Handles the artifact with the given ID, updates its IOC level and cases,</span>
+<span class="sd">    and returns the artifact&#39;s score, confidence, level, and case information.</span>
+
+<span class="sd">    Args:</span>
+<span class="sd">        id (int): The ID of the artifact.</span>
+<span class="sd">        level (str): The IOC level to update.</span>
+<span class="sd">        case_id (int): The ID of the case.</span>
+
+<span class="sd">    Returns:</span>
+<span class="sd">        dict: A dictionary containing the following keys:</span>
+<span class="sd">            - &#39;success&#39; (bool): Indicates whether the operation was successful.</span>
+<span class="sd">            - &#39;score&#39; (float): The artifact&#39;s IOC score.</span>
+<span class="sd">            - &#39;confidence&#39; (float): The artifact&#39;s IOC confidence.</span>
+<span class="sd">            - &#39;level&#39; (str): The artifact&#39;s updated IOC level.</span>
+<span class="sd">            - &#39;case_infos&#39; (dict): A dictionary containing the following keys:</span>
+<span class="sd">                - &#39;id&#39; (int): The ID of the case.</span>
+<span class="sd">                - &#39;score&#39; (float): The case&#39;s final score.</span>
+<span class="sd">                - &#39;confidence&#39; (float): The case&#39;s final confidence.</span>
+<span class="sd">                - &#39;results&#39; (str): The case&#39;s results.</span>
+
+<span class="sd">    Raises:</span>
+<span class="sd">        None.</span>
+<span class="sd">    &quot;&quot;&quot;</span>
+    <span class="n">artifact</span> <span class="o">=</span> <span class="n">get_artifact_by_id</span><span class="p">(</span><span class="nb">id</span><span class="p">)</span>
+    <span class="n">artifact_type</span> <span class="o">=</span> <span class="n">artifact</span><span class="o">.</span><span class="vm">__class__</span><span class="o">.</span><span class="vm">__name__</span><span class="o">.</span><span class="n">lower</span><span class="p">()</span> <span class="k">if</span> <span class="n">artifact</span> <span class="k">else</span> <span class="kc">None</span>
+    <span class="k">if</span> <span class="n">artifact</span><span class="p">:</span>
+        <span class="nb">print</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;Artifact with id </span><span class="si">{</span><span class="n">artifact</span><span class="o">.</span><span class="n">id</span><span class="si">}</span><span class="s2"> found&quot;</span><span class="p">)</span>
+        <span class="n">update_ioc_level_and_cases</span><span class="p">(</span><span class="n">artifact</span><span class="p">,</span> <span class="n">artifact_type</span><span class="p">,</span> <span class="n">level</span><span class="p">)</span>
+        <span class="n">obj_score</span> <span class="o">=</span> <span class="n">artifact</span><span class="o">.</span><span class="n">ioc_score</span>
+        <span class="n">obj_confidence</span> <span class="o">=</span> <span class="n">artifact</span><span class="o">.</span><span class="n">ioc_confidence</span>
+        <span class="n">obj_level</span> <span class="o">=</span> <span class="n">artifact</span><span class="o">.</span><span class="n">ioc_level</span>
+
+        <span class="n">case</span> <span class="o">=</span> <span class="n">Case</span><span class="o">.</span><span class="n">objects</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="nb">id</span><span class="o">=</span><span class="n">case_id</span><span class="p">)</span>
+        <span class="n">case_infos</span> <span class="o">=</span> <span class="p">{</span>
+            <span class="s2">&quot;id&quot;</span><span class="p">:</span> <span class="n">case</span><span class="o">.</span><span class="n">id</span><span class="p">,</span>
+            <span class="s2">&quot;score&quot;</span><span class="p">:</span> <span class="n">case</span><span class="o">.</span><span class="n">finalScore</span><span class="p">,</span>
+            <span class="s2">&quot;confidence&quot;</span><span class="p">:</span> <span class="n">case</span><span class="o">.</span><span class="n">finalConfidence</span><span class="p">,</span>
+            <span class="s2">&quot;results&quot;</span><span class="p">:</span> <span class="n">case</span><span class="o">.</span><span class="n">results</span><span class="p">,</span>
+        <span class="p">}</span>
+        <span class="nb">print</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;Case updated with id </span><span class="si">{</span><span class="n">case</span><span class="o">.</span><span class="n">id</span><span class="si">}</span><span class="s2">, score </span><span class="si">{</span><span class="n">case</span><span class="o">.</span><span class="n">finalScore</span><span class="si">}</span><span class="s2">, confidence </span><span class="si">{</span><span class="n">case</span><span class="o">.</span><span class="n">finalConfidence</span><span class="si">}</span><span class="s2">, and results </span><span class="si">{</span><span class="n">case</span><span class="o">.</span><span class="n">results</span><span class="si">}</span><span class="s2">&quot;</span><span class="p">)</span>
+        <span class="k">return</span> <span class="n">JsonResponse</span><span class="p">({</span><span class="s1">&#39;success&#39;</span><span class="p">:</span> <span class="kc">True</span><span class="p">,</span> <span class="s1">&#39;score&#39;</span><span class="p">:</span> <span class="n">obj_score</span><span class="p">,</span> <span class="s1">&#39;confidence&#39;</span><span class="p">:</span> <span class="n">obj_confidence</span><span class="p">,</span> <span class="s1">&#39;level&#39;</span><span class="p">:</span> <span class="n">obj_level</span><span class="p">,</span> <span class="s1">&#39;case_infos&#39;</span><span class="p">:</span> <span class="n">case_infos</span><span class="p">})</span>
+    <span class="k">else</span><span class="p">:</span>
+        <span class="nb">print</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;Artifact with id </span><span class="si">{</span><span class="nb">id</span><span class="si">}</span><span class="s2"> not found&quot;</span><span class="p">)</span>
+        <span class="k">return</span> <span class="n">JsonResponse</span><span class="p">({</span><span class="s1">&#39;success&#39;</span><span class="p">:</span> <span class="kc">False</span><span class="p">,</span> <span class="s1">&#39;error&#39;</span><span class="p">:</span> <span class="s1">&#39;Artifact does not exist&#39;</span><span class="p">})</span></div>
+
+
+<div class="viewcode-block" id="handle_mail">
+<a class="viewcode-back" href="../../../case_handler/update_case/index.html#case_handler.update_case.update_handler.handle_mail">[docs]</a>
+<span class="k">def</span><span class="w"> </span><span class="nf">handle_mail</span><span class="p">(</span><span class="n">ioc_id</span><span class="p">:</span> <span class="nb">int</span><span class="p">,</span> <span class="n">mail_type</span><span class="p">:</span> <span class="nb">str</span><span class="p">,</span> <span class="n">level</span><span class="p">:</span> <span class="nb">int</span><span class="p">,</span> <span class="n">case_id</span><span class="p">:</span> <span class="nb">int</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="n">JsonResponse</span><span class="p">:</span>
+<span class="w">    </span><span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">    Handle mail IOC update for type &#39;body&#39; or &#39;header&#39;.</span>
+<span class="sd">    &quot;&quot;&quot;</span>
+    <span class="k">if</span> <span class="n">mail_type</span> <span class="ow">not</span> <span class="ow">in</span> <span class="p">{</span><span class="s2">&quot;body&quot;</span><span class="p">,</span> <span class="s2">&quot;header&quot;</span><span class="p">}:</span>
+        <span class="k">return</span> <span class="n">JsonResponse</span><span class="p">({</span><span class="s2">&quot;success&quot;</span><span class="p">:</span> <span class="kc">False</span><span class="p">,</span> <span class="s2">&quot;error&quot;</span><span class="p">:</span> <span class="s2">&quot;Invalid mail_type&quot;</span><span class="p">},</span> <span class="n">status</span><span class="o">=</span><span class="mi">400</span><span class="p">)</span>
+
+    <span class="n">model_name</span> <span class="o">=</span> <span class="sa">f</span><span class="s2">&quot;Mail</span><span class="si">{</span><span class="n">mail_type</span><span class="o">.</span><span class="n">capitalize</span><span class="p">()</span><span class="si">}</span><span class="s2">&quot;</span>
+    <span class="k">try</span><span class="p">:</span>
+        <span class="n">mail_model</span> <span class="o">=</span> <span class="n">apps</span><span class="o">.</span><span class="n">get_model</span><span class="p">(</span><span class="s2">&quot;mail_feeder&quot;</span><span class="p">,</span> <span class="n">model_name</span><span class="p">)</span>  <span class="c1"># &lt;-- adapter &quot;your_app_name&quot;</span>
+    <span class="k">except</span> <span class="ne">LookupError</span><span class="p">:</span>
+        <span class="nb">print</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;Model </span><span class="si">{</span><span class="n">model_name</span><span class="si">}</span><span class="s2"> not found in app &#39;your_app_name&#39;&quot;</span><span class="p">)</span>
+        <span class="k">return</span> <span class="n">JsonResponse</span><span class="p">({</span><span class="s2">&quot;success&quot;</span><span class="p">:</span> <span class="kc">False</span><span class="p">,</span> <span class="s2">&quot;error&quot;</span><span class="p">:</span> <span class="s2">&quot;Mail model not found&quot;</span><span class="p">},</span> <span class="n">status</span><span class="o">=</span><span class="mi">500</span><span class="p">)</span>
+
+    <span class="n">mail_object</span> <span class="o">=</span> <span class="n">mail_model</span><span class="o">.</span><span class="n">objects</span><span class="o">.</span><span class="n">filter</span><span class="p">(</span><span class="n">fuzzy_hash</span><span class="o">=</span><span class="n">ioc_id</span><span class="p">)</span><span class="o">.</span><span class="n">first</span><span class="p">()</span>
+    <span class="k">if</span> <span class="ow">not</span> <span class="n">mail_object</span><span class="p">:</span>
+        <span class="nb">print</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;Mail </span><span class="si">{</span><span class="n">mail_type</span><span class="si">}</span><span class="s2"> with id </span><span class="si">{</span><span class="n">ioc_id</span><span class="si">}</span><span class="s2"> not found&quot;</span><span class="p">)</span>
+        <span class="k">return</span> <span class="n">JsonResponse</span><span class="p">(</span>
+            <span class="p">{</span><span class="s2">&quot;success&quot;</span><span class="p">:</span> <span class="kc">False</span><span class="p">,</span> <span class="s2">&quot;error&quot;</span><span class="p">:</span> <span class="sa">f</span><span class="s2">&quot;Mail </span><span class="si">{</span><span class="n">mail_type</span><span class="si">}</span><span class="s2"> does not exist&quot;</span><span class="p">},</span> <span class="n">status</span><span class="o">=</span><span class="mi">404</span>
+        <span class="p">)</span>
+
+    <span class="nb">print</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;Mail </span><span class="si">{</span><span class="n">mail_type</span><span class="si">}</span><span class="s2"> </span><span class="si">{</span><span class="n">mail_object</span><span class="o">.</span><span class="n">id</span><span class="si">}</span><span class="s2"> found&quot;</span><span class="p">)</span>
+    <span class="n">update_ioc_level_and_cases</span><span class="p">(</span><span class="n">mail_object</span><span class="p">,</span> <span class="n">mail_type</span><span class="p">,</span> <span class="n">level</span><span class="p">)</span>
+
+    <span class="k">if</span> <span class="n">mail_type</span> <span class="o">==</span> <span class="s2">&quot;body&quot;</span><span class="p">:</span>
+        <span class="n">obj_score</span><span class="p">,</span> <span class="n">obj_confidence</span><span class="p">,</span> <span class="n">obj_level</span> <span class="o">=</span> <span class="p">(</span>
+            <span class="n">mail_object</span><span class="o">.</span><span class="n">body_score</span><span class="p">,</span>
+            <span class="n">mail_object</span><span class="o">.</span><span class="n">body_confidence</span><span class="p">,</span>
+            <span class="n">mail_object</span><span class="o">.</span><span class="n">body_level</span><span class="p">,</span>
+        <span class="p">)</span>
+    <span class="k">else</span><span class="p">:</span>  <span class="c1"># header</span>
+        <span class="n">obj_score</span><span class="p">,</span> <span class="n">obj_confidence</span><span class="p">,</span> <span class="n">obj_level</span> <span class="o">=</span> <span class="p">(</span>
+            <span class="n">mail_object</span><span class="o">.</span><span class="n">header_score</span><span class="p">,</span>
+            <span class="n">mail_object</span><span class="o">.</span><span class="n">header_confidence</span><span class="p">,</span>
+            <span class="n">mail_object</span><span class="o">.</span><span class="n">header_level</span><span class="p">,</span>
+        <span class="p">)</span>
+
+    <span class="k">try</span><span class="p">:</span>
+        <span class="n">case</span> <span class="o">=</span> <span class="n">Case</span><span class="o">.</span><span class="n">objects</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="nb">id</span><span class="o">=</span><span class="n">case_id</span><span class="p">)</span>
+    <span class="k">except</span> <span class="n">Case</span><span class="o">.</span><span class="n">DoesNotExist</span><span class="p">:</span>
+        <span class="nb">print</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;Case </span><span class="si">{</span><span class="n">case_id</span><span class="si">}</span><span class="s2"> not found&quot;</span><span class="p">)</span>
+        <span class="k">return</span> <span class="n">JsonResponse</span><span class="p">({</span><span class="s2">&quot;success&quot;</span><span class="p">:</span> <span class="kc">False</span><span class="p">,</span> <span class="s2">&quot;error&quot;</span><span class="p">:</span> <span class="s2">&quot;Case does not exist&quot;</span><span class="p">},</span> <span class="n">status</span><span class="o">=</span><span class="mi">404</span><span class="p">)</span>
+
+    <span class="n">case_infos</span> <span class="o">=</span> <span class="p">{</span>
+        <span class="s2">&quot;id&quot;</span><span class="p">:</span> <span class="n">case</span><span class="o">.</span><span class="n">id</span><span class="p">,</span>
+        <span class="s2">&quot;score&quot;</span><span class="p">:</span> <span class="n">case</span><span class="o">.</span><span class="n">finalScore</span><span class="p">,</span>
+        <span class="s2">&quot;confidence&quot;</span><span class="p">:</span> <span class="n">case</span><span class="o">.</span><span class="n">finalConfidence</span><span class="p">,</span>
+        <span class="s2">&quot;results&quot;</span><span class="p">:</span> <span class="n">case</span><span class="o">.</span><span class="n">results</span><span class="p">,</span>
+    <span class="p">}</span>
+
+    <span class="nb">print</span><span class="p">(</span>
+        <span class="sa">f</span><span class="s2">&quot;Case </span><span class="si">{</span><span class="n">case</span><span class="o">.</span><span class="n">id</span><span class="si">}</span><span class="s2"> updated (score=</span><span class="si">{</span><span class="n">case</span><span class="o">.</span><span class="n">finalScore</span><span class="si">}</span><span class="s2">, confidence=</span><span class="si">{</span><span class="n">case</span><span class="o">.</span><span class="n">finalConfidence</span><span class="si">}</span><span class="s2">)&quot;</span>
+    <span class="p">)</span>
+
+    <span class="k">return</span> <span class="n">JsonResponse</span><span class="p">(</span>
+        <span class="p">{</span>
+            <span class="s2">&quot;success&quot;</span><span class="p">:</span> <span class="kc">True</span><span class="p">,</span>
+            <span class="s2">&quot;score&quot;</span><span class="p">:</span> <span class="n">obj_score</span><span class="p">,</span>
+            <span class="s2">&quot;confidence&quot;</span><span class="p">:</span> <span class="n">obj_confidence</span><span class="p">,</span>
+            <span class="s2">&quot;level&quot;</span><span class="p">:</span> <span class="n">obj_level</span><span class="p">,</span>
+            <span class="s2">&quot;case_infos&quot;</span><span class="p">:</span> <span class="n">case_infos</span><span class="p">,</span>
+        <span class="p">}</span>
+    <span class="p">)</span></div>
+
+<div class="viewcode-block" id="handle_file">
+<a class="viewcode-back" href="../../../case_handler/update_case/index.html#case_handler.update_case.update_handler.handle_file">[docs]</a>
+<span class="k">def</span><span class="w"> </span><span class="nf">handle_file</span><span class="p">(</span><span class="nb">id</span><span class="p">,</span> <span class="n">level</span><span class="p">,</span> <span class="n">case_id</span><span class="p">):</span>
+<span class="w">    </span><span class="sd">&quot;&quot;&quot;Handle file based on the provided parameters.</span>
+
+<span class="sd">    This function retrieves a file object based on the provided ID and updates its IOC level and cases.</span>
+<span class="sd">    It also updates the linked hash object associated with the file.</span>
+<span class="sd">    Finally, it updates a case object with the provided case ID.</span>
+
+<span class="sd">    Args:</span>
+<span class="sd">        id (int): The ID of the file.</span>
+<span class="sd">        level (str): The IOC level to update.</span>
+<span class="sd">        case_id (int): The ID of the case to update.</span>
+
+<span class="sd">    Returns:</span>
+<span class="sd">        dict: A JSON response containing the success status, updated scores, levels, and case information.</span>
+
+<span class="sd">    Raises:</span>
+<span class="sd">        None</span>
+
+<span class="sd">    &quot;&quot;&quot;</span>
+    <span class="n">file</span> <span class="o">=</span> <span class="n">File</span><span class="o">.</span><span class="n">objects</span><span class="o">.</span><span class="n">filter</span><span class="p">(</span><span class="n">linked_hash__value</span><span class="o">=</span><span class="nb">id</span><span class="p">)</span><span class="o">.</span><span class="n">first</span><span class="p">()</span>
+    <span class="k">if</span> <span class="n">file</span><span class="p">:</span>
+        <span class="nb">print</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;File with id </span><span class="si">{</span><span class="n">file</span><span class="o">.</span><span class="n">id</span><span class="si">}</span><span class="s2"> found&quot;</span><span class="p">)</span>
+        <span class="n">obj</span> <span class="o">=</span> <span class="n">update_ioc_level_and_cases</span><span class="p">(</span><span class="n">file</span><span class="p">,</span> <span class="s2">&quot;file&quot;</span><span class="p">,</span> <span class="n">level</span><span class="p">)</span>
+        <span class="n">obj_score</span> <span class="o">=</span> <span class="n">obj</span><span class="o">.</span><span class="n">file_score</span>
+        <span class="n">obj_confidence</span> <span class="o">=</span> <span class="n">obj</span><span class="o">.</span><span class="n">file_confidence</span>
+        <span class="n">obj_level</span> <span class="o">=</span> <span class="n">obj</span><span class="o">.</span><span class="n">file_level</span>
+
+        <span class="nb">print</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;Updating linked hash with id </span><span class="si">{</span><span class="n">file</span><span class="o">.</span><span class="n">linked_hash</span><span class="o">.</span><span class="n">id</span><span class="si">}</span><span class="s2">&quot;</span><span class="p">)</span>
+
+        <span class="n">hash_obj</span> <span class="o">=</span> <span class="n">update_ioc_level_and_cases</span><span class="p">(</span><span class="n">file</span><span class="o">.</span><span class="n">linked_hash</span><span class="p">,</span> <span class="s2">&quot;hash&quot;</span><span class="p">,</span> <span class="n">level</span><span class="p">)</span>
+        <span class="n">hash_obj_score</span> <span class="o">=</span> <span class="n">hash_obj</span><span class="o">.</span><span class="n">ioc_score</span>
+        <span class="n">hash_obj_confidence</span> <span class="o">=</span> <span class="n">hash_obj</span><span class="o">.</span><span class="n">ioc_confidence</span>
+        <span class="n">hash_obj_level</span> <span class="o">=</span> <span class="n">hash_obj</span><span class="o">.</span><span class="n">ioc_level</span>
+
+        <span class="n">case</span> <span class="o">=</span> <span class="n">Case</span><span class="o">.</span><span class="n">objects</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="nb">id</span><span class="o">=</span><span class="n">case_id</span><span class="p">)</span>
+        <span class="n">case_infos</span> <span class="o">=</span> <span class="p">{</span>
+            <span class="s2">&quot;id&quot;</span><span class="p">:</span> <span class="n">case</span><span class="o">.</span><span class="n">id</span><span class="p">,</span>
+            <span class="s2">&quot;score&quot;</span><span class="p">:</span> <span class="n">case</span><span class="o">.</span><span class="n">finalScore</span><span class="p">,</span>
+            <span class="s2">&quot;confidence&quot;</span><span class="p">:</span> <span class="n">case</span><span class="o">.</span><span class="n">finalConfidence</span><span class="p">,</span>
+            <span class="s2">&quot;results&quot;</span><span class="p">:</span> <span class="n">case</span><span class="o">.</span><span class="n">results</span><span class="p">,</span>
+        <span class="p">}</span>
+        <span class="nb">print</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;Case updated with id </span><span class="si">{</span><span class="n">case</span><span class="o">.</span><span class="n">id</span><span class="si">}</span><span class="s2">, score </span><span class="si">{</span><span class="n">case</span><span class="o">.</span><span class="n">finalScore</span><span class="si">}</span><span class="s2">, confidence </span><span class="si">{</span><span class="n">case</span><span class="o">.</span><span class="n">finalConfidence</span><span class="si">}</span><span class="s2">, and results </span><span class="si">{</span><span class="n">case</span><span class="o">.</span><span class="n">results</span><span class="si">}</span><span class="s2">&quot;</span><span class="p">)</span>
+        <span class="k">return</span> <span class="n">JsonResponse</span><span class="p">({</span><span class="s1">&#39;success&#39;</span><span class="p">:</span> <span class="kc">True</span><span class="p">,</span> <span class="s1">&#39;score&#39;</span><span class="p">:</span> <span class="n">obj_score</span><span class="p">,</span> <span class="s1">&#39;confidence&#39;</span><span class="p">:</span> <span class="n">obj_confidence</span><span class="p">,</span> <span class="s1">&#39;level&#39;</span><span class="p">:</span> <span class="n">obj_level</span><span class="p">,</span> <span class="s1">&#39;hash_score&#39;</span><span class="p">:</span> <span class="n">hash_obj_score</span><span class="p">,</span> <span class="s1">&#39;hash_confidence&#39;</span><span class="p">:</span> <span class="n">hash_obj_confidence</span><span class="p">,</span> <span class="s1">&#39;hash_level&#39;</span><span class="p">:</span> <span class="n">hash_obj_level</span><span class="p">,</span> <span class="s1">&#39;case_infos&#39;</span><span class="p">:</span> <span class="n">case_infos</span><span class="p">})</span>
+    <span class="k">else</span><span class="p">:</span>
+        <span class="nb">print</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;File with linked hash </span><span class="si">{</span><span class="nb">id</span><span class="si">}</span><span class="s2"> not found&quot;</span><span class="p">)</span>
+        <span class="k">return</span> <span class="n">JsonResponse</span><span class="p">({</span><span class="s1">&#39;success&#39;</span><span class="p">:</span> <span class="kc">False</span><span class="p">,</span> <span class="s1">&#39;error&#39;</span><span class="p">:</span> <span class="s1">&#39;File does not exist&#39;</span><span class="p">})</span></div>
+
+
+<div class="viewcode-block" id="handle_ioc">
+<a class="viewcode-back" href="../../../case_handler/update_case/index.html#case_handler.update_case.update_handler.handle_ioc">[docs]</a>
+<span class="k">def</span><span class="w"> </span><span class="nf">handle_ioc</span><span class="p">(</span><span class="nb">id</span><span class="p">,</span> <span class="n">ioc_type</span><span class="p">,</span> <span class="n">level</span><span class="p">,</span> <span class="n">case_id</span><span class="p">):</span>
+<span class="w">    </span><span class="sd">&quot;&quot;&quot;Handle IOC (Indicator of Compromise) based on the given parameters.</span>
+
+<span class="sd">    This function retrieves the IOC object based on the provided `id` and `ioc_type`.</span>
+<span class="sd">    It then updates the IOC level and associated cases with the provided `level` and `case_id`.</span>
+<span class="sd">    Finally, it returns a JSON response containing the success status, IOC score, IOC confidence,</span>
+<span class="sd">    IOC level, and case information.</span>
+
+<span class="sd">    Args:</span>
+<span class="sd">        id (int): The ID of the IOC.</span>
+<span class="sd">        ioc_type (str): The type of the IOC (e.g., &#39;ip&#39;, &#39;url&#39;, &#39;hash&#39;).</span>
+<span class="sd">        level (int): The new level to update the IOC with.</span>
+<span class="sd">        case_id (int): The ID of the associated case.</span>
+
+<span class="sd">    Returns:</span>
+<span class="sd">        dict: A JSON response containing the following keys:</span>
+<span class="sd">            - &#39;success&#39; (bool): Indicates whether the operation was successful.</span>
+<span class="sd">            - &#39;score&#39; (int): The updated IOC score.</span>
+<span class="sd">            - &#39;confidence&#39; (int): The updated IOC confidence.</span>
+<span class="sd">            - &#39;level&#39; (int): The updated IOC level.</span>
+<span class="sd">            - &#39;case_infos&#39; (dict): Information about the associated case, including the ID,</span>
+<span class="sd">              final score, final confidence, and results.</span>
+
+<span class="sd">    &quot;&quot;&quot;</span>
+    <span class="k">if</span> <span class="n">ioc_type</span> <span class="o">==</span> <span class="s1">&#39;ip&#39;</span><span class="p">:</span>
+        <span class="n">obj</span> <span class="o">=</span> <span class="n">IP</span><span class="o">.</span><span class="n">objects</span><span class="o">.</span><span class="n">filter</span><span class="p">(</span><span class="n">address</span><span class="o">=</span><span class="nb">id</span><span class="p">)</span><span class="o">.</span><span class="n">first</span><span class="p">()</span>
+    <span class="k">elif</span> <span class="n">ioc_type</span> <span class="o">==</span> <span class="s1">&#39;url&#39;</span><span class="p">:</span>
+        <span class="n">obj</span> <span class="o">=</span> <span class="n">URL</span><span class="o">.</span><span class="n">objects</span><span class="o">.</span><span class="n">filter</span><span class="p">(</span><span class="nb">id</span><span class="o">=</span><span class="nb">id</span><span class="p">)</span><span class="o">.</span><span class="n">first</span><span class="p">()</span>
+    <span class="k">elif</span> <span class="n">ioc_type</span> <span class="o">==</span> <span class="s1">&#39;hash&#39;</span><span class="p">:</span>
+        <span class="n">obj</span> <span class="o">=</span> <span class="n">Hash</span><span class="o">.</span><span class="n">objects</span><span class="o">.</span><span class="n">filter</span><span class="p">(</span><span class="n">value</span><span class="o">=</span><span class="nb">id</span><span class="p">)</span><span class="o">.</span><span class="n">first</span><span class="p">()</span>
+    <span class="k">if</span> <span class="n">obj</span><span class="p">:</span>
+        <span class="nb">print</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;</span><span class="si">{</span><span class="n">ioc_type</span><span class="si">}</span><span class="s2"> with id </span><span class="si">{</span><span class="n">obj</span><span class="o">.</span><span class="n">id</span><span class="si">}</span><span class="s2"> found&quot;</span><span class="p">)</span>
+        <span class="n">obj</span> <span class="o">=</span> <span class="n">update_ioc_level_and_cases</span><span class="p">(</span><span class="n">obj</span><span class="p">,</span> <span class="n">ioc_type</span><span class="p">,</span> <span class="n">level</span><span class="p">)</span>
+        <span class="n">obj_score</span> <span class="o">=</span> <span class="n">obj</span><span class="o">.</span><span class="n">ioc_score</span>
+        <span class="n">obj_confidence</span> <span class="o">=</span> <span class="n">obj</span><span class="o">.</span><span class="n">ioc_confidence</span>
+        <span class="n">obj_level</span> <span class="o">=</span> <span class="n">obj</span><span class="o">.</span><span class="n">ioc_level</span>
+
+        <span class="n">case</span> <span class="o">=</span> <span class="n">Case</span><span class="o">.</span><span class="n">objects</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="nb">id</span><span class="o">=</span><span class="n">case_id</span><span class="p">)</span>
+        <span class="n">case_infos</span> <span class="o">=</span> <span class="p">{</span>
+            <span class="s2">&quot;id&quot;</span><span class="p">:</span> <span class="n">case</span><span class="o">.</span><span class="n">id</span><span class="p">,</span>
+            <span class="s2">&quot;score&quot;</span><span class="p">:</span> <span class="n">case</span><span class="o">.</span><span class="n">finalScore</span><span class="p">,</span>
+            <span class="s2">&quot;confidence&quot;</span><span class="p">:</span> <span class="n">case</span><span class="o">.</span><span class="n">finalConfidence</span><span class="p">,</span>
+            <span class="s2">&quot;results&quot;</span><span class="p">:</span> <span class="n">case</span><span class="o">.</span><span class="n">results</span><span class="p">,</span>
+        <span class="p">}</span>
+        <span class="nb">print</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;Case updated with id </span><span class="si">{</span><span class="n">case</span><span class="o">.</span><span class="n">id</span><span class="si">}</span><span class="s2">, score </span><span class="si">{</span><span class="n">case</span><span class="o">.</span><span class="n">finalScore</span><span class="si">}</span><span class="s2">, confidence </span><span class="si">{</span><span class="n">case</span><span class="o">.</span><span class="n">finalConfidence</span><span class="si">}</span><span class="s2">, and results </span><span class="si">{</span><span class="n">case</span><span class="o">.</span><span class="n">results</span><span class="si">}</span><span class="s2">&quot;</span><span class="p">)</span>
+        <span class="k">return</span> <span class="n">JsonResponse</span><span class="p">({</span><span class="s1">&#39;success&#39;</span><span class="p">:</span> <span class="kc">True</span><span class="p">,</span> <span class="s1">&#39;score&#39;</span><span class="p">:</span> <span class="n">obj_score</span><span class="p">,</span> <span class="s1">&#39;confidence&#39;</span><span class="p">:</span> <span class="n">obj_confidence</span><span class="p">,</span> <span class="s1">&#39;level&#39;</span><span class="p">:</span> <span class="n">obj_level</span><span class="p">,</span> <span class="s1">&#39;case_infos&#39;</span><span class="p">:</span> <span class="n">case_infos</span><span class="p">})</span>
+    <span class="k">else</span><span class="p">:</span>
+        <span class="nb">print</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;</span><span class="si">{</span><span class="n">ioc_type</span><span class="si">}</span><span class="s2"> with id </span><span class="si">{</span><span class="nb">id</span><span class="si">}</span><span class="s2"> not found&quot;</span><span class="p">)</span>
+        <span class="k">return</span> <span class="n">JsonResponse</span><span class="p">({</span><span class="s1">&#39;success&#39;</span><span class="p">:</span> <span class="kc">False</span><span class="p">,</span> <span class="s1">&#39;error&#39;</span><span class="p">:</span> <span class="sa">f</span><span class="s1">&#39;</span><span class="si">{</span><span class="n">ioc_type</span><span class="o">.</span><span class="n">capitalize</span><span class="p">()</span><span class="si">}</span><span class="s1"> does not exist&#39;</span><span class="p">})</span></div>
+
+    
+<div class="viewcode-block" id="get_artifact_by_id">
+<a class="viewcode-back" href="../../../case_handler/update_case/index.html#case_handler.update_case.update_handler.get_artifact_by_id">[docs]</a>
+<span class="k">def</span><span class="w"> </span><span class="nf">get_artifact_by_id</span><span class="p">(</span><span class="nb">id</span><span class="p">):</span>
+<span class="w">    </span><span class="sd">&quot;&quot;&quot;Get artifact by ID.</span>
+
+<span class="sd">    This function retrieves an artifact based on the provided ID. It first tries to find the artifact as an IP address,</span>
+<span class="sd">    then as a URL, and finally as a hash value. If the artifact is not found in any of these categories, a warning</span>
+<span class="sd">    message is logged and None is returned.</span>
+
+<span class="sd">    Args:</span>
+<span class="sd">        id (int): The ID of the artifact.</span>
+
+<span class="sd">    Returns:</span>
+<span class="sd">        IP or Hash or URL or None: The artifact object if found, otherwise None.</span>
+<span class="sd">    &quot;&quot;&quot;</span>
+    <span class="k">try</span><span class="p">:</span>
+        <span class="nb">print</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;Trying to get artifact with id </span><span class="si">{</span><span class="nb">id</span><span class="si">}</span><span class="s2"> as IP&quot;</span><span class="p">)</span>
+        <span class="k">return</span> <span class="n">IP</span><span class="o">.</span><span class="n">objects</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="n">address</span><span class="o">=</span><span class="nb">id</span><span class="p">)</span>
+    <span class="k">except</span> <span class="n">IP</span><span class="o">.</span><span class="n">DoesNotExist</span><span class="p">:</span>
+        <span class="nb">print</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;Artifact with id </span><span class="si">{</span><span class="nb">id</span><span class="si">}</span><span class="s2"> not found as IP&quot;</span><span class="p">)</span>
+
+    <span class="k">try</span><span class="p">:</span>
+        <span class="nb">print</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;Trying to get artifact with id </span><span class="si">{</span><span class="nb">id</span><span class="si">}</span><span class="s2"> as URL&quot;</span><span class="p">)</span>
+        <span class="k">return</span> <span class="n">Hash</span><span class="o">.</span><span class="n">objects</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="n">value</span><span class="o">=</span><span class="nb">id</span><span class="p">)</span>
+    <span class="k">except</span> <span class="n">Hash</span><span class="o">.</span><span class="n">DoesNotExist</span><span class="p">:</span>
+        <span class="nb">print</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;Artifact with id </span><span class="si">{</span><span class="nb">id</span><span class="si">}</span><span class="s2"> not found as Hash&quot;</span><span class="p">)</span>
+
+    <span class="k">try</span><span class="p">:</span>
+        <span class="nb">print</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;Trying to get artifact with id </span><span class="si">{</span><span class="nb">id</span><span class="si">}</span><span class="s2"> as Hash&quot;</span><span class="p">)</span>
+        <span class="k">return</span> <span class="n">URL</span><span class="o">.</span><span class="n">objects</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="nb">id</span><span class="o">=</span><span class="nb">id</span><span class="p">)</span>
+    <span class="k">except</span> <span class="n">URL</span><span class="o">.</span><span class="n">DoesNotExist</span><span class="p">:</span>
+        <span class="nb">print</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;Artifact with id </span><span class="si">{</span><span class="nb">id</span><span class="si">}</span><span class="s2"> not found as URL&quot;</span><span class="p">)</span>
+
+    <span class="nb">print</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;Artifact with id </span><span class="si">{</span><span class="nb">id</span><span class="si">}</span><span class="s2"> not found&quot;</span><span class="p">)</span>
+    <span class="k">return</span> <span class="kc">None</span></div>
+
+</pre></div>
+
+           </div>
+          </div>
+          <footer>
+
+  <hr/>
+
+  <div role="contentinfo">
+    <p>&#169; Copyright 2025, Theo Bhang, Esteban Crispel.</p>
+  </div>
+
+  Built with <a href="https://www.sphinx-doc.org/">Sphinx</a> using a
+    <a href="https://github.com/readthedocs/sphinx_rtd_theme">theme</a>
+    provided by <a href="https://readthedocs.org">Read the Docs</a>.
+   
+
+</footer>
+        </div>
+      </div>
+    </section>
+  </div>
+  <script>
+      jQuery(function () {
+          SphinxRtdTheme.Navigation.enable(true);
+      });
+  </script> 
+
+</body>
+</html>

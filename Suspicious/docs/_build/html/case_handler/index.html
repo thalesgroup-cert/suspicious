@@ -6,7 +6,7 @@
   <meta charset="utf-8" /><meta name="viewport" content="width=device-width, initial-scale=1" />
 
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <title>Case Handler Module &mdash; Suspicious 1.0.0 documentation</title>
+  <title>Case Handler &mdash; Suspicious 1.0.0 documentation</title>
       <link rel="stylesheet" type="text/css" href="../_static/pygments.css?v=b86133f3" />
       <link rel="stylesheet" type="text/css" href="../_static/css/theme.css?v=e59714d7" />
 
@@ -60,7 +60,7 @@
           <div role="navigation" aria-label="Page navigation">
   <ul class="wy-breadcrumbs">
       <li><a href="../index.html" class="icon icon-home" aria-label="Home"></a></li>
-      <li class="breadcrumb-item active">Case Handler Module</li>
+      <li class="breadcrumb-item active">Case Handler</li>
       <li class="wy-breadcrumbs-aside">
             <a href="../_sources/case_handler/index.rst.txt" rel="nofollow"> View page source</a>
       </li>
@@ -70,34 +70,55 @@
           <div role="main" class="document" itemscope="itemscope" itemtype="http://schema.org/Article">
            <div itemprop="articleBody">
              
-  <section id="case-handler-module">
-<h1>Case Handler Module<a class="headerlink" href="#case-handler-module" title="Link to this heading"></a></h1>
+  <section id="case-handler">
+<h1>Case Handler<a class="headerlink" href="#case-handler" title="Link to this heading"></a></h1>
 <div class="toctree-wrapper compound">
-<p class="caption" role="heading"><span class="caption-text">Submodules</span></p>
+<p class="caption" role="heading"><span class="caption-text">Case Handler Modules:</span></p>
 <ul>
-<li class="toctree-l1"><a class="reference internal" href="mail/index.html">Mail Form Handlers</a><ul>
-<li class="toctree-l2"><a class="reference internal" href="mail/parser.html">Email Parser</a></li>
-<li class="toctree-l2"><a class="reference internal" href="mail/saver.html">Email Saver</a></li>
-<li class="toctree-l2"><a class="reference internal" href="mail/service.html">Email Service</a></li>
-<li class="toctree-l2"><a class="reference internal" href="mail/utils.html">Email Utils</a></li>
+<li class="toctree-l1"><a class="reference internal" href="case_utils/index.html">Case Utilities</a><ul>
+<li class="toctree-l2"><a class="reference internal" href="case_utils/form_handler/mail/index.html">Mail Handlers</a></li>
+<li class="toctree-l2"><a class="reference internal" href="case_utils/index.html#case_handler.case_utils.case_creator.CaseCreator"><code class="docutils literal notranslate"><span class="pre">CaseCreator</span></code></a></li>
+<li class="toctree-l2"><a class="reference internal" href="case_utils/index.html#case_handler.case_utils.case_handler.CaseHandler"><code class="docutils literal notranslate"><span class="pre">CaseHandler</span></code></a></li>
+</ul>
+</li>
+<li class="toctree-l1"><a class="reference internal" href="update_case/index.html">Update Case</a><ul>
+<li class="toctree-l2"><a class="reference internal" href="update_case/index.html#case_handler.update_case.update_case.update_case_score"><code class="docutils literal notranslate"><span class="pre">update_case_score()</span></code></a></li>
+<li class="toctree-l2"><a class="reference internal" href="update_case/index.html#case_handler.update_case.update_case.update_ioc_level_and_cases"><code class="docutils literal notranslate"><span class="pre">update_ioc_level_and_cases()</span></code></a></li>
+<li class="toctree-l2"><a class="reference internal" href="update_case/index.html#case_handler.update_case.update_case.update_linked_cases"><code class="docutils literal notranslate"><span class="pre">update_linked_cases()</span></code></a></li>
+<li class="toctree-l2"><a class="reference internal" href="update_case/index.html#case_handler.update_case.update_handler.get_artifact_by_id"><code class="docutils literal notranslate"><span class="pre">get_artifact_by_id()</span></code></a></li>
+<li class="toctree-l2"><a class="reference internal" href="update_case/index.html#case_handler.update_case.update_handler.get_attachments_and_artifacts"><code class="docutils literal notranslate"><span class="pre">get_attachments_and_artifacts()</span></code></a></li>
+<li class="toctree-l2"><a class="reference internal" href="update_case/index.html#case_handler.update_case.update_handler.handle_artifact"><code class="docutils literal notranslate"><span class="pre">handle_artifact()</span></code></a></li>
+<li class="toctree-l2"><a class="reference internal" href="update_case/index.html#case_handler.update_case.update_handler.handle_attachment"><code class="docutils literal notranslate"><span class="pre">handle_attachment()</span></code></a></li>
+<li class="toctree-l2"><a class="reference internal" href="update_case/index.html#case_handler.update_case.update_handler.handle_file"><code class="docutils literal notranslate"><span class="pre">handle_file()</span></code></a></li>
+<li class="toctree-l2"><a class="reference internal" href="update_case/index.html#case_handler.update_case.update_handler.handle_ioc"><code class="docutils literal notranslate"><span class="pre">handle_ioc()</span></code></a></li>
+<li class="toctree-l2"><a class="reference internal" href="update_case/index.html#case_handler.update_case.update_handler.handle_mail"><code class="docutils literal notranslate"><span class="pre">handle_mail()</span></code></a></li>
+<li class="toctree-l2"><a class="reference internal" href="update_case/index.html#case_handler.update_case.update_score_calculation.calculate_artifact_scores"><code class="docutils literal notranslate"><span class="pre">calculate_artifact_scores()</span></code></a></li>
+<li class="toctree-l2"><a class="reference internal" href="update_case/index.html#case_handler.update_case.update_score_calculation.calculate_attachment_scores"><code class="docutils literal notranslate"><span class="pre">calculate_attachment_scores()</span></code></a></li>
+<li class="toctree-l2"><a class="reference internal" href="update_case/index.html#case_handler.update_case.update_score_calculation.calculate_body_score"><code class="docutils literal notranslate"><span class="pre">calculate_body_score()</span></code></a></li>
+<li class="toctree-l2"><a class="reference internal" href="update_case/index.html#case_handler.update_case.update_score_calculation.calculate_file_score"><code class="docutils literal notranslate"><span class="pre">calculate_file_score()</span></code></a></li>
+<li class="toctree-l2"><a class="reference internal" href="update_case/index.html#case_handler.update_case.update_score_calculation.calculate_header_score"><code class="docutils literal notranslate"><span class="pre">calculate_header_score()</span></code></a></li>
+<li class="toctree-l2"><a class="reference internal" href="update_case/index.html#case_handler.update_case.update_score_calculation.calculate_non_file_ioc_scores"><code class="docutils literal notranslate"><span class="pre">calculate_non_file_ioc_scores()</span></code></a></li>
+<li class="toctree-l2"><a class="reference internal" href="update_case/index.html#case_handler.update_case.update_score_calculation.calculate_result_ranges"><code class="docutils literal notranslate"><span class="pre">calculate_result_ranges()</span></code></a></li>
+<li class="toctree-l2"><a class="reference internal" href="update_case/index.html#case_handler.update_case.update_score_calculation.calculate_total_scores"><code class="docutils literal notranslate"><span class="pre">calculate_total_scores()</span></code></a></li>
+<li class="toctree-l2"><a class="reference internal" href="update_case/index.html#case_handler.update_case.update_score_calculation.get_ioc_score"><code class="docutils literal notranslate"><span class="pre">get_ioc_score()</span></code></a></li>
 </ul>
 </li>
 </ul>
 </div>
 <dl class="py class" id="module-case_handler.models">
 <dt class="sig sig-object py" id="case_handler.models.Case">
-<em class="property"><span class="pre">class</span><span class="w"> </span></em><span class="sig-prename descclassname"><span class="pre">case_handler.models.</span></span><span class="sig-name descname"><span class="pre">Case</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="o"><span class="pre">*</span></span><span class="n"><span class="pre">args</span></span></em>, <em class="sig-param"><span class="o"><span class="pre">**</span></span><span class="n"><span class="pre">kwargs</span></span></em><span class="sig-paren">)</span><a class="reference internal" href="../_modules/case_handler/models.html#Case"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#case_handler.models.Case" title="Link to this definition"></a></dt>
+<em class="property"><span class="k"><span class="pre">class</span></span><span class="w"> </span></em><span class="sig-prename descclassname"><span class="pre">case_handler.models.</span></span><span class="sig-name descname"><span class="pre">Case</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="o"><span class="pre">*</span></span><span class="n"><span class="pre">args</span></span></em>, <em class="sig-param"><span class="o"><span class="pre">**</span></span><span class="n"><span class="pre">kwargs</span></span></em><span class="sig-paren">)</span><a class="reference internal" href="../_modules/case_handler/models.html#Case"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#case_handler.models.Case" title="Link to this definition"></a></dt>
 <dd><p>Bases: <code class="xref py py-class docutils literal notranslate"><span class="pre">Model</span></code></p>
 <p>Main incident investigation case, storing scores, analyst decisions and AI predictions.</p>
 <dl class="py exception">
 <dt class="sig sig-object py" id="case_handler.models.Case.DoesNotExist">
-<em class="property"><span class="pre">exception</span><span class="w"> </span></em><span class="sig-name descname"><span class="pre">DoesNotExist</span></span><a class="headerlink" href="#case_handler.models.Case.DoesNotExist" title="Link to this definition"></a></dt>
+<em class="property"><span class="k"><span class="pre">exception</span></span><span class="w"> </span></em><span class="sig-name descname"><span class="pre">DoesNotExist</span></span><a class="headerlink" href="#case_handler.models.Case.DoesNotExist" title="Link to this definition"></a></dt>
 <dd><p>Bases: <code class="xref py py-class docutils literal notranslate"><span class="pre">ObjectDoesNotExist</span></code></p>
 </dd></dl>
 
 <dl class="py exception">
 <dt class="sig sig-object py" id="case_handler.models.Case.MultipleObjectsReturned">
-<em class="property"><span class="pre">exception</span><span class="w"> </span></em><span class="sig-name descname"><span class="pre">MultipleObjectsReturned</span></span><a class="headerlink" href="#case_handler.models.Case.MultipleObjectsReturned" title="Link to this definition"></a></dt>
+<em class="property"><span class="k"><span class="pre">exception</span></span><span class="w"> </span></em><span class="sig-name descname"><span class="pre">MultipleObjectsReturned</span></span><a class="headerlink" href="#case_handler.models.Case.MultipleObjectsReturned" title="Link to this definition"></a></dt>
 <dd><p>Bases: <code class="xref py py-class docutils literal notranslate"><span class="pre">MultipleObjectsReturned</span></code></p>
 </dd></dl>
 
@@ -452,18 +473,18 @@ class built by <code class="docutils literal notranslate"><span class="pre">crea
 
 <dl class="py class">
 <dt class="sig sig-object py" id="case_handler.models.CaseHasFileOrMail">
-<em class="property"><span class="pre">class</span><span class="w"> </span></em><span class="sig-prename descclassname"><span class="pre">case_handler.models.</span></span><span class="sig-name descname"><span class="pre">CaseHasFileOrMail</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="o"><span class="pre">*</span></span><span class="n"><span class="pre">args</span></span></em>, <em class="sig-param"><span class="o"><span class="pre">**</span></span><span class="n"><span class="pre">kwargs</span></span></em><span class="sig-paren">)</span><a class="reference internal" href="../_modules/case_handler/models.html#CaseHasFileOrMail"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#case_handler.models.CaseHasFileOrMail" title="Link to this definition"></a></dt>
+<em class="property"><span class="k"><span class="pre">class</span></span><span class="w"> </span></em><span class="sig-prename descclassname"><span class="pre">case_handler.models.</span></span><span class="sig-name descname"><span class="pre">CaseHasFileOrMail</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="o"><span class="pre">*</span></span><span class="n"><span class="pre">args</span></span></em>, <em class="sig-param"><span class="o"><span class="pre">**</span></span><span class="n"><span class="pre">kwargs</span></span></em><span class="sig-paren">)</span><a class="reference internal" href="../_modules/case_handler/models.html#CaseHasFileOrMail"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#case_handler.models.CaseHasFileOrMail" title="Link to this definition"></a></dt>
 <dd><p>Bases: <code class="xref py py-class docutils literal notranslate"><span class="pre">Model</span></code></p>
 <p>Association model for cases linked to either a file or an email (one-to-one per instance).</p>
 <dl class="py exception">
 <dt class="sig sig-object py" id="case_handler.models.CaseHasFileOrMail.DoesNotExist">
-<em class="property"><span class="pre">exception</span><span class="w"> </span></em><span class="sig-name descname"><span class="pre">DoesNotExist</span></span><a class="headerlink" href="#case_handler.models.CaseHasFileOrMail.DoesNotExist" title="Link to this definition"></a></dt>
+<em class="property"><span class="k"><span class="pre">exception</span></span><span class="w"> </span></em><span class="sig-name descname"><span class="pre">DoesNotExist</span></span><a class="headerlink" href="#case_handler.models.CaseHasFileOrMail.DoesNotExist" title="Link to this definition"></a></dt>
 <dd><p>Bases: <code class="xref py py-class docutils literal notranslate"><span class="pre">ObjectDoesNotExist</span></code></p>
 </dd></dl>
 
 <dl class="py exception">
 <dt class="sig sig-object py" id="case_handler.models.CaseHasFileOrMail.MultipleObjectsReturned">
-<em class="property"><span class="pre">exception</span><span class="w"> </span></em><span class="sig-name descname"><span class="pre">MultipleObjectsReturned</span></span><a class="headerlink" href="#case_handler.models.CaseHasFileOrMail.MultipleObjectsReturned" title="Link to this definition"></a></dt>
+<em class="property"><span class="k"><span class="pre">exception</span></span><span class="w"> </span></em><span class="sig-name descname"><span class="pre">MultipleObjectsReturned</span></span><a class="headerlink" href="#case_handler.models.CaseHasFileOrMail.MultipleObjectsReturned" title="Link to this definition"></a></dt>
 <dd><p>Bases: <code class="xref py py-class docutils literal notranslate"><span class="pre">MultipleObjectsReturned</span></code></p>
 </dd></dl>
 
@@ -592,18 +613,18 @@ one-to-one (via ForwardOneToOneDescriptor subclass) relation.</p>
 
 <dl class="py class">
 <dt class="sig sig-object py" id="case_handler.models.CaseHasNonFileIocs">
-<em class="property"><span class="pre">class</span><span class="w"> </span></em><span class="sig-prename descclassname"><span class="pre">case_handler.models.</span></span><span class="sig-name descname"><span class="pre">CaseHasNonFileIocs</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="o"><span class="pre">*</span></span><span class="n"><span class="pre">args</span></span></em>, <em class="sig-param"><span class="o"><span class="pre">**</span></span><span class="n"><span class="pre">kwargs</span></span></em><span class="sig-paren">)</span><a class="reference internal" href="../_modules/case_handler/models.html#CaseHasNonFileIocs"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#case_handler.models.CaseHasNonFileIocs" title="Link to this definition"></a></dt>
+<em class="property"><span class="k"><span class="pre">class</span></span><span class="w"> </span></em><span class="sig-prename descclassname"><span class="pre">case_handler.models.</span></span><span class="sig-name descname"><span class="pre">CaseHasNonFileIocs</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="o"><span class="pre">*</span></span><span class="n"><span class="pre">args</span></span></em>, <em class="sig-param"><span class="o"><span class="pre">**</span></span><span class="n"><span class="pre">kwargs</span></span></em><span class="sig-paren">)</span><a class="reference internal" href="../_modules/case_handler/models.html#CaseHasNonFileIocs"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#case_handler.models.CaseHasNonFileIocs" title="Link to this definition"></a></dt>
 <dd><p>Bases: <code class="xref py py-class docutils literal notranslate"><span class="pre">Model</span></code></p>
 <p>Association model for cases linked to non-file IOCs: URLs, IPs, and hashes.</p>
 <dl class="py exception">
 <dt class="sig sig-object py" id="case_handler.models.CaseHasNonFileIocs.DoesNotExist">
-<em class="property"><span class="pre">exception</span><span class="w"> </span></em><span class="sig-name descname"><span class="pre">DoesNotExist</span></span><a class="headerlink" href="#case_handler.models.CaseHasNonFileIocs.DoesNotExist" title="Link to this definition"></a></dt>
+<em class="property"><span class="k"><span class="pre">exception</span></span><span class="w"> </span></em><span class="sig-name descname"><span class="pre">DoesNotExist</span></span><a class="headerlink" href="#case_handler.models.CaseHasNonFileIocs.DoesNotExist" title="Link to this definition"></a></dt>
 <dd><p>Bases: <code class="xref py py-class docutils literal notranslate"><span class="pre">ObjectDoesNotExist</span></code></p>
 </dd></dl>
 
 <dl class="py exception">
 <dt class="sig sig-object py" id="case_handler.models.CaseHasNonFileIocs.MultipleObjectsReturned">
-<em class="property"><span class="pre">exception</span><span class="w"> </span></em><span class="sig-name descname"><span class="pre">MultipleObjectsReturned</span></span><a class="headerlink" href="#case_handler.models.CaseHasNonFileIocs.MultipleObjectsReturned" title="Link to this definition"></a></dt>
+<em class="property"><span class="k"><span class="pre">exception</span></span><span class="w"> </span></em><span class="sig-name descname"><span class="pre">MultipleObjectsReturned</span></span><a class="headerlink" href="#case_handler.models.CaseHasNonFileIocs.MultipleObjectsReturned" title="Link to this definition"></a></dt>
 <dd><p>Bases: <code class="xref py py-class docutils literal notranslate"><span class="pre">MultipleObjectsReturned</span></code></p>
 </dd></dl>
 
@@ -750,18 +771,18 @@ one-to-one (via ForwardOneToOneDescriptor subclass) relation.</p>
 
 <dl class="py class">
 <dt class="sig sig-object py" id="case_handler.models.FileInCases">
-<em class="property"><span class="pre">class</span><span class="w"> </span></em><span class="sig-prename descclassname"><span class="pre">case_handler.models.</span></span><span class="sig-name descname"><span class="pre">FileInCases</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="o"><span class="pre">*</span></span><span class="n"><span class="pre">args</span></span></em>, <em class="sig-param"><span class="o"><span class="pre">**</span></span><span class="n"><span class="pre">kwargs</span></span></em><span class="sig-paren">)</span><a class="reference internal" href="../_modules/case_handler/models.html#FileInCases"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#case_handler.models.FileInCases" title="Link to this definition"></a></dt>
+<em class="property"><span class="k"><span class="pre">class</span></span><span class="w"> </span></em><span class="sig-prename descclassname"><span class="pre">case_handler.models.</span></span><span class="sig-name descname"><span class="pre">FileInCases</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="o"><span class="pre">*</span></span><span class="n"><span class="pre">args</span></span></em>, <em class="sig-param"><span class="o"><span class="pre">**</span></span><span class="n"><span class="pre">kwargs</span></span></em><span class="sig-paren">)</span><a class="reference internal" href="../_modules/case_handler/models.html#FileInCases"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#case_handler.models.FileInCases" title="Link to this definition"></a></dt>
 <dd><p>Bases: <code class="xref py py-class docutils literal notranslate"><span class="pre">Model</span></code></p>
 <p>Many-to-many association between files and cases.</p>
 <dl class="py exception">
 <dt class="sig sig-object py" id="case_handler.models.FileInCases.DoesNotExist">
-<em class="property"><span class="pre">exception</span><span class="w"> </span></em><span class="sig-name descname"><span class="pre">DoesNotExist</span></span><a class="headerlink" href="#case_handler.models.FileInCases.DoesNotExist" title="Link to this definition"></a></dt>
+<em class="property"><span class="k"><span class="pre">exception</span></span><span class="w"> </span></em><span class="sig-name descname"><span class="pre">DoesNotExist</span></span><a class="headerlink" href="#case_handler.models.FileInCases.DoesNotExist" title="Link to this definition"></a></dt>
 <dd><p>Bases: <code class="xref py py-class docutils literal notranslate"><span class="pre">ObjectDoesNotExist</span></code></p>
 </dd></dl>
 
 <dl class="py exception">
 <dt class="sig sig-object py" id="case_handler.models.FileInCases.MultipleObjectsReturned">
-<em class="property"><span class="pre">exception</span><span class="w"> </span></em><span class="sig-name descname"><span class="pre">MultipleObjectsReturned</span></span><a class="headerlink" href="#case_handler.models.FileInCases.MultipleObjectsReturned" title="Link to this definition"></a></dt>
+<em class="property"><span class="k"><span class="pre">exception</span></span><span class="w"> </span></em><span class="sig-name descname"><span class="pre">MultipleObjectsReturned</span></span><a class="headerlink" href="#case_handler.models.FileInCases.MultipleObjectsReturned" title="Link to this definition"></a></dt>
 <dd><p>Bases: <code class="xref py py-class docutils literal notranslate"><span class="pre">MultipleObjectsReturned</span></code></p>
 </dd></dl>
 
@@ -849,18 +870,18 @@ object the first time, the query is executed.</p>
 
 <dl class="py class">
 <dt class="sig sig-object py" id="case_handler.models.HashInCases">
-<em class="property"><span class="pre">class</span><span class="w"> </span></em><span class="sig-prename descclassname"><span class="pre">case_handler.models.</span></span><span class="sig-name descname"><span class="pre">HashInCases</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="o"><span class="pre">*</span></span><span class="n"><span class="pre">args</span></span></em>, <em class="sig-param"><span class="o"><span class="pre">**</span></span><span class="n"><span class="pre">kwargs</span></span></em><span class="sig-paren">)</span><a class="reference internal" href="../_modules/case_handler/models.html#HashInCases"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#case_handler.models.HashInCases" title="Link to this definition"></a></dt>
+<em class="property"><span class="k"><span class="pre">class</span></span><span class="w"> </span></em><span class="sig-prename descclassname"><span class="pre">case_handler.models.</span></span><span class="sig-name descname"><span class="pre">HashInCases</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="o"><span class="pre">*</span></span><span class="n"><span class="pre">args</span></span></em>, <em class="sig-param"><span class="o"><span class="pre">**</span></span><span class="n"><span class="pre">kwargs</span></span></em><span class="sig-paren">)</span><a class="reference internal" href="../_modules/case_handler/models.html#HashInCases"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#case_handler.models.HashInCases" title="Link to this definition"></a></dt>
 <dd><p>Bases: <code class="xref py py-class docutils literal notranslate"><span class="pre">Model</span></code></p>
 <p>Many-to-many association between hashes and cases.</p>
 <dl class="py exception">
 <dt class="sig sig-object py" id="case_handler.models.HashInCases.DoesNotExist">
-<em class="property"><span class="pre">exception</span><span class="w"> </span></em><span class="sig-name descname"><span class="pre">DoesNotExist</span></span><a class="headerlink" href="#case_handler.models.HashInCases.DoesNotExist" title="Link to this definition"></a></dt>
+<em class="property"><span class="k"><span class="pre">exception</span></span><span class="w"> </span></em><span class="sig-name descname"><span class="pre">DoesNotExist</span></span><a class="headerlink" href="#case_handler.models.HashInCases.DoesNotExist" title="Link to this definition"></a></dt>
 <dd><p>Bases: <code class="xref py py-class docutils literal notranslate"><span class="pre">ObjectDoesNotExist</span></code></p>
 </dd></dl>
 
 <dl class="py exception">
 <dt class="sig sig-object py" id="case_handler.models.HashInCases.MultipleObjectsReturned">
-<em class="property"><span class="pre">exception</span><span class="w"> </span></em><span class="sig-name descname"><span class="pre">MultipleObjectsReturned</span></span><a class="headerlink" href="#case_handler.models.HashInCases.MultipleObjectsReturned" title="Link to this definition"></a></dt>
+<em class="property"><span class="k"><span class="pre">exception</span></span><span class="w"> </span></em><span class="sig-name descname"><span class="pre">MultipleObjectsReturned</span></span><a class="headerlink" href="#case_handler.models.HashInCases.MultipleObjectsReturned" title="Link to this definition"></a></dt>
 <dd><p>Bases: <code class="xref py py-class docutils literal notranslate"><span class="pre">MultipleObjectsReturned</span></code></p>
 </dd></dl>
 
@@ -948,18 +969,18 @@ object the first time, the query is executed.</p>
 
 <dl class="py class">
 <dt class="sig sig-object py" id="case_handler.models.IpInCases">
-<em class="property"><span class="pre">class</span><span class="w"> </span></em><span class="sig-prename descclassname"><span class="pre">case_handler.models.</span></span><span class="sig-name descname"><span class="pre">IpInCases</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="o"><span class="pre">*</span></span><span class="n"><span class="pre">args</span></span></em>, <em class="sig-param"><span class="o"><span class="pre">**</span></span><span class="n"><span class="pre">kwargs</span></span></em><span class="sig-paren">)</span><a class="reference internal" href="../_modules/case_handler/models.html#IpInCases"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#case_handler.models.IpInCases" title="Link to this definition"></a></dt>
+<em class="property"><span class="k"><span class="pre">class</span></span><span class="w"> </span></em><span class="sig-prename descclassname"><span class="pre">case_handler.models.</span></span><span class="sig-name descname"><span class="pre">IpInCases</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="o"><span class="pre">*</span></span><span class="n"><span class="pre">args</span></span></em>, <em class="sig-param"><span class="o"><span class="pre">**</span></span><span class="n"><span class="pre">kwargs</span></span></em><span class="sig-paren">)</span><a class="reference internal" href="../_modules/case_handler/models.html#IpInCases"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#case_handler.models.IpInCases" title="Link to this definition"></a></dt>
 <dd><p>Bases: <code class="xref py py-class docutils literal notranslate"><span class="pre">Model</span></code></p>
 <p>Many-to-many association between IPs and cases.</p>
 <dl class="py exception">
 <dt class="sig sig-object py" id="case_handler.models.IpInCases.DoesNotExist">
-<em class="property"><span class="pre">exception</span><span class="w"> </span></em><span class="sig-name descname"><span class="pre">DoesNotExist</span></span><a class="headerlink" href="#case_handler.models.IpInCases.DoesNotExist" title="Link to this definition"></a></dt>
+<em class="property"><span class="k"><span class="pre">exception</span></span><span class="w"> </span></em><span class="sig-name descname"><span class="pre">DoesNotExist</span></span><a class="headerlink" href="#case_handler.models.IpInCases.DoesNotExist" title="Link to this definition"></a></dt>
 <dd><p>Bases: <code class="xref py py-class docutils literal notranslate"><span class="pre">ObjectDoesNotExist</span></code></p>
 </dd></dl>
 
 <dl class="py exception">
 <dt class="sig sig-object py" id="case_handler.models.IpInCases.MultipleObjectsReturned">
-<em class="property"><span class="pre">exception</span><span class="w"> </span></em><span class="sig-name descname"><span class="pre">MultipleObjectsReturned</span></span><a class="headerlink" href="#case_handler.models.IpInCases.MultipleObjectsReturned" title="Link to this definition"></a></dt>
+<em class="property"><span class="k"><span class="pre">exception</span></span><span class="w"> </span></em><span class="sig-name descname"><span class="pre">MultipleObjectsReturned</span></span><a class="headerlink" href="#case_handler.models.IpInCases.MultipleObjectsReturned" title="Link to this definition"></a></dt>
 <dd><p>Bases: <code class="xref py py-class docutils literal notranslate"><span class="pre">MultipleObjectsReturned</span></code></p>
 </dd></dl>
 
@@ -1047,18 +1068,18 @@ object the first time, the query is executed.</p>
 
 <dl class="py class">
 <dt class="sig sig-object py" id="case_handler.models.MailInCases">
-<em class="property"><span class="pre">class</span><span class="w"> </span></em><span class="sig-prename descclassname"><span class="pre">case_handler.models.</span></span><span class="sig-name descname"><span class="pre">MailInCases</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="o"><span class="pre">*</span></span><span class="n"><span class="pre">args</span></span></em>, <em class="sig-param"><span class="o"><span class="pre">**</span></span><span class="n"><span class="pre">kwargs</span></span></em><span class="sig-paren">)</span><a class="reference internal" href="../_modules/case_handler/models.html#MailInCases"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#case_handler.models.MailInCases" title="Link to this definition"></a></dt>
+<em class="property"><span class="k"><span class="pre">class</span></span><span class="w"> </span></em><span class="sig-prename descclassname"><span class="pre">case_handler.models.</span></span><span class="sig-name descname"><span class="pre">MailInCases</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="o"><span class="pre">*</span></span><span class="n"><span class="pre">args</span></span></em>, <em class="sig-param"><span class="o"><span class="pre">**</span></span><span class="n"><span class="pre">kwargs</span></span></em><span class="sig-paren">)</span><a class="reference internal" href="../_modules/case_handler/models.html#MailInCases"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#case_handler.models.MailInCases" title="Link to this definition"></a></dt>
 <dd><p>Bases: <code class="xref py py-class docutils literal notranslate"><span class="pre">Model</span></code></p>
 <p>Many-to-many association between mails and cases.</p>
 <dl class="py exception">
 <dt class="sig sig-object py" id="case_handler.models.MailInCases.DoesNotExist">
-<em class="property"><span class="pre">exception</span><span class="w"> </span></em><span class="sig-name descname"><span class="pre">DoesNotExist</span></span><a class="headerlink" href="#case_handler.models.MailInCases.DoesNotExist" title="Link to this definition"></a></dt>
+<em class="property"><span class="k"><span class="pre">exception</span></span><span class="w"> </span></em><span class="sig-name descname"><span class="pre">DoesNotExist</span></span><a class="headerlink" href="#case_handler.models.MailInCases.DoesNotExist" title="Link to this definition"></a></dt>
 <dd><p>Bases: <code class="xref py py-class docutils literal notranslate"><span class="pre">ObjectDoesNotExist</span></code></p>
 </dd></dl>
 
 <dl class="py exception">
 <dt class="sig sig-object py" id="case_handler.models.MailInCases.MultipleObjectsReturned">
-<em class="property"><span class="pre">exception</span><span class="w"> </span></em><span class="sig-name descname"><span class="pre">MultipleObjectsReturned</span></span><a class="headerlink" href="#case_handler.models.MailInCases.MultipleObjectsReturned" title="Link to this definition"></a></dt>
+<em class="property"><span class="k"><span class="pre">exception</span></span><span class="w"> </span></em><span class="sig-name descname"><span class="pre">MultipleObjectsReturned</span></span><a class="headerlink" href="#case_handler.models.MailInCases.MultipleObjectsReturned" title="Link to this definition"></a></dt>
 <dd><p>Bases: <code class="xref py py-class docutils literal notranslate"><span class="pre">MultipleObjectsReturned</span></code></p>
 </dd></dl>
 
@@ -1146,7 +1167,7 @@ object the first time, the query is executed.</p>
 
 <dl class="py class">
 <dt class="sig sig-object py" id="case_handler.models.Result">
-<em class="property"><span class="pre">class</span><span class="w"> </span></em><span class="sig-prename descclassname"><span class="pre">case_handler.models.</span></span><span class="sig-name descname"><span class="pre">Result</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">value</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">names</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">None</span></span></em>, <em class="sig-param"><span class="o"><span class="pre">*</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">module</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">None</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">qualname</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">None</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">type</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">None</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">start</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">1</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">boundary</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">None</span></span></em><span class="sig-paren">)</span><a class="reference internal" href="../_modules/case_handler/models.html#Result"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#case_handler.models.Result" title="Link to this definition"></a></dt>
+<em class="property"><span class="k"><span class="pre">class</span></span><span class="w"> </span></em><span class="sig-prename descclassname"><span class="pre">case_handler.models.</span></span><span class="sig-name descname"><span class="pre">Result</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">value</span></span></em><span class="sig-paren">)</span><a class="reference internal" href="../_modules/case_handler/models.html#Result"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#case_handler.models.Result" title="Link to this definition"></a></dt>
 <dd><p>Bases: <code class="xref py py-class docutils literal notranslate"><span class="pre">TextChoices</span></code></p>
 <p>Enumeration of possible case result statuses.</p>
 <dl class="py attribute">
@@ -1188,7 +1209,7 @@ object the first time, the query is executed.</p>
 
 <dl class="py class">
 <dt class="sig sig-object py" id="case_handler.models.Status">
-<em class="property"><span class="pre">class</span><span class="w"> </span></em><span class="sig-prename descclassname"><span class="pre">case_handler.models.</span></span><span class="sig-name descname"><span class="pre">Status</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">value</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">names</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">None</span></span></em>, <em class="sig-param"><span class="o"><span class="pre">*</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">module</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">None</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">qualname</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">None</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">type</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">None</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">start</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">1</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">boundary</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">None</span></span></em><span class="sig-paren">)</span><a class="reference internal" href="../_modules/case_handler/models.html#Status"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#case_handler.models.Status" title="Link to this definition"></a></dt>
+<em class="property"><span class="k"><span class="pre">class</span></span><span class="w"> </span></em><span class="sig-prename descclassname"><span class="pre">case_handler.models.</span></span><span class="sig-name descname"><span class="pre">Status</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">value</span></span></em><span class="sig-paren">)</span><a class="reference internal" href="../_modules/case_handler/models.html#Status"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#case_handler.models.Status" title="Link to this definition"></a></dt>
 <dd><p>Bases: <code class="xref py py-class docutils literal notranslate"><span class="pre">TextChoices</span></code></p>
 <p>Enumeration of possible case statuses.</p>
 <dl class="py attribute">
@@ -1215,18 +1236,18 @@ object the first time, the query is executed.</p>
 
 <dl class="py class">
 <dt class="sig sig-object py" id="case_handler.models.UrlInCases">
-<em class="property"><span class="pre">class</span><span class="w"> </span></em><span class="sig-prename descclassname"><span class="pre">case_handler.models.</span></span><span class="sig-name descname"><span class="pre">UrlInCases</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="o"><span class="pre">*</span></span><span class="n"><span class="pre">args</span></span></em>, <em class="sig-param"><span class="o"><span class="pre">**</span></span><span class="n"><span class="pre">kwargs</span></span></em><span class="sig-paren">)</span><a class="reference internal" href="../_modules/case_handler/models.html#UrlInCases"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#case_handler.models.UrlInCases" title="Link to this definition"></a></dt>
+<em class="property"><span class="k"><span class="pre">class</span></span><span class="w"> </span></em><span class="sig-prename descclassname"><span class="pre">case_handler.models.</span></span><span class="sig-name descname"><span class="pre">UrlInCases</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="o"><span class="pre">*</span></span><span class="n"><span class="pre">args</span></span></em>, <em class="sig-param"><span class="o"><span class="pre">**</span></span><span class="n"><span class="pre">kwargs</span></span></em><span class="sig-paren">)</span><a class="reference internal" href="../_modules/case_handler/models.html#UrlInCases"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#case_handler.models.UrlInCases" title="Link to this definition"></a></dt>
 <dd><p>Bases: <code class="xref py py-class docutils literal notranslate"><span class="pre">Model</span></code></p>
 <p>Many-to-many association between URLs and cases.</p>
 <dl class="py exception">
 <dt class="sig sig-object py" id="case_handler.models.UrlInCases.DoesNotExist">
-<em class="property"><span class="pre">exception</span><span class="w"> </span></em><span class="sig-name descname"><span class="pre">DoesNotExist</span></span><a class="headerlink" href="#case_handler.models.UrlInCases.DoesNotExist" title="Link to this definition"></a></dt>
+<em class="property"><span class="k"><span class="pre">exception</span></span><span class="w"> </span></em><span class="sig-name descname"><span class="pre">DoesNotExist</span></span><a class="headerlink" href="#case_handler.models.UrlInCases.DoesNotExist" title="Link to this definition"></a></dt>
 <dd><p>Bases: <code class="xref py py-class docutils literal notranslate"><span class="pre">ObjectDoesNotExist</span></code></p>
 </dd></dl>
 
 <dl class="py exception">
 <dt class="sig sig-object py" id="case_handler.models.UrlInCases.MultipleObjectsReturned">
-<em class="property"><span class="pre">exception</span><span class="w"> </span></em><span class="sig-name descname"><span class="pre">MultipleObjectsReturned</span></span><a class="headerlink" href="#case_handler.models.UrlInCases.MultipleObjectsReturned" title="Link to this definition"></a></dt>
+<em class="property"><span class="k"><span class="pre">exception</span></span><span class="w"> </span></em><span class="sig-name descname"><span class="pre">MultipleObjectsReturned</span></span><a class="headerlink" href="#case_handler.models.UrlInCases.MultipleObjectsReturned" title="Link to this definition"></a></dt>
 <dd><p>Bases: <code class="xref py py-class docutils literal notranslate"><span class="pre">MultipleObjectsReturned</span></code></p>
 </dd></dl>
 

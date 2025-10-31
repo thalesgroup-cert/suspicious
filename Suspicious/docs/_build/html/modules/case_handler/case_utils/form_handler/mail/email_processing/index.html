@@ -1,0 +1,253 @@
+
+
+<!DOCTYPE html>
+<html class="writer-html5" lang="en" data-content_root="../../../../../../">
+<head>
+  <meta charset="utf-8" /><meta name="viewport" content="width=device-width, initial-scale=1" />
+
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Email Processing &mdash; Suspicious 1.0.0 documentation</title>
+      <link rel="stylesheet" type="text/css" href="../../../../../../_static/pygments.css?v=b86133f3" />
+      <link rel="stylesheet" type="text/css" href="../../../../../../_static/css/theme.css?v=e59714d7" />
+
+  
+      <script src="../../../../../../_static/jquery.js?v=5d32c60e"></script>
+      <script src="../../../../../../_static/_sphinx_javascript_frameworks_compat.js?v=2cd50e6c"></script>
+      <script src="../../../../../../_static/documentation_options.js?v=8d563738"></script>
+      <script src="../../../../../../_static/doctools.js?v=9bcbadda"></script>
+      <script src="../../../../../../_static/sphinx_highlight.js?v=dc90522c"></script>
+    <script src="../../../../../../_static/js/theme.js"></script>
+    <link rel="index" title="Index" href="../../../../../../genindex.html" />
+    <link rel="search" title="Search" href="../../../../../../search.html" />
+    <link rel="next" title="Update Case" href="../../../../update_case/index.html" />
+    <link rel="prev" title="Mail Handlers" href="../index.html" /> 
+</head>
+
+<body class="wy-body-for-nav"> 
+  <div class="wy-grid-for-nav">
+    <nav data-toggle="wy-nav-shift" class="wy-nav-side">
+      <div class="wy-side-scroll">
+        <div class="wy-side-nav-search" >
+
+          
+          
+          <a href="../../../../../../index.html" class="icon icon-home">
+            Suspicious
+          </a>
+<div role="search">
+  <form id="rtd-search-form" class="wy-form" action="../../../../../../search.html" method="get">
+    <input type="text" name="q" placeholder="Search docs" aria-label="Search docs" />
+    <input type="hidden" name="check_keywords" value="yes" />
+    <input type="hidden" name="area" value="default" />
+  </form>
+</div>
+        </div><div class="wy-menu wy-menu-vertical" data-spy="affix" role="navigation" aria-label="Navigation menu">
+              <p class="caption" role="heading"><span class="caption-text">Contents:</span></p>
+<ul class="current">
+<li class="toctree-l1"><a class="reference internal" href="../../../../../../README.html">Suspicious</a></li>
+<li class="toctree-l1 current"><a class="reference internal" href="../../../../../index.html">Modules (API Reference)</a><ul class="current">
+<li class="toctree-l2 current"><a class="reference internal" href="../../../../index.html">Case Handler</a><ul class="current">
+<li class="toctree-l3 current"><a class="reference internal" href="../../../index.html">Case Utilities</a><ul class="current">
+<li class="toctree-l4 current"><a class="reference internal" href="../index.html">Mail Handlers</a></li>
+<li class="toctree-l4"><a class="reference internal" href="../../../index.html#case_handler.case_utils.case_creator.CaseCreator"><code class="docutils literal notranslate"><span class="pre">CaseCreator</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="../../../index.html#case_handler.case_utils.case_handler.CaseHandler"><code class="docutils literal notranslate"><span class="pre">CaseHandler</span></code></a></li>
+</ul>
+</li>
+<li class="toctree-l3"><a class="reference internal" href="../../../../update_case/index.html">Update Case</a></li>
+<li class="toctree-l3"><a class="reference internal" href="../../../../index.html#case_handler.models.Case"><code class="docutils literal notranslate"><span class="pre">Case</span></code></a></li>
+<li class="toctree-l3"><a class="reference internal" href="../../../../index.html#case_handler.models.CaseHasFileOrMail"><code class="docutils literal notranslate"><span class="pre">CaseHasFileOrMail</span></code></a></li>
+<li class="toctree-l3"><a class="reference internal" href="../../../../index.html#case_handler.models.CaseHasNonFileIocs"><code class="docutils literal notranslate"><span class="pre">CaseHasNonFileIocs</span></code></a></li>
+<li class="toctree-l3"><a class="reference internal" href="../../../../index.html#case_handler.models.FileInCases"><code class="docutils literal notranslate"><span class="pre">FileInCases</span></code></a></li>
+<li class="toctree-l3"><a class="reference internal" href="../../../../index.html#case_handler.models.HashInCases"><code class="docutils literal notranslate"><span class="pre">HashInCases</span></code></a></li>
+<li class="toctree-l3"><a class="reference internal" href="../../../../index.html#case_handler.models.IpInCases"><code class="docutils literal notranslate"><span class="pre">IpInCases</span></code></a></li>
+<li class="toctree-l3"><a class="reference internal" href="../../../../index.html#case_handler.models.MailInCases"><code class="docutils literal notranslate"><span class="pre">MailInCases</span></code></a></li>
+<li class="toctree-l3"><a class="reference internal" href="../../../../index.html#case_handler.models.Result"><code class="docutils literal notranslate"><span class="pre">Result</span></code></a></li>
+<li class="toctree-l3"><a class="reference internal" href="../../../../index.html#case_handler.models.Status"><code class="docutils literal notranslate"><span class="pre">Status</span></code></a></li>
+<li class="toctree-l3"><a class="reference internal" href="../../../../index.html#case_handler.models.UrlInCases"><code class="docutils literal notranslate"><span class="pre">UrlInCases</span></code></a></li>
+</ul>
+</li>
+<li class="toctree-l2"><a class="reference internal" href="../../../../../cortex_job_core.html">Cortex Job module</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../../../../../dashboard_core.html">Dashboard module</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../../../../../domain_process_core.html">Domain Process Module</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../../../../../email_process_core.html">Email Process module</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../../../../../file_process_core.html">File Process module</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../../../../../hash_process_core.html">Hash Process module</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../../../../../ip_process_core.html">IP Process module</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../../../../../mail_feeder_core.html">Mail Feeder module</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../../../../../profiles_core.html">Profiles module</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../../../../../score_process_core.html">Score Process module</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../../../../../settings_core.html">Settings module</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../../../../../tasp_core.html">TASP module</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../../../../../url_process_core.html">Url Process module</a></li>
+</ul>
+</li>
+</ul>
+
+        </div>
+      </div>
+    </nav>
+
+    <section data-toggle="wy-nav-shift" class="wy-nav-content-wrap"><nav class="wy-nav-top" aria-label="Mobile navigation menu" >
+          <i data-toggle="wy-nav-top" class="fa fa-bars"></i>
+          <a href="../../../../../../index.html">Suspicious</a>
+      </nav>
+
+      <div class="wy-nav-content">
+        <div class="rst-content">
+          <div role="navigation" aria-label="Page navigation">
+  <ul class="wy-breadcrumbs">
+      <li><a href="../../../../../../index.html" class="icon icon-home" aria-label="Home"></a></li>
+          <li class="breadcrumb-item"><a href="../../../../../index.html">Modules (API Reference)</a></li>
+          <li class="breadcrumb-item"><a href="../../../../index.html">Case Handler</a></li>
+          <li class="breadcrumb-item"><a href="../../../index.html">Case Utilities</a></li>
+          <li class="breadcrumb-item"><a href="../index.html">Mail Handlers</a></li>
+      <li class="breadcrumb-item active">Email Processing</li>
+      <li class="wy-breadcrumbs-aside">
+            <a href="../../../../../../_sources/modules/case_handler/case_utils/form_handler/mail/email_processing/index.rst.txt" rel="nofollow"> View page source</a>
+      </li>
+  </ul>
+  <hr/>
+</div>
+          <div role="main" class="document" itemscope="itemscope" itemtype="http://schema.org/Article">
+           <div itemprop="articleBody">
+             
+  <section id="module-case_handler.case_utils.form_handlers.mail.email_processing.parser">
+<span id="email-processing"></span><h1>Email Processing<a class="headerlink" href="#module-case_handler.case_utils.form_handlers.mail.email_processing.parser" title="Link to this heading"></a></h1>
+<dl class="py class">
+<dt class="sig sig-object py" id="case_handler.case_utils.form_handlers.mail.email_processing.parser.EmailParser">
+<em class="property"><span class="k"><span class="pre">class</span></span><span class="w"> </span></em><span class="sig-prename descclassname"><span class="pre">case_handler.case_utils.form_handlers.mail.email_processing.parser.</span></span><span class="sig-name descname"><span class="pre">EmailParser</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">tmp_dir</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">Path</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">source_ref</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">str</span></span></em><span class="sig-paren">)</span><a class="reference internal" href="../../../../../../_modules/case_handler/case_utils/form_handlers/mail/email_processing/parser.html#EmailParser"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#case_handler.case_utils.form_handlers.mail.email_processing.parser.EmailParser" title="Link to this definition"></a></dt>
+<dd><p>Parses EmailMessage to extract headers, recipients, date, subject, body, and attachments.</p>
+</dd></dl>
+
+<dl class="py class" id="module-case_handler.case_utils.form_handlers.mail.email_processing.saver">
+<dt class="sig sig-object py" id="case_handler.case_utils.form_handlers.mail.email_processing.saver.EmailSaver">
+<em class="property"><span class="k"><span class="pre">class</span></span><span class="w"> </span></em><span class="sig-prename descclassname"><span class="pre">case_handler.case_utils.form_handlers.mail.email_processing.saver.</span></span><span class="sig-name descname"><span class="pre">EmailSaver</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">dest_dir</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">str</span><span class="w"> </span><span class="p"><span class="pre">|</span></span><span class="w"> </span><span class="pre">Path</span></span></em><span class="sig-paren">)</span><a class="reference internal" href="../../../../../../_modules/case_handler/case_utils/form_handlers/mail/email_processing/saver.html#EmailSaver"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#case_handler.case_utils.form_handlers.mail.email_processing.saver.EmailSaver" title="Link to this definition"></a></dt>
+<dd><p>Responsible for saving parsed email components to disk:
+- original EML content
+- plain text body
+- HTML body
+- headers snapshot</p>
+<dl class="py method">
+<dt class="sig sig-object py" id="case_handler.case_utils.form_handlers.mail.email_processing.saver.EmailSaver.save">
+<span class="sig-name descname"><span class="pre">save</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">ref</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">str</span></span></em>, <em class="sig-param"><span class="keyword-only-separator o"><abbr title="Keyword-only parameters separator (PEP 3102)"><span class="pre">*</span></abbr></span></em>, <em class="sig-param"><span class="n"><span class="pre">body_text</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">str</span><span class="w"> </span><span class="p"><span class="pre">|</span></span><span class="w"> </span><span class="pre">None</span></span><span class="w"> </span><span class="o"><span class="pre">=</span></span><span class="w"> </span><span class="default_value"><span class="pre">None</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">body_html</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">str</span><span class="w"> </span><span class="p"><span class="pre">|</span></span><span class="w"> </span><span class="pre">None</span></span><span class="w"> </span><span class="o"><span class="pre">=</span></span><span class="w"> </span><span class="default_value"><span class="pre">None</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">headers</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">str</span><span class="w"> </span><span class="p"><span class="pre">|</span></span><span class="w"> </span><span class="pre">EmailMessage</span><span class="w"> </span><span class="p"><span class="pre">|</span></span><span class="w"> </span><span class="pre">None</span></span><span class="w"> </span><span class="o"><span class="pre">=</span></span><span class="w"> </span><span class="default_value"><span class="pre">None</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">eml_bytes</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">bytes</span><span class="w"> </span><span class="p"><span class="pre">|</span></span><span class="w"> </span><span class="pre">None</span></span><span class="w"> </span><span class="o"><span class="pre">=</span></span><span class="w"> </span><span class="default_value"><span class="pre">None</span></span></em><span class="sig-paren">)</span> <span class="sig-return"><span class="sig-return-icon">&#x2192;</span> <span class="sig-return-typehint"><span class="pre">None</span></span></span><a class="reference internal" href="../../../../../../_modules/case_handler/case_utils/form_handlers/mail/email_processing/saver.html#EmailSaver.save"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#case_handler.case_utils.form_handlers.mail.email_processing.saver.EmailSaver.save" title="Link to this definition"></a></dt>
+<dd><p>Save the various pieces of an email:</p>
+<ul class="simple">
+<li><p>{ref}.eml  : raw email bytes</p></li>
+<li><p>{ref}.html : HTML body (if provided)</p></li>
+<li><p>{ref}.txt  : plain-text body</p></li>
+<li><p>{ref}.headers: headers snapshot (string form)</p></li>
+</ul>
+<dl class="simple">
+<dt>Args:</dt><dd><p>ref (str): Identifier for file naming.
+body_text (str, optional): Plain text content.
+body_html (str, optional): HTML content.
+headers (str | EmailMessage, optional): Email headers.
+eml_bytes (bytes, optional): Raw .eml bytes.</p>
+</dd>
+</dl>
+</dd></dl>
+
+</dd></dl>
+
+<dl class="py class" id="module-case_handler.case_utils.form_handlers.mail.email_processing.service">
+<dt class="sig sig-object py" id="case_handler.case_utils.form_handlers.mail.email_processing.service.ProcessEmailService">
+<em class="property"><span class="k"><span class="pre">class</span></span><span class="w"> </span></em><span class="sig-prename descclassname"><span class="pre">case_handler.case_utils.form_handlers.mail.email_processing.service.</span></span><span class="sig-name descname"><span class="pre">ProcessEmailService</span></span><a class="reference internal" href="../../../../../../_modules/case_handler/case_utils/form_handlers/mail/email_processing/service.html#ProcessEmailService"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#case_handler.case_utils.form_handlers.mail.email_processing.service.ProcessEmailService" title="Link to this definition"></a></dt>
+<dd><p>Orchestrates email processing: parsing content, saving files,
+moving attachments, and returning structured data or a Mail entity.</p>
+<dl class="py method">
+<dt class="sig sig-object py" id="case_handler.case_utils.form_handlers.mail.email_processing.service.ProcessEmailService.process_submitted_email">
+<span class="sig-name descname"><span class="pre">process_submitted_email</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">msg</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">EmailMessage</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">submitter</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">str</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">tmp_dir</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">str</span></span></em><span class="sig-paren">)</span> <span class="sig-return"><span class="sig-return-icon">&#x2192;</span> <span class="sig-return-typehint"><span class="pre">dict</span><span class="w"> </span><span class="p"><span class="pre">|</span></span><span class="w"> </span><span class="pre">None</span></span></span><a class="reference internal" href="../../../../../../_modules/case_handler/case_utils/form_handlers/mail/email_processing/service.html#ProcessEmailService.process_submitted_email"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#case_handler.case_utils.form_handlers.mail.email_processing.service.ProcessEmailService.process_submitted_email" title="Link to this definition"></a></dt>
+<dd><p>Process an EmailMessage:
+- Save raw EML temporarily
+- Parse content and attachments with EmailParser
+- Move attachments dir to final structure
+- Save all parsed output with EmailSaver
+Args:</p>
+<blockquote>
+<div><p>msg: The email message object to process.
+submitter: Identifier for the submitting user.
+tmp_dir: Temporary directory to hold processing files.</p>
+</div></blockquote>
+<dl class="simple">
+<dt>Returns:</dt><dd><p>dict containing parsed email data, or None on failure.</p>
+</dd>
+</dl>
+</dd></dl>
+
+</dd></dl>
+
+<dl class="py function" id="module-case_handler.case_utils.form_handlers.mail.email_processing.utils">
+<dt class="sig sig-object py" id="case_handler.case_utils.form_handlers.mail.email_processing.utils.cleanup_directory">
+<span class="sig-prename descclassname"><span class="pre">case_handler.case_utils.form_handlers.mail.email_processing.utils.</span></span><span class="sig-name descname"><span class="pre">cleanup_directory</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">dir_path</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">str</span><span class="w"> </span><span class="p"><span class="pre">|</span></span><span class="w"> </span><span class="pre">Path</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">remove_parent_if_empty</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">bool</span></span><span class="w"> </span><span class="o"><span class="pre">=</span></span><span class="w"> </span><span class="default_value"><span class="pre">False</span></span></em><span class="sig-paren">)</span><a class="reference internal" href="../../../../../../_modules/case_handler/case_utils/form_handlers/mail/email_processing/utils.html#cleanup_directory"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#case_handler.case_utils.form_handlers.mail.email_processing.utils.cleanup_directory" title="Link to this definition"></a></dt>
+<dd><p>Recursively delete a directory. Optionally delete its parent if it becomes empty.</p>
+</dd></dl>
+
+<dl class="py function">
+<dt class="sig sig-object py" id="case_handler.case_utils.form_handlers.mail.email_processing.utils.decode_header_str">
+<span class="sig-prename descclassname"><span class="pre">case_handler.case_utils.form_handlers.mail.email_processing.utils.</span></span><span class="sig-name descname"><span class="pre">decode_header_str</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">header_value</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">str</span><span class="w"> </span><span class="p"><span class="pre">|</span></span><span class="w"> </span><span class="pre">None</span></span></em><span class="sig-paren">)</span> <span class="sig-return"><span class="sig-return-icon">&#x2192;</span> <span class="sig-return-typehint"><span class="pre">str</span></span></span><a class="reference internal" href="../../../../../../_modules/case_handler/case_utils/form_handlers/mail/email_processing/utils.html#decode_header_str"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#case_handler.case_utils.form_handlers.mail.email_processing.utils.decode_header_str" title="Link to this definition"></a></dt>
+<dd><p>Decode MIME encoded-word header values (RFC2047), preserving unicode.</p>
+</dd></dl>
+
+<dl class="py function">
+<dt class="sig sig-object py" id="case_handler.case_utils.form_handlers.mail.email_processing.utils.generate_object_reference">
+<span class="sig-prename descclassname"><span class="pre">case_handler.case_utils.form_handlers.mail.email_processing.utils.</span></span><span class="sig-name descname"><span class="pre">generate_object_reference</span></span><span class="sig-paren">(</span><span class="sig-paren">)</span> <span class="sig-return"><span class="sig-return-icon">&#x2192;</span> <span class="sig-return-typehint"><span class="pre">str</span></span></span><a class="reference internal" href="../../../../../../_modules/case_handler/case_utils/form_handlers/mail/email_processing/utils.html#generate_object_reference"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#case_handler.case_utils.form_handlers.mail.email_processing.utils.generate_object_reference" title="Link to this definition"></a></dt>
+<dd><p>Generate unique reference like ‘YYMMDDHHMMSS-xxxxxxxxxxxx’:
+timestamp + 12‑hex UUID.</p>
+</dd></dl>
+
+<dl class="py function">
+<dt class="sig sig-object py" id="case_handler.case_utils.form_handlers.mail.email_processing.utils.get_sha256">
+<span class="sig-prename descclassname"><span class="pre">case_handler.case_utils.form_handlers.mail.email_processing.utils.</span></span><span class="sig-name descname"><span class="pre">get_sha256</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">file_path</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">str</span><span class="w"> </span><span class="p"><span class="pre">|</span></span><span class="w"> </span><span class="pre">Path</span></span></em><span class="sig-paren">)</span> <span class="sig-return"><span class="sig-return-icon">&#x2192;</span> <span class="sig-return-typehint"><span class="pre">str</span><span class="w"> </span><span class="p"><span class="pre">|</span></span><span class="w"> </span><span class="pre">None</span></span></span><a class="reference internal" href="../../../../../../_modules/case_handler/case_utils/form_handlers/mail/email_processing/utils.html#get_sha256"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#case_handler.case_utils.form_handlers.mail.email_processing.utils.get_sha256" title="Link to this definition"></a></dt>
+<dd><p>Compute SHA‑256 checksum in 8 KiB reading blocks.
+Returns hex digest or None if file is missing.</p>
+</dd></dl>
+
+<dl class="py function">
+<dt class="sig sig-object py" id="case_handler.case_utils.form_handlers.mail.email_processing.utils.header_dict_list">
+<span class="sig-prename descclassname"><span class="pre">case_handler.case_utils.form_handlers.mail.email_processing.utils.</span></span><span class="sig-name descname"><span class="pre">header_dict_list</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">msg_part</span></span></em><span class="sig-paren">)</span> <span class="sig-return"><span class="sig-return-icon">&#x2192;</span> <span class="sig-return-typehint"><span class="pre">dict</span></span></span><a class="reference internal" href="../../../../../../_modules/case_handler/case_utils/form_handlers/mail/email_processing/utils.html#header_dict_list"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#case_handler.case_utils.form_handlers.mail.email_processing.utils.header_dict_list" title="Link to this definition"></a></dt>
+<dd><p>Return a mapping of header keys to list of values for a message part.</p>
+</dd></dl>
+
+<dl class="py function">
+<dt class="sig sig-object py" id="case_handler.case_utils.form_handlers.mail.email_processing.utils.sanitize_filename">
+<span class="sig-prename descclassname"><span class="pre">case_handler.case_utils.form_handlers.mail.email_processing.utils.</span></span><span class="sig-name descname"><span class="pre">sanitize_filename</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">filename</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">str</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">id_num</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">int</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">default_base</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">str</span></span><span class="w"> </span><span class="o"><span class="pre">=</span></span><span class="w"> </span><span class="default_value"><span class="pre">'attachment'</span></span></em><span class="sig-paren">)</span> <span class="sig-return"><span class="sig-return-icon">&#x2192;</span> <span class="sig-return-typehint"><span class="pre">str</span></span></span><a class="reference internal" href="../../../../../../_modules/case_handler/case_utils/form_handlers/mail/email_processing/utils.html#sanitize_filename"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#case_handler.case_utils.form_handlers.mail.email_processing.utils.sanitize_filename" title="Link to this definition"></a></dt>
+<dd><p>Sanitize a filename for safe filesystem usage:
+- Replace non-alphanumeric/included punctuation with “_”
+- Collapse spaces and underscores into single underscore
+- Limit name length (~200 chars total including extension)</p>
+</dd></dl>
+
+</section>
+
+
+           </div>
+          </div>
+          <footer><div class="rst-footer-buttons" role="navigation" aria-label="Footer">
+        <a href="../index.html" class="btn btn-neutral float-left" title="Mail Handlers" accesskey="p" rel="prev"><span class="fa fa-arrow-circle-left" aria-hidden="true"></span> Previous</a>
+        <a href="../../../../update_case/index.html" class="btn btn-neutral float-right" title="Update Case" accesskey="n" rel="next">Next <span class="fa fa-arrow-circle-right" aria-hidden="true"></span></a>
+    </div>
+
+  <hr/>
+
+  <div role="contentinfo">
+    <p>&#169; Copyright 2025, Theo Bhang, Esteban Crispel.</p>
+  </div>
+
+  Built with <a href="https://www.sphinx-doc.org/">Sphinx</a> using a
+    <a href="https://github.com/readthedocs/sphinx_rtd_theme">theme</a>
+    provided by <a href="https://readthedocs.org">Read the Docs</a>.
+   
+
+</footer>
+        </div>
+      </div>
+    </section>
+  </div>
+  <script>
+      jQuery(function () {
+          SphinxRtdTheme.Navigation.enable(true);
+      });
+  </script> 
+
+</body>
+</html>

@@ -6,7 +6,7 @@ This section documents each of the modules in Suspicious.
 .. toctree::
    :maxdepth: 1
 
-   case_handler_core
+   case_handler/index
    cortex_job_core
    dashboard_core
    domain_process_core
