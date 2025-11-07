@@ -1,6 +1,6 @@
 import os
 from typing import Optional
-
+import logging
 from mail_feeder.models import MailArchive, MailArtifact, MailAttachment
 from mail_feeder.job_handler.artifacts.artifacts import ArtifactJobLauncherService
 from mail_feeder.job_handler.attachments.attachments import AttachmentJobLauncherService
@@ -11,6 +11,7 @@ from .models import ArtifactResult
 from .utils import safe_execution
 
 WORKDIR="/tmp/mail_feeder_global_submission"
+fetch_mail_logger = logging.getLogger("tasp.cron.fetch_and_process_emails")
 
 class Handlers:
     """
@@ -34,23 +35,28 @@ class Handlers:
         for att in instance_attachments:
             if att:
                 with safe_execution("processing attachment"):
+                    fetch_mail_logger.debug(f"Processing attachment ID: {att.id} for mail ID: {instance.mail_id}")
                     ids, id_ai = attachment_handler.process_attachment(att)
                     if ids:
                         attachment_ids.append(ids)
                     if id_ai:
                         attachment_id_ai.append(id_ai)
-
+        fetch_mail_logger.debug(f"Completed processing attachments for mail ID: {instance.mail_id}")
         # Process archive
         if mail_zip:
+            fetch_mail_logger.debug(f"Processing mail archive for mail ID: {instance.mail_id}")
             mail_archive = MailArchive.objects.filter(mail=instance).first()
             if not mail_archive:
+                fetch_mail_logger.debug(f"Creating mail archive for mail ID: {instance.mail_id}")
                 archive, _ = FileHandler.handle_file(file=None, mail=mail_zip)
                 mail_archive = MailArchive.objects.create(mail=instance, archive=archive)
 
             with safe_execution("launching cortex AI jobs"):
                 cortex_job = CortexJob()
+                fetch_mail_logger.debug(f"Launching Cortex AI jobs for mail archive ID: {mail_archive.id}")
                 id_ai = cortex_job.launch_cortex_ai_jobs(mail_archive, "file")
                 if id_ai:
+                    fetch_mail_logger.debug(f"Received AI ID: {id_ai} for mail archive ID: {mail_archive.id}")
                     attachment_id_ai.append(id_ai)
 
         return ArtifactResult(ids=attachment_ids, ai_ids=attachment_id_ai)

@@ -40,6 +40,7 @@ class EmailHandlerService:
 
     def _handle_new_mail(self, data: EmailDataModel, workdir: str) -> Optional[Mail]:
         with safe_operation("handle_new_mail"):
+            fetch_mail_logger.debug("Creating new mail instance")
             mail_instance_result = self.email_service.create_mail_instance(data.dict())
             if not mail_instance_result:
                 fetch_mail_logger.warning("Failed to create Mail instance.")
@@ -47,11 +48,13 @@ class EmailHandlerService:
             if not mail_instance_result.success:
                 fetch_mail_logger.warning(f"Mail instance creation unsuccessful: {mail_instance.error}")
                 return None
+            fetch_mail_logger.debug(f"Created mail instance with ID: {mail_instance_result.mail_id}")
             mail_instance = Mail.objects.get(id=mail_instance_result.mail_id)
             mail_instance = self._save_and_update_mail(mail_instance, data)
             self._process_rich_observables(mail_instance, data, workdir)
+            fetch_mail_logger.debug(f"Updating times_sent for new mail: {mail_instance.mail_id}")
             self._update_times_sent(mail_instance)
-            return self._save_mail(mail_instance)
+            self._save_mail(mail_instance)
 
     def _handle_existing_mail(
         self,
@@ -65,8 +68,10 @@ class EmailHandlerService:
             if email_list:
                 mail_instance = email_list[0]
                 mail_instance = self._update_existing_mail(mail_instance, data, email_body_list, email_header_list)
+                fetch_mail_logger.debug(f"Updated existing mail: {mail_instance.mail_id}")
                 self._update_times_sent(mail_instance)
-                return self._save_mail(mail_instance)
+                fetch_mail_logger.debug(f"Processing rich observables for mail: {mail_instance.mail_id}")
+                self._save_mail(mail_instance)
             return self._handle_new_mail(data, workdir)
 
     def _check_existing_data(self, data: EmailDataModel) -> Tuple[List[Mail], list, list]:
@@ -99,20 +104,24 @@ class EmailHandlerService:
         """
         Updates an existing mail instance with new body/header data.
         """
-        fetch_mail_logger.error(data)
+        
         if body_list:
+            fetch_mail_logger.error("Existing mail body found, updating times_sent.")
             self.body_service.update_mail_body_times_sent(body_list[0])
             mail_instance.mail_body = body_list[0]
         else:
+            fetch_mail_logger.error("No existing mail body found, creating new one.")
             body = self.body_service.create_mail_body_instance(data.reportedText)
             if body:
                 self.body_service.save_mail_body_instance(body)
                 mail_instance.mail_body = body
 
         if header_list:
+            fetch_mail_logger.error("Existing mail header found, updating times_sent.")
             self.header_service.update_mail_header_times_sent(header_list[0])
             mail_instance.mail_header = header_list[0]
         else:
+            fetch_mail_logger.error("No existing mail header found, creating new one.")
             header = self.header_service.create_mail_header_instance(str(data.headers))
             if header:
                 self.header_service.save_mail_header_instance(header)

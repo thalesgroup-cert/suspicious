@@ -43,17 +43,19 @@ class GlobalSubmissionService:
                                         submission.user if submission.is_submitted else None)
             
             instance = EmailHandlerService().handle_mail(mail_instance, submission.workdir)
-
+            fetch_mail_logger.debug(f"Processed email instance: {instance.mail_id if instance else 'None'}")
             if not instance:
                 fetch_mail_logger.error(f"Email instance processing failed for {submission.email_id}")
                 return None
 
             # Handle post-processing based on submission type
             if submission.is_submitted:
+                fetch_mail_logger.debug(f"Finalizing web submission for email: {submission.email_id}")
                 self.finalize_submission(instance, WebSubmissionConfig(user_email=submission.user, workdir=submission.workdir))
             else:
+                fetch_mail_logger.debug(f"Finalizing MinIO submission for email: {submission.email_id}")
                 self._handle_instance_for_minio(instance, submission.email_id, submission.workdir)
-            
+            fetch_mail_logger.debug(f"Creating mail info for email: {submission.email_id}")
             MailInfoService().create_mail_info(instance)
             return instance
 
@@ -79,12 +81,17 @@ class GlobalSubmissionService:
         Handle post-processing of a MinIO-parsed email instance.
         """
         with safe_execution(f"finalizing MinIO email {email_id}"):
+            fetch_mail_logger.debug(f"Extracting reportedBy for MinIO email: {email_id}")
             user_email = self._extract_reported_by_from_user_submission(workdir)
+            fetch_mail_logger.debug(f"Extracted reportedBy: {user_email} for email: {email_id}")
             instance.reportedBy = user_email
+            fetch_mail_logger.debug(f"Saving instance for MinIO email: {email_id}")
             instance.save()
-
+            fetch_mail_logger.debug(f"Getting mail zip path for MinIO email: {email_id}")
             mail_zip = self._get_mail_zip_path(workdir, email_id)
+            fetch_mail_logger.debug(f"Handling common tasks for MinIO email: {email_id}")
             self._handle_common_tasks(instance, email_id, mail_zip)
+            fetch_mail_logger.info(f"Finalized MinIO email for email_id={email_id}")
 
     def _extract_reported_by_from_user_submission(self, workdir: str) -> Optional[str]:
         """
@@ -112,15 +119,19 @@ class GlobalSubmissionService:
         Handle artifacts, attachments, headers, bodies, and case creation.
         """
         user = UserCreationService().get_or_create_user(instance.reportedBy)
-
+        fetch_mail_logger.debug(f"Handling artifacts and attachments for email: {email_id}")
         artifact_ids = Handlers().handle_artifacts(instance)
+        fetch_mail_logger.debug(f"Handling attachments for email: {email_id}")
         attachment_result = Handlers().handle_attachments(instance, mail_zip)
         attachment_ids, attachment_id_ai = attachment_result.ids, attachment_result.ai_ids
-
+        fetch_mail_logger.debug(f"Handling mail header for email: {email_id}")
         Handlers().handle_mail_header(instance)
+        fetch_mail_logger.debug(f"Handling mail body for email: {email_id}")
         Handlers().handle_mail_body(instance, email_id)
+        fetch_mail_logger.debug(f"Creating case for email: {email_id}")
 
         related_ids = flatten_id_lists(artifact_ids, attachment_ids)
+        fetch_mail_logger.debug(f"Related IDs for case creation: {related_ids} for email: {email_id}")
         CaseCreatorService().create_case(CaseInputData(
             mail_instance=instance,
             user=user,

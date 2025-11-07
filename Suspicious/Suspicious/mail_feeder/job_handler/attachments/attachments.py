@@ -14,6 +14,7 @@ from hash_process.models import Hash
 from file_process.models import File
 
 logger = logging.getLogger("attachments_job_launcher")
+fetch_mail_logger = logging.getLogger("tasp.cron.fetch_and_process_emails")
 
 
 class AttachmentJobLauncherService:
@@ -30,12 +31,14 @@ class AttachmentJobLauncherService:
         Main entry point to process a file attachment.
         """
         with safe_execution("process_attachment"):
+            fetch_mail_logger.debug(f"Processing attachment file: {file_model.file_path}")
             hash_value = self.compute_file_hash(file_model)
             if hash_value is None:
-                logger.info("No hash generated for the file.")
+                fetch_mail_logger.warning(f"Failed to compute hash for file: {file_model.file_path}")
                 return self.job_ids, self.artifact_id
-
+            fetch_mail_logger.debug(f"Computed hash {hash_value} for file: {file_model.file_path}")
             self.handle_hash_and_file(file_model, hash_value)
+            fetch_mail_logger.debug(f"Completed processing for file: {file_model.file_path} with jobs: {self.job_ids}")
             return self.job_ids, self.artifact_id
 
     def compute_file_hash(self, file_model: FileModel) -> str | None:

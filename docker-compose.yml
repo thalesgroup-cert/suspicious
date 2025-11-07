@@ -179,7 +179,10 @@ services:
     command: >
       /bin/bash -c "python3 main.py"
     volumes:
-      - ./email-feeder/application.log:/app/application.log
+      - "./email-feeder/application.log:/app/application.log"
+      - "./email-feeder/certs/suspicious.crt:/etc/private/certfile.pem:ro"
+      - "./email-feeder/certs/main.key:/etc/private/keyfile.pem:ro"
+      - "./email-feeder/certs/ca-full-chain.pem:/etc/private/rootcafile.pem:ro"
     ports:
       - "127.0.0.1:8333:9020"
     container_name: email_feeder
