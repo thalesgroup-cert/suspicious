@@ -1,0 +1,833 @@
+<!DOCTYPE html>
+
+<html lang="en" data-content_root="../../../">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>dashboard.dash_utils.utils &#8212; Suspicious 1.0.0 documentation</title>
+    <link rel="stylesheet" type="text/css" href="../../../_static/pygments.css?v=5ecbeea2" />
+    <link rel="stylesheet" type="text/css" href="../../../_static/basic.css?v=b08954a9" />
+    <link rel="stylesheet" type="text/css" href="../../../_static/alabaster.css?v=27fed22d" />
+    <script src="../../../_static/documentation_options.js?v=8d563738"></script>
+    <script src="../../../_static/doctools.js?v=9bcbadda"></script>
+    <script src="../../../_static/sphinx_highlight.js?v=dc90522c"></script>
+    <link rel="index" title="Index" href="../../../genindex.html" />
+    <link rel="search" title="Search" href="../../../search.html" />
+   
+  <link rel="stylesheet" href="../../../_static/custom.css" type="text/css" />
+  
+
+  
+  
+
+  </head><body>
+  
+
+    <div class="document">
+      <div class="documentwrapper">
+        <div class="bodywrapper">
+          
+
+          <div class="body" role="main">
+            
+  <h1>Source code for dashboard.dash_utils.utils</h1><div class="highlight"><pre>
+<span></span><span class="kn">import</span><span class="w"> </span><span class="nn">logging</span>
+<span class="kn">from</span><span class="w"> </span><span class="nn">typing</span><span class="w"> </span><span class="kn">import</span> <span class="n">Literal</span><span class="p">,</span> <span class="n">List</span><span class="p">,</span> <span class="n">Tuple</span><span class="p">,</span> <span class="n">Union</span><span class="p">,</span> <span class="n">Dict</span><span class="p">,</span> <span class="n">Set</span><span class="p">,</span> <span class="n">Optional</span>
+
+<span class="kn">from</span><span class="w"> </span><span class="nn">dashboard.models</span><span class="w"> </span><span class="kn">import</span> <span class="n">Kpi</span><span class="p">,</span> <span class="n">UserCasesMonthlyStats</span>
+<span class="kn">from</span><span class="w"> </span><span class="nn">django</span><span class="w"> </span><span class="kn">import</span> <span class="n">template</span>
+<span class="kn">from</span><span class="w"> </span><span class="nn">django.contrib.auth.models</span><span class="w"> </span><span class="kn">import</span> <span class="n">User</span>
+<span class="kn">from</span><span class="w"> </span><span class="nn">django.db.models</span><span class="w"> </span><span class="kn">import</span> <span class="n">Count</span> <span class="k">as</span> <span class="n">DbCount</span><span class="p">,</span> <span class="n">Q</span><span class="p">,</span> <span class="n">Sum</span>
+<span class="kn">from</span><span class="w"> </span><span class="nn">django.template.defaultfilters</span><span class="w"> </span><span class="kn">import</span> <span class="n">register</span>
+<span class="kn">import</span><span class="w"> </span><span class="nn">json</span>
+<span class="kn">from</span><span class="w"> </span><span class="nn">pathlib</span><span class="w"> </span><span class="kn">import</span> <span class="n">Path</span>
+
+<span class="n">CONFIG_PATH</span> <span class="o">=</span> <span class="s2">&quot;/app/settings.json&quot;</span>
+<span class="k">with</span> <span class="nb">open</span><span class="p">(</span><span class="n">CONFIG_PATH</span><span class="p">)</span> <span class="k">as</span> <span class="n">config_file</span><span class="p">:</span>
+    <span class="n">config</span> <span class="o">=</span> <span class="n">json</span><span class="o">.</span><span class="n">load</span><span class="p">(</span><span class="n">config_file</span><span class="p">)</span>
+
+<span class="n">suspicious_config</span> <span class="o">=</span> <span class="n">config</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="s1">&#39;suspicious&#39;</span><span class="p">,</span> <span class="p">{})</span>
+
+<span class="n">register</span> <span class="o">=</span> <span class="n">template</span><span class="o">.</span><span class="n">Library</span><span class="p">()</span>
+
+<span class="n">logger</span> <span class="o">=</span> <span class="n">logging</span><span class="o">.</span><span class="n">getLogger</span><span class="p">(</span><span class="vm">__name__</span><span class="p">)</span>
+
+<span class="n">DashboardData</span> <span class="o">=</span> <span class="n">List</span><span class="p">[</span><span class="n">Tuple</span><span class="p">[</span><span class="nb">str</span><span class="p">,</span> <span class="nb">int</span><span class="p">]]</span>
+
+<span class="n">SUSPICIOUS_EMAIL</span><span class="p">:</span> <span class="nb">str</span> <span class="o">=</span> <span class="n">suspicious_config</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="s1">&#39;suspicious_email&#39;</span><span class="p">,</span> <span class="s1">&#39;suspicious@cert.local&#39;</span><span class="p">)</span>
+<span class="n">SUSPICIOUS_EMAIL_USERNAME</span> <span class="o">=</span> <span class="s2">&quot;suspicious&quot;</span>
+<span class="n">DANGER_LEVEL_SAFE</span> <span class="o">=</span> <span class="s2">&quot;safe&quot;</span>
+<span class="n">DANGER_LEVEL_INCONCLUSIVE</span> <span class="o">=</span> <span class="s2">&quot;inconclusive&quot;</span>
+<span class="n">DANGER_LEVEL_SUSPICIOUS</span> <span class="o">=</span> <span class="s2">&quot;suspicious&quot;</span>
+<span class="n">DANGER_LEVEL_DANGEROUS</span> <span class="o">=</span> <span class="s2">&quot;dangerous&quot;</span>
+<span class="n">DANGER_LEVEL_FAILURE</span> <span class="o">=</span> <span class="s2">&quot;failure&quot;</span>
+
+<span class="n">VALID_DANGER_LEVELS</span><span class="p">:</span> <span class="n">Set</span><span class="p">[</span><span class="nb">str</span><span class="p">]</span> <span class="o">=</span> <span class="p">{</span>
+    <span class="n">DANGER_LEVEL_SAFE</span><span class="p">,</span> <span class="n">DANGER_LEVEL_INCONCLUSIVE</span><span class="p">,</span> <span class="n">DANGER_LEVEL_SUSPICIOUS</span><span class="p">,</span>
+    <span class="n">DANGER_LEVEL_DANGEROUS</span><span class="p">,</span> <span class="n">DANGER_LEVEL_FAILURE</span>
+<span class="p">}</span>
+<span class="n">DANGER_FIELD_MAP</span><span class="p">:</span> <span class="n">Dict</span><span class="p">[</span><span class="nb">str</span><span class="p">,</span> <span class="nb">str</span><span class="p">]</span> <span class="o">=</span> <span class="p">{</span>
+    <span class="n">DANGER_LEVEL_SAFE</span><span class="p">:</span> <span class="s2">&quot;safe_cases&quot;</span><span class="p">,</span>
+    <span class="n">DANGER_LEVEL_INCONCLUSIVE</span><span class="p">:</span> <span class="s2">&quot;inconclusive_cases&quot;</span><span class="p">,</span>
+    <span class="n">DANGER_LEVEL_SUSPICIOUS</span><span class="p">:</span> <span class="s2">&quot;suspicious_cases&quot;</span><span class="p">,</span>
+    <span class="n">DANGER_LEVEL_DANGEROUS</span><span class="p">:</span> <span class="s2">&quot;dangerous_cases&quot;</span><span class="p">,</span>
+    <span class="n">DANGER_LEVEL_FAILURE</span><span class="p">:</span> <span class="s2">&quot;failure_cases&quot;</span><span class="p">,</span>
+<span class="p">}</span>
+
+<span class="n">ALLOWED_DANGER_LEVELS</span> <span class="o">=</span> <span class="n">Literal</span><span class="p">[</span>
+    <span class="n">DANGER_LEVEL_SAFE</span><span class="p">,</span>
+    <span class="n">DANGER_LEVEL_INCONCLUSIVE</span><span class="p">,</span>
+    <span class="n">DANGER_LEVEL_SUSPICIOUS</span><span class="p">,</span>
+    <span class="n">DANGER_LEVEL_DANGEROUS</span><span class="p">,</span>
+    <span class="n">DANGER_LEVEL_FAILURE</span><span class="p">,</span>
+<span class="p">]</span>
+
+<span class="c1"># Helper for month/year conversion and validation (DRY)</span>
+<span class="k">def</span><span class="w"> </span><span class="nf">_parse_month_year</span><span class="p">(</span>
+    <span class="n">month_str</span><span class="p">:</span> <span class="n">Union</span><span class="p">[</span><span class="nb">str</span><span class="p">,</span> <span class="nb">int</span><span class="p">],</span> <span class="n">year_str</span><span class="p">:</span> <span class="n">Union</span><span class="p">[</span><span class="nb">str</span><span class="p">,</span> <span class="nb">int</span><span class="p">]</span>
+<span class="p">)</span> <span class="o">-&gt;</span> <span class="n">Optional</span><span class="p">[</span><span class="n">Tuple</span><span class="p">[</span><span class="nb">str</span><span class="p">,</span> <span class="nb">int</span><span class="p">]]:</span>
+<span class="w">    </span><span class="sd">&quot;&quot;&quot;Converts and validates month and year, returns (month_02d_str, year_int) or None.&quot;&quot;&quot;</span>
+    <span class="k">try</span><span class="p">:</span>
+        <span class="n">month_int</span> <span class="o">=</span> <span class="nb">int</span><span class="p">(</span><span class="n">month_str</span><span class="p">)</span>
+        <span class="n">year_int</span> <span class="o">=</span> <span class="nb">int</span><span class="p">(</span><span class="n">year_str</span><span class="p">)</span>
+        <span class="k">if</span> <span class="ow">not</span> <span class="p">(</span><span class="mi">1</span> <span class="o">&lt;=</span> <span class="n">month_int</span> <span class="o">&lt;=</span> <span class="mi">12</span> <span class="ow">and</span> <span class="n">year_int</span> <span class="o">&gt;=</span> <span class="mi">1900</span><span class="p">):</span> <span class="c1"># Basic year validation</span>
+            <span class="n">logger</span><span class="o">.</span><span class="n">warning</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;Invalid month/year values: month=</span><span class="si">{</span><span class="n">month_int</span><span class="si">}</span><span class="s2">, year=</span><span class="si">{</span><span class="n">year_int</span><span class="si">}</span><span class="s2">&quot;</span><span class="p">)</span>
+            <span class="k">return</span> <span class="kc">None</span>
+        <span class="k">return</span> <span class="sa">f</span><span class="s2">&quot;</span><span class="si">{</span><span class="n">month_int</span><span class="si">:</span><span class="s2">02d</span><span class="si">}</span><span class="s2">&quot;</span><span class="p">,</span> <span class="n">year_int</span>
+    <span class="k">except</span> <span class="ne">ValueError</span><span class="p">:</span>
+        <span class="n">logger</span><span class="o">.</span><span class="n">warning</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;Could not parse month/year: month=&#39;</span><span class="si">{</span><span class="n">month_str</span><span class="si">}</span><span class="s2">&#39;, year=&#39;</span><span class="si">{</span><span class="n">year_str</span><span class="si">}</span><span class="s2">&#39;&quot;</span><span class="p">)</span>
+        <span class="k">return</span> <span class="kc">None</span>
+
+<span class="c1"># Helper to get users in ALL specified groups (DRY)</span>
+<span class="k">def</span><span class="w"> </span><span class="nf">_get_users_in_all_groups_queryset</span><span class="p">(</span><span class="n">scope_str</span><span class="p">:</span> <span class="nb">str</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="n">Q</span><span class="p">:</span>
+<span class="w">    </span><span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">    Returns a Q object to filter users belonging to ALL groups in the scope string.</span>
+<span class="sd">    If scope_str is empty or only whitespace, returns an empty Q object (no filter).</span>
+<span class="sd">    &quot;&quot;&quot;</span>
+    <span class="n">group_names</span> <span class="o">=</span> <span class="p">[</span><span class="n">g</span><span class="o">.</span><span class="n">strip</span><span class="p">()</span> <span class="k">for</span> <span class="n">g</span> <span class="ow">in</span> <span class="n">scope_str</span><span class="o">.</span><span class="n">split</span><span class="p">(</span><span class="s1">&#39;|&#39;</span><span class="p">)</span> <span class="k">if</span> <span class="n">g</span><span class="o">.</span><span class="n">strip</span><span class="p">()]</span>
+    <span class="k">if</span> <span class="ow">not</span> <span class="n">group_names</span><span class="p">:</span>
+        <span class="k">return</span> <span class="n">User</span><span class="o">.</span><span class="n">objects</span><span class="o">.</span><span class="n">all</span><span class="p">()</span> <span class="c1"># No group filter</span>
+
+    <span class="n">users_query</span> <span class="o">=</span> <span class="n">User</span><span class="o">.</span><span class="n">objects</span><span class="o">.</span><span class="n">all</span><span class="p">()</span>
+    <span class="k">for</span> <span class="n">group_name</span> <span class="ow">in</span> <span class="n">group_names</span><span class="p">:</span>
+        <span class="n">users_query</span> <span class="o">=</span> <span class="n">users_query</span><span class="o">.</span><span class="n">filter</span><span class="p">(</span><span class="n">groups__name</span><span class="o">=</span><span class="n">group_name</span><span class="p">)</span>
+    <span class="k">return</span> <span class="n">users_query</span><span class="o">.</span><span class="n">distinct</span><span class="p">()</span>
+
+<div class="viewcode-block" id="dashboard_graph">
+<a class="viewcode-back" href="../../../modules/dashboard_core.html#dashboard.dash_utils.utils.dashboard_graph">[docs]</a>
+<span class="k">def</span><span class="w"> </span><span class="nf">dashboard_graph</span><span class="p">(</span>
+    <span class="n">num_emails</span><span class="p">:</span> <span class="nb">int</span><span class="p">,</span> <span class="n">month</span><span class="p">:</span> <span class="nb">int</span><span class="p">,</span> <span class="n">year</span><span class="p">:</span> <span class="nb">int</span>
+<span class="p">)</span> <span class="o">-&gt;</span> <span class="n">List</span><span class="p">[</span><span class="n">Tuple</span><span class="p">[</span><span class="nb">str</span><span class="p">,</span> <span class="nb">int</span><span class="p">]]:</span>
+<span class="w">    </span><span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">    Prepare top-reporter data for the dashboard.</span>
+
+<span class="sd">    Args:</span>
+<span class="sd">        num_emails: Maximum number of top reporters to retrieve.</span>
+<span class="sd">        month:      Month (1–12) for which stats are fetched.</span>
+<span class="sd">        year:       Four-digit year for which stats are fetched.</span>
+
+<span class="sd">    Returns:</span>
+<span class="sd">        A list of (username, total_cases) tuples for the top reporters,</span>
+<span class="sd">        excluding the configured SUSPICIOUS_EMAIL.</span>
+<span class="sd">    &quot;&quot;&quot;</span>
+    <span class="n">qs</span> <span class="o">=</span> <span class="p">(</span>
+        <span class="n">UserCasesMonthlyStats</span><span class="o">.</span><span class="n">objects</span>
+        <span class="o">.</span><span class="n">filter</span><span class="p">(</span><span class="n">month</span><span class="o">=</span><span class="n">month</span><span class="p">,</span> <span class="n">year</span><span class="o">=</span><span class="n">year</span><span class="p">)</span>
+        <span class="o">.</span><span class="n">exclude</span><span class="p">(</span><span class="n">user__username</span><span class="o">=</span><span class="n">SUSPICIOUS_EMAIL</span><span class="p">)</span>
+        <span class="o">.</span><span class="n">order_by</span><span class="p">(</span><span class="s2">&quot;-total_cases&quot;</span><span class="p">)</span>
+        <span class="o">.</span><span class="n">values_list</span><span class="p">(</span><span class="s2">&quot;user__username&quot;</span><span class="p">,</span> <span class="s2">&quot;total_cases&quot;</span><span class="p">)</span>
+    <span class="p">)</span>
+
+    <span class="n">top_stats</span> <span class="o">=</span> <span class="n">qs</span><span class="p">[:</span><span class="n">num_emails</span><span class="p">]</span>
+
+    <span class="k">return</span> <span class="nb">list</span><span class="p">(</span><span class="n">top_stats</span><span class="p">)</span></div>
+
+
+<div class="viewcode-block" id="get_dashboard_email_prefix">
+<a class="viewcode-back" href="../../../modules/dashboard_core.html#dashboard.dash_utils.utils.get_dashboard_email_prefix">[docs]</a>
+<span class="nd">@register</span><span class="o">.</span><span class="n">simple_tag</span><span class="p">(</span><span class="n">name</span><span class="o">=</span><span class="s2">&quot;get_dashboard_email_prefix&quot;</span><span class="p">)</span>
+<span class="k">def</span><span class="w"> </span><span class="nf">get_dashboard_email_prefix</span><span class="p">(</span>
+    <span class="n">rank</span><span class="p">:</span> <span class="nb">int</span><span class="p">,</span>
+    <span class="n">num_emails</span><span class="p">:</span> <span class="nb">int</span><span class="p">,</span>
+    <span class="n">month</span><span class="p">:</span> <span class="nb">int</span><span class="p">,</span>
+    <span class="n">year</span><span class="p">:</span> <span class="nb">int</span>
+<span class="p">)</span> <span class="o">-&gt;</span> <span class="nb">str</span><span class="p">:</span>
+<span class="w">    </span><span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">    Django template tag: return the email prefix (before &#39;@&#39;) at the given rank</span>
+<span class="sd">    from the dashboard graph.</span>
+
+<span class="sd">    Usage:</span>
+<span class="sd">        {% load dashboard_tags %}</span>
+<span class="sd">        {% get_dashboard_email_prefix rank num_emails month year as prefix %}</span>
+<span class="sd">        Email #{{ rank }}: {{ prefix }}</span>
+
+<span class="sd">    Args:</span>
+<span class="sd">        rank:       1-based rank position (must be &gt;= 1).</span>
+<span class="sd">        num_emails: Total number of emails to include in the graph (must be &gt;= 1).</span>
+<span class="sd">        month:      Month number (1–12).</span>
+<span class="sd">        year:       Four‑digit year (&gt;= 1).</span>
+
+<span class="sd">    Returns:</span>
+<span class="sd">        The email prefix at the specified rank, or an empty string if inputs are invalid,</span>
+<span class="sd">        the external call fails, or the rank is out of range.</span>
+<span class="sd">    &quot;&quot;&quot;</span>
+    <span class="c1"># Validate and coerce inputs</span>
+    <span class="k">if</span> <span class="nb">any</span><span class="p">(</span><span class="ow">not</span> <span class="nb">isinstance</span><span class="p">(</span><span class="n">arg</span><span class="p">,</span> <span class="nb">int</span><span class="p">)</span> <span class="k">for</span> <span class="n">arg</span> <span class="ow">in</span> <span class="p">(</span><span class="n">rank</span><span class="p">,</span> <span class="n">num_emails</span><span class="p">,</span> <span class="n">year</span><span class="p">)):</span>
+        <span class="n">logger</span><span class="o">.</span><span class="n">error</span><span class="p">(</span><span class="s2">&quot;get_dashboard_email_prefix: all arguments must be integers, got </span><span class="si">%r</span><span class="s2">&quot;</span><span class="p">,</span> <span class="p">(</span><span class="n">rank</span><span class="p">,</span> <span class="n">num_emails</span><span class="p">,</span> <span class="n">month</span><span class="p">,</span> <span class="n">year</span><span class="p">))</span>
+        <span class="k">return</span> <span class="s2">&quot;&quot;</span>
+    <span class="k">if</span> <span class="n">rank</span> <span class="o">&lt;</span> <span class="mi">1</span><span class="p">:</span>
+        <span class="n">logger</span><span class="o">.</span><span class="n">error</span><span class="p">(</span><span class="s2">&quot;get_dashboard_email_prefix: rank must be &gt;= 1, got </span><span class="si">%d</span><span class="s2">&quot;</span><span class="p">,</span> <span class="n">rank</span><span class="p">)</span>
+        <span class="k">return</span> <span class="s2">&quot;&quot;</span>
+    <span class="k">if</span> <span class="n">num_emails</span> <span class="o">&lt;</span> <span class="mi">1</span><span class="p">:</span>
+        <span class="n">logger</span><span class="o">.</span><span class="n">error</span><span class="p">(</span><span class="s2">&quot;get_dashboard_email_prefix: num_emails must be &gt;= 1, got </span><span class="si">%d</span><span class="s2">&quot;</span><span class="p">,</span> <span class="n">num_emails</span><span class="p">)</span>
+        <span class="k">return</span> <span class="s2">&quot;&quot;</span>
+    <span class="k">if</span> <span class="ow">not</span> <span class="p">(</span><span class="mi">1</span> <span class="o">&lt;=</span> <span class="nb">int</span><span class="p">(</span><span class="n">month</span><span class="p">)</span> <span class="o">&lt;=</span> <span class="mi">12</span><span class="p">):</span>
+        <span class="n">logger</span><span class="o">.</span><span class="n">error</span><span class="p">(</span><span class="s2">&quot;get_dashboard_email_prefix: month must be 1–12, got </span><span class="si">%d</span><span class="s2">&quot;</span><span class="p">,</span> <span class="n">month</span><span class="p">)</span>
+        <span class="k">return</span> <span class="s2">&quot;&quot;</span>
+    <span class="k">if</span> <span class="n">year</span> <span class="o">&lt;</span> <span class="mi">1</span><span class="p">:</span>
+        <span class="n">logger</span><span class="o">.</span><span class="n">error</span><span class="p">(</span><span class="s2">&quot;get_dashboard_email_prefix: year must be &gt;= 1, got </span><span class="si">%d</span><span class="s2">&quot;</span><span class="p">,</span> <span class="n">year</span><span class="p">)</span>
+        <span class="k">return</span> <span class="s2">&quot;&quot;</span>
+
+    <span class="k">try</span><span class="p">:</span>
+        <span class="n">data</span><span class="p">:</span> <span class="n">DashboardData</span> <span class="o">=</span> <span class="n">dashboard_graph</span><span class="p">(</span><span class="n">num_emails</span><span class="p">,</span> <span class="n">month</span><span class="p">,</span> <span class="n">year</span><span class="p">)</span>
+    <span class="k">except</span> <span class="ne">Exception</span><span class="p">:</span>
+        <span class="n">logger</span><span class="o">.</span><span class="n">exception</span><span class="p">(</span><span class="s2">&quot;get_dashboard_email_prefix: failed to generate dashboard data&quot;</span><span class="p">)</span>
+        <span class="k">return</span> <span class="s2">&quot;&quot;</span>
+
+    <span class="k">if</span> <span class="mi">1</span> <span class="o">&lt;=</span> <span class="n">rank</span> <span class="o">&lt;=</span> <span class="nb">len</span><span class="p">(</span><span class="n">data</span><span class="p">):</span>
+        <span class="n">email</span><span class="p">,</span> <span class="n">_</span> <span class="o">=</span> <span class="n">data</span><span class="p">[</span><span class="n">rank</span> <span class="o">-</span> <span class="mi">1</span><span class="p">]</span>
+        <span class="c1"># Safely split at &#39;@&#39;</span>
+        <span class="n">prefix</span> <span class="o">=</span> <span class="n">email</span><span class="o">.</span><span class="n">split</span><span class="p">(</span><span class="s2">&quot;@&quot;</span><span class="p">,</span> <span class="mi">1</span><span class="p">)[</span><span class="mi">0</span><span class="p">]</span>
+        <span class="k">return</span> <span class="n">prefix</span>
+    <span class="k">else</span><span class="p">:</span>
+        <span class="n">logger</span><span class="o">.</span><span class="n">info</span><span class="p">(</span>
+            <span class="s2">&quot;get_dashboard_email_prefix: requested rank </span><span class="si">%d</span><span class="s2"> out of range (1–</span><span class="si">%d</span><span class="s2">)&quot;</span><span class="p">,</span>
+            <span class="n">rank</span><span class="p">,</span> <span class="nb">len</span><span class="p">(</span><span class="n">data</span><span class="p">)</span>
+        <span class="p">)</span>
+        <span class="k">return</span> <span class="s2">&quot;&quot;</span></div>
+
+
+
+<div class="viewcode-block" id="get_dashboard_score">
+<a class="viewcode-back" href="../../../modules/dashboard_core.html#dashboard.dash_utils.utils.get_dashboard_score">[docs]</a>
+<span class="nd">@register</span><span class="o">.</span><span class="n">simple_tag</span><span class="p">(</span><span class="n">name</span><span class="o">=</span><span class="s2">&quot;get_dashboard_score&quot;</span><span class="p">)</span>
+<span class="k">def</span><span class="w"> </span><span class="nf">get_dashboard_score</span><span class="p">(</span>
+    <span class="n">rank</span><span class="p">:</span> <span class="nb">int</span><span class="p">,</span>
+    <span class="n">num_emails</span><span class="p">:</span> <span class="nb">int</span><span class="p">,</span>
+    <span class="n">month</span><span class="p">:</span> <span class="nb">int</span><span class="p">,</span>
+    <span class="n">year</span><span class="p">:</span> <span class="nb">int</span>
+<span class="p">)</span> <span class="o">-&gt;</span> <span class="nb">str</span><span class="p">:</span>
+<span class="w">    </span><span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">    Django template tag: return the score at the given rank for the dashboard.</span>
+
+<span class="sd">    Usage:</span>
+<span class="sd">        {% load dashboard_tags %}</span>
+<span class="sd">        {% get_dashboard_score rank num_emails month year as score %}</span>
+<span class="sd">        Score #{{ rank }}: {{ score }}</span>
+
+<span class="sd">    Args:</span>
+<span class="sd">        rank:       1-based rank position (must be &gt;= 1).</span>
+<span class="sd">        num_emails: Number of emails (must be &gt;= 1).</span>
+<span class="sd">        month:      Month number (1–12).</span>
+<span class="sd">        year:       Four‑digit year (&gt;= 1).</span>
+
+<span class="sd">    Returns:</span>
+<span class="sd">        The score (as string) at the given rank, or an empty string if invalid</span>
+<span class="sd">        inputs, out‑of‑range rank, or on error.</span>
+<span class="sd">    &quot;&quot;&quot;</span>
+    <span class="c1"># Validate inputs</span>
+    <span class="k">if</span> <span class="nb">any</span><span class="p">(</span><span class="ow">not</span> <span class="nb">isinstance</span><span class="p">(</span><span class="n">arg</span><span class="p">,</span> <span class="nb">int</span><span class="p">)</span> <span class="k">for</span> <span class="n">arg</span> <span class="ow">in</span> <span class="p">(</span><span class="n">rank</span><span class="p">,</span> <span class="n">num_emails</span><span class="p">,</span> <span class="n">year</span><span class="p">)):</span>
+        <span class="n">logger</span><span class="o">.</span><span class="n">error</span><span class="p">(</span><span class="s2">&quot;get_dashboard_score: all arguments must be integers, got </span><span class="si">%r</span><span class="s2">&quot;</span><span class="p">,</span> <span class="p">(</span><span class="n">rank</span><span class="p">,</span> <span class="n">num_emails</span><span class="p">,</span> <span class="n">month</span><span class="p">,</span> <span class="n">year</span><span class="p">))</span>
+        <span class="k">return</span> <span class="s2">&quot;&quot;</span>
+    <span class="k">if</span> <span class="n">rank</span> <span class="o">&lt;</span> <span class="mi">1</span><span class="p">:</span>
+        <span class="n">logger</span><span class="o">.</span><span class="n">error</span><span class="p">(</span><span class="s2">&quot;get_dashboard_score: rank must be &gt;= 1, got </span><span class="si">%d</span><span class="s2">&quot;</span><span class="p">,</span> <span class="n">rank</span><span class="p">)</span>
+        <span class="k">return</span> <span class="s2">&quot;&quot;</span>
+    <span class="k">if</span> <span class="n">num_emails</span> <span class="o">&lt;</span> <span class="mi">1</span><span class="p">:</span>
+        <span class="n">logger</span><span class="o">.</span><span class="n">error</span><span class="p">(</span><span class="s2">&quot;get_dashboard_score: num_emails must be &gt;= 1, got </span><span class="si">%d</span><span class="s2">&quot;</span><span class="p">,</span> <span class="n">num_emails</span><span class="p">)</span>
+        <span class="k">return</span> <span class="s2">&quot;&quot;</span>
+    <span class="k">if</span> <span class="ow">not</span> <span class="p">(</span><span class="mi">1</span> <span class="o">&lt;=</span> <span class="nb">int</span><span class="p">(</span><span class="n">month</span><span class="p">)</span> <span class="o">&lt;=</span> <span class="mi">12</span><span class="p">):</span>
+        <span class="n">logger</span><span class="o">.</span><span class="n">error</span><span class="p">(</span><span class="s2">&quot;get_dashboard_score: month must be 1–12, got </span><span class="si">%d</span><span class="s2">&quot;</span><span class="p">,</span> <span class="n">month</span><span class="p">)</span>
+        <span class="k">return</span> <span class="s2">&quot;&quot;</span>
+    <span class="k">if</span> <span class="n">year</span> <span class="o">&lt;</span> <span class="mi">1</span><span class="p">:</span>
+        <span class="n">logger</span><span class="o">.</span><span class="n">error</span><span class="p">(</span><span class="s2">&quot;get_dashboard_score: year must be &gt;= 1, got </span><span class="si">%d</span><span class="s2">&quot;</span><span class="p">,</span> <span class="n">year</span><span class="p">)</span>
+        <span class="k">return</span> <span class="s2">&quot;&quot;</span>
+
+    <span class="k">try</span><span class="p">:</span>
+        <span class="c1"># Retrieve the list of (name, score) tuples from your graph function</span>
+        <span class="n">data</span><span class="p">:</span> <span class="n">DashboardData</span> <span class="o">=</span> <span class="n">dashboard_graph</span><span class="p">(</span><span class="n">num_emails</span><span class="p">,</span> <span class="n">month</span><span class="p">,</span> <span class="n">year</span><span class="p">)</span>
+    <span class="k">except</span> <span class="ne">Exception</span><span class="p">:</span>
+        <span class="n">logger</span><span class="o">.</span><span class="n">exception</span><span class="p">(</span><span class="s2">&quot;get_dashboard_score: failed to generate dashboard data&quot;</span><span class="p">)</span>
+        <span class="k">return</span> <span class="s2">&quot;&quot;</span>
+
+    <span class="c1"># Check rank against data length</span>
+    <span class="k">if</span> <span class="mi">1</span> <span class="o">&lt;=</span> <span class="n">rank</span> <span class="o">&lt;=</span> <span class="nb">len</span><span class="p">(</span><span class="n">data</span><span class="p">):</span>
+        <span class="n">_</span><span class="p">,</span> <span class="n">score</span> <span class="o">=</span> <span class="n">data</span><span class="p">[</span><span class="n">rank</span> <span class="o">-</span> <span class="mi">1</span><span class="p">]</span>
+        <span class="k">return</span> <span class="nb">str</span><span class="p">(</span><span class="n">score</span><span class="p">)</span>
+    <span class="k">else</span><span class="p">:</span>
+        <span class="c1"># Out‑of‑range rank</span>
+        <span class="n">logger</span><span class="o">.</span><span class="n">warning</span><span class="p">(</span>
+            <span class="s2">&quot;get_dashboard_score: requested rank </span><span class="si">%d</span><span class="s2"> out of range (1–</span><span class="si">%d</span><span class="s2">)&quot;</span><span class="p">,</span>
+            <span class="n">rank</span><span class="p">,</span> <span class="nb">len</span><span class="p">(</span><span class="n">data</span><span class="p">)</span>
+        <span class="p">)</span>
+        <span class="k">return</span> <span class="s2">&quot;&quot;</span></div>
+
+
+<div class="viewcode-block" id="dashboard_graph_scope">
+<a class="viewcode-back" href="../../../modules/dashboard_core.html#dashboard.dash_utils.utils.dashboard_graph_scope">[docs]</a>
+<span class="k">def</span><span class="w"> </span><span class="nf">dashboard_graph_scope</span><span class="p">(</span>
+    <span class="n">num_emails</span><span class="p">:</span> <span class="nb">int</span><span class="p">,</span>
+    <span class="n">month</span><span class="p">:</span> <span class="n">Union</span><span class="p">[</span><span class="nb">str</span><span class="p">,</span> <span class="nb">int</span><span class="p">],</span>
+    <span class="n">year</span><span class="p">:</span> <span class="n">Union</span><span class="p">[</span><span class="nb">str</span><span class="p">,</span> <span class="nb">int</span><span class="p">],</span>
+    <span class="n">scope</span><span class="p">:</span> <span class="nb">str</span>
+<span class="p">)</span> <span class="o">-&gt;</span> <span class="n">List</span><span class="p">[</span><span class="n">Tuple</span><span class="p">[</span><span class="nb">str</span><span class="p">,</span> <span class="nb">float</span><span class="p">]]:</span>
+<span class="w">    </span><span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">    Prepares data for the top reporter graph.</span>
+
+<span class="sd">    Retrieves top users by score for a given month, year, and scope (group membership),</span>
+<span class="sd">    excluding a predefined suspicious email username. Users must belong to ALL specified groups.</span>
+
+<span class="sd">    :param num_emails: The number of top users to retrieve (must be &gt; 0).</span>
+<span class="sd">    :param month: The month (1-12).</span>
+<span class="sd">    :param year: The year.</span>
+<span class="sd">    :param scope: A string representing group names, separated by &#39; | &#39;.</span>
+<span class="sd">                If empty or &#39;global&#39; (case-insensitive), no group filter is applied.</span>
+<span class="sd">    :return: A list of tuples (username, score).</span>
+<span class="sd">    &quot;&quot;&quot;</span>
+    <span class="k">if</span> <span class="ow">not</span> <span class="nb">isinstance</span><span class="p">(</span><span class="n">num_emails</span><span class="p">,</span> <span class="nb">int</span><span class="p">)</span> <span class="ow">or</span> <span class="n">num_emails</span> <span class="o">&lt;</span> <span class="mi">1</span><span class="p">:</span>
+        <span class="n">logger</span><span class="o">.</span><span class="n">warning</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;Invalid num_emails: </span><span class="si">{</span><span class="n">num_emails</span><span class="si">}</span><span class="s2">. Must be a positive integer.&quot;</span><span class="p">)</span>
+        <span class="k">return</span> <span class="p">[]</span>
+
+    <span class="n">parsed_date</span> <span class="o">=</span> <span class="n">_parse_month_year</span><span class="p">(</span><span class="n">month</span><span class="p">,</span> <span class="n">year</span><span class="p">)</span>
+    <span class="k">if</span> <span class="ow">not</span> <span class="n">parsed_date</span><span class="p">:</span>
+        <span class="k">return</span> <span class="p">[]</span>
+    <span class="n">month_str</span><span class="p">,</span> <span class="n">year_int</span> <span class="o">=</span> <span class="n">parsed_date</span>
+    <span class="n">users_in_scope_q</span> <span class="o">=</span> <span class="n">User</span><span class="o">.</span><span class="n">objects</span><span class="o">.</span><span class="n">all</span><span class="p">()</span>
+    <span class="n">is_specific_scope</span> <span class="o">=</span> <span class="n">scope</span><span class="o">.</span><span class="n">strip</span><span class="p">()</span> <span class="ow">and</span> <span class="n">scope</span><span class="o">.</span><span class="n">strip</span><span class="p">()</span><span class="o">.</span><span class="n">lower</span><span class="p">()</span> <span class="o">!=</span> <span class="s1">&#39;global&#39;</span>
+
+    <span class="k">if</span> <span class="n">is_specific_scope</span><span class="p">:</span>
+        <span class="n">users_in_scope_q</span> <span class="o">=</span> <span class="n">_get_users_in_all_groups_queryset</span><span class="p">(</span><span class="n">scope</span><span class="p">)</span>
+
+    <span class="c1"># Build the query for UserCasesMonthlyStats</span>
+    <span class="n">stats_query</span> <span class="o">=</span> <span class="n">UserCasesMonthlyStats</span><span class="o">.</span><span class="n">objects</span><span class="o">.</span><span class="n">filter</span><span class="p">(</span>
+        <span class="n">month</span><span class="o">=</span><span class="n">month_str</span><span class="p">,</span>
+        <span class="n">year</span><span class="o">=</span><span class="n">year_int</span>
+    <span class="p">)</span><span class="o">.</span><span class="n">select_related</span><span class="p">(</span><span class="s1">&#39;user&#39;</span><span class="p">)</span>
+
+    <span class="k">if</span> <span class="n">is_specific_scope</span><span class="p">:</span>
+        <span class="n">stats_query</span> <span class="o">=</span> <span class="n">stats_query</span><span class="o">.</span><span class="n">filter</span><span class="p">(</span><span class="n">user__in</span><span class="o">=</span><span class="n">users_in_scope_q</span><span class="p">)</span>
+
+    <span class="n">stats_query</span> <span class="o">=</span> <span class="n">stats_query</span><span class="o">.</span><span class="n">exclude</span><span class="p">(</span>
+        <span class="n">user__username</span><span class="o">=</span><span class="n">SUSPICIOUS_EMAIL_USERNAME</span>
+    <span class="p">)</span><span class="o">.</span><span class="n">order_by</span><span class="p">(</span><span class="s1">&#39;-score&#39;</span><span class="p">)</span>
+
+    <span class="n">top_stats</span> <span class="o">=</span> <span class="n">stats_query</span><span class="p">[:</span><span class="n">num_emails</span><span class="p">]</span>
+
+    <span class="n">results</span> <span class="o">=</span> <span class="p">[</span>
+        <span class="p">(</span><span class="n">stat</span><span class="o">.</span><span class="n">user</span><span class="o">.</span><span class="n">username</span><span class="p">,</span> <span class="n">stat</span><span class="o">.</span><span class="n">score</span><span class="p">)</span>
+        <span class="k">for</span> <span class="n">stat</span> <span class="ow">in</span> <span class="n">top_stats</span> <span class="k">if</span> <span class="n">stat</span><span class="o">.</span><span class="n">user</span>
+    <span class="p">]</span>
+    <span class="k">return</span> <span class="n">results</span></div>
+
+
+
+<div class="viewcode-block" id="dashboard_mail_scope">
+<a class="viewcode-back" href="../../../modules/dashboard_core.html#dashboard.dash_utils.utils.dashboard_mail_scope">[docs]</a>
+<span class="nd">@register</span><span class="o">.</span><span class="n">simple_tag</span>
+<span class="k">def</span><span class="w"> </span><span class="nf">dashboard_mail_scope</span><span class="p">(</span>
+    <span class="n">rank</span><span class="p">:</span> <span class="nb">int</span><span class="p">,</span>
+    <span class="n">num_emails</span><span class="p">:</span> <span class="nb">int</span><span class="p">,</span>
+    <span class="n">month</span><span class="p">:</span> <span class="n">Union</span><span class="p">[</span><span class="nb">str</span><span class="p">,</span> <span class="nb">int</span><span class="p">],</span>
+    <span class="n">year</span><span class="p">:</span> <span class="n">Union</span><span class="p">[</span><span class="nb">str</span><span class="p">,</span> <span class="nb">int</span><span class="p">],</span>
+    <span class="n">scope</span><span class="p">:</span> <span class="nb">str</span>
+<span class="p">)</span> <span class="o">-&gt;</span> <span class="nb">str</span><span class="p">:</span>
+<span class="w">    </span><span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">    Returns the username (part before &#39;@&#39; if applicable) for a given rank from the top reporters.</span>
+
+<span class="sd">    :param rank: The rank (1-based) of the email/username to retrieve.</span>
+<span class="sd">    :param num_emails: The total number of top emails considered.</span>
+<span class="sd">    :param month: The month (1-12).</span>
+<span class="sd">    :param year: The year.</span>
+<span class="sd">    :param scope: Group scope string.</span>
+<span class="sd">    :return: Username part of email, or empty string if not found/invalid.</span>
+<span class="sd">    &quot;&quot;&quot;</span>
+    <span class="k">if</span> <span class="ow">not</span> <span class="p">(</span><span class="nb">isinstance</span><span class="p">(</span><span class="n">rank</span><span class="p">,</span> <span class="nb">int</span><span class="p">)</span> <span class="ow">and</span> <span class="nb">isinstance</span><span class="p">(</span><span class="n">num_emails</span><span class="p">,</span> <span class="nb">int</span><span class="p">)</span> <span class="ow">and</span> \
+            <span class="mi">1</span> <span class="o">&lt;=</span> <span class="n">rank</span> <span class="o">&lt;=</span> <span class="n">num_emails</span> <span class="ow">and</span> <span class="n">num_emails</span> <span class="o">&gt;=</span> <span class="mi">1</span><span class="p">):</span>
+        <span class="n">logger</span><span class="o">.</span><span class="n">warning</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;Invalid rank/num_emails: rank=</span><span class="si">{</span><span class="n">rank</span><span class="si">}</span><span class="s2">, num_emails=</span><span class="si">{</span><span class="n">num_emails</span><span class="si">}</span><span class="s2">&quot;</span><span class="p">)</span>
+        <span class="k">return</span> <span class="s2">&quot;&quot;</span>
+
+    <span class="n">parsed_date</span> <span class="o">=</span> <span class="n">_parse_month_year</span><span class="p">(</span><span class="n">month</span><span class="p">,</span> <span class="n">year</span><span class="p">)</span>
+    <span class="k">if</span> <span class="ow">not</span> <span class="n">parsed_date</span><span class="p">:</span>
+        <span class="k">return</span> <span class="s2">&quot;&quot;</span>
+    <span class="n">month_val</span><span class="p">,</span> <span class="n">year_val</span> <span class="o">=</span> <span class="n">parsed_date</span>
+
+    <span class="n">names_scores</span> <span class="o">=</span> <span class="n">dashboard_graph_scope</span><span class="p">(</span><span class="n">num_emails</span><span class="p">,</span> <span class="n">month_val</span><span class="p">,</span> <span class="n">year_val</span><span class="p">,</span> <span class="n">scope</span><span class="p">)</span>
+
+    <span class="k">if</span> <span class="mi">0</span> <span class="o">&lt;</span> <span class="n">rank</span> <span class="o">&lt;=</span> <span class="nb">len</span><span class="p">(</span><span class="n">names_scores</span><span class="p">):</span>
+        <span class="n">username</span> <span class="o">=</span> <span class="n">names_scores</span><span class="p">[</span><span class="n">rank</span> <span class="o">-</span> <span class="mi">1</span><span class="p">][</span><span class="mi">0</span><span class="p">]</span>
+        <span class="k">return</span> <span class="n">username</span><span class="o">.</span><span class="n">split</span><span class="p">(</span><span class="s1">&#39;@&#39;</span><span class="p">)[</span><span class="mi">0</span><span class="p">]</span> <span class="k">if</span> <span class="s1">&#39;@&#39;</span> <span class="ow">in</span> <span class="n">username</span> <span class="k">else</span> <span class="n">username</span>
+    <span class="k">return</span> <span class="s2">&quot;&quot;</span></div>
+
+
+<div class="viewcode-block" id="dashboard_score_scope">
+<a class="viewcode-back" href="../../../modules/dashboard_core.html#dashboard.dash_utils.utils.dashboard_score_scope">[docs]</a>
+<span class="nd">@register</span><span class="o">.</span><span class="n">simple_tag</span>
+<span class="k">def</span><span class="w"> </span><span class="nf">dashboard_score_scope</span><span class="p">(</span>
+    <span class="n">rank</span><span class="p">:</span> <span class="nb">int</span><span class="p">,</span>
+    <span class="n">num_emails</span><span class="p">:</span> <span class="nb">int</span><span class="p">,</span>
+    <span class="n">month</span><span class="p">:</span> <span class="n">Union</span><span class="p">[</span><span class="nb">str</span><span class="p">,</span> <span class="nb">int</span><span class="p">],</span>
+    <span class="n">year</span><span class="p">:</span> <span class="n">Union</span><span class="p">[</span><span class="nb">str</span><span class="p">,</span> <span class="nb">int</span><span class="p">],</span>
+    <span class="n">scope</span><span class="p">:</span> <span class="nb">str</span>
+<span class="p">)</span> <span class="o">-&gt;</span> <span class="n">Union</span><span class="p">[</span><span class="nb">float</span><span class="p">,</span> <span class="nb">int</span><span class="p">,</span> <span class="nb">str</span><span class="p">]:</span> <span class="c1"># Score could be float/int, empty string on failure</span>
+<span class="w">    </span><span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">    Returns the score for a given rank from the top reporters.</span>
+
+<span class="sd">    :param rank: The rank (1-based) of the score to retrieve.</span>
+<span class="sd">    :param num_emails: The total number of top emails considered.</span>
+<span class="sd">    :param month: The month (1-12).</span>
+<span class="sd">    :param year: The year.</span>
+<span class="sd">    :param scope: Group scope string.</span>
+<span class="sd">    :return: Score, or empty string if not found/invalid (or 0 for numeric consistency).</span>
+<span class="sd">    &quot;&quot;&quot;</span>
+    <span class="k">if</span> <span class="ow">not</span> <span class="p">(</span><span class="nb">isinstance</span><span class="p">(</span><span class="n">rank</span><span class="p">,</span> <span class="nb">int</span><span class="p">)</span> <span class="ow">and</span> <span class="nb">isinstance</span><span class="p">(</span><span class="n">num_emails</span><span class="p">,</span> <span class="nb">int</span><span class="p">)</span> <span class="ow">and</span> \
+            <span class="mi">1</span> <span class="o">&lt;=</span> <span class="n">rank</span> <span class="o">&lt;=</span> <span class="n">num_emails</span> <span class="ow">and</span> <span class="n">num_emails</span> <span class="o">&gt;=</span> <span class="mi">1</span><span class="p">):</span>
+        <span class="n">logger</span><span class="o">.</span><span class="n">warning</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;Invalid rank/num_emails: rank=</span><span class="si">{</span><span class="n">rank</span><span class="si">}</span><span class="s2">, num_emails=</span><span class="si">{</span><span class="n">num_emails</span><span class="si">}</span><span class="s2">&quot;</span><span class="p">)</span>
+        <span class="k">return</span> <span class="s2">&quot;&quot;</span>
+
+    <span class="n">parsed_date</span> <span class="o">=</span> <span class="n">_parse_month_year</span><span class="p">(</span><span class="n">month</span><span class="p">,</span> <span class="n">year</span><span class="p">)</span>
+    <span class="k">if</span> <span class="ow">not</span> <span class="n">parsed_date</span><span class="p">:</span>
+        <span class="k">return</span> <span class="s2">&quot;&quot;</span>
+    <span class="n">month_val</span><span class="p">,</span> <span class="n">year_val</span> <span class="o">=</span> <span class="n">parsed_date</span>
+
+    <span class="n">names_scores</span> <span class="o">=</span> <span class="n">dashboard_graph_scope</span><span class="p">(</span><span class="n">num_emails</span><span class="p">,</span> <span class="n">month_val</span><span class="p">,</span> <span class="n">year_val</span><span class="p">,</span> <span class="n">scope</span><span class="p">)</span>
+
+    <span class="k">if</span> <span class="mi">0</span> <span class="o">&lt;</span> <span class="n">rank</span> <span class="o">&lt;=</span> <span class="nb">len</span><span class="p">(</span><span class="n">names_scores</span><span class="p">):</span>
+        <span class="n">score</span> <span class="o">=</span> <span class="n">names_scores</span><span class="p">[</span><span class="n">rank</span> <span class="o">-</span> <span class="mi">1</span><span class="p">][</span><span class="mi">1</span><span class="p">]</span>
+        <span class="k">return</span> <span class="n">score</span>
+    <span class="k">return</span> <span class="s2">&quot;&quot;</span></div>
+
+
+
+<div class="viewcode-block" id="total_reporters_dash_scope">
+<a class="viewcode-back" href="../../../modules/dashboard_core.html#dashboard.dash_utils.utils.total_reporters_dash_scope">[docs]</a>
+<span class="nd">@register</span><span class="o">.</span><span class="n">filter</span><span class="p">(</span><span class="n">name</span><span class="o">=</span><span class="s2">&quot;total_reporters_dash_scope&quot;</span><span class="p">)</span>
+<span class="k">def</span><span class="w"> </span><span class="nf">total_reporters_dash_scope</span><span class="p">(</span>
+    <span class="n">scope</span><span class="p">:</span> <span class="nb">str</span><span class="p">,</span>
+    <span class="n">month</span><span class="p">:</span> <span class="n">Union</span><span class="p">[</span><span class="nb">str</span><span class="p">,</span> <span class="nb">int</span><span class="p">],</span>
+    <span class="n">year</span><span class="p">:</span> <span class="n">Union</span><span class="p">[</span><span class="nb">str</span><span class="p">,</span> <span class="nb">int</span><span class="p">]</span>
+<span class="p">)</span> <span class="o">-&gt;</span> <span class="nb">int</span><span class="p">:</span>
+<span class="w">    </span><span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">    Calculates the total number of unique active reporters for a given month, year, and scope.</span>
+<span class="sd">    An active reporter is a user with UserCasesMonthlyStats records for the period,</span>
+<span class="sd">    belonging to ALL specified groups.</span>
+
+<span class="sd">    :param scope: Group scope string. Users must belong to ALL groups.</span>
+<span class="sd">    :param month: The month (1-12).</span>
+<span class="sd">    :param year: The year.</span>
+<span class="sd">    :return: Total count of unique reporters.</span>
+<span class="sd">    &quot;&quot;&quot;</span>
+    <span class="n">parsed_date</span> <span class="o">=</span> <span class="n">_parse_month_year</span><span class="p">(</span><span class="n">month</span><span class="p">,</span> <span class="n">year</span><span class="p">)</span>
+    <span class="k">if</span> <span class="ow">not</span> <span class="n">parsed_date</span><span class="p">:</span>
+        <span class="k">return</span> <span class="mi">0</span>
+    <span class="n">month_str</span><span class="p">,</span> <span class="n">year_int</span> <span class="o">=</span> <span class="n">parsed_date</span>
+
+    <span class="n">users_in_scope_q</span> <span class="o">=</span> <span class="n">UserCasesMonthlyStats</span><span class="o">.</span><span class="n">objects</span><span class="o">.</span><span class="n">filter</span><span class="p">(</span>
+        <span class="n">month</span><span class="o">=</span><span class="n">month_str</span><span class="p">,</span>
+        <span class="n">year</span><span class="o">=</span><span class="n">year_int</span>
+    <span class="p">)</span>
+
+    <span class="n">group_names</span> <span class="o">=</span> <span class="p">[</span><span class="n">g</span><span class="o">.</span><span class="n">strip</span><span class="p">()</span> <span class="k">for</span> <span class="n">g</span> <span class="ow">in</span> <span class="n">scope</span><span class="o">.</span><span class="n">split</span><span class="p">(</span><span class="s1">&#39;|&#39;</span><span class="p">)</span> <span class="k">if</span> <span class="n">g</span><span class="o">.</span><span class="n">strip</span><span class="p">()]</span>
+    <span class="k">if</span> <span class="n">group_names</span><span class="p">:</span>
+        <span class="n">user_filter_q</span> <span class="o">=</span> <span class="n">Q</span><span class="p">()</span>
+        <span class="k">for</span> <span class="n">group_name</span> <span class="ow">in</span> <span class="n">group_names</span><span class="p">:</span>
+            <span class="n">user_filter_q</span> <span class="o">&amp;=</span> <span class="n">Q</span><span class="p">(</span><span class="n">user__groups__name</span><span class="o">=</span><span class="n">group_name</span><span class="p">)</span>
+        <span class="n">users_in_scope_q</span> <span class="o">=</span> <span class="n">users_in_scope_q</span><span class="o">.</span><span class="n">filter</span><span class="p">(</span><span class="n">user_filter_q</span><span class="p">)</span>
+
+    <span class="c1"># Count distinct users</span>
+    <span class="n">report_count</span> <span class="o">=</span> <span class="n">users_in_scope_q</span><span class="o">.</span><span class="n">aggregate</span><span class="p">(</span>
+        <span class="n">distinct_reporters</span><span class="o">=</span><span class="n">DbCount</span><span class="p">(</span><span class="s1">&#39;user&#39;</span><span class="p">,</span> <span class="n">distinct</span><span class="o">=</span><span class="kc">True</span><span class="p">)</span>
+    <span class="p">)</span>
+    <span class="k">return</span> <span class="n">report_count</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="s1">&#39;distinct_reporters&#39;</span><span class="p">,</span> <span class="mi">0</span><span class="p">)</span></div>
+
+
+
+<div class="viewcode-block" id="get_case_all_dash_scope">
+<a class="viewcode-back" href="../../../modules/dashboard_core.html#dashboard.dash_utils.utils.get_case_all_dash_scope">[docs]</a>
+<span class="nd">@register</span><span class="o">.</span><span class="n">filter</span><span class="p">(</span><span class="n">name</span><span class="o">=</span><span class="s2">&quot;get_case_all_dash_scope&quot;</span><span class="p">)</span>
+<span class="k">def</span><span class="w"> </span><span class="nf">get_case_all_dash_scope</span><span class="p">(</span>
+    <span class="n">scope</span><span class="p">:</span> <span class="nb">str</span><span class="p">,</span>
+    <span class="n">month</span><span class="p">:</span> <span class="n">Union</span><span class="p">[</span><span class="nb">str</span><span class="p">,</span> <span class="nb">int</span><span class="p">],</span>
+    <span class="n">year</span><span class="p">:</span> <span class="n">Union</span><span class="p">[</span><span class="nb">str</span><span class="p">,</span> <span class="nb">int</span><span class="p">]</span>
+<span class="p">)</span> <span class="o">-&gt;</span> <span class="nb">int</span><span class="p">:</span>
+<span class="w">    </span><span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">    Returns the total number of cases for users in a given month, year, and scope.</span>
+<span class="sd">    Users must belong to ALL specified groups.</span>
+
+<span class="sd">    :param scope: Group scope string.</span>
+<span class="sd">    :param month: The month (1-12).</span>
+<span class="sd">    :param year: The year.</span>
+<span class="sd">    :return: Total number of cases, or 0 on error/no data.</span>
+<span class="sd">    &quot;&quot;&quot;</span>
+    <span class="n">parsed_date</span> <span class="o">=</span> <span class="n">_parse_month_year</span><span class="p">(</span><span class="n">month</span><span class="p">,</span> <span class="n">year</span><span class="p">)</span>
+    <span class="k">if</span> <span class="ow">not</span> <span class="n">parsed_date</span><span class="p">:</span>
+        <span class="k">return</span> <span class="mi">0</span>
+    <span class="n">month_str</span><span class="p">,</span> <span class="n">year_int</span> <span class="o">=</span> <span class="n">parsed_date</span>
+
+    <span class="n">stats_query</span> <span class="o">=</span> <span class="n">UserCasesMonthlyStats</span><span class="o">.</span><span class="n">objects</span><span class="o">.</span><span class="n">filter</span><span class="p">(</span>
+        <span class="n">month</span><span class="o">=</span><span class="n">month_str</span><span class="p">,</span>
+        <span class="n">year</span><span class="o">=</span><span class="n">year_int</span>
+    <span class="p">)</span>
+
+    <span class="n">group_names</span> <span class="o">=</span> <span class="p">[</span><span class="n">g</span><span class="o">.</span><span class="n">strip</span><span class="p">()</span> <span class="k">for</span> <span class="n">g</span> <span class="ow">in</span> <span class="n">scope</span><span class="o">.</span><span class="n">split</span><span class="p">(</span><span class="s1">&#39;|&#39;</span><span class="p">)</span> <span class="k">if</span> <span class="n">g</span><span class="o">.</span><span class="n">strip</span><span class="p">()]</span>
+    <span class="k">if</span> <span class="n">group_names</span><span class="p">:</span>
+        <span class="n">user_filter_q</span> <span class="o">=</span> <span class="n">Q</span><span class="p">()</span>
+        <span class="k">for</span> <span class="n">group_name</span> <span class="ow">in</span> <span class="n">group_names</span><span class="p">:</span>
+            <span class="n">user_filter_q</span> <span class="o">&amp;=</span> <span class="n">Q</span><span class="p">(</span><span class="n">user__groups__name</span><span class="o">=</span><span class="n">group_name</span><span class="p">)</span>
+        <span class="n">stats_query</span> <span class="o">=</span> <span class="n">stats_query</span><span class="o">.</span><span class="n">filter</span><span class="p">(</span><span class="n">user_filter_q</span><span class="p">)</span>
+
+    <span class="k">try</span><span class="p">:</span>
+        <span class="n">aggregation</span> <span class="o">=</span> <span class="n">stats_query</span><span class="o">.</span><span class="n">aggregate</span><span class="p">(</span><span class="n">total_sum</span><span class="o">=</span><span class="n">Sum</span><span class="p">(</span><span class="s1">&#39;total_cases&#39;</span><span class="p">))</span>
+        <span class="k">return</span> <span class="n">aggregation</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="s1">&#39;total_sum&#39;</span><span class="p">)</span> <span class="ow">or</span> <span class="mi">0</span>
+    <span class="k">except</span> <span class="ne">Exception</span> <span class="k">as</span> <span class="n">e</span><span class="p">:</span>
+        <span class="n">logger</span><span class="o">.</span><span class="n">error</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;Error in get_case_all_dash_scope for </span><span class="si">{</span><span class="n">month_str</span><span class="si">}</span><span class="s2">/</span><span class="si">{</span><span class="n">year_int</span><span class="si">}</span><span class="s2">, scope=&#39;</span><span class="si">{</span><span class="n">scope</span><span class="si">}</span><span class="s2">&#39;: </span><span class="si">{</span><span class="n">e</span><span class="si">}</span><span class="s2">&quot;</span><span class="p">)</span>
+        <span class="k">return</span> <span class="mi">0</span></div>
+
+
+
+<div class="viewcode-block" id="new_reporters_dash_scope">
+<a class="viewcode-back" href="../../../modules/dashboard_core.html#dashboard.dash_utils.utils.new_reporters_dash_scope">[docs]</a>
+<span class="nd">@register</span><span class="o">.</span><span class="n">filter</span><span class="p">(</span><span class="n">name</span><span class="o">=</span><span class="s2">&quot;new_reporters_dash_scope&quot;</span><span class="p">)</span>
+<span class="k">def</span><span class="w"> </span><span class="nf">new_reporters_dash_scope</span><span class="p">(</span>
+    <span class="n">scope</span><span class="p">:</span> <span class="nb">str</span><span class="p">,</span>
+    <span class="n">month</span><span class="p">:</span> <span class="n">Union</span><span class="p">[</span><span class="nb">str</span><span class="p">,</span> <span class="nb">int</span><span class="p">],</span>
+    <span class="n">year</span><span class="p">:</span> <span class="n">Union</span><span class="p">[</span><span class="nb">str</span><span class="p">,</span> <span class="nb">int</span><span class="p">]</span>
+<span class="p">)</span> <span class="o">-&gt;</span> <span class="nb">int</span><span class="p">:</span>
+<span class="w">    </span><span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">    Counts users who joined within a specific month and year AND belong to ALL specified groups.</span>
+
+<span class="sd">    :param scope: Group scope string. Users must belong to ALL groups.</span>
+<span class="sd">    :param month: The month (1-12).</span>
+<span class="sd">    :param year: The year.</span>
+<span class="sd">    :return: Count of new users meeting criteria.</span>
+<span class="sd">    &quot;&quot;&quot;</span>
+    <span class="n">parsed_date</span> <span class="o">=</span> <span class="n">_parse_month_year</span><span class="p">(</span><span class="n">month</span><span class="p">,</span> <span class="n">year</span><span class="p">)</span>
+    <span class="k">if</span> <span class="ow">not</span> <span class="n">parsed_date</span><span class="p">:</span>
+        <span class="k">return</span> <span class="mi">0</span>
+    <span class="n">_</span><span class="p">,</span> <span class="n">year_int</span> <span class="o">=</span> <span class="n">parsed_date</span>
+    <span class="k">try</span><span class="p">:</span>
+        <span class="n">month_int</span> <span class="o">=</span> <span class="nb">int</span><span class="p">(</span><span class="n">month</span><span class="p">)</span>
+    <span class="k">except</span> <span class="ne">ValueError</span><span class="p">:</span>
+        <span class="k">return</span> <span class="mi">0</span>
+    <span class="n">users_query</span> <span class="o">=</span> <span class="n">User</span><span class="o">.</span><span class="n">objects</span><span class="o">.</span><span class="n">filter</span><span class="p">(</span><span class="n">date_joined__year</span><span class="o">=</span><span class="n">year_int</span><span class="p">,</span> <span class="n">date_joined__month</span><span class="o">=</span><span class="n">month_int</span><span class="p">)</span>
+
+    <span class="n">group_names</span> <span class="o">=</span> <span class="p">[</span><span class="n">g</span><span class="o">.</span><span class="n">strip</span><span class="p">()</span> <span class="k">for</span> <span class="n">g</span> <span class="ow">in</span> <span class="n">scope</span><span class="o">.</span><span class="n">split</span><span class="p">(</span><span class="s1">&#39;|&#39;</span><span class="p">)</span> <span class="k">if</span> <span class="n">g</span><span class="o">.</span><span class="n">strip</span><span class="p">()]</span>
+    <span class="k">if</span> <span class="n">group_names</span><span class="p">:</span>
+        <span class="k">for</span> <span class="n">group_name</span> <span class="ow">in</span> <span class="n">group_names</span><span class="p">:</span>
+            <span class="n">users_query</span> <span class="o">=</span> <span class="n">users_query</span><span class="o">.</span><span class="n">filter</span><span class="p">(</span><span class="n">groups__name</span><span class="o">=</span><span class="n">group_name</span><span class="p">)</span>
+
+    <span class="k">return</span> <span class="n">users_query</span><span class="o">.</span><span class="n">distinct</span><span class="p">()</span><span class="o">.</span><span class="n">count</span><span class="p">()</span></div>
+
+
+
+<div class="viewcode-block" id="total_by_danger_dash_scope">
+<a class="viewcode-back" href="../../../modules/dashboard_core.html#dashboard.dash_utils.utils.total_by_danger_dash_scope">[docs]</a>
+<span class="nd">@register</span><span class="o">.</span><span class="n">filter</span><span class="p">(</span><span class="n">name</span><span class="o">=</span><span class="s2">&quot;total_by_danger_dash_scope&quot;</span><span class="p">)</span>
+<span class="k">def</span><span class="w"> </span><span class="nf">total_by_danger_dash_scope</span><span class="p">(</span>
+    <span class="n">danger</span><span class="p">:</span> <span class="nb">str</span><span class="p">,</span>
+    <span class="n">month</span><span class="p">:</span> <span class="n">Union</span><span class="p">[</span><span class="nb">str</span><span class="p">,</span> <span class="nb">int</span><span class="p">],</span>
+    <span class="n">year</span><span class="p">:</span> <span class="n">Union</span><span class="p">[</span><span class="nb">str</span><span class="p">,</span> <span class="nb">int</span><span class="p">],</span>
+    <span class="n">scope</span><span class="p">:</span> <span class="nb">str</span>
+<span class="p">)</span> <span class="o">-&gt;</span> <span class="nb">int</span><span class="p">:</span>
+<span class="w">    </span><span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">    Calculates total cases of a specific danger level for a given month, year, and scope.</span>
+<span class="sd">    Users must belong to ALL specified groups.</span>
+
+<span class="sd">    :param danger: The danger level string (e.g., &quot;safe&quot;, &quot;dangerous&quot;).</span>
+<span class="sd">    :param month: The month (1-12).</span>
+<span class="sd">    :param year: The year.</span>
+<span class="sd">    :param scope: Group scope string.</span>
+<span class="sd">    :return: Total count for the specified danger level.</span>
+
+<span class="sd">    &quot;&quot;&quot;</span>
+    <span class="k">if</span> <span class="n">danger</span> <span class="ow">not</span> <span class="ow">in</span> <span class="n">VALID_DANGER_LEVELS</span><span class="p">:</span>
+        <span class="n">logger</span><span class="o">.</span><span class="n">warning</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;Invalid danger level provided: </span><span class="si">{</span><span class="n">danger</span><span class="si">}</span><span class="s2">&quot;</span><span class="p">)</span>
+        <span class="k">return</span> <span class="mi">0</span>
+
+    <span class="n">parsed_date</span> <span class="o">=</span> <span class="n">_parse_month_year</span><span class="p">(</span><span class="n">month</span><span class="p">,</span> <span class="n">year</span><span class="p">)</span>
+    <span class="k">if</span> <span class="ow">not</span> <span class="n">parsed_date</span><span class="p">:</span>
+        <span class="k">return</span> <span class="mi">0</span>
+    <span class="n">month_str</span><span class="p">,</span> <span class="n">year_int</span> <span class="o">=</span> <span class="n">parsed_date</span>
+
+    <span class="n">target_field</span> <span class="o">=</span> <span class="n">DANGER_FIELD_MAP</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="n">danger</span><span class="p">)</span>
+    <span class="k">if</span> <span class="ow">not</span> <span class="n">target_field</span><span class="p">:</span>
+        <span class="n">logger</span><span class="o">.</span><span class="n">error</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;Danger level &#39;</span><span class="si">{</span><span class="n">danger</span><span class="si">}</span><span class="s2">&#39; has no mapped field.&quot;</span><span class="p">)</span>
+        <span class="k">return</span> <span class="mi">0</span>
+
+    <span class="n">stats_query</span> <span class="o">=</span> <span class="n">UserCasesMonthlyStats</span><span class="o">.</span><span class="n">objects</span><span class="o">.</span><span class="n">filter</span><span class="p">(</span>
+        <span class="n">month</span><span class="o">=</span><span class="n">month_str</span><span class="p">,</span>
+        <span class="n">year</span><span class="o">=</span><span class="n">year_int</span>
+    <span class="p">)</span>
+
+    <span class="n">group_names</span> <span class="o">=</span> <span class="p">[</span><span class="n">g</span><span class="o">.</span><span class="n">strip</span><span class="p">()</span> <span class="k">for</span> <span class="n">g</span> <span class="ow">in</span> <span class="n">scope</span><span class="o">.</span><span class="n">split</span><span class="p">(</span><span class="s1">&#39;|&#39;</span><span class="p">)</span> <span class="k">if</span> <span class="n">g</span><span class="o">.</span><span class="n">strip</span><span class="p">()]</span>
+    <span class="k">if</span> <span class="n">group_names</span><span class="p">:</span>
+        <span class="n">user_filter_q</span> <span class="o">=</span> <span class="n">Q</span><span class="p">()</span>
+        <span class="k">for</span> <span class="n">group_name</span> <span class="ow">in</span> <span class="n">group_names</span><span class="p">:</span>
+            <span class="n">user_filter_q</span> <span class="o">&amp;=</span> <span class="n">Q</span><span class="p">(</span><span class="n">user__groups__name</span><span class="o">=</span><span class="n">group_name</span><span class="p">)</span>
+        <span class="n">stats_query</span> <span class="o">=</span> <span class="n">stats_query</span><span class="o">.</span><span class="n">filter</span><span class="p">(</span><span class="n">user_filter_q</span><span class="p">)</span>
+
+    <span class="k">try</span><span class="p">:</span>
+        <span class="n">aggregation</span> <span class="o">=</span> <span class="n">stats_query</span><span class="o">.</span><span class="n">aggregate</span><span class="p">(</span><span class="n">total_sum</span><span class="o">=</span><span class="n">Sum</span><span class="p">(</span><span class="n">target_field</span><span class="p">))</span>
+        <span class="k">return</span> <span class="n">aggregation</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="s1">&#39;total_sum&#39;</span><span class="p">)</span> <span class="ow">or</span> <span class="mi">0</span>
+    <span class="k">except</span> <span class="ne">Exception</span> <span class="k">as</span> <span class="n">e</span><span class="p">:</span>
+        <span class="n">logger</span><span class="o">.</span><span class="n">error</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;Error in total_by_danger_dash_scope for </span><span class="si">{</span><span class="n">danger</span><span class="si">}</span><span class="s2">, </span><span class="si">{</span><span class="n">month_str</span><span class="si">}</span><span class="s2">/</span><span class="si">{</span><span class="n">year_int</span><span class="si">}</span><span class="s2">, scope=&#39;</span><span class="si">{</span><span class="n">scope</span><span class="si">}</span><span class="s2">&#39;: </span><span class="si">{</span><span class="n">e</span><span class="si">}</span><span class="s2">&quot;</span><span class="p">)</span>
+        <span class="k">return</span> <span class="mi">0</span></div>
+
+
+<div class="viewcode-block" id="total_reporters_dash">
+<a class="viewcode-back" href="../../../modules/dashboard_core.html#dashboard.dash_utils.utils.total_reporters_dash">[docs]</a>
+<span class="nd">@register</span><span class="o">.</span><span class="n">filter</span><span class="p">(</span><span class="n">name</span><span class="o">=</span><span class="s2">&quot;total_reporters_dash&quot;</span><span class="p">)</span>
+<span class="k">def</span><span class="w"> </span><span class="nf">total_reporters_dash</span><span class="p">(</span><span class="n">month</span><span class="p">:</span> <span class="n">Union</span><span class="p">[</span><span class="nb">str</span><span class="p">,</span> <span class="nb">int</span><span class="p">],</span> <span class="n">year</span><span class="p">:</span> <span class="n">Union</span><span class="p">[</span><span class="nb">str</span><span class="p">,</span> <span class="nb">int</span><span class="p">])</span> <span class="o">-&gt;</span> <span class="nb">int</span><span class="p">:</span>
+<span class="w">    </span><span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">    Returns the total number of unique reporters for a given month and year.</span>
+<span class="sd">    This version reads pre-calculated statistics from Kpi.monthly_reporter_stats.total_reporters</span>
+<span class="sd">    or calculates it directly from UserCasesMonthlyStats if Kpi path is not viable.</span>
+<span class="sd">    IT DOES NOT CREATE OR UPDATE DATABASE RECORDS.</span>
+
+<span class="sd">    :param month: The month (1-12).</span>
+<span class="sd">    :param year: The year.</span>
+<span class="sd">    :return: Total number of reporters, or 0 if not found/error.</span>
+<span class="sd">    &quot;&quot;&quot;</span>
+    <span class="n">parsed_date</span> <span class="o">=</span> <span class="n">_parse_month_year</span><span class="p">(</span><span class="n">month</span><span class="p">,</span> <span class="n">year</span><span class="p">)</span>
+    <span class="k">if</span> <span class="ow">not</span> <span class="n">parsed_date</span><span class="p">:</span>
+        <span class="k">return</span> <span class="mi">0</span>
+    <span class="n">month_str</span><span class="p">,</span> <span class="n">year_int</span> <span class="o">=</span> <span class="n">parsed_date</span>
+
+    <span class="k">try</span><span class="p">:</span>
+        <span class="n">kpi</span> <span class="o">=</span> <span class="n">Kpi</span><span class="o">.</span><span class="n">objects</span><span class="o">.</span><span class="n">filter</span><span class="p">(</span><span class="n">month</span><span class="o">=</span><span class="n">month_str</span><span class="p">,</span> <span class="n">year</span><span class="o">=</span><span class="n">year_int</span><span class="p">)</span><span class="o">.</span><span class="n">select_related</span><span class="p">(</span><span class="s1">&#39;monthly_reporter_stats&#39;</span><span class="p">)</span><span class="o">.</span><span class="n">first</span><span class="p">()</span>
+        <span class="k">if</span> <span class="n">kpi</span> <span class="ow">and</span> <span class="n">kpi</span><span class="o">.</span><span class="n">monthly_reporter_stats</span> <span class="ow">and</span> <span class="nb">hasattr</span><span class="p">(</span><span class="n">kpi</span><span class="o">.</span><span class="n">monthly_reporter_stats</span><span class="p">,</span> <span class="s1">&#39;total_reporters&#39;</span><span class="p">):</span>
+            <span class="k">return</span> <span class="n">kpi</span><span class="o">.</span><span class="n">monthly_reporter_stats</span><span class="o">.</span><span class="n">total_reporters</span> <span class="ow">or</span> <span class="mi">0</span>
+    <span class="k">except</span> <span class="ne">Exception</span> <span class="k">as</span> <span class="n">e</span><span class="p">:</span> <span class="c1"># Catch specific exceptions if possible</span>
+        <span class="n">logger</span><span class="o">.</span><span class="n">error</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;Error trying to fetch pre-aggregated total_reporters for </span><span class="si">{</span><span class="n">month_str</span><span class="si">}</span><span class="s2">/</span><span class="si">{</span><span class="n">year_int</span><span class="si">}</span><span class="s2">: </span><span class="si">{</span><span class="n">e</span><span class="si">}</span><span class="s2">&quot;</span><span class="p">)</span>
+    <span class="k">try</span><span class="p">:</span>
+        <span class="n">report_count</span> <span class="o">=</span> <span class="n">UserCasesMonthlyStats</span><span class="o">.</span><span class="n">objects</span><span class="o">.</span><span class="n">filter</span><span class="p">(</span>
+            <span class="n">month</span><span class="o">=</span><span class="n">month_str</span><span class="p">,</span>
+            <span class="n">year</span><span class="o">=</span><span class="n">year_int</span>
+        <span class="p">)</span><span class="o">.</span><span class="n">aggregate</span><span class="p">(</span><span class="n">distinct_reporters</span><span class="o">=</span><span class="n">DbCount</span><span class="p">(</span><span class="s1">&#39;user&#39;</span><span class="p">,</span> <span class="n">distinct</span><span class="o">=</span><span class="kc">True</span><span class="p">))</span>
+        <span class="k">return</span> <span class="n">report_count</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="s1">&#39;distinct_reporters&#39;</span><span class="p">,</span> <span class="mi">0</span><span class="p">)</span>
+    <span class="k">except</span> <span class="ne">Exception</span> <span class="k">as</span> <span class="n">e</span><span class="p">:</span>
+        <span class="n">logger</span><span class="o">.</span><span class="n">error</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;Error calculating total_reporters_dash directly for </span><span class="si">{</span><span class="n">month_str</span><span class="si">}</span><span class="s2">/</span><span class="si">{</span><span class="n">year_int</span><span class="si">}</span><span class="s2">: </span><span class="si">{</span><span class="n">e</span><span class="si">}</span><span class="s2">&quot;</span><span class="p">)</span>
+        <span class="k">return</span> <span class="mi">0</span></div>
+
+
+
+<div class="viewcode-block" id="get_case_all_dash">
+<a class="viewcode-back" href="../../../modules/dashboard_core.html#dashboard.dash_utils.utils.get_case_all_dash">[docs]</a>
+<span class="nd">@register</span><span class="o">.</span><span class="n">filter</span><span class="p">(</span><span class="n">name</span><span class="o">=</span><span class="s2">&quot;get_case_all_dash&quot;</span><span class="p">)</span>
+<span class="k">def</span><span class="w"> </span><span class="nf">get_case_all_dash</span><span class="p">(</span><span class="n">month</span><span class="p">:</span> <span class="n">Union</span><span class="p">[</span><span class="nb">str</span><span class="p">,</span> <span class="nb">int</span><span class="p">],</span> <span class="n">year</span><span class="p">:</span> <span class="n">Union</span><span class="p">[</span><span class="nb">str</span><span class="p">,</span> <span class="nb">int</span><span class="p">])</span> <span class="o">-&gt;</span> <span class="nb">int</span><span class="p">:</span>
+<span class="w">    </span><span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">    Retrieves the total number of cases for a given month and year.</span>
+<span class="sd">    Reads from Kpi.total_cases_stats.total_cases or calculates directly.</span>
+<span class="sd">    IT DOES NOT CREATE OR UPDATE DATABASE RECORDS.</span>
+
+<span class="sd">    :param month: The month (1-12).</span>
+<span class="sd">    :param year: The year.</span>
+<span class="sd">    :return: Total number of cases, or 0 if not found/error.</span>
+<span class="sd">    &quot;&quot;&quot;</span>
+    <span class="n">parsed_date</span> <span class="o">=</span> <span class="n">_parse_month_year</span><span class="p">(</span><span class="n">month</span><span class="p">,</span> <span class="n">year</span><span class="p">)</span>
+    <span class="k">if</span> <span class="ow">not</span> <span class="n">parsed_date</span><span class="p">:</span>
+        <span class="k">return</span> <span class="mi">0</span>
+    <span class="n">month_str</span><span class="p">,</span> <span class="n">year_int</span> <span class="o">=</span> <span class="n">parsed_date</span>
+
+    <span class="k">try</span><span class="p">:</span>
+        <span class="n">kpi</span> <span class="o">=</span> <span class="n">Kpi</span><span class="o">.</span><span class="n">objects</span><span class="o">.</span><span class="n">filter</span><span class="p">(</span><span class="n">month</span><span class="o">=</span><span class="n">month_str</span><span class="p">,</span> <span class="n">year</span><span class="o">=</span><span class="n">year_int</span><span class="p">)</span><span class="o">.</span><span class="n">select_related</span><span class="p">(</span><span class="s1">&#39;total_cases_stats&#39;</span><span class="p">)</span><span class="o">.</span><span class="n">first</span><span class="p">()</span>
+        <span class="k">if</span> <span class="n">kpi</span> <span class="ow">and</span> <span class="n">kpi</span><span class="o">.</span><span class="n">total_cases_stats</span> <span class="ow">and</span> <span class="nb">hasattr</span><span class="p">(</span><span class="n">kpi</span><span class="o">.</span><span class="n">total_cases_stats</span><span class="p">,</span> <span class="s1">&#39;total_cases&#39;</span><span class="p">):</span>
+            <span class="k">return</span> <span class="n">kpi</span><span class="o">.</span><span class="n">total_cases_stats</span><span class="o">.</span><span class="n">total_cases</span> <span class="ow">or</span> <span class="mi">0</span>
+    <span class="k">except</span> <span class="ne">Exception</span> <span class="k">as</span> <span class="n">e</span><span class="p">:</span>
+        <span class="n">logger</span><span class="o">.</span><span class="n">error</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;Error trying to fetch pre-aggregated total_cases for </span><span class="si">{</span><span class="n">month_str</span><span class="si">}</span><span class="s2">/</span><span class="si">{</span><span class="n">year_int</span><span class="si">}</span><span class="s2">: </span><span class="si">{</span><span class="n">e</span><span class="si">}</span><span class="s2">&quot;</span><span class="p">)</span>
+
+    <span class="k">try</span><span class="p">:</span>
+        <span class="n">aggregation</span> <span class="o">=</span> <span class="n">UserCasesMonthlyStats</span><span class="o">.</span><span class="n">objects</span><span class="o">.</span><span class="n">filter</span><span class="p">(</span>
+            <span class="n">month</span><span class="o">=</span><span class="n">month_str</span><span class="p">,</span>
+            <span class="n">year</span><span class="o">=</span><span class="n">year_int</span>
+        <span class="p">)</span><span class="o">.</span><span class="n">aggregate</span><span class="p">(</span><span class="n">total_sum</span><span class="o">=</span><span class="n">Sum</span><span class="p">(</span><span class="s1">&#39;total_cases&#39;</span><span class="p">))</span>
+        <span class="k">return</span> <span class="n">aggregation</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="s1">&#39;total_sum&#39;</span><span class="p">)</span> <span class="ow">or</span> <span class="mi">0</span>
+    <span class="k">except</span> <span class="ne">Exception</span> <span class="k">as</span> <span class="n">e</span><span class="p">:</span>
+        <span class="n">logger</span><span class="o">.</span><span class="n">error</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;Error calculating get_case_all_dash directly for </span><span class="si">{</span><span class="n">month_str</span><span class="si">}</span><span class="s2">/</span><span class="si">{</span><span class="n">year_int</span><span class="si">}</span><span class="s2">: </span><span class="si">{</span><span class="n">e</span><span class="si">}</span><span class="s2">&quot;</span><span class="p">)</span>
+        <span class="k">return</span> <span class="mi">0</span></div>
+
+
+
+<div class="viewcode-block" id="new_reporters_dash">
+<a class="viewcode-back" href="../../../modules/dashboard_core.html#dashboard.dash_utils.utils.new_reporters_dash">[docs]</a>
+<span class="nd">@register</span><span class="o">.</span><span class="n">filter</span><span class="p">(</span><span class="n">name</span><span class="o">=</span><span class="s2">&quot;new_reporters_dash&quot;</span><span class="p">)</span>
+<span class="k">def</span><span class="w"> </span><span class="nf">new_reporters_dash</span><span class="p">(</span>
+    <span class="n">month</span><span class="p">:</span> <span class="n">Union</span><span class="p">[</span><span class="nb">str</span><span class="p">,</span> <span class="nb">int</span><span class="p">],</span>
+    <span class="n">year</span><span class="p">:</span> <span class="n">Union</span><span class="p">[</span><span class="nb">str</span><span class="p">,</span> <span class="nb">int</span><span class="p">]</span>
+<span class="p">)</span> <span class="o">-&gt;</span> <span class="nb">int</span><span class="p">:</span>
+<span class="w">    </span><span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">    Returns the number of new reporters for a given month and year.</span>
+
+<span class="sd">    This filter reads from existing Kpi records and does not create new ones.</span>
+<span class="sd">    It expects a Kpi object to have a &#39;monthly_reporter_stats&#39; attribute,</span>
+<span class="sd">    which in turn has a &#39;new_reporters&#39; attribute.</span>
+
+<span class="sd">    :param month: The month (1-12) for which the count is fetched. Can be string or int.</span>
+<span class="sd">    :type month: Union[str, int]</span>
+<span class="sd">    :param year: The year for which the count is fetched. Can be string or int.</span>
+<span class="sd">    :type year: Union[str, int]</span>
+<span class="sd">    :return: The number of new reporters, or 0 if data is not available or an error occurs.</span>
+<span class="sd">    :rtype: int</span>
+
+<span class="sd">    Example usage in Django Template:</span>
+<span class="sd">    ``{{ some_month_variable|new_reporters_dash:some_year_variable }}``</span>
+<span class="sd">    ``{{ &quot;5&quot;|new_reporters_dash:2022 }}``</span>
+<span class="sd">    &quot;&quot;&quot;</span>
+    <span class="k">try</span><span class="p">:</span>
+        <span class="n">month_int</span> <span class="o">=</span> <span class="nb">int</span><span class="p">(</span><span class="n">month</span><span class="p">)</span>
+        <span class="n">year_int</span> <span class="o">=</span> <span class="nb">int</span><span class="p">(</span><span class="n">year</span><span class="p">)</span>
+        <span class="k">if</span> <span class="ow">not</span> <span class="p">(</span><span class="mi">1</span> <span class="o">&lt;=</span> <span class="n">month_int</span> <span class="o">&lt;=</span> <span class="mi">12</span><span class="p">):</span>
+            <span class="n">logger</span><span class="o">.</span><span class="n">warning</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;Invalid month: </span><span class="si">{</span><span class="n">month</span><span class="si">}</span><span class="s2">&quot;</span><span class="p">)</span>
+            <span class="k">return</span> <span class="mi">0</span>
+    <span class="k">except</span> <span class="ne">ValueError</span><span class="p">:</span>
+        <span class="n">logger</span><span class="o">.</span><span class="n">error</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;Invalid month/year format: month=</span><span class="si">{</span><span class="n">month</span><span class="si">}</span><span class="s2">, year=</span><span class="si">{</span><span class="n">year</span><span class="si">}</span><span class="s2">&quot;</span><span class="p">)</span>
+        <span class="k">return</span> <span class="mi">0</span>
+
+    <span class="n">month_str</span> <span class="o">=</span> <span class="sa">f</span><span class="s2">&quot;</span><span class="si">{</span><span class="n">month_int</span><span class="si">:</span><span class="s2">02d</span><span class="si">}</span><span class="s2">&quot;</span>
+
+    <span class="k">try</span><span class="p">:</span>
+        <span class="n">kpi</span> <span class="o">=</span> <span class="n">Kpi</span><span class="o">.</span><span class="n">objects</span><span class="o">.</span><span class="n">filter</span><span class="p">(</span><span class="n">month</span><span class="o">=</span><span class="n">month_str</span><span class="p">,</span> <span class="n">year</span><span class="o">=</span><span class="n">year_int</span><span class="p">)</span><span class="o">.</span><span class="n">first</span><span class="p">()</span>
+
+    <span class="k">except</span> <span class="ne">Exception</span> <span class="k">as</span> <span class="n">e</span><span class="p">:</span>
+        <span class="n">logger</span><span class="o">.</span><span class="n">error</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;Error fetching Kpi for </span><span class="si">{</span><span class="n">month_str</span><span class="si">}</span><span class="s2">/</span><span class="si">{</span><span class="n">year_int</span><span class="si">}</span><span class="s2">: </span><span class="si">{</span><span class="n">e</span><span class="si">}</span><span class="s2">&quot;</span><span class="p">)</span>
+        <span class="k">return</span> <span class="mi">0</span>
+
+    <span class="k">if</span> <span class="ow">not</span> <span class="n">kpi</span><span class="p">:</span>
+        <span class="k">return</span> <span class="mi">0</span>
+    <span class="n">reporter_stats</span> <span class="o">=</span> <span class="nb">getattr</span><span class="p">(</span><span class="n">kpi</span><span class="p">,</span> <span class="s1">&#39;monthly_reporter_stats&#39;</span><span class="p">,</span> <span class="kc">None</span><span class="p">)</span>
+    <span class="k">if</span> <span class="ow">not</span> <span class="n">reporter_stats</span><span class="p">:</span>
+        <span class="k">return</span> <span class="mi">0</span>
+
+    <span class="n">new_reporters_count</span> <span class="o">=</span> <span class="nb">getattr</span><span class="p">(</span><span class="n">reporter_stats</span><span class="p">,</span> <span class="s1">&#39;new_reporters&#39;</span><span class="p">,</span> <span class="mi">0</span><span class="p">)</span>
+    <span class="k">return</span> <span class="n">new_reporters_count</span> <span class="k">if</span> <span class="nb">isinstance</span><span class="p">(</span><span class="n">new_reporters_count</span><span class="p">,</span> <span class="nb">int</span><span class="p">)</span> <span class="k">else</span> <span class="mi">0</span></div>
+
+
+
+<div class="viewcode-block" id="total_by_danger_dash">
+<a class="viewcode-back" href="../../../modules/dashboard_core.html#dashboard.dash_utils.utils.total_by_danger_dash">[docs]</a>
+<span class="nd">@register</span><span class="o">.</span><span class="n">filter</span><span class="p">(</span><span class="n">name</span><span class="o">=</span><span class="s2">&quot;total_by_danger_dash&quot;</span><span class="p">)</span>
+<span class="k">def</span><span class="w"> </span><span class="nf">total_by_danger_dash</span><span class="p">(</span>
+    <span class="n">danger</span><span class="p">:</span> <span class="n">ALLOWED_DANGER_LEVELS</span><span class="p">,</span>
+    <span class="n">month</span><span class="p">:</span> <span class="n">Union</span><span class="p">[</span><span class="nb">str</span><span class="p">,</span> <span class="nb">int</span><span class="p">],</span>
+    <span class="n">year</span><span class="p">:</span> <span class="n">Union</span><span class="p">[</span><span class="nb">str</span><span class="p">,</span> <span class="nb">int</span><span class="p">]</span>
+<span class="p">)</span> <span class="o">-&gt;</span> <span class="nb">int</span><span class="p">:</span>
+<span class="w">    </span><span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">    Returns the total number of cases based on the danger level for a given month and year.</span>
+
+<span class="sd">    Parameters:</span>
+<span class="sd">    - danger (ALLOWED_DANGER_LEVELS): The danger level of the cases.</span>
+<span class="sd">    Possible values are &quot;safe&quot;, &quot;inconclusive&quot;, &quot;suspicious&quot;, &quot;dangerous&quot;, and &quot;failure&quot;.</span>
+<span class="sd">    - month (Union[str, int]): The month (1-12) for which the cases are counted.</span>
+<span class="sd">    - year (Union[str, int]): The year for which the cases are counted.</span>
+
+<span class="sd">    Returns:</span>
+<span class="sd">    - int: The total number of cases based on the danger level, or 0 if not found or an error occurs.</span>
+
+<span class="sd">    Example usage in Django Template:</span>
+<span class="sd">    {{ &quot;safe&quot;\|total_by_danger_dash:5:2022 }}  {# Returns the total number of safe cases for May 2022 #}</span>
+<span class="sd">    &quot;&quot;&quot;</span>
+    <span class="k">try</span><span class="p">:</span>
+        <span class="n">month_int</span> <span class="o">=</span> <span class="nb">int</span><span class="p">(</span><span class="n">month</span><span class="p">)</span>
+        <span class="n">year_int</span> <span class="o">=</span> <span class="nb">int</span><span class="p">(</span><span class="n">year</span><span class="p">)</span>
+        <span class="k">if</span> <span class="ow">not</span> <span class="p">(</span><span class="mi">1</span> <span class="o">&lt;=</span> <span class="n">month_int</span> <span class="o">&lt;=</span> <span class="mi">12</span><span class="p">):</span>
+            <span class="n">logger</span><span class="o">.</span><span class="n">warning</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;Invalid month provided: </span><span class="si">{</span><span class="n">month</span><span class="si">}</span><span class="s2">&quot;</span><span class="p">)</span>
+            <span class="k">return</span> <span class="mi">0</span>
+    <span class="k">except</span> <span class="ne">ValueError</span><span class="p">:</span>
+        <span class="n">logger</span><span class="o">.</span><span class="n">error</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;Could not convert month/year to int: month=</span><span class="si">{</span><span class="n">month</span><span class="si">}</span><span class="s2">, year=</span><span class="si">{</span><span class="n">year</span><span class="si">}</span><span class="s2">&quot;</span><span class="p">)</span>
+        <span class="k">return</span> <span class="mi">0</span>
+
+    <span class="n">month_str</span> <span class="o">=</span> <span class="sa">f</span><span class="s2">&quot;</span><span class="si">{</span><span class="n">month_int</span><span class="si">:</span><span class="s2">02d</span><span class="si">}</span><span class="s2">&quot;</span>
+    <span class="k">try</span><span class="p">:</span>
+        <span class="n">kpi</span> <span class="o">=</span> <span class="n">Kpi</span><span class="o">.</span><span class="n">objects</span><span class="o">.</span><span class="n">filter</span><span class="p">(</span><span class="n">month</span><span class="o">=</span><span class="n">month_str</span><span class="p">,</span> <span class="n">year</span><span class="o">=</span><span class="n">year_int</span><span class="p">)</span><span class="o">.</span><span class="n">first</span><span class="p">()</span>
+
+    <span class="k">except</span> <span class="ne">Exception</span> <span class="k">as</span> <span class="n">e</span><span class="p">:</span>
+        <span class="n">logger</span><span class="o">.</span><span class="n">error</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;Error fetching Kpi data for </span><span class="si">{</span><span class="n">month_str</span><span class="si">}</span><span class="s2">/</span><span class="si">{</span><span class="n">year_int</span><span class="si">}</span><span class="s2">: </span><span class="si">{</span><span class="n">e</span><span class="si">}</span><span class="s2">&quot;</span><span class="p">)</span>
+        <span class="k">return</span> <span class="mi">0</span>
+
+    <span class="k">if</span> <span class="ow">not</span> <span class="n">kpi</span><span class="p">:</span>
+        <span class="k">return</span> <span class="mi">0</span>
+
+    <span class="n">summary</span> <span class="o">=</span> <span class="nb">getattr</span><span class="p">(</span><span class="n">kpi</span><span class="p">,</span> <span class="s1">&#39;monthly_cases_summary&#39;</span><span class="p">,</span> <span class="kc">None</span><span class="p">)</span>
+    <span class="k">if</span> <span class="ow">not</span> <span class="n">summary</span><span class="p">:</span>
+        <span class="k">return</span> <span class="mi">0</span>
+
+    <span class="n">attribute_name</span> <span class="o">=</span> <span class="sa">f</span><span class="s2">&quot;</span><span class="si">{</span><span class="n">danger</span><span class="si">}</span><span class="s2">_cases&quot;</span>
+    <span class="n">value</span> <span class="o">=</span> <span class="nb">getattr</span><span class="p">(</span><span class="n">summary</span><span class="p">,</span> <span class="n">attribute_name</span><span class="p">,</span> <span class="mi">0</span><span class="p">)</span>
+
+    <span class="k">return</span> <span class="n">value</span> <span class="k">if</span> <span class="nb">isinstance</span><span class="p">(</span><span class="n">value</span><span class="p">,</span> <span class="nb">int</span><span class="p">)</span> <span class="k">else</span> <span class="mi">0</span></div>
+
+</pre></div>
+
+          </div>
+          
+        </div>
+      </div>
+      <div class="sphinxsidebar" role="navigation" aria-label="Main">
+        <div class="sphinxsidebarwrapper">
+<h1 class="logo"><a href="../../../index.html">Suspicious</a></h1>
+
+
+
+
+
+
+
+
+
+<search id="searchbox" style="display: none" role="search">
+    <div class="searchformwrapper">
+    <form class="search" action="../../../search.html" method="get">
+      <input type="text" name="q" aria-labelledby="searchlabel" autocomplete="off" autocorrect="off" autocapitalize="off" spellcheck="false" placeholder="Search"/>
+      <input type="submit" value="Go" />
+    </form>
+    </div>
+</search>
+<script>document.getElementById('searchbox').style.display = "block"</script><h3>Navigation</h3>
+<p class="caption" role="heading"><span class="caption-text">Contents:</span></p>
+<ul>
+<li class="toctree-l1"><a class="reference internal" href="../../../modules/index.html">Modules (API Reference)</a></li>
+</ul>
+
+<div class="relations">
+<h3>Related Topics</h3>
+<ul>
+  <li><a href="../../../index.html">Documentation overview</a><ul>
+  <li><a href="../../index.html">Module code</a><ul>
+  </ul></li>
+  </ul></li>
+</ul>
+</div>
+
+
+
+
+
+
+
+
+        </div>
+      </div>
+      <div class="clearer"></div>
+    </div>
+    <div class="footer">
+      &#169;2025, Theo Bhang, Esteban Crispel.
+      
+      |
+      Powered by <a href="https://www.sphinx-doc.org/">Sphinx 8.2.3</a>
+      &amp; <a href="https://alabaster.readthedocs.io">Alabaster 1.0.0</a>
+      
+    </div>
+
+    
+
+    
+  </body>
+</html>

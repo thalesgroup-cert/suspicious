@@ -1,0 +1,1041 @@
+
+
+<!DOCTYPE html>
+<html class="writer-html5" lang="en" data-content_root="../">
+<head>
+  <meta charset="utf-8" /><meta name="viewport" content="width=device-width, initial-scale=1" />
+
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Cortex Job module &mdash; Suspicious 1.0.0 documentation</title>
+      <link rel="stylesheet" type="text/css" href="../_static/pygments.css?v=b86133f3" />
+      <link rel="stylesheet" type="text/css" href="../_static/css/theme.css?v=e59714d7" />
+
+  
+      <script src="../_static/jquery.js?v=5d32c60e"></script>
+      <script src="../_static/_sphinx_javascript_frameworks_compat.js?v=2cd50e6c"></script>
+      <script src="../_static/documentation_options.js?v=8d563738"></script>
+      <script src="../_static/doctools.js?v=9bcbadda"></script>
+      <script src="../_static/sphinx_highlight.js?v=dc90522c"></script>
+    <script src="../_static/js/theme.js"></script>
+    <link rel="index" title="Index" href="../genindex.html" />
+    <link rel="search" title="Search" href="../search.html" />
+    <link rel="next" title="Dashboard module" href="dashboard_core.html" />
+    <link rel="prev" title="Case Handler module" href="case_handler_core.html" /> 
+</head>
+
+<body class="wy-body-for-nav"> 
+  <div class="wy-grid-for-nav">
+    <nav data-toggle="wy-nav-shift" class="wy-nav-side">
+      <div class="wy-side-scroll">
+        <div class="wy-side-nav-search" >
+
+          
+          
+          <a href="../index.html" class="icon icon-home">
+            Suspicious
+          </a>
+<div role="search">
+  <form id="rtd-search-form" class="wy-form" action="../search.html" method="get">
+    <input type="text" name="q" placeholder="Search docs" aria-label="Search docs" />
+    <input type="hidden" name="check_keywords" value="yes" />
+    <input type="hidden" name="area" value="default" />
+  </form>
+</div>
+        </div><div class="wy-menu wy-menu-vertical" data-spy="affix" role="navigation" aria-label="Navigation menu">
+              <p class="caption" role="heading"><span class="caption-text">Contents:</span></p>
+<ul class="current">
+<li class="toctree-l1"><a class="reference internal" href="../README.html">Suspicious</a></li>
+<li class="toctree-l1 current"><a class="reference internal" href="index.html">Modules (API Reference)</a><ul class="current">
+<li class="toctree-l2"><a class="reference internal" href="case_handler_core.html">Case Handler module</a></li>
+<li class="toctree-l2 current"><a class="current reference internal" href="#">Cortex Job module</a><ul>
+<li class="toctree-l3"><a class="reference internal" href="#cortex_job.models.Analyzer"><code class="docutils literal notranslate"><span class="pre">Analyzer</span></code></a><ul>
+<li class="toctree-l4"><a class="reference internal" href="#cortex_job.models.Analyzer.DoesNotExist"><code class="docutils literal notranslate"><span class="pre">Analyzer.DoesNotExist</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="#cortex_job.models.Analyzer.MultipleObjectsReturned"><code class="docutils literal notranslate"><span class="pre">Analyzer.MultipleObjectsReturned</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="#cortex_job.models.Analyzer.analyzer_cortex_id"><code class="docutils literal notranslate"><span class="pre">Analyzer.analyzer_cortex_id</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="#cortex_job.models.Analyzer.analyzer_reports"><code class="docutils literal notranslate"><span class="pre">Analyzer.analyzer_reports</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="#cortex_job.models.Analyzer.creation_date"><code class="docutils literal notranslate"><span class="pre">Analyzer.creation_date</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="#cortex_job.models.Analyzer.get_next_by_creation_date"><code class="docutils literal notranslate"><span class="pre">Analyzer.get_next_by_creation_date()</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="#cortex_job.models.Analyzer.get_next_by_last_update"><code class="docutils literal notranslate"><span class="pre">Analyzer.get_next_by_last_update()</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="#cortex_job.models.Analyzer.get_previous_by_creation_date"><code class="docutils literal notranslate"><span class="pre">Analyzer.get_previous_by_creation_date()</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="#cortex_job.models.Analyzer.get_previous_by_last_update"><code class="docutils literal notranslate"><span class="pre">Analyzer.get_previous_by_last_update()</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="#cortex_job.models.Analyzer.id"><code class="docutils literal notranslate"><span class="pre">Analyzer.id</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="#cortex_job.models.Analyzer.is_active"><code class="docutils literal notranslate"><span class="pre">Analyzer.is_active</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="#cortex_job.models.Analyzer.last_update"><code class="docutils literal notranslate"><span class="pre">Analyzer.last_update</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="#cortex_job.models.Analyzer.name"><code class="docutils literal notranslate"><span class="pre">Analyzer.name</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="#cortex_job.models.Analyzer.objects"><code class="docutils literal notranslate"><span class="pre">Analyzer.objects</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="#cortex_job.models.Analyzer.weight"><code class="docutils literal notranslate"><span class="pre">Analyzer.weight</span></code></a></li>
+</ul>
+</li>
+<li class="toctree-l3"><a class="reference internal" href="#cortex_job.models.AnalyzerReport"><code class="docutils literal notranslate"><span class="pre">AnalyzerReport</span></code></a><ul>
+<li class="toctree-l4"><a class="reference internal" href="#cortex_job.models.AnalyzerReport.DoesNotExist"><code class="docutils literal notranslate"><span class="pre">AnalyzerReport.DoesNotExist</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="#cortex_job.models.AnalyzerReport.MultipleObjectsReturned"><code class="docutils literal notranslate"><span class="pre">AnalyzerReport.MultipleObjectsReturned</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="#cortex_job.models.AnalyzerReport.analyzer"><code class="docutils literal notranslate"><span class="pre">AnalyzerReport.analyzer</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="#cortex_job.models.AnalyzerReport.analyzer_id"><code class="docutils literal notranslate"><span class="pre">AnalyzerReport.analyzer_id</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="#cortex_job.models.AnalyzerReport.category"><code class="docutils literal notranslate"><span class="pre">AnalyzerReport.category</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="#cortex_job.models.AnalyzerReport.confidence"><code class="docutils literal notranslate"><span class="pre">AnalyzerReport.confidence</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="#cortex_job.models.AnalyzerReport.cortex_job_id"><code class="docutils literal notranslate"><span class="pre">AnalyzerReport.cortex_job_id</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="#cortex_job.models.AnalyzerReport.creation_date"><code class="docutils literal notranslate"><span class="pre">AnalyzerReport.creation_date</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="#cortex_job.models.AnalyzerReport.domain"><code class="docutils literal notranslate"><span class="pre">AnalyzerReport.domain</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="#cortex_job.models.AnalyzerReport.domain_id"><code class="docutils literal notranslate"><span class="pre">AnalyzerReport.domain_id</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="#cortex_job.models.AnalyzerReport.file"><code class="docutils literal notranslate"><span class="pre">AnalyzerReport.file</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="#cortex_job.models.AnalyzerReport.file_id"><code class="docutils literal notranslate"><span class="pre">AnalyzerReport.file_id</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="#cortex_job.models.AnalyzerReport.get_category"><code class="docutils literal notranslate"><span class="pre">AnalyzerReport.get_category()</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="#cortex_job.models.AnalyzerReport.get_next_by_creation_date"><code class="docutils literal notranslate"><span class="pre">AnalyzerReport.get_next_by_creation_date()</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="#cortex_job.models.AnalyzerReport.get_next_by_last_update"><code class="docutils literal notranslate"><span class="pre">AnalyzerReport.get_next_by_last_update()</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="#cortex_job.models.AnalyzerReport.get_previous_by_creation_date"><code class="docutils literal notranslate"><span class="pre">AnalyzerReport.get_previous_by_creation_date()</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="#cortex_job.models.AnalyzerReport.get_previous_by_last_update"><code class="docutils literal notranslate"><span class="pre">AnalyzerReport.get_previous_by_last_update()</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="#cortex_job.models.AnalyzerReport.hash"><code class="docutils literal notranslate"><span class="pre">AnalyzerReport.hash</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="#cortex_job.models.AnalyzerReport.hash_id"><code class="docutils literal notranslate"><span class="pre">AnalyzerReport.hash_id</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="#cortex_job.models.AnalyzerReport.id"><code class="docutils literal notranslate"><span class="pre">AnalyzerReport.id</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="#cortex_job.models.AnalyzerReport.ip"><code class="docutils literal notranslate"><span class="pre">AnalyzerReport.ip</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="#cortex_job.models.AnalyzerReport.ip_id"><code class="docutils literal notranslate"><span class="pre">AnalyzerReport.ip_id</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="#cortex_job.models.AnalyzerReport.last_update"><code class="docutils literal notranslate"><span class="pre">AnalyzerReport.last_update</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="#cortex_job.models.AnalyzerReport.level"><code class="docutils literal notranslate"><span class="pre">AnalyzerReport.level</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="#cortex_job.models.AnalyzerReport.mail"><code class="docutils literal notranslate"><span class="pre">AnalyzerReport.mail</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="#cortex_job.models.AnalyzerReport.mail_body"><code class="docutils literal notranslate"><span class="pre">AnalyzerReport.mail_body</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="#cortex_job.models.AnalyzerReport.mail_body_id"><code class="docutils literal notranslate"><span class="pre">AnalyzerReport.mail_body_id</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="#cortex_job.models.AnalyzerReport.mail_header"><code class="docutils literal notranslate"><span class="pre">AnalyzerReport.mail_header</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="#cortex_job.models.AnalyzerReport.mail_header_id"><code class="docutils literal notranslate"><span class="pre">AnalyzerReport.mail_header_id</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="#cortex_job.models.AnalyzerReport.mail_id"><code class="docutils literal notranslate"><span class="pre">AnalyzerReport.mail_id</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="#cortex_job.models.AnalyzerReport.objects"><code class="docutils literal notranslate"><span class="pre">AnalyzerReport.objects</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="#cortex_job.models.AnalyzerReport.report_full"><code class="docutils literal notranslate"><span class="pre">AnalyzerReport.report_full</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="#cortex_job.models.AnalyzerReport.report_summary"><code class="docutils literal notranslate"><span class="pre">AnalyzerReport.report_summary</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="#cortex_job.models.AnalyzerReport.report_taxonomy"><code class="docutils literal notranslate"><span class="pre">AnalyzerReport.report_taxonomy</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="#cortex_job.models.AnalyzerReport.score"><code class="docutils literal notranslate"><span class="pre">AnalyzerReport.score</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="#cortex_job.models.AnalyzerReport.set_category"><code class="docutils literal notranslate"><span class="pre">AnalyzerReport.set_category()</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="#cortex_job.models.AnalyzerReport.status"><code class="docutils literal notranslate"><span class="pre">AnalyzerReport.status</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="#cortex_job.models.AnalyzerReport.type"><code class="docutils literal notranslate"><span class="pre">AnalyzerReport.type</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="#cortex_job.models.AnalyzerReport.url"><code class="docutils literal notranslate"><span class="pre">AnalyzerReport.url</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="#cortex_job.models.AnalyzerReport.url_id"><code class="docutils literal notranslate"><span class="pre">AnalyzerReport.url_id</span></code></a></li>
+</ul>
+</li>
+<li class="toctree-l3"><a class="reference internal" href="#cortex_job.cortex_utils.cortex_and_job_management.CortexJob"><code class="docutils literal notranslate"><span class="pre">CortexJob</span></code></a><ul>
+<li class="toctree-l4"><a class="reference internal" href="#cortex_job.cortex_utils.cortex_and_job_management.CortexJob.get_analyzer_db"><code class="docutils literal notranslate"><span class="pre">CortexJob.get_analyzer_db()</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="#cortex_job.cortex_utils.cortex_and_job_management.CortexJob.get_analyzers_by_type"><code class="docutils literal notranslate"><span class="pre">CortexJob.get_analyzers_by_type()</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="#cortex_job.cortex_utils.cortex_and_job_management.CortexJob.get_data_value"><code class="docutils literal notranslate"><span class="pre">CortexJob.get_data_value()</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="#cortex_job.cortex_utils.cortex_and_job_management.CortexJob.get_file_analyzers"><code class="docutils literal notranslate"><span class="pre">CortexJob.get_file_analyzers()</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="#cortex_job.cortex_utils.cortex_and_job_management.CortexJob.launch_cortex_ai_jobs"><code class="docutils literal notranslate"><span class="pre">CortexJob.launch_cortex_ai_jobs()</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="#cortex_job.cortex_utils.cortex_and_job_management.CortexJob.launch_cortex_jobs"><code class="docutils literal notranslate"><span class="pre">CortexJob.launch_cortex_jobs()</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="#cortex_job.cortex_utils.cortex_and_job_management.CortexJob.run"><code class="docutils literal notranslate"><span class="pre">CortexJob.run()</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="#cortex_job.cortex_utils.cortex_and_job_management.CortexJob.run_analyzer"><code class="docutils literal notranslate"><span class="pre">CortexJob.run_analyzer()</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="#cortex_job.cortex_utils.cortex_and_job_management.CortexJob.set_analyzer_report_data"><code class="docutils literal notranslate"><span class="pre">CortexJob.set_analyzer_report_data()</span></code></a></li>
+</ul>
+</li>
+<li class="toctree-l3"><a class="reference internal" href="#cortex_job.cortex_utils.cortex_and_job_management.CortexJobManager"><code class="docutils literal notranslate"><span class="pre">CortexJobManager</span></code></a><ul>
+<li class="toctree-l4"><a class="reference internal" href="#cortex_job.cortex_utils.cortex_and_job_management.CortexJobManager.calculate_total_results"><code class="docutils literal notranslate"><span class="pre">CortexJobManager.calculate_total_results()</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="#cortex_job.cortex_utils.cortex_and_job_management.CortexJobManager.clean_id"><code class="docutils literal notranslate"><span class="pre">CortexJobManager.clean_id()</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="#cortex_job.cortex_utils.cortex_and_job_management.CortexJobManager.generate_description"><code class="docutils literal notranslate"><span class="pre">CortexJobManager.generate_description()</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="#cortex_job.cortex_utils.cortex_and_job_management.CortexJobManager.get_cortex_jobs_results"><code class="docutils literal notranslate"><span class="pre">CortexJobManager.get_cortex_jobs_results()</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="#cortex_job.cortex_utils.cortex_and_job_management.CortexJobManager.get_job_from_api"><code class="docutils literal notranslate"><span class="pre">CortexJobManager.get_job_from_api()</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="#cortex_job.cortex_utils.cortex_and_job_management.CortexJobManager.get_new_reports"><code class="docutils literal notranslate"><span class="pre">CortexJobManager.get_new_reports()</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="#cortex_job.cortex_utils.cortex_and_job_management.CortexJobManager.get_report_from_api"><code class="docutils literal notranslate"><span class="pre">CortexJobManager.get_report_from_api()</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="#cortex_job.cortex_utils.cortex_and_job_management.CortexJobManager.get_results"><code class="docutils literal notranslate"><span class="pre">CortexJobManager.get_results()</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="#cortex_job.cortex_utils.cortex_and_job_management.CortexJobManager.get_sub_class"><code class="docutils literal notranslate"><span class="pre">CortexJobManager.get_sub_class()</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="#cortex_job.cortex_utils.cortex_and_job_management.CortexJobManager.manage_ai_jobs"><code class="docutils literal notranslate"><span class="pre">CortexJobManager.manage_ai_jobs()</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="#cortex_job.cortex_utils.cortex_and_job_management.CortexJobManager.manage_jobs"><code class="docutils literal notranslate"><span class="pre">CortexJobManager.manage_jobs()</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="#cortex_job.cortex_utils.cortex_and_job_management.CortexJobManager.process_artifacts"><code class="docutils literal notranslate"><span class="pre">CortexJobManager.process_artifacts()</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="#cortex_job.cortex_utils.cortex_and_job_management.CortexJobManager.process_attachments"><code class="docutils literal notranslate"><span class="pre">CortexJobManager.process_attachments()</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="#cortex_job.cortex_utils.cortex_and_job_management.CortexJobManager.process_domain_artifact"><code class="docutils literal notranslate"><span class="pre">CortexJobManager.process_domain_artifact()</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="#cortex_job.cortex_utils.cortex_and_job_management.CortexJobManager.process_file"><code class="docutils literal notranslate"><span class="pre">CortexJobManager.process_file()</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="#cortex_job.cortex_utils.cortex_and_job_management.CortexJobManager.process_hash_artifact"><code class="docutils literal notranslate"><span class="pre">CortexJobManager.process_hash_artifact()</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="#cortex_job.cortex_utils.cortex_and_job_management.CortexJobManager.process_iocs"><code class="docutils literal notranslate"><span class="pre">CortexJobManager.process_iocs()</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="#cortex_job.cortex_utils.cortex_and_job_management.CortexJobManager.process_ip_artifact"><code class="docutils literal notranslate"><span class="pre">CortexJobManager.process_ip_artifact()</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="#cortex_job.cortex_utils.cortex_and_job_management.CortexJobManager.process_mail"><code class="docutils literal notranslate"><span class="pre">CortexJobManager.process_mail()</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="#cortex_job.cortex_utils.cortex_and_job_management.CortexJobManager.process_mail_archive"><code class="docutils literal notranslate"><span class="pre">CortexJobManager.process_mail_archive()</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="#cortex_job.cortex_utils.cortex_and_job_management.CortexJobManager.process_mail_artifact"><code class="docutils literal notranslate"><span class="pre">CortexJobManager.process_mail_artifact()</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="#cortex_job.cortex_utils.cortex_and_job_management.CortexJobManager.process_url_artifact"><code class="docutils literal notranslate"><span class="pre">CortexJobManager.process_url_artifact()</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="#cortex_job.cortex_utils.cortex_and_job_management.CortexJobManager.update_mail_models"><code class="docutils literal notranslate"><span class="pre">CortexJobManager.update_mail_models()</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="#cortex_job.cortex_utils.cortex_and_job_management.CortexJobManager.update_report_instance"><code class="docutils literal notranslate"><span class="pre">CortexJobManager.update_report_instance()</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="#cortex_job.cortex_utils.cortex_and_job_management.CortexJobManager.update_results"><code class="docutils literal notranslate"><span class="pre">CortexJobManager.update_results()</span></code></a></li>
+</ul>
+</li>
+</ul>
+</li>
+<li class="toctree-l2"><a class="reference internal" href="dashboard_core.html">Dashboard module</a></li>
+<li class="toctree-l2"><a class="reference internal" href="domain_process_core.html">Domain Process Module</a></li>
+<li class="toctree-l2"><a class="reference internal" href="email_process_core.html">Email Process module</a></li>
+<li class="toctree-l2"><a class="reference internal" href="file_process_core.html">File Process module</a></li>
+<li class="toctree-l2"><a class="reference internal" href="hash_process_core.html">Hash Process module</a></li>
+<li class="toctree-l2"><a class="reference internal" href="ip_process_core.html">IP Process module</a></li>
+<li class="toctree-l2"><a class="reference internal" href="mail_feeder_core.html">Mail Feeder module</a></li>
+<li class="toctree-l2"><a class="reference internal" href="profiles_core.html">Profiles module</a></li>
+<li class="toctree-l2"><a class="reference internal" href="score_process_core.html">Score Process module</a></li>
+<li class="toctree-l2"><a class="reference internal" href="settings_core.html">Settings module</a></li>
+<li class="toctree-l2"><a class="reference internal" href="tasp_core.html">TASP module</a></li>
+<li class="toctree-l2"><a class="reference internal" href="url_process_core.html">Url Process module</a></li>
+</ul>
+</li>
+</ul>
+
+        </div>
+      </div>
+    </nav>
+
+    <section data-toggle="wy-nav-shift" class="wy-nav-content-wrap"><nav class="wy-nav-top" aria-label="Mobile navigation menu" >
+          <i data-toggle="wy-nav-top" class="fa fa-bars"></i>
+          <a href="../index.html">Suspicious</a>
+      </nav>
+
+      <div class="wy-nav-content">
+        <div class="rst-content">
+          <div role="navigation" aria-label="Page navigation">
+  <ul class="wy-breadcrumbs">
+      <li><a href="../index.html" class="icon icon-home" aria-label="Home"></a></li>
+          <li class="breadcrumb-item"><a href="index.html">Modules (API Reference)</a></li>
+      <li class="breadcrumb-item active">Cortex Job module</li>
+      <li class="wy-breadcrumbs-aside">
+            <a href="../_sources/modules/cortex_job_core.rst.txt" rel="nofollow"> View page source</a>
+      </li>
+  </ul>
+  <hr/>
+</div>
+          <div role="main" class="document" itemscope="itemscope" itemtype="http://schema.org/Article">
+           <div itemprop="articleBody">
+             
+  <section id="module-cortex_job.models">
+<span id="cortex-job-module"></span><h1>Cortex Job module<a class="headerlink" href="#module-cortex_job.models" title="Link to this heading"></a></h1>
+<dl class="py class">
+<dt class="sig sig-object py" id="cortex_job.models.Analyzer">
+<em class="property"><span class="k"><span class="pre">class</span></span><span class="w"> </span></em><span class="sig-prename descclassname"><span class="pre">cortex_job.models.</span></span><span class="sig-name descname"><span class="pre">Analyzer</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">id</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">name</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">weight</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">analyzer_cortex_id</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">is_active</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">creation_date</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">last_update</span></span></em><span class="sig-paren">)</span><a class="reference internal" href="../_modules/cortex_job/models.html#Analyzer"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#cortex_job.models.Analyzer" title="Link to this definition"></a></dt>
+<dd><p>Bases: <code class="xref py py-class docutils literal notranslate"><span class="pre">Model</span></code></p>
+<dl class="py exception">
+<dt class="sig sig-object py" id="cortex_job.models.Analyzer.DoesNotExist">
+<em class="property"><span class="k"><span class="pre">exception</span></span><span class="w"> </span></em><span class="sig-name descname"><span class="pre">DoesNotExist</span></span><a class="headerlink" href="#cortex_job.models.Analyzer.DoesNotExist" title="Link to this definition"></a></dt>
+<dd><p>Bases: <code class="xref py py-class docutils literal notranslate"><span class="pre">ObjectDoesNotExist</span></code></p>
+</dd></dl>
+
+<dl class="py exception">
+<dt class="sig sig-object py" id="cortex_job.models.Analyzer.MultipleObjectsReturned">
+<em class="property"><span class="k"><span class="pre">exception</span></span><span class="w"> </span></em><span class="sig-name descname"><span class="pre">MultipleObjectsReturned</span></span><a class="headerlink" href="#cortex_job.models.Analyzer.MultipleObjectsReturned" title="Link to this definition"></a></dt>
+<dd><p>Bases: <code class="xref py py-class docutils literal notranslate"><span class="pre">MultipleObjectsReturned</span></code></p>
+</dd></dl>
+
+<dl class="py attribute">
+<dt class="sig sig-object py" id="cortex_job.models.Analyzer.analyzer_cortex_id">
+<span class="sig-name descname"><span class="pre">analyzer_cortex_id</span></span><a class="headerlink" href="#cortex_job.models.Analyzer.analyzer_cortex_id" title="Link to this definition"></a></dt>
+<dd><p>A wrapper for a deferred-loading field. When the value is read from this
+object the first time, the query is executed.</p>
+</dd></dl>
+
+<dl class="py attribute">
+<dt class="sig sig-object py" id="cortex_job.models.Analyzer.analyzer_reports">
+<span class="sig-name descname"><span class="pre">analyzer_reports</span></span><a class="headerlink" href="#cortex_job.models.Analyzer.analyzer_reports" title="Link to this definition"></a></dt>
+<dd><p>Accessor to the related objects manager on the reverse side of a
+many-to-one relation.</p>
+<p>In the example:</p>
+<div class="highlight-default notranslate"><div class="highlight"><pre><span></span><span class="k">class</span><span class="w"> </span><span class="nc">Child</span><span class="p">(</span><span class="n">Model</span><span class="p">):</span>
+    <span class="n">parent</span> <span class="o">=</span> <span class="n">ForeignKey</span><span class="p">(</span><span class="n">Parent</span><span class="p">,</span> <span class="n">related_name</span><span class="o">=</span><span class="s1">&#39;children&#39;</span><span class="p">)</span>
+</pre></div>
+</div>
+<p><code class="docutils literal notranslate"><span class="pre">Parent.children</span></code> is a <code class="docutils literal notranslate"><span class="pre">ReverseManyToOneDescriptor</span></code> instance.</p>
+<p>Most of the implementation is delegated to a dynamically defined manager
+class built by <code class="docutils literal notranslate"><span class="pre">create_forward_many_to_many_manager()</span></code> defined below.</p>
+</dd></dl>
+
+<dl class="py attribute">
+<dt class="sig sig-object py" id="cortex_job.models.Analyzer.creation_date">
+<span class="sig-name descname"><span class="pre">creation_date</span></span><a class="headerlink" href="#cortex_job.models.Analyzer.creation_date" title="Link to this definition"></a></dt>
+<dd><p>A wrapper for a deferred-loading field. When the value is read from this
+object the first time, the query is executed.</p>
+</dd></dl>
+
+<dl class="py method">
+<dt class="sig sig-object py" id="cortex_job.models.Analyzer.get_next_by_creation_date">
+<span class="sig-name descname"><span class="pre">get_next_by_creation_date</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">*</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">field=&lt;django.db.models.fields.DateTimeField:</span> <span class="pre">creation_date&gt;</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">is_next=True</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">**kwargs</span></span></em><span class="sig-paren">)</span><a class="headerlink" href="#cortex_job.models.Analyzer.get_next_by_creation_date" title="Link to this definition"></a></dt>
+<dd></dd></dl>
+
+<dl class="py method">
+<dt class="sig sig-object py" id="cortex_job.models.Analyzer.get_next_by_last_update">
+<span class="sig-name descname"><span class="pre">get_next_by_last_update</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">*</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">field=&lt;django.db.models.fields.DateTimeField:</span> <span class="pre">last_update&gt;</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">is_next=True</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">**kwargs</span></span></em><span class="sig-paren">)</span><a class="headerlink" href="#cortex_job.models.Analyzer.get_next_by_last_update" title="Link to this definition"></a></dt>
+<dd></dd></dl>
+
+<dl class="py method">
+<dt class="sig sig-object py" id="cortex_job.models.Analyzer.get_previous_by_creation_date">
+<span class="sig-name descname"><span class="pre">get_previous_by_creation_date</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">*</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">field=&lt;django.db.models.fields.DateTimeField:</span> <span class="pre">creation_date&gt;</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">is_next=False</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">**kwargs</span></span></em><span class="sig-paren">)</span><a class="headerlink" href="#cortex_job.models.Analyzer.get_previous_by_creation_date" title="Link to this definition"></a></dt>
+<dd></dd></dl>
+
+<dl class="py method">
+<dt class="sig sig-object py" id="cortex_job.models.Analyzer.get_previous_by_last_update">
+<span class="sig-name descname"><span class="pre">get_previous_by_last_update</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">*</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">field=&lt;django.db.models.fields.DateTimeField:</span> <span class="pre">last_update&gt;</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">is_next=False</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">**kwargs</span></span></em><span class="sig-paren">)</span><a class="headerlink" href="#cortex_job.models.Analyzer.get_previous_by_last_update" title="Link to this definition"></a></dt>
+<dd></dd></dl>
+
+<dl class="py attribute">
+<dt class="sig sig-object py" id="cortex_job.models.Analyzer.id">
+<span class="sig-name descname"><span class="pre">id</span></span><a class="headerlink" href="#cortex_job.models.Analyzer.id" title="Link to this definition"></a></dt>
+<dd><p>A wrapper for a deferred-loading field. When the value is read from this
+object the first time, the query is executed.</p>
+</dd></dl>
+
+<dl class="py attribute">
+<dt class="sig sig-object py" id="cortex_job.models.Analyzer.is_active">
+<span class="sig-name descname"><span class="pre">is_active</span></span><a class="headerlink" href="#cortex_job.models.Analyzer.is_active" title="Link to this definition"></a></dt>
+<dd><p>A wrapper for a deferred-loading field. When the value is read from this
+object the first time, the query is executed.</p>
+</dd></dl>
+
+<dl class="py attribute">
+<dt class="sig sig-object py" id="cortex_job.models.Analyzer.last_update">
+<span class="sig-name descname"><span class="pre">last_update</span></span><a class="headerlink" href="#cortex_job.models.Analyzer.last_update" title="Link to this definition"></a></dt>
+<dd><p>A wrapper for a deferred-loading field. When the value is read from this
+object the first time, the query is executed.</p>
+</dd></dl>
+
+<dl class="py attribute">
+<dt class="sig sig-object py" id="cortex_job.models.Analyzer.name">
+<span class="sig-name descname"><span class="pre">name</span></span><a class="headerlink" href="#cortex_job.models.Analyzer.name" title="Link to this definition"></a></dt>
+<dd><p>A wrapper for a deferred-loading field. When the value is read from this
+object the first time, the query is executed.</p>
+</dd></dl>
+
+<dl class="py attribute">
+<dt class="sig sig-object py" id="cortex_job.models.Analyzer.objects">
+<span class="sig-name descname"><span class="pre">objects</span></span><em class="property"><span class="w"> </span><span class="p"><span class="pre">=</span></span><span class="w"> </span><span class="pre">&lt;django.db.models.manager.Manager</span> <span class="pre">object&gt;</span></em><a class="headerlink" href="#cortex_job.models.Analyzer.objects" title="Link to this definition"></a></dt>
+<dd></dd></dl>
+
+<dl class="py attribute">
+<dt class="sig sig-object py" id="cortex_job.models.Analyzer.weight">
+<span class="sig-name descname"><span class="pre">weight</span></span><a class="headerlink" href="#cortex_job.models.Analyzer.weight" title="Link to this definition"></a></dt>
+<dd><p>A wrapper for a deferred-loading field. When the value is read from this
+object the first time, the query is executed.</p>
+</dd></dl>
+
+</dd></dl>
+
+<dl class="py class">
+<dt class="sig sig-object py" id="cortex_job.models.AnalyzerReport">
+<em class="property"><span class="k"><span class="pre">class</span></span><span class="w"> </span></em><span class="sig-prename descclassname"><span class="pre">cortex_job.models.</span></span><span class="sig-name descname"><span class="pre">AnalyzerReport</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">id</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">cortex_job_id</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">type</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">status</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">analyzer</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">url</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">domain</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">mail</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">hash</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">file</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">ip</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">mail_body</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">mail_header</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">level</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">confidence</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">score</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">category</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">report_summary</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">report_taxonomy</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">report_full</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">creation_date</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">last_update</span></span></em><span class="sig-paren">)</span><a class="reference internal" href="../_modules/cortex_job/models.html#AnalyzerReport"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#cortex_job.models.AnalyzerReport" title="Link to this definition"></a></dt>
+<dd><p>Bases: <code class="xref py py-class docutils literal notranslate"><span class="pre">Model</span></code></p>
+<dl class="py exception">
+<dt class="sig sig-object py" id="cortex_job.models.AnalyzerReport.DoesNotExist">
+<em class="property"><span class="k"><span class="pre">exception</span></span><span class="w"> </span></em><span class="sig-name descname"><span class="pre">DoesNotExist</span></span><a class="headerlink" href="#cortex_job.models.AnalyzerReport.DoesNotExist" title="Link to this definition"></a></dt>
+<dd><p>Bases: <code class="xref py py-class docutils literal notranslate"><span class="pre">ObjectDoesNotExist</span></code></p>
+</dd></dl>
+
+<dl class="py exception">
+<dt class="sig sig-object py" id="cortex_job.models.AnalyzerReport.MultipleObjectsReturned">
+<em class="property"><span class="k"><span class="pre">exception</span></span><span class="w"> </span></em><span class="sig-name descname"><span class="pre">MultipleObjectsReturned</span></span><a class="headerlink" href="#cortex_job.models.AnalyzerReport.MultipleObjectsReturned" title="Link to this definition"></a></dt>
+<dd><p>Bases: <code class="xref py py-class docutils literal notranslate"><span class="pre">MultipleObjectsReturned</span></code></p>
+</dd></dl>
+
+<dl class="py attribute">
+<dt class="sig sig-object py" id="cortex_job.models.AnalyzerReport.analyzer">
+<span class="sig-name descname"><span class="pre">analyzer</span></span><a class="headerlink" href="#cortex_job.models.AnalyzerReport.analyzer" title="Link to this definition"></a></dt>
+<dd><p>Accessor to the related object on the forward side of a many-to-one or
+one-to-one (via ForwardOneToOneDescriptor subclass) relation.</p>
+<p>In the example:</p>
+<div class="highlight-default notranslate"><div class="highlight"><pre><span></span><span class="k">class</span><span class="w"> </span><span class="nc">Child</span><span class="p">(</span><span class="n">Model</span><span class="p">):</span>
+    <span class="n">parent</span> <span class="o">=</span> <span class="n">ForeignKey</span><span class="p">(</span><span class="n">Parent</span><span class="p">,</span> <span class="n">related_name</span><span class="o">=</span><span class="s1">&#39;children&#39;</span><span class="p">)</span>
+</pre></div>
+</div>
+<p><code class="docutils literal notranslate"><span class="pre">Child.parent</span></code> is a <code class="docutils literal notranslate"><span class="pre">ForwardManyToOneDescriptor</span></code> instance.</p>
+</dd></dl>
+
+<dl class="py attribute">
+<dt class="sig sig-object py" id="cortex_job.models.AnalyzerReport.analyzer_id">
+<span class="sig-name descname"><span class="pre">analyzer_id</span></span><a class="headerlink" href="#cortex_job.models.AnalyzerReport.analyzer_id" title="Link to this definition"></a></dt>
+<dd></dd></dl>
+
+<dl class="py attribute">
+<dt class="sig sig-object py" id="cortex_job.models.AnalyzerReport.category">
+<span class="sig-name descname"><span class="pre">category</span></span><a class="headerlink" href="#cortex_job.models.AnalyzerReport.category" title="Link to this definition"></a></dt>
+<dd><p>A wrapper for a deferred-loading field. When the value is read from this
+object the first time, the query is executed.</p>
+</dd></dl>
+
+<dl class="py attribute">
+<dt class="sig sig-object py" id="cortex_job.models.AnalyzerReport.confidence">
+<span class="sig-name descname"><span class="pre">confidence</span></span><a class="headerlink" href="#cortex_job.models.AnalyzerReport.confidence" title="Link to this definition"></a></dt>
+<dd><p>A wrapper for a deferred-loading field. When the value is read from this
+object the first time, the query is executed.</p>
+</dd></dl>
+
+<dl class="py attribute">
+<dt class="sig sig-object py" id="cortex_job.models.AnalyzerReport.cortex_job_id">
+<span class="sig-name descname"><span class="pre">cortex_job_id</span></span><a class="headerlink" href="#cortex_job.models.AnalyzerReport.cortex_job_id" title="Link to this definition"></a></dt>
+<dd><p>A wrapper for a deferred-loading field. When the value is read from this
+object the first time, the query is executed.</p>
+</dd></dl>
+
+<dl class="py attribute">
+<dt class="sig sig-object py" id="cortex_job.models.AnalyzerReport.creation_date">
+<span class="sig-name descname"><span class="pre">creation_date</span></span><a class="headerlink" href="#cortex_job.models.AnalyzerReport.creation_date" title="Link to this definition"></a></dt>
+<dd><p>A wrapper for a deferred-loading field. When the value is read from this
+object the first time, the query is executed.</p>
+</dd></dl>
+
+<dl class="py attribute">
+<dt class="sig sig-object py" id="cortex_job.models.AnalyzerReport.domain">
+<span class="sig-name descname"><span class="pre">domain</span></span><a class="headerlink" href="#cortex_job.models.AnalyzerReport.domain" title="Link to this definition"></a></dt>
+<dd><p>Accessor to the related object on the forward side of a many-to-one or
+one-to-one (via ForwardOneToOneDescriptor subclass) relation.</p>
+<p>In the example:</p>
+<div class="highlight-default notranslate"><div class="highlight"><pre><span></span><span class="k">class</span><span class="w"> </span><span class="nc">Child</span><span class="p">(</span><span class="n">Model</span><span class="p">):</span>
+    <span class="n">parent</span> <span class="o">=</span> <span class="n">ForeignKey</span><span class="p">(</span><span class="n">Parent</span><span class="p">,</span> <span class="n">related_name</span><span class="o">=</span><span class="s1">&#39;children&#39;</span><span class="p">)</span>
+</pre></div>
+</div>
+<p><code class="docutils literal notranslate"><span class="pre">Child.parent</span></code> is a <code class="docutils literal notranslate"><span class="pre">ForwardManyToOneDescriptor</span></code> instance.</p>
+</dd></dl>
+
+<dl class="py attribute">
+<dt class="sig sig-object py" id="cortex_job.models.AnalyzerReport.domain_id">
+<span class="sig-name descname"><span class="pre">domain_id</span></span><a class="headerlink" href="#cortex_job.models.AnalyzerReport.domain_id" title="Link to this definition"></a></dt>
+<dd></dd></dl>
+
+<dl class="py attribute">
+<dt class="sig sig-object py" id="cortex_job.models.AnalyzerReport.file">
+<span class="sig-name descname"><span class="pre">file</span></span><a class="headerlink" href="#cortex_job.models.AnalyzerReport.file" title="Link to this definition"></a></dt>
+<dd><p>Accessor to the related object on the forward side of a many-to-one or
+one-to-one (via ForwardOneToOneDescriptor subclass) relation.</p>
+<p>In the example:</p>
+<div class="highlight-default notranslate"><div class="highlight"><pre><span></span><span class="k">class</span><span class="w"> </span><span class="nc">Child</span><span class="p">(</span><span class="n">Model</span><span class="p">):</span>
+    <span class="n">parent</span> <span class="o">=</span> <span class="n">ForeignKey</span><span class="p">(</span><span class="n">Parent</span><span class="p">,</span> <span class="n">related_name</span><span class="o">=</span><span class="s1">&#39;children&#39;</span><span class="p">)</span>
+</pre></div>
+</div>
+<p><code class="docutils literal notranslate"><span class="pre">Child.parent</span></code> is a <code class="docutils literal notranslate"><span class="pre">ForwardManyToOneDescriptor</span></code> instance.</p>
+</dd></dl>
+
+<dl class="py attribute">
+<dt class="sig sig-object py" id="cortex_job.models.AnalyzerReport.file_id">
+<span class="sig-name descname"><span class="pre">file_id</span></span><a class="headerlink" href="#cortex_job.models.AnalyzerReport.file_id" title="Link to this definition"></a></dt>
+<dd></dd></dl>
+
+<dl class="py method">
+<dt class="sig sig-object py" id="cortex_job.models.AnalyzerReport.get_category">
+<span class="sig-name descname"><span class="pre">get_category</span></span><span class="sig-paren">(</span><span class="sig-paren">)</span><a class="reference internal" href="../_modules/cortex_job/models.html#AnalyzerReport.get_category"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#cortex_job.models.AnalyzerReport.get_category" title="Link to this definition"></a></dt>
+<dd><p>Return the report categories as a list.</p>
+</dd></dl>
+
+<dl class="py method">
+<dt class="sig sig-object py" id="cortex_job.models.AnalyzerReport.get_next_by_creation_date">
+<span class="sig-name descname"><span class="pre">get_next_by_creation_date</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">*</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">field=&lt;django.db.models.fields.DateTimeField:</span> <span class="pre">creation_date&gt;</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">is_next=True</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">**kwargs</span></span></em><span class="sig-paren">)</span><a class="headerlink" href="#cortex_job.models.AnalyzerReport.get_next_by_creation_date" title="Link to this definition"></a></dt>
+<dd></dd></dl>
+
+<dl class="py method">
+<dt class="sig sig-object py" id="cortex_job.models.AnalyzerReport.get_next_by_last_update">
+<span class="sig-name descname"><span class="pre">get_next_by_last_update</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">*</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">field=&lt;django.db.models.fields.DateTimeField:</span> <span class="pre">last_update&gt;</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">is_next=True</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">**kwargs</span></span></em><span class="sig-paren">)</span><a class="headerlink" href="#cortex_job.models.AnalyzerReport.get_next_by_last_update" title="Link to this definition"></a></dt>
+<dd></dd></dl>
+
+<dl class="py method">
+<dt class="sig sig-object py" id="cortex_job.models.AnalyzerReport.get_previous_by_creation_date">
+<span class="sig-name descname"><span class="pre">get_previous_by_creation_date</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">*</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">field=&lt;django.db.models.fields.DateTimeField:</span> <span class="pre">creation_date&gt;</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">is_next=False</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">**kwargs</span></span></em><span class="sig-paren">)</span><a class="headerlink" href="#cortex_job.models.AnalyzerReport.get_previous_by_creation_date" title="Link to this definition"></a></dt>
+<dd></dd></dl>
+
+<dl class="py method">
+<dt class="sig sig-object py" id="cortex_job.models.AnalyzerReport.get_previous_by_last_update">
+<span class="sig-name descname"><span class="pre">get_previous_by_last_update</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">*</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">field=&lt;django.db.models.fields.DateTimeField:</span> <span class="pre">last_update&gt;</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">is_next=False</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">**kwargs</span></span></em><span class="sig-paren">)</span><a class="headerlink" href="#cortex_job.models.AnalyzerReport.get_previous_by_last_update" title="Link to this definition"></a></dt>
+<dd></dd></dl>
+
+<dl class="py attribute">
+<dt class="sig sig-object py" id="cortex_job.models.AnalyzerReport.hash">
+<span class="sig-name descname"><span class="pre">hash</span></span><a class="headerlink" href="#cortex_job.models.AnalyzerReport.hash" title="Link to this definition"></a></dt>
+<dd><p>Accessor to the related object on the forward side of a many-to-one or
+one-to-one (via ForwardOneToOneDescriptor subclass) relation.</p>
+<p>In the example:</p>
+<div class="highlight-default notranslate"><div class="highlight"><pre><span></span><span class="k">class</span><span class="w"> </span><span class="nc">Child</span><span class="p">(</span><span class="n">Model</span><span class="p">):</span>
+    <span class="n">parent</span> <span class="o">=</span> <span class="n">ForeignKey</span><span class="p">(</span><span class="n">Parent</span><span class="p">,</span> <span class="n">related_name</span><span class="o">=</span><span class="s1">&#39;children&#39;</span><span class="p">)</span>
+</pre></div>
+</div>
+<p><code class="docutils literal notranslate"><span class="pre">Child.parent</span></code> is a <code class="docutils literal notranslate"><span class="pre">ForwardManyToOneDescriptor</span></code> instance.</p>
+</dd></dl>
+
+<dl class="py attribute">
+<dt class="sig sig-object py" id="cortex_job.models.AnalyzerReport.hash_id">
+<span class="sig-name descname"><span class="pre">hash_id</span></span><a class="headerlink" href="#cortex_job.models.AnalyzerReport.hash_id" title="Link to this definition"></a></dt>
+<dd></dd></dl>
+
+<dl class="py attribute">
+<dt class="sig sig-object py" id="cortex_job.models.AnalyzerReport.id">
+<span class="sig-name descname"><span class="pre">id</span></span><a class="headerlink" href="#cortex_job.models.AnalyzerReport.id" title="Link to this definition"></a></dt>
+<dd><p>A wrapper for a deferred-loading field. When the value is read from this
+object the first time, the query is executed.</p>
+</dd></dl>
+
+<dl class="py attribute">
+<dt class="sig sig-object py" id="cortex_job.models.AnalyzerReport.ip">
+<span class="sig-name descname"><span class="pre">ip</span></span><a class="headerlink" href="#cortex_job.models.AnalyzerReport.ip" title="Link to this definition"></a></dt>
+<dd><p>Accessor to the related object on the forward side of a many-to-one or
+one-to-one (via ForwardOneToOneDescriptor subclass) relation.</p>
+<p>In the example:</p>
+<div class="highlight-default notranslate"><div class="highlight"><pre><span></span><span class="k">class</span><span class="w"> </span><span class="nc">Child</span><span class="p">(</span><span class="n">Model</span><span class="p">):</span>
+    <span class="n">parent</span> <span class="o">=</span> <span class="n">ForeignKey</span><span class="p">(</span><span class="n">Parent</span><span class="p">,</span> <span class="n">related_name</span><span class="o">=</span><span class="s1">&#39;children&#39;</span><span class="p">)</span>
+</pre></div>
+</div>
+<p><code class="docutils literal notranslate"><span class="pre">Child.parent</span></code> is a <code class="docutils literal notranslate"><span class="pre">ForwardManyToOneDescriptor</span></code> instance.</p>
+</dd></dl>
+
+<dl class="py attribute">
+<dt class="sig sig-object py" id="cortex_job.models.AnalyzerReport.ip_id">
+<span class="sig-name descname"><span class="pre">ip_id</span></span><a class="headerlink" href="#cortex_job.models.AnalyzerReport.ip_id" title="Link to this definition"></a></dt>
+<dd></dd></dl>
+
+<dl class="py attribute">
+<dt class="sig sig-object py" id="cortex_job.models.AnalyzerReport.last_update">
+<span class="sig-name descname"><span class="pre">last_update</span></span><a class="headerlink" href="#cortex_job.models.AnalyzerReport.last_update" title="Link to this definition"></a></dt>
+<dd><p>A wrapper for a deferred-loading field. When the value is read from this
+object the first time, the query is executed.</p>
+</dd></dl>
+
+<dl class="py attribute">
+<dt class="sig sig-object py" id="cortex_job.models.AnalyzerReport.level">
+<span class="sig-name descname"><span class="pre">level</span></span><a class="headerlink" href="#cortex_job.models.AnalyzerReport.level" title="Link to this definition"></a></dt>
+<dd><p>A wrapper for a deferred-loading field. When the value is read from this
+object the first time, the query is executed.</p>
+</dd></dl>
+
+<dl class="py attribute">
+<dt class="sig sig-object py" id="cortex_job.models.AnalyzerReport.mail">
+<span class="sig-name descname"><span class="pre">mail</span></span><a class="headerlink" href="#cortex_job.models.AnalyzerReport.mail" title="Link to this definition"></a></dt>
+<dd><p>Accessor to the related object on the forward side of a many-to-one or
+one-to-one (via ForwardOneToOneDescriptor subclass) relation.</p>
+<p>In the example:</p>
+<div class="highlight-default notranslate"><div class="highlight"><pre><span></span><span class="k">class</span><span class="w"> </span><span class="nc">Child</span><span class="p">(</span><span class="n">Model</span><span class="p">):</span>
+    <span class="n">parent</span> <span class="o">=</span> <span class="n">ForeignKey</span><span class="p">(</span><span class="n">Parent</span><span class="p">,</span> <span class="n">related_name</span><span class="o">=</span><span class="s1">&#39;children&#39;</span><span class="p">)</span>
+</pre></div>
+</div>
+<p><code class="docutils literal notranslate"><span class="pre">Child.parent</span></code> is a <code class="docutils literal notranslate"><span class="pre">ForwardManyToOneDescriptor</span></code> instance.</p>
+</dd></dl>
+
+<dl class="py attribute">
+<dt class="sig sig-object py" id="cortex_job.models.AnalyzerReport.mail_body">
+<span class="sig-name descname"><span class="pre">mail_body</span></span><a class="headerlink" href="#cortex_job.models.AnalyzerReport.mail_body" title="Link to this definition"></a></dt>
+<dd><p>Accessor to the related object on the forward side of a many-to-one or
+one-to-one (via ForwardOneToOneDescriptor subclass) relation.</p>
+<p>In the example:</p>
+<div class="highlight-default notranslate"><div class="highlight"><pre><span></span><span class="k">class</span><span class="w"> </span><span class="nc">Child</span><span class="p">(</span><span class="n">Model</span><span class="p">):</span>
+    <span class="n">parent</span> <span class="o">=</span> <span class="n">ForeignKey</span><span class="p">(</span><span class="n">Parent</span><span class="p">,</span> <span class="n">related_name</span><span class="o">=</span><span class="s1">&#39;children&#39;</span><span class="p">)</span>
+</pre></div>
+</div>
+<p><code class="docutils literal notranslate"><span class="pre">Child.parent</span></code> is a <code class="docutils literal notranslate"><span class="pre">ForwardManyToOneDescriptor</span></code> instance.</p>
+</dd></dl>
+
+<dl class="py attribute">
+<dt class="sig sig-object py" id="cortex_job.models.AnalyzerReport.mail_body_id">
+<span class="sig-name descname"><span class="pre">mail_body_id</span></span><a class="headerlink" href="#cortex_job.models.AnalyzerReport.mail_body_id" title="Link to this definition"></a></dt>
+<dd></dd></dl>
+
+<dl class="py attribute">
+<dt class="sig sig-object py" id="cortex_job.models.AnalyzerReport.mail_header">
+<span class="sig-name descname"><span class="pre">mail_header</span></span><a class="headerlink" href="#cortex_job.models.AnalyzerReport.mail_header" title="Link to this definition"></a></dt>
+<dd><p>Accessor to the related object on the forward side of a many-to-one or
+one-to-one (via ForwardOneToOneDescriptor subclass) relation.</p>
+<p>In the example:</p>
+<div class="highlight-default notranslate"><div class="highlight"><pre><span></span><span class="k">class</span><span class="w"> </span><span class="nc">Child</span><span class="p">(</span><span class="n">Model</span><span class="p">):</span>
+    <span class="n">parent</span> <span class="o">=</span> <span class="n">ForeignKey</span><span class="p">(</span><span class="n">Parent</span><span class="p">,</span> <span class="n">related_name</span><span class="o">=</span><span class="s1">&#39;children&#39;</span><span class="p">)</span>
+</pre></div>
+</div>
+<p><code class="docutils literal notranslate"><span class="pre">Child.parent</span></code> is a <code class="docutils literal notranslate"><span class="pre">ForwardManyToOneDescriptor</span></code> instance.</p>
+</dd></dl>
+
+<dl class="py attribute">
+<dt class="sig sig-object py" id="cortex_job.models.AnalyzerReport.mail_header_id">
+<span class="sig-name descname"><span class="pre">mail_header_id</span></span><a class="headerlink" href="#cortex_job.models.AnalyzerReport.mail_header_id" title="Link to this definition"></a></dt>
+<dd></dd></dl>
+
+<dl class="py attribute">
+<dt class="sig sig-object py" id="cortex_job.models.AnalyzerReport.mail_id">
+<span class="sig-name descname"><span class="pre">mail_id</span></span><a class="headerlink" href="#cortex_job.models.AnalyzerReport.mail_id" title="Link to this definition"></a></dt>
+<dd></dd></dl>
+
+<dl class="py attribute">
+<dt class="sig sig-object py" id="cortex_job.models.AnalyzerReport.objects">
+<span class="sig-name descname"><span class="pre">objects</span></span><em class="property"><span class="w"> </span><span class="p"><span class="pre">=</span></span><span class="w"> </span><span class="pre">&lt;django.db.models.manager.Manager</span> <span class="pre">object&gt;</span></em><a class="headerlink" href="#cortex_job.models.AnalyzerReport.objects" title="Link to this definition"></a></dt>
+<dd></dd></dl>
+
+<dl class="py attribute">
+<dt class="sig sig-object py" id="cortex_job.models.AnalyzerReport.report_full">
+<span class="sig-name descname"><span class="pre">report_full</span></span><a class="headerlink" href="#cortex_job.models.AnalyzerReport.report_full" title="Link to this definition"></a></dt>
+<dd><p>A wrapper for a deferred-loading field. When the value is read from this
+object the first time, the query is executed.</p>
+</dd></dl>
+
+<dl class="py attribute">
+<dt class="sig sig-object py" id="cortex_job.models.AnalyzerReport.report_summary">
+<span class="sig-name descname"><span class="pre">report_summary</span></span><a class="headerlink" href="#cortex_job.models.AnalyzerReport.report_summary" title="Link to this definition"></a></dt>
+<dd><p>A wrapper for a deferred-loading field. When the value is read from this
+object the first time, the query is executed.</p>
+</dd></dl>
+
+<dl class="py attribute">
+<dt class="sig sig-object py" id="cortex_job.models.AnalyzerReport.report_taxonomy">
+<span class="sig-name descname"><span class="pre">report_taxonomy</span></span><a class="headerlink" href="#cortex_job.models.AnalyzerReport.report_taxonomy" title="Link to this definition"></a></dt>
+<dd><p>A wrapper for a deferred-loading field. When the value is read from this
+object the first time, the query is executed.</p>
+</dd></dl>
+
+<dl class="py attribute">
+<dt class="sig sig-object py" id="cortex_job.models.AnalyzerReport.score">
+<span class="sig-name descname"><span class="pre">score</span></span><a class="headerlink" href="#cortex_job.models.AnalyzerReport.score" title="Link to this definition"></a></dt>
+<dd><p>A wrapper for a deferred-loading field. When the value is read from this
+object the first time, the query is executed.</p>
+</dd></dl>
+
+<dl class="py method">
+<dt class="sig sig-object py" id="cortex_job.models.AnalyzerReport.set_category">
+<span class="sig-name descname"><span class="pre">set_category</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">categories</span></span></em><span class="sig-paren">)</span><a class="reference internal" href="../_modules/cortex_job/models.html#AnalyzerReport.set_category"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#cortex_job.models.AnalyzerReport.set_category" title="Link to this definition"></a></dt>
+<dd><p>Store the report category as a comma-separated string.</p>
+</dd></dl>
+
+<dl class="py attribute">
+<dt class="sig sig-object py" id="cortex_job.models.AnalyzerReport.status">
+<span class="sig-name descname"><span class="pre">status</span></span><a class="headerlink" href="#cortex_job.models.AnalyzerReport.status" title="Link to this definition"></a></dt>
+<dd><p>A wrapper for a deferred-loading field. When the value is read from this
+object the first time, the query is executed.</p>
+</dd></dl>
+
+<dl class="py attribute">
+<dt class="sig sig-object py" id="cortex_job.models.AnalyzerReport.type">
+<span class="sig-name descname"><span class="pre">type</span></span><a class="headerlink" href="#cortex_job.models.AnalyzerReport.type" title="Link to this definition"></a></dt>
+<dd><p>A wrapper for a deferred-loading field. When the value is read from this
+object the first time, the query is executed.</p>
+</dd></dl>
+
+<dl class="py attribute">
+<dt class="sig sig-object py" id="cortex_job.models.AnalyzerReport.url">
+<span class="sig-name descname"><span class="pre">url</span></span><a class="headerlink" href="#cortex_job.models.AnalyzerReport.url" title="Link to this definition"></a></dt>
+<dd><p>Accessor to the related object on the forward side of a many-to-one or
+one-to-one (via ForwardOneToOneDescriptor subclass) relation.</p>
+<p>In the example:</p>
+<div class="highlight-default notranslate"><div class="highlight"><pre><span></span><span class="k">class</span><span class="w"> </span><span class="nc">Child</span><span class="p">(</span><span class="n">Model</span><span class="p">):</span>
+    <span class="n">parent</span> <span class="o">=</span> <span class="n">ForeignKey</span><span class="p">(</span><span class="n">Parent</span><span class="p">,</span> <span class="n">related_name</span><span class="o">=</span><span class="s1">&#39;children&#39;</span><span class="p">)</span>
+</pre></div>
+</div>
+<p><code class="docutils literal notranslate"><span class="pre">Child.parent</span></code> is a <code class="docutils literal notranslate"><span class="pre">ForwardManyToOneDescriptor</span></code> instance.</p>
+</dd></dl>
+
+<dl class="py attribute">
+<dt class="sig sig-object py" id="cortex_job.models.AnalyzerReport.url_id">
+<span class="sig-name descname"><span class="pre">url_id</span></span><a class="headerlink" href="#cortex_job.models.AnalyzerReport.url_id" title="Link to this definition"></a></dt>
+<dd></dd></dl>
+
+</dd></dl>
+
+<dl class="py class" id="module-cortex_job.cortex_utils.cortex_and_job_management">
+<dt class="sig sig-object py" id="cortex_job.cortex_utils.cortex_and_job_management.CortexJob">
+<em class="property"><span class="k"><span class="pre">class</span></span><span class="w"> </span></em><span class="sig-prename descclassname"><span class="pre">cortex_job.cortex_utils.cortex_and_job_management.</span></span><span class="sig-name descname"><span class="pre">CortexJob</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">api_url</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">None</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">api_key</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">None</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">proxies</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">None</span></span></em><span class="sig-paren">)</span><a class="reference internal" href="../_modules/cortex_job/cortex_utils/cortex_and_job_management.html#CortexJob"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#cortex_job.cortex_utils.cortex_and_job_management.CortexJob" title="Link to this definition"></a></dt>
+<dd><p>Bases: <code class="xref py py-class docutils literal notranslate"><span class="pre">object</span></code></p>
+<dl class="py method">
+<dt class="sig sig-object py" id="cortex_job.cortex_utils.cortex_and_job_management.CortexJob.get_analyzer_db">
+<em class="property"><span class="k"><span class="pre">static</span></span><span class="w"> </span></em><span class="sig-name descname"><span class="pre">get_analyzer_db</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">analyzer</span></span></em><span class="sig-paren">)</span><a class="reference internal" href="../_modules/cortex_job/cortex_utils/cortex_and_job_management.html#CortexJob.get_analyzer_db"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#cortex_job.cortex_utils.cortex_and_job_management.CortexJob.get_analyzer_db" title="Link to this definition"></a></dt>
+<dd><p>Retrieve an Analyzer object from the database, or create a new one if it does not exist.</p>
+<dl class="simple">
+<dt>Args:</dt><dd><p>analyzer: An object with <cite>id</cite> and <cite>name</cite> attributes representing the Cortex analyzer.</p>
+</dd>
+<dt>Returns:</dt><dd><p>Analyzer: The retrieved or newly created Analyzer instance.</p>
+</dd>
+</dl>
+</dd></dl>
+
+<dl class="py method">
+<dt class="sig sig-object py" id="cortex_job.cortex_utils.cortex_and_job_management.CortexJob.get_analyzers_by_type">
+<em class="property"><span class="k"><span class="pre">static</span></span><span class="w"> </span></em><span class="sig-name descname"><span class="pre">get_analyzers_by_type</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">api</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">data_type</span></span></em><span class="sig-paren">)</span><a class="reference internal" href="../_modules/cortex_job/cortex_utils/cortex_and_job_management.html#CortexJob.get_analyzers_by_type"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#cortex_job.cortex_utils.cortex_and_job_management.CortexJob.get_analyzers_by_type" title="Link to this definition"></a></dt>
+<dd><p>Retrieve all Cortex analyzers of a given type, excluding certain configured analyzers.</p>
+<dl class="simple">
+<dt>Args:</dt><dd><p>api: Cortex API object.
+data_type (str): Type of data (‘file’, ‘url’, ‘ip’, ‘hash’, ‘domain’, ‘mail’, etc.)</p>
+</dd>
+<dt>Returns:</dt><dd><p>list: Filtered list of analyzers.</p>
+</dd>
+</dl>
+</dd></dl>
+
+<dl class="py method">
+<dt class="sig sig-object py" id="cortex_job.cortex_utils.cortex_and_job_management.CortexJob.get_data_value">
+<em class="property"><span class="k"><span class="pre">static</span></span><span class="w"> </span></em><span class="sig-name descname"><span class="pre">get_data_value</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">data</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">data_type</span></span></em><span class="sig-paren">)</span><a class="reference internal" href="../_modules/cortex_job/cortex_utils/cortex_and_job_management.html#CortexJob.get_data_value"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#cortex_job.cortex_utils.cortex_and_job_management.CortexJob.get_data_value" title="Link to this definition"></a></dt>
+<dd><p>Retrieve the value of the data object based on its type.</p>
+<dl class="simple">
+<dt>Args:</dt><dd><p>data: The data object (File, URL, IP, Hash, Domain, MailBody, MailHeader, etc.)
+data_type (str): The type of the data.</p>
+</dd>
+<dt>Returns:</dt><dd><p>The value corresponding to the data_type.</p>
+</dd>
+<dt>Raises:</dt><dd><p>ValueError: If an unsupported data_type is provided.
+TypeError: If the expected attributes are missing from the data object.</p>
+</dd>
+</dl>
+</dd></dl>
+
+<dl class="py method">
+<dt class="sig sig-object py" id="cortex_job.cortex_utils.cortex_and_job_management.CortexJob.get_file_analyzers">
+<em class="property"><span class="k"><span class="pre">static</span></span><span class="w"> </span></em><span class="sig-name descname"><span class="pre">get_file_analyzers</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">api</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">file</span></span></em><span class="sig-paren">)</span><a class="reference internal" href="../_modules/cortex_job/cortex_utils/cortex_and_job_management.html#CortexJob.get_file_analyzers"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#cortex_job.cortex_utils.cortex_and_job_management.CortexJob.get_file_analyzers" title="Link to this definition"></a></dt>
+<dd><p>Retrieve specific file analyzers from the Cortex API, with special handling for .eml files.</p>
+<dl class="simple">
+<dt>Args:</dt><dd><p>api: Cortex API object.
+file: File object, expected to have ‘file_path.name’ attribute.</p>
+</dd>
+<dt>Returns:</dt><dd><p>list: List of Cortex analyzer objects.</p>
+</dd>
+</dl>
+</dd></dl>
+
+<dl class="py method">
+<dt class="sig sig-object py" id="cortex_job.cortex_utils.cortex_and_job_management.CortexJob.launch_cortex_ai_jobs">
+<span class="sig-name descname"><span class="pre">launch_cortex_ai_jobs</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">value</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">data_type</span></span></em><span class="sig-paren">)</span><a class="reference internal" href="../_modules/cortex_job/cortex_utils/cortex_and_job_management.html#CortexJob.launch_cortex_ai_jobs"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#cortex_job.cortex_utils.cortex_and_job_management.CortexJob.launch_cortex_ai_jobs" title="Link to this definition"></a></dt>
+<dd><p>Launch Cortex AI jobs for the given value and data type.</p>
+<dl class="simple">
+<dt>Args:</dt><dd><p>value: The object to analyze (file, archive, etc.).
+data_type (str): The type of data (‘file’, ‘mail_body’, etc.).</p>
+</dd>
+<dt>Returns:</dt><dd><p>str or None: The job ID of the launched Cortex AI job, or None if launch failed.</p>
+</dd>
+</dl>
+</dd></dl>
+
+<dl class="py method">
+<dt class="sig sig-object py" id="cortex_job.cortex_utils.cortex_and_job_management.CortexJob.launch_cortex_jobs">
+<span class="sig-name descname"><span class="pre">launch_cortex_jobs</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">value</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">data_type</span></span></em><span class="sig-paren">)</span><a class="reference internal" href="../_modules/cortex_job/cortex_utils/cortex_and_job_management.html#CortexJob.launch_cortex_jobs"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#cortex_job.cortex_utils.cortex_and_job_management.CortexJob.launch_cortex_jobs" title="Link to this definition"></a></dt>
+<dd><p>Launch Cortex jobs for the given value and data type.</p>
+<dl class="simple">
+<dt>Args:</dt><dd><p>value: The object to be analyzed (file, mail, domain, etc.).
+data_type (str): The type of data (‘file’, ‘url’, ‘mail_body’, etc.).</p>
+</dd>
+<dt>Returns:</dt><dd><p>list[str]: A list of job IDs for the launched Cortex jobs.</p>
+</dd>
+</dl>
+</dd></dl>
+
+<dl class="py method">
+<dt class="sig sig-object py" id="cortex_job.cortex_utils.cortex_and_job_management.CortexJob.run">
+<em class="property"><span class="k"><span class="pre">static</span></span><span class="w"> </span></em><span class="sig-name descname"><span class="pre">run</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">api</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">analyzer</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">value</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">data_type</span></span></em><span class="sig-paren">)</span><a class="reference internal" href="../_modules/cortex_job/cortex_utils/cortex_and_job_management.html#CortexJob.run"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#cortex_job.cortex_utils.cortex_and_job_management.CortexJob.run" title="Link to this definition"></a></dt>
+<dd><p>Run an analyzer on the provided value using the Cortex API.</p>
+<dl class="simple">
+<dt>Args:</dt><dd><p>api: Cortex API object.
+analyzer: Analyzer object.
+value: Data to analyze.
+data_type (str): Type of the data (‘file’, ‘mail_body’, ‘url’, ‘ip’, ‘hash’, etc.)</p>
+</dd>
+<dt>Returns:</dt><dd><p>The Cortex job report object if successful, None otherwise.</p>
+</dd>
+</dl>
+</dd></dl>
+
+<dl class="py method">
+<dt class="sig sig-object py" id="cortex_job.cortex_utils.cortex_and_job_management.CortexJob.run_analyzer">
+<em class="property"><span class="k"><span class="pre">static</span></span><span class="w"> </span></em><span class="sig-name descname"><span class="pre">run_analyzer</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">api</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">analyzer</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">data</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">data_type</span></span></em><span class="sig-paren">)</span><a class="reference internal" href="../_modules/cortex_job/cortex_utils/cortex_and_job_management.html#CortexJob.run_analyzer"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#cortex_job.cortex_utils.cortex_and_job_management.CortexJob.run_analyzer" title="Link to this definition"></a></dt>
+<dd><p>Run a Cortex analyzer on the given data using the provided API.</p>
+<dl class="simple">
+<dt>Args:</dt><dd><p>api: Cortex API object.
+analyzer: Analyzer object containing <cite>id</cite> and <cite>name</cite>.
+data: The data object to analyze.
+data_type (str): Type of data (‘file’, ‘url’, ‘ip’, ‘hash’, ‘domain’, ‘mail’, ‘mail_body’, ‘mail_header’).</p>
+</dd>
+<dt>Returns:</dt><dd><p>report: The Cortex job report object if successful, None otherwise.</p>
+</dd>
+</dl>
+</dd></dl>
+
+<dl class="py method">
+<dt class="sig sig-object py" id="cortex_job.cortex_utils.cortex_and_job_management.CortexJob.set_analyzer_report_data">
+<em class="property"><span class="k"><span class="pre">static</span></span><span class="w"> </span></em><span class="sig-name descname"><span class="pre">set_analyzer_report_data</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">analyzer_report</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">data</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">data_type</span></span></em><span class="sig-paren">)</span><a class="reference internal" href="../_modules/cortex_job/cortex_utils/cortex_and_job_management.html#CortexJob.set_analyzer_report_data"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#cortex_job.cortex_utils.cortex_and_job_management.CortexJob.set_analyzer_report_data" title="Link to this definition"></a></dt>
+<dd><p>Set the relevant fields of an AnalyzerReport object based on its data type.</p>
+<dl class="simple">
+<dt>Args:</dt><dd><p>analyzer_report (AnalyzerReport): The report object to update.
+data: The data to assign (file, URL, IP, hash, MailBody, MailHeader, etc.).
+data_type (str): Type of the data (‘file’, ‘url’, ‘ip’, ‘domain’, ‘mail’, ‘hash’, ‘mail_body’, ‘mail_header’).</p>
+</dd>
+<dt>Raises:</dt><dd><p>ValueError: If an unsupported data_type is provided.</p>
+</dd>
+</dl>
+</dd></dl>
+
+</dd></dl>
+
+<dl class="py class">
+<dt class="sig sig-object py" id="cortex_job.cortex_utils.cortex_and_job_management.CortexJobManager">
+<em class="property"><span class="k"><span class="pre">class</span></span><span class="w"> </span></em><span class="sig-prename descclassname"><span class="pre">cortex_job.cortex_utils.cortex_and_job_management.</span></span><span class="sig-name descname"><span class="pre">CortexJobManager</span></span><a class="reference internal" href="../_modules/cortex_job/cortex_utils/cortex_and_job_management.html#CortexJobManager"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#cortex_job.cortex_utils.cortex_and_job_management.CortexJobManager" title="Link to this definition"></a></dt>
+<dd><p>Bases: <code class="xref py py-class docutils literal notranslate"><span class="pre">object</span></code></p>
+<dl class="py method">
+<dt class="sig sig-object py" id="cortex_job.cortex_utils.cortex_and_job_management.CortexJobManager.calculate_total_results">
+<span class="sig-name descname"><span class="pre">calculate_total_results</span></span><span class="sig-paren">(</span><span class="sig-paren">)</span><a class="reference internal" href="../_modules/cortex_job/cortex_utils/cortex_and_job_management.html#CortexJobManager.calculate_total_results"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#cortex_job.cortex_utils.cortex_and_job_management.CortexJobManager.calculate_total_results" title="Link to this definition"></a></dt>
+<dd><p>Recompute totals from scratch to avoid inflated counts.</p>
+</dd></dl>
+
+<dl class="py method">
+<dt class="sig sig-object py" id="cortex_job.cortex_utils.cortex_and_job_management.CortexJobManager.clean_id">
+<span class="sig-name descname"><span class="pre">clean_id</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">report_id</span></span></em><span class="sig-paren">)</span><a class="reference internal" href="../_modules/cortex_job/cortex_utils/cortex_and_job_management.html#CortexJobManager.clean_id"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#cortex_job.cortex_utils.cortex_and_job_management.CortexJobManager.clean_id" title="Link to this definition"></a></dt>
+<dd><p>Normalize a report ID so duplicates and invalid values are removed.
+Adjust this to match your DB schema (UUID, int, etc.).</p>
+</dd></dl>
+
+<dl class="py method">
+<dt class="sig sig-object py" id="cortex_job.cortex_utils.cortex_and_job_management.CortexJobManager.generate_description">
+<span class="sig-name descname"><span class="pre">generate_description</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">case</span></span></em><span class="sig-paren">)</span><a class="reference internal" href="../_modules/cortex_job/cortex_utils/cortex_and_job_management.html#CortexJobManager.generate_description"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#cortex_job.cortex_utils.cortex_and_job_management.CortexJobManager.generate_description" title="Link to this definition"></a></dt>
+<dd><p>Generates a user-friendly description for the case based on the current job execution results.</p>
+<dl class="simple">
+<dt>Args:</dt><dd><p>case (Case): The case object to update.</p>
+</dd>
+<dt>Returns:</dt><dd><p>None</p>
+</dd>
+</dl>
+</dd></dl>
+
+<dl class="py method">
+<dt class="sig sig-object py" id="cortex_job.cortex_utils.cortex_and_job_management.CortexJobManager.get_cortex_jobs_results">
+<em class="property"><span class="k"><span class="pre">classmethod</span></span><span class="w"> </span></em><span class="sig-name descname"><span class="pre">get_cortex_jobs_results</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">report_instance</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">data_type</span></span></em><span class="sig-paren">)</span><a class="reference internal" href="../_modules/cortex_job/cortex_utils/cortex_and_job_management.html#CortexJobManager.get_cortex_jobs_results"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#cortex_job.cortex_utils.cortex_and_job_management.CortexJobManager.get_cortex_jobs_results" title="Link to this definition"></a></dt>
+<dd><p>Get the status of a Cortex job for a report instance, update report fields efficiently.</p>
+<dl class="simple">
+<dt>Args:</dt><dd><p>report_instance (AnalyzerReport): The report object
+data_type (str): One of ‘file’, ‘url’, ‘ip’, ‘hash’, ‘domain’, ‘mail’, ‘mail_header’, ‘mail_body’</p>
+</dd>
+<dt>Returns:</dt><dd><p>str: Updated status of the report</p>
+</dd>
+</dl>
+</dd></dl>
+
+<dl class="py method">
+<dt class="sig sig-object py" id="cortex_job.cortex_utils.cortex_and_job_management.CortexJobManager.get_job_from_api">
+<em class="property"><span class="k"><span class="pre">static</span></span><span class="w"> </span></em><span class="sig-name descname"><span class="pre">get_job_from_api</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">job_id</span></span></em><span class="sig-paren">)</span><a class="reference internal" href="../_modules/cortex_job/cortex_utils/cortex_and_job_management.html#CortexJobManager.get_job_from_api"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#cortex_job.cortex_utils.cortex_and_job_management.CortexJobManager.get_job_from_api" title="Link to this definition"></a></dt>
+<dd></dd></dl>
+
+<dl class="py method">
+<dt class="sig sig-object py" id="cortex_job.cortex_utils.cortex_and_job_management.CortexJobManager.get_new_reports">
+<span class="sig-name descname"><span class="pre">get_new_reports</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">data_type</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">filter_kwargs</span></span></em><span class="sig-paren">)</span><a class="reference internal" href="../_modules/cortex_job/cortex_utils/cortex_and_job_management.html#CortexJobManager.get_new_reports"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#cortex_job.cortex_utils.cortex_and_job_management.CortexJobManager.get_new_reports" title="Link to this definition"></a></dt>
+<dd><p>Fetch only new AnalyzerReport objects since last_processed checkpoint
+for this case and data_type.</p>
+</dd></dl>
+
+<dl class="py method">
+<dt class="sig sig-object py" id="cortex_job.cortex_utils.cortex_and_job_management.CortexJobManager.get_report_from_api">
+<em class="property"><span class="k"><span class="pre">static</span></span><span class="w"> </span></em><span class="sig-name descname"><span class="pre">get_report_from_api</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">job_id</span></span></em><span class="sig-paren">)</span><a class="reference internal" href="../_modules/cortex_job/cortex_utils/cortex_and_job_management.html#CortexJobManager.get_report_from_api"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#cortex_job.cortex_utils.cortex_and_job_management.CortexJobManager.get_report_from_api" title="Link to this definition"></a></dt>
+<dd></dd></dl>
+
+<dl class="py method">
+<dt class="sig sig-object py" id="cortex_job.cortex_utils.cortex_and_job_management.CortexJobManager.get_results">
+<span class="sig-name descname"><span class="pre">get_results</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">case</span></span></em><span class="sig-paren">)</span><a class="reference internal" href="../_modules/cortex_job/cortex_utils/cortex_and_job_management.html#CortexJobManager.get_results"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#cortex_job.cortex_utils.cortex_and_job_management.CortexJobManager.get_results" title="Link to this definition"></a></dt>
+<dd><p>Process the case and get the results, efficiently handling large numbers of reports.</p>
+<dl class="simple">
+<dt>Args:</dt><dd><p>case (Case): An instance of the Case model.</p>
+</dd>
+<dt>Returns:</dt><dd><p>dict: The aggregated results of the Cortex jobs.</p>
+</dd>
+</dl>
+</dd></dl>
+
+<dl class="py method">
+<dt class="sig sig-object py" id="cortex_job.cortex_utils.cortex_and_job_management.CortexJobManager.get_sub_class">
+<span class="sig-name descname"><span class="pre">get_sub_class</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">analyzer</span></span></em><span class="sig-paren">)</span><a class="reference internal" href="../_modules/cortex_job/cortex_utils/cortex_and_job_management.html#CortexJobManager.get_sub_class"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#cortex_job.cortex_utils.cortex_and_job_management.CortexJobManager.get_sub_class" title="Link to this definition"></a></dt>
+<dd><p>Get the subclass of the analyzer report.</p>
+<dl class="simple">
+<dt>Args:</dt><dd><p>analyzer (AnalyzerReport): The analyzer report object.</p>
+</dd>
+<dt>Returns:</dt><dd><p>str: The subclass of the analyzer, capitalized, or a default message if not found.</p>
+</dd>
+</dl>
+</dd></dl>
+
+<dl class="py method">
+<dt class="sig sig-object py" id="cortex_job.cortex_utils.cortex_and_job_management.CortexJobManager.manage_ai_jobs">
+<span class="sig-name descname"><span class="pre">manage_ai_jobs</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">case</span></span></em><span class="sig-paren">)</span><a class="reference internal" href="../_modules/cortex_job/cortex_utils/cortex_and_job_management.html#CortexJobManager.manage_ai_jobs"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#cortex_job.cortex_utils.cortex_and_job_management.CortexJobManager.manage_ai_jobs" title="Link to this definition"></a></dt>
+<dd><p>Manage AI jobs for a case.</p>
+<p>Updates the case and MailInfo models if AI analysis has completed.</p>
+<dl class="simple">
+<dt>Args:</dt><dd><p>case (Case): The case to manage.</p>
+</dd>
+</dl>
+</dd></dl>
+
+<dl class="py method">
+<dt class="sig sig-object py" id="cortex_job.cortex_utils.cortex_and_job_management.CortexJobManager.manage_jobs">
+<span class="sig-name descname"><span class="pre">manage_jobs</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">case</span></span></em><span class="sig-paren">)</span><a class="reference internal" href="../_modules/cortex_job/cortex_utils/cortex_and_job_management.html#CortexJobManager.manage_jobs"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#cortex_job.cortex_utils.cortex_and_job_management.CortexJobManager.manage_jobs" title="Link to this definition"></a></dt>
+<dd><p>Manage and update Cortex jobs for a given case, with user-friendly results and descriptions.</p>
+<p>Steps:
+1. Fetch results for the case (files, mail, IOCs, attachments, artifacts).
+2. Generate a user-friendly description and update case status.
+3. Retrieve final report if the case is complete.</p>
+<dl class="simple">
+<dt>Args:</dt><dd><p>case (Case): The case to process.</p>
+</dd>
+<dt>Returns:</dt><dd><p>None</p>
+</dd>
+</dl>
+</dd></dl>
+
+<dl class="py method">
+<dt class="sig sig-object py" id="cortex_job.cortex_utils.cortex_and_job_management.CortexJobManager.process_artifacts">
+<span class="sig-name descname"><span class="pre">process_artifacts</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">artifacts</span></span></em><span class="sig-paren">)</span><a class="reference internal" href="../_modules/cortex_job/cortex_utils/cortex_and_job_management.html#CortexJobManager.process_artifacts"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#cortex_job.cortex_utils.cortex_and_job_management.CortexJobManager.process_artifacts" title="Link to this definition"></a></dt>
+<dd><p>Process a list of artifacts using their corresponding processor methods.</p>
+<dl class="simple">
+<dt>Args:</dt><dd><p>artifacts (list): A list of artifacts to be processed.</p>
+</dd>
+<dt>Returns:</dt><dd><p>None</p>
+</dd>
+</dl>
+</dd></dl>
+
+<dl class="py method">
+<dt class="sig sig-object py" id="cortex_job.cortex_utils.cortex_and_job_management.CortexJobManager.process_attachments">
+<span class="sig-name descname"><span class="pre">process_attachments</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">attachments</span></span></em><span class="sig-paren">)</span><a class="reference internal" href="../_modules/cortex_job/cortex_utils/cortex_and_job_management.html#CortexJobManager.process_attachments"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#cortex_job.cortex_utils.cortex_and_job_management.CortexJobManager.process_attachments" title="Link to this definition"></a></dt>
+<dd><p>Process a list of attachments.</p>
+<dl class="simple">
+<dt>Args:</dt><dd><p>attachments (list): A list of attachments to be processed.</p>
+</dd>
+<dt>Returns:</dt><dd><p>None</p>
+</dd>
+</dl>
+</dd></dl>
+
+<dl class="py method">
+<dt class="sig sig-object py" id="cortex_job.cortex_utils.cortex_and_job_management.CortexJobManager.process_domain_artifact">
+<span class="sig-name descname"><span class="pre">process_domain_artifact</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">artifact</span></span></em><span class="sig-paren">)</span><a class="reference internal" href="../_modules/cortex_job/cortex_utils/cortex_and_job_management.html#CortexJobManager.process_domain_artifact"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#cortex_job.cortex_utils.cortex_and_job_management.CortexJobManager.process_domain_artifact" title="Link to this definition"></a></dt>
+<dd><p>Process a Domain artifact.</p>
+<dl class="simple">
+<dt>Args:</dt><dd><p>artifact: The Domain artifact to process.</p>
+</dd>
+<dt>Returns:</dt><dd><p>None</p>
+</dd>
+</dl>
+</dd></dl>
+
+<dl class="py method">
+<dt class="sig sig-object py" id="cortex_job.cortex_utils.cortex_and_job_management.CortexJobManager.process_file">
+<span class="sig-name descname"><span class="pre">process_file</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">file</span></span></em><span class="sig-paren">)</span><a class="reference internal" href="../_modules/cortex_job/cortex_utils/cortex_and_job_management.html#CortexJobManager.process_file"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#cortex_job.cortex_utils.cortex_and_job_management.CortexJobManager.process_file" title="Link to this definition"></a></dt>
+<dd><p>Process a file and update the results based on related reports.</p>
+<dl class="simple">
+<dt>Args:</dt><dd><p>file: The file to be processed.</p>
+</dd>
+<dt>Raises:</dt><dd><p>ValueError: If the file is None.</p>
+</dd>
+</dl>
+</dd></dl>
+
+<dl class="py method">
+<dt class="sig sig-object py" id="cortex_job.cortex_utils.cortex_and_job_management.CortexJobManager.process_hash_artifact">
+<span class="sig-name descname"><span class="pre">process_hash_artifact</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">artifact</span></span></em><span class="sig-paren">)</span><a class="reference internal" href="../_modules/cortex_job/cortex_utils/cortex_and_job_management.html#CortexJobManager.process_hash_artifact"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#cortex_job.cortex_utils.cortex_and_job_management.CortexJobManager.process_hash_artifact" title="Link to this definition"></a></dt>
+<dd><p>Process a Hash artifact.</p>
+<dl class="simple">
+<dt>Args:</dt><dd><p>artifact: The Hash artifact to process.</p>
+</dd>
+<dt>Returns:</dt><dd><p>None</p>
+</dd>
+</dl>
+</dd></dl>
+
+<dl class="py method">
+<dt class="sig sig-object py" id="cortex_job.cortex_utils.cortex_and_job_management.CortexJobManager.process_iocs">
+<span class="sig-name descname"><span class="pre">process_iocs</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">iocs</span></span></em><span class="sig-paren">)</span><a class="reference internal" href="../_modules/cortex_job/cortex_utils/cortex_and_job_management.html#CortexJobManager.process_iocs"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#cortex_job.cortex_utils.cortex_and_job_management.CortexJobManager.process_iocs" title="Link to this definition"></a></dt>
+<dd><p>Process a dictionary of Indicators of Compromise (IOCs).</p>
+<dl class="simple">
+<dt>Args:</dt><dd><dl class="simple">
+<dt>iocs (dict): A dictionary of IOCs to be processed.</dt><dd><p>Keys: type of IOC (url, ip, hash, domain, mail)
+Values: the actual IOC values.</p>
+</dd>
+</dl>
+</dd>
+<dt>Returns:</dt><dd><p>None</p>
+</dd>
+</dl>
+</dd></dl>
+
+<dl class="py method">
+<dt class="sig sig-object py" id="cortex_job.cortex_utils.cortex_and_job_management.CortexJobManager.process_ip_artifact">
+<span class="sig-name descname"><span class="pre">process_ip_artifact</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">artifact</span></span></em><span class="sig-paren">)</span><a class="reference internal" href="../_modules/cortex_job/cortex_utils/cortex_and_job_management.html#CortexJobManager.process_ip_artifact"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#cortex_job.cortex_utils.cortex_and_job_management.CortexJobManager.process_ip_artifact" title="Link to this definition"></a></dt>
+<dd></dd></dl>
+
+<dl class="py method">
+<dt class="sig sig-object py" id="cortex_job.cortex_utils.cortex_and_job_management.CortexJobManager.process_mail">
+<span class="sig-name descname"><span class="pre">process_mail</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">mail</span></span></em><span class="sig-paren">)</span><a class="reference internal" href="../_modules/cortex_job/cortex_utils/cortex_and_job_management.html#CortexJobManager.process_mail"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#cortex_job.cortex_utils.cortex_and_job_management.CortexJobManager.process_mail" title="Link to this definition"></a></dt>
+<dd><p>Process the given mail object.</p>
+<dl class="simple">
+<dt>Args:</dt><dd><p>mail: The mail object to be processed.</p>
+</dd>
+<dt>Raises:</dt><dd><p>ValueError: If the mail object is None.</p>
+</dd>
+</dl>
+</dd></dl>
+
+<dl class="py method">
+<dt class="sig sig-object py" id="cortex_job.cortex_utils.cortex_and_job_management.CortexJobManager.process_mail_archive">
+<span class="sig-name descname"><span class="pre">process_mail_archive</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">mail_archive</span></span></em><span class="sig-paren">)</span><a class="reference internal" href="../_modules/cortex_job/cortex_utils/cortex_and_job_management.html#CortexJobManager.process_mail_archive"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#cortex_job.cortex_utils.cortex_and_job_management.CortexJobManager.process_mail_archive" title="Link to this definition"></a></dt>
+<dd><p>Process a mail archive.</p>
+<dl class="simple">
+<dt>Args:</dt><dd><p>mail_archive: The mail archive file to be processed.</p>
+</dd>
+<dt>Raises:</dt><dd><p>ValueError: If mail_archive is None.</p>
+</dd>
+</dl>
+</dd></dl>
+
+<dl class="py method">
+<dt class="sig sig-object py" id="cortex_job.cortex_utils.cortex_and_job_management.CortexJobManager.process_mail_artifact">
+<span class="sig-name descname"><span class="pre">process_mail_artifact</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">artifact</span></span></em><span class="sig-paren">)</span><a class="reference internal" href="../_modules/cortex_job/cortex_utils/cortex_and_job_management.html#CortexJobManager.process_mail_artifact"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#cortex_job.cortex_utils.cortex_and_job_management.CortexJobManager.process_mail_artifact" title="Link to this definition"></a></dt>
+<dd><p>Process a Mail artifact.</p>
+<dl class="simple">
+<dt>Args:</dt><dd><p>artifact: The Mail artifact to process.</p>
+</dd>
+<dt>Returns:</dt><dd><p>None</p>
+</dd>
+</dl>
+</dd></dl>
+
+<dl class="py method">
+<dt class="sig sig-object py" id="cortex_job.cortex_utils.cortex_and_job_management.CortexJobManager.process_url_artifact">
+<span class="sig-name descname"><span class="pre">process_url_artifact</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">artifact</span></span></em><span class="sig-paren">)</span><a class="reference internal" href="../_modules/cortex_job/cortex_utils/cortex_and_job_management.html#CortexJobManager.process_url_artifact"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#cortex_job.cortex_utils.cortex_and_job_management.CortexJobManager.process_url_artifact" title="Link to this definition"></a></dt>
+<dd><p>Process a URL artifact.</p>
+<dl class="simple">
+<dt>Args:</dt><dd><p>artifact: The URL artifact to process.</p>
+</dd>
+<dt>Returns:</dt><dd><p>None</p>
+</dd>
+</dl>
+</dd></dl>
+
+<dl class="py method">
+<dt class="sig sig-object py" id="cortex_job.cortex_utils.cortex_and_job_management.CortexJobManager.update_mail_models">
+<span class="sig-name descname"><span class="pre">update_mail_models</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">mail_info</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">classification</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">sub_classification</span></span></em><span class="sig-paren">)</span><a class="reference internal" href="../_modules/cortex_job/cortex_utils/cortex_and_job_management.html#CortexJobManager.update_mail_models"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#cortex_job.cortex_utils.cortex_and_job_management.CortexJobManager.update_mail_models" title="Link to this definition"></a></dt>
+<dd><p>Update MailInfo model based on classification results.</p>
+<dl class="simple">
+<dt>Args:</dt><dd><p>mail_info (MailInfo): The mail info object to update.
+classification (str): The main classification of the mail.
+sub_classification (str): The subclassification of the mail.</p>
+</dd>
+</dl>
+</dd></dl>
+
+<dl class="py method">
+<dt class="sig sig-object py" id="cortex_job.cortex_utils.cortex_and_job_management.CortexJobManager.update_report_instance">
+<em class="property"><span class="k"><span class="pre">static</span></span><span class="w"> </span></em><span class="sig-name descname"><span class="pre">update_report_instance</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">report_instance</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">job</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">report</span></span></em><span class="sig-paren">)</span><a class="reference internal" href="../_modules/cortex_job/cortex_utils/cortex_and_job_management.html#CortexJobManager.update_report_instance"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#cortex_job.cortex_utils.cortex_and_job_management.CortexJobManager.update_report_instance" title="Link to this definition"></a></dt>
+<dd><p>Update report_instance fields efficiently, return list of changed fields.</p>
+</dd></dl>
+
+<dl class="py method">
+<dt class="sig sig-object py" id="cortex_job.cortex_utils.cortex_and_job_management.CortexJobManager.update_results">
+<span class="sig-name descname"><span class="pre">update_results</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">data_type</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">reports</span></span></em><span class="sig-paren">)</span><a class="reference internal" href="../_modules/cortex_job/cortex_utils/cortex_and_job_management.html#CortexJobManager.update_results"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#cortex_job.cortex_utils.cortex_and_job_management.CortexJobManager.update_results" title="Link to this definition"></a></dt>
+<dd><p>Update the results of the Cortex jobs with the given data type and reports.</p>
+<p>Deduplicates and cleans report IDs before inserting them.</p>
+</dd></dl>
+
+</dd></dl>
+
+</section>
+
+
+           </div>
+          </div>
+          <footer><div class="rst-footer-buttons" role="navigation" aria-label="Footer">
+        <a href="case_handler_core.html" class="btn btn-neutral float-left" title="Case Handler module" accesskey="p" rel="prev"><span class="fa fa-arrow-circle-left" aria-hidden="true"></span> Previous</a>
+        <a href="dashboard_core.html" class="btn btn-neutral float-right" title="Dashboard module" accesskey="n" rel="next">Next <span class="fa fa-arrow-circle-right" aria-hidden="true"></span></a>
+    </div>
+
+  <hr/>
+
+  <div role="contentinfo">
+    <p>&#169; Copyright 2025, Theo Bhang, Esteban Crispel.</p>
+  </div>
+
+  Built with <a href="https://www.sphinx-doc.org/">Sphinx</a> using a
+    <a href="https://github.com/readthedocs/sphinx_rtd_theme">theme</a>
+    provided by <a href="https://readthedocs.org">Read the Docs</a>.
+   
+
+</footer>
+        </div>
+      </div>
+    </section>
+  </div>
+  <script>
+      jQuery(function () {
+          SphinxRtdTheme.Navigation.enable(true);
+      });
+  </script> 
+
+</body>
+</html>

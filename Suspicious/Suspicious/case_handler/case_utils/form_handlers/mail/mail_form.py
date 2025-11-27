@@ -5,7 +5,8 @@ from email import policy
 from email.parser import BytesParser
 from pathlib import Path
 
-from mail_feeder.mail_utils.mail import EmailHandler, EmailProcessor
+from mail_feeder.web_submission.web import WebSubmissionService
+from mail_feeder.web_submission.models import WebSubmissionConfig
 
 from case_handler.case_utils.form_handlers.mail.converters import convert_msg_to_eml
 from case_handler.case_utils.form_handlers.mail.email_processing.service import ProcessEmailService
@@ -53,10 +54,10 @@ class MailFormHandler:
         3. Create local directory to store the mail.
         4. Parse email, process content and attachments.
         5. Upload local directory to MinIO.
-        6. Archive directory and process using EmailProcessor.
+        6. Archive directory and process using WebSubmissionService.
 
         Returns:
-            instance from EmailProcessor or None on failure.
+            instance from WebSubmissionService or None on failure.
         """
         user_prefix = self.user.username.split('@')[0]
         mail_id = generate_object_reference()
@@ -109,9 +110,8 @@ class MailFormHandler:
             logger.warning("Failed to archive directory: %s", e)
 
         try:
-            email_handler = EmailHandler()
-            instance = EmailProcessor(email_handler).process_emails_from_web_submission(
-                str(local_dir), self.user.username
+            instance = WebSubmissionService().process_emails(
+                WebSubmissionConfig(user_email=self.user.username, workdir=str(local_dir))
             )
             return instance
         except Exception as e:

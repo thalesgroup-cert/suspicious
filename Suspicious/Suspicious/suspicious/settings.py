@@ -298,13 +298,13 @@ CRONTAB_LOCK_JOBS = True
 # Each job is run every minute and logs to a specific file in /tmp
 # Consider adjusting the frequency of these jobs based on their cost and your needs
 CRONJOBS = [
-    ('*/1 * * * *', 'tasp.cron.fetch_and_process_emails', '>> /var/log/fetched_mail.log'),
-    ('*/1 * * * *', 'tasp.cron.sync_cortex_analyzers'),
-    ('*/1 * * * *', 'tasp.cron.update_ongoing_case_jobs', '>> /var/log/case_updating.log'),
-    ('*/5 * * * *', 'tasp.cron.sync_monthly_kpi'),
-    ('*/10 * * * *', 'tasp.cron.sync_user_profiles'),
-    ('0 0 1 * *', 'tasp.cron.delete_old_analyzer_reports', '>> /var/log/cleanup_phishing.log'),
-    ('0 0 * * *', 'tasp.cron.remove_old_suspicious_emails', '>> /var/log/cleanup_phishing.log')
+    ('*/1 * * * *', 'tasp.cron.fetch_emails.fetch_and_process_emails', '>> /var/log/fetched_mail.log'),
+    ('*/1 * * * *', 'tasp.cron.sync_cortex.sync_cortex_analyzers'),
+    ('*/1 * * * *', 'tasp.cron.user_and_cases.update_ongoing_case_jobs', '>> /var/log/case_updating.log'),
+    ('*/5 * * * *', 'tasp.cron.kpi.sync_monthly_kpi'),
+    ('*/10 * * * *', 'tasp.cron.user_and_cases.sync_user_profiles'),
+    ('0 0 1 * *', 'tasp.cron.cleanup.delete_old_analyzer_reports', '>> /var/log/cleanup_phishing.log'),
+    ('0 0 * * *', 'tasp.cron.suspicious.remove_old_suspicious_emails', '>> /var/log/cleanup_phishing.log')
 ]
 # Consider adding error handling or notifications for when these jobs fail
 # This could be as simple as checking the return code of the job, or as complex as sending an email on failure

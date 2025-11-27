@@ -1,0 +1,247 @@
+
+
+<!DOCTYPE html>
+<html class="writer-html5" lang="en" data-content_root="../../../">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>url_process.url_utils.url_handler &mdash; Suspicious 1.0.0 documentation</title>
+      <link rel="stylesheet" type="text/css" href="../../../_static/pygments.css?v=b86133f3" />
+      <link rel="stylesheet" type="text/css" href="../../../_static/css/theme.css?v=e59714d7" />
+
+  
+      <script src="../../../_static/jquery.js?v=5d32c60e"></script>
+      <script src="../../../_static/_sphinx_javascript_frameworks_compat.js?v=2cd50e6c"></script>
+      <script src="../../../_static/documentation_options.js?v=8d563738"></script>
+      <script src="../../../_static/doctools.js?v=9bcbadda"></script>
+      <script src="../../../_static/sphinx_highlight.js?v=dc90522c"></script>
+    <script src="../../../_static/js/theme.js"></script>
+    <link rel="index" title="Index" href="../../../genindex.html" />
+    <link rel="search" title="Search" href="../../../search.html" /> 
+</head>
+
+<body class="wy-body-for-nav"> 
+  <div class="wy-grid-for-nav">
+    <nav data-toggle="wy-nav-shift" class="wy-nav-side">
+      <div class="wy-side-scroll">
+        <div class="wy-side-nav-search" >
+
+          
+          
+          <a href="../../../index.html" class="icon icon-home">
+            Suspicious
+          </a>
+<div role="search">
+  <form id="rtd-search-form" class="wy-form" action="../../../search.html" method="get">
+    <input type="text" name="q" placeholder="Search docs" aria-label="Search docs" />
+    <input type="hidden" name="check_keywords" value="yes" />
+    <input type="hidden" name="area" value="default" />
+  </form>
+</div>
+        </div><div class="wy-menu wy-menu-vertical" data-spy="affix" role="navigation" aria-label="Navigation menu">
+              <p class="caption" role="heading"><span class="caption-text">Contents:</span></p>
+<ul>
+<li class="toctree-l1"><a class="reference internal" href="../../../modules/index.html">Modules (API Reference)</a></li>
+</ul>
+
+        </div>
+      </div>
+    </nav>
+
+    <section data-toggle="wy-nav-shift" class="wy-nav-content-wrap"><nav class="wy-nav-top" aria-label="Mobile navigation menu" >
+          <i data-toggle="wy-nav-top" class="fa fa-bars"></i>
+          <a href="../../../index.html">Suspicious</a>
+      </nav>
+
+      <div class="wy-nav-content">
+        <div class="rst-content">
+          <div role="navigation" aria-label="Page navigation">
+  <ul class="wy-breadcrumbs">
+      <li><a href="../../../index.html" class="icon icon-home" aria-label="Home"></a></li>
+          <li class="breadcrumb-item"><a href="../../index.html">Module code</a></li>
+      <li class="breadcrumb-item active">url_process.url_utils.url_handler</li>
+      <li class="wy-breadcrumbs-aside">
+      </li>
+  </ul>
+  <hr/>
+</div>
+          <div role="main" class="document" itemscope="itemscope" itemtype="http://schema.org/Article">
+           <div itemprop="articleBody">
+             
+  <h1>Source code for url_process.url_utils.url_handler</h1><div class="highlight"><pre>
+<span></span><span class="kn">import</span><span class="w"> </span><span class="nn">logging</span>
+<span class="kn">from</span><span class="w"> </span><span class="nn">urllib.parse</span><span class="w"> </span><span class="kn">import</span> <span class="n">urlparse</span>
+<span class="kn">import</span><span class="w"> </span><span class="nn">json</span>
+<span class="kn">from</span><span class="w"> </span><span class="nn">typing</span><span class="w"> </span><span class="kn">import</span> <span class="n">Optional</span><span class="p">,</span> <span class="n">Tuple</span>
+
+<span class="kn">from</span><span class="w"> </span><span class="nn">domain_process.domain_utils.domain_handler</span><span class="w"> </span><span class="kn">import</span> <span class="n">DomainHandler</span>
+<span class="kn">from</span><span class="w"> </span><span class="nn">url_process.models</span><span class="w"> </span><span class="kn">import</span> <span class="n">URL</span>
+<span class="kn">from</span><span class="w"> </span><span class="nn">domain_process.models</span><span class="w"> </span><span class="kn">import</span> <span class="n">Domain</span><span class="p">,</span> <span class="n">DomainInIocs</span>
+
+<span class="n">logger</span> <span class="o">=</span> <span class="n">logging</span><span class="o">.</span><span class="n">getLogger</span><span class="p">(</span><span class="vm">__name__</span><span class="p">)</span>
+
+<span class="k">try</span><span class="p">:</span>
+    <span class="k">with</span> <span class="nb">open</span><span class="p">(</span><span class="s2">&quot;/app/settings.json&quot;</span><span class="p">)</span> <span class="k">as</span> <span class="n">config_file</span><span class="p">:</span>
+        <span class="n">config</span> <span class="o">=</span> <span class="n">json</span><span class="o">.</span><span class="n">load</span><span class="p">(</span><span class="n">config_file</span><span class="p">)</span>
+<span class="k">except</span> <span class="p">(</span><span class="ne">FileNotFoundError</span><span class="p">,</span> <span class="n">json</span><span class="o">.</span><span class="n">JSONDecodeError</span><span class="p">)</span> <span class="k">as</span> <span class="n">e</span><span class="p">:</span>
+    <span class="n">logger</span><span class="o">.</span><span class="n">error</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;Config loading error: </span><span class="si">{</span><span class="n">e</span><span class="si">}</span><span class="s2">&quot;</span><span class="p">)</span>
+    <span class="n">config</span> <span class="o">=</span> <span class="p">{}</span>
+
+<span class="n">suspicious_config</span> <span class="o">=</span> <span class="n">config</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="s1">&#39;suspicious&#39;</span><span class="p">,</span> <span class="p">{})</span>
+
+
+<div class="viewcode-block" id="URLHandler">
+<a class="viewcode-back" href="../../../modules/url_process_core.html#url_process.url_utils.url_handler.URLHandler">[docs]</a>
+<span class="k">class</span><span class="w"> </span><span class="nc">URLHandler</span><span class="p">:</span>
+<span class="w">    </span><span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">    Handler class to process URLs and related Domain objects.</span>
+<span class="sd">    &quot;&quot;&quot;</span>
+
+<div class="viewcode-block" id="URLHandler.handle_url">
+<a class="viewcode-back" href="../../../modules/url_process_core.html#url_process.url_utils.url_handler.URLHandler.handle_url">[docs]</a>
+    <span class="k">def</span><span class="w"> </span><span class="nf">handle_url</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">url</span><span class="p">:</span> <span class="nb">str</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="n">Tuple</span><span class="p">[</span><span class="n">Optional</span><span class="p">[</span><span class="n">URL</span><span class="p">],</span> <span class="n">Optional</span><span class="p">[</span><span class="n">Domain</span><span class="p">]]:</span>
+<span class="w">        </span><span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">        Process the given URL or domain string to create or update corresponding models.</span>
+
+<span class="sd">        Args:</span>
+<span class="sd">            url (str): The URL string to handle.</span>
+
+<span class="sd">        Returns:</span>
+<span class="sd">            Tuple[Optional[URL], Optional[Domain]]:</span>
+<span class="sd">                - URL instance and Domain instance if the URL is valid.</span>
+<span class="sd">                - (None, Domain instance) if input is a domain.</span>
+<span class="sd">                - (None, None) if input is invalid or processing fails.</span>
+<span class="sd">        &quot;&quot;&quot;</span>
+        <span class="n">domain_handler</span> <span class="o">=</span> <span class="n">DomainHandler</span><span class="p">()</span>
+        <span class="n">domain_type</span> <span class="o">=</span> <span class="n">domain_handler</span><span class="o">.</span><span class="n">validate_domain</span><span class="p">(</span><span class="n">url</span><span class="p">)</span>
+
+        <span class="k">if</span> <span class="n">domain_type</span> <span class="o">==</span> <span class="s2">&quot;Domain&quot;</span><span class="p">:</span>
+            <span class="n">domain_instance</span> <span class="o">=</span> <span class="n">domain_handler</span><span class="o">.</span><span class="n">handle_domain</span><span class="p">(</span><span class="n">url</span><span class="p">)</span>
+            <span class="k">return</span> <span class="kc">None</span><span class="p">,</span> <span class="n">domain_instance</span>
+        <span class="k">elif</span> <span class="n">domain_type</span> <span class="o">==</span> <span class="s2">&quot;Url&quot;</span><span class="p">:</span>
+            <span class="k">return</span> <span class="n">URLHandler</span><span class="p">()</span><span class="o">.</span><span class="n">_create_or_update_url</span><span class="p">(</span><span class="n">url</span><span class="p">)</span>
+        <span class="k">else</span><span class="p">:</span>
+            <span class="k">return</span> <span class="kc">None</span><span class="p">,</span> <span class="kc">None</span></div>
+
+
+    <span class="k">def</span><span class="w"> </span><span class="nf">_create_or_update_url</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">url</span><span class="p">:</span> <span class="nb">str</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="n">Tuple</span><span class="p">[</span><span class="n">Optional</span><span class="p">[</span><span class="n">URL</span><span class="p">],</span> <span class="n">Optional</span><span class="p">[</span><span class="n">Domain</span><span class="p">]]:</span>
+<span class="w">        </span><span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">        Create or update URL and corresponding DomainInIocs models.</span>
+
+<span class="sd">        Args:</span>
+<span class="sd">            url (str): The URL string to create or update.</span>
+
+<span class="sd">        Returns:</span>
+<span class="sd">            Tuple[Optional[URL], Optional[Domain]]:</span>
+<span class="sd">                The URL and Domain instances if successful, otherwise (None, None).</span>
+<span class="sd">        &quot;&quot;&quot;</span>
+        <span class="k">try</span><span class="p">:</span>
+            <span class="n">url_instance</span><span class="p">,</span> <span class="n">created</span> <span class="o">=</span> <span class="n">URL</span><span class="o">.</span><span class="n">objects</span><span class="o">.</span><span class="n">get_or_create</span><span class="p">(</span><span class="n">address</span><span class="o">=</span><span class="n">url</span><span class="p">)</span>
+            <span class="k">if</span> <span class="ow">not</span> <span class="n">created</span><span class="p">:</span>
+                <span class="bp">self</span><span class="o">.</span><span class="n">_increment_times_sent</span><span class="p">(</span><span class="n">url_instance</span><span class="p">)</span>
+
+            <span class="n">domain_str</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">get_domain</span><span class="p">(</span><span class="n">url_instance</span><span class="o">.</span><span class="n">address</span><span class="p">)</span>
+            <span class="k">if</span> <span class="n">domain_str</span> <span class="ow">is</span> <span class="kc">None</span><span class="p">:</span>
+                <span class="n">logger</span><span class="o">.</span><span class="n">error</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;Failed to extract domain from URL: </span><span class="si">{</span><span class="n">url</span><span class="si">}</span><span class="s2">&quot;</span><span class="p">)</span>
+                <span class="k">return</span> <span class="kc">None</span><span class="p">,</span> <span class="kc">None</span>
+
+            <span class="n">domain_instance</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">_create_or_update_domain</span><span class="p">(</span><span class="n">domain_str</span><span class="p">)</span>
+            <span class="k">if</span> <span class="n">domain_instance</span> <span class="ow">is</span> <span class="kc">None</span><span class="p">:</span>
+                <span class="k">return</span> <span class="kc">None</span><span class="p">,</span> <span class="kc">None</span>
+
+            <span class="n">domain_in_iocs</span><span class="p">,</span> <span class="n">created</span> <span class="o">=</span> <span class="n">DomainInIocs</span><span class="o">.</span><span class="n">objects</span><span class="o">.</span><span class="n">get_or_create</span><span class="p">(</span><span class="n">domain</span><span class="o">=</span><span class="n">domain_instance</span><span class="p">)</span>
+            <span class="n">domain_in_iocs</span><span class="o">.</span><span class="n">url</span> <span class="o">=</span> <span class="n">url_instance</span>
+            <span class="n">domain_in_iocs</span><span class="o">.</span><span class="n">save</span><span class="p">()</span>
+
+            <span class="k">return</span> <span class="n">url_instance</span><span class="p">,</span> <span class="n">domain_instance</span>
+
+        <span class="k">except</span> <span class="ne">Exception</span> <span class="k">as</span> <span class="n">e</span><span class="p">:</span>
+            <span class="n">logger</span><span class="o">.</span><span class="n">error</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;Error handling URL </span><span class="si">{</span><span class="n">url</span><span class="si">}</span><span class="s2">: </span><span class="si">{</span><span class="n">e</span><span class="si">}</span><span class="s2">&quot;</span><span class="p">)</span>
+            <span class="k">return</span> <span class="kc">None</span><span class="p">,</span> <span class="kc">None</span>
+
+    <span class="k">def</span><span class="w"> </span><span class="nf">_create_or_update_domain</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">domain</span><span class="p">:</span> <span class="nb">str</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="n">Optional</span><span class="p">[</span><span class="n">Domain</span><span class="p">]:</span>
+<span class="w">        </span><span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">        Create or update a Domain model instance.</span>
+
+<span class="sd">        Args:</span>
+<span class="sd">            domain (str): The domain string to create or update.</span>
+
+<span class="sd">        Returns:</span>
+<span class="sd">            Optional[Domain]: The Domain instance if successful, None otherwise.</span>
+<span class="sd">        &quot;&quot;&quot;</span>
+        <span class="k">try</span><span class="p">:</span>
+            <span class="n">domain_instance</span><span class="p">,</span> <span class="n">created</span> <span class="o">=</span> <span class="n">Domain</span><span class="o">.</span><span class="n">objects</span><span class="o">.</span><span class="n">get_or_create</span><span class="p">(</span><span class="n">value</span><span class="o">=</span><span class="n">domain</span><span class="p">)</span>
+            <span class="k">if</span> <span class="ow">not</span> <span class="n">created</span><span class="p">:</span>
+                <span class="bp">self</span><span class="o">.</span><span class="n">_increment_times_sent</span><span class="p">(</span><span class="n">domain_instance</span><span class="p">)</span>
+            <span class="k">return</span> <span class="n">domain_instance</span>
+        <span class="k">except</span> <span class="ne">Exception</span> <span class="k">as</span> <span class="n">e</span><span class="p">:</span>
+            <span class="n">logger</span><span class="o">.</span><span class="n">error</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;Error handling domain </span><span class="si">{</span><span class="n">domain</span><span class="si">}</span><span class="s2">: </span><span class="si">{</span><span class="n">e</span><span class="si">}</span><span class="s2">&quot;</span><span class="p">)</span>
+            <span class="k">return</span> <span class="kc">None</span>
+
+    <span class="k">def</span><span class="w"> </span><span class="nf">_increment_times_sent</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">instance</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="kc">None</span><span class="p">:</span>
+<span class="w">        </span><span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">        Increment the times_sent attribute of a given model instance and save it.</span>
+
+<span class="sd">        Args:</span>
+<span class="sd">            instance: The model instance with a times_sent field.</span>
+<span class="sd">        &quot;&quot;&quot;</span>
+        <span class="n">instance</span><span class="o">.</span><span class="n">times_sent</span> <span class="o">=</span> <span class="p">(</span><span class="n">instance</span><span class="o">.</span><span class="n">times_sent</span> <span class="ow">or</span> <span class="mi">0</span><span class="p">)</span> <span class="o">+</span> <span class="mi">1</span>
+        <span class="n">instance</span><span class="o">.</span><span class="n">save</span><span class="p">(</span><span class="n">update_fields</span><span class="o">=</span><span class="p">[</span><span class="s2">&quot;times_sent&quot;</span><span class="p">])</span>
+
+<div class="viewcode-block" id="URLHandler.get_domain">
+<a class="viewcode-back" href="../../../modules/url_process_core.html#url_process.url_utils.url_handler.URLHandler.get_domain">[docs]</a>
+    <span class="nd">@staticmethod</span>
+    <span class="k">def</span><span class="w"> </span><span class="nf">get_domain</span><span class="p">(</span><span class="n">url</span><span class="p">:</span> <span class="nb">str</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="n">Optional</span><span class="p">[</span><span class="nb">str</span><span class="p">]:</span>
+<span class="w">        </span><span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">        Extract the domain from a given URL string, validating its type.</span>
+
+<span class="sd">        Args:</span>
+<span class="sd">            url (str): The URL string from which to extract the domain.</span>
+
+<span class="sd">        Returns:</span>
+<span class="sd">            Optional[str]: The domain string if valid, otherwise None.</span>
+<span class="sd">        &quot;&quot;&quot;</span>
+        <span class="k">try</span><span class="p">:</span>
+            <span class="n">domain</span> <span class="o">=</span> <span class="n">urlparse</span><span class="p">(</span><span class="n">url</span><span class="p">)</span><span class="o">.</span><span class="n">netloc</span><span class="o">.</span><span class="n">lower</span><span class="p">()</span>
+            <span class="k">if</span> <span class="n">domain</span><span class="o">.</span><span class="n">startswith</span><span class="p">(</span><span class="s2">&quot;www.&quot;</span><span class="p">):</span>
+                <span class="n">domain</span> <span class="o">=</span> <span class="n">domain</span><span class="p">[</span><span class="mi">4</span><span class="p">:]</span>
+
+            <span class="n">domain_type</span> <span class="o">=</span> <span class="n">DomainHandler</span><span class="p">()</span><span class="o">.</span><span class="n">validate_domain</span><span class="p">(</span><span class="n">domain</span><span class="p">)</span>
+            <span class="k">if</span> <span class="n">domain_type</span> <span class="ow">in</span> <span class="p">{</span><span class="s2">&quot;Domain&quot;</span><span class="p">,</span> <span class="s2">&quot;Url&quot;</span><span class="p">}:</span>
+                <span class="k">return</span> <span class="n">domain</span>
+            <span class="k">return</span> <span class="kc">None</span>
+        <span class="k">except</span> <span class="ne">Exception</span> <span class="k">as</span> <span class="n">e</span><span class="p">:</span>
+            <span class="n">logger</span><span class="o">.</span><span class="n">error</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;Error extracting domain from URL </span><span class="si">{</span><span class="n">url</span><span class="si">}</span><span class="s2">: </span><span class="si">{</span><span class="n">e</span><span class="si">}</span><span class="s2">&quot;</span><span class="p">)</span>
+            <span class="k">return</span> <span class="kc">None</span></div>
+</div>
+
+</pre></div>
+
+           </div>
+          </div>
+          <footer>
+
+  <hr/>
+
+  <div role="contentinfo">
+    <p>&#169; Copyright 2025, Theo Bhang, Esteban Crispel.</p>
+  </div>
+
+  Built with <a href="https://www.sphinx-doc.org/">Sphinx</a> using a
+    <a href="https://github.com/readthedocs/sphinx_rtd_theme">theme</a>
+    provided by <a href="https://readthedocs.org">Read the Docs</a>.
+   
+
+</footer>
+        </div>
+      </div>
+    </section>
+  </div>
+  <script>
+      jQuery(function () {
+          SphinxRtdTheme.Navigation.enable(true);
+      });
+  </script> 
+
+</body>
+</html>

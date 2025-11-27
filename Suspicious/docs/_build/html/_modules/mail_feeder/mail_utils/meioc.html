@@ -1,0 +1,588 @@
+
+
+<!DOCTYPE html>
+<html class="writer-html5" lang="en" data-content_root="../../../">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>mail_feeder.mail_utils.meioc &mdash; Suspicious 1.0.0 documentation</title>
+      <link rel="stylesheet" type="text/css" href="../../../_static/pygments.css?v=b86133f3" />
+      <link rel="stylesheet" type="text/css" href="../../../_static/css/theme.css?v=e59714d7" />
+
+  
+      <script src="../../../_static/jquery.js?v=5d32c60e"></script>
+      <script src="../../../_static/_sphinx_javascript_frameworks_compat.js?v=2cd50e6c"></script>
+      <script src="../../../_static/documentation_options.js?v=8d563738"></script>
+      <script src="../../../_static/doctools.js?v=9bcbadda"></script>
+      <script src="../../../_static/sphinx_highlight.js?v=dc90522c"></script>
+    <script src="../../../_static/js/theme.js"></script>
+    <link rel="index" title="Index" href="../../../genindex.html" />
+    <link rel="search" title="Search" href="../../../search.html" /> 
+</head>
+
+<body class="wy-body-for-nav"> 
+  <div class="wy-grid-for-nav">
+    <nav data-toggle="wy-nav-shift" class="wy-nav-side">
+      <div class="wy-side-scroll">
+        <div class="wy-side-nav-search" >
+
+          
+          
+          <a href="../../../index.html" class="icon icon-home">
+            Suspicious
+          </a>
+<div role="search">
+  <form id="rtd-search-form" class="wy-form" action="../../../search.html" method="get">
+    <input type="text" name="q" placeholder="Search docs" aria-label="Search docs" />
+    <input type="hidden" name="check_keywords" value="yes" />
+    <input type="hidden" name="area" value="default" />
+  </form>
+</div>
+        </div><div class="wy-menu wy-menu-vertical" data-spy="affix" role="navigation" aria-label="Navigation menu">
+              <p class="caption" role="heading"><span class="caption-text">Contents:</span></p>
+<ul>
+<li class="toctree-l1"><a class="reference internal" href="../../../modules/index.html">Modules (API Reference)</a></li>
+</ul>
+
+        </div>
+      </div>
+    </nav>
+
+    <section data-toggle="wy-nav-shift" class="wy-nav-content-wrap"><nav class="wy-nav-top" aria-label="Mobile navigation menu" >
+          <i data-toggle="wy-nav-top" class="fa fa-bars"></i>
+          <a href="../../../index.html">Suspicious</a>
+      </nav>
+
+      <div class="wy-nav-content">
+        <div class="rst-content">
+          <div role="navigation" aria-label="Page navigation">
+  <ul class="wy-breadcrumbs">
+      <li><a href="../../../index.html" class="icon icon-home" aria-label="Home"></a></li>
+          <li class="breadcrumb-item"><a href="../../index.html">Module code</a></li>
+      <li class="breadcrumb-item active">mail_feeder.mail_utils.meioc</li>
+      <li class="wy-breadcrumbs-aside">
+      </li>
+  </ul>
+  <hr/>
+</div>
+          <div role="main" class="document" itemscope="itemscope" itemtype="http://schema.org/Article">
+           <div itemprop="articleBody">
+             
+  <h1>Source code for mail_feeder.mail_utils.meioc</h1><div class="highlight"><pre>
+<span></span><span class="ch">#!/usr/bin/env python3</span>
+<span class="c1"># This file is part of Meioc.</span>
+<span class="c1">#</span>
+<span class="c1"># Meioc was made with ♥ by Andrea Draghetti</span>
+<span class="c1">#</span>
+<span class="c1"># This file may be licensed under the terms of of the</span>
+<span class="c1"># GNU General Public License Version 3 (the ``GPL&#39;&#39;).</span>
+<span class="c1">#</span>
+<span class="kn">import</span><span class="w"> </span><span class="nn">os</span>
+            
+<span class="kn">import</span><span class="w"> </span><span class="nn">re</span>
+<span class="kn">from</span><span class="w"> </span><span class="nn">urllib.parse</span><span class="w"> </span><span class="kn">import</span> <span class="n">urlparse</span>
+<span class="kn">import</span><span class="w"> </span><span class="nn">spf</span>
+<span class="kn">import</span><span class="w"> </span><span class="nn">json</span>
+<span class="kn">import</span><span class="w"> </span><span class="nn">dkim</span>
+<span class="kn">import</span><span class="w"> </span><span class="nn">email</span>
+<span class="kn">import</span><span class="w"> </span><span class="nn">hashlib</span>
+<span class="kn">import</span><span class="w"> </span><span class="nn">warnings</span>
+<span class="kn">import</span><span class="w"> </span><span class="nn">argparse</span>
+<span class="kn">import</span><span class="w"> </span><span class="nn">ipaddress</span>
+<span class="kn">import</span><span class="w"> </span><span class="nn">logging</span>
+<span class="kn">import</span><span class="w"> </span><span class="nn">encodings</span>
+<span class="kn">import</span><span class="w"> </span><span class="nn">tldextract</span>
+<span class="kn">from</span><span class="w"> </span><span class="nn">pathlib</span><span class="w"> </span><span class="kn">import</span> <span class="n">Path</span>
+<span class="kn">from</span><span class="w"> </span><span class="nn">email</span><span class="w"> </span><span class="kn">import</span> <span class="n">policy</span>
+<span class="kn">from</span><span class="w"> </span><span class="nn">bs4</span><span class="w"> </span><span class="kn">import</span> <span class="n">BeautifulSoup</span>
+<span class="kn">from</span><span class="w"> </span><span class="nn">email.utils</span><span class="w"> </span><span class="kn">import</span> <span class="n">parseaddr</span>
+<span class="kn">from</span><span class="w"> </span><span class="nn">email</span><span class="w"> </span><span class="kn">import</span> <span class="n">message_from_bytes</span>
+
+<span class="n">encodings</span><span class="o">.</span><span class="n">aliases</span><span class="o">.</span><span class="n">aliases</span><span class="p">[</span><span class="s2">&quot;cp_850&quot;</span><span class="p">]</span> <span class="o">=</span> <span class="s2">&quot;cp850&quot;</span>
+<span class="n">warnings</span><span class="o">.</span><span class="n">simplefilter</span><span class="p">(</span><span class="n">action</span><span class="o">=</span><span class="s2">&quot;ignore&quot;</span><span class="p">,</span> <span class="n">category</span><span class="o">=</span><span class="ne">FutureWarning</span><span class="p">)</span>
+
+<span class="c1"># Precompile the regex pattern for email extraction</span>
+<span class="n">email_regex</span> <span class="o">=</span> <span class="n">re</span><span class="o">.</span><span class="n">compile</span><span class="p">(</span><span class="sa">r</span><span class="s2">&quot;[A-Za-z0-9.!#$%&amp;&#39;*+/=?^_`{|}~-]+@[A-Za-z0-9.-]+\.[A-Za-z]{2,}&quot;</span><span class="p">,</span> <span class="n">re</span><span class="o">.</span><span class="n">IGNORECASE</span><span class="p">)</span>
+<span class="n">TLD_CACHE_DIR</span> <span class="o">=</span> <span class="n">Path</span><span class="p">(</span><span class="s2">&quot;/app/Suspicious/domain_process/domain_utils/public&quot;</span><span class="p">)</span>
+<span class="n">HASH_PATTERNS</span> <span class="o">=</span> <span class="p">[</span>
+    <span class="sa">r</span><span class="s1">&#39;\b[a-f0-9]</span><span class="si">{32}</span><span class="s1">\b&#39;</span><span class="p">,</span>    <span class="c1"># MD5</span>
+    <span class="sa">r</span><span class="s1">&#39;\b[a-f0-9]</span><span class="si">{40}</span><span class="s1">\b&#39;</span><span class="p">,</span>    <span class="c1"># SHA1</span>
+    <span class="sa">r</span><span class="s1">&#39;\b[a-f0-9]</span><span class="si">{64}</span><span class="s1">\b&#39;</span>     <span class="c1"># SHA256</span>
+<span class="p">]</span>
+<span class="n">tldcache</span> <span class="o">=</span> <span class="n">tldextract</span><span class="o">.</span><span class="n">TLDExtract</span><span class="p">(</span>
+    <span class="n">cache_dir</span><span class="o">=</span><span class="nb">str</span><span class="p">(</span><span class="n">TLD_CACHE_DIR</span><span class="p">),</span>
+    <span class="n">fallback_to_snapshot</span><span class="o">=</span><span class="kc">True</span>
+<span class="p">)</span>
+<span class="n">fetch_mail_logger</span> <span class="o">=</span> <span class="n">logging</span><span class="o">.</span><span class="n">getLogger</span><span class="p">(</span><span class="s1">&#39;tasp.cron.fetch_and_process_emails&#39;</span><span class="p">)</span>
+
+<div class="viewcode-block" id="real_email">
+<a class="viewcode-back" href="../../../modules/mail_feeder_core.html#mail_feeder.mail_utils.meioc.real_email">[docs]</a>
+<span class="k">def</span><span class="w"> </span><span class="nf">real_email</span><span class="p">(</span><span class="n">string</span><span class="p">):</span>
+    <span class="c1"># A sender obfuscation technique involves entering two e-mails. Only the last one is the real one. Example:</span>
+    <span class="c1">#</span>
+    <span class="c1"># Sender Name: Mario Rossi &lt;rossi.mario@big-society.com&gt;</span>
+    <span class="c1"># Sender Mail: spoof@example.com</span>
+    <span class="c1"># From values is: &quot;Mario Rossi &lt;rossi.mario@big-society.com&gt;&quot; &lt;spoof@example.com&gt;</span>
+
+    <span class="k">try</span><span class="p">:</span>
+        <span class="n">sender_name</span><span class="p">,</span> <span class="n">email_address</span> <span class="o">=</span> <span class="n">parseaddr</span><span class="p">(</span><span class="n">string</span><span class="p">)</span>
+        <span class="k">return</span> <span class="n">email_address</span><span class="o">.</span><span class="n">lower</span><span class="p">()</span> <span class="k">if</span> <span class="n">email_address</span> <span class="k">else</span> <span class="kc">None</span>
+    <span class="k">except</span><span class="p">:</span>
+        <span class="k">return</span> <span class="n">result_meioc</span></div>
+
+
+<div class="viewcode-block" id="normalize_headers">
+<a class="viewcode-back" href="../../../modules/mail_feeder_core.html#mail_feeder.mail_utils.meioc.normalize_headers">[docs]</a>
+<span class="k">def</span><span class="w"> </span><span class="nf">normalize_headers</span><span class="p">(</span><span class="n">raw_email_bytes</span><span class="p">):</span>
+<span class="w">    </span><span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">    Normalize email headers by fixing spaces before &#39;:&#39; in a bytes-like email,</span>
+<span class="sd">    while preserving multi-line header continuation.</span>
+<span class="sd">    </span>
+<span class="sd">    Args:</span>
+<span class="sd">        raw_email_bytes (bytes): Raw email in bytes-like format.</span>
+<span class="sd">    Returns:</span>
+<span class="sd">        bytes: Normalized email in bytes-like format.</span>
+<span class="sd">    &quot;&quot;&quot;</span>
+
+    <span class="n">raw_email</span> <span class="o">=</span> <span class="n">raw_email_bytes</span><span class="o">.</span><span class="n">decode</span><span class="p">(</span><span class="s2">&quot;utf-8&quot;</span><span class="p">,</span> <span class="n">errors</span><span class="o">=</span><span class="s2">&quot;replace&quot;</span><span class="p">)</span>
+    
+    <span class="n">lines</span> <span class="o">=</span> <span class="n">raw_email</span><span class="o">.</span><span class="n">splitlines</span><span class="p">()</span>
+    <span class="n">normalized_lines</span> <span class="o">=</span> <span class="p">[]</span>
+    <span class="k">for</span> <span class="n">i</span><span class="p">,</span> <span class="n">line</span> <span class="ow">in</span> <span class="nb">enumerate</span><span class="p">(</span><span class="n">lines</span><span class="p">):</span>
+        <span class="k">if</span> <span class="n">line</span><span class="o">.</span><span class="n">startswith</span><span class="p">((</span><span class="s1">&#39; &#39;</span><span class="p">,</span> <span class="s1">&#39;</span><span class="se">\t</span><span class="s1">&#39;</span><span class="p">)):</span>
+            <span class="n">normalized_lines</span><span class="o">.</span><span class="n">append</span><span class="p">(</span><span class="n">line</span><span class="p">)</span>
+        <span class="k">else</span><span class="p">:</span>
+            <span class="k">if</span> <span class="s2">&quot;: &quot;</span> <span class="ow">in</span> <span class="n">line</span> <span class="ow">or</span> <span class="s2">&quot;:&quot;</span> <span class="ow">in</span> <span class="n">line</span><span class="p">:</span>
+                <span class="n">header</span><span class="p">,</span> <span class="n">sep</span><span class="p">,</span> <span class="n">value</span> <span class="o">=</span> <span class="n">line</span><span class="o">.</span><span class="n">partition</span><span class="p">(</span><span class="s2">&quot;:&quot;</span><span class="p">)</span>
+                <span class="n">header</span> <span class="o">=</span> <span class="n">header</span><span class="o">.</span><span class="n">strip</span><span class="p">()</span>
+                <span class="n">normalized_lines</span><span class="o">.</span><span class="n">append</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;</span><span class="si">{</span><span class="n">header</span><span class="si">}</span><span class="s2">:</span><span class="si">{</span><span class="n">value</span><span class="si">}</span><span class="s2">&quot;</span><span class="p">)</span>
+            <span class="k">else</span><span class="p">:</span>
+                <span class="n">normalized_lines</span><span class="o">.</span><span class="n">append</span><span class="p">(</span><span class="n">line</span><span class="p">)</span>
+    
+    <span class="n">normalized_email</span> <span class="o">=</span> <span class="s2">&quot;</span><span class="se">\n</span><span class="s2">&quot;</span><span class="o">.</span><span class="n">join</span><span class="p">(</span><span class="n">normalized_lines</span><span class="p">)</span>
+    <span class="k">return</span> <span class="n">normalized_email</span><span class="o">.</span><span class="n">encode</span><span class="p">(</span><span class="s2">&quot;utf-8&quot;</span><span class="p">)</span></div>
+
+
+<div class="viewcode-block" id="email_analysis">
+<a class="viewcode-back" href="../../../modules/mail_feeder_core.html#mail_feeder.mail_utils.meioc.email_analysis">[docs]</a>
+<span class="k">def</span><span class="w"> </span><span class="nf">email_analysis</span><span class="p">(</span><span class="n">filename</span><span class="p">,</span> <span class="n">exclude_private_ip</span><span class="p">,</span> <span class="n">check_spf</span><span class="p">,</span> <span class="n">check_dkim</span><span class="p">,</span> <span class="n">file_output</span><span class="p">):</span>
+    <span class="n">urls_list</span> <span class="o">=</span> <span class="p">[]</span>
+    <span class="n">body_Hash</span> <span class="o">=</span> <span class="p">[]</span>
+    <span class="n">hops_list</span> <span class="o">=</span> <span class="p">[]</span>
+    <span class="n">hops_list_ip</span> <span class="o">=</span> <span class="p">[]</span>
+    <span class="n">domains_list</span> <span class="o">=</span> <span class="p">[]</span>
+    <span class="n">attachments_ist</span> <span class="o">=</span> <span class="p">[]</span>
+    <span class="n">hops_list_ip_public</span> <span class="o">=</span> <span class="p">[]</span>
+    <span class="n">body_IP</span> <span class="o">=</span> <span class="p">[]</span>
+    <span class="n">body_email</span> <span class="o">=</span> <span class="p">[]</span>
+    
+    <span class="n">result_meioc</span> <span class="o">=</span> <span class="p">{</span>
+        <span class="s2">&quot;filename&quot;</span><span class="p">:</span> <span class="n">os</span><span class="o">.</span><span class="n">path</span><span class="o">.</span><span class="n">basename</span><span class="p">(</span><span class="n">filename</span><span class="p">),</span>
+        <span class="s2">&quot;from&quot;</span><span class="p">:</span> <span class="kc">None</span><span class="p">,</span>
+        <span class="s2">&quot;sender&quot;</span><span class="p">:</span> <span class="kc">None</span><span class="p">,</span>
+        <span class="s2">&quot;x-sender&quot;</span><span class="p">:</span> <span class="kc">None</span><span class="p">,</span>
+        <span class="s2">&quot;to&quot;</span><span class="p">:</span> <span class="kc">None</span><span class="p">,</span>
+        <span class="s2">&quot;cc&quot;</span><span class="p">:</span> <span class="kc">None</span><span class="p">,</span>
+        <span class="s2">&quot;bcc&quot;</span><span class="p">:</span> <span class="kc">None</span><span class="p">,</span>
+        <span class="s2">&quot;envelope-to&quot;</span><span class="p">:</span> <span class="kc">None</span><span class="p">,</span>
+        <span class="s2">&quot;delivered-to&quot;</span><span class="p">:</span> <span class="kc">None</span><span class="p">,</span>
+        <span class="s2">&quot;return-path&quot;</span><span class="p">:</span> <span class="kc">None</span><span class="p">,</span>
+        <span class="s2">&quot;subject&quot;</span><span class="p">:</span> <span class="kc">None</span><span class="p">,</span>
+        <span class="s2">&quot;date&quot;</span><span class="p">:</span> <span class="kc">None</span><span class="p">,</span>
+        <span class="s2">&quot;user-agent&quot;</span><span class="p">:</span> <span class="kc">None</span><span class="p">,</span>
+        <span class="s2">&quot;x-mailer&quot;</span><span class="p">:</span> <span class="kc">None</span><span class="p">,</span>
+        <span class="s2">&quot;x-originating-ip&quot;</span><span class="p">:</span> <span class="kc">None</span><span class="p">,</span>
+        <span class="s2">&quot;relay_full&quot;</span><span class="p">:</span> <span class="kc">None</span><span class="p">,</span>
+        <span class="s2">&quot;relay_ip&quot;</span><span class="p">:</span> <span class="kc">None</span><span class="p">,</span>
+        <span class="s2">&quot;body_ip&quot;</span><span class="p">:</span> <span class="kc">None</span><span class="p">,</span>
+        <span class="s2">&quot;body_hash&quot;</span><span class="p">:</span> <span class="kc">None</span><span class="p">,</span>
+        <span class="s2">&quot;body_email&quot;</span><span class="p">:</span> <span class="kc">None</span><span class="p">,</span>
+        <span class="s2">&quot;spf&quot;</span><span class="p">:</span> <span class="kc">None</span><span class="p">,</span>
+        <span class="s2">&quot;dkim&quot;</span><span class="p">:</span> <span class="kc">None</span><span class="p">,</span>
+        <span class="s2">&quot;urls&quot;</span><span class="p">:</span> <span class="kc">None</span><span class="p">,</span>
+        <span class="s2">&quot;domains&quot;</span><span class="p">:</span> <span class="kc">None</span><span class="p">,</span>
+        <span class="s2">&quot;attachments&quot;</span><span class="p">:</span> <span class="kc">None</span>
+    <span class="p">}</span>
+
+    <span class="n">fetch_mail_logger</span><span class="o">.</span><span class="n">debug</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;Processing email file: </span><span class="si">{</span><span class="n">filename</span><span class="si">}</span><span class="s2">&quot;</span><span class="p">)</span>
+    <span class="c1"># Open E-mail</span>
+    <span class="k">with</span> <span class="nb">open</span><span class="p">(</span><span class="n">filename</span><span class="p">,</span> <span class="s2">&quot;rb&quot;</span><span class="p">)</span> <span class="k">as</span> <span class="n">email_file</span><span class="p">:</span>
+        <span class="n">raw_email_content</span> <span class="o">=</span> <span class="n">email_file</span><span class="o">.</span><span class="n">read</span><span class="p">()</span>
+
+    <span class="n">fetch_mail_logger</span><span class="o">.</span><span class="n">debug</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;Raw email content read from file: </span><span class="si">{</span><span class="n">filename</span><span class="si">}</span><span class="s2">&quot;</span><span class="p">)</span>
+    <span class="c1"># Parsing E-mail</span>
+    <span class="k">try</span><span class="p">:</span>
+        <span class="k">if</span> <span class="n">raw_email_content</span><span class="p">:</span>
+            <span class="n">raw_email_content_normalized</span> <span class="o">=</span> <span class="n">normalize_headers</span><span class="p">(</span><span class="n">raw_email_content</span><span class="p">)</span>
+            <span class="n">parsed_email</span> <span class="o">=</span> <span class="n">message_from_bytes</span><span class="p">(</span><span class="n">raw_email_content_normalized</span><span class="p">,</span> <span class="n">policy</span><span class="o">=</span><span class="n">policy</span><span class="o">.</span><span class="n">default</span><span class="p">)</span>
+            <span class="n">fetch_mail_logger</span><span class="o">.</span><span class="n">debug</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;Email parsed successfully from file: </span><span class="si">{</span><span class="n">filename</span><span class="si">}</span><span class="s2">&quot;</span><span class="p">)</span>
+        <span class="k">else</span><span class="p">:</span>
+            <span class="n">fetch_mail_logger</span><span class="o">.</span><span class="n">error</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;Failed to read email content from file: </span><span class="si">{</span><span class="n">filename</span><span class="si">}</span><span class="s2">&quot;</span><span class="p">)</span>
+            <span class="k">return</span> <span class="n">result_meioc</span>
+    <span class="k">except</span> <span class="ne">Exception</span> <span class="k">as</span> <span class="n">e</span><span class="p">:</span>
+        <span class="n">fetch_mail_logger</span><span class="o">.</span><span class="n">error</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;Failed to parse email from file </span><span class="si">{</span><span class="n">filename</span><span class="si">}</span><span class="s2">: </span><span class="si">{</span><span class="n">e</span><span class="si">}</span><span class="s2">&quot;</span><span class="p">)</span>
+        <span class="k">return</span> <span class="n">result_meioc</span>
+    <span class="k">if</span> <span class="n">parsed_email</span><span class="p">:</span>
+        <span class="n">fetch_mail_logger</span><span class="o">.</span><span class="n">debug</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;Email parsed successfully: </span><span class="si">{</span><span class="n">parsed_email</span><span class="p">[</span><span class="s1">&#39;Subject&#39;</span><span class="p">]</span><span class="w"> </span><span class="k">if</span><span class="w"> </span><span class="s1">&#39;Subject&#39;</span><span class="w"> </span><span class="ow">in</span><span class="w"> </span><span class="n">parsed_email</span><span class="w"> </span><span class="k">else</span><span class="w"> </span><span class="s1">&#39;No Subject&#39;</span><span class="si">}</span><span class="s2">&quot;</span><span class="p">)</span>
+        <span class="c1">#</span>
+        <span class="c1"># Header analysis</span>
+        <span class="c1">#</span>
+        <span class="k">try</span><span class="p">:</span>
+            <span class="k">if</span> <span class="n">parsed_email</span><span class="p">[</span><span class="s2">&quot;Date&quot;</span><span class="p">]:</span>
+                <span class="n">result_meioc</span><span class="p">[</span><span class="s2">&quot;date&quot;</span><span class="p">]</span> <span class="o">=</span> <span class="n">parsed_email</span><span class="p">[</span><span class="s2">&quot;Date&quot;</span><span class="p">]</span>
+
+            <span class="k">if</span> <span class="n">parsed_email</span><span class="p">[</span><span class="s2">&quot;From&quot;</span><span class="p">]:</span>
+                <span class="n">mail_from</span> <span class="o">=</span> <span class="n">real_email</span><span class="p">(</span><span class="n">parsed_email</span><span class="p">[</span><span class="s2">&quot;From&quot;</span><span class="p">])</span>
+
+                <span class="k">if</span> <span class="n">mail_from</span><span class="p">:</span>
+                    <span class="n">result_meioc</span><span class="p">[</span><span class="s2">&quot;from&quot;</span><span class="p">]</span> <span class="o">=</span> <span class="n">mail_from</span>
+
+            <span class="k">if</span> <span class="n">parsed_email</span><span class="p">[</span><span class="s2">&quot;Sender&quot;</span><span class="p">]:</span>
+                <span class="n">mail_sender</span> <span class="o">=</span> <span class="n">real_email</span><span class="p">(</span><span class="n">parsed_email</span><span class="p">[</span><span class="s2">&quot;Sender&quot;</span><span class="p">])</span>
+
+                <span class="k">if</span> <span class="n">mail_sender</span><span class="p">:</span>
+                    <span class="n">result_meioc</span><span class="p">[</span><span class="s2">&quot;sender&quot;</span><span class="p">]</span> <span class="o">=</span> <span class="n">mail_sender</span>
+
+            <span class="k">if</span> <span class="n">parsed_email</span><span class="p">[</span><span class="s2">&quot;X-Sender&quot;</span><span class="p">]:</span>
+                <span class="n">mail_xsender</span> <span class="o">=</span> <span class="n">real_email</span><span class="p">(</span><span class="n">parsed_email</span><span class="p">[</span><span class="s2">&quot;X-Sender&quot;</span><span class="p">])</span>
+
+                <span class="k">if</span> <span class="n">mail_xsender</span><span class="p">:</span>
+                    <span class="n">result_meioc</span><span class="p">[</span><span class="s2">&quot;x-sender&quot;</span><span class="p">]</span> <span class="o">=</span> <span class="n">mail_xsender</span>
+
+            <span class="k">if</span> <span class="n">parsed_email</span><span class="p">[</span><span class="s2">&quot;To&quot;</span><span class="p">]:</span>
+                <span class="n">mail_to</span> <span class="o">=</span> <span class="n">email_regex</span><span class="o">.</span><span class="n">findall</span><span class="p">(</span><span class="n">parsed_email</span><span class="p">[</span><span class="s2">&quot;To&quot;</span><span class="p">])</span>
+                <span class="k">if</span> <span class="n">mail_to</span><span class="p">:</span>
+                    <span class="c1"># Convert to lower, remove possible duplicates, and create a numbered dictionary</span>
+                    <span class="n">mail_to</span> <span class="o">=</span> <span class="p">{</span><span class="n">i</span><span class="p">:</span> <span class="n">x</span><span class="o">.</span><span class="n">lower</span><span class="p">()</span> <span class="k">for</span> <span class="n">i</span><span class="p">,</span> <span class="n">x</span> <span class="ow">in</span> <span class="nb">enumerate</span><span class="p">(</span><span class="nb">set</span><span class="p">(</span><span class="n">mail_to</span><span class="p">))}</span>
+                    <span class="n">result_meioc</span><span class="p">[</span><span class="s2">&quot;to&quot;</span><span class="p">]</span> <span class="o">=</span> <span class="n">mail_to</span>
+
+            <span class="k">if</span> <span class="n">parsed_email</span><span class="p">[</span><span class="s2">&quot;Bcc&quot;</span><span class="p">]:</span>
+                <span class="n">result_meioc</span><span class="p">[</span><span class="s2">&quot;bcc&quot;</span><span class="p">]</span> <span class="o">=</span> <span class="n">parsed_email</span><span class="p">[</span><span class="s2">&quot;Bcc&quot;</span><span class="p">]</span><span class="o">.</span><span class="n">lower</span><span class="p">()</span>
+
+            <span class="k">if</span> <span class="n">parsed_email</span><span class="p">[</span><span class="s2">&quot;Cc&quot;</span><span class="p">]:</span>
+                <span class="n">mail_cc_list</span> <span class="o">=</span> <span class="p">[]</span>
+                <span class="k">for</span> <span class="n">mail</span> <span class="ow">in</span> <span class="n">parsed_email</span><span class="p">[</span><span class="s2">&quot;Cc&quot;</span><span class="p">]</span><span class="o">.</span><span class="n">split</span><span class="p">(</span><span class="s2">&quot;,&quot;</span><span class="p">):</span>
+                    <span class="n">mail_cc</span> <span class="o">=</span> <span class="n">real_email</span><span class="p">(</span><span class="n">mail</span><span class="p">)</span>
+
+                    <span class="k">if</span> <span class="n">mail_cc</span><span class="p">:</span>
+                        <span class="n">mail_cc_list</span><span class="o">.</span><span class="n">append</span><span class="p">(</span><span class="n">mail_cc</span><span class="p">)</span>
+
+                <span class="k">if</span> <span class="n">mail_cc_list</span><span class="p">:</span>
+                    <span class="c1"># Convert to lower, remove possible duplicates, and create a numbered dictionary</span>
+                    <span class="n">mail_cc_list</span> <span class="o">=</span> <span class="p">{</span><span class="n">i</span><span class="p">:</span> <span class="n">x</span><span class="o">.</span><span class="n">lower</span><span class="p">()</span> <span class="k">for</span> <span class="n">i</span><span class="p">,</span> <span class="n">x</span> <span class="ow">in</span> <span class="nb">enumerate</span><span class="p">(</span><span class="nb">set</span><span class="p">(</span><span class="n">mail_cc_list</span><span class="p">))}</span>
+                    <span class="n">result_meioc</span><span class="p">[</span><span class="s2">&quot;cc&quot;</span><span class="p">]</span> <span class="o">=</span> <span class="n">mail_cc_list</span>
+
+
+            <span class="k">if</span> <span class="n">parsed_email</span><span class="p">[</span><span class="s2">&quot;Message-ID&quot;</span><span class="p">]:</span>
+                <span class="n">result_meioc</span><span class="p">[</span><span class="s2">&quot;message-id&quot;</span><span class="p">]</span> <span class="o">=</span> <span class="n">parsed_email</span><span class="p">[</span><span class="s2">&quot;Message-ID&quot;</span><span class="p">]</span>
+
+            <span class="k">if</span> <span class="n">parsed_email</span><span class="p">[</span><span class="s2">&quot;Reply-To&quot;</span><span class="p">]:</span>
+                <span class="n">result_meioc</span><span class="p">[</span><span class="s2">&quot;reply-to&quot;</span><span class="p">]</span> <span class="o">=</span> <span class="n">re</span><span class="o">.</span><span class="n">findall</span><span class="p">(</span><span class="sa">r</span><span class="s2">&quot;[A-Za-z0-9.!#$%&amp;&#39;*+\/=?^_`{|}~\-]+@[A-Za-z0-9.-]+\.[A-Za-z]{2,6}&quot;</span><span class="p">,</span> <span class="n">parsed_email</span><span class="p">[</span><span class="s2">&quot;Reply-To&quot;</span><span class="p">][</span><span class="mi">0</span><span class="p">],</span>
+                                    <span class="n">re</span><span class="o">.</span><span class="n">IGNORECASE</span><span class="p">)</span>
+            <span class="k">if</span> <span class="n">parsed_email</span><span class="p">[</span><span class="s2">&quot;Envelope-to&quot;</span><span class="p">]:</span>
+
+                <span class="n">mail_envelopeto</span> <span class="o">=</span> <span class="n">email_regex</span><span class="o">.</span><span class="n">findall</span><span class="p">(</span><span class="n">parsed_email</span><span class="p">[</span><span class="s2">&quot;Envelope-to&quot;</span><span class="p">])</span>
+
+                <span class="k">if</span> <span class="n">mail_envelopeto</span><span class="p">:</span>
+                    <span class="c1"># Convert to lower, remove possible duplicates, and create a numbered dictionary</span>
+                    <span class="n">mail_envelopeto</span> <span class="o">=</span> <span class="p">{</span><span class="n">i</span><span class="p">:</span> <span class="n">x</span><span class="o">.</span><span class="n">lower</span><span class="p">()</span> <span class="k">for</span> <span class="n">i</span><span class="p">,</span> <span class="n">x</span> <span class="ow">in</span> <span class="nb">enumerate</span><span class="p">(</span><span class="nb">set</span><span class="p">(</span><span class="n">mail_envelopeto</span><span class="p">))}</span>
+                    <span class="n">result_meioc</span><span class="p">[</span><span class="s2">&quot;envelope-to&quot;</span><span class="p">]</span> <span class="o">=</span> <span class="n">mail_envelopeto</span>
+
+            <span class="k">if</span> <span class="n">parsed_email</span><span class="p">[</span><span class="s2">&quot;Delivered-To&quot;</span><span class="p">]:</span>
+                <span class="n">result_meioc</span><span class="p">[</span><span class="s2">&quot;delivered-to&quot;</span><span class="p">]</span> <span class="o">=</span> <span class="n">parsed_email</span><span class="p">[</span><span class="s2">&quot;Delivered-To&quot;</span><span class="p">]</span><span class="o">.</span><span class="n">lower</span><span class="p">()</span>
+
+            <span class="k">if</span> <span class="n">parsed_email</span><span class="p">[</span><span class="s2">&quot;Return-Path&quot;</span><span class="p">]:</span>
+                <span class="n">mail_returnpath</span> <span class="o">=</span> <span class="n">real_email</span><span class="p">(</span><span class="n">parsed_email</span><span class="p">[</span><span class="s2">&quot;Return-Path&quot;</span><span class="p">])</span>
+
+                <span class="k">if</span> <span class="n">mail_returnpath</span><span class="p">:</span>
+                    <span class="n">result_meioc</span><span class="p">[</span><span class="s2">&quot;return-path&quot;</span><span class="p">]</span> <span class="o">=</span> <span class="n">mail_returnpath</span>
+
+            <span class="k">if</span> <span class="n">parsed_email</span><span class="p">[</span><span class="s2">&quot;User-Agent&quot;</span><span class="p">]:</span>
+                <span class="n">result_meioc</span><span class="p">[</span><span class="s2">&quot;user-agent&quot;</span><span class="p">]</span> <span class="o">=</span> <span class="n">parsed_email</span><span class="p">[</span><span class="s2">&quot;User-Agent&quot;</span><span class="p">]</span>
+
+            <span class="k">if</span> <span class="n">parsed_email</span><span class="p">[</span><span class="s2">&quot;X-Mailer&quot;</span><span class="p">]:</span>
+                <span class="n">result_meioc</span><span class="p">[</span><span class="s2">&quot;x-mailer&quot;</span><span class="p">]</span> <span class="o">=</span> <span class="n">parsed_email</span><span class="p">[</span><span class="s2">&quot;X-Mailer&quot;</span><span class="p">]</span>
+
+            <span class="k">if</span> <span class="n">parsed_email</span><span class="p">[</span><span class="s2">&quot;X-Originating-IP&quot;</span><span class="p">]:</span>
+                <span class="c1"># Usually the IP is in square brackets, I remove them if present.</span>
+                <span class="n">mail_xorigip</span> <span class="o">=</span> <span class="n">parsed_email</span><span class="p">[</span><span class="s2">&quot;X-Originating-IP&quot;</span><span class="p">]</span><span class="o">.</span><span class="n">replace</span><span class="p">(</span><span class="s2">&quot;[&quot;</span><span class="p">,</span> <span class="s2">&quot;&quot;</span><span class="p">)</span><span class="o">.</span><span class="n">replace</span><span class="p">(</span><span class="s2">&quot;]&quot;</span><span class="p">,</span> <span class="s2">&quot;&quot;</span><span class="p">)</span>
+                <span class="n">result_meioc</span><span class="p">[</span><span class="s2">&quot;x-originating-ip&quot;</span><span class="p">]</span> <span class="o">=</span> <span class="n">mail_xorigip</span>
+
+            <span class="k">if</span> <span class="n">parsed_email</span><span class="p">[</span><span class="s2">&quot;Subject&quot;</span><span class="p">]:</span>
+                <span class="n">result_meioc</span><span class="p">[</span><span class="s2">&quot;subject&quot;</span><span class="p">]</span> <span class="o">=</span> <span class="n">parsed_email</span><span class="p">[</span><span class="s2">&quot;Subject&quot;</span><span class="p">]</span>
+            <span class="c1">#</span>
+            <span class="c1"># Identify each relay</span>
+            <span class="c1">#</span>
+            <span class="n">fetch_mail_logger</span><span class="o">.</span><span class="n">debug</span><span class="p">(</span><span class="s2">&quot;Identifying relays in email headers&quot;</span><span class="p">)</span>
+            <span class="n">received</span> <span class="o">=</span> <span class="n">parsed_email</span><span class="o">.</span><span class="n">get_all</span><span class="p">(</span><span class="s2">&quot;Received&quot;</span><span class="p">)</span>
+            <span class="k">if</span> <span class="n">received</span><span class="p">:</span>
+                <span class="n">received</span><span class="o">.</span><span class="n">reverse</span><span class="p">()</span>
+                <span class="k">for</span> <span class="n">line</span> <span class="ow">in</span> <span class="n">received</span><span class="p">:</span>
+                    <span class="n">hops</span> <span class="o">=</span> <span class="n">re</span><span class="o">.</span><span class="n">findall</span><span class="p">(</span><span class="s2">&quot;from\s+(.*?)\s+by(.*?)(?:(?:with|via)(.*?)(?:id|$)|id|$)&quot;</span><span class="p">,</span> <span class="n">line</span><span class="p">,</span> <span class="n">re</span><span class="o">.</span><span class="n">DOTALL</span> <span class="o">|</span> <span class="n">re</span><span class="o">.</span><span class="n">X</span><span class="p">)</span>
+                    <span class="k">for</span> <span class="n">hop</span> <span class="ow">in</span> <span class="n">hops</span><span class="p">:</span>
+
+                        <span class="c1">#ipv4_address = re.findall(r&quot;\b((25[0-5]|2[0-4][0-9]|1[0-9]{2}|[1-9]?[0-9])\.){3}(25[0-5]|2[0-4][0-9]|1[0-9]{2}|[1-9]?[0-9])\b&quot;, hop[0])</span>
+                        
+                        <span class="n">ipv4_address</span> <span class="o">=</span> <span class="n">re</span><span class="o">.</span><span class="n">findall</span><span class="p">(</span><span class="sa">r</span><span class="s2">&quot;[0-9]+(?:\.[0-9]+)</span><span class="si">{3}</span><span class="s2">&quot;</span><span class="p">,</span> <span class="n">hop</span><span class="p">[</span><span class="mi">0</span><span class="p">],</span> <span class="n">re</span><span class="o">.</span><span class="n">DOTALL</span> <span class="o">|</span> <span class="n">re</span><span class="o">.</span><span class="n">X</span><span class="p">)</span>
+
+                        <span class="c1"># https://gist.github.com/dfee/6ed3a4b05cfe7a6faf40a2102408d5d8</span>
+                        <span class="n">ipv6_address</span> <span class="o">=</span> <span class="n">re</span><span class="o">.</span><span class="n">findall</span><span class="p">(</span>
+                            <span class="sa">r</span><span class="s2">&quot;(?:(?:(?:(?:[0-9a-fA-F]){1,4}):){1,4}:[^\s:](?:(?:(?:25[0-5]|(?:2[0-4]|1{0,1}[0-9]){0,1}[0-9]).){3,3}(?:25[0-5]|(?:2[0-4]|1{0,1}[0-9]){0,1}[0-9])))|(?:::(?:ffff(?::0{1,4}){0,1}:){0,1}[^\s:](?:(?:(?:25[0-5]|(?:2[0-4]|1{0,1}[0-9]){0,1}[0-9]).){3,3}(?:25[0-5]|(?:2[0-4]|1{0,1}[0-9]){0,1}[0-9])))|(?:fe80:(?::(?:(?:[0-9a-fA-F]){1,4})){0,4}%[0-9a-zA-Z]{1,})|(?::(?:(?::(?:(?:[0-9a-fA-F]){1,4})){1,7}|:))|(?:(?:(?:[0-9a-fA-F]){1,4}):(?:(?::(?:(?:[0-9a-fA-F]){1,4})){1,6}))|(?:(?:(?:(?:[0-9a-fA-F]){1,4}):){1,2}(?::(?:(?:[0-9a-fA-F]){1,4})){1,5})|(?:(?:(?:(?:[0-9a-fA-F]){1,4}):){1,3}(?::(?:(?:[0-9a-fA-F]){1,4})){1,4})|(?:(?:(?:(?:[0-9a-fA-F]){1,4}):){1,4}(?::(?:(?:[0-9a-fA-F]){1,4})){1,3})|(?:(?:(?:(?:[0-9a-fA-F]){1,4}):){1,5}(?::(?:(?:[0-9a-fA-F]){1,4})){1,2})|(?:(?:(?:(?:[0-9a-fA-F]){1,4}):){1,6}:(?:(?:[0-9a-fA-F]){1,4}))|(?:(?:(?:(?:[0-9a-fA-F]){1,4}):){1,7}:)|(?:(?:(?:(?:[0-9a-fA-F]){1,4}):){7,7}(?:(?:[0-9a-fA-F]){1,4}))&quot;</span><span class="p">,</span>
+                            <span class="n">hop</span><span class="p">[</span><span class="mi">0</span><span class="p">],</span> <span class="n">re</span><span class="o">.</span><span class="n">DOTALL</span> <span class="o">|</span> <span class="n">re</span><span class="o">.</span><span class="n">X</span><span class="p">)</span>
+
+                        <span class="k">if</span> <span class="n">ipv4_address</span><span class="p">:</span>
+                            <span class="k">for</span> <span class="n">ipv4</span> <span class="ow">in</span> <span class="n">ipv4_address</span><span class="p">:</span>
+                                <span class="k">if</span> <span class="n">ipaddress</span><span class="o">.</span><span class="n">ip_address</span><span class="p">(</span><span class="n">ipv4</span><span class="p">):</span>
+                                    <span class="n">hops_list_ip</span><span class="o">.</span><span class="n">append</span><span class="p">(</span><span class="n">ipv4</span><span class="p">)</span>
+                                    <span class="k">if</span> <span class="ow">not</span> <span class="n">ipaddress</span><span class="o">.</span><span class="n">ip_address</span><span class="p">(</span><span class="n">ipv4</span><span class="p">)</span><span class="o">.</span><span class="n">is_private</span><span class="p">:</span>
+                                        <span class="n">hops_list_ip_public</span><span class="o">.</span><span class="n">append</span><span class="p">(</span><span class="n">ipv4</span><span class="p">)</span>
+
+                        <span class="k">if</span> <span class="n">ipv6_address</span><span class="p">:</span>
+                            <span class="k">for</span> <span class="n">ipv6</span> <span class="ow">in</span> <span class="n">ipv6_address</span><span class="p">:</span>
+                                <span class="k">if</span> <span class="n">ipaddress</span><span class="o">.</span><span class="n">ip_address</span><span class="p">(</span><span class="n">ipv6</span><span class="p">)</span> <span class="ow">and</span> <span class="ow">not</span> <span class="s2">&quot;6::&quot;</span><span class="p">:</span>
+                                    <span class="n">hops_list_ip</span><span class="o">.</span><span class="n">append</span><span class="p">(</span><span class="n">ipv6</span><span class="p">)</span>
+
+                                    <span class="k">if</span> <span class="ow">not</span> <span class="n">ipaddress</span><span class="o">.</span><span class="n">ip_address</span><span class="p">(</span><span class="n">ipv6</span><span class="p">)</span><span class="o">.</span><span class="n">is_private</span><span class="p">:</span>
+                                        <span class="n">hops_list_ip_public</span><span class="o">.</span><span class="n">append</span><span class="p">(</span><span class="n">ipv6</span><span class="p">)</span>
+
+                        <span class="k">if</span> <span class="n">hop</span><span class="p">[</span><span class="mi">0</span><span class="p">]:</span>
+                            <span class="n">hops_list</span><span class="o">.</span><span class="n">append</span><span class="p">(</span><span class="n">hop</span><span class="p">[</span><span class="mi">0</span><span class="p">])</span>
+
+            <span class="k">if</span> <span class="n">hops_list</span><span class="p">:</span>
+                <span class="n">result_meioc</span><span class="p">[</span><span class="s2">&quot;relay_full&quot;</span><span class="p">]</span> <span class="o">=</span> <span class="nb">dict</span><span class="p">(</span><span class="nb">zip</span><span class="p">(</span><span class="nb">range</span><span class="p">(</span><span class="nb">len</span><span class="p">(</span><span class="n">hops_list</span><span class="p">)),</span> <span class="n">hops_list</span><span class="p">))</span>
+
+            <span class="k">if</span> <span class="n">hops_list_ip</span><span class="p">:</span>
+                <span class="k">if</span> <span class="n">exclude_private_ip</span><span class="p">:</span>
+                    <span class="n">result_meioc</span><span class="p">[</span><span class="s2">&quot;relay_ip&quot;</span><span class="p">]</span> <span class="o">=</span> <span class="nb">dict</span><span class="p">(</span><span class="nb">zip</span><span class="p">(</span><span class="nb">range</span><span class="p">(</span><span class="nb">len</span><span class="p">(</span><span class="n">hops_list_ip_public</span><span class="p">)),</span> <span class="n">hops_list_ip_public</span><span class="p">))</span>
+                <span class="k">else</span><span class="p">:</span>
+                    <span class="n">result_meioc</span><span class="p">[</span><span class="s2">&quot;relay_ip&quot;</span><span class="p">]</span> <span class="o">=</span> <span class="nb">dict</span><span class="p">(</span><span class="nb">zip</span><span class="p">(</span><span class="nb">range</span><span class="p">(</span><span class="nb">len</span><span class="p">(</span><span class="n">hops_list_ip</span><span class="p">)),</span> <span class="n">hops_list_ip</span><span class="p">))</span>
+        <span class="k">except</span> <span class="ne">Exception</span> <span class="k">as</span> <span class="n">e</span><span class="p">:</span>
+            <span class="n">fetch_mail_logger</span><span class="o">.</span><span class="n">error</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;Error processing email headers: </span><span class="si">{</span><span class="n">e</span><span class="si">}</span><span class="s2">&quot;</span><span class="p">)</span>
+            <span class="k">return</span> <span class="n">result_meioc</span>
+        <span class="n">fetch_mail_logger</span><span class="o">.</span><span class="n">debug</span><span class="p">(</span><span class="s2">&quot;Header analysis completed successfully&quot;</span><span class="p">)</span>
+        <span class="c1">#</span>
+        <span class="c1"># Body analysis</span>
+        <span class="c1">#</span>
+        <span class="k">try</span><span class="p">:</span>
+            <span class="n">fetch_mail_logger</span><span class="o">.</span><span class="n">debug</span><span class="p">(</span><span class="s2">&quot;Extracting URLs, IPs, emails, and hashes from email body&quot;</span><span class="p">)</span>
+
+            <span class="n">candidates</span> <span class="o">=</span> <span class="p">[]</span>
+            <span class="k">for</span> <span class="n">part</span> <span class="ow">in</span> <span class="n">parsed_email</span><span class="o">.</span><span class="n">walk</span><span class="p">():</span>
+
+                <span class="n">payload</span> <span class="o">=</span> <span class="n">part</span><span class="o">.</span><span class="n">get_payload</span><span class="p">(</span><span class="n">decode</span><span class="o">=</span><span class="kc">True</span><span class="p">)</span>
+                <span class="k">if</span> <span class="ow">not</span> <span class="n">payload</span><span class="p">:</span>
+                    <span class="k">continue</span>
+                <span class="n">text</span> <span class="o">=</span> <span class="n">payload</span><span class="o">.</span><span class="n">decode</span><span class="p">(</span><span class="s1">&#39;utf-8&#39;</span><span class="p">,</span> <span class="n">errors</span><span class="o">=</span><span class="s1">&#39;ignore&#39;</span><span class="p">)</span>
+
+                <span class="k">if</span> <span class="n">part</span><span class="o">.</span><span class="n">get_content_type</span><span class="p">()</span> <span class="o">==</span> <span class="s2">&quot;text/plain&quot;</span><span class="p">:</span>
+                    <span class="c1"># Regex is based on what Diego Perini shared:</span>
+                    <span class="c1"># https://gist.github.com/dperini/729294</span>
+                    <span class="n">candidates</span><span class="o">.</span><span class="n">extend</span><span class="p">(</span><span class="n">re</span><span class="o">.</span><span class="n">findall</span><span class="p">(</span><span class="sa">r</span><span class="s1">&#39;(?:https?://|www\.)[^\s&lt;&gt;&quot;]+&#39;</span><span class="p">,</span> <span class="n">text</span><span class="p">))</span>
+                    <span class="n">body_IP</span><span class="o">.</span><span class="n">extend</span><span class="p">(</span><span class="n">re</span><span class="o">.</span><span class="n">findall</span><span class="p">(</span><span class="sa">r</span><span class="s2">&quot;[0-9]+(?:\.[0-9]+)</span><span class="si">{3}</span><span class="s2">&quot;</span><span class="p">,</span> <span class="nb">str</span><span class="p">(</span><span class="n">part</span><span class="o">.</span><span class="n">get_payload</span><span class="p">()),</span> <span class="n">re</span><span class="o">.</span><span class="n">DOTALL</span> <span class="o">|</span> <span class="n">re</span><span class="o">.</span><span class="n">X</span><span class="p">))</span>
+
+                    <span class="n">body_email</span><span class="o">.</span><span class="n">extend</span><span class="p">(</span><span class="n">re</span><span class="o">.</span><span class="n">findall</span><span class="p">(</span><span class="sa">r</span><span class="s2">&quot;[A-Za-z0-9.!#$%&amp;&#39;*+\/=?^_`{|}~\-]+@[A-Za-z0-9.-]+\.[A-Za-z]{2,6}&quot;</span><span class="p">,</span> <span class="n">part</span><span class="o">.</span><span class="n">get_content</span><span class="p">(),</span>
+                                    <span class="n">re</span><span class="o">.</span><span class="n">IGNORECASE</span><span class="p">))</span>
+
+                    <span class="k">for</span> <span class="n">pattern</span> <span class="ow">in</span> <span class="n">HASH_PATTERNS</span><span class="p">:</span>
+                        <span class="n">body_Hash</span><span class="o">.</span><span class="n">extend</span><span class="p">(</span><span class="n">re</span><span class="o">.</span><span class="n">findall</span><span class="p">(</span><span class="n">pattern</span><span class="p">,</span> <span class="n">part</span><span class="o">.</span><span class="n">get_content</span><span class="p">(),</span> <span class="n">re</span><span class="o">.</span><span class="n">IGNORECASE</span><span class="p">))</span>
+
+                <span class="c1"># Extracts each URL identified in the e-mail in text/html format</span>
+                <span class="k">if</span> <span class="n">part</span><span class="o">.</span><span class="n">get_content_type</span><span class="p">()</span> <span class="o">==</span> <span class="s2">&quot;text/html&quot;</span><span class="p">:</span>
+                    <span class="c1"># The try/except is necessary, if the body of the e-mail contains an incorrect or unencoded HTML code the script freeezes.</span>
+                    <span class="k">try</span><span class="p">:</span>
+                        <span class="n">soup</span> <span class="o">=</span> <span class="n">BeautifulSoup</span><span class="p">(</span><span class="n">text</span><span class="p">,</span> <span class="s1">&#39;html.parser&#39;</span><span class="p">)</span>
+                        <span class="k">for</span> <span class="n">a</span> <span class="ow">in</span> <span class="n">soup</span><span class="o">.</span><span class="n">find_all</span><span class="p">(</span><span class="s1">&#39;a&#39;</span><span class="p">,</span> <span class="n">href</span><span class="o">=</span><span class="kc">True</span><span class="p">):</span>
+                            <span class="n">candidates</span><span class="o">.</span><span class="n">append</span><span class="p">(</span><span class="n">a</span><span class="p">[</span><span class="s1">&#39;href&#39;</span><span class="p">])</span>
+                        <span class="n">body_IP</span><span class="o">.</span><span class="n">extend</span><span class="p">(</span><span class="n">re</span><span class="o">.</span><span class="n">findall</span><span class="p">(</span><span class="sa">r</span><span class="s2">&quot;[0-9]+(?:\.[0-9]+)</span><span class="si">{3}</span><span class="s2">&quot;</span><span class="p">,</span> <span class="nb">str</span><span class="p">(</span><span class="n">part</span><span class="o">.</span><span class="n">get_payload</span><span class="p">()),</span> <span class="n">re</span><span class="o">.</span><span class="n">DOTALL</span> <span class="o">|</span> <span class="n">re</span><span class="o">.</span><span class="n">X</span><span class="p">))</span>
+
+                        <span class="n">body_email</span><span class="o">.</span><span class="n">extend</span><span class="p">(</span><span class="n">re</span><span class="o">.</span><span class="n">findall</span><span class="p">(</span><span class="sa">r</span><span class="s2">&quot;[A-Za-z0-9.!#$%&amp;&#39;*+\/=?^_`{|}~\-]+@[A-Za-z0-9.-]+\.[A-Za-z]{2,6}&quot;</span><span class="p">,</span> <span class="n">part</span><span class="o">.</span><span class="n">get_content</span><span class="p">(),</span>
+                            <span class="n">re</span><span class="o">.</span><span class="n">IGNORECASE</span><span class="p">))</span>
+                        <span class="k">for</span> <span class="n">pattern</span> <span class="ow">in</span> <span class="n">HASH_PATTERNS</span><span class="p">:</span>
+                            <span class="n">body_Hash</span><span class="o">.</span><span class="n">extend</span><span class="p">(</span><span class="n">re</span><span class="o">.</span><span class="n">findall</span><span class="p">(</span><span class="n">pattern</span><span class="p">,</span> <span class="n">part</span><span class="o">.</span><span class="n">get_content</span><span class="p">(),</span> <span class="n">re</span><span class="o">.</span><span class="n">IGNORECASE</span><span class="p">))</span>
+                    <span class="k">except</span><span class="p">:</span>
+                        <span class="k">pass</span>
+
+                <span class="c1"># Extracts information from each file attached to the e-mail</span>
+                <span class="k">if</span> <span class="n">part</span><span class="o">.</span><span class="n">get_filename</span><span class="p">():</span>
+                    <span class="k">if</span> <span class="n">part</span><span class="o">.</span><span class="n">get_payload</span><span class="p">(</span><span class="n">decode</span><span class="o">=</span><span class="kc">True</span><span class="p">):</span>
+                        <span class="n">filename</span> <span class="o">=</span> <span class="n">part</span><span class="o">.</span><span class="n">get_filename</span><span class="p">()</span>
+                        <span class="n">filemd5</span> <span class="o">=</span> <span class="n">hashlib</span><span class="o">.</span><span class="n">md5</span><span class="p">(</span><span class="n">part</span><span class="o">.</span><span class="n">get_payload</span><span class="p">(</span><span class="n">decode</span><span class="o">=</span><span class="kc">True</span><span class="p">))</span><span class="o">.</span><span class="n">hexdigest</span><span class="p">()</span>
+                        <span class="n">filesha1</span> <span class="o">=</span> <span class="n">hashlib</span><span class="o">.</span><span class="n">sha1</span><span class="p">(</span><span class="n">part</span><span class="o">.</span><span class="n">get_payload</span><span class="p">(</span><span class="n">decode</span><span class="o">=</span><span class="kc">True</span><span class="p">))</span><span class="o">.</span><span class="n">hexdigest</span><span class="p">()</span>
+                        <span class="n">filesha256</span> <span class="o">=</span> <span class="n">hashlib</span><span class="o">.</span><span class="n">sha256</span><span class="p">(</span><span class="n">part</span><span class="o">.</span><span class="n">get_payload</span><span class="p">(</span><span class="n">decode</span><span class="o">=</span><span class="kc">True</span><span class="p">))</span><span class="o">.</span><span class="n">hexdigest</span><span class="p">()</span>
+
+                        <span class="n">attachments_ist</span><span class="o">.</span><span class="n">append</span><span class="p">({</span><span class="s2">&quot;filename&quot;</span><span class="p">:</span> <span class="n">filename</span><span class="p">,</span> <span class="s2">&quot;MD5&quot;</span><span class="p">:</span> <span class="n">filemd5</span><span class="p">,</span> <span class="s2">&quot;SHA1&quot;</span><span class="p">:</span> <span class="n">filesha1</span><span class="p">,</span>
+                                                <span class="s2">&quot;SHA256&quot;</span><span class="p">:</span> <span class="n">filesha256</span><span class="p">})</span>
+
+            <span class="n">seen</span> <span class="o">=</span> <span class="nb">set</span><span class="p">()</span>
+            <span class="k">for</span> <span class="n">url</span> <span class="ow">in</span> <span class="n">candidates</span><span class="p">:</span>
+                <span class="n">url</span> <span class="o">=</span> <span class="n">url</span><span class="o">.</span><span class="n">rstrip</span><span class="p">(</span><span class="s1">&#39;.,;:&#39;</span><span class="p">)</span>  <span class="c1"># trim trailing punctuation</span>
+                <span class="n">lower</span> <span class="o">=</span> <span class="n">url</span><span class="o">.</span><span class="n">lower</span><span class="p">()</span>
+                <span class="k">if</span> <span class="n">lower</span><span class="o">.</span><span class="n">startswith</span><span class="p">(</span><span class="s1">&#39;mailto:&#39;</span><span class="p">)</span> <span class="ow">or</span> <span class="n">lower</span><span class="o">.</span><span class="n">startswith</span><span class="p">(</span><span class="s1">&#39;ftp:&#39;</span><span class="p">):</span>
+                    <span class="k">continue</span>  <span class="c1"># skip mailto/ftp</span>
+                <span class="c1"># Ensure scheme for parsing</span>
+                <span class="k">if</span> <span class="ow">not</span> <span class="n">lower</span><span class="o">.</span><span class="n">startswith</span><span class="p">((</span><span class="s1">&#39;http://&#39;</span><span class="p">,</span><span class="s1">&#39;https://&#39;</span><span class="p">)):</span>
+                    <span class="n">url</span> <span class="o">=</span> <span class="s1">&#39;http://&#39;</span> <span class="o">+</span> <span class="n">url</span>
+                <span class="n">parsed</span> <span class="o">=</span> <span class="n">urlparse</span><span class="p">(</span><span class="n">url</span><span class="p">)</span>
+                <span class="n">host</span> <span class="o">=</span> <span class="n">parsed</span><span class="o">.</span><span class="n">hostname</span> <span class="ow">or</span> <span class="s1">&#39;&#39;</span>
+                <span class="c1"># Skip IP-only hosts</span>
+                <span class="k">if</span> <span class="n">host</span><span class="o">.</span><span class="n">replace</span><span class="p">(</span><span class="s1">&#39;.&#39;</span><span class="p">,</span> <span class="s1">&#39;&#39;</span><span class="p">)</span><span class="o">.</span><span class="n">isdigit</span><span class="p">()</span> <span class="ow">or</span> <span class="s1">&#39;:&#39;</span> <span class="ow">in</span> <span class="n">host</span><span class="p">:</span>
+                    <span class="k">continue</span>
+                <span class="n">clean</span> <span class="o">=</span> <span class="n">parsed</span><span class="o">.</span><span class="n">geturl</span><span class="p">()</span>
+                <span class="k">if</span> <span class="n">clean</span> <span class="ow">not</span> <span class="ow">in</span> <span class="n">seen</span><span class="p">:</span>
+                    <span class="n">seen</span><span class="o">.</span><span class="n">add</span><span class="p">(</span><span class="n">clean</span><span class="p">)</span>
+                    <span class="n">urls_list</span><span class="o">.</span><span class="n">append</span><span class="p">(</span><span class="n">clean</span><span class="p">)</span>
+        <span class="k">except</span> <span class="ne">Exception</span> <span class="k">as</span> <span class="n">e</span><span class="p">:</span>
+            <span class="n">fetch_mail_logger</span><span class="o">.</span><span class="n">error</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;Error processing email body: </span><span class="si">{</span><span class="n">e</span><span class="si">}</span><span class="s2">&quot;</span><span class="p">)</span>
+            <span class="k">return</span> <span class="n">result_meioc</span>
+        
+        <span class="n">fetch_mail_logger</span><span class="o">.</span><span class="n">debug</span><span class="p">(</span><span class="s2">&quot;Body analysis completed successfully&quot;</span><span class="p">)</span>
+        
+        <span class="c1">#</span>
+        <span class="c1"># Identify each domain reported in the e-mail body</span>
+        <span class="k">try</span><span class="p">:</span>
+            <span class="k">for</span> <span class="n">url</span> <span class="ow">in</span> <span class="n">urls_list</span><span class="p">:</span>
+                <span class="n">tldextract</span><span class="o">.</span><span class="n">TLDExtract</span><span class="p">(</span>
+                    <span class="n">cache_dir</span><span class="o">=</span><span class="nb">str</span><span class="p">(</span><span class="n">TLD_CACHE_DIR</span><span class="p">),</span>
+                    <span class="n">fallback_to_snapshot</span><span class="o">=</span><span class="kc">True</span>
+                <span class="p">)</span>
+                <span class="n">analyzed_domain</span> <span class="o">=</span> <span class="n">tldcache</span><span class="p">(</span><span class="n">url</span><span class="p">)</span><span class="o">.</span><span class="n">registered_domain</span>
+                <span class="k">if</span> <span class="n">analyzed_domain</span><span class="p">:</span>
+                    <span class="n">domains_list</span><span class="o">.</span><span class="n">append</span><span class="p">(</span><span class="n">analyzed_domain</span><span class="p">)</span>
+        <span class="k">except</span> <span class="ne">Exception</span> <span class="k">as</span> <span class="n">e</span><span class="p">:</span>
+            <span class="n">fetch_mail_logger</span><span class="o">.</span><span class="n">error</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;Error processing email domains: </span><span class="si">{</span><span class="n">e</span><span class="si">}</span><span class="s2">&quot;</span><span class="p">)</span>
+            <span class="k">return</span> <span class="n">result_meioc</span>
+        <span class="c1"># Remove Duplicate from List</span>
+        <span class="n">urls_list</span> <span class="o">=</span> <span class="nb">list</span><span class="p">(</span><span class="nb">set</span><span class="p">(</span><span class="n">urls_list</span><span class="p">))</span>
+        <span class="n">domains_list</span> <span class="o">=</span> <span class="nb">list</span><span class="p">(</span><span class="nb">set</span><span class="p">(</span><span class="n">domains_list</span><span class="p">))</span>
+
+        <span class="k">if</span> <span class="n">urls_list</span><span class="p">:</span>
+            <span class="n">result_meioc</span><span class="p">[</span><span class="s2">&quot;urls&quot;</span><span class="p">]</span> <span class="o">=</span> <span class="nb">dict</span><span class="p">(</span><span class="nb">zip</span><span class="p">(</span><span class="nb">range</span><span class="p">(</span><span class="nb">len</span><span class="p">(</span><span class="n">urls_list</span><span class="p">)),</span> <span class="n">urls_list</span><span class="p">))</span>
+            <span class="n">result_meioc</span><span class="p">[</span><span class="s2">&quot;domains&quot;</span><span class="p">]</span> <span class="o">=</span> <span class="nb">dict</span><span class="p">(</span><span class="nb">zip</span><span class="p">(</span><span class="nb">range</span><span class="p">(</span><span class="nb">len</span><span class="p">(</span><span class="n">domains_list</span><span class="p">)),</span> <span class="n">domains_list</span><span class="p">))</span>
+
+        <span class="k">if</span> <span class="n">attachments_ist</span><span class="p">:</span>
+            <span class="n">result_meioc</span><span class="p">[</span><span class="s2">&quot;attachments&quot;</span><span class="p">]</span> <span class="o">=</span> <span class="n">attachments_ist</span>
+
+        <span class="k">if</span> <span class="n">body_IP</span><span class="p">:</span>
+            <span class="n">result_meioc</span><span class="p">[</span><span class="s2">&quot;body_ip&quot;</span><span class="p">]</span> <span class="o">=</span> <span class="n">body_IP</span>
+        <span class="k">if</span> <span class="n">body_Hash</span><span class="p">:</span>
+            <span class="n">result_meioc</span><span class="p">[</span><span class="s2">&quot;body_hash&quot;</span><span class="p">]</span> <span class="o">=</span> <span class="n">body_Hash</span>
+        <span class="k">if</span> <span class="n">body_email</span><span class="p">:</span>
+            <span class="n">result_meioc</span><span class="p">[</span><span class="s2">&quot;body_email&quot;</span><span class="p">]</span> <span class="o">=</span> <span class="n">body_email</span>
+            
+        <span class="n">fetch_mail_logger</span><span class="o">.</span><span class="n">debug</span><span class="p">(</span><span class="s2">&quot;Email analysis completed successfully&quot;</span><span class="p">)</span>
+        <span class="c1">#</span>
+        <span class="c1"># Verify the SPF record if requested</span>
+        <span class="c1">#</span>
+        <span class="n">fetch_mail_logger</span><span class="o">.</span><span class="n">debug</span><span class="p">(</span><span class="s2">&quot;Checking SPF records if requested&quot;</span><span class="p">)</span>
+        <span class="k">if</span> <span class="n">check_spf</span><span class="p">:</span>
+            <span class="k">try</span><span class="p">:</span>
+                <span class="n">fetch_mail_logger</span><span class="o">.</span><span class="n">debug</span><span class="p">(</span><span class="s2">&quot;Checking SPF records for the email&quot;</span><span class="p">)</span>
+                <span class="n">test_spf</span> <span class="o">=</span> <span class="kc">False</span>
+                <span class="n">resultspf</span> <span class="o">=</span> <span class="s2">&quot;&quot;</span>
+                <span class="k">for</span> <span class="n">ip</span> <span class="ow">in</span> <span class="n">hops_list_ip_public</span><span class="p">:</span>
+                    <span class="k">if</span> <span class="ow">not</span> <span class="n">test_spf</span> <span class="ow">and</span> <span class="s2">&quot;mail_from&quot;</span> <span class="ow">in</span> <span class="nb">locals</span><span class="p">():</span>
+                        <span class="k">try</span><span class="p">:</span>
+                            <span class="n">domain_from</span> <span class="o">=</span> <span class="n">mail_from</span><span class="o">.</span><span class="n">split</span><span class="p">(</span><span class="s2">&quot;@&quot;</span><span class="p">)[</span><span class="mi">1</span><span class="p">]</span>
+                            <span class="n">result_spf</span> <span class="o">=</span> <span class="n">spf</span><span class="o">.</span><span class="n">check2</span><span class="p">(</span><span class="n">ip</span><span class="p">,</span> <span class="n">mail_from</span><span class="p">,</span><span class="n">domain_from</span><span class="p">)[</span><span class="mi">0</span><span class="p">]</span>
+                        <span class="k">except</span><span class="p">:</span>
+                            <span class="k">pass</span>
+
+                        <span class="k">if</span> <span class="n">result_spf</span> <span class="o">==</span> <span class="s2">&quot;pass&quot;</span><span class="p">:</span>
+                            <span class="n">test_spf</span> <span class="o">=</span> <span class="kc">True</span>
+                        <span class="k">else</span><span class="p">:</span>
+                            <span class="n">test_spf</span> <span class="o">=</span> <span class="kc">False</span>
+
+                <span class="n">result_meioc</span><span class="p">[</span><span class="s2">&quot;spf&quot;</span><span class="p">]</span> <span class="o">=</span> <span class="n">test_spf</span>
+            <span class="k">except</span> <span class="ne">Exception</span> <span class="k">as</span> <span class="n">e</span><span class="p">:</span>
+                <span class="n">fetch_mail_logger</span><span class="o">.</span><span class="n">error</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;Error checking SPF record: </span><span class="si">{</span><span class="n">e</span><span class="si">}</span><span class="s2">&quot;</span><span class="p">)</span>
+                <span class="n">result_meioc</span><span class="p">[</span><span class="s2">&quot;spf&quot;</span><span class="p">]</span> <span class="o">=</span> <span class="kc">None</span>
+        <span class="n">fetch_mail_logger</span><span class="o">.</span><span class="n">debug</span><span class="p">(</span><span class="s2">&quot;SPF record check completed&quot;</span><span class="p">)</span>
+        <span class="c1">#</span>
+        <span class="c1"># Verify the DKIM record if requested</span>
+        <span class="c1">#</span>
+        <span class="n">fetch_mail_logger</span><span class="o">.</span><span class="n">debug</span><span class="p">(</span><span class="s2">&quot;Checking DKIM records if requested&quot;</span><span class="p">)</span>
+        <span class="k">if</span> <span class="n">check_dkim</span><span class="p">:</span>
+            <span class="n">test_dkim</span> <span class="o">=</span> <span class="kc">False</span>
+            <span class="k">try</span><span class="p">:</span>
+                <span class="n">dkim_result</span> <span class="o">=</span> <span class="n">dkim</span><span class="o">.</span><span class="n">verify</span><span class="p">(</span><span class="n">raw_email_content_normalized</span><span class="p">)</span>
+                <span class="k">if</span> <span class="n">dkim_result</span><span class="p">:</span>
+                    <span class="n">test_dkim</span> <span class="o">=</span> <span class="kc">True</span>
+            <span class="k">except</span> <span class="ne">Exception</span> <span class="k">as</span> <span class="n">e</span><span class="p">:</span>
+                <span class="n">fetch_mail_logger</span><span class="o">.</span><span class="n">error</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;Error checking DKIM record: </span><span class="si">{</span><span class="n">e</span><span class="si">}</span><span class="s2">&quot;</span><span class="p">)</span>
+                <span class="n">test_dkim</span> <span class="o">=</span> <span class="kc">False</span>
+
+            <span class="n">result_meioc</span><span class="p">[</span><span class="s2">&quot;dkim&quot;</span><span class="p">]</span> <span class="o">=</span> <span class="n">test_dkim</span>
+
+        <span class="n">fetch_mail_logger</span><span class="o">.</span><span class="n">debug</span><span class="p">(</span><span class="s2">&quot;DKIM record check completed&quot;</span><span class="p">)</span>
+        
+        <span class="k">if</span> <span class="n">file_output</span><span class="p">:</span>
+            <span class="k">with</span> <span class="nb">open</span><span class="p">(</span><span class="n">file_output</span><span class="p">,</span> <span class="s2">&quot;w&quot;</span><span class="p">)</span> <span class="k">as</span> <span class="n">f</span><span class="p">:</span>
+                <span class="n">json</span><span class="o">.</span><span class="n">dump</span><span class="p">(</span><span class="n">result_meioc</span><span class="p">,</span> <span class="n">f</span><span class="p">,</span> <span class="n">indent</span><span class="o">=</span><span class="mi">4</span><span class="p">)</span>
+            <span class="nb">print</span><span class="p">(</span><span class="s2">&quot;[!] Output saved in: </span><span class="si">%s</span><span class="s2">&quot;</span> <span class="o">%</span> <span class="n">file_output</span><span class="p">)</span>
+        <span class="k">else</span><span class="p">:</span>
+            <span class="k">try</span><span class="p">:</span>
+                <span class="n">fetch_mail_logger</span><span class="o">.</span><span class="n">debug</span><span class="p">(</span><span class="s2">&quot;Returning JSON result&quot;</span><span class="p">)</span>
+                <span class="n">result</span> <span class="o">=</span> <span class="n">json</span><span class="o">.</span><span class="n">dumps</span><span class="p">(</span><span class="n">result_meioc</span><span class="p">,</span> <span class="n">indent</span><span class="o">=</span><span class="mi">4</span><span class="p">)</span>
+                <span class="k">return</span> <span class="n">result</span>
+            <span class="k">except</span><span class="p">:</span>
+                <span class="n">result</span> <span class="o">=</span> <span class="kc">None</span>
+                <span class="k">return</span> <span class="n">result</span></div>
+
+            
+
+
+<div class="viewcode-block" id="main">
+<a class="viewcode-back" href="../../../modules/mail_feeder_core.html#mail_feeder.mail_utils.meioc.main">[docs]</a>
+<span class="k">def</span><span class="w"> </span><span class="nf">main</span><span class="p">():</span>
+    <span class="n">version</span> <span class="o">=</span> <span class="s2">&quot;1.4&quot;</span>
+    <span class="n">parser</span> <span class="o">=</span> <span class="n">argparse</span><span class="o">.</span><span class="n">ArgumentParser</span><span class="p">()</span>
+    <span class="n">parser</span><span class="o">.</span><span class="n">add_argument</span><span class="p">(</span><span class="s2">&quot;filename&quot;</span><span class="p">,</span> <span class="n">help</span><span class="o">=</span><span class="s2">&quot;Analyze an e-mail (.eml format)&quot;</span><span class="p">)</span>
+    <span class="n">parser</span><span class="o">.</span><span class="n">add_argument</span><span class="p">(</span><span class="s2">&quot;-x&quot;</span><span class="p">,</span> <span class="s2">&quot;--exclude-private-ip&quot;</span><span class="p">,</span> <span class="n">action</span><span class="o">=</span><span class="s2">&quot;store_true&quot;</span><span class="p">,</span> <span class="n">dest</span><span class="o">=</span><span class="s2">&quot;excprip&quot;</span><span class="p">,</span>
+                        <span class="n">help</span><span class="o">=</span><span class="s2">&quot;Exclude private IPs from the report&quot;</span><span class="p">)</span>
+    <span class="n">parser</span><span class="o">.</span><span class="n">add_argument</span><span class="p">(</span><span class="s2">&quot;-s&quot;</span><span class="p">,</span> <span class="s2">&quot;--spf&quot;</span><span class="p">,</span> <span class="n">action</span><span class="o">=</span><span class="s2">&quot;store_true&quot;</span><span class="p">,</span> <span class="n">dest</span><span class="o">=</span><span class="s2">&quot;spf&quot;</span><span class="p">,</span>
+                        <span class="n">help</span><span class="o">=</span><span class="s2">&quot;Check SPF Records&quot;</span><span class="p">)</span>
+    <span class="n">parser</span><span class="o">.</span><span class="n">add_argument</span><span class="p">(</span><span class="s2">&quot;-d&quot;</span><span class="p">,</span> <span class="s2">&quot;--dkim&quot;</span><span class="p">,</span> <span class="n">action</span><span class="o">=</span><span class="s2">&quot;store_true&quot;</span><span class="p">,</span> <span class="n">dest</span><span class="o">=</span><span class="s2">&quot;dkim&quot;</span><span class="p">,</span>
+                        <span class="n">help</span><span class="o">=</span><span class="s2">&quot;Check DKIM Records&quot;</span><span class="p">)</span>
+    <span class="n">parser</span><span class="o">.</span><span class="n">add_argument</span><span class="p">(</span><span class="s2">&quot;-o&quot;</span><span class="p">,</span> <span class="s2">&quot;--output&quot;</span><span class="p">,</span> <span class="n">dest</span><span class="o">=</span><span class="s2">&quot;file_output&quot;</span><span class="p">,</span>
+                        <span class="n">help</span><span class="o">=</span><span class="s2">&quot;Write output to &lt;file&gt;&quot;</span><span class="p">)</span>
+    <span class="n">parser</span><span class="o">.</span><span class="n">add_argument</span><span class="p">(</span><span class="s2">&quot;-v&quot;</span><span class="p">,</span> <span class="s2">&quot;--version&quot;</span><span class="p">,</span> <span class="n">action</span><span class="o">=</span><span class="s2">&quot;version&quot;</span><span class="p">,</span> <span class="n">version</span><span class="o">=</span><span class="s2">&quot;</span><span class="si">%(prog)s</span><span class="s2"> &quot;</span> <span class="o">+</span> <span class="n">version</span><span class="p">)</span>
+
+    <span class="n">arguments</span> <span class="o">=</span> <span class="n">parser</span><span class="o">.</span><span class="n">parse_args</span><span class="p">()</span>
+
+    <span class="k">if</span> <span class="n">arguments</span><span class="o">.</span><span class="n">filename</span><span class="p">:</span>
+        <span class="n">email_analysis</span><span class="p">(</span><span class="n">arguments</span><span class="o">.</span><span class="n">filename</span><span class="p">,</span> <span class="n">arguments</span><span class="o">.</span><span class="n">excprip</span><span class="p">,</span> <span class="n">arguments</span><span class="o">.</span><span class="n">spf</span> <span class="p">,</span><span class="n">arguments</span><span class="o">.</span><span class="n">dkim</span><span class="p">,</span> <span class="n">arguments</span><span class="o">.</span><span class="n">file_output</span><span class="p">)</span></div>
+
+
+
+<span class="k">if</span> <span class="vm">__name__</span> <span class="o">==</span> <span class="s2">&quot;__main__&quot;</span><span class="p">:</span>
+    <span class="n">main</span><span class="p">()</span>
+</pre></div>
+
+           </div>
+          </div>
+          <footer>
+
+  <hr/>
+
+  <div role="contentinfo">
+    <p>&#169; Copyright 2025, Theo Bhang, Esteban Crispel.</p>
+  </div>
+
+  Built with <a href="https://www.sphinx-doc.org/">Sphinx</a> using a
+    <a href="https://github.com/readthedocs/sphinx_rtd_theme">theme</a>
+    provided by <a href="https://readthedocs.org">Read the Docs</a>.
+   
+
+</footer>
+        </div>
+      </div>
+    </section>
+  </div>
+  <script>
+      jQuery(function () {
+          SphinxRtdTheme.Navigation.enable(true);
+      });
+  </script> 
+
+</body>
+</html>

@@ -1,0 +1,314 @@
+
+
+<!DOCTYPE html>
+<html class="writer-html5" lang="en" data-content_root="../../../">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>profiles.profiles_utils.ldap &mdash; Suspicious 1.0.0 documentation</title>
+      <link rel="stylesheet" type="text/css" href="../../../_static/pygments.css?v=b86133f3" />
+      <link rel="stylesheet" type="text/css" href="../../../_static/css/theme.css?v=e59714d7" />
+
+  
+      <script src="../../../_static/jquery.js?v=5d32c60e"></script>
+      <script src="../../../_static/_sphinx_javascript_frameworks_compat.js?v=2cd50e6c"></script>
+      <script src="../../../_static/documentation_options.js?v=8d563738"></script>
+      <script src="../../../_static/doctools.js?v=9bcbadda"></script>
+      <script src="../../../_static/sphinx_highlight.js?v=dc90522c"></script>
+    <script src="../../../_static/js/theme.js"></script>
+    <link rel="index" title="Index" href="../../../genindex.html" />
+    <link rel="search" title="Search" href="../../../search.html" /> 
+</head>
+
+<body class="wy-body-for-nav"> 
+  <div class="wy-grid-for-nav">
+    <nav data-toggle="wy-nav-shift" class="wy-nav-side">
+      <div class="wy-side-scroll">
+        <div class="wy-side-nav-search" >
+
+          
+          
+          <a href="../../../index.html" class="icon icon-home">
+            Suspicious
+          </a>
+<div role="search">
+  <form id="rtd-search-form" class="wy-form" action="../../../search.html" method="get">
+    <input type="text" name="q" placeholder="Search docs" aria-label="Search docs" />
+    <input type="hidden" name="check_keywords" value="yes" />
+    <input type="hidden" name="area" value="default" />
+  </form>
+</div>
+        </div><div class="wy-menu wy-menu-vertical" data-spy="affix" role="navigation" aria-label="Navigation menu">
+              <p class="caption" role="heading"><span class="caption-text">Contents:</span></p>
+<ul>
+<li class="toctree-l1"><a class="reference internal" href="../../../modules/index.html">Modules (API Reference)</a></li>
+</ul>
+
+        </div>
+      </div>
+    </nav>
+
+    <section data-toggle="wy-nav-shift" class="wy-nav-content-wrap"><nav class="wy-nav-top" aria-label="Mobile navigation menu" >
+          <i data-toggle="wy-nav-top" class="fa fa-bars"></i>
+          <a href="../../../index.html">Suspicious</a>
+      </nav>
+
+      <div class="wy-nav-content">
+        <div class="rst-content">
+          <div role="navigation" aria-label="Page navigation">
+  <ul class="wy-breadcrumbs">
+      <li><a href="../../../index.html" class="icon icon-home" aria-label="Home"></a></li>
+          <li class="breadcrumb-item"><a href="../../index.html">Module code</a></li>
+      <li class="breadcrumb-item active">profiles.profiles_utils.ldap</li>
+      <li class="wy-breadcrumbs-aside">
+      </li>
+  </ul>
+  <hr/>
+</div>
+          <div role="main" class="document" itemscope="itemscope" itemtype="http://schema.org/Article">
+           <div itemprop="articleBody">
+             
+  <h1>Source code for profiles.profiles_utils.ldap</h1><div class="highlight"><pre>
+<span></span><span class="kn">import</span><span class="w"> </span><span class="nn">os</span>
+<span class="kn">import</span><span class="w"> </span><span class="nn">ldap</span>
+<span class="kn">from</span><span class="w"> </span><span class="nn">django.contrib.auth.models</span><span class="w"> </span><span class="kn">import</span> <span class="n">Group</span>
+<span class="kn">from</span><span class="w"> </span><span class="nn">profiles.models</span><span class="w"> </span><span class="kn">import</span> <span class="n">CISOProfile</span><span class="p">,</span> <span class="n">UserProfile</span>
+<span class="kn">from</span><span class="w"> </span><span class="nn">django.contrib.auth</span><span class="w"> </span><span class="kn">import</span> <span class="n">get_user_model</span>
+<span class="kn">import</span><span class="w"> </span><span class="nn">json</span>
+<span class="kn">from</span><span class="w"> </span><span class="nn">pathlib</span><span class="w"> </span><span class="kn">import</span> <span class="n">Path</span>
+
+<span class="n">CONFIG_PATH</span> <span class="o">=</span> <span class="s2">&quot;/app/settings.json&quot;</span>
+<span class="k">with</span> <span class="nb">open</span><span class="p">(</span><span class="n">CONFIG_PATH</span><span class="p">)</span> <span class="k">as</span> <span class="n">config_file</span><span class="p">:</span>
+    <span class="n">config</span> <span class="o">=</span> <span class="n">json</span><span class="o">.</span><span class="n">load</span><span class="p">(</span><span class="n">config_file</span><span class="p">)</span>
+
+<span class="n">ldap_config</span> <span class="o">=</span> <span class="n">config</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="s1">&#39;ldap&#39;</span><span class="p">,</span> <span class="p">{})</span>
+
+<span class="n">CISO</span> <span class="o">=</span> <span class="p">{</span>
+    <span class="s2">&quot;CISO&quot;</span><span class="p">,</span>
+    <span class="s2">&quot;RSSI&quot;</span><span class="p">,</span>
+    <span class="s2">&quot;Responsable de la Seguridad de la Información&quot;</span><span class="p">,</span>
+    <span class="s2">&quot;Responsable de la Sécurité des Systèmes d&#39;Information&quot;</span><span class="p">,</span>
+    <span class="s2">&quot;Chief Information Security Officer&quot;</span><span class="p">,</span>
+<span class="p">}</span>
+<span class="n">REGION_DICT</span> <span class="o">=</span> <span class="p">{</span>
+    <span class="s2">&quot;LATAM&quot;</span><span class="p">:</span> <span class="p">[</span><span class="s2">&quot;AR&quot;</span><span class="p">,</span> <span class="s2">&quot;BO&quot;</span><span class="p">,</span> <span class="s2">&quot;BR&quot;</span><span class="p">,</span> <span class="s2">&quot;CL&quot;</span><span class="p">,</span> <span class="s2">&quot;CO&quot;</span><span class="p">,</span> <span class="s2">&quot;MX&quot;</span><span class="p">,</span> <span class="s2">&quot;PE&quot;</span><span class="p">,</span> <span class="s2">&quot;UY&quot;</span><span class="p">,</span> <span class="s2">&quot;VE&quot;</span><span class="p">],</span>
+    <span class="s2">&quot;NORAM&quot;</span><span class="p">:</span> <span class="p">[</span><span class="s2">&quot;BS&quot;</span><span class="p">,</span> <span class="s2">&quot;CA&quot;</span><span class="p">,</span> <span class="s2">&quot;CR&quot;</span><span class="p">,</span> <span class="s2">&quot;DO&quot;</span><span class="p">,</span> <span class="s2">&quot;GT&quot;</span><span class="p">,</span> <span class="s2">&quot;HN&quot;</span><span class="p">,</span> <span class="s2">&quot;HT&quot;</span><span class="p">,</span> <span class="s2">&quot;JM&quot;</span><span class="p">,</span> <span class="s2">&quot;MX&quot;</span><span class="p">,</span> <span class="s2">&quot;NI&quot;</span><span class="p">,</span> <span class="s2">&quot;PA&quot;</span><span class="p">,</span> <span class="s2">&quot;PR&quot;</span><span class="p">,</span> <span class="s2">&quot;SV&quot;</span><span class="p">,</span> <span class="s2">&quot;US&quot;</span><span class="p">],</span>
+    <span class="s2">&quot;EMEA&quot;</span><span class="p">:</span> <span class="p">[</span><span class="s2">&quot;AE&quot;</span><span class="p">,</span> <span class="s2">&quot;AT&quot;</span><span class="p">,</span> <span class="s2">&quot;AZ&quot;</span><span class="p">,</span> <span class="s2">&quot;BE&quot;</span><span class="p">,</span> <span class="s2">&quot;BG&quot;</span><span class="p">,</span> <span class="s2">&quot;BH&quot;</span><span class="p">,</span> <span class="s2">&quot;CM&quot;</span><span class="p">,</span> <span class="s2">&quot;CI&quot;</span><span class="p">,</span> <span class="s2">&quot;CZ&quot;</span><span class="p">,</span> <span class="s2">&quot;DE&quot;</span><span class="p">,</span> <span class="s2">&quot;DZ&quot;</span><span class="p">,</span> <span class="s2">&quot;DK&quot;</span><span class="p">,</span> <span class="s2">&quot;EE&quot;</span><span class="p">,</span> <span class="s2">&quot;EG&quot;</span><span class="p">,</span> <span class="s2">&quot;ES&quot;</span><span class="p">,</span> <span class="s2">&quot;ET&quot;</span><span class="p">,</span> <span class="s2">&quot;FI&quot;</span><span class="p">,</span> <span class="s2">&quot;FR&quot;</span><span class="p">,</span>
+                <span class="s2">&quot;GB&quot;</span><span class="p">,</span> <span class="s2">&quot;GR&quot;</span><span class="p">,</span> <span class="s2">&quot;HK&quot;</span><span class="p">,</span> <span class="s2">&quot;HU&quot;</span><span class="p">,</span> <span class="s2">&quot;IE&quot;</span><span class="p">,</span> <span class="s2">&quot;IL&quot;</span><span class="p">,</span> <span class="s2">&quot;IQ&quot;</span><span class="p">,</span> <span class="s2">&quot;IT&quot;</span><span class="p">,</span> <span class="s2">&quot;JO&quot;</span><span class="p">,</span> <span class="s2">&quot;KE&quot;</span><span class="p">,</span> <span class="s2">&quot;KW&quot;</span><span class="p">,</span> <span class="s2">&quot;KZ&quot;</span><span class="p">,</span> <span class="s2">&quot;LB&quot;</span><span class="p">,</span> <span class="s2">&quot;LT&quot;</span><span class="p">,</span> <span class="s2">&quot;LU&quot;</span><span class="p">,</span> <span class="s2">&quot;LV&quot;</span><span class="p">,</span> <span class="s2">&quot;MA&quot;</span><span class="p">,</span> <span class="s2">&quot;MD&quot;</span><span class="p">,</span> <span class="s2">&quot;MK&quot;</span><span class="p">,</span>
+                <span class="s2">&quot;MT&quot;</span><span class="p">,</span> <span class="s2">&quot;MY&quot;</span><span class="p">,</span> <span class="s2">&quot;NG&quot;</span><span class="p">,</span> <span class="s2">&quot;NL&quot;</span><span class="p">,</span> <span class="s2">&quot;NO&quot;</span><span class="p">,</span> <span class="s2">&quot;OM&quot;</span><span class="p">,</span> <span class="s2">&quot;PK&quot;</span><span class="p">,</span> <span class="s2">&quot;PL&quot;</span><span class="p">,</span> <span class="s2">&quot;PT&quot;</span><span class="p">,</span> <span class="s2">&quot;QA&quot;</span><span class="p">,</span> <span class="s2">&quot;RO&quot;</span><span class="p">,</span> <span class="s2">&quot;RS&quot;</span><span class="p">,</span> <span class="s2">&quot;RU&quot;</span><span class="p">,</span> <span class="s2">&quot;SA&quot;</span><span class="p">,</span> <span class="s2">&quot;SE&quot;</span><span class="p">,</span> <span class="s2">&quot;SG&quot;</span><span class="p">,</span> <span class="s2">&quot;SI&quot;</span><span class="p">,</span> <span class="s2">&quot;SK&quot;</span><span class="p">,</span> <span class="s2">&quot;SN&quot;</span><span class="p">,</span>
+                <span class="s2">&quot;SY&quot;</span><span class="p">,</span> <span class="s2">&quot;TD&quot;</span><span class="p">,</span> <span class="s2">&quot;TN&quot;</span><span class="p">,</span> <span class="s2">&quot;TR&quot;</span><span class="p">,</span> <span class="s2">&quot;UA&quot;</span><span class="p">,</span> <span class="s2">&quot;UG&quot;</span><span class="p">,</span> <span class="s2">&quot;UZ&quot;</span><span class="p">,</span> <span class="s2">&quot;ZA&quot;</span><span class="p">],</span>
+    <span class="s2">&quot;APAC&quot;</span><span class="p">:</span> <span class="p">[</span><span class="s2">&quot;AU&quot;</span><span class="p">,</span> <span class="s2">&quot;CN&quot;</span><span class="p">,</span> <span class="s2">&quot;HK&quot;</span><span class="p">,</span> <span class="s2">&quot;ID&quot;</span><span class="p">,</span> <span class="s2">&quot;IN&quot;</span><span class="p">,</span> <span class="s2">&quot;JP&quot;</span><span class="p">,</span> <span class="s2">&quot;KR&quot;</span><span class="p">,</span> <span class="s2">&quot;MY&quot;</span><span class="p">,</span> <span class="s2">&quot;NZ&quot;</span><span class="p">,</span> <span class="s2">&quot;PH&quot;</span><span class="p">,</span> <span class="s2">&quot;SG&quot;</span><span class="p">,</span> <span class="s2">&quot;TH&quot;</span><span class="p">,</span> <span class="s2">&quot;TW&quot;</span><span class="p">,</span> <span class="s2">&quot;VN&quot;</span><span class="p">]</span>
+<span class="p">}</span>
+
+
+<div class="viewcode-block" id="Ldap">
+<a class="viewcode-back" href="../../../modules/profiles_core.html#profiles.profiles_utils.ldap.Ldap">[docs]</a>
+<span class="k">class</span><span class="w"> </span><span class="nc">Ldap</span><span class="p">:</span>
+    
+    
+<div class="viewcode-block" id="Ldap.initialize_ldap">
+<a class="viewcode-back" href="../../../modules/profiles_core.html#profiles.profiles_utils.ldap.Ldap.initialize_ldap">[docs]</a>
+    <span class="k">def</span><span class="w"> </span><span class="nf">initialize_ldap</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
+<span class="w">        </span><span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">        Initializes and returns an LDAP server connection.</span>
+
+<span class="sd">        This method sets the required TLS options, initializes an LDAP server connection,</span>
+<span class="sd">        and performs a simple bind operation using the provided bind DN and password.</span>
+
+<span class="sd">        Returns:</span>
+<span class="sd">            ldap_server (ldap.LDAPObject): The initialized LDAP server connection.</span>
+
+<span class="sd">        Raises:</span>
+<span class="sd">            LDAPError: If there is an error while binding to the LDAP server.</span>
+
+<span class="sd">        &quot;&quot;&quot;</span>
+        <span class="k">try</span><span class="p">:</span>
+            <span class="n">ldap</span><span class="o">.</span><span class="n">set_option</span><span class="p">(</span><span class="n">ldap</span><span class="o">.</span><span class="n">OPT_X_TLS_REQUIRE_CERT</span><span class="p">,</span> <span class="n">ldap</span><span class="o">.</span><span class="n">OPT_X_TLS_NEVER</span><span class="p">)</span>
+            <span class="n">ldap_server</span> <span class="o">=</span> <span class="n">ldap</span><span class="o">.</span><span class="n">initialize</span><span class="p">(</span><span class="n">ldap_config</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="s2">&quot;auth_ldap_server_uri&quot;</span><span class="p">,</span> <span class="s2">&quot;ldap://localhost&quot;</span><span class="p">))</span>
+            <span class="n">ldap_server</span><span class="o">.</span><span class="n">simple_bind_s</span><span class="p">(</span><span class="n">ldap_config</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="s2">&quot;auth_ldap_bind_dn&quot;</span><span class="p">,</span> <span class="s2">&quot;cn=admin,dc=example,dc=com&quot;</span><span class="p">),</span>
+                                    <span class="n">ldap_config</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="s2">&quot;auth_ldap_bind_password&quot;</span><span class="p">,</span> <span class="s2">&quot;password&quot;</span><span class="p">))</span>
+            <span class="k">return</span> <span class="n">ldap_server</span>
+        <span class="k">except</span> <span class="n">ldap</span><span class="o">.</span><span class="n">LDAPError</span> <span class="k">as</span> <span class="n">e</span><span class="p">:</span>
+            <span class="nb">print</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;Error while binding to the LDAP server: </span><span class="si">{</span><span class="n">e</span><span class="si">}</span><span class="s2">&quot;</span><span class="p">)</span>
+            <span class="k">raise</span></div>
+
+    
+<div class="viewcode-block" id="Ldap.get_search_results">
+<a class="viewcode-back" href="../../../modules/profiles_core.html#profiles.profiles_utils.ldap.Ldap.get_search_results">[docs]</a>
+    <span class="nd">@staticmethod</span>
+    <span class="k">def</span><span class="w"> </span><span class="nf">get_search_results</span><span class="p">(</span><span class="n">instance</span><span class="p">,</span> <span class="n">ldap_server</span><span class="p">):</span>
+<span class="w">        </span><span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">        Get search results from the LDAP server.</span>
+
+<span class="sd">        Args:</span>
+<span class="sd">            instance: The instance of the user.</span>
+<span class="sd">            ldap_server: The initialized LDAP server.</span>
+
+<span class="sd">        Returns:</span>
+<span class="sd">            search_results: The search results from the LDAP server.</span>
+<span class="sd">        &quot;&quot;&quot;</span>
+        <span class="k">try</span><span class="p">:</span>
+            <span class="nb">print</span><span class="p">(</span><span class="s1">&#39;searching user&#39;</span><span class="p">)</span>
+            <span class="n">search_results</span> <span class="o">=</span> <span class="n">ldap_server</span><span class="o">.</span><span class="n">search_s</span><span class="p">(</span><span class="n">ldap_config</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="s2">&quot;auth_ldap_base_dn&quot;</span><span class="p">),</span> <span class="n">ldap</span><span class="o">.</span><span class="n">SCOPE_SUBTREE</span><span class="p">,</span>
+                                                  <span class="sa">f</span><span class="s1">&#39;(&amp;(mail=</span><span class="si">{</span><span class="n">instance</span><span class="o">.</span><span class="n">username</span><span class="si">}</span><span class="s1">)(Tpresent=true)(!(ou=admin))(!(TpreferredFirstName=Test)))&#39;</span><span class="p">,</span>
+                                                  <span class="p">[</span><span class="s1">&#39;mail&#39;</span><span class="p">,</span> <span class="s1">&#39;title&#39;</span><span class="p">,</span> <span class="s1">&#39;businessCategory&#39;</span><span class="p">,</span> <span class="s1">&#39;c&#39;</span><span class="p">])</span>
+            <span class="nb">print</span><span class="p">(</span><span class="n">search_results</span><span class="p">)</span>
+        <span class="k">except</span> <span class="ne">Exception</span> <span class="k">as</span> <span class="n">e</span><span class="p">:</span>
+            <span class="nb">print</span><span class="p">(</span><span class="n">e</span><span class="p">)</span>
+            <span class="n">search_results</span> <span class="o">=</span> <span class="kc">None</span>
+        <span class="k">return</span> <span class="n">search_results</span></div>
+
+
+<div class="viewcode-block" id="Ldap.process_search_results">
+<a class="viewcode-back" href="../../../modules/profiles_core.html#profiles.profiles_utils.ldap.Ldap.process_search_results">[docs]</a>
+    <span class="nd">@staticmethod</span>
+    <span class="k">def</span><span class="w"> </span><span class="nf">process_search_results</span><span class="p">(</span><span class="n">instance</span><span class="p">,</span> <span class="n">search_results</span><span class="p">):</span>
+<span class="w">        </span><span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">        Process the search results and create user profiles.</span>
+
+<span class="sd">        Args:</span>
+<span class="sd">            instance: The instance of the user.</span>
+<span class="sd">            search_results: The search results from the LDAP server.</span>
+
+<span class="sd">        Returns:</span>
+<span class="sd">            None</span>
+<span class="sd">        &quot;&quot;&quot;</span>
+        <span class="n">ciso_found</span> <span class="o">=</span> <span class="kc">False</span>
+        <span class="k">if</span> <span class="n">search_results</span><span class="p">:</span>
+            <span class="k">try</span><span class="p">:</span>
+                <span class="k">for</span> <span class="n">title</span> <span class="ow">in</span> <span class="n">CISO</span><span class="p">:</span>
+                    <span class="k">if</span> <span class="n">title</span> <span class="ow">in</span> <span class="n">search_results</span><span class="p">[</span><span class="mi">0</span><span class="p">][</span><span class="mi">1</span><span class="p">][</span><span class="s1">&#39;title&#39;</span><span class="p">][</span><span class="mi">0</span><span class="p">]</span><span class="o">.</span><span class="n">decode</span><span class="p">(</span><span class="s1">&#39;utf-8&#39;</span><span class="p">):</span>
+                        <span class="n">ciso_found</span> <span class="o">=</span> <span class="kc">True</span>
+                        <span class="nb">print</span><span class="p">(</span><span class="s1">&#39;CISO found&#39;</span><span class="p">)</span>
+                        <span class="k">break</span>
+                <span class="k">if</span> <span class="n">ciso_found</span><span class="p">:</span>
+                    <span class="n">Ldap</span><span class="o">.</span><span class="n">create_ciso_profile</span><span class="p">(</span><span class="n">instance</span><span class="p">,</span> <span class="n">search_results</span><span class="p">)</span>
+                <span class="k">else</span><span class="p">:</span>
+                    <span class="nb">print</span><span class="p">(</span><span class="s1">&#39;Not a CISO&#39;</span><span class="p">)</span>
+                    <span class="n">Ldap</span><span class="o">.</span><span class="n">create_user_profile</span><span class="p">(</span><span class="n">instance</span><span class="p">,</span> <span class="n">search_results</span><span class="p">)</span>
+            <span class="k">except</span> <span class="ne">Exception</span> <span class="k">as</span> <span class="n">e</span><span class="p">:</span>
+                <span class="nb">print</span><span class="p">(</span><span class="n">e</span><span class="p">)</span></div>
+
+
+<div class="viewcode-block" id="Ldap.create_ciso_profile">
+<a class="viewcode-back" href="../../../modules/profiles_core.html#profiles.profiles_utils.ldap.Ldap.create_ciso_profile">[docs]</a>
+    <span class="nd">@staticmethod</span>
+    <span class="k">def</span><span class="w"> </span><span class="nf">create_ciso_profile</span><span class="p">(</span><span class="n">instance</span><span class="p">,</span> <span class="n">search_results</span><span class="p">):</span>
+<span class="w">        </span><span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">        Creates a CISO profile for the given instance.</span>
+
+<span class="sd">        Args:</span>
+<span class="sd">            instance: The instance of the user.</span>
+<span class="sd">            search_results: The search results from the LDAP server.</span>
+
+<span class="sd">        Returns:</span>
+<span class="sd">            None</span>
+<span class="sd">        &quot;&quot;&quot;</span>
+        <span class="n">ciso_profile</span><span class="p">,</span> <span class="n">_</span> <span class="o">=</span> <span class="n">CISOProfile</span><span class="o">.</span><span class="n">objects</span><span class="o">.</span><span class="n">get_or_create</span><span class="p">(</span><span class="n">user</span><span class="o">=</span><span class="n">instance</span><span class="p">)</span>
+        <span class="n">ciso_profile</span><span class="o">.</span><span class="n">gbu</span> <span class="o">=</span> <span class="n">search_results</span><span class="p">[</span><span class="mi">0</span><span class="p">][</span><span class="mi">1</span><span class="p">][</span><span class="s1">&#39;businessCategory&#39;</span><span class="p">][</span><span class="mi">0</span><span class="p">]</span><span class="o">.</span><span class="n">decode</span><span class="p">(</span><span class="s1">&#39;utf-8&#39;</span><span class="p">)</span>
+        <span class="n">ciso_profile</span><span class="o">.</span><span class="n">function</span> <span class="o">=</span> <span class="n">search_results</span><span class="p">[</span><span class="mi">0</span><span class="p">][</span><span class="mi">1</span><span class="p">][</span><span class="s1">&#39;title&#39;</span><span class="p">][</span><span class="mi">0</span><span class="p">]</span><span class="o">.</span><span class="n">decode</span><span class="p">(</span><span class="s1">&#39;utf-8&#39;</span><span class="p">)</span>
+        <span class="n">ciso_profile</span><span class="o">.</span><span class="n">country</span> <span class="o">=</span> <span class="n">search_results</span><span class="p">[</span><span class="mi">0</span><span class="p">][</span><span class="mi">1</span><span class="p">][</span><span class="s1">&#39;c&#39;</span><span class="p">][</span><span class="mi">0</span><span class="p">]</span><span class="o">.</span><span class="n">decode</span><span class="p">(</span><span class="s1">&#39;utf-8&#39;</span><span class="p">)</span>
+        <span class="k">for</span> <span class="n">region</span> <span class="ow">in</span> <span class="n">REGION_DICT</span><span class="p">:</span>
+            <span class="k">if</span> <span class="n">search_results</span><span class="p">[</span><span class="mi">0</span><span class="p">][</span><span class="mi">1</span><span class="p">][</span><span class="s1">&#39;c&#39;</span><span class="p">][</span><span class="mi">0</span><span class="p">]</span><span class="o">.</span><span class="n">decode</span><span class="p">(</span><span class="s1">&#39;utf-8&#39;</span><span class="p">)</span> <span class="ow">in</span> <span class="n">REGION_DICT</span><span class="p">[</span><span class="n">region</span><span class="p">]:</span>
+                <span class="n">ciso_profile</span><span class="o">.</span><span class="n">region</span> <span class="o">=</span> <span class="n">region</span>
+                <span class="k">break</span>
+        <span class="n">ciso_profile</span><span class="o">.</span><span class="n">save</span><span class="p">()</span>
+        <span class="n">Ldap</span><span class="o">.</span><span class="n">add_user_to_group</span><span class="p">(</span><span class="n">instance</span><span class="p">,</span> <span class="n">ciso_profile</span><span class="o">.</span><span class="n">country</span><span class="p">)</span>
+        <span class="n">Ldap</span><span class="o">.</span><span class="n">add_user_to_group</span><span class="p">(</span><span class="n">instance</span><span class="p">,</span> <span class="n">ciso_profile</span><span class="o">.</span><span class="n">region</span><span class="p">)</span>
+        <span class="n">Ldap</span><span class="o">.</span><span class="n">add_user_to_group</span><span class="p">(</span><span class="n">instance</span><span class="p">,</span> <span class="n">ciso_profile</span><span class="o">.</span><span class="n">gbu</span><span class="p">)</span></div>
+
+
+<div class="viewcode-block" id="Ldap.create_user_profile">
+<a class="viewcode-back" href="../../../modules/profiles_core.html#profiles.profiles_utils.ldap.Ldap.create_user_profile">[docs]</a>
+    <span class="nd">@staticmethod</span>
+    <span class="k">def</span><span class="w"> </span><span class="nf">create_user_profile</span><span class="p">(</span><span class="n">instance</span><span class="p">,</span> <span class="n">search_results</span><span class="p">):</span>
+<span class="w">        </span><span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">        Creates a user profile for the given instance.</span>
+
+<span class="sd">        Args:</span>
+<span class="sd">            instance: The instance of the user.</span>
+<span class="sd">            search_results: The search results from the LDAP server.</span>
+
+<span class="sd">        Returns:</span>
+<span class="sd">            None</span>
+<span class="sd">        &quot;&quot;&quot;</span>
+        <span class="n">user_profile</span><span class="p">,</span> <span class="n">_</span> <span class="o">=</span> <span class="n">UserProfile</span><span class="o">.</span><span class="n">objects</span><span class="o">.</span><span class="n">get_or_create</span><span class="p">(</span><span class="n">user</span><span class="o">=</span><span class="n">instance</span><span class="p">)</span>
+        <span class="n">user_profile</span><span class="o">.</span><span class="n">gbu</span> <span class="o">=</span> <span class="n">search_results</span><span class="p">[</span><span class="mi">0</span><span class="p">][</span><span class="mi">1</span><span class="p">][</span><span class="s1">&#39;businessCategory&#39;</span><span class="p">][</span><span class="mi">0</span><span class="p">]</span><span class="o">.</span><span class="n">decode</span><span class="p">(</span><span class="s1">&#39;utf-8&#39;</span><span class="p">)</span>
+        <span class="n">user_profile</span><span class="o">.</span><span class="n">function</span> <span class="o">=</span> <span class="n">search_results</span><span class="p">[</span><span class="mi">0</span><span class="p">][</span><span class="mi">1</span><span class="p">][</span><span class="s1">&#39;title&#39;</span><span class="p">][</span><span class="mi">0</span><span class="p">]</span><span class="o">.</span><span class="n">decode</span><span class="p">(</span><span class="s1">&#39;utf-8&#39;</span><span class="p">)</span>
+        <span class="n">user_profile</span><span class="o">.</span><span class="n">country</span> <span class="o">=</span> <span class="n">search_results</span><span class="p">[</span><span class="mi">0</span><span class="p">][</span><span class="mi">1</span><span class="p">][</span><span class="s1">&#39;c&#39;</span><span class="p">][</span><span class="mi">0</span><span class="p">]</span><span class="o">.</span><span class="n">decode</span><span class="p">(</span><span class="s1">&#39;utf-8&#39;</span><span class="p">)</span>
+        <span class="k">for</span> <span class="n">region</span> <span class="ow">in</span> <span class="n">REGION_DICT</span><span class="p">:</span>
+            <span class="k">if</span> <span class="n">search_results</span><span class="p">[</span><span class="mi">0</span><span class="p">][</span><span class="mi">1</span><span class="p">][</span><span class="s1">&#39;c&#39;</span><span class="p">][</span><span class="mi">0</span><span class="p">]</span><span class="o">.</span><span class="n">decode</span><span class="p">(</span><span class="s1">&#39;utf-8&#39;</span><span class="p">)</span> <span class="ow">in</span> <span class="n">REGION_DICT</span><span class="p">[</span><span class="n">region</span><span class="p">]:</span>
+                <span class="n">user_profile</span><span class="o">.</span><span class="n">region</span> <span class="o">=</span> <span class="n">region</span>
+                <span class="k">break</span>
+        <span class="n">user_profile</span><span class="o">.</span><span class="n">save</span><span class="p">()</span>
+        <span class="n">Ldap</span><span class="o">.</span><span class="n">add_user_to_group</span><span class="p">(</span><span class="n">instance</span><span class="p">,</span> <span class="n">user_profile</span><span class="o">.</span><span class="n">country</span><span class="p">)</span>
+        <span class="n">Ldap</span><span class="o">.</span><span class="n">add_user_to_group</span><span class="p">(</span><span class="n">instance</span><span class="p">,</span> <span class="n">user_profile</span><span class="o">.</span><span class="n">region</span><span class="p">)</span>
+        <span class="n">Ldap</span><span class="o">.</span><span class="n">add_user_to_group</span><span class="p">(</span><span class="n">instance</span><span class="p">,</span> <span class="n">user_profile</span><span class="o">.</span><span class="n">gbu</span><span class="p">)</span></div>
+
+
+<div class="viewcode-block" id="Ldap.create_user">
+<a class="viewcode-back" href="../../../modules/profiles_core.html#profiles.profiles_utils.ldap.Ldap.create_user">[docs]</a>
+    <span class="nd">@staticmethod</span>
+    <span class="k">def</span><span class="w"> </span><span class="nf">create_user</span><span class="p">(</span><span class="n">instance</span><span class="p">):</span>
+<span class="w">        </span><span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">        Creates a user profile for the given instance.</span>
+
+<span class="sd">        Args:</span>
+<span class="sd">            instance: The instance of the user.</span>
+
+<span class="sd">        Returns:</span>
+<span class="sd">            None</span>
+<span class="sd">        &quot;&quot;&quot;</span>
+        <span class="n">searched_user</span> <span class="o">=</span> <span class="n">get_user_model</span><span class="p">()</span><span class="o">.</span><span class="n">objects</span><span class="o">.</span><span class="n">filter</span><span class="p">(</span><span class="n">username</span><span class="o">=</span><span class="n">instance</span><span class="o">.</span><span class="n">username</span><span class="p">)</span>
+        <span class="k">if</span> <span class="n">instance</span><span class="o">.</span><span class="n">username</span> <span class="o">==</span> <span class="s1">&#39;AdminCert&#39;</span><span class="p">:</span>
+            <span class="k">return</span>
+        <span class="k">if</span> <span class="n">instance</span><span class="o">.</span><span class="n">username</span> <span class="o">==</span> <span class="s1">&#39;suspicious@cert.local&#39;</span><span class="p">:</span>
+            <span class="k">return</span>
+        <span class="k">elif</span> <span class="n">searched_user</span><span class="p">:</span>
+            <span class="n">ldap_server</span> <span class="o">=</span> <span class="n">Ldap</span><span class="p">()</span><span class="o">.</span><span class="n">initialize_ldap</span><span class="p">()</span>
+            <span class="n">search_results</span> <span class="o">=</span> <span class="n">Ldap</span><span class="o">.</span><span class="n">get_search_results</span><span class="p">(</span><span class="n">instance</span><span class="p">,</span> <span class="n">ldap_server</span><span class="p">)</span>
+            <span class="n">Ldap</span><span class="o">.</span><span class="n">process_search_results</span><span class="p">(</span><span class="n">instance</span><span class="p">,</span> <span class="n">search_results</span><span class="p">)</span>
+            <span class="n">ldap_server</span><span class="o">.</span><span class="n">unbind_s</span><span class="p">()</span></div>
+
+
+<div class="viewcode-block" id="Ldap.add_user_to_group">
+<a class="viewcode-back" href="../../../modules/profiles_core.html#profiles.profiles_utils.ldap.Ldap.add_user_to_group">[docs]</a>
+    <span class="nd">@staticmethod</span>
+    <span class="k">def</span><span class="w"> </span><span class="nf">add_user_to_group</span><span class="p">(</span><span class="n">user</span><span class="p">,</span> <span class="n">group_name</span><span class="p">):</span>
+        <span class="k">try</span><span class="p">:</span>
+            <span class="n">group</span><span class="p">,</span> <span class="n">_</span> <span class="o">=</span> <span class="n">Group</span><span class="o">.</span><span class="n">objects</span><span class="o">.</span><span class="n">get_or_create</span><span class="p">(</span><span class="n">name</span><span class="o">=</span><span class="n">group_name</span><span class="p">)</span>
+        <span class="k">except</span> <span class="n">Group</span><span class="o">.</span><span class="n">DoesNotExist</span><span class="p">:</span>
+            <span class="n">group</span> <span class="o">=</span> <span class="n">Group</span><span class="o">.</span><span class="n">objects</span><span class="o">.</span><span class="n">create</span><span class="p">(</span><span class="n">name</span><span class="o">=</span><span class="n">group_name</span><span class="p">)</span>
+        <span class="n">user</span><span class="o">.</span><span class="n">groups</span><span class="o">.</span><span class="n">add</span><span class="p">(</span><span class="n">group</span><span class="p">)</span></div>
+</div>
+
+</pre></div>
+
+           </div>
+          </div>
+          <footer>
+
+  <hr/>
+
+  <div role="contentinfo">
+    <p>&#169; Copyright 2025, Theo Bhang, Esteban Crispel.</p>
+  </div>
+
+  Built with <a href="https://www.sphinx-doc.org/">Sphinx</a> using a
+    <a href="https://github.com/readthedocs/sphinx_rtd_theme">theme</a>
+    provided by <a href="https://readthedocs.org">Read the Docs</a>.
+   
+
+</footer>
+        </div>
+      </div>
+    </section>
+  </div>
+  <script>
+      jQuery(function () {
+          SphinxRtdTheme.Navigation.enable(true);
+      });
+  </script> 
+
+</body>
+</html>

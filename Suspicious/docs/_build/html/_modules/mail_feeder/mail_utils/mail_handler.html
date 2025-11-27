@@ -1,0 +1,1489 @@
+
+
+<!DOCTYPE html>
+<html class="writer-html5" lang="en" data-content_root="../../../">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>mail_feeder.mail_utils.mail_handler &mdash; Suspicious 1.0.0 documentation</title>
+      <link rel="stylesheet" type="text/css" href="../../../_static/pygments.css?v=b86133f3" />
+      <link rel="stylesheet" type="text/css" href="../../../_static/css/theme.css?v=e59714d7" />
+
+  
+      <script src="../../../_static/jquery.js?v=5d32c60e"></script>
+      <script src="../../../_static/_sphinx_javascript_frameworks_compat.js?v=2cd50e6c"></script>
+      <script src="../../../_static/documentation_options.js?v=8d563738"></script>
+      <script src="../../../_static/doctools.js?v=9bcbadda"></script>
+      <script src="../../../_static/sphinx_highlight.js?v=dc90522c"></script>
+    <script src="../../../_static/js/theme.js"></script>
+    <link rel="index" title="Index" href="../../../genindex.html" />
+    <link rel="search" title="Search" href="../../../search.html" /> 
+</head>
+
+<body class="wy-body-for-nav"> 
+  <div class="wy-grid-for-nav">
+    <nav data-toggle="wy-nav-shift" class="wy-nav-side">
+      <div class="wy-side-scroll">
+        <div class="wy-side-nav-search" >
+
+          
+          
+          <a href="../../../index.html" class="icon icon-home">
+            Suspicious
+          </a>
+<div role="search">
+  <form id="rtd-search-form" class="wy-form" action="../../../search.html" method="get">
+    <input type="text" name="q" placeholder="Search docs" aria-label="Search docs" />
+    <input type="hidden" name="check_keywords" value="yes" />
+    <input type="hidden" name="area" value="default" />
+  </form>
+</div>
+        </div><div class="wy-menu wy-menu-vertical" data-spy="affix" role="navigation" aria-label="Navigation menu">
+              <p class="caption" role="heading"><span class="caption-text">Contents:</span></p>
+<ul>
+<li class="toctree-l1"><a class="reference internal" href="../../../modules/index.html">Modules (API Reference)</a></li>
+</ul>
+
+        </div>
+      </div>
+    </nav>
+
+    <section data-toggle="wy-nav-shift" class="wy-nav-content-wrap"><nav class="wy-nav-top" aria-label="Mobile navigation menu" >
+          <i data-toggle="wy-nav-top" class="fa fa-bars"></i>
+          <a href="../../../index.html">Suspicious</a>
+      </nav>
+
+      <div class="wy-nav-content">
+        <div class="rst-content">
+          <div role="navigation" aria-label="Page navigation">
+  <ul class="wy-breadcrumbs">
+      <li><a href="../../../index.html" class="icon icon-home" aria-label="Home"></a></li>
+          <li class="breadcrumb-item"><a href="../../index.html">Module code</a></li>
+      <li class="breadcrumb-item active">mail_feeder.mail_utils.mail_handler</li>
+      <li class="wy-breadcrumbs-aside">
+      </li>
+  </ul>
+  <hr/>
+</div>
+          <div role="main" class="document" itemscope="itemscope" itemtype="http://schema.org/Article">
+           <div itemprop="articleBody">
+             
+  <h1>Source code for mail_feeder.mail_utils.mail_handler</h1><div class="highlight"><pre>
+<span></span><span class="kn">import</span><span class="w"> </span><span class="nn">base64</span>
+<span class="kn">import</span><span class="w"> </span><span class="nn">email.header</span>
+<span class="kn">import</span><span class="w"> </span><span class="nn">json</span>
+<span class="kn">import</span><span class="w"> </span><span class="nn">logging</span>
+<span class="kn">import</span><span class="w"> </span><span class="nn">os</span>
+<span class="kn">import</span><span class="w"> </span><span class="nn">re</span>
+<span class="kn">from</span><span class="w"> </span><span class="nn">datetime</span><span class="w"> </span><span class="kn">import</span> <span class="n">date</span>
+<span class="kn">from</span><span class="w"> </span><span class="nn">datetime</span><span class="w"> </span><span class="kn">import</span> <span class="n">datetime</span> <span class="k">as</span> <span class="n">dt</span>
+<span class="kn">from</span><span class="w"> </span><span class="nn">email.utils</span><span class="w"> </span><span class="kn">import</span> <span class="n">parseaddr</span>
+<span class="kn">from</span><span class="w"> </span><span class="nn">urllib.parse</span><span class="w"> </span><span class="kn">import</span> <span class="n">urlparse</span><span class="p">,</span> <span class="n">urlunparse</span><span class="p">,</span> <span class="n">parse_qs</span>
+
+<span class="kn">from</span><span class="w"> </span><span class="nn">dashboard.models</span><span class="w"> </span><span class="kn">import</span> <span class="n">Kpi</span><span class="p">,</span> <span class="n">MonthlyReporterStats</span><span class="p">,</span> <span class="n">UserCasesMonthlyStats</span>
+<span class="kn">from</span><span class="w"> </span><span class="nn">django.contrib.auth.models</span><span class="w"> </span><span class="kn">import</span> <span class="n">User</span>
+<span class="kn">from</span><span class="w"> </span><span class="nn">django.core.exceptions</span><span class="w"> </span><span class="kn">import</span> <span class="n">ObjectDoesNotExist</span>
+<span class="kn">from</span><span class="w"> </span><span class="nn">django.db</span><span class="w"> </span><span class="kn">import</span> <span class="n">transaction</span>
+<span class="kn">from</span><span class="w"> </span><span class="nn">domain_process.domain_utils.domain_handler</span><span class="w"> </span><span class="kn">import</span> <span class="n">DomainHandler</span>
+<span class="kn">from</span><span class="w"> </span><span class="nn">email_process.email_utils.email_handler</span><span class="w"> </span><span class="kn">import</span> <span class="n">MailAddressHandler</span>
+<span class="kn">from</span><span class="w"> </span><span class="nn">email_validator</span><span class="w"> </span><span class="kn">import</span> <span class="n">EmailNotValidError</span><span class="p">,</span> <span class="n">validate_email</span>
+<span class="kn">from</span><span class="w"> </span><span class="nn">file_process.file_utils.file_handler</span><span class="w"> </span><span class="kn">import</span> <span class="n">FileHandler</span>
+<span class="kn">from</span><span class="w"> </span><span class="nn">hash_process.hash_utils.hash_handler</span><span class="w"> </span><span class="kn">import</span> <span class="n">HashHandler</span>
+<span class="kn">from</span><span class="w"> </span><span class="nn">hash_process.models</span><span class="w"> </span><span class="kn">import</span> <span class="n">Hash</span>
+<span class="kn">from</span><span class="w"> </span><span class="nn">ip_process.ip_utils.ip_handler</span><span class="w"> </span><span class="kn">import</span> <span class="n">IPHandler</span>
+<span class="kn">from</span><span class="w"> </span><span class="nn">mail_feeder.mail_utils.meioc</span><span class="w"> </span><span class="kn">import</span> <span class="n">email_analysis</span>
+<span class="kn">from</span><span class="w"> </span><span class="nn">mail_feeder.mail_utils.similarity_hash</span><span class="w"> </span><span class="kn">import</span> <span class="n">TextDistance</span>
+<span class="kn">from</span><span class="w"> </span><span class="nn">mail_feeder.models</span><span class="w"> </span><span class="kn">import</span> <span class="p">(</span><span class="n">ArtifactIsDomain</span><span class="p">,</span> <span class="n">ArtifactIsHash</span><span class="p">,</span> <span class="n">ArtifactIsIp</span><span class="p">,</span>
+                                <span class="n">ArtifactIsMailAddress</span><span class="p">,</span> <span class="n">ArtifactIsUrl</span><span class="p">,</span> <span class="n">Mail</span><span class="p">,</span>
+                                <span class="n">MailArtifact</span><span class="p">,</span> <span class="n">MailAttachment</span><span class="p">,</span> <span class="n">MailBody</span><span class="p">,</span>
+                                <span class="n">MailHeader</span><span class="p">)</span>
+<span class="kn">from</span><span class="w"> </span><span class="nn">profiles.profiles_utils.ldap</span><span class="w"> </span><span class="kn">import</span> <span class="n">Ldap</span>
+<span class="kn">from</span><span class="w"> </span><span class="nn">url_process.url_utils.url_handler</span><span class="w"> </span><span class="kn">import</span> <span class="n">URLHandler</span>
+
+<span class="n">CONFIG_PATH</span> <span class="o">=</span> <span class="s2">&quot;/app/settings.json&quot;</span>
+<span class="k">with</span> <span class="nb">open</span><span class="p">(</span><span class="n">CONFIG_PATH</span><span class="p">)</span> <span class="k">as</span> <span class="n">config_file</span><span class="p">:</span>
+    <span class="n">config</span> <span class="o">=</span> <span class="n">json</span><span class="o">.</span><span class="n">load</span><span class="p">(</span><span class="n">config_file</span><span class="p">)</span>
+
+<span class="n">company_config</span> <span class="o">=</span> <span class="n">config</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="s1">&#39;company_domains&#39;</span><span class="p">,</span> <span class="kc">None</span><span class="p">)</span>
+<span class="n">suspicious_config</span> <span class="o">=</span> <span class="n">config</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="s1">&#39;suspicious&#39;</span><span class="p">,</span> <span class="p">{})</span>
+<span class="n">SUSPICIOUS_EMAIL</span> <span class="o">=</span> <span class="n">suspicious_config</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="s1">&#39;email&#39;</span><span class="p">)</span>
+
+<span class="n">fetch_mail_logger</span> <span class="o">=</span> <span class="n">logging</span><span class="o">.</span><span class="n">getLogger</span><span class="p">(</span><span class="s1">&#39;tasp.cron.fetch_and_process_emails&#39;</span><span class="p">)</span>
+<span class="n">logger</span> <span class="o">=</span> <span class="n">logging</span><span class="o">.</span><span class="n">getLogger</span><span class="p">(</span><span class="vm">__name__</span><span class="p">)</span>
+
+
+<div class="viewcode-block" id="MailHandler">
+<a class="viewcode-back" href="../../../modules/mail_feeder_core.html#mail_feeder.mail_utils.mail_handler.MailHandler">[docs]</a>
+<span class="k">class</span><span class="w"> </span><span class="nc">MailHandler</span><span class="p">:</span>
+    <span class="k">def</span><span class="w"> </span><span class="fm">__init__</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">text_distance</span> <span class="o">=</span> <span class="n">TextDistance</span><span class="p">()</span>
+        
+<div class="viewcode-block" id="MailHandler.handle_mail">
+<a class="viewcode-back" href="../../../modules/mail_feeder_core.html#mail_feeder.mail_utils.mail_handler.MailHandler.handle_mail">[docs]</a>
+    <span class="k">def</span><span class="w"> </span><span class="nf">handle_mail</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">email_data</span><span class="p">,</span> <span class="n">workdir</span><span class="p">):</span>
+<span class="w">        </span><span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">        Handles the email data by checking email lists and either handling a new mail or an existing mail.</span>
+
+<span class="sd">        Args:</span>
+<span class="sd">            email_data (dict): The email data to be handled.</span>
+
+<span class="sd">        Returns:</span>
+<span class="sd">            mail_instance: The instance of the mail that was handled.</span>
+<span class="sd">        &quot;&quot;&quot;</span>
+        <span class="c1"># Validate the email_data before processing</span>
+
+        <span class="c1"># Extract the email lists</span>
+        <span class="n">email_list</span><span class="p">,</span> <span class="n">email_body_list</span><span class="p">,</span> <span class="n">email_header_list</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">check_email_lists</span><span class="p">(</span><span class="n">email_data</span><span class="p">)</span>
+
+        <span class="c1"># Check if the lists are empty</span>
+        <span class="k">if</span> <span class="ow">not</span> <span class="n">email_list</span> <span class="ow">and</span> <span class="ow">not</span> <span class="n">email_body_list</span> <span class="ow">and</span> <span class="ow">not</span> <span class="n">email_header_list</span><span class="p">:</span>
+            <span class="n">fetch_mail_logger</span><span class="o">.</span><span class="n">debug</span><span class="p">(</span><span class="s2">&quot;handling new mail&quot;</span><span class="p">)</span>
+            <span class="c1"># If all lists are empty, handle it as a new mail</span>
+            <span class="n">mail_instance</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">handle_new_mail</span><span class="p">(</span><span class="n">email_data</span><span class="p">,</span> <span class="n">workdir</span><span class="p">)</span>
+        <span class="k">else</span><span class="p">:</span>
+            <span class="c1"># If any of the lists is not empty, handle it as an existing mail</span>
+            <span class="n">fetch_mail_logger</span><span class="o">.</span><span class="n">debug</span><span class="p">(</span><span class="s2">&quot;handling existing mail&quot;</span><span class="p">)</span>
+            <span class="n">mail_instance</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">handle_existing_mail</span><span class="p">(</span><span class="n">email_data</span><span class="p">,</span> <span class="n">email_list</span><span class="p">,</span> <span class="n">workdir</span><span class="p">)</span>
+        <span class="c1"># Validate the mail instance before returning</span>
+        <span class="k">if</span> <span class="ow">not</span> <span class="n">mail_instance</span><span class="p">:</span>
+            <span class="n">fetch_mail_logger</span><span class="o">.</span><span class="n">warning</span><span class="p">(</span><span class="s2">&quot;No mail instance found or created&quot;</span><span class="p">)</span>
+
+        <span class="k">return</span> <span class="n">mail_instance</span></div>
+
+
+<div class="viewcode-block" id="MailHandler.handle_new_mail">
+<a class="viewcode-back" href="../../../modules/mail_feeder_core.html#mail_feeder.mail_utils.mail_handler.MailHandler.handle_new_mail">[docs]</a>
+    <span class="k">def</span><span class="w"> </span><span class="nf">handle_new_mail</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">email_data</span><span class="p">,</span> <span class="n">workdir</span><span class="p">):</span>
+<span class="w">        </span><span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">        Handles a new mail by creating a mail instance, saving and updating it,</span>
+<span class="sd">        handling rich observables, updating mail times sent, and creating mail info.</span>
+
+<span class="sd">        Args:</span>
+<span class="sd">            email_data (dict): The data of the email.</span>
+
+<span class="sd">        Returns:</span>
+<span class="sd">            MailInstance: The saved mail instance.</span>
+
+<span class="sd">        Raises:</span>
+<span class="sd">            Exception: If an error occurs while handling the mail.</span>
+<span class="sd">        &quot;&quot;&quot;</span>
+        <span class="n">mail_instance</span> <span class="o">=</span> <span class="kc">None</span>
+        <span class="k">try</span><span class="p">:</span>
+            <span class="n">mail_instance</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">create_mail_instance</span><span class="p">(</span><span class="n">email_data</span><span class="p">)</span>
+            <span class="n">fetch_mail_logger</span><span class="o">.</span><span class="n">info</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;Mail instance created: </span><span class="si">{</span><span class="n">mail_instance</span><span class="si">}</span><span class="s2">&quot;</span><span class="p">)</span>
+            <span class="k">if</span> <span class="n">mail_instance</span><span class="p">:</span>
+                <span class="n">fetch_mail_logger</span><span class="o">.</span><span class="n">debug</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;Mail instance created:&quot;</span><span class="p">)</span>
+                <span class="n">mail_instance</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">save_and_update_mail_instance</span><span class="p">(</span><span class="n">mail_instance</span><span class="p">,</span> <span class="n">email_data</span><span class="p">)</span>
+                <span class="k">if</span> <span class="n">mail_instance</span><span class="p">:</span>
+                    <span class="n">fetch_mail_logger</span><span class="o">.</span><span class="n">info</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;Mail instance saved and updated: </span><span class="si">{</span><span class="n">mail_instance</span><span class="si">}</span><span class="s2">&quot;</span><span class="p">)</span>
+                    <span class="bp">self</span><span class="o">.</span><span class="n">handle_rich_observables</span><span class="p">(</span><span class="n">mail_instance</span><span class="o">.</span><span class="n">mail_id</span><span class="p">,</span> <span class="n">mail_instance</span><span class="p">,</span> <span class="n">email_data</span><span class="p">,</span> <span class="n">workdir</span><span class="p">)</span>
+                    <span class="n">fetch_mail_logger</span><span class="o">.</span><span class="n">info</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;Rich observables handled&quot;</span><span class="p">)</span>
+                    <span class="bp">self</span><span class="o">.</span><span class="n">update_mail_times_sent</span><span class="p">(</span><span class="n">mail_instance</span><span class="p">)</span>
+                    <span class="n">fetch_mail_logger</span><span class="o">.</span><span class="n">info</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;Mail times sent updated&quot;</span><span class="p">)</span>
+                <span class="n">mail_instance</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">save_mail_instance</span><span class="p">(</span><span class="n">mail_instance</span><span class="p">)</span>
+                <span class="n">fetch_mail_logger</span><span class="o">.</span><span class="n">info</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;Mail instance saved: </span><span class="si">{</span><span class="n">mail_instance</span><span class="si">}</span><span class="s2">&quot;</span><span class="p">)</span>
+        <span class="k">except</span> <span class="ne">Exception</span> <span class="k">as</span> <span class="n">e</span><span class="p">:</span>
+            <span class="n">fetch_mail_logger</span><span class="o">.</span><span class="n">error</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;Error handling mail as first seen: </span><span class="si">{</span><span class="nb">str</span><span class="p">(</span><span class="n">e</span><span class="p">)</span><span class="si">}</span><span class="s2">&quot;</span><span class="p">)</span>
+        <span class="k">return</span> <span class="n">mail_instance</span></div>
+
+
+<div class="viewcode-block" id="MailHandler.handle_existing_mail">
+<a class="viewcode-back" href="../../../modules/mail_feeder_core.html#mail_feeder.mail_utils.mail_handler.MailHandler.handle_existing_mail">[docs]</a>
+    <span class="k">def</span><span class="w"> </span><span class="nf">handle_existing_mail</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">email_data</span><span class="p">,</span> <span class="n">email_list</span><span class="p">,</span> <span class="n">workdir</span><span class="p">):</span>
+<span class="w">        </span><span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">        Handles an existing mail instance.</span>
+
+<span class="sd">        Args:</span>
+<span class="sd">            email_data (dict): The data of the email.</span>
+<span class="sd">            email_list (list): List of existing email instances.</span>
+<span class="sd">            email_body_list (list): List of email bodies.</span>
+<span class="sd">            email_header_list (list): List of email headers.</span>
+
+<span class="sd">        Returns:</span>
+<span class="sd">            mail_instance: The updated or newly created mail instance.</span>
+<span class="sd">        &quot;&quot;&quot;</span>
+        <span class="n">mail_instance</span> <span class="o">=</span> <span class="kc">None</span>
+        <span class="k">try</span><span class="p">:</span>
+            <span class="k">if</span> <span class="n">email_list</span><span class="p">:</span>
+                <span class="n">mail_instance</span> <span class="o">=</span> <span class="n">email_list</span><span class="p">[</span><span class="mi">0</span><span class="p">]</span>
+                <span class="bp">self</span><span class="o">.</span><span class="n">update_mail_times_sent</span><span class="p">(</span><span class="n">mail_instance</span><span class="p">)</span>
+            <span class="k">else</span><span class="p">:</span>
+                <span class="n">mail_instance</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">handle_new_mail</span><span class="p">(</span><span class="n">email_data</span><span class="p">,</span> <span class="n">workdir</span><span class="p">)</span>
+        <span class="k">except</span> <span class="ne">Exception</span> <span class="k">as</span> <span class="n">e</span><span class="p">:</span>
+            <span class="n">fetch_mail_logger</span><span class="o">.</span><span class="n">error</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;Error handling mail as already seen: </span><span class="si">{</span><span class="nb">str</span><span class="p">(</span><span class="n">e</span><span class="p">)</span><span class="si">}</span><span class="s2">&quot;</span><span class="p">)</span>
+        <span class="k">return</span> <span class="n">mail_instance</span></div>
+
+
+<div class="viewcode-block" id="MailHandler.save_and_update_mail_instance">
+<a class="viewcode-back" href="../../../modules/mail_feeder_core.html#mail_feeder.mail_utils.mail_handler.MailHandler.save_and_update_mail_instance">[docs]</a>
+    <span class="k">def</span><span class="w"> </span><span class="nf">save_and_update_mail_instance</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">mail_instance</span><span class="p">,</span> <span class="n">email_data</span><span class="p">):</span>
+<span class="w">        </span><span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">        Saves and updates the mail instance with the provided email data.</span>
+
+<span class="sd">        Args:</span>
+<span class="sd">            mail_instance (Mail): The mail instance to be saved and updated.</span>
+<span class="sd">            email_data (dict): The email data used to create related instances.</span>
+
+<span class="sd">        Returns:</span>
+<span class="sd">            Mail: The saved and updated mail instance.</span>
+<span class="sd">        &quot;&quot;&quot;</span>
+        <span class="k">if</span> <span class="ow">not</span> <span class="n">mail_instance</span> <span class="ow">or</span> <span class="ow">not</span> <span class="nb">isinstance</span><span class="p">(</span><span class="n">mail_instance</span><span class="p">,</span> <span class="n">Mail</span><span class="p">)</span> <span class="ow">or</span> <span class="ow">not</span> <span class="n">email_data</span><span class="p">:</span>
+            <span class="k">raise</span> <span class="ne">ValueError</span><span class="p">(</span><span class="s2">&quot;Invalid mail instance or email data provided&quot;</span><span class="p">)</span>
+
+        <span class="c1"># Save the mail instance</span>
+        <span class="n">mail_instance</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">save_mail_instance</span><span class="p">(</span><span class="n">mail_instance</span><span class="p">)</span>
+
+        <span class="c1"># Create and save mail body instance</span>
+        <span class="n">mail_body_instance</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">create_mail_body_instance</span><span class="p">(</span><span class="n">email_data</span><span class="p">)</span>
+        <span class="k">if</span> <span class="n">mail_instance</span><span class="p">:</span>
+            <span class="k">if</span> <span class="n">mail_body_instance</span><span class="p">:</span>
+                <span class="bp">self</span><span class="o">.</span><span class="n">save_mail_body_instance</span><span class="p">(</span><span class="n">mail_body_instance</span><span class="p">)</span>
+                <span class="n">mail_instance</span><span class="o">.</span><span class="n">mail_body</span> <span class="o">=</span> <span class="n">mail_body_instance</span>
+
+            <span class="c1"># Create and save mail header instance</span>
+            <span class="n">mail_header_instance</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">create_mail_header_instance</span><span class="p">(</span><span class="n">email_data</span><span class="p">)</span>
+            <span class="k">if</span> <span class="n">mail_header_instance</span><span class="p">:</span>
+                <span class="bp">self</span><span class="o">.</span><span class="n">save_mail_header_instance</span><span class="p">(</span><span class="n">mail_header_instance</span><span class="p">)</span>
+                <span class="n">mail_instance</span><span class="o">.</span><span class="n">mail_header</span> <span class="o">=</span> <span class="n">mail_header_instance</span>
+
+        <span class="c1"># Save the updated mail instance</span>
+        <span class="n">mail_instance</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">save_mail_instance</span><span class="p">(</span><span class="n">mail_instance</span><span class="p">)</span>
+
+        <span class="k">return</span> <span class="n">mail_instance</span></div>
+
+
+<div class="viewcode-block" id="MailHandler.update_existing_mail_instance">
+<a class="viewcode-back" href="../../../modules/mail_feeder_core.html#mail_feeder.mail_utils.mail_handler.MailHandler.update_existing_mail_instance">[docs]</a>
+    <span class="k">def</span><span class="w"> </span><span class="nf">update_existing_mail_instance</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">mail_instance</span><span class="p">,</span> <span class="n">email_data</span><span class="p">,</span> <span class="n">email_body_list</span><span class="p">,</span> <span class="n">email_header_list</span><span class="p">):</span>
+<span class="w">        </span><span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">        Updates an existing mail instance with the provided email data, email body list, and email header list.</span>
+
+<span class="sd">        Args:</span>
+<span class="sd">            mail_instance (Mail): The existing mail instance to be updated.</span>
+<span class="sd">            email_data (dict): The email data containing information to update the mail instance.</span>
+<span class="sd">            email_body_list (list): The list of existing email bodies.</span>
+<span class="sd">            email_header_list (list): The list of existing email headers.</span>
+
+<span class="sd">        Returns:</span>
+<span class="sd">            Mail: The updated mail instance.</span>
+<span class="sd">        &quot;&quot;&quot;</span>
+        <span class="c1"># Check if mail_instance is valid</span>
+        <span class="k">if</span> <span class="ow">not</span> <span class="n">mail_instance</span> <span class="ow">or</span> <span class="ow">not</span> <span class="nb">isinstance</span><span class="p">(</span><span class="n">mail_instance</span><span class="p">,</span> <span class="n">Mail</span><span class="p">):</span>
+            <span class="k">raise</span> <span class="ne">ValueError</span><span class="p">(</span><span class="s2">&quot;Invalid mail instance&quot;</span><span class="p">)</span>
+
+        <span class="c1"># Check if email_data is valid</span>
+        <span class="k">if</span> <span class="ow">not</span> <span class="n">email_data</span> <span class="ow">or</span> <span class="ow">not</span> <span class="nb">isinstance</span><span class="p">(</span><span class="n">email_data</span><span class="p">,</span> <span class="nb">dict</span><span class="p">):</span>
+            <span class="k">raise</span> <span class="ne">ValueError</span><span class="p">(</span><span class="s2">&quot;Invalid email data&quot;</span><span class="p">)</span>
+        
+        <span class="c1"># Handle mail body</span>
+        <span class="k">if</span> <span class="n">email_body_list</span><span class="p">:</span>
+            <span class="n">existing_mail_body</span> <span class="o">=</span> <span class="n">email_body_list</span><span class="p">[</span><span class="mi">0</span><span class="p">]</span>
+            <span class="bp">self</span><span class="o">.</span><span class="n">update_mail_body_times_sent</span><span class="p">(</span><span class="n">existing_mail_body</span><span class="p">)</span>
+            <span class="n">mail_instance</span><span class="o">.</span><span class="n">mail_body</span> <span class="o">=</span> <span class="n">existing_mail_body</span>
+        <span class="k">else</span><span class="p">:</span>
+            <span class="n">mail_body_instance</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">create_mail_body_instance</span><span class="p">(</span><span class="n">email_data</span><span class="p">)</span>
+            <span class="k">if</span> <span class="n">mail_body_instance</span><span class="p">:</span>
+                <span class="bp">self</span><span class="o">.</span><span class="n">save_mail_body_instance</span><span class="p">(</span><span class="n">mail_body_instance</span><span class="p">)</span>
+                <span class="n">mail_instance</span><span class="o">.</span><span class="n">mail_body</span> <span class="o">=</span> <span class="n">mail_body_instance</span>
+
+        <span class="c1"># Handle mail header</span>
+        <span class="k">if</span> <span class="n">email_header_list</span><span class="p">:</span>
+            <span class="n">existing_mail_header</span> <span class="o">=</span> <span class="n">email_header_list</span><span class="p">[</span><span class="mi">0</span><span class="p">]</span>
+            <span class="n">mail_instance</span><span class="o">.</span><span class="n">mail_header</span> <span class="o">=</span> <span class="n">existing_mail_header</span>
+        <span class="k">else</span><span class="p">:</span>
+            <span class="n">mail_header_instance</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">create_mail_header_instance</span><span class="p">(</span><span class="n">email_data</span><span class="p">)</span>
+            <span class="k">if</span> <span class="n">mail_header_instance</span><span class="p">:</span>
+                <span class="bp">self</span><span class="o">.</span><span class="n">save_mail_header_instance</span><span class="p">(</span><span class="n">mail_header_instance</span><span class="p">)</span>
+                <span class="n">mail_instance</span><span class="o">.</span><span class="n">mail_header</span> <span class="o">=</span> <span class="n">mail_header_instance</span>
+
+        <span class="c1"># Save and return the updated mail instance</span>
+        <span class="n">mail_instance</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">save_mail_instance</span><span class="p">(</span><span class="n">mail_instance</span><span class="p">)</span>
+        <span class="k">return</span> <span class="n">mail_instance</span></div>
+
+
+<div class="viewcode-block" id="MailHandler.check_email_lists">
+<a class="viewcode-back" href="../../../modules/mail_feeder_core.html#mail_feeder.mail_utils.mail_handler.MailHandler.check_email_lists">[docs]</a>
+    <span class="k">def</span><span class="w"> </span><span class="nf">check_email_lists</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">email_data</span><span class="p">):</span>
+<span class="w">        </span><span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">        Check the email lists for a given email data.</span>
+
+<span class="sd">        Args:</span>
+<span class="sd">            email_data (dict): A dictionary containing email data.</span>
+
+<span class="sd">        Returns:</span>
+<span class="sd">            tuple: A tuple containing the following lists:</span>
+<span class="sd">                - email_list: A list of Mail objects filtered by mail_id.</span>
+<span class="sd">                - email_body_list: A list of email bodies that passed the validation.</span>
+<span class="sd">                - email_header_list: A list of email headers that passed the validation.</span>
+<span class="sd">        &quot;&quot;&quot;</span>
+        <span class="c1"># fetch_mail_logger.info(f&quot;Checking email lists for email data&quot;)</span>
+        <span class="c1"># Extract data from email_data</span>
+        <span class="n">email_id</span> <span class="o">=</span> <span class="n">email_data</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="s1">&#39;id&#39;</span><span class="p">)</span>
+        <span class="n">email_data_body</span> <span class="o">=</span> <span class="n">email_data</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="s1">&#39;reportedText&#39;</span><span class="p">)</span>
+        <span class="n">email_data_header</span> <span class="o">=</span> <span class="n">email_data</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="s1">&#39;headers&#39;</span><span class="p">)</span>
+        <span class="c1"># fetch_mail_logger.info(&quot;Email data extracted&quot;)</span>
+        <span class="c1"># Get the list of Mail objects filtered by mail_id</span>
+        <span class="n">email_list</span> <span class="o">=</span> <span class="n">Mail</span><span class="o">.</span><span class="n">objects</span><span class="o">.</span><span class="n">filter</span><span class="p">(</span><span class="n">mail_id</span><span class="o">=</span><span class="nb">str</span><span class="p">(</span><span class="n">email_id</span><span class="p">))</span>
+        <span class="c1"># fetch_mail_logger.info(&quot;list of Mail objects filtered by mail_id&quot;)</span>
+        <span class="c1"># Check and validate email bodies and headers</span>
+        <span class="n">email_body_list</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">check_email_bodies</span><span class="p">(</span><span class="n">email_data_body</span><span class="p">)</span> <span class="k">if</span> <span class="n">email_data_body</span> <span class="k">else</span> <span class="p">[]</span>
+        <span class="c1"># fetch_mail_logger.info(&quot;Email body processed&quot;)</span>
+        <span class="c1"># fetch_mail_logger.info(f&quot;Email body list: {email_body_list}&quot;)</span>
+        <span class="n">email_header_list</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">check_email_headers</span><span class="p">(</span><span class="n">email_data_header</span><span class="p">)</span> <span class="k">if</span> <span class="n">email_data_header</span> <span class="k">else</span> <span class="p">[]</span>
+        <span class="c1"># fetch_mail_logger.info(&quot;Email header processed&quot;)</span>
+        <span class="c1"># fetch_mail_logger.info(f&quot;Email header list: {email_header_list}&quot;)</span>
+        <span class="k">return</span> <span class="n">email_list</span><span class="p">,</span> <span class="n">email_body_list</span><span class="p">,</span> <span class="n">email_header_list</span></div>
+
+
+<div class="viewcode-block" id="MailHandler.check_email_bodies">
+<a class="viewcode-back" href="../../../modules/mail_feeder_core.html#mail_feeder.mail_utils.mail_handler.MailHandler.check_email_bodies">[docs]</a>
+    <span class="k">def</span><span class="w"> </span><span class="nf">check_email_bodies</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">email_data_body</span><span class="p">):</span>
+<span class="w">        </span><span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">        Check the email bodies for similarity with the given email data body.</span>
+
+<span class="sd">        Args:</span>
+<span class="sd">            email_data_body (str): The email data body to compare with.</span>
+
+<span class="sd">        Returns:</span>
+<span class="sd">            list: A list of email bodies that are similar to the given email data body.</span>
+<span class="sd">        &quot;&quot;&quot;</span>
+        <span class="n">email_body_list</span> <span class="o">=</span> <span class="p">[]</span>
+        <span class="c1"># try:</span>
+        <span class="c1">#     # Filter emails that have a non-null mail_body and possibly narrow down further</span>
+        <span class="c1">#     fetch_mail_logger.info(&quot;Filtering emails with non-null mail_body&quot;)</span>
+        <span class="c1">#     emails = Mail.objects.filter(~Q(mail_body__isnull=True)).select_related(&#39;mail_body&#39;)</span>
+        <span class="c1">#     fetch_mail_logger.info(f&quot;Number of emails with non-null mail_body: {emails.count()}&quot;)</span>
+        <span class="c1">#     # fuzzy_hash = self.text_distance.hash_text_mail(str(email_data_body))</span>
+        <span class="c1">#     fuzzy_hash = self.text_distance.hash_text_mail(str(email_data_body))</span>
+        <span class="c1">#     fetch_mail_logger.info(f&quot;Fuzzy hash: {fuzzy_hash}&quot;)</span>
+        <span class="c1">#     for email in emails:</span>
+        <span class="c1">#         stored_hash = email.mail_body.fuzzy_hash</span>
+        <span class="c1">#         # distance = self.text_distance.calculate_distance(email.mail_body.fuzzy_hash, fuzzy_hash)</span>
+        <span class="c1">#         distance = self.text_distance.calculate_distance(fuzzy_hash,stored_hash)</span>
+        <span class="c1">#         if distance &lt; 1:</span>
+        <span class="c1">#             fetch_mail_logger.info(f&quot;Distance: {distance}&quot;)</span>
+        <span class="c1">#             email_body_list.append(email.mail_body)</span>
+        <span class="c1">#             email.mail_body.times_sent = F(&#39;times_sent&#39;) + 1</span>
+        <span class="c1">#             if distance == 0:</span>
+        <span class="c1">#                 email.times_sent = F(&#39;times_sent&#39;) + 1</span>
+        <span class="c1">#                 email.save(update_fields=[&#39;times_sent&#39;])</span>
+        <span class="c1">#                 break</span>
+        <span class="c1">#             email.mail_body.other_values = self.text_distance.preprocess_text(str(email_data_body))</span>
+        <span class="c1">#             email.mail_body.save(update_fields=[&#39;times_sent&#39;, &#39;other_values&#39;])</span>
+        <span class="c1">#             email.save(update_fields=[&#39;times_sent&#39;])</span>
+        <span class="c1">#             break</span>
+                    
+        <span class="c1"># except Exception as e:</span>
+        <span class="c1">#     print(f&quot;Error checking email body lists: {str(e)}&quot;)</span>
+            
+        <span class="k">return</span> <span class="n">email_body_list</span></div>
+
+
+<div class="viewcode-block" id="MailHandler.check_email_headers">
+<a class="viewcode-back" href="../../../modules/mail_feeder_core.html#mail_feeder.mail_utils.mail_handler.MailHandler.check_email_headers">[docs]</a>
+    <span class="k">def</span><span class="w"> </span><span class="nf">check_email_headers</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">email_data_header</span><span class="p">):</span>
+<span class="w">        </span><span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">        Check and validate email headers.</span>
+
+<span class="sd">        This method checks the email headers against the existing mail headers in the database.</span>
+<span class="sd">        It calculates the distance between the email header and the headers in the database using a text distance algorithm.</span>
+<span class="sd">        If the distance is less than 1, it adds the mail header to the email_header_list.</span>
+<span class="sd">        If the distance is 0, it increments the times_sent counter of the email and breaks the loop.</span>
+<span class="sd">        It also updates the other_values field of the mail header with preprocessed text and saves the changes.</span>
+
+<span class="sd">        Args:</span>
+<span class="sd">            email_data_header (str): The email header to be checked and validated.</span>
+
+<span class="sd">        Returns:</span>
+<span class="sd">            list: A list of mail headers that match the email_data_header.</span>
+
+<span class="sd">        Raises:</span>
+<span class="sd">            Exception: If there is an error while checking the email header lists.</span>
+<span class="sd">        &quot;&quot;&quot;</span>
+        <span class="n">email_header_list</span> <span class="o">=</span> <span class="p">[]</span>
+        <span class="c1"># try:</span>
+        <span class="c1">#     # Filter emails that have a non-null mail_header and prefetch related objects</span>
+        <span class="c1">#     fetch_mail_logger.info(&quot;Filtering emails with non-null mail_header&quot;)</span>
+
+        <span class="c1">#     emails = Mail.objects.filter(~Q(mail_header__isnull=True)).select_related(&#39;mail_header&#39;)</span>
+        <span class="c1">#     fetch_mail_logger.info(f&quot;Number of emails with non-null mail_header: {emails.count()}&quot;)</span>
+        <span class="c1">#     #fuzzy_hash = self.text_distance.hash_text_mail(str(email_data_header))</span>
+        <span class="c1">#     fuzzy_hash = self.text_distance.hash_text(str(email_data_header))</span>
+        <span class="c1">#     for email in emails:</span>
+        <span class="c1">#         stored_hash = self.text_distance.hash_text(email.mail_header.header_value)</span>
+        <span class="c1">#         distance_header = self.text_distance.calculate_distance(fuzzy_hash,stored_hash)</span>
+        <span class="c1">#         if distance_header &lt; 1:</span>
+        <span class="c1">#             fetch_mail_logger.info(f&quot;Distance: {distance_header}&quot;)</span>
+        <span class="c1">#             email_header_list.append(email.mail_header)</span>
+        <span class="c1">#             email.mail_header.times_sent = F(&#39;times_sent&#39;) + 1</span>
+        <span class="c1">#             if distance_header == 0:</span>
+        <span class="c1">#                 email.times_sent = F(&#39;times_sent&#39;) + 1</span>
+        <span class="c1">#                 email.save(update_fields=[&#39;times_sent&#39;])</span>
+        <span class="c1">#                 break</span>
+        <span class="c1">#             email.mail_header.other_values = self.text_distance.preprocess_text(str(email_data_header))</span>
+        <span class="c1">#             email.mail_header.save(update_fields=[&#39;times_sent&#39;, &#39;other_values&#39;])</span>
+        <span class="c1">#             email.save(update_fields=[&#39;times_sent&#39;])</span>
+        <span class="c1">#             break</span>
+                    
+        <span class="c1"># except Mail.DoesNotExist as e:</span>
+        <span class="c1">#     print(f&quot;Mail object does not exist: {str(e)}&quot;)</span>
+        <span class="c1"># except Exception as e:</span>
+        <span class="c1">#     print(f&quot;Error checking email header lists: {str(e)}&quot;)</span>
+            
+        <span class="k">return</span> <span class="n">email_header_list</span></div>
+
+
+<div class="viewcode-block" id="MailHandler.create_mail_instance">
+<a class="viewcode-back" href="../../../modules/mail_feeder_core.html#mail_feeder.mail_utils.mail_handler.MailHandler.create_mail_instance">[docs]</a>
+    <span class="k">def</span><span class="w"> </span><span class="nf">create_mail_instance</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">email_data</span><span class="p">):</span>
+<span class="w">        </span><span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">        Create a Mail instance based on the provided email data.</span>
+
+<span class="sd">        Args:</span>
+<span class="sd">            email_data (dict): A dictionary containing the email data.</span>
+
+<span class="sd">        Returns:</span>
+<span class="sd">            Mail or None: The created Mail instance, or None if creation failed.</span>
+<span class="sd">        &quot;&quot;&quot;</span>
+        <span class="n">subject</span> <span class="o">=</span> <span class="nb">str</span><span class="p">(</span><span class="n">email_data</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="s1">&#39;reportedSubject&#39;</span><span class="p">,</span> <span class="s1">&#39;&#39;</span><span class="p">))</span>
+        <span class="n">_from</span> <span class="o">=</span> <span class="nb">str</span><span class="p">(</span><span class="n">email_data</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="s1">&#39;reportedBy&#39;</span><span class="p">,</span> <span class="s1">&#39;&#39;</span><span class="p">))</span>
+        <span class="n">name</span><span class="p">,</span> <span class="n">addr</span> <span class="o">=</span> <span class="n">parseaddr</span><span class="p">(</span><span class="n">_from</span><span class="p">)</span>
+        <span class="n">decoded_subject</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">decode_subject</span><span class="p">(</span><span class="n">subject</span><span class="p">)</span> <span class="ow">or</span> <span class="sa">f</span><span class="s2">&quot;Suspicious Mail by </span><span class="si">{</span><span class="n">_from</span><span class="w"> </span><span class="ow">or</span><span class="w"> </span><span class="s1">&#39;Unknown Sender&#39;</span><span class="si">}</span><span class="s2">&quot;</span>
+
+        <span class="n">to_field</span> <span class="o">=</span> <span class="nb">str</span><span class="p">(</span><span class="n">email_data</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="s1">&#39;to&#39;</span><span class="p">,</span> <span class="s1">&#39;&#39;</span><span class="p">))</span>
+        <span class="k">if</span> <span class="ow">not</span> <span class="n">_from</span> <span class="ow">or</span> <span class="ow">not</span> <span class="n">to_field</span><span class="p">:</span>
+            <span class="n">fetch_mail_logger</span><span class="o">.</span><span class="n">warning</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;Skipping mail creation: missing required fields reportedBy=&#39;</span><span class="si">{</span><span class="n">_from</span><span class="si">}</span><span class="s2">&#39;, to=&#39;</span><span class="si">{</span><span class="n">to_field</span><span class="si">}</span><span class="s2">&#39;&quot;</span><span class="p">)</span>
+            <span class="k">return</span> <span class="kc">None</span>
+
+        <span class="k">try</span><span class="p">:</span>
+            <span class="n">mail_instance</span> <span class="o">=</span> <span class="n">Mail</span><span class="p">(</span>
+                <span class="n">subject</span><span class="o">=</span><span class="n">decoded_subject</span><span class="p">,</span>
+                <span class="n">reportedBy</span><span class="o">=</span><span class="n">addr</span><span class="p">,</span>
+                <span class="n">date</span><span class="o">=</span><span class="bp">self</span><span class="o">.</span><span class="n">parse_date</span><span class="p">(</span><span class="n">email_data</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="s1">&#39;date&#39;</span><span class="p">,</span> <span class="n">date</span><span class="o">.</span><span class="n">today</span><span class="p">()</span><span class="o">.</span><span class="n">strftime</span><span class="p">(</span><span class="s2">&quot;</span><span class="si">%a</span><span class="s2">, </span><span class="si">%d</span><span class="s2"> %b %Y %H:%M:%S %z&quot;</span><span class="p">))),</span>
+                <span class="n">mail_from</span><span class="o">=</span><span class="nb">str</span><span class="p">(</span><span class="n">email_data</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="s1">&#39;from&#39;</span><span class="p">,</span> <span class="s1">&#39;&#39;</span><span class="p">)),</span>
+                <span class="n">to</span><span class="o">=</span><span class="n">to_field</span><span class="p">,</span>
+                <span class="n">cc</span><span class="o">=</span><span class="nb">str</span><span class="p">(</span><span class="n">email_data</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="s1">&#39;cc&#39;</span><span class="p">,</span> <span class="s1">&#39;&#39;</span><span class="p">)),</span>
+                <span class="n">bcc</span><span class="o">=</span><span class="nb">str</span><span class="p">(</span><span class="n">email_data</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="s1">&#39;bcc&#39;</span><span class="p">,</span> <span class="s1">&#39;&#39;</span><span class="p">)),</span>
+                <span class="n">mail_id</span><span class="o">=</span><span class="nb">str</span><span class="p">(</span><span class="n">email_data</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="s1">&#39;id&#39;</span><span class="p">,</span> <span class="s1">&#39;&#39;</span><span class="p">)),</span>
+            <span class="p">)</span>
+            <span class="n">mail_instance</span><span class="o">.</span><span class="n">full_clean</span><span class="p">()</span>  <span class="c1"># Validate the instance</span>
+            <span class="n">mail_instance</span><span class="o">.</span><span class="n">save</span><span class="p">()</span>        <span class="c1"># Save the instance</span>
+        <span class="k">except</span> <span class="ne">Exception</span> <span class="k">as</span> <span class="n">e</span><span class="p">:</span>
+            <span class="n">fetch_mail_logger</span><span class="o">.</span><span class="n">error</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;Error creating mail instance: </span><span class="si">{</span><span class="n">e</span><span class="si">}</span><span class="s2">&quot;</span><span class="p">)</span>
+            <span class="k">return</span> <span class="kc">None</span>
+
+        <span class="k">return</span> <span class="n">mail_instance</span></div>
+
+
+
+<div class="viewcode-block" id="MailHandler.decode_subject">
+<a class="viewcode-back" href="../../../modules/mail_feeder_core.html#mail_feeder.mail_utils.mail_handler.MailHandler.decode_subject">[docs]</a>
+    <span class="nd">@staticmethod</span>
+    <span class="k">def</span><span class="w"> </span><span class="nf">decode_subject</span><span class="p">(</span><span class="n">subject</span><span class="p">):</span>
+<span class="w">        </span><span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">        Decode the subject of the email.</span>
+
+<span class="sd">        Args:</span>
+<span class="sd">            subject (str): The subject of the email.</span>
+
+<span class="sd">        Returns:</span>
+<span class="sd">            str: The decoded subject.</span>
+<span class="sd">        &quot;&quot;&quot;</span>
+        <span class="n">decoded_subject</span> <span class="o">=</span> <span class="s2">&quot;&quot;</span>
+        <span class="k">for</span> <span class="n">part</span><span class="p">,</span> <span class="n">encoding</span> <span class="ow">in</span> <span class="n">email</span><span class="o">.</span><span class="n">header</span><span class="o">.</span><span class="n">decode_header</span><span class="p">(</span><span class="n">subject</span><span class="p">):</span>
+            <span class="k">if</span> <span class="nb">isinstance</span><span class="p">(</span><span class="n">part</span><span class="p">,</span> <span class="nb">bytes</span><span class="p">):</span>
+                <span class="n">decoded_subject</span> <span class="o">+=</span> <span class="n">part</span><span class="o">.</span><span class="n">decode</span><span class="p">(</span><span class="n">encoding</span> <span class="ow">or</span> <span class="s1">&#39;utf-8&#39;</span><span class="p">,</span> <span class="n">errors</span><span class="o">=</span><span class="s1">&#39;replace&#39;</span><span class="p">)</span>
+            <span class="k">else</span><span class="p">:</span>
+                <span class="n">decoded_subject</span> <span class="o">+=</span> <span class="n">part</span>
+        <span class="k">return</span> <span class="n">decoded_subject</span></div>
+
+
+<div class="viewcode-block" id="MailHandler.parse_date">
+<a class="viewcode-back" href="../../../modules/mail_feeder_core.html#mail_feeder.mail_utils.mail_handler.MailHandler.parse_date">[docs]</a>
+    <span class="nd">@staticmethod</span>
+    <span class="k">def</span><span class="w"> </span><span class="nf">parse_date</span><span class="p">(</span><span class="n">date_string</span><span class="p">):</span>
+<span class="w">        </span><span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">        Parse the date string into a datetime object.</span>
+
+<span class="sd">        Args:</span>
+<span class="sd">            date_string (str): The date string.</span>
+
+<span class="sd">        Returns:</span>
+<span class="sd">            datetime: The parsed datetime object.</span>
+<span class="sd">        &quot;&quot;&quot;</span>
+        <span class="k">try</span><span class="p">:</span>
+            <span class="k">if</span> <span class="n">date_string</span> <span class="ow">is</span> <span class="kc">None</span><span class="p">:</span>
+                <span class="k">return</span> <span class="n">dt</span><span class="o">.</span><span class="n">now</span><span class="p">()</span>
+            <span class="k">return</span> <span class="n">dt</span><span class="o">.</span><span class="n">strptime</span><span class="p">(</span><span class="nb">str</span><span class="p">(</span><span class="n">date_string</span><span class="p">),</span> <span class="s2">&quot;</span><span class="si">%a</span><span class="s2">, </span><span class="si">%d</span><span class="s2"> %b %Y %H:%M:%S %z&quot;</span><span class="p">)</span><span class="o">.</span><span class="n">replace</span><span class="p">(</span><span class="n">tzinfo</span><span class="o">=</span><span class="kc">None</span><span class="p">)</span>
+        <span class="k">except</span> <span class="ne">ValueError</span><span class="p">:</span>
+            <span class="k">return</span> <span class="n">dt</span><span class="o">.</span><span class="n">now</span><span class="p">()</span></div>
+
+
+<div class="viewcode-block" id="MailHandler.save_mail_instance">
+<a class="viewcode-back" href="../../../modules/mail_feeder_core.html#mail_feeder.mail_utils.mail_handler.MailHandler.save_mail_instance">[docs]</a>
+    <span class="k">def</span><span class="w"> </span><span class="nf">save_mail_instance</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">mail_instance</span><span class="p">):</span>
+<span class="w">        </span><span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">        Saves the given mail instance and returns it if successful.</span>
+
+<span class="sd">        Args:</span>
+<span class="sd">            mail_instance: The mail instance to be saved.</span>
+
+<span class="sd">        Returns:</span>
+<span class="sd">            The saved mail instance if successful, None otherwise.</span>
+<span class="sd">        &quot;&quot;&quot;</span>
+        <span class="k">try</span><span class="p">:</span>
+            <span class="n">mail_instance</span><span class="o">.</span><span class="n">save</span><span class="p">()</span>
+            <span class="k">return</span> <span class="n">mail_instance</span>
+        <span class="k">except</span> <span class="ne">Exception</span> <span class="k">as</span> <span class="n">e</span><span class="p">:</span>
+            <span class="n">fetch_mail_logger</span><span class="o">.</span><span class="n">error</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;Error saving mail instance: </span><span class="si">{</span><span class="nb">str</span><span class="p">(</span><span class="n">e</span><span class="p">)</span><span class="si">}</span><span class="s2">&quot;</span><span class="p">)</span>
+            <span class="k">return</span> <span class="kc">None</span></div>
+
+        
+
+<div class="viewcode-block" id="MailHandler.create_mail_body_instance">
+<a class="viewcode-back" href="../../../modules/mail_feeder_core.html#mail_feeder.mail_utils.mail_handler.MailHandler.create_mail_body_instance">[docs]</a>
+    <span class="k">def</span><span class="w"> </span><span class="nf">create_mail_body_instance</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">email_data</span><span class="p">):</span>
+<span class="w">        </span><span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">        Create a MailBody instance based on the provided email data.</span>
+
+<span class="sd">        Args:</span>
+<span class="sd">            email_data (dict): A dictionary containing the email data.</span>
+
+<span class="sd">        Returns:</span>
+<span class="sd">            MailBody: The created MailBody instance.</span>
+<span class="sd">        &quot;&quot;&quot;</span>
+        <span class="c1"># Extract the reported text from the email data</span>
+        <span class="n">reported_text</span> <span class="o">=</span> <span class="nb">str</span><span class="p">(</span><span class="n">email_data</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="s1">&#39;reportedText&#39;</span><span class="p">,</span> <span class="s1">&#39;&#39;</span><span class="p">))</span>
+
+        <span class="c1"># If the reported text is empty, return None or raise an exception</span>
+        <span class="k">if</span> <span class="ow">not</span> <span class="n">reported_text</span><span class="p">:</span>
+            <span class="c1"># You can choose to return None or raise an exception</span>
+            <span class="c1"># return None</span>
+            <span class="k">raise</span> <span class="ne">ValueError</span><span class="p">(</span><span class="s2">&quot;Reported text is empty&quot;</span><span class="p">)</span>
+
+        <span class="c1"># Calculate the fuzzy hash of the reported text</span>
+        <span class="n">fuzzy_hash</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">text_distance</span><span class="o">.</span><span class="n">hash_text_mail</span><span class="p">(</span><span class="n">reported_text</span><span class="p">)</span>
+
+        <span class="c1"># Try to get the MailBody instance with the calculated fuzzy hash</span>
+        <span class="n">mail_body_instance</span><span class="p">,</span> <span class="n">created</span> <span class="o">=</span> <span class="n">MailBody</span><span class="o">.</span><span class="n">objects</span><span class="o">.</span><span class="n">get_or_create</span><span class="p">(</span>
+            <span class="n">fuzzy_hash</span><span class="o">=</span><span class="n">fuzzy_hash</span><span class="p">,</span>
+            <span class="n">defaults</span><span class="o">=</span><span class="p">{</span><span class="s1">&#39;body_value&#39;</span><span class="p">:</span> <span class="n">reported_text</span><span class="p">}</span>
+        <span class="p">)</span>
+
+        <span class="c1"># If the MailBody instance was created now, it means it did not exist before</span>
+        <span class="k">if</span> <span class="n">created</span><span class="p">:</span>
+            <span class="c1"># You can add any additional logic here if needed</span>
+            <span class="k">pass</span>
+
+        <span class="k">return</span> <span class="n">mail_body_instance</span></div>
+
+
+    
+<div class="viewcode-block" id="MailHandler.create_mail_header_instance">
+<a class="viewcode-back" href="../../../modules/mail_feeder_core.html#mail_feeder.mail_utils.mail_handler.MailHandler.create_mail_header_instance">[docs]</a>
+    <span class="k">def</span><span class="w"> </span><span class="nf">create_mail_header_instance</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">email_data</span><span class="p">):</span>
+<span class="w">        </span><span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">        Create a MailHeader instance based on the provided email data.</span>
+
+<span class="sd">        Args:</span>
+<span class="sd">            email_data (dict): A dictionary containing email data.</span>
+
+<span class="sd">        Returns:</span>
+<span class="sd">            MailHeader: The created MailHeader instance.</span>
+
+<span class="sd">        Raises:</span>
+<span class="sd">            None.</span>
+
+<span class="sd">        &quot;&quot;&quot;</span>
+        <span class="c1"># Extract the headers from the email data</span>
+        <span class="n">headers</span> <span class="o">=</span> <span class="nb">str</span><span class="p">(</span><span class="n">email_data</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="s1">&#39;headers&#39;</span><span class="p">,</span> <span class="s1">&#39;&#39;</span><span class="p">))</span>
+
+        <span class="c1"># If the headers are empty, return None or raise an exception</span>
+        <span class="k">if</span> <span class="ow">not</span> <span class="n">headers</span><span class="p">:</span>
+            <span class="k">raise</span> <span class="ne">ValueError</span><span class="p">(</span><span class="s2">&quot;Email data does not contain headers&quot;</span><span class="p">)</span>
+
+        <span class="c1"># Calculate the fuzzy hash of the headers</span>
+        <span class="n">fuzzy_hash</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">text_distance</span><span class="o">.</span><span class="n">hash_text_mail</span><span class="p">(</span><span class="n">headers</span><span class="p">)</span>
+
+        <span class="c1"># Try to get the MailHeader instance with the calculated fuzzy hash</span>
+        <span class="k">try</span><span class="p">:</span>
+            <span class="n">mail_header_instance</span> <span class="o">=</span> <span class="n">MailHeader</span><span class="o">.</span><span class="n">objects</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="n">fuzzy_hash</span><span class="o">=</span><span class="n">fuzzy_hash</span><span class="p">)</span>
+        <span class="k">except</span> <span class="n">MailHeader</span><span class="o">.</span><span class="n">DoesNotExist</span><span class="p">:</span>
+            <span class="c1"># If the MailHeader instance does not exist, create a new one</span>
+            <span class="n">mail_header_instance</span> <span class="o">=</span> <span class="n">MailHeader</span><span class="p">(</span>
+                <span class="n">header_value</span><span class="o">=</span><span class="n">headers</span><span class="p">,</span>
+                <span class="n">fuzzy_hash</span><span class="o">=</span><span class="n">fuzzy_hash</span>
+            <span class="p">)</span>
+
+        <span class="k">return</span> <span class="n">mail_header_instance</span></div>
+
+    
+<div class="viewcode-block" id="MailHandler.save_mail_body_instance">
+<a class="viewcode-back" href="../../../modules/mail_feeder_core.html#mail_feeder.mail_utils.mail_handler.MailHandler.save_mail_body_instance">[docs]</a>
+    <span class="k">def</span><span class="w"> </span><span class="nf">save_mail_body_instance</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">mail_body_instance</span><span class="p">):</span>
+<span class="w">        </span><span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">        Saves the given mail body instance.</span>
+
+<span class="sd">        Args:</span>
+<span class="sd">            mail_body_instance: The mail body instance to be saved.</span>
+
+<span class="sd">        Raises:</span>
+<span class="sd">            Exception: If there is an error while saving the mail body instance.</span>
+<span class="sd">        &quot;&quot;&quot;</span>
+        <span class="k">try</span><span class="p">:</span>
+            <span class="n">mail_body_instance</span><span class="o">.</span><span class="n">save</span><span class="p">()</span>
+        <span class="k">except</span> <span class="ne">Exception</span> <span class="k">as</span> <span class="n">e</span><span class="p">:</span>
+            <span class="c1"># Instead of just printing the error, let&#39;s log it for better debugging and tracking</span>
+            <span class="n">fetch_mail_logger</span><span class="o">.</span><span class="n">error</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;Error saving mail body instance: </span><span class="si">{</span><span class="nb">str</span><span class="p">(</span><span class="n">e</span><span class="p">)</span><span class="si">}</span><span class="s2">&quot;</span><span class="p">)</span>
+            <span class="c1"># Reraise the exception after logging it</span>
+            <span class="k">raise</span></div>
+
+
+<div class="viewcode-block" id="MailHandler.save_mail_header_instance">
+<a class="viewcode-back" href="../../../modules/mail_feeder_core.html#mail_feeder.mail_utils.mail_handler.MailHandler.save_mail_header_instance">[docs]</a>
+    <span class="k">def</span><span class="w"> </span><span class="nf">save_mail_header_instance</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">mail_header_instance</span><span class="p">):</span>
+<span class="w">        </span><span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">        Saves the given mail header instance.</span>
+
+<span class="sd">        Args:</span>
+<span class="sd">            mail_header_instance: The mail header instance to be saved.</span>
+
+<span class="sd">        Raises:</span>
+<span class="sd">            Exception: If there is an error while saving the mail header instance.</span>
+<span class="sd">        &quot;&quot;&quot;</span>
+        <span class="k">try</span><span class="p">:</span>
+            <span class="n">mail_header_instance</span><span class="o">.</span><span class="n">save</span><span class="p">()</span>
+        <span class="k">except</span> <span class="ne">Exception</span> <span class="k">as</span> <span class="n">e</span><span class="p">:</span>
+            <span class="c1"># Instead of just printing the error, let&#39;s log it so that it can be tracked in a logging system</span>
+            <span class="n">fetch_mail_logger</span><span class="o">.</span><span class="n">error</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;Error saving mail header instance: </span><span class="si">{</span><span class="nb">str</span><span class="p">(</span><span class="n">e</span><span class="p">)</span><span class="si">}</span><span class="s2">&quot;</span><span class="p">)</span>
+            <span class="c1"># Reraise the exception after logging so that it can be handled upstream if necessary</span>
+            <span class="k">raise</span></div>
+
+
+<div class="viewcode-block" id="MailHandler.handle_rich_observables">
+<a class="viewcode-back" href="../../../modules/mail_feeder_core.html#mail_feeder.mail_utils.mail_handler.MailHandler.handle_rich_observables">[docs]</a>
+    <span class="k">def</span><span class="w"> </span><span class="nf">handle_rich_observables</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">filename</span><span class="p">,</span> <span class="n">mail_instance</span><span class="p">,</span> <span class="n">email_data</span><span class="p">,</span> <span class="n">workdir</span><span class="p">):</span>
+<span class="w">        </span><span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">        Handles rich observables extracted from an email.</span>
+
+<span class="sd">        Args:</span>
+<span class="sd">            filename (str): The name of the file.</span>
+<span class="sd">            mail_instance: An instance of the mail.</span>
+<span class="sd">            email_data: The data of the email.</span>
+
+<span class="sd">        Raises:</span>
+<span class="sd">            Exception: If there is an error handling rich observables.</span>
+
+<span class="sd">        Returns:</span>
+<span class="sd">            None</span>
+<span class="sd">        &quot;&quot;&quot;</span>
+        <span class="k">try</span><span class="p">:</span>
+            <span class="n">rich_observables</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">extract_observables_v3</span><span class="p">(</span><span class="n">filename</span><span class="p">,</span> <span class="n">email_data</span><span class="p">,</span> <span class="n">workdir</span><span class="p">)</span>
+            <span class="n">artifacts</span> <span class="o">=</span> <span class="n">rich_observables</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="s1">&#39;artifacts&#39;</span><span class="p">,</span> <span class="p">[])</span>
+            <span class="n">files</span> <span class="o">=</span> <span class="n">rich_observables</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="s1">&#39;files&#39;</span><span class="p">,</span> <span class="p">[])</span>
+            <span class="k">if</span> <span class="n">artifacts</span><span class="p">:</span>
+                <span class="bp">self</span><span class="o">.</span><span class="n">handle_mail_artifacts</span><span class="p">(</span><span class="n">artifacts</span><span class="p">,</span> <span class="n">mail_instance</span><span class="p">)</span>
+            <span class="k">if</span> <span class="n">files</span><span class="p">:</span>
+                <span class="bp">self</span><span class="o">.</span><span class="n">handle_mail_attachment</span><span class="p">(</span><span class="n">files</span><span class="p">,</span> <span class="n">mail_instance</span><span class="p">)</span>
+        <span class="k">except</span> <span class="ne">Exception</span> <span class="k">as</span> <span class="n">e</span><span class="p">:</span>
+            <span class="c1"># Instead of printing the error, it&#39;s better to log it for debugging purposes</span>
+            <span class="n">fetch_mail_logger</span><span class="o">.</span><span class="n">error</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;Error handling rich observables: </span><span class="si">{</span><span class="nb">str</span><span class="p">(</span><span class="n">e</span><span class="p">)</span><span class="si">}</span><span class="s2">&quot;</span><span class="p">)</span>
+            <span class="c1"># Re-raise the exception after logging it</span>
+            <span class="k">raise</span></div>
+
+
+<div class="viewcode-block" id="MailHandler.update_mail_times_sent">
+<a class="viewcode-back" href="../../../modules/mail_feeder_core.html#mail_feeder.mail_utils.mail_handler.MailHandler.update_mail_times_sent">[docs]</a>
+    <span class="k">def</span><span class="w"> </span><span class="nf">update_mail_times_sent</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">mail_instance</span><span class="p">):</span>
+<span class="w">        </span><span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">        Update the number of times a mail has been sent and save the changes.</span>
+
+<span class="sd">        Args:</span>
+<span class="sd">            mail_instance: An instance of the Mail model.</span>
+
+<span class="sd">        Raises:</span>
+<span class="sd">            Exception: If there is an error updating the mail times sent.</span>
+
+<span class="sd">        &quot;&quot;&quot;</span>
+        <span class="n">mail_instance</span><span class="o">.</span><span class="n">times_sent</span> <span class="o">+=</span> <span class="mi">1</span>
+        <span class="k">try</span><span class="p">:</span>
+            <span class="n">mail_instance</span><span class="o">.</span><span class="n">save</span><span class="p">()</span>
+        <span class="k">except</span> <span class="ne">Exception</span> <span class="k">as</span> <span class="n">e</span><span class="p">:</span>
+            <span class="n">fetch_mail_logger</span><span class="o">.</span><span class="n">error</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;Error updating mail times sent: </span><span class="si">{</span><span class="nb">str</span><span class="p">(</span><span class="n">e</span><span class="p">)</span><span class="si">}</span><span class="s2">&quot;</span><span class="p">)</span></div>
+
+
+
+<div class="viewcode-block" id="MailHandler.update_mail_body_times_sent">
+<a class="viewcode-back" href="../../../modules/mail_feeder_core.html#mail_feeder.mail_utils.mail_handler.MailHandler.update_mail_body_times_sent">[docs]</a>
+    <span class="k">def</span><span class="w"> </span><span class="nf">update_mail_body_times_sent</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">existing_mail_body</span><span class="p">):</span>
+<span class="w">        </span><span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">        Updates the &#39;times_sent&#39; attribute of an existing mail body object and saves it.</span>
+
+<span class="sd">        Parameters:</span>
+<span class="sd">        existing_mail_body (MailBody): The existing mail body object to update.</span>
+
+<span class="sd">        Returns:</span>
+<span class="sd">        None</span>
+<span class="sd">        &quot;&quot;&quot;</span>
+        <span class="k">try</span><span class="p">:</span>
+            <span class="n">existing_mail_body</span><span class="o">.</span><span class="n">times_sent</span> <span class="o">+=</span> <span class="mi">1</span>
+            <span class="n">existing_mail_body</span><span class="o">.</span><span class="n">save</span><span class="p">()</span>
+        <span class="k">except</span> <span class="ne">Exception</span> <span class="k">as</span> <span class="n">e</span><span class="p">:</span>
+            <span class="n">fetch_mail_logger</span><span class="o">.</span><span class="n">error</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;An error occurred while updating the &#39;times_sent&#39; attribute: </span><span class="si">{</span><span class="n">e</span><span class="si">}</span><span class="s2">&quot;</span><span class="p">)</span></div>
+
+            <span class="c1"># Optionally, you can re-raise the exception if you want the error to propagate</span>
+            <span class="c1"># raise</span>
+
+<div class="viewcode-block" id="MailHandler.handle_mail_artifacts">
+<a class="viewcode-back" href="../../../modules/mail_feeder_core.html#mail_feeder.mail_utils.mail_handler.MailHandler.handle_mail_artifacts">[docs]</a>
+    <span class="k">def</span><span class="w"> </span><span class="nf">handle_mail_artifacts</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">artifacts</span><span class="p">,</span> <span class="n">mail_instance</span><span class="p">):</span>
+<span class="w">        </span><span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">        Handle mail artifacts.</span>
+
+<span class="sd">        Args:</span>
+<span class="sd">            artifacts (list): List of artifacts.</span>
+<span class="sd">            mail_instance (Mail): Mail instance.</span>
+
+<span class="sd">        Returns:</span>
+<span class="sd">            None</span>
+<span class="sd">        &quot;&quot;&quot;</span>
+        <span class="c1"># Define a dictionary to map data types to their respective handler methods</span>
+        <span class="n">data_type_handlers</span> <span class="o">=</span> <span class="p">{</span>
+            <span class="s1">&#39;mail&#39;</span><span class="p">:</span> <span class="bp">self</span><span class="o">.</span><span class="n">handle_mail_artifact_mail</span><span class="p">,</span>
+            <span class="s1">&#39;domain&#39;</span><span class="p">:</span> <span class="bp">self</span><span class="o">.</span><span class="n">handle_mail_artifact_domain</span><span class="p">,</span>
+            <span class="s1">&#39;url&#39;</span><span class="p">:</span> <span class="bp">self</span><span class="o">.</span><span class="n">handle_mail_artifact_url</span><span class="p">,</span>
+            <span class="s1">&#39;ip&#39;</span><span class="p">:</span> <span class="bp">self</span><span class="o">.</span><span class="n">handle_mail_artifact_ip</span><span class="p">,</span>
+            <span class="s1">&#39;hash&#39;</span><span class="p">:</span> <span class="bp">self</span><span class="o">.</span><span class="n">handle_mail_artifact_hash</span><span class="p">,</span>
+        <span class="p">}</span>
+
+        <span class="k">for</span> <span class="n">artifact</span> <span class="ow">in</span> <span class="n">artifacts</span><span class="p">:</span>
+            <span class="k">try</span><span class="p">:</span>
+                <span class="n">data_type</span> <span class="o">=</span> <span class="n">artifact</span><span class="p">[</span><span class="s1">&#39;dataType&#39;</span><span class="p">]</span>
+                <span class="n">data_value</span> <span class="o">=</span> <span class="n">artifact</span><span class="p">[</span><span class="s1">&#39;data&#39;</span><span class="p">]</span>
+                
+                <span class="k">if</span> <span class="n">data_type</span> <span class="o">==</span> <span class="s1">&#39;file&#39;</span><span class="p">:</span>
+                    <span class="k">pass</span>  <span class="c1"># Skip file artifacts</span>
+                <span class="k">else</span><span class="p">:</span>
+                    <span class="n">fetch_mail_logger</span><span class="o">.</span><span class="n">debug</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;Data type: </span><span class="si">{</span><span class="n">data_type</span><span class="si">}</span><span class="s2">, Data value: </span><span class="si">{</span><span class="n">data_value</span><span class="si">}</span><span class="s2">&quot;</span><span class="p">)</span>
+                    <span class="c1"># Use the dictionary to get the handler method for the current data type</span>
+                    <span class="n">handler</span> <span class="o">=</span> <span class="n">data_type_handlers</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="n">data_type</span><span class="p">)</span>
+                    <span class="n">fetch_mail_logger</span><span class="o">.</span><span class="n">debug</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;Handler: </span><span class="si">{</span><span class="nb">str</span><span class="p">(</span><span class="n">handler</span><span class="p">)</span><span class="si">}</span><span class="s2">&quot;</span><span class="p">)</span>
+                    <span class="k">if</span> <span class="n">handler</span><span class="p">:</span>
+                        <span class="n">fetch_mail_logger</span><span class="o">.</span><span class="n">debug</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;Handler found for data type: </span><span class="si">{</span><span class="n">data_type</span><span class="si">}</span><span class="s2">&quot;</span><span class="p">)</span>
+                        <span class="c1"># Call the handler method with the data value and mail instance</span>
+                        <span class="n">handler</span><span class="p">(</span><span class="n">data_value</span><span class="p">,</span> <span class="n">mail_instance</span><span class="p">)</span>
+                        <span class="n">fetch_mail_logger</span><span class="o">.</span><span class="n">debug</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;Handler called for data type: </span><span class="si">{</span><span class="n">data_type</span><span class="si">}</span><span class="s2">&quot;</span><span class="p">)</span>
+                    <span class="k">else</span><span class="p">:</span>
+                        <span class="n">fetch_mail_logger</span><span class="o">.</span><span class="n">warning</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;Unknown data type: </span><span class="si">{</span><span class="n">data_type</span><span class="si">}</span><span class="s2">&quot;</span><span class="p">)</span>
+
+            <span class="k">except</span> <span class="ne">Exception</span> <span class="k">as</span> <span class="n">e</span><span class="p">:</span>
+                <span class="n">fetch_mail_logger</span><span class="o">.</span><span class="n">error</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;Error handling artifact: </span><span class="si">{</span><span class="n">e</span><span class="si">}</span><span class="s2">&quot;</span><span class="p">)</span></div>
+
+
+<div class="viewcode-block" id="MailHandler.handle_mail_artifact_mail">
+<a class="viewcode-back" href="../../../modules/mail_feeder_core.html#mail_feeder.mail_utils.mail_handler.MailHandler.handle_mail_artifact_mail">[docs]</a>
+    <span class="k">def</span><span class="w"> </span><span class="nf">handle_mail_artifact_mail</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">data_value</span><span class="p">,</span> <span class="n">mail_instance</span><span class="p">):</span>
+<span class="w">        </span><span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">        Handle the mail artifact for the given data value and mail instance.</span>
+
+<span class="sd">        Args:</span>
+<span class="sd">            data_value (str): The data value to handle.</span>
+<span class="sd">            mail_instance (MailInstance): The mail instance object.</span>
+
+<span class="sd">        Returns:</span>
+<span class="sd">            None</span>
+<span class="sd">        &quot;&quot;&quot;</span>
+        <span class="n">artifact</span> <span class="o">=</span> <span class="n">MailArtifact</span><span class="o">.</span><span class="n">objects</span><span class="o">.</span><span class="n">filter</span><span class="p">(</span><span class="n">mail</span><span class="o">=</span><span class="n">mail_instance</span><span class="p">,</span> <span class="n">artifact_type</span><span class="o">=</span><span class="s2">&quot;MailAddress&quot;</span><span class="p">,</span> <span class="n">artifactIsMailAddress__mail_address__address</span><span class="o">=</span><span class="n">data_value</span><span class="o">.</span><span class="n">lower</span><span class="p">())</span><span class="o">.</span><span class="n">first</span><span class="p">()</span>
+        <span class="k">if</span> <span class="n">artifact</span><span class="p">:</span>
+            <span class="n">fetch_mail_logger</span><span class="o">.</span><span class="n">debug</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;Mail address artifact already exists for </span><span class="si">{</span><span class="n">data_value</span><span class="si">}</span><span class="s2">&quot;</span><span class="p">)</span>
+            <span class="k">return</span>
+        <span class="n">handler_method</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">get_handler_method</span><span class="p">(</span><span class="s1">&#39;mail&#39;</span><span class="p">)</span>
+        <span class="n">handler</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">get_handler</span><span class="p">(</span><span class="s1">&#39;mail&#39;</span><span class="p">)</span>
+        <span class="k">if</span> <span class="n">handler_method</span><span class="p">:</span>
+            <span class="n">artifact</span> <span class="o">=</span> <span class="n">handler_method</span><span class="p">(</span><span class="n">handler</span><span class="p">,</span> <span class="n">data_value</span><span class="p">)</span>
+        <span class="k">if</span> <span class="n">artifact</span><span class="p">:</span>
+            <span class="k">try</span><span class="p">:</span>
+                <span class="k">with</span> <span class="n">transaction</span><span class="o">.</span><span class="n">atomic</span><span class="p">():</span>
+                    <span class="n">mail_artifact</span> <span class="o">=</span> <span class="n">MailArtifact</span><span class="o">.</span><span class="n">objects</span><span class="o">.</span><span class="n">create</span><span class="p">(</span><span class="n">mail</span><span class="o">=</span><span class="n">mail_instance</span><span class="p">,</span> <span class="n">artifact_type</span><span class="o">=</span><span class="s2">&quot;MailAddress&quot;</span><span class="p">)</span>
+                    <span class="n">data_value</span> <span class="o">=</span> <span class="n">data_value</span><span class="o">.</span><span class="n">lower</span><span class="p">()</span>
+                    <span class="k">if</span> <span class="n">company_config</span><span class="p">:</span>
+                        <span class="n">is_valid</span><span class="p">,</span> <span class="n">valid_email</span> <span class="o">=</span> <span class="n">is_valid_email</span><span class="p">(</span><span class="n">data_value</span><span class="p">)</span>
+                        <span class="k">if</span> <span class="n">is_valid</span><span class="p">:</span>
+                            <span class="k">if</span> <span class="n">is_valid_company_email</span><span class="p">(</span><span class="n">data_value</span><span class="p">):</span>
+                                <span class="bp">self</span><span class="o">.</span><span class="n">get_or_create_user</span><span class="p">(</span><span class="n">data_value</span><span class="p">)</span>
+                            <span class="k">else</span><span class="p">:</span>
+                                <span class="bp">self</span><span class="o">.</span><span class="n">create_artifact_is_mail_address</span><span class="p">(</span><span class="n">artifact</span><span class="p">,</span> <span class="n">mail_artifact</span><span class="p">,</span> <span class="n">valid_email</span><span class="p">,</span> <span class="n">mail_instance</span><span class="p">)</span>
+                    <span class="n">mail_artifact</span><span class="o">.</span><span class="n">save</span><span class="p">()</span>
+                    <span class="n">mail_instance</span><span class="o">.</span><span class="n">save</span><span class="p">()</span>
+            <span class="k">except</span> <span class="ne">Exception</span> <span class="k">as</span> <span class="n">e</span><span class="p">:</span>
+                <span class="n">fetch_mail_logger</span><span class="o">.</span><span class="n">error</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;Unexpected error while saving mail artifact: </span><span class="si">{</span><span class="nb">str</span><span class="p">(</span><span class="n">e</span><span class="p">)</span><span class="si">}</span><span class="s2">&quot;</span><span class="p">)</span></div>
+
+
+<div class="viewcode-block" id="MailHandler.create_artifact_is_mail_address">
+<a class="viewcode-back" href="../../../modules/mail_feeder_core.html#mail_feeder.mail_utils.mail_handler.MailHandler.create_artifact_is_mail_address">[docs]</a>
+    <span class="k">def</span><span class="w"> </span><span class="nf">create_artifact_is_mail_address</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">artifact</span><span class="p">,</span> <span class="n">mail_artifact</span><span class="p">,</span> <span class="n">data_value</span><span class="p">,</span> <span class="n">mail_instance</span><span class="p">):</span>
+<span class="w">        </span><span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">        Creates an ArtifactIsMailAddress object and associates it with the given artifact and mail_artifact.</span>
+<span class="sd">        If the ArtifactIsMailAddress object already exists for the given mail address, it updates the association with the mail_instance.</span>
+
+<span class="sd">        Args:</span>
+<span class="sd">            artifact: The mail address artifact.</span>
+<span class="sd">            mail_artifact: The mail artifact.</span>
+<span class="sd">            data_value: The mail address value.</span>
+<span class="sd">            mail_instance: The mail instance to associate with the ArtifactIsMailAddress object.</span>
+
+<span class="sd">        Returns:</span>
+<span class="sd">            None</span>
+<span class="sd">        &quot;&quot;&quot;</span>
+        <span class="k">try</span><span class="p">:</span>
+            <span class="n">artifact_is_mail_address</span><span class="p">,</span> <span class="n">created</span> <span class="o">=</span> <span class="n">ArtifactIsMailAddress</span><span class="o">.</span><span class="n">objects</span><span class="o">.</span><span class="n">get_or_create</span><span class="p">(</span><span class="n">mail_address__address</span><span class="o">=</span><span class="n">data_value</span><span class="p">,</span> <span class="n">defaults</span><span class="o">=</span><span class="p">{</span><span class="s1">&#39;mail_address&#39;</span><span class="p">:</span> <span class="n">artifact</span><span class="p">,</span> <span class="s1">&#39;artifact&#39;</span><span class="p">:</span> <span class="n">mail_artifact</span><span class="p">})</span>
+            <span class="n">artifact_is_mail_address</span><span class="o">.</span><span class="n">save</span><span class="p">()</span>
+            <span class="n">mail_artifact</span><span class="o">.</span><span class="n">artifactIsMailAddress</span> <span class="o">=</span> <span class="n">artifact_is_mail_address</span>
+        <span class="k">except</span> <span class="ne">Exception</span> <span class="k">as</span> <span class="n">e</span><span class="p">:</span>
+            <span class="n">fetch_mail_logger</span><span class="o">.</span><span class="n">error</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;Error creating/updating ArtifactIsMailAddress: </span><span class="si">{</span><span class="nb">str</span><span class="p">(</span><span class="n">e</span><span class="p">)</span><span class="si">}</span><span class="s2">&quot;</span><span class="p">)</span></div>
+
+
+<div class="viewcode-block" id="MailHandler.handle_mail_artifact_domain">
+<a class="viewcode-back" href="../../../modules/mail_feeder_core.html#mail_feeder.mail_utils.mail_handler.MailHandler.handle_mail_artifact_domain">[docs]</a>
+    <span class="k">def</span><span class="w"> </span><span class="nf">handle_mail_artifact_domain</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">data_value</span><span class="p">,</span> <span class="n">mail_instance</span><span class="p">):</span>
+<span class="w">        </span><span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">        Handles the mail artifact domain.</span>
+
+<span class="sd">        Args:</span>
+<span class="sd">            data_value (str): The data value of the domain.</span>
+<span class="sd">            mail_instance (Mail): The mail instance.</span>
+
+<span class="sd">        Returns:</span>
+<span class="sd">            None</span>
+<span class="sd">        &quot;&quot;&quot;</span>
+        <span class="n">artifact</span> <span class="o">=</span> <span class="n">MailArtifact</span><span class="o">.</span><span class="n">objects</span><span class="o">.</span><span class="n">filter</span><span class="p">(</span><span class="n">mail</span><span class="o">=</span><span class="n">mail_instance</span><span class="p">,</span> <span class="n">artifact_type</span><span class="o">=</span><span class="s2">&quot;Domain&quot;</span><span class="p">,</span> <span class="n">artifactIsDomain__domain__value</span><span class="o">=</span><span class="n">data_value</span><span class="o">.</span><span class="n">lower</span><span class="p">())</span><span class="o">.</span><span class="n">first</span><span class="p">()</span>
+        <span class="k">if</span> <span class="n">artifact</span><span class="p">:</span>
+            <span class="n">fetch_mail_logger</span><span class="o">.</span><span class="n">debug</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;Domain artifact already exists for </span><span class="si">{</span><span class="n">data_value</span><span class="si">}</span><span class="s2">&quot;</span><span class="p">)</span>
+            <span class="k">return</span>
+        <span class="k">try</span><span class="p">:</span>
+            <span class="n">handler_method</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">get_handler_method</span><span class="p">(</span><span class="s1">&#39;domain&#39;</span><span class="p">)</span>
+            <span class="n">handler</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">get_handler</span><span class="p">(</span><span class="s1">&#39;domain&#39;</span><span class="p">)</span>
+            <span class="n">artifact</span> <span class="o">=</span> <span class="n">handler_method</span><span class="p">(</span><span class="n">handler</span><span class="p">,</span> <span class="n">data_value</span><span class="p">)</span> <span class="k">if</span> <span class="n">handler_method</span> <span class="k">else</span> <span class="kc">None</span>
+            <span class="k">if</span> <span class="n">artifact</span><span class="p">:</span>
+                <span class="n">mail_artifact</span> <span class="o">=</span> <span class="n">MailArtifact</span><span class="o">.</span><span class="n">objects</span><span class="o">.</span><span class="n">create</span><span class="p">(</span><span class="n">mail</span><span class="o">=</span><span class="n">mail_instance</span><span class="p">,</span> <span class="n">artifact_type</span><span class="o">=</span><span class="s1">&#39;Domain&#39;</span><span class="p">)</span>
+                <span class="n">data_value</span> <span class="o">=</span> <span class="n">data_value</span><span class="o">.</span><span class="n">lower</span><span class="p">()</span>
+                <span class="n">artifact_is_domain</span><span class="p">,</span> <span class="n">_</span> <span class="o">=</span> <span class="n">ArtifactIsDomain</span><span class="o">.</span><span class="n">objects</span><span class="o">.</span><span class="n">get_or_create</span><span class="p">(</span><span class="n">domain__value</span><span class="o">=</span><span class="n">data_value</span><span class="p">,</span>
+                                                                                     <span class="n">defaults</span><span class="o">=</span><span class="p">{</span><span class="s1">&#39;domain&#39;</span><span class="p">:</span> <span class="n">artifact</span><span class="p">,</span>
+                                                                                               <span class="s1">&#39;artifact&#39;</span><span class="p">:</span> <span class="n">mail_artifact</span><span class="p">})</span>
+                <span class="n">artifact_is_domain</span><span class="o">.</span><span class="n">save</span><span class="p">()</span>
+                <span class="k">if</span> <span class="n">mail_artifact</span><span class="p">:</span>
+                    <span class="n">mail_artifact</span><span class="o">.</span><span class="n">artifactIsDomain</span> <span class="o">=</span> <span class="n">artifact_is_domain</span>
+                    <span class="n">mail_artifact</span><span class="o">.</span><span class="n">save</span><span class="p">()</span>
+                    <span class="n">mail_instance</span><span class="o">.</span><span class="n">save</span><span class="p">()</span>
+        <span class="k">except</span> <span class="ne">Exception</span> <span class="k">as</span> <span class="n">e</span><span class="p">:</span>
+            <span class="n">fetch_mail_logger</span><span class="o">.</span><span class="n">error</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;Error handling mail artifact domain: </span><span class="si">{</span><span class="nb">str</span><span class="p">(</span><span class="n">e</span><span class="p">)</span><span class="si">}</span><span class="s2">&quot;</span><span class="p">)</span></div>
+
+
+<div class="viewcode-block" id="MailHandler.get_prime_and_decoded_url">
+<a class="viewcode-back" href="../../../modules/mail_feeder_core.html#mail_feeder.mail_utils.mail_handler.MailHandler.get_prime_and_decoded_url">[docs]</a>
+    <span class="k">def</span><span class="w"> </span><span class="nf">get_prime_and_decoded_url</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">url</span><span class="p">):</span>
+<span class="w">        </span><span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">        Retrieves the prime URL (without query parameters) and decodes the Base64-encoded &#39;tid&#39; param from the URL.</span>
+
+<span class="sd">        Args:</span>
+<span class="sd">            url (str): The URL to process.</span>
+
+<span class="sd">        Returns:</span>
+<span class="sd">            tuple: A tuple containing the prime URL and the decoded URL (if any).</span>
+<span class="sd">        &quot;&quot;&quot;</span>
+        <span class="k">def</span><span class="w"> </span><span class="nf">get_prime_url</span><span class="p">(</span><span class="n">url</span><span class="p">):</span>
+            <span class="n">parsed_url</span> <span class="o">=</span> <span class="n">urlparse</span><span class="p">(</span><span class="n">url</span><span class="p">)</span>
+            <span class="k">return</span> <span class="n">urlunparse</span><span class="p">(</span><span class="n">parsed_url</span><span class="o">.</span><span class="n">_replace</span><span class="p">(</span><span class="n">query</span><span class="o">=</span><span class="s1">&#39;&#39;</span><span class="p">,</span> <span class="n">fragment</span><span class="o">=</span><span class="s1">&#39;&#39;</span><span class="p">))</span>
+
+        <span class="k">def</span><span class="w"> </span><span class="nf">decode_base64_from_tid_param</span><span class="p">(</span><span class="n">url</span><span class="p">):</span>
+            <span class="k">try</span><span class="p">:</span>
+                <span class="n">parsed</span> <span class="o">=</span> <span class="n">urlparse</span><span class="p">(</span><span class="n">url</span><span class="p">)</span>
+                <span class="n">params</span> <span class="o">=</span> <span class="n">parse_qs</span><span class="p">(</span><span class="n">parsed</span><span class="o">.</span><span class="n">query</span><span class="p">)</span>
+                <span class="n">tid</span> <span class="o">=</span> <span class="n">params</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="s1">&#39;tid&#39;</span><span class="p">,</span> <span class="p">[</span><span class="kc">None</span><span class="p">])[</span><span class="mi">0</span><span class="p">]</span>
+                <span class="k">if</span> <span class="n">tid</span><span class="p">:</span>
+                    <span class="c1"># Add padding if needed</span>
+                    <span class="n">padded</span> <span class="o">=</span> <span class="n">tid</span> <span class="o">+</span> <span class="s1">&#39;=&#39;</span> <span class="o">*</span> <span class="p">(</span><span class="o">-</span><span class="nb">len</span><span class="p">(</span><span class="n">tid</span><span class="p">)</span> <span class="o">%</span> <span class="mi">4</span><span class="p">)</span>
+                    <span class="n">decoded</span> <span class="o">=</span> <span class="n">base64</span><span class="o">.</span><span class="n">urlsafe_b64decode</span><span class="p">(</span><span class="n">padded</span><span class="p">)</span><span class="o">.</span><span class="n">decode</span><span class="p">(</span><span class="s1">&#39;utf-8&#39;</span><span class="p">)</span>
+                    <span class="k">return</span> <span class="n">decoded</span>
+            <span class="k">except</span> <span class="ne">Exception</span> <span class="k">as</span> <span class="n">e</span><span class="p">:</span>
+                <span class="n">fetch_mail_logger</span><span class="o">.</span><span class="n">error</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;Error decoding Base64: </span><span class="si">{</span><span class="n">e</span><span class="si">}</span><span class="s2">&quot;</span><span class="p">)</span>
+            <span class="k">return</span> <span class="kc">None</span>
+
+        <span class="n">prime_url</span> <span class="o">=</span> <span class="n">get_prime_url</span><span class="p">(</span><span class="n">url</span><span class="p">)</span>
+        <span class="n">decoded_url</span> <span class="o">=</span> <span class="n">decode_base64_from_tid_param</span><span class="p">(</span><span class="n">url</span><span class="p">)</span>
+
+        <span class="k">return</span> <span class="n">prime_url</span><span class="p">,</span> <span class="n">decoded_url</span></div>
+
+
+<div class="viewcode-block" id="MailHandler.handle_mail_artifact_url">
+<a class="viewcode-back" href="../../../modules/mail_feeder_core.html#mail_feeder.mail_utils.mail_handler.MailHandler.handle_mail_artifact_url">[docs]</a>
+    <span class="k">def</span><span class="w"> </span><span class="nf">handle_mail_artifact_url</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">data_value</span><span class="p">,</span> <span class="n">mail_instance</span><span class="p">):</span>
+<span class="w">        </span><span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">        Handles the mail artifact URL, processing both the prime URL and the decoded URL.</span>
+
+<span class="sd">        Args:</span>
+<span class="sd">            data_value (str): The data value of the URL.</span>
+<span class="sd">            mail_instance (Mail): The mail instance.</span>
+
+<span class="sd">        Returns:</span>
+<span class="sd">            None</span>
+<span class="sd">        &quot;&quot;&quot;</span>
+        <span class="n">url</span><span class="p">,</span> <span class="n">decoded_url</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">get_prime_and_decoded_url</span><span class="p">(</span><span class="n">data_value</span><span class="p">)</span>
+        <span class="n">seen_urls</span> <span class="o">=</span> <span class="nb">set</span><span class="p">()</span>
+
+        <span class="k">try</span><span class="p">:</span>
+            <span class="k">for</span> <span class="n">candidate_url</span> <span class="ow">in</span> <span class="p">[</span><span class="n">url</span><span class="p">,</span> <span class="n">decoded_url</span><span class="p">]:</span>
+                <span class="k">if</span> <span class="n">candidate_url</span> <span class="ow">and</span> <span class="n">candidate_url</span> <span class="ow">not</span> <span class="ow">in</span> <span class="n">seen_urls</span><span class="p">:</span>
+                    <span class="n">seen_urls</span><span class="o">.</span><span class="n">add</span><span class="p">(</span><span class="n">candidate_url</span><span class="p">)</span>
+                    <span class="bp">self</span><span class="o">.</span><span class="n">process_url</span><span class="p">(</span><span class="n">candidate_url</span><span class="p">,</span> <span class="n">mail_instance</span><span class="p">)</span>
+        <span class="k">except</span> <span class="ne">Exception</span> <span class="k">as</span> <span class="n">e</span><span class="p">:</span>
+            <span class="n">fetch_mail_logger</span><span class="o">.</span><span class="n">error</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;Error handling mail artifact URL: </span><span class="si">{</span><span class="nb">str</span><span class="p">(</span><span class="n">e</span><span class="p">)</span><span class="si">}</span><span class="s2">&quot;</span><span class="p">)</span></div>
+
+
+
+<div class="viewcode-block" id="MailHandler.process_url">
+<a class="viewcode-back" href="../../../modules/mail_feeder_core.html#mail_feeder.mail_utils.mail_handler.MailHandler.process_url">[docs]</a>
+    <span class="k">def</span><span class="w"> </span><span class="nf">process_url</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">url</span><span class="p">,</span> <span class="n">mail_instance</span><span class="p">,</span> <span class="n">artifact_type</span><span class="o">=</span><span class="s1">&#39;URL&#39;</span><span class="p">):</span>
+<span class="w">        </span><span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">        Processes the URL, creates or updates the MailArtifact, and associates it with the mail instance.</span>
+
+<span class="sd">        Args:</span>
+<span class="sd">            url (str): The URL to be processed.</span>
+<span class="sd">            mail_instance (Mail): The mail instance to associate the artifact with.</span>
+<span class="sd">            artifact_type (str): The type of artifact (default is &#39;URL&#39;).</span>
+
+<span class="sd">        Returns:</span>
+<span class="sd">            None</span>
+<span class="sd">        &quot;&quot;&quot;</span>
+        <span class="c1"># Skip if already linked to this mail</span>
+        <span class="n">artifact</span> <span class="o">=</span> <span class="n">MailArtifact</span><span class="o">.</span><span class="n">objects</span><span class="o">.</span><span class="n">filter</span><span class="p">(</span><span class="n">mail</span><span class="o">=</span><span class="n">mail_instance</span><span class="p">,</span> <span class="n">artifact_type</span><span class="o">=</span><span class="n">artifact_type</span><span class="p">,</span> <span class="n">artifactIsUrl__url__address</span><span class="o">=</span><span class="n">url</span><span class="p">)</span><span class="o">.</span><span class="n">first</span><span class="p">()</span>
+        <span class="k">if</span> <span class="n">artifact</span><span class="p">:</span>
+            <span class="n">fetch_mail_logger</span><span class="o">.</span><span class="n">debug</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;URL artifact already exists for </span><span class="si">{</span><span class="n">url</span><span class="si">}</span><span class="s2">&quot;</span><span class="p">)</span>
+            <span class="k">return</span>
+
+        <span class="n">handler_method</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">get_handler_method</span><span class="p">(</span><span class="s1">&#39;url&#39;</span><span class="p">)</span>
+        <span class="n">handler</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">get_handler</span><span class="p">(</span><span class="s1">&#39;url&#39;</span><span class="p">)</span>
+        <span class="n">artifact</span> <span class="o">=</span> <span class="kc">None</span>
+
+        <span class="k">if</span> <span class="n">handler_method</span><span class="p">:</span>
+            <span class="n">artifact</span> <span class="o">=</span> <span class="n">handler_method</span><span class="p">(</span><span class="n">handler</span><span class="p">,</span> <span class="n">url</span><span class="p">)</span>
+
+        <span class="k">if</span> <span class="n">artifact</span> <span class="ow">and</span> <span class="n">artifact</span><span class="p">[</span><span class="mi">0</span><span class="p">]:</span>
+            <span class="n">mail_artifact</span> <span class="o">=</span> <span class="n">MailArtifact</span><span class="o">.</span><span class="n">objects</span><span class="o">.</span><span class="n">create</span><span class="p">(</span><span class="n">mail</span><span class="o">=</span><span class="n">mail_instance</span><span class="p">,</span> <span class="n">artifact_type</span><span class="o">=</span><span class="n">artifact_type</span><span class="p">)</span>
+
+            <span class="n">artifact_is_url</span><span class="p">,</span> <span class="n">_</span> <span class="o">=</span> <span class="n">ArtifactIsUrl</span><span class="o">.</span><span class="n">objects</span><span class="o">.</span><span class="n">get_or_create</span><span class="p">(</span>
+                <span class="n">url__address</span><span class="o">=</span><span class="n">url</span><span class="p">,</span>
+                <span class="n">defaults</span><span class="o">=</span><span class="p">{</span><span class="s1">&#39;url&#39;</span><span class="p">:</span> <span class="n">artifact</span><span class="p">[</span><span class="mi">0</span><span class="p">],</span> <span class="s1">&#39;artifact&#39;</span><span class="p">:</span> <span class="n">mail_artifact</span><span class="p">}</span>
+            <span class="p">)</span>
+
+            <span class="n">mail_artifact</span><span class="o">.</span><span class="n">artifactIsUrl</span> <span class="o">=</span> <span class="n">artifact_is_url</span>
+            <span class="n">mail_artifact</span><span class="o">.</span><span class="n">save</span><span class="p">()</span>
+
+            <span class="n">mail_instance</span><span class="o">.</span><span class="n">save</span><span class="p">()</span>
+
+            <span class="n">fetch_mail_logger</span><span class="o">.</span><span class="n">info</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;Processed URL: </span><span class="si">{</span><span class="n">url</span><span class="si">}</span><span class="s2">&quot;</span><span class="p">)</span>
+        <span class="k">else</span><span class="p">:</span>
+            <span class="n">fetch_mail_logger</span><span class="o">.</span><span class="n">error</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;Failed to process </span><span class="si">{</span><span class="n">artifact_type</span><span class="si">}</span><span class="s2"> artifact for </span><span class="si">{</span><span class="n">url</span><span class="si">}</span><span class="s2">&quot;</span><span class="p">)</span></div>
+
+
+
+<div class="viewcode-block" id="MailHandler.save_mail_artifact">
+<a class="viewcode-back" href="../../../modules/mail_feeder_core.html#mail_feeder.mail_utils.mail_handler.MailHandler.save_mail_artifact">[docs]</a>
+    <span class="k">def</span><span class="w"> </span><span class="nf">save_mail_artifact</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">mail_artifact</span><span class="p">,</span> <span class="n">mail_instance</span><span class="p">):</span>
+<span class="w">        </span><span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">        Saves the mail artifact and associates it with the given mail instance.</span>
+
+<span class="sd">        Args:</span>
+<span class="sd">            mail_artifact (MailArtifact): The mail artifact to be saved.</span>
+<span class="sd">            mail_instance (MailInstance): The mail instance to associate the artifact with.</span>
+
+<span class="sd">        Raises:</span>
+<span class="sd">            Exception: If there is an error while saving the mail artifact.</span>
+
+<span class="sd">        &quot;&quot;&quot;</span>
+        <span class="k">try</span><span class="p">:</span>
+            <span class="k">with</span> <span class="n">transaction</span><span class="o">.</span><span class="n">atomic</span><span class="p">():</span>  <span class="c1"># Use Django&#39;s atomic to ensure database operations are atomic</span>
+                <span class="n">mail_artifact</span><span class="o">.</span><span class="n">save</span><span class="p">()</span>
+                <span class="n">mail_instance</span><span class="o">.</span><span class="n">mail_artifacts</span><span class="o">.</span><span class="n">add</span><span class="p">(</span><span class="n">mail_artifact</span><span class="p">)</span>
+                <span class="n">mail_instance</span><span class="o">.</span><span class="n">save</span><span class="p">()</span>
+        <span class="k">except</span> <span class="ne">Exception</span> <span class="k">as</span> <span class="n">e</span><span class="p">:</span>
+            <span class="n">fetch_mail_logger</span><span class="o">.</span><span class="n">error</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;Error saving mail artifact: </span><span class="si">{</span><span class="nb">str</span><span class="p">(</span><span class="n">e</span><span class="p">)</span><span class="si">}</span><span class="s2">&quot;</span><span class="p">)</span>
+            <span class="k">raise</span> <span class="n">e</span>  <span class="c1"># Re-raise the exception after logging it</span></div>
+
+
+<div class="viewcode-block" id="MailHandler.handle_mail_artifact_ip">
+<a class="viewcode-back" href="../../../modules/mail_feeder_core.html#mail_feeder.mail_utils.mail_handler.MailHandler.handle_mail_artifact_ip">[docs]</a>
+    <span class="k">def</span><span class="w"> </span><span class="nf">handle_mail_artifact_ip</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">data_value</span><span class="p">,</span> <span class="n">mail_instance</span><span class="p">):</span>
+<span class="w">        </span><span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">        Handles the mail artifact for IP addresses.</span>
+
+<span class="sd">        Args:</span>
+<span class="sd">            data_value (str): The IP address value.</span>
+<span class="sd">            mail_instance (Mail): The mail instance.</span>
+
+<span class="sd">        Returns:</span>
+<span class="sd">            None</span>
+<span class="sd">        &quot;&quot;&quot;</span>
+        <span class="n">artifact</span> <span class="o">=</span> <span class="n">MailArtifact</span><span class="o">.</span><span class="n">objects</span><span class="o">.</span><span class="n">filter</span><span class="p">(</span><span class="n">mail</span><span class="o">=</span><span class="n">mail_instance</span><span class="p">,</span> <span class="n">artifact_type</span><span class="o">=</span><span class="s2">&quot;IP&quot;</span><span class="p">,</span> <span class="n">artifactIsIp__ip__address</span><span class="o">=</span><span class="n">data_value</span><span class="o">.</span><span class="n">lower</span><span class="p">())</span><span class="o">.</span><span class="n">first</span><span class="p">()</span>
+        <span class="k">if</span> <span class="n">artifact</span><span class="p">:</span>
+            <span class="n">fetch_mail_logger</span><span class="o">.</span><span class="n">debug</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;IP artifact already exists for </span><span class="si">{</span><span class="n">data_value</span><span class="si">}</span><span class="s2">&quot;</span><span class="p">)</span>
+            <span class="k">return</span>
+        <span class="k">try</span><span class="p">:</span>
+            <span class="n">handler_method</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">get_handler_method</span><span class="p">(</span><span class="s1">&#39;ip&#39;</span><span class="p">)</span>
+            <span class="n">handler</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">get_handler</span><span class="p">(</span><span class="s1">&#39;ip&#39;</span><span class="p">)</span>
+            <span class="k">if</span> <span class="n">handler_method</span><span class="p">:</span>
+                <span class="n">artifact</span> <span class="o">=</span> <span class="n">handler_method</span><span class="p">(</span><span class="n">handler</span><span class="p">,</span> <span class="n">data_value</span><span class="p">)</span>
+            <span class="k">if</span> <span class="n">artifact</span><span class="p">:</span>
+                <span class="n">mail_artifact</span> <span class="o">=</span> <span class="n">MailArtifact</span><span class="o">.</span><span class="n">objects</span><span class="o">.</span><span class="n">create</span><span class="p">(</span><span class="n">mail</span><span class="o">=</span><span class="n">mail_instance</span><span class="p">,</span> <span class="n">artifact_type</span><span class="o">=</span><span class="s1">&#39;IP&#39;</span><span class="p">)</span>
+                <span class="n">artifact_is_ip</span><span class="p">,</span> <span class="n">_</span> <span class="o">=</span> <span class="n">ArtifactIsIp</span><span class="o">.</span><span class="n">objects</span><span class="o">.</span><span class="n">get_or_create</span><span class="p">(</span><span class="n">ip__address</span><span class="o">=</span><span class="n">data_value</span><span class="p">,</span> <span class="n">defaults</span><span class="o">=</span><span class="p">{</span><span class="s1">&#39;ip&#39;</span><span class="p">:</span> <span class="n">artifact</span><span class="p">,</span> <span class="s1">&#39;artifact&#39;</span><span class="p">:</span> <span class="n">mail_artifact</span><span class="p">})</span>
+                <span class="n">artifact_is_ip</span><span class="o">.</span><span class="n">save</span><span class="p">()</span>
+                <span class="n">mail_artifact</span><span class="o">.</span><span class="n">artifactIsIp</span> <span class="o">=</span> <span class="n">artifact_is_ip</span>
+                <span class="n">mail_artifact</span><span class="o">.</span><span class="n">save</span><span class="p">()</span>
+                <span class="n">mail_instance</span><span class="o">.</span><span class="n">save</span><span class="p">()</span>
+        <span class="k">except</span> <span class="ne">Exception</span> <span class="k">as</span> <span class="n">e</span><span class="p">:</span>
+            <span class="n">fetch_mail_logger</span><span class="o">.</span><span class="n">error</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;Error handling mail artifact IP: </span><span class="si">{</span><span class="nb">str</span><span class="p">(</span><span class="n">e</span><span class="p">)</span><span class="si">}</span><span class="s2">&quot;</span><span class="p">)</span></div>
+
+
+<div class="viewcode-block" id="MailHandler.handle_mail_artifact_hash">
+<a class="viewcode-back" href="../../../modules/mail_feeder_core.html#mail_feeder.mail_utils.mail_handler.MailHandler.handle_mail_artifact_hash">[docs]</a>
+    <span class="k">def</span><span class="w"> </span><span class="nf">handle_mail_artifact_hash</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">data_value</span><span class="p">,</span> <span class="n">mail_instance</span><span class="p">):</span>
+<span class="w">        </span><span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">        Handles the mail artifact hash by creating a mail artifact and associating it with the provided mail instance.</span>
+
+<span class="sd">        Args:</span>
+<span class="sd">            data_value (str): The value of the data to be hashed.</span>
+<span class="sd">            mail_instance (Mail): The mail instance to associate the mail artifact with.</span>
+
+<span class="sd">        Returns:</span>
+<span class="sd">            None</span>
+<span class="sd">        &quot;&quot;&quot;</span>
+        <span class="n">artifact</span> <span class="o">=</span> <span class="n">MailArtifact</span><span class="o">.</span><span class="n">objects</span><span class="o">.</span><span class="n">filter</span><span class="p">(</span><span class="n">mail</span><span class="o">=</span><span class="n">mail_instance</span><span class="p">,</span> <span class="n">artifact_type</span><span class="o">=</span><span class="s2">&quot;Hash&quot;</span><span class="p">,</span> <span class="n">artifactIsHash__hash__value</span><span class="o">=</span><span class="n">data_value</span><span class="o">.</span><span class="n">lower</span><span class="p">())</span><span class="o">.</span><span class="n">first</span><span class="p">()</span>
+        <span class="k">if</span> <span class="n">artifact</span><span class="p">:</span>
+            <span class="n">fetch_mail_logger</span><span class="o">.</span><span class="n">debug</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;Hash artifact already exists for </span><span class="si">{</span><span class="n">data_value</span><span class="si">}</span><span class="s2">&quot;</span><span class="p">)</span>
+            <span class="k">return</span>
+        <span class="n">handler_method</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">get_handler_method</span><span class="p">(</span><span class="s1">&#39;hash&#39;</span><span class="p">)</span>
+        <span class="n">handler</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">get_handler</span><span class="p">(</span><span class="s1">&#39;hash&#39;</span><span class="p">)</span>
+        <span class="n">artifact</span> <span class="o">=</span> <span class="kc">None</span>
+        <span class="k">if</span> <span class="n">handler_method</span><span class="p">:</span>
+            <span class="n">artifact</span> <span class="o">=</span> <span class="n">handler_method</span><span class="p">(</span><span class="n">handler</span><span class="p">,</span> <span class="n">data_value</span><span class="p">)</span>
+        <span class="k">if</span> <span class="n">artifact</span><span class="p">:</span>
+            <span class="n">mail_artifact</span> <span class="o">=</span> <span class="n">MailArtifact</span><span class="o">.</span><span class="n">objects</span><span class="o">.</span><span class="n">create</span><span class="p">(</span><span class="n">mail</span><span class="o">=</span><span class="n">mail_instance</span><span class="p">,</span> <span class="n">artifact_type</span><span class="o">=</span><span class="s1">&#39;Hash&#39;</span><span class="p">)</span>
+            <span class="n">hash_obj</span><span class="p">,</span> <span class="n">_</span> <span class="o">=</span> <span class="n">Hash</span><span class="o">.</span><span class="n">objects</span><span class="o">.</span><span class="n">get_or_create</span><span class="p">(</span><span class="n">value</span><span class="o">=</span><span class="n">data_value</span><span class="p">)</span>
+            <span class="n">artifact_is_hash</span><span class="p">,</span> <span class="n">_</span> <span class="o">=</span> <span class="n">ArtifactIsHash</span><span class="o">.</span><span class="n">objects</span><span class="o">.</span><span class="n">get_or_create</span><span class="p">(</span><span class="nb">hash</span><span class="o">=</span><span class="n">hash_obj</span><span class="p">,</span> <span class="n">artifact</span><span class="o">=</span><span class="n">mail_artifact</span><span class="p">)</span>
+            <span class="n">artifact_is_hash</span><span class="o">.</span><span class="n">save</span><span class="p">()</span>
+            <span class="n">mail_artifact</span><span class="o">.</span><span class="n">artifactIsHash</span> <span class="o">=</span> <span class="n">artifact_is_hash</span>
+            <span class="k">try</span><span class="p">:</span>
+                <span class="n">mail_artifact</span><span class="o">.</span><span class="n">save</span><span class="p">()</span>
+                <span class="n">mail_instance</span><span class="o">.</span><span class="n">save</span><span class="p">()</span>
+            <span class="k">except</span> <span class="ne">Exception</span> <span class="k">as</span> <span class="n">e</span><span class="p">:</span>
+                <span class="n">fetch_mail_logger</span><span class="o">.</span><span class="n">error</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;Error saving mail artifact: </span><span class="si">{</span><span class="nb">str</span><span class="p">(</span><span class="n">e</span><span class="p">)</span><span class="si">}</span><span class="s2">&quot;</span><span class="p">)</span></div>
+
+
+
+<div class="viewcode-block" id="MailHandler.get_handler">
+<a class="viewcode-back" href="../../../modules/mail_feeder_core.html#mail_feeder.mail_utils.mail_handler.MailHandler.get_handler">[docs]</a>
+    <span class="k">def</span><span class="w"> </span><span class="nf">get_handler</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">data_type</span><span class="p">):</span>
+        <span class="n">handler_methods</span> <span class="o">=</span> <span class="p">{</span>
+            <span class="s1">&#39;ip&#39;</span><span class="p">:</span> <span class="n">IPHandler</span><span class="p">,</span>
+            <span class="s1">&#39;hash&#39;</span><span class="p">:</span> <span class="n">HashHandler</span><span class="p">,</span>
+            <span class="s1">&#39;url&#39;</span><span class="p">:</span> <span class="n">URLHandler</span><span class="p">,</span>
+            <span class="s1">&#39;domain&#39;</span><span class="p">:</span> <span class="n">DomainHandler</span><span class="p">,</span>
+            <span class="s1">&#39;mail&#39;</span><span class="p">:</span> <span class="n">MailAddressHandler</span>
+        <span class="p">}</span>
+        <span class="k">return</span> <span class="n">handler_methods</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="n">data_type</span><span class="p">)</span></div>
+
+
+<div class="viewcode-block" id="MailHandler.get_handler_method">
+<a class="viewcode-back" href="../../../modules/mail_feeder_core.html#mail_feeder.mail_utils.mail_handler.MailHandler.get_handler_method">[docs]</a>
+    <span class="k">def</span><span class="w"> </span><span class="nf">get_handler_method</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">data_type</span><span class="p">):</span>
+        <span class="n">handler_methods</span> <span class="o">=</span> <span class="p">{</span>
+            <span class="s1">&#39;ip&#39;</span><span class="p">:</span> <span class="n">IPHandler</span><span class="o">.</span><span class="n">handle_ip</span><span class="p">,</span>
+            <span class="s1">&#39;hash&#39;</span><span class="p">:</span> <span class="n">HashHandler</span><span class="o">.</span><span class="n">handle_hash</span><span class="p">,</span>
+            <span class="s1">&#39;url&#39;</span><span class="p">:</span> <span class="n">URLHandler</span><span class="o">.</span><span class="n">handle_url</span><span class="p">,</span>
+            <span class="s1">&#39;domain&#39;</span><span class="p">:</span> <span class="n">DomainHandler</span><span class="o">.</span><span class="n">handle_domain</span><span class="p">,</span>
+            <span class="s1">&#39;mail&#39;</span><span class="p">:</span> <span class="n">MailAddressHandler</span><span class="o">.</span><span class="n">handle_mail</span>
+        <span class="p">}</span>
+        <span class="k">return</span> <span class="n">handler_methods</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="n">data_type</span><span class="p">)</span></div>
+
+
+<div class="viewcode-block" id="MailHandler.handle_mail_attachment">
+<a class="viewcode-back" href="../../../modules/mail_feeder_core.html#mail_feeder.mail_utils.mail_handler.MailHandler.handle_mail_attachment">[docs]</a>
+    <span class="k">def</span><span class="w"> </span><span class="nf">handle_mail_attachment</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">files</span><span class="p">,</span> <span class="n">mail_instance</span><span class="p">):</span>
+<span class="w">        </span><span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">        Handles mail attachments by saving them to the database and associating them with the given mail instance.</span>
+
+<span class="sd">        Args:</span>
+<span class="sd">            files (dict): A dictionary of file objects representing the attachments.</span>
+<span class="sd">            mail_instance (Mail): The mail instance to associate the attachments with.</span>
+
+<span class="sd">        Returns:</span>
+<span class="sd">            None</span>
+<span class="sd">        &quot;&quot;&quot;</span>
+
+        <span class="k">for</span> <span class="n">file_obj</span> <span class="ow">in</span> <span class="n">files</span><span class="o">.</span><span class="n">values</span><span class="p">():</span>
+            <span class="n">filename</span> <span class="o">=</span> <span class="n">file_obj</span><span class="o">.</span><span class="n">name</span>
+            <span class="k">try</span><span class="p">:</span>
+                <span class="n">att</span><span class="p">,</span> <span class="n">_</span> <span class="o">=</span> <span class="n">FileHandler</span><span class="o">.</span><span class="n">handle_file</span><span class="p">(</span><span class="n">file</span><span class="o">=</span><span class="kc">None</span><span class="p">,</span> <span class="n">mail</span><span class="o">=</span><span class="n">filename</span><span class="p">)</span>
+                <span class="k">if</span> <span class="n">att</span> <span class="ow">is</span> <span class="ow">not</span> <span class="kc">None</span><span class="p">:</span>
+                    <span class="n">mail_attachment</span> <span class="o">=</span> <span class="n">MailAttachment</span><span class="p">(</span><span class="n">mail</span><span class="o">=</span><span class="n">mail_instance</span><span class="p">,</span> <span class="n">file</span><span class="o">=</span><span class="n">att</span><span class="p">)</span>
+                    <span class="n">mail_attachment</span><span class="o">.</span><span class="n">save</span><span class="p">()</span>
+            <span class="k">except</span> <span class="ne">Exception</span> <span class="k">as</span> <span class="n">e</span><span class="p">:</span>
+                <span class="n">fetch_mail_logger</span><span class="o">.</span><span class="n">error</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;Error handling attachment: </span><span class="si">{</span><span class="n">e</span><span class="si">}</span><span class="s2">&quot;</span><span class="p">)</span>
+        <span class="n">mail_instance</span><span class="o">.</span><span class="n">save</span><span class="p">()</span></div>
+
+
+<div class="viewcode-block" id="MailHandler.get_or_create_user">
+<a class="viewcode-back" href="../../../modules/mail_feeder_core.html#mail_feeder.mail_utils.mail_handler.MailHandler.get_or_create_user">[docs]</a>
+    <span class="k">def</span><span class="w"> </span><span class="nf">get_or_create_user</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">username</span><span class="p">):</span>
+<span class="w">        </span><span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">        Retrieves an existing user from the database or creates a new user if not found.</span>
+
+<span class="sd">        Args:</span>
+<span class="sd">            username (str): The username of the user to retrieve or create.</span>
+
+<span class="sd">        Returns:</span>
+<span class="sd">            User: The retrieved or created user object.</span>
+
+<span class="sd">        Raises:</span>
+<span class="sd">            Exception: If an error occurs while retrieving the user from the database.</span>
+<span class="sd">        &quot;&quot;&quot;</span>
+        <span class="n">today</span> <span class="o">=</span> <span class="n">date</span><span class="o">.</span><span class="n">today</span><span class="p">()</span>
+        <span class="n">month</span> <span class="o">=</span> <span class="n">today</span><span class="o">.</span><span class="n">strftime</span><span class="p">(</span><span class="s2">&quot;%m&quot;</span><span class="p">)</span>  <span class="c1"># This will ensure the month is always 2 digits</span>
+        <span class="n">year</span> <span class="o">=</span> <span class="n">today</span><span class="o">.</span><span class="n">year</span>
+        <span class="n">user</span> <span class="o">=</span> <span class="kc">None</span>
+        <span class="k">try</span><span class="p">:</span>
+            <span class="n">user</span> <span class="o">=</span> <span class="n">User</span><span class="o">.</span><span class="n">objects</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="n">username</span><span class="o">=</span><span class="n">username</span><span class="p">)</span>
+        <span class="k">except</span> <span class="n">ObjectDoesNotExist</span><span class="p">:</span>
+            <span class="n">is_valid</span><span class="p">,</span> <span class="n">valid_email</span> <span class="o">=</span> <span class="n">is_valid_email</span><span class="p">(</span><span class="n">username</span><span class="p">)</span>
+            <span class="k">if</span> <span class="n">is_valid</span><span class="p">:</span>
+                <span class="n">username</span> <span class="o">=</span> <span class="n">valid_email</span>
+                <span class="k">if</span> <span class="n">is_valid_company_email</span><span class="p">(</span><span class="n">username</span><span class="p">):</span>
+                    <span class="n">user</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">create_user</span><span class="p">(</span><span class="n">username</span><span class="p">)</span>
+                <span class="k">else</span><span class="p">:</span>
+                    <span class="n">fetch_mail_logger</span><span class="o">.</span><span class="n">warning</span><span class="p">(</span><span class="s2">&quot;No User Found, Defaulting user...&quot;</span><span class="p">)</span>
+                    <span class="n">user</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">create_default_user</span><span class="p">()</span>
+
+            <span class="c1"># These operations are common to both cases, so we can move them out of the if-else block</span>
+            <span class="bp">self</span><span class="o">.</span><span class="n">update_kpi_stats</span><span class="p">(</span><span class="n">month</span><span class="p">,</span> <span class="n">year</span><span class="p">)</span>
+            <span class="bp">self</span><span class="o">.</span><span class="n">create_monthly_user_stats</span><span class="p">(</span><span class="n">user</span><span class="p">,</span> <span class="n">month</span><span class="p">,</span> <span class="n">year</span><span class="p">)</span>
+            <span class="n">Ldap</span><span class="o">.</span><span class="n">create_user</span><span class="p">(</span><span class="n">user</span><span class="p">)</span>
+
+        <span class="k">except</span> <span class="ne">Exception</span> <span class="k">as</span> <span class="n">e</span><span class="p">:</span>
+            <span class="n">fetch_mail_logger</span><span class="o">.</span><span class="n">error</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;An error occurred while retrieving user </span><span class="si">{</span><span class="n">username</span><span class="si">}</span><span class="s2"> from the database: </span><span class="si">{</span><span class="n">e</span><span class="si">}</span><span class="s2">&quot;</span><span class="p">)</span>
+
+        <span class="k">return</span> <span class="n">user</span></div>
+
+
+<div class="viewcode-block" id="MailHandler.create_user">
+<a class="viewcode-back" href="../../../modules/mail_feeder_core.html#mail_feeder.mail_utils.mail_handler.MailHandler.create_user">[docs]</a>
+    <span class="k">def</span><span class="w"> </span><span class="nf">create_user</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">username</span><span class="p">):</span>
+<span class="w">        </span><span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">        Creates a new user with the given username.</span>
+
+<span class="sd">        Args:</span>
+<span class="sd">            username (str): The username for the new user.</span>
+
+<span class="sd">        Returns:</span>
+<span class="sd">            User: The newly created user object.</span>
+<span class="sd">        &quot;&quot;&quot;</span>
+        <span class="k">if</span> <span class="ow">not</span> <span class="n">username</span><span class="p">:</span>
+            <span class="k">raise</span> <span class="ne">ValueError</span><span class="p">(</span><span class="s2">&quot;Username cannot be empty&quot;</span><span class="p">)</span>
+
+        <span class="k">try</span><span class="p">:</span>
+            <span class="n">User</span><span class="o">.</span><span class="n">objects</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="n">username</span><span class="o">=</span><span class="n">username</span><span class="p">)</span>
+            <span class="n">fetch_mail_logger</span><span class="o">.</span><span class="n">warning</span><span class="p">(</span><span class="s2">&quot;User: (</span><span class="si">%s</span><span class="s2">) already exists!&quot;</span> <span class="o">%</span> <span class="n">username</span><span class="p">)</span>
+            <span class="k">return</span> <span class="kc">None</span>
+        <span class="k">except</span> <span class="n">User</span><span class="o">.</span><span class="n">DoesNotExist</span><span class="p">:</span>
+            <span class="k">try</span><span class="p">:</span>
+                <span class="n">user</span> <span class="o">=</span> <span class="n">User</span><span class="o">.</span><span class="n">objects</span><span class="o">.</span><span class="n">create_user</span><span class="p">(</span><span class="n">username</span><span class="o">=</span><span class="n">username</span><span class="p">,</span> <span class="n">password</span><span class="o">=</span><span class="kc">None</span><span class="p">)</span>
+                <span class="n">user</span><span class="o">.</span><span class="n">set_unusable_password</span><span class="p">()</span>
+                <span class="n">user</span><span class="o">.</span><span class="n">full_clean</span><span class="p">()</span>  <span class="c1"># Validate the model</span>
+                <span class="n">user</span><span class="o">.</span><span class="n">save</span><span class="p">()</span>
+                <span class="n">fetch_mail_logger</span><span class="o">.</span><span class="n">info</span><span class="p">(</span><span class="s2">&quot;User: (</span><span class="si">%s</span><span class="s2">) created !&quot;</span> <span class="o">%</span> <span class="n">username</span><span class="p">)</span>
+                <span class="k">return</span> <span class="n">user</span>
+            <span class="k">except</span> <span class="ne">Exception</span> <span class="k">as</span> <span class="n">e</span><span class="p">:</span>
+                <span class="n">fetch_mail_logger</span><span class="o">.</span><span class="n">warning</span><span class="p">(</span><span class="s2">&quot;Error creating user: &quot;</span><span class="p">,</span> <span class="n">e</span><span class="p">)</span>
+                <span class="k">return</span> <span class="kc">None</span></div>
+
+                
+<div class="viewcode-block" id="MailHandler.update_kpi_stats">
+<a class="viewcode-back" href="../../../modules/mail_feeder_core.html#mail_feeder.mail_utils.mail_handler.MailHandler.update_kpi_stats">[docs]</a>
+    <span class="k">def</span><span class="w"> </span><span class="nf">update_kpi_stats</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">month</span><span class="p">,</span> <span class="n">year</span><span class="p">):</span>
+<span class="w">        </span><span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">        Update the KPI statistics for a given month and year.</span>
+
+<span class="sd">        Args:</span>
+<span class="sd">            month (int): The month for which the statistics are being updated.</span>
+<span class="sd">            year (int): The year for which the statistics are being updated.</span>
+<span class="sd">        &quot;&quot;&quot;</span>
+        <span class="c1"># Use Django&#39;s get_or_create to avoid try-except block</span>
+        <span class="kn">from</span><span class="w"> </span><span class="nn">tasp.cron</span><span class="w"> </span><span class="kn">import</span> <span class="n">sync_monthly_kpi</span>
+        <span class="n">sync_monthly_kpi</span><span class="p">()</span>
+        <span class="n">kpi</span><span class="o">=</span><span class="n">Kpi</span><span class="o">.</span><span class="n">objects</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="n">month</span><span class="o">=</span><span class="n">month</span><span class="p">,</span> <span class="n">year</span><span class="o">=</span><span class="n">year</span><span class="p">)</span>
+        <span class="c1"># If Kpi instance already exists, update the MonthlyReporterStats instance</span>
+        <span class="k">try</span><span class="p">:</span>
+            <span class="n">kpi</span><span class="o">.</span><span class="n">monthly_reporter_stats</span><span class="o">.</span><span class="n">new_reporters</span> <span class="o">+=</span> <span class="mi">1</span>
+            <span class="n">kpi</span><span class="o">.</span><span class="n">monthly_reporter_stats</span><span class="o">.</span><span class="n">total_reporters</span> <span class="o">+=</span> <span class="mi">1</span>
+        <span class="k">except</span> <span class="ne">Exception</span> <span class="k">as</span> <span class="n">e</span><span class="p">:</span>
+            <span class="c1"># Log the exception for debugging</span>
+            <span class="n">fetch_mail_logger</span><span class="o">.</span><span class="n">error</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;Exception occurred: </span><span class="si">{</span><span class="n">e</span><span class="si">}</span><span class="s2">&quot;</span><span class="p">)</span>
+            <span class="c1"># Create a new MonthlyReporterStats instance if it does not exist</span>
+            <span class="n">monthly_reporter_stats</span> <span class="o">=</span> <span class="n">MonthlyReporterStats</span><span class="o">.</span><span class="n">objects</span><span class="o">.</span><span class="n">create</span><span class="p">(</span>
+                <span class="n">new_reporters</span><span class="o">=</span><span class="mi">1</span><span class="p">,</span>
+                <span class="n">total_reporters</span><span class="o">=</span><span class="mi">1</span><span class="p">,</span>
+            <span class="p">)</span>
+            <span class="n">kpi</span><span class="o">.</span><span class="n">monthly_reporter_stats</span> <span class="o">=</span> <span class="n">monthly_reporter_stats</span>
+        
+        <span class="n">kpi</span><span class="o">.</span><span class="n">monthly_reporter_stats</span><span class="o">.</span><span class="n">save</span><span class="p">()</span>
+
+        <span class="c1"># Save the Kpi instance</span>
+        <span class="n">kpi</span><span class="o">.</span><span class="n">save</span><span class="p">()</span></div>
+
+
+<div class="viewcode-block" id="MailHandler.create_monthly_user_stats">
+<a class="viewcode-back" href="../../../modules/mail_feeder_core.html#mail_feeder.mail_utils.mail_handler.MailHandler.create_monthly_user_stats">[docs]</a>
+    <span class="k">def</span><span class="w"> </span><span class="nf">create_monthly_user_stats</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">user</span><span class="p">,</span> <span class="n">month</span><span class="p">,</span> <span class="n">year</span><span class="p">):</span>
+<span class="w">        </span><span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">        Create or update the monthly user statistics for a given user, month, and year.</span>
+
+<span class="sd">        Args:</span>
+<span class="sd">            user (User): The user for whom the statistics are being created or updated.</span>
+<span class="sd">            month (int): The month for which the statistics are being created or updated.</span>
+<span class="sd">            year (int): The year for which the statistics are being created or updated.</span>
+
+<span class="sd">        Returns:</span>
+<span class="sd">            None</span>
+<span class="sd">        &quot;&quot;&quot;</span>
+        <span class="c1"># Use Django&#39;s get_or_create to avoid try-except block</span>
+        <span class="n">monthly_user_stats</span><span class="p">,</span> <span class="n">_</span> <span class="o">=</span> <span class="n">UserCasesMonthlyStats</span><span class="o">.</span><span class="n">objects</span><span class="o">.</span><span class="n">get_or_create</span><span class="p">(</span><span class="n">user</span><span class="o">=</span><span class="n">user</span><span class="p">,</span> <span class="n">month</span><span class="o">=</span><span class="n">month</span><span class="p">,</span> <span class="n">year</span><span class="o">=</span><span class="n">year</span><span class="p">)</span>
+
+        <span class="c1"># If the UserCasesMonthlyStats instance was created, you can add any additional setup here</span>
+
+        <span class="c1"># Save the UserCasesMonthlyStats instance</span>
+        <span class="n">monthly_user_stats</span><span class="o">.</span><span class="n">save</span><span class="p">()</span></div>
+
+
+<div class="viewcode-block" id="MailHandler.create_default_user">
+<a class="viewcode-back" href="../../../modules/mail_feeder_core.html#mail_feeder.mail_utils.mail_handler.MailHandler.create_default_user">[docs]</a>
+    <span class="k">def</span><span class="w"> </span><span class="nf">create_default_user</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
+<span class="w">        </span><span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">        Creates a default user if it doesn&#39;t already exist.</span>
+
+<span class="sd">        If a user with the username &quot;suspicious@cert.local&quot; already exists, it returns that user.</span>
+<span class="sd">        Otherwise, it creates a new user with the username &quot;suspicious@cert.local&quot; and sets an unusable password.</span>
+
+<span class="sd">        Returns:</span>
+<span class="sd">            User: The default user.</span>
+<span class="sd">        &quot;&quot;&quot;</span>
+        <span class="n">username</span> <span class="o">=</span> <span class="n">SUSPICIOUS_EMAIL</span>
+        <span class="n">user</span><span class="p">,</span> <span class="n">created</span> <span class="o">=</span> <span class="n">User</span><span class="o">.</span><span class="n">objects</span><span class="o">.</span><span class="n">get_or_create</span><span class="p">(</span><span class="n">username</span><span class="o">=</span><span class="n">username</span><span class="p">)</span>
+        <span class="k">if</span> <span class="n">created</span><span class="p">:</span>
+            <span class="n">user</span><span class="o">.</span><span class="n">set_unusable_password</span><span class="p">()</span>
+            <span class="n">user</span><span class="o">.</span><span class="n">save</span><span class="p">()</span>
+        <span class="k">return</span> <span class="n">user</span></div>
+
+
+<div class="viewcode-block" id="MailHandler.extract_observables_v3">
+<a class="viewcode-back" href="../../../modules/mail_feeder_core.html#mail_feeder.mail_utils.mail_handler.MailHandler.extract_observables_v3">[docs]</a>
+    <span class="k">def</span><span class="w"> </span><span class="nf">extract_observables_v3</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">filename</span><span class="p">,</span> <span class="n">mail</span><span class="p">,</span> <span class="n">workdir</span><span class="p">):</span>
+<span class="w">        </span><span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">        Extracts observables from an email and its attachments.</span>
+
+<span class="sd">        Args:</span>
+<span class="sd">            filename (str): The name of the email file.</span>
+<span class="sd">            mail (dict): The metadata of the email.</span>
+
+<span class="sd">        Returns:</span>
+<span class="sd">            dict: A dictionary containing the extracted artifacts and files.</span>
+
+<span class="sd">        Raises:</span>
+<span class="sd">            FileNotFoundError: If the email file or any of its attachments are not found.</span>
+<span class="sd">        &quot;&quot;&quot;</span>
+        <span class="k">def</span><span class="w"> </span><span class="nf">add_artifact</span><span class="p">(</span><span class="n">data_type</span><span class="p">,</span> <span class="n">data</span><span class="p">,</span> <span class="n">tags</span><span class="o">=</span><span class="kc">None</span><span class="p">):</span>
+<span class="w">            </span><span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">            Add an artifact to the list of artifacts.</span>
+
+<span class="sd">            Parameters:</span>
+<span class="sd">            - data_type (str): The type of data for the artifact.</span>
+<span class="sd">            - data (any): The data for the artifact.</span>
+<span class="sd">            - tags (list, optional): A list of tags for the artifact.</span>
+
+<span class="sd">            Returns:</span>
+<span class="sd">            None</span>
+<span class="sd">            &quot;&quot;&quot;</span>
+            <span class="k">if</span> <span class="ow">not</span> <span class="n">data_type</span> <span class="ow">or</span> <span class="ow">not</span> <span class="n">data</span><span class="p">:</span>
+                <span class="k">raise</span> <span class="ne">ValueError</span><span class="p">(</span><span class="s2">&quot;Both data_type and data are required to add an artifact&quot;</span><span class="p">)</span>
+
+            <span class="n">artifact</span> <span class="o">=</span> <span class="p">{</span><span class="s1">&#39;dataType&#39;</span><span class="p">:</span> <span class="n">data_type</span><span class="p">,</span> <span class="s1">&#39;data&#39;</span><span class="p">:</span> <span class="n">data</span><span class="p">}</span>
+            <span class="k">if</span> <span class="n">tags</span><span class="p">:</span>
+                <span class="k">if</span> <span class="ow">not</span> <span class="nb">isinstance</span><span class="p">(</span><span class="n">tags</span><span class="p">,</span> <span class="nb">list</span><span class="p">):</span>
+                    <span class="k">raise</span> <span class="ne">TypeError</span><span class="p">(</span><span class="s2">&quot;tags must be a list&quot;</span><span class="p">)</span>
+                <span class="n">artifact</span><span class="p">[</span><span class="s1">&#39;tags&#39;</span><span class="p">]</span> <span class="o">=</span> <span class="n">tags</span>
+            <span class="n">artifacts</span><span class="o">.</span><span class="n">append</span><span class="p">(</span><span class="n">artifact</span><span class="p">)</span>
+
+        <span class="k">def</span><span class="w"> </span><span class="nf">add_file_attachment</span><span class="p">(</span><span class="n">file_path</span><span class="p">,</span> <span class="n">attachment_id</span><span class="p">,</span> <span class="n">tags</span><span class="o">=</span><span class="kc">None</span><span class="p">):</span>
+<span class="w">            </span><span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">            Add a file attachment to the `files` dictionary and associate it with an artifact.</span>
+
+<span class="sd">            Args:</span>
+<span class="sd">                file_path (str): The path to the file to be attached.</span>
+<span class="sd">                attachment_id (int): The ID of the attachment.</span>
+<span class="sd">                tags (list, optional): A list of tags to associate with the attachment. Defaults to None.</span>
+
+<span class="sd">            Returns:</span>
+<span class="sd">                int: The ID of the next attachment.</span>
+
+<span class="sd">            Raises:</span>
+<span class="sd">                FileNotFoundError: If the file to be attached is not found.</span>
+<span class="sd">            &quot;&quot;&quot;</span>
+            <span class="k">if</span> <span class="n">file_path</span> <span class="ow">not</span> <span class="ow">in</span> <span class="n">processed_files</span><span class="p">:</span>
+                <span class="n">processed_files</span><span class="o">.</span><span class="n">add</span><span class="p">(</span><span class="n">file_path</span><span class="p">)</span>  <span class="c1"># Track the file path as processed</span>
+                <span class="n">files</span><span class="p">[</span><span class="nb">str</span><span class="p">(</span><span class="n">attachment_id</span><span class="p">)]</span> <span class="o">=</span> <span class="nb">open</span><span class="p">(</span><span class="n">file_path</span><span class="p">,</span> <span class="s1">&#39;rb&#39;</span><span class="p">)</span>
+                <span class="n">add_artifact</span><span class="p">(</span><span class="s1">&#39;file&#39;</span><span class="p">,</span> <span class="nb">str</span><span class="p">(</span><span class="n">attachment_id</span><span class="p">),</span> <span class="n">tags</span><span class="p">)</span>
+                <span class="k">return</span> <span class="n">attachment_id</span> <span class="o">+</span> <span class="mi">1</span>
+            <span class="k">return</span> <span class="n">attachment_id</span>  <span class="c1"># Return the same ID if file was already added</span>
+
+        <span class="k">def</span><span class="w"> </span><span class="nf">process_attachments</span><span class="p">(</span><span class="n">directory</span><span class="p">,</span> <span class="n">attachment_id</span><span class="p">,</span> <span class="n">tags</span><span class="p">):</span>
+<span class="w">            </span><span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">            Process attachments in the given directory.</span>
+
+<span class="sd">            Args:</span>
+<span class="sd">                directory (str): The directory path where the attachments are located.</span>
+<span class="sd">                attachment_id (int): The ID of the attachment.</span>
+<span class="sd">                tags (list): A list of tags associated with the attachments.</span>
+
+<span class="sd">            Returns:</span>
+<span class="sd">                int: The updated attachment ID after processing all attachments.</span>
+<span class="sd">            &quot;&quot;&quot;</span>
+            <span class="c1"># Use os.scandir() instead of os.listdir() for better performance</span>
+            <span class="k">with</span> <span class="n">os</span><span class="o">.</span><span class="n">scandir</span><span class="p">(</span><span class="n">directory</span><span class="p">)</span> <span class="k">as</span> <span class="n">entries</span><span class="p">:</span>
+                <span class="k">for</span> <span class="n">entry</span> <span class="ow">in</span> <span class="n">entries</span><span class="p">:</span>
+                    <span class="k">if</span> <span class="n">entry</span><span class="o">.</span><span class="n">is_file</span><span class="p">()</span> <span class="ow">and</span> <span class="ow">not</span> <span class="n">re</span><span class="o">.</span><span class="n">match</span><span class="p">(</span><span class="sa">r</span><span class="s1">&#39;\d</span><span class="si">{6}</span><span class="s1">-[0-9a-f]</span><span class="si">{5}</span><span class="s1">.eml&#39;</span><span class="p">,</span> <span class="n">entry</span><span class="o">.</span><span class="n">name</span><span class="p">):</span>
+                        <span class="n">file_path</span> <span class="o">=</span> <span class="n">os</span><span class="o">.</span><span class="n">path</span><span class="o">.</span><span class="n">join</span><span class="p">(</span><span class="n">directory</span><span class="p">,</span> <span class="n">entry</span><span class="o">.</span><span class="n">name</span><span class="p">)</span>
+                        <span class="n">attachment_id</span> <span class="o">=</span> <span class="n">add_file_attachment</span><span class="p">(</span><span class="n">file_path</span><span class="p">,</span> <span class="n">attachment_id</span><span class="p">,</span> <span class="n">tags</span><span class="p">)</span>
+            <span class="k">return</span> <span class="n">attachment_id</span>
+
+        <span class="n">artifacts</span> <span class="o">=</span> <span class="p">[]</span>
+        <span class="n">files</span> <span class="o">=</span> <span class="p">{}</span>
+        <span class="n">processed_files</span> <span class="o">=</span> <span class="nb">set</span><span class="p">()</span>  <span class="c1"># Keep track of added file paths to avoid duplicates</span>
+
+        <span class="c1"># Generate observables list using meioc library + attached files</span>
+        <span class="n">filepath</span> <span class="o">=</span> <span class="kc">None</span>
+        <span class="n">eml_path</span> <span class="o">=</span> <span class="n">os</span><span class="o">.</span><span class="n">path</span><span class="o">.</span><span class="n">join</span><span class="p">(</span><span class="n">workdir</span><span class="p">,</span> <span class="sa">f</span><span class="s2">&quot;</span><span class="si">{</span><span class="n">filename</span><span class="si">}</span><span class="s2">.eml&quot;</span><span class="p">)</span>
+        <span class="n">msg_path</span> <span class="o">=</span> <span class="n">os</span><span class="o">.</span><span class="n">path</span><span class="o">.</span><span class="n">join</span><span class="p">(</span><span class="n">workdir</span><span class="p">,</span> <span class="sa">f</span><span class="s2">&quot;</span><span class="si">{</span><span class="n">filename</span><span class="si">}</span><span class="s2">.msg&quot;</span><span class="p">)</span>
+
+        <span class="k">if</span> <span class="n">os</span><span class="o">.</span><span class="n">path</span><span class="o">.</span><span class="n">exists</span><span class="p">(</span><span class="n">eml_path</span><span class="p">):</span>
+            <span class="n">filepath</span> <span class="o">=</span> <span class="n">eml_path</span>
+        <span class="k">elif</span> <span class="n">os</span><span class="o">.</span><span class="n">path</span><span class="o">.</span><span class="n">exists</span><span class="p">(</span><span class="n">msg_path</span><span class="p">):</span>
+            <span class="n">filepath</span> <span class="o">=</span> <span class="n">msg_path</span>
+        <span class="k">else</span><span class="p">:</span>
+            <span class="n">eml_path</span> <span class="o">=</span> <span class="n">os</span><span class="o">.</span><span class="n">path</span><span class="o">.</span><span class="n">join</span><span class="p">(</span><span class="n">workdir</span><span class="p">,</span> <span class="s2">&quot;user_submission.eml&quot;</span><span class="p">)</span>
+            <span class="n">msg_path</span> <span class="o">=</span> <span class="n">os</span><span class="o">.</span><span class="n">path</span><span class="o">.</span><span class="n">join</span><span class="p">(</span><span class="n">workdir</span><span class="p">,</span> <span class="s2">&quot;user_submission.msg&quot;</span><span class="p">)</span>
+            <span class="k">if</span> <span class="n">os</span><span class="o">.</span><span class="n">path</span><span class="o">.</span><span class="n">exists</span><span class="p">(</span><span class="n">eml_path</span><span class="p">):</span>
+                <span class="n">filepath</span> <span class="o">=</span> <span class="n">eml_path</span>
+            <span class="k">elif</span> <span class="n">os</span><span class="o">.</span><span class="n">path</span><span class="o">.</span><span class="n">exists</span><span class="p">(</span><span class="n">msg_path</span><span class="p">):</span>
+                <span class="n">filepath</span> <span class="o">=</span> <span class="n">msg_path</span>
+            <span class="k">else</span><span class="p">:</span>
+                <span class="k">raise</span> <span class="ne">FileNotFoundError</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;Neither &#39;</span><span class="si">{</span><span class="n">eml_path</span><span class="si">}</span><span class="s2">&#39; nor &#39;</span><span class="si">{</span><span class="n">msg_path</span><span class="si">}</span><span class="s2">&#39; exists.&quot;</span><span class="p">)</span>
+        <span class="k">try</span><span class="p">:</span>
+            <span class="n">fetch_mail_logger</span><span class="o">.</span><span class="n">debug</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;Beginning&quot;</span><span class="p">)</span>
+            <span class="n">iocextract</span> <span class="o">=</span> <span class="n">json</span><span class="o">.</span><span class="n">loads</span><span class="p">(</span><span class="n">email_analysis</span><span class="p">(</span><span class="n">filepath</span><span class="p">,</span> <span class="kc">True</span><span class="p">,</span> <span class="kc">True</span><span class="p">,</span> <span class="kc">True</span><span class="p">,</span> <span class="kc">False</span><span class="p">))</span>
+        <span class="k">except</span> <span class="ne">Exception</span> <span class="k">as</span> <span class="n">e</span><span class="p">:</span>
+            <span class="n">fetch_mail_logger</span><span class="o">.</span><span class="n">debug</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;Error : </span><span class="si">{</span><span class="n">e</span><span class="si">}</span><span class="s2">&quot;</span><span class="p">)</span>
+        <span class="n">fetch_mail_logger</span><span class="o">.</span><span class="n">debug</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;iocex : </span><span class="si">{</span><span class="n">iocextract</span><span class="si">}</span><span class="s2">&quot;</span><span class="p">)</span>
+        <span class="c1"># Adding observables of type urls, domains, attachment, ip, email, hash</span>
+        <span class="k">if</span> <span class="n">iocextract</span><span class="p">[</span><span class="s1">&#39;urls&#39;</span><span class="p">]:</span>
+            <span class="k">for</span> <span class="n">url</span> <span class="ow">in</span> <span class="n">iocextract</span><span class="p">[</span><span class="s1">&#39;urls&#39;</span><span class="p">]:</span>
+                <span class="k">if</span> <span class="n">iocextract</span><span class="p">[</span><span class="s1">&#39;urls&#39;</span><span class="p">][</span><span class="n">url</span><span class="p">]</span><span class="o">.</span><span class="n">startswith</span><span class="p">(</span><span class="s1">&#39;mailto&#39;</span><span class="p">):</span>
+                    <span class="k">continue</span>
+                <span class="n">add_artifact</span><span class="p">(</span><span class="s1">&#39;url&#39;</span><span class="p">,</span> <span class="n">iocextract</span><span class="p">[</span><span class="s1">&#39;urls&#39;</span><span class="p">][</span><span class="n">url</span><span class="p">])</span>
+        <span class="k">if</span> <span class="n">iocextract</span><span class="p">[</span><span class="s1">&#39;domains&#39;</span><span class="p">]:</span>
+            <span class="k">for</span> <span class="n">domain</span> <span class="ow">in</span> <span class="n">iocextract</span><span class="p">[</span><span class="s1">&#39;domains&#39;</span><span class="p">]:</span>
+                <span class="n">add_artifact</span><span class="p">(</span><span class="s1">&#39;domain&#39;</span><span class="p">,</span> <span class="n">iocextract</span><span class="p">[</span><span class="s1">&#39;domains&#39;</span><span class="p">][</span><span class="n">domain</span><span class="p">])</span>
+        <span class="k">if</span> <span class="n">iocextract</span><span class="p">[</span><span class="s1">&#39;body_ip&#39;</span><span class="p">]:</span>
+            <span class="k">for</span> <span class="n">ip</span> <span class="ow">in</span> <span class="n">iocextract</span><span class="p">[</span><span class="s1">&#39;body_ip&#39;</span><span class="p">]:</span>
+                <span class="n">add_artifact</span><span class="p">(</span><span class="s1">&#39;ip&#39;</span><span class="p">,</span> <span class="nb">str</span><span class="p">(</span><span class="n">ip</span><span class="p">),</span> <span class="p">[</span><span class="s1">&#39;Body&#39;</span><span class="p">])</span>
+        <span class="k">if</span> <span class="n">iocextract</span><span class="p">[</span><span class="s1">&#39;body_email&#39;</span><span class="p">]:</span>
+            <span class="k">for</span> <span class="n">email_add</span> <span class="ow">in</span> <span class="n">iocextract</span><span class="p">[</span><span class="s1">&#39;body_email&#39;</span><span class="p">]:</span>
+                <span class="n">add_artifact</span><span class="p">(</span><span class="s1">&#39;mail&#39;</span><span class="p">,</span> <span class="nb">str</span><span class="p">(</span><span class="n">email_add</span><span class="p">),</span> <span class="p">[</span><span class="s1">&#39;Body&#39;</span><span class="p">])</span>
+        <span class="k">if</span> <span class="n">iocextract</span><span class="p">[</span><span class="s1">&#39;body_hash&#39;</span><span class="p">]:</span>
+            <span class="k">for</span> <span class="n">hash_art</span> <span class="ow">in</span> <span class="n">iocextract</span><span class="p">[</span><span class="s1">&#39;body_hash&#39;</span><span class="p">]:</span>
+                <span class="n">add_artifact</span><span class="p">(</span><span class="s1">&#39;hash&#39;</span><span class="p">,</span> <span class="nb">str</span><span class="p">(</span><span class="n">hash_art</span><span class="p">),</span> <span class="p">[</span><span class="s1">&#39;Body&#39;</span><span class="p">])</span>
+        <span class="c1"># Purging eml file if the attachment was an msg file</span>
+        <span class="k">if</span> <span class="n">mail</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="s1">&#39;mailFormat&#39;</span><span class="p">)</span> <span class="o">==</span> <span class="s1">&#39;msg&#39;</span><span class="p">:</span>
+            <span class="n">os</span><span class="o">.</span><span class="n">remove</span><span class="p">(</span><span class="n">filepath</span><span class="p">)</span>
+            <span class="n">filepath</span> <span class="o">=</span> <span class="n">os</span><span class="o">.</span><span class="n">path</span><span class="o">.</span><span class="n">join</span><span class="p">(</span><span class="n">FILE_TEMP_PATH</span><span class="p">,</span> <span class="n">filename</span><span class="p">,</span> <span class="sa">f</span><span class="s2">&quot;</span><span class="si">{</span><span class="n">filename</span><span class="si">}</span><span class="s2">.msg&quot;</span><span class="p">)</span>
+        <span class="c1"># Working on attached files</span>
+        <span class="n">attachment_id</span> <span class="o">=</span> <span class="mi">0</span>
+        <span class="n">attachment_tags</span> <span class="o">=</span> <span class="p">[</span><span class="s1">&#39;reported email&#39;</span><span class="p">]</span>
+        <span class="n">attachment_id</span> <span class="o">=</span> <span class="n">add_file_attachment</span><span class="p">(</span><span class="n">filepath</span><span class="p">,</span> <span class="n">attachment_id</span><span class="p">,</span> <span class="n">attachment_tags</span><span class="p">)</span>
+        <span class="n">linked_att_path</span> <span class="o">=</span> <span class="n">workdir</span><span class="o">+</span><span class="s2">&quot;/attachments&quot;</span>
+        <span class="k">if</span> <span class="n">os</span><span class="o">.</span><span class="n">path</span><span class="o">.</span><span class="n">exists</span><span class="p">(</span><span class="n">linked_att_path</span><span class="p">):</span>
+            <span class="k">if</span> <span class="n">os</span><span class="o">.</span><span class="n">listdir</span><span class="p">(</span><span class="n">linked_att_path</span><span class="p">):</span>
+                <span class="n">attachment_id</span> <span class="o">=</span> <span class="n">process_attachments</span><span class="p">(</span><span class="n">linked_att_path</span><span class="p">,</span> <span class="n">attachment_id</span><span class="p">,</span> <span class="p">[</span><span class="s1">&#39;from reported email&#39;</span><span class="p">])</span>
+        <span class="k">if</span> <span class="s1">&#39;parent&#39;</span> <span class="ow">in</span> <span class="n">mail</span><span class="p">:</span>
+            <span class="n">parent_directory</span> <span class="o">=</span> <span class="n">os</span><span class="o">.</span><span class="n">path</span><span class="o">.</span><span class="n">join</span><span class="p">(</span><span class="n">workdir</span><span class="p">,</span> <span class="n">mail</span><span class="p">[</span><span class="s1">&#39;parent&#39;</span><span class="p">])</span>
+            <span class="n">attachment_id</span> <span class="o">=</span> <span class="n">process_attachments</span><span class="p">(</span><span class="n">parent_directory</span><span class="p">,</span> <span class="n">attachment_id</span><span class="p">,</span> <span class="p">[</span><span class="s1">&#39;from parent email&#39;</span><span class="p">])</span>
+
+        <span class="k">return</span> <span class="p">{</span><span class="s1">&#39;artifacts&#39;</span><span class="p">:</span> <span class="n">artifacts</span><span class="p">,</span> <span class="s1">&#39;files&#39;</span><span class="p">:</span> <span class="n">files</span><span class="p">}</span></div>
+</div>
+
+
+<div class="viewcode-block" id="is_valid_email">
+<a class="viewcode-back" href="../../../modules/mail_feeder_core.html#mail_feeder.mail_utils.mail_handler.is_valid_email">[docs]</a>
+<span class="k">def</span><span class="w"> </span><span class="nf">is_valid_email</span><span class="p">(</span><span class="n">email</span><span class="p">):</span>
+    <span class="k">try</span><span class="p">:</span>
+        <span class="c1"># Valide l&#39;adresse email et retourne sa forme normalisée</span>
+        <span class="n">valid</span> <span class="o">=</span> <span class="n">validate_email</span><span class="p">(</span><span class="n">email</span><span class="p">,</span> <span class="n">check_deliverability</span><span class="o">=</span><span class="kc">False</span><span class="p">)</span>
+        <span class="k">return</span> <span class="kc">True</span><span class="p">,</span> <span class="n">valid</span><span class="o">.</span><span class="n">email</span>
+    <span class="k">except</span> <span class="n">EmailNotValidError</span> <span class="k">as</span> <span class="n">e</span><span class="p">:</span>
+        <span class="k">return</span> <span class="kc">False</span><span class="p">,</span> <span class="nb">str</span><span class="p">(</span><span class="n">e</span><span class="p">)</span></div>
+
+
+<div class="viewcode-block" id="is_valid_company_email">
+<a class="viewcode-back" href="../../../modules/mail_feeder_core.html#mail_feeder.mail_utils.mail_handler.is_valid_company_email">[docs]</a>
+<span class="k">def</span><span class="w"> </span><span class="nf">is_valid_company_email</span><span class="p">(</span><span class="n">email</span><span class="p">):</span>
+    <span class="k">try</span><span class="p">:</span>
+        <span class="c1"># Validate email syntax and deliverability</span>
+        <span class="n">valid</span> <span class="o">=</span> <span class="kc">False</span>
+        <span class="n">v</span> <span class="o">=</span> <span class="n">validate_email</span><span class="p">(</span><span class="n">email</span><span class="p">)</span>
+        <span class="n">normalized_email</span> <span class="o">=</span> <span class="n">v</span><span class="o">.</span><span class="n">email</span>
+        <span class="n">domain</span> <span class="o">=</span> <span class="n">normalized_email</span><span class="o">.</span><span class="n">split</span><span class="p">(</span><span class="s1">&#39;@&#39;</span><span class="p">)[</span><span class="mi">1</span><span class="p">]</span><span class="o">.</span><span class="n">lower</span><span class="p">()</span>
+        <span class="k">for</span> <span class="n">company_domain</span> <span class="ow">in</span> <span class="n">company_config</span><span class="p">:</span>
+            <span class="n">company_domain</span> <span class="o">=</span> <span class="n">company_domain</span><span class="o">.</span><span class="n">lower</span><span class="p">()</span>
+            <span class="k">if</span> <span class="n">domain</span> <span class="o">==</span> <span class="n">company_domain</span><span class="p">:</span>
+                <span class="n">valid</span> <span class="o">=</span> <span class="kc">True</span>
+        <span class="k">return</span> <span class="n">valid</span>
+    <span class="k">except</span> <span class="n">EmailNotValidError</span><span class="p">:</span>
+        <span class="k">return</span> <span class="kc">False</span></div>
+
+</pre></div>
+
+           </div>
+          </div>
+          <footer>
+
+  <hr/>
+
+  <div role="contentinfo">
+    <p>&#169; Copyright 2025, Theo Bhang, Esteban Crispel.</p>
+  </div>
+
+  Built with <a href="https://www.sphinx-doc.org/">Sphinx</a> using a
+    <a href="https://github.com/readthedocs/sphinx_rtd_theme">theme</a>
+    provided by <a href="https://readthedocs.org">Read the Docs</a>.
+   
+
+</footer>
+        </div>
+      </div>
+    </section>
+  </div>
+  <script>
+      jQuery(function () {
+          SphinxRtdTheme.Navigation.enable(true);
+      });
+  </script> 
+
+</body>
+</html>

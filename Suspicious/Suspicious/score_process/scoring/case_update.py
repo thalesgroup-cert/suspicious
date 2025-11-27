@@ -68,7 +68,7 @@ def update_kpi_and_user_stats(case):
         case (Case): The case from which to derive stats.
     """
     try:
-        from tasp.cron import sync_monthly_kpi
+        from tasp.cron.kpi import sync_monthly_kpi
         kpi = sync_monthly_kpi()
 
         # Update monthly summary
