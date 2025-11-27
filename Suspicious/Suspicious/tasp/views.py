@@ -398,7 +398,7 @@ def create_case_popup(request: HttpRequest, case_id: int, user: str) -> JsonResp
 
         is_admin_or_cert = (
             request.user.is_superuser
-            or request.user.groups.filter(name__in=["Admin", "CERT"]).exists()
+            or request.user.groups.filter(name__in=["Admin", "CERT", "Champions"]).exists()
         )
         is_ciso = CISOProfile.objects.filter(user=request.user).first()
 

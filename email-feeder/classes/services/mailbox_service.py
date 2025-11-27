@@ -155,7 +155,7 @@ class Mailbox:
             self.__mail_client.select(mailbox=mailbox, readonly=False)
 
             fetched_unseen_email_ids = self.search_mails(None, "(UNSEEN)")
-        except OSError as e:
+        except Exception as e:
             error_msg = (
                 f"Error during email search in {mailbox} "
                 f"for {self.__config.login}: {repr(e)}"

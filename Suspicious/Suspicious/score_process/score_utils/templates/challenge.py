@@ -561,11 +561,11 @@ class ChallengeEmail:
 
         # Prepare artifacts mapping
         artifact_type_map = {
-            "ip": lambda a: (safe(a.artifactIsIp.ip.address), "ip"),
-            "url": lambda a: (safe(a.artifactIsUrl.url.address), "url"),
-            "mailaddress": lambda a: (safe(a.artifactIsMailAddress.mail_address.address), "mail"),
-            "domain": lambda a: (safe(a.artifactIsDomain.domain.value), "domain"),
-            "hash": lambda a: (safe(a.artifactIsHash.hash.value), "hash")
+            "ip": lambda a: (safe(getattr(getattr(a, "artifactIsIp", None), "ip.address", None)), "ip"),
+            "url": lambda a: (safe(getattr(getattr(a, "artifactIsUrl", None), "url.address", None)), "url"),
+            "mailaddress": lambda a: (safe(getattr(getattr(a, "artifactIsMailAddress", None), "mail_address.address", None)), "mail"),
+            "domain": lambda a: (safe(getattr(getattr(a, "artifactIsDomain", None), "domain.value", None)), "domain"),
+            "hash": lambda a: (safe(getattr(getattr(a, "artifactIsHash", None), "hash.value", None)), "hash")
         }
 
         artifact_summary = []

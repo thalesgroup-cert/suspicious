@@ -1,6 +1,7 @@
 import imaplib
 import logging
 import ssl
+import time
 
 
 import classes.models.mail_exceptions
@@ -30,6 +31,49 @@ class MailClient:
         )
 
         self.__logger = logger
+
+    def _reconnect(self, attempt_max: int = 3):
+        """Force a clean reconnect to IMAP server."""
+        self.__logger.warning("IMAP connection lost — attempting reconnection")
+
+        # Always drop the broken client
+        try:
+            if self.__imap_client is not None:
+                self.__imap_client.shutdown()
+        except Exception:
+            pass
+        finally:
+            self.__imap_client = None
+
+        backoff = 1
+        for attempt in range(1, attempt_max + 1):
+            try:
+                self.login()
+                self.__logger.info(f"Reconnected on attempt {attempt}")
+                return
+            except Exception as e:
+                self.__logger.error(
+                    f"Reconnect attempt {attempt}/{attempt_max} failed: {e}"
+                )
+                if attempt == attempt_max:
+                    raise
+                time.sleep(backoff)
+                backoff *= 2
+
+    def _safe_op(self, func, *args, **kwargs):
+        """Execute IMAP operation and reconnect transparently on broken pipe."""
+        try:
+            return func(*args, **kwargs)
+
+        except (BrokenPipeError,
+                imaplib.IMAP4.abort,
+                OSError) as e:
+            self.__logger.warning(f"IMAP error detected: {e} — reconnecting")
+            self._reconnect()
+
+            # Retry the operation ONCE after reconnection
+            return func(*args, **kwargs)
+
 
     def login(self):
         """Connects and logs into the IMAP server."""
@@ -131,8 +175,11 @@ class MailClient:
                 "The IMAP client is not connected"
             )
 
-        return self.__imap_client.store(
-            message_set=email_id, command="+FLAGS", flags=flags
+        return self._safe_op(
+            self.__imap_client.store,
+            email_id,
+            "+FLAGS",
+            flags
         )
 
     def mark_email_as_seen(self, email_id: str):
@@ -175,21 +222,19 @@ class MailClient:
                 "The IMAP client is not connected"
             )
 
-        response_status, response = self.__imap_client.select(
-            mailbox=mailbox, readonly=readonly
+        response_status, response = self._safe_op(
+            self.__imap_client.select,
+            mailbox,
+            readonly=readonly
         )
 
         if response_status == "OK":
             return response_status, response
 
-        error_detail = (
-            response[0].decode("utf-8", "replace")
-            if len(response) > 0 and response[0] is not None
-            else "Unknown error"
-        )
         raise classes.models.mail_exceptions.MailboxOperationError(
-            f"Failed to select mailbox '{mailbox}': {error_detail}"
+            f"Failed to select mailbox '{mailbox}'"
         )
+
 
     def search(self, charset: str | None, *criteria: str):
         if self.__imap_client is None:
@@ -197,18 +242,16 @@ class MailClient:
                 "The IMAP client is not connected"
             )
 
-        response_status, response = self.__imap_client.search(charset, *criteria)
+        response_status, response = self._safe_op(
+            self.__imap_client.search,
+            charset, *criteria
+        )
+
         if response_status == "OK":
             return response_status, response
 
-        error_detail = (
-            response[0].decode("utf-8", "replace")
-            if len(response) > 0 and response[0] is not None
-            else "Unknown error"
-        )
-        raise classes.models.mail_exceptions.MailboxOperationError(
-            f"Email lookup failed: {error_detail}"
-        )
+        raise classes.models.mail_exceptions.MailboxOperationError("Email lookup failed")
+
 
     def fetch(self, email_id: bytes, message_parts: str):
         if self.__imap_client is None:
@@ -216,23 +259,26 @@ class MailClient:
                 "The IMAP client is not connected"
             )
 
-        response_status, response = self.__imap_client.fetch(
-            message_set=email_id.decode("utf-8"), message_parts=message_parts
+        response_status, response = self._safe_op(
+            self.__imap_client.fetch,
+            email_id.decode("utf-8"),
+            message_parts
         )
 
-        is_request_successful = (
+        is_ok = (
             response_status == "OK"
             and response
             and len(response) >= 1
             and isinstance(response[0], tuple)
         )
-        if is_request_successful:
+
+        if is_ok:
             return response_status, response
 
-        error_message = (
-            f"Failed to fetch email data for ID {email_id}. Status: {response_status}"
+        raise classes.models.mail_exceptions.MailboxOperationError(
+            f"Failed to fetch email {email_id}"
         )
-        raise classes.models.mail_exceptions.MailboxOperationError(error_message)
+
 
     @property
     def is_logged_in(self) -> bool:

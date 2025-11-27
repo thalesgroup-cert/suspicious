@@ -139,7 +139,7 @@
         <script type="text/javascript" src="{% static 'js/jquery.js' %}"></script>
         <script type="text/javascript" src="{% static 'js/tableManager.js' %}"></script>
         <script type="text/javascript" src="{% static 'js/tablefilter.js' %}"></script>
-        {% if user|is_ciso %}
+        {% if user|is_ciso or user|has_group:"Champions"%}
             <script type="text/javascript" src="{% static 'js/caseScriptUser.js' %}"></script>
         {% endif %}
         {% if user|has_group:"Admin" or user|has_group:"CERT" %}
