@@ -1,0 +1,118 @@
+name: suspicious
+services:
+  suspicious:
+    extends:
+      file: compose_apps.yaml
+      service: suspicious
+    build:
+      context: ${SUSPICIOUS_PATH}/Suspicious/
+      dockerfile: Dockerfile
+      args:
+        - HTTP_PROXY=${HTTP_PROXY}
+        - HTTPS_PROXY=${HTTPS_PROXY}
+    container_name: suspicious
+    image: theobhang/suspicious:latest
+    depends_on:
+      db_suspicious:
+        condition: service_healthy
+      cortex:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD-SHELL", "curl -s -o /dev/null -w '%{http_code}' http://localhost:9020/admin/login/| grep -q 200 || exit 1"]
+      interval: 30s
+      timeout: 30s
+      retries: 15
+      start_period: 60s
+    labels:
+      - "traefik.enable=true"
+      - "traefik.http.routers.suspicious.rule=Host(`suspicious`)"
+      - "traefik.http.routers.suspicious.entrypoints=websecure"
+      - "traefik.http.routers.suspicious.tls=true"
+
+  db_suspicious:
+    extends:
+      file: compose_databases.yaml
+      service: db_suspicious
+    image: mariadb:${DB_SUSPICIOUS_VERSION}
+    container_name: db_suspicious
+    healthcheck:
+      test: mariadb-admin --user=${MYSQL_USER} --password=${MYSQL_PASSWORD} status
+      interval: 2s
+      timeout: 1s
+      retries: 10
+      start_period: 30s
+
+  cortex:
+    extends:
+      file: compose_apps.yaml
+      service: cortex
+    image: thehiveproject/cortex:${CORTEX_VERSION}
+    container_name: cortex
+    depends_on:
+      elasticsearch:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD-SHELL", "curl -s -o /dev/null -w '%{http_code}' http://localhost:9001/api/status | grep -q 200 || exit 1"]
+      interval: 30s
+      timeout: 30s
+      retries: 10
+      start_period: 60s
+
+  elasticsearch:
+    extends:
+      file: compose_databases.yaml
+      service: elasticsearch
+    image: elasticsearch:${ELASTICSEARCH_VERSION}
+    container_name: elasticsearch
+    healthcheck:
+      test: ["CMD-SHELL", "curl -k --silent --fail localhost:9200/_cluster/health | grep -q '\"status\":\"green\"' || exit 1"]
+      interval: 30s
+      timeout: 30s
+      retries: 30
+      start_period: 60s
+
+  minio:
+    extends:
+      file: compose_databases.yaml
+      service: minio
+    image: minio/minio:${MINIO_VERSION}
+    command: server /data --console-address ":9001"
+    container_name: minio
+
+
+  feeder:
+    extends:
+      file: compose_apps.yaml
+      service: feeder
+    build:
+      context: ${FEEDER_PATH}/
+      dockerfile: Dockerfile
+      args:
+        - NO_PROXY=localhost,minio
+        - HTTP_PROXY=${HTTP_PROXY}
+        - HTTPS_PROXY=${HTTPS_PROXY}
+    container_name: email_feeder
+    depends_on:
+      - suspicious
+
+  traefik:
+    init: true
+    image: traefik:${TRAEFIK_VERSION}
+    container_name: traefik
+    extends:
+      file: compose_reverse_proxy.yaml
+      service: traefik
+    command:
+      # Providers
+      - "--providers.docker=true"
+      - "--providers.docker.exposedbydefault=false"
+      - "--providers.docker.network=suspicious_net"
+      # API & Dashboard
+      - "--api.dashboard=true"
+      - "--api.insecure=true"
+      # Observability
+      - "--log.level=INFO"
+      - "--accesslog=true"
+      - "--metrics.prometheus=true"
+
+

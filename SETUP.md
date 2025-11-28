@@ -1,102 +1,227 @@
-# Setup Guide
+# 🚀 **Setup Guide — Modern Deployment (Docker + Make)**
 
-This document explains how to install and run **Suspicious** locally using Docker and Docker Compose.
-
----
-
-## Prerequisites
-
-Before starting, ensure you have the following installed on your system:
-
-* [Docker](https://docs.docker.com/get-docker/)
-* [Docker Compose](https://docs.docker.com/compose/install/)
-* [Git](https://git-scm.com/)
+This document explains how to install and run **Suspicious** locally using **Docker**, **Docker Compose v2**, and optional **Makefile shortcuts**.
 
 ---
 
-## Installation
+## 1️⃣ Prerequisites
 
-1. **Clone the repository**
+Make sure the following are installed:
 
-   ```bash
-   git clone https://github.com/thalesgroup-cert/Suspicious.git
-   ```
+### ✔ Required
 
-2. **Navigate to the project directory**
+* **Docker** – [https://docs.docker.com/get-docker](https://docs.docker.com/get-docker)
+* **Docker Compose v2** (included in Docker Desktop / Docker Engine)
+* **Git** – [https://git-scm.com](https://git-scm.com)
 
-   ```bash
-   cd suspicious
-   ```
+### ✔ Optional but recommended
 
-3. **Build the Docker containers**
+* **make** (quality-of-life improvement)
 
-   ```bash
-   docker compose build
-   ```
+#### macOS / Linux
 
-4. **Start the containers**
-
-   ```bash
-   docker compose up
-   ```
-
-The application will now be running at:
-👉 [http://localhost:9020](http://localhost:9020)
-
-## Post-Installation Steps
-
-Apply these steps inside the Suspicious container:
-
-### Run Database Migrations
+Usually preinstalled. If missing:
 
 ```bash
-python manage.py migrate
+# Ubuntu/Debian
+sudo apt install make
+
+# Fedora/RHEL
+sudo dnf install make
 ```
 
-### **Admin Account:** Create an admin user for managing the app:
-    
- ```bash
- python manage.py createsuperuser
- ```
----
+#### Windows (Recommended)
 
-## Usage
+Use **WSL2** + Ubuntu:
 
-Once the environment is up and configured:
+```powershell
+wsl --install
+```
 
-* **Web Interface**:
-  Open [http://localhost:9020](http://localhost:9020) in your browser to access the platform.
+Inside WSL:
 
-* **Mail Submission**:
-  Send a suspicious email as an attachment to the configured address (e.g., `suspicious@test.com`). The system will analyze and return results.
+```bash
+sudo apt install make
+```
 
-* **Web Form Submission**:
-  Use the `Submit an Item` page to upload files, URLs, IPs, or hashes for analysis.
+> 📝 *You do NOT need `make`. All Makefile commands have script equivalents.*
 
 ---
 
-## Stopping the Application
+## 2️⃣ Clone the Repository
 
-To stop the containers, run:
+```bash
+git clone https://github.com/thalesgroup-cert/Suspicious.git
+cd suspicious
+```
+
+---
+
+## 3️⃣ Environment Configuration
+
+### 1. Create your `.env` file
+
+```bash
+cp .env.example .env
+```
+
+### 2. Edit `.env`
+
+Fill in required values:
+
+* application versions
+* application ports
+* database credentials
+* container names
+* network config
+* application paths
+* optional proxies
+
+`.env` is ignored by Git for safety.
+
+---
+
+## 4️⃣ Start the Application
+
+You can start Suspicious in two ways:
+
+---
+
+## ✔ Option A — Using Make (Recommended)
+
+Start all services:
+
+```bash
+make up
+```
+
+Stop everything:
+
+```bash
+make down
+```
+
+Rebuild:
+
+```bash
+make build
+```
+
+Deploy fully (pull + build + restart):
+
+```bash
+make deploy
+```
+
+---
+
+## ✔ Option B — Using Docker Compose directly
+
+```bash
+docker compose up -d
+```
+
+The application will now be available at:
+
+👉 **[http://localhost:9020](http://localhost:9020)**
+
+---
+
+## 5️⃣ Post-Installation (Database Setup)
+
+Run these for suspicious database setup.
+
+### ✔ Using Make
+
+```bash
+make migrate
+```
+
+Create an admin user:
+
+```bash
+docker compose exec web python manage.py createsuperuser
+```
+
+### ✔ Or manually
+
+```bash
+docker compose exec web python manage.py migrate
+docker compose exec web python manage.py createsuperuser
+```
+
+---
+
+## 6️⃣ Usage
+
+### 🌍 **Web Interface**
+
+Access the application:
+
+👉 [http://localhost:9020](http://localhost:9020)
+
+### 📧 Mail Submission
+
+Send a suspicious email **as an attachment** to the configured mailbox.
+The system will analyze it automatically.
+
+### 📤 Web Form Submission
+
+Use **Submit an Item** to upload:
+
+* Emails
+* Files
+* URLs
+* IPs
+* Hashes
+
+---
+
+## 7️⃣ Useful Commands
+
+### 🔍 Logs
+
+```bash
+docker compose logs -f
+```
+
+### 💽 Database Backup
+
+```bash
+make backup
+```
+
+or:
+
+```bash
+./scripts/backup-db.sh
+```
+
+### 🛠 Rebuild After Code Changes
+
+```bash
+make build
+```
+
+or:
+
+```bash
+docker compose build --no-cache
+docker compose up -d
+```
+
+---
+
+## 8️⃣ Stopping the Application
+
+Using Make:
+
+```bash
+make down
+```
+
+Using Compose:
 
 ```bash
 docker compose down
 ```
-
----
-
-## Development Notes
-
-* Make sure your branch is up-to-date with `dev` before building.
-* Logs can be monitored with:
-
-  ```bash
-  docker compose logs -f
-  ```
-
-* To rebuild after changes:
-
-  ```bash
-  docker compose build --no-cache
-  docker compose up
-  ```

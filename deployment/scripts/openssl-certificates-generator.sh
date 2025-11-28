@@ -33,7 +33,7 @@
 # ├── server.csr.pem
 # └── server.key.pem
 
-OUTPUT_DIR="./certificates"
+OUTPUT_DIR="../certificates"
 SERVER_DAYS_VALID=825
 CA_DAYS_VALID=3650
 CERT_SUBJECT="/C=COUNTRY/ST=STATE/L=CITY/O=ORGANIZATION/OU=Suspicious"

@@ -124,9 +124,9 @@ If you use a private Docker registry, configure the `docker.registry` section in
 
 ---
 
-## Global Environment File (`.env`)
+## Deployment Environment File (`.env`)
 
-A `.env.example` file is in the repo simply copy it to a `.env` that you customize with your needs 
+A `.env.example` file is in the repo in the deployment folder simply copy it to a `.env` that you customize with your needs 
 
 This file contains environment variables used to configure Docker services.
 
@@ -134,9 +134,7 @@ This file contains environment variables used to configure Docker services.
 
 ```env
 MYSQL_DATABASE=db_suspicious       # Database name
-MYSQL_HOST=db_suspicious           # Hostname of the DB container
 MYSQL_USER=suspicious              # Application DB user
-MYSQL_PORT=3306                    # Database port
 MYSQL_PASSWORD=password            # User password
 MYSQL_ROOT_PASSWORD=strongpassword # Root password (use strong values!)
 ```
