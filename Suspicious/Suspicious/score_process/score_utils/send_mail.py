@@ -62,11 +62,8 @@ def send_review_email(case):
     """
     user = case.reporter
     # Build user info if available
-    user_infos = (
-        f"{user.first_name} {user.last_name}"
-        if user.first_name and user.last_name
-        else ""
-    )
+    username, sep, _ = user.email.strip().partition("@")
+    user_infos = (username if sep == "@" and username else "")
     sender = SUSPICIOUS_EMAIL
     mail_header = f"Your submission n°{case.id} has been reviewed as: {case.results}"
 
@@ -92,11 +89,8 @@ def user_acknowledge(mail):
             user = mail.user
             user_profile = UserProfile.objects.filter(user=user).first()
             # Build user info string if available
-            user_infos = (
-                f"{user.first_name} {user.last_name}"
-                if user.first_name and user.last_name
-                else ""
-            )
+            username, sep, _ = user.email.strip().partition("@")
+            user_infos = (username if sep == "@" and username else "")
             update_cases_logger.debug(
                 "Sending acknowledgement email to user with user_infos: %s", user_infos
             )
@@ -141,11 +135,8 @@ def user_final_mail(mail, case):
         if mail:
             user = mail.user
             user_profile = UserProfile.objects.filter(user=user).first()
-            user_infos = (
-                f"{user.first_name} {user.last_name}"
-                if user.first_name and user.last_name
-                else ""
-            )
+            username, sep, _ = user.email.strip().partition("@")
+            user_infos = (username if sep == "@" and username else "")  
             subject = (
                 f"SUSPICIOUS EMAIL ANALYSIS - Your analysis [{case.id}] is completed"
             )
