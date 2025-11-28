@@ -559,6 +559,59 @@ class ChallengeEmail:
         THE_HIVE_URL = thehive_config.get("url", "")
         THE_HIVE_KEY = thehive_config.get("api_key", "")
 
+
+        if not mail:
+            fileormail = case.fileOrMail
+            if fileormail:
+                file = fileormail.file
+                if file:
+                  create_alert_from_challenge_without_mail(
+                      api_url=THE_HIVE_URL,
+                      api_key=THE_HIVE_KEY,
+                      case=case,
+                      file=file,
+                      ioc=file.linked_hash.value,
+                      datatype="hash",
+                      challenger=challenger
+                  )
+            else:
+              nonfileiocs = case.nonFileIocs
+              if nonfileiocs:
+                  url = nonfileiocs.url
+                  ip = nonfileiocs.ip
+                  hash = nonfileiocs.hash
+
+                  if url:
+                      create_alert_from_challenge_without_mail(
+                          api_url=THE_HIVE_URL,
+                          api_key=THE_HIVE_KEY,
+                          case=case,
+                          file=None,
+                          ioc=url.address,
+                          datatype="url",
+                          challenger=challenger
+                      )
+                  if ip:
+                      create_alert_from_challenge_without_mail(
+                          api_url=THE_HIVE_URL,
+                          api_key=THE_HIVE_KEY,
+                          case=case,
+                          file=None,
+                          ioc=ip.address,
+                          datatype="ip",
+                          challenger=challenger
+                      )
+                  if hash:
+                      create_alert_from_challenge_without_mail(
+                          api_url=THE_HIVE_URL,
+                          api_key=THE_HIVE_KEY,
+                          case=case,
+                          file=None,
+                          ioc=hash.value,
+                          datatype="hash",
+                          challenger=challenger
+                      )
+            return  # Exit if there's no mail associated with the case
         # Prepare artifacts mapping
         artifact_type_map = {
             "ip": lambda a: (safe(getattr(getattr(a, "artifactIsIp", None), "ip.address", None)), "ip"),
@@ -599,6 +652,58 @@ class ChallengeEmail:
             # You might want to use logging instead of print in production
             print(f"[ERROR] Failed to create TheHive alert for case #{safe(case.id)}: {e}")
 
+def create_alert_from_challenge_without_mail(api_url, api_key, case, file, ioc, datatype, challenger):
+    """
+    Create an alert in TheHive when a user challenges the result of a case.
+
+    :param api_url: TheHive API base URL
+    :param api_key: TheHive API key
+    :param case: Case object containing analysis results
+    :param file: File object related to the case
+    :param ioc: IOC object related to the case
+    :param challenger: dict with keys 'firstname', 'lastname', 'email'
+    :param artifact_summary: list of tuples (value, type) for extracted artifacts
+    :param attachments_summary: list of filenames for attachments
+    """
+    api = TheHiveApi(url=api_url, apikey=api_key, verify=thehive_config.get('the_hive_verify_ssl', ''))
+    ticket_id = generate_ref()
+    # Construction du titre
+    if file:
+      title = f"Challenge: Case #{case.id} - File {file.file_path.name}"
+    else:
+      title = f"Challenge: Case #{case.id} - IOC {str(ioc)} ({datatype})"
+    # Description complète
+    description = (
+        f"# {challenger.get('firstname', 'N/A')} {challenger.get('lastname', 'N/A')} "
+        f"({challenger.get('email', 'N/A')}) has challenged the result of case #{case.id}.\n\n"
+        f"|Value|Description|\n"
+        f"|---|---|\n"
+        f"|Case Score|{getattr(case, 'score', 'N/A')}|\n"
+        f"|Case Confidence|{getattr(case, 'confidence', 'N/A')}|\n"
+        f"|Results|{getattr(case, 'results', 'N/A')}|"
+    )
+    # Création des observables
+    observables = [
+        {"data": ioc, "dataType": datatype}
+    ]
+    # Envoi de l'alerte
+    return api.alert.create(
+        alert={
+            "type": "user_challenge",
+            "source": "suspicious",
+            "sourceRef": ticket_id,
+            "title": title,
+            "description": description,
+            "observables": observables,
+            "severity": 1,  # 1=Low, 2=Medium, 3=High
+            "tlp": 1,
+            "pap": 1,
+            "tags": ["challenge", "file_ioc", "suspicious"],
+            "customFields": {
+                "tha-id": ticket_id
+            }
+        }
+    )
 
 def create_alert_from_challenge(api_url, api_key, case, mail, challenger, artifact_summary=None, attachments_summary=None):
     """

@@ -352,8 +352,11 @@ class CaseChallengeService:
     def notify(self):
         send_to_thehive = thehive_config.get("enabled", False)
         mail_header = f"Case ID {self.case.id} challenged by {self.case.reporter.username}"
+        logger.info(f"Notifying about challenge for case ID {self.case.id}. Send to TheHive: {send_to_thehive}")
         if send_to_thehive:
+            logger.info(f"Sending challenge notification to TheHive for case ID {self.case.id}")
             ChallengeEmail(mail_header, self.case.reporter, EMAIL_SENDER_DEFAULT, None, self.case, None).send_to_thehive()
+            logger.info(f"Challenge notification sent to TheHive for case ID {self.case.id}")
         else:
             cert_users = User.objects.filter(groups__name="CERT", is_active=True).exclude(email="")
             for cert_user in cert_users:
@@ -375,8 +378,8 @@ def _update_case_challenge_stats(user):
         year=now.year,
         defaults={"challenged_cases": 0, "total_cases": 0},
     )
-    stats.challenged_cases = F("challenged_cases") + 1
-    stats.save(update_fields=["challenged_cases"])
+    stats.challenged_cases += 1
+    stats.save()
 
 
 # --- Pop-up View ---

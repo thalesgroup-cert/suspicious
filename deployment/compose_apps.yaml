@@ -18,7 +18,7 @@ services:
       service cron start &&
       python3 manage.py runserver 0.0.0.0:9020 --insecure"
     env_file:
-      - "${SUSPICIOUS_PATH}/.env"
+      - ".env"
     environment:
       no_proxy: "${NO_PROXY},cortex,db_suspicious,feeder"
     networks:
@@ -48,7 +48,7 @@ services:
       # Neurons Local
       - "${CORTEX_PATH}/Cortex-Analyzers/:/opt/Cortex-Analyzers/:ro"
       # AIMailAnalyzer Neurons
-      - "${AIANALYZER_PATH}/AIMailAnalyzer.json:/opt/Cortex-Analyzers-AI/analyzers/analyzers.json"
+      - "${AIANALYZER_PATH}/analyzers.json:/opt/Cortex-Analyzers-AI/analyzers/analyzers.json"
       # Docker Neurons
       - "${CORTEX_PATH}/Cortex-Analyzers-Public/analyzers/analyzers.json:/opt/Cortex-Analyzers-Public/analyzers/analyzers.json"
       - "${CORTEX_PATH}/Cortex-Analyzers-Public/responders/responders.json:/opt/Cortex-Analyzers-Public/responders/responders.json"
