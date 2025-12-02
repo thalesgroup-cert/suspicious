@@ -1,6 +1,9 @@
 include .env
 
-.PHONY: up down build pull deploy migrate backup superuser create-certs
+.PHONY: netcheck up down build pull deploy migrate backup superuser create-certs
+
+check-network:
+	./scripts/check-network.sh
 
 up:
 	docker compose up -d
@@ -15,6 +18,7 @@ pull:
 	docker compose pull
 
 deploy:
+	./scripts/check-network.sh
 	./scripts/wait-empty.sh "/tmp/emailAnalysis"
 	./scripts/deploy.sh
 

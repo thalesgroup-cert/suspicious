@@ -106,7 +106,7 @@ services:
       # Providers
       - "--providers.docker=true"
       - "--providers.docker.exposedbydefault=false"
-      - "--providers.docker.network=suspicious_net"
+      - "--providers.docker.network=${NETWORK_NAME}"
       # API & Dashboard
       - "--api.dashboard=true"
       - "--api.insecure=true"

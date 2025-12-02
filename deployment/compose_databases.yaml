@@ -24,7 +24,7 @@ services:
       MYSQL_PASSWORD: ${MYSQL_PASSWORD}
       MYSQL_ROOT_PASSWORD: ${MYSQL_ROOT_PASSWORD}
     networks:
-      - suspicious_net
+      - ${NETWORK_NAME}
 
   elasticsearch:
     init: true
@@ -50,7 +50,7 @@ services:
       bootstrap.memory_lock: "true"
       ES_JAVA_OPTS: "-Xms5g -Xmx5g"
     networks:
-      - suspicious_net
+      - ${NETWORK_NAME}
 
   minio:
     restart: always
@@ -63,8 +63,8 @@ services:
     volumes:
       - ${MINIO_PATH}:/data
     networks:
-      - suspicious_net
+      - ${NETWORK_NAME}
 
 
 networks:
-  suspicious_net:
+  ${NETWORK_NAME}:
