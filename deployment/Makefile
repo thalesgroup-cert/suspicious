@@ -25,7 +25,7 @@ backup:
 	./scripts/backup-db.sh
 
 superuser:
-    ./scripts/create-superuser.sh
+	./scripts/create-superuser.sh
 
 create-certs:
 	./scripts/openssl-certificates-generator.sh

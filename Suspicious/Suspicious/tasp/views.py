@@ -4,6 +4,7 @@ import json
 from typing import Callable, Dict
 
 # Django Core Imports
+from django.core.paginator import Paginator, EmptyPage, PageNotAnInteger
 from django.conf import settings
 from django.contrib.auth import logout
 from django.contrib.auth.decorators import login_required
@@ -139,16 +140,24 @@ def home(request: HttpRequest) -> HttpResponse:
 @login_required
 @require_GET
 def submissions(request: HttpRequest) -> HttpResponse:
-    """Render the submissions page displaying the user's latest cases."""
+    """Render the submissions page displaying the user's latest cases, with pagination."""
     context = {}
     try:
-        latest_cases = Case.objects.filter(reporter=request.user).order_by(
-            "-creation_date"
-        )
-        if latest_cases:
-            context["latest_cases"] = latest_cases
+        case_list = Case.objects.filter(reporter=request.user).order_by("-creation_date")
+        paginator = Paginator(case_list, 25)  # 25 cases per page, adjust as needed
+        page_number = request.GET.get("page")
+        try:
+            page_obj = paginator.get_page(page_number)
+        except PageNotAnInteger:
+            page_obj = paginator.page(1)
+        except EmptyPage:
+            page_obj = paginator.page(paginator.num_pages)
+
+        context["page_obj"] = page_obj
+        context["latest_cases"] = page_obj.object_list  # if you want backwards compatibility
         logger.info(
-            f"User '{request.user}' accessed submissions page. Found {latest_cases.count()} cases."
+            f"User '{request.user}' accessed submissions page. "
+            f"Showing page {page_obj.number} of {paginator.num_pages}. Total cases: {paginator.count}"
         )
     except django.db.Error as e:
         logger.error(
@@ -186,13 +195,30 @@ def _get_admin_cases(user: User) -> Q:
 def tasp(request):
     try:
         service = TaspService(request.user)
-        latest_cases = service.get_latest_cases()
+        case_qs = service.get_latest_cases()  # a QuerySet
     except Exception as e:
         logger.error(f"Unexpected error on TASP page for user '{request.user}': {e}", exc_info=True)
-        latest_cases = Case.objects.none()
+        case_qs = Case.objects.none()
 
-    return render(request, "tasp/tasp.html", {"latest_cases": latest_cases})
+    # pagination
+    paginator = Paginator(case_qs, 25)  # e.g. 25 cases per page
+    page_number = request.GET.get("page")
+    try:
+        page_obj = paginator.get_page(page_number)
+    except PageNotAnInteger:
+        page_obj = paginator.page(1)
+    except EmptyPage:
+        page_obj = paginator.page(paginator.num_pages)
 
+    logger.info(
+        f"TASP user '{request.user}' accessed page. "
+        f"Showing page {page_obj.number} of {paginator.num_pages}. Total cases: {paginator.count}"
+    )
+
+    return render(request, "tasp/tasp.html", {
+        "page_obj": page_obj,
+        "latest_cases": page_obj.object_list,  # optional, for compatibility
+    })
 
 class TaspService:
     def __init__(self, user):
