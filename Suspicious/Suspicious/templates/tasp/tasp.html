@@ -79,7 +79,7 @@
                 </td>
                 <td class="user has-text-centered" data-label="User">
                   <a onclick="copy({{ forloop.counter }})" class="usermail"
-                     value="{{ case.id|get_related_field:\"email\" }}">
+                     value="{{ case.id|get_related_field:"email" }}">
                     <p id="text">{{ case.id|get_related_field:"first_name" }}</p>
                   </a>
                 </td>

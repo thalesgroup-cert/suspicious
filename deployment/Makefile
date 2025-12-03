@@ -2,19 +2,23 @@ include .env
 
 .PHONY: netcheck up down build pull deploy migrate backup superuser create-certs
 
-check-network:
+netcheck:
 	./scripts/check-network.sh
 
 up:
+	./scripts/check-network.sh
 	docker compose up -d
 
 down:
+	./scripts/check-network.sh
 	docker compose down --remove-orphans
 
 build:
+	./scripts/check-network.sh
 	docker compose build
 
 pull:
+	./scripts/check-network.sh
 	docker compose pull
 
 deploy:

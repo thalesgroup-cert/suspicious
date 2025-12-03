@@ -71,3 +71,4 @@ services:
 
 networks:
   ${NETWORK_NAME}:
+    external: true

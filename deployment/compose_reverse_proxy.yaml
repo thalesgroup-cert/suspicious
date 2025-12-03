@@ -18,4 +18,5 @@ services:
       - ${TRAEFIK_PATH}/logs:/var/log/traefik
 
 networks:
-  suspicious_net:
+  ${NETWORK_NAME}:
+    external: true
