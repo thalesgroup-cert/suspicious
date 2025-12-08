@@ -9,7 +9,7 @@ http:
     suspicious:
       entryPoints:
         - websecure
-      rule: "Host(`${DOMAIN_CORP}`)"
+      rule: "Host(`suspicious`)" # <-- To Be Changed
       service: suspicious-service
       middlewares:
         - set-host
