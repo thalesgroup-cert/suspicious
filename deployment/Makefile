@@ -1,39 +1,48 @@
+# --- Makefile ---
 include .env
 
 .PHONY: netcheck up down build pull deploy migrate backup superuser create-certs
 
-netcheck:
-	./scripts/check-network.sh
+NETCHECK_CMD = ./scripts/check-network.sh
 
 up:
-	./scripts/check-network.sh
-	docker compose up -d
+	$(NETCHECK_CMD)
+	@echo "Starting services..."
+	@docker compose --env-file .env up -d
 
 down:
-	./scripts/check-network.sh
-	docker compose down --remove-orphans
+	$(NETCHECK_CMD)
+	@echo "Stopping services..."
+	@docker compose --env-file .env down --remove-orphans
 
 build:
-	./scripts/check-network.sh
-	docker compose build
+	$(NETCHECK_CMD)
+	@echo "Building images..."
+	@docker compose --env-file .env build
 
 pull:
-	./scripts/check-network.sh
-	docker compose pull
+	$(NETCHECK_CMD)
+	@echo "Pulling images..."
+	@docker compose --env-file .env pull
 
 deploy:
-	./scripts/check-network.sh
+	$(NETCHECK_CMD)
 	./scripts/wait-empty.sh "/tmp/emailAnalysis"
-	./scripts/deploy.sh
+	@echo "Deploying..."
+	@./scripts/deploy.sh
 
 migrate:
-	./scripts/migrate.sh
+	@echo "Running migrations..."
+	@./scripts/migrate.sh
 
 backup:
-	./scripts/backup-db.sh
+	@echo "Backing up database..."
+	@./scripts/backup-db.sh
 
 superuser:
-	./scripts/create-superuser.sh
+	@echo "Creating superuser..."
+	@./scripts/create-superuser.sh
 
 create-certs:
-	./scripts/openssl-certificates-generator.sh
+	@echo "Generating certificates..."
+	@./scripts/openssl-certificates-generator.sh

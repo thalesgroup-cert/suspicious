@@ -4,12 +4,12 @@ services:
     extends:
       file: compose_apps.yaml
       service: suspicious
-    build:
-      context: ${SUSPICIOUS_PATH}/Suspicious/
-      dockerfile: Dockerfile
-      args:
-        - HTTP_PROXY=${HTTP_PROXY}
-        - HTTPS_PROXY=${HTTPS_PROXY}
+    # build:
+    #   context: ${SUSPICIOUS_PATH}/
+    #   dockerfile: Dockerfile
+    #   args:
+    #     - HTTP_PROXY=${HTTP_PROXY}
+    #     - HTTPS_PROXY=${HTTPS_PROXY}
     container_name: suspicious
     image: ghcr.io/thalesgroup-cert/suspicious:latest
     depends_on:
