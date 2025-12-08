@@ -7,7 +7,7 @@ services:
     volumes:
       - "${SUSPICIOUS_PATH}/logs:/var/log"
       - "/var/run/docker.sock:/var/run/docker.sock"
-      - "${SUSPICIOUS_PATH}/Suspicious/settings.json:/app/settings.json"
+      - "${SUSPICIOUS_PATH}/settings.json:/app/settings.json"
       # AI Vector Database
       - "${SUSPICIOUS_PATH}/chromadb:/app/Suspicious/chromadb"
     command: >
