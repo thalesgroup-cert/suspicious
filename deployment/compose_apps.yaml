@@ -72,4 +72,4 @@ services:
 networks:
   suspicious_network:
     external: true
-    name: ${NETWORK_NAME}
+    name: suspicious_network
