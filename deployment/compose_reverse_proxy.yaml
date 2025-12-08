@@ -3,7 +3,7 @@ services:
     init: true
     container_name: traefik
     restart: unless-stopped
-    env:
+    environment:
       DOMAIN_CORP: ${DOMAIN_CORP}
     security_opt:
       - no-new-privileges:true
