@@ -64,9 +64,11 @@ echo "[3/11] Ensuring directory structure..."
 
 # Directories and their recommended permissions
 declare -A DIRS_PERMS=(
-    ["${ELASTIC_PATH}"]=755
-    ["${ELASTIC_PATH}/logs"]=755
-    ["${DB_SUSPICIOUS_PATH}"]=755
+    ["${ELASTIC_PATH}"]=775
+    ["${ELASTIC_PATH}/logs"]=775
+    ["${DB_SUSPICIOUS_PATH}"]=775
+    ["${MINIO_PATH}"]=755
+    ["${CA_PATH}"]=700
     ["${CORTEX_PATH}"]=755
     ["${CORTEX_PATH}/jobs"]=755
     ["${CORTEX_PATH}/Cortex-Analyzers-Public/analyzers"]=755
@@ -84,13 +86,11 @@ echo "→ Directories created with proper permissions"
 
 
 # -------------------------------------------------
-# 5. Check if settings.json and config.json exist
+# 5. Check if settings.json config.json and tls.yaml exist
 # -------------------------------------------------
 
 echo "[5/11] Checking settings.json and config.json..."
 
-
-EMAIL_FEEDER_PATH="${FEEDER_PATH}"
 
 if [ ! -f "${SUSPICIOUS_PATH}/settings.json" ]; then
     if [ -f "${SUSPICIOUS_PATH}/settings-sample.json" ]; then
@@ -104,9 +104,9 @@ else
     echo "→ settings.json present"
 fi
 
-if [ ! -f "${EMAIL_FEEDER_PATH}/config.json" ]; then
-    if [ -f "${EMAIL_FEEDER_PATH}/config-sample.json" ]; then
-        cp "${EMAIL_FEEDER_PATH}/config-sample.json" "${EMAIL_FEEDER_PATH}/config.json"
+if [ ! -f "${FEEDER_PATH}/config.json" ]; then
+    if [ -f "${FEEDER_PATH}/config-sample.json" ]; then
+        cp "${FEEDER_PATH}/config-sample.json" "${FEEDER_PATH}/config.json"
         echo "→ config.json created from config-sample.json"
     else
         echo "ERROR: Missing both config.json and config-sample.json in Email Feeder path"
@@ -137,8 +137,6 @@ echo "[7/11] Ensuring Cortex application.conf (from upstream)..."
 CORTEX_CONF="${CORTEX_PATH}/application.conf"
 CORTEX_SAMPLE_URL="https://raw.githubusercontent.com/TheHive-Project/Cortex/master/conf/application.sample"
 CORTEX_LOG="${CORTEX_PATH}/application-cortex.log"
-
-mkdir -p "${CORTEX_PATH}"
 
 if [ ! -f "${CORTEX_CONF}" ]; then
     echo "→ application.conf missing, downloading application.sample from official Cortex repository..."
@@ -241,8 +239,6 @@ echo "→ Cortex Docker socket access check complete"
 # -------------------------------------------------
 echo "[10/11] Checking certificates..."
 
-mkdir -p "$CA_PATH"
-
 # Check if required certificate files exist
 CERTFILE="$CA_PATH/certfile.pem"
 KEYFILE="$CA_PATH/keyfile.pem"
@@ -297,4 +293,5 @@ echo "    You can now proceed to modify           "
 echo "        - ${SUSPICIOUS_PATH}/settings.json  "
 echo "        - ${FEEDER_PATH}/config.json        "
 echo "        - ${CORTEX_PATH}/application.conf   "
+echo "        - ${TRAEFIK_PATH}/dynamic/tls.yaml "
 echo "============================================"

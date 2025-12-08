@@ -11,17 +11,14 @@ up:
 	@docker compose --env-file .env up -d
 
 down:
-	$(NETCHECK_CMD)
 	@echo "Stopping services..."
 	@docker compose --env-file .env down --remove-orphans
 
 build:
-	$(NETCHECK_CMD)
 	@echo "Building images..."
 	@docker compose --env-file .env build
 
 pull:
-	$(NETCHECK_CMD)
 	@echo "Pulling images..."
 	@docker compose --env-file .env pull
 

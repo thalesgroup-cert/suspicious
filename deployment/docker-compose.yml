@@ -25,7 +25,7 @@ services:
       start_period: 60s
     labels:
       - "traefik.enable=true"
-      - "traefik.http.routers.suspicious.rule=Host(`suspicious`)"
+      - "traefik.http.routers.suspicious.rule=Host(`${DOMAIN_CORP}`)"
       - "traefik.http.routers.suspicious.entrypoints=websecure"
       - "traefik.http.routers.suspicious.tls=true"
 

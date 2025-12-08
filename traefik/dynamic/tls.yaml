@@ -3,13 +3,13 @@ http:
     set-host:
       headers:
         customRequestHeaders:
-          Host: "http://suspicious:9020"
+          Host: "suspicious:9020"
 
   routers:
     suspicious:
       entryPoints:
         - websecure
-      rule: "Host(`suspicious`)"
+      rule: "Host(`${DOMAIN_CORP}`)"
       service: suspicious-service
       middlewares:
         - set-host
