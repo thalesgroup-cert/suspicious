@@ -6,7 +6,7 @@ services:
     security_opt:
       - no-new-privileges:true
     networks:
-      - suspicious_network
+      - ${NETWORK_NAME}
     ports:
       - "80:80"
       - "443:443"
