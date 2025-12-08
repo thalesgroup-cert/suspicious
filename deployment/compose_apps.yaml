@@ -22,7 +22,7 @@ services:
     environment:
       no_proxy: "${NO_PROXY},cortex,db_suspicious,feeder"
     networks:
-      - ${NETWORK_NAME}
+      - suspicious_network
 
   cortex:
     init: true
@@ -55,7 +55,7 @@ services:
       # Yara rules
       - "${YARA_PATH}/rules/:/opt/Yara/rules"
     networks:
-      - ${NETWORK_NAME}
+      - suspicious_network
 
   feeder:
     command: >
@@ -66,7 +66,7 @@ services:
       - "${CA_PATH}/keyfile.pem:/etc/private/keyfile.pem:ro"
       - "${CA_PATH}/rootcafile.pem:/etc/private/rootcafile.pem:ro"
     networks:
-      - ${NETWORK_NAME}
+      - suspicious_network
 
 
 networks:
