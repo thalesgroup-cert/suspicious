@@ -10,15 +10,24 @@ echo "============================================"
 # -------------------------------------------------
 echo "[1/11] Checking required binaries..."
 
-REQUIRED_CMDS="docker
-docker compose
-curl"
-for cmd in $REQUIRED_CMDS; do
-    if ! command -v "$cmd" >/dev/null 2>&1; then
-        echo "ERROR: Missing required binary: $cmd"
-        exit 1
-    fi
-done
+# Check for docker binary
+if ! command -v docker >/dev/null 2>&1; then
+    echo "ERROR: Missing required binary: docker"
+    exit 1
+fi
+
+# Check that docker supports the compose subcommand
+if ! docker compose version >/dev/null 2>&1; then
+    echo "ERROR: Docker Compose is not available (docker compose subcommand required)"
+    exit 1
+fi
+
+# Check curl
+if ! command -v curl >/dev/null 2>&1; then
+    echo "ERROR: Missing required binary: curl"
+    exit 1
+fi
+
 echo "→ OK"
 
 
