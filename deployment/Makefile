@@ -1,7 +1,7 @@
 # --- Makefile ---
 include .env
 
-.PHONY: netcheck up down build pull deploy migrate backup superuser create-certs
+.PHONY: netcheck up down build pull deploy migrate backup superuser create-certs init
 
 NETCHECK_CMD = ./scripts/check-network.sh
 
@@ -46,3 +46,8 @@ superuser:
 create-certs:
 	@echo "Generating certificates..."
 	@./scripts/openssl-certificates-generator.sh
+
+init:
+	@echo "Initializing project..."
+	@./scripts/init.sh
+	@echo "Initialization complete."
