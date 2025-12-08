@@ -6,7 +6,7 @@ services:
     security_opt:
       - no-new-privileges:true
     networks:
-      - suspicious_network
+      - suspicious
     ports:
       - "80:80"
       - "443:443"
@@ -17,8 +17,12 @@ services:
       - ${CA_PATH}:/etc/private:ro
       - ${TRAEFIK_PATH}/logs:/var/log/traefik
 
+
 networks:
-  suspicious_network:
-    external: true
-    name: suspicious_network
+  suspicious:
+    driver: bridge
+    ipam:
+      config:
+        - subnet: ${NETWORK_SUBNET}
+          gateway: ${NETWORK_GATEWAY}
 
