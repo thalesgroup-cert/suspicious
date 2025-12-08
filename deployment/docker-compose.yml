@@ -115,4 +115,8 @@ services:
       - "--accesslog=true"
       - "--metrics.prometheus=true"
 
+networks:
+  suspicious_network:
+    external: true
+    name: ${NETWORK_NAME}
 
