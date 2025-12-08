@@ -6,7 +6,7 @@ services:
     security_opt:
       - no-new-privileges:true
     networks:
-      - suspicious_net
+      - suspicious_network
     ports:
       - "80:80"
       - "443:443"
@@ -18,5 +18,7 @@ services:
       - ${TRAEFIK_PATH}/logs:/var/log/traefik
 
 networks:
-  ${NETWORK_NAME}:
+  suspicious_network:
     external: true
+    name: ${NETWORK_NAME}
+

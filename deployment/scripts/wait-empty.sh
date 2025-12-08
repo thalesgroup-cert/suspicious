@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
 set -Eeuo pipefail
-source ../.env
+source .env
 
 TARGET_DIR="$1"
 

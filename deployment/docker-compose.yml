@@ -11,7 +11,7 @@ services:
         - HTTP_PROXY=${HTTP_PROXY}
         - HTTPS_PROXY=${HTTPS_PROXY}
     container_name: suspicious
-    image: theobhang/suspicious:latest
+    image: ghcr.io/thalesgroup-cert/suspicious:latest
     depends_on:
       db_suspicious:
         condition: service_healthy

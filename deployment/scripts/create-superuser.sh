@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
 set -Eeuo pipefail
-source ../.env
+source .env
 
 # Simple log function
 log() {

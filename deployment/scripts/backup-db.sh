@@ -1,9 +1,9 @@
 #!/usr/bin/env bash
 set -Eeuo pipefail
-source ../.env
+source .env
 
-mkdir -p ../backups
-FILE="../backups/db_$(date +%Y%m%d_%H%M%S).sql"
+mkdir -p ./backups
+FILE="./backups/db_$(date +%Y%m%d_%H%M%S).sql"
 
 echo "💾 Backing up database into $FILE ..."
 
