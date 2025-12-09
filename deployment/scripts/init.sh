@@ -2,7 +2,7 @@
 set -eu
 
 echo "============================================"
-echo "      SUSPICIOUS – CHECKLIST"
+echo "      SUSPICIOUS – PRE-FLIGHT CHECKLIST"
 echo "============================================"
 
 # -------------------------------------------------
@@ -13,23 +13,19 @@ echo "[1/11] Checking required binaries..."
 # Check for docker binary
 if ! command -v docker >/dev/null 2>&1; then
     echo "ERROR: Missing required binary: docker"
-    exit 1
 fi
 
 # Check that docker supports the compose subcommand
 if ! docker compose version >/dev/null 2>&1; then
     echo "ERROR: Docker Compose is not available (docker compose subcommand required)"
-    exit 1
 fi
 
 # Check curl
 if ! command -v curl >/dev/null 2>&1; then
     echo "ERROR: Missing required binary: curl"
-    exit 1
 fi
 
 echo "→ OK"
-
 
 # -------------------------------------------------
 # 2. Ensure .env exists
@@ -42,256 +38,201 @@ if [ ! -f ".env" ]; then
         echo "→ .env created from .env.example"
     else
         echo "ERROR: Missing both .env and .env.example"
-        exit 1
     fi
 else
     echo "→ .env present"
 fi
 
-
-
-# -------------------------------------------------
-# Load variables for later steps
-# -------------------------------------------------
+# Load environment variables
 set -a
 . ./.env
 set +a
 
 # -------------------------------------------------
-# 3. Base directory structure
+# 3. Directory structure check
 # -------------------------------------------------
-echo "[3/11] Ensuring directory structure..."
+echo "[3/11] Checking directory structure..."
 
-# Directories and their recommended permissions
-declare -A DIRS_PERMS=(
-    ["${ELASTIC_PATH}"]=775
-    ["${ELASTIC_PATH}/logs"]=775
-    ["${DB_SUSPICIOUS_PATH}"]=775
-    ["${MINIO_PATH}"]=755
-    ["${CA_PATH}"]=700
-    ["${CORTEX_PATH}"]=755
-    ["${CORTEX_PATH}/jobs"]=755
-    ["${CORTEX_PATH}/Cortex-Analyzers-Public/analyzers"]=755
-    ["${CORTEX_PATH}/Cortex-Analyzers-Public/responders"]=755
-    ["${AIANALYZER_PATH}"]=755
-    ["${YARA_PATH}"]=755
+DIRS=(
+    "${ELASTIC_PATH}"
+    "${ELASTIC_PATH}/logs"
+    "${DB_SUSPICIOUS_PATH}"
+    "${MINIO_PATH}"
+    "${CA_PATH}"
+    "${CORTEX_PATH}"
+    "${CORTEX_PATH}/jobs"
+    "${CORTEX_PATH}/Cortex-Analyzers-Public/analyzers"
+    "${CORTEX_PATH}/Cortex-Analyzers-Public/responders"
+    "${AIANALYZER_PATH}"
+    "${YARA_PATH}"
 )
 
-for dir in "${!DIRS_PERMS[@]}"; do
-    mkdir -p "$dir"
-    chmod "${DIRS_PERMS[$dir]}" "$dir"
+for dir in "${DIRS[@]}"; do
+    if [ -d "$dir" ]; then
+        perms=$(stat -c '%a' "$dir")
+        echo "→ Directory exists: $dir (permissions: $perms)"
+    else
+        echo "→ Directory missing: $dir"
+    fi
 done
 
-echo "→ Directories created with proper permissions"
-
+echo "→ Directory structure check complete"
 
 # -------------------------------------------------
-# 5. Check if settings.json config.json and tls.yaml exist
+# 4. Check settings.json and Email Feeder config.json
 # -------------------------------------------------
+echo "[4/11] Checking application configuration..."
 
-echo "[5/11] Checking settings.json and config.json..."
-
-
+# Suspicious settings.json
 if [ ! -f "${SUSPICIOUS_PATH}/settings.json" ]; then
     if [ -f "${SUSPICIOUS_PATH}/settings-sample.json" ]; then
         cp "${SUSPICIOUS_PATH}/settings-sample.json" "${SUSPICIOUS_PATH}/settings.json"
-        echo "→ settings.json created from settings-sample.json"
+        echo "→ settings.json created from sample"
     else
         echo "ERROR: Missing both settings.json and settings-sample.json"
-        exit 1
     fi
 else
     echo "→ settings.json present"
 fi
 
+# Email Feeder config.json
 if [ ! -f "${FEEDER_PATH}/config.json" ]; then
     if [ -f "${FEEDER_PATH}/config-sample.json" ]; then
         cp "${FEEDER_PATH}/config-sample.json" "${FEEDER_PATH}/config.json"
-        echo "→ config.json created from config-sample.json"
+        echo "→ config.json created from sample"
     else
-        echo "ERROR: Missing both config.json and config-sample.json in Email Feeder path"
-        exit 1
+        echo "ERROR: Missing both config.json and config-sample.json"
     fi
 else
-    echo "→ config.json present in Email Feeder path"
+    echo "→ Email Feeder config.json present"
 fi
 
-
-# -------------------------------------------------
-# 6. Elasticsearch gc.log
-# -------------------------------------------------
-echo "[6/11] Checking Elasticsearch gc.log..."
-
-if [ ! -f "elasticsearch/logs/gc.log" ]; then
-    touch elasticsearch/logs/gc.log
+# Traefik TLS file
+TLS_FILE="${TRAEFIK_PATH}/dynamic/tls.yaml"
+if [ -f "$TLS_FILE" ]; then
+    if [ -n "${DOMAIN_CORP:-}" ]; then
+        TMP_FILE="${TLS_FILE}.tmp"
+        sed "s/Host(\`suspicious\`)/Host(\`${DOMAIN_CORP}\`)/" "$TLS_FILE" > "$TMP_FILE"
+        mv "$TMP_FILE" "$TLS_FILE"
+        echo "→ tls.yaml updated with DOMAIN_CORP=${DOMAIN_CORP}"
+    else
+        echo "→ DOMAIN_CORP not set; tls.yaml not updated"
+    fi
+else
+    echo "→ tls.yaml not present in Traefik dynamic path"
 fi
-chmod 644 elasticsearch/logs/gc.log
+
+# -------------------------------------------------
+# 5. Elasticsearch gc.log
+# -------------------------------------------------
+echo "[5/11] Checking Elasticsearch gc.log..."
+GC_LOG="${ELASTIC_PATH}/logs/gc.log"
+if [ ! -f "$GC_LOG" ]; then
+    touch "$GC_LOG"
+fi
+chmod 644 "$GC_LOG"
 echo "→ gc.log OK"
 
-
 # -------------------------------------------------
-# 7. Cortex application.conf from official repo
+# 6. Cortex application.conf
 # -------------------------------------------------
-echo "[7/11] Ensuring Cortex application.conf (from upstream)..."
-
+echo "[6/11] Ensuring Cortex configuration..."
 CORTEX_CONF="${CORTEX_PATH}/application.conf"
 CORTEX_SAMPLE_URL="https://raw.githubusercontent.com/TheHive-Project/Cortex/master/conf/application.sample"
 CORTEX_LOG="${CORTEX_PATH}/application-cortex.log"
 
-if [ ! -f "${CORTEX_CONF}" ]; then
-    echo "→ application.conf missing, downloading application.sample from official Cortex repository..."
-    if curl -fsSL "${CORTEX_SAMPLE_URL}" -o "${CORTEX_CONF}"; then
-        echo "→ application.conf created from upstream application.sample"
-    else
-        echo "ERROR: Failed to download application.sample from upstream."
-        exit 1
-    fi
+if [ ! -f "$CORTEX_CONF" ]; then
+    echo "→ application.conf missing, downloading from official Cortex repository..."
+    curl -fsSL "$CORTEX_SAMPLE_URL" -o "$CORTEX_CONF" || {
+        echo "ERROR: Failed to download Cortex application.sample"
+    }
 else
-    echo "→ application.conf already exists — not overwritten"
+    echo "→ application.conf exists — not overwritten"
 fi
 
-# Create log file if missing
-if [ ! -f "${CORTEX_LOG}" ]; then
-    echo "→ creating application-cortex.log file: ${CORTEX_LOG}"
-    touch "${CORTEX_LOG}"
-else
-    echo "WARNING: Cortex log file already exists."
-fi
+[ ! -f "$CORTEX_LOG" ] && touch "$CORTEX_LOG"
 
-chmod 640 "${CORTEX_CONF}"
-echo "→ application.conf OK"
-chmod 664 "${CORTEX_LOG}"
-echo "→ application-cortex.log OK"
-
+chmod 640 "$CORTEX_CONF"
+chmod 664 "$CORTEX_LOG"
+echo "→ Cortex configuration OK"
 
 # -------------------------------------------------
-# 8. Cortex docker config.json
+# 7. Cortex docker config.json
 # -------------------------------------------------
-echo "[8/11] Checking Cortex docker config.json..."
-
-if [ ! -d "$DOCKER_PATH" ]; then
-    mkdir -p "$DOCKER_PATH"
-fi
-
-if [ ! -f "${DOCKER_PATH}/config.json" ]; then
-    echo '{ "auths": {} }' > "${DOCKER_PATH}/config.json"
-fi
-
+echo "[7/11] Checking Cortex Docker config..."
+[ ! -d "$DOCKER_PATH" ] && mkdir -p "$DOCKER_PATH"
+[ ! -f "${DOCKER_PATH}/config.json" ] && echo '{ "auths": {} }' > "${DOCKER_PATH}/config.json"
 chmod 600 "${DOCKER_PATH}/config.json"
-echo "→ config.json OK"
-
+echo "→ Docker config.json OK"
 
 # -------------------------------------------------
-# 9. Cortex user 1001:1001 and Docker socket access
+# 8. Cortex user and Docker socket
 # -------------------------------------------------
-echo "[9/11] Checking Cortex user and Docker socket permissions..."
-
-# Check that user and group 1001 exist
-if ! id -u 1001 >/dev/null 2>&1; then
-    echo "WARNING: No system user with UID 1001 found."
-    echo "→ Cortex runs inside Docker using uid 1001, host user is not strictly required."
-else
-    echo "→ UID 1001 exists on host"
-fi
-
-if ! getent group 1001 >/dev/null 2>&1; then
-    echo "WARNING: No system group with GID 1001 found."
-else
-    echo "→ GID 1001 exists on host"
-fi
-
-# Check docker socket
+echo "[8/11] Checking Cortex Docker socket permissions..."
 DOCKER_SOCK="/var/run/docker.sock"
 
-if [ ! -S "${DOCKER_SOCK}" ]; then
-    echo "ERROR: Docker socket not found at ${DOCKER_SOCK}"
-    exit 1
-fi
+[ ! -S "$DOCKER_SOCK" ] && {
+    echo "ERROR: Docker socket not found at $DOCKER_SOCK"
+}
 
-echo "→ Docker socket exists"
+SOCK_OWNER=$(stat -c '%u' "$DOCKER_SOCK")
+SOCK_GROUP=$(stat -c '%g' "$DOCKER_SOCK")
+SOCK_MODE=$(stat -c '%a' "$DOCKER_SOCK")
+echo "→ Docker socket owner: $SOCK_OWNER:$SOCK_GROUP (mode $SOCK_MODE)"
 
-# Check if uid 1001 is allowed to access it
-SOCK_OWNER="$(stat -c '%u' ${DOCKER_SOCK})"
-SOCK_GROUP="$(stat -c '%g' ${DOCKER_SOCK})"
-SOCK_MODE="$(stat -c '%a' ${DOCKER_SOCK})"
-
-echo "→ Docker socket owner: ${SOCK_OWNER}:${SOCK_GROUP} (mode ${SOCK_MODE})"
-
-if [ "${SOCK_OWNER}" -eq 1001 ] || [ "${SOCK_GROUP}" -eq 1001 ]; then
-    echo "→ Permissions OK for Cortex (uid 1001)"
+if [ "$SOCK_OWNER" -eq 1001 ] || [ "$SOCK_GROUP" -eq 1001 ]; then
+    echo "→ Permissions OK for Cortex (uid/gid 1001)"
 else
-    echo "WARNING: Docker socket is not owned by uid/gid 1001"
-    echo "Cortex may fail to run analyzers unless permissions are adjusted."
-
-    # Optional auto-fix (safe because socket is recreated at Docker restart)
-    echo "→ Setting group ownership to 1001 for Docker socket"
-    chgrp 1001 "${DOCKER_SOCK}" || echo "WARNING: Failed to change group ownership"
-
-    echo "→ Applying group read/write permissions"
-    chmod g+rw "${DOCKER_SOCK}" || echo "WARNING: Failed to adjust permissions"
+    echo "WARNING: Docker socket not owned by uid/gid 1001"
+    echo "Cortex may fail unless permissions are adjusted"
+    chgrp 1001 "$DOCKER_SOCK" || echo "WARNING: Could not change group"
+    chmod g+rw "$DOCKER_SOCK" || echo "WARNING: Could not adjust permissions"
 fi
 
-echo "→ Cortex Docker socket access check complete"
-
-
 # -------------------------------------------------
-# 10. Certificates
+# 9. Certificates
 # -------------------------------------------------
-echo "[10/11] Checking certificates..."
-
-# Check if required certificate files exist
+echo "[9/11] Checking certificates..."
 CERTFILE="$CA_PATH/certfile.pem"
 KEYFILE="$CA_PATH/keyfile.pem"
 ROOTCAFILE="$CA_PATH/rootcafile.pem"
 
 if [ ! -f "$CERTFILE" ] || [ ! -f "$KEYFILE" ] || [ ! -f "$ROOTCAFILE" ]; then
-    echo "→ Missing certificates, generating via openssl-certificates-generator.sh..."
-    
-    # Call generator script for default environment "default"
+    echo "→ Missing certificates, generating..."
     ./scripts/openssl-certificates-generator.sh default --force
-
-    # Move generated files to CA_PATH
     mv ./certificates/default/certfile.pem "$CERTFILE"
     mv ./certificates/default/keyfile.pem "$KEYFILE"
     mv ./certificates/default/rootcafile.pem "$ROOTCAFILE"
-
+    chmod 644 "$CERTFILE" "$ROOTCAFILE"
+    chmod 600 "$KEYFILE"
     echo "→ Certificates generated in $CA_PATH"
 else
-    echo "→ Certificates already present, skipping generation"
+    echo "→ Certificates already present"
 fi
 
-
 # -------------------------------------------------
-# 11. Cortex catalogs (analyzers.json + responders.json)
+# 10. Cortex catalogs
 # -------------------------------------------------
-echo "[11/11] Downloading Cortex catalogs..."
-
+echo "[10/11] Downloading Cortex catalogs..."
 ANALYZERS_URL="https://catalogs.download.strangebee.com/latest/json/analyzers.json"
 RESPONDERS_URL="https://catalogs.download.strangebee.com/latest/json/responders.json"
-
 ANALYZERS_DEST="${CORTEX_PATH}/Cortex-Analyzers-Public/analyzers/analyzers.json"
 RESPONDERS_DEST="${CORTEX_PATH}/Cortex-Analyzers-Public/responders/responders.json"
 
-echo "→ Downloading analyzers.json..."
 curl -fsSL "$ANALYZERS_URL" -o "$ANALYZERS_DEST"
-
-echo "→ Downloading responders.json..."
 curl -fsSL "$RESPONDERS_URL" -o "$RESPONDERS_DEST"
-
 chmod 644 "$ANALYZERS_DEST" "$RESPONDERS_DEST"
-
 echo "→ Cortex catalogs OK"
 
-
 # -------------------------------------------------
-# Final
+# 11. Completion
 # -------------------------------------------------
 echo "============================================"
-echo "    CHECKLIST COMPLETED                     "
-echo "    All required components are in place.   "
-echo "    You can now proceed to modify           "
-echo "        - ${SUSPICIOUS_PATH}/settings.json  "
-echo "        - ${FEEDER_PATH}/config.json        "
-echo "        - ${CORTEX_PATH}/application.conf   "
-echo "        - ${TRAEFIK_PATH}/dynamic/tls.yaml "
+echo "    PRE-FLIGHT CHECKLIST COMPLETED"
+echo "    All required components are in place."
+echo "    You can now modify:"
+echo "        - ${SUSPICIOUS_PATH}/settings.json"
+echo "        - ${FEEDER_PATH}/config.json"
+echo "        - ${CORTEX_PATH}/application.conf"
+echo "        - ${TRAEFIK_PATH}/dynamic/tls.yaml"
 echo "============================================"
