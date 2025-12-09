@@ -130,7 +130,8 @@ GC_LOG="${ELASTIC_PATH}/logs/gc.log"
 if [ ! -f "$GC_LOG" ]; then
     touch "$GC_LOG"
 fi
-chmod 644 "$GC_LOG"
+perm_log=$(stat -c '%a' "$GC_LOG")
+echo "→ Garbage Collector Log exists: $GC_LOG (permissions: $perm_log)"
 echo "→ gc.log OK"
 
 # -------------------------------------------------
@@ -151,9 +152,12 @@ else
 fi
 
 [ ! -f "$CORTEX_LOG" ] && touch "$CORTEX_LOG"
+perm_clog=$(stat -c '%a' "$CORTEX_LOG")
 
-chmod 640 "$CORTEX_CONF"
-chmod 664 "$CORTEX_LOG"
+perm_cconf=$(stat -c '%a' "$CORTEX_CONF")
+
+echo "→ Cortex Log created: $CORTEX_LOG  (permissions: $perm_clog)"
+echo "→ Cortex Conf created: $CORTEX_CONF (permissions: $perm_cconf)"
 echo "→ Cortex configuration OK"
 
 # -------------------------------------------------
@@ -162,7 +166,6 @@ echo "→ Cortex configuration OK"
 echo "[7/11] Checking Cortex Docker config..."
 [ ! -d "$DOCKER_PATH" ] && mkdir -p "$DOCKER_PATH"
 [ ! -f "${DOCKER_PATH}/config.json" ] && echo '{ "auths": {} }' > "${DOCKER_PATH}/config.json"
-chmod 600 "${DOCKER_PATH}/config.json"
 echo "→ Docker config.json OK"
 
 # -------------------------------------------------
@@ -185,8 +188,6 @@ if [ "$SOCK_OWNER" -eq 1001 ] || [ "$SOCK_GROUP" -eq 1001 ]; then
 else
     echo "WARNING: Docker socket not owned by uid/gid 1001"
     echo "Cortex may fail unless permissions are adjusted"
-    chgrp 1001 "$DOCKER_SOCK" || echo "WARNING: Could not change group"
-    chmod g+rw "$DOCKER_SOCK" || echo "WARNING: Could not adjust permissions"
 fi
 
 # -------------------------------------------------
@@ -203,8 +204,6 @@ if [ ! -f "$CERTFILE" ] || [ ! -f "$KEYFILE" ] || [ ! -f "$ROOTCAFILE" ]; then
     mv ./certificates/default/certfile.pem "$CERTFILE"
     mv ./certificates/default/keyfile.pem "$KEYFILE"
     mv ./certificates/default/rootcafile.pem "$ROOTCAFILE"
-    chmod 644 "$CERTFILE" "$ROOTCAFILE"
-    chmod 600 "$KEYFILE"
     echo "→ Certificates generated in $CA_PATH"
 else
     echo "→ Certificates already present"
@@ -221,7 +220,6 @@ RESPONDERS_DEST="${CORTEX_PATH}/Cortex-Analyzers-Public/responders/responders.js
 
 curl -fsSL "$ANALYZERS_URL" -o "$ANALYZERS_DEST"
 curl -fsSL "$RESPONDERS_URL" -o "$RESPONDERS_DEST"
-chmod 644 "$ANALYZERS_DEST" "$RESPONDERS_DEST"
 echo "→ Cortex catalogs OK"
 
 # -------------------------------------------------
