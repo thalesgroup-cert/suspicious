@@ -107,18 +107,18 @@ Suspicious includes a built-in AI module (via `Analyzers/AIMailAnalyzer`) that c
 
 - Uses machine-learning to identify potentially malicious or suspicious email patterns beyond heuristic or rule-based detection.
 - Works alongside standard analyzers (YARA, sandbox, metadata) for a more robust analysis pipeline.
-- Supports organization-specific training — allowing adaptation to your internal email norms, languages, and threat landscape.
+- Supports organization-specific training allowing adaptation to your internal email norms, languages, and threat landscape.
 - Enables dashboards and KPIs: campaign summaries, volumes of suspicious vs safe emails, historical trends, detection stats.
 
 ### Why it matters
 
 - Detects subtle or evolving threats which static rules may miss (e.g. social-engineering, unusual metadata)
-- Provides customization — you can train the model on your own data to fit company-specific patterns
-- Gives visibility & analytics over time — helpful for SOC, reporting, awareness, and improvement loops
+- Provides customization you can train the model on your own data to fit company-specific patterns
+- Gives visibility & analytics over time helpful for SOC, reporting, awareness, and improvement loops
 
 ### How to get started
 
-1. Go to `Analyzers/AIMailAnalyzer/` — there you’ll find training scripts and instructions.
+1. Go to `Analyzers/AIMailAnalyzer/` there you’ll find training scripts and instructions.
 2. Collect a representative, labeled dataset (legitimate vs phishing emails).
 3. Train or retrain the model to suit your environment.
 4. Deploy the trained model in Cortex alongside other analyzers.

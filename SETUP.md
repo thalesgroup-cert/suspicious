@@ -29,7 +29,7 @@ Installation guides:
 
 ## ✔ Recommended
 
-* **make** – provides quality-of-life shortcuts
+* **make** provides quality-of-life shortcuts
 
 ### Install `make`
 
@@ -59,7 +59,7 @@ sudo apt install make
 
 ```bash
 git clone https://github.com/thalesgroup-cert/Suspicious.git
-cd suspicious
+cd suspicious/deployment
 ```
 
 # Initialize the Environment (Important)
@@ -106,7 +106,7 @@ Edit `.env` and fill in:
 
 You have two options.
 
-## ✔ Option A — Using Make (Recommended)
+## ✔ Option A Using Make (Recommended)
 
 ### Start all services
 
@@ -139,7 +139,7 @@ This uses:
 * `wait-empty.sh`
 * `deploy.sh`
 
-## ✔ Option B — Using Docker Compose directly
+## ✔ Option B Using Docker Compose directly
 
 ```bash
 docker compose --env-file .env up -d
@@ -223,7 +223,7 @@ Direct script:
 ./scripts/backup-db.sh
 ```
 
-## 🛠 Rebuild after code changes
+## Rebuild after code changes
 
 Using Make:
 
