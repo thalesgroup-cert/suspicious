@@ -3,10 +3,7 @@
 </p>
 
 <p align="center">
-    <a href="https://thalesgroup-cert.github.io/suspicious/README.html">
-        <img src="https://img.shields.io/badge/Install-Guide-informational?style=for-the-badge&logo=docker" alt="Install">
-    </a>
-    <a href="https://thalesgroup-cert.github.io/suspicious/">
+    <a href="https://github.com/thalesgroup-cert/suspicious/graphs/contributors">
         <img src="https://img.shields.io/github/contributors/thalesgroup-cert/suspicious
         " alt="Contributors">
     </a>
