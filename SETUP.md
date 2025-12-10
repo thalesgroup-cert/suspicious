@@ -1,4 +1,4 @@
-# **Setup Guide — Complete Deployment (Docker + Make + Automatic Checks)**
+# **Setup Guide Complete Deployment (Docker + Make + Automatic Checks)**
 
 This guide explains how to install, initialize, and run **Suspicious** using:
 
@@ -8,8 +8,6 @@ This guide explains how to install, initialize, and run **Suspicious** using:
 * **Optional Makefile shortcuts**
 
 The system includes a **full checklist** to automatically validate directories, configs, certificates, permissions, and Cortex components.
-
----
 
 # Prerequisites
 
@@ -57,16 +55,12 @@ sudo apt install make
 
 > 📝 *You do NOT need `make`. All actions have direct script or Docker equivalents.*
 
----
-
 # Clone the Repository
 
 ```bash
 git clone https://github.com/thalesgroup-cert/Suspicious.git
 cd suspicious
 ```
-
----
 
 # Initialize the Environment (Important)
 
@@ -89,8 +83,6 @@ make init
 
 This MUST be executed at least once before starting the stack.
 
----
-
 # Configure Your `.env`
 
 If you didn’t run `make init` (which auto-creates it), create the file manually:
@@ -110,13 +102,9 @@ Edit `.env` and fill in:
 
 `.env` is ignored by Git for security.
 
----
-
 # Start the Application
 
 You have two options.
-
----
 
 ## ✔ Option A — Using Make (Recommended)
 
@@ -151,8 +139,6 @@ This uses:
 * `wait-empty.sh`
 * `deploy.sh`
 
----
-
 ## ✔ Option B — Using Docker Compose directly
 
 ```bash
@@ -162,8 +148,6 @@ docker compose --env-file .env up -d
 Access Suspicious:
 
 👉 **[http://localhost:9020](http://localhost:9020)**
-
----
 
 # Database Setup
 
@@ -188,8 +172,6 @@ Manual:
 ```bash
 docker compose exec web python manage.py createsuperuser
 ```
-
----
 
 # Using Suspicious
 
@@ -218,8 +200,6 @@ You can submit:
 * URLs
 * IP addresses
 * Hashes
-
----
 
 # Useful Commands
 
@@ -257,8 +237,6 @@ Manual:
 docker compose build --no-cache
 docker compose up -d
 ```
-
----
 
 # Stopping the Application
 
