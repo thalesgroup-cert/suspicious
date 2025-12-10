@@ -2,7 +2,7 @@
 set -eu
 
 echo "============================================"
-echo "      SUSPICIOUS – PRE-FLIGHT CHECKLIST"
+echo "      SUSPICIOUS – CHECKLIST"
 echo "============================================"
 
 # -------------------------------------------------
@@ -226,7 +226,7 @@ echo "→ Cortex catalogs OK"
 # 11. Completion
 # -------------------------------------------------
 echo "============================================"
-echo "    PRE-FLIGHT CHECKLIST COMPLETED"
+echo "    CHECKLIST COMPLETED"
 echo "    All required components are in place."
 echo "    You can now modify:"
 echo "        - ${SUSPICIOUS_PATH}/settings.json"
