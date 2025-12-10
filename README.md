@@ -161,20 +161,25 @@ You can also open [issues](https://github.com/thalesgroup-cert/suspicious/issues
 
 ## Screenshots
 
-**Home Page**
+### Home Page
+
 ![Home page screenshot](https://github.com/user-attachments/assets/51a1a6cb-d58b-4175-996f-dc6cf2fc8345)
 
-**User Submissions**
+### User Submissions
+
 ![User Submissions](https://github.com/user-attachments/assets/23c61439-78d4-4aa3-aa54-db8fd21a028f)
 
-**Submit Page**
+### Submit Page
+
 ![Submit Page](https://github.com/user-attachments/assets/949d789b-b034-44e7-9a97-57361853c0a0)
 
-**Dashboard – Classic**
-![Dashboard Classic](https://github.com/user-attachments/assets/1844…)
+### Dashboard – Classic
 
-**Dashboard – Phishing Campaigns**
-![Dashboard Phishing Campaigns](https://github.com/user-attachments/assets/1843…)
+![Dashboard Classic](https://github.com/user-attachments/assets/a9b6200a-c6b5-4114-b77d-c36f3214a6af)
+
+### Dashboard – Phishing Campaigns
+
+![Dashboard Phishing Campaigns](https://github.com/user-attachments/assets/afabf61c-ba64-4b55-8343-e4df2c3061a0)
 
 ## License
 
