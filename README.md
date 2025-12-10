@@ -1,6 +1,6 @@
 [![License: AGPL v3](https://img.shields.io/badge/License-AGPL%20v3-blue.svg)](LICENSE)
-[![Build Status](https://github.com/thalesgroup-cert/suspicious/actions/workflows/CI.yml/badge.svg?branch=main)](https://github.com/thalesgroup-cert/suspicious/actions/workflows/CI.yml)
-[![Docker Pulls](https://img.shields.io/docker/pulls/thalesgroup-cert/suspicious.svg)](https://hub.docker.com/r/thalesgroup-cert/suspicious)
+[![Build Status](https://github.com/thalesgroup-cert/suspicious/actions/workflows/docker-image.yml/badge.svg?branch=main)](https://github.com/thalesgroup-cert/suspicious/actions/workflows/CI.yml)
+[![Docker Pulls](https://ghcr-badge.egpl.dev/thalesgroup-cert/suspicious/suspicious/shield.svg)](https://github.com/thalesgroup-cert/suspicious/pkgs/container/suspicious)
 [![Last commit](https://img.shields.io/github/last-commit/thalesgroup-cert/suspicious.svg)](https://github.com/thalesgroup-cert/suspicious/commits)
 [![Issues](https://img.shields.io/github/issues/thalesgroup-cert/suspicious.svg)](https://github.com/thalesgroup-cert/suspicious/issues)
 
