@@ -1,8 +1,26 @@
-[![License: AGPL v3](https://img.shields.io/badge/License-AGPL%20v3-blue.svg)](LICENSE)
-[![Build Status](https://github.com/thalesgroup-cert/suspicious/actions/workflows/docker-image.yml/badge.svg?branch=main)](https://github.com/thalesgroup-cert/suspicious/actions/workflows/CI.yml)
-[![Docker Pulls](https://ghcr-badge.egpl.dev/thalesgroup-cert/suspicious/suspicious/shield.svg)](https://github.com/thalesgroup-cert/suspicious/pkgs/container/suspicious)
-[![Last commit](https://img.shields.io/github/last-commit/thalesgroup-cert/suspicious.svg)](https://github.com/thalesgroup-cert/suspicious/commits)
-[![Issues](https://img.shields.io/github/issues/thalesgroup-cert/suspicious.svg)](https://github.com/thalesgroup-cert/suspicious/issues)
+<p align="center">
+    <strong>AI Phishing Threat Analysis Platform</strong>
+</p>
+
+<p align="center">
+    <a href="https://thalesgroup-cert.github.io/suspicious/README.html">
+        <img src="https://img.shields.io/badge/Install-Guide-informational?style=for-the-badge&logo=docker" alt="Install">
+    </a>
+    <a href="https://thalesgroup-cert.github.io/suspicious/">
+        <img src="https://img.shields.io/github/contributors/thalesgroup-cert/suspicious
+        " alt="Contributors">
+    </a>
+    <a href="https://github.com/thalesgroup-cert/suspicious">
+        <img src="https://img.shields.io/github/stars/thalesgroup-cert/suspicious
+        " alt="Stars">
+    </a>
+    <a href="https://github.com/thalesgroup-cert/suspicious/issues?q=is%3Aissue+is%3Aclosed">
+        <img src="https://img.shields.io/github/issues-closed-raw/thalesgroup-cert/suspicious?style=for-the-badge&logo=github" alt="Closed Issues">
+    </a>
+    <a href="./LICENSE">
+        <img src="https://img.shields.io/github/license/thalesgroup-cert/suspicious?style=for-the-badge&logo=opensourceinitiative&logoColor=white" alt="License">
+    </a>
+</p>
 
 # Suspicious 🛡️
 
