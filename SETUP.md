@@ -1,38 +1,49 @@
-# 🚀 **Setup Guide — Modern Deployment (Docker + Make)**
+# **Setup Guide — Complete Deployment (Docker + Make + Automatic Checks)**
 
-This document explains how to install and run **Suspicious** locally using **Docker**, **Docker Compose v2**, and optional **Makefile shortcuts**.
+This guide explains how to install, initialize, and run **Suspicious** using:
+
+* **Docker Engine & Docker Compose v2**
+* **Environment-based configuration**
+* **Self-contained setup scripts**
+* **Optional Makefile shortcuts**
+
+The system includes a **full checklist** to automatically validate directories, configs, certificates, permissions, and Cortex components.
 
 ---
 
-## 1️⃣ Prerequisites
+# Prerequisites
 
-Make sure the following are installed:
+Make sure the following are installed on your system.
 
-### ✔ Required
+## ✔ Required
 
-* **Docker** – [https://docs.docker.com/get-docker](https://docs.docker.com/get-docker)
-* **Docker Compose v2** (included in Docker Desktop / Docker Engine)
-* **Git** – [https://git-scm.com](https://git-scm.com)
+| Component             | Purpose                          |
+| --------------------- | -------------------------------- |
+| **Docker Engine**     | Runs all services                |
+| **Docker Compose v2** | Orchestration (`docker compose`) |
+| **Git**               | Clone the repository             |
+| **curl**              | Used by setup scripts            |
 
-### ✔ Optional but recommended
+Installation guides:
 
-* **make** (quality-of-life improvement)
+* Docker: [https://docs.docker.com/get-docker](https://docs.docker.com/get-docker)
+* Git: [https://git-scm.com](https://git-scm.com)
 
-#### macOS / Linux
+## ✔ Recommended
 
-Usually preinstalled. If missing:
+* **make** – provides quality-of-life shortcuts
+
+### Install `make`
+
+**Linux/macOS** (if missing):
 
 ```bash
-# Ubuntu/Debian
-sudo apt install make
-
-# Fedora/RHEL
-sudo dnf install make
+sudo apt install make        # Debian/Ubuntu
+sudo dnf install make        # Fedora/RHEL
 ```
 
-#### Windows (Recommended)
-
-Use **WSL2** + Ubuntu:
+**Windows (recommended)**
+Use **WSL2 + Ubuntu**:
 
 ```powershell
 wsl --install
@@ -44,11 +55,11 @@ Inside WSL:
 sudo apt install make
 ```
 
-> 📝 *You do NOT need `make`. All Makefile commands have script equivalents.*
+> 📝 *You do NOT need `make`. All actions have direct script or Docker equivalents.*
 
 ---
 
-## 2️⃣ Clone the Repository
+# Clone the Repository
 
 ```bash
 git clone https://github.com/thalesgroup-cert/Suspicious.git
@@ -57,153 +68,190 @@ cd suspicious
 
 ---
 
-## 3️⃣ Environment Configuration
+# Initialize the Environment (Important)
 
-### 1. Create your `.env` file
+The initialization phase performs:
+
+* `.env` creation (if missing)
+* Directory structure validation
+* Copying sample configs when needed
+* Certificate generation
+* Cortex catalogs download
+* Docker socket permission checks
+* Traefik/TLS hostname updates
+* Creation of missing log files and folders
+
+Run:
+
+```bash
+make init
+```
+
+This MUST be executed at least once before starting the stack.
+
+---
+
+# Configure Your `.env`
+
+If you didn’t run `make init` (which auto-creates it), create the file manually:
 
 ```bash
 cp .env.example .env
 ```
 
-### 2. Edit `.env`
+Edit `.env` and fill in:
 
-Fill in required values:
-
-* application versions
-* application ports
+* service versions
+* ports
 * database credentials
-* container names
-* network config
-* application paths
-* optional proxies
+* paths to storage directories
+* domain name (for Traefik/TLS)
+* optional proxy configuration
 
-`.env` is ignored by Git for safety.
+`.env` is ignored by Git for security.
 
 ---
 
-## 4️⃣ Start the Application
+# Start the Application
 
-You can start Suspicious in two ways:
+You have two options.
 
 ---
 
 ## ✔ Option A — Using Make (Recommended)
 
-Start all services:
+### Start all services
 
 ```bash
 make up
 ```
 
-Stop everything:
+### Stop all services
 
 ```bash
 make down
 ```
 
-Rebuild:
+### Rebuild images
 
 ```bash
 make build
 ```
 
-Deploy fully (pull + build + restart):
+### Redeploy (pull + build + safe restart)
 
 ```bash
 make deploy
 ```
+
+This uses:
+
+* `check-network.sh`
+* `replace-tls.sh`
+* `wait-empty.sh`
+* `deploy.sh`
 
 ---
 
 ## ✔ Option B — Using Docker Compose directly
 
 ```bash
-docker compose up -d
+docker compose --env-file .env up -d
 ```
 
-The application will now be available at:
+Access Suspicious:
 
 👉 **[http://localhost:9020](http://localhost:9020)**
 
 ---
 
-## 5️⃣ Post-Installation (Database Setup)
+# Database Setup
 
-Run these for suspicious database setup.
+After the containers are up, run the migrations.
 
-### ✔ Using Make
+## Using Make
 
 ```bash
 make migrate
 ```
 
-Create an admin user:
+## Create a superuser
+
+Recommended (Make):
 
 ```bash
-docker compose exec web python manage.py createsuperuser
+make superuser
 ```
 
-### ✔ Or manually
+Manual:
 
 ```bash
-docker compose exec web python manage.py migrate
 docker compose exec web python manage.py createsuperuser
 ```
 
 ---
 
-## 6️⃣ Usage
+# Using Suspicious
 
-### 🌍 **Web Interface**
+## Web Interface
 
-Access the application:
+Open:
 
-👉 [http://localhost:9020](http://localhost:9020)
+👉 **[http://localhost:9020](http://localhost:9020)**
 
-### 📧 Mail Submission
+## 📧 Email Submission
 
-Send a suspicious email **as an attachment** to the configured mailbox.
-The system will analyze it automatically.
+Send a suspicious message **as an attachment** to the mailbox configured in:
 
-### 📤 Web Form Submission
+```
+FEEDER_PATH/config.json
+```
 
-Use **Submit an Item** to upload:
+The system will ingest and analyze it automatically.
 
-* Emails
+## 📤 Manual Submission (Web Form)
+
+You can submit:
+
+* Emails (EML/MBOX)
 * Files
 * URLs
-* IPs
+* IP addresses
 * Hashes
 
 ---
 
-## 7️⃣ Useful Commands
+# Useful Commands
 
-### 🔍 Logs
+## 🔍 View logs
 
 ```bash
 docker compose logs -f
 ```
 
-### 💽 Database Backup
+## Backup the database
+
+Using Make:
 
 ```bash
 make backup
 ```
 
-or:
+Direct script:
 
 ```bash
 ./scripts/backup-db.sh
 ```
 
-### 🛠 Rebuild After Code Changes
+## 🛠 Rebuild after code changes
+
+Using Make:
 
 ```bash
 make build
 ```
 
-or:
+Manual:
 
 ```bash
 docker compose build --no-cache
@@ -212,7 +260,7 @@ docker compose up -d
 
 ---
 
-## 8️⃣ Stopping the Application
+# Stopping the Application
 
 Using Make:
 
@@ -220,8 +268,8 @@ Using Make:
 make down
 ```
 
-Using Compose:
+Using Docker Compose:
 
 ```bash
-docker compose down
+docker compose --env-file .env down
 ```

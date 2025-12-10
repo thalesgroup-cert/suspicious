@@ -1,105 +1,216 @@
 # Suspicious
 
-Phishing is a widespread form of social engineering attack aimed at stealing sensitive data such as login credentials, payment information, or personal details. 
-Attackers impersonate trusted entities to deceive victims into opening emails, messages, or links that may lead to malware installation, ransomware, or data exposure. 
-These attacks have become increasingly sophisticated, making detection and prevention critical.
+**Suspicious** is a modern phishing-analysis platform designed to help organizations automatically inspect, classify, and report suspicious emails, files, URLs, IPs, and hashes.
+It helps reduce analyst workload, enables fast triage, and provides end-users with clear security feedback.
 
-**Suspicious** is a web application designed to support this need by providing automated analysis of potentially malicious content. 
-It allows users to submit and investigate different types of data, including:
+Phishing attacks continue to grow in sophistication, leveraging social engineering, malware, and credential harvesting. **Suspicious** provides a structured, automated, and scalable defense by combining:
 
-- Emails (MSG /EML format)
-- Files (PDF, DOC/DOCX, XLS/XLSX, EXE, MSI, HTML, ZIP, etc.)
-- IP addresses
-- URLs
-- Hashes
+- ✅ A fast, intuitive web interface
+- ✅ Deep analysis through **Cortex analyzers**, YARA, and sandboxing
+- ✅ Automatic results classification & reporting
+- ✅ Seamless integration with email inboxes
+- ✅ Optional integrations with **TheHive**, **MISP**, **LDAP**, **MinIO**, and Elasticsearch
 
-### How It Works
+---
 
-#### Mail submission
+## Features
 
-1. Users send a suspicious email as an attachment to the dedicated address (e.g., `suspicious@test.com`).
-2. The system splits the submission into individual components (headers, body, attachments, links, etc.).  
-3. Each component is analyzed using **Cortex analyzers** (external APIs and rulesets such as YARA).  
-4. Results are aggregated, scored, and classified.  
-5. The frontend provides users with access to reports, detailed analysis, and final conclusions. 
-6. Using the configured SMTP server it sends back a quick report / answer to the User
+### Multi-type Analysis
 
-#### Web form
+Submit and analyze:
 
-1. Users goes to the web platform and uses the `Submit an Item` page to send an Item to analyze (File, IP, Url, Hash)
-2. If the Item is an MSG or EML File, the system splits the submission into individual components (headers, body, attachments, links, etc.).  
-3. Each component is analyzed using **Cortex analyzers** (external APIs and rulesets such as YARA).  
-4. Results are aggregated, scored, and classified.  
-5. The frontend provides users with access to reports, detailed analysis, and final conclusions.  
+* Emails (**.eml**, **.msg**)
+* Files (PDF, Office docs, EXE, MSI, HTML, ZIP…)
+* IP Addresses
+* URLs
+* Hashes
 
-### Classification
-Based on the analysis score, submissions are categorized into four levels:
+### Automatic Email Intake
 
-- **Dangerous** – Cannot be opened; content must not be trusted.  
-- **Suspicious** – Should not be opened; content is risky.  
-- **Inconclusive** – Can be opened, but content should not be trusted.  
-- **Safe** – Can be opened; content is considered trustworthy.  
+Users can forward emails (as attachments) to a dedicated mailbox.
+The **Email Feeder** ingests these messages and triggers analysis automatically.
 
-## Architecture & Workflow
+### Smart Classification
 
-**Suspicious** is designed as a modular and containerized web application that can be deployed easily using Docker.  
-The core application is built with **Django (Python)**, ensuring flexibility, maintainability, and straightforward setup.  
+Based on aggregated analyzer results, Suspicious classifies each submission:
 
-A database is mandatory for the application to run, while additional services can be integrated to enhance its capabilities.  
+| Level            | Meaning                                 |
+| ---------------- | --------------------------------------- |
+| **Dangerous**    | Do not open; malicious intent detected  |
+| **Suspicious**   | High risk; content should not be opened |
+| **Inconclusive** | Low confidence; caution required        |
+| **Safe**         | Content appears trustworthy             |
 
-### Core Requirements
+### Dashboards & Reporting
 
-- **Database** (MySQL, MariaDB, or PostgreSQL) – Stores submissions, reports, and analysis results.  
-- **Elasticsearch** – Provides fast and efficient search capabilities across stored data.  
-- **[StrangeBee's Cortex](https://github.com/TheHive-Project/Cortex)** – Executes analyzer jobs for processing emails, files, IP addresses, and URLs.  
-- **MinIO S3** – Handles object storage for uploaded files and extracted artifacts. 
+* Classic overview dashboard
+* Phishing campaign dashboard
+* User submission history
+* Detailed analyzer output and final scoring
+* Automatic user notifications via email
 
-## Installation
+### Integrations
 
-To install Suspicious, please review our [CONFIG.md](CONFIG.md) and [SETUP.md](SETUP.md)
+* **Cortex** (required for deep analysis)
+* **Elasticsearch** (search engine)
+* **MinIO S3** (artifact storage)
+* **TheHive** (optional incident creation)
+* **MISP** (optional threat intelligence integration)
+* **LDAP** (optional authentication)
 
-## Screenshots
+---
 
-### Home page
+# Architecture Overview
 
-<img width="1845" height="1072" alt="image" src="https://github.com/user-attachments/assets/51a1a6cb-d58b-4175-996f-dc6cf2fc8345" />
+Suspicious is fully containerized (Docker + Docker Compose) and designed for modular deployments.
 
-### User Submissions page
+### Core Components
 
-<img width="1844" height="1053" alt="image" src="https://github.com/user-attachments/assets/23c61439-78d4-4aa3-aa54-db8fd21a028f" />
+| Service                | Purpose                   |
+| ---------------------- | ------------------------- |
+| **Web (Django)**       | Main logic + frontend     |
+| **Database**           | Submission storage        |
+| **Elasticsearch**      | Full-text search          |
+| **Cortex**             | Analyzer execution engine |
+| **MinIO**              | S3 artifact storage       |
+| **Email Feeder**       | Automatic inbox ingestion |
+| **Traefik (optional)** | Reverse proxy / TLS       |
 
-### Submit page
+### Workflow
 
-<img width="1748" height="982" alt="image" src="https://github.com/user-attachments/assets/949d789b-b034-44e7-9a97-57361853c0a0" />
+**Email Submission**
 
-### Dashboard Classic
+1. User forwards suspicious email as attachment
+2. Email-feeder consumes mailbox & stores message in MinIO
+3. Suspicious extracts headers, body, files, URLs…
+4. Cortex analyzers run (YARA, sandboxing, AI header analysis, file metadata, etc.)
+5. Results are aggregated and scored
+6. User receives automatic response + analysis available in UI
 
-<img width="1844" height="1067" alt="image" src="https://github.com/user-attachments/assets/a9b6200a-c6b5-4114-b77d-c36f3214a6af" />
+**Web Submission**
+Similar process, initiated via the web dashboard.
 
-### Dashboard Phishing Campaign
+---
 
-<img width="1843" height="1066" alt="image" src="https://github.com/user-attachments/assets/afabf61c-ba64-4b55-8343-e4df2c3061a0" />
+# Installation
+
+Installation and configuration are documented in two guides:
+
+* 👉 **Full Setup Guide:** [`SETUP.md`](SETUP.md)
+* 👉 **Configuration Reference:** [`CONFIG.md`](CONFIG.md)
+
+These documents explain:
+
+* How to install using Docker + Docker Compose v2
+* Optional Makefile shortcuts (`make up`, `make deploy`…)
+* Required folder structure
+* Elasticsearch gc.log requirements
+* Cortex setup & API keys
+* Email-feeder configuration
+* Full `.env`, `settings.json`, and `config.json` documentation
+
+---
+
+# Quick Start
+
+The deployment folder will help you deploy the service easily.
+If using `make` (recommended):
+
+```bash
+make deploy   # pull, build, migrate, start
+make up       # start services
+make down     # stop services
+make migrate  # run DB migrations
+make backup   # database backup
+```
+
+Or with Docker Compose directly:
+
+```bash
+docker compose up -d
+```
+
+The web interface will be available at:
+
+👉 [http://localhost:9020](http://localhost:9020)
+
+---
+
+# Configuration Files
+
+Suspicious uses three main configuration files:
+
+| File                       | Purpose                                                 |
+| -------------------------- | ------------------------------------------------------- |
+| `.env`                     | Environment variables for Docker services               |
+| `Suspicious/settings.json` | App configuration (branding, SMTP, LDAP, Cortex, MISP…) |
+| `email-feeder/config.json` | Email ingestion service (IMAP/IMAPS + MinIO + SMTP)     |
+
+Full parameter descriptions are available in **CONFIG.md**.
+
+---
+
+# Screenshots
+
+### Home Page
+
+<img width="1845" src="https://github.com/user-attachments/assets/51a1a6cb-d58b-4175-996f-dc6cf2fc8345" />
+
+### User Submissions
+
+<img width="1844" src="https://github.com/user-attachments/assets/23c61439-78d4-4aa3-aa54-db8fd21a028f" />
+
+### Submit Page
+
+<img width="1748" src="https://github.com/user-attachments/assets/949d789b-b034-44e7-9a97-57361853c0a0" />
+
+### Dashboard – Classic
+
+<img width="1844" src="https://github.com/user-attachments/assets/a9b6200a-c6b5-4114-b77d-c36f3214a6af" />
+
+### Dashboard – Phishing Campaigns
+
+<img width="1843" src="https://github.com/user-attachments/assets/afabf61c-ba64-4b55-8343-e4df2c3061a0" />
 
 ### Settings
 
-<img width="1843" height="1067" alt="image" src="https://github.com/user-attachments/assets/67548827-ca17-47f4-9d10-3f4ed8e75b4f" />
+<img width="1843" src="https://github.com/user-attachments/assets/67548827-ca17-47f4-9d10-3f4ed8e75b4f" />
 
 ### Profile
 
-<img width="1845" height="1067" alt="image" src="https://github.com/user-attachments/assets/9c57dc60-0956-4822-89e0-7eef8551efa4" />
+<img width="1845" src="https://github.com/user-attachments/assets/9c57dc60-0956-4822-89e0-7eef8551efa4" />
 
-### Admin Page
+### Admin Panel
 
-<img width="1846" height="1062" alt="image" src="https://github.com/user-attachments/assets/c32f4b66-e22e-4336-b65e-312a79aaa223" />
+<img width="1846" src="https://github.com/user-attachments/assets/c32f4b66-e22e-4336-b65e-312a79aaa223" />
 
-## Contributing
+---
 
-Contributions are welcome! If you'd like to contribute to Suspicious, please review our [CONTRIBUTING.md](CONTRIBUTING.md) guidelines for information on our development process, coding standards, and how to submit pull requests.
+# 🤝 Contributing
 
-## License
+We welcome contributions!
+Please see:
 
-Suspicious is licensed under the GNU AFFERO GENERAL PUBLIC License. For more details, see the [LICENSE](LICENSE) file.
+👉 [`CONTRIBUTING.md`](CONTRIBUTING.md)
 
-## Contact
+This includes:
 
-For questions, feedback, or support, please open an issue on GitHub
+* Pull request workflow
+* Coding standards (Python/Django/JS)
+* Commit style
+* Security best practices
+
+---
+
+# License
+
+Suspicious is licensed under the **GNU Affero General Public License (AGPL)**.
+Full text available in [`LICENSE`](LICENSE).
+
+---
+
+# Contact
+
+For questions, issues, or feature requests:
+
+👉 Open an issue on GitHub.

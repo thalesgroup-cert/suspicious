@@ -1,276 +1,482 @@
-# Configuration Guide
+# **Configuration Guide – Suspicious Platform**
 
-**Suspicious** relies on several configuration files to define database access, services, authentication, and integration with external tools.
-This document describes each configuration file and its main parameters.
+Suspicious relies on several configuration files to define its infrastructure, integrations, branding, email pipeline, and service credentials.
+This guide explains how each file works and how it connects to the deployment environment.
 
-**Directory Setup**
+It covers:
 
-Before launching **Suspicious**, make sure the required directories exist:
+* `.env` — core deployment configuration
+* `settings.json` — Suspicious main application configuration
+* `config.json` — Email Feeder configuration
+
+The initialization script (`make init`) automatically validates and prepares many of the required files and directories.
+
+---
+
+# `.env` — Deployment Environment Configuration
+
+The `.env` file defines **all runtime variables** used by Docker Compose, the initialization scripts, and the platform.
+
+Create it manually or let the init script generate it:
 
 ```bash
-cd suspicious
-mkdir -p {elasticsearch,cortex}
-
-# If your database folder is missing:
-mkdir -p db
-````
-
-#### Elasticsearch Configuration
-
-##### Log Directory and `gc.log` Requirement
-
-Elasticsearch **will not start** unless a log directory and a `gc.log` file exist and are writable by the Elasticsearch process.
-
-Create them as follows:
-
-```bash
-cd suspicious
-mkdir -p elasticsearch/logs
-touch elasticsearch/logs/gc.log
+cp .env.example .env
 ```
 
-If this file or directory is missing, you may see errors such as:
-
-> `Error opening log file 'logs/gc.log': Permission denied`
+The content is structured into logical sections:
 
 ---
 
-##### Why `gc.log` is Required
-
-Elasticsearch uses Java’s Garbage Collection (GC) logging by default.
-Its JVM startup options include flags such as:
-
-```
--Xlog:gc*:file=logs/gc.log:time,uptime,level,tags
-```
-
-If the `logs/` directory or `gc.log` file cannot be created or written to, the JVM exits before Elasticsearch starts.
-
-More details:
-
-* [Elasticsearch JVM Settings](https://www.elastic.co/guide/en/elasticsearch/reference/current/important-settings.html)
-* [JVM GC Options](https://spinscale.de/posts/2020-10-28-handling-jdk-gc-options-in-elasticsearch.html)
-
----
-
-#### Cortex Configuration
-
-##### Cortex Access
-
-The **Cortex** service must run with the user ID `1001:1001` so that it has permission to access the Docker socket:  
-`/var/run/docker.sock`
-
-This allows Cortex and its analyzers to run containers through the Docker API.
-
----
-
-##### Cortex Instance Setup
-
-```bash
-cd suspicious
-touch cortex/application.conf
-````
-
-1. Follow the official [StrangeBee documentation](https://docs.strangebee.com/cortex/installation-and-configuration/) to configure `application.conf`.
-2. Once Cortex is installed, create an **administrator account**.
-3. Using this admin account:
-
-   * Create an **organization**.
-   * Create a **user** within that organization. This user will be used by **Suspicious** to submit jobs to Cortex.
-4. Generate an **API key** for that user, then copy it into the `Cortex` section of your `Suspicious/settings.json`.
-
-Example:
-
-```json
-{
-  "cortex": {
-    "api_key": "GENERATED_API_KEY",
-    "url": "https://your-cortex-instance"
-  }
-}
-```
-
----
-
-#### Cortex Docker Configuration
-
-Cortex can pull private analyzers using the `cortex/docker/config.json` file.
-This file contains authentication credentials for your private Docker or GitHub registries.
-
-Example:
-
-```json
-{
-  "auths": {
-    "ghcr.io": {
-      "auth": "BASE64_ENCODED_TOKEN"
-    }
-  }
-}
-```
-
-> ⚠️ Use a token with **only the required permissions**, not a full-access token.
-
----
-
-#### Docker Mounts and Job Directories
-
-When running Cortex inside a Docker container, it must mount:
-
-* The Docker socket from the host: `/var/run/docker.sock`
-* A shared directory for job files between Cortex and its analyzers
-
-If you use a private Docker registry, configure the `docker.registry` section in `application.conf` (with username/password) according to the [official documentation](https://docs.strangebee.com/cortex/installation-and-configuration/run-cortex-with-docker/).
-
----
-
-## Deployment Environment File (`.env`)
-
-A `.env.example` file is in the repo in the deployment folder simply copy it to a `.env` that you customize with your needs 
-
-This file contains environment variables used to configure Docker services.
-
-### Database
+## **1. Application Versions**
 
 ```env
-MYSQL_DATABASE=db_suspicious       # Database name
-MYSQL_USER=suspicious              # Application DB user
-MYSQL_PASSWORD=password            # User password
-MYSQL_ROOT_PASSWORD=strongpassword # Root password (use strong values!)
+SUSPICIOUS_VERSION=latest
+DB_SUSPICIOUS_VERSION=12
+MINIO_VERSION=RELEASE.2025-04-22T22-12-26Z
+CORTEX_VERSION=4.0
+ELASTICSEARCH_VERSION=8.19.7
+TRAEFIK_VERSION=v3.5
 ```
 
-⚠️ Credentials must be defined **before the first database initialization**.
-Changing them afterward requires deleting the Docker volume, which will erase all data.
+Modify versions only if you know the minimum compatibility required.
 
-### MinIO
+---
+
+## **2. Application Ports**
+
+Each service exposes one or more ports:
+
+```env
+SUSPICIOUS_PORT=9020
+DB_SUSPICIOUS_PORT=3306
+MINIO_PORT_1=35001
+MINIO_PORT_2=35002
+CORTEX_PORT=9001
+ELASTICSEARCH_PORT=9200
+```
+
+Change these only if ports conflict on your host.
+
+---
+
+## **3. Network Configuration**
+
+```env
+DOMAIN_CORP=your.corporate.domain
+NETWORK_NAME=suspicious_net
+NETWORK_SUBNET=172.20.0.0/16
+NETWORK_GATEWAY=172.20.0.1
+NETWORK_IP_RANGE=172.20.0.0/24
+```
+
+`DOMAIN_CORP` is automatically inserted into **Traefik TLS configuration** by the init script.
+
+---
+
+## **4. Database Credentials**
+
+```env
+MYSQL_DATABASE=db_suspicious
+MYSQL_USER=suspicious
+MYSQL_PASSWORD="password"
+MYSQL_ROOT_PASSWORD="rootpassword"
+```
+
+⚠️ Must be set **before first launch**.
+Changing afterward requires deleting the DB volume → **data loss**.
+
+---
+
+## **5. MinIO Object Storage**
 
 ```env
 MINIO_ROOT_USER=minio
-MINIO_ROOT_PASSWORD=strongpassword
+MINIO_ROOT_PASSWORD="superpassword"
 ```
 
-### Application Paths and Ports
-
-```env
-SUSPICIOUS_PATH=./Suspicious
-SUSPICIOUS_PORT=8000
-DB_SUSPICIOUS_PATH=./db_suspicious
-ELASTICSEARCH_PATH=./elasticsearch
-ELASTICSEARCH_PORT=9200
-CORTEX_PATH=./cortex
-CORTEX_PORT=10001
-```
-
-### Proxy (optional)
-
-As the proxy is optionnal you can let it empty or comment the lines in the `.env`
-
-```env
-HTTP_PROXY=http://proxy.com:8080
-HTTPS_PROXY=http://proxy.com:8080
-```
+Used by Suspicious to store attachments, files, and message artifacts.
 
 ---
 
-## Suspicious Settings (`Suspicious/settings.json`)
+## **6. Container Names**
 
-This JSON configures the main **Suspicious** application.
+```env
+DB_CONTAINER=db_suspicious
+WEB_CONTAINER=suspicious
+```
 
-### Core Application
+Changing these is rarely necessary.
 
-* `allowed_host` → Hostname of the app
-* `csrf_trusted_origins` → Allowed origins for CSRF protection
-* `django_secret_key` → Must be unique and secret
-* `email` → Default address used by the app
-* `tz` → Timezone
-* `pattern` → Regex pattern matching corporate email addresses
-* `footer`, `link`, `ico`, `logo`, `banner`, `sign` → Custom branding
+---
 
-### Integrations
+## **7. Application Paths**
 
-* **TheHive**: Incident response platform (`url`, `api_key`, SSL options, tags)
-* **Cortex**: Analyzer backend (`url`, `api_key`, analyzers configuration)
-* **MISP**: Threat intelligence sharing platform (API URL, keys, tags, SSL)
+All local paths used by components:
 
-### Company Domains
+```env
+ROOT_PATH=../
+SUSPICIOUS_PATH=../Suspicious
+DB_SUSPICIOUS_PATH=../db-suspicious
+FEEDER_PATH=../email-feeder
+DOCKER_PATH=../docker
+YARA_PATH=../yara-rules
+MISP_PATH=../misp
+CORTEX_PATH=../cortex
+AIANALYZER_PATH=../Analyzers/AIMailAnalyzer
+ELASTIC_PATH=../elasticsearch
+MINIO_PATH=../minio
+CA_PATH=./certificates
+TRAEFIK_PATH=../traefik
+```
 
-Company domains are used for detecting users linked to your company and all allow listed subdomains to avoid impersonation
+The init script validates all of these directories and creates missing ones when possible.
+
+---
+
+## **8. Optional Proxy**
+
+```env
+HTTP_PROXY=
+HTTPS_PROXY=
+NO_PROXY=localhost
+```
+
+Leave empty unless your environment requires proxies.
+
+---
+
+---
+
+# `settings.json` — Suspicious Main Application Configuration
+
+This file defines the **internal logic** of Suspicious: branding, API keys, business rules, LDAP, Cortex settings, and more.
+
+It is automatically created if missing:
+
+* From `settings-sample.json`
+* During `make init`
+
+---
+
+## **A. Core Application Settings**
 
 ```json
-"company_domains": ["testgroup.com"]
+"allowed_host": "suspicious",
+"csrf_trusted_origins": "https://localhost",
+"django_debug": "True",
+"django_secret_key": "django-insecure-test",
+"email": "suspicious@test.com",
+"tz": "Europe/Paris"
 ```
 
-### Database
-
-Redundant config (mirrors `.env`) for in-app usage: database, user, SSL, pooling.
-
-### LDAP Authentication
-
-* `auth_ldap_server_uri` → LDAP/LDAPS server
-* `auth_ldap_base_dn` / `auth_ldap_bind_dn` / `auth_ldap_bind_password` → Bind credentials
-* `auth_ldap_filter` → LDAP query to filter valid users
-* `auth_ldap_verify_ssl` → Enable/disable SSL verification
-
-### Mail
-
-Defines SMTP server and branding for notification emails (footers, logos, links to intranet, social networks).
+* Change `django_secret_key` in production.
+* `django_debug` must be `False` in production.
 
 ---
 
-## Email Feeder (`email-feeder/config.json`)
+## **B. Branding**
 
-This service connects to email inboxes and ingests suspicious messages.
+Suspicious supports full corporate branding:
 
-### Mail Connectors
+```json
+"footer": "Your Group",
+"ico": "data:image/png;base64,...",
+"logo": "data:image/png;base64,...",
+"banner": "data:image/png;base64,...",
+"sign": "data:image/png;base64,..."
+```
 
-Supports **IMAP** and **IMAPS**:
+You may embed **Base64** logos or host them externally.
+
+---
+
+## **C. Email Pattern Matching**
+
+```json
+"pattern": "pattern to match your company mail addresses"
+```
+
+Used to detect whether a sender belongs to the organization.
+
+---
+
+## **D. External Integrations**
+
+Suspicious integrates with:
+
+### **1. TheHive**
+
+```json
+"thehive": {
+  "enabled": false,
+  "url": "https://thehive",
+  "api_key": "...",
+  "the_hive_verify_ssl": false
+}
+```
+
+Enable only if you want to create cases automatically.
+
+---
+
+### **2. Cortex**
+
+```json
+"cortex": {
+  "url": "http://cortex:9001",
+  "api_key": "your cortex api key",
+  "header_analyzer": "MailHeader_4_0",
+  "ai_analyzer": "AI_Mail_Analyzer_1_4",
+  "sandbox_analyzer": "ThreatGridOnPrem_1_0",
+  "yara_analyzer": "Yara_Boosted_3_2",
+  "file_info_analyzer": "FileInfo_8_0"
+}
+```
+
+These keys must match analyzer names installed in Cortex.
+
+API key comes from:
+
+* Cortex → Organization → User → API Keys
+
+---
+
+### **3. MISP**
+
+```json
+"misp": {
+  "suspicious": { "url": "...", "key": "...", "ssl_verify": "False" },
+  "security": { "url": "...", "key": "...", "ssl_verify": "False" }
+}
+```
+
+Suspicious can push indicators to multiple MISP instances.
+
+---
+
+## **E. Company Domains**
+
+Used for:
+
+* allowed/verified domains
+* impersonation detection
+* classification
+
+```json
+"company_domains": [ "test.com" ]
+```
+
+---
+
+## **F. Database Section**
+
+This mirrors the `.env` database config:
+
+```json
+"database": {
+  "mysql_database": "db_suspicious",
+  "mysql_host": "db_suspicious",
+  "mysql_password": "password"
+}
+```
+
+Suspicious uses this for Django ORM settings.
+
+---
+
+## **G. LDAP Authentication**
+
+Supports enterprise authentication:
+
+```json
+"ldap": {
+  "auth_ldap_server_uri": "ldaps://ldap",
+  "auth_ldap_base_dn": "ou=People,o=group",
+  "auth_ldap_bind_dn": "...",
+  "auth_ldap_bind_password": "..."
+}
+```
+
+Disable SSL verification only in development.
+
+---
+
+## **H. Outgoing Mail Templates**
+
+Suspicious can send:
+
+* Acknowledgements
+* Challenge messages
+* Final decisions
+* Branding-rich notifications
+
+Configured under:
+
+```json
+"mail": { ... }
+```
+
+All logos support **Base64 images**.
+
+---
+
+---
+
+# `config.json` — Email Feeder Configuration
+
+The Email Feeder is responsible for:
+
+* Connecting to mailboxes (IMAP / IMAPS)
+* Fetching suspicious messages
+* Storing data in MinIO
+* Passing content to Suspicious for analysis
+
+This file is located in:
+
+```
+<FEEDER_PATH>/config.json
+```
+
+If missing, it is created from `config-sample.json` during `make init`.
+
+---
+
+## **A. Mail Connectors**
+
+Supports multiple connectors:
 
 ```json
 "imap-dev": {
-  "enable": false,
-  "host": "imap.test",
-  "port": 143,
-  "login": "user@organisation.com",
-  "password": "secret",
-  "mailbox_to_monitor": "TEST"
+  "enable": true,
+  "host": "localhost",
+  "port": 3143,
+  "login": "imap_user",
+  "password": "imap_password",
+  "mailbox_to_monitor": "INBOX"
 }
 ```
+
+Use `"enable": false` to disable unused profiles.
+
+For IMAP **over TLS**:
 
 ```json
 "imaps-dev": {
   "enable": true,
-  "host": "imaps.test",
-  "port": 993,
-  "login": "user@organisation.com",
-  "password": "secret",
-  "mailbox_to_monitor": "TEST"
+  "certfile": "/path/to/cert.pem",
+  "rootcafile": "/path/to/rootca.pem"
 }
 ```
 
-Multiple connectors can be defined (dev, prod, etc.).
+---
 
-### Processing
+## **B. Feeder Working Directory**
 
-* `working-path` → Storage path for processed cases
-* `timer-inbox-emails` → Polling interval (in seconds)
+```json
+"working-path": "/tmp/suspicious"
+```
 
-### MinIO
+This directory stores:
 
-Object storage configuration for email attachments.
-
-### Mail
-
-SMTP server and templates used for sending analysis results.
+* Temporary EML files
+* Extracted metadata
+* Processing queue
 
 ---
 
-## Recommendations
+## **C. Polling Interval**
 
-* **Security**: Always replace default passwords (`MYSQL`, `MINIO`, `LDAP`, `API keys`).
-* **Branding**: Customize `logo`, `banner`, `footer`, and `mail` section to match your organization.
-* **SSL/TLS**: Enable verification (`ssl_verify`, `auth_ldap_verify_ssl`) in production.
-* **Secrets management**: Use a vault or environment variable injection instead of hardcoding keys.
+```json
+"timer-inbox-emails": 10
+```
+
+Polling frequency in seconds.
 
 ---
 
-👉 With these three files properly configured, **Suspicious** will be ready to run in your environment, integrated with your mail servers, Cortex analyzers, TheHive, and MISP.
+## **D. MinIO Storage**
+
+```json
+"minio": {
+  "endpoint": "localhost:9000",
+  "access_key": "minioadmin",
+  "secret_key": "minioadmin",
+  "secure": false
+}
+```
+
+This must mirror your `.env` MinIO configuration.
+
+---
+
+## **E. SMTP for Notifications**
+
+These fields mirror Suspicious’s email branding:
+
+```json
+"mail": {
+  "server": "localhost",
+  "port": 3025,
+  "username": "SUSPICIOUS",
+  "logos": { ... }
+}
+```
+
+---
+
+# Additional Notes & Recommendations
+
+### SSL/TLS
+
+Enable SSL verification in production environments:
+
+* `ssl_verify`
+* `auth_ldap_verify_ssl`
+* IMAPS certificates
+
+### Secrets
+
+Do NOT store secrets in Git.
+Use:
+
+* Vault
+* CI/CD secret injection
+* Docker secrets (future-ready)
+
+### Branding
+
+Replace all Base64 placeholders with real assets.
+
+### Directory Structure
+
+All required directories are created automatically during:
+
+```bash
+make init
+```
+
+This includes:
+
+* Elasticsearch logs
+* Cortex job dirs
+* MinIO
+* Certificates
+* Docker config
+
+---
+
+# 🎉 Ready to Run
+
+Once `.env`, `settings.json`, and `config.json` are configured:
+
+```bash
+make up
+```
+
+Your Suspicious instance will be fully operational, integrated with:
+
+* Email ingestion
+* Cortex analyzers
+* MinIO object storage
+* LDAP (optional)
+* TheHive + MISP (optional)

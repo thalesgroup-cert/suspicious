@@ -1,71 +1,171 @@
-# Modern Docker-Based Deployment
+# Modern Deployment Guide
 
-This project uses a clean, modern, open-source-friendly deployment system based on:
+This project provides a **modular, automated, Docker-based deployment system** designed for reliability, maintainability, and ease of use.
+It relies on:
 
-- Docker Compose v2
-- Environment files (`.env`)
-- Modular bash scripts
-- Optional Makefile shortcuts
+* **Docker Compose v2**
+* **Environment configuration via `.env`**
+* **Self-contained helper scripts** (`scripts/`)
+* **Optional Makefile shortcuts** for convenience
+* A comprehensive **checklist** that prepares all required files, directories, and certificates
 
-## 🚀 Getting Started
+---
 
-### 1️⃣ Create your environment file
+## Requirements
+
+Before running any commands, ensure you have:
+
+* **Docker**
+* **Docker Compose v2 (`docker compose` subcommand)**
+* **curl**
+
+The `scripts/init.sh` and `scripts/check-network.sh` utilities will verify and prepare the environment automatically.
+
+---
+
+## Initialization
+
+Run the full initialization script:
 
 ```bash
-cp .env.example .env
+make init
 ```
 
-Fill in required values.
+This performs:
 
-### 2️⃣ Start the stack
+* Creation of the `.env` file (or uses yours if present)
+* Directory structure validation
+* Download/creation of config files
+* Certificate generation (if missing)
+* Cortex catalog download
+* Check of Docker socket permissions
+  …and other required system checks.
 
-```bash
-docker compose up -d
-```
+This step ensures the project is ready to run.
 
-or:
+---
+
+## Starting the Stack
+
+### Start all services
 
 ```bash
 make up
 ```
 
-### 3️⃣ Deploy (pull, build, restart)
+or manually:
+
+```bash
+docker compose --env-file .env up -d
+```
+
+### Stop all services
+
+```bash
+make down
+```
+
+---
+
+## Deployment Workflow
+
+To pull new images, rebuild if needed, and restart services safely:
 
 ```bash
 make deploy
 ```
 
-### 4️⃣ Run database migrations
+This command runs:
+
+* Network checks
+* TLS/hostname replacement
+* Safety check for empty workload queues
+* Deployment script execution
+
+---
+
+## 🛠 Development & Maintenance Commands
+
+### Build images
+
+```bash
+make build
+```
+
+### Pull latest images
+
+```bash
+make pull
+```
+
+### Run database migrations
 
 ```bash
 make migrate
 ```
 
-### 5️⃣ Backup database
+### Create a superuser
+
+```bash
+make superuser
+```
+
+### Backup the database
 
 ```bash
 make backup
 ```
 
-### 6️⃣ Pull Cortex Analyzers
+### Regenerate certificates
 
 ```bash
-make analyzers
+make create-certs
 ```
 
 ---
 
-## 📂 Project Structure
+## Project Structure
 
-- `docker-compose.yml` — main service orchestration
-- `scripts/` — small, safe helper scripts
-- `Makefile` — user-friendly commands
-- `.env.example` — example config, safe to commit
-- `.env` — actual config, **never commit**
+```
+.
+├── docker-compose.yml           # Main orchestration file
+├── .env.example                 # Example configuration (safe to commit)
+├── .env                         # Real configuration (never commit)
+├── scripts/                     # Modular shell scripts
+│   ├── init.sh                  # Main initializer (system checks + setup)
+│   ├── check-network.sh
+│   ├── wait-empty.sh
+│   ├── deploy.sh
+│   ├── migrate.sh
+│   ├── backup-db.sh
+│   ├── create-superuser.sh
+│   └── openssl-certificates-generator.sh
+└── Makefile                     # User-friendly command shortcuts
+```
 
 ---
 
-## 🔐 Security Notes
+## Security Notes
 
-- `.env` is in `.gitignore`
-- place secrets here or use CI/CD secret injection
+* `.env` **must never be committed** — it contains secrets.
+* `.env` is already included in `.gitignore`.
+* Secrets can also be provided through:
+
+  * environment variables
+  * CI/CD secret stores
+  * Docker Compose overrides
+
+---
+
+## Summary
+
+| Action                | Command             |
+| --------------------- | ------------------- |
+| Initialize everything | `make init`         |
+| Start services        | `make up`           |
+| Stop services         | `make down`         |
+| Deploy updates        | `make deploy`       |
+| Run migrations        | `make migrate`      |
+| Backup database       | `make backup`       |
+| Create superuser      | `make superuser`    |
+| Generate certificates | `make create-certs` |
