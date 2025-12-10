@@ -4,10 +4,10 @@
 
 <p align="center">
     <a href="https://github.com/thalesgroup-cert/suspicious/graphs/contributors">
-        <img src="https://img.shields.io/github/contributors/thalesgroup-cert/suspicious" alt="Contributors">
+        <img src="https://img.shields.io/github/contributors/thalesgroup-cert/suspicious?style=for-the-badge" alt="Contributors">
     </a>
     <a href="https://github.com/thalesgroup-cert/suspicious">
-        <img src="https://img.shields.io/github/stars/thalesgroup-cert/suspicious" alt="Stars">
+        <img src="https://img.shields.io/github/stars/thalesgroup-cert/suspicious?style=for-the-badge&logo=opensourceinitiative&logoColor=white" alt="Stars">
     </a>
     <a href="https://github.com/thalesgroup-cert/suspicious/issues?q=is%3Aissue+is%3Aclosed">
         <img src="https://img.shields.io/github/issues-closed-raw/thalesgroup-cert/suspicious?style=for-the-badge&logo=github" alt="Closed Issues">
