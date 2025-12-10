@@ -34,6 +34,47 @@ Suspicious offers a **scalable, automated, AI-augmented defense** that helps you
 - 📤 Automatically notify or alert users via email
 - 🔌 Integrate optionally with **TheHive**, **MISP**, **LDAP**, **MinIO**, **Elasticsearch**, and more
 
+## Getting Started (Quick Setup)
+
+We recommend using Docker + Docker Compose v2. For full instructions, see **[SETUP.md](SETUP.md)** and **[CONFIG.md](CONFIG.md)**.
+
+```bash
+# 1. Clone the repo
+git clone https://github.com/thalesgroup-cert/suspicious.git
+cd suspicious/deployment
+
+# 2. Initialize environment, configs & directory structure
+make init
+
+# 3. Start the stack
+make up
+
+# 4. On first run: run database migrations + create superuser
+make migrate
+make superuser
+
+# 5. Open the web UI
+#    http://localhost:9020  (or your configured domain/port)
+```
+
+Alternatively, you can use Docker Compose directly:
+
+```bash
+docker compose up -d
+```
+
+## Configuration Overview
+
+Suspicious uses three main configuration files:
+
+| File                       | Purpose                                                                                                               |
+| -------------------------- | --------------------------------------------------------------------------------------------------------------------- |
+| `.env`                     | Environment variables for Docker services (versions, ports, paths, credentials)                                       |
+| `Suspicious/settings.json` | App-level config: branding, SMTP, LDAP, Cortex & MISP credentials, allowed domains, UI settings, etc.                 |
+| `email-feeder/config.json` | Email ingestion config: IMAP/IMAPS connectors, MinIO settings, polling, working directory, notification SMTP settings |
+
+For full parameter documentation and examples, refer to **[CONFIG.md](CONFIG.md)**.
+
 ## Key Features
 
 - **Multi-type submission support**
@@ -99,47 +140,6 @@ Suspicious includes a built-in AI module (via `Analyzers/AIMailAnalyzer`) that c
 
 The AI analyzer (from `Analyzers/AIMailAnalyzer`) is fully compatible with this architecture, allowing ML-driven detection alongside traditional analyzers.
 
-## Getting Started (Quick Setup)
-
-We recommend using Docker + Docker Compose v2. For full instructions, see **[SETUP.md](SETUP.md)** and **[CONFIG.md](CONFIG.md)**.
-
-```bash
-# 1. Clone the repo
-git clone https://github.com/thalesgroup-cert/suspicious.git
-cd suspicious/deployment
-
-# 2. Initialize environment, configs & directory structure
-make init
-
-# 3. Start the stack
-make up
-
-# 4. On first run: run database migrations + create superuser
-make migrate
-make superuser
-
-# 5. Open the web UI
-#    http://localhost:9020  (or your configured domain/port)
-```
-
-Alternatively, you can use Docker Compose directly:
-
-```bash
-docker compose up -d
-```
-
-## Configuration Overview
-
-Suspicious uses three main configuration files:
-
-| File                       | Purpose                                                                                                               |
-| -------------------------- | --------------------------------------------------------------------------------------------------------------------- |
-| `.env`                     | Environment variables for Docker services (versions, ports, paths, credentials)                                       |
-| `Suspicious/settings.json` | App-level config: branding, SMTP, LDAP, Cortex & MISP credentials, allowed domains, UI settings, etc.                 |
-| `email-feeder/config.json` | Email ingestion config: IMAP/IMAPS connectors, MinIO settings, polling, working directory, notification SMTP settings |
-
-For full parameter documentation and examples, refer to **[CONFIG.md](CONFIG.md)**.
-
 ## 🤝 Contributing
 
 We welcome contributions! Please read **[CONTRIBUTING.md](CONTRIBUTING.md)** for coding standards, pull request flow, and guidelines.
@@ -171,17 +171,19 @@ You can also open [issues](https://github.com/thalesgroup-cert/suspicious/issues
 
 ![Submit Page](https://github.com/user-attachments/assets/949d789b-b034-44e7-9a97-57361853c0a0)
 
-### Dashboard – Classic
+### Dashboard Classic
 
 ![Dashboard Classic](https://github.com/user-attachments/assets/a9b6200a-c6b5-4114-b77d-c36f3214a6af)
 
-### Dashboard – Phishing Campaigns
+### Dashboard Phishing Campaigns
 
 ![Dashboard Phishing Campaigns](https://github.com/user-attachments/assets/afabf61c-ba64-4b55-8343-e4df2c3061a0)
 
 ## License
 
-Suspicious is released under the **GNU Affero General Public License v3 (AGPL-3.0)**. See the [`LICENSE`](LICENSE) file for full details.
+Suspicious is released under the **GNU Affero General Public License v3 (AGPL-3.0)**.
+
+See the [`LICENSE`](LICENSE) file for full details.
 
 ## Contact & Support
 
