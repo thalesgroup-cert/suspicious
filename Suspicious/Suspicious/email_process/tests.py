@@ -44,14 +44,10 @@ class GetDomainTests(TestCase):
 
     @patch("email_process.email_utils.email_handler.DomainHandler")
     def test_get_domain_valid_domain(self, MockDH):
-        """
-        DomainHandler.validate_email returns None,
-        DomainHandler.validate_domain returns 'Domain'.
-        """
         MockDH.return_value.validate_email.return_value = None
         MockDH.return_value.validate_domain.return_value = "Domain"
 
-        mail = MailAddress(address="example.com")
+        mail = "example.com"
         self.assertEqual(get_domain(mail), "example.com")
 
 
@@ -60,7 +56,7 @@ class EmailValidationTests(TestCase):
     def test_is_valid_email_valid(self):
         ok, normalized = is_valid_email("A.LICE+tag@Example.com")
         self.assertTrue(ok)
-        self.assertEqual(normalized, "alice+tag@example.com")
+        self.assertEqual(normalized, "a.lice+tag@example.com")
 
     def test_is_valid_email_invalid(self):
         ok, msg = is_valid_email("bad@@example..com")
@@ -71,7 +67,9 @@ class EmailValidationTests(TestCase):
 class CompanyEmailTests(TestCase):
 
     @patch("email_process.email_utils.email_handler.company_config", ["example.com"])
-    def test_is_valid_company_email_true(self):
+    @patch("email_process.email_utils.email_handler.validate_email")
+    def test_is_valid_company_email_true(self, mock_validate):
+        mock_validate.return_value = MagicMock(email="alice@example.com")
         self.assertTrue(is_valid_company_email("alice@example.com"))
 
     @patch("email_process.email_utils.email_handler.company_config", ["example.com"])

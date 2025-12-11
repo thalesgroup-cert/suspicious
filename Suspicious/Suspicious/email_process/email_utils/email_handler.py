@@ -122,10 +122,10 @@ def is_valid_email(email):
     try:
         # Valide l'adresse email et retourne sa forme normalisée
         valid = validate_email(email, check_deliverability=False)
-        return True, valid.email
+        return True, valid.email.lower()
     except EmailNotValidError as e:
         return False, str(e)
-    
+
 def is_valid_company_email(email):
     try:
         # Validate email syntax and deliverability
