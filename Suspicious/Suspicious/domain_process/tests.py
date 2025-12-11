@@ -107,10 +107,6 @@ class DomainHandlerTests(TestCase):
 
 
 class DomainHandlerExceptionTests(TestCase):
-    """
-    Tests that mimic the exception-handling styles seen in the URLHandler tests,
-    ensuring safe failure when underlying ORM calls raise exceptions.
-    """
 
     @patch("domain_process.domain_utils.domain_handler.Domain.objects.get_or_create")
     def test_handle_domain_exception_returns_none(self, mock_get):
@@ -122,12 +118,13 @@ class DomainHandlerExceptionTests(TestCase):
         self.assertIsNone(result)
 
     @patch("domain_process.domain_utils.domain_handler.normalize_domain")
-    def test_normalize_throws_exception(self, mock_normalize):
+    def test_normalize_exception_is_caught_and_returns_none(self, mock_normalize):
+        # Make normalize_domain raise Exception
         mock_normalize.side_effect = Exception("unexpected error")
 
         handler = DomainHandler()
         result = handler.handle_domain("badinput")
 
-        # DomainHandler should catch exception and return None
+        # Because handler catches any exception inside handle_domain
         self.assertIsNone(result)
 
