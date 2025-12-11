@@ -47,7 +47,7 @@ class GetDomainTests(TestCase):
         MockDH.return_value.validate_email.return_value = None
         MockDH.return_value.validate_domain.return_value = "Domain"
 
-        mail = "example.com"
+        mail = MailAddress(address="example.com")
         self.assertEqual(get_domain(mail), "example.com")
 
 
