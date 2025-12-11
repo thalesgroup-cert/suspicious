@@ -29,7 +29,7 @@ class URLModelTests(TestCase):
 
 class URLHandlerTests(TestCase):
 
-    @patch("url_process.handler.DomainHandler")
+    @patch("url_process.url_utils.url_handler.DomainHandler")
     def test_handle_url_detects_domain(self, MockDomainHandler):
         """
         When DomainHandler.validate_domain() returns 'Domain',
@@ -47,7 +47,7 @@ class URLHandlerTests(TestCase):
         self.assertEqual(domain_instance, mock_domain_instance)
         mock_domain_handler.handle_domain.assert_called_once_with("example.com")
 
-    @patch("url_process.handler.DomainHandler")
+    @patch("url_process.url_utils.url_handler.DomainHandler")
     def test_handle_url_invalid_returns_none_none(self, MockDomainHandler):
         MockDomainHandler.return_value.validate_domain.return_value = None
 
@@ -56,9 +56,9 @@ class URLHandlerTests(TestCase):
         self.assertIsNone(url_instance)
         self.assertIsNone(domain_instance)
 
-    @patch("url_process.handler.DomainInIocs")
-    @patch("url_process.handler.Domain")
-    @patch("url_process.handler.DomainHandler")
+    @patch("url_process.url_utils.url_handler.DomainInIocs")
+    @patch("url_process.url_utils.url_handler.Domain")
+    @patch("url_process.url_utils.url_handler.DomainHandler")
     def test_create_or_update_url_new_url(
         self,
         MockDomainHandler,
@@ -93,9 +93,9 @@ class URLHandlerTests(TestCase):
 
         MockDomainInIocs.objects.get_or_create.assert_called_once()
 
-    @patch("url_process.handler.DomainInIocs")
-    @patch("url_process.handler.Domain")
-    @patch("url_process.handler.DomainHandler")
+    @patch("url_process.url_utils.url_handler.DomainInIocs")
+    @patch("url_process.url_utils.url_handler.Domain")
+    @patch("url_process.url_utils.url_handler.DomainHandler")
     def test_create_or_update_url_increments_times_sent_on_existing_url(
         self,
         MockDomainHandler,
@@ -118,7 +118,7 @@ class URLHandlerTests(TestCase):
         existing_url.refresh_from_db()
         self.assertEqual(existing_url.times_sent, 1)  # incremented
 
-    @patch("url_process.handler.DomainHandler")
+    @patch("url_process.url_utils.url_handler.DomainHandler")
     def test_get_domain_extracts_and_normalizes(self, MockDomainHandler):
         # validate_domain returns Domain to mark it valid
         MockDomainHandler.return_value.validate_domain.return_value = "Domain"
@@ -126,7 +126,7 @@ class URLHandlerTests(TestCase):
         domain = URLHandler.get_domain("http://www.Example.com/path")
         self.assertEqual(domain, "example.com")
 
-    @patch("url_process.handler.DomainHandler")
+    @patch("url_process.url_utils.url_handler.DomainHandler")
     def test_get_domain_invalid_returns_none(self, MockDomainHandler):
         MockDomainHandler.return_value.validate_domain.return_value = None
 
@@ -136,7 +136,7 @@ class URLHandlerTests(TestCase):
 
 class URLHandlerExceptionTests(TestCase):
 
-    @patch("url_process.handler.URL.objects.get_or_create")
+    @patch("url_process.url_utils.url_handler.URL.objects.get_or_create")
     def test_create_or_update_url_handles_exception(self, mock_get_or_create):
         """
         If URL.objects.get_or_create raises an exception,
@@ -150,7 +150,7 @@ class URLHandlerExceptionTests(TestCase):
         self.assertIsNone(url_instance)
         self.assertIsNone(domain_instance)
 
-    @patch("url_process.handler.Domain.objects.get_or_create")
+    @patch("url_process.url_utils.url_handler.Domain.objects.get_or_create")
     def test_create_or_update_domain_handles_exception(self, mock_domain_get):
         """
         If Domain.objects.get_or_create raises an exception,
@@ -163,7 +163,7 @@ class URLHandlerExceptionTests(TestCase):
 
         self.assertIsNone(domain_instance)
 
-    @patch("url_process.handler.urlparse")
+    @patch("url_process.url_utils.url_handler.urlparse")
     def test_get_domain_exception_returns_none(self, mock_urlparse):
         """
         If urlparse throws an exception, get_domain should return None.
