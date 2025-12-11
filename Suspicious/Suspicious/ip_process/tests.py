@@ -32,9 +32,10 @@ class IPHandlerValidationTests(TestCase):
         result = self.handler.validate_ip("192.168.0.10")
         self.assertEqual(result, "Private IPv4")
 
-    def test_validate_ip_reserved(self):
-        result = self.handler.validate_ip("240.0.0.1")
-        self.assertEqual(result, "Reserved IPv4")
+    def test_validate_ip_unspecified(self):
+        result = self.handler.validate_ip("0.0.0.0")
+        self.assertEqual(result, "Unspecified IPv4")
+
 
     def test_validate_ip_invalid(self):
         result = self.handler.validate_ip("not_an_ip")
