@@ -37,9 +37,6 @@ CSRF_TRUSTED_ORIGINS = [suspicious_config.get('csrf_trusted_origins', 'https://e
 TIME_ZONE = suspicious_config.get('tz', 'UTC')
 USE_TZ = True
 
-
-
-
 if 'test' in sys.argv:
     DATABASES = {
         'default': {

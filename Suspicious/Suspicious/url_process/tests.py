@@ -2,7 +2,7 @@ from django.test import TestCase
 from unittest.mock import patch, MagicMock
 
 from url_process.models import URL
-from url_process.handler import URLHandler
+from url_process.url_utils.url_handler import URLHandler
 
 
 class URLModelTests(TestCase):
