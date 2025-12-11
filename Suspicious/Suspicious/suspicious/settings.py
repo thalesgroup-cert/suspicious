@@ -13,6 +13,7 @@ from pathlib import Path
 import json
 import ldap
 from django_auth_ldap.config import LDAPSearch
+import sys
 
 CONFIG_PATH = "/app/settings.json"
 with open(CONFIG_PATH) as config_file:
@@ -36,19 +37,30 @@ CSRF_TRUSTED_ORIGINS = [suspicious_config.get('csrf_trusted_origins', 'https://e
 TIME_ZONE = suspicious_config.get('tz', 'UTC')
 USE_TZ = True
 
-DATABASES = {
-    'default': {
-        'ENGINE': 'django.db.backends.mysql',
-        'NAME': db_config.get('mysql_database', 'default_db_name'),
-        'USER': db_config.get('mysql_user', 'default_db_user'),
-        'PASSWORD': db_config.get('mysql_password', 'default_db_password'),
-        'HOST': db_config.get('mysql_host', 'default_db_host'),
-        'PORT': db_config.get('mysql_port', '3306'),
-        'OPTIONS': {
-            'charset': 'utf8mb4',
+
+
+
+if 'test' in sys.argv:
+    DATABASES = {
+        'default': {
+            'ENGINE': 'django.db.backends.sqlite3',
+            'NAME': ':memory:',
         }
     }
-}
+else:
+    DATABASES = {
+        'default': {
+            'ENGINE': 'django.db.backends.mysql',
+            'NAME': db_config.get('mysql_database', 'default_db_name'),
+            'USER': db_config.get('mysql_user', 'default_db_user'),
+            'PASSWORD': db_config.get('mysql_password', 'default_db_password'),
+            'HOST': db_config.get('mysql_host', 'default_db_host'),
+            'PORT': db_config.get('mysql_port', '3306'),
+            'OPTIONS': {
+                'charset': 'utf8mb4',
+            }
+        }
+    }
 
 if db_config.get('db_use_ssl', 'NO') == 'YES':
     DATABASES['default']['OPTIONS'] = {'ssl': {'ca': '/cert.pem'}}
