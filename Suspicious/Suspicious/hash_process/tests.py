@@ -33,10 +33,11 @@ class HashHandlerValidationTests(TestCase):
     def setUp(self):
         self.handler = HashHandler()
 
-    @patch.object(HashHandler, 'hashid')
-    def test_validate_hash_detected(self, mock_hashid):
+    def test_validate_hash_detected(self):
+        self.handler.hashid = MagicMock()
         mock_hash_info = iter([MagicMock(name='SHA256')])
-        mock_hashid.identifyHash.return_value = mock_hash_info
+        self.handler.hashid.identifyHash.return_value = mock_hash_info
+
         result = self.handler.validate_hash("abcd1234")
         self.assertEqual(result, "SHA256")
 
@@ -49,9 +50,10 @@ class HashHandlerValidationTests(TestCase):
         result = self.handler.validate_hash("0:")
         self.assertIsNone(result)
 
-    @patch.object(HashHandler, 'hashid')
-    def test_validate_hash_invalid_returns_none(self, mock_hashid):
-        mock_hashid.identifyHash.return_value = iter([])
+    def test_validate_hash_invalid_returns_none(self):
+        self.handler.hashid = MagicMock()
+        self.handler.hashid.identifyHash.return_value = iter([])
+
         result = self.handler.validate_hash("invalidhash")
         self.assertIsNone(result)
 
