@@ -39,7 +39,7 @@ USE_TZ = True
 
 if 'test' in sys.argv:
     DATABASES = {
-        'test-default': {
+        'default': {
             'ENGINE': 'django.db.backends.sqlite3',
             'NAME': ':memory:',
         }
