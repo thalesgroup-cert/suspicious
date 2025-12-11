@@ -98,7 +98,7 @@ def get_domain(mail):
         # If not a valid email, check if it's a domain or URL
         domain_type = DomainHandler().validate_domain(mail)
         if domain_type == "Domain":
-            return mail
+            return mail.address
         elif domain_type == "Url":
             # Extract the domain from the URL
             if "@" in mail:
