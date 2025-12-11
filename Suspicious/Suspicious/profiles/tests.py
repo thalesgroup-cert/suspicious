@@ -61,9 +61,9 @@ class CISOProcessingTests(TestCase):
         with patch("profiles.profiles_utils.ciso.CISOProfile.objects.create") as mock_create:
             mock_create.side_effect = lambda **kwargs: CISOProfile.objects.create(
                 user=self.user,
-                function=kwargs.get("title").decode("utf-8"),
-                gbu=kwargs.get("businessCategory").decode("utf-8"),
-                country=kwargs.get("c", b"US").decode("utf-8"),
+                function=kwargs.get("title"),
+                gbu=kwargs.get("businessCategory"),
+                country=kwargs.get("c", b"US"),
                 region="NORAM"
             )
             good, error = process_cisos(["alice"])
