@@ -35,8 +35,9 @@ class HashHandlerValidationTests(TestCase):
 
     def test_validate_hash_detected(self):
         self.handler.hashid = MagicMock()
-        mock_hash_info = iter([MagicMock(name='SHA256')])
-        self.handler.hashid.identifyHash.return_value = mock_hash_info
+        mock_hash_type = MagicMock()
+        mock_hash_type.name = "SHA256"  # Explicit string
+        self.handler.hashid.identifyHash.return_value = iter([mock_hash_type])
 
         result = self.handler.validate_hash("abcd1234")
         self.assertEqual(result, "SHA256")
