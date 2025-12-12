@@ -19,9 +19,9 @@ class CaseInputData(BaseModel):
         default_factory=list,
         description="List of artifact IDs to be associated with the case."
     )
-    attachment_ids: list[list[str]] = Field(
+    attachment_ids: list[str] = Field(
         default_factory=list,
-        description="List of lists of attachment IDs to be associated with the case."
+        description="List of attachment IDs to be associated with the case."
     )
     attachment_ids_ai: list[str] = Field(
         default_factory=list,

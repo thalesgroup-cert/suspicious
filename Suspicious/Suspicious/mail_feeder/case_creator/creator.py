@@ -35,8 +35,7 @@ class CaseCreatorService:
         Flatten and merge artifact_ids and attachment_ids into list_ids.
         """
         validated.list_ids.extend(validated.artifact_ids)
-        for sublist in validated.attachment_ids:
-            validated.list_ids.extend(sublist)
+        validated.list_ids.extend(validated.attachment_ids)
 
     def _prepare_case_dict(self, mail_instance) -> Dict[str, Optional[Any]]:
         """

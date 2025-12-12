@@ -38,9 +38,9 @@ class Handlers:
                     fetch_mail_logger.debug(f"Processing attachment ID: {att.id} for mail ID: {instance.mail_id}")
                     ids, id_ai = attachment_handler.process_attachment(att.file)
                     if ids:
-                        attachment_ids.append(ids)
+                        attachment_ids.extend(str(i) for i in ids)
                     if id_ai:
-                        attachment_id_ai.append(id_ai)
+                        attachment_id_ai.append(str(id_ai))
         fetch_mail_logger.debug(f"Completed processing attachments for mail ID: {instance.mail_id}")
         # Process archive
         if mail_zip:
@@ -57,7 +57,7 @@ class Handlers:
                 id_ai = cortex_job.launch_cortex_ai_jobs(mail_archive, "file")
                 if id_ai:
                     fetch_mail_logger.debug(f"Received AI ID: {id_ai} for mail archive ID: {mail_archive.id}")
-                    attachment_id_ai.append(id_ai)
+                    attachment_id_ai.append(str(id_ai))
 
         return ArtifactResult(ids=attachment_ids, ai_ids=attachment_id_ai)
 
