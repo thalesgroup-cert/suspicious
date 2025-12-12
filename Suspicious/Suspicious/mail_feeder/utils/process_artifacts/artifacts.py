@@ -54,6 +54,8 @@ class ArtifactService:
     # --- Core handlers ---
     def _handle_mail(self, data_value: str, mail_instance):
         data_value = data_value.lower()
+        if "email=" in data_value:
+            data_value = data_value.split("email=")[-1]
         if MailArtifact.objects.filter(
             mail=mail_instance,
             artifact_type="MailAddress",
@@ -71,7 +73,7 @@ class ArtifactService:
         with transaction.atomic():
             mail_artifact = MailArtifact.objects.create(mail=mail_instance, artifact_type="MailAddress")
             validator = EmailValidatorService(ConfigModel(company_domains=self.company_config))
-            valid_email = validator.validate_email_syntax(data_value)
+            valid_email = validator.is_company_email(data_value)
             if valid_email.is_valid:
                 UserCreationService().get_or_create_user(valid_email.normalized)
             else:

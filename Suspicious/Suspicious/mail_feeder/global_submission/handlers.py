@@ -36,7 +36,7 @@ class Handlers:
             if att:
                 with safe_execution("processing attachment"):
                     fetch_mail_logger.debug(f"Processing attachment ID: {att.id} for mail ID: {instance.mail_id}")
-                    ids, id_ai = attachment_handler.process_attachment(att)
+                    ids, id_ai = attachment_handler.process_attachment(att.file)
                     if ids:
                         attachment_ids.append(ids)
                     if id_ai:

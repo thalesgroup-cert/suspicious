@@ -55,6 +55,7 @@ class EmailHandlerService:
             fetch_mail_logger.debug(f"Updating times_sent for new mail: {mail_instance.mail_id}")
             self._update_times_sent(mail_instance)
             self._save_mail(mail_instance)
+            return mail_instance
 
     def _handle_existing_mail(
         self,
