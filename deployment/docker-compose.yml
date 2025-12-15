@@ -65,9 +65,9 @@ services:
     image: elasticsearch:${ELASTICSEARCH_VERSION}
     container_name: elasticsearch
     healthcheck:
-      test: ["CMD-SHELL", "curl -k --silent --fail localhost:9200/_cluster/health | grep -q '\"status\":\"green\"' || exit 1"]
-      interval: 30s
-      timeout: 30s
+      test: ["CMD-SHELL", "curl -k --silent --fail localhost:9200/_cluster/health | grep -Eq '\"status\":\"green\"|\"status\":\"yellow\"' || exit 1"]
+      interval: 20s
+      timeout: 60s
       retries: 30
       start_period: 60s
 
