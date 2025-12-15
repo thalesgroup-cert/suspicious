@@ -3,6 +3,10 @@ from case_handler.case_utils.case_creator import CaseCreator
 from mail_feeder.utils.user_creation.creation import UserCreationService
 from .models import CaseInputData
 from .utils import safe_execution
+import logging
+
+fetch_mail_logger = logging.getLogger("tasp.cron.fetch_and_process_emails")
+logger = logging.getLogger(__name__)
 
 
 class CaseCreatorService:
@@ -56,7 +60,9 @@ class CaseCreatorService:
         case_creator = CaseCreator(user_instance)
         with safe_execution("creating case"):
             case = case_creator.create_case(**case_dict)
-            if case and getattr(case, "fileOrMail", None):
+            fetch_mail_logger.debug(f"Created case: {getattr(case, 'id', 'None')}")
+            if case and case.fileOrMail:
+                fetch_mail_logger.debug(f"Linking mail to case: {getattr(case, 'id', 'None')}")
                 case.fileOrMail.mail = mail_instance
                 case.save()
             return case

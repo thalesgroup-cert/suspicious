@@ -18,7 +18,7 @@ class AcknowledgementEmail:
         self.subject = subject
         self.sender = sender
         self.recipient = recipient
-        self.infos = infos
+        self.infos = infos if infos else recipient
 
     def _html_header(self):
         return """
@@ -256,7 +256,7 @@ class AcknowledgementEmail:
 
     def _body_table(self):
         msg = {
-            'To': self.recipient,
+            'To': self.infos,
             'group': mail_config.get('group', 'Your Group'),
             'online': mail_config.get('submissions', 'https://example.com/online-portal')
         }

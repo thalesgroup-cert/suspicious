@@ -133,7 +133,7 @@ class GlobalSubmissionService:
         related_ids = flatten_id_lists(artifact_ids, attachment_ids)
         fetch_mail_logger.debug(f"Related IDs for case creation: {related_ids} for email: {email_id}")
         CaseCreatorService().create_case(CaseInputData(
-            mail_instance=instance,
+            instance=instance,
             user=user,
             artifact_ids=related_ids,
             attachment_ids=attachment_ids,

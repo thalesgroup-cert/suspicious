@@ -62,8 +62,14 @@ def send_review_email(case):
     """
     user = case.reporter
     # Build user info if available
-    username, sep, _ = user.email.strip().partition("@")
-    user_infos = (username if sep == "@" and username else "")
+    if user:
+        if user.first_name and user.last_name:
+            user_infos = f"{user.first_name} {user.last_name}"
+        else:
+            username = str(user).split("@")[0]
+            user_firstname = username.split(".")[0].capitalize()
+            user_lastname = username.split(".")[1].capitalize()
+            user_infos = f"{user_firstname} {user_lastname}"
     sender = SUSPICIOUS_EMAIL
     mail_header = f"Your submission n°{case.id} has been reviewed as: {case.results}"
 
@@ -89,18 +95,25 @@ def user_acknowledge(mail):
             user = mail.user
             user_profile = UserProfile.objects.filter(user=user).first()
             # Build user info string if available
-            username, sep, _ = user.email.strip().partition("@")
-            user_infos = (username if sep == "@" and username else "")
+            if user:
+                if user.first_name and user.last_name:
+                    user_infos = f"{user.first_name} {user.last_name}"
+                else:
+                    username = str(user).split("@")[0]
+                    user_firstname = username.split(".")[0].capitalize()
+                    user_lastname = username.split(".")[1].capitalize()
+                    user_infos = f"{user_firstname} {user_lastname}"
             update_cases_logger.debug(
                 "Sending acknowledgement email to user with user_infos: %s", user_infos
             )
             # Check user validity (ensuring user is not marked as "suspicious")
             if user is not None and user != SUSPICIOUS_EMAIL:
-                if not user_profile.wants_acknowledgement:
-                    update_cases_logger.info(
-                        "User %s has opted out of acknowledgement emails.", user
-                    )
-                    return
+                if user_profile:
+                    if not user_profile.wants_acknowledgement:
+                        update_cases_logger.info(
+                            "User %s has opted out of acknowledgement emails.", user
+                        )
+                        return
 
                 def send_action():
                     AcknowledgementEmail(
@@ -135,8 +148,15 @@ def user_final_mail(mail, case):
         if mail:
             user = mail.user
             user_profile = UserProfile.objects.filter(user=user).first()
-            username, sep, _ = user.email.strip().partition("@")
-            user_infos = (username if sep == "@" and username else "")  
+            # Build user info string if available
+            if user:
+                if user.first_name and user.last_name:
+                    user_infos = f"{user.first_name} {user.last_name}"
+                else:
+                    username = str(user).split("@")[0]
+                    user_firstname = username.split(".")[0].capitalize()
+                    user_lastname = username.split(".")[1].capitalize()
+                    user_infos = f"{user_firstname} {user_lastname}"
             subject = (
                 f"SUSPICIOUS EMAIL ANALYSIS - Your analysis [{case.id}] is completed"
             )
@@ -145,11 +165,12 @@ def user_final_mail(mail, case):
                 "Sending final email to user with user_infos: %s", user_infos
             )
             if user is not None and user != SUSPICIOUS_EMAIL:
-                if not user_profile.wants_results:
-                    update_cases_logger.info(
-                        "User %s has opted out of final emails.", user
-                    )
-                    return
+                if user_profile:
+                    if not user_profile.wants_results:
+                        update_cases_logger.info(
+                            "User %s has opted out of final emails.", user
+                        )
+                        return
 
                 def send_action():
                     FinalEmail(subject, sender_email, user, case, user_infos).send()
