@@ -20,9 +20,9 @@ class MailInfoService:
     def __init__(self, user_creator: Optional[UserCreationService] = None):
         self.user_creator = user_creator or UserCreationService()
 
-    def create_mail_info(self, mail_instance):
+    def create_mail_info(self, mail_instance) -> MailInfo:
         """
-        Create a MailInfo entry for a given mail instance with validation.
+        Create and persist MailInfo, return instance.
         """
         with safe_execution("creating MailInfo"):
             validated_mail = self._validate_mail_instance(mail_instance)
@@ -31,6 +31,7 @@ class MailInfoService:
 
             mail_info_instance = self._save_mail_info(mail_info_data, mail_instance)
             self._acknowledge_user(mail_info_instance)
+            return mail_info_instance
 
     def _validate_mail_instance(self, mail_instance) -> MailInstanceModel:
         """

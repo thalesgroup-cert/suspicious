@@ -27,12 +27,11 @@ class CaseCreatorService:
         Returns:
             case instance if successfully created, else None
         """
-        validated = data
-        self._merge_ids(validated)
-        user_instance = self.create_user_service.get_or_create_user(validated.user.username)
+        self._merge_ids(data)
+        user_instance = self.create_user_service.get_or_create_user(data.user.username)
 
-        case_dict = self._prepare_case_dict(validated.instance)
-        return self._execute_case_creation(case_dict, validated.instance, user_instance)
+        case_dict = self._prepare_case_dict(data.instance)
+        return self._execute_case_creation(case_dict, data.instance, user_instance)
 
     def _merge_ids(self, validated: CaseInputData) -> None:
         """

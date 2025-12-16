@@ -65,12 +65,16 @@ class CISOProcessingTests(TestCase):
         self.assertIn("alice", good)
         self.assertEqual(error, [])
 
-    @patch("profiles.profiles_utils.ciso.User.objects.get")
-    def test_process_cisos_user_does_not_exist(self, mock_get):
-        mock_get.side_effect = User.DoesNotExist
+    @patch("profiles.profiles_utils.ciso.Ldap")
+    def test_process_cisos_user_does_not_exist(self, MockLdap):
+        # Mock LDAP initialization
+        mock_ldap = MockLdap.return_value
+        mock_ldap.initialize_ldap.return_value = MagicMock()
+
         good, error = process_cisos(["nonexistent"])
+
         self.assertEqual(good, [])
-        self.assertIn("nonexistent", error)
+        self.assertEqual(error, ["nonexistent"])
 
     def test_generate_message(self):
         msg = generate_message(["alice", "bob"], ["carol"], 5)
