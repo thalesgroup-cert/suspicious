@@ -35,4 +35,6 @@ def extract_email_address(from_header: str) -> Optional[str]:
     """
     from email.utils import parseaddr
     _, email_addr = parseaddr(from_header)
-    return email_addr if email_addr else None
+    if not email_addr or "@" not in email_addr:
+        return None
+    return email_addr

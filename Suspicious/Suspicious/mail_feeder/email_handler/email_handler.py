@@ -46,7 +46,7 @@ class EmailHandlerService:
                 fetch_mail_logger.warning("Failed to create Mail instance.")
                 return None
             if not mail_instance_result.success:
-                fetch_mail_logger.warning(f"Mail instance creation unsuccessful: {mail_instance.error}")
+                fetch_mail_logger.warning(f"Mail instance creation unsuccessful: {mail_instance_result.error}")
                 return None
             fetch_mail_logger.debug(f"Created mail instance with ID: {mail_instance_result.mail_id}")
             mail_instance = Mail.objects.get(id=mail_instance_result.mail_id)

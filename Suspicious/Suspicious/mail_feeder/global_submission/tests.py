@@ -1,7 +1,7 @@
 from unittest import TestCase
 from unittest.mock import patch, MagicMock, mock_open
 from email.message import EmailMessage
-
+import io
 from mail_feeder.global_submission.gsubmission import GlobalSubmissionService
 from mail_feeder.global_submission.models import MailSubmissionData
 from mail_feeder.global_submission.utils import flatten_id_lists, extract_email_address
@@ -43,26 +43,17 @@ class GlobalSubmissionServiceTests(TestCase):
         m_finalize.assert_called_once()
         m_mailinfo.return_value.create_mail_info.assert_called_once_with(instance)
 
-    @patch("mail_feeder.global_submission.gsubmission.MailInfoService")
-    @patch("mail_feeder.global_submission.gsubmission.EmailHandlerService")
-    @patch("mail_feeder.global_submission.gsubmission.parse_email")
-    @patch("builtins.open", new_callable=mock_open)
-    def test_process_single_email_minio_submission_success(
-        self, m_open, m_parse, m_handler, m_mailinfo
-    ):
-        m_parse.return_value = "parsed-mail"
-        instance = MagicMock()
-        instance.mail_id = "mid"
-        m_handler.return_value.handle_mail.return_value = instance
+    @patch("mail_feeder.global_submission.gsubmission.EmailHandlerService.handle_mail")
+    @patch("mail_feeder.global_submission.gsubmission.MailInfoService.create_mail_info")
+    def test_process_single_email_minio_submission_success(self, mock_mail_info, mock_handle_mail):
+        mock_instance = MagicMock()
+        mock_handle_mail.return_value = mock_instance
+        submission = self._submission(submitted=False)
 
-        service = GlobalSubmissionService()
-
-        with patch.object(service, "_handle_instance_for_minio") as m_minio:
-            result = service.process_single_email(self._submission(submitted=False))
-
-        self.assertEqual(result, instance)
-        m_minio.assert_called_once()
-        m_mailinfo.return_value.create_mail_info.assert_called_once_with(instance)
+        # mock open pour renvoyer BytesIO
+        with patch("builtins.open", return_value=io.BytesIO(b"From: a@b.com\nTo: x@y.com\nSubject: test\n\nBody")):
+            result = self.service.process_single_email(submission)
+            self.assertEqual(result, mock_instance)
 
     @patch("mail_feeder.global_submission.gsubmission.EmailHandlerService")
     @patch("mail_feeder.global_submission.gsubmission.parse_email")

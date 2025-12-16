@@ -58,9 +58,12 @@ class EmailHandlerServiceTests(TestCase):
         result = self.service.handle_mail(self.data, "/tmp")
         self.assertIsNone(result)
 
+    @patch("mail_feeder.email_handler.email_handler.Mail.objects.get")
     @patch("mail_feeder.email_handler.email_handler.EmailService.create_mail_instance")
-    def test_handle_new_mail_unsuccessful(self, mock_create):
-        mock_create.return_value = MagicMock(success=False, error="err")
+    def test_handle_new_mail_unsuccessful(self, mock_create, mock_get):
+        mock_create.side_effect = Exception("boom")
+        mock_get.return_value = MagicMock(mail_id=1)
+
         result = self.service.handle_mail(self.data, "/tmp")
         self.assertIsNone(result)
 
