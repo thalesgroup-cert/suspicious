@@ -41,18 +41,26 @@ class EmailHandlerService:
     def _handle_new_mail(self, data: EmailDataModel, workdir: str) -> Optional[Mail]:
         with safe_operation("handle_new_mail"):
             fetch_mail_logger.debug("Creating new mail instance")
-            mail_instance_result = self.email_service.create_mail_instance(data.dict())
-            if not mail_instance_result:
-                fetch_mail_logger.warning("Failed to create Mail instance.")
+            try:
+                mail_instance_result = self.email_service.create_mail_instance(data.dict())
+            except Exception as e:
+                fetch_mail_logger.error(f"Mail instance creation failed: {e}")
                 return None
-            if not mail_instance_result.success:
-                fetch_mail_logger.warning(f"Mail instance creation unsuccessful: {mail_instance_result.error}")
+
+            if not mail_instance_result or not mail_instance_result.success:
+                fetch_mail_logger.warning("Mail instance creation unsuccessful")
                 return None
-            fetch_mail_logger.debug(f"Created mail instance with ID: {mail_instance_result.mail_id}")
-            mail_instance = Mail.objects.get(id=mail_instance_result.mail_id)
+
+            try:
+                mail_instance = Mail.objects.get(id=mail_instance_result.mail_id)
+            except Mail.DoesNotExist:
+                fetch_mail_logger.error(
+                    f"Mail instance not found with ID: {mail_instance_result.mail_id}"
+                )
+                return None
+
             mail_instance = self._save_and_update_mail(mail_instance, data)
             self._process_rich_observables(mail_instance, data, workdir)
-            fetch_mail_logger.debug(f"Updating times_sent for new mail: {mail_instance.mail_id}")
             self._update_times_sent(mail_instance)
             self._save_mail(mail_instance)
             return mail_instance
@@ -68,12 +76,15 @@ class EmailHandlerService:
         with safe_operation("handle_existing_mail"):
             if email_list:
                 mail_instance = email_list[0]
-                mail_instance = self._update_existing_mail(mail_instance, data, email_body_list, email_header_list)
+                mail_instance = self._update_existing_mail(
+                    mail_instance, data, email_body_list, email_header_list
+                )
                 fetch_mail_logger.debug(f"Updated existing mail: {mail_instance.mail_id}")
                 self._update_times_sent(mail_instance)
-                fetch_mail_logger.debug(f"Processing rich observables for mail: {mail_instance.mail_id}")
                 self._save_mail(mail_instance)
-            return self._handle_new_mail(data, workdir)
+                return mail_instance
+
+        return self._handle_new_mail(data, workdir)
 
     def _check_existing_data(self, data: EmailDataModel) -> Tuple[List[Mail], list, list]:
         email_list = list(Mail.objects.filter(mail_id=str(data.id)))

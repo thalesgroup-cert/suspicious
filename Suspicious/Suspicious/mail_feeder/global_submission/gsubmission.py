@@ -30,22 +30,31 @@ class GlobalSubmissionService:
     mail headers, and mail bodies.
     """
     def process_single_email(self, submission: MailSubmissionData):
-        """
-        Process a single email file end-to-end.
-        """
         with safe_execution(f"processing email {submission.email_id}"):
             filepath = os.path.join(submission.workdir, submission.filename)
-            with open(filepath, "rb") as f:
-                msg = email.message_from_binary_file(f)
 
-            mail_instance = parse_email(msg, submission.workdir,
-                                        submission.email_id,
-                                        submission.user if submission.is_submitted else None)
-            
+            with open(filepath, "rb") as f:
+                raw_bytes = f.read()
+
+            msg = email.message_from_bytes(raw_bytes)
+
+            mail_instance = parse_email(
+                msg,
+                submission.workdir,
+                submission.email_id,
+                submission.user if submission.is_submitted else None
+            )
+
             instance = EmailHandlerService().handle_mail(mail_instance, submission.workdir)
-            fetch_mail_logger.debug(f"Processed email instance: {instance.mail_id if instance else 'None'}")
+
+            fetch_mail_logger.debug(
+                f"Processed email instance: {instance.mail_id if instance else 'None'}"
+            )
+
             if not instance:
-                fetch_mail_logger.error(f"Email instance processing failed for {submission.email_id}")
+                fetch_mail_logger.error(
+                    f"Email instance processing failed for {submission.email_id}"
+                )
                 return None
 
             # Handle post-processing based on submission type

@@ -9,65 +9,99 @@ from mail_feeder.global_submission.utils import flatten_id_lists, extract_email_
 
 class GlobalSubmissionServiceTests(TestCase):
 
-    def _submission(self, submitted=True):
+    def setUp(self):
+        self.service = GlobalSubmissionService()
+
+    def _submission(self, submitted=False):
         return MailSubmissionData(
-            workdir="/tmp/work",
+            email_id="test-email-id",
             filename="mail.eml",
-            email_id="email123",
-            user="user@example.com",
-            is_submitted=submitted,
+            workdir="/tmp/workdir",
+            user="user@test.com",
+            is_submitted=submitted
         )
 
     @patch("mail_feeder.global_submission.gsubmission.MailInfoService")
+    @patch("mail_feeder.global_submission.gsubmission.Handlers")
     @patch("mail_feeder.global_submission.gsubmission.EmailHandlerService")
     @patch("mail_feeder.global_submission.gsubmission.parse_email")
-    @patch("builtins.open", new_callable=mock_open)
+    @patch("mail_feeder.global_submission.gsubmission.email.message_from_bytes")
+    @patch("builtins.open", new_callable=mock_open, read_data=b"raw email")
     def test_process_single_email_web_submission_success(
-        self, m_open, m_parse, m_handler, m_mailinfo
+        self,
+        mock_open_file,
+        mock_msg_from_bytes,
+        mock_parse_email,
+        mock_email_handler_cls,
+        mock_handlers_cls,
+        mock_mail_info
     ):
-        msg = EmailMessage()
-        m_parse.return_value = "parsed-mail"
+        submission = self._submission(submitted=True)
 
-        instance = MagicMock()
-        instance.mail_id = "mid"
-        m_handler.return_value.handle_mail.return_value = instance
+        fake_msg = MagicMock()
+        fake_instance = MagicMock()
+        fake_instance.mail_id = "mail-db-id"
+        fake_instance.reportedBy = None
 
-        service = GlobalSubmissionService()
+        mock_msg_from_bytes.return_value = fake_msg
+        mock_parse_email.return_value = "parsed-mail"
+        mock_email_handler_cls.return_value.handle_mail.return_value = fake_instance
 
-        with patch.object(service, "finalize_submission") as m_finalize:
-            result = service.process_single_email(self._submission(submitted=True))
+        result = self.service.process_single_email(submission)
 
-        self.assertEqual(result, instance)
-        m_parse.assert_called_once()
-        m_handler.return_value.handle_mail.assert_called_once()
-        m_finalize.assert_called_once()
-        m_mailinfo.return_value.create_mail_info.assert_called_once_with(instance)
+        self.assertEqual(result, fake_instance)
+        mock_mail_info.return_value.create_mail_info.assert_called_once_with(fake_instance)
 
-    @patch("mail_feeder.global_submission.gsubmission.EmailHandlerService.handle_mail")
-    @patch("mail_feeder.global_submission.gsubmission.MailInfoService.create_mail_info")
-    def test_process_single_email_minio_submission_success(self, mock_mail_info, mock_handle_mail):
-        mock_instance = MagicMock()
-        mock_handle_mail.return_value = mock_instance
-        submission = self._submission(submitted=False)
-
-        # mock open pour renvoyer BytesIO
-        with patch("builtins.open", return_value=io.BytesIO(b"From: a@b.com\nTo: x@y.com\nSubject: test\n\nBody")):
-            result = self.service.process_single_email(submission)
-            self.assertEqual(result, mock_instance)
-
-    @patch("mail_feeder.global_submission.gsubmission.EmailHandlerService")
     @patch("mail_feeder.global_submission.gsubmission.parse_email")
-    @patch("builtins.open", new_callable=mock_open)
+    @patch("mail_feeder.global_submission.gsubmission.email.message_from_bytes")
+    @patch("mail_feeder.global_submission.gsubmission.EmailHandlerService")
+    @patch("builtins.open", new_callable=mock_open, read_data=b"raw email")
     def test_process_single_email_handler_failure_returns_none(
-        self, m_open, m_parse, m_handler
+        self,
+        mock_open_file,
+        mock_msg_from_bytes,
+        mock_email_handler_cls,
+        mock_parse_email
     ):
-        m_parse.return_value = "parsed-mail"
-        m_handler.return_value.handle_mail.return_value = None
+        submission = self._submission()
 
-        service = GlobalSubmissionService()
-        result = service.process_single_email(self._submission())
+        mock_msg_from_bytes.return_value = MagicMock()
+        mock_parse_email.return_value = "parsed-mail"
+        mock_email_handler_cls.return_value.handle_mail.return_value = None
+
+        result = self.service.process_single_email(submission)
 
         self.assertIsNone(result)
+
+    @patch("mail_feeder.global_submission.gsubmission.MailInfoService")
+    @patch("mail_feeder.global_submission.gsubmission.Handlers")
+    @patch("mail_feeder.global_submission.gsubmission.EmailHandlerService")
+    @patch("mail_feeder.global_submission.gsubmission.parse_email")
+    @patch("mail_feeder.global_submission.gsubmission.email.message_from_bytes")
+    @patch("builtins.open", new_callable=mock_open, read_data=b"raw email")
+    def test_process_single_email_minio_submission_success(
+        self,
+        mock_open_file,
+        mock_msg_from_bytes,
+        mock_parse_email,
+        mock_email_handler_cls,
+        mock_handlers_cls,
+        mock_mail_info
+    ):
+        submission = self._submission(submitted=False)
+
+        fake_instance = MagicMock()
+        fake_instance.mail_id = "mail-db-id"
+        fake_instance.reportedBy = None
+
+        mock_msg_from_bytes.return_value = MagicMock()
+        mock_parse_email.return_value = "parsed-mail"
+        mock_email_handler_cls.return_value.handle_mail.return_value = fake_instance
+
+        result = self.service.process_single_email(submission)
+
+        self.assertEqual(result, fake_instance)
+        mock_mail_info.return_value.create_mail_info.assert_called_once_with(fake_instance)
 
     @patch.object(GlobalSubmissionService, "_handle_common_tasks")
     def test_finalize_submission(self, m_common):
