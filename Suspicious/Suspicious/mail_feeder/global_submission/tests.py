@@ -1,5 +1,7 @@
 from unittest import TestCase
-from unittest.mock import patch, MagicMock, mock_open
+from unittest.mock import patch, MagicMock
+from io import BytesIO, StringIO
+
 from mail_feeder.global_submission.gsubmission import GlobalSubmissionService
 from mail_feeder.global_submission.models import MailSubmissionData
 from mail_feeder.global_submission.utils import flatten_id_lists, extract_email_address
@@ -27,23 +29,25 @@ class GlobalSubmissionServiceTests(TestCase):
     @patch("mail_feeder.global_submission.gsubmission.EmailHandlerService")
     @patch("mail_feeder.global_submission.gsubmission.parse_email")
     @patch("mail_feeder.global_submission.gsubmission.email.message_from_binary_file")
-    @patch("builtins.open", new_callable=mock_open, read_data=b"raw email")
+    @patch("builtins.open")
     def test_process_single_email_web_submission_success(
         self,
-        mock_open_file,
-        mock_msg_from_file,
+        mock_open,
+        mock_msg_from_binary,
         mock_parse_email,
         mock_email_handler_cls,
         mock_handlers_cls,
         mock_mail_info
     ):
+        mock_open.return_value = BytesIO(b"raw email")
+
         submission = self._submission(submitted=True)
 
         fake_instance = MagicMock()
         fake_instance.mail_id = "mail-db-id"
         fake_instance.reportedBy = None
 
-        mock_msg_from_file.return_value = MagicMock()
+        mock_msg_from_binary.return_value = MagicMock()
         mock_parse_email.return_value = "parsed-mail"
         mock_email_handler_cls.return_value.handle_mail.return_value = fake_instance
 
@@ -63,17 +67,19 @@ class GlobalSubmissionServiceTests(TestCase):
     @patch("mail_feeder.global_submission.gsubmission.parse_email")
     @patch("mail_feeder.global_submission.gsubmission.email.message_from_binary_file")
     @patch("mail_feeder.global_submission.gsubmission.EmailHandlerService")
-    @patch("builtins.open", new_callable=mock_open, read_data=b"raw email")
+    @patch("builtins.open")
     def test_process_single_email_handler_failure_returns_none(
         self,
-        mock_open_file,
-        mock_msg_from_file,
+        mock_open,
+        mock_msg_from_binary,
         mock_email_handler_cls,
         mock_parse_email
     ):
+        mock_open.return_value = BytesIO(b"raw email")
+
         submission = self._submission()
 
-        mock_msg_from_file.return_value = MagicMock()
+        mock_msg_from_binary.return_value = MagicMock()
         mock_parse_email.return_value = "parsed-mail"
         mock_email_handler_cls.return_value.handle_mail.return_value = None
 
@@ -90,10 +96,10 @@ class GlobalSubmissionServiceTests(TestCase):
     @patch("mail_feeder.global_submission.gsubmission.parse_email")
     @patch("mail_feeder.global_submission.gsubmission.email.message_from_file")
     @patch("mail_feeder.global_submission.gsubmission.email.message_from_binary_file")
-    @patch("builtins.open", new_callable=mock_open, read_data="From: user@test.com\n")
+    @patch("builtins.open")
     def test_process_single_email_minio_submission_success(
         self,
-        mock_open_file,
+        mock_open,
         mock_msg_from_binary,
         mock_msg_from_file,
         mock_parse_email,
@@ -101,6 +107,13 @@ class GlobalSubmissionServiceTests(TestCase):
         mock_handlers_cls,
         mock_mail_info
     ):
+        def open_side_effect(*args, **kwargs):
+            if "rb" in kwargs.get("mode", "rb"):
+                return BytesIO(b"raw email")
+            return StringIO("From: user@test.com\n")
+
+        mock_open.side_effect = open_side_effect
+
         submission = self._submission(submitted=False)
 
         fake_instance = MagicMock()
@@ -111,6 +124,7 @@ class GlobalSubmissionServiceTests(TestCase):
         mock_msg_from_file.return_value = MagicMock(
             get=lambda k: "user@test.com" if k == "From" else None
         )
+
         mock_parse_email.return_value = "parsed-mail"
         mock_email_handler_cls.return_value.handle_mail.return_value = fake_instance
 
@@ -164,9 +178,7 @@ class GlobalSubmissionServiceTests(TestCase):
     # =========================
     @patch("os.listdir")
     def test_list_eml_files(self, m_listdir):
-        m_listdir.return_value = [
-            "a.eml", "b.eml", "x.txt", "pref_1.eml"
-        ]
+        m_listdir.return_value = ["a.eml", "b.eml", "x.txt", "pref_1.eml"]
 
         result = self.service.list_eml_files("/tmp", prefix="pref")
 
@@ -176,13 +188,13 @@ class GlobalSubmissionServiceTests(TestCase):
 class GlobalSubmissionUtilsTests(TestCase):
 
     def test_flatten_id_lists(self):
-        result = flatten_id_lists([1, 2], [3], 4)
-        self.assertEqual(result, [1, 2, 3, 4])
+        self.assertEqual(flatten_id_lists([1, 2], [3], 4), [1, 2, 3, 4])
 
     def test_extract_email_address_valid(self):
-        addr = extract_email_address("Alice <alice@example.com>")
-        self.assertEqual(addr, "alice@example.com")
+        self.assertEqual(
+            extract_email_address("Alice <alice@example.com>"),
+            "alice@example.com"
+        )
 
     def test_extract_email_address_invalid(self):
-        addr = extract_email_address("invalid")
-        self.assertIsNone(addr)
+        self.assertIsNone(extract_email_address("invalid"))
