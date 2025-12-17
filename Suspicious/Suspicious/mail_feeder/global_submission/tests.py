@@ -1,5 +1,5 @@
 from unittest import TestCase
-from unittest.mock import patch, MagicMock
+from unittest.mock import patch, MagicMock, mock_open
 from io import BytesIO, StringIO
 
 from mail_feeder.global_submission.gsubmission import GlobalSubmissionService
@@ -64,28 +64,30 @@ class GlobalSubmissionServiceTests(TestCase):
     # =========================
     # Handler failure
     # =========================
+    @patch.object(GlobalSubmissionService, "finalize_submission")
+    @patch("mail_feeder.global_submission.gsubmission.EmailHandlerService")
     @patch("mail_feeder.global_submission.gsubmission.parse_email")
     @patch("mail_feeder.global_submission.gsubmission.email.message_from_binary_file")
-    @patch("mail_feeder.global_submission.gsubmission.EmailHandlerService")
-    @patch("builtins.open")
+    @patch("builtins.open", new_callable=mock_open, read_data=b"raw email")
     def test_process_single_email_handler_failure_returns_none(
         self,
-        mock_open,
-        mock_msg_from_binary,
+        mock_open_file,
+        mock_msg_from_file,
+        mock_parse_email,
         mock_email_handler_cls,
-        mock_parse_email
+        mock_finalize,
     ):
-        mock_open.return_value = BytesIO(b"raw email")
-
         submission = self._submission(submitted=True)
 
-        mock_msg_from_binary.return_value = MagicMock()
+        mock_msg_from_file.return_value = MagicMock()
         mock_parse_email.return_value = "parsed-mail"
         mock_email_handler_cls.return_value.handle_mail.return_value = None
 
         result = self.service.process_single_email(submission)
 
         self.assertIsNone(result)
+        mock_finalize.assert_not_called()
+
 
     # =========================
     # MinIO submission
