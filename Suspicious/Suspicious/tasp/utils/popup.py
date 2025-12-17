@@ -86,10 +86,10 @@ def get_artifacts(case_mail_artifacts):
                     artifact.artifactIsIp.ip.ioc_level
                 ])
         elif artifact.artifact_type == 'URL':
-            url_address = str(artifact.artifactIsUrl.url.address)
-            artifacts.append([url_address, artifact.artifactIsUrl.url.id, url_id(url_address)])
-            hashids.append(get_rand(artifact.artifactIsUrl.url.id))
             if artifact.artifactIsUrl:
+                url_address = str(artifact.artifactIsUrl.url.address)
+                artifacts.append([url_address, artifact.artifactIsUrl.url.id, url_id(url_address)])
+                hashids.append(get_rand(artifact.artifactIsUrl.url.id))
                 infos.append([
                     artifact.artifactIsUrl.url.ioc_score,
                     artifact.artifactIsUrl.url.ioc_confidence,
