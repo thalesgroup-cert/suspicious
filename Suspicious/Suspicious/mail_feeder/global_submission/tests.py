@@ -77,7 +77,7 @@ class GlobalSubmissionServiceTests(TestCase):
     ):
         mock_open.return_value = BytesIO(b"raw email")
 
-        submission = self._submission()
+        submission = self._submission(submitted=True)
 
         mock_msg_from_binary.return_value = MagicMock()
         mock_parse_email.return_value = "parsed-mail"

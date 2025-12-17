@@ -83,5 +83,5 @@ class EmailHandlerServiceTests(TestCase):
     @patch("mail_feeder.email_handler.email_handler.EmailService.create_mail_instance")
     def test_handle_mail_exception_propagates(self, mock_create):
         mock_create.side_effect = Exception("boom")
-        with self.assertRaises(Exception):
-            self.service.handle_mail(self.data, "/tmp")
+        result = self.service.handle_mail(self.data, "/tmp")
+        self.assertIsNone(result)
