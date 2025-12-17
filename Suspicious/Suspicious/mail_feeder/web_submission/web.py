@@ -27,7 +27,7 @@ class WebSubmissionService:
 
         with safe_execution(f"processing emails in {config.workdir}"):
             self.logger.info(f"Processing submitted emails in {config.workdir}")
-            eml_files = glo.list_eml_files(config.workdir, prefix="user_submission")
+            eml_files = glo().list_eml_files(config.workdir, prefix="user_submission")
             for filename in eml_files:
                 self.logger.debug(f"Processing email file: {filename}")
                 last_instance = glo.process_single_email(MailSubmissionData(
