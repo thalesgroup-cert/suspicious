@@ -77,11 +77,11 @@ class ArtifactService:
             if valid_email.is_valid:
                 UserCreationService().get_or_create_user(valid_email.normalized)
             else:
-                ArtifactIsMailAddress.objects.get_or_create(
+                artifact_mail = ArtifactIsMailAddress.objects.get_or_create(
                     mail_address=artifact, artifact=mail_artifact
                 )
-            mail_artifact.ArtifactIsMailAddress = artifact
-            mail_artifact.save()
+                mail_artifact.ArtifactIsMailAddress = artifact_mail[0]
+                mail_artifact.save()
             mail_instance.save()
 
     def _handle_domain(self, data_value: str, mail_instance):
@@ -101,8 +101,8 @@ class ArtifactService:
 
         with transaction.atomic():
             mail_artifact = MailArtifact.objects.create(mail=mail_instance, artifact_type="Domain")
-            ArtifactIsDomain.objects.get_or_create(domain=artifact, artifact=mail_artifact)
-            mail_artifact.ArtifactIsDomain = artifact
+            artifact_domain = ArtifactIsDomain.objects.get_or_create(domain=artifact, artifact=mail_artifact)
+            mail_artifact.ArtifactIsDomain = artifact_domain[0]
             mail_artifact.save()
             mail_instance.save()
 
@@ -132,8 +132,8 @@ class ArtifactService:
 
         with transaction.atomic():
             mail_artifact = MailArtifact.objects.create(mail=mail_instance, artifact_type="URL")
-            ArtifactIsUrl.objects.get_or_create(url=artifact[0], artifact=mail_artifact)
-            mail_artifact.ArtifactIsUrl = artifact[0]
+            artifacturl = ArtifactIsUrl.objects.get_or_create(url=artifact[0], artifact=mail_artifact)
+            mail_artifact.ArtifactIsUrl = artifacturl[0]
             mail_artifact.save()
             mail_instance.save()
 
@@ -150,8 +150,8 @@ class ArtifactService:
         if artifact:
             with transaction.atomic():
                 mail_artifact = MailArtifact.objects.create(mail=mail_instance, artifact_type="IP")
-                ArtifactIsIp.objects.get_or_create(ip=artifact, artifact=mail_artifact)
-                mail_artifact.ArtifactIsIp = artifact
+                artifactip = ArtifactIsIp.objects.get_or_create(ip=artifact, artifact=mail_artifact)
+                mail_artifact.ArtifactIsIp = artifactip[0]
                 mail_artifact.save()
                 mail_instance.save()
 
@@ -173,7 +173,7 @@ class ArtifactService:
         with transaction.atomic():
             mail_artifact = MailArtifact.objects.create(mail=mail_instance, artifact_type="Hash")
             hash_obj, _ = Hash.objects.get_or_create(value=data_value)
-            ArtifactIsHash.objects.get_or_create(hash=hash_obj, artifact=mail_artifact)
-            mail_artifact.ArtifactIsHash = hash_obj
+            artifact_hash = ArtifactIsHash.objects.get_or_create(hash=hash_obj, artifact=mail_artifact)
+            mail_artifact.ArtifactIsHash = artifact_hash[0]
             mail_artifact.save()
             mail_instance.save()
