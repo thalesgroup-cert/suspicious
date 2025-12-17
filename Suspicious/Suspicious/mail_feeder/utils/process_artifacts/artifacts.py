@@ -80,7 +80,7 @@ class ArtifactService:
                 artifact_mail = ArtifactIsMailAddress.objects.get_or_create(
                     mail_address=artifact, artifact=mail_artifact
                 )
-                mail_artifact.ArtifactIsMailAddress = artifact_mail[0]
+                mail_artifact.artifactIsMailAddress = artifact_mail[0]
                 mail_artifact.save()
             mail_instance.save()
 
@@ -102,7 +102,7 @@ class ArtifactService:
         with transaction.atomic():
             mail_artifact = MailArtifact.objects.create(mail=mail_instance, artifact_type="Domain")
             artifact_domain = ArtifactIsDomain.objects.get_or_create(domain=artifact, artifact=mail_artifact)
-            mail_artifact.ArtifactIsDomain = artifact_domain[0]
+            mail_artifact.artifactIsDomain = artifact_domain[0]
             mail_artifact.save()
             mail_instance.save()
 
@@ -133,7 +133,7 @@ class ArtifactService:
         with transaction.atomic():
             mail_artifact = MailArtifact.objects.create(mail=mail_instance, artifact_type="URL")
             artifacturl = ArtifactIsUrl.objects.get_or_create(url=artifact[0], artifact=mail_artifact)
-            mail_artifact.ArtifactIsUrl = artifacturl[0]
+            mail_artifact.artifactIsUrl = artifacturl[0]
             mail_artifact.save()
             mail_instance.save()
 
@@ -151,7 +151,7 @@ class ArtifactService:
             with transaction.atomic():
                 mail_artifact = MailArtifact.objects.create(mail=mail_instance, artifact_type="IP")
                 artifactip = ArtifactIsIp.objects.get_or_create(ip=artifact, artifact=mail_artifact)
-                mail_artifact.ArtifactIsIp = artifactip[0]
+                mail_artifact.artifactIsIp = artifactip[0]
                 mail_artifact.save()
                 mail_instance.save()
 
@@ -174,6 +174,6 @@ class ArtifactService:
             mail_artifact = MailArtifact.objects.create(mail=mail_instance, artifact_type="Hash")
             hash_obj, _ = Hash.objects.get_or_create(value=data_value)
             artifact_hash = ArtifactIsHash.objects.get_or_create(hash=hash_obj, artifact=mail_artifact)
-            mail_artifact.ArtifactIsHash = artifact_hash[0]
+            mail_artifact.artifactIsHash = artifact_hash[0]
             mail_artifact.save()
             mail_instance.save()
