@@ -8,7 +8,7 @@ from cortex_job.cortex_utils.cortex_and_job_management import CortexJob
 from settings.models import AllowListFile, AllowListDomain
 from url_process.url_utils.url_handler import URLHandler
 
-fetch_mail_logger = logging.getLogger("artifacts_job_launcher")
+fetch_mail_logger = logging.getLogger("tasp.cron.fetch_and_process_emails")
 
 
 class ArtifactJobLauncherService:
@@ -31,7 +31,6 @@ class ArtifactJobLauncherService:
             "Domain": self._process_domain_artifact,
             "MailAddress": self._process_mail_artifact,
         }
-
         for artifact in artifacts:
             try:
                 artifact_data = ArtifactModel(artifact_type=artifact.artifact_type)
@@ -89,11 +88,9 @@ class ArtifactJobLauncherService:
             if mail_obj.is_internal:
                 fetch_mail_logger.warning(f"Mail address is internal: {mail_obj.address}")
                 return
-
-            from mail_feeder.utils import get_domain, _create_or_update_domain  # lazy import
+            from email_process.email_utils.email_handler import get_domain, _create_or_update_domain
             domain_str = get_domain(mail_obj)
             domain_instance = _create_or_update_domain(domain_str)
-
             if not self._is_domain_allow_listed(domain_instance, mail_obj):
                 self._launch_cortex_jobs(mail_obj, "mail")
             mail_obj.save()

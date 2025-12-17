@@ -18,12 +18,22 @@ class Handlers:
     Handlers for artifacts, attachments, mail headers, and mail bodies.
     """
     def handle_artifacts(self, instance) -> list[int]:
+        fetch_mail_logger.debug(f"Handling artifacts for mail ID: {instance.mail_id}")
         artifact_handler = ArtifactJobLauncherService()
+        fetch_mail_logger.debug("Initialized ArtifactJobLauncherService")
         instance_artifacts = MailArtifact.objects.filter(mail=instance)
+        fetch_mail_logger.debug(f"Found {instance_artifacts.count()} artifacts for mail ID: {instance.mail_id}")
         artifact_ids = []
+        fetch_mail_logger.debug("Starting artifact processing")
         with safe_execution("handling artifacts"):
+            fetch_mail_logger.debug("Processing artifacts")
+            instance_artifacts = list(MailArtifact.objects.filter(mail=instance))
+            fetch_mail_logger.debug(f"Artifacts to process: {len(instance_artifacts)}")
             if instance_artifacts:
+                fetch_mail_logger.debug("Launching artifact processing")
                 artifact_ids = artifact_handler.process_artifacts(instance_artifacts)
+
+                fetch_mail_logger.debug(f"Artifact processing completed with IDs: {artifact_ids}")
         return artifact_ids
 
     def handle_attachments(self, instance, mail_zip: Optional[str]) -> ArtifactResult:
