@@ -810,6 +810,8 @@ def get_attachment_file_analyzers(attachment):
     """
     analyzers = []
     unique_analyzers = set()  # Set to track unique analyzer names
+    if not attachment.file:
+        return analyzers
     mail_attachments_analyzers = AnalyzerReport.objects.filter(file=attachment.file).order_by('-creation_date')
     
     for analyzer in mail_attachments_analyzers:
@@ -846,6 +848,8 @@ def get_attachment_hash_analyzers(attachment):
     """
     analyzers = []
     unique_analyzers = set()  # Set to track unique analyzer names
+    if not attachment.file or not attachment.file.linked_hash:
+        return analyzers
     mail_hash_attachments_analyzers = AnalyzerReport.objects.filter(hash=attachment.file.linked_hash).order_by('-creation_date')
     
     for analyzer in mail_hash_attachments_analyzers:
@@ -937,20 +941,21 @@ def get_artifact_url_analyzers(artifact):
     """
     analyzers = []
     unique_analyzers = set()  # Set to track unique analyzer names
-    mail_artifacts_analyzers = AnalyzerReport.objects.filter(url=artifact.artifactIsUrl.url).order_by('-creation_date')
+    if artifact.artifactIsUrl:
+        mail_artifacts_analyzers = AnalyzerReport.objects.filter(url=artifact.artifactIsUrl.url).order_by('-creation_date')
 
-    for analyzer in mail_artifacts_analyzers:
-        if analyzer.analyzer.name not in unique_analyzers:  # Ensure only one report per analyzer
-            unique_analyzers.add(analyzer.analyzer.name)
-            analyzers.append({
-                "id": analyzer.id,
-                "analyzer_name": analyzer.analyzer.name,
-                "status": analyzer.status,
-                "score": analyzer.score,
-                "confidence": analyzer.confidence,
-                "level": analyzer.level,
-                "artifact": artifact.artifactIsUrl.url.address
-            })
+        for analyzer in mail_artifacts_analyzers:
+            if analyzer.analyzer.name not in unique_analyzers:  # Ensure only one report per analyzer
+                unique_analyzers.add(analyzer.analyzer.name)
+                analyzers.append({
+                    "id": analyzer.id,
+                    "analyzer_name": analyzer.analyzer.name,
+                    "status": analyzer.status,
+                    "score": analyzer.score,
+                    "confidence": analyzer.confidence,
+                    "level": analyzer.level,
+                    "artifact": artifact.artifactIsUrl.url.address
+                })
     
     return analyzers
 
@@ -973,19 +978,20 @@ def get_artifact_hash_analyzers(artifact):
     """
     analyzers = []
     unique_analyzers = set()  # Set to track unique analyzer names
-    mail_artifacts_analyzers = AnalyzerReport.objects.filter(hash=artifact.artifactIsHash.hash).order_by('-creation_date')
+    if artifact.artifactIsHash:
+        mail_artifacts_analyzers = AnalyzerReport.objects.filter(hash=artifact.artifactIsHash.hash).order_by('-creation_date')
 
-    for analyzer in mail_artifacts_analyzers:
-        if analyzer.analyzer.name not in unique_analyzers:  # Ensure only one report per analyzer
-            unique_analyzers.add(analyzer.analyzer.name)
-            analyzers.append({
-                "id": analyzer.id,
-                "analyzer_name": analyzer.analyzer.name,
-                "status": analyzer.status,
-                "score": analyzer.score,
-                "confidence": analyzer.confidence,
-                "level": analyzer.level,
-                "artifact": artifact.artifactIsHash.hash.value
-            })
+        for analyzer in mail_artifacts_analyzers:
+            if analyzer.analyzer.name not in unique_analyzers:  # Ensure only one report per analyzer
+                unique_analyzers.add(analyzer.analyzer.name)
+                analyzers.append({
+                    "id": analyzer.id,
+                    "analyzer_name": analyzer.analyzer.name,
+                    "status": analyzer.status,
+                    "score": analyzer.score,
+                    "confidence": analyzer.confidence,
+                    "level": analyzer.level,
+                    "artifact": artifact.artifactIsHash.hash.value
+                })
     
     return analyzers
