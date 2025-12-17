@@ -76,32 +76,35 @@ def get_artifacts(case_mail_artifacts):
 
     for artifact in case_mail_artifacts:
         if artifact.artifact_type == 'IP':
-            ip_address = str(artifact.artifactIsIp.ip.address)
-            artifacts.append(ip_address)
-            hashids.append(get_rand(artifact.artifactIsIp.ip.id))
-            infos.append([
-                artifact.artifactIsIp.ip.ioc_score,
-                artifact.artifactIsIp.ip.ioc_confidence,
-                artifact.artifactIsIp.ip.ioc_level
-            ])
+            if artifact.artifactIsIp:
+                ip_address = str(artifact.artifactIsIp.ip.address)
+                artifacts.append(ip_address)
+                hashids.append(get_rand(artifact.artifactIsIp.ip.id))
+                infos.append([
+                    artifact.artifactIsIp.ip.ioc_score,
+                    artifact.artifactIsIp.ip.ioc_confidence,
+                    artifact.artifactIsIp.ip.ioc_level
+                ])
         elif artifact.artifact_type == 'URL':
             url_address = str(artifact.artifactIsUrl.url.address)
             artifacts.append([url_address, artifact.artifactIsUrl.url.id, url_id(url_address)])
             hashids.append(get_rand(artifact.artifactIsUrl.url.id))
-            infos.append([
-                artifact.artifactIsUrl.url.ioc_score,
-                artifact.artifactIsUrl.url.ioc_confidence,
-                artifact.artifactIsUrl.url.ioc_level
-            ])
+            if artifact.artifactIsUrl:
+                infos.append([
+                    artifact.artifactIsUrl.url.ioc_score,
+                    artifact.artifactIsUrl.url.ioc_confidence,
+                    artifact.artifactIsUrl.url.ioc_level
+                ])
         elif artifact.artifact_type == 'Hash':
-            hash_value = str(artifact.artifactIsHash.hash.value)
-            artifacts.append(hash_value)
-            hashids.append(get_rand(artifact.artifactIsHash.hash.id))
-            infos.append([
-                artifact.artifactIsHash.hash.ioc_score,
-                artifact.artifactIsHash.hash.ioc_confidence,
-                artifact.artifactIsHash.hash.ioc_level
-            ])
+            if artifact.artifactIsHash:
+                hash_value = str(artifact.artifactIsHash.hash.value)
+                artifacts.append(hash_value)
+                hashids.append(get_rand(artifact.artifactIsHash.hash.id))
+                infos.append([
+                    artifact.artifactIsHash.hash.ioc_score,
+                    artifact.artifactIsHash.hash.ioc_confidence,
+                    artifact.artifactIsHash.hash.ioc_level
+                ])
     return {
         "artifact": artifacts,
         "hashid": hashids,
@@ -127,6 +130,8 @@ def get_attachments(case_mail_attachments):
     infos = []
 
     for attachment in case_mail_attachments:
+        if not attachment.file:
+            continue
         file_info = {
             'file_score': attachment.file.file_score,
             'file_confidence': attachment.file.file_confidence,

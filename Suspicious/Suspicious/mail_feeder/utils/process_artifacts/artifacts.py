@@ -80,6 +80,7 @@ class ArtifactService:
                 ArtifactIsMailAddress.objects.get_or_create(
                     mail_address=artifact, artifact=mail_artifact
                 )
+            mail_artifact.ArtifactIsMailAddress = artifact
             mail_artifact.save()
             mail_instance.save()
 
@@ -101,6 +102,7 @@ class ArtifactService:
         with transaction.atomic():
             mail_artifact = MailArtifact.objects.create(mail=mail_instance, artifact_type="Domain")
             ArtifactIsDomain.objects.get_or_create(domain=artifact, artifact=mail_artifact)
+            mail_artifact.ArtifactIsDomain = artifact
             mail_artifact.save()
             mail_instance.save()
 
@@ -131,6 +133,7 @@ class ArtifactService:
         with transaction.atomic():
             mail_artifact = MailArtifact.objects.create(mail=mail_instance, artifact_type="URL")
             ArtifactIsUrl.objects.get_or_create(url=artifact[0], artifact=mail_artifact)
+            mail_artifact.ArtifactIsUrl = artifact[0]
             mail_artifact.save()
             mail_instance.save()
 
@@ -148,6 +151,7 @@ class ArtifactService:
             with transaction.atomic():
                 mail_artifact = MailArtifact.objects.create(mail=mail_instance, artifact_type="IP")
                 ArtifactIsIp.objects.get_or_create(ip=artifact, artifact=mail_artifact)
+                mail_artifact.ArtifactIsIp = artifact
                 mail_artifact.save()
                 mail_instance.save()
 
@@ -170,5 +174,6 @@ class ArtifactService:
             mail_artifact = MailArtifact.objects.create(mail=mail_instance, artifact_type="Hash")
             hash_obj, _ = Hash.objects.get_or_create(value=data_value)
             ArtifactIsHash.objects.get_or_create(hash=hash_obj, artifact=mail_artifact)
+            mail_artifact.ArtifactIsHash = hash_obj
             mail_artifact.save()
             mail_instance.save()
