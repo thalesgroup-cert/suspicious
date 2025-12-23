@@ -4,7 +4,7 @@ from typing import Optional
 
 from mail_feeder.utils.user_creation.creation import UserCreationService
 from mail_feeder.models import MailInfo
-from score_process.score_utils.send_mail import user_acknowledge
+from score_process.score_utils.send_mail.service import MailNotificationService
 
 from .utils import safe_execution
 from .models import MailInstanceModel, MailInfoData
@@ -83,7 +83,8 @@ class MailInfoService:
         Trigger acknowledgment for the user.
         """
         try:
-            user_acknowledge(mail_info_instance)
+            cls = MailNotificationService.from_settings()
+            cls.send_acknowledgement(mail_info_instance)
             fetch_mail_logger.info(f"Acknowledgment sent for user {mail_info_instance.user}")
         except Exception as e:
             fetch_mail_logger.error(f"Failed to send acknowledgment: {e}")
