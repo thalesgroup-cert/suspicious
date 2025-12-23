@@ -34,7 +34,7 @@ from case_handler.models import Case
 
 from minio import Minio
 from minio.error import S3Error
-from .base import BaseAnalyzer
+from ..base import BaseAnalyzer
 
 CONFIG_PATH = "/app/settings.json"
 with open(CONFIG_PATH) as config_file:
