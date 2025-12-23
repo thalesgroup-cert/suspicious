@@ -34,7 +34,7 @@ from case_handler.update_case.update_handler import (
     handle_ioc,
 )
 from score_process.score_utils.thehive.challenge import ChallengeToTheHiveService
-from score_process.score_utils.templates.modification import ModifEmail
+from score_process.score_utils.send_mail.service import MailNotificationService
 
 from cortex_job.models import AnalyzerReport
 
@@ -324,12 +324,9 @@ class CaseEditService:
         self.case.save(update_fields=["finalScore", "finalConfidence", "results", "last_update_by", "status"])
 
     def notify_reporter(self):
-        user_reporter = self.case.reporter
-        user_infos = (f"{user_reporter.first_name} {user_reporter.last_name}".strip()
-                      or user_reporter.username)
-        mail_header = f"Your submission n° {self.case.id} has been reviewed: {self.case.results}"
-        ModifEmail(mail_header, EMAIL_SENDER_DEFAULT, user_reporter, self.case, user_infos).send()
-        self.logger.info(f"Modification email sent for case ID {self.case.id} to '{user_reporter}'.")
+        cls = MailNotificationService.from_settings()
+        cls.send_review_email(self.case)
+        self.logger.info(f"Modification email sent for case ID {self.case.id} to '{self.case.reporter}'.")
 
 class CaseStatus():
     CHALLENGED = "Challenged"
