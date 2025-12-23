@@ -3,7 +3,7 @@ import logging
 from django.db.models import Max
 
 from .service import CortexAnalyzerService
-from .models import AnalyzerReport
+from cortex_job.models import AnalyzerReport
 from score_process.scoring.processing import (
     process_file_ioc,
     process_mail,
