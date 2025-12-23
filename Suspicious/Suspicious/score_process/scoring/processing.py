@@ -132,17 +132,17 @@ def _process_mail_part(mail_part, part_type, score_field, confidence_field, repo
     Returns:
         int: A failure counter (0 if all went well; >0 otherwise).
     """
-    from score_process.scoring.score_check import CortexAnalyzer
+    from score_process.scoring.cortex_analyzers.reports import CortexAnalyzerReports
     failure = 0
     log_func(f"process_{part_type}: processing {part_type}.")
     try:
         mail_part.times_sent += 1
         # Retrieve analyzer reports using a fuzzy hash for the part
-        analyzer_reports = CortexAnalyzer.get_analyzer_reports_by_type_and_artifact(part_type, mail_part)
+        analyzer_reports = CortexAnalyzerReports.get_analyzer_reports_by_type_and_artifact(part_type, mail_part)
         log_func(f"process_{part_type}: analyzer reports retrieved.")
 
         if analyzer_reports:
-            failure += CortexAnalyzer.process_analyzer_reports(reports, analyzer_reports, mail_part.fuzzy_hash, None)
+            failure += CortexAnalyzerReports.process_analyzer_reports(reports, analyzer_reports, mail_part.fuzzy_hash, None)
             log_func(f"process_{part_type}: analyzer reports processed.")
 
             # Calculate the score and confidence from reports
@@ -215,7 +215,7 @@ def process_ioc(ioc, ioc_type, reports, total_scores, total_confidences, is_mali
     Returns:
         int: A failure indicator (0 if processing was successful, non-zero otherwise).
     """
-    from score_process.scoring.score_check import CortexAnalyzer
+    from score_process.scoring.score_check import CortexAnalyzerReports
     failure = 0
     try:
         # Increment times_sent and save the IOC.
@@ -223,13 +223,13 @@ def process_ioc(ioc, ioc_type, reports, total_scores, total_confidences, is_mali
         ioc.save()
 
         update_cases_logger.debug("Processing %s IOC (times_sent=%d).", ioc_type, ioc.times_sent)
-        analyzer_reports = CortexAnalyzer.get_analyzer_reports_by_type_and_artifact(ioc_type, ioc)
+        analyzer_reports = CortexAnalyzerReports.get_analyzer_reports_by_type_and_artifact(ioc_type, ioc)
         update_cases_logger.debug("Analyzer reports retrieved.")
 
         if analyzer_reports:
             # Use ioc.value for "hash" type, otherwise use ioc.address.
             artifact_value = ioc.value if ioc_type == "hash" else ioc.address
-            failure = CortexAnalyzer.process_analyzer_reports(reports, analyzer_reports, artifact_value, None)
+            failure = CortexAnalyzerReports.process_analyzer_reports(reports, analyzer_reports, artifact_value, None)
             update_cases_logger.debug("Analyzer reports processed.")
 
             weighted_scores = []
@@ -318,7 +318,7 @@ def process_file_ioc(file_ioc, reports, total_scores, total_confidences, is_mali
     Returns:
         int: The failure count (0 if processing is successful; nonzero otherwise).
     """
-    from score_process.scoring.score_check import CortexAnalyzer
+    from score_process.scoring.score_check import CortexAnalyzerReports
     failure = 0
 
     try:
@@ -330,7 +330,7 @@ def process_file_ioc(file_ioc, reports, total_scores, total_confidences, is_mali
         )
 
         # Retrieve analyzer reports for the file.
-        analyzers_reports_file = CortexAnalyzer.get_analyzer_reports_by_type_and_artifact("file", file_ioc)
+        analyzers_reports_file = CortexAnalyzerReports.get_analyzer_reports_by_type_and_artifact("file", file_ioc)
         update_cases_logger.debug("[score_check.py] process_file_ioc: file analyzer reports retrieved.")
 
         # If there are no analyzer reports, we can exit early.
@@ -338,7 +338,7 @@ def process_file_ioc(file_ioc, reports, total_scores, total_confidences, is_mali
             return failure
 
         # Process file analyzer reports and update failure count.
-        failure = CortexAnalyzer.process_analyzer_reports(
+        failure = CortexAnalyzerReports.process_analyzer_reports(
             reports, analyzers_reports_file, str(file_ioc.file_path.name), case_id
         )
 
@@ -351,7 +351,7 @@ def process_file_ioc(file_ioc, reports, total_scores, total_confidences, is_mali
 
         # Process linked hash if available.
         if file_ioc.linked_hash:
-            analyzers_reports_hash = CortexAnalyzer.get_analyzer_reports_by_type_and_artifact("hash", file_ioc.linked_hash)
+            analyzers_reports_hash = CortexAnalyzerReports.get_analyzer_reports_by_type_and_artifact("hash", file_ioc.linked_hash)
             hash_score, hash_confidence, hash_weight = compute_weighted_scores(analyzers_reports_hash, "hash")
             update_cases_logger.debug("[score_check.py] process_file_ioc: hash analyzer reports processed.")
 
@@ -422,7 +422,7 @@ def process_archive_ioc(file_ioc, reports, total_scores, total_confidences, is_m
     Returns:
         int: The failure count (0 if processing is successful; nonzero otherwise).
     """
-    from score_process.scoring.score_check import CortexAnalyzer
+    from score_process.scoring.score_check import CortexAnalyzerReports
     failure = 0
 
     try:
@@ -434,7 +434,7 @@ def process_archive_ioc(file_ioc, reports, total_scores, total_confidences, is_m
         )
 
         # Retrieve analyzer reports for the file.
-        analyzers_reports_file = CortexAnalyzer.get_analyzer_reports_by_type_and_artifact("file", file_ioc)
+        analyzers_reports_file = CortexAnalyzerReports.get_analyzer_reports_by_type_and_artifact("file", file_ioc)
         update_cases_logger.debug("[score_check.py] process_file_ioc: file analyzer reports retrieved.")
 
         # If there are no analyzer reports, we can exit early.
@@ -442,7 +442,7 @@ def process_archive_ioc(file_ioc, reports, total_scores, total_confidences, is_m
             return failure
 
         # Process file analyzer reports and update failure count.
-        failure = CortexAnalyzer.process_analyzer_reports(
+        failure = CortexAnalyzerReports.process_analyzer_reports(
             reports, analyzers_reports_file, str(file_ioc.file_path.name), case_id
         )
 

@@ -1,14 +1,141 @@
-from email.header import decode_header
-from collections import Counter
-from collections import defaultdict
+import os
+import re
+from datetime import datetime
+from secrets import token_hex
+from typing import List
+from email.header import decode_header, make_header
+
+from .models import Observable
+from collections import Counter, defaultdict
 import json
 import ast
-import re
 import logging
-import html  # Added for HTML entity unescaping
+import html
 
 logger = logging.getLogger(__name__)
 update_cases_logger = logging.getLogger('tasp.cron.update_ongoing_case_jobs')
+
+ATTACHMENTS_DIR = "/tmp/attachments"
+
+def safe(value, default=None):
+    return value if value not in (None, "") else default
+
+
+def generate_ref() -> str:
+    return datetime.now().strftime("%y%m%d") + "-" + token_hex(3)[:5]
+
+
+def decode_mime_header(value) -> str:
+    try:
+        if isinstance(value, list):
+            value = value[0]
+        if not isinstance(value, str):
+            value = str(value)
+        if re.search(r"=\?.+?\?[bBqQ]\?.+?\?=", value):
+            return str(make_header(decode_header(value)))
+        return value
+    except Exception:
+        return str(value)
+
+
+def build_mail_attachments(
+    headers: str | None,
+    eml: str | None,
+    txt: str | None,
+    html: str | None,
+    case_id: str,
+) -> List[str]:
+    os.makedirs(ATTACHMENTS_DIR, exist_ok=True)
+    attachments = []
+
+    def _write(ext: str, content: str):
+        path = f"{ATTACHMENTS_DIR}/{case_id}.{ext}"
+        with open(path, "w") as f:
+            f.write(content)
+        attachments.append(path)
+
+    if headers:
+        _write("headers", headers)
+    if eml:
+        _write("eml", eml)
+    if txt:
+        _write("txt", txt)
+    if html:
+        _write("html", html)
+
+    return attachments
+
+
+def observables_from_html(html: str) -> List[Observable]:
+    return [
+        Observable(
+            dataType="url",
+            data=url,
+            tags=["url", "suspicious", 'enisa:nefarious-activity-abuse="phishing-attack"'],
+            message="Mail body URL",
+        )
+        for url in extract_urls(html)
+    ]
+
+
+def observables_from_headers(raw_headers: str) -> List[Observable]:
+    headers = parse_headers(raw_headers)
+    obs: List[Observable] = []
+
+    if subject := headers.get("Subject"):
+        decoded = decode_mime_header(subject[0])
+        obs.append(
+            Observable(
+                dataType="mail-subject",
+                data=decoded,
+                tags=["subject", "suspicious", 'enisa:nefarious-activity-abuse="phishing-attack"'],
+                message="Mail subject",
+            )
+        )
+
+    def _mail_observable(value, label):
+        return Observable(
+            dataType="mail",
+            data=extract_mails(value)[0],
+            tags=[label, "suspicious", 'enisa:nefarious-activity-abuse="phishing-attack"'],
+            message=label,
+        )
+
+    for key, label in [("From", "sender"), ("Reply-To", "reply-to"), ("In-Reply-To", "in-reply-to")]:
+        if headers.get(key):
+            value = str(headers[key][0])
+            obs.append(
+                Observable(
+                    dataType="other",
+                    data=value,
+                    tags=[label, "suspicious", 'enisa:nefarious-activity-abuse="phishing-attack"'],
+                    message=f'"{key}" header field',
+                )
+            )
+            obs.append(_mail_observable(value, label))
+
+    return obs
+
+def build_mail_attachments_paths(eml: str, ticket_id: str) -> str:
+    if not eml:
+        return ""
+
+    os.makedirs("/tmp/attachments", exist_ok=True)
+    path = f"/tmp/attachments/{ticket_id}.eml"
+
+    with open(path, "w") as f:
+        f.write(eml)
+
+    return path
+
+
+def map_result_color(result: str) -> str:
+    return {
+        "Dangerous": "#EF3340",
+        "Suspicious": "#FFAA4D",
+        "Safe": "#00AB84",
+        "Inconclusive": "#0085CA",
+    }.get(result, "#000")
 
 def extract_mails(string):
     pattern = r'[\w\.-]+@[\w\.-]+'
