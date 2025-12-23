@@ -1,5 +1,6 @@
 from .client import MISPClient
-from .utils import parse_email_headers, current_month_event_name, first_day_of_month
+from .utils import current_month_event_name, first_day_of_month
+from score_process.scoring.header_parser import parse_email_headers
 from pymisp import MISPEvent, MISPObject
 from ip_process.models import IP
 from url_process.models import URL
