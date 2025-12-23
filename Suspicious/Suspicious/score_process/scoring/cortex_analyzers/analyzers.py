@@ -4,23 +4,23 @@ from .models import AnalyzerResult
 
 # Import all analyzers
 from .analyzers_services.base import BaseAnalyzer
-from .analyzers_services.googlesafebrowsing import AnalyzerGoogleSafeBrowsing
+from .analyzers_services.google_safebrowsing import AnalyzerGoogleSafeBrowsing
 from .analyzers_services.fileinfo import AnalyzerFileinfo
 from .analyzers_services.virustotal import AnalyzerVT
 from .analyzers_services.misp import AnalyzerMISP
-from .analyzers_services.otxquery import AnalyzerOTXQuery
+from .analyzers_services.otx import AnalyzerOTXQuery
 from .analyzers_services.urlscan import AnalyzerUrlscan
 from .analyzers_services.urlhaus import AnalyzerURLhaus
 from .analyzers_services.abuseipdb import AnalyzerAbuseIPDB
 from .analyzers_services.crowdsec import AnalyzerCrowdsec
-from .analyzers_services.circlhashlookup import AnalyzerCIRCLHashLookup
+from .analyzers_services.circl_hashlookup import AnalyzerCIRCLHashLookup
 from .analyzers_services.dshield import AnalyzerDShield
 from .analyzers_services.maxmind import AnalyzerMaxMind
-from .analyzers_services.mnemonic import AnalyzerMN_PDNS
+from .analyzers_services.mnemonic_pdns import AnalyzerMN_PDNS
 from .analyzers_services.zscaler import AnalyzerZscaler
-from .analyzers_services.stopforumspam import AnalyzerSFS
+from .analyzers_services.sfs import AnalyzerSFS
 from .analyzers_services.hashdd import AnalyzerHashdd
-from .analyzers_services.yara import AnalyzerYaraSuspicious, AnalyzerYaraTasp
+from .analyzers_services.yara import AnalyzerYara
 from .analyzers_services.mailheader import AnalyzerMailHeader
 from .analyzers_services.ai.service import AnalyzerAI
 
@@ -49,8 +49,7 @@ class AnalyzerFactory:
         "zscaler": AnalyzerZscaler,
         "stopforumspam": AnalyzerSFS,
         "hashdd": AnalyzerHashdd,
-        "yara": AnalyzerYaraSuspicious,
-        "yaratasp": AnalyzerYaraTasp,
+        "yara": AnalyzerYara,
         "mailheader": AnalyzerMailHeader,
         "ai": AnalyzerAI,
     }
