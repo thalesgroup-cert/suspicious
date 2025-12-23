@@ -5,8 +5,8 @@ from datetime import datetime, timedelta
 
 from cortex4py.api import Api
 from cortex_job.models import Analyzer, AnalyzerReport
-from mail_feeder.models import MailBody, MailArchive, MailInfo
-from score_process.scoring.score_check import CortexAnalyzer
+from mail_feeder.models import MailBody, MailArchive, MailInfo, MailHeader
+from score_process.scoring.cortex_analyzers.reports import CortexAnalyzerReports
 
 # ------------------------
 # Logger setup
@@ -1258,7 +1258,7 @@ class CortexJobManager:
         # If all jobs are done, fetch the final report
         if case.status == "Done":
             try:
-                CortexAnalyzer.get_report(case)
+                CortexAnalyzerReports.get_report(case)
             except Exception as e:
                 update_cases_logger.error(
                     f"Error fetching final report for case {case.id}: {e}",

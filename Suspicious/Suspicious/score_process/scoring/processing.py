@@ -215,7 +215,7 @@ def process_ioc(ioc, ioc_type, reports, total_scores, total_confidences, is_mali
     Returns:
         int: A failure indicator (0 if processing was successful, non-zero otherwise).
     """
-    from score_process.scoring.score_check import CortexAnalyzerReports
+    from score_process.scoring.cortex_analyzers.reports import CortexAnalyzerReports
     failure = 0
     try:
         # Increment times_sent and save the IOC.
@@ -318,7 +318,7 @@ def process_file_ioc(file_ioc, reports, total_scores, total_confidences, is_mali
     Returns:
         int: The failure count (0 if processing is successful; nonzero otherwise).
     """
-    from score_process.scoring.score_check import CortexAnalyzerReports
+    from score_process.scoring.cortex_analyzers.reports import CortexAnalyzerReports
     failure = 0
 
     try:
@@ -422,7 +422,7 @@ def process_archive_ioc(file_ioc, reports, total_scores, total_confidences, is_m
     Returns:
         int: The failure count (0 if processing is successful; nonzero otherwise).
     """
-    from score_process.scoring.score_check import CortexAnalyzerReports
+    from score_process.scoring.cortex_analyzers.reports import CortexAnalyzerReports
     failure = 0
 
     try:
