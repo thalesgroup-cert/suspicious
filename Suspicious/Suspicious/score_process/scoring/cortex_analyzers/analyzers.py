@@ -3,26 +3,26 @@ from .utils import normalize_analyzer_name
 from .models import AnalyzerResult
 
 # Import all analyzers
-from .cortex_analyzers.base import BaseAnalyzer
-from .cortex_analyzers.googlesafebrowsing import AnalyzerGoogleSafeBrowsing
-from .cortex_analyzers.fileinfo import AnalyzerFileinfo
-from .cortex_analyzers.virustotal import AnalyzerVT
-from .cortex_analyzers.misp import AnalyzerMISP
-from .cortex_analyzers.otxquery import AnalyzerOTXQuery
-from .cortex_analyzers.urlscan import AnalyzerUrlscan
-from .cortex_analyzers.urlhaus import AnalyzerURLhaus
-from .cortex_analyzers.abuseipdb import AnalyzerAbuseIPDB
-from .cortex_analyzers.crowdsec import AnalyzerCrowdsec
-from .cortex_analyzers.circlhashlookup import AnalyzerCIRCLHashLookup
-from .cortex_analyzers.dshield import AnalyzerDShield
-from .cortex_analyzers.maxmind import AnalyzerMaxMind
-from .cortex_analyzers.mnemonic import AnalyzerMN_PDNS
-from .cortex_analyzers.zscaler import AnalyzerZscaler
-from .cortex_analyzers.stopforumspam import AnalyzerSFS
-from .cortex_analyzers.hashdd import AnalyzerHashdd
-from .cortex_analyzers.yara import AnalyzerYaraSuspicious, AnalyzerYaraTasp
-from .cortex_analyzers.mailheader import AnalyzerMailHeader
-from .cortex_analyzers.ai.service import AnalyzerAI
+from .analyzers_services.base import BaseAnalyzer
+from .analyzers_services.googlesafebrowsing import AnalyzerGoogleSafeBrowsing
+from .analyzers_services.fileinfo import AnalyzerFileinfo
+from .analyzers_services.virustotal import AnalyzerVT
+from .analyzers_services.misp import AnalyzerMISP
+from .analyzers_services.otxquery import AnalyzerOTXQuery
+from .analyzers_services.urlscan import AnalyzerUrlscan
+from .analyzers_services.urlhaus import AnalyzerURLhaus
+from .analyzers_services.abuseipdb import AnalyzerAbuseIPDB
+from .analyzers_services.crowdsec import AnalyzerCrowdsec
+from .analyzers_services.circlhashlookup import AnalyzerCIRCLHashLookup
+from .analyzers_services.dshield import AnalyzerDShield
+from .analyzers_services.maxmind import AnalyzerMaxMind
+from .analyzers_services.mnemonic import AnalyzerMN_PDNS
+from .analyzers_services.zscaler import AnalyzerZscaler
+from .analyzers_services.stopforumspam import AnalyzerSFS
+from .analyzers_services.hashdd import AnalyzerHashdd
+from .analyzers_services.yara import AnalyzerYaraSuspicious, AnalyzerYaraTasp
+from .analyzers_services.mailheader import AnalyzerMailHeader
+from .analyzers_services.ai.service import AnalyzerAI
 
 logger = logging.getLogger("tasp.cron.update_ongoing_case_jobs")
 
