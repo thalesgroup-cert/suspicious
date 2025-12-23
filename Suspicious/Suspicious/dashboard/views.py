@@ -40,7 +40,7 @@ from datetime import datetime, timezone
 import re
 from email.utils import parsedate_to_datetime
 
-from score_process.score_utils.utils import parse_and_decode_defaultdict, parse_headers
+from score_process.score_utils.thehive.utils import parse_and_decode_defaultdict, parse_headers
 
 logger = logging.getLogger(__name__)
 

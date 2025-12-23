@@ -3,7 +3,7 @@ from datetime import datetime
 from secrets import token_hex
 import ast
 import logging
-from score_process.score_utils.utils import extract_urls, extract_mails, parse_headers
+from score_process.score_utils.thehive.utils import extract_urls, extract_mails, parse_headers
 import os
 import json
 from email.header import decode_header, make_header  # Added for decoding MIME encoded headers
