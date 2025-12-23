@@ -4,6 +4,7 @@ import json
 from typing import Callable, Dict
 
 # Django Core Imports
+import django
 from django.core.paginator import Paginator, EmptyPage, PageNotAnInteger
 from django.conf import settings
 from django.contrib.auth import logout
@@ -32,7 +33,7 @@ from case_handler.update_case.update_handler import (
     handle_file,
     handle_ioc,
 )
-from score_process.score_utils.templates.challenge import ChallengeEmail
+from score_process.score_utils.thehive.challenge import ChallengeToTheHiveService
 from score_process.score_utils.templates.modification import ModifEmail
 
 from cortex_job.models import AnalyzerReport
@@ -73,6 +74,10 @@ INVALID_TYPE_ERROR = "Invalid type"
 CSV = "csv"
 JSON = "json"
 TXT = "txt"
+
+
+ERROR_MISSING_PARAMETERS = "Missing required parameter."
+ERROR_UNSUPPORTED_IOC_TYPE = "Invalid IOC type."
 
 IOC_HANDLER_MAP: Dict[str, Callable] = {
     "attachment": handle_attachment,
@@ -381,13 +386,13 @@ class CaseChallengeService:
         logger.info(f"Notifying about challenge for case ID {self.case.id}. Send to TheHive: {send_to_thehive}")
         if send_to_thehive:
             logger.info(f"Sending challenge notification to TheHive for case ID {self.case.id}")
-            ChallengeEmail(mail_header, self.case.reporter, EMAIL_SENDER_DEFAULT, None, self.case, None).send_to_thehive()
+            ChallengeToTheHiveService(mail_header, self.case.reporter, EMAIL_SENDER_DEFAULT, None, self.case, None).send_to_thehive()
             logger.info(f"Challenge notification sent to TheHive for case ID {self.case.id}")
         else:
             cert_users = User.objects.filter(groups__name="CERT", is_active=True).exclude(email="")
             for cert_user in cert_users:
                 name = f"{cert_user.first_name} {cert_user.last_name}".strip() or cert_user.username
-                ChallengeEmail(mail_header, self.case.reporter, EMAIL_SENDER_DEFAULT, cert_user, self.case, name).send()
+                ChallengeToTheHiveService(mail_header, self.case.reporter, EMAIL_SENDER_DEFAULT, cert_user, self.case, name).send()
 
 def _get_case_or_404(case_id, user):
     return get_object_or_404(
@@ -673,6 +678,10 @@ def set_ioc_level(request: HttpRequest, id, type, level, case_id) -> JsonRespons
     Expects POST with: ioc_id, ioc_type, level, case_id
     """
     try:
+        KEY_IOC_ID = "ioc_id"
+        KEY_IOC_TYPE = "ioc_type"
+        KEY_LEVEL = "level"
+        KEY_CASE_ID = "case_id"
         # Extract POST params
         ioc_id_str = str(id)
         ioc_type = type
