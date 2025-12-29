@@ -16,20 +16,21 @@ class BaseAnalyzer:
         self,
         summary,
         full,
-        data_name,
         data,
         analyzer_name,
-        type,
-        suspicious_case_id=None,
+        data_type=None,
+        case_id=None,
+        data_name=None,
+        **kwargs,
     ):
         self.summary = summary
         self.full = full
         self.data = data
-        self.data_name = data_name
+        self.data_name = data_name or data
         self.analyzer_name = analyzer_name
-        self.type = type
-        self.suspicious_case_id = suspicious_case_id
-        self.response = base_response(analyzer_name, data_name)
+        self.type = data_type
+        self.suspicious_case_id = case_id
+        self.response = base_response(analyzer_name, self.data_name)
 
     def process(self):
         logger.debug("[%s] start processing", self.analyzer_name)

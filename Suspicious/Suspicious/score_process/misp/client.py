@@ -5,14 +5,14 @@ import logging
 logger = logging.getLogger(__name__)
 
 class MISPClient:
-    def __init__(self, config: MISPSettings, primary: bool = True):
-        if primary:
-            self.url = config.suspicious.url
-            self.key = config.suspicious.key
-        else:
-            self.url = config.security.url
-            self.key = config.security.key
+    def __init__(self, config):
+        if not hasattr(config, "url") or not hasattr(config, "key"):
+            raise ValueError("Invalid MISP config: missing url or key")
+
+        self.url = config.url
+        self.key = config.key
         self.misp = self._connect()
+
 
     def _connect(self) -> ExpandedPyMISP:
         try:

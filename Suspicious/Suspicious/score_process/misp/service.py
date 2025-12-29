@@ -162,7 +162,7 @@ class MISPService:
         if ioc_level.upper() not in ['MALICIOUS', 'SUSPICIOUS']:
             return
         try:
-            secondary_handler = MISPService(MISPClient, primary=False)
+            secondary_handler = MISPService(primary=False)
             monthly_event = secondary_handler.get_or_create_monthly_event()
             new_obj = MISPObject(misp_object.name)
             for attr in misp_object.attributes:
