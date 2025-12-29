@@ -107,7 +107,7 @@
         "submissions" : "https://suspicious.corp.test/submissions/",
         "security" : "mailto:yoursecuritymail@yourcompany.com",
         "security_msg" : "yoursecuritymail@yourcompany.com",
-        "socials_logos" : {
+        "logos" : {
             "company" : "data:image/png;base64,Base64 text of your company logo",
             "acknowledge" : "data:image/png;base64,The Base 64 image for the acknowledge mail",
             "final" : "data:image/png;base64,The Base 64 image for the final mail",

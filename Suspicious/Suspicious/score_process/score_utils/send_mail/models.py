@@ -14,3 +14,21 @@ class RetryConfig(BaseModel):
 
 class SuspiciousConfig(BaseModel):
     email: str
+
+
+class AcknowledgeMailServiceConfigSocial(BaseModel):
+    name: str
+    url: str
+    logo: str
+
+
+class FinalMailServiceConfigSocial(BaseModel):
+    name: str
+    url: str
+    logo: str
+
+
+class ModificationMailServiceConfigSocial(BaseModel):
+    name: str
+    url: str
+    logo: str
