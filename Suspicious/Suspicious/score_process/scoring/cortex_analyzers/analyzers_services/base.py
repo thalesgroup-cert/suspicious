@@ -17,12 +17,14 @@ class BaseAnalyzer:
         summary,
         full,
         data_name,
+        data,
         analyzer_name,
         type,
         suspicious_case_id=None,
     ):
         self.summary = summary
         self.full = full
+        self.data = data
         self.data_name = data_name
         self.analyzer_name = analyzer_name
         self.type = type

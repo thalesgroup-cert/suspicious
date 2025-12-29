@@ -1,29 +1,22 @@
 import json
 import logging
 
-from typing import List
 from thehive4py import TheHiveApi
 from minio import Minio
 from minio.error import S3Error
 import smtplib
 from email.mime.text import MIMEText
 from email.mime.multipart import MIMEMultipart
-
+from jinja2 import Environment, FileSystemLoader, select_autoescape
+from pathlib import Path
 from mail_feeder.models import MailArtifact, MailAttachment
 
-from .client import TheHiveService
-
-from .models import (
-    ChallengerModel,
-    ArtifactModel,
-    CaseModel,
-    MailModel,
-    MinioConfig,
-)
-from .utils import safe, generate_ref, build_mail_attachments_paths
+from .utils import generate_ref, build_mail_attachments_paths
 
 logger = logging.getLogger(__name__)
 update_logger = logging.getLogger("tasp.cron.update_ongoing_case_jobs")
+TEMPLATES_DIR = Path(__file__).parent / "templates"
+
 
 CONFIG_PATH = "/app/settings.json"
 with open(CONFIG_PATH) as config_file:
@@ -33,42 +26,110 @@ mail_config = config.get('mail', {})
 thehive_config = config.get('thehive', {})
 
 class ChallengeToTheHiveService:
-    def __init__(self, subject, challenger, sender, recipient, case, infos):
-        self.subject = str(subject)
-        self.sender = str(sender)
-        self.recipient = str(recipient)
-        self.challenger = str(challenger.email).split('@')[0]
-        self.challenger_email = str(challenger)
-        self.challenger_firstname = self.challenger.split('.')[0].capitalize()
-        self.challenger_lastname = self.challenger.split('.')[1].capitalize()
-        self.challenger_groups = ', '.join([group.name for group in challenger.groups.all()]) if challenger.groups.exists() else "No Group"
+    def __init__(self, case, challenger, recipient, subject):
+        with open(CONFIG_PATH) as f:
+            self.config = json.load(f)
+
         self.case = case
-        self.infos = infos
+        self.challenger = challenger
+        self.recipient = recipient
+        self.subject = subject
 
+        self.template = Environment(
+            loader=FileSystemLoader(TEMPLATES_DIR),
+            autoescape=select_autoescape(["html"])
+        ).get_template("challenge_email.html.jinja2")
 
-    def send(self):
-        """
-        Send the email using the SMTP server.
-        """
-        msg = MIMEMultipart()
-        msg['From'] = self.sender
-        if self.infos != "":
-            msg['To'] = str(self.infos)
-        else:
-            msg['To'] = str(self.recipient)
-        msg['Subject'] = str(self.subject)
-        # Attach the HTML content to the email
-        html_content = self._html_table()
-        msg.attach(MIMEText(html_content, 'html'))
+    def _context(self) -> dict:
+        mail = getattr(getattr(self.case, "fileOrMail", None), "mail", None)
 
-        # Connect to the SMTP server
-        server = smtplib.SMTP(mail_config.get("server"), mail_config.get("port", 587))
-        # Send the email
-        text = msg.as_string()
-        server.sendmail(self.sender, str(self.recipient), text)
+        artifacts = [
+            {
+                "label": a.artifact_type,
+                "score": a.artifact_score,
+                "confidence": a.artifact_confidence,
+            }
+            for a in MailArtifact.objects.filter(mail=mail)
+        ]
 
-        # Close the connection
-        server.quit()
+        attachments = [
+            a.file.file_path.name
+            for a in MailAttachment.objects.filter(mail=mail)
+        ]
+
+        result_color = {
+            "Dangerous": "#EF3340",
+            "Suspicious": "#FFAA4D",
+            "Safe": "#00AB84",
+            "Inconclusive": "#0085CA",
+        }.get(self.case.results, "#000")
+
+        mail_cfg = self.config["mail"]
+
+        return {
+            "subject": self.subject,
+            "recipient_name": self.recipient,
+            "company": mail_cfg["group"],
+            "global_team": mail_cfg["global"],
+            "logos": mail_cfg["logos"],
+            "urls": {
+                "portal": mail_cfg["submissions"],
+                "glossary": mail_cfg["glossary"],
+                "inquiry": mail_cfg["inquiry"],
+                "global": mail_cfg["global_url"],
+            },
+            "inquiry_text": mail_cfg["inquiry_text"],
+            "socials": [
+                {
+                    "name": name,
+                    "url": url,
+                    "logo": mail_cfg["social_logos"][name],
+                }
+                for name, url in mail_cfg["socials"].items()
+            ],
+            "challenger": {
+                "firstname": self.challenger.first_name,
+                "lastname": self.challenger.last_name,
+                "email": self.challenger.email,
+                "groups": ", ".join(
+                    g.name for g in self.challenger.groups.all()
+                ) or "No group",
+            },
+            "case": {
+                "id": self.case.id,
+                "score": self.case.score,
+                "confidence": self.case.confidence,
+                "result": self.case.results,
+                "result_color": result_color,
+                "ai": {
+                    "category": self.case.categoryAI,
+                    "result": self.case.resultsAI,
+                    "score": round(self.case.scoreAI),
+                    "confidence": round(self.case.confidenceAI),
+                },
+            },
+            "mail": {
+                "subject": getattr(mail, "subject", "N/A"),
+                "from": getattr(mail, "mail_from", "N/A"),
+            },
+            "artifacts": artifacts,
+            "attachments": attachments,
+        }
+
+    def send(self) -> None:
+        html = self.template.render(self._context())
+
+        msg = MIMEMultipart("alternative")
+        msg["From"] = self.config["mail"]["username"]
+        msg["To"] = self.recipient
+        msg["Subject"] = self.subject
+        msg.attach(MIMEText(html, "html"))
+
+        with smtplib.SMTP(
+            self.config["mail"]["server"],
+            self.config["mail"]["port"]
+        ) as smtp:
+            smtp.send_message(msg)
 
 
     def send_to_thehive(self):
