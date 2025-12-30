@@ -19,6 +19,7 @@ from score_process.scoring.case_update import (
 from score_process.misp.service import MISPService
 update_cases_logger = logging.getLogger("tasp.cron.update_ongoing_case_jobs")
 
+from .utils import dump_model
 
 class CortexAnalyzerReports:
     """
@@ -92,11 +93,14 @@ class CortexAnalyzerReports:
                 case_id=case_id,
             )
 
-            result_dict = json.loads(json.dumps(result))
+            result_dict = dump_model(result)
+            category = result_dict.get("category", "Unknown")
+            if isinstance(category, list):
+                category = ", ".join(category)
 
             report.score = result_dict.get("score", 0)
             report.confidence = result_dict.get("confidence", 0)
-            report.category = result_dict.get("category", "Unknown")
+            report.category = category
             report.level = result_dict.get("level", "info")
             report.details = result_dict.get("details", {})
 

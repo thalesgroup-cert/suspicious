@@ -1,5 +1,6 @@
 import logging
 from datetime import datetime
+from typing import Any
 
 logger = logging.getLogger(__name__)
 
@@ -25,6 +26,15 @@ def parse_tags(tags_config: dict) -> list[dict]:
             for subkey, subval in value.items():
                 tags.append({"name": f'{key}:{subkey}="{subval}"'})
     return tags
+
+def add_case_number_attribute(misp, event: dict, case_number: Any) -> None:
+    case_number_attribute = {
+        'type': 'text',
+        'value': str(case_number),
+        'category': 'Other',
+        'comment': 'Case Number'
+    }
+    misp.add_attribute(event['id'], case_number_attribute)
 
 
 def clean_subject(subject: str) -> str:

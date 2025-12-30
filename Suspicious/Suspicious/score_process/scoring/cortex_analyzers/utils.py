@@ -14,3 +14,8 @@ def extract_domain(value: str) -> str | None:
     if domain_type == "Url":
         return urlparse(value).netloc
     return None
+
+def dump_model(model):
+    if hasattr(model, "model_dump"):
+        return model.model_dump(exclude_none=True)
+    return model.dict()

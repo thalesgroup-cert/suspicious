@@ -58,11 +58,14 @@ class AcknowledgementEmailService:
         )
 
     def send(self, recipient: str, recipient_name: str) -> None:
+        recipient = str(recipient)
+        sender = str(self.config["username"])
+
         html = self.render_html(recipient, recipient_name)
 
         msg = MIMEMultipart("alternative")
         msg["Subject"] = "Suspicious – Submission Registered"
-        msg["From"] = self.config["username"]
+        msg["From"] = sender
         msg["To"] = recipient
         msg.attach(MIMEText(html, "html"))
 
