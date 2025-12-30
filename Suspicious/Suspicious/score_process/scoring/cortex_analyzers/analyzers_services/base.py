@@ -37,7 +37,8 @@ class BaseAnalyzer:
 
         try:
             whitelist = check_allow_list(self.data_name, self.type)
-            for _, value in whitelist.items():
+
+            for _, value in whitelist.model_dump().items():
                 if value is not None:
                     return analyze_whitelist(self.response, value)
         except Exception as exc:

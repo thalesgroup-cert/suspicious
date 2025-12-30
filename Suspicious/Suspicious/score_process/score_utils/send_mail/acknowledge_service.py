@@ -47,7 +47,7 @@ class AcknowledgementEmailService:
             inquiry_text=self.config["inquiry_text"],
             global_team=self.config["global"],
             global_url=self.config["global_url"],
-            company_socials=[
+            socials=[
                 AcknowledgeMailServiceConfigSocial(
                     name=social,
                     url=self.config["socials"].get(social, f"https://{social}.com"),

@@ -149,10 +149,13 @@ class FinalEmailService:
         }
 
     def send(self) -> None:
-        html = self.template.render(self._context())
+        recipient = str(self.recipient)
+        sender = str(self.sender)
+
+        html = self.render_html(recipient, self.recipient_name)
 
         msg = MIMEMultipart("alternative")
-        msg["From"] = self.sender
+        msg["From"] = sender
         msg["To"] = self.recipient
         msg["Subject"] = self.subject
         msg.attach(MIMEText(html, "html"))

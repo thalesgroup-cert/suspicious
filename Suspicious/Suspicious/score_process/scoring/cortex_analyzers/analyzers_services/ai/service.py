@@ -51,9 +51,9 @@ class AnalyzerAI(BaseAnalyzer):
         try:
             if self.summary:
                 # Convert "malscore" to float and use it as the score.
-                response["score"] = float(self.summary.get("malscore", 5))
-                # Convert "confidence" to float, multiply by 100, and use it as the confidence.
-                response["confidence"] = float(self.summary.get("confidence", 0)) * 10
+                response["score"] = int(round(float(self.summary.get("malscore", 5))))
+                response["confidence"] = int(round(float(self.summary.get("confidence", 0)) * 10))
+
                 # Set level based on the classification value in summary.
                 response["level"] = self.summary.get("classification", "info").lower()
 
