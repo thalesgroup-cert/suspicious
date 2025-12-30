@@ -11,9 +11,9 @@ from .objects import (build_email_object,
         build_url_object,
         build_ip_object,
         build_hash_object,
-        build_domain_object)
+        build_domain_object,
+        finalize_misp_object)
 import json
-from .utils import add_case_number_attribute, finalize_misp_object
 from .config_loader import load_misp_settings
 
 CONFIG_PATH = "/app/settings.json"
