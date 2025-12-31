@@ -159,7 +159,8 @@ class FinalEmailService:
         msg.attach(MIMEText(html, "html"))
 
         with smtplib.SMTP(self.config["server"], self.config["port"]) as smtp:
-            smtp.starttls()
+            if self.config.get("tls", True):
+                smtp.starttls()
             smtp.login(
                 self.config["username"],
                 self.config["password"],
