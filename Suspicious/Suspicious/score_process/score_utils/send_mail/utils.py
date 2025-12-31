@@ -22,6 +22,13 @@ def build_user_infos(user) -> str:
 
     return username.capitalize()
 
+def log_event(level, event: str, **fields):
+    logger.log(
+        level,
+        event,
+        extra={"event": event, **fields},
+    )
+
 
 def send_with_retry(
     send_callable: Callable[[], None],

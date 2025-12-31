@@ -17,20 +17,30 @@ SOCIAL_LOGOS = {
 }
 
 class ModificationEmailService:
-    def __init__(self, subject, sender, recipient, recipient_name, case):
+    def __init__(
+        self,
+        subject: str,
+        sender: str,
+        recipient: str,
+        recipient_name: str,
+        case,
+    ):
         with open(CONFIG_PATH) as f:
-            self.config = json.load(f)["mail"]
+            self.config = json.load(f).get("mail", {})
 
         self.subject = subject
-        self.sender = sender
-        self.recipient = recipient
+        self.sender = str(sender)
+        self.recipient = str(recipient)
         self.recipient_name = recipient_name
         self.case = case
 
-        self.template = Environment(
+        env = Environment(
             loader=FileSystemLoader(TEMPLATES_DIR),
-            autoescape=select_autoescape(["html"]),
-        ).get_template("modification_email.jinja2")
+            autoescape=select_autoescape(["html", "xml"]),
+        )
+        self.template = env.get_template("modification_email.jinja2")
+
+    # ------------------ case helpers ------------------
 
     def _case_type(self) -> str:
         fm = self.case.fileOrMail
@@ -45,7 +55,6 @@ class ModificationEmailService:
         return "item"
 
     def _result_block(self, case_type: str) -> dict:
-        portal = self.config["submissions"]
         cert_url = self.config.get("security")
         cert_msg = self.config.get("security_msg")
 
@@ -54,13 +63,17 @@ class ModificationEmailService:
                 "color": "#FF0000",
                 "text": f"As a conclusion, this {case_type} has been revised as dangerous*.",
                 "desc": (
-                    f"Do not open files or links. If interaction occurred, report to "
+                    "Do not open files or links. "
+                    f"If interaction occurred, report to "
                     f"<a href='{cert_url}' target='_blank'>{cert_msg}</a>."
                 ),
             },
             "Suspicious": {
                 "color": "#FF9A00",
-                "text": f"As a conclusion, this {case_type} has been revised as most likely suspicious*.",
+                "text": (
+                    f"As a conclusion, this {case_type} has been revised as "
+                    "most likely suspicious*."
+                ),
                 "desc": "As a precaution, avoid interaction.",
             },
             "Inconclusive": {
@@ -70,12 +83,17 @@ class ModificationEmailService:
             },
             "Safe": {
                 "color": "#5EC27F",
-                "text": f"As a conclusion, this {case_type} has been revised as most likely safe*.",
+                "text": (
+                    f"As a conclusion, this {case_type} has been revised as "
+                    "most likely safe*."
+                ),
                 "desc": "You may proceed while remaining vigilant.",
             },
         }
 
-        return mapping.get(self.case.results, mapping["Inconclusive"])
+        return mapping.get(self.case.results, mapping["Suspicious"])
+
+    # ------------------ context ------------------
 
     def _context(self) -> dict:
         case_type = self._case_type()
@@ -97,10 +115,13 @@ class ModificationEmailService:
             "socials": [
                 ModificationMailServiceConfigSocial(
                     name=social,
-                    url=self.config["socials"].get(social, f"https://{social}.com"),
-                    logo=SOCIAL_LOGOS.get(social, "#"),
+                    url=self.config["socials"].get(
+                        social, f"https://{social}.com"
+                    ),
+                    logo=SOCIAL_LOGOS.get(social),
                 )
-                for social in self.config["socials"].keys()
+                for social in self.config.get("socials", {})
+                if SOCIAL_LOGOS.get(social)
             ],
             "case": {
                 "id": self.case.id,
@@ -111,6 +132,8 @@ class ModificationEmailService:
                 "description": result["desc"],
             },
         }
+
+    # ------------------ send ------------------
 
     def send(self) -> None:
         html = self.template.render(self._context())
@@ -123,6 +146,11 @@ class ModificationEmailService:
 
         with smtplib.SMTP(
             self.config["server"],
-            self.config["port"]
+            self.config["port"],
         ) as smtp:
+            smtp.starttls()
+            smtp.login(
+                self.config["username"],
+                self.config["password"],
+            )
             smtp.send_message(msg)

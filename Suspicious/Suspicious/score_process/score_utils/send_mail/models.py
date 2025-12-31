@@ -1,6 +1,7 @@
 from pydantic import BaseModel
 from typing import Optional
 
+from dataclasses import dataclass
 
 class UserInfo(BaseModel):
     email: str
@@ -32,3 +33,9 @@ class ModificationMailServiceConfigSocial(BaseModel):
     name: str
     url: str
     logo: str
+
+@dataclass(frozen=True)
+class EmailSubjectsConfig:
+    acknowledgement: str
+    review: str
+    final: str

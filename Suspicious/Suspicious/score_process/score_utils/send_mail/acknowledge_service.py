@@ -17,14 +17,21 @@ SOCIAL_LOGOS = {
 }
 
 class AcknowledgementEmailService:
-    def __init__(self) -> None:
+    SUBJECT = "Suspicious – Submission Registered"
+
+    def __init__(
+        self,
+        *,
+        sender: str | None = None,
+    ) -> None:
         self.config = self._load_config()
+        self.sender = str(sender or self.config["username"])
         self.template = self._load_template()
 
     @staticmethod
     def _load_config() -> dict:
         with open(CONFIG_PATH) as f:
-            return json.load(f)["mail"]
+            return json.load(f).get("mail", {})
 
     @staticmethod
     def _load_template():
@@ -34,9 +41,11 @@ class AcknowledgementEmailService:
         )
         return env.get_template("acknowledgement_email.jinja2")
 
-    def render_html(self, recipient: str, recipient_name: str) -> str:
+    # ------------------ rendering ------------------
+
+    def render_html(self, recipient_name: str, subject: str) -> str:
         return self.template.render(
-            subject="Suspicious – Submission Registered",
+            subject=subject,
             recipient_name=recipient_name,
             company_name=self.config["group"],
             company_logo=self.config["logos"]["company"],
@@ -51,23 +60,29 @@ class AcknowledgementEmailService:
                 AcknowledgeMailServiceConfigSocial(
                     name=social,
                     url=self.config["socials"].get(social, f"https://{social}.com"),
-                    logo=SOCIAL_LOGOS.get(social, "#"),
+                    logo=SOCIAL_LOGOS.get(social),
                 )
-                for social in self.config["socials"].keys()
+                for social in self.config.get("socials", {})
+                if SOCIAL_LOGOS.get(social)
             ],
         )
 
-    def send(self, recipient: str, recipient_name: str) -> None:
-        recipient = str(recipient)
-        sender = str(self.config["username"])
+    # ------------------ send ------------------
 
-        html = self.render_html(recipient, recipient_name)
+    def send(self, recipient: str, recipient_name: str) -> None:
+        subject = self.SUBJECT
+        html = self.render_html(recipient_name, subject)
 
         msg = MIMEMultipart("alternative")
-        msg["Subject"] = "Suspicious – Submission Registered"
-        msg["From"] = sender
-        msg["To"] = recipient
+        msg["Subject"] = subject
+        msg["From"] = self.sender
+        msg["To"] = str(recipient)
         msg.attach(MIMEText(html, "html"))
 
         with smtplib.SMTP(self.config["server"], self.config["port"]) as smtp:
+            smtp.starttls()
+            smtp.login(
+                self.config["username"],
+                self.config["password"],
+            )
             smtp.send_message(msg)

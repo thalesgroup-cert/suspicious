@@ -13,6 +13,8 @@ from .objects import (build_email_object,
         build_hash_object,
         build_domain_object,
         finalize_misp_object)
+from .events import MISPEventManager
+
 import json
 from .config_loader import load_misp_settings
 
@@ -37,7 +39,8 @@ class MISPService:
     # ----------------------
     def update_misp(self, case: Case) -> None:
         try:
-            event = self.get_or_create_event(case)
+            mem = MISPEventManager(self.client)
+            event = mem.get_or_create_event(case)
             if not event or not hasattr(event, 'id'):
                 logger.error(f"Could not create or retrieve event for case {case.id}.")
                 return
@@ -119,7 +122,8 @@ class MISPService:
             return
         try:
             secondary_handler = MISPService(primary=False)
-            monthly_event = secondary_handler.get_or_create_monthly_event()
+            mem = MISPEventManager(secondary_handler.client)
+            monthly_event = mem.get_or_create_monthly_event()
             new_obj = MISPObject(misp_object.name)
             for attr in misp_object.attributes:
                 if attr.object_relation and attr.value:

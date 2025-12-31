@@ -17,148 +17,151 @@ SOCIAL_LOGOS = {
 }
 
 class FinalEmailService:
-    def __init__(self, subject: str, sender: str, recipient: str, case, recipient_name: str):
-        with open(CONFIG_PATH) as f:
-            self.config = json.load(f)["mail"]
-
-        self.subject = subject
-        self.sender = sender
-        self.recipient = recipient
-        self.recipient_name = recipient_name
+    def __init__(
+        self,
+        *,
+        case,
+        sender: str,
+        recipient,
+        recipient_name: str,
+    ) -> None:
         self.case = case
+        self.sender = str(sender)
+        self.recipient = str(recipient)
+        self.recipient_name = recipient_name
+        self.config = self._load_config()
+        self.template = self._load_template()
 
-        self.template = Environment(
+    @staticmethod
+    def _load_config() -> dict:
+        with open(CONFIG_PATH) as f:
+            return json.load(f).get("mail", {})
+
+    @staticmethod
+    def _load_template():
+        env = Environment(
             loader=FileSystemLoader(TEMPLATES_DIR),
-            autoescape=select_autoescape(["html"])
-        ).get_template("final_email.jinja2")
+            autoescape=select_autoescape(["html", "xml"]),
+        )
+        return env.get_template("final_email.jinja2")
+
+    # ------------------ rendering ------------------
+
+    def render_html(self, subject: str) -> str:
+        case_meta = self._case_metadata()
+        result = self._result_block()
+
+        return self.template.render(
+            subject=subject,
+            recipient_name=self.recipient_name,
+            company=self.config["group"],
+            logos={
+                "company": self.config["logos"]["company"],
+                "final": self.config["logos"]["final"],
+            },
+            urls={
+                "portal": self.config["submissions"],
+                "glossary": self.config["glossary"],
+                "inquiry": self.config["inquiry"],
+                "global": self.config["global_url"],
+            },
+            inquiry_text=self.config["inquiry_text"],
+            global_team=self.config["global"],
+            socials=[
+                FinalMailServiceConfigSocial(
+                    name=s,
+                    url=self.config["socials"].get(s, f"https://{s}.com"),
+                    logo=SOCIAL_LOGOS.get(s),
+                )
+                for s in self.config.get("socials", {})
+            ],
+            case={
+                **case_meta,
+                **result,
+            },
+        )
+
+    # ------------------ case helpers ------------------
 
     def _case_metadata(self) -> dict:
-        if self.case.fileOrMail:
-            if self.case.fileOrMail.mail:
-                mail = self.case.fileOrMail.mail
-                return {
-                    "type": "mail",
-                    "subject": mail.subject,
-                    "sender": mail.mail_from,
-                    "recipient": mail.to,
-                }
-            if self.case.fileOrMail.file:
-                return {
-                    "type": "file",
-                    "subject": self.case.id,
-                    "sender": self.case.fileOrMail.file.file_path.name,
-                    "recipient": None,
-                }
+        fom = self.case.fileOrMail
+
+        if fom and fom.mail:
+            mail = fom.mail
+            return {
+                "type": "mail",
+                "subject": mail.subject,
+                "sender": mail.mail_from,
+                "recipient": mail.to,
+            }
+
+        if fom and fom.file:
+            return {
+                "type": "file",
+                "subject": str(self.case.id),
+                "sender": fom.file.file_path.name,
+                "recipient": None,
+            }
 
         if self.case.nonFileIocs:
             ioc = self.case.nonFileIocs
             value = ioc.ip or ioc.url or ioc.hash
             return {
                 "type": "ioc",
-                "subject": self.case.id,
+                "subject": str(self.case.id),
                 "sender": value,
                 "recipient": None,
             }
 
         return {
             "type": "unknown",
-            "subject": self.case.id,
+            "subject": str(self.case.id),
             "sender": "N/A",
             "recipient": None,
         }
 
-    def _result_block(self, case_type: str) -> dict:
+    def _result_block(self) -> dict:
         online = self.config["submissions"]
-        cert_url = self.config.get("security")
-        cert_msg = self.config.get("security_msg")
 
         mapping = {
             "Dangerous": {
-                "color": "#FF0000",
-                "text": f"As a conclusion, this {case_type} has been assessed as dangerous*.",
-                "desc": (
-                    f"If applicable, do not open files or click links. "
-                    f"If interaction already occurred, report to "
-                    f"<a href='{cert_url}' target='_blank'>{cert_msg}</a>."
+                "result_color": "#FF0000",
+                "result_text": "As a conclusion, this case has been assessed as dangerous*.",
+                "result_description": (
+                    "If applicable, do not open files or click links."
                 ),
             },
             "Suspicious": {
-                "color": "#FF9A00",
-                "text": f"As a conclusion, this {case_type} has been assessed as most likely suspicious*.",
-                "desc": (
-                    f"As a precaution, avoid interaction. "
-                    f"You may challenge the result <a href='{online}' target='_blank'>here</a>."
+                "result_color": "#FF9A00",
+                "result_text": "As a conclusion, this case has been assessed as suspicious*.",
+                "result_description": (
+                    f"You may challenge the result <a href='{online}'>here</a>."
                 ),
             },
             "Safe": {
-                "color": "#5EC27F",
-                "text": f"As a conclusion, this {case_type} has been assessed as most likely safe*.",
-                "desc": "You may proceed safely, while remaining vigilant.",
-            },
-            "Inconclusive": {
-                "color": "#0084BD",
-                "text": "Unfortunately, the investigations were inconclusive*.",
-                "desc": (
-                    f"The analysis could not determine safety. "
-                    f"You may challenge the result <a href='{online}' target='_blank'>here</a>."
-                ),
-            },
-            "Failure": {
-                "color": "#000000",
-                "text": "The analysis failed to provide a result.",
-                "desc": (
-                    f"Please verify manually or challenge the result "
-                    f"<a href='{online}' target='_blank'>here</a>."
-                ),
+                "result_color": "#5EC27F",
+                "result_text": "As a conclusion, this case has been assessed as safe*.",
+                "result_description": "You may proceed safely, while remaining vigilant.",
             },
         }
 
-        return mapping.get(self.case.results, mapping["Failure"])
+        return mapping.get(self.case.results, mapping["Suspicious"])
 
-    def _context(self) -> dict:
-        case_meta = self._case_metadata()
-        result = self._result_block(case_meta["type"])
+    # ------------------ send ------------------
 
-        return {
-            "subject": self.subject,
-            "recipient_name": self.recipient_name,
-            "company": self.config["group"],
-            "global_team": self.config["global"],
-            "logos": self.config["logos"],
-            "urls": {
-                "portal": self.config["submissions"],
-                "glossary": self.config["glossary"],
-                "inquiry": self.config["inquiry"],
-                "global": self.config["global_url"],
-            },
-            "inquiry_text": self.config["inquiry_text"],
-            "socials": [
-                FinalMailServiceConfigSocial(
-                    name=social,
-                    url=self.config["socials"].get(social, f"https://{social}.com"),
-                    logo=SOCIAL_LOGOS.get(social, "#"),
-                )
-                for social in self.config["socials"].keys()
-            ],
-            "case": {
-                **case_meta,
-                "result_color": result["color"],
-                "result_text": result["text"],
-                "result_description": result["desc"],
-            },
-        }
-
-    def send(self) -> None:
-        recipient = str(self.recipient)
-        sender = str(self.sender)
-
-        html = self.render_html(recipient, self.recipient_name)
+    def send(self, subject: str) -> None:
+        html = self.render_html(subject)
 
         msg = MIMEMultipart("alternative")
-        msg["From"] = sender
+        msg["From"] = self.sender
         msg["To"] = self.recipient
-        msg["Subject"] = self.subject
+        msg["Subject"] = subject
         msg.attach(MIMEText(html, "html"))
 
         with smtplib.SMTP(self.config["server"], self.config["port"]) as smtp:
+            smtp.starttls()
+            smtp.login(
+                self.config["username"],
+                self.config["password"],
+            )
             smtp.send_message(msg)
