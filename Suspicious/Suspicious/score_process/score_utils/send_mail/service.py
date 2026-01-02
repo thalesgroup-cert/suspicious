@@ -169,7 +169,7 @@ class MailNotificationService:
                 sender=self.suspicious_email,
                 recipient=recipient,
                 recipient_name=user_infos,
-            )._send_action(user=recipient, user_infos=user_infos, subject=subject)
+            )._send_action(user=recipient, subject=subject)
 
         if self._send_with_retry(
             action,
