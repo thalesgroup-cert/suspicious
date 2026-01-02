@@ -37,7 +37,7 @@ def fetch_and_process_emails(config_path: str = CONFIG_PATH) -> None:
     cfg = load_config(config_path)
     base_temp = cfg.temp_dir
     ensure_dir(base_temp)
-    mail_logger.info("Starting email fetch job")
+    logger.info("Starting email fetch job")
     try:
         _process_minio_buckets(cfg, base_temp)
     finally:
@@ -45,7 +45,7 @@ def fetch_and_process_emails(config_path: str = CONFIG_PATH) -> None:
             shutil.rmtree(base_temp)
         except Exception:
             logger.exception("Failed to remove temp dir")
-    mail_logger.info("Email fetch job completed")
+    logger.info("Email fetch job completed")
 
 
 def _process_minio_buckets(cfg: CronConfig, base_path: str) -> None:
