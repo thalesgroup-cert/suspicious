@@ -6,7 +6,7 @@ from typing import List, Dict, Any, Optional
 from .utils import decode_email_header, ensure_dir
 from .models import EmailDataModel, AttachmentModel
 
-logger = logging.getLogger("processor.processor")
+logger = logging.getLogger("tasp.cron.fetch_and_process_emails")
 
 
 def extract_email_attachments(
@@ -70,11 +70,17 @@ def parse_email(
     attachments = extract_email_attachments(email_message, working_dir, email_reference)
 
     from_addr = decode_email_header(email_message.get("From", ""))
+    logger.debug(f"Decoded From address: {from_addr}")
     to_addr = decode_email_header(email_message.get("To", ""))
+    logger.debug(f"Decoded To address: {to_addr}")
     cc_addr = decode_email_header(email_message.get("Cc", ""))
+    logger.debug(f"Decoded Cc address: {cc_addr}")
     bcc_addr = decode_email_header(email_message.get("Bcc", ""))
+    logger.debug(f"Decoded Bcc address: {bcc_addr}")
     subject = decode_email_header(email_message.get("Subject", ""))
+    logger.debug(f"Decoded Subject: {subject}")
     reporter = reported_by or from_addr
+    logger.debug(f"Using reporter: {reporter}")
 
     email_text_parts = [
         part.get_payload(decode=True).decode(part.get_content_charset("utf-8"), errors="replace")

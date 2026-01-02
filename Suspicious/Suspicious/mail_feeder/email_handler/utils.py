@@ -2,9 +2,7 @@ import logging
 from contextlib import contextmanager
 from typing import Generator
 
-logger = logging.getLogger("email_handler")
-
-
+logger = logging.getLogger("tasp.cron.fetch_and_process_emails")
 @contextmanager
 def safe_operation(context: str) -> Generator[None, None, None]:
     """

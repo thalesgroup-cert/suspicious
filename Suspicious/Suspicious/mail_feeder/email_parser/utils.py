@@ -4,8 +4,7 @@ import uuid
 from datetime import datetime
 from email.header import decode_header, make_header
 
-logger = logging.getLogger("processor.utils")
-
+logger = logging.getLogger("tasp.cron.fetch_and_process_emails")
 
 def decode_email_header(header_value: str) -> str:
     """

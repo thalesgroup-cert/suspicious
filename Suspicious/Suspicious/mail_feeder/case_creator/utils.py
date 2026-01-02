@@ -1,7 +1,7 @@
 import logging
 from contextlib import contextmanager
 
-logger = logging.getLogger("email_info")
+logger = logging.getLogger("tasp.cron.fetch_and_process_emails")
 
 
 @contextmanager

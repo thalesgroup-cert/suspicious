@@ -13,7 +13,6 @@ from file_process.file_utils.file_handler import FileHandler
 from hash_process.models import Hash
 from file_process.models import File
 
-logger = logging.getLogger("attachments_job_launcher")
 fetch_mail_logger = logging.getLogger("tasp.cron.fetch_and_process_emails")
 
 
@@ -132,7 +131,7 @@ class AttachmentJobLauncherService:
         Mark file and hash as safe and allowlisted.
         """
         with safe_execution("allowlist_file_and_hash"):
-            logger.info(f"File {file_model.file_path} is allow-listed")
+            fetch_mail_logger.info(f"File {file_model.file_path} is allow-listed")
             file_model.file_score = 0
             file_model.file_confidence = 100
             file_model.file_level = "SAFE-ALLOW_LISTED"

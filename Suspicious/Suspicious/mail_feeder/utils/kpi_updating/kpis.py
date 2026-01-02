@@ -3,8 +3,7 @@ from django.db import transaction
 from dashboard.models import Kpi, MonthlyReporterStats, UserCasesMonthlyStats
 from .utils import Period, safe_get_or_create
 
-logger = logging.getLogger("kpi_updating")
-
+logger = logging.getLogger("tasp.cron.fetch_and_process_emails")
 
 class KpiService:
     """

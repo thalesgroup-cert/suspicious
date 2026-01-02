@@ -2,8 +2,7 @@ import os
 import logging
 from contextlib import contextmanager
 
-logger = logging.getLogger("web_submission")
-
+logger = logging.getLogger("tasp.cron.fetch_and_process_emails")
 
 @contextmanager
 def safe_execution(context: str):

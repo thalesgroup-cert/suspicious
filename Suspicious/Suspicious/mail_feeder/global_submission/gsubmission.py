@@ -21,7 +21,6 @@ from .utils import safe_execution, flatten_id_lists, extract_email_address
 from .handlers import Handlers
 
 
-logger = logging.getLogger("global_submissions")
 fetch_mail_logger = logging.getLogger("tasp.cron.fetch_and_process_emails")
 
 class GlobalSubmissionService:

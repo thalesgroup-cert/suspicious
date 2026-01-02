@@ -8,7 +8,6 @@ from mail_feeder.utils.process_em_header.email_header import EmailHeaderService
 from .models import EmailDataModel
 from .utils import safe_operation, increment_field
 
-logger = logging.getLogger("email_handler")
 fetch_mail_logger = logging.getLogger("tasp.cron.fetch_and_process_emails")
 
 

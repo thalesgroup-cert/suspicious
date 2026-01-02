@@ -7,8 +7,7 @@ from .models import EmailDataModel, MailInstanceResult
 from .utils import decode_subject, parse_email_date, safe_execution
 
 
-logger = logging.getLogger("define_email")
-
+logger = logging.getLogger("tasp.cron.fetch_and_process_emails")
 
 class EmailService:
     """

@@ -3,8 +3,7 @@ import email.header
 from datetime import datetime as dt
 from contextlib import contextmanager
 
-logger = logging.getLogger("define_email")
-
+logger = logging.getLogger("tasp.cron.fetch_and_process_emails")
 
 @contextmanager
 def safe_execution(context: str):

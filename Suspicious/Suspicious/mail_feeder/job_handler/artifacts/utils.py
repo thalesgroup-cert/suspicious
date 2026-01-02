@@ -1,8 +1,7 @@
 import logging
 from contextlib import contextmanager
 
-logger = logging.getLogger("artifacts")
-
+logger = logging.getLogger("tasp.cron.fetch_and_process_emails")
 
 @contextmanager
 def safe_execution(context: str):

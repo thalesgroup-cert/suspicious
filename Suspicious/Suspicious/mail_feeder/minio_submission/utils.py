@@ -2,8 +2,7 @@ import logging
 from contextlib import contextmanager
 from typing import Optional
 
-logger = logging.getLogger("minio_submissions")
-
+logger = logging.getLogger("tasp.cron.fetch_and_process_emails")
 
 @contextmanager
 def safe_execution(context: str):

@@ -8,8 +8,7 @@ from .models import EmailHeaderData, SimilarityResult
 from .utils import safe_execution
 
 
-logger = logging.getLogger("process_em_header")
-
+logger = logging.getLogger("tasp.cron.fetch_and_process_emails")
 
 class EmailHeaderService:
     """

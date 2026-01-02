@@ -9,8 +9,7 @@ from mail_feeder.utils.process_artifacts.artifacts import ArtifactService
 from mail_feeder.utils.process_attachments.attachments import AttachmentService
 
 FILE_TEMP_PATH = "/tmp/files"
-logger = logging.getLogger("email_observables.extract")
-
+logger = logging.getLogger("tasp.cron.fetch_and_process_emails")
 class EmailObservablesService:
     """Service for extracting observables from emails."""
 

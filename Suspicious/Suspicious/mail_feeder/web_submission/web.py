@@ -6,8 +6,7 @@ from mail_feeder.global_submission.models import MailSubmissionData
 from .models import WebSubmissionConfig
 from .utils import safe_execution
 
-logger = logging.getLogger("web_submission")
-
+logger = logging.getLogger("tasp.cron.fetch_and_process_emails")
 
 class WebSubmissionService:
     """

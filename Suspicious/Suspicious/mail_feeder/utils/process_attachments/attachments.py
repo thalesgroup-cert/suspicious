@@ -9,8 +9,7 @@ from .models import AttachmentBatchModel
 from .utils import safe_execution
 
 
-logger = logging.getLogger("process_attachments")
-
+logger = logging.getLogger("tasp.cron.fetch_and_process_emails")
 
 class AttachmentService:
     """

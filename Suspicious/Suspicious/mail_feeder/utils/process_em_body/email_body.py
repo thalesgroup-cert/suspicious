@@ -58,7 +58,6 @@ class EmailBodyService:
         validated = EmailBodyData(reportedText=str(email_data))
         reported_text = validated.reportedText
         fuzzy_hash = str(self.text_distance.get_hash(reported_text))
-        logger = logging.getLogger("email_handler")
         with safe_execution("create_mail_body_instance"):
             mail_body, created = MailBody.objects.get_or_create(
                 fuzzy_hash=fuzzy_hash,

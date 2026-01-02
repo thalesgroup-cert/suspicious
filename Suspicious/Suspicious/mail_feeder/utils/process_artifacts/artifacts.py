@@ -20,8 +20,7 @@ from hash_process.models import Hash
 from mail_feeder.utils.email_validation.validators import EmailValidatorService
 from mail_feeder.utils.user_creation.creation import UserCreationService
 
-
-logger = logging.getLogger("process_artifacts")
+logger = logging.getLogger("tasp.cron.fetch_and_process_emails")
 
 CONFIG_PATH = "/app/settings.json"
 with open(CONFIG_PATH) as config_file:
