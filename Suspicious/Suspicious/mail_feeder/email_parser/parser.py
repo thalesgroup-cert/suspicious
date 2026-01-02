@@ -79,7 +79,7 @@ def parse_email(
     logger.debug(f"Decoded Bcc address: {bcc_addr}")
     subject = decode_email_header(email_message.get("Subject", ""))
     logger.debug(f"Decoded Subject: {subject}")
-    reporter = reported_by or from_addr
+    reporter = reported_by or to_addr
     logger.debug(f"Using reporter: {reporter}")
 
     email_text_parts = [

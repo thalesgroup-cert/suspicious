@@ -55,7 +55,7 @@ class GlobalSubmissionService:
                     f"Email instance processing failed for {submission.email_id}"
                 )
                 return None
-
+            instance.save()
             # Handle post-processing based on submission type
             if submission.is_submitted:
                 fetch_mail_logger.debug(f"Finalizing web submission for email: {submission.email_id}")
