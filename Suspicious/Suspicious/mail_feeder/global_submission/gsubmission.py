@@ -120,7 +120,7 @@ class GlobalSubmissionService:
         List all `.eml` files in a directory optionally filtering by prefix.
         """
         all_files = os.listdir(workdir)
-        return [f for f in all_files if f.endswith(".eml") and f.startswith(prefix)]
+        return [f for f in all_files if f.endswith(".eml") and not f.startswith(prefix)]
 
     def _handle_common_tasks(self, instance, email_id: str, mail_zip: str):
         """

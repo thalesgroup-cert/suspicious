@@ -11,8 +11,7 @@ from .utils import safe_execution, load_config, ensure_dir
 from .models import CronConfig
 from mail_feeder.minio_submission.minio import MinioEmailService
 
-logger = logging.getLogger("cron.fetch")
-mail_logger = logging.getLogger("tasp.cron.fetch_and_process_emails")
+logger = logging.getLogger("tasp.cron.fetch_and_process_emails")
 
 CONFIG_PATH = "/app/settings.json"
 
