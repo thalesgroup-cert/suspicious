@@ -849,7 +849,7 @@ class CortexJobManager:
             "URL": self.process_url_artifact,
             "Hash": self.process_hash_artifact,
             "Domain": self.process_domain_artifact,
-            "Mail": self.process_mail_artifact,
+            "MailAddress": self.process_mail_artifact,
         }
 
         for artifact in artifacts:
@@ -979,12 +979,12 @@ class CortexJobManager:
 
         reports = self.get_new_reports(
             data_type="mail",
-            filter_kwargs={"mail": artifact.artifactIsMailAddress.mail},
+            filter_kwargs={"mail": artifact.artifactIsMailAddress.mail_address},
         )
 
         if not reports.exists():
             update_cases_logger.info(
-                f"No new reports found related to the provided Mail Address: {artifact.artifactIsMailAddress.mail}"
+                f"No new reports found related to the provided Mail Address: {artifact.artifactIsMailAddress.mail_address}"
             )
             return
 

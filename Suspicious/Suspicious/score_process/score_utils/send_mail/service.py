@@ -110,7 +110,11 @@ class MailNotificationService:
                 recipient=recipient,
                 recipient_name=user_infos,
                 case=case,
-            ).send()
+            ).__send_action(
+                user=recipient,
+                user_infos=user_infos,
+                subject=subject,
+            )
 
         self._send_with_retry(
             action,
@@ -132,9 +136,10 @@ class MailNotificationService:
         user_infos = build_user_infos(user)
 
         def action():
-            AcknowledgementEmailService().send(
-                recipient=recipient,
-                recipient_name=user_infos,
+            AcknowledgementEmailService().__send_action(
+                user=recipient,
+                user_infos=user_infos,
+                subject=subject,
             )
 
         if self._send_with_retry(
@@ -164,7 +169,7 @@ class MailNotificationService:
                 sender=self.suspicious_email,
                 recipient=recipient,
                 recipient_name=user_infos,
-            ).send(subject=subject)
+            ).__send_action(user=recipient, user_infos=user_infos, subject=subject)
 
         if self._send_with_retry(
             action,

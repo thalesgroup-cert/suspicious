@@ -1,10 +1,8 @@
 import json
-import smtplib
 from pathlib import Path
-from email.mime.multipart import MIMEMultipart
-from email.mime.text import MIMEText
 from .models import AcknowledgeMailServiceConfigSocial
 from jinja2 import Environment, FileSystemLoader, select_autoescape
+from .send_email_service import SendMailService
 
 CONFIG_PATH = "/app/settings.json"
 TEMPLATES_DIR = Path(__file__).parent / "templates"
@@ -69,21 +67,23 @@ class AcknowledgementEmailService:
 
     # ------------------ send ------------------
 
-    def send(self, recipient: str, recipient_name: str) -> None:
-        subject = self.SUBJECT
-        html = self.render_html(recipient_name, subject)
+    def __send_action(self, user: str, user_infos: str, subject: str) -> None:
+        html = self.render_html(
+            recipient_name=user_infos,
+            subject=subject
+        )
 
-        msg = MIMEMultipart("alternative")
-        msg["Subject"] = subject
-        msg["From"] = self.sender
-        msg["To"] = str(recipient)
-        msg.attach(MIMEText(html, "html"))
+        send_mail_service = SendMailService(
+            host=self.config["host"], port=self.config["port"]
+        )
 
-        with smtplib.SMTP(self.config["server"], self.config["port"]) as smtp:
-            if self.config.get("tls", True):
-                smtp.starttls()
-            smtp.login(
-                self.config["username"],
-                self.config["password"],
-            )
-            smtp.send_message(msg)
+        send_mail_service.connect()
+
+        send_mail_service.publish_email(
+            subject=subject,
+            sender=self.sender,
+            recipient=user,
+            html=html,
+        )
+
+        send_mail_service.close()
