@@ -74,6 +74,7 @@ def update_kpi_and_user_stats(case):
 
         # Update monthly summary
         kpi.monthly_cases_summary.update_case_results(case.results)
+        kpi.monthly_cases_summary.update_case_results(case.categoryAI)
         kpi.monthly_cases_summary.save()
 
         # Update global case count
@@ -89,6 +90,7 @@ def update_kpi_and_user_stats(case):
                 user=case.reporter, month=kpi.month, year=kpi.year
             )
         stats.update_case_results(case.results)
+        stats.update_case_results(case.categoryAI)
         stats.total_cases += 1
         stats.save()
 
