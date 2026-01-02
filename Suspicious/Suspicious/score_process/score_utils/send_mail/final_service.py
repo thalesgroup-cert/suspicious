@@ -147,7 +147,7 @@ class FinalEmailService:
 
     # ------------------ send ------------------
 
-    def __send_action(self, user: str, user_infos: str, subject: str) -> None:
+    def _send_action(self, user: str, user_infos: str, subject: str) -> None:
         html = self.render_html(
             recipient_name=user_infos,
             subject=subject
