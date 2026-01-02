@@ -154,7 +154,7 @@ class FinalEmailService:
         )
 
         send_mail_service = SendMailService(
-            host=self.config["host"], port=self.config["port"]
+            host=self.config["server"], port=self.config["port"]
         )
 
         send_mail_service.connect()
