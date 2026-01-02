@@ -91,6 +91,7 @@ def parse_email(
     email_data = EmailDataModel(
         reportedBy=reporter,
         **{
+            "mail_from": from_addr,
             "from": from_addr,
             "to": to_addr,
             "cc": cc_addr,
