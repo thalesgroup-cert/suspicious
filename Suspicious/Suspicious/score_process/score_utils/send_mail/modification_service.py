@@ -93,24 +93,27 @@ class ModificationEmailService:
 
     # ------------------ context ------------------
 
-    def _context(self) -> dict:
+    def render_html(self, subject: str) -> str:
         case_type = self._case_type()
         result = self._result_block(case_type)
 
-        return {
-            "subject": self.subject,
-            "recipient_name": self.recipient_name,
-            "company": self.config["group"],
-            "global_team": self.config["global"],
-            "logos": self.config["logos"],
-            "urls": {
+        return self.template.render(
+            subject=subject,
+            recipient_name=self.recipient_name,
+            company=self.config["group"],
+            logos={
+                "company": self.config["logos"]["company"],
+                "final": self.config["logos"]["final"],
+            },
+            urls={
                 "portal": self.config["submissions"],
                 "glossary": self.config["glossary"],
                 "inquiry": self.config["inquiry"],
                 "global": self.config["global_url"],
             },
-            "inquiry_text": self.config["inquiry_text"],
-            "socials": [
+            inquiry_text=self.config["inquiry_text"],
+            global_team=self.config["global"],
+            socials=[
                 ModificationMailServiceConfigSocial(
                     name=social,
                     url=self.config["socials"].get(
@@ -121,15 +124,10 @@ class ModificationEmailService:
                 for social in self.config.get("socials", {})
                 if SOCIAL_LOGOS.get(social)
             ],
-            "case": {
-                "id": self.case.id,
+            case={
+                **result,
             },
-            "result": {
-                "color": result["color"],
-                "text": result["text"],
-                "description": result["desc"],
-            },
-        }
+        )
 
     # ------------------ send ------------------
 
