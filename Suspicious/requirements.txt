@@ -29,6 +29,7 @@ fontawesomefree==6.6.0
 
 # Web Framework and Application Enhancements
 django-crontab==0.7.1
+django-sso==3.0.2
 whitenoise==6.11.0
 django-import-export==4.3.10
 

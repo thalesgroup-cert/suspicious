@@ -185,6 +185,18 @@ MAX_UPLOAD_SIZE = 5242880  # 5MB
 AUTH_LDAP_ALWAYS_UPDATE_USER = True
 AUTH_LDAP_CACHE_TIMEOUT = 3600
 
+# SSO settings section in the gateway side are optional
+#SSO = {
+    # Timeout for the communication with subordinated services. (OPTIONAL)
+    # This timeout is defined in seconds with a default value of 0.1s 
+    # (100ms) per registered service.
+    #'SUBORDINATE_COMMUNICATION_TIMEOUT': 0.1,
+    
+    # Additional fields. (OPTIONAL). For more details look to part
+    # named as "Send additional data to subordinated services"
+    #'ADDITIONAL_FIELDS': ('additiona_fields', 'from_user_model', 'and_related_models'),
+#}
+
 # Authentication backends
 AUTHENTICATION_BACKENDS = (
     'django_auth_ldap.backend.LDAPBackend',
@@ -194,6 +206,7 @@ AUTHENTICATION_BACKENDS = (
 # Application definition
 INSTALLED_APPS = [
     'fontawesomefree',
+    'django_sso.sso_gateway',
     'tasp.apps.TaspConfig',
     'dashboard.apps.DashboardConfig',
     'case_handler.apps.CaseConfig',
