@@ -41,15 +41,6 @@ RUN apt-get update && \
     && rm -rf /var/lib/apt/lists/*
 
 # -------------------------
-# Create non-root user
-# -------------------------
-RUN groupadd --gid 1000 appgroup \
-    && useradd --uid 1000 --gid appgroup \
-       --create-home \
-       --shell /usr/sbin/nologin \
-       appuser
-
-# -------------------------
 # Set working directory
 # -------------------------
 WORKDIR /app
@@ -67,19 +58,3 @@ RUN pip install uv && uv pip install --system --upgrade pip\
 # Copy application source
 # -------------------------
 COPY . .
-
-# -------------------------
-# Permissions hardening
-# -------------------------
-RUN chown -R appuser:appgroup /app \
-    && chmod -R 755 /app
-
-# -------------------------
-# Drop privileges
-# -------------------------
-USER appuser
-
-# -------------------------
-# Runtime configuration
-# -------------------------
-# ENTRYPOINT ["python", "-m", "main.py"]
