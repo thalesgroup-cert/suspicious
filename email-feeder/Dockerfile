@@ -49,10 +49,13 @@ WORKDIR /app
 # Dependency installation
 # (layer caching optimized)
 # -------------------------
+# Install uv (pinned)
+COPY --from=ghcr.io/astral-sh/uv:latest /uv /uvx /usr/local/bin/
+
 COPY requirements.txt .
 
-RUN pip install uv && uv pip install --system --upgrade pip\
-    && uv pip install --system --no-cache -r requirements.txt
+# Install dependencies directly into system python
+RUN uv pip install --system --no-cache -r requirements.txt
 
 # -------------------------
 # Copy application source
