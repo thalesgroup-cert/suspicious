@@ -5,7 +5,7 @@ services:
       - "127.0.0.1:${SUSPICIOUS_PORT}:9020"
     restart: always
     volumes:
-      - "${SUSPICIOUS_PATH}/logs:/var/log"
+      - "${SUSPICIOUS_PATH}/logs:/app/log"
       - "/var/run/docker.sock:/var/run/docker.sock"
       - "${SUSPICIOUS_PATH}/settings.json:/app/settings.json"
       # AI Vector Database

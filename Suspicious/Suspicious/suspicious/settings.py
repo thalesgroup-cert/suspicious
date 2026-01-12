@@ -103,7 +103,7 @@ LOGGING = {
         'file': {
             'level': suspicious_config.get('trace_level', 'DEBUG'),
             'class': 'logging.FileHandler',
-            'filename': '/var/log/suspicious.log',
+            'filename': '/app/log/suspicious.log',
             'formatter': 'verbose',
         },
         'console': {
@@ -113,25 +113,25 @@ LOGGING = {
         'fetch_mail_file': {
             'level': suspicious_config.get('trace_level', 'DEBUG'),
             'class': 'logging.FileHandler',
-            'filename': '/var/log/fetched_mail.log',
+            'filename': '/app/log/fetched_mail.log',
             'formatter': 'verbose',
         },
         'update_cases_file': {
             'level': suspicious_config.get('trace_level', 'DEBUG'),
             'class': 'logging.FileHandler',
-            'filename': '/var/log/case_updating.log',
+            'filename': '/app/log/case_updating.log',
             'formatter': 'verbose',
         },
         'fetch_analyzer_file': {
             'level': suspicious_config.get('trace_level', 'DEBUG'),
             'class': 'logging.FileHandler',
-            'filename': '/var/log/fetch_analyzer.log',
+            'filename': '/app/log/fetch_analyzer.log',
             'formatter': 'verbose',
         },
         'cleanup_phishing_file': {
             'level': suspicious_config.get('trace_level', 'DEBUG'),
             'class': 'logging.FileHandler',
-            'filename': '/var/log/cleanup_phishing.log',
+            'filename': '/app/log/cleanup_phishing.log',
             'formatter': 'verbose',
         },
     },
@@ -320,13 +320,13 @@ CRONTAB_LOCK_JOBS = True
 # Each job is run every minute and logs to a specific file in /tmp
 # Consider adjusting the frequency of these jobs based on their cost and your needs
 CRONJOBS = [
-    ('*/1 * * * *', 'tasp.cron.fetch_emails.fetch_and_process_emails', '>> /var/log/fetched_mail.log'),
+    ('*/1 * * * *', 'tasp.cron.fetch_emails.fetch_and_process_emails', '>> /app/log/fetched_mail.log'),
     ('*/1 * * * *', 'tasp.cron.sync_cortex.sync_cortex_analyzers'),
-    ('*/1 * * * *', 'tasp.cron.user_and_cases.update_ongoing_case_jobs', '>> /var/log/case_updating.log'),
+    ('*/1 * * * *', 'tasp.cron.user_and_cases.update_ongoing_case_jobs', '>> /app/log/case_updating.log'),
     ('*/5 * * * *', 'tasp.cron.kpi.sync_monthly_kpi'),
     ('*/10 * * * *', 'tasp.cron.user_and_cases.sync_user_profiles'),
-    ('0 0 1 * *', 'tasp.cron.cleanup.delete_old_analyzer_reports', '>> /var/log/cleanup_phishing.log'),
-    ('0 0 * * *', 'tasp.cron.suspicious.remove_old_suspicious_emails', '>> /var/log/cleanup_phishing.log')
+    ('0 0 1 * *', 'tasp.cron.cleanup.delete_old_analyzer_reports', '>> /app/log/cleanup_phishing.log'),
+    ('0 0 * * *', 'tasp.cron.suspicious.remove_old_suspicious_emails', '>> /app/log/cleanup_phishing.log')
 ]
 # Consider adding error handling or notifications for when these jobs fail
 # This could be as simple as checking the return code of the job, or as complex as sending an email on failure
