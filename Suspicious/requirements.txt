@@ -43,6 +43,7 @@ hashid==3.1.4
 thehive4py==2.0.3
 cortex4py==2.1.0
 pymisp==2.5.17.3
+vt-py==0.21.0
 
 # Vector store
 chromadb==1.4.0

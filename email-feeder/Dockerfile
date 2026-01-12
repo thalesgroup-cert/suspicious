@@ -5,7 +5,7 @@
 #################################################
 
 # Use Docker Hardened Image (minimal, signed, scanned)
-FROM dhi.io/python:3-debian13-sfw-dev AS runtime
+FROM python AS runtime
 
 # -------------------------
 # Build-time arguments
@@ -31,13 +31,13 @@ ENV HTTP_PROXY=${HTTP_PROXY} \
 # System dependencies
 # (minimal + no recommends)
 # -------------------------
-RUN sfw apt-get update && \
-    sfw apt-get install -y --no-install-recommends \
+RUN apt-get update && \
+    apt-get install -y --no-install-recommends \
         ca-certificates \
         curl \
         libmariadb3 \
         logrotate \
-    && sfw apt-get clean \
+    && apt-get clean \
     && rm -rf /var/lib/apt/lists/*
 
 # -------------------------
@@ -60,8 +60,8 @@ WORKDIR /app
 # -------------------------
 COPY requirements.txt .
 
-RUN sfw pip install uv && sfw uv pip install --system --upgrade pip\
-    && sfw uv pip install --system --no-cache -r requirements.txt
+RUN pip install uv && uv pip install --system --upgrade pip\
+    && uv pip install --system --no-cache -r requirements.txt
 
 # -------------------------
 # Copy application source

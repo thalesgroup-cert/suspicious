@@ -92,13 +92,6 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
     && mkdir -p /var/log \
     && touch /var/log/cron.log
 
-# Non-root user
-RUN groupadd --gid 1000 appgroup \
-    && useradd --uid 1000 --gid appgroup \
-       --create-home \
-       --shell /usr/sbin/nologin \
-       appuser
-
 # Copy Python environment from builder
 COPY --from=builder /usr/local /usr/local
 
@@ -107,10 +100,6 @@ COPY --from=builder /usr/local/share/nltk_data /usr/local/share/nltk_data
 
 # Copy application code
 COPY . .
-
-RUN chown -R appuser:appgroup /app
-
-USER appuser
 
 WORKDIR /app/Suspicious
 
