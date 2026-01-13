@@ -42,7 +42,7 @@ class ChallengeToTheHiveService:
         self.template = Environment(
             loader=FileSystemLoader(TEMPLATES_DIR),
             autoescape=select_autoescape(["html"])
-        ).get_template("challenge_email.html.jinja2")
+        ).get_template("challenge_email.jinja2")
 
     def _context(self) -> dict:
         mail = getattr(getattr(self.case, "fileOrMail", None), "mail", None)
