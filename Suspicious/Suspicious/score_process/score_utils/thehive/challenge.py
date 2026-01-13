@@ -15,7 +15,7 @@ from .utils import generate_ref, build_mail_attachments_paths
 
 logger = logging.getLogger(__name__)
 update_logger = logging.getLogger("tasp.cron.update_ongoing_case_jobs")
-TEMPLATES_DIR = Path(__file__).parent / "templates"
+TEMPLATES_DIR = Path(__file__).parent.parent / "send_mail/templates"
 
 
 CONFIG_PATH = "/app/settings.json"
