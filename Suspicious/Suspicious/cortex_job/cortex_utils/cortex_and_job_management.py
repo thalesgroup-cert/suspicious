@@ -5,8 +5,8 @@ from datetime import datetime, timedelta
 
 from cortex4py.api import Api
 from cortex_job.models import Analyzer, AnalyzerReport
-from mail_feeder.models import MailBody, MailArchive, MailInfo
-from score_process.scoring.score_check import CortexAnalyzer
+from mail_feeder.models import MailBody, MailArchive, MailInfo, MailHeader
+from score_process.scoring.cortex_analyzers.reports import CortexAnalyzerReports
 
 # ------------------------
 # Logger setup
@@ -849,7 +849,7 @@ class CortexJobManager:
             "URL": self.process_url_artifact,
             "Hash": self.process_hash_artifact,
             "Domain": self.process_domain_artifact,
-            "Mail": self.process_mail_artifact,
+            "MailAddress": self.process_mail_artifact,
         }
 
         for artifact in artifacts:
@@ -979,12 +979,12 @@ class CortexJobManager:
 
         reports = self.get_new_reports(
             data_type="mail",
-            filter_kwargs={"mail": artifact.artifactIsMailAddress.mail},
+            filter_kwargs={"mail": artifact.artifactIsMailAddress.mail_address},
         )
 
         if not reports.exists():
             update_cases_logger.info(
-                f"No new reports found related to the provided Mail Address: {artifact.artifactIsMailAddress.mail}"
+                f"No new reports found related to the provided Mail Address: {artifact.artifactIsMailAddress.mail_address}"
             )
             return
 
@@ -1258,7 +1258,7 @@ class CortexJobManager:
         # If all jobs are done, fetch the final report
         if case.status == "Done":
             try:
-                CortexAnalyzer.get_report(case)
+                CortexAnalyzerReports.get_report(case)
             except Exception as e:
                 update_cases_logger.error(
                     f"Error fetching final report for case {case.id}: {e}",

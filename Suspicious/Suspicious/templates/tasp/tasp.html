@@ -1,154 +1,220 @@
 {% extends 'base.html' %}
-{% block title %}All Submissions{% endblock %}
+{% block title %}Suspicious - Investigations{% endblock %}
 {% block content %}
-    {% load utils %} 
-    {% if user|has_group_elevated  %}
-        {% load static %}
+  {% load utils %}
+  {% if user|has_group_elevated  %}
+    {% load static %}
 
-        <section class="info mt-6">
-          <header>
-              <h1 class="title is-1">All Submissions :</h1>
-              <p class="title2 ml-6 mb-4">Click on the submission ID to get more details</p>
-          </header>
-        </section>
-        {% if latest_cases %}
-        <div id="count" class="rowsNum">
-          <div class="button has-background-link has-text-white">
-            <p>Currently showing : </p>
-            <span id="num" class="mr-1 ml-1" aria-label="Number of rows"></span>
-            <p>rows</p>
-          </div>
-          <div class="addfilter">
-            <button class="button btn btn-default btn-xs btn-filter has-background-link has-text-white "><span class="glyphicon glyphicon-filter"></span>Click To Add / Remove Filter</button>
-          </div>
+    <section class="info mt-6">
+      <header>
+        <h1 class="title is-1">All Submissions :</h1>
+        <p class="title2 ml-6 mb-4">Click on the submission ID to get more details</p>
+      </header>
+    </section>
+
+    {% if page_obj and page_obj.object_list %}
+      <div id="count" class="rowsNum">
+        <div class="button has-background-link has-text-white">
+          <p>Currently showing : </p>
+          <span id="num" class="mr-1 ml-1" aria-label="Number of rows">
+            {{ page_obj.start_index }}–{{ page_obj.end_index }} of {{ page_obj.paginator.count }}
+          </span>
+          <p>rows</p>
         </div>
+        <div class="addfilter">
+          <button class="button btn btn-default btn-xs btn-filter has-background-link has-text-white">
+            <span class="glyphicon glyphicon-filter"></span>Click To Add / Remove Filter
+          </button>
+        </div>
+      </div>
 
-        <div class="panel panel-primary filterable mb-6">
-          <table id="table" class="table table-bordered table-striped tablemanager is-bordered is-striped is-narrow is-hoverable is-fullwidth" >
-            <thead>
-              <tr class="filters">
-                <th>
-                  <label for="case-number" class="ml-5">Id</label>
-                  <input id="case-number" class="input" type="text" placeholder="" disabled />
-                </th>
-                <th>
-                  <label for="user" class="ml-5">User</label>
-                  <input id="user" class="input" type="text" placeholder="" disabled />
-                </th>
-                <th>
-                  <label for="status" class="ml-5">Status</label>
-                  <input id="status" class="input" type="text" placeholder="" disabled />
-                </th>
-                <th>
-                  <label for="info" class="ml-5">Info</label>
-                  <input id="info" class="input" type="text" placeholder="" disabled />
-                </th>
-                <th>
-                  <label for="date" class="ml-5">Date</label>
-                  <input id="date" class="input" type="date" placeholder="" pattern="\d{4}-\d{2}-\d{2}" min="1997-01-01" max="2050-12-31" value="" disabled />
-                </th>
-                <th>
-                  <label for="tests-done" class="ml-5">Tests</label>
-                  <input id="tests-done" class="input" type="text" placeholder="" disabled/>
-                </th>
-                <th>
-                  <label for="type" class="ml-5">Type</label>
-                  <input id="type" class="input" type="text" placeholder="" disabled />
-                </th>
-                <th>
-                  <label for="result" class="ml-5">Results</label>
-                  <input id="result" class="input" type="text" placeholder="" disabled />
-                </th>
-              </tr>
-            </thead>
-            <tbody id="table_body">
-              {% csrf_token %}  
-              {% for case in latest_cases %}
-                <tr>
-                  <td data-label="Case #">
-                    <div>
-                      <button class="button js-modal-triggers has-background-link has-text-white caseid" value="{{ case.id }},{{ case.reporter }}">{{ case.id }}</button>
-                    </div>
-                  </td>
-                  <td class="user has-text-centered" data-label="User"><a onclick="copy({{ forloop.counter }})" id="" value="{{ case.id|get_related_field:"email" }}" class="usermail"><p id="text" >{{ case.id|get_related_field:"first_name" }}</p></a></td>
-                  <td class="status has-text-centered" data-label="Status">{{case.status}}</td>
-                  {% if case.fileOrMail %}
-                    {% if case.fileOrMail.file %}
-                      <td class="info has-text-centered" title="{{case.fileOrMail.file.file_path.name}}" data-label="Info">{{ case.fileOrMail.file.file_path.name | truncate_chars }}</td>
-                    {% elif  case.fileOrMail.mail %}
-                      <td class="info has-text-centered" title="{{case.fileOrMail.mail.subject}}" data-label="Info">{{ case.fileOrMail.mail.subject | decode_email_subject}}</td>
-                    {% endif %}
+      <div class="panel panel-primary filterable mb-6">
+        <table id="table"
+               class="table table-bordered table-striped tablemanager is-bordered is-striped is-narrow is-hoverable is-fullwidth">
+          <thead>
+            <tr class="filters">
+              <th>
+                <label for="case-number" class="ml-5">Id</label>
+                <input id="case-number" class="input" type="text" disabled />
+              </th>
+              <th>
+                <label for="user" class="ml-5">User</label>
+                <input id="user" class="input" type="text" disabled />
+              </th>
+              <th>
+                <label for="status" class="ml-5">Status</label>
+                <input id="status" class="input" type="text" disabled />
+              </th>
+              <th>
+                <label for="info" class="ml-5">Info</label>
+                <input id="info" class="input" type="text" disabled />
+              </th>
+              <th>
+                <label for="date" class="ml-5">Date</label>
+                <input id="date" class="input" type="date" disabled />
+              </th>
+              <th>
+                <label for="tests-done" class="ml-5">Tests</label>
+                <input id="tests-done" class="input" type="text" disabled/>
+              </th>
+              <th>
+                <label for="type" class="ml-5">Type</label>
+                <input id="type" class="input" type="text" disabled />
+              </th>
+              <th>
+                <label for="result" class="ml-5">Results</label>
+                <input id="result" class="input" type="text" disabled />
+              </th>
+            </tr>
+          </thead>
+          <tbody id="table_body">
+            {% csrf_token %}
+            {% for case in page_obj %}
+              <tr>
+                <td data-label="Case #">
+                  <div>
+                    <button class="button js-modal-triggers has-background-link has-text-white caseid"
+                            value="{{ case.id }},{{ case.reporter }}">{{ case.id }}</button>
+                  </div>
+                </td>
+                <td class="user has-text-centered" data-label="User">
+                  <a onclick="copy({{ forloop.counter }})" class="usermail"
+                     value="{{ case.id|get_related_field:"email" }}">
+                    <p id="text">{{ case.id|get_related_field:"first_name" }}</p>
+                  </a>
+                </td>
+                <td class="status has-text-centered" data-label="Status">{{ case.status }}</td>
+
+                {# Info column #}
+                {% if case.fileOrMail %}
+                  {% if case.fileOrMail.file %}
+                    <td class="info has-text-centered"
+                        title="{{ case.fileOrMail.file.file_path.name }}"
+                        data-label="Info">
+                      {{ case.fileOrMail.file.file_path.name | truncate_chars }}
+                    </td>
+                  {% elif case.fileOrMail.mail %}
+                    <td class="info has-text-centered"
+                        title="{{ case.fileOrMail.mail.subject }}"
+                        data-label="Info">
+                      {{ case.fileOrMail.mail.subject | decode_email_subject }}
+                    </td>
                   {% endif %}
-                  {% if  case.nonFileIocs and not case.fileOrMail.file %}
-                    {% if  case.nonFileIocs.hash %}
-                      <td class="info has-text-centered" title="{{case.nonFileIocs.hash.value}}" data-label="Info">{{ case.nonFileIocs.hash.value  | truncate_chars}}</td>
-                    {% elif  case.nonFileIocs.ip %}
-                      <td class="info has-text-centered" title="{{case.nonFileIocs.ip.address}}" data-label="Info">{{ case.nonFileIocs.ip.address | truncate_chars}}</td>
-                    {% elif  case.nonFileIocs.url %}
-                      <td class="info has-text-centered" title="{{case.nonFileIocs.url.address}}" data-label="Info">{{ case.nonFileIocs.url.address | truncate_chars }}</td>
-                    {% endif %}
+                {% elif case.nonFileIocs %}
+                  {% if case.nonFileIocs.hash %}
+                    <td class="info has-text-centered"
+                        title="{{ case.nonFileIocs.hash.value }}"
+                        data-label="Info">
+                      {{ case.nonFileIocs.hash.value | truncate_chars }}
+                    </td>
+                  {% elif case.nonFileIocs.ip %}
+                    <td class="info has-text-centered"
+                        title="{{ case.nonFileIocs.ip.address }}"
+                        data-label="Info">
+                      {{ case.nonFileIocs.ip.address | truncate_chars }}
+                    </td>
+                  {% elif case.nonFileIocs.url %}
+                    <td class="info has-text-centered"
+                        title="{{ case.nonFileIocs.url.address }}"
+                        data-label="Info">
+                      {{ case.nonFileIocs.url.address | truncate_chars }}
+                    </td>
                   {% endif %}
-                  {% if not case.fileOrMail and not case.nonFileIocs %}
-                    <td class="info has-text-centered" data-label="Info">Default</td>
-                  {% endif %}
-                  <td class="date has-text-centered" data-label="Date">{{case.creation_date | change_date_format}}</td>
-                  <td class="tests has-text-centered" data-label="Tests" class="test_done">{{case.analysis_done}}</td>
-                  {% if case.fileOrMail %}
-                    {% if case.fileOrMail.file %}
-                    <td class="type has-text-centered" data-label="Type">{{ case.fileOrMail.file.filetype }}</td>
-                    {% elif  case.fileOrMail.mail %}
+                {% else %}
+                  <td class="info has-text-centered" data-label="Info">Default</td>
+                {% endif %}
+
+                <td class="date has-text-centered" data-label="Date">
+                  {{ case.creation_date | change_date_format }}
+                </td>
+                <td class="tests has-text-centered" data-label="Tests">{{ case.analysis_done }}</td>
+
+                {# Type column #}
+                {% if case.fileOrMail %}
+                  {% if case.fileOrMail.file %}
+                    <td class="type has-text-centered"
+                        data-label="Type">{{ case.fileOrMail.file.filetype }}</td>
+                  {% elif case.fileOrMail.mail %}
                     <td class="type has-text-centered" data-label="Type">Mail</td>
-                    {% endif %}
                   {% endif %}
-                  {% if  case.nonFileIocs and not case.fileOrMail.file %}
-                    {% if  case.nonFileIocs.hash %}
-                      <td class="type has-text-centered" data-label="Type">{{ case.nonFileIocs.hash.hashtype }}</td>
-                    {% elif  case.nonFileIocs.ip %}
-                      <td class="type has-text-centered" data-label="Type">IPV4</td>
-                    {% elif  case.nonFileIocs.url %}
-                      <td class="type has-text-centered" data-label="Type">Url</td>
-                    {% endif %}
+                {% elif case.nonFileIocs %}
+                  {% if case.nonFileIocs.hash %}
+                    <td class="type has-text-centered"
+                        data-label="Type">{{ case.nonFileIocs.hash.hashtype }}</td>
+                  {% elif case.nonFileIocs.ip %}
+                    <td class="type has-text-centered" data-label="Type">IPV4</td>
+                  {% elif case.nonFileIocs.url %}
+                    <td class="type has-text-centered" data-label="Type">Url</td>
                   {% endif %}
-                  {% if not case.fileOrMail and not case.nonFileIocs %}
-                    <td class="type has-text-centered" data-label="Type">Default</td>
-                  {% endif %}
-                  <td class="result has-text-centered" data-label="Result">{{case.results}}</td>
-                </tr>
-              {% endfor %}
-            </tbody>
-          </table>
+                {% else %}
+                  <td class="type has-text-centered" data-label="Type">Default</td>
+                {% endif %}
+
+                <td class="result has-text-centered" data-label="Result">{{ case.results }}</td>
+              </tr>
+            {% endfor %}
+          </tbody>
+        </table>
+      </div>
+
+      {# Pagination controls #}
+      {% if page_obj.has_previous or page_obj.has_next %}
+        <nav class="pagination is-centered mt-4" role="navigation" aria-label="pagination">
+          <ul class="pagination-list">
+            {% if page_obj.has_previous %}
+              <li><a class="pagination-link" href="?page=1">&laquo; first</a></li>
+              <li><a class="pagination-link" href="?page={{ page_obj.previous_page_number }}">previous</a></li>
+            {% else %}
+              <li><span class="pagination-link is-disabled">&laquo; first</span></li>
+              <li><span class="pagination-link is-disabled">previous</span></li>
+            {% endif %}
+
+            <li><span class="pagination-link">Page {{ page_obj.number }} of {{ page_obj.paginator.num_pages }}</span></li>
+
+            {% if page_obj.has_next %}
+              <li><a class="pagination-link" href="?page={{ page_obj.next_page_number }}">next</a></li>
+              <li><a class="pagination-link" href="?page={{ page_obj.paginator.num_pages }}">last &raquo;</a></li>
+            {% else %}
+              <li><span class="pagination-link is-disabled">next</span></li>
+              <li><span class="pagination-link is-disabled">last &raquo;</span></li>
+            {% endif %}
+          </ul>
+        </nav>
+      {% endif %}
+
+      <div class="modal" id="myPopup"></div>
+      <div class="modal" id="myLoadingPopup">
+        <div class="modal-background"></div>
+        <div class="modal-card">
+          <header class="modal-card-head">
+            <p class="modal-card-title">Loading...</p>
+          </header>
+          <section class="modal-card-body">
+            <p class="title is-4">Waiting for your request: </p>
+            <p class="subtitle is-6">This may take a moment depending on the amount of cases selected...</p>
+            <progress class="progress is-medium is-info" max="100">60%</progress>
+          </section>
         </div>
-            <div class="modal" id="myPopup">
-            </div>
-            <div class="modal" id="myLoadingPopup">
-              <div class="modal-background"></div>
-              <div class="modal-card">
-                <header class="modal-card-head">
-                  <p class="modal-card-title">Loading...</p>
-                </header>
-                <section class="modal-card-body">
-                  <p class="title is-4">Waiting for your request: </p>
-                  <p class="subtitle is-6">This may take a moment depending on the amount of cases selected...</p>
-                  <progress class="progress is-medium is-info" max="100">60%</progress>
-                </section>
-              </div>
-            </div>
-        {% else %}
-            <p>No cases are available.</p>
-        {% endif %}
-        <script type="text/javascript" src="{% static 'js/jquery.js' %}"></script>
-        <script type="text/javascript" src="{% static 'js/tableManager.js' %}"></script>
-        <script type="text/javascript" src="{% static 'js/tablefilter.js' %}"></script>
-        {% if user|is_ciso or user|has_group:"Champions"%}
-            <script type="text/javascript" src="{% static 'js/caseScriptUser.js' %}"></script>
-        {% endif %}
-        {% if user|has_group:"Admin" or user|has_group:"CERT" %}
-          <script type="text/javascript" src="{% static 'js/caseScript.js' %}"></script>
-        {% endif %}
-        <script src="{% static 'js/navbar.js' %}"></script>
-        <script src="{% static 'js/loader2.js' %}"></script>
+      </div>
+
     {% else %}
-        <p>You are not an Admin</p>
-        <script>window.location.href = "/";</script>
+      <p>No cases are available.</p>
     {% endif %}
+
+    <script type="text/javascript" src="{% static 'js/jquery.js' %}"></script>
+    <script type="text/javascript" src="{% static 'js/tableManager.js' %}"></script>
+    <script type="text/javascript" src="{% static 'js/tablefilter.js' %}"></script>
+    {% if user|is_ciso or user|has_group:"Champions" %}
+      <script type="text/javascript" src="{% static 'js/caseScriptUser.js' %}"></script>
+    {% endif %}
+    {% if user|has_group:"Admin" or user|has_group:"CERT" %}
+      <script type="text/javascript" src="{% static 'js/caseScript.js' %}"></script>
+    {% endif %}
+    <script src="{% static 'js/navbar.js' %}"></script>
+    <script src="{% static 'js/loader2.js' %}"></script>
+
+  {% else %}
+    <p>You are not an Admin</p>
+    <script>window.location.href = "/";</script>
+  {% endif %}
 {% endblock %}

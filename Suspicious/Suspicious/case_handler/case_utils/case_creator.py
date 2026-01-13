@@ -10,9 +10,13 @@ from case_handler.models import (
     CaseHasNonFileIocs,
     MailInCases
 )
+import logging
 
 from dashboard.models import UserCasesMonthlyStats
 from django.db.models import F
+
+fetch_mail_logger = logging.getLogger("tasp.cron.fetch_and_process_emails")
+logger = logging.getLogger(__name__)
 
 
 class CaseCreator:
@@ -51,6 +55,7 @@ class CaseCreator:
         )
 
         for key, value in kwargs.items():
+            fetch_mail_logger.debug(f"Processing key: {key}, value: {getattr(value, 'id', 'None')}")
             if key == 'allow_listed' and value == True:
                 case.results = "SAFE-ALLOW_LISTED"
                 case.finalScore = 0
@@ -68,7 +73,7 @@ class CaseCreator:
             case.save()
             return case
         except Exception as e:
-            print(f"Error creating case: {str(e)}")
+            fetch_mail_logger.error(f"Error creating case: {str(e)}")
             return None
 
     def _create_related_model(self, key, value, case):
@@ -205,7 +210,7 @@ class CaseCreator:
             None
         """
         try:
-            from tasp.cron import sync_monthly_kpi
+            from tasp.cron.kpi import sync_monthly_kpi
             kpi = sync_monthly_kpi()
 
             # Only update the stats if the case results are "SAFE-ALLOW_LISTED"
@@ -230,7 +235,7 @@ class CaseCreator:
             None
         """
         try:
-            from tasp.cron import sync_monthly_kpi
+            from tasp.cron.kpi import sync_monthly_kpi
             kpi = sync_monthly_kpi()
 
             user_cases_monthly_stats = UserCasesMonthlyStats.objects.filter(user=self.user, month=kpi.month, year=kpi.year).first()

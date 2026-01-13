@@ -1,0 +1,75 @@
+services:
+  suspicious:
+    init: true
+    ports:
+      - "127.0.0.1:${SUSPICIOUS_PORT}:9020"
+    restart: always
+    volumes:
+      - "${SUSPICIOUS_PATH}/logs:/app/log"
+      - "/var/run/docker.sock:/var/run/docker.sock"
+      - "${SUSPICIOUS_PATH}/settings.json:/app/settings.json"
+      # AI Vector Database
+      - "${SUSPICIOUS_PATH}/chromadb:/app/Suspicious/chromadb"
+    command: >
+      /bin/bash -c "
+      python3 manage.py crontab show &&
+      python3 manage.py crontab add &&
+      python3 manage.py crontab show &&
+      service cron start &&
+      python3 manage.py runserver 0.0.0.0:9020 --insecure"
+    env_file:
+      - ".env"
+    environment:
+      no_proxy: "${NO_PROXY},cortex,db_suspicious,feeder"
+    networks:
+      - suspicious_network
+
+  cortex:
+    init: true
+    ports:
+      - "127.0.0.1:${CORTEX_PORT}:9001"
+    restart: unless-stopped
+    environment:
+      http_proxy: "${HTTP_PROXY}"
+      https_proxy: "${HTTPS_PROXY}"
+      no_proxy: "${NO_PROXY}"
+      JAVA_OPTS: "-Djavax.net.ssl.trustStore=/etc/cortex/keystore.jks"
+      job_directory: "${CORTEX_PATH}/jobs"
+    volumes:
+      # Certificates
+      - "${CA_PATH}/keystore.jks:/etc/cortex/keystore.jks:ro"
+      # Cortex config
+      - "${CORTEX_PATH}/jobs:${CORTEX_PATH}/jobs:rw"
+      - "${CORTEX_PATH}/application.conf:/etc/cortex/application.conf:ro"
+      - "${CORTEX_PATH}/application-cortex.log:/var/log/cortex/application.log:rw"
+      # Docker configuration
+      - "/var/run/docker.sock:/var/run/docker.sock"
+      - "${DOCKER_PATH}/config.json:/home/cortex/.docker/config.json:ro"
+      # Neurons Local
+      - "${CORTEX_PATH}/Cortex-Analyzers/:/opt/Cortex-Analyzers/:ro"
+      # AIMailAnalyzer Neurons
+      - "${AIANALYZER_PATH}/analyzers.json:/opt/Cortex-Analyzers-AI/analyzers/analyzers.json"
+      # Docker Neurons
+      - "${CORTEX_PATH}/Cortex-Analyzers-Public/analyzers/analyzers.json:/opt/Cortex-Analyzers-Public/analyzers/analyzers.json"
+      - "${CORTEX_PATH}/Cortex-Analyzers-Public/responders/responders.json:/opt/Cortex-Analyzers-Public/responders/responders.json"
+      # Yara rules
+      - "${YARA_PATH}/rules/:/opt/Yara/rules"
+    networks:
+      - suspicious_network
+
+  feeder:
+    command: >
+      /bin/bash -c "python3 main.py"
+    volumes:
+      - "${FEEDER_PATH}/application.log:/app/application.log"
+      - "${CA_PATH}/certfile.pem:/etc/private/certfile.pem:ro"
+      - "${CA_PATH}/keyfile.pem:/etc/private/keyfile.pem:ro"
+      - "${CA_PATH}/rootcafile.pem:/etc/private/rootcafile.pem:ro"
+    networks:
+      - suspicious_network
+
+
+networks:
+  suspicious_network:
+    external: true
+    name: ${NETWORK_NAME}

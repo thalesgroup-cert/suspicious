@@ -1,0 +1,100 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>{{ subject }}</title>
+</head>
+
+<body style="margin:0;padding:0;background:#EDF1F4;">
+<center>
+<table width="100%" role="presentation">
+<tr><td align="center">
+
+<table width="600" role="presentation" style="max-width:600px;">
+
+  <!-- Header -->
+  <tr>
+    <td style="background:#242A75;padding:30px;text-align:center;">
+      <img src="{{ logos.company }}" alt="Company" style="max-width:100px;">
+    </td>
+  </tr>
+
+  <tr>
+    <td style="background:#242A75;text-align:center;">
+      <img src="{{ logos.final }}" alt="" style="width:100%;max-width:600px;">
+    </td>
+  </tr>
+
+  <!-- Body -->
+  <tr>
+    <td style="background:#FFFFFF;padding:30px;font-family:Arial;font-size:14px;color:#000;">
+      <p style="font-size:18px;color:#00BBDD;">
+        Dear {{ recipient_name }},
+      </p>
+
+      <p>
+        After a first automated analysis, one of our analysts has revised your
+        submission <strong>#{{ case.id }}</strong>.
+      </p>
+
+      <div style="margin:20px 0;text-align:center;">
+        <strong style="color:{{ result.color }};">
+          {{ result.text }}
+        </strong>
+      </div>
+
+      <div>
+        {{ result.description | safe }}
+      </div>
+    </td>
+  </tr>
+
+  <!-- Footer -->
+  <tr>
+    <td style="background:#242A75;padding:30px;color:#FFF;font-style:italic;text-align:center;">
+      <p>
+        Definitions are available in the
+        <a href="{{ urls.glossary }}" style="color:#FFF;">cybersecurity glossary</a>.
+        Questions?
+        <a href="{{ urls.inquiry }}" style="color:#FFF;">{{ inquiry_text }}</a>.
+      </p>
+
+      <p>
+        Portal access
+        <a href="{{ urls.portal }}" style="color:#FFF;">here</a>.
+      </p>
+
+      <p>With our kindest regards,</p>
+    </td>
+  </tr>
+
+  <tr>
+    <td style="background:#242A75;text-align:center;padding:10px;">
+      <strong style="color:#FFF;">{{ company }} Team</strong>
+    </td>
+  </tr>
+
+  <tr>
+    <td style="background:#242A75;text-align:center;padding:20px;">
+      <a href="{{ urls.global }}" style="color:#FFF;">{{ global_team }}</a>
+    </td>
+  </tr>
+
+  <tr>
+    <td style="background:#242A75;text-align:center;padding:15px;">
+      {% for s in socials %}
+        <a href="{{ s.url }}" target="_blank">
+          <img src="{{ s.logo }}" alt="{{ s.name }}" width="20">
+        </a>
+      {% endfor %}
+    </td>
+  </tr>
+
+</table>
+
+</td></tr>
+</table>
+</center>
+</body>
+</html>

@@ -16,7 +16,8 @@ Including another URLconf
 from django.contrib import admin
 from django.urls import include, path
 
-urlpatterns = [ 
+urlpatterns = [
+    path('', include('django_sso.sso_gateway.urls')),
     path("accounts/", include("django.contrib.auth.urls"), name="login"),
     path('admin/', admin.site.urls),
     path('', include('tasp.urls')),

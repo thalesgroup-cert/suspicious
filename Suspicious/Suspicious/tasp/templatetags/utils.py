@@ -571,7 +571,7 @@ def total_cases_this_month() -> int:
             or 0 if an error occurs or data is missing.
     """
     try:
-        from tasp.cron import sync_monthly_kpi as fetch_kpis
+        from tasp.cron.kpi import sync_monthly_kpi as fetch_kpis
         kpi = fetch_kpis()  # your cron function returns a KPI instance
         stats = getattr(kpi, "total_cases_stats", None)  # safe access
         if stats is None:
@@ -596,7 +596,7 @@ def monthly_new_reporters() -> int:
         int: The 'new_reporters' value from the current KPI, or 0 on error or if missing.
     """
     try:
-        from tasp.cron import sync_monthly_kpi as fetch_kpis
+        from tasp.cron.kpi import sync_monthly_kpi as fetch_kpis
         kpi = fetch_kpis()  # should return an object with monthly_reporter_stats
         stats = getattr(kpi, "monthly_reporter_stats", None)
         if stats is None:
@@ -676,7 +676,7 @@ def monthly_reporters_count() -> int:
         ValueError: if the KPI record is not found or missing the attribute.
     """
     try:
-        from tasp.cron import sync_monthly_kpi as fetch_kpis
+        from tasp.cron.kpi import sync_monthly_kpi as fetch_kpis
         kpi_data = fetch_kpis()  # your cron function should return a KPI instance or similar
         return kpi_data.monthly_reporter_stats.total_reporters
     except AttributeError as e:

@@ -40,7 +40,7 @@ from datetime import datetime, timezone
 import re
 from email.utils import parsedate_to_datetime
 
-from score_process.score_utils.utils import parse_and_decode_defaultdict, parse_headers
+from score_process.score_utils.thehive.utils import parse_and_decode_defaultdict, parse_headers
 
 logger = logging.getLogger(__name__)
 
@@ -180,7 +180,7 @@ def dashboard(request: HttpRequest) -> HttpResponse:
     current_month = today.strftime('%m')
     current_year = today.year
     # Importing here to avoid circular imports or to ensure it runs on-demand.
-    from tasp.cron import sync_monthly_kpi  
+    from tasp.cron.kpi import sync_monthly_kpi
     kpi = sync_monthly_kpi()  # Although kpi isn't used in context, it might trigger needed side effects.
     context = {
         'month': current_month,

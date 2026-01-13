@@ -86,6 +86,7 @@
         "secure": false
     },
     "mail": {
+        "tls": true,
         "server" : "the smtp serve to allow the app to send mails",
         "port" : 25,
         "username" : "SUSPICIOUS",
@@ -114,5 +115,10 @@
             "challenge" : "data:image/png;base64,The Base 64 image for the challenge mail",
             "modif" : "data:image/png;base64,The Base 64 image for the modif mail"
         }
+    },
+    "email_subjects": {
+        "acknowledgement": "Suspicious – Submission Registered",
+        "review": "Your submission n°{case_id} has been reviewed as: {result}",
+        "final": "SUSPICIOUS EMAIL ANALYSIS - Your analysis [{case_id}] is completed"
     }
 }
