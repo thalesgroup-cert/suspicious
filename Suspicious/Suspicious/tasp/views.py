@@ -383,13 +383,12 @@ class CaseChallengeService:
         logger.info(f"Notifying about challenge for case ID {self.case.id}. Send to TheHive: {send_to_thehive}")
         if send_to_thehive:
             logger.info(f"Sending challenge notification to TheHive for case ID {self.case.id}")
-            ChallengeToTheHiveService(mail_header, self.case.reporter, EMAIL_SENDER_DEFAULT, None, self.case, None).send_to_thehive()
+            ChallengeToTheHiveService(self.case, None, mail_header).send_to_thehive()
             logger.info(f"Challenge notification sent to TheHive for case ID {self.case.id}")
         else:
             cert_users = User.objects.filter(groups__name="CERT", is_active=True).exclude(email="")
             for cert_user in cert_users:
-                name = f"{cert_user.first_name} {cert_user.last_name}".strip() or cert_user.username
-                ChallengeToTheHiveService(mail_header, self.case.reporter, EMAIL_SENDER_DEFAULT, cert_user, self.case, name).send()
+                ChallengeToTheHiveService(self.case, cert_user, mail_header).send()
 
 def _get_case_or_404(case_id, user):
     return get_object_or_404(

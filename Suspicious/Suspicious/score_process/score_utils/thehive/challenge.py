@@ -26,12 +26,16 @@ mail_config = config.get('mail', {})
 thehive_config = config.get('thehive', {})
 
 class ChallengeToTheHiveService:
-    def __init__(self, case, challenger, recipient, subject):
+    def __init__(self, case, recipient, subject):
         with open(CONFIG_PATH) as f:
             self.config = json.load(f)
 
         self.case = case
-        self.challenger = challenger
+        self.challenger = case.reporter
+        self.challenger_firstname = case.reporter.first_name
+        self.challenger_lastname = case.reporter.last_name
+        self.challenger_email = case.reporter.email
+        self.challenger_groups = [g.name for g in case.reporter.groups.all()]
         self.recipient = recipient
         self.subject = subject
 
