@@ -1,10 +1,8 @@
 #################################################
 #                                               #
-#   HARDENED DOCKERFILE – EMAIL FEEDER SERVICE  #
+#   DOCKERFILE – EMAIL FEEDER SERVICE           #
 #                                               #
 #################################################
-
-# Use Docker Hardened Image (minimal, signed, scanned)
 FROM python AS runtime
 
 # -------------------------
