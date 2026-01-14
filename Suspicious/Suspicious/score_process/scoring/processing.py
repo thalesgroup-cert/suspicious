@@ -604,7 +604,8 @@ def process_mail_artifact(artifact, reports, total_scores, total_confidences, is
                 "url": "url",
                 "ip": "ip",
                 "hash": "hash",
-                "domain": "domain"
+                "domain": "domain",
+                "mailaddress": "mailaddress"
             }
 
             # Validate the artifact type

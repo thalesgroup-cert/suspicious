@@ -97,31 +97,6 @@
         </table>
       </div>
 
-      {# Pagination controls #}
-      {% if page_obj.has_previous or page_obj.has_next %}
-        <nav class="pagination is-centered mt-4" role="navigation" aria-label="pagination">
-          <ul class="pagination-list">
-            {% if page_obj.has_previous %}
-              <li><a class="pagination-link" href="?page=1">&laquo; first</a></li>
-              <li><a class="pagination-link" href="?page={{ page_obj.previous_page_number }}">previous</a></li>
-            {% else %}
-              <li><span class="pagination-link is-disabled">&laquo; first</span></li>
-              <li><span class="pagination-link is-disabled">previous</span></li>
-            {% endif %}
-
-            <li><span class="pagination-link">Page {{ page_obj.number }} of {{ page_obj.paginator.num_pages }}</span></li>
-
-            {% if page_obj.has_next %}
-              <li><a class="pagination-link" href="?page={{ page_obj.next_page_number }}">next</a></li>
-              <li><a class="pagination-link" href="?page={{ page_obj.paginator.num_pages }}">last &raquo;</a></li>
-            {% else %}
-              <li><span class="pagination-link is-disabled">next</span></li>
-              <li><span class="pagination-link is-disabled">last &raquo;</span></li>
-            {% endif %}
-          </ul>
-        </nav>
-      {% endif %}
-
       <div class="modal" id="myPopup"></div>
 
     {% else %}

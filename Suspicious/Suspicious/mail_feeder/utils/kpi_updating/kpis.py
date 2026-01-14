@@ -18,9 +18,8 @@ class KpiService:
         """
         period = Period(month=month, year=year)
         from tasp.cron.kpi import sync_monthly_kpi
-        sync_monthly_kpi()
+        kpi = sync_monthly_kpi()
 
-        kpi = Kpi.objects.get(month=period.month, year=period.year)
         stats = kpi.monthly_reporter_stats
 
         if stats:
