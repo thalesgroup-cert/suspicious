@@ -13,6 +13,7 @@ from pathlib import Path
 import json
 import ldap
 from django_auth_ldap.config import LDAPSearch
+import sys
 
 CONFIG_PATH = "/app/settings.json"
 with open(CONFIG_PATH) as config_file:
@@ -36,19 +37,27 @@ CSRF_TRUSTED_ORIGINS = [suspicious_config.get('csrf_trusted_origins', 'https://e
 TIME_ZONE = suspicious_config.get('tz', 'UTC')
 USE_TZ = True
 
-DATABASES = {
-    'default': {
-        'ENGINE': 'django.db.backends.mysql',
-        'NAME': db_config.get('mysql_database', 'default_db_name'),
-        'USER': db_config.get('mysql_user', 'default_db_user'),
-        'PASSWORD': db_config.get('mysql_password', 'default_db_password'),
-        'HOST': db_config.get('mysql_host', 'default_db_host'),
-        'PORT': db_config.get('mysql_port', '3306'),
-        'OPTIONS': {
-            'charset': 'utf8mb4',
+if 'test' in sys.argv:
+    DATABASES = {
+        'default': {
+            'ENGINE': 'django.db.backends.sqlite3',
+            'NAME': ':memory:',
         }
     }
-}
+else:
+    DATABASES = {
+        'default': {
+            'ENGINE': 'django.db.backends.mysql',
+            'NAME': db_config.get('mysql_database', 'default_db_name'),
+            'USER': db_config.get('mysql_user', 'default_db_user'),
+            'PASSWORD': db_config.get('mysql_password', 'default_db_password'),
+            'HOST': db_config.get('mysql_host', 'default_db_host'),
+            'PORT': db_config.get('mysql_port', '3306'),
+            'OPTIONS': {
+                'charset': 'utf8mb4',
+            }
+        }
+    }
 
 if db_config.get('db_use_ssl', 'NO') == 'YES':
     DATABASES['default']['OPTIONS'] = {'ssl': {'ca': '/cert.pem'}}
@@ -94,7 +103,7 @@ LOGGING = {
         'file': {
             'level': suspicious_config.get('trace_level', 'DEBUG'),
             'class': 'logging.FileHandler',
-            'filename': '/var/log/suspicious.log',
+            'filename': '/app/log/suspicious.log',
             'formatter': 'verbose',
         },
         'console': {
@@ -104,25 +113,25 @@ LOGGING = {
         'fetch_mail_file': {
             'level': suspicious_config.get('trace_level', 'DEBUG'),
             'class': 'logging.FileHandler',
-            'filename': '/var/log/fetched_mail.log',
+            'filename': '/app/log/fetched_mail.log',
             'formatter': 'verbose',
         },
         'update_cases_file': {
             'level': suspicious_config.get('trace_level', 'DEBUG'),
             'class': 'logging.FileHandler',
-            'filename': '/var/log/case_updating.log',
+            'filename': '/app/log/case_updating.log',
             'formatter': 'verbose',
         },
         'fetch_analyzer_file': {
             'level': suspicious_config.get('trace_level', 'DEBUG'),
             'class': 'logging.FileHandler',
-            'filename': '/var/log/fetch_analyzer.log',
+            'filename': '/app/log/fetch_analyzer.log',
             'formatter': 'verbose',
         },
         'cleanup_phishing_file': {
             'level': suspicious_config.get('trace_level', 'DEBUG'),
             'class': 'logging.FileHandler',
-            'filename': '/var/log/cleanup_phishing.log',
+            'filename': '/app/log/cleanup_phishing.log',
             'formatter': 'verbose',
         },
     },
@@ -176,6 +185,18 @@ MAX_UPLOAD_SIZE = 5242880  # 5MB
 AUTH_LDAP_ALWAYS_UPDATE_USER = True
 AUTH_LDAP_CACHE_TIMEOUT = 3600
 
+# SSO settings section in the gateway side are optional
+#SSO = {
+    # Timeout for the communication with subordinated services. (OPTIONAL)
+    # This timeout is defined in seconds with a default value of 0.1s 
+    # (100ms) per registered service.
+    #'SUBORDINATE_COMMUNICATION_TIMEOUT': 0.1,
+    
+    # Additional fields. (OPTIONAL). For more details look to part
+    # named as "Send additional data to subordinated services"
+    #'ADDITIONAL_FIELDS': ('additiona_fields', 'from_user_model', 'and_related_models'),
+#}
+
 # Authentication backends
 AUTHENTICATION_BACKENDS = (
     'django_auth_ldap.backend.LDAPBackend',
@@ -185,6 +206,7 @@ AUTHENTICATION_BACKENDS = (
 # Application definition
 INSTALLED_APPS = [
     'fontawesomefree',
+    'django_sso.sso_gateway',
     'tasp.apps.TaspConfig',
     'dashboard.apps.DashboardConfig',
     'case_handler.apps.CaseConfig',
@@ -298,13 +320,13 @@ CRONTAB_LOCK_JOBS = True
 # Each job is run every minute and logs to a specific file in /tmp
 # Consider adjusting the frequency of these jobs based on their cost and your needs
 CRONJOBS = [
-    ('*/1 * * * *', 'tasp.cron.fetch_and_process_emails', '>> /var/log/fetched_mail.log'),
-    ('*/1 * * * *', 'tasp.cron.sync_cortex_analyzers'),
-    ('*/1 * * * *', 'tasp.cron.update_ongoing_case_jobs', '>> /var/log/case_updating.log'),
-    ('*/5 * * * *', 'tasp.cron.sync_monthly_kpi'),
-    ('*/10 * * * *', 'tasp.cron.sync_user_profiles'),
-    ('0 0 1 * *', 'tasp.cron.delete_old_analyzer_reports', '>> /var/log/cleanup_phishing.log'),
-    ('0 0 * * *', 'tasp.cron.remove_old_suspicious_emails', '>> /var/log/cleanup_phishing.log')
+    ('*/1 * * * *', 'tasp.cron.fetch_emails.fetch_and_process_emails', '>> /app/log/fetched_mail.log'),
+    ('*/1 * * * *', 'tasp.cron.sync_cortex.sync_cortex_analyzers'),
+    ('*/1 * * * *', 'tasp.cron.user_and_cases.update_ongoing_case_jobs', '>> /app/log/case_updating.log'),
+    ('*/5 * * * *', 'tasp.cron.kpi.sync_monthly_kpi'),
+    ('*/10 * * * *', 'tasp.cron.user_and_cases.sync_user_profiles'),
+    ('0 0 1 * *', 'tasp.cron.cleanup.delete_old_analyzer_reports', '>> /app/log/cleanup_phishing.log'),
+    ('0 0 * * *', 'tasp.cron.suspicious.remove_old_suspicious_emails', '>> /app/log/cleanup_phishing.log')
 ]
 # Consider adding error handling or notifications for when these jobs fail
 # This could be as simple as checking the return code of the job, or as complex as sending an email on failure

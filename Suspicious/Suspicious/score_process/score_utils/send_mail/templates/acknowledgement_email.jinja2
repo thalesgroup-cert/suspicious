@@ -1,0 +1,104 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <meta name="color-scheme" content="light dark">
+  <meta name="supported-color-schemes" content="light dark">
+  <title>{{ subject }}</title>
+</head>
+
+<body style="margin:0;padding:0;background:#EDF1F4;">
+<center>
+<table width="100%" role="presentation">
+<tr>
+<td align="center">
+
+<table width="600" role="presentation" style="max-width:600px;">
+  <!-- Header -->
+  <tr>
+    <td style="background:#242A75;padding:30px;text-align:center;">
+      <img src="{{ company_logo }}" alt="{{ company_name }}" style="max-width:120px;">
+    </td>
+  </tr>
+
+  <tr>
+    <td style="background:#242A75;text-align:center;">
+      <img src="{{ acknowledge_logo }}" alt="" style="width:100%;max-width:600px;">
+    </td>
+  </tr>
+
+  <!-- Body -->
+  <tr>
+    <td style="background:#FFFFFF;padding:30px;font-family:Arial;font-size:14px;color:#333;">
+      <p style="font-size:18px;color:#00BBDD;">Dear {{ recipient_name }},</p>
+
+      <p>{{ company_name }} team thanks you for your submission.</p>
+
+      <p style="text-align:center;">
+        Your submission has been registered.  
+        Follow the analysis on the portal
+        <a href="{{ portal_url }}" target="_blank">here</a>.
+      </p>
+
+      <p style="text-align:center;">
+        You will receive one of the following conclusions:
+        <strong style="color:#FF0000;">dangerous</strong>,
+        <strong style="color:#FF9A00;">most likely suspicious</strong>,
+        <strong style="color:#37A65B;">most likely safe</strong>,
+        <strong style="color:#00A4E9;">inconclusive</strong>.
+      </p>
+    </td>
+  </tr>
+
+  <!-- Footer -->
+  <tr>
+    <td style="background:#242A75;padding:30px;color:#FFFFFF;font-style:italic;text-align:center;">
+      <p>
+        Definitions are available in the
+        <a href="{{ glossary_url }}" style="color:#FFF;">cybersecurity glossary</a>.
+        Questions?
+        <a href="{{ inquiry_url }}" style="color:#FFF;">{{ inquiry_text }}</a>.
+      </p>
+
+      <p>
+        Portal access:
+        <a href="{{ portal_url }}" style="color:#FFF;">here</a>
+      </p>
+
+      <p>With our kindest regards,</p>
+    </td>
+  </tr>
+
+  <!-- Signature -->
+  <tr>
+    <td style="background:#242A75;padding:10px;text-align:center;">
+      <strong style="color:#FFF;">{{ company_name }}</strong>
+    </td>
+  </tr>
+
+  <tr>
+    <td style="background:#242A75;padding:20px;text-align:center;">
+      <a href="{{ global_url }}" style="color:#FFF;">{{ global_team }}</a>
+    </td>
+  </tr>
+
+  <!-- Socials -->
+  <tr>
+    <td style="background:#242A75;padding:15px;text-align:center;">
+      {% for social in socials %}
+        <a href="{{ social.url }}" target="_blank">
+          <img src="{{ social.logo }}" alt="{{ social.name }}" width="24" height="24">
+        </a>
+      {% endfor %}
+    </td>
+  </tr>
+
+</table>
+
+</td>
+</tr>
+</table>
+</center>
+</body>
+</html>

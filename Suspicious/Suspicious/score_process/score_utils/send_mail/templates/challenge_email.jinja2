@@ -1,0 +1,138 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>{{ subject }}</title>
+</head>
+
+<body style="margin:0;padding:0;background:#EDF1F4;">
+<center>
+<table width="100%" role="presentation">
+<tr><td align="center">
+
+<table width="600" style="max-width:600px;" role="presentation">
+
+  <!-- Header -->
+  <tr>
+    <td style="background:#242A75;padding:30px;text-align:center;">
+      <img src="{{ logos.company }}" alt="Company" style="max-width:100px;">
+    </td>
+  </tr>
+
+  <tr>
+    <td style="background:#242A75;text-align:center;">
+      <img src="{{ logos.challenge }}" alt="" style="width:100%;max-width:600px;">
+    </td>
+  </tr>
+
+  <!-- Body -->
+  <tr>
+    <td style="background:#FFFFFF;padding:30px;font-family:Arial;color:#333;font-size:14px;">
+
+      <h2 style="color:#00BBDD;">Dear {{ recipient_name }},</h2>
+
+      <p>
+        <strong>{{ challenger.firstname }} {{ challenger.lastname }}</strong>
+        (<a href="mailto:{{ challenger.email }}">{{ challenger.email }}</a>)
+        from group <strong>{{ challenger.groups }}</strong>
+        has challenged the result of <strong>case #{{ case.id }}</strong>.
+      </p>
+
+      <hr>
+
+      <table width="100%" cellpadding="5">
+        <tr><td><strong>Mail subject</strong></td><td>{{ mail.subject }}</td></tr>
+        <tr><td><strong>From</strong></td><td>{{ mail.from }}</td></tr>
+        <tr><td><strong>Case score</strong></td><td>{{ case.score }}</td></tr>
+        <tr><td><strong>Confidence</strong></td><td>{{ case.confidence }}</td></tr>
+        <tr>
+          <td><strong>AI suggestion</strong></td>
+          <td>
+            {{ case.ai.category }} / {{ case.ai.result }}
+            (Score {{ case.ai.score }}, Confidence {{ case.ai.confidence }})
+          </td>
+        </tr>
+        <tr>
+          <td><strong>Result</strong></td>
+          <td>
+            <strong style="color:{{ case.result_color }}">{{ case.result }}</strong>
+          </td>
+        </tr>
+      </table>
+
+      <hr>
+
+      <p><strong>Extracted artifacts</strong></p>
+      <ul>
+        {% for a in artifacts %}
+          <li>{{ a.label }} — Score {{ a.score }}, Confidence {{ a.confidence }}</li>
+        {% else %}
+          <li>No artifacts found</li>
+        {% endfor %}
+      </ul>
+
+      <p><strong>Attachments</strong></p>
+      <ul>
+        {% for att in attachments %}
+          <li>{{ att }}</li>
+        {% else %}
+          <li>No attachments</li>
+        {% endfor %}
+      </ul>
+
+      <p>
+        Review the case on the
+        <a href="{{ urls.portal }}" target="_blank">portal</a>.
+      </p>
+
+      <p>{{ company }} Team</p>
+    </td>
+  </tr>
+
+  <!-- Footer -->
+  <tr>
+    <td style="background:#242A75;color:#FFF;padding:30px;text-align:center;font-style:italic;">
+      <p>
+        Definitions are available in the
+        <a href="{{ urls.glossary }}" style="color:#FFF;">glossary</a>.
+        Questions?
+        <a href="{{ urls.inquiry }}" style="color:#FFF;">{{ inquiry_text }}</a>.
+      </p>
+      <p>
+        Portal access
+        <a href="{{ urls.portal }}" style="color:#FFF;">here</a>.
+      </p>
+      <p>With regards,</p>
+    </td>
+  </tr>
+
+  <tr>
+    <td style="background:#242A75;text-align:center;padding:10px;">
+      <strong style="color:#FFF;">{{ company }}</strong>
+    </td>
+  </tr>
+
+  <tr>
+    <td style="background:#242A75;text-align:center;padding:20px;">
+      <a href="{{ urls.global }}" style="color:#FFF;">{{ global_team }}</a>
+    </td>
+  </tr>
+
+  <tr>
+    <td style="background:#242A75;text-align:center;padding:15px;">
+      {% for s in socials %}
+        <a href="{{ s.url }}" target="_blank">
+          <img src="{{ s.logo }}" alt="{{ s.name }}" width="20">
+        </a>
+      {% endfor %}
+    </td>
+  </tr>
+
+</table>
+
+</td></tr>
+</table>
+</center>
+</body>
+</html>

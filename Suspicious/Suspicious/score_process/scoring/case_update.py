@@ -2,7 +2,7 @@ import logging
 from django.db import transaction
 from dashboard.models import Kpi, MonthlyCasesSummary, TotalCasesStats, UserCasesMonthlyStats
 from mail_feeder.models import MailInfo
-from score_process.score_utils.send_mail import user_final_mail
+from score_process.score_utils.send_mail.service import MailNotificationService
 
 logger = logging.getLogger(__name__)
 update_cases_logger = logging.getLogger('tasp.cron.update_ongoing_case_jobs')
@@ -47,7 +47,8 @@ def save_case_results(case, mail):
         mail_info.is_analyzed = True
         mail_info.is_dangerous = case.results == "Dangerous"
         mail_info.save()
-        user_final_mail(mail_info, case)
+        cls = MailNotificationService.from_settings()
+        cls.send_final(mail_info, case)
 
     except MailInfo.DoesNotExist:
         update_cases_logger.error("MailInfo entry not found for provided mail object.")
@@ -68,11 +69,12 @@ def update_kpi_and_user_stats(case):
         case (Case): The case from which to derive stats.
     """
     try:
-        from tasp.cron import sync_monthly_kpi
+        from tasp.cron.kpi import sync_monthly_kpi
         kpi = sync_monthly_kpi()
 
         # Update monthly summary
         kpi.monthly_cases_summary.update_case_results(case.results)
+        kpi.monthly_cases_summary.update_case_results(case.categoryAI)
         kpi.monthly_cases_summary.save()
 
         # Update global case count
@@ -88,6 +90,7 @@ def update_kpi_and_user_stats(case):
                 user=case.reporter, month=kpi.month, year=kpi.year
             )
         stats.update_case_results(case.results)
+        stats.update_case_results(case.categoryAI)
         stats.total_cases += 1
         stats.save()
 

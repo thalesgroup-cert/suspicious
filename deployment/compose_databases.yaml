@@ -1,0 +1,72 @@
+services:
+  db_suspicious:
+    init: true
+    ports:
+      - "127.0.0.1:${DB_SUSPICIOUS_PORT}:3306"
+    restart: always
+    command: "\
+      --default-authentication-plugin=mysql_native_password \
+      --innodb-buffer-pool-size=${INNODB_BUFFER_POOL_SIZE:-2048M} \
+      --innodb-change-buffering=${INNODB_CHANGE_BUFFERING:-none} \
+      --innodb-io-capacity=${INNODB_IO_CAPACITY:-1000} \
+      --innodb-io-capacity-max=${INNODB_IO_CAPACITY_MAX:-2000} \
+      --innodb-log-file-size=${INNODB_LOG_FILE_SIZE:-600M} \
+      --innodb-read-io-threads=${INNODB_READ_IO_THREADS:-16} \
+      --innodb-stats-persistent=${INNODB_STATS_PERSISTENT:-ON} \
+      --innodb-write-io-threads=${INNODB_WRITE_IO_THREADS:-4}"
+    volumes:
+      - '${DB_SUSPICIOUS_PATH}/data:/var/lib/mysql'
+    cap_add:
+      - SYS_NICE
+    environment:
+      MYSQL_DATABASE: ${MYSQL_DATABASE}
+      MYSQL_USER: ${MYSQL_USER}
+      MYSQL_PASSWORD: ${MYSQL_PASSWORD}
+      MYSQL_ROOT_PASSWORD: ${MYSQL_ROOT_PASSWORD}
+    networks:
+      - suspicious_network
+
+  elasticsearch:
+    init: true
+    ports:
+      - "127.0.0.1:${ELASTICSEARCH_PORT}:9200"
+    restart: unless-stopped
+    volumes:
+      - "${ELASTIC_PATH}/data:/usr/share/elasticsearch/data"
+      - "${ELASTIC_PATH}/logs:/usr/share/elasticsearch/logs"
+    ulimits:
+      nofile:
+        soft: 65536
+        hard: 65536
+    environment:
+      http_proxy: "${HTTP_PROXY}"
+      https_proxy: "${HTTPS_PROXY}"
+      no_proxy: "localhost"
+      discovery.type: "single-node"
+      xpack.security.enabled: "false"
+      http.host: "0.0.0.0"
+      cluster.name: "suspicious"
+      script.allowed_types: "inline,stored"
+      bootstrap.memory_lock: "true"
+      ES_JAVA_OPTS: "-Xms5g -Xmx5g"
+    networks:
+      - suspicious_network
+
+  minio:
+    restart: always
+    ports:
+      - "127.0.0.1:${MINIO_PORT_1}:9000"
+      - "127.0.0.1:${MINIO_PORT_2}:9001"
+    environment:
+      MINIO_ROOT_USER: ${MINIO_ROOT_USER}
+      MINIO_ROOT_PASSWORD: ${MINIO_ROOT_PASSWORD}
+    volumes:
+      - ${MINIO_PATH}:/data
+    networks:
+      - suspicious_network
+
+
+networks:
+  suspicious_network:
+    external: true
+    name: ${NETWORK_NAME}

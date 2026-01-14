@@ -121,7 +121,12 @@ class DomainHandler:
             logger.warning("Empty domain input.")
             return None
 
-        normalized = normalize_domain(domain)
+        try:
+            normalized = normalize_domain(domain)
+        except Exception as e:
+            logger.exception("Exception normalizing domain '%s': %s", domain, e)
+            return None
+
         if not normalized:
             logger.warning("Could not normalize domain: %s", domain)
             return None

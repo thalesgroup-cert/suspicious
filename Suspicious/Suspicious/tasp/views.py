@@ -4,6 +4,8 @@ import json
 from typing import Callable, Dict
 
 # Django Core Imports
+import django
+from django.core.paginator import Paginator, EmptyPage, PageNotAnInteger
 from django.conf import settings
 from django.contrib.auth import logout
 from django.contrib.auth.decorators import login_required
@@ -31,8 +33,8 @@ from case_handler.update_case.update_handler import (
     handle_file,
     handle_ioc,
 )
-from score_process.score_utils.templates.challenge import ChallengeEmail
-from score_process.score_utils.templates.modification import ModifEmail
+from score_process.score_utils.thehive.challenge import ChallengeToTheHiveService
+from score_process.score_utils.send_mail.service import MailNotificationService
 
 from cortex_job.models import AnalyzerReport
 
@@ -72,6 +74,10 @@ INVALID_TYPE_ERROR = "Invalid type"
 CSV = "csv"
 JSON = "json"
 TXT = "txt"
+
+
+ERROR_MISSING_PARAMETERS = "Missing required parameter."
+ERROR_UNSUPPORTED_IOC_TYPE = "Invalid IOC type."
 
 IOC_HANDLER_MAP: Dict[str, Callable] = {
     "attachment": handle_attachment,
@@ -139,16 +145,24 @@ def home(request: HttpRequest) -> HttpResponse:
 @login_required
 @require_GET
 def submissions(request: HttpRequest) -> HttpResponse:
-    """Render the submissions page displaying the user's latest cases."""
+    """Render the submissions page displaying the user's latest cases, with pagination."""
     context = {}
     try:
-        latest_cases = Case.objects.filter(reporter=request.user).order_by(
-            "-creation_date"
-        )
-        if latest_cases:
-            context["latest_cases"] = latest_cases
+        case_list = Case.objects.filter(reporter=request.user).order_by("-creation_date")
+        paginator = Paginator(case_list, 25)  # 25 cases per page, adjust as needed
+        page_number = request.GET.get("page")
+        try:
+            page_obj = paginator.get_page(page_number)
+        except PageNotAnInteger:
+            page_obj = paginator.page(1)
+        except EmptyPage:
+            page_obj = paginator.page(paginator.num_pages)
+
+        context["page_obj"] = page_obj
+        context["latest_cases"] = page_obj.object_list  # if you want backwards compatibility
         logger.info(
-            f"User '{request.user}' accessed submissions page. Found {latest_cases.count()} cases."
+            f"User '{request.user}' accessed submissions page. "
+            f"Showing page {page_obj.number} of {paginator.num_pages}. Total cases: {paginator.count}"
         )
     except django.db.Error as e:
         logger.error(
@@ -186,13 +200,30 @@ def _get_admin_cases(user: User) -> Q:
 def tasp(request):
     try:
         service = TaspService(request.user)
-        latest_cases = service.get_latest_cases()
+        case_qs = service.get_latest_cases()  # a QuerySet
     except Exception as e:
         logger.error(f"Unexpected error on TASP page for user '{request.user}': {e}", exc_info=True)
-        latest_cases = Case.objects.none()
+        case_qs = Case.objects.none()
 
-    return render(request, "tasp/tasp.html", {"latest_cases": latest_cases})
+    # pagination
+    paginator = Paginator(case_qs, 25)  # e.g. 25 cases per page
+    page_number = request.GET.get("page")
+    try:
+        page_obj = paginator.get_page(page_number)
+    except PageNotAnInteger:
+        page_obj = paginator.page(1)
+    except EmptyPage:
+        page_obj = paginator.page(paginator.num_pages)
 
+    logger.info(
+        f"TASP user '{request.user}' accessed page. "
+        f"Showing page {page_obj.number} of {paginator.num_pages}. Total cases: {paginator.count}"
+    )
+
+    return render(request, "tasp/tasp.html", {
+        "page_obj": page_obj,
+        "latest_cases": page_obj.object_list,  # optional, for compatibility
+    })
 
 class TaspService:
     def __init__(self, user):
@@ -293,12 +324,9 @@ class CaseEditService:
         self.case.save(update_fields=["finalScore", "finalConfidence", "results", "last_update_by", "status"])
 
     def notify_reporter(self):
-        user_reporter = self.case.reporter
-        user_infos = (f"{user_reporter.first_name} {user_reporter.last_name}".strip()
-                      or user_reporter.username)
-        mail_header = f"Your submission n° {self.case.id} has been reviewed: {self.case.results}"
-        ModifEmail(mail_header, EMAIL_SENDER_DEFAULT, user_reporter, self.case, user_infos).send()
-        self.logger.info(f"Modification email sent for case ID {self.case.id} to '{user_reporter}'.")
+        cls = MailNotificationService.from_settings()
+        cls.send_review_email(self.case)
+        self.logger.info(f"Modification email sent for case ID {self.case.id} to '{self.case.reporter}'.")
 
 class CaseStatus():
     CHALLENGED = "Challenged"
@@ -352,13 +380,15 @@ class CaseChallengeService:
     def notify(self):
         send_to_thehive = thehive_config.get("enabled", False)
         mail_header = f"Case ID {self.case.id} challenged by {self.case.reporter.username}"
+        logger.info(f"Notifying about challenge for case ID {self.case.id}. Send to TheHive: {send_to_thehive}")
         if send_to_thehive:
-            ChallengeEmail(mail_header, self.case.reporter, EMAIL_SENDER_DEFAULT, None, self.case, None).send_to_thehive()
+            logger.info(f"Sending challenge notification to TheHive for case ID {self.case.id}")
+            ChallengeToTheHiveService(self.case, None, mail_header).send_to_thehive()
+            logger.info(f"Challenge notification sent to TheHive for case ID {self.case.id}")
         else:
             cert_users = User.objects.filter(groups__name="CERT", is_active=True).exclude(email="")
             for cert_user in cert_users:
-                name = f"{cert_user.first_name} {cert_user.last_name}".strip() or cert_user.username
-                ChallengeEmail(mail_header, self.case.reporter, EMAIL_SENDER_DEFAULT, cert_user, self.case, name).send()
+                ChallengeToTheHiveService(self.case, cert_user, mail_header).send()
 
 def _get_case_or_404(case_id, user):
     return get_object_or_404(
@@ -375,8 +405,8 @@ def _update_case_challenge_stats(user):
         year=now.year,
         defaults={"challenged_cases": 0, "total_cases": 0},
     )
-    stats.challenged_cases = F("challenged_cases") + 1
-    stats.save(update_fields=["challenged_cases"])
+    stats.challenged_cases += 1
+    stats.save()
 
 
 # --- Pop-up View ---
@@ -644,6 +674,10 @@ def set_ioc_level(request: HttpRequest, id, type, level, case_id) -> JsonRespons
     Expects POST with: ioc_id, ioc_type, level, case_id
     """
     try:
+        KEY_IOC_ID = "ioc_id"
+        KEY_IOC_TYPE = "ioc_type"
+        KEY_LEVEL = "level"
+        KEY_CASE_ID = "case_id"
         # Extract POST params
         ioc_id_str = str(id)
         ioc_type = type

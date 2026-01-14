@@ -16,7 +16,6 @@ settings.json
 
 # System
 .vscode
-docs
 .DS_Store
 Thumbs.db
 

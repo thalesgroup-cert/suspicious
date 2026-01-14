@@ -50,7 +50,7 @@ def real_email(string):
     # Sender Name: Mario Rossi <rossi.mario@big-society.com>
     # Sender Mail: spoof@example.com
     # From values is: "Mario Rossi <rossi.mario@big-society.com>" <spoof@example.com>
-
+    result_meioc = None
     try:
         sender_name, email_address = parseaddr(string)
         return email_address.lower() if email_address else None

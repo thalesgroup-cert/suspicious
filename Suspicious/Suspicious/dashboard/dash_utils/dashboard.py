@@ -53,6 +53,20 @@ def update_monthly_cases_summary(kpi, current_month: int, current_year: int) -> 
         if hasattr(kpi.monthly_cases_summary, field_name):
             setattr(kpi.monthly_cases_summary, field_name, entry['count'])
 
+    category_counts = (
+        Case.objects.filter(
+            creation_date__month=current_month,
+            creation_date__year=current_year
+        )
+        .values('categoryAI')
+        .annotate(count=Count('categoryAI'))
+    )
+    for entry in category_counts:
+        category_label = entry['categoryAI'].lower()
+        field_name = f"{category_label}_cases"
+        if hasattr(kpi.monthly_cases_summary, field_name):
+            setattr(kpi.monthly_cases_summary, field_name, entry['count'])
+
     kpi.monthly_cases_summary.save()
 
 

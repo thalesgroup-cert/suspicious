@@ -1,62 +1,61 @@
 #################################################
 #                                               #
-#    DOCKERFILE TEMPLATE EMAIL FEEDER SERVICE   #
+#   DOCKERFILE – EMAIL FEEDER SERVICE           #
 #                                               #
 #################################################
+FROM python AS runtime
 
-# Multi-stage build for dependencies
-FROM python AS builder
-
+# -------------------------
+# Build-time arguments
+# -------------------------
 ARG HTTP_PROXY
 ARG HTTPS_PROXY
 ARG NO_PROXY
-ARG PATH_TO
+ARG PATH_TO=/app
 
-ENV HTTP_PROXY=${HTTP_PROXY}
-ENV HTTPS_PROXY=${HTTPS_PROXY}
-ENV NO_PROXY=${NO_PROXY}
-ENV PATH_TO=${PATH_TO}
+# -------------------------
+# Environment variables
+# -------------------------
+ENV HTTP_PROXY=${HTTP_PROXY} \
+    HTTPS_PROXY=${HTTPS_PROXY} \
+    NO_PROXY=${NO_PROXY} \
+    PATH_TO=${PATH_TO} \
+    PYTHONUNBUFFERED=1 \
+    PYTHONDONTWRITEBYTECODE=1 \
+    PIP_DISABLE_PIP_VERSION_CHECK=1 \
+    PIP_NO_CACHE_DIR=1
 
+# -------------------------
+# System dependencies
+# (minimal + no recommends)
+# -------------------------
+RUN apt-get update && \
+    apt-get install -y --no-install-recommends \
+        ca-certificates \
+        curl \
+        libmariadb3 \
+        logrotate \
+    && apt-get clean \
+    && rm -rf /var/lib/apt/lists/*
 
-# set working directory
-WORKDIR /tmp/
-
-# copy and install Python dependencies
-COPY requirements.txt /tmp/
-RUN pip wheel --no-cache-dir --no-deps --wheel-dir /usr/src/app/wheels -r requirements.txt
-
-# Final runtime stage
-FROM python:slim
-
-ARG HTTP_PROXY
-ARG HTTPS_PROXY
-ARG NO_PROXY
-ARG PATH_TO
-
-ENV HTTP_PROXY=${HTTP_PROXY}
-ENV HTTPS_PROXY=${HTTPS_PROXY}
-ENV NO_PROXY=${NO_PROXY}
-ENV PATH_TO=${PATH_TO}
-
-
-RUN apt-get update  && apt-get install -y --no-install-recommends \
-    curl \
-    bash \
-    libmariadb3 \
-    logrotate \
-    && apt-get clean && rm -rf /var/lib/apt/lists/*
-
+# -------------------------
+# Set working directory
+# -------------------------
 WORKDIR /app
 
-# install dependencies
-COPY --from=builder /usr/src/app/wheels /wheels
-COPY --from=builder /tmp/requirements.txt .
-RUN pip install --upgrade pip
-RUN pip install --no-cache /wheels/*
+# -------------------------
+# Dependency installation
+# (layer caching optimized)
+# -------------------------
+# Install uv (pinned)
+COPY --from=ghcr.io/astral-sh/uv:latest /uv /uvx /usr/local/bin/
 
+COPY requirements.txt .
+
+# Install dependencies directly into system python
+RUN uv pip install --system --no-cache -r requirements.txt
+
+# -------------------------
+# Copy application source
+# -------------------------
 COPY . .
-
-# Configure runtime environment and unbuffered output
-ENV PYTHONUNBUFFERED=1
-
-#ENTRYPOINT ["/usr/local/bin/python", "-u", "main.py"]

@@ -1,11 +1,10 @@
 # LDAP Authentication and Database Connectivity
-django-auth-ldap==5.2.0
+django-auth-ldap==5.3.0
 django-mysql==4.19.0
 mysqlclient==2.2.7
 python-ldap==3.4.5
 
 # Environment Configuration
-python-dotenv==1.1.1
 docker==7.1.0
 
 # Parsing and Text Extraction
@@ -13,9 +12,8 @@ beautifulsoup4==4.13.5
 compoundfiles==0.3
 compressed-rtf==1.0.7
 extract-msg==0.55.0
-py3dns==4.0.2
 pyspf==2.0.14
-tldextract==5.3.0
+tldextract==5.3.1
 dkimpy==1.1.8
 email-validator==2.3.0
 msg_parser==1.2.0
@@ -29,30 +27,32 @@ fontawesomefree==6.6.0
 
 # Web Framework and Application Enhancements
 django-crontab==0.7.1
-whitenoise==6.11.0
-django-import-export==4.3.10
+django-sso==3.0.2
+django-import-export==4.4.0
 
 # Request Handling
 requests==2.32.5
-minio==7.2.18
+minio==7.2.20
 
 # Email Handling
-imap_tools==1.11.0
 chardet==5.2.0
 
 # Data Analysis and Machine Learning
-numpy==2.3.3
+numpy==2.4.1
 validators==0.35.0
 hashid==3.1.4
 
 # Cybersecurity and Incident Response
-thehive4py==2.0.2
+thehive4py==2.0.3
 cortex4py==2.1.0
-pymisp==2.5.17.2
+pymisp==2.5.17.3
 vt-py==0.21.0
 
-# Version Control
-gitpython==3.1.45
-
 # Vector store
-chromadb==1.1.1
+chromadb==1.4.0
+
+# Docs
+docutils==0.21.2
+Sphinx==8.2.3
+sphinx-rtd-theme==3.0.2
+myst-parser==4.0.1

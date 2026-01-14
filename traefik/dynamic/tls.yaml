@@ -1,0 +1,28 @@
+http:
+  middlewares:
+    set-host:
+      headers:
+        customRequestHeaders:
+          Host: "suspicious:9020"
+
+  routers:
+    suspicious:
+      entryPoints:
+        - websecure
+      rule: "Host(`suspicious`)" # <-- To Be Changed
+      service: suspicious-service
+      middlewares:
+        - set-host
+
+
+  services:
+    suspicious-service:
+      loadBalancer:
+        servers:
+          - url: "http://suspicious:9020"
+        passHostHeader: true
+
+tls:
+  certificates:
+    - certFile: /etc/private/certfile.pem
+      keyFile: /etc/private/keyfile.pem
