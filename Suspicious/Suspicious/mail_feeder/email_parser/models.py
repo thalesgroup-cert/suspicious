@@ -16,9 +16,9 @@ class EmailDataModel(BaseModel):
     """
     Model representing parsed email data.
     """
-    reportedBy: EmailStr
-    from_addr: EmailStr = Field(..., alias="from")
-    to: EmailStr
+    reportedBy: str
+    from_addr: str = Field(..., alias="from")
+    to: str
     cc: Optional[str] = ""
     bcc: Optional[str] = ""
     reportedSubject: str
