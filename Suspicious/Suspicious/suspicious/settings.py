@@ -14,6 +14,7 @@ import json
 import ldap
 from django_auth_ldap.config import LDAPSearch
 import sys
+from datetime import timedelta
 
 CONFIG_PATH = "/app/settings.json"
 with open(CONFIG_PATH) as config_file:
@@ -206,6 +207,8 @@ AUTHENTICATION_BACKENDS = (
 # Application definition
 INSTALLED_APPS = [
     'fontawesomefree',
+    'rest_framework',
+    'knox',
     'django_sso.sso_gateway',
     'tasp.apps.TaspConfig',
     'dashboard.apps.DashboardConfig',
@@ -223,13 +226,26 @@ INSTALLED_APPS = [
     'score_process.apps.ScoreConfig',
     'django_crontab',
     'django.contrib.admin',
+    'django.contrib.admindocs',
     'django.contrib.auth',
     'django.contrib.contenttypes',
     'django.contrib.sessions',
     'django.contrib.messages',
     'django.contrib.staticfiles',
     'import_export',
+    'django_filters',
 ]
+
+REST_FRAMEWORK = {
+    'DEFAULT_AUTHENTICATION_CLASSES':
+        ('knox.auth.TokenAuthentication',),
+    'DEFAULT_FILTER_BACKENDS': ['django_filters.rest_framework.DjangoFilterBackend']
+}
+
+REST_KNOX = {
+  'SECURE_HASH_ALGORITHM': 'cryptography.hazmat.primitives.hashes.SHA3_512',  
+  'TOKEN_TTL': timedelta(hours=10),
+}
 
 MIDDLEWARE = [
     'django.middleware.security.SecurityMiddleware',
