@@ -210,6 +210,7 @@ INSTALLED_APPS = [
     'rest_framework',
     'knox',
     'django_sso.sso_gateway',
+    'api.apps.ApiConfig',
     'tasp.apps.TaspConfig',
     'dashboard.apps.DashboardConfig',
     'case_handler.apps.CaseConfig',
