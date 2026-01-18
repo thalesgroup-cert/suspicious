@@ -135,6 +135,10 @@ LOGGING = {
             'filename': '/app/log/cleanup_phishing.log',
             'formatter': 'verbose',
         },
+        'audit_file': {
+            "class": "logging.FileHandler",
+            "filename": "/var/log/cert_downloads.log",
+        },
     },
     "loggers": {
         'django': {
@@ -174,6 +178,11 @@ LOGGING = {
         "django_auth_ldap": {
             'level': suspicious_config.get('trace_level', 'DEBUG'),
             "handlers": ["console"]
+        },
+        "audit.cert_download": {
+            "handlers": ["audit_file"],
+            "level": "INFO",
+            "propagate": False,
         },
     },
     "disable_existing_loggers": False

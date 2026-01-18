@@ -62,7 +62,7 @@ class GlobalSubmissionService:
                 self.finalize_submission(instance, WebSubmissionConfig(user_email=submission.user, workdir=submission.workdir))
             else:
                 fetch_mail_logger.debug(f"Finalizing MinIO submission for email: {submission.email_id}")
-                self._handle_instance_for_minio(instance, submission.email_id, submission.workdir)
+                self._handle_instance_for_minio(instance, submission.email_id, submission.workdir, submission.bucket_name)
             fetch_mail_logger.debug(f"Creating mail info for email: {submission.email_id}")
             MailInfoService().create_mail_info(instance)
             return instance
@@ -78,13 +78,13 @@ class GlobalSubmissionService:
             instance.save()
 
             mail_zip = self._get_mail_zip_path(config.workdir, email_id)
-            self._handle_common_tasks(instance, email_id, mail_zip)
+            self._handle_common_tasks(instance, email_id, mail_zip, bucket_name="")
             fetch_mail_logger.info(f"Finalized web submission for email_id={email_id}")
 
     def _get_mail_zip_path(self, workdir: str, email_id: str) -> str:
         return os.path.join(os.path.dirname(workdir), f"{email_id}.tar.gz")
 
-    def _handle_instance_for_minio(self, instance, email_id: str, workdir: str):
+    def _handle_instance_for_minio(self, instance, email_id: str, workdir: str, bucket_name: str):
         """
         Handle post-processing of a MinIO-parsed email instance.
         """
@@ -98,7 +98,7 @@ class GlobalSubmissionService:
             fetch_mail_logger.debug(f"Getting mail zip path for MinIO email: {email_id}")
             mail_zip = self._get_mail_zip_path(workdir, email_id)
             fetch_mail_logger.debug(f"Handling common tasks for MinIO email: {email_id}")
-            self._handle_common_tasks(instance, email_id, mail_zip)
+            self._handle_common_tasks(instance, email_id, mail_zip, bucket_name)
             fetch_mail_logger.info(f"Finalized MinIO email for email_id={email_id}")
 
     def _extract_reported_by_from_user_submission(self, workdir: str) -> Optional[str]:
@@ -122,7 +122,7 @@ class GlobalSubmissionService:
         all_files = os.listdir(workdir)
         return [f for f in all_files if f.endswith(".eml") and not f.startswith(prefix)]
 
-    def _handle_common_tasks(self, instance, email_id: str, mail_zip: str):
+    def _handle_common_tasks(self, instance, email_id: str, mail_zip: str, bucket_name: str):
         """
         Handle artifacts, attachments, headers, bodies, and case creation.
         """
@@ -130,7 +130,7 @@ class GlobalSubmissionService:
         fetch_mail_logger.debug(f"Handling artifacts and attachments for email: {email_id}")
         artifact_ids = Handlers().handle_artifacts(instance)
         fetch_mail_logger.debug(f"Handling attachments for email: {email_id}")
-        attachment_result = Handlers().handle_attachments(instance, mail_zip)
+        attachment_result = Handlers().handle_attachments(instance, mail_zip, bucket_name=bucket_name)
         attachment_ids, attachment_id_ai = attachment_result.ids, attachment_result.ai_ids
         fetch_mail_logger.debug(f"Handling mail header for email: {email_id}")
         Handlers().handle_mail_header(instance)

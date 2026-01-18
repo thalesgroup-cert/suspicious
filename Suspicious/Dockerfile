@@ -61,6 +61,11 @@ EOF
 ################
 FROM python:${PYTHON_VERSION}-slim-${DEBIAN_SUITE}
 
+LABEL title='Suspicious' \
+        description='Suspicious is an AI-powered phishing & threat-analysis platform to automatically inspect, classify, and report suspicious emails, files, URLs, IPs, and hashes built for teams and organizations' \
+        source='https://github.com/thalesgroup-cert/suspicious' \
+        maintainer='Theo BHANG'
+
 ENV PYTHONDONTWRITEBYTECODE=1 \
     PYTHONUNBUFFERED=1 \
     NLTK_DATA=/usr/local/share/nltk_data
