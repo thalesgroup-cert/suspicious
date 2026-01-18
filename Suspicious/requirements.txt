@@ -6,7 +6,7 @@ python-ldap==3.4.5
 djangorestframework==3.16.1
 django-rest-knox==4.2.0
 django-filter==25.2
-
+drf-spectacular==0.29.0
 # Environment Configuration
 docker==7.1.0
 

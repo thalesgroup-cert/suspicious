@@ -217,6 +217,7 @@ AUTHENTICATION_BACKENDS = (
 INSTALLED_APPS = [
     'fontawesomefree',
     'rest_framework',
+    'drf_spectacular',
     'knox',
     'django_sso.sso_gateway',
     'api.apps.ApiConfig',
@@ -249,7 +250,16 @@ INSTALLED_APPS = [
 REST_FRAMEWORK = {
     'DEFAULT_AUTHENTICATION_CLASSES':
         ('knox.auth.TokenAuthentication',),
-    'DEFAULT_FILTER_BACKENDS': ['django_filters.rest_framework.DjangoFilterBackend']
+    'DEFAULT_FILTER_BACKENDS': ['django_filters.rest_framework.DjangoFilterBackend'],
+    'DEFAULT_SCHEMA_CLASS': 'drf_spectacular.openapi.AutoSchema',
+}
+
+SPECTACULAR_SETTINGS = {
+    'TITLE': 'Suspicious API',
+    'DESCRIPTION': 'Suspicious API',
+    'VERSION': '1.0.0',
+    'SERVE_INCLUDE_SCHEMA': False,
+    # OTHER SETTINGS
 }
 
 REST_KNOX = {
