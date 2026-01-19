@@ -36,6 +36,7 @@ django-import-export==4.4.0
 # Request Handling
 requests==2.32.5
 minio==7.2.20
+zipstream==1.1.4
 
 # Email Handling
 chardet==5.2.0
