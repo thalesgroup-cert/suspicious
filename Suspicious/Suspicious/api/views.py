@@ -16,7 +16,7 @@ from dashboard.models import (
     MonthlyReporterStats,
     TotalCasesStats,
 )
-
+from knox.models import AuthToken
 from .serializers import (
     MonthlyCasesSummarySerializer,
     UserCasesMonthlyStatsSerializer,
@@ -27,13 +27,28 @@ from .filters import MonthlyCasesSummaryFilter, MonthlyReporterStatsFilter, Tota
 from .storage import StorageClient
 from .mixins import MonthYearQueryMixin
 from .audit import log_cert_download
-
+from django.utils import timezone
+import json
+import zipstream
+from django.http import StreamingHttpResponse
+from minio.error import S3Error
 # ---------------------------------------------------------------------
 # Permissions
 # ---------------------------------------------------------------------
 
 ALLOWED_DOWNLOAD_GROUPS = {"Admin", "CERT"}
+CONFIG_PATH = "/app/settings.json"
 
+with open(CONFIG_PATH) as config_file:
+    config = json.load(config_file)
+
+minio_config = config.get('minio', None)
+# Generate API Key
+def generate_api_key(user, expiration):
+    expiry = timezone.timedelta(days=expiration)
+    token_instance, raw_key = AuthToken.objects.create(user=user, expiry=expiry)
+    
+    return raw_key, token_instance
 
 def user_can_download(user) -> bool:
     return user.groups.filter(name__in=ALLOWED_DOWNLOAD_GROUPS).exists()
@@ -42,17 +57,9 @@ def user_can_download(user) -> bool:
 # ---------------------------------------------------------------------
 # Download
 # ---------------------------------------------------------------------
-
 class DownloadCaseArchiveView(APIView):
     permission_classes = [IsAuthenticated]
 
-    @extend_schema(
-        parameters=[
-            OpenApiParameter("case_id", int, OpenApiParameter.PATH),
-        ],
-        responses={200: None},
-        description="Download case archive (CERT/Admin only)",
-    )
     def get(self, request, case_id: int):
         if not user_can_download(request.user):
             raise PermissionDenied("Not authorized")
@@ -60,18 +67,35 @@ class DownloadCaseArchiveView(APIView):
         case = self._get_case(case_id)
         archive = self._get_archive(case)
 
-        object_name = f"case_{case.reporter}_{case.pk}.zip"
+        storage = StorageClient(minio_config)
 
-        storage = StorageClient(request.app_settings["minio"])
-        response = storage.stream_object(
-            archive.bucket_name,
-            object_name,
+        try:
+            objects = storage.client.list_objects(archive.bucket_name, recursive=True)
+        except S3Error:
+            raise NotFound("Bucket not found")
+
+        zs = zipstream.ZipFile(mode='w', compression=zipstream.ZIP_DEFLATED)
+
+        for obj in objects:
+            def stream_obj(o=obj):
+                f = storage.client.get_object(archive.bucket_name, o.object_name)
+                for chunk in f.stream(32 * 1024):
+                    yield chunk
+                f.close()
+            zs.write_iter(obj.object_name, stream_obj())
+
+        response = StreamingHttpResponse(
+            zs,
+            content_type="application/zip"
+        )
+        response['Content-Disposition'] = (
+            f'attachment; filename="case_{case.reporter.split("@")[0]}_{case.pk}.zip"'
         )
 
         log_cert_download(
             user=request.user,
             case_id=case.pk,
-            object_name=object_name,
+            object_name=f"bucket_{archive.bucket_name}",
             ip=request.META.get("REMOTE_ADDR"),
         )
 
@@ -145,7 +169,7 @@ class MonthlyCasesSummaryAggregateView(
     MonthYearQueryMixin,
     APIView,
 ):
-    permission_classes = [IsAuthenticated]
+    # permission_classes = [IsAuthenticated]
 
     @extend_schema(
         parameters=[
@@ -161,11 +185,23 @@ class MonthlyCasesSummaryAggregateView(
         data = MonthlyCasesSummary.objects.filter(
             creation_date__month=month,
             creation_date__year=year,
-        ).aggregate(
+        ).values("user__username", "creation_date__month", "creation_date__year").aggregate(
             suspicious_cases=Sum("suspicious_cases"),
+            inconclusive_cases=Sum("inconclusive_cases"),
+            failure_cases=Sum("failure_cases"),
             dangerous_cases=Sum("dangerous_cases"),
             safe_cases=Sum("safe_cases"),
-            total_cases=Sum("total_cases"),
+            challenged_cases=Sum("challenged_cases"),
+            allow_listed_cases=Sum("allow_listed_cases"),
+            uncategorized_cases=Sum("uncategorized_cases"),
+            spam_cases=Sum("spam_cases"),
+            newsletter_cases=Sum("newsletter_cases"),
+            classic_phishing_cases=Sum("classic_phishing_cases"),
+            clone_cases=Sum("clone_cases"),
+            blackmail_cases=Sum("blackmail_cases"),
+            whaling_cases=Sum("whaling_cases"),
+            internal_cases=Sum("internal_cases"),
+            external_cases=Sum("external_cases"),
         )
         return Response(data)
 
@@ -174,7 +210,7 @@ class UserCasesMonthlyStatsAggregateView(
     MonthYearQueryMixin,
     APIView,
 ):
-    permission_classes = [IsAuthenticated]
+    # permission_classes = [IsAuthenticated] 
 
     @extend_schema(
         parameters=[
@@ -187,12 +223,30 @@ class UserCasesMonthlyStatsAggregateView(
     def get(self, request):
         month, year = self.get_month_year()
 
-        data = UserCasesMonthlyStats.objects.filter(
-            month=month,
-            year=year,
-        ).values("user__username").annotate(
-            total_cases=Sum("total_cases"),
-            total_dangerous=Sum("dangerous_cases"),
-            total_safe=Sum("safe_cases"),
+        data = (
+            UserCasesMonthlyStats.objects
+            .filter(month=month, year=year)
+            .values("user__username", "creation_date__month", "creation_date__year")
+            .annotate(
+                total_cases=Sum("total_cases"),
+                total_safe=Sum("safe_cases"),
+                total_dangerous=Sum("dangerous_cases"),
+                total_suspicious=Sum("suspicious_cases"),
+                total_inconclusive=Sum("inconclusive_cases"),
+                total_failure=Sum("failure_cases"),
+                total_uncategorized=Sum("uncategorized_cases"),
+                total_spam=Sum("spam_cases"),
+                total_newsletter=Sum("newsletter_cases"),
+                total_classic_phishing=Sum("classic_phishing_cases"),
+                total_clone=Sum("clone_cases"),
+                total_blackmail=Sum("blackmail_cases"),
+                total_whaling=Sum("whaling_cases"),
+                total_internal=Sum("internal_cases"),
+                total_external=Sum("external_cases"),
+                total_challenged=Sum("challenged_cases"),
+                total_allow_listed=Sum("allow_listed_cases"),
+            )
         )
-        return Response(data)
+
+        return Response(list(data))
+
