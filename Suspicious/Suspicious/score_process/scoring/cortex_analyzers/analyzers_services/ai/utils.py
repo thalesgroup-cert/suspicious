@@ -1,8 +1,36 @@
 import logging
 from minio import Minio
 from minio.error import S3Error
+import io
+import zipfile
 
 logger = logging.getLogger("tasp.cron.update_ongoing_case_jobs")
+
+def build_mail_zip_from_minio(minio_client, bucket_name, mail_id, reporter_name):
+    """
+    Returns (filename, bytes) for a ZIP containing all objects under mail_id/
+    """
+    zip_buffer = io.BytesIO()
+    prefix = f"{mail_id}/"
+
+    with zipfile.ZipFile(zip_buffer, "w", zipfile.ZIP_DEFLATED) as zf:
+        objects = minio_client.list_objects(bucket_name, prefix=prefix, recursive=True)
+
+        for obj in objects:
+            try:
+                data = minio_client.get_object(bucket_name, obj.object_name)
+                content = data.read()
+                arcname = obj.object_name.replace(prefix, "")
+                zf.writestr(arcname, content)
+            except Exception as e:
+                logger.error(f"Error reading {obj.object_name} from {bucket_name}: {e}")
+
+    zip_buffer.seek(0)
+
+    safe_reporter = reporter_name.replace(" ", "_").replace("/", "_")
+    filename = f"{safe_reporter}_{mail_id}.zip"
+
+    return filename, zip_buffer.read()
 
 def fetch_mail_files_from_minio(minio_client: Minio, mail_id: str, bucket_prefix: str):
     """Retrieve headers, eml, txt, html files from MinIO for a given mail."""
