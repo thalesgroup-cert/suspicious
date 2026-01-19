@@ -18,7 +18,7 @@ class MinioEmailService:
     def __init__(self, email_handler=None):
         self.email_handler = email_handler  # Optionally inject an email handler service
 
-    def process_emails_from_minio_workdir(self, workdir: str):
+    def process_emails_from_minio_workdir(self, workdir: str, bucket_name: str) -> None:
         """
         Process all regular emails in a given MinIO work directory.
         """
@@ -33,6 +33,7 @@ class MinioEmailService:
                     filename=filename,
                     email_id=email_id,
                     user=None,
+                    bucket_name=bucket_name,
                     is_submitted=False
                 ))
 

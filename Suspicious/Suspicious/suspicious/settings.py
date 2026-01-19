@@ -14,6 +14,7 @@ import json
 import ldap
 from django_auth_ldap.config import LDAPSearch
 import sys
+from datetime import timedelta
 
 CONFIG_PATH = "/app/settings.json"
 with open(CONFIG_PATH) as config_file:
@@ -134,6 +135,10 @@ LOGGING = {
             'filename': '/app/log/cleanup_phishing.log',
             'formatter': 'verbose',
         },
+        'audit_file': {
+            "class": "logging.FileHandler",
+            "filename": "/var/log/cert_downloads.log",
+        },
     },
     "loggers": {
         'django': {
@@ -174,6 +179,11 @@ LOGGING = {
             'level': suspicious_config.get('trace_level', 'DEBUG'),
             "handlers": ["console"]
         },
+        "audit.cert_download": {
+            "handlers": ["audit_file"],
+            "level": "INFO",
+            "propagate": False,
+        },
     },
     "disable_existing_loggers": False
 }
@@ -206,7 +216,11 @@ AUTHENTICATION_BACKENDS = (
 # Application definition
 INSTALLED_APPS = [
     'fontawesomefree',
+    'rest_framework',
+    'drf_spectacular',
+    'knox',
     'django_sso.sso_gateway',
+    'api.apps.ApiConfig',
     'tasp.apps.TaspConfig',
     'dashboard.apps.DashboardConfig',
     'case_handler.apps.CaseConfig',
@@ -223,13 +237,35 @@ INSTALLED_APPS = [
     'score_process.apps.ScoreConfig',
     'django_crontab',
     'django.contrib.admin',
+    'django.contrib.admindocs',
     'django.contrib.auth',
     'django.contrib.contenttypes',
     'django.contrib.sessions',
     'django.contrib.messages',
     'django.contrib.staticfiles',
     'import_export',
+    'django_filters',
 ]
+
+REST_FRAMEWORK = {
+    'DEFAULT_AUTHENTICATION_CLASSES':
+        ('knox.auth.TokenAuthentication',),
+    'DEFAULT_FILTER_BACKENDS': ['django_filters.rest_framework.DjangoFilterBackend'],
+    'DEFAULT_SCHEMA_CLASS': 'drf_spectacular.openapi.AutoSchema',
+}
+
+SPECTACULAR_SETTINGS = {
+    'TITLE': 'Suspicious API',
+    'DESCRIPTION': 'Suspicious API',
+    'VERSION': '1.0.0',
+    'SERVE_INCLUDE_SCHEMA': False,
+    # OTHER SETTINGS
+}
+
+REST_KNOX = {
+  'SECURE_HASH_ALGORITHM': 'cryptography.hazmat.primitives.hashes.SHA3_512',  
+  'TOKEN_TTL': timedelta(hours=10),
+}
 
 MIDDLEWARE = [
     'django.middleware.security.SecurityMiddleware',

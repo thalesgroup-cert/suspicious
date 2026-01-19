@@ -36,7 +36,7 @@ class Handlers:
                 fetch_mail_logger.debug(f"Artifact processing completed with IDs: {artifact_ids}")
         return artifact_ids
 
-    def handle_attachments(self, instance, mail_zip: Optional[str]) -> ArtifactResult:
+    def handle_attachments(self, instance, mail_zip: Optional[str], bucket_name: Optional[str] = None) -> ArtifactResult:
         attachment_handler = AttachmentJobLauncherService()
         attachment_ids: list[int] = []
         attachment_id_ai: list[int] = []
@@ -59,7 +59,7 @@ class Handlers:
             if not mail_archive:
                 fetch_mail_logger.debug(f"Creating mail archive for mail ID: {instance.mail_id}")
                 archive, _ = FileHandler.handle_file(file=None, mail=mail_zip)
-                mail_archive = MailArchive.objects.create(mail=instance, archive=archive)
+                mail_archive = MailArchive.objects.create(mail=instance, archive=archive, bucket_name=bucket_name)
 
             with safe_execution("launching cortex AI jobs"):
                 cortex_job = CortexJob()

@@ -4,14 +4,11 @@ import logging
 from datetime import date, timedelta
 from django.contrib.auth.decorators import login_required
 from django.contrib.auth import logout as auth_logout
-from django.contrib.auth.models import User
 from django.http import JsonResponse, HttpRequest, HttpResponse
 from django.shortcuts import redirect, render, get_object_or_404
 
 from dashboard.dash_utils.dashboard import (
-    update_all_kpi_stats,
-    update_monthly_cases_summary,
-    update_total_cases_stats
+    update_all_kpi_stats
 )
 from dashboard.dash_utils.utils import (
     get_dashboard_score,
@@ -29,10 +26,7 @@ from dashboard.dash_utils.utils import (
 )
 
 from .models import (
-    Kpi,
-    MonthlyReporterStats,
-    MonthlyCasesSummary,
-    TotalCasesStats,
+    Kpi
 )
 
 import numpy as np  # For PCA computation without sklearn

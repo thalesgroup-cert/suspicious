@@ -237,6 +237,7 @@ class MailArchive(models.Model):
         File, on_delete=models.CASCADE, related_name='mail_archive',
         null=True, blank=True, db_index=True
     )
+    bucket_name = models.CharField(max_length=255, db_index=True, blank=True)
     def __str__(self):
         return f"Mail ID: {self.mail_id} - Archive ID: {self.archive_id or 'None'}"
 
