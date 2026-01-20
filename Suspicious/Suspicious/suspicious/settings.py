@@ -195,48 +195,11 @@ MAX_UPLOAD_SIZE = 5242880  # 5MB
 AUTH_LDAP_ALWAYS_UPDATE_USER = True
 AUTH_LDAP_CACHE_TIMEOUT = 3600
 
-# SSO settings section in the gateway side are optional
-#SSO = {
-    # Timeout for the communication with subordinated services. (OPTIONAL)
-    # This timeout is defined in seconds with a default value of 0.1s 
-    # (100ms) per registered service.
-    #'SUBORDINATE_COMMUNICATION_TIMEOUT': 0.1,
-    
-    # Additional fields. (OPTIONAL). For more details look to part
-    # named as "Send additional data to subordinated services"
-    #'ADDITIONAL_FIELDS': ('additiona_fields', 'from_user_model', 'and_related_models'),
-#}
-
-SITE_ID = 1
-
-ACCOUNT_EMAIL_VERIFICATION = "none"
-ACCOUNT_AUTHENTICATION_METHOD = "username_email"
-ACCOUNT_UNIQUE_EMAIL = True
-LOGIN_REDIRECT_URL = "/"
-LOGOUT_REDIRECT_URL = "/accounts/login/"
-
-SOCIALACCOUNT_PROVIDERS = {
-    "openid_connect": {
-        "SERVERS": [
-            {
-                "id": "company",
-                "name": "Company SSO",
-                "server_url": suspicious_config.get("oidc_server_url"),
-                "client_id": suspicious_config.get("oidc_client_id"),
-                "client_secret": suspicious_config.get("oidc_client_secret"),
-                "settings": {
-                    "scope": ["openid", "email", "profile"],
-                },
-            },
-        ],
-    },
-}
 
 # Authentication backends
 AUTHENTICATION_BACKENDS = (
     'django_auth_ldap.backend.LDAPBackend',
     "django.contrib.auth.backends.ModelBackend",
-    "allauth.account.auth_backends.AuthenticationBackend",
 )
 
 # Application definition
@@ -246,11 +209,6 @@ INSTALLED_APPS = [
     'drf_spectacular',
     'knox',
     'django.contrib.sites',
-    'allauth',
-    'allauth.account',
-    'allauth.socialaccount',
-    'allauth.socialaccount.providers.openid_connect',
-    'django_sso.sso_gateway',
     'api.apps.ApiConfig',
     'tasp.apps.TaspConfig',
     'dashboard.apps.DashboardConfig',
@@ -408,5 +366,3 @@ CRONJOBS = [
     ('0 0 1 * *', 'tasp.cron.cleanup.delete_old_analyzer_reports', '>> /app/log/cleanup_phishing.log'),
     ('0 0 * * *', 'tasp.cron.suspicious.remove_old_suspicious_emails', '>> /app/log/cleanup_phishing.log')
 ]
-# Consider adding error handling or notifications for when these jobs fail
-# This could be as simple as checking the return code of the job, or as complex as sending an email on failure

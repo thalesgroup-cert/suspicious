@@ -13,7 +13,10 @@
         "ico" : "data:image/png;base64,Base64 text of your company logo",
         "logo": "data:image/png;base64,Base64 text of your company logo",
         "banner": "data:image/png;base64,Base64 text of your company logo",
-        "sign": "data:image/png;base64,Base64 text of your company logo"
+        "sign": "data:image/png;base64,Base64 text of your company logo",
+        "oidc_server_url": "oicd-server",
+        "oidc_client_id": "oicd-client-id",
+        "oidc_client_secret": "oidc_client_secret"
     },
     "thehive": {
         "enabled": false,

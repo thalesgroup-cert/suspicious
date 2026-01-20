@@ -30,9 +30,7 @@ fontawesomefree==6.6.0
 
 # Web Framework and Application Enhancements
 django-crontab==0.7.1
-django-sso==3.0.2
 django-import-export==4.4.0
-django-allauth==65.11.2
 
 # Request Handling
 requests==2.32.5
