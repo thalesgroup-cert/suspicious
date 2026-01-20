@@ -1,7 +1,7 @@
 from django.db.models import Sum
 from rest_framework.views import APIView
 from rest_framework.permissions import IsAuthenticated
-from rest_framework.exceptions import PermissionDenied, NotFound
+from rest_framework.exceptions import PermissionDenied, NotFound, APIException
 from rest_framework.response import Response
 from rest_framework import generics
 from django_filters.rest_framework import DjangoFilterBackend
@@ -29,25 +29,46 @@ from .mixins import MonthYearQueryMixin
 from .audit import log_cert_download
 from django.utils import timezone
 import json
-import zipstream
+import io
+import zipfile
 from django.http import StreamingHttpResponse
+import os
+import logging
 from minio.error import S3Error
 # ---------------------------------------------------------------------
 # Permissions
 # ---------------------------------------------------------------------
 
 ALLOWED_DOWNLOAD_GROUPS = {"Admin", "CERT"}
-CONFIG_PATH = "/app/settings.json"
+CONFIG_PATH = os.environ.get("SUSPICIOUS_SETTINGS_PATH", "/app/settings.json")
+logger = logging.getLogger(__name__)
 
-with open(CONFIG_PATH) as config_file:
-    config = json.load(config_file)
 
-minio_config = config.get('minio', None)
+class StorageUnavailable(APIException):
+    status_code = 503
+    default_detail = "Storage backend unavailable"
+    default_code = "storage_unavailable"
+
+
+def load_minio_config(path: str):
+    try:
+        with open(path) as config_file:
+            config = json.load(config_file)
+    except FileNotFoundError:
+        logger.warning("Settings file not found: %s", path)
+        return None
+    except json.JSONDecodeError:
+        logger.warning("Settings file contains invalid JSON: %s", path)
+        return None
+
+    return config.get("minio")
+
+
+minio_config = load_minio_config(CONFIG_PATH)
 # Generate API Key
 def generate_api_key(user, expiration):
     expiry = timezone.timedelta(days=expiration)
     token_instance, raw_key = AuthToken.objects.create(user=user, expiry=expiry)
-    
     return raw_key, token_instance
 
 def user_can_download(user) -> bool:
@@ -64,38 +85,44 @@ class DownloadCaseArchiveView(APIView):
         if not user_can_download(request.user):
             raise PermissionDenied("Not authorized")
 
+        if not minio_config:
+            raise StorageUnavailable("Storage backend not configured")
+
         case = self._get_case(case_id)
         archive = self._get_archive(case)
 
         storage = StorageClient(minio_config)
+        if not storage.client:
+            raise StorageUnavailable("Storage backend unavailable")
 
         try:
             objects = storage.client.list_objects(archive.bucket_name, recursive=True)
         except S3Error:
             raise NotFound("Bucket not found")
 
-        zs = zipstream.ZipFile(mode='w', compression=zipstream.ZIP_DEFLATED)
-
-        for obj in objects:
-            def stream_obj(o=obj):
-                f = storage.client.get_object(archive.bucket_name, o.object_name)
-                for chunk in f.stream(32 * 1024):
-                    yield chunk
-                f.close()
-            zs.write_iter(obj.object_name, stream_obj())
+        def zip_stream():
+            buf = io.BytesIO()
+            with zipfile.ZipFile(buf, 'w', zipfile.ZIP_DEFLATED) as zip_file:
+                for obj in objects:
+                    try:
+                        data = storage.client.get_object(archive.bucket_name, obj.object_name)
+                        zip_file.writestr(obj.object_name, data.read())
+                        data.close()
+                    except S3Error:
+                        continue
+            buf.seek(0)
+            yield from buf
 
         response = StreamingHttpResponse(
-            zs,
+            zip_stream(),
             content_type="application/zip"
         )
-        response['Content-Disposition'] = (
-            f'attachment; filename="case_{case.reporter.split("@")[0]}_{case.pk}.zip"'
-        )
+        response['Content-Disposition'] = f'attachment; filename="case_{case.pk}.zip"'
 
         log_cert_download(
             user=request.user,
             case_id=case.pk,
-            object_name=f"bucket_{archive.bucket_name}",
+            object_name=f"case_{case.pk}.zip",
             ip=request.META.get("REMOTE_ADDR"),
         )
 
@@ -176,7 +203,7 @@ class MonthlyCasesSummaryAggregateView(
             OpenApiParameter("month", int, OpenApiParameter.QUERY),
             OpenApiParameter("year", int, OpenApiParameter.QUERY),
         ],
-        responses=dict,
+        responses=MonthlyCasesSummarySerializer(many=True),
         description="Aggregate case stats for a given month/year",
     )
     def get(self, request):
@@ -217,7 +244,7 @@ class UserCasesMonthlyStatsAggregateView(
             OpenApiParameter("month", int, OpenApiParameter.QUERY),
             OpenApiParameter("year", int, OpenApiParameter.QUERY),
         ],
-        responses=dict,
+        responses=UserCasesMonthlyStatsSerializer(many=True),
         description="Aggregate user case statistics",
     )
     def get(self, request):
@@ -249,4 +276,3 @@ class UserCasesMonthlyStatsAggregateView(
         )
 
         return Response(list(data))
-
