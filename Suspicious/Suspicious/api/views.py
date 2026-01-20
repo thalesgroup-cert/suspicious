@@ -177,7 +177,7 @@ class MonthlyCasesSummaryAggregateView(
             OpenApiParameter("month", int, OpenApiParameter.QUERY),
             OpenApiParameter("year", int, OpenApiParameter.QUERY),
         ],
-        responses=dict,
+        responses=MonthlyCasesSummarySerializer(many=True),
         description="Aggregate case stats for a given month/year",
     )
     def get(self, request):
@@ -218,7 +218,7 @@ class UserCasesMonthlyStatsAggregateView(
             OpenApiParameter("month", int, OpenApiParameter.QUERY),
             OpenApiParameter("year", int, OpenApiParameter.QUERY),
         ],
-        responses=dict,
+        responses=UserCasesMonthlyStatsSerializer(many=True),
         description="Aggregate user case statistics",
     )
     def get(self, request):
