@@ -29,7 +29,8 @@ from .mixins import MonthYearQueryMixin
 from .audit import log_cert_download
 from django.utils import timezone
 import json
-import zipstream
+import io
+import zipfile
 from django.http import StreamingHttpResponse
 from minio.error import S3Error
 # ---------------------------------------------------------------------
@@ -47,7 +48,6 @@ minio_config = config.get('minio', None)
 def generate_api_key(user, expiration):
     expiry = timezone.timedelta(days=expiration)
     token_instance, raw_key = AuthToken.objects.create(user=user, expiry=expiry)
-    
     return raw_key, token_instance
 
 def user_can_download(user) -> bool:
@@ -74,28 +74,29 @@ class DownloadCaseArchiveView(APIView):
         except S3Error:
             raise NotFound("Bucket not found")
 
-        zs = zipstream.ZipFile(mode='w', compression=zipstream.ZIP_DEFLATED)
-
-        for obj in objects:
-            def stream_obj(o=obj):
-                f = storage.client.get_object(archive.bucket_name, o.object_name)
-                for chunk in f.stream(32 * 1024):
-                    yield chunk
-                f.close()
-            zs.write_iter(obj.object_name, stream_obj())
+        def zip_stream():
+            buf = io.BytesIO()
+            with zipfile.ZipFile(buf, 'w', zipfile.ZIP_DEFLATED) as zip_file:
+                for obj in objects:
+                    try:
+                        data = storage.client.get_object(archive.bucket_name, obj.object_name)
+                        zip_file.writestr(obj.object_name, data.read())
+                        data.close()
+                    except S3Error:
+                        continue
+            buf.seek(0)
+            yield from buf
 
         response = StreamingHttpResponse(
-            zs,
+            zip_stream(),
             content_type="application/zip"
         )
-        response['Content-Disposition'] = (
-            f'attachment; filename="case_{case.reporter.split("@")[0]}_{case.pk}.zip"'
-        )
+        response['Content-Disposition'] = f'attachment; filename="case_{case.pk}.zip"'
 
         log_cert_download(
             user=request.user,
             case_id=case.pk,
-            object_name=f"bucket_{archive.bucket_name}",
+            object_name=f"case_{case.pk}.zip",
             ip=request.META.get("REMOTE_ADDR"),
         )
 
@@ -169,7 +170,7 @@ class MonthlyCasesSummaryAggregateView(
     MonthYearQueryMixin,
     APIView,
 ):
-    # permission_classes = [IsAuthenticated]
+    permission_classes = [IsAuthenticated]
 
     @extend_schema(
         parameters=[
@@ -210,7 +211,7 @@ class UserCasesMonthlyStatsAggregateView(
     MonthYearQueryMixin,
     APIView,
 ):
-    # permission_classes = [IsAuthenticated] 
+    permission_classes = [IsAuthenticated]
 
     @extend_schema(
         parameters=[
