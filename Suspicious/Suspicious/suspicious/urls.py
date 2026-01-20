@@ -18,7 +18,7 @@ from django.urls import include, path
 
 urlpatterns = [
     path('', include('django_sso.sso_gateway.urls')),
-    path("accounts/", include("django.contrib.auth.urls"), name="login"),
+    path("accounts/", include("allauth.urls")),
     path('admin/', admin.site.urls),
     path('', include('tasp.urls')),
     path('', include('dashboard.urls')),

@@ -1,7 +1,7 @@
 from django.db.models import Sum
 from rest_framework.views import APIView
 from rest_framework.permissions import IsAuthenticated
-from rest_framework.exceptions import PermissionDenied, NotFound
+from rest_framework.exceptions import PermissionDenied, NotFound, APIException
 from rest_framework.response import Response
 from rest_framework import generics
 from django_filters.rest_framework import DjangoFilterBackend
@@ -32,18 +32,39 @@ import json
 import io
 import zipfile
 from django.http import StreamingHttpResponse
+import os
+import logging
 from minio.error import S3Error
 # ---------------------------------------------------------------------
 # Permissions
 # ---------------------------------------------------------------------
 
 ALLOWED_DOWNLOAD_GROUPS = {"Admin", "CERT"}
-CONFIG_PATH = "/app/settings.json"
+CONFIG_PATH = os.environ.get("SUSPICIOUS_SETTINGS_PATH", "/app/settings.json")
+logger = logging.getLogger(__name__)
 
-with open(CONFIG_PATH) as config_file:
-    config = json.load(config_file)
 
-minio_config = config.get('minio', None)
+class StorageUnavailable(APIException):
+    status_code = 503
+    default_detail = "Storage backend unavailable"
+    default_code = "storage_unavailable"
+
+
+def load_minio_config(path: str):
+    try:
+        with open(path) as config_file:
+            config = json.load(config_file)
+    except FileNotFoundError:
+        logger.warning("Settings file not found: %s", path)
+        return None
+    except json.JSONDecodeError:
+        logger.warning("Settings file contains invalid JSON: %s", path)
+        return None
+
+    return config.get("minio")
+
+
+minio_config = load_minio_config(CONFIG_PATH)
 # Generate API Key
 def generate_api_key(user, expiration):
     expiry = timezone.timedelta(days=expiration)
@@ -64,10 +85,15 @@ class DownloadCaseArchiveView(APIView):
         if not user_can_download(request.user):
             raise PermissionDenied("Not authorized")
 
+        if not minio_config:
+            raise StorageUnavailable("Storage backend not configured")
+
         case = self._get_case(case_id)
         archive = self._get_archive(case)
 
         storage = StorageClient(minio_config)
+        if not storage.client:
+            raise StorageUnavailable("Storage backend unavailable")
 
         try:
             objects = storage.client.list_objects(archive.bucket_name, recursive=True)
@@ -250,4 +276,3 @@ class UserCasesMonthlyStatsAggregateView(
         )
 
         return Response(list(data))
-
