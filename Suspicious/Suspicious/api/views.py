@@ -196,7 +196,7 @@ class MonthlyCasesSummaryAggregateView(
     MonthYearQueryMixin,
     APIView,
 ):
-    # permission_classes = [IsAuthenticated]
+    permission_classes = [IsAuthenticated]
 
     @extend_schema(
         parameters=[
@@ -237,7 +237,7 @@ class UserCasesMonthlyStatsAggregateView(
     MonthYearQueryMixin,
     APIView,
 ):
-    # permission_classes = [IsAuthenticated] 
+    permission_classes = [IsAuthenticated]
 
     @extend_schema(
         parameters=[

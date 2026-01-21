@@ -277,7 +277,7 @@ def oidc_callback(request: HttpRequest) -> HttpResponseRedirect:
     next_url = request.session.pop("oidc_next", "")
     if next_url:
         return redirect(next_url)
-    return redirect("tasp.home")
+    return redirect("tasp:home")
 
 
 # --- Authentication Views ---

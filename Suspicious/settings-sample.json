@@ -6,6 +6,7 @@
         "django_secret_key": "django-insecure-test",
         "trace_level": "INFO",
         "email": "suspicious@test.com",
+        "company": "Test",
         "tz": "Europe/Paris",
         "pattern": "pattern to match your company mail addresses",
         "footer": "Your Group",
