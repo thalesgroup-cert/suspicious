@@ -25,6 +25,11 @@ suspicious_config = config.get('suspicious', {})
 cortex_config = config.get('cortex', {})
 db_config = config.get('database', {})
 
+OIDC_SERVER_URL = suspicious_config.get("oidc_server_url")
+OIDC_CLIENT_ID = suspicious_config.get("oidc_client_id")
+OIDC_CLIENT_SECRET = suspicious_config.get("oidc_client_secret")
+OIDC_SCOPES = suspicious_config.get("oidc_scopes", "openid email profile")
+
 BASE_DIR = Path(__file__).resolve().parent.parent.parent
 SECRET_KEY = suspicious_config.get('django_secret_key', 'default_secret_key')
 DEBUG = suspicious_config.get('django_debug', False)

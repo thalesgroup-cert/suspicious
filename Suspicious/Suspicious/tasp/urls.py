@@ -11,6 +11,10 @@ urlpatterns = [
 
     # logout
     path('logout/', views.logout_view, name='logout'),
+
+    # OIDC SSO
+    path('oidc/login/', views.oidc_login, name='oidc_login'),
+    path('oidc/callback/', views.oidc_callback, name='oidc_callback'),
     
     # Submission form
     path('submit/', views.submit, name='submit'),
