@@ -25,6 +25,11 @@ suspicious_config = config.get('suspicious', {})
 cortex_config = config.get('cortex', {})
 db_config = config.get('database', {})
 
+# si ton proxy met X-Forwarded-Proto: https
+SECURE_PROXY_SSL_HEADER = ("HTTP_X_FORWARDED_PROTO", "https")
+
+# si ton proxy met X-Forwarded-Host: suspicious.corp.test
+USE_X_FORWARDED_HOST = True
 OIDC_SERVER_URL = suspicious_config.get("oidc_server_url")
 OIDC_CLIENT_ID = suspicious_config.get("oidc_client_id")
 OIDC_CLIENT_SECRET = suspicious_config.get("oidc_client_secret")
@@ -200,6 +205,7 @@ MAX_UPLOAD_SIZE = 5242880  # 5MB
 AUTH_LDAP_ALWAYS_UPDATE_USER = True
 AUTH_LDAP_CACHE_TIMEOUT = 3600
 
+SITE_ID = 1
 
 # Authentication backends
 AUTHENTICATION_BACKENDS = (

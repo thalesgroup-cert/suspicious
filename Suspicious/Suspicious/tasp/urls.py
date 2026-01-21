@@ -7,7 +7,7 @@ from tasp import views
 app_name = 'tasp'
 urlpatterns = [
     # Home page
-    path('', views.home,name='home'),
+    path('', views.home, name='home'),
 
     # logout
     path('logout/', views.logout_view, name='logout'),

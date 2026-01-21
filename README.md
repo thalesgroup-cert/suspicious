@@ -1,4 +1,7 @@
 <p align="center">
+    <img alt="Suspicious Logo" src="/assets/suspicious-logo.png" height="330" width="260">
+</p>
+<p align="center">
     <strong>AI Phishing Threat Analysis Platform</strong>
 </p>
 
@@ -17,7 +20,7 @@
     </a>
 </p>
 
-# Suspicious 🛡️
+# Suspicious
 
 An **AI-powered phishing & threat-analysis platform** to automatically inspect, classify, and report suspicious emails, files, URLs, IPs, and hashes built for teams and organizations.
 
