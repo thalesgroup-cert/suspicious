@@ -23,6 +23,7 @@ from .analyzers_services.hashdd import AnalyzerHashdd
 from .analyzers_services.yara import AnalyzerYara
 from .analyzers_services.mailheader import AnalyzerMailHeader
 from .analyzers_services.ai.service import AnalyzerAI
+from .analyzers_services.glimps import AnalyzerGMalware
 
 logger = logging.getLogger("tasp.cron.update_ongoing_case_jobs")
 
@@ -52,6 +53,7 @@ class AnalyzerFactory:
         "yara": AnalyzerYara,
         "mailheader": AnalyzerMailHeader,
         "ai": AnalyzerAI,
+        "gmalware": AnalyzerGMalware,
     }
 
     @classmethod
