@@ -236,7 +236,6 @@ SOCIALACCOUNT_PROVIDERS = {
 AUTHENTICATION_BACKENDS = (
     'django_auth_ldap.backend.LDAPBackend',
     "django.contrib.auth.backends.ModelBackend",
-    "allauth.account.auth_backends.AuthenticationBackend",
 )
 
 # Application definition
