@@ -34,15 +34,15 @@
   --dropzone-thumb-label-color: #ffffff;
   --dropzone-thumb-label-font-size: 0.875rem; /* 14px */
   --dropzone-thumb-margin-bottom: 1.5625rem; /* 25px */
-  --dropzone-thumb-margin-top: 0;
+  --dropzone-thumb-margin-top: -25vh;
 
   --file-result-font-size: 1.2rem;
   --file-input-width: 30vw;
   --file-input-height: 10vh;
   --file-input-left: 5vw;
   --file-input-top: 50vh;
-  --file-result-top: 30vh;
-  --file-result-left: -4%;
+  --file-result-top: 60vh;
+  --file-result-left: 50vw;
 
   --submit-btn-width: 250px;
   --submit-btn-height: 50px;

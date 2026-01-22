@@ -69,7 +69,7 @@ class FileHandler:
             tuple: (file_instance, hash_instance).
         """
         try:
-            size = os.path.getsize(tmp_path)
+            size = os.path.getsize("/tmp/"+ tmp_path)
         except FileNotFoundError:
             logger.error("Temporary file not found at: %s", tmp_path)
             size = 0
