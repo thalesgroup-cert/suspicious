@@ -116,6 +116,16 @@ def get_logo():
     # Assuming the logo is located in the static files directory
     return suspicious_config.get('logo')
 
+@register.simple_tag(name='get_company')
+def get_company():
+    """
+    Returns the company name.
+
+    This function is used in Django templates to include the company name in the HTML head section.
+    """
+    return suspicious_config.get('company', 'Company')
+
+
 @register.simple_tag(name='get_banner')
 def get_banner():
     """

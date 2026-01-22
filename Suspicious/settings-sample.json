@@ -6,6 +6,7 @@
         "django_secret_key": "django-insecure-test",
         "trace_level": "INFO",
         "email": "suspicious@test.com",
+        "company": "Test",
         "tz": "Europe/Paris",
         "pattern": "pattern to match your company mail addresses",
         "footer": "Your Group",
@@ -13,7 +14,10 @@
         "ico" : "data:image/png;base64,Base64 text of your company logo",
         "logo": "data:image/png;base64,Base64 text of your company logo",
         "banner": "data:image/png;base64,Base64 text of your company logo",
-        "sign": "data:image/png;base64,Base64 text of your company logo"
+        "sign": "data:image/png;base64,Base64 text of your company logo",
+        "oidc_server_url": "oicd-server",
+        "oidc_client_id": "oicd-client-id",
+        "oidc_client_secret": "oidc_client_secret"
     },
     "thehive": {
         "enabled": false,

@@ -25,6 +25,16 @@ suspicious_config = config.get('suspicious', {})
 cortex_config = config.get('cortex', {})
 db_config = config.get('database', {})
 
+# si ton proxy met X-Forwarded-Proto: https
+SECURE_PROXY_SSL_HEADER = ("HTTP_X_FORWARDED_PROTO", "https")
+
+# si ton proxy met X-Forwarded-Host: suspicious.corp.test
+USE_X_FORWARDED_HOST = True
+OIDC_SERVER_URL = suspicious_config.get("oidc_server_url")
+OIDC_CLIENT_ID = suspicious_config.get("oidc_client_id")
+OIDC_CLIENT_SECRET = suspicious_config.get("oidc_client_secret")
+OIDC_SCOPES = suspicious_config.get("oidc_scopes", "openid email profile")
+
 BASE_DIR = Path(__file__).resolve().parent.parent.parent
 SECRET_KEY = suspicious_config.get('django_secret_key', 'default_secret_key')
 DEBUG = suspicious_config.get('django_debug', False)
@@ -195,17 +205,7 @@ MAX_UPLOAD_SIZE = 5242880  # 5MB
 AUTH_LDAP_ALWAYS_UPDATE_USER = True
 AUTH_LDAP_CACHE_TIMEOUT = 3600
 
-# SSO settings section in the gateway side are optional
-#SSO = {
-    # Timeout for the communication with subordinated services. (OPTIONAL)
-    # This timeout is defined in seconds with a default value of 0.1s 
-    # (100ms) per registered service.
-    #'SUBORDINATE_COMMUNICATION_TIMEOUT': 0.1,
-    
-    # Additional fields. (OPTIONAL). For more details look to part
-    # named as "Send additional data to subordinated services"
-    #'ADDITIONAL_FIELDS': ('additiona_fields', 'from_user_model', 'and_related_models'),
-#}
+SITE_ID = 1
 
 SITE_ID = 1
 
@@ -246,11 +246,6 @@ INSTALLED_APPS = [
     'drf_spectacular',
     'knox',
     'django.contrib.sites',
-    'allauth',
-    'allauth.account',
-    'allauth.socialaccount',
-    'allauth.socialaccount.providers.openid_connect',
-    'django_sso.sso_gateway',
     'api.apps.ApiConfig',
     'tasp.apps.TaspConfig',
     'dashboard.apps.DashboardConfig',
@@ -408,5 +403,3 @@ CRONJOBS = [
     ('0 0 1 * *', 'tasp.cron.cleanup.delete_old_analyzer_reports', '>> /app/log/cleanup_phishing.log'),
     ('0 0 * * *', 'tasp.cron.suspicious.remove_old_suspicious_emails', '>> /app/log/cleanup_phishing.log')
 ]
-# Consider adding error handling or notifications for when these jobs fail
-# This could be as simple as checking the return code of the job, or as complex as sending an email on failure
