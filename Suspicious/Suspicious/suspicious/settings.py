@@ -207,10 +207,36 @@ AUTH_LDAP_CACHE_TIMEOUT = 3600
 
 SITE_ID = 1
 
+SITE_ID = 1
+
+ACCOUNT_EMAIL_VERIFICATION = "none"
+ACCOUNT_AUTHENTICATION_METHOD = "username_email"
+ACCOUNT_UNIQUE_EMAIL = True
+LOGIN_REDIRECT_URL = "/"
+LOGOUT_REDIRECT_URL = "/accounts/login/"
+
+SOCIALACCOUNT_PROVIDERS = {
+    "openid_connect": {
+        "SERVERS": [
+            {
+                "id": "company",
+                "name": "Company SSO",
+                "server_url": suspicious_config.get("oidc_server_url"),
+                "client_id": suspicious_config.get("oidc_client_id"),
+                "client_secret": suspicious_config.get("oidc_client_secret"),
+                "settings": {
+                    "scope": ["openid", "email", "profile"],
+                },
+            },
+        ],
+    },
+}
+
 # Authentication backends
 AUTHENTICATION_BACKENDS = (
     'django_auth_ldap.backend.LDAPBackend',
     "django.contrib.auth.backends.ModelBackend",
+    "allauth.account.auth_backends.AuthenticationBackend",
 )
 
 # Application definition
