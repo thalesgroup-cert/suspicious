@@ -14,6 +14,7 @@ import json
 import ldap
 from django_auth_ldap.config import LDAPSearch
 import sys
+from datetime import timedelta
 
 CONFIG_PATH = "/app/settings.json"
 with open(CONFIG_PATH) as config_file:
@@ -23,6 +24,16 @@ ldap_config = config.get('ldap', {})
 suspicious_config = config.get('suspicious', {})
 cortex_config = config.get('cortex', {})
 db_config = config.get('database', {})
+
+# si ton proxy met X-Forwarded-Proto: https
+SECURE_PROXY_SSL_HEADER = ("HTTP_X_FORWARDED_PROTO", "https")
+
+# si ton proxy met X-Forwarded-Host: suspicious.corp.test
+USE_X_FORWARDED_HOST = True
+OIDC_SERVER_URL = suspicious_config.get("oidc_server_url")
+OIDC_CLIENT_ID = suspicious_config.get("oidc_client_id")
+OIDC_CLIENT_SECRET = suspicious_config.get("oidc_client_secret")
+OIDC_SCOPES = suspicious_config.get("oidc_scopes", "openid email profile")
 
 BASE_DIR = Path(__file__).resolve().parent.parent.parent
 SECRET_KEY = suspicious_config.get('django_secret_key', 'default_secret_key')
@@ -134,6 +145,10 @@ LOGGING = {
             'filename': '/app/log/cleanup_phishing.log',
             'formatter': 'verbose',
         },
+        'audit_file': {
+            "class": "logging.FileHandler",
+            "filename": "/var/log/cert_downloads.log",
+        },
     },
     "loggers": {
         'django': {
@@ -174,6 +189,11 @@ LOGGING = {
             'level': suspicious_config.get('trace_level', 'DEBUG'),
             "handlers": ["console"]
         },
+        "audit.cert_download": {
+            "handlers": ["audit_file"],
+            "level": "INFO",
+            "propagate": False,
+        },
     },
     "disable_existing_loggers": False
 }
@@ -185,17 +205,7 @@ MAX_UPLOAD_SIZE = 5242880  # 5MB
 AUTH_LDAP_ALWAYS_UPDATE_USER = True
 AUTH_LDAP_CACHE_TIMEOUT = 3600
 
-# SSO settings section in the gateway side are optional
-#SSO = {
-    # Timeout for the communication with subordinated services. (OPTIONAL)
-    # This timeout is defined in seconds with a default value of 0.1s 
-    # (100ms) per registered service.
-    #'SUBORDINATE_COMMUNICATION_TIMEOUT': 0.1,
-    
-    # Additional fields. (OPTIONAL). For more details look to part
-    # named as "Send additional data to subordinated services"
-    #'ADDITIONAL_FIELDS': ('additiona_fields', 'from_user_model', 'and_related_models'),
-#}
+SITE_ID = 1
 
 # Authentication backends
 AUTHENTICATION_BACKENDS = (
@@ -206,7 +216,11 @@ AUTHENTICATION_BACKENDS = (
 # Application definition
 INSTALLED_APPS = [
     'fontawesomefree',
-    'django_sso.sso_gateway',
+    'rest_framework',
+    'drf_spectacular',
+    'knox',
+    'django.contrib.sites',
+    'api.apps.ApiConfig',
     'tasp.apps.TaspConfig',
     'dashboard.apps.DashboardConfig',
     'case_handler.apps.CaseConfig',
@@ -223,13 +237,48 @@ INSTALLED_APPS = [
     'score_process.apps.ScoreConfig',
     'django_crontab',
     'django.contrib.admin',
+    'django.contrib.admindocs',
     'django.contrib.auth',
     'django.contrib.contenttypes',
     'django.contrib.sessions',
     'django.contrib.messages',
     'django.contrib.staticfiles',
     'import_export',
+    'django_filters',
 ]
+
+REST_FRAMEWORK = {
+    'DEFAULT_AUTHENTICATION_CLASSES':
+        ('knox.auth.TokenAuthentication',),
+    'DEFAULT_FILTER_BACKENDS': ['django_filters.rest_framework.DjangoFilterBackend'],
+    'DEFAULT_SCHEMA_CLASS': 'drf_spectacular.openapi.AutoSchema',
+}
+
+SPECTACULAR_SETTINGS = {
+    'TITLE': 'Suspicious API',
+    'DESCRIPTION': 'Suspicious API',
+    'VERSION': '1.0.0',
+    'SERVE_INCLUDE_SCHEMA': False,
+    "SECURITY": [
+        {"TokenAuth": []},
+    ],
+
+    "COMPONENTS": {
+        "securitySchemes": {
+            "TokenAuth": {
+                "type": "apiKey",
+                "in": "header",
+                "name": "Authorization",
+                "description": "Format: Token <your_api_token>",
+            }
+        }
+    },
+}
+
+REST_KNOX = {
+    'SECURE_HASH_ALGORITHM': 'cryptography.hazmat.primitives.hashes.SHA3_512',  
+    'TOKEN_TTL': timedelta(hours=10),
+}
 
 MIDDLEWARE = [
     'django.middleware.security.SecurityMiddleware',
@@ -328,5 +377,3 @@ CRONJOBS = [
     ('0 0 1 * *', 'tasp.cron.cleanup.delete_old_analyzer_reports', '>> /app/log/cleanup_phishing.log'),
     ('0 0 * * *', 'tasp.cron.suspicious.remove_old_suspicious_emails', '>> /app/log/cleanup_phishing.log')
 ]
-# Consider adding error handling or notifications for when these jobs fail
-# This could be as simple as checking the return code of the job, or as complex as sending an email on failure

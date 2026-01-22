@@ -1,13 +1,17 @@
 # Python Standard Library Imports
-import logging
+import base64
+import hashlib
 import json
+import logging
+from functools import lru_cache
 from typing import Callable, Dict
+from urllib.parse import urlencode, urljoin
 
 # Django Core Imports
 import django
 from django.core.paginator import Paginator, EmptyPage, PageNotAnInteger
 from django.conf import settings
-from django.contrib.auth import logout
+from django.contrib.auth import login, logout
 from django.contrib.auth.decorators import login_required
 from django.contrib import messages
 from django.contrib.auth.models import User
@@ -15,6 +19,9 @@ from django.db import transaction, IntegrityError
 from django.db.models import Q, QuerySet, F
 from django.http import JsonResponse, HttpRequest, HttpResponse, HttpResponseRedirect
 from django.shortcuts import redirect, render, get_object_or_404
+from django.urls import reverse
+from django.utils.crypto import get_random_string
+from django.utils.http import url_has_allowed_host_and_scheme
 from django.utils import timezone
 from django.views.decorators.csrf import csrf_exempt, csrf_protect
 from django.views.decorators.http import require_GET
@@ -23,6 +30,9 @@ from django.views.decorators.http import require_GET
 
 from tasp.forms import UploadFileForm, UploadURLForm, UploadOtherForm
 from tasp.utils.popup import generate_html
+
+import jwt
+import requests
 
 from case_handler.case_utils.case_handler import CaseHandler
 from case_handler.models import Case
@@ -93,6 +103,181 @@ IOC_TYPES_NEEDING_TYPE_ARG = {"body", "header", "ip", "url", "hash"}
 
 # --- Logger Configuration ---
 logger = logging.getLogger(__name__)
+
+
+def _oidc_enabled() -> bool:
+    return bool(
+        settings.OIDC_SERVER_URL
+        and settings.OIDC_CLIENT_ID
+        and settings.OIDC_CLIENT_SECRET
+    )
+
+
+@lru_cache(maxsize=1)
+def _get_oidc_provider_config() -> Dict[str, str]:
+    discovery_url = urljoin(
+        settings.OIDC_SERVER_URL.rstrip("/") + "/",
+        ".well-known/openid-configuration",
+    )
+    response = requests.get(discovery_url, timeout=10)
+    response.raise_for_status()
+    return response.json()
+
+
+def _generate_pkce_pair() -> Dict[str, str]:
+    code_verifier = get_random_string(64)
+    code_challenge = hashlib.sha256(code_verifier.encode("utf-8")).digest()
+    code_challenge_b64 = base64.urlsafe_b64encode(code_challenge).rstrip(b"=").decode("utf-8")
+    return {"code_verifier": code_verifier, "code_challenge": code_challenge_b64}
+
+
+def _build_safe_next_url(request: HttpRequest) -> str:
+    next_url = request.GET.get("next")
+    if next_url and url_has_allowed_host_and_scheme(
+        next_url, allowed_hosts={request.get_host()}, require_https=request.is_secure()
+    ):
+        return next_url
+    return ""
+
+
+def oidc_login(request: HttpRequest) -> HttpResponseRedirect:
+    if not _oidc_enabled():
+        messages.error(request, "Company SSO is not configured.")
+        return redirect("login")
+
+    try:
+        provider_config = _get_oidc_provider_config()
+    except requests.RequestException as exc:
+        logger.error("OIDC discovery failed: %s", exc, exc_info=True)
+        messages.error(request, "Unable to reach the SSO provider.")
+        return redirect("login")
+
+    state = get_random_string(32)
+    nonce = get_random_string(32)
+    pkce_pair = _generate_pkce_pair()
+    request.session["oidc_state"] = state
+    request.session["oidc_nonce"] = nonce
+    request.session["oidc_code_verifier"] = pkce_pair["code_verifier"]
+    request.session["oidc_next"] = _build_safe_next_url(request)
+
+    redirect_uri = request.build_absolute_uri(reverse("tasp:oidc_callback"))
+    params = {
+        "client_id": settings.OIDC_CLIENT_ID,
+        "response_type": "code",
+        "scope": settings.OIDC_SCOPES,
+        "redirect_uri": redirect_uri,
+        "state": state,
+        "nonce": nonce,
+        "code_challenge": pkce_pair["code_challenge"],
+        "code_challenge_method": "S256",
+    }
+    authorization_url = f"{provider_config['authorization_endpoint']}?{urlencode(params)}"
+    return redirect(authorization_url)
+
+
+def oidc_callback(request: HttpRequest) -> HttpResponseRedirect:
+    if not _oidc_enabled():
+        messages.error(request, "Company SSO is not configured.")
+        return redirect("login")
+
+    error = request.GET.get("error")
+    if error:
+        messages.error(request, f"SSO error: {error}")
+        return redirect("login")
+
+    state = request.GET.get("state")
+    if not state or state != request.session.get("oidc_state"):
+        messages.error(request, "Invalid SSO response.")
+        return redirect("login")
+
+    code = request.GET.get("code")
+    if not code:
+        messages.error(request, "Missing authorization code.")
+        return redirect("login")
+
+    try:
+        provider_config = _get_oidc_provider_config()
+    except requests.RequestException as exc:
+        logger.error("OIDC discovery failed: %s", exc, exc_info=True)
+        messages.error(request, "Unable to reach the SSO provider.")
+        return redirect("login")
+
+    redirect_uri = request.build_absolute_uri(reverse("tasp:oidc_callback"))
+    token_payload = {
+        "grant_type": "authorization_code",
+        "code": code,
+        "redirect_uri": redirect_uri,
+        "client_id": settings.OIDC_CLIENT_ID,
+        "code_verifier": request.session.get("oidc_code_verifier", ""),
+    }
+    try:
+        token_response = requests.post(
+            provider_config["token_endpoint"],
+            data=token_payload,
+            auth=(settings.OIDC_CLIENT_ID, settings.OIDC_CLIENT_SECRET),
+            timeout=10,
+        )
+        token_response.raise_for_status()
+    except requests.RequestException as exc:
+        logger.error("OIDC token exchange failed: %s", exc, exc_info=True)
+        messages.error(request, "SSO token exchange failed.")
+        return redirect("login")
+
+    token_data = token_response.json()
+    id_token = token_data.get("id_token")
+    if not id_token:
+        messages.error(request, "SSO response did not include an ID token.")
+        return redirect("login")
+
+    try:
+        jwk_client = jwt.PyJWKClient(provider_config["jwks_uri"])
+        signing_key = jwk_client.get_signing_key_from_jwt(id_token)
+        algorithms = provider_config.get("id_token_signing_alg_values_supported", ["RS256"])
+        claims = jwt.decode(
+            id_token,
+            signing_key.key,
+            algorithms=algorithms,
+            audience=settings.OIDC_CLIENT_ID,
+            issuer=provider_config["issuer"],
+        )
+    except jwt.PyJWTError as exc:
+        logger.error("OIDC ID token validation failed: %s", exc, exc_info=True)
+        messages.error(request, "Invalid SSO ID token.")
+        return redirect("login")
+
+    nonce = request.session.get("oidc_nonce")
+    if nonce and claims.get("nonce") != nonce:
+        messages.error(request, "Invalid SSO nonce.")
+        return redirect("login")
+
+    email = claims.get("email")
+    if not email:
+        messages.error(request, "SSO account missing email.")
+        return redirect("login")
+
+    user_defaults = {
+        "email": email,
+        "first_name": claims.get("given_name", ""),
+        "last_name": claims.get("family_name", ""),
+    }
+    user, _created = User.objects.get_or_create(username=email, defaults=user_defaults)
+    if not user.is_active:
+        messages.error(request, "Your account is inactive.")
+        return redirect("login")
+
+    for field, value in user_defaults.items():
+        if value and getattr(user, field) != value:
+            setattr(user, field, value)
+    user.save(update_fields=["email", "first_name", "last_name"])
+
+    login(request, user, backend="django.contrib.auth.backends.ModelBackend")
+    request.session.pop("oidc_state", None)
+    request.session.pop("oidc_nonce", None)
+    request.session.pop("oidc_code_verifier", None)
+    next_url = request.session.pop("oidc_next", "")
+    if next_url:
+        return redirect(next_url)
+    return redirect("tasp:home")
 
 
 # --- Authentication Views ---

@@ -89,7 +89,7 @@ def _process_minio_buckets(cfg: CronConfig, base_path: str) -> None:
                     shutil.copy(submission_path, os.path.join(entry.path, "user_submission.eml"))
                     # create archive and process
                     shutil.make_archive(entry.path, "gztar", entry.path)
-                    minio_processor.process_emails_from_minio_workdir(entry.path)
+                    minio_processor.process_emails_from_minio_workdir(entry.path, bucket.name)
 
             # tag bucket as Done
             try:

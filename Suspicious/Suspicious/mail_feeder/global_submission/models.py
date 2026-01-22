@@ -11,5 +11,6 @@ class MailSubmissionData(BaseModel):
     workdir: str
     filename: str
     email_id: str
+    bucket_name: Optional[str]
     user: Optional[str]
     is_submitted: bool

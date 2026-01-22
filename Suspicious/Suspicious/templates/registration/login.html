@@ -48,6 +48,11 @@
                     <div class="field padding-bottom--24">
                       <input class="button" type="submit" name="submit" value="Continue">
                     </div>
+                    <div class="field padding-bottom--24">
+                      <a class="button is-link is-fullwidth" href="{% url 'tasp:oidc_login' %}">
+                        Login with {% get_company %} SSO
+                      </a>
+                    </div>
                   </form>
                 </div>
               </div>
