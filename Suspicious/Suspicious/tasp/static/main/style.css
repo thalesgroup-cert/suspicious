@@ -1573,7 +1573,11 @@ img.is-align-self-center.mt-4.image {
   height: 80vh;
   top: 10vh;
 }
-
+div#myLoadingPopup div.modal-card {
+  width: 80% !important;
+  height: 25vh;
+  top: 5vh;
+}
 /* ===============================
    Responsive
 ================================== */
