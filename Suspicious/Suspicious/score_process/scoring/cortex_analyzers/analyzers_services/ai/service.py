@@ -140,6 +140,18 @@ class AnalyzerAI(BaseAnalyzer):
 
             if malscore_val <= 6.5:
                 logger.info("Mail not considered dangerous")
+                try:
+                    logger.info("Adding mail to suspicious collection...")
+                    add_to_suspicious_collection(
+                        self.full,
+                        "",
+                        "",
+                        self.suspicious_case_id,
+                        suspicious_collection,
+                    )
+                    logger.info("Mail added to suspicious collection!")
+                except Exception as e:
+                    logger.error(f"Error adding to suspicious collection: {e}")
                 return response
 
             logger.info("Mail considered dangerous")
