@@ -20,6 +20,7 @@ tldextract==5.3.1
 dkimpy==1.1.8
 email-validator==2.3.0
 msg_parser==1.2.0
+eml2png==0.0.2
 
 # Natural Language Processing and Similarity Checking
 nltk==3.9.2

@@ -17,7 +17,10 @@
         "sign": "data:image/png;base64,Base64 text of your company logo",
         "oidc_server_url": "oicd-server",
         "oidc_client_id": "oicd-client-id",
-        "oidc_client_secret": "oidc_client_secret"
+        "oidc_client_secret": "oidc_client_secret",
+        "storage_backend": "minio",
+        "minio_media_bucket": "suspicious-media",
+        "storage_dual_write" : "False"
     },
     "thehive": {
         "enabled": false,
@@ -87,7 +90,8 @@
         "access_key": "the minio access key",
         "endpoint": "minio:9000",
         "secret_key": "the minio secret key",
-        "secure": false
+        "secure": false,
+        "minio_auto_create_bucket": true
     },
     "mail": {
         "tls": true,

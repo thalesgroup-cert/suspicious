@@ -13,6 +13,7 @@ from .views import (
 
     # Downloads
     DownloadCaseArchiveView,
+    CaseChallengeTokenView,
 )
 from drf_spectacular.views import SpectacularAPIView, SpectacularSwaggerView
 urlpatterns = [
@@ -68,5 +69,10 @@ urlpatterns = [
         "cases/<int:case_id>/download/",
         DownloadCaseArchiveView.as_view(),
         name="case-download",
+    ),
+    path(
+        "cases/<int:case_id>/challenge",
+        CaseChallengeTokenView.as_view(),
+        name="case-challenge",
     ),
 ]
