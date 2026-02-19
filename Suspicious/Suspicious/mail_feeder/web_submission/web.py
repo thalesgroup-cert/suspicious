@@ -34,6 +34,7 @@ class WebSubmissionService:
                     filename=filename,
                     email_id=email_id,
                     user=config.user_email,
+                    bucket_name=None,
                     is_submitted=True
                 ))
         return last_instance

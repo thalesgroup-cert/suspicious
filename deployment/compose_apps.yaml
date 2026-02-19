@@ -68,6 +68,13 @@ services:
     networks:
       - suspicious_network
 
+  suspicious_ui:
+    ports:
+    - "127.0.0.1:${SUSPICIOUS_UI_PORT}:80"
+    init: true
+    restart: unless-stopped
+    networks:
+      - suspicious_network
 
 networks:
   suspicious_network:

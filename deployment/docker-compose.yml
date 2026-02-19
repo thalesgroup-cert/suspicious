@@ -23,11 +23,26 @@ services:
       timeout: 30s
       retries: 15
       start_period: 60s
+
+  suspicious_ui:
+    extends:
+      file: compose_apps.yaml
+      service: suspicious_ui
+    build:
+      context: ${SUSPICIOUS_PATH}/suspicious-ui/
+      dockerfile: Dockerfile
+      args:
+        - HTTP_PROXY=${HTTP_PROXY}
+        - HTTPS_PROXY=${HTTPS_PROXY}
+    container_name: suspicious_ui
+    depends_on:
+      - suspicious
     labels:
       - "traefik.enable=true"
-      - "traefik.http.routers.suspicious.rule=Host(`${DOMAIN_CORP}`)"
-      - "traefik.http.routers.suspicious.entrypoints=websecure"
-      - "traefik.http.routers.suspicious.tls=true"
+      - "traefik.http.routers.suspicious-ui.rule=Host(`${DOMAIN_CORP}`)"
+      - "traefik.http.routers.suspicious-ui.entrypoints=websecure"
+      - "traefik.http.routers.suspicious-ui.tls=true"
+      - "traefik.http.services.suspicious-ui.loadbalancer.server.port=80"
 
   db_suspicious:
     extends:
