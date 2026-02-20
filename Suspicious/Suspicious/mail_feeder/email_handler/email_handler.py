@@ -7,6 +7,9 @@ from mail_feeder.utils.process_em_body.email_body import EmailBodyService
 from mail_feeder.utils.process_em_header.email_header import EmailHeaderService
 from .models import EmailDataModel
 from .utils import safe_operation, increment_field
+from pathlib import Path
+from mail_feeder.utils.email_preview.eml2png_renderer import Eml2PngRenderer
+import os
 
 fetch_mail_logger = logging.getLogger("tasp.cron.fetch_and_process_emails")
 
@@ -21,6 +24,7 @@ class EmailHandlerService:
         self.body_service = EmailBodyService()
         self.header_service = EmailHeaderService()
         self.observables_service = EmailObservablesService()
+        self.preview_renderer = Eml2PngRenderer()
 
     def handle_mail(self, email_data: dict, workdir: str) -> Optional[Mail]:
         """
@@ -59,6 +63,9 @@ class EmailHandlerService:
                 return None
 
             mail_instance = self._save_and_update_mail(mail_instance, data)
+
+            self._generate_mail_preview_png(mail_instance, data, workdir)
+
             self._process_rich_observables(mail_instance, data, workdir)
             self._update_times_sent(mail_instance)
             self._save_mail(mail_instance)
@@ -79,6 +86,7 @@ class EmailHandlerService:
                     mail_instance, data, email_body_list, email_header_list
                 )
                 fetch_mail_logger.debug(f"Updated existing mail: {mail_instance.mail_id}")
+
                 self._update_times_sent(mail_instance)
                 self._save_mail(mail_instance)
                 return mail_instance
@@ -90,6 +98,46 @@ class EmailHandlerService:
         email_body_list = self.body_service.check_email_bodies(data.reportedText) if data.reportedText else []
         email_header_list = self.header_service.check_email_headers(data.headers) if data.headers else []
         return email_list, email_body_list, email_header_list
+
+    def _generate_mail_preview_png(self, mail_instance: Mail, data: EmailDataModel, workdir: str) -> None:
+        """
+        PNG preview generation.
+        """
+        with safe_operation("generate_mail_preview_png"):
+            try:
+                email_path = self._resolve_file_path(
+                    filename=str(data.id),
+                    workdir=workdir,
+                )
+            except FileNotFoundError:
+                fetch_mail_logger.debug(
+                    "No email file found for preview (mail_id=%s, workdir=%s)",
+                    mail_instance.mail_id,
+                    workdir,
+                )
+                return
+
+            png_bytes = self.preview_renderer.render_eml_path_to_png_bytes(
+                Path(email_path)
+            )
+            if not png_bytes:
+                return
+
+            self.preview_renderer.save_preview_to_mail(mail_instance, png_bytes)
+
+    def _resolve_file_path(self, filename: str, workdir: str) -> str:
+        for ext in [".eml", ".msg"]:
+            path = os.path.join(workdir, f"{filename}{ext}")
+            if os.path.exists(path):
+                return path
+
+        for alt in ["user_submission.eml", "user_submission.msg"]:
+            path = os.path.join(workdir, alt)
+            if os.path.exists(path):
+                return path
+
+        raise FileNotFoundError(f"No email file found for {filename} in {workdir}")
+
 
     def _save_and_update_mail(self, mail_instance: Mail, data: EmailDataModel) -> Mail:
         """

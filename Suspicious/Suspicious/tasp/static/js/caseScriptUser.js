@@ -245,7 +245,35 @@ $(document).ready(function () {
   const caseIdList = document.querySelectorAll(".caseid");
   const testList = document.querySelectorAll(".tests");
   const resultList = document.querySelectorAll(".result");
+  const challengeButtons = document.querySelectorAll(".challengebtn");
+  challengeButtons.forEach((challengeButton) => {
+    challengeButton.addEventListener("click", async () => {
+      const hidden = challengeButton.value;
+      const caseId = hidden;
 
+      // hide the button
+      challengeButton.style.display = "none";
+
+      const challenge = confirm("Are you sure you want to challenge the results?");
+      if (challenge) {
+        try {
+          const response = await fetch(`../challenge/${caseId}`);
+          const result = await response.json();
+
+          if (result.success) {
+            alert("Challenge sent");
+            // replace the button with a message
+            const parentDiv = challengeButton.parentElement;
+            parentDiv.innerHTML = `
+              <p>Not Challengeable</p>
+            `;
+          }
+        } catch (error) {
+          console.error(`Error sending challenge: ${error}`);
+        }
+      }
+    });
+  });
 
 
 

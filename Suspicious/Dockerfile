@@ -89,6 +89,7 @@ RUN apt-get update && \
 RUN apt-get update && apt-get install -y --no-install-recommends \
         libldap-common \
         libsasl2-2 \
+        wkhtmltopdf \
         libmariadb3 \
         libmagic1 \
         cron \

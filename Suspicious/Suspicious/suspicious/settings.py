@@ -22,6 +22,7 @@ with open(CONFIG_PATH) as config_file:
 
 ldap_config = config.get('ldap', {})
 suspicious_config = config.get('suspicious', {})
+minio_config = config.get('minio', {})
 cortex_config = config.get('cortex', {})
 db_config = config.get('database', {})
 
@@ -207,8 +208,6 @@ AUTH_LDAP_CACHE_TIMEOUT = 3600
 
 SITE_ID = 1
 
-SITE_ID = 1
-
 ACCOUNT_EMAIL_VERIFICATION = "none"
 ACCOUNT_AUTHENTICATION_METHOD = "username_email"
 ACCOUNT_UNIQUE_EMAIL = True
@@ -272,6 +271,27 @@ INSTALLED_APPS = [
     'django_filters',
 ]
 
+# --- Storage backend selection (default: local filesystem) ---
+# Values: local | minio | dual
+SUSPICIOUS_STORAGE_BACKEND = suspicious_config.get("storage_backend", "local").lower()
+
+# MinIO (django-minio-storage) settings (env first, then settings.json)
+MINIO_STORAGE_ENDPOINT = minio_config.get("endpoint", "minio:9000")
+MINIO_STORAGE_ACCESS_KEY = minio_config.get("access_key", "")
+MINIO_STORAGE_SECRET_KEY = minio_config.get("secret_key", "")
+MINIO_STORAGE_USE_HTTPS = str(minio_config.get("secure", "0")).lower() in {"1", "true", "yes", "on"}
+
+MINIO_STORAGE_MEDIA_BUCKET_NAME = suspicious_config.get("minio_media_bucket", "suspicious-media")
+MINIO_STORAGE_AUTO_CREATE_MEDIA_BUCKET = bool(minio_config.get("minio_auto_create_bucket", True))
+
+# Dual mode option: also write a local copy
+SUSPICIOUS_STORAGE_DUAL_WRITE = str(suspicious_config.get("storage_dual_write", "0")).lower() in {"1", "true", "yes", "on"}
+
+if SUSPICIOUS_STORAGE_BACKEND in {"minio", "dual"}:
+    # Only include when enabled
+    if "minio_storage" not in INSTALLED_APPS:
+        INSTALLED_APPS.append("minio_storage")
+
 REST_FRAMEWORK = {
     'DEFAULT_AUTHENTICATION_CLASSES':
         ('knox.auth.TokenAuthentication',),
@@ -301,7 +321,7 @@ SPECTACULAR_SETTINGS = {
 }
 
 REST_KNOX = {
-    'SECURE_HASH_ALGORITHM': 'cryptography.hazmat.primitives.hashes.SHA3_512',  
+    'SECURE_HASH_ALGORITHM': 'cryptography.hazmat.primitives.hashes.SHA3_512',
     'TOKEN_TTL': timedelta(hours=10),
 }
 
@@ -342,8 +362,6 @@ ASGI_APPLICATION = 'suspicious.asgi.application'
 
 # Password validation
 # https://docs.djangoproject.com/en/4.1/ref/settings/#auth-password-validators
-# Password validation
-# https://docs.djangoproject.com/en/4.1/ref/settings/#auth-password-validators
 AUTH_PASSWORD_VALIDATORS = [
     {
         'NAME': 'django.contrib.auth.password_validation.UserAttributeSimilarityValidator',
@@ -369,7 +387,6 @@ FILE_UPLOAD_HANDLERS = [
 
 # Internationalization
 # https://docs.djangoproject.com/en/4.1/topics/i18n/
-
 LANGUAGE_CODE = 'en-us'
 USE_I18N = True
 USE_L10N = True
@@ -384,19 +401,24 @@ MEDIA_ROOT = FILES_BASE_DIR / 'media'
 
 # Clé primaire par défaut
 DEFAULT_AUTO_FIELD = 'django.db.models.BigAutoField'
-# Add default storage for file uploads
-DEFAULT_FILE_STORAGE = 'django.core.files.storage.FileSystemStorage'
+
+# Default storage for file uploads (Django 4.1)
+if SUSPICIOUS_STORAGE_BACKEND == "minio":
+    DEFAULT_FILE_STORAGE = "minio_storage.storage.MinioMediaStorage"
+elif SUSPICIOUS_STORAGE_BACKEND == "dual":
+    DEFAULT_FILE_STORAGE = "suspicious.storage_backends.DualStorage"
+else:
+    DEFAULT_FILE_STORAGE = "django.core.files.storage.FileSystemStorage"
 
 # Lock jobs to prevent them from running simultaneously
 CRONTAB_LOCK_JOBS = True
 
 # Cron jobs for various tasks
-# Each job is run every minute and logs to a specific file in /tmp
-# Consider adjusting the frequency of these jobs based on their cost and your needs
 CRONJOBS = [
     ('*/1 * * * *', 'tasp.cron.fetch_emails.fetch_and_process_emails', '>> /app/log/fetched_mail.log'),
     ('*/1 * * * *', 'tasp.cron.sync_cortex.sync_cortex_analyzers'),
     ('*/1 * * * *', 'tasp.cron.user_and_cases.update_ongoing_case_jobs', '>> /app/log/case_updating.log'),
+    ('0 0 * * *', 'tasp.cron.suspicious.check_challengeable', '>> /app/log/case_challengeable.log'),
     ('*/5 * * * *', 'tasp.cron.kpi.sync_monthly_kpi'),
     ('*/10 * * * *', 'tasp.cron.user_and_cases.sync_user_profiles'),
     ('0 0 1 * *', 'tasp.cron.cleanup.delete_old_analyzer_reports', '>> /app/log/cleanup_phishing.log'),

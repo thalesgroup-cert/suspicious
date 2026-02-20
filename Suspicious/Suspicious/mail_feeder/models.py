@@ -11,6 +11,7 @@ from django.utils.translation import gettext_lazy as _
 class Mail(models.Model):
     subject = models.CharField(max_length=255, db_index=True)
     reportedBy = models.CharField(max_length=255, db_index=True)
+    preview_png = models.ImageField(upload_to="mail_previews/", null=True, blank=True)
     mail_header = models.ForeignKey(
         'MailHeader', on_delete=models.CASCADE, related_name='mails',
         null=True, blank=True, db_index=True

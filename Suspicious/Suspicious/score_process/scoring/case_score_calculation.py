@@ -3,6 +3,7 @@ from enum import Enum
 from typing import List, Set, Optional, Type, Union
 
 from urllib.parse import urlparse
+from email.utils import parseaddr
 
 # Models
 from settings.models import DenyListDomain, CampaignDomainAllowList
@@ -109,6 +110,19 @@ def _extract_domain_from_url(url_string: str, logger: logging.Logger) -> Optiona
         logger.error(f"Failed to parse URL '{url_string}': {e}")
         return None
 
+def _extract_domain_from_email_address(
+    address: str,
+    logger: logging.Logger,
+) -> Optional[str]:
+    try:
+        _, email_addr = parseaddr(address)
+        if "@" not in email_addr:
+            return None
+        return email_addr.rsplit("@", 1)[1].lower()
+    except Exception as e:
+        logger.error(f"Failed to parse email address '{address}': {e}")
+        return None
+
 def _update_ioc(obj, logger, label: str):
     for field in ["ioc_score", "ioc_confidence", "ioc_level"]:
         if not hasattr(obj, field):
@@ -156,6 +170,12 @@ def _check_mail_artifacts_for_deny_list(mail, deny_list: Set[str], logger: loggi
     for artifact in artifacts:
         domain_obj, url_obj, address = None, None, None
         source = "Unknown"
+
+        if hasattr(artifact, 'artifactIsMailAddress') and artifact.artifactIsMailAddress:
+            mail_address = getattr(artifact.artifactIsMailAddress, 'mail_address', None)
+            if mail_address and hasattr(mail_address, 'address'):
+                address = _extract_domain_from_email_address(mail_address.address, logger)
+                source = "Mail Address"
 
         if hasattr(artifact, 'artifactIsDomain') and artifact.artifactIsDomain:
             domain = getattr(artifact.artifactIsDomain, 'domain', None)

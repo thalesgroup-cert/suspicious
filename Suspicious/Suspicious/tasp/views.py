@@ -43,13 +43,12 @@ from case_handler.update_case.update_handler import (
     handle_file,
     handle_ioc,
 )
-from score_process.score_utils.thehive.challenge import ChallengeToTheHiveService
 from score_process.score_utils.send_mail.service import MailNotificationService
 
 from cortex_job.models import AnalyzerReport
 
 from profiles.models import CISOProfile
-from dashboard.models import UserCasesMonthlyStats
+from tasp.services.challenge import run_case_challenge
 
 # --- Constants ---
 ERROR_CASE_NOT_FOUND = "Case does not exist."
@@ -67,7 +66,6 @@ with open(CONFIG_PATH) as config_file:
     config = json.load(config_file)
 
 suspicious_config = config.get("suspicious", {})
-thehive_config = config.get("thehive", {})
 
 # Email configuration (safer to get from Django settings or handle None)
 EMAIL_SENDER_DEFAULT = suspicious_config.get("email", "SUSPICIOUS")
@@ -500,11 +498,7 @@ def challenge(request: HttpRequest, case_id: int) -> JsonResponse:
     try:
         case = _get_case_or_404(case_id, request.user)
 
-        service = CaseChallengeService(case, logger)
-        service.validate()
-        service.mark_challenged()
-        service.update_user_stats()
-        service.notify()
+        run_case_challenge(case, logger)
 
         return JsonResponse({"success": True, "message": f"Case {case_id} successfully challenged."})
 
@@ -520,53 +514,12 @@ def challenge(request: HttpRequest, case_id: int) -> JsonResponse:
         return JsonResponse({"success": False, "error": ERROR_UNEXPECTED}, status=500)
 
 
-class CaseChallengeService:
-    def __init__(self, case, logger):
-        self.case = case
-        self.logger = logger
-
-    def validate(self):
-        if self.case.is_challenged or self.case.status == "Challenged":
-            raise ValueError("Case already challenged")
-
-    def mark_challenged(self):
-        self.case.is_challenged = True
-        self.case.status = "Challenged"
-        self.case.save(update_fields=["is_challenged", "status"])
-
-    def update_user_stats(self):
-        _update_case_challenge_stats(self.case.reporter)
-
-    def notify(self):
-        send_to_thehive = thehive_config.get("enabled", False)
-        mail_header = f"Case ID {self.case.id} challenged by {self.case.reporter.username}"
-        logger.info(f"Notifying about challenge for case ID {self.case.id}. Send to TheHive: {send_to_thehive}")
-        if send_to_thehive:
-            logger.info(f"Sending challenge notification to TheHive for case ID {self.case.id}")
-            ChallengeToTheHiveService(self.case, None, mail_header).send_to_thehive()
-            logger.info(f"Challenge notification sent to TheHive for case ID {self.case.id}")
-        else:
-            cert_users = User.objects.filter(groups__name="CERT", is_active=True).exclude(email="")
-            for cert_user in cert_users:
-                ChallengeToTheHiveService(self.case, cert_user, mail_header).send()
-
 def _get_case_or_404(case_id, user):
     return get_object_or_404(
         Case.objects.select_related("reporter"),
         id=case_id,
         reporter=user
     )
-
-def _update_case_challenge_stats(user):
-    now = timezone.now()
-    stats, _ = UserCasesMonthlyStats.objects.get_or_create(
-        user=user,
-        month=now.strftime("%m"),
-        year=now.year,
-        defaults={"challenged_cases": 0, "total_cases": 0},
-    )
-    stats.challenged_cases += 1
-    stats.save()
 
 
 # --- Pop-up View ---
