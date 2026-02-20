@@ -1,8 +1,8 @@
 services:
   db_suspicious:
     init: true
-    ports:
-      - "127.0.0.1:${DB_SUSPICIOUS_PORT}:3306"
+    expose:
+      - "3306"
     restart: always
     command: "\
       --default-authentication-plugin=mysql_native_password \
@@ -15,7 +15,7 @@ services:
       --innodb-stats-persistent=${INNODB_STATS_PERSISTENT:-ON} \
       --innodb-write-io-threads=${INNODB_WRITE_IO_THREADS:-4}"
     volumes:
-      - '${DB_SUSPICIOUS_PATH}/data:/var/lib/mysql'
+      - "db_suspicious_data:/var/lib/mysql:Z"
     cap_add:
       - SYS_NICE
     environment:
@@ -28,12 +28,12 @@ services:
 
   elasticsearch:
     init: true
-    ports:
-      - "127.0.0.1:${ELASTICSEARCH_PORT}:9200"
+    expose:
+      - "9200"
     restart: unless-stopped
     volumes:
-      - "${ELASTIC_PATH}/data:/usr/share/elasticsearch/data"
-      - "${ELASTIC_PATH}/logs:/usr/share/elasticsearch/logs"
+      - "elasticsearch_data:/usr/share/elasticsearch/data:Z"
+      - "elasticsearch_logs:/usr/share/elasticsearch/logs:Z"
     ulimits:
       nofile:
         soft: 65536
@@ -54,17 +54,27 @@ services:
 
   minio:
     restart: always
+    expose:
+      - "9000"
     ports:
-      - "127.0.0.1:${MINIO_PORT_1}:9000"
-      - "127.0.0.1:${MINIO_PORT_2}:9001"
+      - "127.0.0.1:${MINIO_PORT}:9001"
     environment:
       MINIO_ROOT_USER: ${MINIO_ROOT_USER}
       MINIO_ROOT_PASSWORD: ${MINIO_ROOT_PASSWORD}
     volumes:
-      - ${MINIO_PATH}:/data
+      - "minio_data:/data:Z"
     networks:
       - suspicious_network
 
+volumes:
+  db_suspicious_data:
+    driver: local
+  elasticsearch_data:
+    driver: local
+  elasticsearch_logs:
+    driver: local
+  minio_data:
+    driver: local
 
 networks:
   suspicious_network:

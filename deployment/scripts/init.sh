@@ -1,4 +1,4 @@
-#!/usr/bin/env sh
+#!/usr/bin/env bash
 set -eu
 
 echo "============================================"
@@ -23,6 +23,11 @@ fi
 # Check curl
 if ! command -v curl >/dev/null 2>&1; then
     echo "ERROR: Missing required binary: curl"
+fi
+
+# Check keytool
+if ! command -v keytool >/dev/null 2>&1; then
+    echo "ERROR: Missing required binary: keytool (part of JDK)"
 fi
 
 echo "→ OK"
@@ -73,6 +78,9 @@ for dir in "${DIRS[@]}"; do
         echo "→ Directory exists: $dir (permissions: $perms)"
     else
         echo "→ Directory missing: $dir"
+        echo "Creating directory: $dir"
+        mkdir -p "$dir"
+        echo "→ Directory created: $dir"
     fi
 done
 
@@ -106,6 +114,14 @@ if [ ! -f "${FEEDER_PATH}/config.json" ]; then
 else
     echo "→ Email Feeder config.json present"
 fi
+
+# Email Feeder pplication.log
+FEEDER_LOG="${FEEDER_PATH}/application.log"
+if [ ! -f "$FEEDER_LOG" ]; then
+    touch "$FEEDER_LOG"
+fi
+perm_flog=$(stat -c '%a' "$FEEDER_LOG")
+echo "→ Email Feeder log created: $FEEDER_LOG (permissions: $perm_flog)"
 
 # Traefik TLS file
 TLS_FILE="${TRAEFIK_PATH}/dynamic/tls.yaml"
@@ -207,6 +223,15 @@ if [ ! -f "$CERTFILE" ] || [ ! -f "$KEYFILE" ] || [ ! -f "$ROOTCAFILE" ]; then
     echo "→ Certificates generated in $CA_PATH"
 else
     echo "→ Certificates already present"
+fi
+
+echo "Creating keystore for Cortex..."
+KEYSTORE="$CA_PATH/keystore.jks"
+if [ ! -f "$KEYSTORE" ]; then
+    touch "$KEYSTORE"
+    echo "→ Keystore created at $KEYSTORE"
+else
+    echo "→ Keystore already exists at $KEYSTORE"
 fi
 
 # -------------------------------------------------

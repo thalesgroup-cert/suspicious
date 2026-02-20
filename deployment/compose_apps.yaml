@@ -9,7 +9,7 @@ services:
       - "/var/run/docker.sock:/var/run/docker.sock"
       - "${SUSPICIOUS_PATH}/settings.json:/app/settings.json"
       # AI Vector Database
-      - "${SUSPICIOUS_PATH}/chromadb:/app/Suspicious/chromadb"
+      - "chromadb:/app/Suspicious/chromadb:Z"
     command: >
       /bin/bash -c "
       python3 manage.py crontab show &&
@@ -20,7 +20,7 @@ services:
     env_file:
       - ".env"
     environment:
-      no_proxy: "${NO_PROXY},cortex,db_suspicious,feeder"
+      no_proxy: "${NO_PROXY},cortex,db_suspicious,feeder,minio"
     networks:
       - suspicious_network
 
@@ -39,7 +39,7 @@ services:
       # Certificates
       - "${CA_PATH}/keystore.jks:/etc/cortex/keystore.jks:ro"
       # Cortex config
-      - "${CORTEX_PATH}/jobs:${CORTEX_PATH}/jobs:rw"
+      - "cortex_jobs:${CORTEX_PATH}/jobs:Z"
       - "${CORTEX_PATH}/application.conf:/etc/cortex/application.conf:ro"
       - "${CORTEX_PATH}/application-cortex.log:/var/log/cortex/application.log:rw"
       # Docker configuration
@@ -76,7 +76,14 @@ services:
     networks:
       - suspicious_network
 
+volumes:
+  cortex_jobs:
+    driver: local
+  chromadb:
+    driver: local
+
 networks:
   suspicious_network:
     external: true
     name: ${NETWORK_NAME}
+

@@ -18,7 +18,7 @@
         "oidc_server_url": "oicd-server",
         "oidc_client_id": "oicd-client-id",
         "oidc_client_secret": "oidc_client_secret",
-        "storage_backend": "minio",
+        "storage_backend": "local",
         "minio_media_bucket": "suspicious-media",
         "storage_dual_write" : "False"
     },

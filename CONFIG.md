@@ -40,9 +40,7 @@ Update only when you know compatibility. Mismatched versions can break services.
 
 ```env
 SUSPICIOUS_PORT=9020
-DB_SUSPICIOUS_PORT=3306
-MINIO_PORT_1=35001
-MINIO_PORT_2=35002
+MINIO_PORT=35000
 CORTEX_PORT=9001
 ELASTICSEARCH_PORT=9200
 ```
@@ -98,15 +96,12 @@ If changed, ensure all references (in Compose files, scripts, configs) match.
 ```env
 ROOT_PATH=../
 SUSPICIOUS_PATH=../Suspicious
-DB_SUSPICIOUS_PATH=../db-suspicious
 FEEDER_PATH=../email-feeder
 DOCKER_PATH=../docker
 YARA_PATH=../yara-rules
 MISP_PATH=../misp
 CORTEX_PATH=../cortex
 AIANALYZER_PATH=../Analyzers/AIMailAnalyzer
-ELASTIC_PATH=../elasticsearch
-MINIO_PATH=../minio
 CA_PATH=./certificates
 TRAEFIK_PATH=../traefik
 ```

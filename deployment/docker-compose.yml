@@ -29,7 +29,7 @@ services:
       file: compose_apps.yaml
       service: suspicious_ui
     build:
-      context: ${SUSPICIOUS_PATH}/suspicious-ui/
+      context: ${SUSPICIOUS_UI_PATH}/
       dockerfile: Dockerfile
       args:
         - HTTP_PROXY=${HTTP_PROXY}
@@ -129,6 +129,20 @@ services:
       - "--log.level=INFO"
       - "--accesslog=true"
       - "--metrics.prometheus=true"
+
+volumes:
+  db_suspicious_data:
+    driver: local
+  elasticsearch_data:
+    driver: local
+  elasticsearch_logs:
+    driver: local
+  minio_data:
+    driver: local
+  cortex_jobs:
+    driver: local
+  chromadb:
+    driver: local
 
 networks:
   suspicious_network:
