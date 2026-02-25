@@ -182,6 +182,18 @@ class AnalyzerAI(BaseAnalyzer):
 
             if not phishing_campaign:
                 logger.info("No phishing campaign detected")
+                try:
+                    logger.info("Adding mail to suspicious collection...")
+                    add_to_suspicious_collection(
+                        self.full,
+                        "",
+                        "",
+                        self.suspicious_case_id,
+                        suspicious_collection,
+                    )
+                    logger.info("Mail added to suspicious collection!")
+                except Exception as e:
+                    logger.error(f"Error adding to suspicious collection: {e}")
                 return response
 
             logger.info("Phishing campaign detected")
