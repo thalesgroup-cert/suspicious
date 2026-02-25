@@ -127,28 +127,34 @@ class FinalEmailService:
         mapping = {
             "Dangerous": {
                 "result_color": "#FF0000",
-                "result_text": "As a conclusion, this case has been assessed as dangerous*.",
+                "result_text": f"As a conclusion, this case has been assessed as {self.case.resultsAI}/{self.case.categoryAI} (dangerous*).",
                 "result_description": (
                     "If applicable, do not open files or click links."
-                    "You may challenge the result "
+                    "You can access the "
+                    f"<a href='{online}'>Case Details</a>."
+                    " or challenge the result "
                     f"<a href='{self._challenge_url() or online}'>here</a>."
                 ),
             },
             "Suspicious": {
                 "result_color": "#FF9A00",
-                "result_text": "As a conclusion, this case has been assessed as suspicious*.",
+                "result_text": f"As a conclusion, this case has been assessed as {self.case.resultsAI}/{self.case.categoryAI} (suspicious*).",
                 "result_description": (
                     "Exercise caution when interacting with files or links."
-                    "You may challenge the result "
+                    "You can access the "
+                    f"<a href='{online}'>Case Details</a>."
+                    " or challenge the result "
                     f"<a href='{self._challenge_url() or online}'>here</a>."
                 ),
             },
             "Safe": {
                 "result_color": "#5EC27F",
-                "result_text": "As a conclusion, this case has been assessed as safe*.",
+                "result_text": f"As a conclusion, this case has been assessed as {self.case.resultsAI}/{self.case.categoryAI} (safe*).",
                 "result_description": (
                     "You may proceed safely, while remaining vigilant."
-                    "You may challenge the result "
+                    "You can access the "
+                    f"<a href='{online}'>Case Details</a>."
+                    " or challenge the result "
                     f"<a href='{self._challenge_url() or online}'>here</a>."
                 ),
             },
