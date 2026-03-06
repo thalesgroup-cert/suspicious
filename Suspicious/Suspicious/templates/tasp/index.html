@@ -57,10 +57,6 @@
               <label for="result" class="ml-5">Results</label>
               <input id="result" class="input" type="text" placeholder="" disabled />
             </th>
-            <th>
-              <label for="challenge" class="ml-5">Challenge</label>
-              <input id="challenge" class="input" type="text" placeholder="" disabled />
-            </th>
           </tr>
         </thead>
         <tbody id="table_body">
@@ -114,14 +110,6 @@
                 <td class="type has-text-centered" data-label="Type">Default</td>
               {% endif %}
               <td class="result has-text-centered" data-label="Result">{{case.results}}</td>
-              <td class="challenge has-text-centered" data-label="Challenge">
-                <div>
-                  {% if case.is_challengeable and not case.is_challenged %}
-                    <button class="button js-modal-challenge-triggers has-background-link has-text-white challengebtn" value="{{ case.id }}">Challenge</button>
-                  {% else %}
-                    <p>Not Challengeable</p>
-                  {% endif %}
-              </td>
             </tr>
           {% endfor %}
         </tbody>
