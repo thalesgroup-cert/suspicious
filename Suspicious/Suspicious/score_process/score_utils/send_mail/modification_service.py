@@ -93,13 +93,13 @@ class ModificationEmailService:
 
     # ------------------ context ------------------
 
-    def render_html(self, subject: str) -> str:
+    def render_html(self, subject: str, recipient_name: str) -> str:
         case_type = self._case_type()
         result = self._result_block(case_type)
 
         return self.template.render(
             subject=subject,
-            recipient_name=self.recipient_name,
+            recipient_name=recipient_name,
             company=self.config["group"],
             logos={
                 "company": self.config["logos"]["company"],

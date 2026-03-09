@@ -254,7 +254,7 @@ class AnalyzerAI(BaseAnalyzer):
                 try:
                     case = Case.objects.get(id=suspicious_case_id)
                     mail_id = str(case.fileOrMail.mail.mail_id)
-                    reporter_name = case.reporter
+                    reporter_name = case.reporter.username
 
                     zip_name = None
                     zip_bytes = None
