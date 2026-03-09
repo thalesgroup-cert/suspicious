@@ -1,42 +1,41 @@
 import axios from "axios";
 
-let accessToken: string | null = null;
+let accessToken: string | null = localStorage.getItem("token");
+
 export function setAccessToken(token: string | null) {
   accessToken = token;
+
+  if (token) {
+    localStorage.setItem("token", token);
+  } else {
+    localStorage.removeItem("token");
+  }
+}
+
+export function getAccessToken() {
+  return accessToken;
 }
 
 const baseURL = import.meta.env.VITE_API_BASE ?? "/api";
 
 export const api = axios.create({
   baseURL,
-  withCredentials: true
+  withCredentials: true,
 });
 
 api.interceptors.request.use((config) => {
-  if (accessToken) config.headers.Authorization = `Bearer ${accessToken}`;
+  if (accessToken) {
+    config.headers.Authorization = `Token ${accessToken}`;
+  }
   return config;
 });
 
-let refreshing: Promise<void> | null = null;
-
 api.interceptors.response.use(
-  (r) => r,
+  (response) => response,
   async (error) => {
-    const original = error.config;
-    if (error.response?.status !== 401 || original?._retry) throw error;
-
-    original._retry = true;
-
-    if (!refreshing) {
-      refreshing = api
-        .post("/auth/refresh/")
-        .then((res) => setAccessToken(res.data.access))
-        .finally(() => {
-          refreshing = null;
-        });
+    if (error.response?.status === 401) {
+      setAccessToken(null);
     }
-
-    await refreshing;
-    return api(original);
+    throw error;
   }
 );

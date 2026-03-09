@@ -40,34 +40,6 @@ function getMonthWindow(month: number, year: number, windowSize: number) {
   return out.reverse();
 }
 
-function makeMockDashboard(month: number, year: number, scope: string): DashboardSummary {
-  return {
-    month,
-    year,
-    scope,
-    kpis: { new_users: 42, total_reporters: 1840, total_cases: 612 },
-    danger_counts: {
-      failure: 4,
-      safe: 210,
-      inconclusive: 78,
-      suspicious: 185,
-      dangerous: 92,
-      malicious: 43,
-    },
-    top_prefixes: [
-      { label: "paypal", value: 64 },
-      { label: "microsoft", value: 58 },
-      { label: "docusign", value: 51 },
-      { label: "google", value: 45 },
-      { label: "amazon", value: 39 },
-      { label: "fedex", value: 36 },
-      { label: "security", value: 31 },
-      { label: "invoice", value: 29 },
-      { label: "hr", value: 22 },
-      { label: "it-support", value: 18 },
-    ],
-  };
-}
 
 const EMPTY_SUMMARY: DashboardSummary = {
   month: 1,
@@ -79,8 +51,7 @@ const EMPTY_SUMMARY: DashboardSummary = {
     safe: 0,
     inconclusive: 0,
     suspicious: 0,
-    dangerous: 0,
-    malicious: 0,
+    dangerous: 0
   },
   top_prefixes: [],
 };
@@ -104,39 +75,14 @@ export default function DashboardPage() {
   const isCiso = groups.includes("CISO");
   const isElevated = groups.includes("CISO") || groups.includes("CERT");
   const cisoScope: string | undefined = (meQuery.data as any)?.ciso_scope;
-
-  const useMockDashboard = import.meta.env.VITE_USE_MOCK_DASHBOARD === "true";
   const effectiveScope = isCiso ? scope : "ALL";
 
   const summaryQuery = useQuery<DashboardSummary>({
-    queryKey: ["dashboardSummary", month, year, effectiveScope, useMockDashboard],
+    queryKey: ["dashboardSummary", month, year, effectiveScope],
     queryFn: async () => {
-      if (useMockDashboard) {
-        await new Promise((r) => setTimeout(r, 250));
-        return makeMockDashboard(month, year, effectiveScope);
-      }
       return getDashboardSummary({ month, year, scope: effectiveScope });
     },
-    enabled: useMockDashboard ? true : !!meQuery.data,
     retry: false,
-    initialData: () =>
-      useMockDashboard
-        ? makeMockDashboard(month, year, effectiveScope)
-        : {
-            month,
-            year,
-            scope: effectiveScope,
-            kpis: { new_users: 0, total_reporters: 0, total_cases: 0 },
-            danger_counts: {
-              failure: 0,
-              safe: 0,
-              inconclusive: 0,
-              suspicious: 0,
-              dangerous: 0,
-              malicious: 0,
-            },
-            top_prefixes: [],
-          },
   });
 
   // IMPORTANT: hooks must be above conditional returns.
@@ -154,27 +100,10 @@ export default function DashboardPage() {
 
   const historyQueries = useQueries({
     queries: historyParams.map(({ month: hm, year: hy }) => ({
-      queryKey: ["dashboardSummary", hm, hy, effectiveScope, useMockDashboard, "history"],
+      queryKey: ["dashboardSummary", hm, hy, effectiveScope, "history"],
       queryFn: async () => {
-        if (useMockDashboard) {
-          await new Promise((r) => setTimeout(r, 60));
-          const mod = (hm + hy) % 20;
-          return {
-            month: hm,
-            year: hy,
-            scope: effectiveScope,
-            kpis: {
-              new_users: 20 + mod,
-              total_reporters: 1000 + mod * 10,
-              total_cases: 300 + mod * 5,
-            },
-            danger_counts: { failure: 0, safe: 0, inconclusive: 0, suspicious: 0, dangerous: 0, malicious: 0 },
-            top_prefixes: [],
-          } as DashboardSummary;
-        }
         return getDashboardSummary({ month: hm, year: hy, scope: effectiveScope });
       },
-      enabled: useMockDashboard ? true : !!meQuery.data,
       retry: false,
       staleTime: 30_000,
     })),
@@ -304,65 +233,10 @@ export default function DashboardPage() {
           >
             <Box sx={{ display: "grid", gap: 2 }}>
               <TopPrefixesPanel data={filteredTop} />
-              <RankedPrefixesTable data={filteredTop} search={prefixSearch} onSearchChange={setPrefixSearch} />
             </Box>
 
             <Box sx={{ display: "grid", gap: 2 }}>
               <ThreatDistributionPanel dangerCounts={data.danger_counts} />
-
-              <Box
-                sx={{
-                  borderRadius: 3,
-                  border: "1px solid",
-                  borderColor: "divider",
-                  bgcolor: "background.paper",
-                  p: 2,
-                }}
-              >
-                <Box sx={{ fontWeight: 900, fontSize: 14, mb: 0.5 }}>Quick actions</Box>
-                <Box sx={{ color: "text.secondary", fontSize: 12, mb: 1.5 }}>
-                  Actions depend on routes/endpoints. These are placeholders.
-                </Box>
-
-                <Box sx={{ display: "grid", gap: 1 }}>
-                  <Box
-                    component="button"
-                    disabled
-                    style={{
-                      width: "100%",
-                      textAlign: "left",
-                      padding: "10px 12px",
-                      borderRadius: 12,
-                      border: "1px solid rgba(255,255,255,0.12)",
-                      background: "transparent",
-                      color: "inherit",
-                      cursor: "not-allowed",
-                      opacity: 0.7,
-                      font: "inherit",
-                    }}
-                  >
-                    View cases (TODO)
-                  </Box>
-                  <Box
-                    component="button"
-                    disabled
-                    style={{
-                      width: "100%",
-                      textAlign: "left",
-                      padding: "10px 12px",
-                      borderRadius: 12,
-                      border: "1px solid rgba(255,255,255,0.12)",
-                      background: "transparent",
-                      color: "inherit",
-                      cursor: "not-allowed",
-                      opacity: 0.7,
-                      font: "inherit",
-                    }}
-                  >
-                    Export report (TODO)
-                  </Box>
-                </Box>
-              </Box>
             </Box>
           </Box>
         </Box>

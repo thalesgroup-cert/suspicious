@@ -1,6 +1,7 @@
 // file: src/features/dashboard/components/ThreatDistributionPanel.tsx
 import * as React from "react";
-import { Box, Chip, Divider, Stack, Typography } from "@mui/material";
+import { Box, Card, CardContent, Chip, Divider, Stack, Typography } from "@mui/material";
+import { ShieldOutlined } from "@mui/icons-material";
 import { Cell, Pie, PieChart, ResponsiveContainer, Tooltip as RechartsTooltip } from "recharts";
 
 type DangerCounts = {
@@ -9,20 +10,17 @@ type DangerCounts = {
   inconclusive: number;
   suspicious: number;
   dangerous: number;
-  malicious: number;
 };
 
-const DANGER_ORDER = ["Failure", "Safe", "Inconclusive", "Suspicious", "Dangerous", "Malicious"] as const;
+const DANGER_ORDER = ["Failure", "Safe", "Inconclusive", "Suspicious", "Dangerous"] as const;
 type DangerLabel = (typeof DANGER_ORDER)[number];
 
-// Same palette as HomePage. If you want to avoid hardcoding, move these into theme tokens later.
 const DANGER_COLORS: Record<DangerLabel, string> = {
-  Failure: "#64748B", // slate
-  Safe: "#22C55E", // green
-  Inconclusive: "#A3A3A3", // neutral
-  Suspicious: "#F59E0B", // amber
-  Dangerous: "#F97316", // orange
-  Malicious: "#EF4444", // red
+  Failure: "#64748B",
+  Safe: "#22C55E",
+  Inconclusive: "#A3A3A3",
+  Suspicious: "#F59E0B",
+  Dangerous: "#EF4444",
 };
 
 function sum(values: number[]) {
@@ -39,30 +37,113 @@ function toDonut(d: DangerCounts) {
     .filter((x) => x.value > 0);
 }
 
-export default function ThreatDistributionPanel(props: { dangerCounts: DangerCounts }) {
-  const donut = React.useMemo(() => toDonut(props.dangerCounts), [props.dangerCounts]);
-  const total = React.useMemo(() => sum(donut.map((d) => d.value)), [donut]);
+function GlassCard(props: React.PropsWithChildren<{
+  title: string;
+  icon?: React.ReactNode;
+  right?: React.ReactNode;
+}>) {
+  return (
+    <Card
+      sx={{
+        borderRadius: 3,
+        border: "1px solid rgba(255,255,255,.10)",
+        background: "linear-gradient(180deg, rgba(255,255,255,.06), rgba(255,255,255,.03))",
+      }}
+    >
+      <CardContent sx={{ p: { xs: 1.5, md: 2 } }}>
+        <Stack direction="row" alignItems="center" justifyContent="space-between" sx={{ mb: 1 }}>
+          <Stack direction="row" spacing={0.9} alignItems="center">
+            <Box
+              sx={{
+                width: 34,
+                height: 34,
+                borderRadius: 2,
+                display: "grid",
+                placeItems: "center",
+                border: "1px solid rgba(255,255,255,.12)",
+                background:
+                  "linear-gradient(135deg, rgba(56,189,248,.14), rgba(120,119,198,.12))",
+                "& svg": { fontSize: 18 },
+              }}
+            >
+              {props.icon}
+            </Box>
+            <Typography fontWeight={900} fontSize={15}>
+              {props.title}
+            </Typography>
+          </Stack>
+          {props.right}
+        </Stack>
 
-  const danger = props.dangerCounts;
+        <Divider sx={{ opacity: 0.25, mb: 1.5 }} />
+        {props.children}
+      </CardContent>
+    </Card>
+  );
+}
+
+function ThreatTooltip({
+  active,
+  payload,
+}: {
+  active?: boolean;
+  payload?: Array<{ name?: string; value?: number; color?: string }>;
+}) {
+  if (!active || !payload?.length) return null;
+
+  const item = payload[0];
+  const label = item?.name ?? "Unknown";
+  const value = item?.value ?? 0;
+  const color = item?.color ?? "#94A3B8";
 
   return (
     <Box
       sx={{
-        borderRadius: 3,
-        border: "1px solid",
-        borderColor: "divider",
-        bgcolor: "background.paper",
-        p: 2,
+        background: "rgba(15,23,42,0.95)",
+        border: "1px solid rgba(255,255,255,0.12)",
+        borderRadius: 2,
+        px: 1.25,
+        py: 1,
+        backdropFilter: "blur(6px)",
+        minWidth: 130,
       }}
     >
-      <Stack direction="row" alignItems="center" justifyContent="space-between" sx={{ mb: 1 }}>
-        <Typography sx={{ fontWeight: 900, fontSize: 14 }}>Threat distribution</Typography>
-        <Chip size="small" label="Monthly" variant="outlined" />
-      </Stack>
+      <Typography
+        sx={{
+          fontSize: 12,
+          fontWeight: 700,
+          color: "#E2E8F0",
+          mb: 0.5,
+        }}
+      >
+        {label}
+      </Typography>
 
-      <Divider sx={{ mb: 1.5, opacity: 0.35 }} />
+      <Typography
+        sx={{
+          fontSize: 12,
+          fontWeight: 600,
+          color,
+        }}
+      >
+        Value: {typeof value === "number" ? value.toLocaleString() : "—"}
+      </Typography>
+    </Box>
+  );
+}
 
-      <Box sx={{ height: 220 }}>
+export default function ThreatDistributionPanel(props: { dangerCounts: DangerCounts }) {
+  const donut = React.useMemo(() => toDonut(props.dangerCounts), [props.dangerCounts]);
+  const total = React.useMemo(() => sum(donut.map((d) => d.value)), [donut]);
+  const danger = props.dangerCounts;
+
+  return (
+    <GlassCard
+      title="Threat distribution"
+      icon={<ShieldOutlined />}
+      right={<Chip size="small" label="Monthly" variant="outlined" />}
+    >
+      <Box sx={{ height: 240 }}>
         {donut.length ? (
           <ResponsiveContainer width="100%" height="100%">
             <PieChart>
@@ -70,8 +151,8 @@ export default function ThreatDistributionPanel(props: { dangerCounts: DangerCou
                 data={donut}
                 dataKey="value"
                 nameKey="name"
-                innerRadius={62}
-                outerRadius={86}
+                innerRadius={66}
+                outerRadius={90}
                 isAnimationActive={false}
                 stroke="rgba(255,255,255,.10)"
                 strokeWidth={1}
@@ -81,17 +162,18 @@ export default function ThreatDistributionPanel(props: { dangerCounts: DangerCou
                 ))}
               </Pie>
 
-              {/* center total */}
-              <text x="50%" y="48%" textAnchor="middle" dominantBaseline="central">
-                <tspan style={{ fontWeight: 950, fontSize: 22, fill: "white" }}>{total}</tspan>
+              <text x="50%" y="47%" textAnchor="middle" dominantBaseline="central">
+                <tspan style={{ fontWeight: 950, fontSize: 24, fill: "currentColor" }}>
+                  {total}
+                </tspan>
               </text>
               <text x="50%" y="60%" textAnchor="middle" dominantBaseline="central">
-                <tspan style={{ opacity: 0.75, fontSize: 12, fill: "white" }}>signals</tspan>
+                <tspan style={{ opacity: 0.72, fontSize: 12, fill: "currentColor" }}>
+                  signals
+                </tspan>
               </text>
 
-              <RechartsTooltip
-                formatter={(v: any) => (typeof v === "number" ? v.toLocaleString() : "—")}
-              />
+              <RechartsTooltip content={<ThreatTooltip />} />
             </PieChart>
           </ResponsiveContainer>
         ) : (
@@ -103,7 +185,7 @@ export default function ThreatDistributionPanel(props: { dangerCounts: DangerCou
         )}
       </Box>
 
-      <Stack spacing={0.6} sx={{ mt: 1 }}>
+      <Stack spacing={0.7} sx={{ mt: 1 }}>
         {(DANGER_ORDER as readonly DangerLabel[]).map((label) => {
           const key = label.toLowerCase() as keyof DangerCounts;
           const value = (danger[key] ?? 0) as number;
@@ -127,12 +209,12 @@ export default function ThreatDistributionPanel(props: { dangerCounts: DangerCou
               </Stack>
 
               <Typography variant="body2" sx={{ fontWeight: 900 }}>
-                {value}
+                {value.toLocaleString()}
               </Typography>
             </Stack>
           );
         })}
       </Stack>
-    </Box>
+    </GlassCard>
   );
 }

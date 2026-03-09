@@ -17,7 +17,7 @@ export default function TopPrefixesPanel(props: { data: PrefixItem[] }) {
       }}
     >
       <Stack direction="row" alignItems="center" justifyContent="space-between" sx={{ mb: 1 }}>
-        <Typography sx={{ fontWeight: 900, fontSize: 14 }}>Top prefixes</Typography>
+        <Typography sx={{ fontWeight: 900, fontSize: 14 }}>Top 10</Typography>
         <Chip size="small" label="Top 10" variant="outlined" />
       </Stack>
 
@@ -41,10 +41,6 @@ export default function TopPrefixesPanel(props: { data: PrefixItem[] }) {
             </Typography>
           </Stack>
         )}
-      </Box>
-
-      <Box sx={{ mt: 1, color: "text.secondary", fontSize: 12 }}>
-        Tip: use the ranked table below for search + quick actions.
       </Box>
     </Box>
   );

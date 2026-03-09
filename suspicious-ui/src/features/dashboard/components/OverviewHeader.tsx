@@ -58,7 +58,6 @@ export default function OverviewHeader(props: {
         borderBottom: "1px solid",
         borderColor: "divider",
         backdropFilter: "blur(14px)",
-        bgcolor: "rgba(11,16,32,.72)",
       }}
     >
       <Box sx={{ px: { xs: 2, md: 3 }, py: 1.5 }}>
@@ -67,17 +66,6 @@ export default function OverviewHeader(props: {
             <Typography variant="h5" sx={{ fontWeight: 950, letterSpacing: -0.4, lineHeight: 1.1 }}>
               {props.title}
             </Typography>
-            <Typography variant="body2" color="text.secondary" sx={{ mt: 0.25 }}>
-              {props.subtitle}
-            </Typography>
-
-            <Stack direction="row" spacing={1} sx={{ mt: 1, flexWrap: "wrap" }}>
-              <Chip size="small" label="Monthly view" variant="outlined" />
-              <Chip size="small" label="Security KPIs" variant="outlined" />
-              {props.isCiso ? <Chip size="small" label={`Scope: ${props.scope}`} variant="outlined" /> : null}
-              {!props.isElevated ? <Chip size="small" label="Time locked" variant="outlined" /> : null}
-              <Chip size="small" label={`Trend: ${props.trendWindow}m`} variant="outlined" />
-            </Stack>
           </Box>
 
           <Stack direction="row" spacing={1} alignItems="center">

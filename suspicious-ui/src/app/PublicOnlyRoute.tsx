@@ -6,17 +6,26 @@ type Props = {
   children: React.ReactElement;
 };
 
-export default function ProtectedRoute({ children }: Props) {
+export default function PublicOnlyRoute({ children }: Props) {
+  const token = localStorage.getItem("token");
+
   const { data, isLoading, isError } = useQuery({
     queryKey: ["me"],
     queryFn: getMe,
     retry: false,
+    enabled: !!token,
   });
 
-  if (isLoading) return null;
+  if (!token) {
+    return children;
+  }
 
-  if (isError || !data) {
-    return <Navigate to="/login" replace />;
+  if (isLoading) {
+    return <div>Loading...</div>;
+  }
+
+  if (!isError && data) {
+    return <Navigate to="/" replace />;
   }
 
   return children;

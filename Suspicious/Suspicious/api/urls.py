@@ -1,5 +1,10 @@
 from django.urls import path
 from .views import (
+    # Authentication
+    LogoutView,
+    LoginView,
+    MeView,
+
     # Monthly global stats
     MonthlyCasesSummaryListView,
     MonthlyCasesSummaryAggregateView,
@@ -10,6 +15,17 @@ from .views import (
     UserCasesMonthlyStatsListView,
     UserCasesMonthlyStatsDetailView,
     UserCasesMonthlyStatsAggregateView,
+    
+    # Dashboard stats
+    DashboardSummaryView,
+    
+    # Dashboard Campaigns stats
+    CampaignClassificationCountsView,
+    CampaignPcaView,
+    CampaignMailVolumeView,
+    
+    # Home stats
+    HomeSummaryView,
 
     # Downloads
     DownloadCaseArchiveView,
@@ -19,6 +35,14 @@ from drf_spectacular.views import SpectacularAPIView, SpectacularSwaggerView
 urlpatterns = [
     path("schema/", SpectacularAPIView.as_view(), name="schema"),
     path("docs/", SpectacularSwaggerView.as_view(url_name="schema"), name="swagger-ui"),
+
+    # ------------------------------------------------------------------
+    # Authentication
+    # ------------------------------------------------------------------
+    path("auth/login/", LoginView.as_view(), name="login"),
+    path("auth/logout/", LogoutView.as_view(), name="logout"),
+    path("auth/me/", MeView.as_view(), name="me"),
+
     # ------------------------------------------------------------------
     # Global monthly statistics
     # ------------------------------------------------------------------
@@ -74,5 +98,42 @@ urlpatterns = [
         "cases/<int:case_id>/challenge",
         CaseChallengeTokenView.as_view(),
         name="case-challenge",
+    ),
+    
+    # ------------------------------------------------------------------
+    # Dashboard summary
+    # ------------------------------------------------------------------
+    path(
+        "dashboard/summary/",
+        DashboardSummaryView.as_view(),
+        name="dashboard-summary",
+    ),
+    
+    # ------------------------------------------------------------------
+    # Dashboard Campaigns stats
+    # ------------------------------------------------------------------
+    path(
+        "campaigns/classification-counts/",
+        CampaignClassificationCountsView.as_view(),
+        name="campaign-classification-counts",
+    ),
+    path(
+        "campaigns/pca/",
+        CampaignPcaView.as_view(),
+        name="campaign-pca",
+    ),
+    path(
+        "campaigns/mail-volume/",
+        CampaignMailVolumeView.as_view(),
+        name="campaign-mail-volume",
+    ),
+
+    # ------------------------------------------------------------------
+    # Home summary
+    # ------------------------------------------------------------------
+    path(
+        "home/summary/",
+        HomeSummaryView.as_view(),
+        name="home-summary",
     ),
 ]

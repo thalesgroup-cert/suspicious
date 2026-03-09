@@ -73,6 +73,8 @@ services:
     - "127.0.0.1:${SUSPICIOUS_UI_PORT}:80"
     init: true
     restart: unless-stopped
+    environment:
+      no_proxy: "${NO_PROXY},suspicious"
     networks:
       - suspicious_network
 

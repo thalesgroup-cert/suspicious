@@ -20,7 +20,6 @@ import {
 import { useNavigate } from "react-router-dom";
 import { useQuery } from "@tanstack/react-query";
 import { getMe, login } from "@/api/auth";
-import { setAccessToken } from "@/api/client";
 
 const COMPANY_NAME = import.meta.env.VITE_COMPANY_NAME ?? "Company";
 const COMPANY_LINK = import.meta.env.VITE_COMPANY_LINK ?? "/";
@@ -97,7 +96,6 @@ function BrandHeader() {
 export default function LoginPage() {
   const navigate = useNavigate();
 
-  // Hooks (stable order)
   const [username, setUsername] = React.useState("");
   const [password, setPassword] = React.useState("");
   const [showPassword, setShowPassword] = React.useState(false);
@@ -111,11 +109,10 @@ export default function LoginPage() {
   });
 
   React.useEffect(() => {
-    if (me) navigate("/dashboard", { replace: true });
+    if (me) navigate("/", { replace: true });
   }, [me, navigate]);
 
   function onSSO() {
-    // backend-initiated redirect to IdP
     window.location.assign("/oidc/login/");
   }
 
@@ -125,9 +122,8 @@ export default function LoginPage() {
     setLoading(true);
 
     try {
-      const res = await login({ username, password });
-      if (res.access) setAccessToken(res.access);
-      navigate("/dashboard", { replace: true });
+      await login(username, password);
+      navigate("/", { replace: true });
     } catch (err: any) {
       const msg =
         err?.response?.data?.detail ||
@@ -161,7 +157,6 @@ export default function LoginPage() {
         bgcolor: "background.default",
       }}
     >
-      {/* Background */}
       <Box
         aria-hidden
         sx={{
@@ -188,7 +183,6 @@ export default function LoginPage() {
         }}
       />
 
-      {/* Card */}
       <Box
         sx={{
           width: "100%",

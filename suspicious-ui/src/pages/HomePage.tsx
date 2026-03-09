@@ -38,23 +38,36 @@ import { useMutation, useQuery } from "@tanstack/react-query";
 import { useTheme } from "@mui/material/styles";
 import { api } from "@/api/client";
 import { getMe, type Me } from "@/api/auth";
-import { Cell, Pie, PieChart, ResponsiveContainer, Tooltip as RechartsTooltip } from "recharts";
+import {
+  Cell,
+  Pie,
+  PieChart,
+  ResponsiveContainer,
+  Tooltip as RechartsTooltip,
+} from "recharts";
 
-// Reuse shared chips (same as Submissions/Investigation)
 import { StatusChip } from "@/shared/components/StatusChip";
 import { ResultChip } from "@/shared/components/ResultChip";
+
+type DangerCounts = {
+  safe?: number;
+  inconclusive?: number;
+  suspicious?: number;
+  dangerous?: number;
+};
 
 type HomeSummary = {
   show_scope_modal: boolean;
   monthly: {
     everyone_items?: number;
     scope_items?: number;
-    scope_name?: string;
+    scope_name?: string | null;
   };
+  danger_counts?: DangerCounts;
   suggested_scopes?: {
-    region?: string;
-    country?: string;
-    gbu?: string;
+    region?: string | null;
+    country?: string | null;
+    gbu?: string | null;
   };
   spotlight?: {
     title: string;
@@ -64,14 +77,42 @@ type HomeSummary = {
   };
 };
 
-async function getHomeSummary(): Promise<HomeSummary> {
-  const res = await api.get("/home/summary/");
+async function getHomeSummary(params?: {
+  month?: number;
+  year?: number;
+}): Promise<HomeSummary> {
+  const res = await api.get("/home/summary/", { params });
   return res.data;
 }
 
 async function setCisoScope(input: { scope: string }): Promise<{ scope: string }> {
   const res = await api.post("/home/ciso/scope/", input);
   return res.data;
+}
+
+type SubmissionRow = {
+  id: number | string;
+  status?: string;
+  info?: string;
+  created_at?: string;
+  tests_done?: number;
+  type?: string;
+  result?: string;
+};
+
+type SubmissionsResponse = {
+  results?: SubmissionRow[];
+  count?: number;
+};
+
+async function getMyRecentSubmissions(): Promise<SubmissionRow[]> {
+  const res = await api.get("/submissions/", {
+    params: { mine: 1, page_size: 3, ordering: "-created_at" },
+  });
+
+  const data = res.data as SubmissionsResponse | SubmissionRow[];
+  if (Array.isArray(data)) return data.slice(0, 3);
+  return (data.results ?? []).slice(0, 3);
 }
 
 function short(text: string | undefined, max = 64) {
@@ -84,7 +125,11 @@ function fmtDate(iso: string | undefined) {
   if (!iso) return "—";
   const d = new Date(iso);
   if (Number.isNaN(d.getTime())) return "—";
-  return d.toLocaleString(undefined, { year: "numeric", month: "short", day: "2-digit" });
+  return d.toLocaleString(undefined, {
+    year: "numeric",
+    month: "short",
+    day: "2-digit",
+  });
 }
 
 function sum(values: number[]) {
@@ -115,7 +160,8 @@ function SurfaceCard(props: React.PropsWithChildren<{ sx?: Record<string, unknow
       sx={{
         borderRadius: 4,
         border: "1px solid rgba(255,255,255,.08)",
-        background: "linear-gradient(180deg, rgba(255,255,255,.05), rgba(255,255,255,.02))",
+        background:
+          "linear-gradient(180deg, rgba(255,255,255,.05), rgba(255,255,255,.02))",
         ...props.sx,
       }}
     >
@@ -126,7 +172,12 @@ function SurfaceCard(props: React.PropsWithChildren<{ sx?: Record<string, unknow
 
 function SectionTitle(props: { title: string; right?: React.ReactNode }) {
   return (
-    <Stack direction="row" alignItems="center" justifyContent="space-between" sx={{ mb: 1 }}>
+    <Stack
+      direction="row"
+      alignItems="center"
+      justifyContent="space-between"
+      sx={{ mb: 1 }}
+    >
       <Typography fontWeight={950} letterSpacing={-0.2}>
         {props.title}
       </Typography>
@@ -135,127 +186,51 @@ function SectionTitle(props: { title: string; right?: React.ReactNode }) {
   );
 }
 
-/** Donut data: expected to match your dashboard's danger breakdown. */
-type DangerCounts = {
-  safe?: number;
-  inconclusive?: number;
-  suspicious?: number;
-  dangerous?: number;
-};
-
-type DashboardSummaryForDonut = {
-  danger?: DangerCounts;
-};
-
-async function getDashboardSummaryForDonut(): Promise<DashboardSummaryForDonut> {
-  const res = await api.get("/dashboard/summary/");
-  return res.data;
-}
-
 const DANGER_ORDER = ["Safe", "Inconclusive", "Suspicious", "Dangerous"] as const;
 type DangerLabel = (typeof DANGER_ORDER)[number];
 
-// Keep explicit fills for slices; center text is theme-aware below.
 const DANGER_COLORS: Record<DangerLabel, string> = {
   Safe: "#22C55E",
   Inconclusive: "#A3A3A3",
   Suspicious: "#F59E0B",
-  Dangerous: "#F97316",
+  Dangerous: "#EF4444",
 };
-
-/** Recent submissions: last 3 for current user. */
-type SubmissionRow = {
-  id: number | string;
-  status?: string;
-  info?: string;
-  created_at?: string;
-  tests_done?: number;
-  type?: string;
-  result?: string;
-};
-
-type SubmissionsResponse = {
-  results?: SubmissionRow[];
-  count?: number;
-};
-
-async function getMyRecentSubmissions(): Promise<SubmissionRow[]> {
-  const res = await api.get("/submissions/", {
-    params: { mine: 1, page_size: 3, ordering: "-created_at" },
-  });
-
-  const data = res.data as SubmissionsResponse | SubmissionRow[];
-  if (Array.isArray(data)) return data.slice(0, 3);
-  return (data.results ?? []).slice(0, 3);
-}
 
 export default function HomePage() {
   const navigate = useNavigate();
   const theme = useTheme();
 
   const BADGE_W = 132;
-
-  // If your wrapper/main adds padding-top (eg 72px), cancel it locally here.
-  // Adjust if your appbar/toolbar height differs.
   const TOP_OFFSET = 50;
 
-  // ---- Hooks: always run ----
   const [scopeChoice, setScopeChoice] = React.useState("");
 
-  const useMockMe = import.meta.env.VITE_USE_MOCK_ME === "true";
+  const now = React.useMemo(() => new Date(), []);
+  const currentMonth = now.getMonth() + 1;
+  const currentYear = now.getFullYear();
 
   const meQuery = useQuery<Me>({
     queryKey: ["me"],
     queryFn: getMe,
     retry: false,
-    enabled: !useMockMe,
   });
 
-  const me: Me | undefined = useMockMe
-    ? {
-        id: 1,
-        username: "mockuser",
-        first_name: "Mock",
-        last_name: "User",
-        email: "mockuser@example.com",
-        groups: ["CISO", "CERT"],
-        ciso_scope: "EU",
-      }
-    : meQuery.data;
-
+  const me = meQuery.data;
   const groups = me?.groups ?? [];
   const isCiso = groups.includes("CISO");
   const isElevated = isCiso || groups.includes("CERT");
 
   const homeQuery = useQuery<HomeSummary>({
-    queryKey: ["homeSummary"],
-    queryFn: getHomeSummary,
+    queryKey: ["homeSummary", currentMonth, currentYear],
+    queryFn: () => getHomeSummary({ month: currentMonth, year: currentYear }),
     enabled: !!me,
-    retry: false,
-    initialData: {
-      show_scope_modal: false,
-      monthly: { everyone_items: 0, scope_items: 0, scope_name: me?.ciso_scope },
-      suggested_scopes: { region: "EU", country: "FR", gbu: "DEF" },
-      spotlight: {
-        title: "What’s new",
-        description: "New dashboard + SSO improvements are available, for more details check them out on the github page ",
-        cta_label: "Open dashboard",
-        cta_path: "/dashboard",
-      },
-    },
-  });
-
-  const donutQuery = useQuery<DashboardSummaryForDonut>({
-    queryKey: ["dashboardDonut"],
-    queryFn: getDashboardSummaryForDonut,
-    enabled: !!me && !useMockMe,
     retry: false,
   });
 
   const recentQuery = useQuery<SubmissionRow[]>({
     queryKey: ["myRecentSubmissions"],
     queryFn: getMyRecentSubmissions,
-    enabled: !!me && !useMockMe,
+    enabled: !!me,
     retry: false,
   });
 
@@ -263,12 +238,11 @@ export default function HomePage() {
     mutationFn: setCisoScope,
     onSuccess: () => {
       homeQuery.refetch();
-      if (!useMockMe) meQuery.refetch();
+      meQuery.refetch();
     },
   });
 
-  // ---- Render guards AFTER hooks ----
-  if (!useMockMe && meQuery.isLoading) {
+  if (meQuery.isLoading) {
     return (
       <Box sx={{ minHeight: "100vh", display: "grid", placeItems: "center" }}>
         <CircularProgress />
@@ -291,20 +265,16 @@ export default function HomePage() {
   const fullName = [me.first_name, me.last_name].filter(Boolean).join(" ");
   const displayName = fullName || me.username || "User";
 
-  const everyoneCount = home?.monthly.everyone_items ?? 0;
-  const scopeCount = home?.monthly.scope_items ?? 0;
-  const scopeLabel = me.ciso_scope ?? home?.monthly.scope_name;
+  const everyoneCount = home?.monthly?.everyone_items ?? 0;
+  const scopeCount = home?.monthly?.scope_items ?? 0;
+  const scopeLabel = home?.monthly?.scope_name || me.ciso_scope || undefined;
 
-  // ---- Donut (real -> fallback mock) ----
-  const useMockDonut = useMockMe || donutQuery.isError;
-  const danger: Required<DangerCounts> = useMockDonut
-    ? { safe: 41, inconclusive: 6, suspicious: 12, dangerous: 4 }
-    : {
-        safe: donutQuery.data?.danger?.safe ?? 0,
-        inconclusive: donutQuery.data?.danger?.inconclusive ?? 0,
-        suspicious: donutQuery.data?.danger?.suspicious ?? 0,
-        dangerous: donutQuery.data?.danger?.dangerous ?? 0,
-      };
+  const danger: Required<DangerCounts> = {
+    safe: home?.danger_counts?.safe ?? 0,
+    inconclusive: home?.danger_counts?.inconclusive ?? 0,
+    suspicious: home?.danger_counts?.suspicious ?? 0,
+    dangerous: home?.danger_counts?.dangerous ?? 0,
+  };
 
   const donut = (DANGER_ORDER as readonly DangerLabel[])
     .map((name) => {
@@ -315,59 +285,27 @@ export default function HomePage() {
     .filter((d) => d.value > 0);
 
   const donutTotal = sum(donut.map((d) => d.value));
-
   const donutTotalColor = theme.palette.text.primary;
   const donutLabelColor = theme.palette.text.secondary;
 
-  // ---- Recent submissions (real -> fallback mock) ----
-  const recent: SubmissionRow[] =
-    useMockMe || recentQuery.isError
-      ? [
-          {
-            id: 18421,
-            status: "DONE",
-            info: "Suspicious URL in invoice email (user clicked).",
-            created_at: new Date(Date.now() - 1000 * 60 * 60 * 3).toISOString(),
-            tests_done: 8,
-            type: "url",
-            result: "SUSPICIOUS",
-          },
-          {
-            id: 18418,
-            status: "IN_PROGRESS",
-            info: "Attachment flagged by gateway (possible macro).",
-            created_at: new Date(Date.now() - 1000 * 60 * 60 * 26).toISOString(),
-            tests_done: 3,
-            type: "file",
-            result: "INCONCLUSIVE",
-          },
-          {
-            id: 18402,
-            status: "IN_PROGRESS",
-            info: "Reported email: account takeover lure (MFA reset).",
-            created_at: new Date(Date.now() - 1000 * 60 * 60 * 72).toISOString(),
-            tests_done: 0,
-            type: "email",
-            result: "DANGEROUS",
-          },
-        ]
-      : recentQuery.data ?? [];
+  const recent = recentQuery.data ?? [];
 
   return (
     <Box
       sx={{
-        // page padding
         px: { xs: 2, md: 3 },
         pb: 8,
-
-        // cancel parent "padding-top: 72px" seen as .css-19gsy8e
         mt: `-${TOP_OFFSET}px`,
         pt: 0,
       }}
     >
       <Box sx={{ maxWidth: 1280, mx: "auto" }}>
-        {/* Header */}
-        <Stack direction={{ xs: "column", md: "row" }} spacing={1.5} sx={{ mb: 2 }} justifyContent="space-between">
+        <Stack
+          direction={{ xs: "column", md: "row" }}
+          spacing={1.5}
+          sx={{ mb: 2 }}
+          justifyContent="space-between"
+        >
           <Stack direction="row" spacing={1.5} alignItems="flex-start" sx={{ minWidth: 0 }}>
             <Box sx={{ minWidth: 0 }}>
               <Typography variant="h5" fontWeight={980} letterSpacing={-0.6} noWrap>
@@ -377,15 +315,20 @@ export default function HomePage() {
           </Stack>
         </Stack>
 
+        {homeQuery.isError ? (
+          <Box sx={{ mb: 2 }}>
+            <Alert severity="error">Home summary unavailable.</Alert>
+          </Box>
+        ) : null}
+
         <Grid container spacing={2}>
-          {/* Donut */}
           <Grid item xs={12} md={7}>
             <SurfaceCard sx={{ height: "100%" }}>
               <CardContent sx={{ p: { xs: 2.25, md: 3 } }}>
                 <SectionTitle title="Threat distribution" right={<Chip size="small" label="Monthly" />} />
 
                 <Box sx={{ height: 220 }}>
-                  {donutQuery.isLoading && !useMockDonut ? (
+                  {homeQuery.isLoading ? (
                     <Stack sx={{ height: "100%" }} alignItems="center" justifyContent="center">
                       <CircularProgress size={22} />
                     </Stack>
@@ -407,10 +350,22 @@ export default function HomePage() {
                           ))}
                         </Pie>
 
-                        <text x="50%" y="48%" textAnchor="middle" dominantBaseline="central" fill={donutTotalColor}>
+                        <text
+                          x="50%"
+                          y="48%"
+                          textAnchor="middle"
+                          dominantBaseline="central"
+                          fill={donutTotalColor}
+                        >
                           <tspan style={{ fontWeight: 950, fontSize: 22 }}>{donutTotal}</tspan>
                         </text>
-                        <text x="50%" y="60%" textAnchor="middle" dominantBaseline="central" fill={donutLabelColor}>
+                        <text
+                          x="50%"
+                          y="60%"
+                          textAnchor="middle"
+                          dominantBaseline="central"
+                          fill={donutLabelColor}
+                        >
                           <tspan style={{ fontSize: 12 }}>submissions</tspan>
                         </text>
 
@@ -431,7 +386,12 @@ export default function HomePage() {
                     const key = label.toLowerCase() as keyof DangerCounts;
                     const value = (danger[key] ?? 0) as number;
                     return (
-                      <Stack key={label} direction="row" justifyContent="space-between" alignItems="center">
+                      <Stack
+                        key={label}
+                        direction="row"
+                        justifyContent="space-between"
+                        alignItems="center"
+                      >
                         <Stack direction="row" spacing={1} alignItems="center">
                           <Box
                             aria-hidden
@@ -481,7 +441,6 @@ export default function HomePage() {
             </SurfaceCard>
           </Grid>
 
-          {/* Snapshot / Spotlight */}
           <Grid item xs={12} md={5}>
             <GlassCard sx={{ height: "100%" }}>
               <CardContent sx={{ p: { xs: 2.25, md: 3 } }}>
@@ -496,7 +455,8 @@ export default function HomePage() {
                           display: "grid",
                           placeItems: "center",
                           border: "1px solid rgba(255,255,255,.12)",
-                          background: "linear-gradient(135deg, rgba(56,189,248,.14), rgba(120,119,198,.12))",
+                          background:
+                            "linear-gradient(135deg, rgba(56,189,248,.14), rgba(120,119,198,.12))",
                         }}
                       >
                         <ShieldOutlined />
@@ -509,7 +469,11 @@ export default function HomePage() {
                       </Box>
                     </Stack>
 
-                    <Chip size="small" label={isCiso ? "Scoped" : "Global"} variant="outlined" />
+                    <Chip
+                      size="small"
+                      label={isCiso ? "Scoped" : "Global"}
+                      variant="outlined"
+                    />
                   </Stack>
 
                   <Stack spacing={0.5}>
@@ -551,6 +515,15 @@ export default function HomePage() {
                         <Typography color="text.secondary" variant="body2">
                           {home.spotlight.description}
                         </Typography>
+                        <Box>
+                          <Button
+                            variant="outlined"
+                            onClick={() => navigate(home.spotlight!.cta_path)}
+                            sx={{ borderRadius: 3, textTransform: "none", fontWeight: 900 }}
+                          >
+                            {home.spotlight.cta_label}
+                          </Button>
+                        </Box>
                       </Stack>
                     </>
                   ) : null}
@@ -559,12 +532,16 @@ export default function HomePage() {
             </GlassCard>
           </Grid>
 
-          {/* Recent submissions */}
           <Grid item xs={12}>
             <GlassCard>
               <CardContent sx={{ p: 0 }}>
                 <Box sx={{ p: { xs: 2.25, md: 3 }, pb: 1.5 }}>
-                  <Stack direction="row" alignItems="center" justifyContent="space-between" spacing={1}>
+                  <Stack
+                    direction="row"
+                    alignItems="center"
+                    justifyContent="space-between"
+                    spacing={1}
+                  >
                     <Box>
                       <Typography variant="h6" fontWeight={950} letterSpacing={-0.2}>
                         Recent submissions
@@ -584,7 +561,7 @@ export default function HomePage() {
                   </Stack>
                 </Box>
 
-                {recentQuery.isLoading && !useMockMe ? (
+                {recentQuery.isLoading ? (
                   <Box sx={{ p: 3 }}>
                     <Stack direction="row" spacing={1} alignItems="center">
                       <CircularProgress size={18} />
@@ -592,6 +569,10 @@ export default function HomePage() {
                         Loading submissions…
                       </Typography>
                     </Stack>
+                  </Box>
+                ) : recentQuery.isError ? (
+                  <Box sx={{ p: 3 }}>
+                    <Alert severity="error">Recent submissions unavailable.</Alert>
                   </Box>
                 ) : recent.length === 0 ? (
                   <Box sx={{ p: 3 }}>
@@ -621,9 +602,9 @@ export default function HomePage() {
                                   size="small"
                                   variant="contained"
                                   component={RouterLink}
-                                  to={`/submissions?q=${encodeURIComponent(String(r.id))}&open=${encodeURIComponent(
+                                  to={`/submissions?q=${encodeURIComponent(
                                     String(r.id)
-                                  )}`}
+                                  )}&open=${encodeURIComponent(String(r.id))}`}
                                   sx={{ borderRadius: 3, textTransform: "none", fontWeight: 950 }}
                                 >
                                   {r.id}
@@ -633,9 +614,9 @@ export default function HomePage() {
                                   <IconButton
                                     size="small"
                                     component={RouterLink}
-                                    to={`/submissions?q=${encodeURIComponent(String(r.id))}&open=${encodeURIComponent(
+                                    to={`/submissions?q=${encodeURIComponent(
                                       String(r.id)
-                                    )}`}
+                                    )}&open=${encodeURIComponent(String(r.id))}`}
                                   >
                                     <OpenInNewOutlined fontSize="small" />
                                   </IconButton>
@@ -694,7 +675,6 @@ export default function HomePage() {
           </Grid>
         </Grid>
 
-        {/* CISO onboarding modal */}
         <Dialog open={showScopeModal} maxWidth="sm" fullWidth>
           <DialogTitle>Select your management scope</DialogTitle>
           <DialogContent>
@@ -714,7 +694,7 @@ export default function HomePage() {
                           icon={<PublicOutlined />}
                           label={`Region: ${suggested.region}`}
                           clickable
-                          onClick={() => setScopeChoice(suggested.region!)}
+                          onClick={() => setScopeChoice(suggested.region ?? "")}
                           variant={scopeChoice === suggested.region ? "filled" : "outlined"}
                         />
                       ) : null}
@@ -724,12 +704,21 @@ export default function HomePage() {
                           icon={<ApartmentOutlined />}
                           label={`Country: ${suggested.country}`}
                           clickable
-                          onClick={() => setScopeChoice(suggested.country!)}
+                          onClick={() => setScopeChoice(suggested.country ?? "")}
                           variant={scopeChoice === suggested.country ? "filled" : "outlined"}
                         />
                       ) : null}
 
-                      {!suggested.region && !suggested.country ? (
+                      {suggested.gbu ? (
+                        <Chip
+                          label={`GBU: ${suggested.gbu}`}
+                          clickable
+                          onClick={() => setScopeChoice(suggested.gbu ?? "")}
+                          variant={scopeChoice === suggested.gbu ? "filled" : "outlined"}
+                        />
+                      ) : null}
+
+                      {!suggested.region && !suggested.country && !suggested.gbu ? (
                         <Chip label="No suggestions" variant="outlined" />
                       ) : null}
                     </Stack>
@@ -738,7 +727,9 @@ export default function HomePage() {
                       You can change it later if your responsibilities change.
                     </Typography>
 
-                    {scopeMutation.isError ? <Alert severity="error">Failed to set scope.</Alert> : null}
+                    {scopeMutation.isError ? (
+                      <Alert severity="error">Failed to set scope.</Alert>
+                    ) : null}
                   </Stack>
                 </CardContent>
               </SurfaceCard>
