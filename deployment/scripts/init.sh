@@ -59,13 +59,8 @@ set +a
 echo "[3/11] Checking directory structure..."
 
 DIRS=(
-    "${ELASTIC_PATH}"
-    "${ELASTIC_PATH}/logs"
-    "${DB_SUSPICIOUS_PATH}"
-    "${MINIO_PATH}"
     "${CA_PATH}"
     "${CORTEX_PATH}"
-    "${CORTEX_PATH}/jobs"
     "${CORTEX_PATH}/Cortex-Analyzers-Public/analyzers"
     "${CORTEX_PATH}/Cortex-Analyzers-Public/responders"
     "${AIANALYZER_PATH}"
@@ -138,17 +133,17 @@ else
     echo "→ tls.yaml not present in Traefik dynamic path"
 fi
 
-# -------------------------------------------------
-# 5. Elasticsearch gc.log
-# -------------------------------------------------
-echo "[5/11] Checking Elasticsearch gc.log..."
-GC_LOG="${ELASTIC_PATH}/logs/gc.log"
-if [ ! -f "$GC_LOG" ]; then
-    touch "$GC_LOG"
-fi
-perm_log=$(stat -c '%a' "$GC_LOG")
-echo "→ Garbage Collector Log exists: $GC_LOG (permissions: $perm_log)"
-echo "→ gc.log OK"
+# # -------------------------------------------------
+# # 5. Elasticsearch gc.log
+# # -------------------------------------------------
+# echo "[5/11] Checking Elasticsearch gc.log..."
+# GC_LOG="${ELASTIC_PATH}/logs/gc.log"
+# if [ ! -f "$GC_LOG" ]; then
+#     touch "$GC_LOG"
+# fi
+# perm_log=$(stat -c '%a' "$GC_LOG")
+# echo "→ Garbage Collector Log exists: $GC_LOG (permissions: $perm_log)"
+# echo "→ gc.log OK"
 
 # -------------------------------------------------
 # 6. Cortex application.conf

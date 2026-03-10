@@ -32,12 +32,12 @@ services:
       https_proxy: "${HTTPS_PROXY}"
       no_proxy: "${NO_PROXY}"
       JAVA_OPTS: "-Djavax.net.ssl.trustStore=/etc/cortex/keystore.jks"
-      job_directory: "${CORTEX_PATH}/jobs"
+      job_directory: "/etc/jobs"
     volumes:
       # Certificates
       - "${CA_PATH}/keystore.jks:/etc/cortex/keystore.jks:ro"
       # Cortex config
-      - "cortex_jobs:${CORTEX_PATH}/jobs:Z"
+      - "cortex_jobs:/etc/jobs:Z"
       - "${CORTEX_PATH}/application.conf:/etc/cortex/application.conf:ro"
       - "${CORTEX_PATH}/application-cortex.log:/var/log/cortex/application.log:rw"
       # Docker configuration
