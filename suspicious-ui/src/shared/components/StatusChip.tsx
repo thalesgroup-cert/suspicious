@@ -16,6 +16,7 @@ const STATUS_META: Record<
   DONE: { label: "DONE", color: "success", icon: <CheckCircleOutlined fontSize="small" /> },
   FAILED: { label: "FAILED", color: "error", icon: <ErrorOutlineOutlined fontSize="small" /> },
   REJECTED: { label: "REJECTED", color: "error", icon: <ReportProblemOutlined fontSize="small" /> },
+  CHALLENGED: { label: "CHALLENGED", color: "warning", icon: <ReportProblemOutlined fontSize="small" /> },
   UNKNOWN: { label: "UNKNOWN", color: "default", icon: <ErrorOutlineOutlined fontSize="small" /> },
 };
 

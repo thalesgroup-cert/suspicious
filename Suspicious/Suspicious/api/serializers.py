@@ -5,6 +5,70 @@ from dashboard.models import (
     TotalCasesStats,
     UserCasesMonthlyStats
 )
+from profiles.models import UserProfile, CISOProfile, Theme
+from case_handler.models import Case
+
+
+class SubmissionListSerializer(serializers.ModelSerializer):
+    created_at = serializers.DateTimeField(source="creation_date", read_only=True)
+    tests_done = serializers.IntegerField(source="analysis_done", read_only=True)
+    result = serializers.CharField(source="results", read_only=True)
+    type = serializers.SerializerMethodField()
+    info = serializers.SerializerMethodField()
+
+    class Meta:
+        model = Case
+        fields = [
+            "id",
+            "status",
+            "info",
+            "created_at",
+            "tests_done",
+            "type",
+            "result",
+        ]
+
+    def get_type(self, obj):
+        if obj.fileOrMail_id:
+            linked = obj.fileOrMail
+            if linked:
+                if linked.mail_id:
+                    return "mail"
+                if linked.file_id:
+                    return "file"
+
+        if obj.nonFileIocs_id:
+            linked = obj.nonFileIocs
+            if linked:
+                if linked.url_id:
+                    return "url"
+                if linked.ip_id:
+                    return "ip"
+                if linked.hash_id:
+                    return "hash"
+
+        return "case"
+
+    def get_info(self, obj):
+        if obj.fileOrMail_id:
+            linked = obj.fileOrMail
+            if linked:
+                if linked.file_id and linked.file:
+                    return linked.file.file_path.name.split("/")[-1] or getattr(linked.file, "filename", "") or ""
+                if linked.mail_id and linked.mail:
+                    return getattr(linked.mail, "subject", "") or ""
+
+        if obj.nonFileIocs_id:
+            linked = obj.nonFileIocs
+            if linked:
+                if linked.url_id and linked.url:
+                    return getattr(linked.url, "address", "") or str(linked.url)
+                if linked.ip_id and linked.ip:
+                    return getattr(linked.ip, "address", "") or str(linked.ip)
+                if linked.hash_id and linked.hash:
+                    return getattr(linked.hash, "value", "") or getattr(linked.hash, "hash", "") or str(linked.hash)
+
+        return obj.description or ""
 
 class MonthlyCasesSummarySerializer(serializers.ModelSerializer):
     class Meta:
@@ -94,3 +158,59 @@ class CampaignMailVolumeResponseSerializer(serializers.Serializer):
     non_danger = serializers.ListField(child=serializers.IntegerField())
     dangerous = serializers.ListField(child=serializers.IntegerField())
     campaigns = CampaignMailVolumeBandSerializer(many=True)
+    
+
+class ProfileSerializer(serializers.Serializer):
+    function = serializers.CharField(allow_blank=True, required=False)
+    gbu = serializers.CharField(allow_blank=True, required=False)
+    country = serializers.CharField(allow_blank=True, required=False)
+    region = serializers.CharField(allow_blank=True, required=False)
+    wants_acknowledgement = serializers.BooleanField()
+    wants_results = serializers.BooleanField()
+    theme = serializers.ChoiceField(choices=Theme.choices)
+    auto_seasonal = serializers.BooleanField()
+
+
+class UpdatePreferencesSerializer(serializers.Serializer):
+    wants_acknowledgement = serializers.BooleanField()
+    wants_results = serializers.BooleanField()
+
+
+class UpdateAppearanceSerializer(serializers.Serializer):
+    theme = serializers.ChoiceField(choices=Theme.choices)
+    auto_seasonal = serializers.BooleanField(required=False)
+    
+    
+class HomeMonthlySerializer(serializers.Serializer):
+    everyone_items = serializers.IntegerField()
+    scope_items = serializers.IntegerField()
+    scope_name = serializers.CharField(allow_null=True, required=False)
+
+
+class HomeDangerCountsSerializer(serializers.Serializer):
+    safe = serializers.IntegerField()
+    inconclusive = serializers.IntegerField()
+    suspicious = serializers.IntegerField()
+    dangerous = serializers.IntegerField()
+
+
+class HomeSuggestedScopesSerializer(serializers.Serializer):
+    region = serializers.CharField(allow_null=True, required=False)
+    country = serializers.CharField(allow_null=True, required=False)
+    gbu = serializers.CharField(allow_null=True, required=False)
+
+
+class HomeSpotlightSerializer(serializers.Serializer):
+    title = serializers.CharField()
+    description = serializers.CharField()
+    cta_label = serializers.CharField()
+    cta_path = serializers.CharField()
+
+
+class HomeSummaryResponseSerializer(serializers.Serializer):
+    show_scope_modal = serializers.BooleanField()
+    monthly = HomeMonthlySerializer()
+    danger_counts = HomeDangerCountsSerializer()
+    scope_danger_counts = HomeDangerCountsSerializer(allow_null=True)
+    suggested_scopes = HomeSuggestedScopesSerializer()
+    spotlight = HomeSpotlightSerializer()

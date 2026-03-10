@@ -42,6 +42,13 @@
         "yara_analyzer" : "Yara_Boosted_3_2",
         "file_info_analyzer" : "FileInfo_8_0"
     },
+    "chromadb": {
+        "url": "http://chromadb:8000",
+        "host": "chromadb",
+        "port": 8000,
+        "collection_name": "suspicious_emails",
+        "chroma_verify_ssl": false
+    },
     "company_domains": [
         "testgroup.com"
     ],

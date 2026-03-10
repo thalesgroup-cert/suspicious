@@ -26,6 +26,14 @@ from .views import (
     
     # Home stats
     HomeSummaryView,
+    
+    # Submissions
+    SubmissionListView,
+    
+    # Profile
+    ProfileView,
+    ProfilePreferencesView,
+    ProfileAppearanceView,
 
     # Downloads
     DownloadCaseArchiveView,
@@ -127,7 +135,35 @@ urlpatterns = [
         CampaignMailVolumeView.as_view(),
         name="campaign-mail-volume",
     ),
-
+    
+    # ------------------------------------------------------------------
+    # Profile
+    # ------------------------------------------------------------------
+    path(
+        "profile/",
+        ProfileView.as_view(),
+        name="profile",
+    ),
+    path(
+        "profile/preferences/",
+        ProfilePreferencesView.as_view(),
+        name="profile-preferences",
+    ),
+    path(
+        "profile/appearance/",
+        ProfileAppearanceView.as_view(),
+        name="profile-appearance",
+    ),
+    
+    # ------------------------------------------------------------------
+    # submissions summary
+    # ------------------------------------------------------------------
+    path(
+        "submissions/",
+        SubmissionListView.as_view(),
+        name="submissions-list",
+    ),
+    
     # ------------------------------------------------------------------
     # Home summary
     # ------------------------------------------------------------------

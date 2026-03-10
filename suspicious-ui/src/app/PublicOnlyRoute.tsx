@@ -1,6 +1,7 @@
 import { Navigate } from "react-router-dom";
 import { useQuery } from "@tanstack/react-query";
 import { getMe } from "@/api/auth";
+import PageLoader from "@/styles/components/PageLoader";
 
 type Props = {
   children: React.ReactElement;
@@ -21,7 +22,7 @@ export default function PublicOnlyRoute({ children }: Props) {
   }
 
   if (isLoading) {
-    return <div>Loading...</div>;
+    return <PageLoader />;
   }
 
   if (!isError && data) {

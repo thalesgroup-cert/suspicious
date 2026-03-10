@@ -9,6 +9,7 @@ services:
       - no-new-privileges:true
     networks:
       - suspicious_network
+      - reverse_network
     ports:
       - "80:80"
       - "443:443"
@@ -22,4 +23,5 @@ networks:
   suspicious_network:
     external: true
     name: ${NETWORK_NAME}
+  reverse_network:
 

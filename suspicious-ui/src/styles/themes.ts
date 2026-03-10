@@ -72,7 +72,7 @@ const noiseSVG = (opacity = 0.06) => {
 
 // ---- base stays as-is ----
 const base: ThemeOptions = {
-  shape: { borderRadius: 12 },
+  shape: { borderRadius: 4 },
   typography: {
     fontFamily: fontStack,
     fontSize: 13,
@@ -339,6 +339,7 @@ export const themes: Record<ThemeName, ReturnType<typeof createTheme>> = {
     success: "#2BD576",
     info: "#60A5FA",
     text: "#E6EAF2",
+    shape: { borderRadius: 4 },
     components: {
       MuiCssBaseline: {
         styleOverrides: {
@@ -393,7 +394,7 @@ export const themes: Record<ThemeName, ReturnType<typeof createTheme>> = {
     success: "#3DDC97",
     info: "#60A5FA",
     text: "#E8EDF4",
-    shape: { borderRadius: 10 },
+    shape: { borderRadius: 4 },
     components: {
       MuiCssBaseline: {
         styleOverrides: {
@@ -440,6 +441,7 @@ export const themes: Record<ThemeName, ReturnType<typeof createTheme>> = {
     success: "#34D399",
     info: "#60A5FA",
     text: "#E7ECF5",
+    shape: { borderRadius: 4 },
     typography: {
       h1: { fontFamily: monoStack, fontWeight: 850, letterSpacing: -0.7 },
       h2: { fontFamily: monoStack, fontWeight: 850 },
@@ -486,7 +488,7 @@ export const themes: Record<ThemeName, ReturnType<typeof createTheme>> = {
     success: "#067647",
     info: "#2563EB",
     text: "#0B1220",
-    shape: { borderRadius: 14 },
+    shape: { borderRadius: 4 },
     components: {
       MuiCssBaseline: {
         styleOverrides: {
@@ -517,6 +519,7 @@ export const themes: Record<ThemeName, ReturnType<typeof createTheme>> = {
     success: "#05603A",
     info: "#1D4ED8",
     text: "#111827",
+    shape: { borderRadius: 4 },
     typography: {
       fontFamily: serifStack,
       h1: { fontFamily: serifStack, fontWeight: 800, letterSpacing: -0.4 },
@@ -616,7 +619,7 @@ export const themes: Record<ThemeName, ReturnType<typeof createTheme>> = {
     primary: "#FF4D2E",
     secondary: "#FFB020",
     text: "#1F2937",
-    shape: { borderRadius: 18 },
+    shape: { borderRadius: 4 },
     typography: { fontFamily: roundedStack },
     components: {
       MuiCssBaseline: {
@@ -661,7 +664,7 @@ export const themes: Record<ThemeName, ReturnType<typeof createTheme>> = {
     primary: "#E11D48",
     secondary: "#EC4899",
     text: "#1F2937",
-    shape: { borderRadius: 22 },
+    shape: { borderRadius: 4 },
     components: {
       MuiCssBaseline: {
         styleOverrides: {
@@ -702,6 +705,7 @@ export const themes: Record<ThemeName, ReturnType<typeof createTheme>> = {
     warning: "#FBBF24",
     error: "#FF3B30",
     text: "#EAF2FF",
+    shape: { borderRadius: 4 },
     typography: {
       fontFamily: monoStack,
       h1: { fontFamily: monoStack, fontWeight: 900, letterSpacing: -0.8 },
@@ -762,6 +766,7 @@ export const themes: Record<ThemeName, ReturnType<typeof createTheme>> = {
     warning: "#F59E0B",
     error: "#EF4444",
     text: "#F5F5F5",
+    shape: { borderRadius: 4 },
     typography: {
       h1: { fontWeight: 900, letterSpacing: -0.7 },
       button: { fontWeight: 900, letterSpacing: 0.6, textTransform: "uppercase" },
@@ -814,7 +819,7 @@ export const themes: Record<ThemeName, ReturnType<typeof createTheme>> = {
     warning: "#FBBF24",
     error: "#FB7185",
     text: "#EAF2FF",
-    shape: { borderRadius: 16 },
+    shape: { borderRadius: 4 },
     components: {
       MuiCssBaseline: {
         styleOverrides: {
@@ -845,7 +850,7 @@ export const themes: Record<ThemeName, ReturnType<typeof createTheme>> = {
     primary: "#16A34A",
     secondary: "#22C55E",
     text: "#0B1220",
-    shape: { borderRadius: 20 },
+    shape: { borderRadius: 4 },
     typography: { fontFamily: roundedStack },
     components: {
       MuiCssBaseline: {
@@ -876,7 +881,7 @@ export const themes: Record<ThemeName, ReturnType<typeof createTheme>> = {
     primary: "#F59E0B",
     secondary: "#FB7185",
     text: "#0B1220",
-    shape: { borderRadius: 18 },
+    shape: { borderRadius: 4 },
     components: {
       MuiCssBaseline: {
         styleOverrides: {
@@ -916,7 +921,7 @@ export const themes: Record<ThemeName, ReturnType<typeof createTheme>> = {
     warning: "#FBBF24",
     error: "#EF4444",
     text: "#F5EFE6",
-    shape: { borderRadius: 12 },
+    shape: { borderRadius: 4 },
     components: {
       MuiCssBaseline: {
         styleOverrides: {

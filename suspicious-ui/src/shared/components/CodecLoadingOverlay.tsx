@@ -1,7 +1,7 @@
 // src/shared/components/CodecLoadingOverlay.tsx
 import * as React from "react";
 import { Backdrop, Box, Stack, Typography, useTheme } from "@mui/material";
-import { alpha } from "@mui/material/styles";
+import { alpha, keyframes } from "@mui/material/styles";
 
 type Props = {
   open: boolean;
@@ -15,7 +15,26 @@ export function CodecLoadingOverlay({
   subtitle = "Uploading… secure channel established",
 }: Props) {
   const theme = useTheme();
+  const codecLed = keyframes`
+  0%,100% { transform: scale(1); opacity: 0.85; }
+  50% { transform: scale(1.22); opacity: 1; }
+  `;
 
+  const codecSweep = keyframes`
+  0% { transform: translateX(-60%); }
+  100% { transform: translateX(60%); }
+  `;
+
+  const codecBar = keyframes`
+  0%,100% { opacity: .35; transform: scaleY(.55); }
+  50% { opacity: 1; transform: scaleY(1.15); }
+  `;
+
+  const codecBlink = keyframes`
+  0% { opacity: 1; }
+  50% { opacity: .3; }
+  100% { opacity: 1; }
+  `;
   const ink = theme.palette.text.primary;
   const dim = theme.palette.text.secondary;
   const primary = theme.palette.primary.main;
@@ -103,7 +122,7 @@ export function CodecLoadingOverlay({
               borderRadius: 99,
               bgcolor: theme.palette.info.main,
               boxShadow: `0 0 0 1px ${alpha(ink, 0.18)}, 0 0 18px ${alpha(theme.palette.info.main, 0.28)}`,
-              animation: "codecLed 950ms ease-in-out infinite",
+              animation: `${codecLed} 950ms ease-in-out infinite`,
               "@keyframes codecLed": {
                 "0%, 100%": { transform: "scale(1)", opacity: 0.85 },
                 "50%": { transform: "scale(1.22)", opacity: 1 },
@@ -138,7 +157,7 @@ export function CodecLoadingOverlay({
                   transparent 100%
                 )`,
                 transform: "translateX(-60%)",
-                animation: "codecSweep 1200ms linear infinite",
+                animation: `${codecSweep} 1200ms linear infinite`,
                 "@keyframes codecSweep": {
                   "0%": { transform: "translateX(-60%)" },
                   "100%": { transform: "translateX(60%)" },
@@ -166,7 +185,7 @@ export function CodecLoadingOverlay({
                     alignSelf: "end",
                     height: `${18 + ((i * 13) % 36)}px`,
                     bgcolor: alpha(primary, 0.26),
-                    animation: `codecBar 900ms ease-in-out ${i * 45}ms infinite`,
+                    animation: `${codecBar} 900ms ease-in-out ${i * 45}ms infinite`,
                     "@keyframes codecBar": {
                       "0%, 100%": { opacity: 0.35, transform: "scaleY(0.55)" },
                       "50%": { opacity: 1, transform: "scaleY(1.15)" },
@@ -189,7 +208,7 @@ export function CodecLoadingOverlay({
                 color: ink,
                 fontWeight: 850,
                 letterSpacing: 0.6,
-                animation: "codecBlink 900ms steps(2, end) infinite",
+                animation: `${codecBlink} 900ms steps(2,end) infinite`,
                 "@keyframes codecBlink": {
                   "0%": { opacity: 1 },
                   "50%": { opacity: 0.3 },

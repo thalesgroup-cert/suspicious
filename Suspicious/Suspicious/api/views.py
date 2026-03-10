@@ -7,7 +7,7 @@ from rest_framework.exceptions import PermissionDenied, NotFound, APIException
 from rest_framework.response import Response
 from rest_framework import generics
 from django_filters.rest_framework import DjangoFilterBackend
-
+from rest_framework.generics import ListAPIView
 from drf_spectacular.utils import extend_schema, OpenApiParameter
 
 from case_handler.models import Case, CaseChallengeToken
@@ -30,6 +30,11 @@ from .serializers import (
     CampaignClassificationCountsSerializer,
     CampaignPcaResponseSerializer,
     CampaignMailVolumeResponseSerializer,
+    ProfileSerializer,
+    UpdatePreferencesSerializer,
+    UpdateAppearanceSerializer,
+    HomeSummaryResponseSerializer,
+    SubmissionListSerializer
 )
 from .filters import MonthlyCasesSummaryFilter, MonthlyReporterStatsFilter, TotalCasesStatsFilter
 from .storage import StorageClient
@@ -43,6 +48,7 @@ import zipfile
 import os
 import logging
 from minio.error import S3Error
+from rest_framework.pagination import PageNumberPagination
 
 from django.conf import settings
 from django.db.models import Sum, Value, IntegerField
@@ -68,6 +74,15 @@ from score_process.score_utils.thehive.utils import parse_and_decode_defaultdict
 ALLOWED_DOWNLOAD_GROUPS = {"Admin", "CERT"}
 CONFIG_PATH = os.environ.get("SUSPICIOUS_SETTINGS_PATH", "/app/settings.json")
 logger = logging.getLogger(__name__)
+
+with open(CONFIG_PATH, "r") as f:
+    settings = json.load(f)
+
+chromadb_conf = settings.get("chromadb", {})
+CHROMA_HOST = chromadb_conf.get("host", "chromadb")
+CHROMA_PORT = chromadb_conf.get("port", 8000)
+CHROMA_COLLECTION_NAME = chromadb_conf.get("collection_name", "suspicious")
+
 
 class LoginView(APIView):
     permission_classes = [AllowAny]
@@ -110,6 +125,52 @@ class LogoutView(APIView):
         request._auth.delete()
         return Response({"detail": "Logged out."})
 
+class SubmissionPagination(PageNumberPagination):
+    page_size = 10
+    page_size_query_param = "page_size"
+    max_page_size = 100
+
+
+class SubmissionListView(ListAPIView):
+    permission_classes = [IsAuthenticated]
+    serializer_class = SubmissionListSerializer
+    pagination_class = SubmissionPagination
+
+    def get_queryset(self):
+        qs = Case.objects.select_related(
+            "fileOrMail",
+            "nonFileIocs",
+        )
+
+        mine = self.request.query_params.get("mine")
+        if mine in {"1", "true", "True"}:
+            qs = qs.filter(reporter=self.request.user)
+
+        ordering = self.request.query_params.get("ordering", "-created_at")
+        ordering_map = {
+            "created_at": "creation_date",
+            "-created_at": "-creation_date",
+            "id": "id",
+            "-id": "-id",
+            "status": "status",
+            "-status": "-status",
+            "result": "results",
+            "-result": "-results",
+        }
+
+        db_ordering = ordering_map.get(ordering)
+        if db_ordering is None:
+            raise ValidationError({"ordering": "Unsupported ordering field."})
+
+        return qs.order_by(db_ordering, "-id")
+
+@extend_schema(
+    parameters=[
+        OpenApiParameter(name="month", type=int, required=False),
+        OpenApiParameter(name="year", type=int, required=False),
+    ],
+    responses=HomeSummaryResponseSerializer,
+)
 class HomeSummaryView(APIView):
     permission_classes = [IsAuthenticated]
 
@@ -804,64 +865,35 @@ def _disable_chromadb_telemetry():
         pass
 
 
-def _get_chroma_collection(collection_name: str = "suspicious_mails"):
+def _get_chroma_collection(collection_name: str = CHROMA_COLLECTION_NAME):
     try:
-        import chromadb  # type: ignore
-        from chromadb.config import Settings  # type: ignore
+        import chromadb
     except Exception as e:
         logger.warning("ChromaDB not available in environment: %s", e)
         return None
 
     _disable_chromadb_telemetry()
 
-    persist_path = "/app/Suspicious/chromadb"
-    errors = []
+    host = CHROMA_HOST
+    port = int(CHROMA_PORT)
 
-    attempts = []
     try:
-        attempts.append(
-            lambda: chromadb.PersistentClient(
-                path=persist_path,
-                tenant="default_tenant",
-                database="default_database",
-                settings=Settings(anonymized_telemetry=False),
-            )
+        client = chromadb.HttpClient(
+            host=host,
+            port=port,
         )
-    except Exception:
-        attempts.append(
-            lambda: chromadb.PersistentClient(
-                path=persist_path,
-                settings=Settings(anonymized_telemetry=False),
-            )
-        )
-
-    def _legacy_client():
-        s = Settings(
-            is_persistent=True,
-            persist_directory=persist_path,
-            anonymized_telemetry=False,
-        )  # type: ignore[arg-type]
-        return chromadb.Client(s)
-
-    attempts.append(_legacy_client)
-
-    client = None
-    for factory in attempts:
-        try:
-            client = factory()
-            break
-        except Exception as e:
-            errors.append(str(e))
-            client = None
-
-    if client is None:
-        logger.error("Failed to init ChromaDB client: %s", " | ".join(errors))
+    except Exception as e:
+        logger.error("Failed to connect to ChromaDB server %s:%s: %s", host, port, e)
         return None
 
     try:
         return client.get_collection(name=collection_name)
     except Exception as e:
-        logger.warning("ChromaDB collection '%s' not accessible: %s", collection_name, e)
+        logger.warning(
+            "ChromaDB collection '%s' not accessible: %s",
+            collection_name,
+            e,
+        )
         return None
 
 
@@ -1425,3 +1457,135 @@ class CampaignMailVolumeView(APIView):
         serializer = CampaignMailVolumeResponseSerializer(data=payload)
         serializer.is_valid(raise_exception=True)
         return Response(serializer.data)
+    
+class ProfileView(APIView):
+    permission_classes = [IsAuthenticated]
+
+    def get_profile_instance(self, user):
+        groups = set(user.groups.values_list("name", flat=True))
+        if "CISO" in groups:
+            profile, _ = CISOProfile.objects.get_or_create(
+                user=user,
+                defaults={
+                    "function": "",
+                    "gbu": "",
+                    "country": "",
+                    "region": "",
+                    "scope": "Not defined",
+                },
+            )
+            return profile
+
+        profile, _ = UserProfile.objects.get_or_create(
+            user=user,
+            defaults={
+                "function": "",
+                "gbu": "",
+                "country": "",
+                "region": "",
+            },
+        )
+        return profile
+
+    def get(self, request):
+        profile = self.get_profile_instance(request.user)
+
+        data = {
+            "wants_acknowledgement": profile.wants_acknowledgement,
+            "wants_results": profile.wants_results,
+            "theme": profile.theme,
+            "auto_seasonal": profile.auto_seasonal,
+        }
+
+        serializer = ProfileSerializer(data)
+        return Response(serializer.data)
+
+
+class ProfilePreferencesView(APIView):
+    permission_classes = [IsAuthenticated]
+
+    def get_profile_instance(self, user):
+        groups = set(user.groups.values_list("name", flat=True))
+        if "CISO" in groups:
+            profile, _ = CISOProfile.objects.get_or_create(
+                user=user,
+                defaults={
+                    "function": "",
+                    "gbu": "",
+                    "country": "",
+                    "region": "",
+                    "scope": "Not defined",
+                },
+            )
+            return profile
+
+        profile, _ = UserProfile.objects.get_or_create(
+            user=user,
+            defaults={
+                "function": "",
+                "gbu": "",
+                "country": "",
+                "region": "",
+            },
+        )
+        return profile
+
+    def patch(self, request):
+        serializer = UpdatePreferencesSerializer(data=request.data)
+        serializer.is_valid(raise_exception=True)
+
+        profile = self.get_profile_instance(request.user)
+        profile.wants_acknowledgement = serializer.validated_data["wants_acknowledgement"]
+        profile.wants_results = serializer.validated_data["wants_results"]
+        profile.save(update_fields=["wants_acknowledgement", "wants_results", "last_update"])
+
+        return Response({
+            "wants_acknowledgement": profile.wants_acknowledgement,
+            "wants_results": profile.wants_results,
+        })
+
+
+class ProfileAppearanceView(APIView):
+    permission_classes = [IsAuthenticated]
+
+    def get_profile_instance(self, user):
+        groups = set(user.groups.values_list("name", flat=True))
+        if "CISO" in groups:
+            profile, _ = CISOProfile.objects.get_or_create(
+                user=user,
+                defaults={
+                    "function": "",
+                    "gbu": "",
+                    "country": "",
+                    "region": "",
+                    "scope": "Not defined",
+                },
+            )
+            return profile
+
+        profile, _ = UserProfile.objects.get_or_create(
+            user=user,
+            defaults={
+                "function": "",
+                "gbu": "",
+                "country": "",
+                "region": "",
+            },
+        )
+        return profile
+
+    def patch(self, request):
+        serializer = UpdateAppearanceSerializer(data=request.data)
+        serializer.is_valid(raise_exception=True)
+
+        theme = serializer.validated_data["theme"]
+        profile = self.get_profile_instance(request.user)
+        profile.theme = theme
+        profile.save(update_fields=["theme", "last_update"])
+
+        return Response({
+            "wants_acknowledgement": profile.wants_acknowledgement,
+            "wants_results": profile.wants_results,
+            "theme": profile.theme,
+            "auto_seasonal": profile.auto_seasonal,
+        })

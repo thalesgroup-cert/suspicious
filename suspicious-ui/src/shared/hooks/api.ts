@@ -4,4 +4,5 @@ export type SubmissionStatus =
   | "DONE"
   | "FAILED"
   | "REJECTED"
+  | "CHALLENGED"
   | "UNKNOWN";

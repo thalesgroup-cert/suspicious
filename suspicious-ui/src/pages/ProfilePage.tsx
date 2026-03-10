@@ -110,36 +110,24 @@ export default function ProfilePage() {
 
   const [section, setSection] = React.useState<Section>("preferences");
 
-  const useMockMe = import.meta.env.VITE_USE_MOCK_ME === "true";
-
   const meQuery = useQuery<Me>({
     queryKey: ["me"],
     queryFn: getMe,
     retry: false,
-    enabled: !useMockMe,
   });
 
-  const me: Me | undefined = useMockMe
-    ? ({
-        id: 1,
-        username: "mockuser",
-        email: "mockuser@example.com",
-        first_name: "Mock",
-        last_name: "User",
-        groups: ["CISO", "CERT"],
-        ciso_scope: "EU",
-      } as any)
-    : meQuery.data;
+  const me = meQuery.data;
 
   const profileQuery = useQuery<UserProfile>({
     queryKey: ["profile"],
     queryFn: getProfile,
-    enabled: !!me && !useMockMe,
+    enabled: !!me,
     retry: false,
     initialData: {
       wants_acknowledgement: false,
       wants_results: false,
       theme: (readLocalProfile()?.theme as ThemeName) ?? ("graphite" as ThemeName),
+      auto_seasonal: true,
     },
   });
 
@@ -165,9 +153,12 @@ export default function ProfilePage() {
     const t = (p.theme as ThemeName) ?? ("graphite" as ThemeName);
     setPickedTheme(t);
 
-    // apply theme immediately (note: theme store may override if autoSeasonal is ON)
-    setThemeName(t);
-  }, [profileQuery.data, setThemeName]);
+    setAutoSeasonal(!!p.auto_seasonal);
+
+    if (!p.auto_seasonal) {
+      setThemeName(t);
+    }
+  }, [profileQuery.data, setThemeName, setAutoSeasonal]);
 
   React.useEffect(() => {
     const lp = readLocalProfile();
@@ -207,7 +198,7 @@ export default function ProfilePage() {
   const savingPrefs = prefMutation.isPending;
   const savingTheme = appearanceMutation.isPending;
 
-  if (!useMockMe && meQuery.isLoading) {
+  if (meQuery.isLoading) {
     return (
       <Box sx={{ minHeight: "60vh", display: "grid", placeItems: "center" }}>
         <CircularProgress />
@@ -235,7 +226,9 @@ export default function ProfilePage() {
 
   // If seasonal is ON, appearance changes are still allowed, but the active theme is seasonal.
   // themeDirty should compare against stored preference (pickedTheme) vs baseProfile theme.
-  const themeDirty = pickedTheme !== ((baseProfile?.theme as ThemeName) ?? pickedTheme);
+  const themeDirty =
+    pickedTheme !== ((baseProfile?.theme as ThemeName) ?? pickedTheme) ||
+    autoSeasonal !== !!baseProfile?.auto_seasonal;
 
   const savePreferences = () => {
     setLocalBanner(null);
@@ -247,29 +240,26 @@ export default function ProfilePage() {
       wants_results: wantsResults,
     }));
 
-    if (useMockMe) {
-      setLocalBanner({ kind: "success", text: "Preferences saved locally (mock mode)." });
-      return;
-    }
-
     prefMutation.mutate({ wants_acknowledgement: wantsAck, wants_results: wantsResults });
   };
-
   const saveAppearance = () => {
     setLocalBanner(null);
 
-    writeLocalProfile({ theme: pickedTheme });
+    writeLocalProfile({
+      theme: pickedTheme,
+      auto_seasonal: autoSeasonal,
+    } as any);
+
     queryClient.setQueryData<UserProfile>(["profile"], (prev) => ({
       ...(prev ?? (baseProfile as UserProfile)),
       theme: pickedTheme,
+      auto_seasonal: autoSeasonal,
     }));
 
-    if (useMockMe) {
-      setLocalBanner({ kind: "success", text: "Theme saved locally (mock mode)." });
-      return;
-    }
-
-    appearanceMutation.mutate({ theme: pickedTheme } as any);
+    appearanceMutation.mutate({
+      theme: pickedTheme,
+      auto_seasonal: autoSeasonal,
+    });
   };
 
   // Preview immediately when autoSeasonal is OFF.
@@ -317,7 +307,6 @@ export default function ProfilePage() {
                 </Typography>
 
                 <Stack direction="row" spacing={1} sx={{ mt: 0.9, flexWrap: "wrap" }}>
-                  <Chip size="small" icon={<PersonOutline />} label={me.username} variant="outlined" />
                   {me.email ? <Chip size="small" icon={<MailOutline />} label={me.email} variant="outlined" /> : null}
                   {isElevated ? (
                     <Chip size="small" icon={<ShieldOutlined />} label="Elevated" variant="outlined" />
@@ -325,7 +314,6 @@ export default function ProfilePage() {
                     <Chip size="small" label="Standard" variant="outlined" />
                   )}
                   {scope ? <Chip size="small" label={`Scope: ${scope}`} variant="outlined" /> : null}
-                  <Chip size="small" label={useMockMe ? "Mock auth" : "Live auth"} variant="outlined" />
                 </Stack>
               </Box>
             </Stack>
@@ -479,7 +467,7 @@ export default function ProfilePage() {
                     disabled={!prefsDirty || savingPrefs}
                     onClick={savePreferences}
                   >
-                    {savingPrefs ? "Saving…" : useMockMe ? "Save (local)" : "Save changes"}
+                    {savingPrefs ? "Saving…" : "Save changes"}
                   </Button>
                 </Stack>
               </Stack>
@@ -551,7 +539,7 @@ export default function ProfilePage() {
                     disabled={!themeDirty || savingTheme}
                     onClick={saveAppearance}
                   >
-                    {savingTheme ? "Saving…" : useMockMe ? "Save (local)" : "Save changes"}
+                    {savingTheme ? "Saving…" : "Save changes"}
                   </Button>
                 </Stack>
                 <Stack direction="row" spacing={2} sx={{ flexWrap: "wrap" }}>
@@ -576,12 +564,6 @@ export default function ProfilePage() {
             )}
           </CardContent>
         </SurfaceCard>
-      </Box>
-
-      <Box sx={{ mt: 2 }}>
-        <Typography variant="caption" color="text.secondary">
-          Signed in as {me.username}
-        </Typography>
       </Box>
     </Box>
   );

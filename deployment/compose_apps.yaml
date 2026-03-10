@@ -8,8 +8,6 @@ services:
       - "${SUSPICIOUS_PATH}/logs:/app/log"
       - "/var/run/docker.sock:/var/run/docker.sock"
       - "${SUSPICIOUS_PATH}/settings.json:/app/settings.json"
-      # AI Vector Database
-      - "chromadb:/app/Suspicious/chromadb:Z"
     command: >
       /bin/bash -c "
       python3 manage.py crontab show &&
@@ -20,7 +18,7 @@ services:
     env_file:
       - ".env"
     environment:
-      no_proxy: "${NO_PROXY},cortex,db_suspicious,feeder,minio"
+      no_proxy: "${NO_PROXY},cortex,db_suspicious,minio,chromadb"
     networks:
       - suspicious_network
 
@@ -77,15 +75,17 @@ services:
       no_proxy: "${NO_PROXY},suspicious"
     networks:
       - suspicious_network
+      - reverse_network
 
 volumes:
   cortex_jobs:
     driver: local
-  chromadb:
+  chromadb_data:
     driver: local
 
 networks:
   suspicious_network:
     external: true
     name: ${NETWORK_NAME}
+  reverse_network:
 

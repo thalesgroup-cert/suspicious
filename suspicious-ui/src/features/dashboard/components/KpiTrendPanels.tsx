@@ -136,64 +136,52 @@ function TrendDeltaChip(props: { values: Array<number | null> }) {
 function TrendIcon(props: { values: Array<number | null> }) {
   const { prev, last } = React.useMemo(() => lastTwoNumbers(props.values), [props.values]);
 
+  let icon: React.ReactNode = null;
+  let color = "text.secondary";
+
   if (typeof prev !== "number" || typeof last !== "number") {
-    return (
-      <Box
-        sx={{
-          height: 170,
-          display: "grid",
-          placeItems: "center",
-          color: "text.disabled",
-        }}
-      >
-        <TrendingFlatOutlined sx={{ fontSize: 92, opacity: 0.45 }} />
-      </Box>
-    );
-  }
+    icon = <TrendingFlatOutlined sx={{ fontSize: 100, opacity: 0.45 }} />;
+    color = "text.disabled";
+  } else {
+    const d = last - prev;
 
-  const d = last - prev;
-
-  if (d > 0) {
-    return (
-      <Box
-        sx={{
-          height: 170,
-          display: "grid",
-          placeItems: "center",
-          color: "#22C55E",
-        }}
-      >
-        <TrendingUpOutlined sx={{ fontSize: 100 }} />
-      </Box>
-    );
-  }
-
-  if (d < 0) {
-    return (
-      <Box
-        sx={{
-          height: 170,
-          display: "grid",
-          placeItems: "center",
-          color: "#EF4444",
-        }}
-      >
-        <TrendingDownOutlined sx={{ fontSize: 100 }} />
-      </Box>
-    );
+    if (d > 0) {
+      icon = <TrendingUpOutlined sx={{ fontSize: 100 }} />;
+      color = "#22C55E";
+    } else if (d < 0) {
+      icon = <TrendingDownOutlined sx={{ fontSize: 100 }} />;
+      color = "#EF4444";
+    } else {
+      icon = <TrendingFlatOutlined sx={{ fontSize: 100 }} />;
+      color = "text.secondary";
+    }
   }
 
   return (
-    <Box
+    <Stack
+      alignItems="center"
+      justifyContent="center"
+      spacing={1}
       sx={{
-        height: 170,
-        display: "grid",
-        placeItems: "center",
-        color: "text.secondary",
+        minHeight: 190,
+        color,
       }}
     >
-      <TrendingFlatOutlined sx={{ fontSize: 100 }} />
-    </Box>
+      <Box sx={{ display: "grid", placeItems: "center", lineHeight: 1 }}>
+        {icon}
+      </Box>
+
+      <Typography
+        sx={{
+          fontSize: 30,
+          fontWeight: 950,
+          lineHeight: 1,
+          color: "text.primary",
+        }}
+      >
+        {formatNumber(last)}
+      </Typography>
+    </Stack>
   );
 }
 
@@ -204,25 +192,8 @@ function TrendPanel(props: {
   values: Array<number | null>;
   onOpenTrends?: () => void;
 }) {
-  const { last } = React.useMemo(() => lastTwoNumbers(props.values), [props.values]);
-
   return (
-    <GlassCard
-      title={props.title}
-      icon={props.icon}
-      right={
-        <Stack direction="row" spacing={1} alignItems="center">
-          <TrendDeltaChip values={props.values} />
-          <Chip size="small" label={props.chipLabel} variant="outlined" />
-        </Stack>
-      }
-    >
-      <Stack direction="row" alignItems="baseline" justifyContent="space-between" sx={{ mb: 1 }}>
-        <Typography sx={{ fontSize: 28, fontWeight: 950, lineHeight: 1 }}>
-          {formatNumber(last)}
-        </Typography>
-      </Stack>
-
+    <GlassCard title={props.title} icon={props.icon}>
       <TrendIcon values={props.values} />
     </GlassCard>
   );

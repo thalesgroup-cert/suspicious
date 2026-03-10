@@ -66,6 +66,16 @@ services:
     networks:
       - suspicious_network
 
+  chromadb:
+    image: chromadb/chroma:latest
+    restart: unless-stopped
+    expose:
+      - "8000"
+    volumes:
+      - "chromadb_data:/data:Z"
+    networks:
+      - suspicious_network
+
 volumes:
   db_suspicious_data:
     driver: local
@@ -74,6 +84,8 @@ volumes:
   elasticsearch_logs:
     driver: local
   minio_data:
+    driver: local
+  chromadb_data:
     driver: local
 
 networks:

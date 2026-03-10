@@ -13,6 +13,7 @@ import {
   ListItemText,
   Stack,
   Toolbar,
+  Tooltip,
   Typography,
   useMediaQuery,
 } from "@mui/material";
@@ -27,6 +28,7 @@ import {
   ManageSearchOutlined,
   MenuRounded,
   PersonOutline,
+  PushPinOutlined,
   SettingsOutlined,
   UploadFileOutlined,
 } from "@mui/icons-material";
@@ -36,6 +38,7 @@ import { getMe, logout, type Me } from "@/api/auth";
 import { getAccessToken } from "@/api/client";
 
 const drawerWidth = 304;
+const collapsedDrawerWidth = 88;
 
 type NavItemConfig = {
   to: string;
@@ -97,27 +100,41 @@ function NavSection(props: {
   items: NavItemConfig[];
   onNavigate?: () => void;
   isDark: boolean;
+  collapsed?: boolean;
+  showIconChrome?: boolean;
 }) {
-  const { title, items, onNavigate, isDark } = props;
+  const {
+    title,
+    items,
+    onNavigate,
+    isDark,
+    collapsed = false,
+    showIconChrome = true,
+  } = props;
 
   return (
     <Box component="section" aria-labelledby={`nav-section-${title}`}>
-      <Typography
-        id={`nav-section-${title}`}
-        variant="overline"
-        sx={(theme) => ({
-          display: "block",
-          px: 2.25,
-          pb: 0.75,
-          color: theme.palette.text.secondary,
-          letterSpacing: "0.14em",
-          fontWeight: 800,
-          lineHeight: 1.8,
-          opacity: isDark ? 0.9 : 0.8,
-        })}
-      >
-        {title}
-      </Typography>
+      {!collapsed ? (
+        <Typography
+          id={`nav-section-${title}`}
+          variant="overline"
+          sx={(theme) => ({
+            display: "block",
+            px: 2.25,
+            pb: 0.75,
+            color: theme.palette.text.secondary,
+            letterSpacing: "0.14em",
+            fontWeight: 800,
+            lineHeight: 1.8,
+            opacity: isDark ? 0.9 : 0.8,
+            whiteSpace: "nowrap",
+          })}
+        >
+          {title}
+        </Typography>
+      ) : (
+        <Box sx={{ height: 16 }} />
+      )}
 
       <List disablePadding sx={{ px: 1 }}>
         {items.map((item) => (
@@ -127,6 +144,8 @@ function NavSection(props: {
             label={item.label}
             icon={item.icon}
             onClick={onNavigate}
+            collapsed={collapsed}
+            showIconChrome={showIconChrome}
           />
         ))}
       </List>
@@ -139,8 +158,17 @@ function SidebarNavItem(props: {
   label: string;
   icon: React.ReactElement;
   onClick?: () => void;
+  collapsed?: boolean;
+  showIconChrome?: boolean;
 }) {
-  const { to, label, icon, onClick } = props;
+  const {
+    to,
+    label,
+    icon,
+    onClick,
+    collapsed = false,
+    showIconChrome = true,
+  } = props;
 
   return (
     <ListItemButton
@@ -148,57 +176,92 @@ function SidebarNavItem(props: {
       to={to}
       onClick={onClick}
       aria-label={label}
+      title={collapsed ? label : undefined}
       sx={(theme) => {
         const isDark = theme.palette.mode === "dark";
         const primary = theme.palette.primary.main;
+        const minimalCollapsed = collapsed && !showIconChrome;
 
         return {
           minHeight: 52,
-          px: 1.25,
+          px: collapsed ? 1 : 1.25,
           py: 0.625,
           mb: 0.5,
           borderRadius: 3,
           color: alpha(theme.palette.text.primary, isDark ? 0.78 : 0.82),
+          justifyContent: collapsed ? "center" : "flex-start",
           transition: theme.transitions.create(
-            ["background-color", "border-color", "transform", "color", "box-shadow"],
+            [
+              "background-color",
+              "border-color",
+              "transform",
+              "color",
+              "box-shadow",
+              "padding",
+            ],
             {
               duration: theme.transitions.duration.shorter,
             },
           ),
-          border: `1px solid ${alpha(theme.palette.divider, isDark ? 0.28 : 0.9)}`,
+          border: minimalCollapsed
+            ? "1px solid transparent"
+            : `1px solid ${alpha(theme.palette.divider, isDark ? 0.28 : 0.9)}`,
+          backgroundColor: minimalCollapsed ? "transparent" : "transparent",
+          boxShadow: "none",
           "& .MuiListItemIcon-root": {
             minWidth: 0,
-            mr: 1.5,
+            mr: collapsed ? 0 : 1.5,
             color: "inherit",
+            justifyContent: "center",
+          },
+          "& .MuiListItemText-root": {
+            opacity: collapsed ? 0 : 1,
+            width: collapsed ? 0 : "auto",
+            overflow: "hidden",
+            transition: theme.transitions.create(["opacity", "width"], {
+              duration: theme.transitions.duration.shorter,
+            }),
           },
           "& .MuiListItemText-primary": {
             fontSize: 14,
             fontWeight: 700,
             letterSpacing: "-0.01em",
+            whiteSpace: "nowrap",
           },
           "&:hover": {
             backgroundColor: alpha(primary, isDark ? 0.08 : 0.06),
             borderColor: alpha(primary, isDark ? 0.24 : 0.2),
             color: theme.palette.text.primary,
-            transform: "translateX(2px)",
+            transform: collapsed ? "none" : "translateX(2px)",
           },
-          "&.active": {
-            color: theme.palette.text.primary,
-            background: `linear-gradient(180deg, ${alpha(primary, isDark ? 0.18 : 0.12)} 0%, ${alpha(
-              primary,
-              isDark ? 0.1 : 0.06,
-            )} 100%)`,
-            borderColor: alpha(primary, isDark ? 0.32 : 0.26),
-            boxShadow: isDark
-              ? `inset 0 1px 0 ${alpha(theme.palette.common.white, 0.08)}, 0 8px 24px ${alpha(
-                  "#020617",
-                  0.28,
-                )}`
-              : `inset 0 1px 0 ${alpha(theme.palette.common.white, 0.5)}, 0 8px 24px ${alpha(
+          "&:hover .nav-icon-shell": {
+            borderColor: alpha(primary, isDark ? 0.22 : 0.18),
+            backgroundColor: alpha(primary, isDark ? 0.12 : 0.08),
+          },
+          "&.active": minimalCollapsed
+            ? {
+                color: theme.palette.text.primary,
+                background: "transparent",
+                borderColor: "transparent",
+                boxShadow: "none",
+              }
+            : {
+                color: theme.palette.text.primary,
+                background: `linear-gradient(180deg, ${alpha(primary, isDark ? 0.18 : 0.12)} 0%, ${alpha(
                   primary,
-                  0.08,
-                )}`,
-          },
+                  isDark ? 0.1 : 0.06,
+                )} 100%)`,
+                borderColor: alpha(primary, isDark ? 0.32 : 0.26),
+                boxShadow: isDark
+                  ? `inset 0 1px 0 ${alpha(theme.palette.common.white, 0.08)}, 0 8px 24px ${alpha(
+                      "#020617",
+                      0.28,
+                    )}`
+                  : `inset 0 1px 0 ${alpha(theme.palette.common.white, 0.5)}, 0 8px 24px ${alpha(
+                      primary,
+                      0.08,
+                    )}`,
+              },
           "&.active .nav-icon-shell": {
             backgroundColor: alpha(primary, isDark ? 0.18 : 0.12),
             borderColor: alpha(primary, isDark ? 0.26 : 0.2),
@@ -219,8 +282,15 @@ function SidebarNavItem(props: {
             borderRadius: 2.25,
             display: "grid",
             placeItems: "center",
-            border: `1px solid ${alpha(theme.palette.divider, 0.7)}`,
-            backgroundColor: alpha(theme.palette.text.primary, theme.palette.mode === "dark" ? 0.03 : 0.02),
+            border: showIconChrome
+              ? `1px solid ${alpha(theme.palette.divider, 0.7)}`
+              : "1px solid transparent",
+            backgroundColor: showIconChrome
+              ? alpha(
+                  theme.palette.text.primary,
+                  theme.palette.mode === "dark" ? 0.03 : 0.02,
+                )
+              : "transparent",
             transition: theme.transitions.create(
               ["background-color", "border-color"],
               {
@@ -263,10 +333,18 @@ export default function AppLayout() {
   const isElevated = groups.includes("CISO") || groups.includes("CERT");
 
   const [mobileOpen, setMobileOpen] = React.useState(false);
+  const [sidebarHovered, setSidebarHovered] = React.useState(false);
+  const [sidebarPinned, setSidebarPinned] = React.useState(false);
 
   React.useEffect(() => {
     setMobileOpen(false);
   }, [location.pathname]);
+
+  React.useEffect(() => {
+    if (!isDesktop) {
+      setSidebarHovered(false);
+    }
+  }, [isDesktop]);
 
   const visiblePrimaryItems = React.useMemo(
     () => filterNavItems(primaryNavItems, isElevated),
@@ -301,6 +379,14 @@ export default function AppLayout() {
     }
   }
 
+  const isSidebarCollapsed = isDesktop && !sidebarPinned && !sidebarHovered;
+  const showSidebarIconChrome = !isSidebarCollapsed;
+  const effectiveDrawerWidth = isDesktop
+    ? isSidebarCollapsed
+      ? collapsedDrawerWidth
+      : drawerWidth
+    : drawerWidth;
+
   const shellBackground = isDark
     ? `
       radial-gradient(circle at top left, ${alpha(theme.palette.primary.main, 0.08)}, transparent 24%),
@@ -330,7 +416,10 @@ export default function AppLayout() {
     `;
 
   const sidebarText = theme.palette.text.primary;
-  const sidebarSubtleText = alpha(theme.palette.text.secondary, isDark ? 0.9 : 1);
+  const sidebarSubtleText = alpha(
+    theme.palette.text.secondary,
+    isDark ? 0.9 : 1,
+  );
 
   const drawerContent = (
     <Box
@@ -340,86 +429,127 @@ export default function AppLayout() {
         flexDirection: "column",
         color: sidebarText,
         background: sidebarBackground,
+        overflowX: "hidden",
       }}
     >
-      <Box sx={{ px: 2, pt: 2, pb: 1.5 }}>
+      <Box sx={{ px: isSidebarCollapsed ? 1.25 : 2, pt: 2, pb: 1.5 }}>
         <Stack spacing={1.25}>
           <Box
             sx={{
               display: "flex",
               alignItems: "center",
-              justifyContent: "space-between",
+              justifyContent: isSidebarCollapsed ? "center" : "space-between",
               gap: 1,
             }}
           >
-            <Stack direction="row" spacing={1.25} alignItems="center" minWidth={0}>
+            <Stack
+              direction="row"
+              spacing={isSidebarCollapsed ? 0 : 1.25}
+              alignItems="center"
+              minWidth={0}
+              sx={{
+                width: "100%",
+                justifyContent: isSidebarCollapsed ? "center" : "flex-start",
+              }}
+            >
               <Avatar
                 variant="rounded"
+                src="/icons/suspicious-logo.png"
+                alt="Suspicious"
                 sx={{
-                  width: 40,
-                  height: 40,
-                  borderRadius: 3,
-                  fontSize: 16,
-                  fontWeight: 900,
-                  color: isDark ? theme.palette.common.white : theme.palette.primary.dark,
-                  bgcolor: alpha(theme.palette.primary.main, isDark ? 0.18 : 0.12),
-                  border: `1px solid ${alpha(theme.palette.primary.main, isDark ? 0.2 : 0.16)}`,
-                  boxShadow: `inset 0 1px 0 ${alpha(
-                    theme.palette.common.white,
-                    isDark ? 0.08 : 0.4,
-                  )}`,
-                }}
-              >
-                S
-              </Avatar>
-
-              <Box minWidth={0}>
-                <Typography
-                  variant="subtitle1"
-                  sx={{
-                    fontWeight: 900,
-                    letterSpacing: "-0.03em",
-                    lineHeight: 1.1,
-                    color: sidebarText,
-                  }}
-                >
-                  Suspicious
-                </Typography>
-                <Typography
-                  variant="caption"
-                  sx={{
-                    color: sidebarSubtleText,
-                    display: "block",
-                    mt: 0.25,
-                  }}
-                >
-                  Security operations console
-                </Typography>
-              </Box>
-            </Stack>
-
-            {isElevated ? (
-              <Chip
-                label="Elevated"
-                size="small"
-                sx={{
-                  height: 24,
-                  borderRadius: 999,
-                  fontWeight: 800,
-                  color: isDark ? "#dbeafe" : theme.palette.primary.dark,
-                  backgroundColor: alpha(theme.palette.primary.main, isDark ? 0.14 : 0.1),
-                  border: `1px solid ${alpha(theme.palette.primary.main, isDark ? 0.18 : 0.14)}`,
-                  "& .MuiChip-label": {
-                    px: 1.1,
+                  width: 44,
+                  height: 44,
+                  "& img": {
+                    objectFit: "contain",
                   },
                 }}
               />
-            ) : null}
+
+              {!isSidebarCollapsed && (
+                <Box minWidth={0}>
+                  <Typography
+                    variant="subtitle1"
+                    sx={{
+                      fontWeight: 900,
+                      letterSpacing: "-0.03em",
+                      lineHeight: 1.1,
+                      color: sidebarText,
+                    }}
+                  >
+                    Suspicious
+                  </Typography>
+                </Box>
+              )}
+            </Stack>
+
+            {!isSidebarCollapsed && (
+              <Stack direction="row" spacing={1} alignItems="center">
+                {isDesktop && (
+                  <Tooltip
+                    title={sidebarPinned ? "Unpin sidebar" : "Pin sidebar"}
+                  >
+                    <IconButton
+                      size="small"
+                      aria-label={
+                        sidebarPinned ? "Unpin sidebar" : "Pin sidebar"
+                      }
+                      onClick={() => setSidebarPinned((prev) => !prev)}
+                      sx={{
+                        width: 30,
+                        height: 30,
+                        border: `1px solid ${alpha(theme.palette.divider, isDark ? 0.5 : 1)}`,
+                        backgroundColor: sidebarPinned
+                          ? alpha(
+                              theme.palette.primary.main,
+                              isDark ? 0.14 : 0.1,
+                            )
+                          : alpha(
+                              theme.palette.text.primary,
+                              isDark ? 0.04 : 0.02,
+                            ),
+                        color: sidebarPinned
+                          ? theme.palette.primary.main
+                          : alpha(theme.palette.text.primary, 0.8),
+                        "&:hover": {
+                          backgroundColor: sidebarPinned
+                            ? alpha(
+                                theme.palette.primary.main,
+                                isDark ? 0.18 : 0.14,
+                              )
+                            : alpha(
+                                theme.palette.text.primary,
+                                isDark ? 0.08 : 0.05,
+                              ),
+                        },
+                        "&:focus-visible": {
+                          outline: `2px solid ${alpha(theme.palette.primary.main, 0.72)}`,
+                          outlineOffset: 2,
+                        },
+                      }}
+                    >
+                      <PushPinOutlined
+                        sx={{
+                          fontSize: 18,
+                          transform: sidebarPinned
+                            ? "rotate(0deg)"
+                            : "rotate(45deg)",
+                          transition: theme.transitions.create("transform", {
+                            duration: theme.transitions.duration.shorter,
+                          }),
+                        }}
+                      />
+                    </IconButton>
+                  </Tooltip>
+                )}
+              </Stack>
+            )}
           </Box>
         </Stack>
       </Box>
 
-      <Divider sx={{ borderColor: alpha(theme.palette.divider, isDark ? 0.5 : 1) }} />
+      <Divider
+        sx={{ borderColor: alpha(theme.palette.divider, isDark ? 0.5 : 1) }}
+      />
 
       <Box
         component="nav"
@@ -437,6 +567,8 @@ export default function AppLayout() {
             items={visiblePrimaryItems}
             onNavigate={!isDesktop ? () => setMobileOpen(false) : undefined}
             isDark={isDark}
+            collapsed={isSidebarCollapsed}
+            showIconChrome={showSidebarIconChrome}
           />
 
           <NavSection
@@ -444,6 +576,8 @@ export default function AppLayout() {
             items={visibleWorkspaceItems}
             onNavigate={!isDesktop ? () => setMobileOpen(false) : undefined}
             isDark={isDark}
+            collapsed={isSidebarCollapsed}
+            showIconChrome={showSidebarIconChrome}
           />
 
           <NavSection
@@ -451,93 +585,152 @@ export default function AppLayout() {
             items={visibleSecondaryItems}
             onNavigate={!isDesktop ? () => setMobileOpen(false) : undefined}
             isDark={isDark}
+            collapsed={isSidebarCollapsed}
+            showIconChrome={showSidebarIconChrome}
           />
         </Stack>
       </Box>
 
-      <Box sx={{ p: 1.25 }}>
-        <Divider sx={{ mb: 1.25, borderColor: alpha(theme.palette.divider, isDark ? 0.5 : 1) }} />
-
-        <Box
+      <Box sx={{ p: isSidebarCollapsed ? 1 : 1.25 }}>
+        <Divider
           sx={{
-            p: 1,
-            mb: 1,
-            borderRadius: 3,
-            border: `1px solid ${alpha(theme.palette.divider, isDark ? 0.5 : 1)}`,
-            backgroundColor: alpha(theme.palette.text.primary, isDark ? 0.03 : 0.02),
+            mb: 1.25,
+            borderColor: alpha(theme.palette.divider, isDark ? 0.5 : 1),
           }}
-        >
-          <Stack direction="row" spacing={1.25} alignItems="center">
-            <Avatar
-              sx={{
-                width: 32,
-                height: 32,
-                fontSize: 13,
-                fontWeight: 800,
-                bgcolor: alpha(theme.palette.text.primary, isDark ? 0.08 : 0.06),
-                color: sidebarText,
-              }}
-            >
-              {isElevated ? "E" : "U"}
-            </Avatar>
+        />
 
-            <Box minWidth={0}>
-              <Typography
-                variant="body2"
-                sx={{ fontWeight: 700, color: sidebarText, lineHeight: 1.2 }}
+        {!isSidebarCollapsed && (
+          <Box
+            sx={{
+              p: 1,
+              mb: 1,
+              borderRadius: 3,
+              border: `1px solid ${alpha(theme.palette.divider, isDark ? 0.5 : 1)}`,
+              backgroundColor: alpha(
+                theme.palette.text.primary,
+                isDark ? 0.03 : 0.02,
+              ),
+            }}
+          >
+            <Stack direction="row" spacing={1.25} alignItems="center">
+              <Avatar
+                sx={{
+                  width: 32,
+                  height: 32,
+                  fontSize: 13,
+                  fontWeight: 800,
+                  bgcolor: alpha(
+                    theme.palette.text.primary,
+                    isDark ? 0.08 : 0.06,
+                  ),
+                  color: sidebarText,
+                }}
               >
-                {isElevated ? "Elevated access" : "Standard access"}
-              </Typography>
-              <Typography
-                variant="caption"
-                sx={{ color: sidebarSubtleText }}
-              >
-                {groups.length > 0 ? groups.join(" • ") : "Authenticated session"}
-              </Typography>
-            </Box>
-          </Stack>
-        </Box>
+                {isElevated ? "E" : "U"}
+              </Avatar>
+
+              <Box minWidth={0}>
+                <Typography
+                  variant="body2"
+                  sx={{ fontWeight: 700, color: sidebarText, lineHeight: 1.2 }}
+                >
+                  {isElevated ? "Elevated access" : "Standard access"}
+                </Typography>
+                <Typography variant="caption" sx={{ color: sidebarSubtleText }}>
+                  {groups.length > 0
+                    ? groups.join(" • ")
+                    : "Authenticated session"}
+                </Typography>
+              </Box>
+            </Stack>
+          </Box>
+        )}
 
         <List disablePadding sx={{ px: 0 }}>
           <ListItemButton
             onClick={onLogout}
             aria-label="Logout"
-            sx={{
-              minHeight: 52,
-              px: 1.25,
-              borderRadius: 3,
-              color: alpha(theme.palette.text.primary, isDark ? 0.82 : 0.88),
-              border: `1px solid ${alpha(theme.palette.divider, isDark ? 0.5 : 1)}`,
-              "& .MuiListItemIcon-root": {
-                minWidth: 0,
-                mr: 1.5,
-                color: "inherit",
-              },
-              "& .MuiListItemText-primary": {
-                fontSize: 14,
-                fontWeight: 800,
-              },
-              "&:hover": {
-                backgroundColor: alpha(theme.palette.error.main, isDark ? 0.1 : 0.08),
-                borderColor: alpha(theme.palette.error.main, isDark ? 0.16 : 0.14),
-                color: isDark ? "#fecaca" : theme.palette.error.dark,
-              },
-              "&:focus-visible": {
-                outline: `2px solid ${alpha(theme.palette.primary.main, 0.72)}`,
-                outlineOffset: 2,
-              },
+            title={isSidebarCollapsed ? "Logout" : undefined}
+            sx={(theme) => {
+              const minimalCollapsed =
+                isSidebarCollapsed && !showSidebarIconChrome;
+
+              return {
+                minHeight: 52,
+                px: isSidebarCollapsed ? 1 : 1.25,
+                borderRadius: 3,
+                color: alpha(theme.palette.text.primary, isDark ? 0.82 : 0.88),
+                border: minimalCollapsed
+                  ? "1px solid transparent"
+                  : `1px solid ${alpha(theme.palette.divider, isDark ? 0.5 : 1)}`,
+                backgroundColor: minimalCollapsed
+                  ? "transparent"
+                  : "transparent",
+                justifyContent: isSidebarCollapsed ? "center" : "flex-start",
+                "& .MuiListItemIcon-root": {
+                  minWidth: 0,
+                  mr: isSidebarCollapsed ? 0 : 1.5,
+                  color: "inherit",
+                },
+                "& .MuiListItemText-root": {
+                  opacity: isSidebarCollapsed ? 0 : 1,
+                  width: isSidebarCollapsed ? 0 : "auto",
+                  overflow: "hidden",
+                },
+                "& .MuiListItemText-primary": {
+                  fontSize: 14,
+                  fontWeight: 800,
+                  whiteSpace: "nowrap",
+                },
+                "&:hover": {
+                  backgroundColor: alpha(
+                    theme.palette.error.main,
+                    isDark ? 0.1 : 0.08,
+                  ),
+                  borderColor: alpha(
+                    theme.palette.error.main,
+                    isDark ? 0.16 : 0.14,
+                  ),
+                  color: isDark ? "#fecaca" : theme.palette.error.dark,
+                },
+                "&:hover .logout-icon-shell": {
+                  borderColor: alpha(
+                    theme.palette.error.main,
+                    isDark ? 0.22 : 0.18,
+                  ),
+                  backgroundColor: alpha(
+                    theme.palette.error.main,
+                    isDark ? 0.12 : 0.08,
+                  ),
+                },
+                "&:focus-visible": {
+                  outline: `2px solid ${alpha(theme.palette.primary.main, 0.72)}`,
+                  outlineOffset: 2,
+                },
+              };
             }}
           >
             <ListItemIcon>
               <Box
+                className="logout-icon-shell"
                 sx={{
                   width: 34,
                   height: 34,
                   borderRadius: 2.25,
                   display: "grid",
                   placeItems: "center",
-                  border: `1px solid ${alpha(theme.palette.divider, isDark ? 0.5 : 1)}`,
-                  backgroundColor: alpha(theme.palette.text.primary, isDark ? 0.03 : 0.02),
+                  border: showSidebarIconChrome
+                    ? `1px solid ${alpha(theme.palette.divider, isDark ? 0.5 : 1)}`
+                    : "1px solid transparent",
+                  backgroundColor: showSidebarIconChrome
+                    ? alpha(theme.palette.text.primary, isDark ? 0.03 : 0.02)
+                    : "transparent",
+                  transition: theme.transitions.create(
+                    ["background-color", "border-color"],
+                    {
+                      duration: theme.transitions.duration.shorter,
+                    },
+                  ),
                 }}
               >
                 <LogoutOutlined sx={{ fontSize: 20 }} />
@@ -568,7 +761,10 @@ export default function AppLayout() {
           display: { xs: "block", md: "none" },
           zIndex: (t) => t.zIndex.drawer + 1,
           backdropFilter: "blur(16px)",
-          backgroundColor: alpha(theme.palette.background.paper, isDark ? 0.72 : 0.82),
+          backgroundColor: alpha(
+            theme.palette.background.paper,
+            isDark ? 0.72 : 0.82,
+          ),
           borderBottom: `1px solid ${alpha(theme.palette.divider, isDark ? 0.5 : 1)}`,
           boxShadow: isDark
             ? `0 8px 32px ${alpha("#020617", 0.22)}`
@@ -576,7 +772,12 @@ export default function AppLayout() {
         }}
       >
         <Toolbar sx={{ minHeight: 72, px: 2 }}>
-          <Stack direction="row" alignItems="center" justifyContent="space-between" sx={{ width: "100%" }}>
+          <Stack
+            direction="row"
+            alignItems="center"
+            justifyContent="space-between"
+            sx={{ width: "100%" }}
+          >
             <IconButton
               edge="start"
               color="inherit"
@@ -584,9 +785,15 @@ export default function AppLayout() {
               onClick={() => setMobileOpen(true)}
               sx={{
                 border: `1px solid ${alpha(theme.palette.divider, isDark ? 0.5 : 1)}`,
-                backgroundColor: alpha(theme.palette.text.primary, isDark ? 0.04 : 0.02),
+                backgroundColor: alpha(
+                  theme.palette.text.primary,
+                  isDark ? 0.04 : 0.02,
+                ),
                 "&:hover": {
-                  backgroundColor: alpha(theme.palette.text.primary, isDark ? 0.08 : 0.05),
+                  backgroundColor: alpha(
+                    theme.palette.text.primary,
+                    isDark ? 0.08 : 0.05,
+                  ),
                 },
                 "&:focus-visible": {
                   outline: `2px solid ${alpha(theme.palette.primary.main, 0.72)}`,
@@ -609,9 +816,24 @@ export default function AppLayout() {
       <Box
         component="aside"
         aria-label="Sidebar"
+        onMouseEnter={
+          isDesktop && !sidebarPinned
+            ? () => setSidebarHovered(true)
+            : undefined
+        }
+        onMouseLeave={
+          isDesktop && !sidebarPinned
+            ? () => setSidebarHovered(false)
+            : undefined
+        }
         sx={{
-          width: { md: drawerWidth },
+          width: { md: effectiveDrawerWidth },
           flexShrink: { md: 0 },
+          transition: (theme) =>
+            theme.transitions.create("width", {
+              duration: theme.transitions.duration.standard,
+              easing: theme.transitions.easing.easeInOut,
+            }),
         }}
       >
         {!isDesktop ? (
@@ -639,7 +861,12 @@ export default function AppLayout() {
             open
             PaperProps={{
               sx: {
-                width: drawerWidth,
+                width: effectiveDrawerWidth,
+                overflowX: "hidden",
+                transition: theme.transitions.create("width", {
+                  duration: theme.transitions.duration.standard,
+                  easing: theme.transitions.easing.easeInOut,
+                }),
                 borderRight: `1px solid ${alpha(theme.palette.divider, isDark ? 0.5 : 1)}`,
                 backgroundColor: "transparent",
                 boxShadow: "none",
@@ -656,11 +883,34 @@ export default function AppLayout() {
         sx={{
           flexGrow: 1,
           minWidth: 0,
-          width: { md: `calc(100% - ${drawerWidth}px)` },
+          width: { md: `calc(100% - ${effectiveDrawerWidth}px)` },
+          transition: (theme) =>
+            theme.transitions.create(["width", "margin", "padding"], {
+              duration: theme.transitions.duration.standard,
+              easing: theme.transitions.easing.easeInOut,
+            }),
         }}
       >
         <Box sx={{ height: { xs: 72, md: 0 } }} />
-        <Box sx={{ px: { xs: 2, md: 3 }, py: { xs: 2, md: 3 } }}>
+        <Box
+          sx={{
+            px: {
+              xs: 2,
+              md: isSidebarCollapsed ? 5 : 3,
+            },
+            py: { xs: 2, md: 3 },
+            maxWidth: {
+              md: isSidebarCollapsed ? "1600px" : "1440px",
+            },
+            mx: "auto",
+            width: "100%",
+            transition: (theme) =>
+              theme.transitions.create(["max-width", "padding"], {
+                duration: theme.transitions.duration.standard,
+                easing: theme.transitions.easing.easeInOut,
+              }),
+          }}
+        >
           <Outlet />
         </Box>
       </Box>

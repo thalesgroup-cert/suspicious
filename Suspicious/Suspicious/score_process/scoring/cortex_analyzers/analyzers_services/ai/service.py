@@ -4,7 +4,6 @@ import io
 import zipfile
 import requests
 import chromadb
-from chromadb.config import Settings
 from minio import Minio
 from minio.error import S3Error
 from case_handler.models import Case
@@ -39,6 +38,7 @@ with open(CONFIG_PATH) as config_file:
 
 thehive_config = config.get("thehive", {})
 minio_config = config.get("minio", {})
+chromadb_config = config.get("chromadb", {})
 
 logger = logging.getLogger("tasp.cron.update_ongoing_case_jobs")
 
@@ -121,9 +121,9 @@ class AnalyzerAI(BaseAnalyzer):
             # Chroma init
             # ----------------------
             try:
-                chroma_client = chromadb.PersistentClient(
-                    path="/app/Suspicious/chromadb",
-                    settings=Settings(anonymized_telemetry=False)
+                chroma_client = chromadb.HttpClient(
+                    host=chromadb_config.get("host", "chromadb"),
+                    port=int(chromadb_config.get("port", 8000)),
                 )
                 suspicious_collection = get_suspicious_collection(chroma_client)
             except Exception as e:
