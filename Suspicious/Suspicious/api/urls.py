@@ -29,7 +29,10 @@ from .views import (
     
     # Submissions
     SubmissionListView,
-    
+    MySubmissionsView,
+    SubmissionDetailsView,
+    SubmissionChallengeView,
+
     # Profile
     ProfileView,
     ProfilePreferencesView,
@@ -163,7 +166,14 @@ urlpatterns = [
         SubmissionListView.as_view(),
         name="submissions-list",
     ),
-    
+    path(
+        "submissions/mine/",
+        MySubmissionsView.as_view(),
+        name="my-submissions",
+    ),
+    path("submissions/<int:submission_id>/", SubmissionDetailsView.as_view(), name="submission-details"),
+    path("submissions/<int:submission_id>/challenge/", SubmissionChallengeView.as_view(), name="submission-challenge"),
+
     # ------------------------------------------------------------------
     # Home summary
     # ------------------------------------------------------------------

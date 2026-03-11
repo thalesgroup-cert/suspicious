@@ -95,7 +95,7 @@ async function setCisoScope(input: { scope: string }): Promise<{ scope: string }
 type SubmissionRow = {
   id: number | string;
   status?: string;
-  info?: string;
+  artifact?: string;
   created_at?: string;
   tests_done?: number;
   type?: string;
@@ -596,7 +596,7 @@ export default function HomePage() {
                       <TableRow>
                         <TableCell sx={{ fontWeight: 950 }}>ID</TableCell>
                         <TableCell sx={{ fontWeight: 950 }}>Status</TableCell>
-                        <TableCell sx={{ fontWeight: 950 }}>Info</TableCell>
+                        <TableCell sx={{ fontWeight: 950 }}>Artifact</TableCell>
                         <TableCell sx={{ fontWeight: 950 }}>Date</TableCell>
                         <TableCell sx={{ fontWeight: 950, textAlign: "right" }}>Tests</TableCell>
                         <TableCell sx={{ fontWeight: 950 }}>Type</TableCell>
@@ -639,7 +639,7 @@ export default function HomePage() {
                             <StatusChip status={r.status as any} minWidth={BADGE_W} />
                           </TableCell>
 
-                          <TableCell title={r.info ?? ""}>
+                          <TableCell title={r.artifact ?? ""}>
                             <Typography
                               sx={{
                                 maxWidth: 360,
@@ -648,7 +648,7 @@ export default function HomePage() {
                                 textOverflow: "ellipsis",
                               }}
                             >
-                              {short(r.info, 64) || "—"}
+                              {short(r.artifact, 64) || "—"}
                             </Typography>
                           </TableCell>
 

@@ -30,6 +30,9 @@ import {
   TextField,
   Tooltip,
   Typography,
+  Accordion,
+  AccordionSummary,
+  AccordionDetails,
 } from "@mui/material";
 import {
   AssignmentTurnedInOutlined,
@@ -37,47 +40,186 @@ import {
   RefreshOutlined,
   OpenInNewOutlined,
   FilterAltOutlined,
+  ExpandMoreOutlined,
 } from "@mui/icons-material";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useNavigate, useSearchParams } from "react-router-dom";
-
+import { alpha } from "@mui/material/styles";
 import { getMe, type Me } from "@/api/auth";
 import {
   challengeSubmission,
   getMySubmissions,
   getSubmissionDetails,
+  SubmissionDetails, SubmissionAnalyzerReport,
   type SubmissionRow,
   type SubmissionStatus,
   type SubmissionType,
 } from "@/features/submissions/api";
-import { mockMySubmissions } from "@/features/submissions/mock";
-import { mockSubmissionDetails } from "@/features/submissions/mockDetails";
 
 import { useDebounced } from "@/shared/hooks/useDebounced";
 import { StatusChip } from "@/shared/components/StatusChip";
 import { ResultChip } from "@/shared/components/ResultChip";
 import { CopyIconButton } from "@/shared/components/CopyIconButton";
 
-import { groupAnalyzers, normalizeAnalyzers, type AnalyzerGroup } from "@/shared/hooks/detailsNormalize";
-import { ArtifactAnalyzersAccordion } from "@/shared/components/ArtifactAnalyzersAccordion";
-
 type SubmissionsResponse = { items: SubmissionRow[] };
+
+function AnalyzerReportCard({ report }: { report: SubmissionAnalyzerReport }) {
+  return (
+    <Card
+      sx={{
+        borderRadius: 2,
+        border: "1px solid rgba(255,255,255,.08)",
+        background: "rgba(255,255,255,.025)",
+      }}
+    >
+      <CardContent sx={{ p: 1.5 }}>
+        <Stack spacing={1}>
+          <Stack direction="row" justifyContent="space-between" alignItems="flex-start" spacing={1}>
+            <Box>
+              <Typography variant="subtitle2" fontWeight={900}>
+                {report.analyzer_name || "Unknown analyzer"}
+              </Typography>
+              <Typography variant="caption" color="text.secondary">
+                {report.analyzer_id} • {report.type} • {report.status}
+              </Typography>
+            </Box>
+
+            <Stack direction="row" spacing={0.75} sx={{ flexWrap: "wrap", justifyContent: "flex-end" }}>
+              <Chip size="small" label={`Level: ${report.level || "—"}`} variant="outlined" />
+              <Chip size="small" label={`Score: ${report.score ?? "—"}`} variant="outlined" />
+              <Chip
+                size="small"
+                label={`Confidence: ${typeof report.confidence === "number" ? report.confidence.toFixed(2) : "—"}`}
+                variant="outlined"
+              />
+            </Stack>
+          </Stack>
+
+          <Box
+            sx={{
+              display: "grid",
+              gridTemplateColumns: { xs: "1fr", sm: "120px 1fr" },
+              gap: 1,
+            }}
+          >
+            <Typography color="text.secondary" variant="body2">
+              Target
+            </Typography>
+            <Typography variant="body2" sx={{ wordBreak: "break-word" }}>
+              {report.target?.value || "—"} {report.target?.kind ? `(${report.target.kind})` : ""}
+            </Typography>
+
+            <Typography color="text.secondary" variant="body2">
+              Categories
+            </Typography>
+            <Typography variant="body2">
+              {report.categories?.length ? report.categories.join(", ") : "—"}
+            </Typography>
+
+            <Typography color="text.secondary" variant="body2">
+              Created
+            </Typography>
+            <Typography variant="body2">
+              {fmtDate(report.created_at)}
+            </Typography>
+          </Box>
+
+          {report.report_taxonomy ? (
+            <Accordion
+              disableGutters
+              sx={{
+                borderRadius: 2,
+                border: "1px solid rgba(255,255,255,.08)",
+                background: "rgba(255,255,255,.02)",
+                "&:before": { display: "none" },
+              }}
+            >
+              <AccordionSummary expandIcon={<ExpandMoreOutlined />}>
+                <Typography variant="body2" fontWeight={800}>
+                  Taxonomy
+                </Typography>
+              </AccordionSummary>
+              <AccordionDetails>
+                <Box
+                  component="pre"
+                  sx={{
+                    m: 0,
+                    p: 1.25,
+                    borderRadius: 2,
+                    border: "1px solid rgba(255,255,255,.08)",
+                    background: "rgba(0,0,0,.18)",
+                    overflow: "auto",
+                    maxHeight: 220,
+                    fontSize: 12,
+                    lineHeight: 1.45,
+                  }}
+                >
+                  {JSON.stringify(report.report_taxonomy, null, 2)}
+                </Box>
+              </AccordionDetails>
+            </Accordion>
+          ) : null}
+
+          {report.report_summary ? (
+            <Accordion
+              disableGutters
+              sx={{
+                borderRadius: 2,
+                border: "1px solid rgba(255,255,255,.08)",
+                background: "rgba(255,255,255,.02)",
+                "&:before": { display: "none" },
+              }}
+            >
+              <AccordionSummary expandIcon={<ExpandMoreOutlined />}>
+                <Typography variant="body2" fontWeight={800}>
+                  Summary
+                </Typography>
+              </AccordionSummary>
+              <AccordionDetails>
+                <Box
+                  component="pre"
+                  sx={{
+                    m: 0,
+                    p: 1.25,
+                    borderRadius: 2,
+                    border: "1px solid rgba(255,255,255,.08)",
+                    background: "rgba(0,0,0,.18)",
+                    overflow: "auto",
+                    maxHeight: 220,
+                    fontSize: 12,
+                    lineHeight: 1.45,
+                  }}
+                >
+                  {JSON.stringify(report.report_summary, null, 2)}
+                </Box>
+              </AccordionDetails>
+            </Accordion>
+          ) : null}
+        </Stack>
+      </CardContent>
+    </Card>
+  );
+}
 
 function GlassCard(props: React.PropsWithChildren<{ sx?: any }>) {
   return (
     <Card
-      sx={{
-        borderRadius: 2, // less roundy (was 4)
-        border: "1px solid rgba(255,255,255,.10)",
-        background: "linear-gradient(180deg, rgba(255,255,255,.06), rgba(255,255,255,.03))",
+      sx={(theme) => ({
+        borderRadius: 2,
+        border: `1px solid ${alpha(theme.palette.divider, 0.9)}`,
+        background: `linear-gradient(
+          180deg,
+          ${alpha(theme.palette.background.paper, 0.88)} 0%,
+          ${alpha(theme.palette.background.paper, 0.72)} 100%
+        )`,
+        backdropFilter: "blur(8px)",
         ...props.sx,
-      }}
+      })}
     >
       {props.children}
     </Card>
   );
 }
-
 function fmtDate(iso: string) {
   const d = new Date(iso);
   if (Number.isNaN(d.getTime())) return iso;
@@ -94,7 +236,7 @@ function matches(row: SubmissionRow, q: string) {
   if (!v) return true;
   return (
     String(row.id).includes(v) ||
-    (row.info ?? "").toLowerCase().includes(v) ||
+    (row.artifact ?? "").toLowerCase().includes(v) ||
     (row.status ?? "").toLowerCase().includes(v) ||
     (row.type ?? "").toLowerCase().includes(v) ||
     (row.result ?? "").toLowerCase().includes(v)
@@ -122,11 +264,6 @@ export default function SubmissionsPage() {
   const [searchParams] = useSearchParams();
   const qc = useQueryClient();
 
-  const useMock = import.meta.env.VITE_USE_MOCK_SUBMISSIONS === "true";
-  const useMockMe = import.meta.env.VITE_USE_MOCK_ME === "true";
-  // new flag (optional): mock details even when using live submissions
-  const useMockDetails = import.meta.env.VITE_USE_MOCK_SUBMISSION_DETAILS === "true";
-
   const [q, setQ] = React.useState("");
   const qDebounced = useDebounced(q, 200);
 
@@ -146,31 +283,19 @@ export default function SubmissionsPage() {
     queryKey: ["me"],
     queryFn: getMe,
     retry: false,
-    enabled: !useMockMe,
   });
 
   const me: Me | undefined = React.useMemo(() => {
-    if (useMockMe) {
-      return {
-        id: 1,
-        username: "mockuser",
-        email: "mockuser@example.com",
-        first_name: "Mock",
-        last_name: "User",
-        groups: ["USER"],
-      } as any;
-    }
     return meQuery.data;
-  }, [useMockMe, meQuery.data]);
+  }, [meQuery.data]);
 
   const submissionsQuery = useQuery<SubmissionsResponse>({
-    queryKey: ["submissions", useMock],
-    queryFn: async () => (useMock ? mockMySubmissions() : getMySubmissions()),
+    queryKey: ["submissions"],
+    queryFn: async () => (getMySubmissions()),
     enabled: !!me,
     retry: false,
     initialData: { items: [] },
     refetchInterval: (query) => {
-      if (useMock) return false;
       const items = (query.state.data as SubmissionsResponse | undefined)?.items ?? [];
       const shouldPoll = items.some((r) => {
         const s = ((r.status ?? "UNKNOWN") as string).toUpperCase();
@@ -184,13 +309,12 @@ export default function SubmissionsPage() {
   const selectedIdNum = typeof selectedId === "number" ? selectedId : selectedId ? Number(selectedId) : NaN;
   const hasNumericSelectedId = Number.isFinite(selectedIdNum);
 
-  const detailsQuery = useQuery<any>({
-    queryKey: ["submissionDetails", selectedIdNum, useMockDetails],
+  const detailsQuery = useQuery<SubmissionDetails>({
+    queryKey: ["submissionDetails", selectedIdNum],
     queryFn: async () => {
-      if (useMockDetails) return mockSubmissionDetails(selectedIdNum);
       return getSubmissionDetails(selectedIdNum);
     },
-    enabled: !!me && hasNumericSelectedId && openDrawer && !(useMock && !useMockDetails),
+    enabled: !!me && hasNumericSelectedId && openDrawer,
     retry: false,
     staleTime: 30_000,
     gcTime: 10 * 60_000,
@@ -200,10 +324,10 @@ export default function SubmissionsPage() {
   const challengeMutation = useMutation({
     mutationFn: async (id: number) => challengeSubmission(id),
     onMutate: async (id) => {
-      await qc.cancelQueries({ queryKey: ["submissions", useMock] });
-      const prev = qc.getQueryData<SubmissionsResponse>(["submissions", useMock]);
+      await qc.cancelQueries({ queryKey: ["submissions"] });
+      const prev = qc.getQueryData<SubmissionsResponse>(["submissions"]);
       if (prev) {
-        qc.setQueryData<SubmissionsResponse>(["submissions", useMock], {
+        qc.setQueryData<SubmissionsResponse>(["submissions"], {
           items: prev.items.map((r) =>
             r.id === id ? { ...r, is_challenged: true, is_challengeable: false } : r
           ),
@@ -212,10 +336,10 @@ export default function SubmissionsPage() {
       return { prev };
     },
     onError: (_err, _id, ctx) => {
-      if (ctx?.prev) qc.setQueryData(["submissions", useMock], ctx.prev);
+      if (ctx?.prev) qc.setQueryData(["submissions"], ctx.prev);
     },
     onSettled: () => {
-      qc.invalidateQueries({ queryKey: ["submissions", useMock] });
+      qc.invalidateQueries({ queryKey: ["submissions"] });
       qc.invalidateQueries({ queryKey: ["submissionDetails"] });
     },
     onSuccess: () => setChallengeId(null),
@@ -241,7 +365,7 @@ export default function SubmissionsPage() {
     setPage(0);
   }, [qDebounced, status, type, from, to, sort, pageSize]);
 
-  const rows = submissionsQuery.data.items;
+  const rows = submissionsQuery.data?.items ?? [];
 
   const filtered = rows
     .filter((r) => matches(r, qDebounced))
@@ -265,13 +389,7 @@ export default function SubmissionsPage() {
 
   const selectedRow = selectedId ? rows.find((r) => String(r.id) === String(selectedId)) : undefined;
 
-  const analyzerGroups: AnalyzerGroup[] = React.useMemo(() => {
-    if (!detailsQuery.data) return [];
-    const hits = normalizeAnalyzers(detailsQuery.data);
-    return groupAnalyzers(hits, detailsQuery.data);
-  }, [detailsQuery.data]);
-
-  if (!useMockMe && meQuery.isLoading) {
+  if (meQuery.isLoading) {
     return (
       <Box sx={{ minHeight: "60vh", display: "grid", placeItems: "center" }}>
         <CircularProgress />
@@ -327,8 +445,6 @@ export default function SubmissionsPage() {
           <Stack direction="row" spacing={1} sx={{ mt: 1, flexWrap: "wrap" }}>
             <Chip icon={<AssignmentTurnedInOutlined />} label={`${total} shown`} variant="outlined" />
             <Chip icon={<FilterAltOutlined />} label="Filters available" variant="outlined" />
-            <Chip label={useMock ? "Mock mode" : "Live"} variant="outlined" />
-            {useMockDetails ? <Chip label="Mock details" variant="outlined" /> : null}
             {qDebounced ? <Chip label={`Search: ${qDebounced}`} variant="outlined" /> : null}
           </Stack>
         </Stack>
@@ -361,7 +477,7 @@ export default function SubmissionsPage() {
                 value={q}
                 onChange={(e) => setQ(e.target.value)}
                 label="Search"
-                placeholder="id, status, info, type, result"
+                placeholder="id, status, artifact, type, result"
                 fullWidth
                 InputProps={{
                   startAdornment: (
@@ -496,7 +612,7 @@ export default function SubmissionsPage() {
                   <TableRow>
                     <TableCell sx={{ fontWeight: 950 }}>ID</TableCell>
                     <TableCell sx={{ fontWeight: 950 }}>Status</TableCell>
-                    <TableCell sx={{ fontWeight: 950 }}>Info</TableCell>
+                    <TableCell sx={{ fontWeight: 950 }}>Artifact</TableCell>
                     <TableCell sx={{ fontWeight: 950 }}>Date</TableCell>
                     <TableCell sx={{ fontWeight: 950, textAlign: "right" }}>Tests</TableCell>
                     <TableCell sx={{ fontWeight: 950 }}>Type</TableCell>
@@ -562,7 +678,7 @@ export default function SubmissionsPage() {
                           <StatusChip status={r.status} minWidth={BADGE_W} />
                         </TableCell>
 
-                        <TableCell title={r.info}>
+                        <TableCell title={r.artifact}>
                           <Typography
                             sx={{
                               maxWidth: 340,
@@ -571,7 +687,7 @@ export default function SubmissionsPage() {
                               textOverflow: "ellipsis",
                             }}
                           >
-                            {short(r.info, 64)}
+                            {short(r.artifact, 64)}
                           </Typography>
                         </TableCell>
 
@@ -630,48 +746,67 @@ export default function SubmissionsPage() {
         open={openDrawer}
         onClose={() => setOpenDrawer(false)}
         PaperProps={{
-          sx: {
-            borderRadius: DRAWER_RADIUS, // added
-            width: { xs: "100%", sm: 600 },
-            p: 2,
-            borderLeft: "1px solid rgba(255,255,255,.10)",
-            background: "rgb(20, 18, 18)",
-          },
+          sx: (theme) => ({
+            width: { xs: "100%", sm: 620 },
+            p: 0,
+            borderLeft: `1px solid ${theme.palette.divider}`,
+            background: `linear-gradient(
+              180deg,
+              ${theme.palette.background.paper} 0%,
+              ${alpha(theme.palette.background.default, 0.98)} 100%
+            )`,
+            color: theme.palette.text.primary,
+            overflow: "hidden",
+          }),
         }}
       >
-        <Stack spacing={1.25}>
-          <Stack direction="row" alignItems="center" justifyContent="space-between">
-            <Typography variant="h6" fontWeight={950}>
-              Submission details
-            </Typography>
-            <Button onClick={() => setOpenDrawer(false)} sx={{ textTransform: "none", borderRadius: 2 }}>
-              Close
-            </Button>
-          </Stack>
-
-          <Divider sx={{ opacity: 0.25 }} />
-
-          {!selectedRow ? (
+        {!selectedRow ? (
+          <Box sx={{ p: 2 }}>
             <Alert severity="info">Select a row.</Alert>
-          ) : (
-            <>
-              <Stack spacing={0.5}>
-                <Typography variant="overline" color="text.secondary">
-                  ID
-                </Typography>
-                <Stack direction="row" spacing={1} alignItems="center">
-                  <Typography variant="h5" fontWeight={950}>
-                    {selectedRow.id}
+          </Box>
+        ) : (
+          <Stack sx={{ height: "100%" }}>
+            {/* Header */}
+            <Box
+              sx={(theme) => ({
+                px: 2.25,
+                py: 1.75,
+                borderBottom: `1px solid ${theme.palette.divider}`,
+                background: `linear-gradient(
+                  180deg,
+                  ${alpha(theme.palette.action.hover, 0.22)} 0%,
+                  ${alpha(theme.palette.background.paper, 0)} 100%
+                )`,
+              })}
+            >
+              <Stack direction="row" alignItems="flex-start" justifyContent="space-between" spacing={2}>
+                <Box>
+                  <Typography variant="overline" color="text.secondary">
+                    Submission
                   </Typography>
-                  <CopyIconButton text={String(selectedRow.id)} title="Copy ID" />
-                </Stack>
+
+                  <Stack direction="row" spacing={1} alignItems="center" sx={{ mt: 0.25 }}>
+                    <Typography variant="h5" fontWeight={950} lineHeight={1.1}>
+                      #{selectedRow.id}
+                    </Typography>
+                    <CopyIconButton text={String(selectedRow.id)} title="Copy ID" />
+                  </Stack>
+
+                  <Typography variant="body2" color="text.secondary" sx={{ mt: 0.75 }}>
+                    Created {fmtDate(selectedRow.created_at)}
+                  </Typography>
+                </Box>
+
+                <Button
+                  onClick={() => setOpenDrawer(false)}
+                  sx={{ textTransform: "none", borderRadius: 2, alignSelf: "flex-start" }}
+                >
+                  Close
+                </Button>
               </Stack>
 
-              <Stack direction="row" spacing={1} sx={{ flexWrap: "wrap" }}>
-                <Chip size="small" label="Status" variant="outlined" />
+              <Stack direction="row" spacing={1} sx={{ mt: 1.75, flexWrap: "wrap" }}>
                 <StatusChip status={selectedRow.status} minWidth={BADGE_W} />
-
-                <Chip size="small" label="Type" variant="outlined" />
                 <Chip
                   size="small"
                   label={selectedRow.type}
@@ -683,69 +818,151 @@ export default function SubmissionsPage() {
                     "& .MuiChip-label": { width: "100%", textAlign: "center" },
                   }}
                 />
-
-                <Chip size="small" label="Result" variant="outlined" />
                 <ResultChip result={selectedRow.result} minWidth={BADGE_W} />
-
                 <Chip
                   size="small"
-                  label={`Tests: ${selectedRow.tests_done}`}
+                  label={`${selectedRow.tests_done} tests`}
                   variant="outlined"
                   sx={{ fontWeight: 900 }}
                 />
               </Stack>
+            </Box>
 
-              <Divider sx={{ opacity: 0.25 }} />
-
-              <Typography fontWeight={900}>Info</Typography>
-              <Typography color="text.secondary" sx={{ wordBreak: "break-word" }}>
-                {selectedRow.info}
-              </Typography>
-
-              <Typography fontWeight={900} sx={{ mt: 1 }}>
-                Created
-              </Typography>
-              <Typography color="text.secondary">{fmtDate(selectedRow.created_at)}</Typography>
-
-              <Divider sx={{ opacity: 0.25 }} />
-
-              <Typography fontWeight={900}>Analyzer details</Typography>
-
-              {detailsQuery.isLoading ? (
-                <CircularProgress size={18} />
-              ) : detailsQuery.isError ? (
-                <Alert severity="warning">Could not load details.</Alert>
-              ) : (
-                <ArtifactAnalyzersAccordion groups={analyzerGroups} defaultExpanded />
-              )}
-
-              <Divider sx={{ opacity: 0.25 }} />
-              <Typography fontWeight={900}>Raw details (API)</Typography>
-
-              {detailsQuery.isLoading ? (
-                <CircularProgress size={18} />
-              ) : detailsQuery.isError ? (
-                <Alert severity="warning">Could not load details.</Alert>
-              ) : (
-                <Box
-                  component="pre"
+            {/* Scrollable content */}
+            <Box sx={{ flex: 1, overflowY: "auto", p: 2 }}>
+              <Stack spacing={2}>
+                {/* Overview */}
+                <Card
                   sx={{
-                    m: 0,
-                    p: 1.5,
-                    borderRadius: 2, // less roundy (was 3)
-                    border: "1px solid rgba(255,255,255,.10)",
-                    background: "rgba(0,0,0,.20)",
-                    overflow: "auto",
-                    maxHeight: 260,
-                    fontSize: 12,
+                    borderRadius: 2,
+                    border: "1px solid rgba(255,255,255,.08)",
+                    background: "rgba(255,255,255,.025)",
                   }}
                 >
-                  {JSON.stringify(detailsQuery.data, null, 2)}
-                </Box>
-              )}
-            </>
-          )}
-        </Stack>
+                  <CardContent sx={{ p: 2 }}>
+                    <Typography variant="subtitle2" fontWeight={900} sx={{ mb: 1.25 }}>
+                      Overview
+                    </Typography>
+
+                    <Box
+                      sx={{
+                        display: "grid",
+                        gridTemplateColumns: { xs: "1fr", sm: "120px 1fr" },
+                        gap: 1.25,
+                      }}
+                    >
+                      <Typography color="text.secondary">Artifact</Typography>
+                      <Typography sx={{ wordBreak: "break-word" }}>
+                        {selectedRow.artifact || "—"}
+                      </Typography>
+
+                      <Typography color="text.secondary">Created</Typography>
+                      <Typography>{fmtDate(selectedRow.created_at)}</Typography>
+
+                      <Typography color="text.secondary">Submission ID</Typography>
+                      <Stack direction="row" spacing={1} alignItems="center">
+                        <Typography>{selectedRow.id}</Typography>
+                        <CopyIconButton text={String(selectedRow.id)} title="Copy ID" />
+                      </Stack>
+                    </Box>
+                  </CardContent>
+                </Card>
+
+                {/* Analyzer details */}
+                <Card
+                  sx={{
+                    borderRadius: 2,
+                    border: "1px solid rgba(255,255,255,.08)",
+                    background: "rgba(255,255,255,.025)",
+                  }}
+                >
+                  <CardContent sx={{ p: 2 }}>
+                    <Stack
+                      direction="row"
+                      justifyContent="space-between"
+                      alignItems="center"
+                      sx={{ mb: 1.25 }}
+                    >
+                      <Typography variant="subtitle2" fontWeight={900}>
+                        Analyzer details
+                      </Typography>
+
+                      {!detailsQuery.isLoading && !detailsQuery.isError ? (
+                        <Typography variant="caption" color="text.secondary">
+                          {detailsQuery.data?.analyzer_reports?.length ?? 0} report
+                          {(detailsQuery.data?.analyzer_reports?.length ?? 0) === 1 ? "" : "s"}
+                        </Typography>
+                      ) : null}
+                    </Stack>
+
+                    {detailsQuery.isLoading ? (
+                      <Stack direction="row" spacing={1} alignItems="center">
+                        <CircularProgress size={18} />
+                        <Typography variant="body2" color="text.secondary">
+                          Loading details…
+                        </Typography>
+                      </Stack>
+                    ) : detailsQuery.isError ? (
+                      <Alert severity="warning">Could not load details.</Alert>
+                    ) : !detailsQuery.data?.analyzer_reports?.length ? (
+                      <Alert severity="info">No analyzers triggered for this submission.</Alert>
+                    ) : (
+                      <Stack spacing={1.25}>
+                        {detailsQuery.data.analyzer_reports.map((report) => (
+                          <AnalyzerReportCard key={report.id} report={report} />
+                        ))}
+                      </Stack>
+                    )}
+                  </CardContent>
+                </Card>
+
+                {/* Raw details */}
+                <Card
+                  sx={{
+                    borderRadius: 2,
+                    border: "1px solid rgba(255,255,255,.08)",
+                    background: "rgba(255,255,255,.02)",
+                  }}
+                >
+                  <Accordion
+                    disableGutters
+                    sx={{
+                      borderRadius: 2,
+                      border: "1px solid rgba(255,255,255,.08)",
+                      background: "rgba(255,255,255,.02)",
+                      "&:before": { display: "none" },
+                    }}
+                  >
+                    <AccordionSummary expandIcon={<ExpandMoreOutlined />}>
+                      <Typography variant="subtitle2" fontWeight={900}>
+                        Raw details (API)
+                      </Typography>
+                    </AccordionSummary>
+                    <AccordionDetails>
+                        <Box
+                          component="pre"
+                          sx={(theme) => ({
+                            m: 0,
+                            p: 1.5,
+                            borderRadius: 2,
+                            border: `1px solid ${theme.palette.divider}`,
+                            backgroundColor: alpha(theme.palette.action.hover, 0.55),
+                            color: theme.palette.text.primary,
+                            overflow: "auto",
+                            maxHeight: 320,
+                            fontSize: 12,
+                            lineHeight: 1.45,
+                          })}
+                        >
+                        {JSON.stringify(detailsQuery.data?.raw ?? detailsQuery.data, null, 2)}
+                      </Box>
+                    </AccordionDetails>
+                  </Accordion>
+                </Card>
+              </Stack>
+            </Box>
+          </Stack>
+        )}
       </Drawer>
 
       {/* Challenge dialog */}
@@ -764,11 +981,6 @@ export default function SubmissionsPage() {
               Failed to challenge.
             </Alert>
           ) : null}
-          {useMock ? (
-            <Alert severity="info" sx={{ mt: 2 }}>
-              Mock mode: challenge disabled.
-            </Alert>
-          ) : null}
         </DialogContent>
         <DialogActions>
           <Button onClick={() => setChallengeId(null)} sx={{ borderRadius: 2 }}>
@@ -776,7 +988,7 @@ export default function SubmissionsPage() {
           </Button>
           <Button
             variant="contained"
-            disabled={challengeMutation.isPending || challengeId === null || useMock}
+            disabled={challengeMutation.isPending || challengeId === null}
             onClick={() => {
               if (challengeId) challengeMutation.mutate(challengeId);
             }}

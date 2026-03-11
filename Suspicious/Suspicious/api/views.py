@@ -1,5 +1,5 @@
 from django.db import IntegrityError, transaction
-from django.db.models import Sum
+from django.db.models import Sum, Q
 from django.http import HttpResponseRedirect, StreamingHttpResponse
 from rest_framework.views import APIView
 from rest_framework.permissions import AllowAny, IsAuthenticated
@@ -19,6 +19,7 @@ from dashboard.models import (
     MonthlyReporterStats,
     TotalCasesStats,
 )
+from cortex_job.models import AnalyzerReport
 from profiles.models import UserProfile, CISOProfile
 from knox.models import AuthToken
 from .serializers import (
@@ -34,7 +35,9 @@ from .serializers import (
     UpdatePreferencesSerializer,
     UpdateAppearanceSerializer,
     HomeSummaryResponseSerializer,
-    SubmissionListSerializer
+    SubmissionListSerializer,
+    SubmissionRowSerializer,
+    SubmissionDetailsSerializer,
 )
 from .filters import MonthlyCasesSummaryFilter, MonthlyReporterStatsFilter, TotalCasesStatsFilter
 from .storage import StorageClient
@@ -130,6 +133,128 @@ class SubmissionPagination(PageNumberPagination):
     page_size_query_param = "page_size"
     max_page_size = 100
 
+
+class MySubmissionsView(APIView):
+    permission_classes = [IsAuthenticated]
+
+    def get(self, request):
+        queryset = (
+            Case.objects
+            .filter(reporter=request.user)
+            .select_related("fileOrMail", "nonFileIocs")
+            .order_by("-creation_date")
+        )
+
+        items = SubmissionRowSerializer(queryset, many=True).data
+        return Response({"items": items})
+
+class SubmissionDetailsView(APIView):
+    permission_classes = [IsAuthenticated]
+
+    def get_object(self, request, submission_id: int):
+        try:
+            obj = (
+                Case.objects
+                .select_related(
+                    "fileOrMail",
+                    "fileOrMail__file",
+                    "fileOrMail__mail",
+                    "nonFileIocs",
+                    "nonFileIocs__url",
+                    "nonFileIocs__ip",
+                    "nonFileIocs__hash",
+                    "reporter",
+                    "last_update_by",
+                )
+                .get(pk=submission_id)
+            )
+        except Case.DoesNotExist:
+            raise NotFound("Submission not found.")
+
+        is_owner = obj.reporter_id == request.user.id
+        is_elevated = request.user.groups.filter(name__in=["CERT", "CISO", "Admin"]).exists()
+
+        if not is_owner and not is_elevated:
+            raise PermissionDenied("Not authorized.")
+
+        return obj
+
+    def _get_analyzer_reports_queryset(self, obj: Case):
+        q = Q()
+
+        if obj.fileOrMail_id and obj.fileOrMail:
+            if obj.fileOrMail.file_id:
+                q |= Q(file_id=obj.fileOrMail.file_id)
+
+            # mail support is partial here because AnalyzerReport points to MailAddress / MailBody / MailHeader,
+            # while Case points to Mail. If later you expose Mail -> body/header/address relations,
+            # you can extend this block.
+
+        if obj.nonFileIocs_id and obj.nonFileIocs:
+            if obj.nonFileIocs.url_id:
+                q |= Q(url_id=obj.nonFileIocs.url_id)
+            if obj.nonFileIocs.ip_id:
+                q |= Q(ip_id=obj.nonFileIocs.ip_id)
+            if obj.nonFileIocs.hash_id:
+                q |= Q(hash_id=obj.nonFileIocs.hash_id)
+
+        if not q:
+            return AnalyzerReport.objects.none()
+
+        return (
+            AnalyzerReport.objects
+            .filter(q)
+            .select_related(
+                "analyzer",
+                "url",
+                "domain",
+                "mail",
+                "hash",
+                "file",
+                "ip",
+                "mail_body",
+                "mail_header",
+            )
+            .order_by("-creation_date")
+            .distinct()
+        )
+
+    def get(self, request, submission_id: int):
+        obj = self.get_object(request, submission_id)
+        analyzer_reports_qs = self._get_analyzer_reports_queryset(obj)
+
+        serializer = SubmissionDetailsSerializer(
+            obj,
+            context={
+                "request": request,
+                "analyzer_reports_qs": analyzer_reports_qs,
+            },
+        )
+        return Response(serializer.data)
+
+class SubmissionChallengeView(APIView):
+    permission_classes = [IsAuthenticated]
+
+    def post(self, request, submission_id: int):
+        try:
+            obj = Case.objects.get(pk=submission_id)
+        except Case.DoesNotExist:
+            raise NotFound("Submission not found.")
+
+        if obj.reporter_id != request.user.id:
+            raise PermissionDenied("Not authorized.")
+
+        if obj.is_challenged:
+            return Response({"detail": "Submission already challenged."}, status=400)
+
+        if not obj.is_challengeable:
+            return Response({"detail": "Submission cannot be challenged."}, status=400)
+
+        obj.is_challenged = True
+        obj.status = "Challenged"
+        obj.save(update_fields=["is_challenged", "status", "last_update"])
+
+        return Response({"detail": "Challenge submitted."})
 
 class SubmissionListView(ListAPIView):
     permission_classes = [IsAuthenticated]

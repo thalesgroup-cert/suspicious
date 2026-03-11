@@ -162,6 +162,11 @@ else
     echo "→ application.conf exists — not overwritten"
 fi
 
+# Replace 127.0.0.1:9200 with elasticsearch:9200 in application.conf
+if grep -q "127.0.0.1:9200" "$CORTEX_CONF"; then
+    sed -i 's/127.0.0.1:9200/elasticsearch:9200/g' "$CORTEX_CONF"
+fi
+
 [ ! -f "$CORTEX_LOG" ] && touch "$CORTEX_LOG"
 perm_clog=$(stat -c '%a' "$CORTEX_LOG")
 

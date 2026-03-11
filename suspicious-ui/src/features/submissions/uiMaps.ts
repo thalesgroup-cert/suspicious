@@ -10,6 +10,7 @@ export const STATUS_META: Record<
   DONE: { label: "Done", muiColor: "success" },
   FAILED: { label: "Failed", muiColor: "error" },
   REJECTED: { label: "Rejected", muiColor: "error" },
+  CHALLENGED: { label: "Challenged", muiColor: "warning" },
   UNKNOWN: { label: "Unknown" },
 };
 
