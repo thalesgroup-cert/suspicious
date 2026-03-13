@@ -34,6 +34,10 @@ class Theme(models.TextChoices):
     CYBER = "cyber", _("Cyber")
     THE_ONE = "the_one", _("The One")
     METAL = "metal", _("Metal")
+    SUMMER = "summer", _("Summer")
+    WINTER = "winter", _("Winter")
+    SPRING = "spring", _("Spring")
+    AUTUMN = "autumn", _("Autumn")
 
 class UserProfile(models.Model):
     id = models.AutoField(primary_key=True)

@@ -4,43 +4,75 @@ import {
   Alert,
   Box,
   Button,
-  Card,
-  CardActionArea,
-  CardContent,
   Chip,
-  Dialog,
-  DialogContent,
-  DialogTitle,
+  Container,
   Divider,
-  Grid,
-  IconButton,
+  Link,
   Stack,
   Typography,
+  Accordion,
+  AccordionSummary,
+  AccordionDetails,
+  Card,
+  Grid,
+  useTheme,
+  alpha,
 } from "@mui/material";
 import {
-  CloseOutlined,
+  ExpandMoreRounded,
   InfoOutlined,
   SecurityOutlined,
   InsertDriveFileOutlined,
   EmailOutlined,
   LinkOutlined,
-  FingerprintOutlined,
   PublicOutlined,
+  FingerprintOutlined,
   ShieldOutlined,
   WarningAmberOutlined,
   HelpOutlineOutlined,
-    CheckCircleOutlined,    
+  CheckCircleOutlined,
+  DescriptionOutlined,
+  PolicyOutlined,
 } from "@mui/icons-material";
 
-type AboutModalKey = "suspicious" | "phishing" | "fileAnalysis";
+type Severity = "dangerous" | "suspicious" | "inconclusive" | "safe";
 
-function GlassCard(props: React.PropsWithChildren<{ sx?: any }>) {
+function PageSection(props: React.PropsWithChildren<{ title?: string; subtitle?: string }>) {
+  return (
+    <Box>
+      {props.title ? (
+        <Stack spacing={0.75} sx={{ mb: 2 }}>
+          <Typography variant="h5" fontWeight={800} letterSpacing={-0.4}>
+            {props.title}
+          </Typography>
+          {props.subtitle ? (
+            <Typography variant="body2" color="text.secondary" sx={{ maxWidth: 760 }}>
+              {props.subtitle}
+            </Typography>
+          ) : null}
+        </Stack>
+      ) : null}
+      {props.children}
+    </Box>
+  );
+}
+
+function SoftCard(props: React.PropsWithChildren<{ sx?: any }>) {
+  const theme = useTheme();
+  const isDark = theme.palette.mode === "dark";
+
   return (
     <Card
+      elevation={0}
       sx={{
         borderRadius: 4,
-        border: "1px solid rgba(255,255,255,.10)",
-        background: "linear-gradient(180deg, rgba(255,255,255,.06), rgba(255,255,255,.03))",
+        border: `1px solid ${alpha(theme.palette.divider, isDark ? 0.3 : 0.9)}`,
+        background: isDark
+          ? `linear-gradient(180deg, ${alpha("#fff", 0.03)}, ${alpha("#fff", 0.02)})`
+          : `linear-gradient(180deg, ${alpha("#fff", 0.9)}, ${alpha(theme.palette.grey[50], 0.96)})`,
+        boxShadow: isDark
+          ? "0 10px 30px rgba(0,0,0,.28)"
+          : "0 8px 24px rgba(15,23,42,.06)",
         ...props.sx,
       }}
     >
@@ -49,437 +81,505 @@ function GlassCard(props: React.PropsWithChildren<{ sx?: any }>) {
   );
 }
 
-function Pill(props: { icon: React.ReactNode; label: string }) {
-  return <Chip size="small" icon={props.icon as any} label={props.label} variant="outlined" />;
+function InfoPill(props: { icon: React.ReactElement; label: string }) {
+  return (
+    <Chip
+      icon={props.icon}
+      label={props.label}
+      size="small"
+      variant="outlined"
+      sx={{
+        borderRadius: 2.5,
+        height: 30,
+        "& .MuiChip-label": {
+          px: 1.25,
+          fontWeight: 600,
+        },
+      }}
+    />
+  );
+}
+
+function TopicCard(props: {
+  icon: React.ReactNode;
+  title: string;
+  description: string;
+  children: React.ReactNode;
+}) {
+  const theme = useTheme();
+
+  return (
+    <SoftCard sx={{ height: "100%" }}>
+      <Box sx={{ p: 2.5 }}>
+        <Stack spacing={1.5}>
+          <Stack direction="row" spacing={1.25} alignItems="center">
+            <Box
+              sx={{
+                width: 40,
+                height: 40,
+                borderRadius: 3,
+                display: "grid",
+                placeItems: "center",
+                border: `1px solid ${alpha(theme.palette.divider, 0.8)}`,
+                background: alpha(theme.palette.primary.main, 0.08),
+                color: "text.primary",
+              }}
+            >
+              {props.icon}
+            </Box>
+            <Typography variant="h6" fontWeight={800} letterSpacing={-0.25}>
+              {props.title}
+            </Typography>
+          </Stack>
+
+          <Typography variant="body2" color="text.secondary">
+            {props.description}
+          </Typography>
+
+          <Divider />
+
+          <Box>{props.children}</Box>
+        </Stack>
+      </Box>
+    </SoftCard>
+  );
 }
 
 function SeverityCard(props: {
+  severity: Severity;
   title: string;
   subtitle: string;
-  icon: React.ReactNode;
   bullets: string[];
 }) {
+  const theme = useTheme();
+
+  const config = {
+    dangerous: {
+      icon: <WarningAmberOutlined fontSize="small" />,
+      tone: theme.palette.error.main,
+    },
+    suspicious: {
+      icon: <ShieldOutlined fontSize="small" />,
+      tone: theme.palette.warning.main,
+    },
+    inconclusive: {
+      icon: <HelpOutlineOutlined fontSize="small" />,
+      tone: theme.palette.info.main,
+    },
+    safe: {
+      icon: <CheckCircleOutlined fontSize="small" />,
+      tone: theme.palette.success.main,
+    },
+  }[props.severity];
+
   return (
-    <Box
-      sx={{
-        borderRadius: 4,
-        border: "1px solid rgba(255,255,255,.10)",
-        p: 2,
-        background: "rgba(255,255,255,.03)",
-      }}
-    >
-      <Stack direction="row" spacing={1.25} alignItems="flex-start">
-        <Box
-          sx={{
-            width: 40,
-            height: 40,
-            borderRadius: 3,
-            display: "grid",
-            placeItems: "center",
-            border: "1px solid rgba(255,255,255,.12)",
-            background: "linear-gradient(135deg, rgba(56,189,248,.14), rgba(120,119,198,.12))",
-          }}
-        >
-          {props.icon}
-        </Box>
+    <SoftCard sx={{ height: "100%" }}>
+      <Box sx={{ p: 2.25 }}>
+        <Stack spacing={1.5}>
+          <Stack direction="row" spacing={1.25} alignItems="flex-start">
+            <Box
+              sx={{
+                width: 38,
+                height: 38,
+                borderRadius: 2.5,
+                display: "grid",
+                placeItems: "center",
+                border: `1px solid ${alpha(config.tone, 0.28)}`,
+                background: alpha(config.tone, 0.12),
+                color: config.tone,
+                flexShrink: 0,
+              }}
+            >
+              {config.icon}
+            </Box>
 
-        <Box sx={{ flex: 1 }}>
-          <Typography fontWeight={950}>{props.title}</Typography>
-          <Typography variant="body2" color="text.secondary">
-            {props.subtitle}
-          </Typography>
+            <Box>
+              <Typography fontWeight={800}>{props.title}</Typography>
+              <Typography variant="body2" color="text.secondary">
+                {props.subtitle}
+              </Typography>
+            </Box>
+          </Stack>
 
-          <Box component="ul" sx={{ mt: 1, mb: 0, pl: 2 }}>
-            {props.bullets.map((b) => (
-              <Typography key={b} component="li" variant="body2" color="text.secondary" sx={{ mb: 0.5 }}>
-                {b}
+          <Box component="ul" sx={{ m: 0, pl: 2.5 }}>
+            {props.bullets.map((bullet) => (
+              <Typography
+                key={bullet}
+                component="li"
+                variant="body2"
+                color="text.secondary"
+                sx={{ mb: 0.75 }}
+              >
+                {bullet}
               </Typography>
             ))}
           </Box>
-        </Box>
-      </Stack>
-    </Box>
+        </Stack>
+      </Box>
+    </SoftCard>
+  );
+}
+
+function SimpleAccordion(props: {
+  icon: React.ReactNode;
+  title: string;
+  summary: string;
+  children: React.ReactNode;
+  defaultExpanded?: boolean;
+}) {
+  const theme = useTheme();
+
+  return (
+    <Accordion
+      disableGutters
+      defaultExpanded={props.defaultExpanded}
+      elevation={0}
+      sx={{
+        borderRadius: "16px !important",
+        overflow: "hidden",
+        border: `1px solid ${alpha(theme.palette.divider, 0.8)}`,
+        background: "transparent",
+        "&:before": { display: "none" },
+      }}
+    >
+      <AccordionSummary
+        expandIcon={<ExpandMoreRounded />}
+        sx={{
+          px: 2,
+          py: 0.25,
+          minHeight: 72,
+          "& .MuiAccordionSummary-content": { my: 1.25 },
+        }}
+      >
+        <Stack direction="row" spacing={1.25} alignItems="center" sx={{ pr: 2 }}>
+          <Box sx={{ color: "text.secondary", display: "grid", placeItems: "center" }}>{props.icon}</Box>
+          <Box>
+            <Typography fontWeight={700}>{props.title}</Typography>
+            <Typography variant="body2" color="text.secondary">
+              {props.summary}
+            </Typography>
+          </Box>
+        </Stack>
+      </AccordionSummary>
+
+      <AccordionDetails sx={{ px: 2, pb: 2 }}>
+        <Divider sx={{ mb: 2 }} />
+        {props.children}
+      </AccordionDetails>
+    </Accordion>
   );
 }
 
 export default function AboutPage() {
-  // If you want auth gating like legacy, do it at route-level; About is usually safe to show.
   const suspiciousEmail =
     (import.meta.env.VITE_SUSPICIOUS_EMAIL as string | undefined) ?? "security@example.com";
 
-  const [open, setOpen] = React.useState<AboutModalKey | null>(null);
-
   return (
-    <Box sx={{ p: { xs: 2, md: 3 }, maxWidth: 1180, mx: "auto" }}>
-      {/* Hero */}
-      <GlassCard
-        sx={{
-          mb: 2,
-          overflow: "hidden",
-          background:
-            "radial-gradient(900px 260px at 12% 10%, rgba(56,189,248,.22), transparent 60%)," +
-            "radial-gradient(900px 260px at 88% 30%, rgba(120,119,198,.18), transparent 60%)," +
-            "linear-gradient(180deg, rgba(255,255,255,.06), rgba(255,255,255,.03))",
-        }}
-      >
-        <CardContent sx={{ p: { xs: 2.25, md: 3 } }}>
-          <Stack spacing={1.25}>
-            <Stack direction="row" spacing={1} alignItems="center">
-              <Box
+    <Container maxWidth="lg" sx={{ py: { xs: 3, md: 5 } }}>
+      <Stack spacing={3}>
+        {/* Hero */}
+        <SoftCard>
+          <Box sx={{ p: { xs: 2.5, md: 3.5 } }}>
+            <Stack spacing={2}>
+              <Stack spacing={1.25}>
+                <Stack direction="row" spacing={1.25} alignItems="center">
+                  <Box
+                    sx={{
+                      width: 44,
+                      height: 44,
+                      borderRadius: 3,
+                      display: "grid",
+                      placeItems: "center",
+                      bgcolor: "action.hover",
+                      border: (theme) => `1px solid ${alpha(theme.palette.divider, 0.8)}`,
+                    }}
+                  >
+                    <InfoOutlined />
+                  </Box>
+
+                  <Box>
+                    <Typography variant="h4" fontWeight={850} letterSpacing={-0.8}>
+                      About Suspicious
+                    </Typography>
+                    <Typography color="text.secondary" sx={{ mt: 0.25 }}>
+                      Security intake and automated analysis for emails, files, URLs, IPs, and hashes.
+                    </Typography>
+                  </Box>
+                </Stack>
+
+                <Stack direction="row" spacing={1} useFlexGap flexWrap="wrap">
+                  <InfoPill icon={<EmailOutlined fontSize="small" />} label="Mail" />
+                  <InfoPill icon={<InsertDriveFileOutlined fontSize="small" />} label="Files" />
+                  <InfoPill icon={<LinkOutlined fontSize="small" />} label="URLs" />
+                  <InfoPill icon={<PublicOutlined fontSize="small" />} label="IPs" />
+                  <InfoPill icon={<FingerprintOutlined fontSize="small" />} label="Hashes" />
+                  <InfoPill icon={<ShieldOutlined fontSize="small" />} label="Scoring & classification" />
+                </Stack>
+              </Stack>
+
+              <Alert
+                severity="info"
                 sx={{
-                  width: 46,
-                  height: 46,
                   borderRadius: 3,
-                  display: "grid",
-                  placeItems: "center",
-                  border: "1px solid rgba(255,255,255,.12)",
-                  background: "linear-gradient(135deg, rgba(56,189,248,.14), rgba(120,119,198,.12))",
+                  alignItems: "center",
                 }}
               >
-                <InfoOutlined />
-              </Box>
-
-              <Box sx={{ flex: 1 }}>
-                <Typography variant="h4" fontWeight={980} letterSpacing={-0.6}>
-                  About Suspicious
-                </Typography>
-                <Typography color="text.secondary">
-                  Security intake and automated analysis for emails, files, URLs, IPs, and hashes.
-                </Typography>
-              </Box>
+                You can forward suspicious emails to{" "}
+                <Box component="span" sx={{ fontWeight: 700, userSelect: "all" }}>
+                  {suspiciousEmail}
+                </Box>
+                .
+              </Alert>
             </Stack>
+          </Box>
+        </SoftCard>
 
-            <Stack direction="row" spacing={1} sx={{ flexWrap: "wrap" }}>
-              <Pill icon={<EmailOutlined fontSize="small" />} label="Mail" />
-              <Pill icon={<InsertDriveFileOutlined fontSize="small" />} label="Files" />
-              <Pill icon={<LinkOutlined fontSize="small" />} label="URLs" />
-              <Pill icon={<PublicOutlined fontSize="small" />} label="IPs" />
-              <Pill icon={<FingerprintOutlined fontSize="small" />} label="Hashes" />
-              <Pill icon={<ShieldOutlined fontSize="small" />} label="Scoring + classification" />
-            </Stack>
-
-            <Divider sx={{ opacity: 0.25 }} />
-
-            <Alert severity="info">
-              You can forward suspicious emails to{" "}
-              <b style={{ userSelect: "all" }}>{suspiciousEmail}</b>.
-            </Alert>
-          </Stack>
-        </CardContent>
-      </GlassCard>
-
-      {/* Primary cards */}
-      <Grid container spacing={2}>
-        <Grid item xs={12} md={4}>
-          <Card
-            sx={{
-              height: "100%",
-              borderRadius: 4,
-              border: "1px solid rgba(255,255,255,.10)",
-              background: "linear-gradient(180deg, rgba(255,255,255,.06), rgba(255,255,255,.03))",
-            }}
-          >
-            <CardActionArea sx={{ height: "100%" }} onClick={() => setOpen("suspicious")}>
-              <CardContent sx={{ p: 2.5 }}>
-                <Stack spacing={1.25}>
-                  <Stack direction="row" spacing={1} alignItems="center">
-                    <SecurityOutlined />
-                    <Typography variant="h6" fontWeight={950} letterSpacing={-0.2}>
-                      What is Suspicious?
+        {/* Quick explanation */}
+        <PageSection
+          title="How it works"
+          subtitle="The platform collects submitted artifacts, runs analysis, and summarizes risk to support review and triage."
+        >
+          <Grid container spacing={2}>
+            <Grid item xs={12} md={4}>
+              <SoftCard sx={{ height: "100%" }}>
+                <Box sx={{ p: 2.25 }}>
+                  <Stack spacing={1}>
+                    <Typography fontWeight={800}>1. Submit</Typography>
+                    <Typography variant="body2" color="text.secondary">
+                      Users submit emails, files, URLs, IPs, or hashes through the interface or by forwarding mail.
                     </Typography>
                   </Stack>
-                  <Typography variant="body2" color="text.secondary">
-                    How intake works, what gets analyzed, and how classification is computed.
-                  </Typography>
-                  <Button
-                    variant="outlined"
-                    sx={{ alignSelf: "flex-start", borderRadius: 3, textTransform: "none", fontWeight: 900 }}
-                  >
-                    Read
-                  </Button>
-                </Stack>
-              </CardContent>
-            </CardActionArea>
-          </Card>
-        </Grid>
+                </Box>
+              </SoftCard>
+            </Grid>
 
-        <Grid item xs={12} md={4}>
-          <Card
-            sx={{
-              height: "100%",
-              borderRadius: 4,
-              border: "1px solid rgba(255,255,255,.10)",
-              background: "linear-gradient(180deg, rgba(255,255,255,.06), rgba(255,255,255,.03))",
-            }}
-          >
-            <CardActionArea sx={{ height: "100%" }} onClick={() => setOpen("phishing")}>
-              <CardContent sx={{ p: 2.5 }}>
-                <Stack spacing={1.25}>
-                  <Stack direction="row" spacing={1} alignItems="center">
-                    <WarningAmberOutlined />
-                    <Typography variant="h6" fontWeight={950} letterSpacing={-0.2}>
-                      What is phishing?
+            <Grid item xs={12} md={4}>
+              <SoftCard sx={{ height: "100%" }}>
+                <Box sx={{ p: 2.25 }}>
+                  <Stack spacing={1}>
+                    <Typography fontWeight={800}>2. Analyze</Typography>
+                    <Typography variant="body2" color="text.secondary">
+                      Relevant parts are extracted and checked by analyzers to identify signals, metadata, and known matches.
                     </Typography>
                   </Stack>
-                  <Typography variant="body2" color="text.secondary">
-                    Definition, typical attacker tactics, and why rapid reporting matters.
-                  </Typography>
-                  <Button
-                    variant="outlined"
-                    sx={{ alignSelf: "flex-start", borderRadius: 3, textTransform: "none", fontWeight: 900 }}
-                  >
-                    Read
-                  </Button>
-                </Stack>
-              </CardContent>
-            </CardActionArea>
-          </Card>
-        </Grid>
+                </Box>
+              </SoftCard>
+            </Grid>
 
-        <Grid item xs={12} md={4}>
-          <Card
-            sx={{
-              height: "100%",
-              borderRadius: 4,
-              border: "1px solid rgba(255,255,255,.10)",
-              background: "linear-gradient(180deg, rgba(255,255,255,.06), rgba(255,255,255,.03))",
-            }}
-          >
-            <CardActionArea sx={{ height: "100%" }} onClick={() => setOpen("fileAnalysis")}>
-              <CardContent sx={{ p: 2.5 }}>
-                <Stack spacing={1.25}>
-                  <Stack direction="row" spacing={1} alignItems="center">
-                    <InsertDriveFileOutlined />
-                    <Typography variant="h6" fontWeight={950} letterSpacing={-0.2}>
-                      File analysis
+            <Grid item xs={12} md={4}>
+              <SoftCard sx={{ height: "100%" }}>
+                <Box sx={{ p: 2.25 }}>
+                  <Stack spacing={1}>
+                    <Typography fontWeight={800}>3. Classify</Typography>
+                    <Typography variant="body2" color="text.secondary">
+                      Analyzer outputs are aggregated into a score and an overall classification to help prioritize action.
                     </Typography>
                   </Stack>
-                  <Typography variant="body2" color="text.secondary">
-                    What’s extracted, what’s compared, and what the platform never does.
-                  </Typography>
-                  <Button
-                    variant="outlined"
-                    sx={{ alignSelf: "flex-start", borderRadius: 3, textTransform: "none", fontWeight: 900 }}
-                  >
-                    Read
-                  </Button>
-                </Stack>
-              </CardContent>
-            </CardActionArea>
-          </Card>
-        </Grid>
-      </Grid>
+                </Box>
+              </SoftCard>
+            </Grid>
+          </Grid>
+        </PageSection>
 
-      {/* Classification quick view */}
-      <GlassCard sx={{ mt: 2 }}>
-        <CardContent sx={{ p: { xs: 2.25, md: 3 } }}>
-          <Stack spacing={1.25}>
-            <Stack direction="row" spacing={1} alignItems="center" justifyContent="space-between">
-              <Stack direction="row" spacing={1} alignItems="center">
-                <HelpOutlineOutlined />
-                <Typography variant="h6" fontWeight={950} letterSpacing={-0.2}>
-                  Classification and guidance
+        {/* Main info blocks */}
+        <PageSection
+          title="Key topics"
+          subtitle="The most common questions are answered here without forcing users into another page or modal."
+        >
+          <Grid container spacing={2}>
+            <Grid item xs={12} md={4}>
+              <TopicCard
+                icon={<SecurityOutlined />}
+                title="What is Suspicious?"
+                description="A concise explanation of the platform, its purpose, and what it does with submitted artifacts."
+              >
+                <Stack spacing={1.25}>
+                  <Typography variant="body2" color="text.secondary">
+                    Suspicious is a triage-oriented platform for collecting suspicious content and running automated analysis
+                    to help determine whether it should be escalated, reviewed, or dismissed.
+                  </Typography>
+
+                  <Typography variant="body2" color="text.secondary">
+                    It is a decision aid. It helps structure and accelerate review, but it does not replace analyst judgment.
+                  </Typography>
+                </Stack>
+              </TopicCard>
+            </Grid>
+
+            <Grid item xs={12} md={4}>
+              <TopicCard
+                icon={<WarningAmberOutlined />}
+                title="What is phishing?"
+                description="A short explanation of phishing and the main attack outcomes users should recognize."
+              >
+                <Stack spacing={1}>
+                  <Typography variant="body2" color="text.secondary">
+                    Phishing is a social engineering attack where an attacker imitates a trusted source to get credentials,
+                    payments, access, or execution of malicious content.
+                  </Typography>
+                  <Box component="ul" sx={{ m: 0, pl: 2.5 }}>
+                    <Typography component="li" variant="body2" color="text.secondary" sx={{ mb: 0.5 }}>
+                      Credential theft
+                    </Typography>
+                    <Typography component="li" variant="body2" color="text.secondary" sx={{ mb: 0.5 }}>
+                      Malware delivery
+                    </Typography>
+                    <Typography component="li" variant="body2" color="text.secondary">
+                      Invoice or payment fraud
+                    </Typography>
+                  </Box>
+                </Stack>
+              </TopicCard>
+            </Grid>
+
+            <Grid item xs={12} md={4}>
+              <TopicCard
+                icon={<InsertDriveFileOutlined />}
+                title="File analysis"
+                description="What is extracted, what may be compared, and what users should assume about unknown files."
+              >
+                <Stack spacing={1.25}>
+                  <Typography variant="body2" color="text.secondary">
+                    Submitted files may be fingerprinted, inspected for metadata, and compared against prior sightings or
+                    known references.
+                  </Typography>
+                  <Typography variant="body2" color="text.secondary">
+                    Unknown files should be treated as untrusted until review is complete.
+                  </Typography>
+                </Stack>
+              </TopicCard>
+            </Grid>
+          </Grid>
+        </PageSection>
+
+        {/* Detailed sections */}
+        <PageSection
+          title="Details"
+          subtitle="Secondary information stays available, but does not overload the first screen."
+        >
+          <Stack spacing={1.5}>
+            <SimpleAccordion
+              defaultExpanded
+              icon={<DescriptionOutlined />}
+              title="What gets analyzed"
+              summary="Supported submission types and typical processing behavior."
+            >
+              <Stack spacing={1.25}>
+                <Typography variant="body2" color="text.secondary">
+                  The platform accepts emails, files, URLs, IP addresses, and hashes. Depending on the submission type,
+                  analysis may include structure parsing, metadata extraction, indicator comparison, and correlation with
+                  previous observations.
+                </Typography>
+
+                <Typography variant="body2" color="text.secondary">
+                  For emails, relevant elements may include headers, body content, links, sender information, and attachments.
                 </Typography>
               </Stack>
-              <Chip size="small" label="Operator summary" variant="outlined" />
-            </Stack>
+            </SimpleAccordion>
 
-            <Typography color="text.secondary">
-              Suspicious computes an overall classification from analyzer reports. Use it as a decision aid,
-              not a replacement for review.
-            </Typography>
+            <SimpleAccordion
+              icon={<PolicyOutlined />}
+              title="How to use the result"
+              summary="Classification should guide action, not replace review."
+            >
+              <Stack spacing={1.25}>
+                <Typography variant="body2" color="text.secondary">
+                  The overall result should be used as a triage aid. It helps decide whether to isolate, escalate, request
+                  more context, or close the case.
+                </Typography>
+                <Typography variant="body2" color="text.secondary">
+                  Final handling should still consider context, user report quality, and any supporting analyst review.
+                </Typography>
+              </Stack>
+            </SimpleAccordion>
 
-            <Divider sx={{ opacity: 0.25 }} />
-
-            <Grid container spacing={2}>
-              <Grid item xs={12} md={3}>
-                <SeverityCard
-                  title="Dangerous"
-                  subtitle="High confidence malicious"
-                  icon={<WarningAmberOutlined />}
-                  bullets={[
-                    "Do not open or execute.",
-                    "Treat content as untrusted.",
-                    "Escalate / isolate if needed.",
-                  ]}
-                />
-              </Grid>
-              <Grid item xs={12} md={3}>
-                <SeverityCard
-                  title="Suspicious"
-                  subtitle="Indicators suggest risk"
-                  icon={<ShieldOutlined />}
-                  bullets={[
-                    "Avoid opening attachments/links.",
-                    "Prefer analyst validation.",
-                    "Monitor related activity.",
-                  ]}
-                />
-              </Grid>
-              <Grid item xs={12} md={3}>
-                <SeverityCard
-                  title="Inconclusive"
-                  subtitle="Insufficient signal"
-                  icon={<HelpOutlineOutlined />}
-                  bullets={[
-                    "Proceed with caution.",
-                    "Sources may be unknown.",
-                    "Request more context if possible.",
-                  ]}
-                />
-              </Grid>
-              <Grid item xs={12} md={3}>
-                <SeverityCard
-                  title="Safe"
-                  subtitle="Low signal detected"
-                  icon={<CheckCircleOutlined />}
-                  bullets={[
-                    "No strong indicators found.",
-                    "Still apply normal hygiene.",
-                    "Re-submit if behavior changes.",
-                  ]}
-                />
-              </Grid>
-            </Grid>
+            <SimpleAccordion
+              icon={<EmailOutlined />}
+              title="Reporting suspicious email"
+              summary="The simplest path for users who only want to submit a suspicious message."
+            >
+              <Stack spacing={1.25}>
+                <Typography variant="body2" color="text.secondary">
+                  Users can forward suspicious messages directly to the reporting address below.
+                </Typography>
+                <Alert severity="info" sx={{ borderRadius: 3 }}>
+                  Forwarding address:{" "}
+                  <Box component="span" sx={{ fontWeight: 700, userSelect: "all" }}>
+                    {suspiciousEmail}
+                  </Box>
+                </Alert>
+              </Stack>
+            </SimpleAccordion>
           </Stack>
-        </CardContent>
-      </GlassCard>
+        </PageSection>
 
-      {/* Dialogs */}
-      <Dialog open={open !== null} onClose={() => setOpen(null)} maxWidth="md" fullWidth>
-        <DialogTitle sx={{ pr: 6 }}>
-          {open === "suspicious"
-            ? "What is Suspicious?"
-            : open === "phishing"
-              ? "What is phishing?"
-              : open === "fileAnalysis"
-                ? "File analysis"
-                : ""}
-          <IconButton
-            onClick={() => setOpen(null)}
-            sx={{ position: "absolute", right: 10, top: 10 }}
-            aria-label="Close"
-          >
-            <CloseOutlined />
-          </IconButton>
-        </DialogTitle>
+        {/* Classification */}
+        <PageSection
+          title="Classification and guidance"
+          subtitle="The four outcomes should be visually distinct and immediately actionable."
+        >
+          <Grid container spacing={2}>
+            <Grid item xs={12} sm={6} md={3}>
+              <SeverityCard
+                severity="dangerous"
+                title="Dangerous"
+                subtitle="High confidence malicious"
+                bullets={[
+                  "Do not open or execute.",
+                  "Treat content as untrusted.",
+                  "Escalate or isolate if required.",
+                ]}
+              />
+            </Grid>
 
-        <DialogContent dividers>
-          {open === "suspicious" ? (
-            <Stack spacing={1.5}>
-              <Typography variant="h6" fontWeight={950}>
-                Overview
-              </Typography>
-              <Typography color="text.secondary">
-                Suspicious is a web application that collects submissions (emails, files, IPs, URLs, hashes) and
-                runs automated analysis to help classify risk and support triage workflows.
-              </Typography>
+            <Grid item xs={12} sm={6} md={3}>
+              <SeverityCard
+                severity="suspicious"
+                title="Suspicious"
+                subtitle="Indicators suggest risk"
+                bullets={[
+                  "Avoid opening links or attachments.",
+                  "Prefer validation by an analyst.",
+                  "Monitor related activity.",
+                ]}
+              />
+            </Grid>
 
-              <Divider sx={{ opacity: 0.25 }} />
+            <Grid item xs={12} sm={6} md={3}>
+              <SeverityCard
+                severity="inconclusive"
+                title="Inconclusive"
+                subtitle="Insufficient signal"
+                bullets={[
+                  "Proceed with caution.",
+                  "Source trust may be unclear.",
+                  "Request more context where possible.",
+                ]}
+              />
+            </Grid>
 
-              <Typography variant="h6" fontWeight={950}>
-                How it works
-              </Typography>
-              <Box component="ol" sx={{ pl: 2, m: 0 }}>
-                <Typography component="li" color="text.secondary" sx={{ mb: 0.75 }}>
-                  A reporter submits data (UI upload, URL/IP/hash form, or forwarded email).
-                </Typography>
-                <Typography component="li" color="text.secondary" sx={{ mb: 0.75 }}>
-                  The submission is split into relevant parts (e.g., mail headers/body/attachments) and analyzed.
-                </Typography>
-                <Typography component="li" color="text.secondary" sx={{ mb: 0.75 }}>
-                  Analyzers generate individual reports; Suspicious aggregates results into a score and classification.
-                </Typography>
-              </Box>
+            <Grid item xs={12} sm={6} md={3}>
+              <SeverityCard
+                severity="safe"
+                title="Safe"
+                subtitle="Low signal detected"
+                bullets={[
+                  "No strong indicators found.",
+                  "Still apply normal hygiene.",
+                  "Re-submit if behavior changes.",
+                ]}
+              />
+            </Grid>
+          </Grid>
+        </PageSection>
 
-              <Divider sx={{ opacity: 0.25 }} />
-
-              <Typography variant="h6" fontWeight={950}>
-                Classification
-              </Typography>
-              <Typography color="text.secondary">
-                Common classes: <b>Dangerous</b>, <b>Suspicious</b>, <b>Inconclusive</b>, <b>Safe</b>. The class is derived
-                from analyzer outputs and weighting.
-              </Typography>
-
-              <Alert severity="info">
-                Forwarding address: <b style={{ userSelect: "all" }}>{suspiciousEmail}</b>
-              </Alert>
-            </Stack>
-          ) : null}
-
-          {open === "phishing" ? (
-            <Stack spacing={1.5}>
-              <Typography variant="h6" fontWeight={950}>
-                Definition
-              </Typography>
-              <Typography color="text.secondary">
-                Phishing is a social engineering attack where an attacker impersonates a trusted entity to trick a
-                recipient into revealing credentials, transferring money, or executing malicious content.
-              </Typography>
-
-              <Divider sx={{ opacity: 0.25 }} />
-
-              <Typography variant="h6" fontWeight={950}>
-                Typical outcomes
-              </Typography>
-              <Box component="ul" sx={{ pl: 2, m: 0 }}>
-                <Typography component="li" color="text.secondary" sx={{ mb: 0.5 }}>
-                  Credential theft (SSO, email, banking).
-                </Typography>
-                <Typography component="li" color="text.secondary" sx={{ mb: 0.5 }}>
-                  Malware/ransomware installation via links or attachments.
-                </Typography>
-                <Typography component="li" color="text.secondary" sx={{ mb: 0.5 }}>
-                  Business email compromise (invoice and payment fraud).
-                </Typography>
-              </Box>
-
-              <Divider sx={{ opacity: 0.25 }} />
-
-              <Typography variant="h6" fontWeight={950}>
-                Why Suspicious helps
-              </Typography>
-              <Typography color="text.secondary">
-                It speeds up triage by analyzing artifacts and summarizing risk signals, helping you decide whether to
-                escalate, isolate, or dismiss.
-              </Typography>
-            </Stack>
-          ) : null}
-
-          {open === "fileAnalysis" ? (
-            <Stack spacing={1.5}>
-              <Typography variant="h6" fontWeight={950}>
-                What happens when you submit a file
-              </Typography>
-              <Typography color="text.secondary">
-                Suspicious can compute file fingerprints (hashes) and inspect metadata. Hashes may be compared against
-                known sources and internal history to detect prior sightings.
-              </Typography>
-
-              <Divider sx={{ opacity: 0.25 }} />
-
-              <Typography variant="h6" fontWeight={950}>
-                Safety model
-              </Typography>
-              <Box component="ul" sx={{ pl: 2, m: 0 }}>
-                <Typography component="li" color="text.secondary" sx={{ mb: 0.5 }}>
-                  Files are analyzed for identification and attributes; avoid executing unknown content.
-                </Typography>
-                <Typography component="li" color="text.secondary" sx={{ mb: 0.5 }}>
-                  Results are used to classify risk and help responders prioritize.
-                </Typography>
-              </Box>
-
-              <Divider sx={{ opacity: 0.25 }} />
-
-              <Alert severity="warning">
-                Treat unknown attachments as untrusted until analysis and review are complete.
-              </Alert>
-            </Stack>
-          ) : null}
-        </DialogContent>
-      </Dialog>
-    </Box>
+        {/* Small footer/help */}
+        <Box sx={{ pt: 0.5 }}>
+          <Typography variant="body2" color="text.secondary">
+            This page is intended to help users understand what the platform does and how to interpret its output.
+          </Typography>
+        </Box>
+      </Stack>
+    </Container>
   );
 }

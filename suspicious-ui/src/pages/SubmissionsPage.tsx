@@ -19,6 +19,7 @@ import {
   IconButton,
   InputAdornment,
   InputLabel,
+  LinearProgress,
   MenuItem,
   Select,
   Stack,
@@ -63,140 +64,508 @@ import { CopyIconButton } from "@/shared/components/CopyIconButton";
 
 type SubmissionsResponse = { items: SubmissionRow[] };
 
-function AnalyzerReportCard({ report }: { report: SubmissionAnalyzerReport }) {
+function clamp(n: number, min = 0, max = 100) {
+  return Math.max(min, Math.min(max, n));
+}
+
+function normalizeScore(score?: number) {
+  if (typeof score !== "number" || Number.isNaN(score)) return 0;
+
+  // If backend score is 0..10, convert to 0..100
+  if (score <= 10) return clamp(score * 10);
+
+  // If already 0..100
+  return clamp(score);
+}
+
+function normalizeConfidence(confidence?: number) {
+  if (typeof confidence !== "number" || Number.isNaN(confidence)) return 0;
+
+  // if backend sends 0..1
+  if (confidence <= 1) return clamp(confidence * 100);
+
+  // if backend sends 0..10
+  if (confidence <= 10) return clamp(confidence * 10);
+
+  // if backend sends 0..100
+  return clamp(confidence);
+}
+
+function getRiskTone(score?: number) {
+  const v = normalizeScore(score);
+
+  if (v >= 80) {
+    return {
+      label: "High risk",
+      color: "#ef4444",
+      softBg: "rgba(239,68,68,.12)",
+      softBorder: "rgba(239,68,68,.32)",
+      barSx: {
+        "& .MuiLinearProgress-bar": { backgroundColor: "#ef4444" },
+        backgroundColor: "rgba(239,68,68,.18)",
+      },
+    };
+  }
+
+  if (v >= 55) {
+    return {
+      label: "Needs attention",
+      color: "#f59e0b",
+      softBg: "rgba(245,158,11,.12)",
+      softBorder: "rgba(245,158,11,.32)",
+      barSx: {
+        "& .MuiLinearProgress-bar": { backgroundColor: "#f59e0b" },
+        backgroundColor: "rgba(245,158,11,.18)",
+      },
+    };
+  }
+
+  return {
+    label: "Low risk",
+    color: "#22c55e",
+    softBg: "rgba(34,197,94,.12)",
+    softBorder: "rgba(34,197,94,.32)",
+    barSx: {
+      "& .MuiLinearProgress-bar": { backgroundColor: "#22c55e" },
+      backgroundColor: "rgba(34,197,94,.18)",
+    },
+  };
+}
+
+function getConfidenceTone(confidence?: number) {
+  const v = normalizeConfidence(confidence);
+
+  if (v >= 75) {
+    return {
+      label: "High confidence",
+      color: "#22c55e",
+      barSx: {
+        "& .MuiLinearProgress-bar": { backgroundColor: "#22c55e" },
+        backgroundColor: "rgba(34,197,94,.18)",
+      },
+    };
+  }
+
+  if (v >= 45) {
+    return {
+      label: "Medium confidence",
+      color: "#f59e0b",
+      barSx: {
+        "& .MuiLinearProgress-bar": { backgroundColor: "#f59e0b" },
+        backgroundColor: "rgba(245,158,11,.18)",
+      },
+    };
+  }
+
+  return {
+    label: "Low confidence",
+    color: "#94a3b8",
+    barSx: {
+      "& .MuiLinearProgress-bar": { backgroundColor: "#94a3b8" },
+      backgroundColor: "rgba(148,163,184,.18)",
+    },
+  };
+}
+
+function readStatus(status?: string) {
+  const s = (status ?? "").toUpperCase();
+
+  if (s === "DONE") return "Finished";
+  if (s === "FAILED") return "Failed";
+  if (s === "IN_PROGRESS") return "Running";
+  if (s === "NEW") return "Queued";
+  return status || "Unknown";
+}
+
+function readType(type?: string) {
+  const t = (type ?? "").toLowerCase();
+
+  if (t === "file") return "File check";
+  if (t === "hash") return "Hash check";
+  if (t === "mail") return "Email check";
+  if (t === "url") return "Link check";
+  if (t === "ip") return "IP check";
+  return type || "Analyzer";
+}
+
+function summarizeForReading(report: SubmissionAnalyzerReport) {
+  const risk = getRiskTone(report.score);
+  const confidence = getConfidenceTone(report.confidence);
+  const targetValue = report.target?.value;
+  const categories = report.categories?.filter(Boolean) ?? [];
+
+  const parts: string[] = [];
+
+  parts.push(`${report.analyzer_name || "This analyzer"} marked this item as ${risk.label.toLowerCase()}.`);
+  parts.push(`The result confidence is ${confidence.label.toLowerCase()}.`);
+
+  if (targetValue) {
+    parts.push(`Checked item: ${targetValue}.`);
+  }
+
+  if (categories.length) {
+    parts.push(`Detected type: ${categories.join(", ")}.`);
+  }
+
+  return parts.join(" ");
+}
+
+function prettySummary(summary: any) {
+  if (!summary) return null;
+  if (typeof summary === "string") return summary;
+  if (Array.isArray(summary)) {
+    return summary.map((v) => (typeof v === "string" ? v : JSON.stringify(v))).join("\n");
+  }
+  if (typeof summary === "object") {
+    if (typeof summary.summary === "string") return summary.summary;
+    if (typeof summary.message === "string") return summary.message;
+    if (typeof summary.verdict === "string") return summary.verdict;
+  }
+  return null;
+}
+
+function AnalyzerReportCard({
+  report,
+  expanded,
+  onToggle,
+}: {
+  report: SubmissionAnalyzerReport;
+  expanded: boolean;
+  onToggle: () => void;
+}) {
+  const risk = getRiskTone(report.score);
+  const confidence = getConfidenceTone(report.confidence);
+
+  const scorePct = normalizeScore(report.score);
+  const confidencePct = normalizeConfidence(report.confidence);
+
+  const readableSummary = prettySummary(report.report_summary);
+  const plainSummary = summarizeForReading(report);
+
   return (
     <Card
       sx={{
-        borderRadius: 2,
-        border: "1px solid rgba(255,255,255,.08)",
-        background: "rgba(255,255,255,.025)",
+        borderRadius: 3,
+        border: `1px solid ${risk.softBorder}`,
+        background: `linear-gradient(180deg, ${risk.softBg} 0%, rgba(255,255,255,.03) 100%)`,
+        overflow: "hidden",
       }}
     >
-      <CardContent sx={{ p: 1.5 }}>
-        <Stack spacing={1}>
-          <Stack direction="row" justifyContent="space-between" alignItems="flex-start" spacing={1}>
-            <Box>
-              <Typography variant="subtitle2" fontWeight={900}>
-                {report.analyzer_name || "Unknown analyzer"}
-              </Typography>
-              <Typography variant="caption" color="text.secondary">
-                {report.analyzer_id} • {report.type} • {report.status}
-              </Typography>
-            </Box>
-
-            <Stack direction="row" spacing={0.75} sx={{ flexWrap: "wrap", justifyContent: "flex-end" }}>
-              <Chip size="small" label={`Level: ${report.level || "—"}`} variant="outlined" />
-              <Chip size="small" label={`Score: ${report.score ?? "—"}`} variant="outlined" />
-              <Chip
-                size="small"
-                label={`Confidence: ${typeof report.confidence === "number" ? report.confidence.toFixed(2) : "—"}`}
-                variant="outlined"
-              />
-            </Stack>
-          </Stack>
-
-          <Box
-            sx={{
-              display: "grid",
-              gridTemplateColumns: { xs: "1fr", sm: "120px 1fr" },
-              gap: 1,
-            }}
-          >
-            <Typography color="text.secondary" variant="body2">
-              Target
+      <Box
+        role="button"
+        tabIndex={0}
+        onClick={onToggle}
+        onKeyDown={(e) => {
+          if (e.key === "Enter" || e.key === " ") {
+            e.preventDefault();
+            onToggle();
+          }
+        }}
+        sx={{
+          px: 2,
+          py: 1.5,
+          borderBottom: expanded ? "1px solid rgba(255,255,255,.08)" : "none",
+          background: "rgba(255,255,255,.03)",
+          cursor: "pointer",
+          userSelect: "none",
+        }}
+      >
+        <Stack
+          direction={{ xs: "column", sm: "row" }}
+          spacing={1.25}
+          justifyContent="space-between"
+          alignItems={{ xs: "flex-start", sm: "center" }}
+        >
+          <Box>
+            <Typography variant="subtitle1" fontWeight={900}>
+              {report.analyzer_name || "Unknown analyzer"}
             </Typography>
-            <Typography variant="body2" sx={{ wordBreak: "break-word" }}>
-              {report.target?.value || "—"} {report.target?.kind ? `(${report.target.kind})` : ""}
-            </Typography>
-
-            <Typography color="text.secondary" variant="body2">
-              Categories
-            </Typography>
-            <Typography variant="body2">
-              {report.categories?.length ? report.categories.join(", ") : "—"}
-            </Typography>
-
-            <Typography color="text.secondary" variant="body2">
-              Created
-            </Typography>
-            <Typography variant="body2">
-              {fmtDate(report.created_at)}
+            <Typography variant="body2" color="text.secondary">
+              {readType(report.type)} • {readStatus(report.status)}
             </Typography>
           </Box>
 
-          {report.report_taxonomy ? (
-            <Accordion
-              disableGutters
+          <Stack direction="row" spacing={1} alignItems="center" sx={{ flexWrap: "wrap" }}>
+            <Chip
+              size="small"
+              label={risk.label}
               sx={{
-                borderRadius: 2,
-                border: "1px solid rgba(255,255,255,.08)",
-                background: "rgba(255,255,255,.02)",
-                "&:before": { display: "none" },
+                fontWeight: 800,
+                color: risk.color,
+                border: `1px solid ${risk.softBorder}`,
+                backgroundColor: risk.softBg,
               }}
-            >
-              <AccordionSummary expandIcon={<ExpandMoreOutlined />}>
-                <Typography variant="body2" fontWeight={800}>
-                  Taxonomy
-                </Typography>
-              </AccordionSummary>
-              <AccordionDetails>
-                <Box
-                  component="pre"
-                  sx={{
-                    m: 0,
-                    p: 1.25,
-                    borderRadius: 2,
-                    border: "1px solid rgba(255,255,255,.08)",
-                    background: "rgba(0,0,0,.18)",
-                    overflow: "auto",
-                    maxHeight: 220,
-                    fontSize: 12,
-                    lineHeight: 1.45,
-                  }}
-                >
-                  {JSON.stringify(report.report_taxonomy, null, 2)}
-                </Box>
-              </AccordionDetails>
-            </Accordion>
-          ) : null}
-
-          {report.report_summary ? (
-            <Accordion
-              disableGutters
+            />
+            <Chip
+              size="small"
+              label={confidence.label}
               sx={{
-                borderRadius: 2,
-                border: "1px solid rgba(255,255,255,.08)",
-                background: "rgba(255,255,255,.02)",
-                "&:before": { display: "none" },
+                fontWeight: 800,
+                border: "1px solid rgba(255,255,255,.12)",
+                backgroundColor: "rgba(255,255,255,.04)",
               }}
-            >
-              <AccordionSummary expandIcon={<ExpandMoreOutlined />}>
-                <Typography variant="body2" fontWeight={800}>
-                  Summary
-                </Typography>
-              </AccordionSummary>
-              <AccordionDetails>
-                <Box
-                  component="pre"
-                  sx={{
-                    m: 0,
-                    p: 1.25,
-                    borderRadius: 2,
-                    border: "1px solid rgba(255,255,255,.08)",
-                    background: "rgba(0,0,0,.18)",
-                    overflow: "auto",
-                    maxHeight: 220,
-                    fontSize: 12,
-                    lineHeight: 1.45,
-                  }}
-                >
-                  {JSON.stringify(report.report_summary, null, 2)}
-                </Box>
-              </AccordionDetails>
-            </Accordion>
-          ) : null}
+            />
+            <ExpandMoreOutlined
+              sx={{
+                transition: "transform .2s ease",
+                transform: expanded ? "rotate(180deg)" : "rotate(0deg)",
+                opacity: 0.85,
+              }}
+            />
+          </Stack>
         </Stack>
-      </CardContent>
+      </Box>
+
+      {expanded ? (
+        <CardContent sx={{ p: 2 }}>
+          <Stack spacing={2}>
+            <Box
+              sx={{
+                p: 1.5,
+                borderRadius: 2,
+                border: "1px solid rgba(255,255,255,.08)",
+                background: "rgba(255,255,255,.03)",
+              }}
+            >
+              <Typography variant="body2" fontWeight={800} sx={{ mb: 0.75 }}>
+                What this means
+              </Typography>
+
+              <Typography variant="body2" sx={{ lineHeight: 1.6 }}>
+                {readableSummary || plainSummary}
+              </Typography>
+            </Box>
+
+            <Stack spacing={1.25}>
+              <Box>
+                <Stack direction="row" justifyContent="space-between" sx={{ mb: 0.5 }}>
+                  <Typography variant="body2" fontWeight={700}>
+                    Risk score
+                  </Typography>
+                  <Typography variant="body2" fontWeight={900}>
+                    {typeof report.score === "number" ? report.score.toFixed(report.score <= 10 ? 1 : 0) : "—"}
+                  </Typography>
+                </Stack>
+
+                <LinearProgress
+                  variant="determinate"
+                  value={scorePct}
+                  sx={{
+                    height: 10,
+                    borderRadius: 999,
+                    ...risk.barSx,
+                  }}
+                />
+
+                <Typography variant="caption" color="text.secondary" sx={{ mt: 0.5, display: "block" }}>
+                  Higher means the analyzer sees more signs of risk.
+                </Typography>
+              </Box>
+
+              <Box>
+                <Stack direction="row" justifyContent="space-between" sx={{ mb: 0.5 }}>
+                  <Typography variant="body2" fontWeight={700}>
+                    Confidence
+                  </Typography>
+                  <Typography variant="body2" fontWeight={900}>
+                    {Math.round(confidencePct)}%
+                  </Typography>
+                </Stack>
+
+                <LinearProgress
+                  variant="determinate"
+                  value={confidencePct}
+                  sx={{
+                    height: 10,
+                    borderRadius: 999,
+                    ...confidence.barSx,
+                  }}
+                />
+
+                <Typography variant="caption" color="text.secondary" sx={{ mt: 0.5, display: "block" }}>
+                  Higher means the analyzer is more sure about its result.
+                </Typography>
+              </Box>
+            </Stack>
+
+            <Box
+              sx={{
+                display: "grid",
+                gridTemplateColumns: { xs: "1fr", sm: "140px 1fr" },
+                gap: 1,
+                p: 1.5,
+                borderRadius: 2,
+                border: "1px solid rgba(255,255,255,.08)",
+                background: "rgba(255,255,255,.02)",
+              }}
+            >
+              <Typography color="text.secondary" variant="body2">
+                Checked item
+              </Typography>
+              <Typography variant="body2" sx={{ wordBreak: "break-word" }}>
+                {report.target?.value || "—"}
+              </Typography>
+
+              <Typography color="text.secondary" variant="body2">
+                Item type
+              </Typography>
+              <Typography variant="body2">
+                {report.target?.kind || "—"}
+              </Typography>
+
+              <Typography color="text.secondary" variant="body2">
+                Categories
+              </Typography>
+              <Typography variant="body2">
+                {report.categories?.length ? report.categories.join(", ") : "None listed"}
+              </Typography>
+
+              <Typography color="text.secondary" variant="body2">
+                Finished
+              </Typography>
+              <Typography variant="body2">
+                {fmtDate(report.created_at)}
+              </Typography>
+            </Box>
+
+            <Accordion
+              disableGutters
+              sx={{
+                borderRadius: 2,
+                border: "1px solid rgba(255,255,255,.08)",
+                background: "rgba(255,255,255,.02)",
+                "&:before": { display: "none" },
+              }}
+            >
+              <AccordionSummary
+                expandIcon={<ExpandMoreOutlined />}
+                onClick={(e) => e.stopPropagation()}
+              >
+                <Typography variant="body2" fontWeight={800}>
+                  Technical details
+                </Typography>
+              </AccordionSummary>
+              <AccordionDetails onClick={(e) => e.stopPropagation()}>
+                <Stack spacing={1.5}>
+                  <Box
+                    sx={{
+                      display: "grid",
+                      gridTemplateColumns: { xs: "1fr", sm: "140px 1fr" },
+                      gap: 1,
+                    }}
+                  >
+                    <Typography color="text.secondary" variant="body2">
+                      Analyzer ID
+                    </Typography>
+                    <Typography variant="body2" sx={{ wordBreak: "break-word" }}>
+                      {report.analyzer_id || "—"}
+                    </Typography>
+
+                    <Typography color="text.secondary" variant="body2">
+                      Job ID
+                    </Typography>
+                    <Typography variant="body2" sx={{ wordBreak: "break-word" }}>
+                      {report.cortex_job_id || "—"}
+                    </Typography>
+
+                    <Typography color="text.secondary" variant="body2">
+                      Level
+                    </Typography>
+                    <Typography variant="body2">
+                      {report.level || "—"}
+                    </Typography>
+
+                    <Typography color="text.secondary" variant="body2">
+                      Status
+                    </Typography>
+                    <Typography variant="body2">
+                      {report.status || "—"}
+                    </Typography>
+                  </Box>
+
+                  {report.report_taxonomy ? (
+                    <Accordion
+                      disableGutters
+                      sx={{
+                        borderRadius: 2,
+                        border: "1px solid rgba(255,255,255,.08)",
+                        background: "rgba(255,255,255,.02)",
+                        "&:before": { display: "none" },
+                      }}
+                    >
+                      <AccordionSummary
+                        expandIcon={<ExpandMoreOutlined />}
+                        onClick={(e) => e.stopPropagation()}
+                      >
+                        <Typography variant="body2" fontWeight={800}>
+                          Taxonomy JSON
+                        </Typography>
+                      </AccordionSummary>
+                      <AccordionDetails onClick={(e) => e.stopPropagation()}>
+                        <Box
+                          component="pre"
+                          sx={{
+                            m: 0,
+                            p: 1.25,
+                            borderRadius: 2,
+                            border: "1px solid rgba(255,255,255,.08)",
+                            background: "rgba(0,0,0,.22)",
+                            overflow: "auto",
+                            maxHeight: 220,
+                            fontSize: 12,
+                            lineHeight: 1.45,
+                          }}
+                        >
+                          {JSON.stringify(report.report_taxonomy, null, 2)}
+                        </Box>
+                      </AccordionDetails>
+                    </Accordion>
+                  ) : null}
+
+                  {report.report_summary ? (
+                    <Accordion
+                      disableGutters
+                      sx={{
+                        borderRadius: 2,
+                        border: "1px solid rgba(255,255,255,.08)",
+                        background: "rgba(255,255,255,.02)",
+                        "&:before": { display: "none" },
+                      }}
+                    >
+                      <AccordionSummary
+                        expandIcon={<ExpandMoreOutlined />}
+                        onClick={(e) => e.stopPropagation()}
+                      >
+                        <Typography variant="body2" fontWeight={800}>
+                          Summary JSON
+                        </Typography>
+                      </AccordionSummary>
+                      <AccordionDetails onClick={(e) => e.stopPropagation()}>
+                        <Box
+                          component="pre"
+                          sx={{
+                            m: 0,
+                            p: 1.25,
+                            borderRadius: 2,
+                            border: "1px solid rgba(255,255,255,.08)",
+                            background: "rgba(0,0,0,.22)",
+                            overflow: "auto",
+                            maxHeight: 220,
+                            fontSize: 12,
+                            lineHeight: 1.45,
+                          }}
+                        >
+                          {JSON.stringify(report.report_summary, null, 2)}
+                        </Box>
+                      </AccordionDetails>
+                    </Accordion>
+                  ) : null}
+                </Stack>
+              </AccordionDetails>
+            </Accordion>
+          </Stack>
+        </CardContent>
+      ) : null}
     </Card>
   );
 }
@@ -204,17 +573,13 @@ function AnalyzerReportCard({ report }: { report: SubmissionAnalyzerReport }) {
 function GlassCard(props: React.PropsWithChildren<{ sx?: any }>) {
   return (
     <Card
-      sx={(theme) => ({
-        borderRadius: 2,
-        border: `1px solid ${alpha(theme.palette.divider, 0.9)}`,
-        background: `linear-gradient(
-          180deg,
-          ${alpha(theme.palette.background.paper, 0.88)} 0%,
-          ${alpha(theme.palette.background.paper, 0.72)} 100%
-        )`,
-        backdropFilter: "blur(8px)",
+      sx={{
+        height: "100%",
+        borderRadius: 3,
+        border: "1px solid rgba(255,255,255,.10)",
+        background: "linear-gradient(180deg, rgba(255,255,255,.06), rgba(255,255,255,.03))",
         ...props.sx,
-      })}
+      }}
     >
       {props.children}
     </Card>
@@ -278,7 +643,7 @@ export default function SubmissionsPage() {
   const [openDrawer, setOpenDrawer] = React.useState(false);
   const [selectedId, setSelectedId] = React.useState<number | string | null>(null);
   const [challengeId, setChallengeId] = React.useState<number | null>(null);
-
+  const [expandedAnalyzerIds, setExpandedAnalyzerIds] = React.useState<Record<number, boolean>>({});
   const meQuery = useQuery<Me>({
     queryKey: ["me"],
     queryFn: getMe,
@@ -365,6 +730,20 @@ export default function SubmissionsPage() {
     setPage(0);
   }, [qDebounced, status, type, from, to, sort, pageSize]);
 
+  React.useEffect(() => {
+    if (!openDrawer) {
+      setExpandedAnalyzerIds({});
+    }
+  }, [openDrawer]);
+
+  React.useEffect(() => {
+    setExpandedAnalyzerIds({});
+  }, [selectedId]);
+
+  React.useEffect(() => {
+    setExpandedAnalyzerIds({});
+  }, [detailsQuery.data?.analyzer_reports]);
+
   const rows = submissionsQuery.data?.items ?? [];
 
   const filtered = rows
@@ -425,6 +804,24 @@ export default function SubmissionsPage() {
   const DIALOG_RADIUS = 2;
   const DRAWER_RADIUS = 2;
 
+  const analyzerReports = detailsQuery.data?.analyzer_reports ?? [];
+  const expandAllAnalyzers = React.useCallback(() => {
+    setExpandedAnalyzerIds(
+      Object.fromEntries(analyzerReports.map((r) => [r.id, true]))
+    );
+  }, [analyzerReports]);
+
+  const collapseAllAnalyzers = React.useCallback(() => {
+    setExpandedAnalyzerIds({});
+  }, []);
+
+  const invertAnalyzers = React.useCallback(() => {
+    setExpandedAnalyzerIds((prev) =>
+      Object.fromEntries(analyzerReports.map((r) => [r.id, !prev[r.id]]))
+    );
+  }, [analyzerReports]);
+
+
   return (
     <Box sx={{ p: { xs: 2, md: 3 } }}>
       {/* Header */}
@@ -438,7 +835,9 @@ export default function SubmissionsPage() {
               <Typography variant="h4" fontWeight={950} letterSpacing={-0.5}>
                 Submissions
               </Typography>
-              <Typography color="text.secondary">Your latest submissions — open an ID to see details.</Typography>
+              <Typography color="text.secondary">
+                Review your submitted files, checks, and results in plain language.
+              </Typography>
             </Box>
           </Stack>
 
@@ -497,7 +896,7 @@ export default function SubmissionsPage() {
                   onChange={(e) => setStatus(e.target.value as any)}
                 >
                   <MenuItem value="ALL">All</MenuItem>
-                  {(["NEW", "IN_PROGRESS", "DONE", "FAILED", "REJECTED", "UNKNOWN"] as const).map((s) => (
+                  {(["NEW", "IN_PROGRESS", "DONE", "FAILED", "CHALLENGED", "REJECTED", "UNKNOWN"] as const).map((s) => (
                     <MenuItem key={s} value={s}>
                       {s}
                     </MenuItem>
@@ -878,20 +1277,54 @@ export default function SubmissionsPage() {
                 >
                   <CardContent sx={{ p: 2 }}>
                     <Stack
-                      direction="row"
+                      direction={{ xs: "column", sm: "row" }}
                       justifyContent="space-between"
-                      alignItems="center"
+                      alignItems={{ xs: "flex-start", sm: "center" }}
+                      spacing={1}
                       sx={{ mb: 1.25 }}
                     >
                       <Typography variant="subtitle2" fontWeight={900}>
-                        Analyzer details
+                        Analysis results
                       </Typography>
 
                       {!detailsQuery.isLoading && !detailsQuery.isError ? (
-                        <Typography variant="caption" color="text.secondary">
-                          {detailsQuery.data?.analyzer_reports?.length ?? 0} report
-                          {(detailsQuery.data?.analyzer_reports?.length ?? 0) === 1 ? "" : "s"}
-                        </Typography>
+                        <Stack direction="row" spacing={1} alignItems="center" flexWrap="wrap">
+                          <Typography variant="caption" color="text.secondary">
+                            {detailsQuery.data?.analyzer_reports?.length ?? 0} report
+                            {(detailsQuery.data?.analyzer_reports?.length ?? 0) === 1 ? "" : "s"}
+                          </Typography>
+
+                          {!!analyzerReports.length ? (
+                            <>
+                              <Button
+                                size="small"
+                                variant="outlined"
+                                onClick={expandAllAnalyzers}
+                                sx={{ textTransform: "none", borderRadius: 2, fontWeight: 800 }}
+                              >
+                                Expand all
+                              </Button>
+
+                              <Button
+                                size="small"
+                                variant="outlined"
+                                onClick={collapseAllAnalyzers}
+                                sx={{ textTransform: "none", borderRadius: 2, fontWeight: 800 }}
+                              >
+                                Collapse all
+                              </Button>
+
+                              <Button
+                                size="small"
+                                variant="outlined"
+                                onClick={invertAnalyzers}
+                                sx={{ textTransform: "none", borderRadius: 2, fontWeight: 800 }}
+                              >
+                                Invert
+                              </Button>
+                            </>
+                          ) : null}
+                        </Stack>
                       ) : null}
                     </Stack>
 
@@ -905,11 +1338,21 @@ export default function SubmissionsPage() {
                     ) : detailsQuery.isError ? (
                       <Alert severity="warning">Could not load details.</Alert>
                     ) : !detailsQuery.data?.analyzer_reports?.length ? (
-                      <Alert severity="info">No analyzers triggered for this submission.</Alert>
+                      <Alert severity="info">No analysis details are available for this submission yet.</Alert>
                     ) : (
                       <Stack spacing={1.25}>
                         {detailsQuery.data.analyzer_reports.map((report) => (
-                          <AnalyzerReportCard key={report.id} report={report} />
+                          <AnalyzerReportCard
+                            key={report.id}
+                            report={report}
+                            expanded={!!expandedAnalyzerIds[report.id]}
+                            onToggle={() =>
+                              setExpandedAnalyzerIds((prev) => ({
+                                ...prev,
+                                [report.id]: !prev[report.id],
+                              }))
+                            }
+                          />
                         ))}
                       </Stack>
                     )}

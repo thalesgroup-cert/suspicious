@@ -219,11 +219,11 @@ export type ThemeName =
   | "slate"
   | "light"
   | "paper"
-  | "highContrast"
+  | "high_contrast"
   | "sunrise"
   | "valentine"
   | "cyber"
-  | "theOne"
+  | "the_one"
   | "winter"
   | "spring"
   | "summer"
@@ -558,7 +558,7 @@ export const themes: Record<ThemeName, ReturnType<typeof createTheme>> = {
   }),
 
   // 6) HighContrast = “accessibility / hard terminal”
-  highContrast: mkDark({
+  high_contrast: mkDark({
     bg: "#000000",
     paper: "#0A0A0A",
     primary: "#FFFFFF",
@@ -756,7 +756,7 @@ export const themes: Record<ThemeName, ReturnType<typeof createTheme>> = {
   }),
 
   // 10) TheOne = “luxury / gold foil”
-  theOne: mkDark({
+  the_one: mkDark({
     bg: "#070707",
     paper: "#101010",
     primary: "#D4AF37",

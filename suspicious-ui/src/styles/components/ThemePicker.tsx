@@ -15,19 +15,17 @@ type ThemeMeta = {
 };
 
 const ORDER: ThemeName[] = [
-  // Core
   "midnight",
   "graphite",
   "slate",
   "light",
   "paper",
-  "highContrast",
-  // Classic (old-style inspired)
+  "high_contrast",
   "sunrise",
   "valentine",
   "cyber",
-  "theOne",
-  // Seasonal
+  "the_one",
+  "metal",
   "winter",
   "spring",
   "summer",
@@ -40,12 +38,11 @@ const META: Partial<Record<ThemeName, ThemeMeta>> = {
   slate: { label: "Slate", description: "Dark with a bit more separation.", group: "Core" },
   light: { label: "Light", description: "Clean professional light theme.", group: "Core" },
   paper: { label: "Paper", description: "Warm light theme for reviews and audit work.", group: "Core" },
-  highContrast: { label: "High contrast", description: "Accessibility-oriented dark theme.", group: "Core" },
-
+  high_contrast: { label: "High contrast", description: "Accessibility-oriented dark theme.", group: "Core" },
+  the_one: { label: "The One", description: "Ivory + gold + charcoal. Premium feel.", group: "Classic" },
   sunrise: { label: "Sunrise", description: "Peach + coral. Warm, bright, friendly.", group: "Classic" },
   valentine: { label: "Valentine", description: "Pink + berry. Soft and bold accents.", group: "Classic" },
   cyber: { label: "Cyber", description: "Neon cyan/green on deep black.", group: "Classic" },
-  theOne: { label: "The One", description: "Ivory + gold + charcoal. Premium feel.", group: "Classic" },
   metal: {
     label: "Metal",
     description: "Stealth HUD: CRT scanlines, alert red, terminal edges.",

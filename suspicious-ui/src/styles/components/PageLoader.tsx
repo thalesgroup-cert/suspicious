@@ -7,7 +7,7 @@ export default function PageLoader(props: { label?: string }) {
   return (
     <Box
       sx={{
-        minHeight: "50vh",
+        minHeight: "100vh",
         display: "grid",
         placeItems: "center",
       }}

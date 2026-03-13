@@ -11,48 +11,91 @@ export type SettingsSection =
   | "scoring";
 
 export type ListItem = {
-  id: string; // stable id (domain string, hash, username, etc.)
+  id: string;
   value: string;
   created_at?: string;
 };
 
-export async function listItems(section: SettingsSection): Promise<ListItem[]> {
-  const res = await api.get(`/settings/${section}/`);
+export type CisoUser = {
+  id: string | number;
+  username: string;
+  email?: string;
+  function?: string;
+  gbu?: string;
+  country?: string;
+  region?: string;
+  scope?: string;
+};
+
+export type Analyzer = {
+  id: number;
+  name: string;
+  weight: number;
+  analyzer_cortex_id: string;
+  is_active: boolean;
+};
+
+type ListSection =
+  | "domains_allow"
+  | "domains_deny"
+  | "campaign_domains_allow"
+  | "emails_files_allow"
+  | "filetypes_allow";
+
+type SectionResponseMap = {
+  domains_allow: ListItem[];
+  domains_deny: ListItem[];
+  campaign_domains_allow: ListItem[];
+  emails_files_allow: ListItem[];
+  filetypes_allow: ListItem[];
+  ciso_users: CisoUser[];
+};
+
+export async function listItems<T extends keyof SectionResponseMap>(
+  section: T
+): Promise<SectionResponseMap[T]> {
+  const res = await api.get(`/settings/list/${section}/`);
   return res.data;
 }
 
-export async function addItems(section: SettingsSection, values: string[]): Promise<void> {
-  await api.post(`/settings/${section}/`, { values });
-}
-
-export async function removeItem(section: SettingsSection, id: string): Promise<void> {
-  await api.delete(`/settings/${section}/${encodeURIComponent(id)}/`);
-}
-
-export async function addFromFile(section: SettingsSection, file: File): Promise<void> {
-  const fd = new FormData();
-  fd.append("file", file);
-  await api.post(`/settings/${section}/import/`, fd, {
-    headers: { "Content-Type": "multipart/form-data" },
-  });
-}
-
-/** Email feeder */
-export type FeederStatus = { enabled: boolean };
-export async function getFeederStatus(): Promise<FeederStatus> {
-  const res = await api.get(`/settings/email_feeder/`);
+export async function addItems(section: ListSection, values: string[]) {
+  const res = await api.post(`/settings/list/${section}/`, { values });
   return res.data;
 }
-export async function setFeederStatus(enabled: boolean): Promise<void> {
-  await api.post(`/settings/email_feeder/`, { enabled });
+
+export async function removeItem(section: ListSection, id: string) {
+  const res = await api.delete(`/settings/list/${section}/${id}/`);
+  return res.data;
 }
 
-/** Scoring */
-export type Analyzer = { id: string; name: string; weight: number };
+export async function getFeederStatus(): Promise<{ enabled: boolean }> {
+  const res = await api.get(`/settings/email-feeder/`);
+  return res.data;
+}
+
+export async function setFeederStatus(
+  enabled: boolean
+): Promise<{ enabled: boolean }> {
+  const res = await api.patch(`/settings/email-feeder/`, { enabled });
+  return res.data;
+}
+
 export async function listAnalyzers(): Promise<Analyzer[]> {
-  const res = await api.get(`/settings/scoring/`);
+  const res = await api.get(`/settings/analyzers/`);
   return res.data;
 }
-export async function updateAnalyzerWeight(id: string, weight: number): Promise<void> {
-  await api.post(`/settings/scoring/${encodeURIComponent(id)}/`, { weight });
+
+export async function updateAnalyzerWeight(id: number, weight: number) {
+  const res = await api.patch(`/settings/analyzers/${id}/`, { weight });
+  return res.data;
+}
+
+export async function addFromFile(section: ListSection, file: File) {
+  const text = await file.text();
+  const values = text
+    .split(/[\r\n,;]+/g)
+    .map((v) => v.trim())
+    .filter(Boolean);
+
+  return addItems(section, values);
 }

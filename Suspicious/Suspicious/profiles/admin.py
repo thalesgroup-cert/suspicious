@@ -12,7 +12,7 @@ from import_export.admin import ImportExportModelAdmin
 from knox.models import AuthToken
 
 from .models import UserProfile, CISOProfile, APIKey
-from api.views import generate_api_key
+from api.views.downloads import generate_api_key
 
 
 # =============================================================================

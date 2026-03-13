@@ -1,47 +1,18 @@
 from django.urls import path
-from .views import (
-    # Authentication
-    LogoutView,
-    LoginView,
-    MeView,
+from rest_framework.views import APIView
+from api.views.auth import LoginView, LogoutView, MeView
+from api.views.dashboard import DashboardSummaryView, MonthlyCasesSummaryListView, MonthlyCasesSummaryAggregateView, MonthlyReporterStatsListView, TotalCasesStatsListView, UserCasesMonthlyStatsListView, UserCasesMonthlyStatsDetailView, UserCasesMonthlyStatsAggregateView
+from api.views.profile import ProfileView, ProfilePreferencesView, ProfileAppearanceView
+from api.views.challenge import CaseChallengeTokenView
 
-    # Monthly global stats
-    MonthlyCasesSummaryListView,
-    MonthlyCasesSummaryAggregateView,
-    MonthlyReporterStatsListView,
-    TotalCasesStatsListView,
+from api.views.submissions import SubmissionListView, MySubmissionsView, SubmissionDetailsView, SubmissionChallengeView
+from api.views.settings import SettingsListView, SettingsListItemDeleteView, EmailFeederSettingsView, AnalyzerSettingsListView, AnalyzerSettingsDetailView
+from api.views.investigations import InvestigationListView, InvestigationDetailsView, InvestigationGlobalEditView
+from api.views.home import HomeSummaryView
+from api.views.challenge import CaseChallengeTokenView
+from api.views.downloads import DownloadCaseArchiveView
+from api.views.campaigns import CampaignClassificationCountsView, CampaignPcaView, CampaignMailVolumeView
 
-    # User stats
-    UserCasesMonthlyStatsListView,
-    UserCasesMonthlyStatsDetailView,
-    UserCasesMonthlyStatsAggregateView,
-    
-    # Dashboard stats
-    DashboardSummaryView,
-    
-    # Dashboard Campaigns stats
-    CampaignClassificationCountsView,
-    CampaignPcaView,
-    CampaignMailVolumeView,
-    
-    # Home stats
-    HomeSummaryView,
-    
-    # Submissions
-    SubmissionListView,
-    MySubmissionsView,
-    SubmissionDetailsView,
-    SubmissionChallengeView,
-
-    # Profile
-    ProfileView,
-    ProfilePreferencesView,
-    ProfileAppearanceView,
-
-    # Downloads
-    DownloadCaseArchiveView,
-    CaseChallengeTokenView,
-)
 from drf_spectacular.views import SpectacularAPIView, SpectacularSwaggerView
 urlpatterns = [
     path("schema/", SpectacularAPIView.as_view(), name="schema"),
@@ -173,6 +144,21 @@ urlpatterns = [
     ),
     path("submissions/<int:submission_id>/", SubmissionDetailsView.as_view(), name="submission-details"),
     path("submissions/<int:submission_id>/challenge/", SubmissionChallengeView.as_view(), name="submission-challenge"),
+
+    # ------------------------------------------------------------------
+    # Settings
+    # ------------------------------------------------------------------
+    path("settings/list/<str:section>/", SettingsListView.as_view(), name="settings-list"),
+    path("settings/list/<str:section>/<int:item_id>/", SettingsListItemDeleteView.as_view(), name="settings-list-delete"),
+
+    path("settings/email-feeder/", EmailFeederSettingsView.as_view(), name="settings-email-feeder"),
+
+    path("settings/analyzers/", AnalyzerSettingsListView.as_view(), name="settings-analyzers"),
+    path("settings/analyzers/<int:analyzer_id>/", AnalyzerSettingsDetailView.as_view(), name="settings-analyzer-detail"),
+
+    path("investigations/", InvestigationListView.as_view(), name="investigation-list"),
+    path("investigations/<int:case_id>/", InvestigationDetailsView.as_view(), name="investigation-details"),
+    path("investigations/<int:case_id>/edit-global/", InvestigationGlobalEditView.as_view(), name="investigation-edit-global"),
 
     # ------------------------------------------------------------------
     # Home summary
