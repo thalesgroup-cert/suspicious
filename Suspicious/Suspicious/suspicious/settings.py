@@ -28,7 +28,7 @@ db_config = config.get('database', {})
 
 # si ton proxy met X-Forwarded-Proto: https
 SECURE_PROXY_SSL_HEADER = ("HTTP_X_FORWARDED_PROTO", "https")
-
+SUBMISSION_ELEVATED_GROUPS = ("CERT", "CISO", "Admin")
 # si ton proxy met X-Forwarded-Host: suspicious.corp.test
 USE_X_FORWARDED_HOST = True
 OIDC_SERVER_URL = suspicious_config.get("oidc_server_url")
@@ -298,6 +298,9 @@ REST_FRAMEWORK = {
     "DEFAULT_PERMISSION_CLASSES": (
         "rest_framework.permissions.IsAuthenticated",
     ),
+    "DEFAULT_THROTTLE_RATES": {
+        "login": "5/min",
+    },
     'DEFAULT_FILTER_BACKENDS': ['django_filters.rest_framework.DjangoFilterBackend'],
     'DEFAULT_SCHEMA_CLASS': 'drf_spectacular.openapi.AutoSchema',
 }

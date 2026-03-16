@@ -1,10 +1,14 @@
 from rest_framework import serializers
 
 
+class CampaignPcaQuerySerializer(serializers.Serializer):
+    limit = serializers.IntegerField(min_value=1, max_value=5000, default=1500)
+
+
 class CampaignClassificationCountsSerializer(serializers.Serializer):
-    SAFE = serializers.IntegerField()
-    UNWANTED = serializers.IntegerField()
-    DANGEROUS = serializers.IntegerField()
+    SAFE = serializers.IntegerField(min_value=0)
+    UNWANTED = serializers.IntegerField(min_value=0)
+    DANGEROUS = serializers.IntegerField(min_value=0)
 
 
 class CampaignPcaPointSerializer(serializers.Serializer):
@@ -16,6 +20,7 @@ class CampaignPcaPointSerializer(serializers.Serializer):
         child=serializers.CharField(),
         required=False,
         allow_empty=True,
+        default=list,
     )
 
 
@@ -30,12 +35,12 @@ class CampaignPcaResponseSerializer(serializers.Serializer):
 
 class CampaignMailVolumeBandSerializer(serializers.Serializer):
     name = serializers.CharField()
-    start = serializers.CharField()
-    end = serializers.CharField()
+    start = serializers.DateTimeField()
+    end = serializers.DateTimeField()
 
 
 class CampaignMailVolumeResponseSerializer(serializers.Serializer):
-    dates = serializers.ListField(child=serializers.CharField())
-    non_danger = serializers.ListField(child=serializers.IntegerField())
-    dangerous = serializers.ListField(child=serializers.IntegerField())
+    dates = serializers.ListField(child=serializers.DateField(format="%Y-%m-%d"))
+    non_danger = serializers.ListField(child=serializers.IntegerField(min_value=0))
+    dangerous = serializers.ListField(child=serializers.IntegerField(min_value=0))
     campaigns = CampaignMailVolumeBandSerializer(many=True)

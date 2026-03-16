@@ -1,4 +1,3 @@
-// src/pages/SubmissionsPage.tsx
 import * as React from "react";
 import {
   Alert,
@@ -49,49 +48,40 @@ import { alpha } from "@mui/material/styles";
 import { getMe, type Me } from "@/api/auth";
 import {
   challengeSubmission,
-  getMySubmissions,
   getSubmissionDetails,
-  SubmissionDetails, SubmissionAnalyzerReport,
+  listSubmissions,
+  type PaginatedSubmissionsResponse,
+  type SubmissionAnalyzerReport,
+  type SubmissionDetails,
+  type SubmissionOrdering,
+  type SubmissionResult,
   type SubmissionRow,
   type SubmissionStatus,
   type SubmissionType,
 } from "@/features/submissions/api";
-
 import { useDebounced } from "@/shared/hooks/useDebounced";
 import { StatusChip } from "@/shared/components/StatusChip";
 import { ResultChip } from "@/shared/components/ResultChip";
 import { CopyIconButton } from "@/shared/components/CopyIconButton";
 
-type SubmissionsResponse = { items: SubmissionRow[] };
-
 function clamp(n: number, min = 0, max = 100) {
   return Math.max(min, Math.min(max, n));
 }
 
-function normalizeScore(score?: number) {
+function normalizeScore(score?: number | null) {
   if (typeof score !== "number" || Number.isNaN(score)) return 0;
-
-  // If backend score is 0..10, convert to 0..100
   if (score <= 10) return clamp(score * 10);
-
-  // If already 0..100
   return clamp(score);
 }
 
-function normalizeConfidence(confidence?: number) {
+function normalizeConfidence(confidence?: number | null) {
   if (typeof confidence !== "number" || Number.isNaN(confidence)) return 0;
-
-  // if backend sends 0..1
   if (confidence <= 1) return clamp(confidence * 100);
-
-  // if backend sends 0..10
   if (confidence <= 10) return clamp(confidence * 10);
-
-  // if backend sends 0..100
   return clamp(confidence);
 }
 
-function getRiskTone(score?: number) {
+function getRiskTone(score?: number | null) {
   const v = normalizeScore(score);
 
   if (v >= 80) {
@@ -132,7 +122,7 @@ function getRiskTone(score?: number) {
   };
 }
 
-function getConfidenceTone(confidence?: number) {
+function getConfidenceTone(confidence?: number | null) {
   const v = normalizeConfidence(confidence);
 
   if (v >= 75) {
@@ -174,18 +164,40 @@ function readStatus(status?: string) {
   if (s === "FAILED") return "Failed";
   if (s === "IN_PROGRESS") return "Running";
   if (s === "NEW") return "Queued";
+  if (s === "CHALLENGED") return "Challenged";
   return status || "Unknown";
 }
 
 function readType(type?: string) {
-  const t = (type ?? "").toLowerCase();
+  const t = (type ?? "").toUpperCase();
 
-  if (t === "file") return "File check";
-  if (t === "hash") return "Hash check";
-  if (t === "mail") return "Email check";
-  if (t === "url") return "Link check";
-  if (t === "ip") return "IP check";
+  if (t === "FILE") return "File check";
+  if (t === "HASH") return "Hash check";
+  if (t === "MAIL") return "Email check";
+  if (t === "URL") return "Link check";
+  if (t === "IP") return "IP check";
   return type || "Analyzer";
+}
+
+function prettyResult(result?: SubmissionResult) {
+  switch (result) {
+    case "SAFE":
+      return "Safe";
+    case "INCONCLUSIVE":
+      return "Inconclusive";
+    case "UNCHALLENGED":
+      return "Unchallenged";
+    case "ALLOW_LISTED":
+      return "Allow listed";
+    case "FAILURE":
+      return "Failure";
+    case "SUSPICIOUS":
+      return "Suspicious";
+    case "DANGEROUS":
+      return "Dangerous";
+    default:
+      return result || "Unknown";
+  }
 }
 
 function summarizeForReading(report: SubmissionAnalyzerReport) {
@@ -210,16 +222,17 @@ function summarizeForReading(report: SubmissionAnalyzerReport) {
   return parts.join(" ");
 }
 
-function prettySummary(summary: any) {
+function prettySummary(summary: unknown) {
   if (!summary) return null;
   if (typeof summary === "string") return summary;
   if (Array.isArray(summary)) {
     return summary.map((v) => (typeof v === "string" ? v : JSON.stringify(v))).join("\n");
   }
   if (typeof summary === "object") {
-    if (typeof summary.summary === "string") return summary.summary;
-    if (typeof summary.message === "string") return summary.message;
-    if (typeof summary.verdict === "string") return summary.verdict;
+    const obj = summary as Record<string, unknown>;
+    if (typeof obj.summary === "string") return obj.summary;
+    if (typeof obj.message === "string") return obj.message;
+    if (typeof obj.verdict === "string") return obj.verdict;
   }
   return null;
 }
@@ -421,6 +434,13 @@ function AnalyzerReportCard({
               </Typography>
 
               <Typography color="text.secondary" variant="body2">
+                Result
+              </Typography>
+              <Typography variant="body2">
+                {prettyResult((report.category as SubmissionResult | null) ?? undefined)}
+              </Typography>
+
+              <Typography color="text.secondary" variant="body2">
                 Finished
               </Typography>
               <Typography variant="body2">
@@ -585,6 +605,7 @@ function GlassCard(props: React.PropsWithChildren<{ sx?: any }>) {
     </Card>
   );
 }
+
 function fmtDate(iso: string) {
   const d = new Date(iso);
   if (Number.isNaN(d.getTime())) return iso;
@@ -624,6 +645,34 @@ function withinDates(rowIso: string, from?: string, to?: string) {
   return true;
 }
 
+function toBackendOrdering(
+  sort: "date_desc" | "date_asc" | "id_desc" | "id_asc"
+): SubmissionOrdering {
+  if (sort === "date_desc") return "-created_at";
+  if (sort === "date_asc") return "created_at";
+  if (sort === "id_desc") return "-id";
+  return "id";
+}
+
+const STATUS_OPTIONS: Array<SubmissionStatus | "ALL"> = [
+  "ALL",
+  "NEW",
+  "IN_PROGRESS",
+  "DONE",
+  "CHALLENGED",
+  "UNKNOWN",
+];
+
+const TYPE_OPTIONS: Array<SubmissionType | "ALL"> = [
+  "ALL",
+  "FILE",
+  "MAIL",
+  "URL",
+  "IP",
+  "HASH",
+  "UNKNOWN",
+];
+
 export default function SubmissionsPage() {
   const navigate = useNavigate();
   const [searchParams] = useSearchParams();
@@ -644,25 +693,37 @@ export default function SubmissionsPage() {
   const [selectedId, setSelectedId] = React.useState<number | string | null>(null);
   const [challengeId, setChallengeId] = React.useState<number | null>(null);
   const [expandedAnalyzerIds, setExpandedAnalyzerIds] = React.useState<Record<number, boolean>>({});
+
   const meQuery = useQuery<Me>({
     queryKey: ["me"],
     queryFn: getMe,
     retry: false,
   });
 
-  const me: Me | undefined = React.useMemo(() => {
-    return meQuery.data;
-  }, [meQuery.data]);
+  const me: Me | undefined = React.useMemo(() => meQuery.data, [meQuery.data]);
 
-  const submissionsQuery = useQuery<SubmissionsResponse>({
-    queryKey: ["submissions"],
-    queryFn: async () => (getMySubmissions()),
+  const backendOrdering = React.useMemo(() => toBackendOrdering(sort), [sort]);
+
+  const submissionsQuery = useQuery<PaginatedSubmissionsResponse>({
+    queryKey: ["submissions", { mine: true, ordering: backendOrdering, fetchSize: 100 }],
+    queryFn: async () =>
+      listSubmissions({
+        mine: true,
+        ordering: backendOrdering,
+        page: 1,
+        page_size: 100,
+      }),
     enabled: !!me,
     retry: false,
-    initialData: { items: [] },
+    initialData: {
+      count: 0,
+      next: null,
+      previous: null,
+      results: [],
+    },
     refetchInterval: (query) => {
-      const items = (query.state.data as SubmissionsResponse | undefined)?.items ?? [];
-      const shouldPoll = items.some((r) => {
+      const rows = (query.state.data as PaginatedSubmissionsResponse | undefined)?.results ?? [];
+      const shouldPoll = rows.some((r) => {
         const s = ((r.status ?? "UNKNOWN") as string).toUpperCase();
         return s === "NEW" || s === "IN_PROGRESS";
       });
@@ -671,37 +732,45 @@ export default function SubmissionsPage() {
     refetchIntervalInBackground: true,
   });
 
-  const selectedIdNum = typeof selectedId === "number" ? selectedId : selectedId ? Number(selectedId) : NaN;
+  const selectedIdNum =
+    typeof selectedId === "number" ? selectedId : selectedId ? Number(selectedId) : NaN;
   const hasNumericSelectedId = Number.isFinite(selectedIdNum);
 
   const detailsQuery = useQuery<SubmissionDetails>({
     queryKey: ["submissionDetails", selectedIdNum],
-    queryFn: async () => {
-      return getSubmissionDetails(selectedIdNum);
-    },
+    queryFn: async () => getSubmissionDetails(selectedIdNum),
     enabled: !!me && hasNumericSelectedId && openDrawer,
     retry: false,
     staleTime: 30_000,
     gcTime: 10 * 60_000,
-    placeholderData: (prev: any) => prev,
+    placeholderData: (prev) => prev,
   });
 
   const challengeMutation = useMutation({
     mutationFn: async (id: number) => challengeSubmission(id),
     onMutate: async (id) => {
       await qc.cancelQueries({ queryKey: ["submissions"] });
-      const prev = qc.getQueryData<SubmissionsResponse>(["submissions"]);
-      if (prev) {
-        qc.setQueryData<SubmissionsResponse>(["submissions"], {
-          items: prev.items.map((r) =>
+
+      const prevEntries = qc.getQueriesData<PaginatedSubmissionsResponse>({
+        queryKey: ["submissions"],
+      });
+
+      prevEntries.forEach(([key, prev]) => {
+        if (!prev) return;
+        qc.setQueryData<PaginatedSubmissionsResponse>(key, {
+          ...prev,
+          results: prev.results.map((r) =>
             r.id === id ? { ...r, is_challenged: true, is_challengeable: false } : r
           ),
         });
-      }
-      return { prev };
+      });
+
+      return { prevEntries };
     },
     onError: (_err, _id, ctx) => {
-      if (ctx?.prev) qc.setQueryData(["submissions"], ctx.prev);
+      ctx?.prevEntries?.forEach(([key, data]) => {
+        qc.setQueryData(key, data);
+      });
     },
     onSettled: () => {
       qc.invalidateQueries({ queryKey: ["submissions"] });
@@ -723,8 +792,7 @@ export default function SubmissionsPage() {
         setOpenDrawer(true);
       }
     }
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, []);
+  }, [searchParams]);
 
   React.useEffect(() => {
     setPage(0);
@@ -744,7 +812,7 @@ export default function SubmissionsPage() {
     setExpandedAnalyzerIds({});
   }, [detailsQuery.data?.analyzer_reports]);
 
-  const rows = submissionsQuery.data?.items ?? [];
+  const rows = submissionsQuery.data?.results ?? [];
 
   const filtered = rows
     .filter((r) => matches(r, qDebounced))
@@ -752,21 +820,14 @@ export default function SubmissionsPage() {
     .filter((r) => (type === "ALL" ? true : r.type === type))
     .filter((r) => withinDates(r.created_at, from || undefined, to || undefined));
 
-  const sorted = [...filtered].sort((a, b) => {
-    const ta = new Date(a.created_at).getTime();
-    const tb = new Date(b.created_at).getTime();
-    if (sort === "date_desc") return (Number.isFinite(tb) ? tb : 0) - (Number.isFinite(ta) ? ta : 0);
-    if (sort === "date_asc") return (Number.isFinite(ta) ? ta : 0) - (Number.isFinite(tb) ? tb : 0);
-    if (sort === "id_desc") return b.id - a.id;
-    return a.id - b.id;
-  });
-
-  const total = sorted.length;
+  const total = filtered.length;
   const start = page * pageSize;
   const end = Math.min(total, start + pageSize);
-  const pageRows = sorted.slice(start, end);
+  const pageRows = filtered.slice(start, end);
 
-  const selectedRow = selectedId ? rows.find((r) => String(r.id) === String(selectedId)) : undefined;
+  const selectedRow = selectedId
+    ? rows.find((r) => String(r.id) === String(selectedId))
+    : undefined;
 
   if (meQuery.isLoading) {
     return (
@@ -795,20 +856,19 @@ export default function SubmissionsPage() {
   if (submissionsQuery.isError) {
     return (
       <Box sx={{ p: 3 }}>
-        <Alert severity="error">Failed to load submissions (API route / permissions).</Alert>
+        <Alert severity="error">Failed to load submissions.</Alert>
       </Box>
     );
   }
 
-  const BADGE_W = 132; // same width for Status/Result/Type, tweak as you like
+  const BADGE_W = 132;
   const DIALOG_RADIUS = 2;
-  const DRAWER_RADIUS = 2;
 
   const analyzerReports = detailsQuery.data?.analyzer_reports ?? [];
+  const hasRawDetails = typeof detailsQuery.data?.raw !== "undefined";
+
   const expandAllAnalyzers = React.useCallback(() => {
-    setExpandedAnalyzerIds(
-      Object.fromEntries(analyzerReports.map((r) => [r.id, true]))
-    );
+    setExpandedAnalyzerIds(Object.fromEntries(analyzerReports.map((r) => [r.id, true])));
   }, [analyzerReports]);
 
   const collapseAllAnalyzers = React.useCallback(() => {
@@ -821,10 +881,8 @@ export default function SubmissionsPage() {
     );
   }, [analyzerReports]);
 
-
   return (
     <Box sx={{ p: { xs: 2, md: 3 } }}>
-      {/* Header */}
       <Stack direction={{ xs: "column", md: "row" }} spacing={2} justifyContent="space-between" sx={{ mb: 2 }}>
         <Stack spacing={0.4}>
           <Stack direction="row" spacing={1.25} alignItems="center">
@@ -845,6 +903,13 @@ export default function SubmissionsPage() {
             <Chip icon={<AssignmentTurnedInOutlined />} label={`${total} shown`} variant="outlined" />
             <Chip icon={<FilterAltOutlined />} label="Filters available" variant="outlined" />
             {qDebounced ? <Chip label={`Search: ${qDebounced}`} variant="outlined" /> : null}
+            {submissionsQuery.data.count > rows.length ? (
+              <Chip
+                label={`Loaded ${rows.length} of ${submissionsQuery.data.count}`}
+                variant="outlined"
+                color="warning"
+              />
+            ) : null}
           </Stack>
         </Stack>
 
@@ -852,7 +917,7 @@ export default function SubmissionsPage() {
           <Button
             variant="contained"
             onClick={() => navigate("/submit")}
-            sx={{ borderRadius: 2, textTransform: "none", fontWeight: 900 }} // slightly less round
+            sx={{ borderRadius: 2, textTransform: "none", fontWeight: 900 }}
           >
             New submission
           </Button>
@@ -867,7 +932,6 @@ export default function SubmissionsPage() {
         </Stack>
       </Stack>
 
-      {/* Filters */}
       <GlassCard sx={{ mb: 2 }}>
         <CardContent sx={{ p: { xs: 2.25, md: 3 } }}>
           <Stack spacing={1.5}>
@@ -893,12 +957,11 @@ export default function SubmissionsPage() {
                   labelId="status-label"
                   label="Status"
                   value={status}
-                  onChange={(e) => setStatus(e.target.value as any)}
+                  onChange={(e) => setStatus(e.target.value as SubmissionStatus | "ALL")}
                 >
-                  <MenuItem value="ALL">All</MenuItem>
-                  {(["NEW", "IN_PROGRESS", "DONE", "FAILED", "CHALLENGED", "REJECTED", "UNKNOWN"] as const).map((s) => (
+                  {STATUS_OPTIONS.map((s) => (
                     <MenuItem key={s} value={s}>
-                      {s}
+                      {s === "ALL" ? "All" : s}
                     </MenuItem>
                   ))}
                 </Select>
@@ -906,11 +969,15 @@ export default function SubmissionsPage() {
 
               <FormControl sx={{ minWidth: 160 }} fullWidth>
                 <InputLabel id="type-label">Type</InputLabel>
-                <Select labelId="type-label" label="Type" value={type} onChange={(e) => setType(e.target.value as any)}>
-                  <MenuItem value="ALL">All</MenuItem>
-                  {(["FILE", "MAIL", "URL", "IP", "HASH", "UNKNOWN"] as const).map((t) => (
+                <Select
+                  labelId="type-label"
+                  label="Type"
+                  value={type}
+                  onChange={(e) => setType(e.target.value as SubmissionType | "ALL")}
+                >
+                  {TYPE_OPTIONS.map((t) => (
                     <MenuItem key={t} value={t}>
-                      {t}
+                      {t === "ALL" ? "All" : t}
                     </MenuItem>
                   ))}
                 </Select>
@@ -937,7 +1004,14 @@ export default function SubmissionsPage() {
 
               <FormControl sx={{ minWidth: 220 }} fullWidth>
                 <InputLabel id="sort-label">Sort</InputLabel>
-                <Select labelId="sort-label" label="Sort" value={sort} onChange={(e) => setSort(e.target.value as any)}>
+                <Select
+                  labelId="sort-label"
+                  label="Sort"
+                  value={sort}
+                  onChange={(e) =>
+                    setSort(e.target.value as "date_desc" | "date_asc" | "id_desc" | "id_asc")
+                  }
+                >
                   <MenuItem value="date_desc">Date (new → old)</MenuItem>
                   <MenuItem value="date_asc">Date (old → new)</MenuItem>
                   <MenuItem value="id_desc">ID (high → low)</MenuItem>
@@ -979,7 +1053,7 @@ export default function SubmissionsPage() {
                   variant="outlined"
                   disabled={page === 0}
                   onClick={() => setPage((p) => Math.max(0, p - 1))}
-                  sx={{ borderRadius: 2, textTransform: "none", fontWeight: 900 }} // less round
+                  sx={{ borderRadius: 2, textTransform: "none", fontWeight: 900 }}
                 >
                   Prev
                 </Button>
@@ -987,7 +1061,7 @@ export default function SubmissionsPage() {
                   variant="outlined"
                   disabled={end >= total}
                   onClick={() => setPage((p) => p + 1)}
-                  sx={{ borderRadius: 2, textTransform: "none", fontWeight: 900 }} // less round
+                  sx={{ borderRadius: 2, textTransform: "none", fontWeight: 900 }}
                 >
                   Next
                 </Button>
@@ -997,7 +1071,6 @@ export default function SubmissionsPage() {
         </CardContent>
       </GlassCard>
 
-      {/* Table */}
       <GlassCard>
         <CardContent sx={{ p: 0 }}>
           {total === 0 ? (
@@ -1022,7 +1095,7 @@ export default function SubmissionsPage() {
 
                 <TableBody>
                   {pageRows.map((r) => {
-                    const canChallenge = r.is_challengeable && !r.is_challenged;
+                    const canChallenge = !!r.is_challengeable && !r.is_challenged;
 
                     return (
                       <TableRow
@@ -1051,7 +1124,7 @@ export default function SubmissionsPage() {
                                 setSelectedId(r.id);
                                 setOpenDrawer(true);
                               }}
-                              sx={{ borderRadius: 2, textTransform: "none", fontWeight: 950 }} // less round
+                              sx={{ borderRadius: 2, textTransform: "none", fontWeight: 950 }}
                             >
                               {r.id}
                             </Button>
@@ -1092,7 +1165,9 @@ export default function SubmissionsPage() {
 
                         <TableCell>{fmtDate(r.created_at)}</TableCell>
 
-                        <TableCell sx={{ textAlign: "right", fontWeight: 900 }}>{r.tests_done}</TableCell>
+                        <TableCell sx={{ textAlign: "right", fontWeight: 900 }}>
+                          {r.tests_done}
+                        </TableCell>
 
                         <TableCell>
                           <Chip
@@ -1119,7 +1194,7 @@ export default function SubmissionsPage() {
                               variant="outlined"
                               disabled={challengeMutation.isPending}
                               onClick={() => setChallengeId(r.id)}
-                              sx={{ borderRadius: 2, textTransform: "none", fontWeight: 950 }} // less round
+                              sx={{ borderRadius: 2, textTransform: "none", fontWeight: 950 }}
                             >
                               Challenge
                             </Button>
@@ -1139,7 +1214,6 @@ export default function SubmissionsPage() {
         </CardContent>
       </GlassCard>
 
-      {/* Details drawer */}
       <Drawer
         anchor="right"
         open={openDrawer}
@@ -1165,7 +1239,6 @@ export default function SubmissionsPage() {
           </Box>
         ) : (
           <Stack sx={{ height: "100%" }}>
-            {/* Header */}
             <Box
               sx={(theme) => ({
                 px: 2.25,
@@ -1227,10 +1300,8 @@ export default function SubmissionsPage() {
               </Stack>
             </Box>
 
-            {/* Scrollable content */}
             <Box sx={{ flex: 1, overflowY: "auto", p: 2 }}>
               <Stack spacing={2}>
-                {/* Overview */}
                 <Card
                   sx={{
                     borderRadius: 2,
@@ -1267,7 +1338,6 @@ export default function SubmissionsPage() {
                   </CardContent>
                 </Card>
 
-                {/* Analyzer details */}
                 <Card
                   sx={{
                     borderRadius: 2,
@@ -1359,29 +1429,29 @@ export default function SubmissionsPage() {
                   </CardContent>
                 </Card>
 
-                {/* Raw details */}
-                <Card
-                  sx={{
-                    borderRadius: 2,
-                    border: "1px solid rgba(255,255,255,.08)",
-                    background: "rgba(255,255,255,.02)",
-                  }}
-                >
-                  <Accordion
-                    disableGutters
+                {hasRawDetails ? (
+                  <Card
                     sx={{
                       borderRadius: 2,
                       border: "1px solid rgba(255,255,255,.08)",
                       background: "rgba(255,255,255,.02)",
-                      "&:before": { display: "none" },
                     }}
                   >
-                    <AccordionSummary expandIcon={<ExpandMoreOutlined />}>
-                      <Typography variant="subtitle2" fontWeight={900}>
-                        Raw details (API)
-                      </Typography>
-                    </AccordionSummary>
-                    <AccordionDetails>
+                    <Accordion
+                      disableGutters
+                      sx={{
+                        borderRadius: 2,
+                        border: "1px solid rgba(255,255,255,.08)",
+                        background: "rgba(255,255,255,.02)",
+                        "&:before": { display: "none" },
+                      }}
+                    >
+                      <AccordionSummary expandIcon={<ExpandMoreOutlined />}>
+                        <Typography variant="subtitle2" fontWeight={900}>
+                          Raw details (admin/debug)
+                        </Typography>
+                      </AccordionSummary>
+                      <AccordionDetails>
                         <Box
                           component="pre"
                           sx={(theme) => ({
@@ -1397,28 +1467,30 @@ export default function SubmissionsPage() {
                             lineHeight: 1.45,
                           })}
                         >
-                        {JSON.stringify(detailsQuery.data?.raw ?? detailsQuery.data, null, 2)}
-                      </Box>
-                    </AccordionDetails>
-                  </Accordion>
-                </Card>
+                          {JSON.stringify(detailsQuery.data?.raw, null, 2)}
+                        </Box>
+                      </AccordionDetails>
+                    </Accordion>
+                  </Card>
+                ) : null}
               </Stack>
             </Box>
           </Stack>
         )}
       </Drawer>
 
-      {/* Challenge dialog */}
       <Dialog
         open={challengeId !== null}
         onClose={() => setChallengeId(null)}
         maxWidth="xs"
         fullWidth
-        PaperProps={{ sx: { borderRadius: DIALOG_RADIUS } }} // added
+        PaperProps={{ sx: { borderRadius: DIALOG_RADIUS } }}
       >
         <DialogTitle>Challenge submission</DialogTitle>
         <DialogContent>
-          <Typography color="text.secondary">Submit a challenge request for case #{challengeId}.</Typography>
+          <Typography color="text.secondary">
+            Submit a challenge request for submission #{challengeId}.
+          </Typography>
           {challengeMutation.isError ? (
             <Alert severity="error" sx={{ mt: 2 }}>
               Failed to challenge.
@@ -1435,7 +1507,7 @@ export default function SubmissionsPage() {
             onClick={() => {
               if (challengeId) challengeMutation.mutate(challengeId);
             }}
-            sx={{ textTransform: "none", fontWeight: 950, borderRadius: 2 }} // less round
+            sx={{ textTransform: "none", fontWeight: 950, borderRadius: 2 }}
           >
             {challengeMutation.isPending ? "Sending…" : "Confirm"}
           </Button>

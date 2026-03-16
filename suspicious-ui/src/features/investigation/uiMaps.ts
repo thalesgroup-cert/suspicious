@@ -8,8 +8,6 @@ export const STATUS_META: Record<
   NEW: { label: "New", muiColor: "info" },
   IN_PROGRESS: { label: "In progress", muiColor: "warning" },
   DONE: { label: "Done", muiColor: "success" },
-  FAILED: { label: "Failed", muiColor: "error" },
-  REJECTED: { label: "Rejected", muiColor: "error" },
   CHALLENGED: { label: "Challenged", muiColor: "warning" },
   UNKNOWN: { label: "Unknown" },
 };

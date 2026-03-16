@@ -6,7 +6,8 @@ export type DangerKey =
   | "safe"
   | "inconclusive"
   | "suspicious"
-  | "dangerous";
+  | "dangerous"
+  | "malicious";
 
 export type DashboardSummary = {
   month: number;
@@ -47,6 +48,7 @@ function normalizeDashboardSummary(data: any): DashboardSummary {
       inconclusive: toNumber(data?.danger_counts?.inconclusive),
       suspicious: toNumber(data?.danger_counts?.suspicious),
       dangerous: toNumber(data?.danger_counts?.dangerous),
+      malicious: toNumber(data?.danger_counts?.malicious),
     },
     top_prefixes: Array.isArray(data?.top_prefixes)
       ? data.top_prefixes

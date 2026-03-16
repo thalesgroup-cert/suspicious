@@ -1,62 +1,91 @@
-from django.contrib.auth import authenticate
-from rest_framework import status
-from rest_framework.permissions import AllowAny, IsAuthenticated
-from rest_framework.response import Response
-from rest_framework.views import APIView
 from knox.models import AuthToken
+from drf_spectacular.utils import OpenApiResponse, extend_schema
+from rest_framework import generics, permissions, serializers, status, throttling
+from rest_framework.response import Response
 
-from api.serializers.auth import LoginSerializer
-
-class MeView(APIView):
-    permission_classes = [IsAuthenticated]
-
-    def get(self, request):
-        user = request.user
-        groups = list(user.groups.values_list("name", flat=True))
-
-        return Response({
-            "id": user.id,
-            "username": user.username,
-            "email": getattr(user, "email", ""),
-            "first_name": getattr(user, "first_name", ""),
-            "last_name": getattr(user, "last_name", ""),
-            "groups": groups,
-            "ciso_scope": "",
-        })
+from api.serializers.auth import (
+    LoginResponseSerializer,
+    LoginSerializer,
+    LogoutResponseSerializer,
+    MeResponseSerializer,
+)
 
 
-class LoginView(APIView):
-    permission_classes = [AllowAny]
+class LoginRateThrottle(throttling.AnonRateThrottle):
+    scope = "login"
 
-    def post(self, request):
-        serializer = LoginSerializer(data=request.data)
+
+class MeView(generics.GenericAPIView):
+    permission_classes = [permissions.IsAuthenticated]
+    serializer_class = MeResponseSerializer
+
+    @extend_schema(
+        operation_id="auth_me",
+        responses={
+            200: MeResponseSerializer,
+            401: OpenApiResponse(description="Authentication credentials were not provided or are invalid."),
+        },
+        tags=["auth"],
+    )
+    def get(self, request, *args, **kwargs):
+        serializer = self.get_serializer(request.user)
+        return Response(serializer.data, status=status.HTTP_200_OK)
+
+
+class LoginView(generics.GenericAPIView):
+    permission_classes = [permissions.AllowAny]
+    serializer_class = LoginSerializer
+    throttle_classes = [LoginRateThrottle]
+
+    @extend_schema(
+        operation_id="auth_login",
+        request=LoginSerializer,
+        responses={
+            200: LoginResponseSerializer,
+            400: OpenApiResponse(description="Invalid request payload."),
+            401: OpenApiResponse(description="Invalid credentials."),
+            429: OpenApiResponse(description="Too many login attempts."),
+        },
+        tags=["auth"],
+    )
+    def post(self, request, *args, **kwargs):
+        serializer = self.get_serializer(data=request.data)
         serializer.is_valid(raise_exception=True)
 
-        user = authenticate(
-            username=serializer.validated_data["username"],
-            password=serializer.validated_data["password"],
-        )
-        if not user:
-            return Response({"detail": "Invalid credentials."}, status=status.HTTP_401_UNAUTHORIZED)
-
+        user = serializer.validated_data["user"]
         token_instance, token = AuthToken.objects.create(user=user)
 
-        return Response({
+        response_data = {
             "token": token,
             "expiry": token_instance.expiry,
-            "user": {
-                "id": user.id,
-                "username": user.username,
-                "email": getattr(user, "email", ""),
-                "groups": list(user.groups.values_list("name", flat=True)),
-            },
-        })
+            "user": user,
+        }
 
-class LogoutView(APIView):
-    permission_classes = [IsAuthenticated]
+        return Response(
+            LoginResponseSerializer(response_data).data,
+            status=status.HTTP_200_OK,
+        )
 
-    def post(self, request):
-        auth = getattr(request, "_auth", None)
-        if auth is not None:
-            auth.delete()
-        return Response({"detail": "Logged out."})
+
+class LogoutView(generics.GenericAPIView):
+    permission_classes = [permissions.IsAuthenticated]
+    serializer_class = LogoutResponseSerializer
+
+    @extend_schema(
+        operation_id="auth_logout",
+        request=None,
+        responses={
+            200: LogoutResponseSerializer,
+            401: OpenApiResponse(description="Authentication credentials were not provided or are invalid."),
+        },
+        tags=["auth"],
+    )
+    def post(self, request, *args, **kwargs):
+        token = request.auth
+        if token is not None:
+            token.delete()
+
+        return Response(
+            {"detail": "Logged out."},
+            status=status.HTTP_200_OK,
+        )

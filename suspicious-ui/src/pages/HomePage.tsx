@@ -103,6 +103,7 @@ type SubmissionRow = {
 };
 
 type SubmissionsResponse = {
+  items?: SubmissionRow[];
   results?: SubmissionRow[];
   count?: number;
 };
@@ -114,7 +115,7 @@ async function getMyRecentSubmissions(): Promise<SubmissionRow[]> {
 
   const data = res.data as SubmissionsResponse | SubmissionRow[];
   if (Array.isArray(data)) return data.slice(0, 3);
-  return (data.results ?? []).slice(0, 3);
+  return (data.results ?? data.items ?? []).slice(0, 3);
 }
 
 function short(text: string | undefined, max = 64) {

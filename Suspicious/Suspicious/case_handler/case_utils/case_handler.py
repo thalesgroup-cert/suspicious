@@ -191,8 +191,15 @@ class CaseHandler:
             allow_listed=allow_listed,
         )
         logger.debug("Creating case with: %s", ctx)
+        description = ""
+        if self.file_form.is_valid():
+            description = self.file_form.cleaned_data.get("context") or description
+        if self.url_form.is_valid():
+            description = self.url_form.cleaned_data.get("context") or description
+        if self.other_form.is_valid():
+            description = self.other_form.cleaned_data.get("context") or description
         try:
-            case = CaseCreator(self.request.user).create_case(**ctx)
+            case = CaseCreator(self.request.user).create_case(description=description, **ctx)
             logger.info("Case created: %s", case)
             return case
         except Exception:

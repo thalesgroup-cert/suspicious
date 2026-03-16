@@ -23,7 +23,7 @@ class CaseCreator:
     def __init__(self, user):
         self.user = user
 
-    def create_case(self, **kwargs):
+    def create_case(self, description=None, **kwargs):
         """
         Create a new case with the given parameters.
 
@@ -33,6 +33,7 @@ class CaseCreator:
             url_instance (URL): The URL associated with the case.
             hash_instance (Hash): The hash associated with the case.
             mail_instance (Mail): The email associated with the case.
+            description (str): The description for the case.
 
         Returns:
             Case: The newly created case.
@@ -46,7 +47,7 @@ class CaseCreator:
         casestr = str(id_max + 1).zfill(6)
 
         case = Case(
-            description=casestr,
+            description=description or casestr,
             creation_date=timezone.now(),
             analysis_done=False,
             results="Suspicious",

@@ -1,7 +1,5 @@
-// file: src/pages/DashboardPage.tsx
 import * as React from "react";
-import { Alert, Box, Button, Container, Stack } from "@mui/material";
-import { TrendingUpOutlined } from "@mui/icons-material";
+import { Alert, Box, Container, Stack } from "@mui/material";
 import { useQueries, useQuery } from "@tanstack/react-query";
 
 import { getMe } from "@/api/auth";
@@ -10,7 +8,6 @@ import { getDashboardSummary, type DashboardSummary } from "@/features/dashboard
 import OverviewHeader from "@/features/dashboard/components/OverviewHeader";
 import ThreatDistributionPanel from "@/features/dashboard/components/ThreatDistributionPanel";
 import TopPrefixesPanel from "@/features/dashboard/components/TopPrefixesPanel";
-import RankedPrefixesTable from "@/features/dashboard/components/RankedPrefixesTable";
 import { DashboardEmpty, DashboardLoading } from "@/features/dashboard/components/StatePanels";
 import KpiTrendPanels from "@/features/dashboard/components/KpiTrendPanels";
 
@@ -25,7 +22,6 @@ function clampTopN<T>(arr: T[], n: number) {
 }
 
 function getMonthWindow(month: number, year: number, windowSize: number) {
-  // oldest -> newest, includes current
   const out: Array<{ month: number; year: number }> = [];
   let m = month;
   let y = year;
@@ -40,7 +36,6 @@ function getMonthWindow(month: number, year: number, windowSize: number) {
   return out.reverse();
 }
 
-
 const EMPTY_SUMMARY: DashboardSummary = {
   month: 1,
   year: 1970,
@@ -51,7 +46,8 @@ const EMPTY_SUMMARY: DashboardSummary = {
     safe: 0,
     inconclusive: 0,
     suspicious: 0,
-    dangerous: 0
+    dangerous: 0,
+    malicious: 0,
   },
   top_prefixes: [],
 };
@@ -66,7 +62,6 @@ export default function DashboardPage() {
   const [year, setYear] = React.useState(now.getFullYear());
   const [scope, setScope] = React.useState<string>("ALL");
   const [prefixSearch, setPrefixSearch] = React.useState("");
-
   const [trendWindow, setTrendWindow] = React.useState<number>(6);
 
   const meQuery = useQuery({ queryKey: ["me"], queryFn: getMe, retry: false });
@@ -85,7 +80,6 @@ export default function DashboardPage() {
     retry: false,
   });
 
-  // IMPORTANT: hooks must be above conditional returns.
   const data: DashboardSummary = summaryQuery.data ?? {
     ...EMPTY_SUMMARY,
     month,
@@ -151,6 +145,8 @@ export default function DashboardPage() {
     setSelectedMetric(metric);
     setOpenKpiTrends(true);
   }, []);
+  const strMonth = String(month).padStart(2, "0");
+  const strYear = String(year);
 
   if (isInitialLoading) return <DashboardLoading />;
 
@@ -176,7 +172,7 @@ export default function DashboardPage() {
   }
 
   return (
-    <Box sx={{ minHeight: "100vh" }}>
+    <Box>
       <OverviewHeader
         title="Dashboard"
         subtitle={pageSubtitle}
@@ -215,7 +211,6 @@ export default function DashboardPage() {
             </Box>
           </Stack>
 
-          {/* ✅ 3 chart panels (GlassCard + ComposedChart), each panel opens drawer */}
           <KpiTrendPanels
             spark={kpiSpark}
             trendWindow={trendWindow}
@@ -232,7 +227,11 @@ export default function DashboardPage() {
             }}
           >
             <Box sx={{ display: "grid", gap: 2 }}>
-              <TopPrefixesPanel data={filteredTop} />
+              <TopPrefixesPanel
+                month={strMonth}
+                year={strYear}
+                limit={5}
+              />
             </Box>
 
             <Box sx={{ display: "grid", gap: 2 }}>

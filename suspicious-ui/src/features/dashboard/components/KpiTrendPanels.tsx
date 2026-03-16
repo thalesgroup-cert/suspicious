@@ -48,6 +48,7 @@ function GlassCard(props: React.PropsWithChildren<{
   return (
     <Card
       sx={{
+        height: 200,
         borderRadius: 3,
         border: "1px solid rgba(255,255,255,.10)",
         background: "linear-gradient(180deg, rgba(255,255,255,.06), rgba(255,255,255,.03))",
@@ -85,54 +86,6 @@ function GlassCard(props: React.PropsWithChildren<{
   );
 }
 
-function TrendDeltaChip(props: { values: Array<number | null> }) {
-  const { prev, last } = React.useMemo(() => lastTwoNumbers(props.values), [props.values]);
-
-  if (typeof prev !== "number" || typeof last !== "number") return null;
-
-  const d = last - prev;
-
-  if (d > 0) {
-    return (
-      <Chip
-        size="small"
-        icon={<TrendingUpOutlined fontSize="small" />}
-        label={`+${d.toLocaleString()}`}
-        sx={{
-          fontWeight: 900,
-          bgcolor: "#16A34A",
-          color: "#fff",
-        }}
-      />
-    );
-  }
-
-  if (d < 0) {
-    return (
-      <Chip
-        size="small"
-        icon={<TrendingDownOutlined fontSize="small" />}
-        label={`${d.toLocaleString()}`}
-        sx={{
-          fontWeight: 900,
-          bgcolor: "#DC2626",
-          color: "#fff",
-        }}
-      />
-    );
-  }
-
-  return (
-    <Chip
-      size="small"
-      icon={<TrendingFlatOutlined fontSize="small" />}
-      label="0"
-      variant="outlined"
-      sx={{ fontWeight: 900 }}
-    />
-  );
-}
-
 function TrendIcon(props: { values: Array<number | null> }) {
   const { prev, last } = React.useMemo(() => lastTwoNumbers(props.values), [props.values]);
 
@@ -146,13 +99,13 @@ function TrendIcon(props: { values: Array<number | null> }) {
     const d = last - prev;
 
     if (d > 0) {
-      icon = <TrendingUpOutlined sx={{ fontSize: 100 }} />;
+      icon = <TrendingUpOutlined sx={{ fontSize: 60 }} />;
       color = "#22C55E";
     } else if (d < 0) {
-      icon = <TrendingDownOutlined sx={{ fontSize: 100 }} />;
+      icon = <TrendingDownOutlined sx={{ fontSize: 60 }} />;
       color = "#EF4444";
     } else {
-      icon = <TrendingFlatOutlined sx={{ fontSize: 100 }} />;
+      icon = <TrendingFlatOutlined sx={{ fontSize: 60 }} />;
       color = "text.secondary";
     }
   }
@@ -163,7 +116,7 @@ function TrendIcon(props: { values: Array<number | null> }) {
       justifyContent="center"
       spacing={1}
       sx={{
-        minHeight: 190,
+        minHeight: 80,
         color,
       }}
     >

@@ -143,7 +143,7 @@ export default function ThreatDistributionPanel(props: { dangerCounts: DangerCou
       icon={<ShieldOutlined />}
       right={<Chip size="small" label="Monthly" variant="outlined" />}
     >
-      <Box sx={{ height: 240 }}>
+      <Box sx={{ height: 369 }}>
         {donut.length ? (
           <ResponsiveContainer width="100%" height="100%">
             <PieChart>
@@ -203,12 +203,12 @@ export default function ThreatDistributionPanel(props: { dangerCounts: DangerCou
                     border: "1px solid rgba(255,255,255,.18)",
                   }}
                 />
-                <Typography variant="body2" color="text.secondary">
+                <Typography variant="body2" sx={{ fontWeight: 500, fontSize: 14 }} color="text.secondary">
                   {label}
                 </Typography>
               </Stack>
 
-              <Typography variant="body2" sx={{ fontWeight: 900 }}>
+              <Typography variant="body2" sx={{ fontWeight: 900, fontSize: 14 }} color="text.primary">
                 {value.toLocaleString()}
               </Typography>
             </Stack>
