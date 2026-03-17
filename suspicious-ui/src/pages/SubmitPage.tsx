@@ -40,12 +40,66 @@ import { useSnackbar } from "notistack";
 import { api } from "@/api/client";
 import { getMe, type Me } from "@/api/auth";
 
-type SubmitMode = "file" | "url" | "ioc";
+import axios, { AxiosError } from "axios";
 
-type SubmitResult = {
-  id?: string | number;
-  message?: string;
+type SubmitConfigResponse = {
+  status: "success";
+  data: {
+    suspicious_email: string;
+  };
 };
+
+type SubmitSuccessResponse = {
+  status: "success";
+  accepted: boolean;
+  submission_type: "url" | "other" | "file";
+  result_type: "case" | "mail";
+  case_id: number | string | null;
+  id?: number | string | null; // compatibility
+  message: string;
+};
+
+type ApiErrorResponse = {
+  status?: "error";
+  code?: string;
+  detail?: string;
+  non_field_errors?: string[];
+} & Record<string, unknown>;
+
+function extractApiErrorMessage(error: unknown): string {
+  if (!axios.isAxiosError(error)) {
+    return "Request failed.";
+  }
+
+  const data = error.response?.data as ApiErrorResponse | undefined;
+  if (!data) {
+    return error.message || "Request failed.";
+  }
+
+  if (typeof data.detail === "string" && data.detail.trim()) {
+    return data.detail;
+  }
+
+  const fieldMessages = Object.entries(data)
+    .filter(([key, value]) => key !== "status" && key !== "code" && key !== "detail")
+    .flatMap(([key, value]) => {
+      if (Array.isArray(value)) {
+        return value.map((msg) => `${key}: ${String(msg)}`);
+      }
+      if (typeof value === "string") {
+        return [`${key}: ${value}`];
+      }
+      return [];
+    });
+
+  if (fieldMessages.length > 0) {
+    return fieldMessages.join(" ");
+  }
+
+  return error.message || "Request failed.";
+}
+
+type SubmitMode = "file" | "url" | "ioc";
 
 function formatBytes(bytes: number) {
   const units = ["B", "KB", "MB", "GB"];
@@ -58,31 +112,28 @@ function formatBytes(bytes: number) {
   return `${v.toFixed(i === 0 ? 0 : 1)} ${units[i]}`;
 }
 
-/** API */
-async function submitUrl(input: { url: string; context?: string }): Promise<SubmitResult> {
+async function submitUrl(input: { url: string; context?: string }): Promise<SubmitSuccessResponse> {
   const res = await api.post("/submit/url/", input);
   return res.data;
 }
 
-async function submitIoc(input: { value: string; context?: string }): Promise<SubmitResult> {
+async function submitIoc(input: { value: string; context?: string }): Promise<SubmitSuccessResponse> {
   const res = await api.post("/submit/other/", input);
   return res.data;
 }
 
-async function submitFile(input: { file: File; context?: string }): Promise<SubmitResult> {
+async function submitFile(input: { file: File; context?: string }): Promise<SubmitSuccessResponse> {
   const form = new FormData();
   form.append("file", input.file);
   if (input.context) form.append("context", input.context);
 
-  const res = await api.post("/submit/file/", form, {
-    headers: { "Content-Type": "multipart/form-data" },
-  });
+  const res = await api.post("/submit/file/", form);
   return res.data;
 }
 
-async function getSubmitConfig(): Promise<{ suspicious_email: string }> {
-  const res = await api.get("/submit/config/");
-  return res.data;
+async function getSubmitConfig(): Promise<string> {
+  const res = await api.get<SubmitConfigResponse>("/submit/config/");
+  return res.data.data.suspicious_email;
 }
 
 /** Validation */
@@ -92,7 +143,11 @@ const urlSchema = z.object({
 });
 
 const iocSchema = z.object({
-  value: z.string().min(1, "Hash or IP is required"),
+  value: z
+    .string()
+    .trim()
+    .min(1, "Indicator is required")
+    .max(4096, "Indicator is too long"),
   context: z.string().optional(),
 });
 
@@ -251,18 +306,13 @@ export default function SubmitPage() {
   const theme = useTheme();
   const { enqueueSnackbar } = useSnackbar();
 
-  const useMockMe = import.meta.env.VITE_USE_MOCK_ME === "true";
-
   const meQuery = useQuery<Me>({
     queryKey: ["me"],
     queryFn: getMe,
     retry: false,
-    enabled: !useMockMe,
   });
 
-  const me: Me | undefined = useMockMe
-    ? ({ id: 1, username: "mockuser", email: "mockuser@example.com" } as any)
-    : meQuery.data;
+  const me = meQuery.data;
 
   const suspiciousEmailEnv = import.meta.env.VITE_SUSPICIOUS_EMAIL as string | undefined;
 
@@ -271,10 +321,10 @@ export default function SubmitPage() {
     queryFn: getSubmitConfig,
     retry: false,
     enabled: !!me && !suspiciousEmailEnv,
-    initialData: { suspicious_email: suspiciousEmailEnv ?? "suspicious@example.com" },
+    initialData: suspiciousEmailEnv ?? undefined,
   });
 
-  const suspiciousEmail = suspiciousEmailEnv ?? configQuery.data.suspicious_email;
+  const suspiciousEmail = suspiciousEmailEnv ?? configQuery.data ?? "suspicious@example.com";
 
   const [mode, setMode] = React.useState<SubmitMode>("file");
   const [selectedFile, setSelectedFile] = React.useState<File | null>(null);
@@ -309,17 +359,15 @@ export default function SubmitPage() {
     mutationFn: submitUrl,
     onSuccess: (res) => {
       enqueueSnackbar(
-        res?.id
-          ? `URL submitted successfully (case #${res.id}).`
-          : (res?.message ?? "URL submitted."),
+        res.case_id
+          ? `${res.message} (case #${res.case_id}).`
+          : res.message,
         { variant: "success" }
       );
       urlForm.reset();
     },
-    onError: () => {
-      enqueueSnackbar("Submission failed (URL). Check endpoint / permissions.", {
-        variant: "error",
-      });
+    onError: (error) => {
+      enqueueSnackbar(extractApiErrorMessage(error), { variant: "error" });
     },
   });
 
@@ -327,17 +375,15 @@ export default function SubmitPage() {
     mutationFn: submitIoc,
     onSuccess: (res) => {
       enqueueSnackbar(
-        res?.id
-          ? `Indicator submitted successfully (case #${res.id}).`
-          : (res?.message ?? "Indicator submitted."),
+        res.case_id
+          ? `${res.message} (case #${res.case_id}).`
+          : res.message,
         { variant: "success" }
       );
       iocForm.reset();
     },
-    onError: () => {
-      enqueueSnackbar("Submission failed (Hash/IP). Check endpoint / permissions.", {
-        variant: "error",
-      });
+    onError: (error) => {
+      enqueueSnackbar(extractApiErrorMessage(error), { variant: "error" });
     },
   });
 
@@ -345,24 +391,22 @@ export default function SubmitPage() {
     mutationFn: submitFile,
     onSuccess: (res) => {
       enqueueSnackbar(
-        res?.id
-          ? `File submitted successfully (case #${res.id}).`
-          : (res?.message ?? "File uploaded."),
+        res.case_id
+          ? `${res.message} (case #${res.case_id}).`
+          : res.message,
         { variant: "success" }
       );
       setSelectedFile(null);
       fileForm.reset();
     },
-    onError: () => {
-      enqueueSnackbar("Upload failed (File). Check endpoint / size limits.", {
-        variant: "error",
-      });
+    onError: (error) => {
+      enqueueSnackbar(extractApiErrorMessage(error), { variant: "error" });
     },
   });
 
   const loadingOpen = urlMutation.isPending || iocMutation.isPending || fileMutation.isPending;
 
-  if (!useMockMe && meQuery.isLoading) {
+  if (meQuery.isLoading) {
     return (
       <Box sx={{ minHeight: "60vh", display: "grid", placeItems: "center" }}>
         <CircularProgress />
@@ -430,8 +474,8 @@ export default function SubmitPage() {
                 />
                 <ModeSelectorCard
                   active={mode === "ioc"}
-                  title="Hash & IP"
-                  subtitle="Submit an indicator for lookup and correlation."
+                  title="Indicator"
+                  subtitle="Submit a hash, IP, or other indicator for lookup and correlation."
                   icon={<FingerprintOutlined />}
                   onClick={() => setMode("ioc")}
                 />
@@ -612,17 +656,17 @@ export default function SubmitPage() {
               {mode === "ioc" ? (
                 <Stack spacing={2.5}>
                   <SectionHeader
-                    title="Hash or IP submission"
-                    subtitle="Submit a single indicator. Specify brief context if it is connected to a report or case."
+                    title="Indicator submission"
+                    subtitle="Submit a single indicator. Add brief context only if it helps triage."
                   />
 
                   <TextField
-                    label="Hash or IP"
-                    placeholder="SHA256, MD5, SHA1, or IP address"
+                    label="Indicator"
+                    placeholder="SHA256, MD5, SHA1, IP address, or other indicator"
                     error={!!iocForm.formState.errors.value}
                     helperText={
                       iocForm.formState.errors.value?.message ??
-                      "If you know the hash type, mention it in the context."
+                      "If the indicator type is known, mention it in the context."
                     }
                     {...iocForm.register("value")}
                   />

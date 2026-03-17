@@ -1,5 +1,11 @@
 from rest_framework import serializers
 
+
+class HomeSummaryQuerySerializer(serializers.Serializer):
+    month = serializers.IntegerField(required=False, min_value=1, max_value=12)
+    year = serializers.IntegerField(required=False, min_value=1)
+
+
 class HomeMonthlySerializer(serializers.Serializer):
     everyone_items = serializers.IntegerField()
     scope_items = serializers.IntegerField()

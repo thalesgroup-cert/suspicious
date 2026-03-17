@@ -45,7 +45,6 @@ from api.views.submit import (
     SubmitUrlView,
 )
 from api.views.submissions import (
-    MySubmissionsView,
     SubmissionChallengeView,
     SubmissionDetailsView,
     SubmissionListView,

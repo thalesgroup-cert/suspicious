@@ -1,6 +1,170 @@
+from __future__ import annotations
+
+from typing import Any
+
 from rest_framework import serializers
-from cortex_job.models import AnalyzerReport
+
 from case_handler.models import Case
+from cortex_job.models import AnalyzerReport
+
+
+API_RESULT_TO_INTERNAL = {
+    "SAFE": "Safe",
+    "INCONCLUSIVE": "Inconclusive",
+    "UNCHALLENGED": "Unchallenged",
+    "ALLOW_LISTED": "AllowListed",
+    "FAILURE": "Failure",
+    "SUSPICIOUS": "Suspicious",
+    "DANGEROUS": "Dangerous",
+}
+INTERNAL_RESULT_TO_API = {internal: api for api, internal in API_RESULT_TO_INTERNAL.items()}
+
+STATUS_TO_API = {
+    "To Do": "NEW",
+    "On Going": "IN_PROGRESS",
+    "Done": "DONE",
+    "Challenged": "CHALLENGED",
+}
+
+API_STATUS_TO_INTERNAL = {
+    "NEW": "To Do",
+    "IN_PROGRESS": "On Going",
+    "DONE": "Done",
+    "CHALLENGED": "Challenged",
+}
+
+INVESTIGATION_TYPE_CHOICES = ("FILE", "MAIL", "URL", "IP", "HASH", "UNKNOWN")
+INVESTIGATION_ORDERING_CHOICES = ("-creation_date", "creation_date", "-id", "id")
+
+
+def normalize_result_to_api(value: Any) -> str:
+    if value is None:
+        return "UNKNOWN"
+
+    normalized = str(value).strip()
+    if not normalized:
+        return "UNKNOWN"
+
+    if normalized.upper() in API_RESULT_TO_INTERNAL:
+        return normalized.upper()
+
+    return INTERNAL_RESULT_TO_API.get(normalized, "UNKNOWN")
+
+
+def normalize_categories(value: Any) -> list[str]:
+    if value is None:
+        return []
+
+    if isinstance(value, (list, tuple, set)):
+        return [str(item) for item in value if item not in (None, "")]
+
+    return [str(value)]
+
+
+def get_case_type(obj: Case) -> str:
+    file_or_mail = getattr(obj, "fileOrMail", None)
+    non_file_iocs = getattr(obj, "nonFileIocs", None)
+
+    if obj.fileOrMail_id and file_or_mail:
+        if file_or_mail.file_id:
+            return "FILE"
+        if file_or_mail.mail_id:
+            return "MAIL"
+
+    if obj.nonFileIocs_id and non_file_iocs:
+        if non_file_iocs.url_id:
+            return "URL"
+        if non_file_iocs.ip_id:
+            return "IP"
+        if non_file_iocs.hash_id:
+            return "HASH"
+
+    return "UNKNOWN"
+
+
+def get_case_info_value(obj: Case) -> str:
+    file_or_mail = getattr(obj, "fileOrMail", None)
+    non_file_iocs = getattr(obj, "nonFileIocs", None)
+
+    if obj.fileOrMail_id and file_or_mail:
+        if file_or_mail.file_id and file_or_mail.file:
+            file_field = getattr(file_or_mail.file, "file_path", None)
+            file_name = getattr(file_field, "name", None)
+            if file_name:
+                return str(file_name).split("/")[-1]
+            return str(file_or_mail.file_id)
+
+        if file_or_mail.mail_id and file_or_mail.mail:
+            return getattr(file_or_mail.mail, "subject", "") or obj.description or ""
+
+    if obj.nonFileIocs_id and non_file_iocs:
+        if non_file_iocs.url_id and non_file_iocs.url:
+            return getattr(non_file_iocs.url, "address", "") or obj.description or ""
+        if non_file_iocs.ip_id and non_file_iocs.ip:
+            return getattr(non_file_iocs.ip, "address", "") or obj.description or ""
+        if non_file_iocs.hash_id and non_file_iocs.hash:
+            return (
+                getattr(non_file_iocs.hash, "value", "")
+                or getattr(non_file_iocs.hash, "hash", "")
+                or obj.description
+                or ""
+            )
+
+    return obj.description or ""
+
+
+class InvestigationListQuerySerializer(serializers.Serializer):
+    search = serializers.CharField(required=False, allow_blank=True, trim_whitespace=True, max_length=255)
+    status = serializers.ChoiceField(
+        choices=("ALL", "NEW", "IN_PROGRESS", "DONE", "CHALLENGED", "UNKNOWN"),
+        required=False,
+        default="ALL",
+    )
+    type = serializers.ChoiceField(
+        choices=("ALL",) + INVESTIGATION_TYPE_CHOICES,
+        required=False,
+        default="ALL",
+    )
+    from_date = serializers.DateField(required=False, input_formats=["%Y-%m-%d"])
+    to_date = serializers.DateField(required=False, input_formats=["%Y-%m-%d"])
+    ordering = serializers.ChoiceField(
+        choices=INVESTIGATION_ORDERING_CHOICES,
+        required=False,
+        default="-creation_date",
+    )
+
+
+class InvestigationGlobalEditRequestSerializer(serializers.Serializer):
+    score = serializers.FloatField(min_value=0, max_value=10)
+    confidence = serializers.FloatField(min_value=0, max_value=100)
+    classification = serializers.ChoiceField(choices=tuple(API_RESULT_TO_INTERNAL.keys()))
+
+    def validate_classification(self, value: str) -> str:
+        return value.upper()
+
+
+class InvestigationAnalyzerTargetSerializer(serializers.Serializer):
+    kind = serializers.CharField()
+    id = serializers.IntegerField(allow_null=True)
+    value = serializers.CharField(allow_null=True)
+
+
+class InvestigationCaseInfosSerializer(serializers.Serializer):
+    score = serializers.FloatField(allow_null=True)
+    confidence = serializers.FloatField(allow_null=True)
+    classification = serializers.CharField()
+    score_ai = serializers.FloatField(allow_null=True)
+    confidence_ai = serializers.FloatField(allow_null=True)
+    classification_ai = serializers.CharField()
+    category_ai = serializers.CharField(allow_null=True)
+
+
+class InvestigationRawSerializer(serializers.Serializer):
+    case = serializers.DictField()
+    fileOrMail = serializers.DictField(allow_null=True)
+    nonFileIocs = serializers.DictField(allow_null=True)
+    analyzer_report_ids = serializers.ListField(child=serializers.IntegerField())
+
 
 class InvestigationAnalyzerReportSerializer(serializers.ModelSerializer):
     analyzer_name = serializers.CharField(source="analyzer.name", read_only=True)
@@ -30,10 +194,10 @@ class InvestigationAnalyzerReportSerializer(serializers.ModelSerializer):
             "created_at",
         ]
 
-    def get_categories(self, obj):
-        return obj.get_category()
+    def get_categories(self, obj: AnalyzerReport) -> list[str]:
+        return normalize_categories(obj.get_category())
 
-    def get_target(self, obj):
+    def get_target(self, obj: AnalyzerReport) -> dict[str, Any]:
         if obj.url_id:
             return {
                 "kind": "url",
@@ -59,14 +223,12 @@ class InvestigationAnalyzerReportSerializer(serializers.ModelSerializer):
                 "value": getattr(obj.hash, "value", str(obj.hash_id)),
             }
         if obj.file_id:
-            try:
-                value = obj.file.file_path.name
-            except Exception:
-                value = str(obj.file_id)
+            file_field = getattr(obj.file, "file_path", None)
+            file_name = getattr(file_field, "name", None)
             return {
                 "kind": "file",
                 "id": obj.file_id,
-                "value": value,
+                "value": file_name or str(obj.file_id),
             }
         if obj.ip_id:
             return {
@@ -86,6 +248,7 @@ class InvestigationAnalyzerReportSerializer(serializers.ModelSerializer):
                 "id": obj.mail_header_id,
                 "value": getattr(obj.mail_header, "fuzzy_hash", str(obj.mail_header_id)),
             }
+
         return {"kind": "unknown", "id": None, "value": None}
 
 
@@ -113,68 +276,17 @@ class InvestigationRowSerializer(serializers.ModelSerializer):
             "is_challenged",
         ]
 
-    def get_status(self, obj):
-        mapping = {
-            "To Do": "NEW",
-            "On Going": "IN_PROGRESS",
-            "Done": "DONE",
-            "Challenged": "CHALLENGED",
-        }
-        return mapping.get(obj.status, "UNKNOWN")
+    def get_status(self, obj: Case) -> str:
+        return STATUS_TO_API.get(obj.status, "UNKNOWN")
 
-    def get_result(self, obj):
-        mapping = {
-            "Safe": "SAFE",
-            "Inconclusive": "INCONCLUSIVE",
-            "Unchallenged": "UNCHALLENGED",
-            "AllowListed": "ALLOW_LISTED",
-            "Failure": "FAILURE",
-            "Suspicious": "SUSPICIOUS",
-            "Dangerous": "DANGEROUS",
-        }
-        return mapping.get(obj.results, "UNKNOWN")
+    def get_result(self, obj: Case) -> str:
+        return normalize_result_to_api(obj.results)
 
-    def get_type(self, obj):
-        if obj.fileOrMail_id and obj.fileOrMail:
-            if obj.fileOrMail.file_id:
-                return "FILE"
-            if obj.fileOrMail.mail_id:
-                return "MAIL"
+    def get_type(self, obj: Case) -> str:
+        return get_case_type(obj)
 
-        if obj.nonFileIocs_id and obj.nonFileIocs:
-            if obj.nonFileIocs.url_id:
-                return "URL"
-            if obj.nonFileIocs.ip_id:
-                return "IP"
-            if obj.nonFileIocs.hash_id:
-                return "HASH"
-
-        return "UNKNOWN"
-
-    def get_info(self, obj):
-        if obj.fileOrMail_id and obj.fileOrMail:
-            if obj.fileOrMail.file_id and obj.fileOrMail.file:
-                try:
-                    return obj.fileOrMail.file.file_path.name.split("/")[-1]
-                except Exception:
-                    return str(obj.fileOrMail.file_id)
-            if obj.fileOrMail.mail_id and obj.fileOrMail.mail:
-                return getattr(obj.fileOrMail.mail, "subject", "") or obj.description or ""
-
-        if obj.nonFileIocs_id and obj.nonFileIocs:
-            if obj.nonFileIocs.url_id and obj.nonFileIocs.url:
-                return getattr(obj.nonFileIocs.url, "address", "") or obj.description or ""
-            if obj.nonFileIocs.ip_id and obj.nonFileIocs.ip:
-                return getattr(obj.nonFileIocs.ip, "address", "") or obj.description or ""
-            if obj.nonFileIocs.hash_id and obj.nonFileIocs.hash:
-                return (
-                    getattr(obj.nonFileIocs.hash, "value", "")
-                    or getattr(obj.nonFileIocs.hash, "hash", "")
-                    or obj.description
-                    or ""
-                )
-
-        return obj.description or ""
+    def get_info(self, obj: Case) -> str:
+        return get_case_info_value(obj)
 
 
 class InvestigationDetailsSerializer(InvestigationRowSerializer):
@@ -189,24 +301,26 @@ class InvestigationDetailsSerializer(InvestigationRowSerializer):
             "raw",
         ]
 
-    def get_analyzer_reports(self, obj):
+    def get_analyzer_reports(self, obj: Case) -> list[dict[str, Any]]:
         queryset = self.context.get("analyzer_reports_qs")
         if queryset is None:
             return []
         return InvestigationAnalyzerReportSerializer(queryset, many=True).data
 
-    def get_case_infos(self, obj):
+    def get_case_infos(self, obj: Case) -> dict[str, Any]:
         return {
             "score": obj.finalScore,
             "confidence": obj.finalConfidence,
-            "classification": obj.results,
+            "classification": normalize_result_to_api(obj.results),
             "score_ai": obj.scoreAI,
             "confidence_ai": obj.confidenceAI,
-            "classification_ai": obj.resultsAI,
+            "classification_ai": normalize_result_to_api(obj.resultsAI),
             "category_ai": obj.categoryAI,
         }
 
-    def get_raw(self, obj):
+    def get_raw(self, obj: Case) -> dict[str, Any]:
+        analyzer_reports_qs = self.context.get("analyzer_reports_qs", AnalyzerReport.objects.none())
+
         file_or_mail = None
         non_file_iocs = None
 
@@ -251,7 +365,5 @@ class InvestigationDetailsSerializer(InvestigationRowSerializer):
             },
             "fileOrMail": file_or_mail,
             "nonFileIocs": non_file_iocs,
-            "analyzer_report_ids": list(
-                self.context.get("analyzer_reports_qs", AnalyzerReport.objects.none()).values_list("id", flat=True)
-            ),
+            "analyzer_report_ids": list(analyzer_reports_qs.values_list("id", flat=True)),
         }

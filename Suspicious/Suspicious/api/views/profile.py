@@ -1,146 +1,68 @@
-from rest_framework.views import APIView
+from django.db import transaction
+from rest_framework import status
+from rest_framework.generics import GenericAPIView
 from rest_framework.permissions import IsAuthenticated
 from rest_framework.response import Response
-from rest_framework import status
-from profiles.models import UserProfile, CISOProfile
-from api.serializers.profile import ProfileSerializer, UpdatePreferencesSerializer, UpdateAppearanceSerializer
+
+from api.serializers.profile import (
+    AppearancePatchSerializer,
+    AppearanceResponseSerializer,
+    PreferencesPatchSerializer,
+    PreferencesResponseSerializer,
+    ProfileSerializer,
+)
+from api.utils.profile_service import ProfileService
 
 
-class ProfileView(APIView):
+class BaseProfileAPIView(GenericAPIView):
     permission_classes = [IsAuthenticated]
 
-    def get_profile_instance(self, user):
-        groups = set(user.groups.values_list("name", flat=True))
-        if "CISO" in groups:
-            profile, _ = CISOProfile.objects.get_or_create(
-                user=user,
-                defaults={
-                    "function": "",
-                    "gbu": "",
-                    "country": "",
-                    "region": "",
-                    "scope": "Not defined",
-                },
-            )
-            return profile
-
-        profile, _ = UserProfile.objects.get_or_create(
-            user=user,
-            defaults={
-                "function": "",
-                "gbu": "",
-                "country": "",
-                "region": "",
-            },
-        )
-        return profile
-
-    def get(self, request):
-        profile = self.get_profile_instance(request.user)
-
-        data = {
-            "wants_acknowledgement": profile.wants_acknowledgement,
-            "wants_results": profile.wants_results,
-            "theme": profile.theme,
-            "auto_seasonal": profile.auto_seasonal,
-        }
-
-        serializer = ProfileSerializer(data)
-        return Response(serializer.data)
+    def get_profile(self):
+        return ProfileService.get_or_create_profile(self.request.user)
 
 
-class ProfilePreferencesView(APIView):
-    permission_classes = [IsAuthenticated]
+class ProfileView(BaseProfileAPIView):
+    serializer_class = ProfileSerializer
 
-    def get_profile_instance(self, user):
-        groups = set(user.groups.values_list("name", flat=True))
-        if "CISO" in groups:
-            profile, _ = CISOProfile.objects.get_or_create(
-                user=user,
-                defaults={
-                    "function": "",
-                    "gbu": "",
-                    "country": "",
-                    "region": "",
-                    "scope": "Not defined",
-                },
-            )
-            return profile
-
-        profile, _ = UserProfile.objects.get_or_create(
-            user=user,
-            defaults={
-                "function": "",
-                "gbu": "",
-                "country": "",
-                "region": "",
-            },
-        )
-        return profile
-
-    def patch(self, request):
-        serializer = UpdatePreferencesSerializer(data=request.data)
-        serializer.is_valid(raise_exception=True)
-
-        profile = self.get_profile_instance(request.user)
-        profile.wants_acknowledgement = serializer.validated_data["wants_acknowledgement"]
-        profile.wants_results = serializer.validated_data["wants_results"]
-        profile.save(update_fields=["wants_acknowledgement", "wants_results", "last_update"])
-
-        return Response({
-            "wants_acknowledgement": profile.wants_acknowledgement,
-            "wants_results": profile.wants_results,
-        })
+    def get(self, request, *args, **kwargs):
+        profile = self.get_profile()
+        serializer = self.get_serializer(profile)
+        return Response(serializer.data, status=status.HTTP_200_OK)
 
 
-class ProfileAppearanceView(APIView):
-    permission_classes = [IsAuthenticated]
+class ProfilePreferencesView(BaseProfileAPIView):
+    serializer_class = PreferencesPatchSerializer
+    response_serializer_class = PreferencesResponseSerializer
 
-    def get_profile_instance(self, user):
-        groups = set(user.groups.values_list("name", flat=True))
-        if "CISO" in groups:
-            profile, _ = CISOProfile.objects.get_or_create(
-                user=user,
-                defaults={
-                    "function": "",
-                    "gbu": "",
-                    "country": "",
-                    "region": "",
-                    "scope": "Not defined",
-                },
-            )
-            return profile
-
-        profile, _ = UserProfile.objects.get_or_create(
-            user=user,
-            defaults={
-                "function": "",
-                "gbu": "",
-                "country": "",
-                "region": "",
-            },
-        )
-        return profile
-
+    @transaction.atomic
     def patch(self, request, *args, **kwargs):
-        profile = self.get_profile_instance(request.user)  # ou ta logique CISO/UserProfile
-        serializer = UpdateAppearanceSerializer(data=request.data, partial=True)
+        serializer = self.get_serializer(data=request.data, partial=True)
         serializer.is_valid(raise_exception=True)
 
-        if "theme" in serializer.validated_data:
-            profile.theme = serializer.validated_data["theme"]
+        profile = self.get_profile()
+        changed_fields = ProfileService.apply_updates(profile, serializer.validated_data)
 
-        if "auto_seasonal" in serializer.validated_data:
-            profile.auto_seasonal = serializer.validated_data["auto_seasonal"]
+        if changed_fields:
+            profile.save(update_fields=[*changed_fields, "last_update"])
 
-        profile.save(update_fields=["theme", "auto_seasonal", "last_update"])
+        response_data = self.response_serializer_class(profile).data
+        return Response(response_data, status=status.HTTP_200_OK)
 
-        return Response(
-            {
-                "theme": profile.theme,
-                "auto_seasonal": profile.auto_seasonal,
-                "wants_acknowledgement": profile.wants_acknowledgement,
-                "wants_results": profile.wants_results,
-            },
-            status=status.HTTP_200_OK,
-        )
+
+class ProfileAppearanceView(BaseProfileAPIView):
+    serializer_class = AppearancePatchSerializer
+    response_serializer_class = AppearanceResponseSerializer
+
+    @transaction.atomic
+    def patch(self, request, *args, **kwargs):
+        serializer = self.get_serializer(data=request.data, partial=True)
+        serializer.is_valid(raise_exception=True)
+
+        profile = self.get_profile()
+        changed_fields = ProfileService.apply_updates(profile, serializer.validated_data)
+
+        if changed_fields:
+            profile.save(update_fields=[*changed_fields, "last_update"])
+
+        response_data = self.response_serializer_class(profile).data
+        return Response(response_data, status=status.HTTP_200_OK)

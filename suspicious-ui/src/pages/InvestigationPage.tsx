@@ -1,4 +1,3 @@
-// src/pages/InvestigationPage.tsx
 import * as React from "react";
 import {
   Accordion,
@@ -53,18 +52,15 @@ import {
   getInvestigationDetails,
   editGlobalCase,
   type InvestigationDetails,
+  type InvestigationListResponse,
   type InvestigationRow,
   type InvestigationStatus,
   type InvestigationType,
-  type InvestigationAnalyzerReport,
 } from "@/features/investigation/api";
-
 import { useDebounced } from "@/shared/hooks/useDebounced";
 import { StatusChip } from "@/shared/components/StatusChip";
 import { ResultChip } from "@/shared/components/ResultChip";
 import { CopyIconButton } from "@/shared/components/CopyIconButton";
-
-type InvestigationResponse = { items: InvestigationRow[] };
 
 function GlassCard(props: React.PropsWithChildren<{ sx?: any }>) {
   return (
@@ -96,35 +92,6 @@ function short(s: string, n = 42) {
   return t.length > n ? t.slice(0, n - 1) + "…" : t;
 }
 
-function matches(row: InvestigationRow, q: string) {
-  const v = q.trim().toLowerCase();
-  if (!v) return true;
-  return (
-    String(row.id).includes(v) ||
-    (row.reporter_email ?? "").toLowerCase().includes(v) ||
-    (row.info ?? "").toLowerCase().includes(v) ||
-    (row.status ?? "").toLowerCase().includes(v) ||
-    (row.type ?? "").toLowerCase().includes(v) ||
-    (row.result ?? "").toLowerCase().includes(v)
-  );
-}
-
-function withinDates(rowIso: string, from?: string, to?: string) {
-  if (!from && !to) return true;
-  const t = new Date(rowIso).getTime();
-  if (Number.isNaN(t)) return true;
-
-  if (from) {
-    const f = new Date(`${from}T00:00:00`).getTime();
-    if (!Number.isNaN(f) && t < f) return false;
-  }
-  if (to) {
-    const tt = new Date(`${to}T23:59:59`).getTime();
-    if (!Number.isNaN(tt) && t > tt) return false;
-  }
-  return true;
-}
-
 function pickScore(d?: InvestigationDetails) {
   return d?.case_infos?.score ?? null;
 }
@@ -136,7 +103,6 @@ function pickConfidence(d?: InvestigationDetails) {
 function pickClassification(d?: InvestigationDetails) {
   return d?.case_infos?.classification ?? "UNKNOWN";
 }
-
 
 function clamp(n: number, min = 0, max = 100) {
   return Math.max(min, Math.min(max, n));
@@ -628,13 +594,14 @@ function InvestigationAnalyzerReportCard({
     </Card>
   );
 }
+
 export default function InvestigationPage() {
   const navigate = useNavigate();
   const [searchParams] = useSearchParams();
   const qc = useQueryClient();
 
   const [q, setQ] = React.useState("");
-  const qDebounced = useDebounced(q, 200);
+  const qDebounced = useDebounced(q, 250);
 
   const [status, setStatus] = React.useState<InvestigationStatus | "ALL">("ALL");
   const [type, setType] = React.useState<InvestigationType | "ALL">("ALL");
@@ -645,7 +612,7 @@ export default function InvestigationPage() {
   const [pageSize, setPageSize] = React.useState(10);
 
   const [openDrawer, setOpenDrawer] = React.useState(false);
-  const [selectedId, setSelectedId] = React.useState<number | string | null>(null);
+  const [selectedId, setSelectedId] = React.useState<number | null>(null);
 
   const [editMode, setEditMode] = React.useState(false);
   const [editScore, setEditScore] = React.useState<string>("");
@@ -660,7 +627,7 @@ export default function InvestigationPage() {
     retry: false,
   });
 
-  const me: Me | undefined = React.useMemo(() => meQuery.data, [meQuery.data]);
+  const me = meQuery.data;
 
   const groups = React.useMemo(() => me?.groups ?? [], [me]);
   const isElevated = React.useMemo(
@@ -668,16 +635,30 @@ export default function InvestigationPage() {
     [groups]
   );
 
-  const investigationsQuery = useQuery<InvestigationResponse>({
-    queryKey: ["investigation"],
-    queryFn: async () => getAllInvestigations(),
+  const investigationListParams = React.useMemo(
+    () => ({
+      page,
+      pageSize,
+      search: qDebounced,
+      status,
+      type,
+      from,
+      to,
+      sort,
+    }),
+    [page, pageSize, qDebounced, status, type, from, to, sort]
+  );
+
+  const investigationsQuery = useQuery<InvestigationListResponse>({
+    queryKey: ["investigation", investigationListParams],
+    queryFn: () => getAllInvestigations(investigationListParams),
     enabled: !!me && isElevated,
     retry: false,
-    initialData: { items: [] },
+    placeholderData: (prev) => prev,
     refetchInterval: (query) => {
-      const items = (query.state.data as InvestigationResponse | undefined)?.items ?? [];
-      const shouldPoll = items.some((r) => {
-        const s = ((r.status ?? "UNKNOWN") as string).toUpperCase();
+      const rows = (query.state.data as InvestigationListResponse | undefined)?.results ?? [];
+      const shouldPoll = rows.some((r) => {
+        const s = String(r.status ?? "UNKNOWN").toUpperCase();
         return s === "NEW" || s === "IN_PROGRESS";
       });
       return shouldPoll ? 10_000 : false;
@@ -685,13 +666,12 @@ export default function InvestigationPage() {
     refetchIntervalInBackground: true,
   });
 
-  const selectedIdNum =
-    typeof selectedId === "number" ? selectedId : selectedId ? Number(selectedId) : NaN;
+  const selectedIdNum = typeof selectedId === "number" && Number.isFinite(selectedId) ? selectedId : NaN;
   const hasNumericSelectedId = Number.isFinite(selectedIdNum);
 
   const detailsQuery = useQuery<InvestigationDetails>({
     queryKey: ["investigationDetails", selectedIdNum],
-    queryFn: async () => getInvestigationDetails(selectedIdNum),
+    queryFn: () => getInvestigationDetails(selectedIdNum),
     enabled: !!me && isElevated && hasNumericSelectedId && openDrawer,
     retry: false,
     staleTime: 30_000,
@@ -721,11 +701,13 @@ export default function InvestigationPage() {
     const urlQ = searchParams.get("q") ?? "";
     const open = searchParams.get("open");
 
-    if (urlQ) setQ(urlQ);
+    if (urlQ) {
+      setQ(urlQ);
+    }
 
     if (open) {
       const idNum = Number(open);
-      if (!Number.isNaN(idNum)) {
+      if (Number.isFinite(idNum)) {
         setSelectedId(idNum);
         setOpenDrawer(true);
       }
@@ -750,30 +732,57 @@ export default function InvestigationPage() {
     setExpandedAnalyzerIds({});
   }, [detailsQuery.data?.analyzer_reports]);
 
-  const rows = investigationsQuery.data?.items ?? [];
+  React.useEffect(() => {
+    setEditMode(false);
+    editMutation.reset();
+  }, [selectedIdNum]); // eslint-disable-line react-hooks/exhaustive-deps
 
-  const filtered = rows
-    .filter((r) => matches(r, qDebounced))
-    .filter((r) => (status === "ALL" ? true : r.status === status))
-    .filter((r) => (type === "ALL" ? true : r.type === type))
-    .filter((r) => withinDates(r.created_at, from || undefined, to || undefined));
+  React.useEffect(() => {
+    if (!openDrawer || !detailsQuery.data || editMode) {
+      return;
+    }
 
-  const sorted = [...filtered].sort((a, b) => {
-    const ta = new Date(a.created_at).getTime();
-    const tb = new Date(b.created_at).getTime();
+    const score = pickScore(detailsQuery.data);
+    const confidence = pickConfidence(detailsQuery.data);
+    const classification = pickClassification(detailsQuery.data);
 
-    if (sort === "date_desc") return (Number.isFinite(tb) ? tb : 0) - (Number.isFinite(ta) ? ta : 0);
-    if (sort === "date_asc") return (Number.isFinite(ta) ? ta : 0) - (Number.isFinite(tb) ? tb : 0);
-    if (sort === "id_desc") return b.id - a.id;
-    return a.id - b.id;
-  });
+    setEditScore(score == null ? "" : String(score));
+    setEditConfidence(confidence == null ? "" : String(confidence));
+    setEditClassification(String(classification).toUpperCase());
+  }, [openDrawer, detailsQuery.data, editMode]);
 
-  const total = sorted.length;
-  const start = page * pageSize;
-  const end = Math.min(total, start + pageSize);
-  const pageRows = sorted.slice(start, end);
+  const rows = investigationsQuery.data?.results ?? [];
+  const total = investigationsQuery.data?.count ?? 0;
+  const start = total === 0 ? 0 : page * pageSize;
+  const end = Math.min(total, start + rows.length);
 
-  const selectedRow = selectedId ? rows.find((r) => String(r.id) === String(selectedId)) : undefined;
+  const selectedRow = selectedId != null
+    ? rows.find((r) => String(r.id) === String(selectedId))
+    : undefined;
+
+  const drawerRow = selectedRow || detailsQuery.data;
+
+  const detailsReady = !!detailsQuery.data && !detailsQuery.isLoading && !detailsQuery.isError;
+
+  const currentScore = pickScore(detailsQuery.data);
+  const currentConfidence = pickConfidence(detailsQuery.data);
+  const currentClassification = pickClassification(detailsQuery.data);
+
+  const analyzerReports = detailsQuery.data?.analyzer_reports ?? [];
+
+  const expandAllAnalyzers = React.useCallback(() => {
+    setExpandedAnalyzerIds(Object.fromEntries(analyzerReports.map((r) => [r.id, true])));
+  }, [analyzerReports]);
+
+  const collapseAllAnalyzers = React.useCallback(() => {
+    setExpandedAnalyzerIds({});
+  }, []);
+
+  const invertAnalyzers = React.useCallback(() => {
+    setExpandedAnalyzerIds((prev) =>
+      Object.fromEntries(analyzerReports.map((r) => [r.id, !prev[r.id]]))
+    );
+  }, [analyzerReports]);
 
   function closeDrawer() {
     setOpenDrawer(false);
@@ -781,25 +790,14 @@ export default function InvestigationPage() {
     editMutation.reset();
   }
 
-  React.useEffect(() => {
-    setEditMode(false);
-    editMutation.reset();
-  }, [selectedIdNum]); // eslint-disable-line react-hooks/exhaustive-deps
-
-  React.useEffect(() => {
-    if (!openDrawer) return;
-    if (!detailsQuery.data) return;
-
-    const score = pickScore(detailsQuery.data);
-    const confidence = pickConfidence(detailsQuery.data);
-    const classification = pickClassification(detailsQuery.data);
-
-    if (!editMode) {
-      setEditScore(score == null ? "" : String(score));
-      setEditConfidence(confidence == null ? "" : String(confidence));
-      setEditClassification(String(classification).toUpperCase());
+  async function copyEmail(email?: string) {
+    if (!email) return;
+    try {
+      await navigator.clipboard.writeText(email);
+    } catch {
+      // ignore
     }
-  }, [openDrawer, detailsQuery.data, editMode]);
+  }
 
   if (meQuery.isLoading) {
     return (
@@ -825,7 +823,7 @@ export default function InvestigationPage() {
     );
   }
 
-  if (investigationsQuery.isLoading) {
+  if (investigationsQuery.isLoading && !investigationsQuery.data) {
     return (
       <Box sx={{ minHeight: "60vh", display: "grid", placeItems: "center" }}>
         <CircularProgress />
@@ -836,7 +834,7 @@ export default function InvestigationPage() {
   if (investigationsQuery.isError) {
     return (
       <Box sx={{ p: 3 }}>
-        <Alert severity="error">Failed to load investigations (API route / permissions).</Alert>
+        <Alert severity="error">Failed to load investigations.</Alert>
       </Box>
     );
   }
@@ -852,7 +850,6 @@ export default function InvestigationPage() {
     "FAILURE",
     "SUSPICIOUS",
     "DANGEROUS",
-    "UNKNOWN",
   ];
 
   const scoreNum = Number(editScore);
@@ -861,40 +858,14 @@ export default function InvestigationPage() {
   const confValid = Number.isFinite(confNum) && confNum >= 0 && confNum <= 100;
   const canSave = scoreValid && confValid && !!editClassification && !editMutation.isPending;
 
-  async function copyEmail(email?: string) {
-    if (!email) return;
-    try {
-      await navigator.clipboard.writeText(email);
-    } catch {
-      // ignore
-    }
-  }
-
-  const detailsReady = !!detailsQuery.data && !detailsQuery.isLoading && !detailsQuery.isError;
-
-  const currentScore = pickScore(detailsQuery.data);
-  const currentConfidence = pickConfidence(detailsQuery.data);
-  const currentClassification = pickClassification(detailsQuery.data);
-
-  const analyzerReports = detailsQuery.data?.analyzer_reports ?? [];
-
-  const expandAllAnalyzers = React.useCallback(() => {
-    setExpandedAnalyzerIds(Object.fromEntries(analyzerReports.map((r) => [r.id, true])));
-  }, [analyzerReports]);
-
-  const collapseAllAnalyzers = React.useCallback(() => {
-    setExpandedAnalyzerIds({});
-  }, []);
-
-  const invertAnalyzers = React.useCallback(() => {
-    setExpandedAnalyzerIds((prev) =>
-      Object.fromEntries(analyzerReports.map((r) => [r.id, !prev[r.id]]))
-    );
-  }, [analyzerReports]);
-
   return (
     <Box sx={{ p: { xs: 2, md: 3 } }}>
-      <Stack direction={{ xs: "column", md: "row" }} spacing={2} justifyContent="space-between" sx={{ mb: 2 }}>
+      <Stack
+        direction={{ xs: "column", md: "row" }}
+        spacing={2}
+        justifyContent="space-between"
+        sx={{ mb: 2 }}
+      >
         <Stack spacing={0.4}>
           <Stack direction="row" spacing={1.25} alignItems="center">
             <Avatar sx={{ width: 46, height: 46, fontWeight: 950 }}>
@@ -911,8 +882,12 @@ export default function InvestigationPage() {
           </Stack>
 
           <Stack direction="row" spacing={1} sx={{ mt: 1, flexWrap: "wrap" }}>
-            <Chip icon={<AssignmentTurnedInOutlined />} label={`${total} shown`} variant="outlined" />
-            <Chip icon={<FilterAltOutlined />} label="Filters available" variant="outlined" />
+            <Chip
+              icon={<AssignmentTurnedInOutlined />}
+              label={`${total} total`}
+              variant="outlined"
+            />
+            <Chip icon={<FilterAltOutlined />} label="Server filters" variant="outlined" />
             {qDebounced ? <Chip label={`Search: ${qDebounced}`} variant="outlined" /> : null}
           </Stack>
         </Stack>
@@ -944,7 +919,7 @@ export default function InvestigationPage() {
                 value={q}
                 onChange={(e) => setQ(e.target.value)}
                 label="Search"
-                placeholder="id, user mail, status, info, type, result"
+                placeholder="id, user mail, status, artifact, type, result"
                 fullWidth
                 InputProps={{
                   startAdornment: (
@@ -961,16 +936,14 @@ export default function InvestigationPage() {
                   labelId="status-label"
                   label="Status"
                   value={status}
-                  onChange={(e) => setStatus(e.target.value as any)}
+                  onChange={(e) => setStatus(e.target.value as InvestigationStatus | "ALL")}
                 >
                   <MenuItem value="ALL">All</MenuItem>
-                  {(["NEW", "IN_PROGRESS", "DONE", "CHALLENGED", "FAILED", "REJECTED", "UNKNOWN"] as const).map(
-                    (s) => (
-                      <MenuItem key={s} value={s}>
-                        {s}
-                      </MenuItem>
-                    )
-                  )}
+                  {(["NEW", "IN_PROGRESS", "DONE", "CHALLENGED", "UNKNOWN"] as const).map((s) => (
+                    <MenuItem key={s} value={s}>
+                      {s}
+                    </MenuItem>
+                  ))}
                 </Select>
               </FormControl>
 
@@ -980,7 +953,7 @@ export default function InvestigationPage() {
                   labelId="type-label"
                   label="Type"
                   value={type}
-                  onChange={(e) => setType(e.target.value as any)}
+                  onChange={(e) => setType(e.target.value as InvestigationType | "ALL")}
                 >
                   <MenuItem value="ALL">All</MenuItem>
                   {(["FILE", "MAIL", "URL", "IP", "HASH", "UNKNOWN"] as const).map((t) => (
@@ -1001,6 +974,7 @@ export default function InvestigationPage() {
                 InputLabelProps={{ shrink: true }}
                 fullWidth
               />
+
               <TextField
                 label="To"
                 type="date"
@@ -1016,7 +990,9 @@ export default function InvestigationPage() {
                   labelId="sort-label"
                   label="Sort"
                   value={sort}
-                  onChange={(e) => setSort(e.target.value as any)}
+                  onChange={(e) =>
+                    setSort(e.target.value as "date_desc" | "date_asc" | "id_desc" | "id_asc")
+                  }
                 >
                   <MenuItem value="date_desc">Date (new → old)</MenuItem>
                   <MenuItem value="date_asc">Date (old → new)</MenuItem>
@@ -1057,15 +1033,16 @@ export default function InvestigationPage() {
 
                 <Button
                   variant="outlined"
-                  disabled={page === 0}
+                  disabled={page === 0 || investigationsQuery.isFetching}
                   onClick={() => setPage((p) => Math.max(0, p - 1))}
                   sx={{ borderRadius: 2, textTransform: "none", fontWeight: 900 }}
                 >
                   Prev
                 </Button>
+
                 <Button
                   variant="outlined"
-                  disabled={end >= total}
+                  disabled={!investigationsQuery.data?.next || investigationsQuery.isFetching}
                   onClick={() => setPage((p) => p + 1)}
                   sx={{ borderRadius: 2, textTransform: "none", fontWeight: 900 }}
                 >
@@ -1079,6 +1056,8 @@ export default function InvestigationPage() {
 
       <GlassCard>
         <CardContent sx={{ p: 0 }}>
+          {investigationsQuery.isFetching ? <LinearProgress /> : null}
+
           {total === 0 ? (
             <Box sx={{ p: 3 }}>
               <Alert severity="info">No investigations match your filters.</Alert>
@@ -1091,7 +1070,7 @@ export default function InvestigationPage() {
                     <TableCell sx={{ fontWeight: 950 }}>ID</TableCell>
                     <TableCell sx={{ fontWeight: 950 }}>User mail</TableCell>
                     <TableCell sx={{ fontWeight: 950 }}>Status</TableCell>
-                    <TableCell sx={{ fontWeight: 950 }}>Info</TableCell>
+                    <TableCell sx={{ fontWeight: 950 }}>Artifact</TableCell>
                     <TableCell sx={{ fontWeight: 950 }}>Date</TableCell>
                     <TableCell sx={{ fontWeight: 950, textAlign: "right" }}>Tests</TableCell>
                     <TableCell sx={{ fontWeight: 950 }}>Type</TableCell>
@@ -1100,7 +1079,7 @@ export default function InvestigationPage() {
                 </TableHead>
 
                 <TableBody>
-                  {pageRows.map((r) => (
+                  {rows.map((r) => (
                     <TableRow
                       key={r.id}
                       hover
@@ -1112,6 +1091,7 @@ export default function InvestigationPage() {
                       }}
                       onKeyDown={(e) => {
                         if (e.key === "Enter" || e.key === " ") {
+                          e.preventDefault();
                           setSelectedId(r.id);
                           setOpenDrawer(true);
                         }
@@ -1151,7 +1131,9 @@ export default function InvestigationPage() {
 
                       <TableCell onClick={(e) => e.stopPropagation()}>
                         <Stack direction="row" spacing={1} alignItems="center">
-                          <Typography sx={{ fontWeight: 900 }}>{r.reporter_email ?? "—"}</Typography>
+                          <Typography sx={{ fontWeight: 900 }}>
+                            {r.reporter_email ?? "—"}
+                          </Typography>
                           {r.reporter_email ? (
                             <Tooltip title="Copy email">
                               <IconButton size="small" onClick={() => copyEmail(r.reporter_email)}>
@@ -1184,7 +1166,9 @@ export default function InvestigationPage() {
 
                       <TableCell>{fmtDate(r.created_at)}</TableCell>
 
-                      <TableCell sx={{ textAlign: "right", fontWeight: 900 }}>{r.tests_done}</TableCell>
+                      <TableCell sx={{ textAlign: "right", fontWeight: 900 }}>
+                        {r.tests_done}
+                      </TableCell>
 
                       <TableCell>
                         <Chip
@@ -1232,13 +1216,12 @@ export default function InvestigationPage() {
           }),
         }}
       >
-        {!selectedRow ? (
+        {!drawerRow ? (
           <Box sx={{ p: 2 }}>
             <Alert severity="info">Select a row.</Alert>
           </Box>
         ) : (
           <Stack sx={{ height: "100%" }}>
-            {/* Header */}
             <Box
               sx={(theme) => ({
                 px: 2.25,
@@ -1259,13 +1242,13 @@ export default function InvestigationPage() {
 
                   <Stack direction="row" spacing={1} alignItems="center" sx={{ mt: 0.25 }}>
                     <Typography variant="h5" fontWeight={950} lineHeight={1.1}>
-                      #{selectedRow.id}
+                      #{drawerRow.id}
                     </Typography>
-                    <CopyIconButton text={String(selectedRow.id)} title="Copy ID" />
+                    <CopyIconButton text={String(drawerRow.id)} title="Copy ID" />
                   </Stack>
 
                   <Typography variant="body2" color="text.secondary" sx={{ mt: 0.75 }}>
-                    Created {fmtDate(selectedRow.created_at)}
+                    Created {fmtDate(drawerRow.created_at)}
                   </Typography>
                 </Box>
 
@@ -1324,10 +1307,10 @@ export default function InvestigationPage() {
               </Stack>
 
               <Stack direction="row" spacing={1} sx={{ mt: 1.75, flexWrap: "wrap" }}>
-                <StatusChip status={selectedRow.status as any} minWidth={BADGE_W} />
+                <StatusChip status={drawerRow.status as any} minWidth={BADGE_W} />
                 <Chip
                   size="small"
-                  label={selectedRow.type}
+                  label={drawerRow.type}
                   variant="outlined"
                   sx={{
                     fontWeight: 900,
@@ -1336,20 +1319,18 @@ export default function InvestigationPage() {
                     "& .MuiChip-label": { width: "100%", textAlign: "center" },
                   }}
                 />
-                <ResultChip result={selectedRow.result} minWidth={BADGE_W} />
+                <ResultChip result={drawerRow.result} minWidth={BADGE_W} />
                 <Chip
                   size="small"
-                  label={`${selectedRow.tests_done} tests`}
+                  label={`${drawerRow.tests_done} tests`}
                   variant="outlined"
                   sx={{ fontWeight: 900 }}
                 />
               </Stack>
             </Box>
 
-            {/* Scrollable content */}
             <Box sx={{ flex: 1, overflowY: "auto", p: 2 }}>
               <Stack spacing={2}>
-                {/* Overview */}
                 <Card
                   sx={{
                     borderRadius: 2,
@@ -1371,34 +1352,33 @@ export default function InvestigationPage() {
                     >
                       <Typography color="text.secondary">Artifact</Typography>
                       <Typography sx={{ wordBreak: "break-word" }}>
-                        {selectedRow.info || "—"}
+                        {drawerRow.info || "—"}
                       </Typography>
 
                       <Typography color="text.secondary">User mail</Typography>
                       <Stack direction="row" spacing={1} alignItems="center">
                         <Typography sx={{ wordBreak: "break-word" }}>
-                          {selectedRow.reporter_email || "—"}
+                          {drawerRow.reporter_email || "—"}
                         </Typography>
-                        {selectedRow.reporter_email ? (
-                          <IconButton size="small" onClick={() => copyEmail(selectedRow.reporter_email)}>
+                        {drawerRow.reporter_email ? (
+                          <IconButton size="small" onClick={() => copyEmail(drawerRow.reporter_email)}>
                             <ContentCopyOutlined fontSize="small" />
                           </IconButton>
                         ) : null}
                       </Stack>
 
                       <Typography color="text.secondary">Created</Typography>
-                      <Typography>{fmtDate(selectedRow.created_at)}</Typography>
+                      <Typography>{fmtDate(drawerRow.created_at)}</Typography>
 
                       <Typography color="text.secondary">Investigation ID</Typography>
                       <Stack direction="row" spacing={1} alignItems="center">
-                        <Typography>{selectedRow.id}</Typography>
-                        <CopyIconButton text={String(selectedRow.id)} title="Copy ID" />
+                        <Typography>{drawerRow.id}</Typography>
+                        <CopyIconButton text={String(drawerRow.id)} title="Copy ID" />
                       </Stack>
                     </Box>
                   </CardContent>
                 </Card>
 
-                {/* Global override */}
                 <Card
                   sx={{
                     borderRadius: 2,
@@ -1460,7 +1440,10 @@ export default function InvestigationPage() {
                               sx={{ fontWeight: 900 }}
                             />
                             <Chip size="small" label="Classification" variant="outlined" />
-                            <ResultChip result={String(currentClassification ?? "UNKNOWN")} minWidth={BADGE_W} />
+                            <ResultChip
+                              result={String(currentClassification ?? "UNKNOWN")}
+                              minWidth={BADGE_W}
+                            />
                           </Stack>
                         ) : (
                           <Stack spacing={1.25}>
@@ -1531,7 +1514,6 @@ export default function InvestigationPage() {
                   </CardContent>
                 </Card>
 
-                {/* Analyzer details */}
                 <Card
                   sx={{
                     borderRadius: 2,
@@ -1601,7 +1583,9 @@ export default function InvestigationPage() {
                     ) : detailsQuery.isError ? (
                       <Alert severity="warning">Could not load details.</Alert>
                     ) : !analyzerReports.length ? (
-                      <Alert severity="info">No analysis details are available for this investigation yet.</Alert>
+                      <Alert severity="info">
+                        No analysis details are available for this investigation yet.
+                      </Alert>
                     ) : (
                       <Stack spacing={1.25}>
                         {analyzerReports.map((report) => (
@@ -1622,7 +1606,6 @@ export default function InvestigationPage() {
                   </CardContent>
                 </Card>
 
-                {/* Raw details */}
                 <Card
                   sx={{
                     borderRadius: 2,

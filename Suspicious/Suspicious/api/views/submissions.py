@@ -147,30 +147,6 @@ class SubmissionListView(ListAPIView):
         return super().get(request, *args, **kwargs)
 
 
-class MySubmissionsView(ListAPIView):
-    permission_classes = [IsAuthenticated]
-    serializer_class = SubmissionRowSerializer
-    pagination_class = None
-
-    def get_queryset(self):
-        return (
-            Case.objects.select_related(*CASE_DETAIL_SELECT_RELATED)
-            .filter(reporter=self.request.user)
-            .order_by("-creation_date", "-id")
-        )
-
-    @extend_schema(
-        summary="List current user's submissions",
-        deprecated=True,
-        description=(
-            "Deprecated. Prefer `GET /submissions/?mine=true`."
-        ),
-    )
-    def get(self, request, *args, **kwargs):
-        serializer = self.get_serializer(self.get_queryset(), many=True)
-        return Response({"items": serializer.data})
-
-
 class SubmissionDetailsView(RetrieveAPIView):
     permission_classes = [IsAuthenticated, CanAccessSubmission]
     lookup_url_kwarg = "submission_id"

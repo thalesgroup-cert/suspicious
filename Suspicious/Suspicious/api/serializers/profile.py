@@ -2,23 +2,44 @@ from rest_framework import serializers
 from profiles.models import Theme
 
 
-
 class ProfileSerializer(serializers.Serializer):
-    function = serializers.CharField(allow_blank=True, required=False)
-    gbu = serializers.CharField(allow_blank=True, required=False)
-    country = serializers.CharField(allow_blank=True, required=False)
-    region = serializers.CharField(allow_blank=True, required=False)
     wants_acknowledgement = serializers.BooleanField()
     wants_results = serializers.BooleanField()
     theme = serializers.ChoiceField(choices=Theme.choices)
     auto_seasonal = serializers.BooleanField()
 
 
-class UpdatePreferencesSerializer(serializers.Serializer):
+class PreferencesPatchSerializer(serializers.Serializer):
+    wants_acknowledgement = serializers.BooleanField(required=False)
+    wants_results = serializers.BooleanField(required=False)
+
+    def validate(self, attrs):
+        if not attrs:
+            raise serializers.ValidationError(
+                "At least one preference field must be provided."
+            )
+        return attrs
+
+
+class PreferencesResponseSerializer(serializers.Serializer):
     wants_acknowledgement = serializers.BooleanField()
     wants_results = serializers.BooleanField()
 
 
-class UpdateAppearanceSerializer(serializers.Serializer):
-    theme = serializers.ChoiceField(choices=Theme.choices)
+class AppearancePatchSerializer(serializers.Serializer):
+    theme = serializers.ChoiceField(choices=Theme.choices, required=False)
     auto_seasonal = serializers.BooleanField(required=False)
+
+    def validate(self, attrs):
+        if not attrs:
+            raise serializers.ValidationError(
+                "At least one appearance field must be provided."
+            )
+        return attrs
+
+
+class AppearanceResponseSerializer(serializers.Serializer):
+    theme = serializers.ChoiceField(choices=Theme.choices)
+    auto_seasonal = serializers.BooleanField()
+    wants_acknowledgement = serializers.BooleanField()
+    wants_results = serializers.BooleanField()

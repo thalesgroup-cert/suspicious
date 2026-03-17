@@ -66,6 +66,7 @@ type HomeSummary = {
     scope_name?: string | null;
   };
   danger_counts?: DangerCounts;
+  scope_danger_counts?: DangerCounts | null;
   suggested_scopes?: {
     region?: string | null;
     country?: string | null;
