@@ -1,7 +1,25 @@
 # --- Makefile ---
-include .env
+.PHONY: help netcheck up down build pull deploy migrate backup superuser create-certs init
 
-.PHONY: netcheck up down build pull deploy migrate backup superuser create-certs init
+help:
+	@echo "Available targets:"
+	@echo "  init         - Initialize the project"
+	@echo "  up           - Start services"
+	@echo "  down         - Stop services"
+	@echo "  build        - Build images"
+	@echo "  pull         - Pull images"
+	@echo "  deploy       - Deploy application"
+	@echo "  migrate      - Run migrations"
+	@echo "  backup       - Backup database"
+	@echo "  superuser    - Create superuser"
+	@echo "  create-certs - Generate certificates"
+
+init:
+	@echo "Initializing project..."
+	@./scripts/init.sh
+	@echo "Initialization complete."
+
+include .env
 
 NETCHECK_CMD = ./scripts/check-network.sh
 REPLACE_TLS_CMD = ./scripts/replace-tls.sh
@@ -46,8 +64,3 @@ superuser:
 create-certs:
 	@echo "Generating certificates..."
 	@./scripts/openssl-certificates-generator.sh
-
-init:
-	@echo "Initializing project..."
-	@./scripts/init.sh
-	@echo "Initialization complete."

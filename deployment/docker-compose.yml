@@ -1,15 +1,16 @@
 name: suspicious
+
 services:
   suspicious:
     extends:
       file: compose_apps.yaml
       service: suspicious
-    # build:
-    #   context: ${SUSPICIOUS_PATH}/
-    #   dockerfile: Dockerfile
-    #   args:
-    #     - HTTP_PROXY=${HTTP_PROXY}
-    #     - HTTPS_PROXY=${HTTPS_PROXY}
+    build:
+      context: ${SUSPICIOUS_PATH}/
+      dockerfile: Dockerfile
+      args:
+        - HTTP_PROXY=${HTTP_PROXY}
+        - HTTPS_PROXY=${HTTPS_PROXY}
     container_name: suspicious
     image: ghcr.io/thalesgroup-cert/suspicious:${SUSPICIOUS_VERSION}
     depends_on:
@@ -17,17 +18,34 @@ services:
         condition: service_healthy
       cortex:
         condition: service_healthy
+      chromadb:
+        condition: service_started
     healthcheck:
       test: ["CMD-SHELL", "curl -s -o /dev/null -w '%{http_code}' http://localhost:9020/admin/login/| grep -q 200 || exit 1"]
       interval: 30s
       timeout: 30s
       retries: 15
       start_period: 60s
+
+  suspicious_ui:
+    extends:
+      file: compose_apps.yaml
+      service: suspicious_ui
+    build:
+      context: ${SUSPICIOUS_UI_PATH}/
+      dockerfile: Dockerfile
+      args:
+        - HTTP_PROXY=${HTTP_PROXY}
+        - HTTPS_PROXY=${HTTPS_PROXY}
+    container_name: suspicious_ui
+    depends_on:
+      - suspicious
     labels:
       - "traefik.enable=true"
-      - "traefik.http.routers.suspicious.rule=Host(`${DOMAIN_CORP}`)"
-      - "traefik.http.routers.suspicious.entrypoints=websecure"
-      - "traefik.http.routers.suspicious.tls=true"
+      - "traefik.http.routers.suspicious-ui.rule=Host(`${DOMAIN_CORP}`)"
+      - "traefik.http.routers.suspicious-ui.entrypoints=websecure"
+      - "traefik.http.routers.suspicious-ui.tls=true"
+      - "traefik.http.services.suspicious-ui.loadbalancer.server.port=80"
 
   db_suspicious:
     extends:
@@ -79,6 +97,12 @@ services:
     command: server /data --console-address ":9001"
     container_name: minio
 
+  chromadb:
+    extends:
+      file: compose_databases.yaml
+      service: chromadb
+    image: chromadb/chroma:latest
+    container_name: chromadb
 
   feeder:
     extends:
@@ -88,7 +112,7 @@ services:
       context: ${FEEDER_PATH}/
       dockerfile: Dockerfile
       args:
-        - NO_PROXY=localhost,minio
+        - NO_PROXY=localhost,minio,chromadb
         - HTTP_PROXY=${HTTP_PROXY}
         - HTTPS_PROXY=${HTTPS_PROXY}
     container_name: email_feeder
@@ -103,20 +127,31 @@ services:
       file: compose_reverse_proxy.yaml
       service: traefik
     command:
-      # Providers
       - "--providers.docker=true"
       - "--providers.docker.exposedbydefault=false"
       - "--providers.docker.network=${NETWORK_NAME}"
-      # API & Dashboard
       - "--api.dashboard=true"
       - "--api.insecure=true"
-      # Observability
       - "--log.level=INFO"
       - "--accesslog=true"
       - "--metrics.prometheus=true"
+
+volumes:
+  db_suspicious_data:
+    driver: local
+  elasticsearch_data:
+    driver: local
+  elasticsearch_logs:
+    driver: local
+  minio_data:
+    driver: local
+  cortex_jobs:
+    driver: local
+  chromadb_data:
+    driver: local
 
 networks:
   suspicious_network:
     external: true
     name: ${NETWORK_NAME}
-
+  reverse_network:

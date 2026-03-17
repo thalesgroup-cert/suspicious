@@ -23,7 +23,7 @@ msg_parser==1.2.0
 eml2png==0.0.2
 
 # Natural Language Processing and Similarity Checking
-nltk==3.9.2
+nltk==3.9.3
 simhash==2.1.2
 
 # Image and Font Utilities

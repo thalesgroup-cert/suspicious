@@ -15,23 +15,35 @@ class AnalyzerFileinfo(BaseAnalyzer):
         priority = {"safe": 0, "info": 1, "suspicious": 2, "malicious": 3}
 
         try:
+            file_type = None
+
             for taxonomy in self.summary.get("taxonomies", []):
                 if taxonomy.get("namespace") != "FileInfo":
                     continue
 
                 predicate = taxonomy.get("predicate", "unknown")
-                details[predicate] = taxonomy.get("value", "")
+                value = taxonomy.get("value", "")
+                details[predicate] = value
+
+                if predicate.lower() in {"type", "filetype", "mime", "format"} and isinstance(value, str):
+                    file_type = value
 
                 level = taxonomy.get("level", "safe").lower()
+                if level not in priority:
+                    level = "safe"
+
                 if best_level is None or priority[level] > priority[best_level]:
                     best_level = level
+
+            if file_type:
+                response["category"] = file_type
+            else:
+                response["category"] = "FileInfo"
 
             if best_level:
                 response["level"] = best_level
                 response["details"] = details
-                response["score"], response["confidence"] = (
-                    get_level_score_confidence(best_level)
-                )
+                response["score"], response["confidence"] = get_level_score_confidence(best_level)
 
         except Exception as exc:
             logger.error("[AnalyzerFileinfo] error: %s", exc)

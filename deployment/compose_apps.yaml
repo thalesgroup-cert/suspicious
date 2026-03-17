@@ -8,8 +8,6 @@ services:
       - "${SUSPICIOUS_PATH}/logs:/app/log"
       - "/var/run/docker.sock:/var/run/docker.sock"
       - "${SUSPICIOUS_PATH}/settings.json:/app/settings.json"
-      # AI Vector Database
-      - "${SUSPICIOUS_PATH}/chromadb:/app/Suspicious/chromadb"
     command: >
       /bin/bash -c "
       python3 manage.py crontab show &&
@@ -20,7 +18,7 @@ services:
     env_file:
       - ".env"
     environment:
-      no_proxy: "${NO_PROXY},cortex,db_suspicious,feeder"
+      no_proxy: "${NO_PROXY},cortex,db_suspicious,minio,chromadb"
     networks:
       - suspicious_network
 
@@ -39,7 +37,7 @@ services:
       # Certificates
       - "${CA_PATH}/keystore.jks:/etc/cortex/keystore.jks:ro"
       # Cortex config
-      - "${CORTEX_PATH}/jobs:${CORTEX_PATH}/jobs:rw"
+      - "${CORTEX_PATH}/jobs:${CORTEX_PATH}/jobs:Z"
       - "${CORTEX_PATH}/application.conf:/etc/cortex/application.conf:ro"
       - "${CORTEX_PATH}/application-cortex.log:/var/log/cortex/application.log:rw"
       # Docker configuration
@@ -68,8 +66,26 @@ services:
     networks:
       - suspicious_network
 
+  suspicious_ui:
+    ports:
+    - "127.0.0.1:${SUSPICIOUS_UI_PORT}:80"
+    init: true
+    restart: unless-stopped
+    environment:
+      no_proxy: "${NO_PROXY},suspicious"
+    networks:
+      - suspicious_network
+      - reverse_network
+
+volumes:
+  cortex_jobs:
+    driver: local
+  chromadb_data:
+    driver: local
 
 networks:
   suspicious_network:
     external: true
     name: ${NETWORK_NAME}
+  reverse_network:
+
