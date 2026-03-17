@@ -23,7 +23,7 @@ msg_parser==1.2.0
 eml2png==0.0.2
 
 # Natural Language Processing and Similarity Checking
-nltk==3.9.2
+nltk==3.9.3
 simhash==2.1.2
 
 # Image and Font Utilities
@@ -35,7 +35,7 @@ django-import-export==4.4.0
 
 # Request Handling
 requests==2.32.5
-PyJWT==2.9.0
+PyJWT==2.12.0
 minio==7.2.20
 zipstream==1.1.4
 

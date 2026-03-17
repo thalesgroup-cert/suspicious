@@ -1,5 +1,6 @@
 import ast
 import json
+import os
 import logging
 from datetime import date, timedelta
 from django.contrib.auth.decorators import login_required
@@ -35,7 +36,16 @@ import re
 from email.utils import parsedate_to_datetime
 
 from score_process.score_utils.thehive.utils import parse_and_decode_defaultdict, parse_headers
+CONFIG_PATH = os.environ.get("SUSPICIOUS_SETTINGS_PATH", "/app/settings.json")
 
+
+with open(CONFIG_PATH, "r") as f:
+    settings = json.load(f)
+
+chromadb_conf = settings.get("chromadb", {})
+CHROMA_HOST = chromadb_conf.get("host", "chromadb")
+CHROMA_PORT = chromadb_conf.get("port", 8000)
+CHROMA_COLLECTION_NAME = chromadb_conf.get("collection_name", "suspicious")
 logger = logging.getLogger(__name__)
 
 
@@ -106,61 +116,35 @@ def logout_view(request: HttpRequest) -> HttpResponse:
 
 # --- ChromaDB helper utilities ---
 
-def _get_chroma_collection(collection_name: str = "suspicious_mails"):
-    """Best-effort ChromaDB collection getter handling API/tenant differences.
-
-    Returns the collection object or None if unavailable.
-    """
+def _get_chroma_collection(collection_name: str = CHROMA_COLLECTION_NAME):
     try:
-        import os
-        import chromadb  # type: ignore
-        from chromadb.config import Settings  # type: ignore
+        import chromadb
     except Exception as e:
         logger.warning("ChromaDB not available in environment: %s", e)
         return None
 
     _disable_chromadb_telemetry()
 
-    persist_path = "/app/Suspicious/chromadb"
-    errors = []
+    host = CHROMA_HOST
+    port = int(CHROMA_PORT)
 
-    # Attempt matrix for different versions
-    attempts = []
     try:
-        attempts.append(lambda: chromadb.PersistentClient(path=persist_path, tenant="default_tenant", database="default_database", settings=Settings(anonymized_telemetry=False)))
-    except Exception:
-        # Signature may not support tenant/database
-        attempts.append(lambda: chromadb.PersistentClient(path=persist_path, settings=Settings(anonymized_telemetry=False)))
-
-    # Older API fallback: Client with Settings(is_persistent=True)
-    def _legacy_client():
-        try:
-            s = Settings(is_persistent=True, persist_directory=persist_path, anonymized_telemetry=False)  # type: ignore[arg-type]
-            return chromadb.Client(s)
-        except Exception as e:
-            errors.append(f"Legacy client failed init: {e}")
-            raise
-
-    attempts.append(_legacy_client)
-
-    client = None
-    for factory in attempts:
-        try:
-            client = factory()
-            break
-        except Exception as e:
-            errors.append(str(e))
-            client = None
-            continue
-
-    if client is None:
-        logger.error("Failed to init ChromaDB client: %s", " | ".join(errors))
+        client = chromadb.HttpClient(
+            host=host,
+            port=port,
+        )
+    except Exception as e:
+        logger.error("Failed to connect to ChromaDB server %s:%s: %s", host, port, e)
         return None
 
     try:
         return client.get_collection(name=collection_name)
     except Exception as e:
-        logger.warning("ChromaDB collection '%s' not accessible: %s", collection_name, e)
+        logger.warning(
+            "ChromaDB collection '%s' not accessible: %s",
+            collection_name,
+            e,
+        )
         return None
 
 

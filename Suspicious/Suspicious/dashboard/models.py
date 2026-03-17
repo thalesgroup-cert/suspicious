@@ -168,3 +168,34 @@ class UserCasesMonthlyStats(models.Model):
             setattr(self, detailed_map[case_result], getattr(self, detailed_map[case_result]) + 1)
 
         self.save()
+
+class GroupMonthlyStats(models.Model):
+    group_name = models.CharField(max_length=200)
+    month = models.CharField(max_length=200)
+    year = models.CharField(max_length=200)
+    total_cases = models.PositiveIntegerField(default=0)
+
+    suspicious_cases = models.PositiveIntegerField(default=0)
+    inconclusive_cases = models.PositiveIntegerField(default=0)
+    failure_cases = models.PositiveIntegerField(default=0)
+    dangerous_cases = models.PositiveIntegerField(default=0)
+    safe_cases = models.PositiveIntegerField(default=0)
+    challenged_cases = models.PositiveIntegerField(default=0)
+    allow_listed_cases = models.PositiveIntegerField(default=0)
+
+    # 🆕 Detailed categories
+    uncategorized_cases = models.PositiveIntegerField(default=0)
+    spam_cases = models.PositiveIntegerField(default=0)
+    newsletter_cases = models.PositiveIntegerField(default=0)
+    classic_phishing_cases = models.PositiveIntegerField(default=0)
+    clone_cases = models.PositiveIntegerField(default=0)
+    blackmail_cases = models.PositiveIntegerField(default=0)
+    whaling_cases = models.PositiveIntegerField(default=0)
+    internal_cases = models.PositiveIntegerField(default=0)
+    external_cases = models.PositiveIntegerField(default=0)
+
+    creation_date = models.DateTimeField(auto_now_add=True)
+    last_update = models.DateTimeField(auto_now=True)
+
+    def __str__(self):
+        return f"{self.group_name} - {self.month} - {self.year}"
