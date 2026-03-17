@@ -83,17 +83,33 @@ class APIKeyAdmin(admin.ModelAdmin):
     # Display helpers
     # ------------------------------------------------------------------
 
+    def _get_auth_token(self, obj):
+        auth_token_id = getattr(obj, "auth_token_id", None)
+        if not auth_token_id:
+            return None
+        return AuthToken.objects.filter(pk=auth_token_id).first()
+
     def display_user(self, obj):
-        return obj.auth_token.user if obj.auth_token else None
+        token = self._get_auth_token(obj)
+        return token.user if token else None
 
     def display_digest(self, obj):
-        return obj.auth_token.digest if obj.auth_token else None
+        token = self._get_auth_token(obj)
+        return token.digest if token else None
 
     def display_created(self, obj):
-        return obj.auth_token.created if obj.auth_token else None
+        token = self._get_auth_token(obj)
+        return token.created if token else None
 
     def display_expiry(self, obj):
-        return obj.auth_token.expiry if obj.auth_token else None
+        token = self._get_auth_token(obj)
+        return token.expiry if token else None
+
+    def has_view_permission(self, request, obj=None):
+        if obj and not request.user.is_superuser:
+            token = self._get_auth_token(obj)
+            return token is not None and token.user == request.user
+        return True
 
     display_user.short_description = "User"
     display_digest.short_description = "Digest"
@@ -191,8 +207,9 @@ class APIKeyAdmin(admin.ModelAdmin):
 # Auto-cleanup Knox token when APIKey is deleted
 @receiver(post_delete, sender=APIKey)
 def delete_authtoken_on_apikey_delete(sender, instance, **kwargs):
-    if instance.auth_token:
-        instance.auth_token.delete()
+    auth_token_id = getattr(instance, "auth_token_id", None)
+    if auth_token_id:
+        AuthToken.objects.filter(pk=auth_token_id).delete()
 
 
 # =============================================================================
