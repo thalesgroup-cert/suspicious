@@ -1,6 +1,10 @@
 import * as React from "react";
 import { Alert, Box, Container, Stack } from "@mui/material";
 import { useQueries, useQuery } from "@tanstack/react-query";
+import { Responsive, WidthProvider, type Layout } from "react-grid-layout/legacy";
+
+import "react-grid-layout/css/styles.css";
+import "react-resizable/css/styles.css";
 
 import { getMe } from "@/api/auth";
 import { getDashboardSummary, type DashboardSummary } from "@/features/dashboard/api";
@@ -14,17 +18,16 @@ import KpiTrendPanels from "@/features/dashboard/components/KpiTrendPanels";
 function monthName(m: number) {
   return new Date(2000, m - 1, 1).toLocaleString("en", { month: "long" });
 }
+
 function monthNameShort(m: number) {
   return new Date(2000, m - 1, 1).toLocaleString("en", { month: "short" });
-}
-function clampTopN<T>(arr: T[], n: number) {
-  return arr.length > n ? arr.slice(0, n) : arr;
 }
 
 function getMonthWindow(month: number, year: number, windowSize: number) {
   const out: Array<{ month: number; year: number }> = [];
   let m = month;
   let y = year;
+
   for (let i = 0; i < windowSize; i++) {
     out.push({ month: m, year: y });
     m -= 1;
@@ -33,6 +36,7 @@ function getMonthWindow(month: number, year: number, windowSize: number) {
       y -= 1;
     }
   }
+
   return out.reverse();
 }
 
@@ -52,6 +56,123 @@ const EMPTY_SUMMARY: DashboardSummary = {
   top_prefixes: [],
 };
 
+const DASHBOARD_PANEL_KEYS = {
+  KPI_TRENDS: "kpi-trends",
+  TOP_PREFIXES: "top-prefixes",
+  THREAT_DISTRIBUTION: "threat-distribution",
+} as const;
+
+const DASHBOARD_BREAKPOINTS = {
+  lg: 1200,
+  md: 900,
+  sm: 600,
+  xs: 0,
+};
+
+const DASHBOARD_COLS = {
+  lg: 12,
+  md: 12,
+  sm: 6,
+  xs: 1,
+};
+
+type ResponsiveLayouts = Partial<Record<string, Layout>>;
+
+const DEFAULT_DASHBOARD_LAYOUTS: ResponsiveLayouts = {
+  lg: [
+    { i: DASHBOARD_PANEL_KEYS.KPI_TRENDS, x: 0, y: 0, w: 12, h: 6, minW: 6, minH: 4 },
+    { i: DASHBOARD_PANEL_KEYS.TOP_PREFIXES, x: 0, y: 6, w: 8, h: 10, minW: 4, minH: 6 },
+    { i: DASHBOARD_PANEL_KEYS.THREAT_DISTRIBUTION, x: 8, y: 6, w: 4, h: 10, minW: 4, minH: 6 },
+  ],
+  md: [
+    { i: DASHBOARD_PANEL_KEYS.KPI_TRENDS, x: 0, y: 0, w: 12, h: 6, minW: 6, minH: 4 },
+    { i: DASHBOARD_PANEL_KEYS.TOP_PREFIXES, x: 0, y: 6, w: 7, h: 10, minW: 4, minH: 6 },
+    { i: DASHBOARD_PANEL_KEYS.THREAT_DISTRIBUTION, x: 7, y: 6, w: 5, h: 10, minW: 4, minH: 6 },
+  ],
+  sm: [
+    { i: DASHBOARD_PANEL_KEYS.KPI_TRENDS, x: 0, y: 0, w: 6, h: 6, minH: 4 },
+    { i: DASHBOARD_PANEL_KEYS.TOP_PREFIXES, x: 0, y: 6, w: 6, h: 10, minH: 6 },
+    { i: DASHBOARD_PANEL_KEYS.THREAT_DISTRIBUTION, x: 0, y: 16, w: 6, h: 10, minH: 6 },
+  ],
+  xs: [
+    { i: DASHBOARD_PANEL_KEYS.KPI_TRENDS, x: 0, y: 0, w: 1, h: 6, minH: 4 },
+    { i: DASHBOARD_PANEL_KEYS.TOP_PREFIXES, x: 0, y: 6, w: 1, h: 10, minH: 6 },
+    { i: DASHBOARD_PANEL_KEYS.THREAT_DISTRIBUTION, x: 0, y: 16, w: 1, h: 10, minH: 6 },
+  ],
+};
+
+const ResponsiveGridLayout = WidthProvider(Responsive);
+
+function isValidLayouts(value: unknown): value is ResponsiveLayouts {
+  return !!value && typeof value === "object" && !Array.isArray(value);
+}
+
+function getStorageKey(userId?: string | number) {
+  return `dashboard:layouts:${userId ?? "anonymous"}`;
+}
+
+function loadLayoutsFromStorage(storageKey: string): ResponsiveLayouts {
+  if (typeof window === "undefined") return DEFAULT_DASHBOARD_LAYOUTS;
+
+  try {
+    const raw = window.localStorage.getItem(storageKey);
+    if (!raw) return DEFAULT_DASHBOARD_LAYOUTS;
+
+    const parsed = JSON.parse(raw);
+    return isValidLayouts(parsed) ? parsed : DEFAULT_DASHBOARD_LAYOUTS;
+  } catch {
+    return DEFAULT_DASHBOARD_LAYOUTS;
+  }
+}
+
+function saveLayoutsToStorage(storageKey: string, layouts: ResponsiveLayouts) {
+  if (typeof window === "undefined") return;
+
+  try {
+    window.localStorage.setItem(storageKey, JSON.stringify(layouts));
+  } catch {
+    // ignore storage failures
+  }
+}
+
+type DashboardPanelShellProps = {
+  title: string;
+  children: React.ReactNode;
+};
+
+const DashboardPanelShell = React.memo(function DashboardPanelShell({
+  title,
+  children,
+}: DashboardPanelShellProps) {
+  return (
+    <Box
+      sx={{
+        height: "100%",
+        minHeight: 0,
+        display: "flex",
+        flexDirection: "column",
+      }}
+    >
+      <Box
+        className="dashboard-panel-drag-handle"
+        sx={{
+          mb: 1,
+          px: 0.5,
+          fontSize: 12,
+          fontWeight: 700,
+          color: "text.secondary",
+          cursor: "move",
+          userSelect: "none",
+        }}
+      >
+        {title}
+      </Box>
+
+      <Box sx={{ flex: 1, minHeight: 0 }}>{children}</Box>
+    </Box>
+  );
+});
+
 export default function DashboardPage() {
   const now = new Date();
 
@@ -61,16 +182,30 @@ export default function DashboardPage() {
   const [month, setMonth] = React.useState(now.getMonth() + 1);
   const [year, setYear] = React.useState(now.getFullYear());
   const [scope, setScope] = React.useState<string>("ALL");
-  const [prefixSearch, setPrefixSearch] = React.useState("");
   const [trendWindow, setTrendWindow] = React.useState<number>(6);
 
-  const meQuery = useQuery({ queryKey: ["me"], queryFn: getMe, retry: false });
+  const meQuery = useQuery({
+    queryKey: ["me"],
+    queryFn: getMe,
+    retry: false,
+  });
 
   const groups: string[] = (meQuery.data as any)?.groups ?? [];
   const isCiso = groups.includes("CISO");
   const isElevated = groups.includes("CISO") || groups.includes("CERT");
   const cisoScope: string | undefined = (meQuery.data as any)?.ciso_scope;
   const effectiveScope = isCiso ? scope : "ALL";
+  const userId = (meQuery.data as any)?.id;
+
+  const storageKey = React.useMemo(() => getStorageKey(userId), [userId]);
+
+  const [layouts, setLayouts] = React.useState<ResponsiveLayouts>(() =>
+    loadLayoutsFromStorage(storageKey)
+  );
+
+  React.useEffect(() => {
+    setLayouts(loadLayoutsFromStorage(storageKey));
+  }, [storageKey]);
 
   const summaryQuery = useQuery<DashboardSummary>({
     queryKey: ["dashboardSummary", month, year, effectiveScope],
@@ -103,21 +238,12 @@ export default function DashboardPage() {
     })),
   });
 
-  const top10 = React.useMemo(() => clampTopN(data.top_prefixes ?? [], 10), [data.top_prefixes]);
-
-  const filteredTop = React.useMemo(() => {
-    if (!prefixSearch) return top10;
-    const q = prefixSearch.toLowerCase();
-    return top10.filter((x) => x.label.toLowerCase().includes(q));
-  }, [top10, prefixSearch]);
-
   const pageSubtitle = React.useMemo(() => {
     return `${monthName(data.month)} ${data.year}${isCiso ? ` • Scope: ${data.scope}` : ""}`;
   }, [data.month, data.year, data.scope, isCiso]);
 
   const kpiSpark = React.useMemo(() => {
     const labels = historyParams.map((p) => `${monthNameShort(p.month)} ${String(p.year).slice(-2)}`);
-
     const toNumOrNull = (v: unknown) => (typeof v === "number" ? v : null);
     const series = historyQueries.map((q) => q.data?.kpis);
 
@@ -132,7 +258,9 @@ export default function DashboardPage() {
   const isEmpty = React.useMemo(() => {
     const k = data.kpis;
     const noKpis =
-      (k?.new_users ?? 0) === 0 && (k?.total_reporters ?? 0) === 0 && (k?.total_cases ?? 0) === 0;
+      (k?.new_users ?? 0) === 0 &&
+      (k?.total_reporters ?? 0) === 0 &&
+      (k?.total_cases ?? 0) === 0;
     const noPrefixes = (data.top_prefixes?.length ?? 0) === 0;
     const counts = Object.values(data.danger_counts ?? {});
     const noCounts = counts.length === 0 || counts.every((v) => (v ?? 0) === 0);
@@ -145,8 +273,26 @@ export default function DashboardPage() {
     setSelectedMetric(metric);
     setOpenKpiTrends(true);
   }, []);
+
+  const handleLayoutsChange = React.useCallback(
+    (_currentLayout: Layout, allLayouts: Partial<Record<string, Layout>>) => {
+      const nextLayouts: ResponsiveLayouts = allLayouts;
+      setLayouts(nextLayouts);
+      saveLayoutsToStorage(storageKey, nextLayouts);
+    },
+    [storageKey]
+  );
+
+  const resetLayouts = React.useCallback(() => {
+    setLayouts(DEFAULT_DASHBOARD_LAYOUTS);
+    saveLayoutsToStorage(storageKey, DEFAULT_DASHBOARD_LAYOUTS);
+  }, [storageKey]);
+
   const strMonth = String(month).padStart(2, "0");
   const strYear = String(year);
+
+  void openKpiTrends;
+  void selectedMetric;
 
   if (isInitialLoading) return <DashboardLoading />;
 
@@ -209,35 +355,64 @@ export default function DashboardPage() {
                 KPI evolution for {monthName(data.month)} {data.year}
               </Box>
             </Box>
+
+            <Box
+              component="button"
+              type="button"
+              onClick={resetLayouts}
+              sx={{
+                border: 0,
+                background: "transparent",
+                color: "text.secondary",
+                fontSize: 12,
+                fontWeight: 700,
+                cursor: "pointer",
+                textDecoration: "underline",
+              }}
+            >
+              Reset layout
+            </Box>
           </Stack>
 
-          <KpiTrendPanels
-            spark={kpiSpark}
-            trendWindow={trendWindow}
-            onOpenTrends={(metric) => openTrends(metric)}
-          />
-
-          <Box
-            sx={{
-              display: "grid",
-              gridTemplateColumns: { xs: "1fr", md: "2fr 1fr" },
-              gap: 2,
-              mt: 2,
-              alignItems: "start",
-            }}
+          <ResponsiveGridLayout
+            className="dashboard-layout"
+            layouts={layouts}
+            breakpoints={DASHBOARD_BREAKPOINTS}
+            cols={DASHBOARD_COLS}
+            rowHeight={28}
+            margin={[16, 16]}
+            containerPadding={[0, 0]}
+            compactType="vertical"
+            preventCollision={false}
+            isDraggable
+            isResizable
+            useCSSTransforms
+            measureBeforeMount={false}
+            draggableHandle=".dashboard-panel-drag-handle"
+            onLayoutChange={handleLayoutsChange}
           >
-            <Box sx={{ display: "grid", gap: 2 }}>
-              <TopPrefixesPanel
-                month={strMonth}
-                year={strYear}
-                limit={5}
-              />
+            <Box key={DASHBOARD_PANEL_KEYS.KPI_TRENDS} sx={{ height: "100%" }}>
+              <DashboardPanelShell title="KPI Trends">
+                <KpiTrendPanels
+                  spark={kpiSpark}
+                  trendWindow={trendWindow}
+                  onOpenTrends={openTrends}
+                />
+              </DashboardPanelShell>
             </Box>
 
-            <Box sx={{ display: "grid", gap: 2 }}>
-              <ThreatDistributionPanel dangerCounts={data.danger_counts} />
+            <Box key={DASHBOARD_PANEL_KEYS.TOP_PREFIXES} sx={{ height: "100%" }}>
+              <DashboardPanelShell title="Top Prefixes">
+                <TopPrefixesPanel month={strMonth} year={strYear} limit={5} />
+              </DashboardPanelShell>
             </Box>
-          </Box>
+
+            <Box key={DASHBOARD_PANEL_KEYS.THREAT_DISTRIBUTION} sx={{ height: "100%" }}>
+              <DashboardPanelShell title="Threat Distribution">
+                <ThreatDistributionPanel dangerCounts={data.danger_counts} />
+              </DashboardPanelShell>
+            </Box>
+          </ResponsiveGridLayout>
         </Box>
       </Container>
     </Box>
