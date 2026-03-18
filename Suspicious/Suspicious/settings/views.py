@@ -36,8 +36,8 @@ from profiles.models import CISOProfile
 from profiles.profiles_utils.ciso import (generate_message, handle_csv_file,
                                           handle_json_file, handle_txt_file,
                                           process_cisos)
-from settings.models import (DenyListDomain, Mailbox, AllowListDomain,
-                             AllowListFile, AllowListFiletype, CampaignDomainAllowList)
+from settings.models import (DenyListDomain, Mailbox, AllowListDomain, WatcherLegitDomain,
+                             AllowListFile, AllowListFiletype, CampaignDomainAllowList, WatcherMonitoredDomain)
 from settings.settings_utils.domain import (generate_message_domain,
                                             handle_bdomain_file,
                                             handle_domain_file,
@@ -358,6 +358,9 @@ def add_bdomain_by_name(request, domain):
 
         # Add the domain to the deny_list
         if not DenyListDomain.objects.filter(domain=domain_db).exists():
+            if WatcherMonitoredDomain.objects.filter(domain=domain_db).exists():
+                logger.info(f"Domain {domain} is being monitored by Watcher")
+                return JsonResponse({'success': False, 'message': f'Domain "{domain}" is being monitored by Watcher and cannot be added to the deny_list.'})
             DenyListDomain.objects.create(domain=domain_db, user=request.user)
             logger.info(f"Domain {domain} added to the deny_list by user {request.user}")
             return JsonResponse({'success': True, 'domain': domain, 'message': DOMAIN_ADDED_MESSAGE})
@@ -608,6 +611,9 @@ def add_domain_by_name(request, domain):
 
         # Add the domain to the allow_list
         if not AllowListDomain.objects.filter(domain=domain_db).exists():
+            if WatcherLegitDomain.objects.filter(domain=domain_db).exists():
+                logger.info(f"Domain {domain} is being monitored by Watcher")
+                return JsonResponse({'success': False, 'message': f'Domain "{domain}" is being monitored by Watcher and cannot be added to the allow_list.'})
             AllowListDomain.objects.create(domain=domain_db, user=request.user)
             logger.info(f"Domain {domain} added to the allow_list by user {request.user}")
             return JsonResponse({'success': True, 'domain': domain, 'message': DOMAIN_ADDED_MESSAGE})

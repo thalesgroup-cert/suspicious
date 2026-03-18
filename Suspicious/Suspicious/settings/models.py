@@ -17,7 +17,6 @@ class Mailbox(models.Model):
     last_update = models.DateTimeField(auto_now=True)
 
     def save(self, *args, **kwargs):
-        # évite de re-hasher un mot de passe déjà hashé
         if self.password and not str(self.password).startswith("pbkdf2_"):
             self.password = make_password(self.password)
         super().save(*args, **kwargs)
@@ -51,6 +50,31 @@ class AllowListDomain(models.Model):
         return self.domain.value if self.domain else f"AllowListDomain #{self.id}"
 
 
+class WatcherLegitDomain(models.Model):
+    id = models.AutoField(primary_key=True)
+    watcher_id = models.IntegerField(unique=True, null=True, blank=True)
+    domain = models.ForeignKey(
+        Domain,
+        on_delete=models.CASCADE,
+        related_name="legit_lists",
+        null=True,
+        blank=True,
+    )
+    status = models.CharField(max_length=100, blank=True, default="")
+    remote_last_update = models.DateTimeField(null=True, blank=True)
+    raw_payload = models.JSONField(default=dict, blank=True)
+    creation_date = models.DateTimeField(auto_now_add=True)
+    last_update = models.DateTimeField(auto_now=True)
+
+    class Meta:
+        constraints = [
+            models.UniqueConstraint(fields=["domain"], name="uniq_watcher_legit_domain"),
+        ]
+
+    def __str__(self):
+        return self.domain.value if self.domain else f"WatcherLegitDomain #{self.id}"
+
+
 class DenyListDomain(models.Model):
     id = models.AutoField(primary_key=True)
     domain = models.ForeignKey(
@@ -66,6 +90,31 @@ class DenyListDomain(models.Model):
 
     def __str__(self):
         return self.domain.value if self.domain else f"DenyListDomain #{self.id}"
+
+
+class WatcherMonitoredDomain(models.Model):
+    id = models.AutoField(primary_key=True)
+    watcher_id = models.IntegerField(unique=True, null=True, blank=True)
+    domain = models.ForeignKey(
+        Domain,
+        on_delete=models.CASCADE,
+        related_name="monitored_lists",
+        null=True,
+        blank=True,
+    )
+    status = models.CharField(max_length=100, blank=True, default="")
+    remote_last_update = models.DateTimeField(null=True, blank=True)
+    raw_payload = models.JSONField(default=dict, blank=True)
+    creation_date = models.DateTimeField(auto_now_add=True)
+    last_update = models.DateTimeField(auto_now=True)
+
+    class Meta:
+        constraints = [
+            models.UniqueConstraint(fields=["domain"], name="uniq_watcher_monitored_domain"),
+        ]
+
+    def __str__(self):
+        return self.domain.value if self.domain else f"WatcherMonitoredDomain #{self.id}"
 
 
 class CampaignDomainAllowList(models.Model):

@@ -11,6 +11,7 @@ services:
       args:
         - HTTP_PROXY=${HTTP_PROXY}
         - HTTPS_PROXY=${HTTPS_PROXY}
+    image: ghcr.io/thalesgroup-cert/suspicious:${SUSPICIOUS_VERSION}
     container_name: suspicious
     depends_on:
       db_suspicious:
