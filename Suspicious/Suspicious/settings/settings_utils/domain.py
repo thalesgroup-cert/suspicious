@@ -2,7 +2,7 @@ import csv
 import json
 import re
 from domain_process.models import Domain
-from settings.models import AllowListDomain, DenyListDomain, CampaignDomainAllowList
+from settings.models import AllowListDomain, DenyListDomain, CampaignDomainAllowList, WatcherMonitoredDomain, WatcherLegitDomain
 from domain_process.domain_utils.domain_handler import DomainHandler
 
 CSV_CONTENT_TYPE = 'text/csv'
@@ -101,7 +101,7 @@ def process_domains(domains, user):
             except Domain.DoesNotExist:
                 domain_db = Domain.objects.create(value=domain)
 
-            if domain_db and not AllowListDomain.objects.filter(domain=domain_db).exists():
+            if domain_db and not AllowListDomain.objects.filter(domain=domain_db).exists() and not WatcherLegitDomain.objects.filter(domain=domain_db).exists():
                 AllowListDomain.objects.create(domain=domain_db, user=user)
                 good_domains.append(domain)
             else:
@@ -137,7 +137,7 @@ def process_bdomains(domains, user):
             except Domain.DoesNotExist:
                 domain_db = Domain.objects.create(value=domain)
 
-            if domain_db and not DenyListDomain.objects.filter(domain=domain_db).exists():
+            if domain_db and not DenyListDomain.objects.filter(domain=domain_db).exists() and not WatcherMonitoredDomain.objects.filter(domain=domain_db).exists():
                 DenyListDomain.objects.create(domain=domain_db, user=user)
                 good_domains.append(domain)
             else:

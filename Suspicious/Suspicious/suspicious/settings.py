@@ -428,5 +428,6 @@ CRONJOBS = [
     ('*/5 * * * *', 'tasp.cron.kpi.sync_monthly_kpi'),
     ('*/10 * * * *', 'tasp.cron.user_and_cases.sync_user_profiles'),
     ('0 0 1 * *', 'tasp.cron.cleanup.delete_old_analyzer_reports', '>> /app/log/cleanup_phishing.log'),
-    ('0 0 * * *', 'tasp.cron.suspicious.remove_old_suspicious_emails', '>> /app/log/cleanup_phishing.log')
+    ('0 0 * * *', 'tasp.cron.suspicious.remove_old_suspicious_emails', '>> /app/log/cleanup_phishing.log'),
+    ('*/10 * * * *', 'tasp.cron.watcher.run_watcher_sync', '>> /app/log/watcher_sync.log'),
 ]

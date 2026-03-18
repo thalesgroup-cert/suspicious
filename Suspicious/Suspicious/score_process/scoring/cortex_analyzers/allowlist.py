@@ -4,6 +4,7 @@ from settings.models import (
     AllowListDomain,
     AllowListFile,
     AllowListFiletype,
+    WatcherLegitDomain,
 )
 from .utils import extract_domain
 from .models import AllowListResult
@@ -25,7 +26,7 @@ def check_allow_list(data: str, data_type: str) -> AllowListResult:
 
         elif data_type == "url":
             domain = extract_domain(data)
-            if domain and AllowListDomain.objects.filter(domain__value=domain).exists():
+            if domain and AllowListDomain.objects.filter(domain__value=domain).exists() and WatcherLegitDomain.objects.filter(domain__value=domain).exists():
                 result.DomainAllowList = "Safe DW triggered"
 
     except Exception as exc:

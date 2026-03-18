@@ -6,7 +6,7 @@ from urllib.parse import urlparse
 from email.utils import parseaddr
 
 # Models
-from settings.models import DenyListDomain, CampaignDomainAllowList
+from settings.models import DenyListDomain, CampaignDomainAllowList, WatcherMonitoredDomain
 from domain_process.models import Domain
 from url_process.models import URL
 from email_process.models import MailAddress
@@ -98,6 +98,9 @@ def get_deny_listed_domains_set() -> Set[str]:
         .values_list('domain__value', flat=True)
     ) | set(
         CampaignDomainAllowList.objects.filter(domain__value__isnull=False)
+        .values_list('domain__value', flat=True)
+    ) | set(
+        WatcherMonitoredDomain.objects.filter(domain__value__isnull=False)
         .values_list('domain__value', flat=True)
     )
     update_cases_logger.info("Fetched %d deny_listed domains.", len(domains))

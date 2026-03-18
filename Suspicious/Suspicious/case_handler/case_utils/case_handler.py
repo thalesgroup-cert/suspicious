@@ -19,6 +19,7 @@ from settings.models import (
     AllowListDomain,
     AllowListFile,
     AllowListFiletype,
+    WatcherLegitDomain,
 )
 from cortex_job.cortex_utils.cortex_and_job_management import CortexJob
 
@@ -131,7 +132,7 @@ class CaseHandler:
         try:
             url_inst, domain = URLHandler().handle_url(url)
             if url_inst and domain:
-                if not AllowListDomain.objects.filter(domain=domain).exists():
+                if not AllowListDomain.objects.filter(domain=domain).exists() and not WatcherLegitDomain.objects.filter(domain=domain).exists():
                     self._launch_analysis(url_inst, None, data_type="url")
                     return url_inst, False
                 url_inst.update_allow_listed()

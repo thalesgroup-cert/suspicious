@@ -37,8 +37,7 @@
         "enabled": false,
         "url": "https://watcher",
         "api_key": "superpassword",
-        "certificate_path" : "/app/cert.pem",
-        "user": "exemple@user.com"
+        "timeout": 10
     },
     "cortex": {
         "url": "http://cortex:9001",
