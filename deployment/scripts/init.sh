@@ -48,6 +48,17 @@ else
     echo "→ .env present"
 fi
 
+if [ ! -f "../../suspicious-ui/.env" ]; then
+    if [ -f "../../suspicious-ui/.env.example" ]; then
+        cp ../../suspicious-ui/.env.example ../../suspicious-ui/.env
+        echo "→ UI .env created from .env.example"
+    else
+        echo "ERROR: Missing both UI .env and .env.example"
+    fi
+else
+    echo "→ UI .env present"
+fi
+
 # Load environment variables
 set -a
 . ./.env
