@@ -33,6 +33,13 @@
         "certificate_path" : "/app/cert.pem",
         "user": "exemple@user.com"
     },
+    "watcher": {
+        "enabled": false,
+        "url": "https://watcher",
+        "api_key": "superpassword",
+        "certificate_path" : "/app/cert.pem",
+        "user": "exemple@user.com"
+    },
     "cortex": {
         "url": "http://cortex:9001",
         "api_key": "your cortex api key",
