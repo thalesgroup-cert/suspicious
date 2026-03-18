@@ -25,6 +25,11 @@ services:
       timeout: 30s
       retries: 15
       start_period: 60s
+    # labels:
+    #   - "traefik.enable=true"
+    #   - "traefik.http.routers.suspicious.rule=Host(`${DOMAIN_CORP}`)"
+    #   - "traefik.http.routers.suspicious.entrypoints=websecure"
+    #   - "traefik.http.routers.suspicious.tls=true"
 
   suspicious_ui:
     extends:
@@ -44,7 +49,7 @@ services:
       - "traefik.http.routers.suspicious-ui.rule=Host(`${DOMAIN_CORP}`)"
       - "traefik.http.routers.suspicious-ui.entrypoints=websecure"
       - "traefik.http.routers.suspicious-ui.tls=true"
-      - "traefik.http.services.suspicious-ui.loadbalancer.server.port=443"
+      - "traefik.http.services.suspicious-ui.loadbalancer.server.port=80"
 
   db_suspicious:
     extends:
@@ -143,8 +148,6 @@ volumes:
   elasticsearch_logs:
     driver: local
   minio_data:
-    driver: local
-  cortex_jobs:
     driver: local
   chromadb_data:
     driver: local
