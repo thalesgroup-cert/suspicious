@@ -76,7 +76,18 @@ class InvestigationAccessMixin:
         return Case.objects.select_related(*CASE_LIST_SELECT_RELATED)
 
     def get_case_detail_queryset(self):
-        return Case.objects.select_related(*CASE_DETAIL_SELECT_RELATED)
+        return (
+            Case.objects.select_related(*CASE_DETAIL_SELECT_RELATED)
+            .prefetch_related(
+                "fileOrMail__mail__mail_attachments",
+                "fileOrMail__mail__mail_artifacts",
+                "fileOrMail__mail__mail_artifacts__artifactIsUrl",
+                "fileOrMail__mail__mail_artifacts__artifactIsIp",
+                "fileOrMail__mail__mail_artifacts__artifactIsHash",
+                "fileOrMail__mail__mail_artifacts__artifactIsDomain",
+                "fileOrMail__mail__mail_artifacts__artifactIsMailAddress",
+            )
+        )
 
     def get_case_or_404(self, case_id: int) -> Case:
         try:
@@ -93,8 +104,65 @@ class InvestigationAccessMixin:
         if obj.fileOrMail_id and file_or_mail:
             if file_or_mail.file_id:
                 query |= Q(file_id=file_or_mail.file_id)
-            if file_or_mail.mail_id:
-                query |= Q(mail_id=file_or_mail.mail_id)
+
+            if file_or_mail.mail_id and getattr(file_or_mail, "mail", None):
+                mail = file_or_mail.mail
+
+                if mail.mail_body_id:
+                    query |= Q(mail_body_id=mail.mail_body_id)
+
+                if mail.mail_header_id:
+                    query |= Q(mail_header_id=mail.mail_header_id)
+
+                attachment_file_ids = list(
+                    mail.mail_attachments.exclude(file_id__isnull=True)
+                    .values_list("file_id", flat=True)
+                )
+                if attachment_file_ids:
+                    query |= Q(file_id__in=attachment_file_ids)
+
+                url_ids = []
+                ip_ids = []
+                hash_ids = []
+                domain_ids = []
+                mail_address_ids = []
+
+                for artifact in mail.mail_artifacts.select_related(
+                    "artifactIsUrl",
+                    "artifactIsIp",
+                    "artifactIsHash",
+                    "artifactIsDomain",
+                    "artifactIsMailAddress",
+                ):
+                    if artifact.artifactIsUrl_id and artifact.artifactIsUrl and artifact.artifactIsUrl.url_id:
+                        url_ids.append(artifact.artifactIsUrl.url_id)
+
+                    if artifact.artifactIsIp_id and artifact.artifactIsIp and artifact.artifactIsIp.ip_id:
+                        ip_ids.append(artifact.artifactIsIp.ip_id)
+
+                    if artifact.artifactIsHash_id and artifact.artifactIsHash and artifact.artifactIsHash.hash_id:
+                        hash_ids.append(artifact.artifactIsHash.hash_id)
+
+                    if artifact.artifactIsDomain_id and artifact.artifactIsDomain and artifact.artifactIsDomain.domain_id:
+                        domain_ids.append(artifact.artifactIsDomain.domain_id)
+
+                    if (
+                        artifact.artifactIsMailAddress_id
+                        and artifact.artifactIsMailAddress
+                        and artifact.artifactIsMailAddress.mail_address_id
+                    ):
+                        mail_address_ids.append(artifact.artifactIsMailAddress.mail_address_id)
+
+                if url_ids:
+                    query |= Q(url_id__in=url_ids)
+                if ip_ids:
+                    query |= Q(ip_id__in=ip_ids)
+                if hash_ids:
+                    query |= Q(hash_id__in=hash_ids)
+                if domain_ids:
+                    query |= Q(domain_id__in=domain_ids)
+                if mail_address_ids:
+                    query |= Q(mail_id__in=mail_address_ids)
 
         if obj.nonFileIocs_id and non_file_iocs:
             if non_file_iocs.url_id:
@@ -112,6 +180,7 @@ class InvestigationAccessMixin:
             .filter(query)
             .select_related(*self.analyzer_report_select_related)
             .order_by("-creation_date", "-pk")
+            .distinct()
         )
 
     def filter_case_queryset(self, queryset, validated_filters: dict):

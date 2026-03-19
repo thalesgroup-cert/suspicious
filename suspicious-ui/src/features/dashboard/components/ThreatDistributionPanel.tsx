@@ -45,13 +45,22 @@ function GlassCard(props: React.PropsWithChildren<{
   return (
     <Card
       sx={{
+        height: "100%",
         borderRadius: 3,
         border: "1px solid rgba(255,255,255,.10)",
         background: "linear-gradient(180deg, rgba(255,255,255,.06), rgba(255,255,255,.03))",
       }}
     >
-      <CardContent sx={{ p: { xs: 1.5, md: 2 } }}>
-        <Stack direction="row" alignItems="center" justifyContent="space-between" sx={{ mb: 1 }}>
+      <CardContent
+        sx={{
+          height: "100%",
+          p: { xs: 1.5, md: 2 },
+          display: "flex",
+          flexDirection: "column",
+          minHeight: 0,
+        }}
+      >
+        <Stack direction="row" alignItems="center" justifyContent="space-between" sx={{ mb: 1, flexShrink: 0 }}>
           <Stack direction="row" spacing={0.9} alignItems="center">
             <Box
               sx={{
@@ -75,8 +84,10 @@ function GlassCard(props: React.PropsWithChildren<{
           {props.right}
         </Stack>
 
-        <Divider sx={{ opacity: 0.25, mb: 1.5 }} />
-        {props.children}
+        <Divider sx={{ opacity: 0.25, mb: 1.5, flexShrink: 0 }} />
+        <Box sx={{ flex: 1, minHeight: 0, display: "flex", flexDirection: "column" }}>
+          {props.children}
+        </Box>
       </CardContent>
     </Card>
   );
@@ -143,7 +154,7 @@ export default function ThreatDistributionPanel(props: { dangerCounts: DangerCou
       icon={<ShieldOutlined />}
       right={<Chip size="small" label="Monthly" variant="outlined" />}
     >
-      <Box sx={{ height: 369 }}>
+      <Box sx={{ flex: 1, minHeight: 220 }}>
         {donut.length ? (
           <ResponsiveContainer width="100%" height="100%">
             <PieChart>
@@ -185,7 +196,7 @@ export default function ThreatDistributionPanel(props: { dangerCounts: DangerCou
         )}
       </Box>
 
-      <Stack spacing={0.7} sx={{ mt: 1 }}>
+      <Stack spacing={0.7} sx={{ mt: 1, flexShrink: 0 }}>
         {(DANGER_ORDER as readonly DangerLabel[]).map((label) => {
           const key = label.toLowerCase() as keyof DangerCounts;
           const value = (danger[key] ?? 0) as number;

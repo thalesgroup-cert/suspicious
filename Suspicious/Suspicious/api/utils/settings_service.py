@@ -2,7 +2,7 @@
 from __future__ import annotations
 
 from dataclasses import dataclass
-from typing import Any, Callable, Iterable, Type
+from typing import Any, Callable, Type
 
 from django.contrib.auth import get_user_model
 from django.db import transaction
@@ -18,6 +18,8 @@ from settings.models import (
     AllowListFiletype,
     CampaignDomainAllowList,
     DenyListDomain,
+    WatcherLegitDomain,
+    WatcherMonitoredDomain,
 )
 
 User = get_user_model()
@@ -53,6 +55,14 @@ def _filetype_queryset() -> QuerySet:
 
 def _ciso_queryset() -> QuerySet:
     return CISOProfile.objects.select_related("user").order_by("user__username")
+
+
+def _watcher_legit_queryset() -> QuerySet:
+    return WatcherLegitDomain.objects.select_related("domain").order_by("-last_update", "-creation_date")
+
+
+def _watcher_monitored_queryset() -> QuerySet:
+    return WatcherMonitoredDomain.objects.select_related("domain").order_by("-last_update", "-creation_date")
 
 
 def _bulk_create_domain_links(
@@ -210,14 +220,26 @@ SETTINGS_LIST_SECTIONS: dict[str, ListSectionConfig] = {
         value_getter=lambda obj: obj.filetype,
         bulk_create_handler=_bulk_create_filetypes,
     ),
-    # Kept for compatibility with existing route structure.
-    # If deletion is not intended business logic, make this read-only in a later change.
+    "watcher_legit_domains": ListSectionConfig(
+        section="watcher_legit_domains",
+        model=WatcherLegitDomain,
+        queryset_factory=_watcher_legit_queryset,
+        value_getter=lambda obj: obj.domain.value if obj.domain else "",
+        allow_delete=False,
+    ),
+    "watcher_monitored_domains": ListSectionConfig(
+        section="watcher_monitored_domains",
+        model=WatcherMonitoredDomain,
+        queryset_factory=_watcher_monitored_queryset,
+        value_getter=lambda obj: obj.domain.value if obj.domain else "",
+        allow_delete=False,
+    ),
     "ciso_users": ListSectionConfig(
         section="ciso_users",
         model=CISOProfile,
         queryset_factory=_ciso_queryset,
         value_getter=lambda obj: obj.user.username if obj.user else "",
-        allow_delete=True,
+        allow_delete=False,
     ),
 }
 

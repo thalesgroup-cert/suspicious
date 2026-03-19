@@ -8,7 +8,9 @@ export type SettingsSection =
   | "filetypes_allow"
   | "ciso_users"
   | "email_feeder"
-  | "scoring";
+  | "scoring"
+  | "watcher_legit_domains"
+  | "watcher_monitored_domains";
 
 export type ListItem = {
   id: string;
@@ -35,12 +37,28 @@ export type Analyzer = {
   is_active: boolean;
 };
 
-type ListSection =
+/**
+ * Sections that are editable from the frontend.
+ * Watcher sections are intentionally excluded because they are read-only.
+ */
+export type EditableListSection =
   | "domains_allow"
   | "domains_deny"
   | "campaign_domains_allow"
   | "emails_files_allow"
   | "filetypes_allow";
+
+/**
+ * Sections that return list-shaped data from /settings/list/<section>/
+ */
+type ListResponseSection =
+  | "domains_allow"
+  | "domains_deny"
+  | "campaign_domains_allow"
+  | "emails_files_allow"
+  | "filetypes_allow"
+  | "watcher_legit_domains"
+  | "watcher_monitored_domains";
 
 type SectionResponseMap = {
   domains_allow: ListItem[];
@@ -48,6 +66,8 @@ type SectionResponseMap = {
   campaign_domains_allow: ListItem[];
   emails_files_allow: ListItem[];
   filetypes_allow: ListItem[];
+  watcher_legit_domains: ListItem[];
+  watcher_monitored_domains: ListItem[];
   ciso_users: CisoUser[];
 };
 
@@ -58,12 +78,18 @@ export async function listItems<T extends keyof SectionResponseMap>(
   return res.data;
 }
 
-export async function addItems(section: ListSection, values: string[]) {
+export async function addItems(
+  section: EditableListSection,
+  values: string[]
+) {
   const res = await api.post(`/settings/list/${section}/`, { values });
   return res.data;
 }
 
-export async function removeItem(section: ListSection, id: string) {
+export async function removeItem(
+  section: EditableListSection,
+  id: string
+) {
   const res = await api.delete(`/settings/list/${section}/${id}/`);
   return res.data;
 }
@@ -90,7 +116,10 @@ export async function updateAnalyzerWeight(id: number, weight: number) {
   return res.data;
 }
 
-export async function addFromFile(section: ListSection, file: File) {
+export async function addFromFile(
+  section: EditableListSection,
+  file: File
+) {
   const text = await file.text();
   const values = text
     .split(/[\r\n,;]+/g)

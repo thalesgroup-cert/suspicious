@@ -150,6 +150,12 @@ LOGGING = {
             "class": "logging.FileHandler",
             "filename": "/var/log/cert_downloads.log",
         },
+        'watcher_sync_file': {
+            'level': suspicious_config.get('trace_level', 'DEBUG'),
+            'class': 'logging.FileHandler',
+            'filename': '/app/log/watcher_sync.log',
+            'formatter': 'verbose',
+        },
     },
     "loggers": {
         'django': {
@@ -194,6 +200,11 @@ LOGGING = {
             "handlers": ["audit_file"],
             "level": "INFO",
             "propagate": False,
+        },
+        'tasp.cron.watcher': {
+            'handlers': ['watcher_sync_file'],
+            'level': suspicious_config.get('trace_level', 'DEBUG'),
+            'propagate': False,
         },
     },
     "disable_existing_loggers": False
@@ -429,5 +440,5 @@ CRONJOBS = [
     ('*/10 * * * *', 'tasp.cron.user_and_cases.sync_user_profiles'),
     ('0 0 1 * *', 'tasp.cron.cleanup.delete_old_analyzer_reports', '>> /app/log/cleanup_phishing.log'),
     ('0 0 * * *', 'tasp.cron.suspicious.remove_old_suspicious_emails', '>> /app/log/cleanup_phishing.log'),
-    ('*/10 * * * *', 'tasp.cron.watcher.run_watcher_sync', '>> /app/log/watcher_sync.log'),
+    ('*/5 * * * *', 'tasp.cron.watcher.run_watcher_sync', '>> /app/log/watcher_sync.log'),
 ]

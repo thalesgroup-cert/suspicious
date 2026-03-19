@@ -57,7 +57,7 @@ import {
   type SettingsSection,
 } from "@/features/settings/api";
 
-type SectionKind = "list" | "toggle" | "scoring" | "ciso_users";
+type SectionKind = "list" | "toggle" | "scoring" | "ciso_users" | "domain_pair";
 
 type SectionMeta = {
   key: SettingsSection;
@@ -71,16 +71,16 @@ const SECTIONS: SectionMeta[] = [
   {
     key: "domains_allow",
     title: "Domains allowlist",
-    subtitle: "Allow known benign domains.",
+    subtitle: "Manage local allowlist and synced Watcher legit domains.",
     icon: <CheckCircleOutline />,
-    kind: "list",
+    kind: "domain_pair",
   },
   {
     key: "domains_deny",
     title: "Domains denylist",
-    subtitle: "Block known malicious domains.",
+    subtitle: "Manage local denylist and synced Watcher monitored domains.",
     icon: <BlockOutlined />,
-    kind: "list",
+    kind: "domain_pair",
   },
   {
     key: "campaign_domains_allow",
@@ -149,11 +149,13 @@ function GlassCard(props: React.PropsWithChildren<{ sx?: any }>) {
   );
 }
 
-function SectionCard(props: React.PropsWithChildren<{
-  title: string;
-  subtitle: string;
-  right?: React.ReactNode;
-}>) {
+function SectionCard(
+  props: React.PropsWithChildren<{
+    title: string;
+    subtitle: string;
+    right?: React.ReactNode;
+  }>
+) {
   return (
     <GlassCard>
       <CardContent sx={{ p: { xs: 2, md: 2.5 } }}>
@@ -184,7 +186,11 @@ function SectionCard(props: React.PropsWithChildren<{
 function ListManager(props: {
   section: Exclude<
     SettingsSection,
-    "email_feeder" | "scoring" | "ciso_users"
+    | "email_feeder"
+    | "scoring"
+    | "ciso_users"
+    | "watcher_legit_domains"
+    | "watcher_monitored_domains"
   >;
   placeholder: string;
   fileAccept: string;
@@ -390,6 +396,429 @@ function ListManager(props: {
         </GlassCard>
       )}
     </Stack>
+  );
+}
+
+function EditableListCard(props: {
+  section: Exclude<
+    SettingsSection,
+    | "email_feeder"
+    | "scoring"
+    | "ciso_users"
+    | "watcher_legit_domains"
+    | "watcher_monitored_domains"
+  >;
+  title: string;
+  subtitle: string;
+  placeholder: string;
+  fileAccept: string;
+}) {
+  const qc = useQueryClient();
+  const [input, setInput] = React.useState("");
+  const [filter, setFilter] = React.useState("");
+
+  const listQuery = useQuery<ListItem[]>({
+    queryKey: ["settings", "list", props.section],
+    queryFn: () => listItems(props.section),
+    retry: false,
+  });
+
+  const addMutation = useMutation({
+    mutationFn: (values: string[]) => addItems(props.section, values),
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: ["settings", "list", props.section] });
+      setInput("");
+    },
+  });
+
+  const removeMutation = useMutation({
+    mutationFn: (id: string) => removeItem(props.section, id),
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: ["settings", "list", props.section] });
+    },
+  });
+
+  const importMutation = useMutation({
+    mutationFn: (file: File) => addFromFile(props.section, file),
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: ["settings", "list", props.section] });
+    },
+  });
+
+  const items = React.useMemo(() => {
+    const base = listQuery.data ?? [];
+    const q = filter.trim().toLowerCase();
+    if (!q) return base;
+    return base.filter((it) => it.value.toLowerCase().includes(q));
+  }, [listQuery.data, filter]);
+
+  return (
+    <GlassCard
+      sx={{
+        height: "100%",
+        borderRadius: 2.5,
+        background: "rgba(255,255,255,.03)",
+      }}
+    >
+      <CardContent sx={{ p: 2 }}>
+        <Stack spacing={1.5}>
+          <Box>
+            <Typography fontWeight={950}>{props.title}</Typography>
+            <Typography variant="body2" color="text.secondary">
+              {props.subtitle}
+            </Typography>
+          </Box>
+
+          <TextField
+            size="small"
+            label="Add values"
+            placeholder={props.placeholder}
+            value={input}
+            onChange={(e) => setInput(e.target.value)}
+            fullWidth
+            helperText="Spaces, commas or new lines."
+            InputProps={{
+              endAdornment: (
+                <InputAdornment position="end">
+                  <IconButton
+                    aria-label="Add values"
+                    onClick={() => {
+                      const values = parseMulti(input);
+                      if (!values.length) return;
+                      addMutation.mutate(values);
+                    }}
+                    size="small"
+                  >
+                    <AddOutlined fontSize="small" />
+                  </IconButton>
+                </InputAdornment>
+              ),
+            }}
+          />
+
+          <TextField
+            size="small"
+            label="Search"
+            placeholder="Filter items…"
+            value={filter}
+            onChange={(e) => setFilter(e.target.value)}
+            fullWidth
+            InputProps={{
+              startAdornment: (
+                <InputAdornment position="start">
+                  <SearchOutlined fontSize="small" />
+                </InputAdornment>
+              ),
+            }}
+          />
+
+          <Stack
+            direction={{ xs: "column", sm: "row" }}
+            spacing={1}
+            alignItems={{ sm: "center" }}
+          >
+            <Button
+              size="small"
+              variant="outlined"
+              component="label"
+              startIcon={<FileUploadOutlined />}
+              sx={{ borderRadius: 2, textTransform: "none", fontWeight: 900 }}
+            >
+              Import
+              <input
+                hidden
+                type="file"
+                accept={props.fileAccept}
+                onChange={(e) => {
+                  const f = e.target.files?.[0];
+                  if (f) importMutation.mutate(f);
+                  e.currentTarget.value = "";
+                }}
+              />
+            </Button>
+
+            <Chip
+              size="small"
+              label={`${items.length} item(s)`}
+              variant="outlined"
+              sx={{ ml: { sm: "auto" } }}
+            />
+          </Stack>
+
+          {addMutation.isError ? (
+            <Alert severity="error">Failed to add values.</Alert>
+          ) : null}
+          {removeMutation.isError ? (
+            <Alert severity="error">Failed to remove item.</Alert>
+          ) : null}
+          {importMutation.isError ? (
+            <Alert severity="error">Failed to import file.</Alert>
+          ) : null}
+
+          {listQuery.isLoading ? (
+            <Box sx={{ display: "grid", placeItems: "center", py: 4 }}>
+              <CircularProgress size={24} />
+            </Box>
+          ) : listQuery.isError ? (
+            <Alert severity="error">Failed to load list.</Alert>
+          ) : (
+            <Box
+              sx={{
+                maxHeight: 420,
+                overflowY: "auto",
+                borderRadius: 2,
+                border: "1px solid rgba(255,255,255,.08)",
+              }}
+            >
+              {items.length ? (
+                <Stack spacing={0} sx={{ p: 1 }}>
+                  {items.map((it) => (
+                    <Stack
+                      key={it.id}
+                      direction="row"
+                      alignItems="center"
+                      justifyContent="space-between"
+                      sx={{
+                        px: 1.25,
+                        py: 1,
+                        borderRadius: 1.5,
+                        "&:not(:last-child)": {
+                          mb: 0.75,
+                        },
+                        border: "1px solid rgba(255,255,255,.06)",
+                      }}
+                    >
+                      <Box sx={{ minWidth: 0, pr: 1 }}>
+                        <Typography
+                          sx={{
+                            fontWeight: 800,
+                            overflow: "hidden",
+                            textOverflow: "ellipsis",
+                            whiteSpace: "nowrap",
+                          }}
+                        >
+                          {it.value}
+                        </Typography>
+                        {it.created_at ? (
+                          <Typography variant="caption" color="text.secondary">
+                            {new Date(it.created_at).toLocaleString()}
+                          </Typography>
+                        ) : null}
+                      </Box>
+
+                      <IconButton
+                        aria-label="Remove"
+                        onClick={() => removeMutation.mutate(it.id)}
+                        size="small"
+                        sx={{
+                          border: "1px solid rgba(255,255,255,.10)",
+                          borderRadius: 2,
+                        }}
+                      >
+                        <DeleteOutline fontSize="small" />
+                      </IconButton>
+                    </Stack>
+                  ))}
+                </Stack>
+              ) : (
+                <Typography color="text.secondary" sx={{ p: 2 }}>
+                  No items.
+                </Typography>
+              )}
+            </Box>
+          )}
+        </Stack>
+      </CardContent>
+    </GlassCard>
+  );
+}
+
+function ReadOnlyListCard(props: {
+  section: "watcher_legit_domains" | "watcher_monitored_domains";
+  title: string;
+  subtitle: string;
+}) {
+  const [filter, setFilter] = React.useState("");
+
+  const listQuery = useQuery<ListItem[]>({
+    queryKey: ["settings", "list", props.section],
+    queryFn: () => listItems(props.section),
+    retry: false,
+  });
+
+  const items = React.useMemo(() => {
+    const base = listQuery.data ?? [];
+    const q = filter.trim().toLowerCase();
+    if (!q) return base;
+    return base.filter((it) => it.value.toLowerCase().includes(q));
+  }, [listQuery.data, filter]);
+
+  return (
+    <GlassCard
+      sx={{
+        height: "100%",
+        borderRadius: 2.5,
+        background: "rgba(255,255,255,.03)",
+      }}
+    >
+      <CardContent sx={{ p: 2 }}>
+        <Stack spacing={1.5}>
+          <Stack
+            direction="row"
+            justifyContent="space-between"
+            alignItems="flex-start"
+            spacing={1}
+          >
+            <Box>
+              <Typography fontWeight={950}>{props.title}</Typography>
+              <Typography variant="body2" color="text.secondary">
+                {props.subtitle}
+              </Typography>
+            </Box>
+
+            <Chip
+              size="small"
+              label="Synced from Watcher"
+              color="info"
+              variant="outlined"
+            />
+          </Stack>
+
+          <Typography variant="caption" color="text.secondary">
+            Managed externally. These domains are read-only in this page.
+          </Typography>
+
+          <TextField
+            size="small"
+            label="Search"
+            placeholder="Filter domains…"
+            value={filter}
+            onChange={(e) => setFilter(e.target.value)}
+            fullWidth
+            InputProps={{
+              startAdornment: (
+                <InputAdornment position="start">
+                  <SearchOutlined fontSize="small" />
+                </InputAdornment>
+              ),
+            }}
+          />
+
+          {listQuery.isLoading ? (
+            <Box sx={{ display: "grid", placeItems: "center", py: 4 }}>
+              <CircularProgress size={24} />
+            </Box>
+          ) : listQuery.isError ? (
+            <Alert severity="error">Failed to load synced domains.</Alert>
+          ) : (
+            <>
+              <Stack
+                direction="row"
+                justifyContent="space-between"
+                alignItems="center"
+              >
+                <Typography variant="caption" color="text.secondary">
+                  Read-only list
+                </Typography>
+                <Chip
+                  size="small"
+                  label={`${items.length} item(s)`}
+                  variant="outlined"
+                />
+              </Stack>
+
+              <Box
+                sx={{
+                  maxHeight: 420,
+                  overflowY: "auto",
+                  borderRadius: 2,
+                  border: "1px solid rgba(255,255,255,.08)",
+                }}
+              >
+                {items.length ? (
+                  <Stack spacing={0} sx={{ p: 1 }}>
+                    {items.map((it) => (
+                      <Box
+                        key={it.id}
+                        sx={{
+                          px: 1.25,
+                          py: 1,
+                          borderRadius: 1.5,
+                          "&:not(:last-child)": {
+                            mb: 0.75,
+                          },
+                          border: "1px solid rgba(255,255,255,.06)",
+                        }}
+                      >
+                        <Typography
+                          sx={{
+                            fontWeight: 800,
+                            overflow: "hidden",
+                            textOverflow: "ellipsis",
+                            whiteSpace: "nowrap",
+                          }}
+                        >
+                          {it.value}
+                        </Typography>
+                        {it.created_at ? (
+                          <Typography variant="caption" color="text.secondary">
+                            {new Date(it.created_at).toLocaleString()}
+                          </Typography>
+                        ) : null}
+                      </Box>
+                    ))}
+                  </Stack>
+                ) : (
+                  <Typography color="text.secondary" sx={{ p: 2 }}>
+                    No synced items.
+                  </Typography>
+                )}
+              </Box>
+            </>
+          )}
+        </Stack>
+      </CardContent>
+    </GlassCard>
+  );
+}
+
+function DomainPairPanel(props: {
+  editableSection: "domains_allow" | "domains_deny";
+}) {
+  const isAllow = props.editableSection === "domains_allow";
+
+  return (
+    <Grid container spacing={2}>
+      <Grid item xs={12} lg={6}>
+        <EditableListCard
+          section={props.editableSection}
+          title={isAllow ? "Domains allowlist" : "Domains denylist"}
+          subtitle={
+            isAllow
+              ? "Manage locally allowed domains."
+              : "Manage locally denied domains."
+          }
+          placeholder="Paste domains…"
+          fileAccept=".txt,.csv,.json"
+        />
+      </Grid>
+
+      <Grid item xs={12} lg={6}>
+        <ReadOnlyListCard
+          section={
+            isAllow ? "watcher_legit_domains" : "watcher_monitored_domains"
+          }
+          title={
+            isAllow ? "Watcher legit domains" : "Watcher monitored domains"
+          }
+          subtitle={
+            isAllow
+              ? "Read-only domains synchronized from Watcher."
+              : "Read-only monitored domains synchronized from Watcher."
+          }
+        />
+      </Grid>
+    </Grid>
   );
 }
 
@@ -801,7 +1230,12 @@ export default function SettingsPage() {
         <Grid item xs={12} md={3.5}>
           <GlassCard sx={{ overflow: "hidden" }}>
             <CardContent sx={{ p: 1.25 }}>
-              <Stack direction="row" spacing={1} alignItems="center" sx={{ px: 1, py: 1 }}>
+              <Stack
+                direction="row"
+                spacing={1}
+                alignItems="center"
+                sx={{ px: 1, py: 1 }}
+              >
                 <Box
                   sx={{
                     width: 38,
@@ -841,7 +1275,14 @@ export default function SettingsPage() {
                       },
                     }}
                   >
-                    <Box sx={{ width: 34, display: "grid", placeItems: "center", opacity: 0.9 }}>
+                    <Box
+                      sx={{
+                        width: 34,
+                        display: "grid",
+                        placeItems: "center",
+                        opacity: 0.9,
+                      }}
+                    >
                       {s.icon}
                     </Box>
                     <ListItemText
@@ -861,12 +1302,22 @@ export default function SettingsPage() {
 
         <Grid item xs={12} md={8.5}>
           <SectionCard title={meta.title} subtitle={meta.subtitle}>
-            {meta.kind === "list" ? (
+            {meta.kind === "domain_pair" && active === "domains_allow" ? (
+              <DomainPairPanel editableSection="domains_allow" />
+            ) : meta.kind === "domain_pair" && active === "domains_deny" ? (
+              <DomainPairPanel editableSection="domains_deny" />
+            ) : meta.kind === "list" ? (
               <ListManager
-                section={meta.key as Exclude<
-                  SettingsSection,
-                  "email_feeder" | "scoring" | "ciso_users"
-                >}
+                section={
+                  meta.key as Exclude<
+                    SettingsSection,
+                    | "email_feeder"
+                    | "scoring"
+                    | "ciso_users"
+                    | "watcher_legit_domains"
+                    | "watcher_monitored_domains"
+                  >
+                }
                 placeholder="Paste values…"
                 fileAccept=".txt,.csv,.json"
               />

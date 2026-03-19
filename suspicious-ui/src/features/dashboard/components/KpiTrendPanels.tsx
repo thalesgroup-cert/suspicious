@@ -48,13 +48,22 @@ function GlassCard(props: React.PropsWithChildren<{
   return (
     <Card
       sx={{
-        height: 200,
+        height: "100%",
+        minHeight: 180,
         borderRadius: 3,
         border: "1px solid rgba(255,255,255,.10)",
         background: "linear-gradient(180deg, rgba(255,255,255,.06), rgba(255,255,255,.03))",
       }}
     >
-      <CardContent sx={{ p: { xs: 1.5, md: 2 } }}>
+      <CardContent
+        sx={{
+          height: "100%",
+          p: { xs: 1.5, md: 2 },
+          display: "flex",
+          flexDirection: "column",
+          minHeight: 0,
+        }}
+      >
         <Stack direction="row" alignItems="center" justifyContent="space-between" sx={{ mb: 1 }}>
           <Stack direction="row" spacing={0.9} alignItems="center">
             <Box
@@ -116,7 +125,8 @@ function TrendIcon(props: { values: Array<number | null> }) {
       justifyContent="center"
       spacing={1}
       sx={{
-        minHeight: 80,
+        flex: 1,
+        minHeight: 0,
         color,
       }}
     >
@@ -147,7 +157,9 @@ function TrendPanel(props: {
 }) {
   return (
     <GlassCard title={props.title} icon={props.icon}>
-      <TrendIcon values={props.values} />
+      <Box sx={{ flex: 1, minHeight: 0, display: "flex" }}>
+        <TrendIcon values={props.values} />
+      </Box>
     </GlassCard>
   );
 }
