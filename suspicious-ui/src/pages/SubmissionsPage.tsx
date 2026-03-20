@@ -1,3 +1,4 @@
+// src/pages/SubmissionsPage.tsx
 import * as React from "react";
 import {
   Alert,
@@ -45,6 +46,7 @@ import {
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useNavigate, useSearchParams } from "react-router-dom";
 import { alpha } from "@mui/material/styles";
+import { useTheme } from "@mui/material/styles";
 import { getMe, type Me } from "@/api/auth";
 import {
   challengeSubmission,
@@ -63,6 +65,10 @@ import { useDebounced } from "@/shared/hooks/useDebounced";
 import { StatusChip } from "@/shared/components/StatusChip";
 import { ResultChip } from "@/shared/components/ResultChip";
 import { CopyIconButton } from "@/shared/components/CopyIconButton";
+
+// ---------------------------------------------------------------------------
+// Score / confidence helpers
+// ---------------------------------------------------------------------------
 
 function clamp(n: number, min = 0, max = 100) {
   return Math.max(min, Math.min(max, n));
@@ -157,9 +163,12 @@ function getConfidenceTone(confidence?: number | null) {
   };
 }
 
+// ---------------------------------------------------------------------------
+// Label helpers
+// ---------------------------------------------------------------------------
+
 function readStatus(status?: string) {
   const s = (status ?? "").toUpperCase();
-
   if (s === "DONE") return "Finished";
   if (s === "FAILED") return "Failed";
   if (s === "IN_PROGRESS") return "Running";
@@ -170,7 +179,6 @@ function readStatus(status?: string) {
 
 function readType(type?: string) {
   const t = (type ?? "").toUpperCase();
-
   if (t === "FILE") return "File check";
   if (t === "HASH") return "Hash check";
   if (t === "MAIL") return "Email check";
@@ -181,22 +189,14 @@ function readType(type?: string) {
 
 function prettyResult(result?: SubmissionResult) {
   switch (result) {
-    case "SAFE":
-      return "Safe";
-    case "INCONCLUSIVE":
-      return "Inconclusive";
-    case "UNCHALLENGED":
-      return "Unchallenged";
-    case "ALLOW_LISTED":
-      return "Allow listed";
-    case "FAILURE":
-      return "Failure";
-    case "SUSPICIOUS":
-      return "Suspicious";
-    case "DANGEROUS":
-      return "Dangerous";
-    default:
-      return result || "Unknown";
+    case "SAFE": return "Safe";
+    case "INCONCLUSIVE": return "Inconclusive";
+    case "UNCHALLENGED": return "Unchallenged";
+    case "ALLOW_LISTED": return "Allow listed";
+    case "FAILURE": return "Failure";
+    case "SUSPICIOUS": return "Suspicious";
+    case "DANGEROUS": return "Dangerous";
+    default: return result || "Unknown";
   }
 }
 
@@ -207,17 +207,10 @@ function summarizeForReading(report: SubmissionAnalyzerReport) {
   const categories = report.categories?.filter(Boolean) ?? [];
 
   const parts: string[] = [];
-
   parts.push(`${report.analyzer_name || "This analyzer"} marked this item as ${risk.label.toLowerCase()}.`);
   parts.push(`The result confidence is ${confidence.label.toLowerCase()}.`);
-
-  if (targetValue) {
-    parts.push(`Checked item: ${targetValue}.`);
-  }
-
-  if (categories.length) {
-    parts.push(`Detected type: ${categories.join(", ")}.`);
-  }
+  if (targetValue) parts.push(`Checked item: ${targetValue}.`);
+  if (categories.length) parts.push(`Detected type: ${categories.join(", ")}.`);
 
   return parts.join(" ");
 }
@@ -235,375 +228,6 @@ function prettySummary(summary: unknown) {
     if (typeof obj.verdict === "string") return obj.verdict;
   }
   return null;
-}
-
-function AnalyzerReportCard({
-  report,
-  expanded,
-  onToggle,
-}: {
-  report: SubmissionAnalyzerReport;
-  expanded: boolean;
-  onToggle: () => void;
-}) {
-  const risk = getRiskTone(report.score);
-  const confidence = getConfidenceTone(report.confidence);
-
-  const scorePct = normalizeScore(report.score);
-  const confidencePct = normalizeConfidence(report.confidence);
-
-  const readableSummary = prettySummary(report.report_summary);
-  const plainSummary = summarizeForReading(report);
-
-  return (
-    <Card
-      sx={{
-        borderRadius: 3,
-        border: `1px solid ${risk.softBorder}`,
-        background: `linear-gradient(180deg, ${risk.softBg} 0%, rgba(255,255,255,.03) 100%)`,
-        overflow: "hidden",
-      }}
-    >
-      <Box
-        role="button"
-        tabIndex={0}
-        onClick={onToggle}
-        onKeyDown={(e) => {
-          if (e.key === "Enter" || e.key === " ") {
-            e.preventDefault();
-            onToggle();
-          }
-        }}
-        sx={{
-          px: 2,
-          py: 1.5,
-          borderBottom: expanded ? "1px solid rgba(255,255,255,.08)" : "none",
-          background: "rgba(255,255,255,.03)",
-          cursor: "pointer",
-          userSelect: "none",
-        }}
-      >
-        <Stack
-          direction={{ xs: "column", sm: "row" }}
-          spacing={1.25}
-          justifyContent="space-between"
-          alignItems={{ xs: "flex-start", sm: "center" }}
-        >
-          <Box>
-            <Typography variant="subtitle1" fontWeight={900}>
-              {report.analyzer_name || "Unknown analyzer"}
-            </Typography>
-            <Typography variant="body2" color="text.secondary">
-              {readType(report.type)} • {readStatus(report.status)}
-            </Typography>
-          </Box>
-
-          <Stack direction="row" spacing={1} alignItems="center" sx={{ flexWrap: "wrap" }}>
-            <Chip
-              size="small"
-              label={risk.label}
-              sx={{
-                fontWeight: 800,
-                color: risk.color,
-                border: `1px solid ${risk.softBorder}`,
-                backgroundColor: risk.softBg,
-              }}
-            />
-            <Chip
-              size="small"
-              label={confidence.label}
-              sx={{
-                fontWeight: 800,
-                border: "1px solid rgba(255,255,255,.12)",
-                backgroundColor: "rgba(255,255,255,.04)",
-              }}
-            />
-            <ExpandMoreOutlined
-              sx={{
-                transition: "transform .2s ease",
-                transform: expanded ? "rotate(180deg)" : "rotate(0deg)",
-                opacity: 0.85,
-              }}
-            />
-          </Stack>
-        </Stack>
-      </Box>
-
-      {expanded ? (
-        <CardContent sx={{ p: 2 }}>
-          <Stack spacing={2}>
-            <Box
-              sx={{
-                p: 1.5,
-                borderRadius: 2,
-                border: "1px solid rgba(255,255,255,.08)",
-                background: "rgba(255,255,255,.03)",
-              }}
-            >
-              <Typography variant="body2" fontWeight={800} sx={{ mb: 0.75 }}>
-                What this means
-              </Typography>
-
-              <Typography variant="body2" sx={{ lineHeight: 1.6 }}>
-                {readableSummary || plainSummary}
-              </Typography>
-            </Box>
-
-            <Stack spacing={1.25}>
-              <Box>
-                <Stack direction="row" justifyContent="space-between" sx={{ mb: 0.5 }}>
-                  <Typography variant="body2" fontWeight={700}>
-                    Risk score
-                  </Typography>
-                  <Typography variant="body2" fontWeight={900}>
-                    {typeof report.score === "number" ? report.score.toFixed(report.score <= 10 ? 1 : 0) : "—"}
-                  </Typography>
-                </Stack>
-
-                <LinearProgress
-                  variant="determinate"
-                  value={scorePct}
-                  sx={{
-                    height: 10,
-                    borderRadius: 999,
-                    ...risk.barSx,
-                  }}
-                />
-
-                <Typography variant="caption" color="text.secondary" sx={{ mt: 0.5, display: "block" }}>
-                  Higher means the analyzer sees more signs of risk.
-                </Typography>
-              </Box>
-
-              <Box>
-                <Stack direction="row" justifyContent="space-between" sx={{ mb: 0.5 }}>
-                  <Typography variant="body2" fontWeight={700}>
-                    Confidence
-                  </Typography>
-                  <Typography variant="body2" fontWeight={900}>
-                    {Math.round(confidencePct)}%
-                  </Typography>
-                </Stack>
-
-                <LinearProgress
-                  variant="determinate"
-                  value={confidencePct}
-                  sx={{
-                    height: 10,
-                    borderRadius: 999,
-                    ...confidence.barSx,
-                  }}
-                />
-
-                <Typography variant="caption" color="text.secondary" sx={{ mt: 0.5, display: "block" }}>
-                  Higher means the analyzer is more sure about its result.
-                </Typography>
-              </Box>
-            </Stack>
-
-            <Box
-              sx={{
-                display: "grid",
-                gridTemplateColumns: { xs: "1fr", sm: "140px 1fr" },
-                gap: 1,
-                p: 1.5,
-                borderRadius: 2,
-                border: "1px solid rgba(255,255,255,.08)",
-                background: "rgba(255,255,255,.02)",
-              }}
-            >
-              <Typography color="text.secondary" variant="body2">
-                Checked item
-              </Typography>
-              <Typography variant="body2" sx={{ wordBreak: "break-word" }}>
-                {report.target?.value || "—"}
-              </Typography>
-
-              <Typography color="text.secondary" variant="body2">
-                Item type
-              </Typography>
-              <Typography variant="body2">
-                {report.target?.kind || "—"}
-              </Typography>
-
-              <Typography color="text.secondary" variant="body2">
-                Categories
-              </Typography>
-              <Typography variant="body2">
-                {report.categories?.length ? report.categories.join(", ") : "None listed"}
-              </Typography>
-
-              <Typography color="text.secondary" variant="body2">
-                Result
-              </Typography>
-              <Typography variant="body2">
-                {prettyResult((report.category as SubmissionResult | null) ?? undefined)}
-              </Typography>
-
-              <Typography color="text.secondary" variant="body2">
-                Finished
-              </Typography>
-              <Typography variant="body2">
-                {fmtDate(report.created_at)}
-              </Typography>
-            </Box>
-
-            <Accordion
-              disableGutters
-              sx={{
-                borderRadius: 2,
-                border: "1px solid rgba(255,255,255,.08)",
-                background: "rgba(255,255,255,.02)",
-                "&:before": { display: "none" },
-              }}
-            >
-              <AccordionSummary
-                expandIcon={<ExpandMoreOutlined />}
-                onClick={(e) => e.stopPropagation()}
-              >
-                <Typography variant="body2" fontWeight={800}>
-                  Technical details
-                </Typography>
-              </AccordionSummary>
-              <AccordionDetails onClick={(e) => e.stopPropagation()}>
-                <Stack spacing={1.5}>
-                  <Box
-                    sx={{
-                      display: "grid",
-                      gridTemplateColumns: { xs: "1fr", sm: "140px 1fr" },
-                      gap: 1,
-                    }}
-                  >
-                    <Typography color="text.secondary" variant="body2">
-                      Analyzer ID
-                    </Typography>
-                    <Typography variant="body2" sx={{ wordBreak: "break-word" }}>
-                      {report.analyzer_id || "—"}
-                    </Typography>
-
-                    <Typography color="text.secondary" variant="body2">
-                      Job ID
-                    </Typography>
-                    <Typography variant="body2" sx={{ wordBreak: "break-word" }}>
-                      {report.cortex_job_id || "—"}
-                    </Typography>
-
-                    <Typography color="text.secondary" variant="body2">
-                      Level
-                    </Typography>
-                    <Typography variant="body2">
-                      {report.level || "—"}
-                    </Typography>
-
-                    <Typography color="text.secondary" variant="body2">
-                      Status
-                    </Typography>
-                    <Typography variant="body2">
-                      {report.status || "—"}
-                    </Typography>
-                  </Box>
-
-                  {report.report_taxonomy ? (
-                    <Accordion
-                      disableGutters
-                      sx={{
-                        borderRadius: 2,
-                        border: "1px solid rgba(255,255,255,.08)",
-                        background: "rgba(255,255,255,.02)",
-                        "&:before": { display: "none" },
-                      }}
-                    >
-                      <AccordionSummary
-                        expandIcon={<ExpandMoreOutlined />}
-                        onClick={(e) => e.stopPropagation()}
-                      >
-                        <Typography variant="body2" fontWeight={800}>
-                          Taxonomy JSON
-                        </Typography>
-                      </AccordionSummary>
-                      <AccordionDetails onClick={(e) => e.stopPropagation()}>
-                        <Box
-                          component="pre"
-                          sx={{
-                            m: 0,
-                            p: 1.25,
-                            borderRadius: 2,
-                            border: "1px solid rgba(255,255,255,.08)",
-                            background: "rgba(0,0,0,.22)",
-                            overflow: "auto",
-                            maxHeight: 220,
-                            fontSize: 12,
-                            lineHeight: 1.45,
-                          }}
-                        >
-                          {JSON.stringify(report.report_taxonomy, null, 2)}
-                        </Box>
-                      </AccordionDetails>
-                    </Accordion>
-                  ) : null}
-
-                  {report.report_summary ? (
-                    <Accordion
-                      disableGutters
-                      sx={{
-                        borderRadius: 2,
-                        border: "1px solid rgba(255,255,255,.08)",
-                        background: "rgba(255,255,255,.02)",
-                        "&:before": { display: "none" },
-                      }}
-                    >
-                      <AccordionSummary
-                        expandIcon={<ExpandMoreOutlined />}
-                        onClick={(e) => e.stopPropagation()}
-                      >
-                        <Typography variant="body2" fontWeight={800}>
-                          Summary JSON
-                        </Typography>
-                      </AccordionSummary>
-                      <AccordionDetails onClick={(e) => e.stopPropagation()}>
-                        <Box
-                          component="pre"
-                          sx={{
-                            m: 0,
-                            p: 1.25,
-                            borderRadius: 2,
-                            border: "1px solid rgba(255,255,255,.08)",
-                            background: "rgba(0,0,0,.22)",
-                            overflow: "auto",
-                            maxHeight: 220,
-                            fontSize: 12,
-                            lineHeight: 1.45,
-                          }}
-                        >
-                          {JSON.stringify(report.report_summary, null, 2)}
-                        </Box>
-                      </AccordionDetails>
-                    </Accordion>
-                  ) : null}
-                </Stack>
-              </AccordionDetails>
-            </Accordion>
-          </Stack>
-        </CardContent>
-      ) : null}
-    </Card>
-  );
-}
-
-function GlassCard(props: React.PropsWithChildren<{ sx?: any }>) {
-  return (
-    <Card
-      sx={{
-        height: "100%",
-        borderRadius: 3,
-        border: "1px solid rgba(255,255,255,.10)",
-        background: "linear-gradient(180deg, rgba(255,255,255,.06), rgba(255,255,255,.03))",
-        ...props.sx,
-      }}
-    >
-      {props.children}
-    </Card>
-  );
 }
 
 function fmtDate(iso: string) {
@@ -654,29 +278,373 @@ function toBackendOrdering(
   return "id";
 }
 
+// ---------------------------------------------------------------------------
+// Constants
+// ---------------------------------------------------------------------------
+
 const STATUS_OPTIONS: Array<SubmissionStatus | "ALL"> = [
-  "ALL",
-  "NEW",
-  "IN_PROGRESS",
-  "DONE",
-  "CHALLENGED",
-  "UNKNOWN",
+  "ALL", "NEW", "IN_PROGRESS", "DONE", "CHALLENGED", "UNKNOWN",
 ];
 
 const TYPE_OPTIONS: Array<SubmissionType | "ALL"> = [
-  "ALL",
-  "FILE",
-  "MAIL",
-  "URL",
-  "IP",
-  "HASH",
-  "UNKNOWN",
+  "ALL", "FILE", "MAIL", "URL", "IP", "HASH", "UNKNOWN",
 ];
+
+// ---------------------------------------------------------------------------
+// SoftCard — theme-aware container, identical to SubmitPage / HomePage
+// ---------------------------------------------------------------------------
+
+function SoftCard(props: React.PropsWithChildren<{ sx?: object }>) {
+  const theme = useTheme();
+  const isDark = theme.palette.mode === "dark";
+
+  return (
+    <Card
+      sx={{
+        borderRadius: 4,
+        border: `1px solid ${alpha(theme.palette.divider, isDark ? 0.28 : 0.9)}`,
+        background: isDark
+          ? `linear-gradient(180deg, ${alpha("#fff", 0.03)}, ${alpha("#fff", 0.02)})`
+          : `linear-gradient(180deg, ${alpha("#fff", 0.88)}, ${alpha(
+              theme.palette.grey[50],
+              0.96
+            )})`,
+        boxShadow: isDark
+          ? "0 12px 32px rgba(0,0,0,.28)"
+          : "0 10px 28px rgba(15,23,42,.06)",
+        ...props.sx,
+      }}
+    >
+      {props.children}
+    </Card>
+  );
+}
+
+// ---------------------------------------------------------------------------
+// AnalyzerReportCard
+// ---------------------------------------------------------------------------
+
+function AnalyzerReportCard({
+  report,
+  expanded,
+  onToggle,
+}: {
+  report: SubmissionAnalyzerReport;
+  expanded: boolean;
+  onToggle: () => void;
+}) {
+  const theme = useTheme();
+  const isDark = theme.palette.mode === "dark";
+
+  const risk = getRiskTone(report.score);
+  const confidence = getConfidenceTone(report.confidence);
+
+  const scorePct = normalizeScore(report.score);
+  const confidencePct = normalizeConfidence(report.confidence);
+
+  const readableSummary = prettySummary(report.report_summary);
+  const plainSummary = summarizeForReading(report);
+
+  // In light mode, tone down the semi-transparent backgrounds so they don't
+  // look washed out on white.
+  const cardBg = isDark
+    ? `linear-gradient(180deg, ${risk.softBg} 0%, rgba(255,255,255,.03) 100%)`
+    : `linear-gradient(180deg, ${risk.softBg} 0%, ${alpha("#fff", 0.9)} 100%)`;
+
+  const headerBg = isDark ? "rgba(255,255,255,.03)" : alpha(theme.palette.background.paper, 0.6);
+  const detailBg = isDark ? "rgba(255,255,255,.03)" : alpha(theme.palette.background.paper, 0.5);
+  const detailBorder = isDark ? "rgba(255,255,255,.08)" : alpha(theme.palette.divider, 0.6);
+  const codeBg = isDark ? "rgba(0,0,0,.22)" : alpha(theme.palette.grey[100], 0.9);
+
+  return (
+    <Card
+      sx={{
+        borderRadius: 3,
+        border: `1px solid ${risk.softBorder}`,
+        background: cardBg,
+        overflow: "hidden",
+      }}
+    >
+      <Box
+        role="button"
+        tabIndex={0}
+        onClick={onToggle}
+        onKeyDown={(e) => {
+          if (e.key === "Enter" || e.key === " ") {
+            e.preventDefault();
+            onToggle();
+          }
+        }}
+        sx={{
+          px: 2,
+          py: 1.5,
+          borderBottom: expanded ? `1px solid ${detailBorder}` : "none",
+          background: headerBg,
+          cursor: "pointer",
+          userSelect: "none",
+        }}
+      >
+        <Stack
+          direction={{ xs: "column", sm: "row" }}
+          spacing={1.25}
+          justifyContent="space-between"
+          alignItems={{ xs: "flex-start", sm: "center" }}
+        >
+          <Box>
+            <Typography variant="subtitle1" fontWeight={900}>
+              {report.analyzer_name || "Unknown analyzer"}
+            </Typography>
+            <Typography variant="body2" color="text.secondary">
+              {readType(report.type)} • {readStatus(report.status)}
+            </Typography>
+          </Box>
+
+          <Stack direction="row" spacing={1} alignItems="center" sx={{ flexWrap: "wrap" }}>
+            <Chip
+              size="small"
+              label={risk.label}
+              sx={{
+                fontWeight: 800,
+                color: risk.color,
+                border: `1px solid ${risk.softBorder}`,
+                backgroundColor: risk.softBg,
+              }}
+            />
+            <Chip
+              size="small"
+              label={confidence.label}
+              sx={{
+                fontWeight: 800,
+                border: `1px solid ${alpha(theme.palette.divider, isDark ? 0.18 : 0.6)}`,
+                backgroundColor: isDark ? "rgba(255,255,255,.04)" : alpha(theme.palette.grey[100], 0.7),
+              }}
+            />
+            <ExpandMoreOutlined
+              sx={{
+                transition: "transform .2s ease",
+                transform: expanded ? "rotate(180deg)" : "rotate(0deg)",
+                opacity: 0.85,
+              }}
+            />
+          </Stack>
+        </Stack>
+      </Box>
+
+      {expanded ? (
+        <CardContent sx={{ p: 2 }}>
+          <Stack spacing={2}>
+            <Box
+              sx={{
+                p: 1.5,
+                borderRadius: 2,
+                border: `1px solid ${detailBorder}`,
+                background: detailBg,
+              }}
+            >
+              <Typography variant="body2" fontWeight={800} sx={{ mb: 0.75 }}>
+                What this means
+              </Typography>
+              <Typography variant="body2" sx={{ lineHeight: 1.6 }}>
+                {readableSummary || plainSummary}
+              </Typography>
+            </Box>
+
+            <Stack spacing={1.25}>
+              <Box>
+                <Stack direction="row" justifyContent="space-between" sx={{ mb: 0.5 }}>
+                  <Typography variant="body2" fontWeight={700}>Risk score</Typography>
+                  <Typography variant="body2" fontWeight={900}>
+                    {typeof report.score === "number"
+                      ? report.score.toFixed(report.score <= 10 ? 1 : 0)
+                      : "—"}
+                  </Typography>
+                </Stack>
+                <LinearProgress
+                  variant="determinate"
+                  value={scorePct}
+                  sx={{ height: 10, borderRadius: 999, ...risk.barSx }}
+                />
+                <Typography variant="caption" color="text.secondary" sx={{ mt: 0.5, display: "block" }}>
+                  Higher means the analyzer sees more signs of risk.
+                </Typography>
+              </Box>
+
+              <Box>
+                <Stack direction="row" justifyContent="space-between" sx={{ mb: 0.5 }}>
+                  <Typography variant="body2" fontWeight={700}>Confidence</Typography>
+                  <Typography variant="body2" fontWeight={900}>
+                    {Math.round(confidencePct)}%
+                  </Typography>
+                </Stack>
+                <LinearProgress
+                  variant="determinate"
+                  value={confidencePct}
+                  sx={{ height: 10, borderRadius: 999, ...confidence.barSx }}
+                />
+                <Typography variant="caption" color="text.secondary" sx={{ mt: 0.5, display: "block" }}>
+                  Higher means the analyzer is more sure about its result.
+                </Typography>
+              </Box>
+            </Stack>
+
+            <Box
+              sx={{
+                display: "grid",
+                gridTemplateColumns: { xs: "1fr", sm: "140px 1fr" },
+                gap: 1,
+                p: 1.5,
+                borderRadius: 2,
+                border: `1px solid ${detailBorder}`,
+                background: isDark ? "rgba(255,255,255,.02)" : alpha(theme.palette.background.paper, 0.4),
+              }}
+            >
+              <Typography color="text.secondary" variant="body2">Checked item</Typography>
+              <Typography variant="body2" sx={{ wordBreak: "break-word" }}>
+                {report.target?.value || "—"}
+              </Typography>
+
+              <Typography color="text.secondary" variant="body2">Item type</Typography>
+              <Typography variant="body2">{report.target?.kind || "—"}</Typography>
+
+              <Typography color="text.secondary" variant="body2">Categories</Typography>
+              <Typography variant="body2">
+                {report.categories?.length ? report.categories.join(", ") : "None listed"}
+              </Typography>
+
+              <Typography color="text.secondary" variant="body2">Result</Typography>
+              <Typography variant="body2">
+                {prettyResult((report.category as SubmissionResult | null) ?? undefined)}
+              </Typography>
+
+              <Typography color="text.secondary" variant="body2">Finished</Typography>
+              <Typography variant="body2">{fmtDate(report.created_at)}</Typography>
+            </Box>
+
+            <Accordion
+              disableGutters
+              sx={{
+                borderRadius: 2,
+                border: `1px solid ${detailBorder}`,
+                background: isDark ? "rgba(255,255,255,.02)" : alpha(theme.palette.background.paper, 0.4),
+                "&:before": { display: "none" },
+              }}
+            >
+              <AccordionSummary expandIcon={<ExpandMoreOutlined />} onClick={(e) => e.stopPropagation()}>
+                <Typography variant="body2" fontWeight={800}>Technical details</Typography>
+              </AccordionSummary>
+              <AccordionDetails onClick={(e) => e.stopPropagation()}>
+                <Stack spacing={1.5}>
+                  <Box
+                    sx={{
+                      display: "grid",
+                      gridTemplateColumns: { xs: "1fr", sm: "140px 1fr" },
+                      gap: 1,
+                    }}
+                  >
+                    <Typography color="text.secondary" variant="body2">Analyzer ID</Typography>
+                    <Typography variant="body2" sx={{ wordBreak: "break-word" }}>
+                      {report.analyzer_id || "—"}
+                    </Typography>
+
+                    <Typography color="text.secondary" variant="body2">Job ID</Typography>
+                    <Typography variant="body2" sx={{ wordBreak: "break-word" }}>
+                      {report.cortex_job_id || "—"}
+                    </Typography>
+
+                    <Typography color="text.secondary" variant="body2">Level</Typography>
+                    <Typography variant="body2">{report.level || "—"}</Typography>
+
+                    <Typography color="text.secondary" variant="body2">Status</Typography>
+                    <Typography variant="body2">{report.status || "—"}</Typography>
+                  </Box>
+
+                  {report.report_taxonomy ? (
+                    <Accordion
+                      disableGutters
+                      sx={{
+                        borderRadius: 2,
+                        border: `1px solid ${detailBorder}`,
+                        background: isDark ? "rgba(255,255,255,.02)" : alpha(theme.palette.background.paper, 0.4),
+                        "&:before": { display: "none" },
+                      }}
+                    >
+                      <AccordionSummary expandIcon={<ExpandMoreOutlined />} onClick={(e) => e.stopPropagation()}>
+                        <Typography variant="body2" fontWeight={800}>Taxonomy JSON</Typography>
+                      </AccordionSummary>
+                      <AccordionDetails onClick={(e) => e.stopPropagation()}>
+                        <Box
+                          component="pre"
+                          sx={{
+                            m: 0,
+                            p: 1.25,
+                            borderRadius: 2,
+                            border: `1px solid ${detailBorder}`,
+                            background: codeBg,
+                            overflow: "auto",
+                            maxHeight: 220,
+                            fontSize: 12,
+                            lineHeight: 1.45,
+                          }}
+                        >
+                          {JSON.stringify(report.report_taxonomy, null, 2)}
+                        </Box>
+                      </AccordionDetails>
+                    </Accordion>
+                  ) : null}
+
+                  {report.report_summary ? (
+                    <Accordion
+                      disableGutters
+                      sx={{
+                        borderRadius: 2,
+                        border: `1px solid ${detailBorder}`,
+                        background: isDark ? "rgba(255,255,255,.02)" : alpha(theme.palette.background.paper, 0.4),
+                        "&:before": { display: "none" },
+                      }}
+                    >
+                      <AccordionSummary expandIcon={<ExpandMoreOutlined />} onClick={(e) => e.stopPropagation()}>
+                        <Typography variant="body2" fontWeight={800}>Summary JSON</Typography>
+                      </AccordionSummary>
+                      <AccordionDetails onClick={(e) => e.stopPropagation()}>
+                        <Box
+                          component="pre"
+                          sx={{
+                            m: 0,
+                            p: 1.25,
+                            borderRadius: 2,
+                            border: `1px solid ${detailBorder}`,
+                            background: codeBg,
+                            overflow: "auto",
+                            maxHeight: 220,
+                            fontSize: 12,
+                            lineHeight: 1.45,
+                          }}
+                        >
+                          {JSON.stringify(report.report_summary, null, 2)}
+                        </Box>
+                      </AccordionDetails>
+                    </Accordion>
+                  ) : null}
+                </Stack>
+              </AccordionDetails>
+            </Accordion>
+          </Stack>
+        </CardContent>
+      ) : null}
+    </Card>
+  );
+}
+
+// ---------------------------------------------------------------------------
+// Page
+// ---------------------------------------------------------------------------
 
 export default function SubmissionsPage() {
   const navigate = useNavigate();
   const [searchParams] = useSearchParams();
   const qc = useQueryClient();
+  const theme = useTheme();
+  const isDark = theme.palette.mode === "dark";
 
   const [q, setQ] = React.useState("");
   const qDebounced = useDebounced(q, 200);
@@ -707,20 +675,10 @@ export default function SubmissionsPage() {
   const submissionsQuery = useQuery<PaginatedSubmissionsResponse>({
     queryKey: ["submissions", { mine: true, ordering: backendOrdering, fetchSize: 100 }],
     queryFn: async () =>
-      listSubmissions({
-        mine: true,
-        ordering: backendOrdering,
-        page: 1,
-        page_size: 100,
-      }),
+      listSubmissions({ mine: true, ordering: backendOrdering, page: 1, page_size: 100 }),
     enabled: !!me,
     retry: false,
-    initialData: {
-      count: 0,
-      next: null,
-      previous: null,
-      results: [],
-    },
+    initialData: { count: 0, next: null, previous: null, results: [] },
     refetchInterval: (query) => {
       const rows = (query.state.data as PaginatedSubmissionsResponse | undefined)?.results ?? [];
       const shouldPoll = rows.some((r) => {
@@ -750,11 +708,7 @@ export default function SubmissionsPage() {
     mutationFn: async (id: number) => challengeSubmission(id),
     onMutate: async (id) => {
       await qc.cancelQueries({ queryKey: ["submissions"] });
-
-      const prevEntries = qc.getQueriesData<PaginatedSubmissionsResponse>({
-        queryKey: ["submissions"],
-      });
-
+      const prevEntries = qc.getQueriesData<PaginatedSubmissionsResponse>({ queryKey: ["submissions"] });
       prevEntries.forEach(([key, prev]) => {
         if (!prev) return;
         qc.setQueryData<PaginatedSubmissionsResponse>(key, {
@@ -764,13 +718,10 @@ export default function SubmissionsPage() {
           ),
         });
       });
-
       return { prevEntries };
     },
     onError: (_err, _id, ctx) => {
-      ctx?.prevEntries?.forEach(([key, data]) => {
-        qc.setQueryData(key, data);
-      });
+      ctx?.prevEntries?.forEach(([key, data]) => { qc.setQueryData(key, data); });
     },
     onSettled: () => {
       qc.invalidateQueries({ queryKey: ["submissions"] });
@@ -782,9 +733,7 @@ export default function SubmissionsPage() {
   React.useEffect(() => {
     const urlQ = searchParams.get("q") ?? "";
     const open = searchParams.get("open");
-
     if (urlQ) setQ(urlQ);
-
     if (open) {
       const idNum = Number(open);
       if (!Number.isNaN(idNum)) {
@@ -794,26 +743,12 @@ export default function SubmissionsPage() {
     }
   }, [searchParams]);
 
-  React.useEffect(() => {
-    setPage(0);
-  }, [qDebounced, status, type, from, to, sort, pageSize]);
-
-  React.useEffect(() => {
-    if (!openDrawer) {
-      setExpandedAnalyzerIds({});
-    }
-  }, [openDrawer]);
-
-  React.useEffect(() => {
-    setExpandedAnalyzerIds({});
-  }, [selectedId]);
-
-  React.useEffect(() => {
-    setExpandedAnalyzerIds({});
-  }, [detailsQuery.data?.analyzer_reports]);
+  React.useEffect(() => { setPage(0); }, [qDebounced, status, type, from, to, sort, pageSize]);
+  React.useEffect(() => { if (!openDrawer) setExpandedAnalyzerIds({}); }, [openDrawer]);
+  React.useEffect(() => { setExpandedAnalyzerIds({}); }, [selectedId]);
+  React.useEffect(() => { setExpandedAnalyzerIds({}); }, [detailsQuery.data?.analyzer_reports]);
 
   const rows = submissionsQuery.data?.results ?? [];
-
   const filtered = rows
     .filter((r) => matches(r, qDebounced))
     .filter((r) => (status === "ALL" ? true : r.status === status))
@@ -824,12 +759,9 @@ export default function SubmissionsPage() {
   const start = page * pageSize;
   const end = Math.min(total, start + pageSize);
   const pageRows = filtered.slice(start, end);
+  const selectedRow = selectedId ? rows.find((r) => String(r.id) === String(selectedId)) : undefined;
 
-  const selectedRow = selectedId
-    ? rows.find((r) => String(r.id) === String(selectedId))
-    : undefined;
-
-  if (meQuery.isLoading) {
+  if (meQuery.isLoading || submissionsQuery.isLoading) {
     return (
       <Box sx={{ minHeight: "60vh", display: "grid", placeItems: "center" }}>
         <CircularProgress />
@@ -838,27 +770,11 @@ export default function SubmissionsPage() {
   }
 
   if (!me) {
-    return (
-      <Box sx={{ p: 3 }}>
-        <Alert severity="error">Not authenticated.</Alert>
-      </Box>
-    );
-  }
-
-  if (submissionsQuery.isLoading) {
-    return (
-      <Box sx={{ minHeight: "60vh", display: "grid", placeItems: "center" }}>
-        <CircularProgress />
-      </Box>
-    );
+    return <Box sx={{ p: 3 }}><Alert severity="error">Not authenticated.</Alert></Box>;
   }
 
   if (submissionsQuery.isError) {
-    return (
-      <Box sx={{ p: 3 }}>
-        <Alert severity="error">Failed to load submissions.</Alert>
-      </Box>
-    );
+    return <Box sx={{ p: 3 }}><Alert severity="error">Failed to load submissions.</Alert></Box>;
   }
 
   const BADGE_W = 132;
@@ -881,9 +797,24 @@ export default function SubmissionsPage() {
     );
   }, [analyzerReports]);
 
+  // Theme-aware values used in the drawer and inline cards
+  const drawerCardBorder = isDark ? "rgba(255,255,255,.08)" : alpha(theme.palette.divider, 0.6);
+  const drawerCardBg = isDark ? "rgba(255,255,255,.025)" : alpha(theme.palette.background.paper, 0.7);
+  const refreshBtnBorder = isDark
+    ? "1px solid rgba(255,255,255,.10)"
+    : `1px solid ${alpha(theme.palette.divider, 0.6)}`;
+
   return (
     <Box sx={{ p: { xs: 2, md: 3 } }}>
-      <Stack direction={{ xs: "column", md: "row" }} spacing={2} justifyContent="space-between" sx={{ mb: 2 }}>
+      {/* ------------------------------------------------------------------ */}
+      {/* Page header                                                         */}
+      {/* ------------------------------------------------------------------ */}
+      <Stack
+        direction={{ xs: "column", md: "row" }}
+        spacing={2}
+        justifyContent="space-between"
+        sx={{ mb: 2 }}
+      >
         <Stack spacing={0.4}>
           <Stack direction="row" spacing={1.25} alignItems="center">
             <Avatar sx={{ width: 46, height: 46, fontWeight: 950 }}>
@@ -925,14 +856,17 @@ export default function SubmissionsPage() {
           <IconButton
             aria-label="Refresh"
             onClick={() => submissionsQuery.refetch()}
-            sx={{ border: "1px solid rgba(255,255,255,.10)", borderRadius: 2 }}
+            sx={{ border: refreshBtnBorder, borderRadius: 2 }}
           >
             <RefreshOutlined />
           </IconButton>
         </Stack>
       </Stack>
 
-      <GlassCard sx={{ mb: 2 }}>
+      {/* ------------------------------------------------------------------ */}
+      {/* Filter bar                                                          */}
+      {/* ------------------------------------------------------------------ */}
+      <SoftCard sx={{ mb: 2 }}>
         <CardContent sx={{ p: { xs: 2.25, md: 3 } }}>
           <Stack spacing={1.5}>
             <Stack direction={{ xs: "column", md: "row" }} spacing={1.25} alignItems="stretch">
@@ -960,9 +894,7 @@ export default function SubmissionsPage() {
                   onChange={(e) => setStatus(e.target.value as SubmissionStatus | "ALL")}
                 >
                   {STATUS_OPTIONS.map((s) => (
-                    <MenuItem key={s} value={s}>
-                      {s === "ALL" ? "All" : s}
-                    </MenuItem>
+                    <MenuItem key={s} value={s}>{s === "ALL" ? "All" : s}</MenuItem>
                   ))}
                 </Select>
               </FormControl>
@@ -976,9 +908,7 @@ export default function SubmissionsPage() {
                   onChange={(e) => setType(e.target.value as SubmissionType | "ALL")}
                 >
                   {TYPE_OPTIONS.map((t) => (
-                    <MenuItem key={t} value={t}>
-                      {t === "ALL" ? "All" : t}
-                    </MenuItem>
+                    <MenuItem key={t} value={t}>{t === "ALL" ? "All" : t}</MenuItem>
                   ))}
                 </Select>
               </FormControl>
@@ -1042,9 +972,7 @@ export default function SubmissionsPage() {
                     onChange={(e) => setPageSize(Number(e.target.value))}
                   >
                     {[10, 20, 50].map((n) => (
-                      <MenuItem key={n} value={n}>
-                        {n}
-                      </MenuItem>
+                      <MenuItem key={n} value={n}>{n}</MenuItem>
                     ))}
                   </Select>
                 </FormControl>
@@ -1069,9 +997,12 @@ export default function SubmissionsPage() {
             </Stack>
           </Stack>
         </CardContent>
-      </GlassCard>
+      </SoftCard>
 
-      <GlassCard>
+      {/* ------------------------------------------------------------------ */}
+      {/* Results table                                                       */}
+      {/* ------------------------------------------------------------------ */}
+      <SoftCard>
         <CardContent sx={{ p: 0 }}>
           {total === 0 ? (
             <Box sx={{ p: 3 }}>
@@ -1103,10 +1034,7 @@ export default function SubmissionsPage() {
                         hover
                         tabIndex={0}
                         sx={{ cursor: "pointer" }}
-                        onClick={() => {
-                          setSelectedId(r.id);
-                          setOpenDrawer(true);
-                        }}
+                        onClick={() => { setSelectedId(r.id); setOpenDrawer(true); }}
                         onKeyDown={(e) => {
                           if (e.key === "Enter" || e.key === " ") {
                             setSelectedId(r.id);
@@ -1128,9 +1056,7 @@ export default function SubmissionsPage() {
                             >
                               {r.id}
                             </Button>
-
                             <CopyIconButton text={String(r.id)} title="Copy ID" />
-
                             <Tooltip title="Open details">
                               <IconButton
                                 size="small"
@@ -1212,8 +1138,11 @@ export default function SubmissionsPage() {
             </Box>
           )}
         </CardContent>
-      </GlassCard>
+      </SoftCard>
 
+      {/* ------------------------------------------------------------------ */}
+      {/* Detail drawer                                                       */}
+      {/* ------------------------------------------------------------------ */}
       <Drawer
         anchor="right"
         open={openDrawer}
@@ -1239,6 +1168,7 @@ export default function SubmissionsPage() {
           </Box>
         ) : (
           <Stack sx={{ height: "100%" }}>
+            {/* Drawer header */}
             <Box
               sx={(theme) => ({
                 px: 2.25,
@@ -1253,22 +1183,17 @@ export default function SubmissionsPage() {
             >
               <Stack direction="row" alignItems="flex-start" justifyContent="space-between" spacing={2}>
                 <Box>
-                  <Typography variant="overline" color="text.secondary">
-                    Submission
-                  </Typography>
-
+                  <Typography variant="overline" color="text.secondary">Submission</Typography>
                   <Stack direction="row" spacing={1} alignItems="center" sx={{ mt: 0.25 }}>
                     <Typography variant="h5" fontWeight={950} lineHeight={1.1}>
                       #{selectedRow.id}
                     </Typography>
                     <CopyIconButton text={String(selectedRow.id)} title="Copy ID" />
                   </Stack>
-
                   <Typography variant="body2" color="text.secondary" sx={{ mt: 0.75 }}>
                     Created {fmtDate(selectedRow.created_at)}
                   </Typography>
                 </Box>
-
                 <Button
                   onClick={() => setOpenDrawer(false)}
                   sx={{ textTransform: "none", borderRadius: 2, alignSelf: "flex-start" }}
@@ -1300,20 +1225,21 @@ export default function SubmissionsPage() {
               </Stack>
             </Box>
 
+            {/* Drawer body */}
             <Box sx={{ flex: 1, overflowY: "auto", p: 2 }}>
               <Stack spacing={2}>
+                {/* Overview card */}
                 <Card
                   sx={{
                     borderRadius: 2,
-                    border: "1px solid rgba(255,255,255,.08)",
-                    background: "rgba(255,255,255,.025)",
+                    border: `1px solid ${drawerCardBorder}`,
+                    background: drawerCardBg,
                   }}
                 >
                   <CardContent sx={{ p: 2 }}>
                     <Typography variant="subtitle2" fontWeight={900} sx={{ mb: 1.25 }}>
                       Overview
                     </Typography>
-
                     <Box
                       sx={{
                         display: "grid",
@@ -1338,11 +1264,12 @@ export default function SubmissionsPage() {
                   </CardContent>
                 </Card>
 
+                {/* Analysis results card */}
                 <Card
                   sx={{
                     borderRadius: 2,
-                    border: "1px solid rgba(255,255,255,.08)",
-                    background: "rgba(255,255,255,.025)",
+                    border: `1px solid ${drawerCardBorder}`,
+                    background: drawerCardBg,
                   }}
                 >
                   <CardContent sx={{ p: 2 }}>
@@ -1374,7 +1301,6 @@ export default function SubmissionsPage() {
                               >
                                 Expand all
                               </Button>
-
                               <Button
                                 size="small"
                                 variant="outlined"
@@ -1383,7 +1309,6 @@ export default function SubmissionsPage() {
                               >
                                 Collapse all
                               </Button>
-
                               <Button
                                 size="small"
                                 variant="outlined"
@@ -1408,7 +1333,9 @@ export default function SubmissionsPage() {
                     ) : detailsQuery.isError ? (
                       <Alert severity="warning">Could not load details.</Alert>
                     ) : !detailsQuery.data?.analyzer_reports?.length ? (
-                      <Alert severity="info">No analysis details are available for this submission yet.</Alert>
+                      <Alert severity="info">
+                        No analysis details are available for this submission yet.
+                      </Alert>
                     ) : (
                       <Stack spacing={1.25}>
                         {detailsQuery.data.analyzer_reports.map((report) => (
@@ -1429,20 +1356,21 @@ export default function SubmissionsPage() {
                   </CardContent>
                 </Card>
 
+                {/* Raw details */}
                 {hasRawDetails ? (
                   <Card
                     sx={{
                       borderRadius: 2,
-                      border: "1px solid rgba(255,255,255,.08)",
-                      background: "rgba(255,255,255,.02)",
+                      border: `1px solid ${drawerCardBorder}`,
+                      background: isDark ? "rgba(255,255,255,.02)" : alpha(theme.palette.background.paper, 0.5),
                     }}
                   >
                     <Accordion
                       disableGutters
                       sx={{
                         borderRadius: 2,
-                        border: "1px solid rgba(255,255,255,.08)",
-                        background: "rgba(255,255,255,.02)",
+                        border: "none",
+                        background: "transparent",
                         "&:before": { display: "none" },
                       }}
                     >
@@ -1479,6 +1407,9 @@ export default function SubmissionsPage() {
         )}
       </Drawer>
 
+      {/* ------------------------------------------------------------------ */}
+      {/* Challenge dialog                                                    */}
+      {/* ------------------------------------------------------------------ */}
       <Dialog
         open={challengeId !== null}
         onClose={() => setChallengeId(null)}
@@ -1492,9 +1423,7 @@ export default function SubmissionsPage() {
             Submit a challenge request for submission #{challengeId}.
           </Typography>
           {challengeMutation.isError ? (
-            <Alert severity="error" sx={{ mt: 2 }}>
-              Failed to challenge.
-            </Alert>
+            <Alert severity="error" sx={{ mt: 2 }}>Failed to challenge.</Alert>
           ) : null}
         </DialogContent>
         <DialogActions>
@@ -1504,9 +1433,7 @@ export default function SubmissionsPage() {
           <Button
             variant="contained"
             disabled={challengeMutation.isPending || challengeId === null}
-            onClick={() => {
-              if (challengeId) challengeMutation.mutate(challengeId);
-            }}
+            onClick={() => { if (challengeId) challengeMutation.mutate(challengeId); }}
             sx={{ textTransform: "none", fontWeight: 950, borderRadius: 2 }}
           >
             {challengeMutation.isPending ? "Sending…" : "Confirm"}

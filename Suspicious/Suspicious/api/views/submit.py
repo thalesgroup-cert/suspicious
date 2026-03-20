@@ -1,3 +1,4 @@
+# api/views/submit.py
 import logging
 
 from django.conf import settings
@@ -91,6 +92,18 @@ class BaseSubmitView(APIView):
                 submission_type=self.submission_type,
                 case=case,
                 result_type="case",
+            )
+
+        # Submission was accepted but matched the allow-list — no case is
+        # expected. Return 200 so the frontend doesn't treat it as an error.
+        if results.get("allow_listed"):
+            return _build_submission_response(
+                message="Submission accepted (allowlisted — no case created).",
+                submission_type=self.submission_type,
+                case=None,
+                accepted=True,
+                result_type="case",
+                http_status=status.HTTP_200_OK,
             )
 
         return _error_response(
@@ -207,6 +220,17 @@ class SubmitFileView(BaseSubmitView):
                 submission_type=self.submission_type,
                 case=None,
                 result_type="mail",
+            )
+
+        # Allow-listed files: accepted but no case or mail produced.
+        if results.get("allow_listed"):
+            return _build_submission_response(
+                message="Submission accepted (allowlisted — no case created).",
+                submission_type=self.submission_type,
+                case=None,
+                accepted=True,
+                result_type="case",
+                http_status=status.HTTP_200_OK,
             )
 
         return _error_response(

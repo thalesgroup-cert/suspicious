@@ -24,6 +24,7 @@ import {
   Tooltip,
   Typography,
 } from "@mui/material";
+import { alpha } from "@mui/material/styles";
 import {
   ApartmentOutlined,
   ManageSearchOutlined,
@@ -50,6 +51,10 @@ import {
 
 import { StatusChip } from "@/shared/components/StatusChip";
 import { ResultChip } from "@/shared/components/ResultChip";
+
+// ---------------------------------------------------------------------------
+// Types
+// ---------------------------------------------------------------------------
 
 type DangerCounts = {
   safe?: number;
@@ -80,19 +85,6 @@ type HomeSummary = {
   };
 };
 
-async function getHomeSummary(params?: {
-  month?: number;
-  year?: number;
-}): Promise<HomeSummary> {
-  const res = await api.get("/home/summary/", { params });
-  return res.data;
-}
-
-async function setCisoScope(input: { scope: string }): Promise<{ scope: string }> {
-  const res = await api.post("/home/ciso/scope/", input);
-  return res.data;
-}
-
 type SubmissionRow = {
   id: number | string;
   status?: string;
@@ -109,15 +101,35 @@ type SubmissionsResponse = {
   count?: number;
 };
 
+// ---------------------------------------------------------------------------
+// API
+// ---------------------------------------------------------------------------
+
+async function getHomeSummary(params?: {
+  month?: number;
+  year?: number;
+}): Promise<HomeSummary> {
+  const res = await api.get("/home/summary/", { params });
+  return res.data;
+}
+
+async function setCisoScope(input: { scope: string }): Promise<{ scope: string }> {
+  const res = await api.post("/home/ciso/scope/", input);
+  return res.data;
+}
+
 async function getMyRecentSubmissions(): Promise<SubmissionRow[]> {
   const res = await api.get("/submissions/", {
     params: { mine: 1, page_size: 3, ordering: "-created_at" },
   });
-
   const data = res.data as SubmissionsResponse | SubmissionRow[];
   if (Array.isArray(data)) return data.slice(0, 3);
   return (data.results ?? data.items ?? []).slice(0, 3);
 }
+
+// ---------------------------------------------------------------------------
+// Helpers
+// ---------------------------------------------------------------------------
 
 function short(text: string | undefined, max = 64) {
   const t = (text ?? "").trim();
@@ -139,33 +151,58 @@ function fmtDate(iso: string | undefined) {
 function sum(values: number[]) {
   return values.reduce((a, b) => a + b, 0);
 }
-function DashboardCard(
-  props: React.PropsWithChildren<{
-    title: string;
-    icon?: React.ReactNode;
-    right?: React.ReactNode;
-    sx?: Record<string, unknown>;
-    contentSx?: Record<string, unknown>;
-  }>
-) {
-  const { title, icon, right, sx, contentSx, children } = props;
+
+// ---------------------------------------------------------------------------
+// Shared card shell — mirrors SubmitPage's SoftCard exactly
+// ---------------------------------------------------------------------------
+
+function SoftCard(props: React.PropsWithChildren<{ sx?: object }>) {
+  const theme = useTheme();
+  const isDark = theme.palette.mode === "dark";
 
   return (
     <Card
       sx={{
         height: "100%",
-        borderRadius: 3,
-        border: "1px solid rgba(255,255,255,.10)",
-        background: "linear-gradient(180deg, rgba(255,255,255,.06), rgba(255,255,255,.03))",
-        ...sx,
+        borderRadius: 4,
+        border: `1px solid ${alpha(theme.palette.divider, isDark ? 0.28 : 0.9)}`,
+        background: isDark
+          ? `linear-gradient(180deg, ${alpha("#fff", 0.03)}, ${alpha("#fff", 0.02)})`
+          : `linear-gradient(180deg, ${alpha("#fff", 0.88)}, ${alpha(
+              theme.palette.grey[50],
+              0.96
+            )})`,
+        boxShadow: isDark
+          ? "0 12px 32px rgba(0,0,0,.28)"
+          : "0 10px 28px rgba(15,23,42,.06)",
+        ...props.sx,
       }}
     >
-      <CardContent
-        sx={{
-          p: { xs: 1.5, md: 2 },
-          ...contentSx,
-        }}
-      >
+      {props.children}
+    </Card>
+  );
+}
+
+// ---------------------------------------------------------------------------
+// DashboardCard — now renders inside SoftCard, drops its own border/bg
+// ---------------------------------------------------------------------------
+
+function DashboardCard(
+  props: React.PropsWithChildren<{
+    title: string;
+    icon?: React.ReactNode;
+    right?: React.ReactNode;
+    sx?: object;
+    contentSx?: object;
+  }>
+) {
+  const { title, icon, right, sx, contentSx, children } = props;
+  const theme = useTheme();
+  const isDark = theme.palette.mode === "dark";
+
+  return (
+    <SoftCard sx={sx}>
+      <CardContent sx={{ p: { xs: 1.5, md: 2 }, ...contentSx }}>
         <Stack
           direction="row"
           alignItems="center"
@@ -181,7 +218,7 @@ function DashboardCard(
                   borderRadius: 2,
                   display: "grid",
                   placeItems: "center",
-                  border: "1px solid rgba(255,255,255,.12)",
+                  border: `1px solid ${alpha(theme.palette.divider, isDark ? 0.18 : 0.7)}`,
                   background:
                     "linear-gradient(135deg, rgba(56,189,248,.14), rgba(120,119,198,.12))",
                   "& svg": { fontSize: 18 },
@@ -202,25 +239,13 @@ function DashboardCard(
         <Divider sx={{ opacity: 0.25, mb: 1.5 }} />
         {children}
       </CardContent>
-    </Card>
+    </SoftCard>
   );
 }
 
-function SectionTitle(props: { title: string; right?: React.ReactNode }) {
-  return (
-    <Stack
-      direction="row"
-      alignItems="center"
-      justifyContent="space-between"
-      sx={{ mb: 1 }}
-    >
-      <Typography fontWeight={950} letterSpacing={-0.2}>
-        {props.title}
-      </Typography>
-      {props.right}
-    </Stack>
-  );
-}
+// ---------------------------------------------------------------------------
+// Constants
+// ---------------------------------------------------------------------------
 
 const DANGER_ORDER = ["Safe", "Inconclusive", "Suspicious", "Dangerous"] as const;
 type DangerLabel = (typeof DANGER_ORDER)[number];
@@ -232,12 +257,15 @@ const DANGER_COLORS: Record<DangerLabel, string> = {
   Dangerous: "#EF4444",
 };
 
+// ---------------------------------------------------------------------------
+// Page
+// ---------------------------------------------------------------------------
+
 export default function HomePage() {
   const navigate = useNavigate();
   const theme = useTheme();
 
   const BADGE_W = 132;
-  const TOP_OFFSET = 50;
 
   const [scopeChoice, setScopeChoice] = React.useState("");
 
@@ -327,14 +355,12 @@ export default function HomePage() {
   const recent = recentQuery.data ?? [];
 
   return (
-    <Box
-      sx={{
-        px: { xs: 2, md: 3 },
-        pb: 8,
-        pt: 0,
-      }}
-    >
+    <Box sx={{ px: { xs: 2, md: 3 }, pb: 8, pt: 0 }}>
       <Box sx={{ maxWidth: 1280, mx: "auto" }}>
+
+        {/* ---------------------------------------------------------------- */}
+        {/* Page header                                                      */}
+        {/* ---------------------------------------------------------------- */}
         <Stack
           direction={{ xs: "column", md: "row" }}
           spacing={1.5}
@@ -357,6 +383,10 @@ export default function HomePage() {
         ) : null}
 
         <Grid container spacing={2}>
+
+          {/* -------------------------------------------------------------- */}
+          {/* Threat distribution                                             */}
+          {/* -------------------------------------------------------------- */}
           <Grid item xs={12} md={7}>
             <DashboardCard
               title="Threat distribution"
@@ -382,7 +412,10 @@ export default function HomePage() {
                         strokeWidth={1}
                       >
                         {donut.map((entry) => (
-                          <Cell key={entry.name} fill={DANGER_COLORS[entry.name as DangerLabel]} />
+                          <Cell
+                            key={entry.name}
+                            fill={DANGER_COLORS[entry.name as DangerLabel]}
+                          />
                         ))}
                       </Pie>
 
@@ -479,6 +512,9 @@ export default function HomePage() {
             </DashboardCard>
           </Grid>
 
+          {/* -------------------------------------------------------------- */}
+          {/* Snapshot                                                        */}
+          {/* -------------------------------------------------------------- */}
           <Grid item xs={12} md={5}>
             <DashboardCard
               title="Snapshot"
@@ -554,6 +590,9 @@ export default function HomePage() {
             </DashboardCard>
           </Grid>
 
+          {/* -------------------------------------------------------------- */}
+          {/* Recent submissions                                              */}
+          {/* -------------------------------------------------------------- */}
           <Grid item xs={12}>
             <DashboardCard
               title="Recent submissions"
@@ -600,7 +639,9 @@ export default function HomePage() {
                         <TableCell sx={{ fontWeight: 950 }}>Status</TableCell>
                         <TableCell sx={{ fontWeight: 950 }}>Artifact</TableCell>
                         <TableCell sx={{ fontWeight: 950 }}>Date</TableCell>
-                        <TableCell sx={{ fontWeight: 950, textAlign: "right" }}>Tests</TableCell>
+                        <TableCell sx={{ fontWeight: 950, textAlign: "right" }}>
+                          Tests
+                        </TableCell>
                         <TableCell sx={{ fontWeight: 950 }}>Type</TableCell>
                         <TableCell sx={{ fontWeight: 950 }}>Result</TableCell>
                       </TableRow>
@@ -618,7 +659,11 @@ export default function HomePage() {
                                 to={`/submissions?q=${encodeURIComponent(
                                   String(r.id)
                                 )}&open=${encodeURIComponent(String(r.id))}`}
-                                sx={{ borderRadius: 3, textTransform: "none", fontWeight: 950 }}
+                                sx={{
+                                  borderRadius: 3,
+                                  textTransform: "none",
+                                  fontWeight: 950,
+                                }}
                               >
                                 {r.id}
                               </Button>
@@ -687,6 +732,9 @@ export default function HomePage() {
           </Grid>
         </Grid>
 
+        {/* ---------------------------------------------------------------- */}
+        {/* CISO scope modal                                                 */}
+        {/* ---------------------------------------------------------------- */}
         <Dialog open={showScopeModal} maxWidth="sm" fullWidth>
           <DialogTitle>Select your management scope</DialogTitle>
           <DialogContent>
@@ -698,8 +746,11 @@ export default function HomePage() {
               <Card
                 sx={{
                   borderRadius: 3,
-                  border: "1px solid rgba(255,255,255,.10)",
-                  background: "linear-gradient(180deg, rgba(255,255,255,.06), rgba(255,255,255,.03))",
+                  border: `1px solid ${alpha(theme.palette.divider, theme.palette.mode === "dark" ? 0.18 : 0.7)}`,
+                  background:
+                    theme.palette.mode === "dark"
+                      ? "linear-gradient(180deg, rgba(255,255,255,.06), rgba(255,255,255,.03))"
+                      : `linear-gradient(180deg, ${alpha("#fff", 0.88)}, ${alpha(theme.palette.grey[50], 0.96)})`,
                 }}
               >
                 <CardContent>

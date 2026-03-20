@@ -18,8 +18,12 @@ import {
   Stack,
   Switch,
   TextField,
+  Tooltip,
   Typography,
   Slider,
+  Collapse,
+  Badge,
+  LinearProgress,
 } from "@mui/material";
 import {
   AddOutlined,
@@ -37,9 +41,21 @@ import {
   MailOutline,
   TuneOutlined,
   ShieldOutlined,
+  ContentCopyOutlined,
+  LockOutlined,
+  PowerSettingsNewOutlined,
+  CheckBoxOutlined,
+  CheckBoxOutlineBlank,
+  IndeterminateCheckBoxOutlined,
+  DoneAllOutlined,
+  SaveOutlined,
+  RestoreOutlined,
+  VisibilityOutlined,
+  VisibilityOffOutlined,
 } from "@mui/icons-material";
 import { alpha, useTheme } from "@mui/material/styles";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
+import { useSnackbar } from "notistack";
 
 import { getMe, type Me } from "@/api/auth";
 import {
@@ -55,7 +71,12 @@ import {
   type CisoUser,
   type ListItem,
   type SettingsSection,
+  type EditableListSection,
 } from "@/features/settings/api";
+
+// ---------------------------------------------------------------------------
+// Types
+// ---------------------------------------------------------------------------
 
 type SectionKind = "list" | "toggle" | "scoring" | "ciso_users" | "domain_pair";
 
@@ -65,26 +86,1270 @@ type SectionMeta = {
   subtitle: string;
   icon: React.ReactNode;
   kind: SectionKind;
+  badge?: number;
 };
+
+// ---------------------------------------------------------------------------
+// SoftCard — shared theme-aware card (mirrors other pages)
+// ---------------------------------------------------------------------------
+
+function SoftCard(props: React.PropsWithChildren<{ sx?: object }>) {
+  const theme = useTheme();
+  const isDark = theme.palette.mode === "dark";
+
+  return (
+    <Card
+      sx={{
+        borderRadius: 4,
+        border: `1px solid ${alpha(theme.palette.divider, isDark ? 0.28 : 0.9)}`,
+        background: isDark
+          ? `linear-gradient(180deg, ${alpha("#fff", 0.03)}, ${alpha("#fff", 0.02)})`
+          : `linear-gradient(180deg, ${alpha("#fff", 0.88)}, ${alpha(theme.palette.grey[50], 0.96)})`,
+        boxShadow: isDark
+          ? "0 12px 32px rgba(0,0,0,.28)"
+          : "0 10px 28px rgba(15,23,42,.06)",
+        ...props.sx,
+      }}
+    >
+      {props.children}
+    </Card>
+  );
+}
+
+// A tighter inner card for list items / sub-panels
+function InnerCard(props: React.PropsWithChildren<{ sx?: object; hover?: boolean }>) {
+  const theme = useTheme();
+  const isDark = theme.palette.mode === "dark";
+
+  return (
+    <Box
+      sx={{
+        borderRadius: 2.5,
+        border: `1px solid ${alpha(theme.palette.divider, isDark ? 0.14 : 0.55)}`,
+        background: isDark ? alpha("#fff", 0.025) : alpha(theme.palette.background.paper, 0.6),
+        transition: "border-color .15s ease, background .15s ease",
+        ...(props.hover && {
+          "&:hover": {
+            borderColor: alpha(theme.palette.divider, isDark ? 0.28 : 0.8),
+            background: isDark ? alpha("#fff", 0.04) : alpha(theme.palette.background.paper, 0.9),
+          },
+        }),
+        ...props.sx,
+      }}
+    >
+      {props.children}
+    </Box>
+  );
+}
+
+// ---------------------------------------------------------------------------
+// Icon badge helper
+// ---------------------------------------------------------------------------
+
+function NavIcon({ icon, isDark }: { icon: React.ReactNode; isDark: boolean }) {
+  const theme = useTheme();
+  return (
+    <Box
+      sx={{
+        width: 32,
+        height: 32,
+        borderRadius: 2,
+        display: "grid",
+        placeItems: "center",
+        border: `1px solid ${alpha(theme.palette.divider, isDark ? 0.18 : 0.6)}`,
+        background: "linear-gradient(135deg, rgba(56,189,248,.14), rgba(120,119,198,.12))",
+        flexShrink: 0,
+        "& svg": { fontSize: 17 },
+      }}
+    >
+      {icon}
+    </Box>
+  );
+}
+
+// ---------------------------------------------------------------------------
+// parseMulti
+// ---------------------------------------------------------------------------
+
+function parseMulti(input: string) {
+  return input.split(/[\n,; ]+/g).map((s) => s.trim()).filter(Boolean);
+}
+
+// ---------------------------------------------------------------------------
+// Empty state
+// ---------------------------------------------------------------------------
+
+function EmptyList({ message }: { message: string }) {
+  const theme = useTheme();
+  return (
+    <Stack alignItems="center" justifyContent="center" spacing={1} sx={{ py: 5 }}>
+      <Box
+        sx={{
+          width: 48,
+          height: 48,
+          borderRadius: 3,
+          display: "grid",
+          placeItems: "center",
+          background: alpha(theme.palette.action.hover, 0.5),
+          "& svg": { fontSize: 26, opacity: 0.4 },
+        }}
+      >
+        <SearchOutlined />
+      </Box>
+      <Typography variant="body2" color="text.disabled" sx={{ fontWeight: 600 }}>
+        {message}
+      </Typography>
+    </Stack>
+  );
+}
+
+// ---------------------------------------------------------------------------
+// ListItemRow — individual item with copy + delete
+// ---------------------------------------------------------------------------
+
+function ListItemRow({
+  item,
+  selected,
+  onToggleSelect,
+  onDelete,
+  deleting,
+  selectionMode,
+}: {
+  item: ListItem;
+  selected: boolean;
+  onToggleSelect: () => void;
+  onDelete: () => void;
+  deleting: boolean;
+  selectionMode: boolean;
+}) {
+  const theme = useTheme();
+  const isDark = theme.palette.mode === "dark";
+  const { enqueueSnackbar } = useSnackbar();
+
+  return (
+    <InnerCard
+      hover
+      sx={{
+        px: 1.5,
+        py: 1,
+        display: "flex",
+        alignItems: "center",
+        gap: 1.25,
+        borderColor: selected
+          ? alpha(theme.palette.primary.main, isDark ? 0.45 : 0.5)
+          : undefined,
+        background: selected
+          ? alpha(theme.palette.primary.main, isDark ? 0.08 : 0.05)
+          : undefined,
+        transition: "all .14s ease",
+      }}
+    >
+      {/* Selection checkbox */}
+      <IconButton
+        size="small"
+        onClick={onToggleSelect}
+        sx={{ opacity: selectionMode || selected ? 1 : 0, transition: "opacity .14s", p: 0.25 }}
+        aria-label={selected ? "Deselect" : "Select"}
+      >
+        {selected
+          ? <CheckBoxOutlined fontSize="small" color="primary" />
+          : <CheckBoxOutlineBlank fontSize="small" />}
+      </IconButton>
+
+      <Box sx={{ flex: 1, minWidth: 0 }}>
+        <Typography
+          sx={{
+            fontWeight: 700,
+            overflow: "hidden",
+            textOverflow: "ellipsis",
+            whiteSpace: "nowrap",
+            fontSize: 13.5,
+          }}
+        >
+          {item.value}
+        </Typography>
+        {item.created_at ? (
+          <Typography variant="caption" color="text.disabled" sx={{ fontSize: 11 }}>
+            Added {new Date(item.created_at).toLocaleString()}
+          </Typography>
+        ) : null}
+      </Box>
+
+      <Stack direction="row" spacing={0.5}>
+        <Tooltip title="Copy value">
+          <IconButton
+            size="small"
+            onClick={async () => {
+              try {
+                await navigator.clipboard.writeText(item.value);
+                enqueueSnackbar("Copied.", { variant: "info" });
+              } catch { /* ignore */ }
+            }}
+            sx={{ opacity: 0.55, "&:hover": { opacity: 1 } }}
+          >
+            <ContentCopyOutlined sx={{ fontSize: 14 }} />
+          </IconButton>
+        </Tooltip>
+
+        <Tooltip title="Delete">
+          <IconButton
+            size="small"
+            onClick={onDelete}
+            disabled={deleting}
+            sx={{
+              color: theme.palette.error.main,
+              opacity: 0.55,
+              "&:hover": { opacity: 1, background: alpha(theme.palette.error.main, 0.1) },
+            }}
+          >
+            {deleting
+              ? <CircularProgress size={13} color="error" />
+              : <DeleteOutline sx={{ fontSize: 14 }} />}
+          </IconButton>
+        </Tooltip>
+      </Stack>
+    </InnerCard>
+  );
+}
+
+// ---------------------------------------------------------------------------
+// AddBar — textarea + submit (supports multi-line paste)
+// ---------------------------------------------------------------------------
+
+function AddBar({
+  onAdd,
+  placeholder,
+  loading,
+}: {
+  onAdd: (values: string[]) => void;
+  placeholder: string;
+  loading: boolean;
+}) {
+  const [input, setInput] = React.useState("");
+  const theme = useTheme();
+
+  const submit = () => {
+    const values = parseMulti(input);
+    if (!values.length) return;
+    onAdd(values);
+    setInput("");
+  };
+
+  return (
+    <Stack direction="row" spacing={1} alignItems="flex-start">
+      <TextField
+        size="small"
+        placeholder={placeholder}
+        value={input}
+        onChange={(e) => setInput(e.target.value)}
+        onKeyDown={(e) => {
+          if (e.key === "Enter" && (e.ctrlKey || e.metaKey)) {
+            e.preventDefault();
+            submit();
+          }
+        }}
+        multiline
+        maxRows={3}
+        fullWidth
+        helperText="Enter, comma or space separated — Ctrl+Enter to submit"
+        sx={{
+          "& .MuiFormHelperText-root": { fontSize: 11, mt: 0.4 },
+        }}
+      />
+      <Button
+        variant="contained"
+        onClick={submit}
+        disabled={!input.trim() || loading}
+        startIcon={loading ? <CircularProgress size={14} color="inherit" /> : <AddOutlined />}
+        sx={{
+          borderRadius: 2.5,
+          textTransform: "none",
+          fontWeight: 900,
+          minWidth: 90,
+          mt: 0.25,
+          whiteSpace: "nowrap",
+        }}
+      >
+        Add
+      </Button>
+    </Stack>
+  );
+}
+
+// ---------------------------------------------------------------------------
+// BulkToolbar
+// ---------------------------------------------------------------------------
+
+function BulkToolbar({
+  total,
+  selected,
+  onSelectAll,
+  onClearSelection,
+  onDeleteSelected,
+  deleting,
+}: {
+  total: number;
+  selected: number;
+  onSelectAll: () => void;
+  onClearSelection: () => void;
+  onDeleteSelected: () => void;
+  deleting: boolean;
+}) {
+  const theme = useTheme();
+  const allSelected = selected > 0 && selected === total;
+  const someSelected = selected > 0 && !allSelected;
+
+  return (
+    <Stack
+      direction="row"
+      alignItems="center"
+      spacing={1}
+      sx={{
+        px: 1.25,
+        py: 0.75,
+        borderRadius: 2,
+        background: alpha(theme.palette.primary.main, 0.07),
+        border: `1px solid ${alpha(theme.palette.primary.main, 0.2)}`,
+      }}
+    >
+      <IconButton size="small" onClick={allSelected ? onClearSelection : onSelectAll} sx={{ p: 0.25 }}>
+        {allSelected
+          ? <CheckBoxOutlined fontSize="small" color="primary" />
+          : someSelected
+          ? <IndeterminateCheckBoxOutlined fontSize="small" color="primary" />
+          : <CheckBoxOutlineBlank fontSize="small" />}
+      </IconButton>
+
+      <Typography variant="body2" fontWeight={700} sx={{ flex: 1 }}>
+        {selected > 0 ? `${selected} selected` : `${total} item${total !== 1 ? "s" : ""}`}
+      </Typography>
+
+      {selected > 0 ? (
+        <>
+          <Button
+            size="small"
+            onClick={onClearSelection}
+            sx={{ textTransform: "none", fontWeight: 700 }}
+          >
+            Clear
+          </Button>
+          <Button
+            size="small"
+            variant="outlined"
+            color="error"
+            startIcon={deleting ? <CircularProgress size={12} color="error" /> : <DeleteOutline />}
+            disabled={deleting}
+            onClick={onDeleteSelected}
+            sx={{ textTransform: "none", fontWeight: 900, borderRadius: 2 }}
+          >
+            Delete {selected}
+          </Button>
+        </>
+      ) : null}
+    </Stack>
+  );
+}
+
+// ---------------------------------------------------------------------------
+// EditableListPanel — full-featured list manager
+// ---------------------------------------------------------------------------
+
+function EditableListPanel({
+  section,
+  placeholder,
+  fileAccept = ".txt,.csv,.json",
+}: {
+  section: EditableListSection;
+  placeholder: string;
+  fileAccept?: string;
+}) {
+  const qc = useQueryClient();
+  const { enqueueSnackbar } = useSnackbar();
+  const theme = useTheme();
+  const isDark = theme.palette.mode === "dark";
+
+  const [filter, setFilter] = React.useState("");
+  const [selectedIds, setSelectedIds] = React.useState<Set<string>>(new Set());
+  const [showFilter, setShowFilter] = React.useState(false);
+  const [deletingId, setDeletingId] = React.useState<string | null>(null);
+
+  const listQuery = useQuery<ListItem[]>({
+    queryKey: ["settings", "list", section],
+    queryFn: () => listItems(section),
+    retry: false,
+  });
+
+  const addMutation = useMutation({
+    mutationFn: (values: string[]) => addItems(section, values),
+    onSuccess: (_, vars) => {
+      qc.invalidateQueries({ queryKey: ["settings", "list", section] });
+      enqueueSnackbar(`${vars.length} value${vars.length !== 1 ? "s" : ""} added.`, { variant: "success" });
+    },
+    onError: () => enqueueSnackbar("Failed to add values.", { variant: "error" }),
+  });
+
+  const removeMutation = useMutation({
+    mutationFn: (id: string) => removeItem(section, id),
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: ["settings", "list", section] });
+      setSelectedIds((prev) => { const next = new Set(prev); next.delete(deletingId!); return next; });
+      setDeletingId(null);
+    },
+    onError: () => { enqueueSnackbar("Failed to remove item.", { variant: "error" }); setDeletingId(null); },
+  });
+
+  const importMutation = useMutation({
+    mutationFn: (file: File) => addFromFile(section, file),
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: ["settings", "list", section] });
+      enqueueSnackbar("File imported.", { variant: "success" });
+    },
+    onError: () => enqueueSnackbar("Failed to import file.", { variant: "error" }),
+  });
+
+  const items = listQuery.data ?? [];
+  const filtered = React.useMemo(() => {
+    const q = filter.trim().toLowerCase();
+    return q ? items.filter((it) => it.value.toLowerCase().includes(q)) : items;
+  }, [items, filter]);
+
+  const allVisibleIds = filtered.map((it) => it.id);
+  const selectedCount = allVisibleIds.filter((id) => selectedIds.has(id)).length;
+
+  function handleSelectAll() {
+    setSelectedIds(new Set(allVisibleIds));
+  }
+
+  function handleClear() {
+    setSelectedIds(new Set());
+  }
+
+  async function handleBulkDelete() {
+    const toDelete = allVisibleIds.filter((id) => selectedIds.has(id));
+    for (const id of toDelete) {
+      setDeletingId(id);
+      await removeItem(section, id);
+    }
+    qc.invalidateQueries({ queryKey: ["settings", "list", section] });
+    setSelectedIds(new Set());
+    setDeletingId(null);
+    enqueueSnackbar(`${toDelete.length} item${toDelete.length !== 1 ? "s" : ""} deleted.`, { variant: "success" });
+  }
+
+  const selectionMode = selectedIds.size > 0;
+
+  return (
+    <Stack spacing={2}>
+      {/* Add bar */}
+      <AddBar
+        placeholder={placeholder}
+        onAdd={(values) => addMutation.mutate(values)}
+        loading={addMutation.isPending}
+      />
+
+      {/* Toolbar row */}
+      <Stack direction="row" spacing={1} alignItems="center" flexWrap="wrap">
+        <Button
+          size="small"
+          variant="outlined"
+          component="label"
+          startIcon={importMutation.isPending ? <CircularProgress size={13} /> : <FileUploadOutlined />}
+          disabled={importMutation.isPending}
+          sx={{ borderRadius: 2.5, textTransform: "none", fontWeight: 900 }}
+        >
+          Import file
+          <input
+            hidden
+            type="file"
+            accept={fileAccept}
+            onChange={(e) => {
+              const f = e.target.files?.[0];
+              if (f) importMutation.mutate(f);
+              e.currentTarget.value = "";
+            }}
+          />
+        </Button>
+
+        <Tooltip title={showFilter ? "Hide search" : "Search items"}>
+          <IconButton
+            size="small"
+            onClick={() => setShowFilter((v) => !v)}
+            sx={{
+              border: `1px solid ${alpha(theme.palette.divider, isDark ? 0.22 : 0.6)}`,
+              borderRadius: 2,
+              color: showFilter ? theme.palette.primary.main : undefined,
+            }}
+          >
+            <SearchOutlined fontSize="small" />
+          </IconButton>
+        </Tooltip>
+
+        <Chip
+          size="small"
+          label={`${items.length} total`}
+          variant="outlined"
+          sx={{ ml: "auto" }}
+        />
+      </Stack>
+
+      {/* Search collapse */}
+      <Collapse in={showFilter}>
+        <TextField
+          size="small"
+          placeholder="Filter items…"
+          value={filter}
+          onChange={(e) => setFilter(e.target.value)}
+          autoFocus
+          fullWidth
+          InputProps={{
+            startAdornment: (
+              <InputAdornment position="start">
+                <SearchOutlined fontSize="small" />
+              </InputAdornment>
+            ),
+          }}
+        />
+      </Collapse>
+
+      {/* List */}
+      {listQuery.isLoading ? (
+        <Box sx={{ py: 4, display: "grid", placeItems: "center" }}>
+          <CircularProgress size={24} />
+        </Box>
+      ) : listQuery.isError ? (
+        <Alert severity="error">Failed to load list.</Alert>
+      ) : (
+        <Stack spacing={1}>
+          {/* Bulk toolbar — only when items exist */}
+          {filtered.length > 0 ? (
+            <BulkToolbar
+              total={filtered.length}
+              selected={selectedCount}
+              onSelectAll={handleSelectAll}
+              onClearSelection={handleClear}
+              onDeleteSelected={handleBulkDelete}
+              deleting={removeMutation.isPending}
+            />
+          ) : null}
+
+          {/* Item list */}
+          {filtered.length === 0 ? (
+            <EmptyList message={filter ? `No items matching "${filter}"` : "No items yet."} />
+          ) : (
+            <Stack
+              spacing={0.6}
+              sx={{
+                maxHeight: 400,
+                overflowY: "auto",
+                pr: 0.5,
+                // thin scrollbar
+                "&::-webkit-scrollbar": { width: 4 },
+                "&::-webkit-scrollbar-thumb": {
+                  borderRadius: 999,
+                  background: alpha(theme.palette.divider, 0.5),
+                },
+              }}
+            >
+              {filtered.map((it) => (
+                <ListItemRow
+                  key={it.id}
+                  item={it}
+                  selected={selectedIds.has(it.id)}
+                  onToggleSelect={() => setSelectedIds((prev) => {
+                    const next = new Set(prev);
+                    next.has(it.id) ? next.delete(it.id) : next.add(it.id);
+                    return next;
+                  })}
+                  onDelete={() => {
+                    setDeletingId(it.id);
+                    removeMutation.mutate(it.id);
+                  }}
+                  deleting={deletingId === it.id && removeMutation.isPending}
+                  selectionMode={selectionMode}
+                />
+              ))}
+            </Stack>
+          )}
+        </Stack>
+      )}
+    </Stack>
+  );
+}
+
+// ---------------------------------------------------------------------------
+// ReadOnlyListPanel
+// ---------------------------------------------------------------------------
+
+function ReadOnlyListPanel({
+  section,
+  title,
+  subtitle,
+}: {
+  section: "watcher_legit_domains" | "watcher_monitored_domains";
+  title: string;
+  subtitle: string;
+}) {
+  const theme = useTheme();
+  const isDark = theme.palette.mode === "dark";
+  const [filter, setFilter] = React.useState("");
+  const [showItems, setShowItems] = React.useState(false);
+
+  const listQuery = useQuery<ListItem[]>({
+    queryKey: ["settings", "list", section],
+    queryFn: () => listItems(section),
+    retry: false,
+  });
+
+  const items = listQuery.data ?? [];
+  const filtered = React.useMemo(() => {
+    const q = filter.trim().toLowerCase();
+    return q ? items.filter((it) => it.value.toLowerCase().includes(q)) : items;
+  }, [items, filter]);
+
+  return (
+    <InnerCard sx={{ p: 2 }}>
+      <Stack spacing={1.5}>
+        <Stack direction="row" alignItems="flex-start" justifyContent="space-between" spacing={1}>
+          <Box>
+            <Stack direction="row" spacing={0.75} alignItems="center">
+              <LockOutlined sx={{ fontSize: 14, opacity: 0.55 }} />
+              <Typography fontWeight={950} fontSize={14}>{title}</Typography>
+            </Stack>
+            <Typography variant="caption" color="text.secondary">{subtitle}</Typography>
+          </Box>
+          <Stack direction="row" spacing={0.75} alignItems="center">
+            <Chip size="small" label="Watcher sync" color="info" variant="outlined" />
+            <Chip size="small" label={`${items.length}`} variant="outlined" />
+          </Stack>
+        </Stack>
+
+        <Stack direction="row" spacing={1}>
+          <TextField
+            size="small"
+            placeholder="Search synced domains…"
+            value={filter}
+            onChange={(e) => setFilter(e.target.value)}
+            fullWidth
+            InputProps={{
+              startAdornment: (
+                <InputAdornment position="start">
+                  <SearchOutlined fontSize="small" />
+                </InputAdornment>
+              ),
+            }}
+          />
+          <Tooltip title={showItems ? "Hide list" : "Show list"}>
+            <IconButton
+              size="small"
+              onClick={() => setShowItems((v) => !v)}
+              sx={{
+                border: `1px solid ${alpha(theme.palette.divider, isDark ? 0.22 : 0.6)}`,
+                borderRadius: 2,
+                color: showItems ? theme.palette.primary.main : undefined,
+              }}
+            >
+              {showItems ? <VisibilityOffOutlined fontSize="small" /> : <VisibilityOutlined fontSize="small" />}
+            </IconButton>
+          </Tooltip>
+        </Stack>
+
+        <Collapse in={showItems}>
+          {listQuery.isLoading ? (
+            <Box sx={{ py: 3, display: "grid", placeItems: "center" }}><CircularProgress size={20} /></Box>
+          ) : listQuery.isError ? (
+            <Alert severity="error">Failed to load.</Alert>
+          ) : filtered.length === 0 ? (
+            <EmptyList message={filter ? `No items matching "${filter}"` : "No synced items."} />
+          ) : (
+            <Stack
+              spacing={0.5}
+              sx={{
+                maxHeight: 320,
+                overflowY: "auto",
+                pr: 0.25,
+                "&::-webkit-scrollbar": { width: 4 },
+                "&::-webkit-scrollbar-thumb": { borderRadius: 999, background: alpha(theme.palette.divider, 0.5) },
+              }}
+            >
+              {filtered.map((it) => (
+                <InnerCard key={it.id} sx={{ px: 1.5, py: 0.9 }}>
+                  <Typography sx={{ fontWeight: 700, fontSize: 13, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
+                    {it.value}
+                  </Typography>
+                  {it.created_at ? (
+                    <Typography variant="caption" color="text.disabled" sx={{ fontSize: 11 }}>
+                      {new Date(it.created_at).toLocaleString()}
+                    </Typography>
+                  ) : null}
+                </InnerCard>
+              ))}
+            </Stack>
+          )}
+        </Collapse>
+      </Stack>
+    </InnerCard>
+  );
+}
+
+// ---------------------------------------------------------------------------
+// DomainPairPanel
+// ---------------------------------------------------------------------------
+
+function DomainPairPanel({ editableSection }: { editableSection: "domains_allow" | "domains_deny" }) {
+  const isAllow = editableSection === "domains_allow";
+
+  return (
+    <Stack spacing={2}>
+      <EditableListPanel
+        section={editableSection}
+        placeholder="Paste domains, one per line or comma-separated…"
+      />
+      <ReadOnlyListPanel
+        section={isAllow ? "watcher_legit_domains" : "watcher_monitored_domains"}
+        title={isAllow ? "Watcher legit domains" : "Watcher monitored domains"}
+        subtitle="Read-only — synchronized from Watcher automatically."
+      />
+    </Stack>
+  );
+}
+
+// ---------------------------------------------------------------------------
+// FeederPanel — enhanced toggle with status indicator
+// ---------------------------------------------------------------------------
+
+function FeederPanel() {
+  const qc = useQueryClient();
+  const { enqueueSnackbar } = useSnackbar();
+  const theme = useTheme();
+  const isDark = theme.palette.mode === "dark";
+
+  const statusQuery = useQuery({
+    queryKey: ["settings", "email_feeder"],
+    queryFn: getFeederStatus,
+    retry: false,
+  });
+
+  const toggleMutation = useMutation({
+    mutationFn: (enabled: boolean) => setFeederStatus(enabled),
+    onSuccess: (res) => {
+      qc.invalidateQueries({ queryKey: ["settings", "email_feeder"] });
+      enqueueSnackbar(
+        res.enabled ? "Email feeder enabled." : "Email feeder disabled.",
+        { variant: res.enabled ? "success" : "info" }
+      );
+    },
+    onError: () => enqueueSnackbar("Failed to update feeder status.", { variant: "error" }),
+  });
+
+  const enabled = statusQuery.data?.enabled ?? false;
+  const pending = statusQuery.isLoading || toggleMutation.isPending;
+
+  return (
+    <Stack spacing={2}>
+      <InnerCard sx={{ p: 0, overflow: "hidden" }}>
+        {/* Status bar accent */}
+        <Box
+          sx={{
+            height: 4,
+            background: enabled
+              ? "linear-gradient(90deg, #22C55E, #16A34A)"
+              : alpha(theme.palette.divider, 0.4),
+            transition: "background .4s ease",
+          }}
+        />
+
+        <Stack
+          direction={{ xs: "column", sm: "row" }}
+          alignItems={{ sm: "center" }}
+          justifyContent="space-between"
+          spacing={2}
+          sx={{ p: 2.5 }}
+        >
+          <Stack direction="row" spacing={1.75} alignItems="center">
+            <Box
+              sx={{
+                width: 48,
+                height: 48,
+                borderRadius: 3,
+                display: "grid",
+                placeItems: "center",
+                background: enabled
+                  ? alpha("#22C55E", 0.12)
+                  : alpha(theme.palette.action.hover, 0.5),
+                border: `1px solid ${enabled ? alpha("#22C55E", 0.3) : alpha(theme.palette.divider, isDark ? 0.18 : 0.5)}`,
+                transition: "all .3s ease",
+                "& svg": { fontSize: 24, color: enabled ? "#22C55E" : undefined, transition: "color .3s ease" },
+              }}
+            >
+              <PowerSettingsNewOutlined />
+            </Box>
+
+            <Box>
+              <Typography fontWeight={950} fontSize={15}>Email feeder</Typography>
+              <Typography variant="body2" color="text.secondary">
+                Automatically ingest suspicious emails and create cases.
+              </Typography>
+            </Box>
+          </Stack>
+
+          <Stack direction="row" spacing={1.5} alignItems="center">
+            <Chip
+              size="small"
+              label={pending ? "…" : enabled ? "Running" : "Stopped"}
+              sx={{
+                fontWeight: 900,
+                bgcolor: enabled
+                  ? alpha("#22C55E", 0.12)
+                  : alpha(theme.palette.action.hover, 0.6),
+                color: enabled ? "#22C55E" : "text.secondary",
+                border: `1px solid ${enabled ? alpha("#22C55E", 0.3) : alpha(theme.palette.divider, 0.4)}`,
+                transition: "all .3s ease",
+              }}
+            />
+            <Switch
+              checked={enabled}
+              onChange={(e) => toggleMutation.mutate(e.target.checked)}
+              disabled={pending}
+              color="success"
+            />
+          </Stack>
+        </Stack>
+      </InnerCard>
+
+      <InnerCard sx={{ p: 2 }}>
+        <Typography variant="body2" color="text.secondary" sx={{ fontSize: 13 }}>
+          When enabled, the feeder polls the configured mailbox and automatically creates
+          new analysis cases for each suspicious message. Disabling it will stop ingestion
+          immediately — existing cases are unaffected.
+        </Typography>
+      </InnerCard>
+    </Stack>
+  );
+}
+
+// ---------------------------------------------------------------------------
+// ScoringPanel — sliders with live preview, dirty tracking, bulk save
+// ---------------------------------------------------------------------------
+
+function ScoringPanel() {
+  const qc = useQueryClient();
+  const { enqueueSnackbar } = useSnackbar();
+  const theme = useTheme();
+  const isDark = theme.palette.mode === "dark";
+
+  const analyzersQuery = useQuery<Analyzer[]>({
+    queryKey: ["settings", "scoring"],
+    queryFn: listAnalyzers,
+    retry: false,
+  });
+
+  const updateMutation = useMutation({
+    mutationFn: ({ id, weight }: { id: number; weight: number }) =>
+      updateAnalyzerWeight(id, weight),
+    onSuccess: () => qc.invalidateQueries({ queryKey: ["settings", "scoring"] }),
+    onError: () => enqueueSnackbar("Failed to save weight.", { variant: "error" }),
+  });
+
+  const [drafts, setDrafts] = React.useState<Record<number, number>>({});
+
+  React.useEffect(() => {
+    if (!analyzersQuery.data) return;
+    const next: Record<number, number> = {};
+    for (const a of analyzersQuery.data) next[a.id] = a.weight;
+    setDrafts(next);
+  }, [analyzersQuery.data]);
+
+  if (analyzersQuery.isLoading) {
+    return <Box sx={{ py: 4, display: "grid", placeItems: "center" }}><CircularProgress /></Box>;
+  }
+  if (analyzersQuery.isError) {
+    return <Alert severity="error">Failed to load analyzers.</Alert>;
+  }
+
+  const analyzers = analyzersQuery.data ?? [];
+  const dirtyIds = analyzers.filter((a) => Number((drafts[a.id] ?? a.weight).toFixed(1)) !== Number(a.weight.toFixed(1))).map((a) => a.id);
+
+  async function saveAll() {
+    for (const id of dirtyIds) {
+      await updateAnalyzerWeight(id, Number((drafts[id] ?? 0).toFixed(1)));
+    }
+    qc.invalidateQueries({ queryKey: ["settings", "scoring"] });
+    enqueueSnackbar(`${dirtyIds.length} weight${dirtyIds.length !== 1 ? "s" : ""} saved.`, { variant: "success" });
+  }
+
+  function resetAll() {
+    const reset: Record<number, number> = {};
+    for (const a of analyzers) reset[a.id] = a.weight;
+    setDrafts(reset);
+  }
+
+  return (
+    <Stack spacing={2}>
+      {/* Bulk action bar */}
+      {dirtyIds.length > 0 ? (
+        <InnerCard
+          sx={{
+            px: 2,
+            py: 1.25,
+            display: "flex",
+            alignItems: "center",
+            gap: 1.5,
+            borderColor: alpha(theme.palette.warning.main, 0.4),
+            background: alpha(theme.palette.warning.main, isDark ? 0.06 : 0.04),
+          }}
+        >
+          <Typography variant="body2" fontWeight={700} sx={{ flex: 1 }}>
+            {dirtyIds.length} unsaved change{dirtyIds.length !== 1 ? "s" : ""}
+          </Typography>
+          <Button
+            size="small"
+            startIcon={<RestoreOutlined />}
+            onClick={resetAll}
+            sx={{ textTransform: "none", fontWeight: 800, borderRadius: 2 }}
+          >
+            Reset all
+          </Button>
+          <Button
+            size="small"
+            variant="contained"
+            startIcon={
+              updateMutation.isPending
+                ? <CircularProgress size={13} color="inherit" />
+                : <DoneAllOutlined />
+            }
+            disabled={updateMutation.isPending}
+            onClick={saveAll}
+            sx={{ textTransform: "none", fontWeight: 900, borderRadius: 2 }}
+          >
+            Save all
+          </Button>
+        </InnerCard>
+      ) : null}
+
+      {/* Analyzer cards */}
+      <Stack spacing={1.25}>
+        {analyzers.map((a) => {
+          const draft = drafts[a.id] ?? a.weight;
+          const isDirty = Number(draft.toFixed(1)) !== Number(a.weight.toFixed(1));
+          const savingThis = updateMutation.isPending && updateMutation.variables?.id === a.id;
+
+          // Weight color
+          const weightColor =
+            draft >= 0.7 ? "#22C55E"
+            : draft >= 0.4 ? "#F59E0B"
+            : "#EF4444";
+
+          return (
+            <InnerCard
+              key={a.id}
+              sx={{
+                p: 2,
+                borderColor: isDirty ? alpha(theme.palette.warning.main, 0.35) : undefined,
+                background: isDirty
+                  ? alpha(theme.palette.warning.main, isDark ? 0.04 : 0.02)
+                  : undefined,
+                transition: "all .18s ease",
+              }}
+            >
+              <Stack spacing={1.75}>
+                <Stack direction="row" alignItems="flex-start" justifyContent="space-between" spacing={1}>
+                  <Box sx={{ minWidth: 0 }}>
+                    <Stack direction="row" spacing={0.75} alignItems="center">
+                      <Typography fontWeight={950} fontSize={14} sx={{ overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
+                        {a.name}
+                      </Typography>
+                      {!a.is_active ? (
+                        <Chip size="small" label="Inactive" variant="outlined" color="warning" sx={{ height: 18, "& .MuiChip-label": { px: 0.75, fontSize: 10 } }} />
+                      ) : null}
+                      {isDirty ? (
+                        <Chip size="small" label="Modified" variant="outlined" color="warning" sx={{ height: 18, "& .MuiChip-label": { px: 0.75, fontSize: 10 } }} />
+                      ) : null}
+                    </Stack>
+                    <Typography variant="caption" color="text.disabled" sx={{ fontFamily: "monospace", fontSize: 11 }}>
+                      {a.analyzer_cortex_id}
+                    </Typography>
+                  </Box>
+
+                  {/* Weight badge */}
+                  <Box
+                    sx={{
+                      px: 1.25,
+                      py: 0.5,
+                      borderRadius: 2,
+                      background: alpha(weightColor, 0.12),
+                      border: `1px solid ${alpha(weightColor, 0.3)}`,
+                      minWidth: 56,
+                      textAlign: "center",
+                      transition: "all .2s ease",
+                    }}
+                  >
+                    <Typography sx={{ fontWeight: 950, fontSize: 18, lineHeight: 1, color: weightColor, transition: "color .2s" }}>
+                      {draft.toFixed(1)}
+                    </Typography>
+                    <Typography sx={{ fontSize: 10, color: "text.disabled", mt: 0.1 }}>
+                      weight
+                    </Typography>
+                  </Box>
+                </Stack>
+
+                {/* Slider + progress */}
+                <Stack spacing={0.75}>
+                  <LinearProgress
+                    variant="determinate"
+                    value={draft * 100}
+                    sx={{
+                      height: 5,
+                      borderRadius: 999,
+                      bgcolor: alpha(weightColor, 0.12),
+                      "& .MuiLinearProgress-bar": {
+                        bgcolor: weightColor,
+                        transition: "background-color .2s ease",
+                        borderRadius: 999,
+                      },
+                    }}
+                  />
+
+                  <Slider
+                    value={draft}
+                    min={0}
+                    max={1}
+                    step={0.1}
+                    marks
+                    onChange={(_, v) => setDrafts((prev) => ({ ...prev, [a.id]: Number(v) }))}
+                    sx={{
+                      color: weightColor,
+                      transition: "color .2s",
+                      "& .MuiSlider-mark": { width: 3, height: 3, borderRadius: 99, opacity: 0.6 },
+                      "& .MuiSlider-markLabel": { display: "none" },
+                      "& .MuiSlider-rail": { opacity: 0.25 },
+                    }}
+                  />
+
+                  <Stack direction="row" justifyContent="space-between">
+                    {[0, 0.1, 0.2, 0.3, 0.4, 0.5, 0.6, 0.7, 0.8, 0.9, 1].map((v) => (
+                      <Typography key={v} variant="caption" color={draft === v ? "text.primary" : "text.disabled"}
+                        sx={{ fontSize: 10, fontWeight: draft === v ? 900 : 400, cursor: "pointer", lineHeight: 1 }}
+                        onClick={() => setDrafts((prev) => ({ ...prev, [a.id]: v }))}
+                      >
+                        {v === 0 ? "0" : v === 1 ? "1" : ""}
+                      </Typography>
+                    ))}
+                  </Stack>
+                </Stack>
+
+                <Stack direction="row" justifyContent="flex-end" spacing={1}>
+                  {isDirty ? (
+                    <Button
+                      size="small"
+                      startIcon={<RestoreOutlined />}
+                      onClick={() => setDrafts((prev) => ({ ...prev, [a.id]: a.weight }))}
+                      sx={{ textTransform: "none", fontWeight: 800, borderRadius: 2 }}
+                    >
+                      Reset
+                    </Button>
+                  ) : null}
+                  <Button
+                    size="small"
+                    variant={isDirty ? "contained" : "outlined"}
+                    disabled={!isDirty || savingThis}
+                    startIcon={
+                      savingThis
+                        ? <CircularProgress size={13} color="inherit" />
+                        : <SaveOutlined />
+                    }
+                    onClick={() =>
+                      updateMutation.mutate({ id: a.id, weight: Number(draft.toFixed(1)) })
+                    }
+                    sx={{ textTransform: "none", fontWeight: 900, borderRadius: 2 }}
+                  >
+                    {savingThis ? "Saving…" : "Save"}
+                  </Button>
+                </Stack>
+              </Stack>
+            </InnerCard>
+          );
+        })}
+      </Stack>
+    </Stack>
+  );
+}
+
+// ---------------------------------------------------------------------------
+// CisoUsersPanel
+// ---------------------------------------------------------------------------
+
+function CisoUsersPanel() {
+  const theme = useTheme();
+  const isDark = theme.palette.mode === "dark";
+  const [filter, setFilter] = React.useState("");
+
+  const query = useQuery<CisoUser[]>({
+    queryKey: ["settings", "list", "ciso_users"],
+    queryFn: () => listItems("ciso_users"),
+    retry: false,
+  });
+
+  const items = query.data ?? [];
+  const filtered = React.useMemo(() => {
+    const q = filter.trim().toLowerCase();
+    if (!q) return items;
+    return items.filter((it) =>
+      [it.username, it.email, it.function, it.region, it.country, it.gbu, it.scope]
+        .filter(Boolean).join(" ").toLowerCase().includes(q)
+    );
+  }, [items, filter]);
+
+  return (
+    <Stack spacing={2}>
+      <Stack direction="row" spacing={1} alignItems="center">
+        <TextField
+          size="small"
+          placeholder="Search by username, email, scope, region…"
+          value={filter}
+          onChange={(e) => setFilter(e.target.value)}
+          fullWidth
+          InputProps={{
+            startAdornment: (
+              <InputAdornment position="start"><SearchOutlined fontSize="small" /></InputAdornment>
+            ),
+          }}
+        />
+        <Chip size="small" label={`${filtered.length} / ${items.length}`} variant="outlined" />
+      </Stack>
+
+      {query.isLoading ? (
+        <Box sx={{ py: 4, display: "grid", placeItems: "center" }}><CircularProgress /></Box>
+      ) : query.isError ? (
+        <Alert severity="error">Failed to load CISO users.</Alert>
+      ) : filtered.length === 0 ? (
+        <EmptyList message={filter ? `No users matching "${filter}"` : "No CISO users."} />
+      ) : (
+        <Stack spacing={1}>
+          {filtered.map((user) => (
+            <InnerCard key={user.id} hover sx={{ p: 2 }}>
+              <Stack spacing={1.25}>
+                <Stack direction={{ xs: "column", sm: "row" }} justifyContent="space-between" spacing={1} alignItems={{ sm: "center" }}>
+                  <Stack direction="row" spacing={1.25} alignItems="center">
+                    <Box
+                      sx={{
+                        width: 40,
+                        height: 40,
+                        borderRadius: 2.5,
+                        display: "grid",
+                        placeItems: "center",
+                        background: alpha(theme.palette.primary.main, 0.1),
+                        border: `1px solid ${alpha(theme.palette.primary.main, 0.2)}`,
+                      }}
+                    >
+                      <Typography fontWeight={950} fontSize={15} color="primary">
+                        {(user.username?.[0] ?? "?").toUpperCase()}
+                      </Typography>
+                    </Box>
+                    <Box>
+                      <Typography fontWeight={950} fontSize={14}>{user.username}</Typography>
+                      <Typography variant="caption" color="text.secondary">{user.email || "No email"}</Typography>
+                    </Box>
+                  </Stack>
+
+                  {user.scope ? (
+                    <Chip
+                      size="small"
+                      icon={<ShieldOutlined />}
+                      label={user.scope}
+                      variant="outlined"
+                      color="primary"
+                    />
+                  ) : (
+                    <Chip size="small" label="No scope" variant="outlined" />
+                  )}
+                </Stack>
+
+                <Divider sx={{ opacity: isDark ? 0.12 : 0.35 }} />
+
+                <Box
+                  sx={{
+                    display: "grid",
+                    gridTemplateColumns: { xs: "1fr", sm: "repeat(2, 1fr)", md: "repeat(4, 1fr)" },
+                    gap: 1,
+                  }}
+                >
+                  {[
+                    ["Function", user.function],
+                    ["GBU", user.gbu],
+                    ["Country", user.country],
+                    ["Region", user.region],
+                  ].map(([label, value]) => (
+                    <Box key={label}>
+                      <Typography variant="caption" color="text.disabled" sx={{ fontWeight: 700, fontSize: 10, textTransform: "uppercase", letterSpacing: 0.5 }}>
+                        {label}
+                      </Typography>
+                      <Typography variant="body2" fontWeight={700} sx={{ fontSize: 13 }}>
+                        {value || "—"}
+                      </Typography>
+                    </Box>
+                  ))}
+                </Box>
+              </Stack>
+            </InnerCard>
+          ))}
+        </Stack>
+      )}
+    </Stack>
+  );
+}
+
+// ---------------------------------------------------------------------------
+// Section content router
+// ---------------------------------------------------------------------------
+
+function SectionContent({ section }: { section: SectionMeta }) {
+  switch (section.kind) {
+    case "domain_pair":
+      return (
+        <DomainPairPanel
+          editableSection={section.key as "domains_allow" | "domains_deny"}
+        />
+      );
+    case "list":
+      return (
+        <EditableListPanel
+          section={section.key as EditableListSection}
+          placeholder="Paste values, one per line or comma-separated…"
+        />
+      );
+    case "toggle":
+      return <FeederPanel />;
+    case "scoring":
+      return <ScoringPanel />;
+    case "ciso_users":
+      return <CisoUsersPanel />;
+    default:
+      return null;
+  }
+}
+
+// ---------------------------------------------------------------------------
+// SECTIONS definition
+// ---------------------------------------------------------------------------
 
 const SECTIONS: SectionMeta[] = [
   {
     key: "domains_allow",
     title: "Domains allowlist",
-    subtitle: "Manage local allowlist and synced Watcher legit domains.",
+    subtitle: "Manage local allowlist and Watcher legit domains.",
     icon: <CheckCircleOutline />,
     kind: "domain_pair",
   },
   {
     key: "domains_deny",
     title: "Domains denylist",
-    subtitle: "Manage local denylist and synced Watcher monitored domains.",
+    subtitle: "Manage local denylist and Watcher monitored domains.",
     icon: <BlockOutlined />,
     kind: "domain_pair",
   },
   {
     key: "campaign_domains_allow",
-    title: "Campaign domains allowlist",
+    title: "Campaign domains",
     subtitle: "Allow campaign or newsletter domains.",
     icon: <CampaignOutlined />,
     kind: "list",
@@ -126,1059 +1391,22 @@ const SECTIONS: SectionMeta[] = [
   },
 ];
 
-function parseMulti(input: string) {
-  return input
-    .split(/[\n,; ]+/g)
-    .map((s) => s.trim())
-    .filter(Boolean);
-}
-
-function GlassCard(props: React.PropsWithChildren<{ sx?: any }>) {
-  return (
-    <Card
-      sx={{
-        borderRadius: 3,
-        border: "1px solid rgba(255,255,255,.10)",
-        background:
-          "linear-gradient(180deg, rgba(255,255,255,.06), rgba(255,255,255,.03))",
-        ...props.sx,
-      }}
-    >
-      {props.children}
-    </Card>
-  );
-}
-
-function SectionCard(
-  props: React.PropsWithChildren<{
-    title: string;
-    subtitle: string;
-    right?: React.ReactNode;
-  }>
-) {
-  return (
-    <GlassCard>
-      <CardContent sx={{ p: { xs: 2, md: 2.5 } }}>
-        <Stack
-          direction={{ xs: "column", md: "row" }}
-          spacing={1.25}
-          justifyContent="space-between"
-          alignItems={{ md: "center" }}
-        >
-          <Box>
-            <Typography variant="h6" fontWeight={950} letterSpacing={-0.2}>
-              {props.title}
-            </Typography>
-            <Typography variant="body2" color="text.secondary">
-              {props.subtitle}
-            </Typography>
-          </Box>
-          {props.right}
-        </Stack>
-
-        <Divider sx={{ my: 1.75, opacity: 0.25 }} />
-        {props.children}
-      </CardContent>
-    </GlassCard>
-  );
-}
-
-function ListManager(props: {
-  section: Exclude<
-    SettingsSection,
-    | "email_feeder"
-    | "scoring"
-    | "ciso_users"
-    | "watcher_legit_domains"
-    | "watcher_monitored_domains"
-  >;
-  placeholder: string;
-  fileAccept: string;
-}) {
-  const qc = useQueryClient();
-  const [input, setInput] = React.useState("");
-  const [filter, setFilter] = React.useState("");
-
-  const listQuery = useQuery<ListItem[]>({
-    queryKey: ["settings", "list", props.section],
-    queryFn: () => listItems(props.section),
-    retry: false,
-  });
-
-  const addMutation = useMutation({
-    mutationFn: (values: string[]) => addItems(props.section, values),
-    onSuccess: () => {
-      qc.invalidateQueries({ queryKey: ["settings", "list", props.section] });
-      setInput("");
-    },
-  });
-
-  const removeMutation = useMutation({
-    mutationFn: (id: string) => removeItem(props.section, id),
-    onSuccess: () => {
-      qc.invalidateQueries({ queryKey: ["settings", "list", props.section] });
-    },
-  });
-
-  const importMutation = useMutation({
-    mutationFn: (file: File) => addFromFile(props.section, file),
-    onSuccess: () => {
-      qc.invalidateQueries({ queryKey: ["settings", "list", props.section] });
-    },
-  });
-
-  const items = React.useMemo(() => {
-    const base = listQuery.data ?? [];
-    const q = filter.trim().toLowerCase();
-    if (!q) return base;
-    return base.filter((it) => it.value.toLowerCase().includes(q));
-  }, [listQuery.data, filter]);
-
-  return (
-    <Stack spacing={2}>
-      <Grid container spacing={1.5}>
-        <Grid item xs={12} md={6}>
-          <TextField
-            label="Add values"
-            placeholder={props.placeholder}
-            value={input}
-            onChange={(e) => setInput(e.target.value)}
-            helperText="Multiple values supported: spaces, commas or new lines."
-            fullWidth
-            InputProps={{
-              endAdornment: (
-                <InputAdornment position="end">
-                  <IconButton
-                    aria-label="Add values"
-                    onClick={() => {
-                      const values = parseMulti(input);
-                      if (!values.length) return;
-                      addMutation.mutate(values);
-                    }}
-                  >
-                    <AddOutlined />
-                  </IconButton>
-                </InputAdornment>
-              ),
-            }}
-          />
-        </Grid>
-
-        <Grid item xs={12} md={6}>
-          <TextField
-            label="Search"
-            placeholder="Filter items…"
-            value={filter}
-            onChange={(e) => setFilter(e.target.value)}
-            fullWidth
-            InputProps={{
-              startAdornment: (
-                <InputAdornment position="start">
-                  <SearchOutlined fontSize="small" />
-                </InputAdornment>
-              ),
-            }}
-          />
-        </Grid>
-
-        <Grid item xs={12}>
-          <Stack
-            direction={{ xs: "column", sm: "row" }}
-            spacing={1}
-            alignItems={{ sm: "center" }}
-          >
-            <Button
-              variant="outlined"
-              component="label"
-              startIcon={<FileUploadOutlined />}
-              sx={{ borderRadius: 2, textTransform: "none", fontWeight: 900 }}
-            >
-              Import file
-              <input
-                hidden
-                type="file"
-                accept={props.fileAccept}
-                onChange={(e) => {
-                  const f = e.target.files?.[0];
-                  if (f) importMutation.mutate(f);
-                  e.currentTarget.value = "";
-                }}
-              />
-            </Button>
-
-            <Chip
-              size="small"
-              label={`${items.length} item(s)`}
-              variant="outlined"
-              sx={{ ml: { sm: "auto" } }}
-            />
-          </Stack>
-        </Grid>
-      </Grid>
-
-      {addMutation.isError ? (
-        <Alert severity="error">Failed to add values.</Alert>
-      ) : null}
-      {removeMutation.isError ? (
-        <Alert severity="error">Failed to remove item.</Alert>
-      ) : null}
-      {importMutation.isError ? (
-        <Alert severity="error">Failed to import file.</Alert>
-      ) : null}
-
-      {listQuery.isLoading ? (
-        <Box sx={{ display: "grid", placeItems: "center", py: 4 }}>
-          <CircularProgress />
-        </Box>
-      ) : listQuery.isError ? (
-        <Alert severity="error">Failed to load list.</Alert>
-      ) : (
-        <GlassCard
-          sx={{
-            borderRadius: 2.5,
-            background: "rgba(255,255,255,.03)",
-          }}
-        >
-          <CardContent sx={{ p: 1.25 }}>
-            {items.length ? (
-              <Stack spacing={0.9}>
-                {items.map((it) => (
-                  <Stack
-                    key={it.id}
-                    direction="row"
-                    alignItems="center"
-                    justifyContent="space-between"
-                    sx={{
-                      borderRadius: 2,
-                      border: "1px solid rgba(255,255,255,.08)",
-                      px: 1.25,
-                      py: 0.9,
-                    }}
-                  >
-                    <Box sx={{ minWidth: 0, pr: 1 }}>
-                      <Typography
-                        sx={{
-                          fontWeight: 800,
-                          overflow: "hidden",
-                          textOverflow: "ellipsis",
-                          whiteSpace: "nowrap",
-                        }}
-                      >
-                        {it.value}
-                      </Typography>
-                      {it.created_at ? (
-                        <Typography variant="caption" color="text.secondary">
-                          {new Date(it.created_at).toLocaleString()}
-                        </Typography>
-                      ) : null}
-                    </Box>
-
-                    <IconButton
-                      aria-label="Remove"
-                      onClick={() => removeMutation.mutate(it.id)}
-                      size="small"
-                      sx={{
-                        border: "1px solid rgba(255,255,255,.10)",
-                        borderRadius: 2,
-                      }}
-                    >
-                      <DeleteOutline fontSize="small" />
-                    </IconButton>
-                  </Stack>
-                ))}
-              </Stack>
-            ) : (
-              <Typography color="text.secondary" sx={{ p: 2 }}>
-                No items.
-              </Typography>
-            )}
-          </CardContent>
-        </GlassCard>
-      )}
-    </Stack>
-  );
-}
-
-function EditableListCard(props: {
-  section: Exclude<
-    SettingsSection,
-    | "email_feeder"
-    | "scoring"
-    | "ciso_users"
-    | "watcher_legit_domains"
-    | "watcher_monitored_domains"
-  >;
-  title: string;
-  subtitle: string;
-  placeholder: string;
-  fileAccept: string;
-}) {
-  const qc = useQueryClient();
-  const [input, setInput] = React.useState("");
-  const [filter, setFilter] = React.useState("");
-
-  const listQuery = useQuery<ListItem[]>({
-    queryKey: ["settings", "list", props.section],
-    queryFn: () => listItems(props.section),
-    retry: false,
-  });
-
-  const addMutation = useMutation({
-    mutationFn: (values: string[]) => addItems(props.section, values),
-    onSuccess: () => {
-      qc.invalidateQueries({ queryKey: ["settings", "list", props.section] });
-      setInput("");
-    },
-  });
-
-  const removeMutation = useMutation({
-    mutationFn: (id: string) => removeItem(props.section, id),
-    onSuccess: () => {
-      qc.invalidateQueries({ queryKey: ["settings", "list", props.section] });
-    },
-  });
-
-  const importMutation = useMutation({
-    mutationFn: (file: File) => addFromFile(props.section, file),
-    onSuccess: () => {
-      qc.invalidateQueries({ queryKey: ["settings", "list", props.section] });
-    },
-  });
-
-  const items = React.useMemo(() => {
-    const base = listQuery.data ?? [];
-    const q = filter.trim().toLowerCase();
-    if (!q) return base;
-    return base.filter((it) => it.value.toLowerCase().includes(q));
-  }, [listQuery.data, filter]);
-
-  return (
-    <GlassCard
-      sx={{
-        height: "100%",
-        borderRadius: 2.5,
-        background: "rgba(255,255,255,.03)",
-      }}
-    >
-      <CardContent sx={{ p: 2 }}>
-        <Stack spacing={1.5}>
-          <Box>
-            <Typography fontWeight={950}>{props.title}</Typography>
-            <Typography variant="body2" color="text.secondary">
-              {props.subtitle}
-            </Typography>
-          </Box>
-
-          <TextField
-            size="small"
-            label="Add values"
-            placeholder={props.placeholder}
-            value={input}
-            onChange={(e) => setInput(e.target.value)}
-            fullWidth
-            helperText="Spaces, commas or new lines."
-            InputProps={{
-              endAdornment: (
-                <InputAdornment position="end">
-                  <IconButton
-                    aria-label="Add values"
-                    onClick={() => {
-                      const values = parseMulti(input);
-                      if (!values.length) return;
-                      addMutation.mutate(values);
-                    }}
-                    size="small"
-                  >
-                    <AddOutlined fontSize="small" />
-                  </IconButton>
-                </InputAdornment>
-              ),
-            }}
-          />
-
-          <TextField
-            size="small"
-            label="Search"
-            placeholder="Filter items…"
-            value={filter}
-            onChange={(e) => setFilter(e.target.value)}
-            fullWidth
-            InputProps={{
-              startAdornment: (
-                <InputAdornment position="start">
-                  <SearchOutlined fontSize="small" />
-                </InputAdornment>
-              ),
-            }}
-          />
-
-          <Stack
-            direction={{ xs: "column", sm: "row" }}
-            spacing={1}
-            alignItems={{ sm: "center" }}
-          >
-            <Button
-              size="small"
-              variant="outlined"
-              component="label"
-              startIcon={<FileUploadOutlined />}
-              sx={{ borderRadius: 2, textTransform: "none", fontWeight: 900 }}
-            >
-              Import
-              <input
-                hidden
-                type="file"
-                accept={props.fileAccept}
-                onChange={(e) => {
-                  const f = e.target.files?.[0];
-                  if (f) importMutation.mutate(f);
-                  e.currentTarget.value = "";
-                }}
-              />
-            </Button>
-
-            <Chip
-              size="small"
-              label={`${items.length} item(s)`}
-              variant="outlined"
-              sx={{ ml: { sm: "auto" } }}
-            />
-          </Stack>
-
-          {addMutation.isError ? (
-            <Alert severity="error">Failed to add values.</Alert>
-          ) : null}
-          {removeMutation.isError ? (
-            <Alert severity="error">Failed to remove item.</Alert>
-          ) : null}
-          {importMutation.isError ? (
-            <Alert severity="error">Failed to import file.</Alert>
-          ) : null}
-
-          {listQuery.isLoading ? (
-            <Box sx={{ display: "grid", placeItems: "center", py: 4 }}>
-              <CircularProgress size={24} />
-            </Box>
-          ) : listQuery.isError ? (
-            <Alert severity="error">Failed to load list.</Alert>
-          ) : (
-            <Box
-              sx={{
-                maxHeight: 420,
-                overflowY: "auto",
-                borderRadius: 2,
-                border: "1px solid rgba(255,255,255,.08)",
-              }}
-            >
-              {items.length ? (
-                <Stack spacing={0} sx={{ p: 1 }}>
-                  {items.map((it) => (
-                    <Stack
-                      key={it.id}
-                      direction="row"
-                      alignItems="center"
-                      justifyContent="space-between"
-                      sx={{
-                        px: 1.25,
-                        py: 1,
-                        borderRadius: 1.5,
-                        "&:not(:last-child)": {
-                          mb: 0.75,
-                        },
-                        border: "1px solid rgba(255,255,255,.06)",
-                      }}
-                    >
-                      <Box sx={{ minWidth: 0, pr: 1 }}>
-                        <Typography
-                          sx={{
-                            fontWeight: 800,
-                            overflow: "hidden",
-                            textOverflow: "ellipsis",
-                            whiteSpace: "nowrap",
-                          }}
-                        >
-                          {it.value}
-                        </Typography>
-                        {it.created_at ? (
-                          <Typography variant="caption" color="text.secondary">
-                            {new Date(it.created_at).toLocaleString()}
-                          </Typography>
-                        ) : null}
-                      </Box>
-
-                      <IconButton
-                        aria-label="Remove"
-                        onClick={() => removeMutation.mutate(it.id)}
-                        size="small"
-                        sx={{
-                          border: "1px solid rgba(255,255,255,.10)",
-                          borderRadius: 2,
-                        }}
-                      >
-                        <DeleteOutline fontSize="small" />
-                      </IconButton>
-                    </Stack>
-                  ))}
-                </Stack>
-              ) : (
-                <Typography color="text.secondary" sx={{ p: 2 }}>
-                  No items.
-                </Typography>
-              )}
-            </Box>
-          )}
-        </Stack>
-      </CardContent>
-    </GlassCard>
-  );
-}
-
-function ReadOnlyListCard(props: {
-  section: "watcher_legit_domains" | "watcher_monitored_domains";
-  title: string;
-  subtitle: string;
-}) {
-  const [filter, setFilter] = React.useState("");
-
-  const listQuery = useQuery<ListItem[]>({
-    queryKey: ["settings", "list", props.section],
-    queryFn: () => listItems(props.section),
-    retry: false,
-  });
-
-  const items = React.useMemo(() => {
-    const base = listQuery.data ?? [];
-    const q = filter.trim().toLowerCase();
-    if (!q) return base;
-    return base.filter((it) => it.value.toLowerCase().includes(q));
-  }, [listQuery.data, filter]);
-
-  return (
-    <GlassCard
-      sx={{
-        height: "100%",
-        borderRadius: 2.5,
-        background: "rgba(255,255,255,.03)",
-      }}
-    >
-      <CardContent sx={{ p: 2 }}>
-        <Stack spacing={1.5}>
-          <Stack
-            direction="row"
-            justifyContent="space-between"
-            alignItems="flex-start"
-            spacing={1}
-          >
-            <Box>
-              <Typography fontWeight={950}>{props.title}</Typography>
-              <Typography variant="body2" color="text.secondary">
-                {props.subtitle}
-              </Typography>
-            </Box>
-
-            <Chip
-              size="small"
-              label="Synced from Watcher"
-              color="info"
-              variant="outlined"
-            />
-          </Stack>
-
-          <Typography variant="caption" color="text.secondary">
-            Managed externally. These domains are read-only in this page.
-          </Typography>
-
-          <TextField
-            size="small"
-            label="Search"
-            placeholder="Filter domains…"
-            value={filter}
-            onChange={(e) => setFilter(e.target.value)}
-            fullWidth
-            InputProps={{
-              startAdornment: (
-                <InputAdornment position="start">
-                  <SearchOutlined fontSize="small" />
-                </InputAdornment>
-              ),
-            }}
-          />
-
-          {listQuery.isLoading ? (
-            <Box sx={{ display: "grid", placeItems: "center", py: 4 }}>
-              <CircularProgress size={24} />
-            </Box>
-          ) : listQuery.isError ? (
-            <Alert severity="error">Failed to load synced domains.</Alert>
-          ) : (
-            <>
-              <Stack
-                direction="row"
-                justifyContent="space-between"
-                alignItems="center"
-              >
-                <Typography variant="caption" color="text.secondary">
-                  Read-only list
-                </Typography>
-                <Chip
-                  size="small"
-                  label={`${items.length} item(s)`}
-                  variant="outlined"
-                />
-              </Stack>
-
-              <Box
-                sx={{
-                  maxHeight: 420,
-                  overflowY: "auto",
-                  borderRadius: 2,
-                  border: "1px solid rgba(255,255,255,.08)",
-                }}
-              >
-                {items.length ? (
-                  <Stack spacing={0} sx={{ p: 1 }}>
-                    {items.map((it) => (
-                      <Box
-                        key={it.id}
-                        sx={{
-                          px: 1.25,
-                          py: 1,
-                          borderRadius: 1.5,
-                          "&:not(:last-child)": {
-                            mb: 0.75,
-                          },
-                          border: "1px solid rgba(255,255,255,.06)",
-                        }}
-                      >
-                        <Typography
-                          sx={{
-                            fontWeight: 800,
-                            overflow: "hidden",
-                            textOverflow: "ellipsis",
-                            whiteSpace: "nowrap",
-                          }}
-                        >
-                          {it.value}
-                        </Typography>
-                        {it.created_at ? (
-                          <Typography variant="caption" color="text.secondary">
-                            {new Date(it.created_at).toLocaleString()}
-                          </Typography>
-                        ) : null}
-                      </Box>
-                    ))}
-                  </Stack>
-                ) : (
-                  <Typography color="text.secondary" sx={{ p: 2 }}>
-                    No synced items.
-                  </Typography>
-                )}
-              </Box>
-            </>
-          )}
-        </Stack>
-      </CardContent>
-    </GlassCard>
-  );
-}
-
-function DomainPairPanel(props: {
-  editableSection: "domains_allow" | "domains_deny";
-}) {
-  const isAllow = props.editableSection === "domains_allow";
-
-  return (
-    <Grid container spacing={2}>
-      <Grid item xs={12} lg={6}>
-        <EditableListCard
-          section={props.editableSection}
-          title={isAllow ? "Domains allowlist" : "Domains denylist"}
-          subtitle={
-            isAllow
-              ? "Manage locally allowed domains."
-              : "Manage locally denied domains."
-          }
-          placeholder="Paste domains…"
-          fileAccept=".txt,.csv,.json"
-        />
-      </Grid>
-
-      <Grid item xs={12} lg={6}>
-        <ReadOnlyListCard
-          section={
-            isAllow ? "watcher_legit_domains" : "watcher_monitored_domains"
-          }
-          title={
-            isAllow ? "Watcher legit domains" : "Watcher monitored domains"
-          }
-          subtitle={
-            isAllow
-              ? "Read-only domains synchronized from Watcher."
-              : "Read-only monitored domains synchronized from Watcher."
-          }
-        />
-      </Grid>
-    </Grid>
-  );
-}
-
-function FeederPanel() {
-  const qc = useQueryClient();
-
-  const statusQuery = useQuery({
-    queryKey: ["settings", "email_feeder"],
-    queryFn: getFeederStatus,
-    retry: false,
-  });
-
-  const toggleMutation = useMutation({
-    mutationFn: (enabled: boolean) => setFeederStatus(enabled),
-    onSuccess: () => {
-      qc.invalidateQueries({ queryKey: ["settings", "email_feeder"] });
-    },
-  });
-
-  const enabled = statusQuery.data?.enabled ?? false;
-
-  return (
-    <Stack spacing={2}>
-      {statusQuery.isError ? (
-        <Alert severity="error">Failed to load feeder status.</Alert>
-      ) : null}
-
-      <GlassCard
-        sx={{
-          borderRadius: 2.5,
-          background: "rgba(255,255,255,.03)",
-        }}
-      >
-        <CardContent sx={{ p: 2 }}>
-          <Stack
-            direction="row"
-            alignItems="center"
-            justifyContent="space-between"
-            spacing={2}
-          >
-            <Stack spacing={0.25}>
-              <Typography fontWeight={950}>Email feeder</Typography>
-              <Typography variant="body2" color="text.secondary">
-                Automatically ingest suspicious emails and create cases.
-              </Typography>
-            </Stack>
-
-            <Stack direction="row" spacing={1} alignItems="center">
-              <Chip
-                size="small"
-                label={enabled ? "Enabled" : "Disabled"}
-                variant="outlined"
-                color={enabled ? "success" : "default"}
-              />
-              <Switch
-                checked={enabled}
-                onChange={(e) => toggleMutation.mutate(e.target.checked)}
-                disabled={statusQuery.isLoading || toggleMutation.isPending}
-              />
-            </Stack>
-          </Stack>
-        </CardContent>
-      </GlassCard>
-    </Stack>
-  );
-}
-
-function ScoringPanel() {
-  const qc = useQueryClient();
-
-  const analyzersQuery = useQuery<Analyzer[]>({
-    queryKey: ["settings", "scoring"],
-    queryFn: listAnalyzers,
-    retry: false,
-  });
-
-  const updateMutation = useMutation({
-    mutationFn: async (payload: { id: number; weight: number }) =>
-      updateAnalyzerWeight(payload.id, payload.weight),
-    onSuccess: () => {
-      qc.invalidateQueries({ queryKey: ["settings", "scoring"] });
-    },
-  });
-
-  const [drafts, setDrafts] = React.useState<Record<number, number>>({});
-
-  React.useEffect(() => {
-    if (!analyzersQuery.data) return;
-    const next: Record<number, number> = {};
-    for (const analyzer of analyzersQuery.data) {
-      next[analyzer.id] = analyzer.weight;
-    }
-    setDrafts(next);
-  }, [analyzersQuery.data]);
-
-  if (analyzersQuery.isLoading) {
-    return (
-      <Box sx={{ display: "grid", placeItems: "center", py: 4 }}>
-        <CircularProgress />
-      </Box>
-    );
-  }
-
-  if (analyzersQuery.isError) {
-    return <Alert severity="error">Failed to load analyzers.</Alert>;
-  }
-
-  const analyzers = analyzersQuery.data ?? [];
-
-  return (
-    <Stack spacing={1.25}>
-      {analyzers.map((a) => {
-        const draftWeight = drafts[a.id] ?? a.weight;
-        const dirty = Number(draftWeight) !== Number(a.weight);
-        const savingThisOne =
-          updateMutation.isPending && updateMutation.variables?.id === a.id;
-
-        return (
-          <Card
-            key={a.id}
-            sx={{
-              borderRadius: 3,
-              border: "1px solid rgba(255,255,255,.10)",
-              background: "rgba(255,255,255,.03)",
-            }}
-          >
-            <CardContent sx={{ p: 2 }}>
-              <Stack
-                direction={{ xs: "column", md: "row" }}
-                spacing={2}
-                alignItems={{ md: "center" }}
-              >
-                <Box sx={{ flex: 1, minWidth: 0 }}>
-                  <Typography fontWeight={950}>{a.name}</Typography>
-                  <Typography variant="caption" color="text.secondary">
-                    cortex id: {a.analyzer_cortex_id}
-                  </Typography>
-                </Box>
-
-                <Stack
-                  direction={{ xs: "column", sm: "row" }}
-                  spacing={1.5}
-                  alignItems={{ xs: "stretch", sm: "center" }}
-                  sx={{ minWidth: { md: 420 } }}
-                >
-                  <Box sx={{ flex: 1, px: 1 }}>
-                    <Slider
-                      value={draftWeight}
-                      min={0}
-                      max={1}
-                      step={0.1}
-                      marks
-                      onChange={(_, value) => {
-                        setDrafts((prev) => ({
-                          ...prev,
-                          [a.id]: Number(value),
-                        }));
-                      }}
-                      sx={{
-                        "& .MuiSlider-mark": {
-                          width: 4,
-                          height: 4,
-                          borderRadius: 99,
-                          opacity: 0.7,
-                        },
-                        "& .MuiSlider-markLabel": {
-                          display: "none",
-                        },
-                      }}
-                    />
-                  </Box>
-
-                  <TextField
-                    size="small"
-                    value={draftWeight}
-                    onChange={(e) => {
-                      const v = Number(e.target.value);
-                      if (!Number.isFinite(v)) return;
-                      const clamped = Math.max(0, Math.min(1, v));
-                      setDrafts((prev) => ({
-                        ...prev,
-                        [a.id]: clamped,
-                      }));
-                    }}
-                    inputProps={{
-                      inputMode: "decimal",
-                      step: 0.1,
-                      min: 0,
-                      max: 1,
-                      style: { textAlign: "center", width: 72 },
-                    }}
-                  />
-
-                  <Button
-                    variant="contained"
-                    disabled={!dirty || savingThisOne}
-                    onClick={() =>
-                      updateMutation.mutate({
-                        id: a.id,
-                        weight: Number(draftWeight.toFixed(1)),
-                      })
-                    }
-                    sx={{
-                      borderRadius: 3,
-                      textTransform: "none",
-                      fontWeight: 900,
-                      minWidth: 88,
-                    }}
-                  >
-                    {savingThisOne ? "Saving…" : "Save"}
-                  </Button>
-                </Stack>
-              </Stack>
-            </CardContent>
-          </Card>
-        );
-      })}
-    </Stack>
-  );
-}
-
-function CisoUsersPanel() {
-  const [filter, setFilter] = React.useState("");
-
-  const query = useQuery<CisoUser[]>({
-    queryKey: ["settings", "list", "ciso_users"],
-    queryFn: () => listItems("ciso_users"),
-    retry: false,
-  });
-
-  const items = React.useMemo(() => {
-    const base = query.data ?? [];
-    const q = filter.trim().toLowerCase();
-    if (!q) return base;
-
-    return base.filter((it) => {
-      const haystack = [
-        it.username,
-        it.email,
-        it.function,
-        it.region,
-        it.country,
-        it.gbu,
-        it.scope,
-      ]
-        .filter(Boolean)
-        .join(" ")
-        .toLowerCase();
-
-      return haystack.includes(q);
-    });
-  }, [query.data, filter]);
-
-  return (
-    <Stack spacing={2}>
-      <TextField
-        label="Search CISO users"
-        placeholder="username, email, scope…"
-        value={filter}
-        onChange={(e) => setFilter(e.target.value)}
-        fullWidth
-        InputProps={{
-          startAdornment: (
-            <InputAdornment position="start">
-              <SearchOutlined fontSize="small" />
-            </InputAdornment>
-          ),
-        }}
-      />
-
-      {query.isLoading ? (
-        <Box sx={{ display: "grid", placeItems: "center", py: 4 }}>
-          <CircularProgress />
-        </Box>
-      ) : query.isError ? (
-        <Alert severity="error">Failed to load CISO users.</Alert>
-      ) : items.length === 0 ? (
-        <Alert severity="info">No CISO users found.</Alert>
-      ) : (
-        <Stack spacing={1}>
-          {items.map((user) => (
-            <GlassCard
-              key={user.id}
-              sx={{
-                borderRadius: 2.5,
-                background: "rgba(255,255,255,.03)",
-              }}
-            >
-              <CardContent sx={{ p: 2 }}>
-                <Stack spacing={1}>
-                  <Stack
-                    direction={{ xs: "column", sm: "row" }}
-                    justifyContent="space-between"
-                    spacing={1}
-                  >
-                    <Box>
-                      <Typography fontWeight={950}>{user.username}</Typography>
-                      <Typography variant="body2" color="text.secondary">
-                        {user.email || "No email"}
-                      </Typography>
-                    </Box>
-
-                    <Chip
-                      size="small"
-                      icon={<ShieldOutlined />}
-                      label={user.scope || "No scope"}
-                      variant="outlined"
-                    />
-                  </Stack>
-
-                  <Divider sx={{ opacity: 0.2 }} />
-
-                  <Box
-                    sx={{
-                      display: "grid",
-                      gridTemplateColumns: { xs: "1fr", sm: "repeat(2, 1fr)" },
-                      gap: 1,
-                    }}
-                  >
-                    <Typography variant="body2">
-                      <b>Function:</b> {user.function || "—"}
-                    </Typography>
-                    <Typography variant="body2">
-                      <b>GBU:</b> {user.gbu || "—"}
-                    </Typography>
-                    <Typography variant="body2">
-                      <b>Country:</b> {user.country || "—"}
-                    </Typography>
-                    <Typography variant="body2">
-                      <b>Region:</b> {user.region || "—"}
-                    </Typography>
-                  </Box>
-                </Stack>
-              </CardContent>
-            </GlassCard>
-          ))}
-        </Stack>
-      )}
-    </Stack>
-  );
-}
+// ---------------------------------------------------------------------------
+// Page
+// ---------------------------------------------------------------------------
 
 export default function SettingsPage() {
   const qc = useQueryClient();
   const theme = useTheme();
+  const isDark = theme.palette.mode === "dark";
 
-  const meQuery = useQuery<Me>({
-    queryKey: ["me"],
-    queryFn: getMe,
-    retry: false,
-  });
-
+  const meQuery = useQuery<Me>({ queryKey: ["me"], queryFn: getMe, retry: false });
   const me = meQuery.data;
   const groups = me?.groups ?? [];
   const isAllowed = groups.includes("Admin") || groups.includes("CERT");
 
-  const [active, setActive] =
-    React.useState<SettingsSection>("domains_allow");
-
-  const meta = SECTIONS.find((s) => s.key === active)!;
+  const [active, setActive] = React.useState<SettingsSection>("domains_allow");
+  const activeMeta = SECTIONS.find((s) => s.key === active)!;
 
   if (meQuery.isLoading) {
     return (
@@ -1191,18 +1419,21 @@ export default function SettingsPage() {
   if (!me || !isAllowed) {
     return (
       <Box sx={{ p: 3 }}>
-        <Alert severity="error">Not authorized (Admin/CERT only).</Alert>
+        <Alert severity="error">Not authorized (Admin / CERT only).</Alert>
       </Box>
     );
   }
 
   return (
     <Box sx={{ p: { xs: 1.5, md: 2.5 } }}>
+      {/* ---------------------------------------------------------------- */}
+      {/* Page header                                                       */}
+      {/* ---------------------------------------------------------------- */}
       <Stack
         direction={{ xs: "column", md: "row" }}
         justifyContent="space-between"
         spacing={1.5}
-        sx={{ mb: 2 }}
+        sx={{ mb: 2.5 }}
       >
         <Stack spacing={0.3}>
           <Typography variant="h4" fontWeight={950} letterSpacing={-0.5}>
@@ -1213,122 +1444,155 @@ export default function SettingsPage() {
           </Typography>
         </Stack>
 
-        <IconButton
-          aria-label="Refresh all"
-          onClick={() => qc.invalidateQueries({ queryKey: ["settings"] })}
-          sx={{
-            alignSelf: { xs: "flex-start", md: "center" },
-            border: `1px solid ${alpha(theme.palette.common.white, 0.1)}`,
-            borderRadius: 2,
-          }}
-        >
-          <RefreshOutlined />
-        </IconButton>
+        <Tooltip title="Refresh all settings">
+          <IconButton
+            aria-label="Refresh all"
+            onClick={() => qc.invalidateQueries({ queryKey: ["settings"] })}
+            sx={{
+              alignSelf: { xs: "flex-start", md: "center" },
+              border: `1px solid ${alpha(theme.palette.divider, isDark ? 0.22 : 0.6)}`,
+              borderRadius: 2,
+            }}
+          >
+            <RefreshOutlined />
+          </IconButton>
+        </Tooltip>
       </Stack>
 
-      <Grid container spacing={2}>
-        <Grid item xs={12} md={3.5}>
-          <GlassCard sx={{ overflow: "hidden" }}>
-            <CardContent sx={{ p: 1.25 }}>
-              <Stack
-                direction="row"
-                spacing={1}
-                alignItems="center"
-                sx={{ px: 1, py: 1 }}
-              >
+      <Grid container spacing={2} alignItems="flex-start">
+        {/* ---------------------------------------------------------------- */}
+        {/* Sidebar nav                                                       */}
+        {/* ---------------------------------------------------------------- */}
+        <Grid item xs={12} md={3.5} lg={3}>
+          <SoftCard sx={{ overflow: "hidden", position: { md: "sticky" }, top: { md: 16 } }}>
+            <CardContent sx={{ p: 1.5 }}>
+              {/* Console identity */}
+              <Stack direction="row" spacing={1.25} alignItems="center" sx={{ px: 1, py: 1, mb: 0.5 }}>
                 <Box
                   sx={{
-                    width: 38,
-                    height: 38,
-                    borderRadius: 2.5,
+                    width: 42,
+                    height: 42,
+                    borderRadius: 3,
                     display: "grid",
                     placeItems: "center",
-                    border: "1px solid rgba(255,255,255,.12)",
-                    background:
-                      "linear-gradient(135deg, rgba(56,189,248,.14), rgba(120,119,198,.12))",
+                    border: `1px solid ${alpha(theme.palette.divider, isDark ? 0.22 : 0.6)}`,
+                    background: "linear-gradient(135deg, rgba(56,189,248,.14), rgba(120,119,198,.12))",
+                    "& svg": { fontSize: 22 },
                   }}
                 >
                   <SettingsOutlined />
                 </Box>
-                <Box>
-                  <Typography fontWeight={950}>Admin console</Typography>
-                  <Typography variant="caption" color="text.secondary">
-                    {me.username}
-                  </Typography>
+                <Box sx={{ minWidth: 0 }}>
+                  <Typography fontWeight={950} fontSize={14}>Admin console</Typography>
+                  <Typography variant="caption" color="text.secondary" noWrap>{me.username}</Typography>
                 </Box>
               </Stack>
 
-              <Divider sx={{ opacity: 0.25, my: 1 }} />
+              <Divider sx={{ opacity: isDark ? 0.18 : 0.45, my: 1 }} />
 
+              {/* Section list */}
               <List dense disablePadding>
-                {SECTIONS.map((s) => (
-                  <ListItemButton
-                    key={s.key}
-                    selected={active === s.key}
-                    onClick={() => setActive(s.key)}
-                    sx={{
-                      borderRadius: 2.25,
-                      mx: 0.5,
-                      my: 0.4,
-                      "&.Mui-selected": {
-                        backgroundColor: "rgba(255,255,255,.08)",
-                      },
-                    }}
-                  >
-                    <Box
+                {SECTIONS.map((s) => {
+                  const isActive = active === s.key;
+                  return (
+                    <ListItemButton
+                      key={s.key}
+                      selected={isActive}
+                      onClick={() => setActive(s.key)}
                       sx={{
-                        width: 34,
-                        display: "grid",
-                        placeItems: "center",
-                        opacity: 0.9,
+                        borderRadius: 2.5,
+                        mx: 0.25,
+                        my: 0.35,
+                        py: 1,
+                        px: 1.25,
+                        transition: "all .15s ease",
+                        "&.Mui-selected": {
+                          background: alpha(theme.palette.primary.main, isDark ? 0.12 : 0.08),
+                          "&:hover": {
+                            background: alpha(theme.palette.primary.main, isDark ? 0.16 : 0.11),
+                          },
+                        },
                       }}
                     >
-                      {s.icon}
-                    </Box>
-                    <ListItemText
-                      primary={s.title}
-                      secondary={s.subtitle}
-                      primaryTypographyProps={{ fontWeight: 900 }}
-                      secondaryTypographyProps={{
-                        sx: { display: { xs: "none", md: "block" } },
-                      }}
-                    />
-                  </ListItemButton>
-                ))}
+                      <NavIcon icon={s.icon} isDark={isDark} />
+                      <ListItemText
+                        primary={s.title}
+                        secondary={s.subtitle}
+                        sx={{ ml: 1.25 }}
+                        primaryTypographyProps={{
+                          fontWeight: isActive ? 950 : 800,
+                          fontSize: 13.5,
+                          color: isActive ? "primary.main" : undefined,
+                        }}
+                        secondaryTypographyProps={{
+                          sx: { display: { xs: "none", md: "block" }, fontSize: 11, mt: 0.15 },
+                        }}
+                      />
+                    </ListItemButton>
+                  );
+                })}
               </List>
             </CardContent>
-          </GlassCard>
+          </SoftCard>
         </Grid>
 
-        <Grid item xs={12} md={8.5}>
-          <SectionCard title={meta.title} subtitle={meta.subtitle}>
-            {meta.kind === "domain_pair" && active === "domains_allow" ? (
-              <DomainPairPanel editableSection="domains_allow" />
-            ) : meta.kind === "domain_pair" && active === "domains_deny" ? (
-              <DomainPairPanel editableSection="domains_deny" />
-            ) : meta.kind === "list" ? (
-              <ListManager
-                section={
-                  meta.key as Exclude<
-                    SettingsSection,
-                    | "email_feeder"
-                    | "scoring"
-                    | "ciso_users"
-                    | "watcher_legit_domains"
-                    | "watcher_monitored_domains"
+        {/* ---------------------------------------------------------------- */}
+        {/* Main content panel                                               */}
+        {/* ---------------------------------------------------------------- */}
+        <Grid item xs={12} md={8.5} lg={9}>
+          <SoftCard>
+            <CardContent sx={{ p: { xs: 2, md: 3 } }}>
+              {/* Section header */}
+              <Stack
+                direction={{ xs: "column", sm: "row" }}
+                spacing={1.25}
+                justifyContent="space-between"
+                alignItems={{ sm: "center" }}
+                sx={{ mb: 2.5 }}
+              >
+                <Stack direction="row" spacing={1.5} alignItems="center">
+                  <Box
+                    sx={{
+                      width: 46,
+                      height: 46,
+                      borderRadius: 3,
+                      display: "grid",
+                      placeItems: "center",
+                      border: `1px solid ${alpha(theme.palette.divider, isDark ? 0.22 : 0.6)}`,
+                      background: "linear-gradient(135deg, rgba(56,189,248,.14), rgba(120,119,198,.12))",
+                      "& svg": { fontSize: 22 },
+                      flexShrink: 0,
+                    }}
                   >
-                }
-                placeholder="Paste values…"
-                fileAccept=".txt,.csv,.json"
-              />
-            ) : meta.kind === "toggle" ? (
-              <FeederPanel />
-            ) : meta.kind === "scoring" ? (
-              <ScoringPanel />
-            ) : (
-              <CisoUsersPanel />
-            )}
-          </SectionCard>
+                    {activeMeta.icon}
+                  </Box>
+                  <Box>
+                    <Typography variant="h6" fontWeight={950} letterSpacing={-0.2}>
+                      {activeMeta.title}
+                    </Typography>
+                    <Typography variant="body2" color="text.secondary">
+                      {activeMeta.subtitle}
+                    </Typography>
+                  </Box>
+                </Stack>
+
+                <Button
+                  size="small"
+                  variant="outlined"
+                  startIcon={<RefreshOutlined />}
+                  onClick={() => qc.invalidateQueries({ queryKey: ["settings", "list", active] })}
+                  sx={{ borderRadius: 2.5, textTransform: "none", fontWeight: 900, flexShrink: 0 }}
+                >
+                  Refresh
+                </Button>
+              </Stack>
+
+              <Divider sx={{ opacity: isDark ? 0.18 : 0.45, mb: 2.5 }} />
+
+              {/* Section body */}
+              <SectionContent section={activeMeta} />
+            </CardContent>
+          </SoftCard>
         </Grid>
       </Grid>
     </Box>

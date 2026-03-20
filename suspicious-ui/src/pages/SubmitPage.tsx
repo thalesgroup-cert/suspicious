@@ -36,11 +36,16 @@ import { z } from "zod";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { useDropzone } from "react-dropzone";
 import { useSnackbar } from "notistack";
+import { useNavigate } from "react-router-dom";
 
 import { api } from "@/api/client";
 import { getMe, type Me } from "@/api/auth";
 
-import axios, { AxiosError } from "axios";
+import axios from "axios";
+
+// ---------------------------------------------------------------------------
+// Types
+// ---------------------------------------------------------------------------
 
 type SubmitConfigResponse = {
   status: "success";
@@ -55,7 +60,7 @@ type SubmitSuccessResponse = {
   submission_type: "url" | "other" | "file";
   result_type: "case" | "mail";
   case_id: number | string | null;
-  id?: number | string | null; // compatibility
+  id?: number | string | null;
   message: string;
 };
 
@@ -65,6 +70,12 @@ type ApiErrorResponse = {
   detail?: string;
   non_field_errors?: string[];
 } & Record<string, unknown>;
+
+type SubmitMode = "file" | "artifact";
+
+// ---------------------------------------------------------------------------
+// Helpers
+// ---------------------------------------------------------------------------
 
 function extractApiErrorMessage(error: unknown): string {
   if (!axios.isAxiosError(error)) {
@@ -81,7 +92,7 @@ function extractApiErrorMessage(error: unknown): string {
   }
 
   const fieldMessages = Object.entries(data)
-    .filter(([key, value]) => key !== "status" && key !== "code" && key !== "detail")
+    .filter(([key]) => key !== "status" && key !== "code" && key !== "detail")
     .flatMap(([key, value]) => {
       if (Array.isArray(value)) {
         return value.map((msg) => `${key}: ${String(msg)}`);
@@ -99,7 +110,9 @@ function extractApiErrorMessage(error: unknown): string {
   return error.message || "Request failed.";
 }
 
-type SubmitMode = "file" | "url" | "ioc";
+function resolveId(res: SubmitSuccessResponse): string | number | null {
+  return res.case_id ?? res.id ?? null;
+}
 
 function formatBytes(bytes: number) {
   const units = ["B", "KB", "MB", "GB"];
@@ -112,21 +125,78 @@ function formatBytes(bytes: number) {
   return `${v.toFixed(i === 0 ? 0 : 1)} ${units[i]}`;
 }
 
-async function submitUrl(input: { url: string; context?: string }): Promise<SubmitSuccessResponse> {
+// ---------------------------------------------------------------------------
+// Artifact classification
+//
+// Determines whether a raw input string should be routed to /submit/url/
+// or /submit/other/.
+//
+// Rules (in priority order):
+//   1. Starts with http:// or https://                                   → url
+//   2. Looks like a bare domain (evil.com, sub.evil.co.uk, evil.com/path) → url
+//   3. Everything else (hash, IP, free-text IOC)                          → ioc
+//
+// The bare-domain branch also normalises the value to "http://<input>"
+// before sending, because Django's URLField requires a scheme.
+// ---------------------------------------------------------------------------
+
+const FULL_URL_RE = /^https?:\/\/.+/i;
+
+/**
+ * Matches bare hostnames / domains with an optional path.
+ * Does NOT match plain IPs (handled as IOC) or hashes (no dots).
+ *
+ * Matches:   evil.com  sub.evil.co.uk  evil.com/path?q=1
+ * No match:  192.168.1.1  abc123deadbeef  malware
+ */
+const BARE_DOMAIN_RE =
+  /^(?:[a-z0-9](?:[a-z0-9-]{0,61}[a-z0-9])?\.)+[a-z]{2,}(\/.*)?$/i;
+
+type ArtifactKind = "url" | "ioc";
+
+function classifyArtifact(raw: string): ArtifactKind {
+  const v = raw.trim();
+  if (FULL_URL_RE.test(v)) return "url";
+  if (BARE_DOMAIN_RE.test(v)) return "url";
+  return "ioc";
+}
+
+/**
+ * Ensures the value sent to /submit/url/ always carries a scheme.
+ * Django URLField rejects scheme-less strings, so bare domains get http://.
+ */
+function normaliseUrl(raw: string): string {
+  const v = raw.trim();
+  return FULL_URL_RE.test(v) ? v : `http://${v}`;
+}
+
+// ---------------------------------------------------------------------------
+// API calls
+// ---------------------------------------------------------------------------
+
+async function submitUrl(input: {
+  url: string;
+  context?: string;
+}): Promise<SubmitSuccessResponse> {
   const res = await api.post("/submit/url/", input);
   return res.data;
 }
 
-async function submitIoc(input: { value: string; context?: string }): Promise<SubmitSuccessResponse> {
+async function submitIoc(input: {
+  value: string;
+  context?: string;
+}): Promise<SubmitSuccessResponse> {
   const res = await api.post("/submit/other/", input);
   return res.data;
 }
 
-async function submitFile(input: { file: File; context?: string }): Promise<SubmitSuccessResponse> {
+async function submitFile(input: {
+  file: File;
+  context?: string;
+}): Promise<SubmitSuccessResponse> {
   const form = new FormData();
   form.append("file", input.file);
   if (input.context) form.append("context", input.context);
-
   const res = await api.post("/submit/file/", form);
   return res.data;
 }
@@ -136,18 +206,16 @@ async function getSubmitConfig(): Promise<string> {
   return res.data.data.suspicious_email;
 }
 
-/** Validation */
-const urlSchema = z.object({
-  url: z.string().min(1, "URL is required").url("Invalid URL"),
-  context: z.string().optional(),
-});
+// ---------------------------------------------------------------------------
+// Validation schemas
+// ---------------------------------------------------------------------------
 
-const iocSchema = z.object({
+const artifactSchema = z.object({
   value: z
     .string()
     .trim()
-    .min(1, "Indicator is required")
-    .max(4096, "Indicator is too long"),
+    .min(1, "URL or indicator is required")
+    .max(4096, "Input is too long"),
   context: z.string().optional(),
 });
 
@@ -155,11 +223,14 @@ const fileSchema = z.object({
   context: z.string().optional(),
 });
 
-type UrlForm = z.infer<typeof urlSchema>;
-type IocForm = z.infer<typeof iocSchema>;
+type ArtifactForm = z.infer<typeof artifactSchema>;
 type FileForm = z.infer<typeof fileSchema>;
 
-function SoftCard(props: React.PropsWithChildren<{ sx?: any }>) {
+// ---------------------------------------------------------------------------
+// Sub-components
+// ---------------------------------------------------------------------------
+
+function SoftCard(props: React.PropsWithChildren<{ sx?: object }>) {
   const theme = useTheme();
   const isDark = theme.palette.mode === "dark";
 
@@ -170,7 +241,10 @@ function SoftCard(props: React.PropsWithChildren<{ sx?: any }>) {
         border: `1px solid ${alpha(theme.palette.divider, isDark ? 0.28 : 0.9)}`,
         background: isDark
           ? `linear-gradient(180deg, ${alpha("#fff", 0.03)}, ${alpha("#fff", 0.02)})`
-          : `linear-gradient(180deg, ${alpha("#fff", 0.88)}, ${alpha(theme.palette.grey[50], 0.96)})`,
+          : `linear-gradient(180deg, ${alpha("#fff", 0.88)}, ${alpha(
+              theme.palette.grey[50],
+              0.96
+            )})`,
         boxShadow: isDark
           ? "0 12px 32px rgba(0,0,0,.28)"
           : "0 10px 28px rgba(15,23,42,.06)",
@@ -213,7 +287,10 @@ function ModeSelectorCard(props: {
             : alpha(theme.palette.divider, 0.9)
         }`,
         background: props.active
-          ? alpha(theme.palette.primary.main, theme.palette.mode === "dark" ? 0.10 : 0.06)
+          ? alpha(
+              theme.palette.primary.main,
+              theme.palette.mode === "dark" ? 0.1 : 0.06
+            )
           : "rgba(255,255,255,.02)",
         transition: "all .16s ease",
         "&:hover": {
@@ -243,7 +320,13 @@ function ModeSelectorCard(props: {
         </Box>
 
         <Box sx={{ minWidth: 0, flex: 1 }}>
-          <Stack direction="row" spacing={1} alignItems="center" useFlexGap flexWrap="wrap">
+          <Stack
+            direction="row"
+            spacing={1}
+            alignItems="center"
+            useFlexGap
+            flexWrap="wrap"
+          >
             <Typography fontWeight={850}>{props.title}</Typography>
 
             {props.helper ? (
@@ -286,7 +369,9 @@ function SectionHeader(props: { title: string; subtitle: string }) {
   );
 }
 
-function SidePanel(props: React.PropsWithChildren<{ title: string; icon: React.ReactNode }>) {
+function SidePanel(
+  props: React.PropsWithChildren<{ title: string; icon: React.ReactNode }>
+) {
   return (
     <SoftCard>
       <CardContent sx={{ p: 2.25 }}>
@@ -302,8 +387,13 @@ function SidePanel(props: React.PropsWithChildren<{ title: string; icon: React.R
   );
 }
 
+// ---------------------------------------------------------------------------
+// Page
+// ---------------------------------------------------------------------------
+
 export default function SubmitPage() {
   const theme = useTheme();
+  const navigate = useNavigate();
   const { enqueueSnackbar } = useSnackbar();
 
   const meQuery = useQuery<Me>({
@@ -314,7 +404,9 @@ export default function SubmitPage() {
 
   const me = meQuery.data;
 
-  const suspiciousEmailEnv = import.meta.env.VITE_SUSPICIOUS_EMAIL as string | undefined;
+  const suspiciousEmailEnv = import.meta.env.VITE_SUSPICIOUS_EMAIL as
+    | string
+    | undefined;
 
   const configQuery = useQuery({
     queryKey: ["submitConfig"],
@@ -324,19 +416,15 @@ export default function SubmitPage() {
     initialData: suspiciousEmailEnv ?? undefined,
   });
 
-  const suspiciousEmail = suspiciousEmailEnv ?? configQuery.data ?? "suspicious@example.com";
+  const suspiciousEmail =
+    suspiciousEmailEnv ?? configQuery.data ?? "suspicious@example.com";
 
   const [mode, setMode] = React.useState<SubmitMode>("file");
   const [selectedFile, setSelectedFile] = React.useState<File | null>(null);
+  const [fallbackCta, setFallbackCta] = React.useState(false);
 
-  const urlForm = useForm<UrlForm>({
-    resolver: zodResolver(urlSchema),
-    defaultValues: { url: "", context: "" },
-    mode: "onChange",
-  });
-
-  const iocForm = useForm<IocForm>({
-    resolver: zodResolver(iocSchema),
+  const artifactForm = useForm<ArtifactForm>({
+    resolver: zodResolver(artifactSchema),
     defaultValues: { value: "", context: "" },
     mode: "onChange",
   });
@@ -355,32 +443,43 @@ export default function SubmitPage() {
     },
   });
 
-  const urlMutation = useMutation({
-    mutationFn: submitUrl,
-    onSuccess: (res) => {
-      enqueueSnackbar(
-        res.case_id
-          ? `${res.message} (case #${res.case_id}).`
-          : res.message,
-        { variant: "success" }
-      );
-      urlForm.reset();
-    },
-    onError: (error) => {
-      enqueueSnackbar(extractApiErrorMessage(error), { variant: "error" });
-    },
-  });
+  // -------------------------------------------------------------------------
+  // Shared post-submission navigation
+  // -------------------------------------------------------------------------
 
-  const iocMutation = useMutation({
-    mutationFn: submitIoc,
-    onSuccess: (res) => {
-      enqueueSnackbar(
-        res.case_id
-          ? `${res.message} (case #${res.case_id}).`
-          : res.message,
-        { variant: "success" }
+  function handleSuccess(res: SubmitSuccessResponse) {
+    const id = resolveId(res);
+    if (id !== null) {
+      enqueueSnackbar(`${res.message} (case #${id})`, { variant: "success" });
+      navigate(
+        `/submissions?q=${encodeURIComponent(String(id))}&open=${encodeURIComponent(
+          String(id)
+        )}`
       );
-      iocForm.reset();
+    } else {
+      enqueueSnackbar(res.message, { variant: "success" });
+      setFallbackCta(true);
+    }
+  }
+
+  // -------------------------------------------------------------------------
+  // Mutations
+  // -------------------------------------------------------------------------
+
+  const artifactMutation = useMutation({
+    mutationFn: (input: ArtifactForm) => {
+      const kind = classifyArtifact(input.value);
+      if (kind === "url") {
+        return submitUrl({
+          url: normaliseUrl(input.value),
+          context: input.context,
+        });
+      }
+      return submitIoc(input);
+    },
+    onSuccess: (res) => {
+      handleSuccess(res);
+      artifactForm.reset();
     },
     onError: (error) => {
       enqueueSnackbar(extractApiErrorMessage(error), { variant: "error" });
@@ -390,12 +489,7 @@ export default function SubmitPage() {
   const fileMutation = useMutation({
     mutationFn: submitFile,
     onSuccess: (res) => {
-      enqueueSnackbar(
-        res.case_id
-          ? `${res.message} (case #${res.case_id}).`
-          : res.message,
-        { variant: "success" }
-      );
+      handleSuccess(res);
       setSelectedFile(null);
       fileForm.reset();
     },
@@ -404,7 +498,11 @@ export default function SubmitPage() {
     },
   });
 
-  const loadingOpen = urlMutation.isPending || iocMutation.isPending || fileMutation.isPending;
+  const loadingOpen = artifactMutation.isPending || fileMutation.isPending;
+
+  // -------------------------------------------------------------------------
+  // Auth guard
+  // -------------------------------------------------------------------------
 
   if (meQuery.isLoading) {
     return (
@@ -422,6 +520,10 @@ export default function SubmitPage() {
     );
   }
 
+  // -------------------------------------------------------------------------
+  // Handlers
+  // -------------------------------------------------------------------------
+
   async function copyEmail() {
     try {
       await navigator.clipboard.writeText(suspiciousEmail);
@@ -431,10 +533,21 @@ export default function SubmitPage() {
     }
   }
 
+  function switchMode(next: SubmitMode) {
+    setMode(next);
+    setFallbackCta(false);
+  }
+
+  // -------------------------------------------------------------------------
+  // Render
+  // -------------------------------------------------------------------------
+
   return (
     <Container maxWidth="lg" sx={{ py: { xs: 2.5, md: 3.5 }, pb: 8 }}>
       <Stack spacing={2}>
-        {/* Header */}
+        {/* ---------------------------------------------------------------- */}
+        {/* Header + mode selector                                           */}
+        {/* ---------------------------------------------------------------- */}
         <SoftCard>
           <CardContent sx={{ p: { xs: 2.25, md: 3 } }}>
             <Stack spacing={2}>
@@ -443,8 +556,9 @@ export default function SubmitPage() {
                   Submit
                 </Typography>
                 <Typography color="text.secondary" sx={{ maxWidth: 760 }}>
-                  Send a file, URL, hash, or IP for security triage. Choose the artifact type,
-                  add short factual context, and submit it for analysis.
+                  Send a file, URL, domain, hash, or IP for security triage.
+                  Choose the artifact type, add short factual context, and
+                  submit it for analysis.
                 </Typography>
               </Stack>
 
@@ -453,7 +567,7 @@ export default function SubmitPage() {
               <Box
                 sx={{
                   display: "grid",
-                  gridTemplateColumns: { xs: "1fr", md: "repeat(3, 1fr)" },
+                  gridTemplateColumns: { xs: "1fr", md: "repeat(2, 1fr)" },
                   gap: 1.5,
                 }}
               >
@@ -463,27 +577,23 @@ export default function SubmitPage() {
                   subtitle="Upload an attachment or sample for analysis."
                   icon={<UploadFileOutlined />}
                   helper="Recommended"
-                  onClick={() => setMode("file")}
+                  onClick={() => switchMode("file")}
                 />
                 <ModeSelectorCard
-                  active={mode === "url"}
-                  title="URL"
-                  subtitle="Submit a link for reputation and detonation workflows."
-                  icon={<LinkOutlined />}
-                  onClick={() => setMode("url")}
-                />
-                <ModeSelectorCard
-                  active={mode === "ioc"}
-                  title="Indicator"
-                  subtitle="Submit a hash, IP, or other indicator for lookup and correlation."
+                  active={mode === "artifact"}
+                  title="URL, Domain or Indicator"
+                  subtitle="Submit a link, bare domain, hash, IP, or any other text-based indicator. Type is detected automatically."
                   icon={<FingerprintOutlined />}
-                  onClick={() => setMode("ioc")}
+                  onClick={() => switchMode("artifact")}
                 />
               </Box>
             </Stack>
           </CardContent>
         </SoftCard>
 
+        {/* ---------------------------------------------------------------- */}
+        {/* Main content + sidebar                                           */}
+        {/* ---------------------------------------------------------------- */}
         <Box
           sx={{
             display: "grid",
@@ -495,6 +605,9 @@ export default function SubmitPage() {
           {/* Main form */}
           <SoftCard>
             <CardContent sx={{ p: { xs: 2.25, md: 3 } }}>
+              {/* ---------------------------------------------------------- */}
+              {/* FILE mode                                                   */}
+              {/* ---------------------------------------------------------- */}
               {mode === "file" ? (
                 <Stack spacing={2.5}>
                   <SectionHeader
@@ -512,8 +625,14 @@ export default function SubmitPage() {
                           : alpha(theme.palette.divider, 0.9)
                       }`,
                       background: dropzone.isDragActive
-                        ? alpha(theme.palette.primary.main, theme.palette.mode === "dark" ? 0.08 : 0.04)
-                        : alpha(theme.palette.background.default, theme.palette.mode === "dark" ? 0.24 : 0.45),
+                        ? alpha(
+                            theme.palette.primary.main,
+                            theme.palette.mode === "dark" ? 0.08 : 0.04
+                          )
+                        : alpha(
+                            theme.palette.background.default,
+                            theme.palette.mode === "dark" ? 0.24 : 0.45
+                          ),
                       px: 3,
                       py: 4.5,
                       cursor: "pointer",
@@ -544,11 +663,16 @@ export default function SubmitPage() {
                           {selectedFile
                             ? "File selected"
                             : dropzone.isDragActive
-                              ? "Drop file here"
-                              : "Drag and drop or click to browse"}
+                            ? "Drop file here"
+                            : "Drag and drop or click to browse"}
                         </Typography>
-                        <Typography variant="body2" color="text.secondary" sx={{ mt: 0.5 }}>
-                          One file per submission. Limits and acceptance rules are enforced server-side.
+                        <Typography
+                          variant="body2"
+                          color="text.secondary"
+                          sx={{ mt: 0.5 }}
+                        >
+                          One file per submission. Limits and acceptance rules
+                          are enforced server-side.
                         </Typography>
                       </Box>
 
@@ -561,7 +685,10 @@ export default function SubmitPage() {
                           justifyContent="center"
                         >
                           <Chip label={selectedFile.name} variant="outlined" />
-                          <Chip label={formatBytes(selectedFile.size)} variant="outlined" />
+                          <Chip
+                            label={formatBytes(selectedFile.size)}
+                            variant="outlined"
+                          />
                           <Button
                             size="small"
                             variant="text"
@@ -586,6 +713,24 @@ export default function SubmitPage() {
                     {...fileForm.register("context")}
                   />
 
+                  {fallbackCta ? (
+                    <Alert
+                      severity="success"
+                      action={
+                        <Button
+                          color="inherit"
+                          size="small"
+                          onClick={() => navigate("/submissions")}
+                          sx={{ fontWeight: 850, textTransform: "none" }}
+                        >
+                          View submissions
+                        </Button>
+                      }
+                    >
+                      Submitted successfully. Navigate to see the result.
+                    </Alert>
+                  ) : null}
+
                   <Stack direction="row" justifyContent="flex-end">
                     <Button
                       variant="contained"
@@ -609,81 +754,63 @@ export default function SubmitPage() {
                 </Stack>
               ) : null}
 
-              {mode === "url" ? (
+              {/* ---------------------------------------------------------- */}
+              {/* ARTIFACT mode — URL / domain / IOC unified                  */}
+              {/* ---------------------------------------------------------- */}
+              {mode === "artifact" ? (
                 <Stack spacing={2.5}>
                   <SectionHeader
-                    title="URL submission"
-                    subtitle="Submit a full URL. Include short context only when it helps explain where it came from."
+                    title="URL, domain or indicator"
+                    subtitle="Paste a full URL, bare domain, hash, IP, or other indicator. The type is detected automatically."
                   />
 
                   <TextField
-                    label="URL"
-                    placeholder="https://example.com/path"
-                    error={!!urlForm.formState.errors.url}
+                    label="URL, domain or indicator"
+                    placeholder="https://evil.com  ·  evil.com  ·  SHA256 / MD5 / IP"
+                    error={!!artifactForm.formState.errors.value}
                     helperText={
-                      urlForm.formState.errors.url?.message ??
-                      "Use the full URL, including the path if relevant."
+                      artifactForm.formState.errors.value?.message ??
+                      "Full URLs and bare domains are submitted for reputation and detonation. Everything else is correlated as an indicator."
                     }
-                    {...urlForm.register("url")}
+                    {...artifactForm.register("value")}
                   />
 
                   <TextField
                     label="Context (optional)"
-                    placeholder="Email subject, source, observed redirect, user report, or related case."
+                    placeholder="Source, related case, user report, or observed behavior."
                     multiline
                     minRows={4}
-                    {...urlForm.register("context")}
+                    {...artifactForm.register("context")}
                   />
 
-                  <Stack direction="row" justifyContent="flex-end">
-                    <Button
-                      variant="contained"
-                      disabled={!urlForm.formState.isValid || urlMutation.isPending}
-                      onClick={urlForm.handleSubmit((v) => urlMutation.mutate(v))}
-                      sx={{
-                        borderRadius: 2,
-                        textTransform: "none",
-                        fontWeight: 850,
-                        minWidth: 140,
-                      }}
+                  {fallbackCta ? (
+                    <Alert
+                      severity="success"
+                      action={
+                        <Button
+                          color="inherit"
+                          size="small"
+                          onClick={() => navigate("/submissions")}
+                          sx={{ fontWeight: 850, textTransform: "none" }}
+                        >
+                          View submissions
+                        </Button>
+                      }
                     >
-                      Submit URL
-                    </Button>
-                  </Stack>
-                </Stack>
-              ) : null}
-
-              {mode === "ioc" ? (
-                <Stack spacing={2.5}>
-                  <SectionHeader
-                    title="Indicator submission"
-                    subtitle="Submit a single indicator. Add brief context only if it helps triage."
-                  />
-
-                  <TextField
-                    label="Indicator"
-                    placeholder="SHA256, MD5, SHA1, IP address, or other indicator"
-                    error={!!iocForm.formState.errors.value}
-                    helperText={
-                      iocForm.formState.errors.value?.message ??
-                      "If the indicator type is known, mention it in the context."
-                    }
-                    {...iocForm.register("value")}
-                  />
-
-                  <TextField
-                    label="Context (optional)"
-                    placeholder="Where it appeared, related submission, hostname, user report, or case reference."
-                    multiline
-                    minRows={4}
-                    {...iocForm.register("context")}
-                  />
+                      Submitted successfully. Navigate to see the result.
+                    </Alert>
+                  ) : null}
 
                   <Stack direction="row" justifyContent="flex-end">
                     <Button
                       variant="contained"
-                      disabled={!iocForm.formState.isValid || iocMutation.isPending}
-                      onClick={iocForm.handleSubmit((v) => iocMutation.mutate(v))}
+                      disabled={
+                        !artifactForm.formState.isValid ||
+                        artifactMutation.isPending
+                      }
+                      onClick={artifactForm.handleSubmit((v) =>
+                        artifactMutation.mutate(v)
+                      )}
                       sx={{
                         borderRadius: 2,
                         textTransform: "none",
@@ -691,7 +818,7 @@ export default function SubmitPage() {
                         minWidth: 160,
                       }}
                     >
-                      Submit indicator
+                      Submit
                     </Button>
                   </Stack>
                 </Stack>
@@ -703,20 +830,23 @@ export default function SubmitPage() {
           <Stack spacing={2}>
             <SidePanel title="Guidance" icon={<InfoOutlined fontSize="small" />}>
               <Typography variant="body2" color="text.secondary">
-                Keep context brief and factual. Prefer original artifacts. Do not alter submitted
-                content unless required by policy.
+                Keep context brief and factual. Prefer original artifacts. Do
+                not alter submitted content unless required by policy.
               </Typography>
 
               <Divider sx={{ opacity: 0.25 }} />
 
               <Stack spacing={1}>
-                <Chip label="URL: include full path" variant="outlined" />
+                <Chip label="URL / domain: include full path if known" variant="outlined" />
                 <Chip label="Hash: specify algorithm if known" variant="outlined" />
                 <Chip label="File: keep original filename" variant="outlined" />
               </Stack>
             </SidePanel>
 
-            <SidePanel title="Accepted inputs" icon={<InsertDriveFileOutlined fontSize="small" />}>
+            <SidePanel
+              title="Accepted inputs"
+              icon={<InsertDriveFileOutlined fontSize="small" />}
+            >
               <Stack spacing={1}>
                 <Stack direction="row" spacing={1} alignItems="center">
                   <InsertDriveFileOutlined fontSize="small" color="action" />
@@ -727,7 +857,7 @@ export default function SubmitPage() {
                 <Stack direction="row" spacing={1} alignItems="center">
                   <LinkOutlined fontSize="small" color="action" />
                   <Typography variant="body2" color="text.secondary">
-                    URLs and links
+                    Full URLs and bare domains
                   </Typography>
                 </Stack>
                 <Stack direction="row" spacing={1} alignItems="center">
@@ -745,7 +875,10 @@ export default function SubmitPage() {
               </Stack>
             </SidePanel>
 
-            <SidePanel title="Forward suspicious email" icon={<ContentCopyOutlined fontSize="small" />}>
+            <SidePanel
+              title="Forward suspicious email"
+              icon={<ContentCopyOutlined fontSize="small" />}
+            >
               <Typography variant="body2" color="text.secondary">
                 Alternative intake channel. Click to copy the reporting address.
               </Typography>
@@ -769,10 +902,14 @@ export default function SubmitPage() {
         </Box>
 
         <Alert severity="info" sx={{ borderRadius: 3 }}>
-          Submit one artifact at a time for cleaner triage and easier backend correlation.
+          Submit one artifact at a time for cleaner triage and easier backend
+          correlation.
         </Alert>
       </Stack>
 
+      {/* ------------------------------------------------------------------ */}
+      {/* Loading overlay                                                     */}
+      {/* ------------------------------------------------------------------ */}
       <Dialog open={loadingOpen} onClose={() => {}} maxWidth="xs" fullWidth>
         <DialogContent sx={{ py: 4 }}>
           <Stack spacing={2} alignItems="center" textAlign="center">

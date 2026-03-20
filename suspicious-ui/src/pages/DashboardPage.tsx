@@ -1,5 +1,8 @@
+// src/pages/DashboardPage.tsx
 import * as React from "react";
 import { Alert, Box, Container, Stack } from "@mui/material";
+import { useTheme } from "@mui/material/styles";
+import { alpha } from "@mui/material/styles";
 import { useQueries, useQuery } from "@tanstack/react-query";
 import { Responsive, WidthProvider, type Layout } from "react-grid-layout/legacy";
 
@@ -15,6 +18,10 @@ import TopPrefixesPanel from "@/features/dashboard/components/TopPrefixesPanel";
 import { DashboardEmpty, DashboardLoading } from "@/features/dashboard/components/StatePanels";
 import KpiTrendPanels from "@/features/dashboard/components/KpiTrendPanels";
 
+// ---------------------------------------------------------------------------
+// Helpers
+// ---------------------------------------------------------------------------
+
 function monthName(m: number) {
   return new Date(2000, m - 1, 1).toLocaleString("en", { month: "long" });
 }
@@ -27,18 +34,17 @@ function getMonthWindow(month: number, year: number, windowSize: number) {
   const out: Array<{ month: number; year: number }> = [];
   let m = month;
   let y = year;
-
   for (let i = 0; i < windowSize; i++) {
     out.push({ month: m, year: y });
     m -= 1;
-    if (m <= 0) {
-      m = 12;
-      y -= 1;
-    }
+    if (m <= 0) { m = 12; y -= 1; }
   }
-
   return out.reverse();
 }
+
+// ---------------------------------------------------------------------------
+// Constants
+// ---------------------------------------------------------------------------
 
 const EMPTY_SUMMARY: DashboardSummary = {
   month: 1,
@@ -46,12 +52,7 @@ const EMPTY_SUMMARY: DashboardSummary = {
   scope: "ALL",
   kpis: { new_users: 0, total_reporters: 0, total_cases: 0 },
   danger_counts: {
-    failure: 0,
-    safe: 0,
-    inconclusive: 0,
-    suspicious: 0,
-    dangerous: 0,
-    malicious: 0,
+    failure: 0, safe: 0, inconclusive: 0, suspicious: 0, dangerous: 0, malicious: 0,
   },
   top_prefixes: [],
 };
@@ -62,42 +63,42 @@ const DASHBOARD_PANEL_KEYS = {
   THREAT_DISTRIBUTION: "threat-distribution",
 } as const;
 
-const DASHBOARD_BREAKPOINTS = {
-  lg: 1200,
-  md: 900,
-  sm: 600,
-  xs: 0,
-};
+const DASHBOARD_BREAKPOINTS = { lg: 1200, md: 900, sm: 600, xs: 0 };
+const DASHBOARD_COLS = { lg: 12, md: 12, sm: 6, xs: 1 };
 
-const DASHBOARD_COLS = {
-  lg: 12,
-  md: 12,
-  sm: 6,
-  xs: 1,
-};
+// Row height unit in px. All h values below are in these units.
+// rowHeight=32 → h:6 = 192px (KPI row), h:14 = 448px (bottom row — tall enough for all legend items)
+const ROW_HEIGHT = 32;
+
+// Bottom row height — tall enough to show the full threat legend without scrolling.
+// At 32px/unit: 14 units = 448px. Increase if needed.
+const BOTTOM_H = 14;
+const BOTTOM_MIN_H = 10;
 
 type ResponsiveLayouts = Partial<Record<string, Layout>>;
 
+// Layouts: KPI row is full-width, bottom row splits Top Prefixes (8 cols) and
+// Threat Distribution (4 cols) at the SAME height so they align perfectly.
 const DEFAULT_DASHBOARD_LAYOUTS: ResponsiveLayouts = {
   lg: [
-    { i: DASHBOARD_PANEL_KEYS.KPI_TRENDS, x: 0, y: 0, w: 12, h: 6, minW: 6, minH: 4 },
-    { i: DASHBOARD_PANEL_KEYS.TOP_PREFIXES, x: 0, y: 6, w: 8, h: 10, minW: 4, minH: 6 },
-    { i: DASHBOARD_PANEL_KEYS.THREAT_DISTRIBUTION, x: 8, y: 6, w: 4, h: 10, minW: 4, minH: 6 },
+    { i: DASHBOARD_PANEL_KEYS.KPI_TRENDS,          x: 0,  y: 0,          w: 12, h: 6,       minW: 6,  minH: 4 },
+    { i: DASHBOARD_PANEL_KEYS.TOP_PREFIXES,         x: 0,  y: 6,          w: 8,  h: BOTTOM_H, minW: 4, minH: BOTTOM_MIN_H },
+    { i: DASHBOARD_PANEL_KEYS.THREAT_DISTRIBUTION,  x: 8,  y: 6,          w: 4,  h: BOTTOM_H, minW: 4, minH: BOTTOM_MIN_H },
   ],
   md: [
-    { i: DASHBOARD_PANEL_KEYS.KPI_TRENDS, x: 0, y: 0, w: 12, h: 6, minW: 6, minH: 4 },
-    { i: DASHBOARD_PANEL_KEYS.TOP_PREFIXES, x: 0, y: 6, w: 7, h: 10, minW: 4, minH: 6 },
-    { i: DASHBOARD_PANEL_KEYS.THREAT_DISTRIBUTION, x: 7, y: 6, w: 5, h: 10, minW: 4, minH: 6 },
+    { i: DASHBOARD_PANEL_KEYS.KPI_TRENDS,          x: 0,  y: 0,          w: 12, h: 6,       minW: 6,  minH: 4 },
+    { i: DASHBOARD_PANEL_KEYS.TOP_PREFIXES,         x: 0,  y: 6,          w: 7,  h: BOTTOM_H, minW: 4, minH: BOTTOM_MIN_H },
+    { i: DASHBOARD_PANEL_KEYS.THREAT_DISTRIBUTION,  x: 7,  y: 6,          w: 5,  h: BOTTOM_H, minW: 4, minH: BOTTOM_MIN_H },
   ],
   sm: [
-    { i: DASHBOARD_PANEL_KEYS.KPI_TRENDS, x: 0, y: 0, w: 6, h: 6, minH: 4 },
-    { i: DASHBOARD_PANEL_KEYS.TOP_PREFIXES, x: 0, y: 6, w: 6, h: 10, minH: 6 },
-    { i: DASHBOARD_PANEL_KEYS.THREAT_DISTRIBUTION, x: 0, y: 16, w: 6, h: 10, minH: 6 },
+    { i: DASHBOARD_PANEL_KEYS.KPI_TRENDS,          x: 0,  y: 0,                   w: 6, h: 6,       minH: 4 },
+    { i: DASHBOARD_PANEL_KEYS.TOP_PREFIXES,         x: 0,  y: 6,                   w: 6, h: BOTTOM_H, minH: BOTTOM_MIN_H },
+    { i: DASHBOARD_PANEL_KEYS.THREAT_DISTRIBUTION,  x: 0,  y: 6 + BOTTOM_H,        w: 6, h: BOTTOM_H, minH: BOTTOM_MIN_H },
   ],
   xs: [
-    { i: DASHBOARD_PANEL_KEYS.KPI_TRENDS, x: 0, y: 0, w: 1, h: 6, minH: 4 },
-    { i: DASHBOARD_PANEL_KEYS.TOP_PREFIXES, x: 0, y: 6, w: 1, h: 10, minH: 6 },
-    { i: DASHBOARD_PANEL_KEYS.THREAT_DISTRIBUTION, x: 0, y: 16, w: 1, h: 10, minH: 6 },
+    { i: DASHBOARD_PANEL_KEYS.KPI_TRENDS,          x: 0,  y: 0,                          w: 1, h: 6,       minH: 4 },
+    { i: DASHBOARD_PANEL_KEYS.TOP_PREFIXES,         x: 0,  y: 6,                          w: 1, h: BOTTOM_H, minH: BOTTOM_MIN_H },
+    { i: DASHBOARD_PANEL_KEYS.THREAT_DISTRIBUTION,  x: 0,  y: 6 + BOTTOM_H,               w: 1, h: BOTTOM_H, minH: BOTTOM_MIN_H },
   ],
 };
 
@@ -113,11 +114,9 @@ function getStorageKey(userId?: string | number) {
 
 function loadLayoutsFromStorage(storageKey: string): ResponsiveLayouts {
   if (typeof window === "undefined") return DEFAULT_DASHBOARD_LAYOUTS;
-
   try {
     const raw = window.localStorage.getItem(storageKey);
     if (!raw) return DEFAULT_DASHBOARD_LAYOUTS;
-
     const parsed = JSON.parse(raw);
     return isValidLayouts(parsed) ? parsed : DEFAULT_DASHBOARD_LAYOUTS;
   } catch {
@@ -127,21 +126,16 @@ function loadLayoutsFromStorage(storageKey: string): ResponsiveLayouts {
 
 function saveLayoutsToStorage(storageKey: string, layouts: ResponsiveLayouts) {
   if (typeof window === "undefined") return;
-
-  try {
-    window.localStorage.setItem(storageKey, JSON.stringify(layouts));
-  } catch {
-    // ignore storage failures
-  }
+  try { window.localStorage.setItem(storageKey, JSON.stringify(layouts)); } catch { /* ignore */ }
 }
 
-type DashboardPanelShellProps = {
-  title: string;
-  children: React.ReactNode;
-};
+// ---------------------------------------------------------------------------
+// DashboardPanelShell — drag handle + visible affordances
+// ---------------------------------------------------------------------------
+
+type DashboardPanelShellProps = { title: string; children: React.ReactNode };
 
 const DashboardPanelShell = React.memo(function DashboardPanelShell({
-  title,
   children,
 }: DashboardPanelShellProps) {
   return (
@@ -152,36 +146,175 @@ const DashboardPanelShell = React.memo(function DashboardPanelShell({
         display: "flex",
         flexDirection: "column",
         overflow: "hidden",
+        // Make the resize handle visible via a global override scoped to this panel
+        "& .react-resizable-handle": {
+          opacity: 0,
+          transition: "opacity .18s ease",
+        },
+        "&:hover .react-resizable-handle": {
+          opacity: 1,
+        },
       }}
     >
-      <Box
-        className="dashboard-panel-drag-handle"
-        sx={{
-          flexShrink: 0,
-          mb: 1,
-          px: 0.5,
-          fontSize: 12,
-          fontWeight: 700,
-          color: "text.secondary",
-          cursor: "move",
-          userSelect: "none",
-        }}
-      >
-        {title}
-      </Box>
+      {/* Drag handle bar — visible on hover */}
+      <DragHandle />
 
-      <Box
-        sx={{
-          flex: 1,
-          minHeight: 0,
-          overflow: "hidden",
-        }}
-      >
+      <Box sx={{ flex: 1, minHeight: 0, overflow: "hidden" }}>
         {children}
       </Box>
     </Box>
   );
 });
+
+// Visible drag handle strip at the top of every panel
+function DragHandle() {
+  const theme = useTheme();
+  const isDark = theme.palette.mode === "dark";
+
+  return (
+    <Box
+      className="dashboard-panel-drag-handle"
+      title="Drag to move"
+      sx={{
+        flexShrink: 0,
+        height: 22,
+        mb: 0.5,
+        mx: 0,
+        borderRadius: "8px 8px 0 0",
+        display: "flex",
+        alignItems: "center",
+        justifyContent: "center",
+        cursor: "grab",
+        userSelect: "none",
+        opacity: 0,
+        transition: "opacity .18s ease, background .18s ease",
+        background: isDark
+          ? alpha("#fff", 0.04)
+          : alpha(theme.palette.grey[400], 0.1),
+        // Show on parent hover — handled by sibling selector in DashboardPanelShell
+        ".dashboard-draggable-panel:hover &": {
+          opacity: 1,
+        },
+        "&:active": {
+          cursor: "grabbing",
+          background: isDark
+            ? alpha("#fff", 0.08)
+            : alpha(theme.palette.grey[400], 0.18),
+        },
+      }}
+    >
+      {/* 6-dot grip */}
+      <DragDots isDark={isDark} dividerColor={theme.palette.divider} />
+    </Box>
+  );
+}
+
+function DragDots({ isDark, dividerColor }: { isDark: boolean; dividerColor: string }) {
+  const dotColor = isDark ? "rgba(255,255,255,.38)" : alpha(dividerColor, 0.9);
+
+  return (
+    <Box
+      sx={{
+        display: "grid",
+        gridTemplateColumns: "repeat(3, 5px)",
+        gridTemplateRows: "repeat(2, 5px)",
+        gap: "3px",
+        pointerEvents: "none",
+      }}
+    >
+      {Array.from({ length: 6 }).map((_, i) => (
+        <Box
+          key={i}
+          sx={{
+            width: 4,
+            height: 4,
+            borderRadius: 99,
+            backgroundColor: dotColor,
+          }}
+        />
+      ))}
+    </Box>
+  );
+}
+
+// ---------------------------------------------------------------------------
+// Global grid CSS overrides — injected once
+// ---------------------------------------------------------------------------
+
+function GridStyles() {
+  const theme = useTheme();
+  const isDark = theme.palette.mode === "dark";
+
+  const handleColor = isDark ? "rgba(255,255,255,.55)" : alpha(theme.palette.grey[500], 0.7);
+  const handleBg = isDark
+    ? "rgba(30,41,59,0.92)"
+    : alpha(theme.palette.background.paper, 0.95);
+  const handleBorder = isDark
+    ? "1px solid rgba(255,255,255,.12)"
+    : `1px solid ${alpha(theme.palette.divider, 0.7)}`;
+
+  return (
+    <style>{`
+      /* Resize handle: small square in bottom-right corner */
+      .react-resizable-handle {
+        position: absolute;
+        width: 20px;
+        height: 20px;
+        bottom: 4px;
+        right: 4px;
+        padding: 0;
+        border-radius: 6px;
+        background: ${handleBg};
+        border: ${handleBorder};
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        cursor: se-resize;
+        z-index: 10;
+        transition: opacity .18s ease;
+      }
+
+      /* Draw a resize icon using a CSS border trick */
+      .react-resizable-handle::after {
+        content: '';
+        display: block;
+        width: 8px;
+        height: 8px;
+        border-right: 2px solid ${handleColor};
+        border-bottom: 2px solid ${handleColor};
+        border-radius: 0 0 3px 0;
+      }
+
+      /* Override the default background-image the library sets */
+      .react-resizable-handle-se {
+        background-image: none !important;
+        background-position: unset !important;
+      }
+
+      /* Dragging placeholder */
+      .react-grid-item.react-grid-placeholder {
+        background: ${isDark ? "rgba(56,189,248,.14)" : alpha(theme.palette.primary.main, 0.08)} !important;
+        border: 2px dashed ${isDark ? "rgba(56,189,248,.45)" : alpha(theme.palette.primary.main, 0.4)} !important;
+        border-radius: 12px !important;
+        opacity: 1 !important;
+      }
+
+      /* Show drag handle strip on grid item hover */
+      .react-grid-item:hover .dashboard-panel-drag-handle {
+        opacity: 1 !important;
+      }
+
+      /* Show resize handle on grid item hover */
+      .react-grid-item:hover .react-resizable-handle {
+        opacity: 1 !important;
+      }
+    `}</style>
+  );
+}
+
+// ---------------------------------------------------------------------------
+// Page
+// ---------------------------------------------------------------------------
 
 export default function DashboardPage() {
   const now = new Date();
@@ -194,11 +327,7 @@ export default function DashboardPage() {
   const [scope, setScope] = React.useState<string>("ALL");
   const [trendWindow, setTrendWindow] = React.useState<number>(6);
 
-  const meQuery = useQuery({
-    queryKey: ["me"],
-    queryFn: getMe,
-    retry: false,
-  });
+  const meQuery = useQuery({ queryKey: ["me"], queryFn: getMe, retry: false });
 
   const groups: string[] = (meQuery.data as any)?.groups ?? [];
   const isCiso = groups.includes("CISO");
@@ -219,17 +348,12 @@ export default function DashboardPage() {
 
   const summaryQuery = useQuery<DashboardSummary>({
     queryKey: ["dashboardSummary", month, year, effectiveScope],
-    queryFn: async () => {
-      return getDashboardSummary({ month, year, scope: effectiveScope });
-    },
+    queryFn: async () => getDashboardSummary({ month, year, scope: effectiveScope }),
     retry: false,
   });
 
   const data: DashboardSummary = summaryQuery.data ?? {
-    ...EMPTY_SUMMARY,
-    month,
-    year,
-    scope: effectiveScope,
+    ...EMPTY_SUMMARY, month, year, scope: effectiveScope,
   };
 
   const historyParams = React.useMemo(
@@ -240,9 +364,7 @@ export default function DashboardPage() {
   const historyQueries = useQueries({
     queries: historyParams.map(({ month: hm, year: hy }) => ({
       queryKey: ["dashboardSummary", hm, hy, effectiveScope, "history"],
-      queryFn: async () => {
-        return getDashboardSummary({ month: hm, year: hy, scope: effectiveScope });
-      },
+      queryFn: async () => getDashboardSummary({ month: hm, year: hy, scope: effectiveScope }),
       retry: false,
       staleTime: 30_000,
     })),
@@ -253,7 +375,9 @@ export default function DashboardPage() {
   }, [data.month, data.year, data.scope, isCiso]);
 
   const kpiSpark = React.useMemo(() => {
-    const labels = historyParams.map((p) => `${monthNameShort(p.month)} ${String(p.year).slice(-2)}`);
+    const labels = historyParams.map(
+      (p) => `${monthNameShort(p.month)} ${String(p.year).slice(-2)}`
+    );
     const toNumOrNull = (v: unknown) => (typeof v === "number" ? v : null);
     const series = historyQueries.map((q) => q.data?.kpis);
 
@@ -329,6 +453,9 @@ export default function DashboardPage() {
 
   return (
     <Box>
+      {/* Inject grid CSS overrides — theme-aware, re-renders on theme switch */}
+      <GridStyles />
+
       <OverviewHeader
         title="Dashboard"
         subtitle={pageSubtitle}
@@ -358,7 +485,13 @@ export default function DashboardPage() {
         ) : null}
 
         <Box sx={{ opacity: isEmpty ? 0.5 : 1, pointerEvents: isEmpty ? "none" : "auto" }}>
-          <Stack direction="row" alignItems="center" justifyContent="space-between" sx={{ mb: 1 }}>
+          {/* Section header */}
+          <Stack
+            direction="row"
+            alignItems="center"
+            justifyContent="space-between"
+            sx={{ mb: 1 }}
+          >
             <Box>
               <Box sx={{ fontWeight: 900, fontSize: 14 }}>Overview</Box>
               <Box sx={{ color: "text.secondary", fontSize: 12 }}>
@@ -389,7 +522,7 @@ export default function DashboardPage() {
             layouts={layouts}
             breakpoints={DASHBOARD_BREAKPOINTS}
             cols={DASHBOARD_COLS}
-            rowHeight={28}
+            rowHeight={ROW_HEIGHT}
             margin={[16, 16]}
             containerPadding={[0, 0]}
             compactType="vertical"
@@ -401,7 +534,12 @@ export default function DashboardPage() {
             draggableHandle=".dashboard-panel-drag-handle"
             onLayoutChange={handleLayoutsChange}
           >
-            <Box key={DASHBOARD_PANEL_KEYS.KPI_TRENDS} sx={{ height: "100%", minHeight: 0, overflow: "hidden" }}>
+            {/* KPI Trends */}
+            <Box
+              key={DASHBOARD_PANEL_KEYS.KPI_TRENDS}
+              className="dashboard-draggable-panel"
+              sx={{ height: "100%", minHeight: 0, overflow: "hidden" }}
+            >
               <DashboardPanelShell title="KPI Trends">
                 <KpiTrendPanels
                   spark={kpiSpark}
@@ -411,13 +549,23 @@ export default function DashboardPage() {
               </DashboardPanelShell>
             </Box>
 
-            <Box key={DASHBOARD_PANEL_KEYS.TOP_PREFIXES} sx={{ height: "100%", minHeight: 0, overflow: "hidden" }}>
+            {/* Top Prefixes */}
+            <Box
+              key={DASHBOARD_PANEL_KEYS.TOP_PREFIXES}
+              className="dashboard-draggable-panel"
+              sx={{ height: "100%", minHeight: 0, overflow: "hidden" }}
+            >
               <DashboardPanelShell title="Top Prefixes">
                 <TopPrefixesPanel month={strMonth} year={strYear} limit={5} />
               </DashboardPanelShell>
             </Box>
 
-            <Box key={DASHBOARD_PANEL_KEYS.THREAT_DISTRIBUTION} sx={{ height: "100%", minHeight: 0, overflow: "hidden" }}>
+            {/* Threat Distribution */}
+            <Box
+              key={DASHBOARD_PANEL_KEYS.THREAT_DISTRIBUTION}
+              className="dashboard-draggable-panel"
+              sx={{ height: "100%", minHeight: 0, overflow: "hidden" }}
+            >
               <DashboardPanelShell title="Threat Distribution">
                 <ThreatDistributionPanel dangerCounts={data.danger_counts} />
               </DashboardPanelShell>
