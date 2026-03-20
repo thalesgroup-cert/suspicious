@@ -151,11 +151,13 @@ const DashboardPanelShell = React.memo(function DashboardPanelShell({
         minHeight: 0,
         display: "flex",
         flexDirection: "column",
+        overflow: "hidden",
       }}
     >
       <Box
         className="dashboard-panel-drag-handle"
         sx={{
+          flexShrink: 0,
           mb: 1,
           px: 0.5,
           fontSize: 12,
@@ -168,7 +170,15 @@ const DashboardPanelShell = React.memo(function DashboardPanelShell({
         {title}
       </Box>
 
-      <Box sx={{ flex: 1, minHeight: 0 }}>{children}</Box>
+      <Box
+        sx={{
+          flex: 1,
+          minHeight: 0,
+          overflow: "hidden",
+        }}
+      >
+        {children}
+      </Box>
     </Box>
   );
 });
@@ -391,7 +401,7 @@ export default function DashboardPage() {
             draggableHandle=".dashboard-panel-drag-handle"
             onLayoutChange={handleLayoutsChange}
           >
-            <Box key={DASHBOARD_PANEL_KEYS.KPI_TRENDS} sx={{ height: "100%" }}>
+            <Box key={DASHBOARD_PANEL_KEYS.KPI_TRENDS} sx={{ height: "100%", minHeight: 0, overflow: "hidden" }}>
               <DashboardPanelShell title="KPI Trends">
                 <KpiTrendPanels
                   spark={kpiSpark}
@@ -401,13 +411,13 @@ export default function DashboardPage() {
               </DashboardPanelShell>
             </Box>
 
-            <Box key={DASHBOARD_PANEL_KEYS.TOP_PREFIXES} sx={{ height: "100%" }}>
+            <Box key={DASHBOARD_PANEL_KEYS.TOP_PREFIXES} sx={{ height: "100%", minHeight: 0, overflow: "hidden" }}>
               <DashboardPanelShell title="Top Prefixes">
                 <TopPrefixesPanel month={strMonth} year={strYear} limit={5} />
               </DashboardPanelShell>
             </Box>
 
-            <Box key={DASHBOARD_PANEL_KEYS.THREAT_DISTRIBUTION} sx={{ height: "100%" }}>
+            <Box key={DASHBOARD_PANEL_KEYS.THREAT_DISTRIBUTION} sx={{ height: "100%", minHeight: 0, overflow: "hidden" }}>
               <DashboardPanelShell title="Threat Distribution">
                 <ThreatDistributionPanel dangerCounts={data.danger_counts} />
               </DashboardPanelShell>

@@ -7,12 +7,15 @@ from import_export.widgets import ForeignKeyWidget
 
 from .models import (
     Mailbox,
+    EmailFeederState,
     AllowListDomain,
-    AllowListFile,
-    AllowListFiletype,
+    WatcherLegitDomain,
     DenyListDomain,
-    DenyListFile,
+    WatcherMonitoredDomain,
     CampaignDomainAllowList,
+    AllowListFile,
+    DenyListFile,
+    AllowListFiletype,
 )
 from domain_process.models import Domain
 from hash_process.models import Hash
@@ -66,6 +69,26 @@ class MailboxAdmin(ImportExportModelAdmin):
 
 
 # =========================
+# EmailFeederState
+# =========================
+class EmailFeederStateResource(resources.ModelResource):
+    class Meta:
+        model = EmailFeederState
+        fields = ("id", "is_running", "updated_at")
+        export_order = ("id", "is_running", "updated_at")
+        import_id_fields = ("id",)
+
+
+@admin.register(EmailFeederState)
+class EmailFeederStateAdmin(ImportExportModelAdmin):
+    resource_class = EmailFeederStateResource
+    list_display = ("id", "is_running", "updated_at")
+    list_filter = ("is_running", "updated_at")
+    search_fields = ()
+    ordering = ("-updated_at",)
+
+
+# =========================
 # AllowListDomain
 # =========================
 class AllowListDomainResource(resources.ModelResource):
@@ -103,6 +126,63 @@ class AllowListDomainAdmin(ImportExportModelAdmin):
 
 
 # =========================
+# WatcherLegitDomain
+# =========================
+class WatcherLegitDomainResource(resources.ModelResource):
+    domain = fields.Field(
+        column_name="domain__value",
+        attribute="domain",
+        widget=ForeignKeyWidget(Domain, "value"),
+    )
+
+    def before_import_row(self, row, **kwargs):
+        domain_value = normalize_value(row.get("domain__value"))
+        if domain_value:
+            row["domain__value"] = domain_value
+            Domain.objects.get_or_create(value=domain_value)
+
+    class Meta:
+        model = WatcherLegitDomain
+        fields = (
+            "id",
+            "watcher_id",
+            "domain",
+            "status",
+            "remote_last_update",
+            "raw_payload",
+            "creation_date",
+            "last_update",
+        )
+        export_order = (
+            "id",
+            "watcher_id",
+            "domain",
+            "status",
+            "remote_last_update",
+            "raw_payload",
+            "creation_date",
+            "last_update",
+        )
+        import_id_fields = ("id",)
+
+
+@admin.register(WatcherLegitDomain)
+class WatcherLegitDomainAdmin(ImportExportModelAdmin):
+    resource_class = WatcherLegitDomainResource
+    list_display = (
+        "domain",
+        "watcher_id",
+        "status",
+        "remote_last_update",
+        "creation_date",
+        "last_update",
+    )
+    list_filter = ("status", "creation_date", "last_update", "remote_last_update")
+    search_fields = ("domain__value", "status", "watcher_id")
+    ordering = ("creation_date",)
+
+
+# =========================
 # DenyListDomain
 # =========================
 class DenyListDomainResource(resources.ModelResource):
@@ -136,6 +216,63 @@ class DenyListDomainAdmin(ImportExportModelAdmin):
     list_display = ("domain", "user", "creation_date", "last_update")
     list_filter = ("domain", "user", "creation_date")
     search_fields = ("domain__value", "user__username")
+    ordering = ("creation_date",)
+
+
+# =========================
+# WatcherMonitoredDomain
+# =========================
+class WatcherMonitoredDomainResource(resources.ModelResource):
+    domain = fields.Field(
+        column_name="domain__value",
+        attribute="domain",
+        widget=ForeignKeyWidget(Domain, "value"),
+    )
+
+    def before_import_row(self, row, **kwargs):
+        domain_value = normalize_value(row.get("domain__value"))
+        if domain_value:
+            row["domain__value"] = domain_value
+            Domain.objects.get_or_create(value=domain_value)
+
+    class Meta:
+        model = WatcherMonitoredDomain
+        fields = (
+            "id",
+            "watcher_id",
+            "domain",
+            "status",
+            "remote_last_update",
+            "raw_payload",
+            "creation_date",
+            "last_update",
+        )
+        export_order = (
+            "id",
+            "watcher_id",
+            "domain",
+            "status",
+            "remote_last_update",
+            "raw_payload",
+            "creation_date",
+            "last_update",
+        )
+        import_id_fields = ("id",)
+
+
+@admin.register(WatcherMonitoredDomain)
+class WatcherMonitoredDomainAdmin(ImportExportModelAdmin):
+    resource_class = WatcherMonitoredDomainResource
+    list_display = (
+        "domain",
+        "watcher_id",
+        "status",
+        "remote_last_update",
+        "creation_date",
+        "last_update",
+    )
+    list_filter = ("status", "creation_date", "last_update", "remote_last_update")
+    search_fields = ("domain__value", "status", "watcher_id")
     ordering = ("creation_date",)
 
 

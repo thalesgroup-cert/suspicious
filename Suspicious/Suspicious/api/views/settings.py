@@ -1,9 +1,8 @@
 # api/views/settings.py
 from __future__ import annotations
 
-from django.db import transaction
-from django.shortcuts import get_object_or_404
 from rest_framework import generics, status
+from rest_framework.exceptions import ValidationError
 from rest_framework.response import Response
 
 from api.permissions.settings import IsAdminOrCERT
@@ -19,6 +18,13 @@ from api.utils.settings_service import SettingsListSectionService
 from cortex_job.models import Analyzer
 from profiles.models import CISOProfile
 from settings.models import EmailFeederState
+
+
+READ_ONLY_SECTIONS = {
+    "watcher_legit_domains",
+    "watcher_monitored_domains",
+    "ciso_users",
+}
 
 
 class SettingsListView(generics.GenericAPIView):
@@ -40,6 +46,9 @@ class SettingsListView(generics.GenericAPIView):
         return Response(data)
 
     def post(self, request, section: str, *args, **kwargs):
+        if section in READ_ONLY_SECTIONS:
+            raise ValidationError({"detail": f"Section '{section}' is read-only."})
+
         serializer = self.get_serializer(data=request.data)
         serializer.is_valid(raise_exception=True)
 
@@ -59,6 +68,9 @@ class SettingsListItemDeleteView(generics.GenericAPIView):
     permission_classes = [IsAdminOrCERT]
 
     def delete(self, request, section: str, item_id: str, *args, **kwargs):
+        if section in READ_ONLY_SECTIONS:
+            raise ValidationError({"detail": f"Section '{section}' is read-only."})
+
         deleted_id = SettingsListSectionService.delete_item(section, item_id)
         return Response({"deleted": deleted_id})
 

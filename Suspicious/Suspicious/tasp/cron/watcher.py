@@ -5,7 +5,7 @@ from urllib.parse import urlparse
 
 import requests
 from django.db import transaction
-from django.utils.dateparse import parse_datetime
+from django.utils.dateparse import parse_date, parse_datetime
 
 from domain_process.models import Domain
 from settings.models import (
@@ -13,9 +13,8 @@ from settings.models import (
     WatcherMonitoredDomain,
 )
 
-logger = logging.getLogger("cron.watcher")
+logger = logging.getLogger("tasp.cron.watcher")
 CONFIG_PATH = "/app/settings.json"
-
 
 with open(CONFIG_PATH, "r") as f:
     settings_data = json.load(f)
@@ -24,11 +23,19 @@ watcher_conf = settings_data.get("watcher", {})
 
 
 class WatcherConfig:
-    def __init__(self, url: str, api_key: str, enabled: bool = True, timeout: int = 10):
+    def __init__(
+        self,
+        url: str,
+        api_key: str,
+        enabled: bool = True,
+        timeout: int = 10,
+        verify_ssl: bool = True,
+    ):
         self.url = url.rstrip("/")
         self.api_key = api_key
         self.enabled = enabled
         self.timeout = timeout
+        self.verify_ssl = verify_ssl
 
 
 def get_watcher_config() -> Optional[WatcherConfig]:
@@ -39,6 +46,7 @@ def get_watcher_config() -> Optional[WatcherConfig]:
     url = watcher_conf.get("url")
     api_key = watcher_conf.get("api_key")
     timeout = watcher_conf.get("timeout", 10)
+    verify_ssl = watcher_conf.get("verify_ssl", True)
 
     if not url or not api_key:
         logger.error("Watcher configuration is incomplete")
@@ -49,6 +57,7 @@ def get_watcher_config() -> Optional[WatcherConfig]:
         api_key=api_key,
         enabled=True,
         timeout=timeout,
+        verify_ssl=verify_ssl,
     )
 
 
@@ -71,8 +80,17 @@ class WatcherClient:
                 url,
                 params={"page": page, "page_size": 100},
                 timeout=self.config.timeout,
+                verify=self.config.verify_ssl,
             )
-            response.raise_for_status()
+
+            if response.status_code >= 400:
+                logger.error(
+                    "Watcher API error status=%s url=%s body=%s",
+                    response.status_code,
+                    response.url,
+                    response.text[:1000],
+                )
+                response.raise_for_status()
 
             payload = response.json()
             page_results = payload.get("results", [])
@@ -88,13 +106,17 @@ class WatcherClient:
     def get_sites(self) -> list[dict[str, Any]]:
         return self._get_paginated("/api/site_monitoring/site/")
 
+    def get_legitimates(self) -> list[dict[str, Any]]:
+        return self._get_paginated("/api/common/legitimate_domains/")
 
-def extract_domain_value(site_value: str) -> str:
-    if not site_value:
+
+def extract_domain_value(value: str) -> str:
+    value = (value or "").strip().lower()
+    if not value:
         return ""
 
-    parsed = urlparse(site_value if "://" in site_value else f"https://{site_value}")
-    return (parsed.hostname or site_value).lower()
+    parsed = urlparse(value if "://" in value else f"https://{value}")
+    return (parsed.hostname or value).strip().lower()
 
 
 def get_or_create_domain(domain_value: str) -> Optional[Domain]:
@@ -110,38 +132,61 @@ def get_or_create_domain(domain_value: str) -> Optional[Domain]:
 
 
 def map_site_status(site_payload: dict[str, Any]) -> str:
-    return str(site_payload.get("status", "") or "")
+    monitored = site_payload.get("monitored")
+    legitimacy = site_payload.get("legitimacy")
+    web_status = site_payload.get("web_status")
+
+    return f"monitored={monitored}; legitimacy={legitimacy}; web_status={web_status}"
 
 
-def is_legit_site(site_payload: dict[str, Any]) -> bool:
-    """
-    Adjust this rule to your Watcher payload.
-    Example:
-    - legit if explicitly marked non-malicious
-    - or if category/type/status says legit
-    """
-    if site_payload.get("is_malicious") is False:
-        return True
+def map_legit_status(legit_payload: dict[str, Any]) -> str:
+    return str(legit_payload.get("status", "") or "legit")
 
-    status = str(site_payload.get("status", "")).lower()
-    return status in {"legit", "safe", "clean"}
+
+def parse_any_datetime(value):
+    if not value:
+        return None
+
+    dt = parse_datetime(value)
+    if dt is not None:
+        return dt
+
+    d = parse_date(value)
+    if d is not None:
+        from datetime import datetime, time
+        return datetime.combine(d, time.min)
+
+    return None
 
 
 @transaction.atomic
 def sync_site(site_payload: dict[str, Any]) -> None:
     watcher_id = site_payload.get("id")
-    site_value = site_payload.get("site") or site_payload.get("url") or site_payload.get("domain") or ""
+    site_value = (
+        site_payload.get("domain_name")
+        or site_payload.get("url")
+        or site_payload.get("domain")
+        or ""
+    )
     domain_value = extract_domain_value(site_value)
 
-    if not watcher_id or not domain_value:
-        logger.warning("Skipping invalid site payload: %s", site_payload)
+    if watcher_id is None or not domain_value:
+        logger.warning(
+            "Skipping invalid site payload: watcher_id=%r domain_value=%r payload=%s",
+            watcher_id,
+            domain_value,
+            site_payload,
+        )
         return
 
     domain_obj = get_or_create_domain(domain_value)
     status = map_site_status(site_payload)
-    remote_last_update = parse_datetime(site_payload.get("updated_at")) if site_payload.get("updated_at") else None
 
-    monitored_obj, _ = WatcherMonitoredDomain.objects.update_or_create(
+    remote_last_update = parse_any_datetime(
+        site_payload.get("updated_at") or site_payload.get("created_at")
+    )
+
+    monitored_obj, created = WatcherMonitoredDomain.objects.update_or_create(
         watcher_id=watcher_id,
         defaults={
             "domain": domain_obj,
@@ -151,21 +196,56 @@ def sync_site(site_payload: dict[str, Any]) -> None:
         },
     )
 
-    if is_legit_site(site_payload):
-        WatcherLegitDomain.objects.update_or_create(
-            watcher_id=watcher_id,
-            defaults={
-                "domain": domain_obj,
-                "status": status,
-                "remote_last_update": remote_last_update,
-                "raw_payload": site_payload,
-            },
+    logger.info(
+        "Synced site watcher_id=%s domain=%s created=%s",
+        monitored_obj.watcher_id,
+        domain_value,
+        created,
+    )
+
+
+@transaction.atomic
+def sync_legit(legit_payload: dict[str, Any]) -> None:
+    watcher_id = legit_payload.get("id")
+    legit_value = (
+        legit_payload.get("domain_name")
+        or legit_payload.get("url")
+        or legit_payload.get("domain")
+        or ""
+    )
+    domain_value = extract_domain_value(legit_value)
+
+    if watcher_id is None or not domain_value:
+        logger.warning(
+            "Skipping invalid legit payload: watcher_id=%r domain_value=%r payload=%s",
+            watcher_id,
+            domain_value,
+            legit_payload,
         )
-    else:
-        WatcherLegitDomain.objects.filter(watcher_id=watcher_id).delete()
+        return
 
-    logger.info("Synced site watcher_id=%s domain=%s", monitored_obj.watcher_id, domain_value)
+    domain_obj = get_or_create_domain(domain_value)
+    status = map_legit_status(legit_payload)
+    remote_last_update = parse_any_datetime(
+        legit_payload.get("updated_at") or legit_payload.get("created_at")
+    )
 
+    legit_obj, created = WatcherLegitDomain.objects.update_or_create(
+        watcher_id=watcher_id,
+        defaults={
+            "domain": domain_obj,
+            "status": status,
+            "remote_last_update": remote_last_update,
+            "raw_payload": legit_payload,
+        },
+    )
+
+    logger.info(
+        "Synced legit watcher_id=%s domain=%s created=%s",
+        legit_obj.watcher_id,
+        domain_value,
+        created,
+    )
 
 
 def run_watcher_sync() -> None:
@@ -186,6 +266,18 @@ def run_watcher_sync() -> None:
                 sync_site(site_payload)
             except Exception:
                 logger.exception("Failed to sync site payload: %s", site_payload)
+
+        try:
+            legits = client.get_legitimates()
+            logger.info("Fetched %s legitimate domains from Watcher", len(legits))
+
+            for legit_payload in legits:
+                try:
+                    sync_legit(legit_payload)
+                except Exception:
+                    logger.exception("Failed to sync legit payload: %s", legit_payload)
+        except requests.RequestException:
+            logger.exception("Failed to fetch legitimate domains from Watcher")
 
         logger.info("Watcher sync completed")
 

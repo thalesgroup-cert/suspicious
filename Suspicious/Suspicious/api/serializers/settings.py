@@ -105,3 +105,8 @@ class CISOUserSerializer(serializers.ModelSerializer):
             "creation_date",
             "last_update",
         ]
+
+class WatcherDomainListItemSerializer(serializers.Serializer):
+    id = serializers.CharField()
+    value = serializers.CharField()
+    created_at = serializers.DateTimeField()
