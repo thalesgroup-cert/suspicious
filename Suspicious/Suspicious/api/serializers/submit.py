@@ -1,3 +1,4 @@
+# api/serializers/submit.py
 from django.conf import settings
 from rest_framework import serializers
 
@@ -27,7 +28,13 @@ class SubmitUrlSerializer(OptionalContextMixin, serializers.Serializer):
     url = serializers.URLField(required=True)
 
     def validate_url(self, value: str) -> str:
-        return value.strip()
+        value = value.strip()
+        # Normalise bare domains that arrive without a scheme.
+        # The frontend already prepends http:// for bare domains, but this
+        # acts as a safety net in case the value slips through uncorrected.
+        if value and not value.startswith(("http://", "https://")):
+            value = f"http://{value}"
+        return value
 
 
 class SubmitOtherSerializer(OptionalContextMixin, serializers.Serializer):

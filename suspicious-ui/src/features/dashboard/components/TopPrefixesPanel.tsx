@@ -1,23 +1,25 @@
+// src/features/dashboard/components/TopPrefixesPanel.tsx
 import * as React from "react";
 import { api } from "@/api/client";
 import {
   Box,
-  Card,
-  CardContent,
   Chip,
   CircularProgress,
-  Divider,
   Stack,
   ToggleButton,
   ToggleButtonGroup,
   Typography,
 } from "@mui/material";
+import { useTheme } from "@mui/material/styles";
+import { alpha } from "@mui/material/styles";
 import {
   SellOutlined,
   WorkspacePremiumRounded,
   MilitaryTechRounded,
   EmojiEventsRounded,
 } from "@mui/icons-material";
+
+import { SoftCard } from "./SoftCard";
 
 type TopPrefixesType = "user" | "group";
 
@@ -67,7 +69,6 @@ function getRankBadge(rank: number) {
       ring: "0 0 0 4px rgba(250,204,21,0.18)",
     };
   }
-
   if (rank === 1) {
     return {
       icon: <MilitaryTechRounded sx={{ fontSize: 15 }} />,
@@ -76,7 +77,6 @@ function getRankBadge(rank: number) {
       ring: "0 0 0 4px rgba(148,163,184,0.16)",
     };
   }
-
   if (rank === 2) {
     return {
       icon: <EmojiEventsRounded sx={{ fontSize: 15 }} />,
@@ -85,7 +85,6 @@ function getRankBadge(rank: number) {
       ring: "0 0 0 4px rgba(245,158,11,0.16)",
     };
   }
-
   return {
     icon: (
       <Box component="span" sx={{ fontSize: 12, fontWeight: 800 }}>
@@ -112,64 +111,7 @@ async function fetchTopPrefixes(params: {
       limit: params.limit ?? 5,
     },
   });
-
   return response.data;
-}
-
-function GlassCard(props: React.PropsWithChildren<{
-  title: string;
-  icon?: React.ReactNode;
-  right?: React.ReactNode;
-}>) {
-  return (
-    <Card
-      sx={{
-        height: "100%",
-        borderRadius: 3,
-        border: "1px solid rgba(255,255,255,.10)",
-        background: "linear-gradient(180deg, rgba(255,255,255,.06), rgba(255,255,255,.03))",
-      }}
-    >
-      <CardContent
-        sx={{
-          height: "100%",
-          p: { xs: 1.5, md: 2 },
-          display: "flex",
-          flexDirection: "column",
-          minHeight: 0,
-        }}
-      >
-        <Stack direction="row" alignItems="center" justifyContent="space-between" sx={{ mb: 1, flexShrink: 0 }}>
-          <Stack direction="row" spacing={0.9} alignItems="center">
-            <Box
-              sx={{
-                width: 34,
-                height: 34,
-                borderRadius: 2,
-                display: "grid",
-                placeItems: "center",
-                border: "1px solid rgba(255,255,255,.12)",
-                background:
-                  "linear-gradient(135deg, rgba(56,189,248,.14), rgba(120,119,198,.12))",
-                "& svg": { fontSize: 18 },
-              }}
-            >
-              {props.icon}
-            </Box>
-            <Typography fontWeight={900} fontSize={15}>
-              {props.title}
-            </Typography>
-          </Stack>
-          {props.right}
-        </Stack>
-
-        <Divider sx={{ opacity: 0.25, mb: 1.5, flexShrink: 0 }} />
-        <Box sx={{ flex: 1, minHeight: 0, overflow: "auto" }}>
-          {props.children}
-        </Box>
-      </CardContent>
-    </Card>
-  );
 }
 
 export default function TopPrefixesPanel({
@@ -177,6 +119,9 @@ export default function TopPrefixesPanel({
   year,
   limit = 5,
 }: TopPrefixesPanelProps) {
+  const theme = useTheme();
+  const isDark = theme.palette.mode === "dark";
+
   const [type, setType] = React.useState<TopPrefixesType>("user");
   const [loading, setLoading] = React.useState(false);
   const [error, setError] = React.useState<string | null>(null);
@@ -189,10 +134,8 @@ export default function TopPrefixesPanel({
       try {
         setLoading(true);
         setError(null);
-
         const result = await fetchTopPrefixes({ type, month, year, limit });
         if (!active) return;
-
         setRows(result.data);
       } catch (err) {
         if (!active) return;
@@ -204,25 +147,28 @@ export default function TopPrefixesPanel({
     }
 
     load();
-
-    return () => {
-      active = false;
-    };
+    return () => { active = false; };
   }, [type, month, year, limit]);
 
-  const chartData = rows.map((item, index) => ({
-    prefix: item.prefix,
-    shortLabel: `${index + 1}. ${compactLabel(item.prefix)}`,
+  // Theme-aware row styling
+  const rowBorderColor = isDark ? "rgba(255,255,255,0.08)" : alpha(theme.palette.divider, 0.55);
+  const rowBgTop = isDark
+    ? "linear-gradient(180deg, rgba(255,255,255,0.06), rgba(255,255,255,0.03))"
+    : `linear-gradient(180deg, ${alpha("#fff", 0.85)}, ${alpha(theme.palette.grey[50], 0.9)})`;
+  const rowBgRest = isDark ? "rgba(255,255,255,0.02)" : alpha(theme.palette.background.paper, 0.4);
 
-    safe: item.safe,
-    suspicious: item.suspicious,
-    dangerous: item.dangerous,
-    failure: item.failure,
-    inconclusive: item.inconclusive,
-  }));
+  const rankBadgeBorder = isDark
+    ? "1px solid rgba(255,255,255,0.10)"
+    : `1px solid ${alpha(theme.palette.divider, 0.45)}`;
+
+  const chipBgTop = isDark ? "rgba(56,189,248,.16)" : alpha("#38BDF8", 0.12);
+  const chipBgRest = isDark ? "rgba(148,163,184,.12)" : alpha(theme.palette.grey[300], 0.35);
+  const chipBorder = isDark ? "1px solid rgba(255,255,255,.08)" : `1px solid ${alpha(theme.palette.divider, 0.5)}`;
+
+  const stackedBarBg = isDark ? "rgba(148,163,184,0.10)" : alpha(theme.palette.grey[300], 0.35);
 
   return (
-    <GlassCard
+    <SoftCard
       title={`Top ${limit} Reporters`}
       icon={<SellOutlined />}
       right={
@@ -241,6 +187,7 @@ export default function TopPrefixesPanel({
           <Chip size="small" label={`Top ${limit}`} variant="outlined" />
         </Stack>
       }
+      fillHeight
     >
       <Box sx={{ height: "100%", minHeight: 0, overflow: "auto" }}>
         {loading ? (
@@ -249,22 +196,19 @@ export default function TopPrefixesPanel({
           </Stack>
         ) : error ? (
           <Stack sx={{ height: "100%" }} alignItems="center" justifyContent="center">
-            <Typography color="error" variant="body2">
-              {error}
-            </Typography>
+            <Typography color="error" variant="body2">{error}</Typography>
           </Stack>
-        ) : chartData.length === 0 ? (
+        ) : rows.length === 0 ? (
           <Stack sx={{ height: "100%" }} alignItems="center" justifyContent="center">
             <Typography color="text.secondary" variant="body2">
               No prefixes for this period
             </Typography>
           </Stack>
         ) : (
-        <>
-
           <Stack spacing={1.25}>
             {rows.map((item, index) => {
               const total = item.total || 0;
+              const badge = getRankBadge(index);
 
               return (
                 <Box
@@ -273,11 +217,8 @@ export default function TopPrefixesPanel({
                     borderRadius: 2.5,
                     px: 1.25,
                     py: 1,
-                    border: "1px solid rgba(255,255,255,0.08)",
-                    background:
-                      index === 0
-                        ? "linear-gradient(180deg, rgba(255,255,255,0.06), rgba(255,255,255,0.03))"
-                        : "rgba(255,255,255,0.02)",
+                    border: `1px solid ${rowBorderColor}`,
+                    background: index === 0 ? rowBgTop : rowBgRest,
                   }}
                 >
                   <Stack
@@ -288,29 +229,23 @@ export default function TopPrefixesPanel({
                     sx={{ mb: 0.75 }}
                   >
                     <Stack direction="row" spacing={1} alignItems="center" sx={{ minWidth: 0 }}>
-                      {(() => {
-                        const badge = getRankBadge(index);
-
-                        return (
-                          <Box
-                            sx={{
-                              minWidth: 28,
-                              width: 28,
-                              height: 28,
-                              borderRadius: 999,
-                              display: "grid",
-                              placeItems: "center",
-                              color: badge.color,
-                              background: badge.bg,
-                              boxShadow: badge.ring,
-                              border: "1px solid rgba(255,255,255,0.10)",
-                              flexShrink: 0,
-                            }}
-                          >
-                            {badge.icon}
-                          </Box>
-                        );
-                      })()}
+                      <Box
+                        sx={{
+                          minWidth: 28,
+                          width: 28,
+                          height: 28,
+                          borderRadius: 999,
+                          display: "grid",
+                          placeItems: "center",
+                          color: badge.color,
+                          background: badge.bg,
+                          boxShadow: badge.ring,
+                          border: rankBadgeBorder,
+                          flexShrink: 0,
+                        }}
+                      >
+                        {badge.icon}
+                      </Box>
 
                       <Typography
                         variant="body2"
@@ -331,26 +266,28 @@ export default function TopPrefixesPanel({
                       label={total.toLocaleString()}
                       sx={{
                         fontWeight: 800,
-                        bgcolor: index === 0 ? "rgba(56,189,248,.16)" : "rgba(148,163,184,.12)",
-                        border: "1px solid rgba(255,255,255,.08)",
+                        bgcolor: index === 0 ? chipBgTop : chipBgRest,
+                        border: chipBorder,
                       }}
                     />
                   </Stack>
 
+                  {/* Stacked bar */}
                   <Box
                     sx={{
                       height: 16,
                       borderRadius: 999,
                       overflow: "hidden",
                       display: "flex",
-                      bgcolor: "rgba(148,163,184,0.10)",
-                      boxShadow: "inset 0 0 0 1px rgba(255,255,255,0.04)",
+                      bgcolor: stackedBarBg,
+                      boxShadow: isDark
+                        ? "inset 0 0 0 1px rgba(255,255,255,0.04)"
+                        : `inset 0 0 0 1px ${alpha(theme.palette.divider, 0.2)}`,
                     }}
                   >
                     {CATEGORY_CONFIG.map((category) => {
                       const value = item[category.key] as number;
                       const width = total > 0 ? (value / total) * 100 : 0;
-
                       if (value <= 0) return null;
 
                       return (
@@ -362,14 +299,13 @@ export default function TopPrefixesPanel({
                             minWidth: value > 0 ? 6 : 0,
                             bgcolor: category.color,
                             transition: "width .35s ease",
-                            boxShadow:
-                              index === 0 ? `inset 0 0 0 1px ${category.color}` : "none",
                           }}
                         />
                       );
                     })}
                   </Box>
 
+                  {/* Legend */}
                   <Stack
                     direction="row"
                     spacing={1.5}
@@ -380,7 +316,6 @@ export default function TopPrefixesPanel({
                     {CATEGORY_CONFIG.map((category) => {
                       const value = item[category.key] as number;
                       const pct = total > 0 ? Math.round((value / total) * 100) : 0;
-
                       if (value <= 0) return null;
 
                       return (
@@ -394,20 +329,9 @@ export default function TopPrefixesPanel({
                             gap: 0.5,
                           }}
                         >
-                          <Box
-                            sx={{
-                              width: 7,
-                              height: 7,
-                              borderRadius: 999,
-                              bgcolor: category.color,
-                            }}
-                          />
-                          <Box component="span" sx={{ fontWeight: 700 }}>
-                            {category.label}
-                          </Box>
-                          <Box component="span">
-                            {value} · {pct}%
-                          </Box>
+                          <Box sx={{ width: 7, height: 7, borderRadius: 999, bgcolor: category.color }} />
+                          <Box component="span" sx={{ fontWeight: 700 }}>{category.label}</Box>
+                          <Box component="span">{value} · {pct}%</Box>
                         </Typography>
                       );
                     })}
@@ -416,9 +340,8 @@ export default function TopPrefixesPanel({
               );
             })}
           </Stack>
-        </>
         )}
       </Box>
-    </GlassCard>
+    </SoftCard>
   );
 }

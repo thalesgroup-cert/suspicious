@@ -1,10 +1,10 @@
+// src/pages/InvestigationPage.tsx
 import * as React from "react";
 import {
   Accordion,
   AccordionDetails,
   AccordionSummary,
   Alert,
-  alpha,
   Avatar,
   LinearProgress,
   Box,
@@ -45,6 +45,8 @@ import {
 } from "@mui/icons-material";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useNavigate, useSearchParams } from "react-router-dom";
+import { alpha } from "@mui/material/styles";
+import { useTheme } from "@mui/material/styles";
 
 import { getMe, type Me } from "@/api/auth";
 import {
@@ -62,47 +64,9 @@ import { StatusChip } from "@/shared/components/StatusChip";
 import { ResultChip } from "@/shared/components/ResultChip";
 import { CopyIconButton } from "@/shared/components/CopyIconButton";
 
-function GlassCard(props: React.PropsWithChildren<{ sx?: any }>) {
-  return (
-    <Card
-      sx={{
-        borderRadius: 2,
-        border: "1px solid rgba(255,255,255,.10)",
-        background: "linear-gradient(180deg, rgba(255,255,255,.06), rgba(255,255,255,.03))",
-        ...props.sx,
-      }}
-    >
-      {props.children}
-    </Card>
-  );
-}
-
-function fmtDate(iso: string) {
-  const d = new Date(iso);
-  if (Number.isNaN(d.getTime())) return iso;
-  return d.toLocaleString(undefined, {
-    year: "numeric",
-    month: "short",
-    day: "2-digit",
-  });
-}
-
-function short(s: string, n = 42) {
-  const t = (s ?? "").trim();
-  return t.length > n ? t.slice(0, n - 1) + "…" : t;
-}
-
-function pickScore(d?: InvestigationDetails) {
-  return d?.case_infos?.score ?? null;
-}
-
-function pickConfidence(d?: InvestigationDetails) {
-  return d?.case_infos?.confidence ?? null;
-}
-
-function pickClassification(d?: InvestigationDetails) {
-  return d?.case_infos?.classification ?? "UNKNOWN";
-}
+// ---------------------------------------------------------------------------
+// Score / confidence helpers  (identical to SubmissionsPage)
+// ---------------------------------------------------------------------------
 
 function clamp(n: number, min = 0, max = 100) {
   return Math.max(min, Math.min(max, n));
@@ -123,7 +87,6 @@ function normalizeConfidence(confidence?: number | null) {
 
 function getRiskTone(score?: number | null) {
   const v = normalizeScore(score);
-
   if (v >= 80) {
     return {
       label: "High risk",
@@ -136,7 +99,6 @@ function getRiskTone(score?: number | null) {
       },
     };
   }
-
   if (v >= 55) {
     return {
       label: "Needs attention",
@@ -149,7 +111,6 @@ function getRiskTone(score?: number | null) {
       },
     };
   }
-
   return {
     label: "Low risk",
     color: "#22c55e",
@@ -164,7 +125,6 @@ function getRiskTone(score?: number | null) {
 
 function getConfidenceTone(confidence?: number | null) {
   const v = normalizeConfidence(confidence);
-
   if (v >= 75) {
     return {
       label: "High confidence",
@@ -175,7 +135,6 @@ function getConfidenceTone(confidence?: number | null) {
       },
     };
   }
-
   if (v >= 45) {
     return {
       label: "Medium confidence",
@@ -186,7 +145,6 @@ function getConfidenceTone(confidence?: number | null) {
       },
     };
   }
-
   return {
     label: "Low confidence",
     color: "#94a3b8",
@@ -197,9 +155,12 @@ function getConfidenceTone(confidence?: number | null) {
   };
 }
 
+// ---------------------------------------------------------------------------
+// Label helpers
+// ---------------------------------------------------------------------------
+
 function readStatus(status?: string) {
   const s = (status ?? "").toUpperCase();
-
   if (s === "DONE") return "Finished";
   if (s === "FAILED") return "Failed";
   if (s === "IN_PROGRESS") return "Running";
@@ -210,7 +171,6 @@ function readStatus(status?: string) {
 
 function readType(type?: string) {
   const t = (type ?? "").toLowerCase();
-
   if (t === "file") return "File check";
   if (t === "hash") return "Hash check";
   if (t === "mail") return "Email check";
@@ -224,20 +184,11 @@ function summarizeForReading(report: any) {
   const confidence = getConfidenceTone(report.confidence);
   const targetValue = report.target?.value;
   const categories = report.categories?.filter(Boolean) ?? [];
-
   const parts: string[] = [];
-
   parts.push(`${report.analyzer_name || "This analyzer"} marked this item as ${risk.label.toLowerCase()}.`);
   parts.push(`The result confidence is ${confidence.label.toLowerCase()}.`);
-
-  if (targetValue) {
-    parts.push(`Checked item: ${targetValue}.`);
-  }
-
-  if (categories.length) {
-    parts.push(`Detected type: ${categories.join(", ")}.`);
-  }
-
+  if (targetValue) parts.push(`Checked item: ${targetValue}.`);
+  if (categories.length) parts.push(`Detected type: ${categories.join(", ")}.`);
   return parts.join(" ");
 }
 
@@ -255,6 +206,61 @@ function prettySummary(summary: any) {
   return null;
 }
 
+function fmtDate(iso: string) {
+  const d = new Date(iso);
+  if (Number.isNaN(d.getTime())) return iso;
+  return d.toLocaleString(undefined, { year: "numeric", month: "short", day: "2-digit" });
+}
+
+function short(s: string, n = 42) {
+  const t = (s ?? "").trim();
+  return t.length > n ? t.slice(0, n - 1) + "…" : t;
+}
+
+function pickScore(d?: InvestigationDetails) {
+  return d?.case_infos?.score ?? null;
+}
+function pickConfidence(d?: InvestigationDetails) {
+  return d?.case_infos?.confidence ?? null;
+}
+function pickClassification(d?: InvestigationDetails) {
+  return d?.case_infos?.classification ?? "UNKNOWN";
+}
+
+// ---------------------------------------------------------------------------
+// SoftCard — theme-aware, identical to SubmitPage / HomePage / SubmissionsPage
+// ---------------------------------------------------------------------------
+
+function SoftCard(props: React.PropsWithChildren<{ sx?: object }>) {
+  const theme = useTheme();
+  const isDark = theme.palette.mode === "dark";
+
+  return (
+    <Card
+      sx={{
+        borderRadius: 4,
+        border: `1px solid ${alpha(theme.palette.divider, isDark ? 0.28 : 0.9)}`,
+        background: isDark
+          ? `linear-gradient(180deg, ${alpha("#fff", 0.03)}, ${alpha("#fff", 0.02)})`
+          : `linear-gradient(180deg, ${alpha("#fff", 0.88)}, ${alpha(
+              theme.palette.grey[50],
+              0.96
+            )})`,
+        boxShadow: isDark
+          ? "0 12px 32px rgba(0,0,0,.28)"
+          : "0 10px 28px rgba(15,23,42,.06)",
+        ...props.sx,
+      }}
+    >
+      {props.children}
+    </Card>
+  );
+}
+
+// ---------------------------------------------------------------------------
+// InvestigationAnalyzerReportCard — fully theme-aware
+// ---------------------------------------------------------------------------
+
 function InvestigationAnalyzerReportCard({
   report,
   expanded,
@@ -264,6 +270,9 @@ function InvestigationAnalyzerReportCard({
   expanded: boolean;
   onToggle: () => void;
 }) {
+  const theme = useTheme();
+  const isDark = theme.palette.mode === "dark";
+
   const risk = getRiskTone(report.score);
   const confidence = getConfidenceTone(report.confidence);
 
@@ -273,12 +282,21 @@ function InvestigationAnalyzerReportCard({
   const readableSummary = prettySummary(report.report_summary);
   const plainSummary = summarizeForReading(report);
 
+  const cardBg = isDark
+    ? `linear-gradient(180deg, ${risk.softBg} 0%, rgba(255,255,255,.03) 100%)`
+    : `linear-gradient(180deg, ${risk.softBg} 0%, ${alpha("#fff", 0.9)} 100%)`;
+
+  const headerBg = isDark ? "rgba(255,255,255,.03)" : alpha(theme.palette.background.paper, 0.6);
+  const detailBg = isDark ? "rgba(255,255,255,.03)" : alpha(theme.palette.background.paper, 0.5);
+  const detailBorder = isDark ? "rgba(255,255,255,.08)" : alpha(theme.palette.divider, 0.6);
+  const codeBg = isDark ? "rgba(0,0,0,.22)" : alpha(theme.palette.grey[100], 0.9);
+
   return (
     <Card
       sx={{
         borderRadius: 3,
         border: `1px solid ${risk.softBorder}`,
-        background: `linear-gradient(180deg, ${risk.softBg} 0%, rgba(255,255,255,.03) 100%)`,
+        background: cardBg,
         overflow: "hidden",
       }}
     >
@@ -295,8 +313,8 @@ function InvestigationAnalyzerReportCard({
         sx={{
           px: 2,
           py: 1.5,
-          borderBottom: expanded ? "1px solid rgba(255,255,255,.08)" : "none",
-          background: "rgba(255,255,255,.03)",
+          borderBottom: expanded ? `1px solid ${detailBorder}` : "none",
+          background: headerBg,
           cursor: "pointer",
           userSelect: "none",
         }}
@@ -332,8 +350,10 @@ function InvestigationAnalyzerReportCard({
               label={confidence.label}
               sx={{
                 fontWeight: 800,
-                border: "1px solid rgba(255,255,255,.12)",
-                backgroundColor: "rgba(255,255,255,.04)",
+                border: `1px solid ${alpha(theme.palette.divider, isDark ? 0.18 : 0.6)}`,
+                backgroundColor: isDark
+                  ? "rgba(255,255,255,.04)"
+                  : alpha(theme.palette.grey[100], 0.7),
               }}
             />
             <ExpandMoreOutlined
@@ -350,69 +370,57 @@ function InvestigationAnalyzerReportCard({
       {expanded ? (
         <CardContent sx={{ p: 2 }}>
           <Stack spacing={2}>
+            {/* What this means */}
             <Box
               sx={{
                 p: 1.5,
                 borderRadius: 2,
-                border: "1px solid rgba(255,255,255,.08)",
-                background: "rgba(255,255,255,.03)",
+                border: `1px solid ${detailBorder}`,
+                background: detailBg,
               }}
             >
               <Typography variant="body2" fontWeight={800} sx={{ mb: 0.75 }}>
                 What this means
               </Typography>
-
               <Typography variant="body2" sx={{ lineHeight: 1.6 }}>
                 {readableSummary || plainSummary}
               </Typography>
             </Box>
 
+            {/* Score + confidence bars */}
             <Stack spacing={1.25}>
               <Box>
                 <Stack direction="row" justifyContent="space-between" sx={{ mb: 0.5 }}>
-                  <Typography variant="body2" fontWeight={700}>
-                    Risk score
-                  </Typography>
+                  <Typography variant="body2" fontWeight={700}>Risk score</Typography>
                   <Typography variant="body2" fontWeight={900}>
                     {typeof report.score === "number"
                       ? report.score.toFixed(report.score <= 10 ? 1 : 0)
                       : "—"}
                   </Typography>
                 </Stack>
-
                 <LinearProgress
                   variant="determinate"
                   value={scorePct}
-                  sx={{
-                    height: 10,
-                    borderRadius: 999,
-                    ...risk.barSx,
-                  }}
+                  sx={{ height: 10, borderRadius: 999, ...risk.barSx }}
                 />
               </Box>
 
               <Box>
                 <Stack direction="row" justifyContent="space-between" sx={{ mb: 0.5 }}>
-                  <Typography variant="body2" fontWeight={700}>
-                    Confidence
-                  </Typography>
+                  <Typography variant="body2" fontWeight={700}>Confidence</Typography>
                   <Typography variant="body2" fontWeight={900}>
                     {Math.round(confidencePct)}%
                   </Typography>
                 </Stack>
-
                 <LinearProgress
                   variant="determinate"
                   value={confidencePct}
-                  sx={{
-                    height: 10,
-                    borderRadius: 999,
-                    ...confidence.barSx,
-                  }}
+                  sx={{ height: 10, borderRadius: 999, ...confidence.barSx }}
                 />
               </Box>
             </Stack>
 
+            {/* Details grid */}
             <Box
               sx={{
                 display: "grid",
@@ -420,55 +428,45 @@ function InvestigationAnalyzerReportCard({
                 gap: 1,
                 p: 1.5,
                 borderRadius: 2,
-                border: "1px solid rgba(255,255,255,.08)",
-                background: "rgba(255,255,255,.02)",
+                border: `1px solid ${detailBorder}`,
+                background: isDark
+                  ? "rgba(255,255,255,.02)"
+                  : alpha(theme.palette.background.paper, 0.4),
               }}
             >
-              <Typography color="text.secondary" variant="body2">
-                Checked item
-              </Typography>
+              <Typography color="text.secondary" variant="body2">Checked item</Typography>
               <Typography variant="body2" sx={{ wordBreak: "break-word" }}>
                 {report.target?.value || "—"}
               </Typography>
 
-              <Typography color="text.secondary" variant="body2">
-                Item type
-              </Typography>
-              <Typography variant="body2">
-                {report.target?.kind || "—"}
-              </Typography>
+              <Typography color="text.secondary" variant="body2">Item type</Typography>
+              <Typography variant="body2">{report.target?.kind || "—"}</Typography>
 
-              <Typography color="text.secondary" variant="body2">
-                Categories
-              </Typography>
+              <Typography color="text.secondary" variant="body2">Categories</Typography>
               <Typography variant="body2">
                 {report.categories?.length ? report.categories.join(", ") : "None listed"}
               </Typography>
 
-              <Typography color="text.secondary" variant="body2">
-                Finished
-              </Typography>
+              <Typography color="text.secondary" variant="body2">Finished</Typography>
               <Typography variant="body2">
                 {report.created_at ? fmtDate(report.created_at) : "—"}
               </Typography>
             </Box>
 
+            {/* Technical details accordion */}
             <Accordion
               disableGutters
               sx={{
                 borderRadius: 2,
-                border: "1px solid rgba(255,255,255,.08)",
-                background: "rgba(255,255,255,.02)",
+                border: `1px solid ${detailBorder}`,
+                background: isDark
+                  ? "rgba(255,255,255,.02)"
+                  : alpha(theme.palette.background.paper, 0.4),
                 "&:before": { display: "none" },
               }}
             >
-              <AccordionSummary
-                expandIcon={<ExpandMoreOutlined />}
-                onClick={(e) => e.stopPropagation()}
-              >
-                <Typography variant="body2" fontWeight={800}>
-                  Technical details
-                </Typography>
+              <AccordionSummary expandIcon={<ExpandMoreOutlined />} onClick={(e) => e.stopPropagation()}>
+                <Typography variant="body2" fontWeight={800}>Technical details</Typography>
               </AccordionSummary>
               <AccordionDetails onClick={(e) => e.stopPropagation()}>
                 <Stack spacing={1.5}>
@@ -479,33 +477,21 @@ function InvestigationAnalyzerReportCard({
                       gap: 1,
                     }}
                   >
-                    <Typography color="text.secondary" variant="body2">
-                      Analyzer ID
-                    </Typography>
+                    <Typography color="text.secondary" variant="body2">Analyzer ID</Typography>
                     <Typography variant="body2" sx={{ wordBreak: "break-word" }}>
                       {report.analyzer_id || "—"}
                     </Typography>
 
-                    <Typography color="text.secondary" variant="body2">
-                      Job ID
-                    </Typography>
+                    <Typography color="text.secondary" variant="body2">Job ID</Typography>
                     <Typography variant="body2" sx={{ wordBreak: "break-word" }}>
                       {report.cortex_job_id || "—"}
                     </Typography>
 
-                    <Typography color="text.secondary" variant="body2">
-                      Level
-                    </Typography>
-                    <Typography variant="body2">
-                      {report.level || "—"}
-                    </Typography>
+                    <Typography color="text.secondary" variant="body2">Level</Typography>
+                    <Typography variant="body2">{report.level || "—"}</Typography>
 
-                    <Typography color="text.secondary" variant="body2">
-                      Status
-                    </Typography>
-                    <Typography variant="body2">
-                      {report.status || "—"}
-                    </Typography>
+                    <Typography color="text.secondary" variant="body2">Status</Typography>
+                    <Typography variant="body2">{report.status || "—"}</Typography>
                   </Box>
 
                   {report.report_taxonomy ? (
@@ -513,32 +499,24 @@ function InvestigationAnalyzerReportCard({
                       disableGutters
                       sx={{
                         borderRadius: 2,
-                        border: "1px solid rgba(255,255,255,.08)",
-                        background: "rgba(255,255,255,.02)",
+                        border: `1px solid ${detailBorder}`,
+                        background: isDark
+                          ? "rgba(255,255,255,.02)"
+                          : alpha(theme.palette.background.paper, 0.4),
                         "&:before": { display: "none" },
                       }}
                     >
-                      <AccordionSummary
-                        expandIcon={<ExpandMoreOutlined />}
-                        onClick={(e) => e.stopPropagation()}
-                      >
-                        <Typography variant="body2" fontWeight={800}>
-                          Taxonomy JSON
-                        </Typography>
+                      <AccordionSummary expandIcon={<ExpandMoreOutlined />} onClick={(e) => e.stopPropagation()}>
+                        <Typography variant="body2" fontWeight={800}>Taxonomy JSON</Typography>
                       </AccordionSummary>
                       <AccordionDetails onClick={(e) => e.stopPropagation()}>
                         <Box
                           component="pre"
                           sx={{
-                            m: 0,
-                            p: 1.25,
-                            borderRadius: 2,
-                            border: "1px solid rgba(255,255,255,.08)",
-                            background: "rgba(0,0,0,.22)",
-                            overflow: "auto",
-                            maxHeight: 220,
-                            fontSize: 12,
-                            lineHeight: 1.45,
+                            m: 0, p: 1.25, borderRadius: 2,
+                            border: `1px solid ${detailBorder}`,
+                            background: codeBg,
+                            overflow: "auto", maxHeight: 220, fontSize: 12, lineHeight: 1.45,
                           }}
                         >
                           {JSON.stringify(report.report_taxonomy, null, 2)}
@@ -552,32 +530,24 @@ function InvestigationAnalyzerReportCard({
                       disableGutters
                       sx={{
                         borderRadius: 2,
-                        border: "1px solid rgba(255,255,255,.08)",
-                        background: "rgba(255,255,255,.02)",
+                        border: `1px solid ${detailBorder}`,
+                        background: isDark
+                          ? "rgba(255,255,255,.02)"
+                          : alpha(theme.palette.background.paper, 0.4),
                         "&:before": { display: "none" },
                       }}
                     >
-                      <AccordionSummary
-                        expandIcon={<ExpandMoreOutlined />}
-                        onClick={(e) => e.stopPropagation()}
-                      >
-                        <Typography variant="body2" fontWeight={800}>
-                          Summary JSON
-                        </Typography>
+                      <AccordionSummary expandIcon={<ExpandMoreOutlined />} onClick={(e) => e.stopPropagation()}>
+                        <Typography variant="body2" fontWeight={800}>Summary JSON</Typography>
                       </AccordionSummary>
                       <AccordionDetails onClick={(e) => e.stopPropagation()}>
                         <Box
                           component="pre"
                           sx={{
-                            m: 0,
-                            p: 1.25,
-                            borderRadius: 2,
-                            border: "1px solid rgba(255,255,255,.08)",
-                            background: "rgba(0,0,0,.22)",
-                            overflow: "auto",
-                            maxHeight: 220,
-                            fontSize: 12,
-                            lineHeight: 1.45,
+                            m: 0, p: 1.25, borderRadius: 2,
+                            border: `1px solid ${detailBorder}`,
+                            background: codeBg,
+                            overflow: "auto", maxHeight: 220, fontSize: 12, lineHeight: 1.45,
                           }}
                         >
                           {JSON.stringify(report.report_summary, null, 2)}
@@ -595,10 +565,16 @@ function InvestigationAnalyzerReportCard({
   );
 }
 
+// ---------------------------------------------------------------------------
+// Page
+// ---------------------------------------------------------------------------
+
 export default function InvestigationPage() {
   const navigate = useNavigate();
   const [searchParams] = useSearchParams();
   const qc = useQueryClient();
+  const theme = useTheme();
+  const isDark = theme.palette.mode === "dark";
 
   const [q, setQ] = React.useState("");
   const qDebounced = useDebounced(q, 250);
@@ -621,12 +597,7 @@ export default function InvestigationPage() {
 
   const [expandedAnalyzerIds, setExpandedAnalyzerIds] = React.useState<Record<number, boolean>>({});
 
-  const meQuery = useQuery<Me>({
-    queryKey: ["me"],
-    queryFn: getMe,
-    retry: false,
-  });
-
+  const meQuery = useQuery<Me>({ queryKey: ["me"], queryFn: getMe, retry: false });
   const me = meQuery.data;
 
   const groups = React.useMemo(() => me?.groups ?? [], [me]);
@@ -636,16 +607,7 @@ export default function InvestigationPage() {
   );
 
   const investigationListParams = React.useMemo(
-    () => ({
-      page,
-      pageSize,
-      search: qDebounced,
-      status,
-      type,
-      from,
-      to,
-      sort,
-    }),
+    () => ({ page, pageSize, search: qDebounced, status, type, from, to, sort }),
     [page, pageSize, qDebounced, status, type, from, to, sort]
   );
 
@@ -666,7 +628,8 @@ export default function InvestigationPage() {
     refetchIntervalInBackground: true,
   });
 
-  const selectedIdNum = typeof selectedId === "number" && Number.isFinite(selectedId) ? selectedId : NaN;
+  const selectedIdNum =
+    typeof selectedId === "number" && Number.isFinite(selectedId) ? selectedId : NaN;
   const hasNumericSelectedId = Number.isFinite(selectedIdNum);
 
   const detailsQuery = useQuery<InvestigationDetails>({
@@ -700,52 +663,24 @@ export default function InvestigationPage() {
   React.useEffect(() => {
     const urlQ = searchParams.get("q") ?? "";
     const open = searchParams.get("open");
-
-    if (urlQ) {
-      setQ(urlQ);
-    }
-
+    if (urlQ) setQ(urlQ);
     if (open) {
       const idNum = Number(open);
-      if (Number.isFinite(idNum)) {
-        setSelectedId(idNum);
-        setOpenDrawer(true);
-      }
+      if (Number.isFinite(idNum)) { setSelectedId(idNum); setOpenDrawer(true); }
     }
   }, [searchParams]);
 
-  React.useEffect(() => {
-    setPage(0);
-  }, [qDebounced, status, type, from, to, sort, pageSize]);
+  React.useEffect(() => { setPage(0); }, [qDebounced, status, type, from, to, sort, pageSize]);
+  React.useEffect(() => { if (!openDrawer) setExpandedAnalyzerIds({}); }, [openDrawer]);
+  React.useEffect(() => { setExpandedAnalyzerIds({}); }, [selectedId]);
+  React.useEffect(() => { setExpandedAnalyzerIds({}); }, [detailsQuery.data?.analyzer_reports]);
+  React.useEffect(() => { setEditMode(false); editMutation.reset(); }, [selectedIdNum]); // eslint-disable-line react-hooks/exhaustive-deps
 
   React.useEffect(() => {
-    if (!openDrawer) {
-      setExpandedAnalyzerIds({});
-    }
-  }, [openDrawer]);
-
-  React.useEffect(() => {
-    setExpandedAnalyzerIds({});
-  }, [selectedId]);
-
-  React.useEffect(() => {
-    setExpandedAnalyzerIds({});
-  }, [detailsQuery.data?.analyzer_reports]);
-
-  React.useEffect(() => {
-    setEditMode(false);
-    editMutation.reset();
-  }, [selectedIdNum]); // eslint-disable-line react-hooks/exhaustive-deps
-
-  React.useEffect(() => {
-    if (!openDrawer || !detailsQuery.data || editMode) {
-      return;
-    }
-
+    if (!openDrawer || !detailsQuery.data || editMode) return;
     const score = pickScore(detailsQuery.data);
     const confidence = pickConfidence(detailsQuery.data);
     const classification = pickClassification(detailsQuery.data);
-
     setEditScore(score == null ? "" : String(score));
     setEditConfidence(confidence == null ? "" : String(confidence));
     setEditClassification(String(classification).toUpperCase());
@@ -759,9 +694,7 @@ export default function InvestigationPage() {
   const selectedRow = selectedId != null
     ? rows.find((r) => String(r.id) === String(selectedId))
     : undefined;
-
   const drawerRow = selectedRow || detailsQuery.data;
-
   const detailsReady = !!detailsQuery.data && !detailsQuery.isLoading && !detailsQuery.isError;
 
   const currentScore = pickScore(detailsQuery.data);
@@ -774,9 +707,7 @@ export default function InvestigationPage() {
     setExpandedAnalyzerIds(Object.fromEntries(analyzerReports.map((r) => [r.id, true])));
   }, [analyzerReports]);
 
-  const collapseAllAnalyzers = React.useCallback(() => {
-    setExpandedAnalyzerIds({});
-  }, []);
+  const collapseAllAnalyzers = React.useCallback(() => { setExpandedAnalyzerIds({}); }, []);
 
   const invertAnalyzers = React.useCallback(() => {
     setExpandedAnalyzerIds((prev) =>
@@ -784,72 +715,36 @@ export default function InvestigationPage() {
     );
   }, [analyzerReports]);
 
-  function closeDrawer() {
-    setOpenDrawer(false);
-    setEditMode(false);
-    editMutation.reset();
-  }
+  function closeDrawer() { setOpenDrawer(false); setEditMode(false); editMutation.reset(); }
 
   async function copyEmail(email?: string) {
     if (!email) return;
-    try {
-      await navigator.clipboard.writeText(email);
-    } catch {
-      // ignore
-    }
+    try { await navigator.clipboard.writeText(email); } catch { /* ignore */ }
   }
 
+  // Auth / access guards
   if (meQuery.isLoading) {
-    return (
-      <Box sx={{ minHeight: "60vh", display: "grid", placeItems: "center" }}>
-        <CircularProgress />
-      </Box>
-    );
+    return <Box sx={{ minHeight: "60vh", display: "grid", placeItems: "center" }}><CircularProgress /></Box>;
   }
-
   if (!me) {
-    return (
-      <Box sx={{ p: 3 }}>
-        <Alert severity="error">Not authenticated.</Alert>
-      </Box>
-    );
+    return <Box sx={{ p: 3 }}><Alert severity="error">Not authenticated.</Alert></Box>;
   }
-
   if (!isElevated) {
-    return (
-      <Box sx={{ p: 3 }}>
-        <Alert severity="error">Access denied.</Alert>
-      </Box>
-    );
+    return <Box sx={{ p: 3 }}><Alert severity="error">Access denied.</Alert></Box>;
   }
-
   if (investigationsQuery.isLoading && !investigationsQuery.data) {
-    return (
-      <Box sx={{ minHeight: "60vh", display: "grid", placeItems: "center" }}>
-        <CircularProgress />
-      </Box>
-    );
+    return <Box sx={{ minHeight: "60vh", display: "grid", placeItems: "center" }}><CircularProgress /></Box>;
   }
-
   if (investigationsQuery.isError) {
-    return (
-      <Box sx={{ p: 3 }}>
-        <Alert severity="error">Failed to load investigations.</Alert>
-      </Box>
-    );
+    return <Box sx={{ p: 3 }}><Alert severity="error">Failed to load investigations.</Alert></Box>;
   }
 
   const BADGE_W = 132;
   const DRAWER_RADIUS = 2;
 
   const classificationOptions = [
-    "SAFE",
-    "INCONCLUSIVE",
-    "UNCHALLENGED",
-    "ALLOW_LISTED",
-    "FAILURE",
-    "SUSPICIOUS",
-    "DANGEROUS",
+    "SAFE", "INCONCLUSIVE", "UNCHALLENGED", "ALLOW_LISTED",
+    "FAILURE", "SUSPICIOUS", "DANGEROUS",
   ];
 
   const scoreNum = Number(editScore);
@@ -858,8 +753,18 @@ export default function InvestigationPage() {
   const confValid = Number.isFinite(confNum) && confNum >= 0 && confNum <= 100;
   const canSave = scoreValid && confValid && !!editClassification && !editMutation.isPending;
 
+  // Theme-aware values for drawer inline cards
+  const drawerCardBorder = isDark ? "rgba(255,255,255,.08)" : alpha(theme.palette.divider, 0.6);
+  const drawerCardBg = isDark ? "rgba(255,255,255,.025)" : alpha(theme.palette.background.paper, 0.7);
+  const refreshBtnBorder = isDark
+    ? "1px solid rgba(255,255,255,.10)"
+    : `1px solid ${alpha(theme.palette.divider, 0.6)}`;
+
   return (
     <Box sx={{ p: { xs: 2, md: 3 } }}>
+      {/* ------------------------------------------------------------------ */}
+      {/* Page header                                                         */}
+      {/* ------------------------------------------------------------------ */}
       <Stack
         direction={{ xs: "column", md: "row" }}
         spacing={2}
@@ -882,11 +787,7 @@ export default function InvestigationPage() {
           </Stack>
 
           <Stack direction="row" spacing={1} sx={{ mt: 1, flexWrap: "wrap" }}>
-            <Chip
-              icon={<AssignmentTurnedInOutlined />}
-              label={`${total} total`}
-              variant="outlined"
-            />
+            <Chip icon={<AssignmentTurnedInOutlined />} label={`${total} total`} variant="outlined" />
             <Chip icon={<FilterAltOutlined />} label="Server filters" variant="outlined" />
             {qDebounced ? <Chip label={`Search: ${qDebounced}`} variant="outlined" /> : null}
           </Stack>
@@ -904,14 +805,17 @@ export default function InvestigationPage() {
           <IconButton
             aria-label="Refresh"
             onClick={() => investigationsQuery.refetch()}
-            sx={{ border: "1px solid rgba(255,255,255,.10)", borderRadius: 2 }}
+            sx={{ border: refreshBtnBorder, borderRadius: 2 }}
           >
             <RefreshOutlined />
           </IconButton>
         </Stack>
       </Stack>
 
-      <GlassCard sx={{ mb: 2 }}>
+      {/* ------------------------------------------------------------------ */}
+      {/* Filter bar                                                          */}
+      {/* ------------------------------------------------------------------ */}
+      <SoftCard sx={{ mb: 2 }}>
         <CardContent sx={{ p: { xs: 2.25, md: 3 } }}>
           <Stack spacing={1.5}>
             <Stack direction={{ xs: "column", md: "row" }} spacing={1.25} alignItems="stretch">
@@ -940,9 +844,7 @@ export default function InvestigationPage() {
                 >
                   <MenuItem value="ALL">All</MenuItem>
                   {(["NEW", "IN_PROGRESS", "DONE", "CHALLENGED", "UNKNOWN"] as const).map((s) => (
-                    <MenuItem key={s} value={s}>
-                      {s}
-                    </MenuItem>
+                    <MenuItem key={s} value={s}>{s}</MenuItem>
                   ))}
                 </Select>
               </FormControl>
@@ -957,9 +859,7 @@ export default function InvestigationPage() {
                 >
                   <MenuItem value="ALL">All</MenuItem>
                   {(["FILE", "MAIL", "URL", "IP", "HASH", "UNKNOWN"] as const).map((t) => (
-                    <MenuItem key={t} value={t}>
-                      {t}
-                    </MenuItem>
+                    <MenuItem key={t} value={t}>{t}</MenuItem>
                   ))}
                 </Select>
               </FormControl>
@@ -974,7 +874,6 @@ export default function InvestigationPage() {
                 InputLabelProps={{ shrink: true }}
                 fullWidth
               />
-
               <TextField
                 label="To"
                 type="date"
@@ -1024,9 +923,7 @@ export default function InvestigationPage() {
                     onChange={(e) => setPageSize(Number(e.target.value))}
                   >
                     {[10, 20, 50].map((n) => (
-                      <MenuItem key={n} value={n}>
-                        {n}
-                      </MenuItem>
+                      <MenuItem key={n} value={n}>{n}</MenuItem>
                     ))}
                   </Select>
                 </FormControl>
@@ -1039,7 +936,6 @@ export default function InvestigationPage() {
                 >
                   Prev
                 </Button>
-
                 <Button
                   variant="outlined"
                   disabled={!investigationsQuery.data?.next || investigationsQuery.isFetching}
@@ -1052,9 +948,12 @@ export default function InvestigationPage() {
             </Stack>
           </Stack>
         </CardContent>
-      </GlassCard>
+      </SoftCard>
 
-      <GlassCard>
+      {/* ------------------------------------------------------------------ */}
+      {/* Results table                                                       */}
+      {/* ------------------------------------------------------------------ */}
+      <SoftCard>
         <CardContent sx={{ p: 0 }}>
           {investigationsQuery.isFetching ? <LinearProgress /> : null}
 
@@ -1085,10 +984,7 @@ export default function InvestigationPage() {
                       hover
                       tabIndex={0}
                       sx={{ cursor: "pointer" }}
-                      onClick={() => {
-                        setSelectedId(r.id);
-                        setOpenDrawer(true);
-                      }}
+                      onClick={() => { setSelectedId(r.id); setOpenDrawer(true); }}
                       onKeyDown={(e) => {
                         if (e.key === "Enter" || e.key === " ") {
                           e.preventDefault();
@@ -1102,26 +998,16 @@ export default function InvestigationPage() {
                           <Button
                             size="small"
                             variant="contained"
-                            onClick={(e) => {
-                              e.stopPropagation();
-                              setSelectedId(r.id);
-                              setOpenDrawer(true);
-                            }}
+                            onClick={(e) => { e.stopPropagation(); setSelectedId(r.id); setOpenDrawer(true); }}
                             sx={{ borderRadius: 2, textTransform: "none", fontWeight: 950 }}
                           >
                             {r.id}
                           </Button>
-
                           <CopyIconButton text={String(r.id)} title="Copy ID" />
-
                           <Tooltip title="Open details">
                             <IconButton
                               size="small"
-                              onClick={(e) => {
-                                e.stopPropagation();
-                                setSelectedId(r.id);
-                                setOpenDrawer(true);
-                              }}
+                              onClick={(e) => { e.stopPropagation(); setSelectedId(r.id); setOpenDrawer(true); }}
                             >
                               <OpenInNewOutlined fontSize="small" />
                             </IconButton>
@@ -1194,8 +1080,11 @@ export default function InvestigationPage() {
             </Box>
           )}
         </CardContent>
-      </GlassCard>
+      </SoftCard>
 
+      {/* ------------------------------------------------------------------ */}
+      {/* Detail drawer                                                       */}
+      {/* ------------------------------------------------------------------ */}
       <Drawer
         anchor="right"
         open={openDrawer}
@@ -1217,11 +1106,10 @@ export default function InvestigationPage() {
         }}
       >
         {!drawerRow ? (
-          <Box sx={{ p: 2 }}>
-            <Alert severity="info">Select a row.</Alert>
-          </Box>
+          <Box sx={{ p: 2 }}><Alert severity="info">Select a row.</Alert></Box>
         ) : (
           <Stack sx={{ height: "100%" }}>
+            {/* Drawer header */}
             <Box
               sx={(theme) => ({
                 px: 2.25,
@@ -1236,17 +1124,13 @@ export default function InvestigationPage() {
             >
               <Stack direction="row" alignItems="flex-start" justifyContent="space-between" spacing={2}>
                 <Box>
-                  <Typography variant="overline" color="text.secondary">
-                    Investigation
-                  </Typography>
-
+                  <Typography variant="overline" color="text.secondary">Investigation</Typography>
                   <Stack direction="row" spacing={1} alignItems="center" sx={{ mt: 0.25 }}>
                     <Typography variant="h5" fontWeight={950} lineHeight={1.1}>
                       #{drawerRow.id}
                     </Typography>
                     <CopyIconButton text={String(drawerRow.id)} title="Copy ID" />
                   </Stack>
-
                   <Typography variant="body2" color="text.secondary" sx={{ mt: 0.75 }}>
                     Created {fmtDate(drawerRow.created_at)}
                   </Typography>
@@ -1265,29 +1149,14 @@ export default function InvestigationPage() {
                         startIcon={editMode ? <CloseOutlined /> : <EditOutlined />}
                         onClick={() => {
                           if (!detailsReady) return;
-
-                          if (editMode) {
-                            const score = pickScore(detailsQuery.data);
-                            const confidence = pickConfidence(detailsQuery.data);
-                            const classification = pickClassification(detailsQuery.data);
-
-                            setEditScore(score == null ? "" : String(score));
-                            setEditConfidence(confidence == null ? "" : String(confidence));
-                            setEditClassification(String(classification).toUpperCase());
-                            editMutation.reset();
-                            setEditMode(false);
-                            return;
-                          }
-
                           const score = pickScore(detailsQuery.data);
                           const confidence = pickConfidence(detailsQuery.data);
                           const classification = pickClassification(detailsQuery.data);
-
                           setEditScore(score == null ? "" : String(score));
                           setEditConfidence(confidence == null ? "" : String(confidence));
                           setEditClassification(String(classification).toUpperCase());
                           editMutation.reset();
-                          setEditMode(true);
+                          setEditMode((prev) => !prev);
                         }}
                         sx={{ textTransform: "none", borderRadius: 2, fontWeight: 950 }}
                         disabled={!detailsReady}
@@ -1329,20 +1198,15 @@ export default function InvestigationPage() {
               </Stack>
             </Box>
 
+            {/* Drawer body */}
             <Box sx={{ flex: 1, overflowY: "auto", p: 2 }}>
               <Stack spacing={2}>
-                <Card
-                  sx={{
-                    borderRadius: 2,
-                    border: "1px solid rgba(255,255,255,.08)",
-                    background: "rgba(255,255,255,.025)",
-                  }}
-                >
+                {/* Overview */}
+                <Card sx={{ borderRadius: 2, border: `1px solid ${drawerCardBorder}`, background: drawerCardBg }}>
                   <CardContent sx={{ p: 2 }}>
                     <Typography variant="subtitle2" fontWeight={900} sx={{ mb: 1.25 }}>
                       Overview
                     </Typography>
-
                     <Box
                       sx={{
                         display: "grid",
@@ -1351,9 +1215,7 @@ export default function InvestigationPage() {
                       }}
                     >
                       <Typography color="text.secondary">Artifact</Typography>
-                      <Typography sx={{ wordBreak: "break-word" }}>
-                        {drawerRow.info || "—"}
-                      </Typography>
+                      <Typography sx={{ wordBreak: "break-word" }}>{drawerRow.info || "—"}</Typography>
 
                       <Typography color="text.secondary">User mail</Typography>
                       <Stack direction="row" spacing={1} alignItems="center">
@@ -1379,13 +1241,8 @@ export default function InvestigationPage() {
                   </CardContent>
                 </Card>
 
-                <Card
-                  sx={{
-                    borderRadius: 2,
-                    border: "1px solid rgba(255,255,255,.08)",
-                    background: "rgba(255,255,255,.025)",
-                  }}
-                >
+                {/* Global override */}
+                <Card sx={{ borderRadius: 2, border: `1px solid ${drawerCardBorder}`, background: drawerCardBg }}>
                   <CardContent sx={{ p: 2 }}>
                     <Typography variant="subtitle2" fontWeight={900} sx={{ mb: 1.25 }}>
                       Global override
@@ -1394,56 +1251,25 @@ export default function InvestigationPage() {
                     {detailsQuery.isLoading ? (
                       <Stack direction="row" spacing={1} alignItems="center">
                         <CircularProgress size={18} />
-                        <Typography variant="body2" color="text.secondary">
-                          Loading details…
-                        </Typography>
+                        <Typography variant="body2" color="text.secondary">Loading details…</Typography>
                       </Stack>
                     ) : detailsQuery.isError ? (
                       <Alert severity="warning">Could not load details.</Alert>
                     ) : (
                       <Stack spacing={1.25}>
                         <Stack direction="row" spacing={1} sx={{ flexWrap: "wrap" }}>
-                          <Chip
-                            size="small"
-                            label={`AI score: ${detailsQuery.data?.case_infos?.score_ai ?? "—"}`}
-                            variant="outlined"
-                          />
-                          <Chip
-                            size="small"
-                            label={`AI confidence: ${detailsQuery.data?.case_infos?.confidence_ai ?? "—"}`}
-                            variant="outlined"
-                          />
-                          <Chip
-                            size="small"
-                            label={`AI result: ${detailsQuery.data?.case_infos?.classification_ai ?? "—"}`}
-                            variant="outlined"
-                          />
-                          <Chip
-                            size="small"
-                            label={`AI category: ${detailsQuery.data?.case_infos?.category_ai ?? "—"}`}
-                            variant="outlined"
-                          />
+                          <Chip size="small" label={`AI score: ${detailsQuery.data?.case_infos?.score_ai ?? "—"}`} variant="outlined" />
+                          <Chip size="small" label={`AI confidence: ${detailsQuery.data?.case_infos?.confidence_ai ?? "—"}`} variant="outlined" />
+                          <Chip size="small" label={`AI result: ${detailsQuery.data?.case_infos?.classification_ai ?? "—"}`} variant="outlined" />
+                          <Chip size="small" label={`AI category: ${detailsQuery.data?.case_infos?.category_ai ?? "—"}`} variant="outlined" />
                         </Stack>
 
                         {!editMode ? (
                           <Stack direction="row" spacing={1} sx={{ flexWrap: "wrap" }}>
-                            <Chip
-                              size="small"
-                              label={`Score: ${currentScore ?? "—"} / 10`}
-                              variant="outlined"
-                              sx={{ fontWeight: 900 }}
-                            />
-                            <Chip
-                              size="small"
-                              label={`Confidence: ${currentConfidence ?? "—"} %`}
-                              variant="outlined"
-                              sx={{ fontWeight: 900 }}
-                            />
+                            <Chip size="small" label={`Score: ${currentScore ?? "—"} / 10`} variant="outlined" sx={{ fontWeight: 900 }} />
+                            <Chip size="small" label={`Confidence: ${currentConfidence ?? "—"} %`} variant="outlined" sx={{ fontWeight: 900 }} />
                             <Chip size="small" label="Classification" variant="outlined" />
-                            <ResultChip
-                              result={String(currentClassification ?? "UNKNOWN")}
-                              minWidth={BADGE_W}
-                            />
+                            <ResultChip result={String(currentClassification ?? "UNKNOWN")} minWidth={BADGE_W} />
                           </Stack>
                         ) : (
                           <Stack spacing={1.25}>
@@ -1475,9 +1301,7 @@ export default function InvestigationPage() {
                                 onChange={(e) => setEditClassification(String(e.target.value))}
                               >
                                 {classificationOptions.map((c) => (
-                                  <MenuItem key={c} value={c}>
-                                    {c}
-                                  </MenuItem>
+                                  <MenuItem key={c} value={c}>{c}</MenuItem>
                                 ))}
                               </Select>
                             </FormControl>
@@ -1500,11 +1324,8 @@ export default function InvestigationPage() {
                               >
                                 {editMutation.isPending ? "Saving…" : "Save"}
                               </Button>
-
                               {editMutation.isError ? (
-                                <Alert severity="error" sx={{ py: 0.5 }}>
-                                  Save failed.
-                                </Alert>
+                                <Alert severity="error" sx={{ py: 0.5 }}>Save failed.</Alert>
                               ) : null}
                             </Stack>
                           </Stack>
@@ -1514,13 +1335,8 @@ export default function InvestigationPage() {
                   </CardContent>
                 </Card>
 
-                <Card
-                  sx={{
-                    borderRadius: 2,
-                    border: "1px solid rgba(255,255,255,.08)",
-                    background: "rgba(255,255,255,.025)",
-                  }}
-                >
+                {/* Analysis results */}
+                <Card sx={{ borderRadius: 2, border: `1px solid ${drawerCardBorder}`, background: drawerCardBg }}>
                   <CardContent sx={{ p: 2 }}>
                     <Stack
                       direction={{ xs: "column", sm: "row" }}
@@ -1529,42 +1345,22 @@ export default function InvestigationPage() {
                       spacing={1}
                       sx={{ mb: 1.25 }}
                     >
-                      <Typography variant="subtitle2" fontWeight={900}>
-                        Analysis results
-                      </Typography>
+                      <Typography variant="subtitle2" fontWeight={900}>Analysis results</Typography>
 
                       {!detailsQuery.isLoading && !detailsQuery.isError ? (
                         <Stack direction="row" spacing={1} alignItems="center" flexWrap="wrap">
                           <Typography variant="caption" color="text.secondary">
                             {analyzerReports.length} report{analyzerReports.length === 1 ? "" : "s"}
                           </Typography>
-
                           {!!analyzerReports.length ? (
                             <>
-                              <Button
-                                size="small"
-                                variant="outlined"
-                                onClick={expandAllAnalyzers}
-                                sx={{ textTransform: "none", borderRadius: 2, fontWeight: 800 }}
-                              >
+                              <Button size="small" variant="outlined" onClick={expandAllAnalyzers} sx={{ textTransform: "none", borderRadius: 2, fontWeight: 800 }}>
                                 Expand all
                               </Button>
-
-                              <Button
-                                size="small"
-                                variant="outlined"
-                                onClick={collapseAllAnalyzers}
-                                sx={{ textTransform: "none", borderRadius: 2, fontWeight: 800 }}
-                              >
+                              <Button size="small" variant="outlined" onClick={collapseAllAnalyzers} sx={{ textTransform: "none", borderRadius: 2, fontWeight: 800 }}>
                                 Collapse all
                               </Button>
-
-                              <Button
-                                size="small"
-                                variant="outlined"
-                                onClick={invertAnalyzers}
-                                sx={{ textTransform: "none", borderRadius: 2, fontWeight: 800 }}
-                              >
+                              <Button size="small" variant="outlined" onClick={invertAnalyzers} sx={{ textTransform: "none", borderRadius: 2, fontWeight: 800 }}>
                                 Invert
                               </Button>
                             </>
@@ -1576,16 +1372,12 @@ export default function InvestigationPage() {
                     {detailsQuery.isLoading ? (
                       <Stack direction="row" spacing={1} alignItems="center">
                         <CircularProgress size={18} />
-                        <Typography variant="body2" color="text.secondary">
-                          Loading details…
-                        </Typography>
+                        <Typography variant="body2" color="text.secondary">Loading details…</Typography>
                       </Stack>
                     ) : detailsQuery.isError ? (
                       <Alert severity="warning">Could not load details.</Alert>
                     ) : !analyzerReports.length ? (
-                      <Alert severity="info">
-                        No analysis details are available for this investigation yet.
-                      </Alert>
+                      <Alert severity="info">No analysis details are available for this investigation yet.</Alert>
                     ) : (
                       <Stack spacing={1.25}>
                         {analyzerReports.map((report) => (
@@ -1606,26 +1398,25 @@ export default function InvestigationPage() {
                   </CardContent>
                 </Card>
 
+                {/* Raw details */}
                 <Card
                   sx={{
                     borderRadius: 2,
-                    border: "1px solid rgba(255,255,255,.08)",
-                    background: "rgba(255,255,255,.02)",
+                    border: `1px solid ${drawerCardBorder}`,
+                    background: isDark ? "rgba(255,255,255,.02)" : alpha(theme.palette.background.paper, 0.5),
                   }}
                 >
                   <Accordion
                     disableGutters
                     sx={{
                       borderRadius: 2,
-                      border: "1px solid rgba(255,255,255,.08)",
-                      background: "rgba(255,255,255,.02)",
+                      border: "none",
+                      background: "transparent",
                       "&:before": { display: "none" },
                     }}
                   >
                     <AccordionSummary expandIcon={<ExpandMoreOutlined />}>
-                      <Typography variant="subtitle2" fontWeight={900}>
-                        Raw details (API)
-                      </Typography>
+                      <Typography variant="subtitle2" fontWeight={900}>Raw details (API)</Typography>
                     </AccordionSummary>
                     <AccordionDetails>
                       {detailsQuery.isLoading ? (
@@ -1636,16 +1427,11 @@ export default function InvestigationPage() {
                         <Box
                           component="pre"
                           sx={(theme) => ({
-                            m: 0,
-                            p: 1.5,
-                            borderRadius: 2,
+                            m: 0, p: 1.5, borderRadius: 2,
                             border: `1px solid ${theme.palette.divider}`,
                             backgroundColor: alpha(theme.palette.action.hover, 0.55),
                             color: theme.palette.text.primary,
-                            overflow: "auto",
-                            maxHeight: 320,
-                            fontSize: 12,
-                            lineHeight: 1.45,
+                            overflow: "auto", maxHeight: 320, fontSize: 12, lineHeight: 1.45,
                           })}
                         >
                           {JSON.stringify(detailsQuery.data?.raw ?? detailsQuery.data, null, 2)}
