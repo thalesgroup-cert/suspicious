@@ -13,25 +13,30 @@ import {
 import { useTheme } from "@mui/material/styles";
 import { alpha } from "@mui/material/styles";
 import {
+  EmojiEventsRounded,
+  MilitaryTechRounded,
   SellOutlined,
   WorkspacePremiumRounded,
-  MilitaryTechRounded,
-  EmojiEventsRounded,
 } from "@mui/icons-material";
 
 import { SoftCard } from "./SoftCard";
+import { useResultColors, useStatusColors } from "@/styles/colorStore";
+
+// ---------------------------------------------------------------------------
+// Types
+// ---------------------------------------------------------------------------
 
 type TopPrefixesType = "user" | "group";
 
-const CATEGORY_CONFIG = [
-  { key: "safe", label: "Safe", color: "#22c55e" },
-  { key: "suspicious", label: "Suspicious", color: "#facc15" },
-  { key: "dangerous", label: "Dangerous", color: "#ef4444" },
-  { key: "failure", label: "Failure", color: "#64748b" },
-  { key: "inconclusive", label: "Inconclusive", color: "#8b5cf6" },
-] as const;
+// CATEGORY_CONFIG is built dynamically from the color store (see component)
+// so it respects the user's preset (Standard / Colorblind-safe / Monochrome).
+type CategoryKey = "safe" | "suspicious" | "dangerous" | "failure" | "inconclusive";
 
-type CategoryKey = (typeof CATEGORY_CONFIG)[number]["key"];
+type CategoryConfig = {
+  key: CategoryKey;
+  label: string;
+  color: string;
+};
 
 type TopPrefixApiItem = {
   prefix: string;
@@ -56,10 +61,16 @@ type TopPrefixesPanelProps = {
   limit?: number;
 };
 
+// ---------------------------------------------------------------------------
+// Helpers
+// ---------------------------------------------------------------------------
+
 function compactLabel(text: string, max = 14) {
   return text.length > max ? `${text.slice(0, max - 1)}…` : text;
 }
 
+// Rank badge visual config — gold/silver/bronze trophy aesthetics,
+// not semantic status colors (intentionally stays hardcoded).
 function getRankBadge(rank: number) {
   if (rank === 0) {
     return {
@@ -114,6 +125,10 @@ async function fetchTopPrefixes(params: {
   return response.data;
 }
 
+// ---------------------------------------------------------------------------
+// TopPrefixesPanel
+// ---------------------------------------------------------------------------
+
 export default function TopPrefixesPanel({
   month,
   year,
@@ -122,10 +137,25 @@ export default function TopPrefixesPanel({
   const theme = useTheme();
   const isDark = theme.palette.mode === "dark";
 
-  const [type, setType] = React.useState<TopPrefixesType>("user");
+  // Build category config from the semantic color store so stacked bar
+  // segments and legend dots respect the user's colorblind-safe preset.
+  // "Failure" maps to statusColors.failure (processing error, not an
+  // analysis result) — the other four map to resultColors.
+  const resultColors = useResultColors();
+  const statusColors  = useStatusColors();
+
+  const CATEGORY_CONFIG = React.useMemo<CategoryConfig[]>(() => [
+    { key: "safe",         label: "Safe",         color: resultColors.safe.main },
+    { key: "suspicious",   label: "Suspicious",   color: resultColors.suspicious.main },
+    { key: "dangerous",    label: "Dangerous",    color: resultColors.dangerous.main },
+    { key: "failure",      label: "Failure",      color: statusColors.failure.main },
+    { key: "inconclusive", label: "Inconclusive", color: resultColors.inconclusive.main },
+  ], [resultColors, statusColors]);
+
+  const [type, setType]     = React.useState<TopPrefixesType>("user");
   const [loading, setLoading] = React.useState(false);
-  const [error, setError] = React.useState<string | null>(null);
-  const [rows, setRows] = React.useState<TopPrefixApiItem[]>([]);
+  const [error, setError]   = React.useState<string | null>(null);
+  const [rows, setRows]     = React.useState<TopPrefixApiItem[]>([]);
 
   React.useEffect(() => {
     let active = true;
@@ -150,22 +180,40 @@ export default function TopPrefixesPanel({
     return () => { active = false; };
   }, [type, month, year, limit]);
 
-  // Theme-aware row styling
-  const rowBorderColor = isDark ? "rgba(255,255,255,0.08)" : alpha(theme.palette.divider, 0.55);
+  // ── Theme-aware style tokens ─────────────────────────────────────────────
+
+  const rowBorderColor = isDark
+    ? "rgba(255,255,255,0.08)"
+    : alpha(theme.palette.divider, 0.55);
+
   const rowBgTop = isDark
     ? "linear-gradient(180deg, rgba(255,255,255,0.06), rgba(255,255,255,0.03))"
     : `linear-gradient(180deg, ${alpha("#fff", 0.85)}, ${alpha(theme.palette.grey[50], 0.9)})`;
-  const rowBgRest = isDark ? "rgba(255,255,255,0.02)" : alpha(theme.palette.background.paper, 0.4);
+
+  const rowBgRest = isDark
+    ? "rgba(255,255,255,0.02)"
+    : alpha(theme.palette.background.paper, 0.4);
 
   const rankBadgeBorder = isDark
     ? "1px solid rgba(255,255,255,0.10)"
     : `1px solid ${alpha(theme.palette.divider, 0.45)}`;
 
-  const chipBgTop = isDark ? "rgba(56,189,248,.16)" : alpha("#38BDF8", 0.12);
-  const chipBgRest = isDark ? "rgba(148,163,184,.12)" : alpha(theme.palette.grey[300], 0.35);
-  const chipBorder = isDark ? "1px solid rgba(255,255,255,.08)" : `1px solid ${alpha(theme.palette.divider, 0.5)}`;
+  // #1 rank chip uses theme primary (not a semantic result color)
+  const chipBgTop  = isDark
+    ? alpha(theme.palette.primary.main, 0.16)
+    : alpha(theme.palette.primary.main, 0.12);
+  const chipBgRest = isDark
+    ? "rgba(148,163,184,.12)"
+    : alpha(theme.palette.grey[300], 0.35);
+  const chipBorder = isDark
+    ? "1px solid rgba(255,255,255,.08)"
+    : `1px solid ${alpha(theme.palette.divider, 0.5)}`;
 
-  const stackedBarBg = isDark ? "rgba(148,163,184,0.10)" : alpha(theme.palette.grey[300], 0.35);
+  const stackedBarBg = isDark
+    ? "rgba(148,163,184,0.10)"
+    : alpha(theme.palette.grey[300], 0.35);
+
+  // ── Render ───────────────────────────────────────────────────────────────
 
   return (
     <SoftCard
@@ -221,6 +269,7 @@ export default function TopPrefixesPanel({
                     background: index === 0 ? rowBgTop : rowBgRest,
                   }}
                 >
+                  {/* Row header: rank badge + prefix label + total chip */}
                   <Stack
                     direction="row"
                     alignItems="center"
@@ -228,7 +277,12 @@ export default function TopPrefixesPanel({
                     spacing={2}
                     sx={{ mb: 0.75 }}
                   >
-                    <Stack direction="row" spacing={1} alignItems="center" sx={{ minWidth: 0 }}>
+                    <Stack
+                      direction="row"
+                      spacing={1}
+                      alignItems="center"
+                      sx={{ minWidth: 0 }}
+                    >
                       <Box
                         sx={{
                           minWidth: 28,
@@ -250,14 +304,15 @@ export default function TopPrefixesPanel({
                       <Typography
                         variant="body2"
                         sx={{
-                          fontWeight: index === 0 ? 900 : index < 3 ? 800 : 700,
+                          fontWeight:
+                            index === 0 ? 900 : index < 3 ? 800 : 700,
                           whiteSpace: "nowrap",
                           overflow: "hidden",
                           textOverflow: "ellipsis",
                           maxWidth: { xs: 140, md: 220 },
                         }}
                       >
-                        {item.prefix}
+                        {compactLabel(item.prefix)}
                       </Typography>
                     </Stack>
 
@@ -272,7 +327,7 @@ export default function TopPrefixesPanel({
                     />
                   </Stack>
 
-                  {/* Stacked bar */}
+                  {/* Stacked bar — segment colors from the color store */}
                   <Box
                     sx={{
                       height: 16,
@@ -315,7 +370,8 @@ export default function TopPrefixesPanel({
                   >
                     {CATEGORY_CONFIG.map((category) => {
                       const value = item[category.key] as number;
-                      const pct = total > 0 ? Math.round((value / total) * 100) : 0;
+                      const pct =
+                        total > 0 ? Math.round((value / total) * 100) : 0;
                       if (value <= 0) return null;
 
                       return (
@@ -329,9 +385,20 @@ export default function TopPrefixesPanel({
                             gap: 0.5,
                           }}
                         >
-                          <Box sx={{ width: 7, height: 7, borderRadius: 999, bgcolor: category.color }} />
-                          <Box component="span" sx={{ fontWeight: 700 }}>{category.label}</Box>
-                          <Box component="span">{value} · {pct}%</Box>
+                          <Box
+                            sx={{
+                              width: 7,
+                              height: 7,
+                              borderRadius: 999,
+                              bgcolor: category.color,
+                            }}
+                          />
+                          <Box component="span" sx={{ fontWeight: 700 }}>
+                            {category.label}
+                          </Box>
+                          <Box component="span">
+                            {value} · {pct}%
+                          </Box>
                         </Typography>
                       );
                     })}

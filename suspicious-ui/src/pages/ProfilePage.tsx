@@ -50,7 +50,7 @@ import {
 import { useThemeMode } from "@/styles/themeStore";
 import type { ThemeName } from "@/styles/themes";
 import { useHudModes } from "@/shared/hooks/useHudModes";
-import { useColorStore } from "@/styles/colorStore";
+import { useColorStore, useResultColors, useStatusColors } from "@/styles/colorStore";
 import { ColorSettingsPanel } from "@/features/profile/ColorSettingsPanel";
 
 // ---------------------------------------------------------------------------
@@ -299,6 +299,11 @@ function PreferencesPanel({
   wantsResults: boolean; setWantsResults: (v: boolean) => void;
   dirty: boolean; saving: boolean; onSave: () => void; onReset: () => void;
 }) {
+  // Use semantic store colors so notification toggles follow the user's
+  // colorblind-safe preset — inconclusive blue for "info/ack", done green for "results".
+  const resultColors = useResultColors();
+  const statusColors  = useStatusColors();
+
   return (
     <Stack spacing={2}>
       <Stack direction="row" spacing={1.5} alignItems="center">
@@ -328,13 +333,15 @@ function PreferencesPanel({
           icon={<NotificationsOutlined />}
           title="Acknowledgements"
           subtitle="Receive a confirmation when your report is received and queued."
-          checked={wantsAck} onChange={setWantsAck} accentColor="#38BDF8"
+          checked={wantsAck} onChange={setWantsAck}
+          accentColor={resultColors.inconclusive.main}
         />
         <ToggleRow
           icon={<NotificationsActiveOutlined />}
           title="Analysis results"
           subtitle="Receive outcome updates when analysis is complete."
-          checked={wantsResults} onChange={setWantsResults} accentColor="#22C55E"
+          checked={wantsResults} onChange={setWantsResults}
+          accentColor={statusColors.done.main}
         />
       </Stack>
 
@@ -366,6 +373,9 @@ function AppearancePanel({
 }) {
   const theme = useTheme();
   const isDark = theme.palette.mode === "dark";
+
+  // Pull semantic colors so accent chips follow the user's preset.
+  const statusColors = useStatusColors();
 
   return (
     <Stack spacing={2.5}>
@@ -427,8 +437,8 @@ function AppearancePanel({
               icon={<DoneOutlined sx={{ fontSize: "12px !important" }} />}
               label="saved"
               sx={{
-                height: 20, bgcolor: alpha("#22C55E", 0.1), color: "#22C55E",
-                border: `1px solid ${alpha("#22C55E", 0.25)}`,
+                height: 20, bgcolor: alpha(statusColors.done.main, 0.1), color: statusColors.done.main,
+                border: `1px solid ${alpha(statusColors.done.main, 0.25)}`,
                 fontWeight: 800, "& .MuiChip-label": { px: 0.75, fontSize: 11 },
               }}
             />
@@ -472,7 +482,7 @@ function AppearancePanel({
           icon={<NotificationsActiveOutlined />}
           title="ALERT mode"
           subtitle="Enable high-visibility alert HUD overlay."
-          checked={alertMode} onChange={setAlert} accentColor="#EF4444"
+          checked={alertMode} onChange={setAlert} accentColor={statusColors.failure.main}
         />
       </Stack>
 
@@ -513,6 +523,7 @@ export default function ProfilePage() {
 
   // Color store — hydrated from server profile on load
   const hydrateFromProfile = useColorStore((s) => s.hydrateFromProfile);
+  const pageStatusColors   = useStatusColors();   // for hero "All saved" chip
 
   const [section, setSection] = React.useState<Section>("preferences");
 
@@ -529,9 +540,10 @@ export default function ProfilePage() {
   });
 
   // ── Hydrate color store from server profile ──────────────────────────────
-  // Server value wins over localStorage on first load — ensures colors
-  // are consistent across devices.
-
+  // Primary hydration: auth.ts → hydrateColorsFromServer() fires on getMe()
+  //   and login(), so colors are set before this page even mounts.
+  // Secondary hydration (here): re-syncs when the full profile query resolves,
+  //   which catches color changes saved from another device or tab.
   React.useEffect(() => {
     const p = profileQuery.data;
     if (!p?.semantic_colors) return;
@@ -568,13 +580,10 @@ export default function ProfilePage() {
       const t = lp.theme as ThemeName;
       setPickedTheme(t);
       setThemeName(t);
-      queryClient.setQueryData<UserProfile>(["profile"], (prev) => {
-        if (!prev) return prev;
-        return {
-          ...prev,
-          theme: t,
-        };
-      });
+      queryClient.setQueryData<UserProfile>(["profile"], (prev) => ({
+        ...(prev ?? profileQuery.data as UserProfile),
+        theme: t,
+      }));
     }
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
@@ -624,14 +633,11 @@ export default function ProfilePage() {
 
   function savePreferences() {
     writeLocalProfile({ wants_acknowledgement: wantsAck, wants_results: wantsResults });
-    queryClient.setQueryData<UserProfile>(["profile"], (prev) => {
-      if (!prev) return prev;
-      return {
-        ...prev,
-        wants_acknowledgement: wantsAck,
-        wants_results: wantsResults,
-      };
-    });
+    queryClient.setQueryData<UserProfile>(["profile"], (prev) => ({
+      ...(prev ?? baseProfile as UserProfile),
+      wants_acknowledgement: wantsAck,
+      wants_results: wantsResults,
+    }));
     prefMutation.mutate({ wants_acknowledgement: wantsAck, wants_results: wantsResults });
   }
 
@@ -642,14 +648,11 @@ export default function ProfilePage() {
 
   function saveAppearance() {
     writeLocalProfile({ theme: pickedTheme, auto_seasonal: autoSeasonal } as any);
-    queryClient.setQueryData<UserProfile>(["profile"], (prev) => {
-      if (!prev) return prev;
-      return {
-        ...prev,
-        theme: pickedTheme,
-        auto_seasonal: autoSeasonal,
-      };
-    });
+    queryClient.setQueryData<UserProfile>(["profile"], (prev) => ({
+      ...(prev ?? baseProfile as UserProfile),
+      theme: pickedTheme,
+      auto_seasonal: autoSeasonal,
+    }));
     appearanceMutation.mutate({ theme: pickedTheme, auto_seasonal: autoSeasonal });
   }
 
@@ -661,7 +664,7 @@ export default function ProfilePage() {
 
   // ── Auth guard ────────────────────────────────────────────────────────────
 
-  if (profileQuery.isLoading || !profileQuery.data) {
+  if (meQuery.isLoading) {
     return (
       <Box sx={{ minHeight: "60vh", display: "grid", placeItems: "center" }}>
         <CircularProgress />
@@ -783,6 +786,7 @@ export default function ProfilePage() {
                 sx={{ fontWeight: 700, textTransform: "uppercase", letterSpacing: 0.5, fontSize: 10 }}>
                 Account
               </Typography>
+              <Typography fontWeight={900} fontSize={14}>{me.username}</Typography>
               <Stack direction="row" spacing={0.5}>
                 {anyDirty ? (
                   <Chip size="small" label="Unsaved changes" sx={{
@@ -798,8 +802,8 @@ export default function ProfilePage() {
                     icon={<CheckCircleOutlined sx={{ fontSize: "13px !important" }} />}
                     label="All saved"
                     sx={{
-                      height: 20, bgcolor: alpha("#22C55E", 0.1), color: "#22C55E",
-                      border: `1px solid ${alpha("#22C55E", 0.25)}`,
+                      height: 20, bgcolor: alpha(pageStatusColors.done.main, 0.1), color: pageStatusColors.done.main,
+                      border: `1px solid ${alpha(pageStatusColors.done.main, 0.25)}`,
                       fontWeight: 800, "& .MuiChip-label": { px: 0.9, fontSize: 11 },
                     }}
                   />
@@ -833,6 +837,7 @@ export default function ProfilePage() {
               </Box>
               <Box sx={{ minWidth: 0 }}>
                 <Typography fontWeight={950} fontSize={14}>My profile</Typography>
+                <Typography variant="caption" color="text.secondary" noWrap>{me.username}</Typography>
               </Box>
             </Stack>
 

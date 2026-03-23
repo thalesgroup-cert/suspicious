@@ -678,7 +678,11 @@ export default function SubmissionsPage() {
       listSubmissions({ mine: true, ordering: backendOrdering, page: 1, page_size: 100 }),
     enabled: !!me,
     retry: false,
-    initialData: { count: 0, next: null, previous: null, results: [] },
+    // placeholderData keeps isFetching:true until the real response lands,
+    // so the empty-state message never fires prematurely.
+    // initialData would mark the query as "successful" immediately with []
+    // and show "No submissions match your filters." before the fetch completes.
+    placeholderData: { count: 0, next: null, previous: null, results: [] },
     refetchInterval: (query) => {
       const rows = (query.state.data as PaginatedSubmissionsResponse | undefined)?.results ?? [];
       const shouldPoll = rows.some((r) => {
@@ -761,21 +765,8 @@ export default function SubmissionsPage() {
   const pageRows = filtered.slice(start, end);
   const selectedRow = selectedId ? rows.find((r) => String(r.id) === String(selectedId)) : undefined;
 
-  if (meQuery.isLoading || submissionsQuery.isLoading) {
-    return (
-      <Box sx={{ minHeight: "60vh", display: "grid", placeItems: "center" }}>
-        <CircularProgress />
-      </Box>
-    );
-  }
-
-  if (!me) {
-    return <Box sx={{ p: 3 }}><Alert severity="error">Not authenticated.</Alert></Box>;
-  }
-
-  if (submissionsQuery.isError) {
-    return <Box sx={{ p: 3 }}><Alert severity="error">Failed to load submissions.</Alert></Box>;
-  }
+  // ── Derived values and callbacks ────────────────────────────────────────
+  // Must be declared BEFORE any early returns to satisfy Rules of Hooks.
 
   const BADGE_W = 132;
   const DIALOG_RADIUS = 2;
@@ -803,6 +794,29 @@ export default function SubmissionsPage() {
   const refreshBtnBorder = isDark
     ? "1px solid rgba(255,255,255,.10)"
     : `1px solid ${alpha(theme.palette.divider, 0.6)}`;
+
+  // ── Early returns (AFTER all hooks) ─────────────────────────────────────
+
+  // With placeholderData, isLoading is always false. Use isFetching + no real
+  // data yet to detect the true initial load so we show a spinner, not empty state.
+  const submissionsLoading =
+    submissionsQuery.isFetching && submissionsQuery.data?.results.length === 0;
+
+  if (meQuery.isLoading || submissionsLoading) {
+    return (
+      <Box sx={{ minHeight: "60vh", display: "grid", placeItems: "center" }}>
+        <CircularProgress />
+      </Box>
+    );
+  }
+
+  if (!me) {
+    return <Box sx={{ p: 3 }}><Alert severity="error">Not authenticated.</Alert></Box>;
+  }
+
+  if (submissionsQuery.isError) {
+    return <Box sx={{ p: 3 }}><Alert severity="error">Failed to load submissions.</Alert></Box>;
+  }
 
   return (
     <Box sx={{ p: { xs: 2, md: 3 } }}>
@@ -834,9 +848,9 @@ export default function SubmissionsPage() {
             <Chip icon={<AssignmentTurnedInOutlined />} label={`${total} shown`} variant="outlined" />
             <Chip icon={<FilterAltOutlined />} label="Filters available" variant="outlined" />
             {qDebounced ? <Chip label={`Search: ${qDebounced}`} variant="outlined" /> : null}
-            {submissionsQuery.data.count > rows.length ? (
+            {(submissionsQuery.data?.count ?? 0) > rows.length ? (
               <Chip
-                label={`Loaded ${rows.length} of ${submissionsQuery.data.count}`}
+                label={`Loaded ${rows.length} of ${submissionsQuery.data?.count ?? 0}`}
                 variant="outlined"
                 color="warning"
               />
@@ -1004,7 +1018,7 @@ export default function SubmissionsPage() {
       {/* ------------------------------------------------------------------ */}
       <SoftCard>
         <CardContent sx={{ p: 0 }}>
-          {total === 0 ? (
+          {total === 0 && !submissionsQuery.isFetching ? (
             <Box sx={{ p: 3 }}>
               <Alert severity="info">No submissions match your filters.</Alert>
             </Box>

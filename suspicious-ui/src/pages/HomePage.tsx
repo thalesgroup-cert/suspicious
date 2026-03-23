@@ -48,6 +48,7 @@ import {
   ResponsiveContainer,
   Tooltip as RechartsTooltip,
 } from "recharts";
+import { useResultColors, useStatusColors } from "@/styles/colorStore";
 
 import { StatusChip } from "@/shared/components/StatusChip";
 import { ResultChip } from "@/shared/components/ResultChip";
@@ -264,7 +265,16 @@ const DANGER_COLORS: Record<DangerLabel, string> = {
 export default function HomePage() {
   const navigate = useNavigate();
   const theme = useTheme();
+  const resultColors = useResultColors();
+  const statusColors  = useStatusColors();
 
+  const dangerColors: Record<DangerLabel, string> = React.useMemo(() => ({
+    Safe:         resultColors.safe.main,
+    Inconclusive: resultColors.inconclusive.main,
+    Suspicious:   resultColors.suspicious.main,
+    Dangerous:    resultColors.dangerous.main,
+    Failure:      statusColors.failure.main, // optional if your data includes failures
+  }), [resultColors, statusColors]);
   const BADGE_W = 132;
 
   const [scopeChoice, setScopeChoice] = React.useState("");
@@ -341,12 +351,12 @@ export default function HomePage() {
   };
 
   const donut = (DANGER_ORDER as readonly DangerLabel[])
-    .map((name) => {
-      const key = name.toLowerCase() as keyof DangerCounts;
+    .map(label => {
+      const key = label.toLowerCase() as keyof DangerCounts;
       const value = (danger[key] ?? 0) as number;
-      return { name, value };
+      return { name: label, value, color: dangerColors[label] };
     })
-    .filter((d) => d.value > 0);
+    .filter(d => d.value > 0);
 
   const donutTotal = sum(donut.map((d) => d.value));
   const donutTotalColor = theme.palette.text.primary;
@@ -414,7 +424,7 @@ export default function HomePage() {
                         {donut.map((entry) => (
                           <Cell
                             key={entry.name}
-                            fill={DANGER_COLORS[entry.name as DangerLabel]}
+                            fill={dangerColors[entry.name as DangerLabel]}
                           />
                         ))}
                       </Pie>
@@ -469,7 +479,7 @@ export default function HomePage() {
                             width: 10,
                             height: 10,
                             borderRadius: 99,
-                            backgroundColor: DANGER_COLORS[label],
+                            backgroundColor: dangerColors[label],
                             border: "1px solid rgba(255,255,255,.18)",
                           }}
                         />

@@ -839,9 +839,9 @@ export const themes: Record<ThemeName, ReturnType<typeof createTheme>> = {
     },
   }),
 
-  // ── 11. METAL — stealth HUD, alert red, CRT edges ─────────────────────
-  // Emergency response aesthetic. Red primary on near-black with
-  // scanlines and grid. Monospace everywhere. Alarm-room severity.
+  // ── 11. METAL ─────────────────────
+  // Suspicious ? Email ? Kept you waiting huh ?
+  //
   metal: createTheme({
     ...base,
     shape: { borderRadius: 4 },
@@ -1069,61 +1069,12 @@ export const themes: Record<ThemeName, ReturnType<typeof createTheme>> = {
   }),
 
 
-  // ── 16. FUTURE — Le Visiteur du Futur ────────────────────────────────
+  // ── 16. FUTURE ────────────────────────────────
   //
-  // «Je viens du futur. Si vous ne m'écoutez pas, voilà ce qui va se passer.»
+  // «Here's what's gonna happen... A new Theme !»
   //
-  // UNIVERSE: French sci-fi web series (2009–2014) by François Descraques,
-  // adapted into a film in 2022. The Visitor (Raph) time-travels from 2555
-  // wearing a copper bracelet, pursued by the Brigade Temporelle.
-  // Year 2555: nuclear-devastated Paris — ash, rubble, fire, and Fennec
-  // the small fennec fox who becomes the Visitor's inseparable companion.
-  //
-  // PALETTE — extracted directly from the film posters:
-  //
-  //   SCORCHED AMBER   #E8720C  — PRIMARY. The dominant warm glow of the
-  //                              poster: fire, the Visitor's leather coat,
-  //                              the amber atmosphere of the apocalypse.
-  //                              Also the colour of Fennec's fur.
-  //
-  //   BRIGADE STEEL    #4A90D9  — SECONDARY. The cold blue half of the
-  //                              split-tone poster — Brigade Temporelle
-  //                              armour, the future sky before the blast,
-  //                              the portal's arrival flash.
-  //
-  //   TEMPORAL COPPER  #C87941  — The bracelet itself. Oxidised copper
-  //                              with warm highlights — the goggles frame,
-  //                              the mechanical texture of 2555 tech.
-  //
-  //   EMBER RED        #C42B0A  — Deep fire-red behind the Visitor's
-  //                              silhouette, the Brigade's danger alerts.
-  //
-  //   ASH BONE         #E8DED0  — text.primary. The rubble dust, bone-
-  //                              white surfaces in the wasteland, the
-  //                              warmth of candlelit survival shelters.
-  //
-  //   FENNEC TIP       #F5A623  — warning. The lighter amber of Fennec's
-  //                              ear tips and paw pads — warm, small,
-  //                              hopeful signal in a dark world.
-  //
-  //   IRRAD. GREEN     #5CB85C  — info. The faint green contamination
-  //                              glow in the background of wasteland shots.
-  //
-  //   BRIGADE GHOST    #8FA8C0  — text.secondary. The cold grey-blue of
-  //                              ash and smoke, Brigade comm-link static.
-  //
-  // BACKGROUND: Near-black burnt char with a warm amber radial at top-right
-  //             (fire horizon), a cool blue at top-left (Brigade approach),
-  //             and heavy noise texture for post-apocalyptic grit.
-  //
-  // TYPOGRAPHY: Mix of sans (body — survivors communicate fast and dirty)
-  //             and mono (headings — tactical Brigade terminals).
-  //             Stencilled letter-spacing. Weight 900 everywhere it matters.
-  //
-  // FENNEC DETAIL: The switch thumb, slider thumb, and active chip use the
-  //                amber Fennec-fur colour with a warm glow — a tiny nod to
-  //                the small fox who survived the end of the world.
-  //
+
+
   future: createTheme({
     ...base,
     shape: { borderRadius: 6 }, // slightly rounded — survival tech, not precise Brigade

@@ -48,6 +48,7 @@ const ORDER: ThemeName[] = [
   "spring",
   "summer",
   "autumn",
+  "future"
 ];
 
 const META: Partial<Record<ThemeName, ThemeMeta>> = {
@@ -57,15 +58,17 @@ const META: Partial<Record<ThemeName, ThemeMeta>> = {
   light:         { label: "Light",         description: "Clean professional light theme.",               group: "Core",    emoji: "☀️" },
   paper:         { label: "Paper",         description: "Warm light theme for reviews and audit work.",  group: "Core",    emoji: "📄" },
   high_contrast: { label: "High contrast", description: "Accessibility-oriented dark theme.",            group: "Core",    emoji: "🔳" },
-  the_one:       { label: "The One",       description: "Ivory + gold + charcoal. Premium feel.",        group: "Classic", emoji: "✨" },
+  the_one:       { label: "The One",       description: "A new Theme ? Who decided that ?",        group: "Classic", emoji: "👆" },
   sunrise:       { label: "Sunrise",       description: "Peach + coral. Warm, bright, friendly.",        group: "Classic", emoji: "🌅" },
   valentine:     { label: "Valentine",     description: "Pink + berry. Soft and bold accents.",          group: "Classic", emoji: "💜" },
   cyber:         { label: "Cyber",         description: "Neon cyan/green on deep black.",                group: "Classic", emoji: "💻" },
-  metal:         { label: "Metal",         description: "Stealth HUD: alert red, terminal edges.",       group: "Special", emoji: "🔴" },
+  metal:         { label: "Metal",         description: "A Metal...Theme ? A 'solid' option...",       group: "Special", emoji: "📦" },
   winter:        { label: "Winter",        description: "Deep navy with icy highlights.",                group: "Seasonal", emoji: "❄️" },
   spring:        { label: "Spring",        description: "Fresh green with lilac accents.",               group: "Seasonal", emoji: "🌸" },
   summer:        { label: "Summer",        description: "Bright sky blue with sun amber.",               group: "Seasonal", emoji: "🌞" },
   autumn:        { label: "Autumn",        description: "Terracotta warmth with olive depth.",           group: "Seasonal", emoji: "🍂" },
+  future:        { label: "Future",        description: "What the f..bzt ? A Visiteur du Futur theme...",   group: "Special", emoji: "🦊" },
+
 };
 
 const GROUP_ORDER = ["Core", "Classic", "Seasonal", "Special"] as const;
@@ -82,16 +85,6 @@ function titleCase(key: string) {
   return key.replace(/_/g, " ").replace(/\b\w/g, (s) => s.toUpperCase());
 }
 
-// ---------------------------------------------------------------------------
-// Swatch — reads every token from the real theme object
-//
-// Layout (72px tall):
-//   ┌──────────────────────────────────┐
-//   │ bg ░░░░░░░░ │ paper    [●primary]│  ← top half: surfaces
-//   │             │          [●second] │
-//   │ [bar:prim.] │ [bar:err/warn/succ]│  ← bottom half: accent bars
-//   └──────────────────────────────────┘
-// ---------------------------------------------------------------------------
 
 function Swatch({ name, selected }: { name: ThemeName; selected: boolean }) {
   const t = themes[name];
