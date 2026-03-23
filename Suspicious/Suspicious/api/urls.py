@@ -27,9 +27,11 @@ from api.views.investigations import (
     InvestigationListView,
 )
 from api.views.profile import (
-    ProfileAppearanceView,
-    ProfilePreferencesView,
     ProfileView,
+    AppearanceView,
+    PreferencesView,
+    SemanticColorsView,
+    ResetSemanticColorsView,
 )
 from api.views.settings import (
     AnalyzerSettingsDetailView,
@@ -84,9 +86,13 @@ urlpatterns = [
     path("campaigns/mail-volume/", CampaignMailVolumeView.as_view(), name="campaign-mail-volume"),
 
     # Profile
-    path("profile/", ProfileView.as_view(), name="profile"),
-    path("profile/preferences/", ProfilePreferencesView.as_view(), name="profile-preferences"),
-    path("profile/appearance/", ProfileAppearanceView.as_view(), name="profile-appearance"),
+    path("profile/",             ProfileView.as_view(),             name="profile"),
+    # Dedicated partial-update endpoints (used by ProfilePage panels)
+    path("profile/appearance/",  AppearanceView.as_view(),          name="profile-appearance"),
+    path("profile/preferences/", PreferencesView.as_view(),         name="profile-preferences"),
+    # Semantic colors — standalone sync
+    path("profile/colors/",      SemanticColorsView.as_view(),      name="profile-colors"),
+    path("profile/colors/reset/",ResetSemanticColorsView.as_view(), name="profile-colors-reset"),
 
     # Submissions
     path("submissions/", SubmissionListView.as_view(), name="submissions-list"),

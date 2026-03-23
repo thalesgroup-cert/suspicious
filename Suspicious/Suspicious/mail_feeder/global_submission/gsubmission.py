@@ -41,7 +41,7 @@ class GlobalSubmissionService:
                 msg,
                 submission.workdir,
                 submission.email_id,
-                submission.user if submission.is_submitted else None
+                submission.user
             )
 
             instance = EmailHandlerService().handle_mail(mail_instance, submission.workdir)

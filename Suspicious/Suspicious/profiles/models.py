@@ -4,6 +4,22 @@ from django.utils.translation import gettext_lazy as _
 from django.contrib.auth.models import User
 from knox.models import AuthToken
 
+DEFAULT_SEMANTIC_COLORS = {
+    "result": {
+        "safe":         {"main": "#22C55E"},
+        "suspicious":   {"main": "#F59E0B"},
+        "dangerous":    {"main": "#EF4444"},
+        "inconclusive": {"main": "#94A3B8"},
+    },
+    "status": {
+        "done":        {"main": "#22C55E"},
+        "in_progress": {"main": "#3B82F6"},
+        "new":         {"main": "#94A3B8"},
+        "failure":     {"main": "#EF4444"},
+        "challenged":  {"main": "#A855F7"},
+        "unknown":     {"main": "#64748B"},
+    },
+}
 
 class APIKey(models.Model):
     """
@@ -34,12 +50,15 @@ class Theme(models.TextChoices):
     CYBER = "cyber", _("Cyber")
     THE_ONE = "the_one", _("The One")
     METAL = "metal", _("Metal")
+    FUTURE = "future", _("Future")
     SUMMER = "summer", _("Summer")
     WINTER = "winter", _("Winter")
     SPRING = "spring", _("Spring")
     AUTUMN = "autumn", _("Autumn")
 
 class UserProfile(models.Model):
+    def default_semantic_colors():
+        return DEFAULT_SEMANTIC_COLORS.copy()
     id = models.AutoField(primary_key=True)
     user = models.OneToOneField(settings.AUTH_USER_MODEL, on_delete=models.CASCADE)
     function = models.CharField(max_length=200)
@@ -49,13 +68,35 @@ class UserProfile(models.Model):
     wants_acknowledgement = models.BooleanField(default=True)
     wants_results = models.BooleanField(default=True)
     theme = models.CharField(max_length=50, choices=Theme.choices, default=Theme.GRAPHITE)
-    auto_seasonal = models.BooleanField(default=True)
+    auto_seasonal = models.BooleanField(default=False)
+    semantic_colors = models.JSONField(
+        default= default_semantic_colors,
+        blank=True,
+        verbose_name=_("Semantic colors"),
+        help_text=_(
+            "User-defined colors for result/status indicators. "
+            "Structure: {result: {safe, suspicious, dangerous, inconclusive}, "
+            "status: {done, in_progress, new, failure, challenged, unknown}}. "
+            "Each entry is {main: '#rrggbb'}."
+        ),
+    )
     creation_date = models.DateTimeField(auto_now_add=True)
     last_update = models.DateTimeField(auto_now=True)
     def __str__(self):
         return self.user.username
+    def get_semantic_colors(self) -> dict:
+        """Same merge logic as UserProfile.get_semantic_colors."""
+        import copy
+        base = copy.deepcopy(DEFAULT_SEMANTIC_COLORS)
+        stored = self.semantic_colors or {}
+        for group in ("result", "status"):
+            if group in stored and isinstance(stored[group], dict):
+                base[group].update(stored[group])
+        return base
 
 class CISOProfile(models.Model):
+    def default_semantic_colors():
+        return DEFAULT_SEMANTIC_COLORS.copy()
     id = models.AutoField(primary_key=True)
     user = models.OneToOneField(settings.AUTH_USER_MODEL, on_delete=models.CASCADE)
     function = models.CharField(max_length=200)
@@ -66,8 +107,28 @@ class CISOProfile(models.Model):
     wants_acknowledgement = models.BooleanField(default=True)
     wants_results = models.BooleanField(default=True)
     theme = models.CharField(max_length=50, choices=Theme.choices, default=Theme.GRAPHITE)
-    auto_seasonal = models.BooleanField(default=True)
+    auto_seasonal = models.BooleanField(default=False)
+    semantic_colors = models.JSONField(
+        default=default_semantic_colors,
+        blank=True,
+        verbose_name=_("Semantic colors"),
+        help_text=_(
+            "User-defined colors for result/status indicators. "
+            "Structure: {result: {safe, suspicious, dangerous, inconclusive}, "
+            "status: {done, in_progress, new, failure, challenged, unknown}}. "
+            "Each entry is {main: '#rrggbb'}."
+        ),
+    )
     creation_date = models.DateTimeField(auto_now_add=True)
     last_update = models.DateTimeField(auto_now=True)
     def __str__(self):
         return self.user.username
+    def get_semantic_colors(self) -> dict:
+        """Same merge logic as UserProfile.get_semantic_colors."""
+        import copy
+        base = copy.deepcopy(DEFAULT_SEMANTIC_COLORS)
+        stored = self.semantic_colors or {}
+        for group in ("result", "status"):
+            if group in stored and isinstance(stored[group], dict):
+                base[group].update(stored[group])
+        return base
