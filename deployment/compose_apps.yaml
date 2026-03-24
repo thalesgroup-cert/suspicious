@@ -5,6 +5,9 @@ services:
       - "127.0.0.1:${SUSPICIOUS_PORT}:9020"
     restart: always
     volumes:
+      - "${CA_PATH}/certfile.pem:/etc/private/certfile.pem:ro"
+      - "${CA_PATH}/keyfile.pem:/etc/private/keyfile.pem:ro"
+      - "${CA_PATH}/rootcafile.pem:/etc/private/rootcafile.pem:ro"
       - "${SUSPICIOUS_PATH}/logs:/app/log"
       - "/var/run/docker.sock:/var/run/docker.sock"
       - "${SUSPICIOUS_PATH}/settings.json:/app/settings.json"

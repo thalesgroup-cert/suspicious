@@ -1,28 +1,30 @@
+// src/features/dashboard/components/KpiGrid.tsx
 import * as React from "react";
-import {
-  Box,
-  Card,
-  CardContent,
-  Chip,
-  Divider,
-  Stack,
-  Typography,
-} from "@mui/material";
+import { Box, Chip, Stack, Typography } from "@mui/material";
+import { useTheme } from "@mui/material/styles";
+import { alpha } from "@mui/material/styles";
 import {
   GroupsOutlined,
   Inventory2Outlined,
   PersonAddAltOutlined,
 } from "@mui/icons-material";
 import {
-  ResponsiveContainer,
   BarChart,
   Bar,
+  CartesianGrid,
+  Cell,
+  ResponsiveContainer,
   Tooltip,
   XAxis,
   YAxis,
-  Cell,
-  CartesianGrid,
 } from "recharts";
+
+import { SoftCard } from "./SoftCard";
+import { useStatusColors } from "@/styles/colorStore";
+
+// ---------------------------------------------------------------------------
+// Types
+// ---------------------------------------------------------------------------
 
 type Kpis = {
   new_users: number;
@@ -45,12 +47,15 @@ type MiniDatum = {
   raw: number | null;
 };
 
-const KPI_BAR_COLOR = "#38BDF8";
+// ---------------------------------------------------------------------------
+// Helpers
+// ---------------------------------------------------------------------------
 
+// KPI bar color comes from the status color store (in_progress = activity in flight)
 function toMiniSeries(labels: string[], values: Array<number | null>): MiniDatum[] {
   return labels.map((label, i) => ({
     label,
-    v: typeof values[i] === "number" ? values[i] : 0,
+    v: typeof values[i] === "number" ? (values[i] as number) : 0,
     raw: values[i] ?? null,
   }));
 }
@@ -59,50 +64,9 @@ function formatNumber(v: unknown) {
   return typeof v === "number" ? v.toLocaleString() : "—";
 }
 
-function GlassCard(props: React.PropsWithChildren<{
-  title: string;
-  icon?: React.ReactNode;
-  right?: React.ReactNode;
-}>) {
-  return (
-    <Card
-      sx={{
-        borderRadius: 3,
-        border: "1px solid rgba(255,255,255,.10)",
-        background: "linear-gradient(180deg, rgba(255,255,255,.06), rgba(255,255,255,.03))",
-      }}
-    >
-      <CardContent sx={{ p: { xs: 1.5, md: 2 } }}>
-        <Stack direction="row" alignItems="center" justifyContent="space-between" sx={{ mb: 1 }}>
-          <Stack direction="row" spacing={0.9} alignItems="center">
-            <Box
-              sx={{
-                width: 34,
-                height: 34,
-                borderRadius: 2,
-                display: "grid",
-                placeItems: "center",
-                border: "1px solid rgba(255,255,255,.12)",
-                background:
-                  "linear-gradient(135deg, rgba(56,189,248,.14), rgba(120,119,198,.12))",
-                "& svg": { fontSize: 18 },
-              }}
-            >
-              {props.icon}
-            </Box>
-            <Typography fontWeight={900} fontSize={15}>
-              {props.title}
-            </Typography>
-          </Stack>
-          {props.right}
-        </Stack>
-
-        <Divider sx={{ opacity: 0.25, mb: 1.5 }} />
-        {props.children}
-      </CardContent>
-    </Card>
-  );
-}
+// ---------------------------------------------------------------------------
+// MiniTooltip — theme-aware
+// ---------------------------------------------------------------------------
 
 function MiniTooltip({
   active,
@@ -113,18 +77,23 @@ function MiniTooltip({
   payload?: Array<{ payload?: MiniDatum; color?: string }>;
   label?: string;
 }) {
+  const theme = useTheme();
+  const isDark = theme.palette.mode === "dark";
+
   if (!active || !payload?.length) return null;
 
   const point = payload[0]?.payload;
-  const color = payload[0]?.color ?? KPI_BAR_COLOR;
-
+  // Fallback colour — never actually rendered since color always comes from Cell
+  const color = payload[0]?.color ?? "#38BDF8";
   if (!point) return null;
 
   return (
     <Box
       sx={{
-        background: "rgba(15,23,42,0.95)",
-        border: "1px solid rgba(255,255,255,0.12)",
+        background: isDark
+          ? "rgba(15,23,42,0.95)"
+          : alpha(theme.palette.background.paper, 0.97),
+        border: `1px solid ${alpha(theme.palette.divider, isDark ? 0.18 : 0.7)}`,
         borderRadius: 2,
         px: 1.25,
         py: 1,
@@ -133,34 +102,30 @@ function MiniTooltip({
       }}
     >
       <Typography
-        sx={{
-          fontSize: 12,
-          fontWeight: 700,
-          color: "#E2E8F0",
-          mb: 0.5,
-        }}
+        sx={{ fontSize: 12, fontWeight: 700, color: "text.primary", mb: 0.5 }}
       >
         {label}
       </Typography>
-
-      <Typography
-        sx={{
-          fontSize: 12,
-          fontWeight: 600,
-          color,
-        }}
-      >
+      <Typography sx={{ fontSize: 12, fontWeight: 600, color }}>
         Value: {point.raw == null ? "—" : Number(point.raw).toLocaleString()}
       </Typography>
     </Box>
   );
 }
 
+// ---------------------------------------------------------------------------
+// ClickableMiniBar
+// ---------------------------------------------------------------------------
+
 function ClickableMiniBar(props: {
   ariaLabel: string;
   data: MiniDatum[];
+  barColor: string;
   onActivate?: () => void;
 }) {
+  const theme = useTheme();
+  const isDark = theme.palette.mode === "dark";
+
   const onKeyDown = (e: React.KeyboardEvent) => {
     if (!props.onActivate) return;
     if (e.key === "Enter" || e.key === " ") {
@@ -182,9 +147,17 @@ function ClickableMiniBar(props: {
         borderRadius: 2,
         outline: "none",
         cursor: props.onActivate ? "pointer" : "default",
-        "&:hover": props.onActivate ? { bgcolor: "rgba(255,255,255,.03)" } : undefined,
+        "&:hover": props.onActivate
+          ? {
+              bgcolor: isDark
+                ? "rgba(255,255,255,.03)"
+                : alpha(theme.palette.action.hover, 0.06),
+            }
+          : undefined,
         "&:focus-visible": props.onActivate
-          ? { boxShadow: "0 0 0 2px rgba(255,255,255,.22)" }
+          ? {
+              boxShadow: `0 0 0 2px ${alpha(theme.palette.primary.main, 0.35)}`,
+            }
           : undefined,
         px: 0.25,
         py: 0.25,
@@ -192,16 +165,25 @@ function ClickableMiniBar(props: {
     >
       <ResponsiveContainer width="100%" height="100%">
         <BarChart data={props.data} barCategoryGap={4}>
-          <CartesianGrid strokeDasharray="3 3" opacity={0.18} vertical={false} />
+          <CartesianGrid
+            strokeDasharray="3 3"
+            opacity={isDark ? 0.18 : 0.3}
+            vertical={false}
+            stroke={isDark ? undefined : alpha(theme.palette.divider, 0.6)}
+          />
           <XAxis dataKey="label" hide />
           <YAxis hide domain={[0, "dataMax"]} />
           <Tooltip
             content={<MiniTooltip />}
-            cursor={{ fill: "rgba(148,163,184,0.10)" }}
+            cursor={{
+              fill: isDark
+                ? "rgba(148,163,184,0.10)"
+                : alpha(theme.palette.action.hover, 0.12),
+            }}
           />
           <Bar dataKey="v" isAnimationActive={false} radius={[6, 6, 0, 0]}>
             {props.data.map((d, i) => (
-              <Cell key={`${d.label}-${i}`} fill={KPI_BAR_COLOR} />
+              <Cell key={`${d.label}-${i}`} fill={props.barColor} />
             ))}
           </Bar>
         </BarChart>
@@ -210,27 +192,34 @@ function ClickableMiniBar(props: {
   );
 }
 
+// ---------------------------------------------------------------------------
+// KpiCard
+// ---------------------------------------------------------------------------
+
 function KpiCard(props: {
   title: string;
   value: number | string;
   subtitle: string;
   icon: React.ReactNode;
+  barColor: string;
   miniBars?: MiniDatum[];
   onOpenTrends?: () => void;
 }) {
+  const theme = useTheme();
+  const isDark = theme.palette.mode === "dark";
+
   return (
-    <GlassCard
+    <SoftCard
       title={props.title}
       icon={props.icon}
-      right={
-        <Chip
-          size="small"
-          label="Monthly"
-          variant="outlined"
-        />
-      }
+      right={<Chip size="small" label="Monthly" variant="outlined" />}
     >
-      <Stack direction="row" alignItems="baseline" justifyContent="space-between" sx={{ mb: 0.5 }}>
+      <Stack
+        direction="row"
+        alignItems="baseline"
+        justifyContent="space-between"
+        sx={{ mb: 0.5 }}
+      >
         <Typography sx={{ fontSize: 30, fontWeight: 950, lineHeight: 1.05 }}>
           {props.value}
         </Typography>
@@ -253,8 +242,14 @@ function KpiCard(props: {
               borderRadius: 2,
               px: 1,
               py: 0.5,
-              "&:hover": { bgcolor: "rgba(255,255,255,.03)" },
-              "&:focus-visible": { boxShadow: "0 0 0 2px rgba(255,255,255,.22)" },
+              "&:hover": {
+                bgcolor: isDark
+                  ? "rgba(255,255,255,.03)"
+                  : alpha(theme.palette.action.hover, 0.06),
+              },
+              "&:focus-visible": {
+                boxShadow: `0 0 0 2px ${alpha(theme.palette.primary.main, 0.35)}`,
+              },
             }}
             aria-label={`Open ${props.title} trends`}
           >
@@ -271,14 +266,19 @@ function KpiCard(props: {
         <ClickableMiniBar
           ariaLabel={`${props.title} trend${props.onOpenTrends ? " (open details)" : ""}`}
           data={props.miniBars}
+          barColor={props.barColor}
           onActivate={props.onOpenTrends}
         />
       ) : (
         <Box sx={{ mt: 1.25, height: 88 }} />
       )}
-    </GlassCard>
+    </SoftCard>
   );
 }
+
+// ---------------------------------------------------------------------------
+// KpiGrid (default export)
+// ---------------------------------------------------------------------------
 
 export default function KpiGrid(props: {
   kpis: Kpis;
@@ -287,33 +287,29 @@ export default function KpiGrid(props: {
 }) {
   const labels = props.spark?.labels ?? [];
 
-  const newUsersBars = React.useMemo(() => {
-    if (!props.spark) return [];
-    return toMiniSeries(labels, props.spark.newUsers);
-  }, [props.spark, labels]);
+  // KPI bars use in_progress color from the status store — represents
+  // "activity happening this month" which matches the metric semantics.
+  // With Okabe-Ito preset this becomes #0072B2 (blue), still distinct from
+  // the green/vermilion used for trend arrows.
+  const statusColors = useStatusColors();
+  const kpiBarColor = statusColors.in_progress.main;
 
-  const reportersBars = React.useMemo(() => {
-    if (!props.spark) return [];
-    return toMiniSeries(labels, props.spark.reporters);
-  }, [props.spark, labels]);
+  const newUsersBars = React.useMemo(
+    () => (props.spark ? toMiniSeries(labels, props.spark.newUsers) : []),
+    [props.spark, labels]
+  );
+  const reportersBars = React.useMemo(
+    () => (props.spark ? toMiniSeries(labels, props.spark.reporters) : []),
+    [props.spark, labels]
+  );
+  const submissionsBars = React.useMemo(
+    () => (props.spark ? toMiniSeries(labels, props.spark.submissions) : []),
+    [props.spark, labels]
+  );
 
-  const submissionsBars = React.useMemo(() => {
-    if (!props.spark) return [];
-    return toMiniSeries(labels, props.spark.submissions);
-  }, [props.spark, labels]);
-
-  const openNewUsers = React.useCallback(() => {
-    props.onOpenTrends?.("new_users");
-  }, [props.onOpenTrends]);
-
-  const openReporters = React.useCallback(() => {
-    props.onOpenTrends?.("total_reporters");
-  }, [props.onOpenTrends]);
-
-  const openSubmissions = React.useCallback(() => {
-    props.onOpenTrends?.("total_cases");
-  }, [props.onOpenTrends]);
-
+  const openNewUsers    = React.useCallback(() => { props.onOpenTrends?.("new_users"); },       [props.onOpenTrends]);
+  const openReporters   = React.useCallback(() => { props.onOpenTrends?.("total_reporters"); }, [props.onOpenTrends]);
+  const openSubmissions = React.useCallback(() => { props.onOpenTrends?.("total_cases"); },     [props.onOpenTrends]);
   const canOpen = !!props.onOpenTrends;
 
   return (
@@ -329,24 +325,25 @@ export default function KpiGrid(props: {
         value={formatNumber(props.kpis.new_users)}
         subtitle="Reporters created this month"
         icon={<PersonAddAltOutlined fontSize="small" />}
+        barColor={kpiBarColor}
         miniBars={newUsersBars}
         onOpenTrends={canOpen ? openNewUsers : undefined}
       />
-
       <KpiCard
         title="Total reporters"
         value={formatNumber(props.kpis.total_reporters)}
         subtitle="Distinct reporting identities"
         icon={<GroupsOutlined fontSize="small" />}
+        barColor={kpiBarColor}
         miniBars={reportersBars}
         onOpenTrends={canOpen ? openReporters : undefined}
       />
-
       <KpiCard
         title="Total submissions"
         value={formatNumber(props.kpis.total_cases)}
         subtitle="Cases submitted this month"
         icon={<Inventory2Outlined fontSize="small" />}
+        barColor={kpiBarColor}
         miniBars={submissionsBars}
         onOpenTrends={canOpen ? openSubmissions : undefined}
       />

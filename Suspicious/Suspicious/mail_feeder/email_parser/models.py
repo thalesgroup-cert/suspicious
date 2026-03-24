@@ -1,11 +1,8 @@
-from pydantic import BaseModel, EmailStr, Field
-from typing import Optional, List, Dict, Any
+from pydantic import BaseModel, EmailStr, Field, field_validator
+from typing import Optional, List, Dict
 
 
 class AttachmentModel(BaseModel):
-    """
-    Model representing an email attachment.
-    """
     filename: str
     content: bytes
     headers: Dict[str, str]
@@ -13,17 +10,22 @@ class AttachmentModel(BaseModel):
 
 
 class EmailDataModel(BaseModel):
-    """
-    Model representing parsed email data.
-    """
     reportedBy: str
     from_addr: str = Field(..., alias="from")
-    to: str
-    cc: Optional[str] = ""
-    bcc: Optional[str] = ""
+
+    to: Optional[str] = None
+    cc: Optional[str] = None
+    bcc: Optional[str] = None
+
     reportedSubject: str
     reportedText: List[str]
     date: str
     headers: Dict[str, str]
     id: str
     attachments: List[AttachmentModel]
+
+    # Nettoyage automatique des valeurs vides
+    @field_validator("to", "cc", "bcc", mode="before")
+    @classmethod
+    def empty_to_none(cls, v):
+        return v or None

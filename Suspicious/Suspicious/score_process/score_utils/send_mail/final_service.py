@@ -181,10 +181,15 @@ class FinalEmailService:
         )
 
         send_mail_service = SendMailService(
-            host=self.config["server"], port=self.config["port"]
+            host=self.config["server"], port=self.config["port"],
+            login=self.config["username"], password=self.config["password"]
         )
 
         send_mail_service.connect()
+        if self.config["tls"]:
+            send_mail_service.start_tls()
+
+        send_mail_service.login()
 
         send_mail_service.publish_email(
             subject=subject,

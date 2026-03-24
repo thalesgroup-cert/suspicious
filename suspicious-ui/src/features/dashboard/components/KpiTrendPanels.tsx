@@ -6,12 +6,17 @@ import {
   GroupsOutlined,
   Inventory2Outlined,
   PersonAddAltOutlined,
-  TrendingUpOutlined,
   TrendingDownOutlined,
   TrendingFlatOutlined,
+  TrendingUpOutlined,
 } from "@mui/icons-material";
 
 import { SoftCard } from "./SoftCard";
+import { useStatusColors } from "@/styles/colorStore";
+
+// ---------------------------------------------------------------------------
+// Types
+// ---------------------------------------------------------------------------
 
 type Spark = {
   labels: string[];
@@ -21,6 +26,10 @@ type Spark = {
 };
 
 type MetricKey = "newUsers" | "reporters" | "submissions";
+
+// ---------------------------------------------------------------------------
+// Helpers
+// ---------------------------------------------------------------------------
 
 function formatNumber(v: unknown) {
   return typeof v === "number" ? v.toLocaleString() : "—";
@@ -40,9 +49,24 @@ function lastTwoNumbers(values: Array<number | null>) {
   return { prev, last };
 }
 
+// ---------------------------------------------------------------------------
+// TrendIcon
+// ---------------------------------------------------------------------------
+
 function TrendIcon(props: { values: Array<number | null> }) {
   const theme = useTheme();
-  const { prev, last } = React.useMemo(() => lastTwoNumbers(props.values), [props.values]);
+
+  // Use done (positive) and failure (negative) from the status color store
+  // so trend arrows respect the user's colorblind-safe preset.
+  // With Okabe-Ito: ↑ becomes #009E73 (bluish-green), ↓ becomes #D55E00
+  // (vermilion) — both distinguishable by protanopia and deuteranopia users,
+  // unlike the default red/green pair.
+  const statusColors = useStatusColors();
+
+  const { prev, last } = React.useMemo(
+    () => lastTwoNumbers(props.values),
+    [props.values]
+  );
 
   let icon: React.ReactNode = null;
   let color: string = theme.palette.text.disabled;
@@ -53,10 +77,10 @@ function TrendIcon(props: { values: Array<number | null> }) {
     const d = last - prev;
     if (d > 0) {
       icon = <TrendingUpOutlined sx={{ fontSize: 60 }} />;
-      color = "#22C55E";
+      color = statusColors.done.main;       // positive → "done" semantic
     } else if (d < 0) {
       icon = <TrendingDownOutlined sx={{ fontSize: 60 }} />;
-      color = "#EF4444";
+      color = statusColors.failure.main;    // negative → "failure" semantic
     } else {
       icon = <TrendingFlatOutlined sx={{ fontSize: 60 }} />;
       color = theme.palette.text.secondary as string;
@@ -73,12 +97,18 @@ function TrendIcon(props: { values: Array<number | null> }) {
       <Box sx={{ display: "grid", placeItems: "center", lineHeight: 1 }}>
         {icon}
       </Box>
-      <Typography sx={{ fontSize: 30, fontWeight: 950, lineHeight: 1, color: "text.primary" }}>
+      <Typography
+        sx={{ fontSize: 30, fontWeight: 950, lineHeight: 1, color: "text.primary" }}
+      >
         {formatNumber(last)}
       </Typography>
     </Stack>
   );
 }
+
+// ---------------------------------------------------------------------------
+// TrendPanel
+// ---------------------------------------------------------------------------
 
 function TrendPanel(props: {
   title: string;
@@ -91,6 +121,10 @@ function TrendPanel(props: {
     </SoftCard>
   );
 }
+
+// ---------------------------------------------------------------------------
+// KpiTrendPanels (default export)
+// ---------------------------------------------------------------------------
 
 export default function KpiTrendPanels(props: {
   spark: Spark;

@@ -13,6 +13,7 @@ import {
 } from "recharts";
 
 import { SoftCard } from "./SoftCard";
+import { useResultColors, useStatusColors } from "@/styles/colorStore";
 
 type DangerCounts = {
   failure: number;
@@ -25,24 +26,16 @@ type DangerCounts = {
 const DANGER_ORDER = ["Failure", "Safe", "Inconclusive", "Suspicious", "Dangerous"] as const;
 type DangerLabel = (typeof DANGER_ORDER)[number];
 
-const DANGER_COLORS: Record<DangerLabel, string> = {
-  Failure: "#64748B",
-  Safe: "#22C55E",
-  Inconclusive: "#A3A3A3",
-  Suspicious: "#F59E0B",
-  Dangerous: "#EF4444",
-};
-
 function sum(values: number[]) {
   return values.reduce((a, b) => a + b, 0);
 }
 
-function toDonut(d: DangerCounts) {
+function toDonut(d: DangerCounts, colors: Record<DangerLabel, string>) {
   return (DANGER_ORDER as readonly DangerLabel[])
     .map((name) => {
       const key = name.toLowerCase() as keyof DangerCounts;
       const value = (d[key] ?? 0) as number;
-      return { name, value };
+      return { name, value, color: colors[name] };
     })
     .filter((x) => x.value > 0);
 }
@@ -90,7 +83,26 @@ export default function ThreatDistributionPanel(props: { dangerCounts: DangerCou
   const theme = useTheme();
   const isDark = theme.palette.mode === "dark";
 
-  const donut = React.useMemo(() => toDonut(props.dangerCounts), [props.dangerCounts]);
+  // Read from the user's semantic color store so this panel respects
+  // colorblind-safe presets and custom color choices from ProfilePage.
+  const resultColors = useResultColors();
+  const statusColors  = useStatusColors();
+
+  // Map the DangerLabel keys to their semantic color store equivalents.
+  // "Failure" maps to status.failure (not a result) — it's a processing
+  // failure, not an analysis outcome, so it reads from statusColors.
+  const dangerColors: Record<DangerLabel, string> = React.useMemo(() => ({
+    Safe:         resultColors.safe.main,
+    Suspicious:   resultColors.suspicious.main,
+    Dangerous:    resultColors.dangerous.main,
+    Inconclusive: resultColors.inconclusive.main,
+    Failure:      statusColors.failure.main,
+  }), [resultColors, statusColors]);
+
+  const donut = React.useMemo(
+    () => toDonut(props.dangerCounts, dangerColors),
+    [props.dangerCounts, dangerColors]
+  );
   const total = React.useMemo(() => sum(donut.map((d) => d.value)), [donut]);
   const danger = props.dangerCounts;
 
@@ -121,7 +133,7 @@ export default function ThreatDistributionPanel(props: { dangerCounts: DangerCou
                 strokeWidth={1}
               >
                 {donut.map((entry) => (
-                  <Cell key={entry.name} fill={DANGER_COLORS[entry.name as DangerLabel]} />
+                  <Cell key={entry.name} fill={dangerColors[entry.name as DangerLabel]} />
                 ))}
               </Pie>
 
@@ -172,7 +184,7 @@ export default function ThreatDistributionPanel(props: { dangerCounts: DangerCou
                     width: 10,
                     height: 10,
                     borderRadius: 99,
-                    backgroundColor: DANGER_COLORS[label],
+                    backgroundColor: dangerColors[label],
                     border: `1px solid ${dotBorder}`,
                   }}
                 />

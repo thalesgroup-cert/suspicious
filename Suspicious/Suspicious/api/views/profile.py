@@ -1,68 +1,150 @@
-from django.db import transaction
+# profiles/views.py
 from rest_framework import status
-from rest_framework.generics import GenericAPIView
 from rest_framework.permissions import IsAuthenticated
 from rest_framework.response import Response
+from rest_framework.views import APIView
 
+from profiles.models import UserProfile, CISOProfile
 from api.serializers.profile import (
-    AppearancePatchSerializer,
-    AppearanceResponseSerializer,
-    PreferencesPatchSerializer,
-    PreferencesResponseSerializer,
-    ProfileSerializer,
+    UserProfileSerializer,
+    CISOProfileSerializer,
+    AppearanceSerializer,
+    PreferencesSerializer,
+    SemanticColorsSerializer,
 )
-from api.utils.profile_service import ProfileService
 
 
-class BaseProfileAPIView(GenericAPIView):
+# ---------------------------------------------------------------------------
+# Helper — resolve the correct profile model for the requesting user.
+#
+# CISOProfile takes priority: users with a CISO profile get CISO
+# serialization (which includes the scope field).
+# ---------------------------------------------------------------------------
+
+def _get_profile(user):
+    """
+    Returns (profile_instance, serializer_class).
+    Creates a UserProfile on first access if neither profile exists.
+    """
+    try:
+        return user.cisoprofile, CISOProfileSerializer
+    except CISOProfile.DoesNotExist:
+        pass
+
+    profile, _ = UserProfile.objects.get_or_create(user=user)
+    return profile, UserProfileSerializer
+
+
+# ---------------------------------------------------------------------------
+# GET / PATCH /api/profile/
+# ---------------------------------------------------------------------------
+
+class ProfileView(APIView):
     permission_classes = [IsAuthenticated]
 
-    def get_profile(self):
-        return ProfileService.get_or_create_profile(self.request.user)
+    def get(self, request):
+        profile, SerializerClass = _get_profile(request.user)
+        return Response(SerializerClass(profile).data)
 
-
-class ProfileView(BaseProfileAPIView):
-    serializer_class = ProfileSerializer
-
-    def get(self, request, *args, **kwargs):
-        profile = self.get_profile()
-        serializer = self.get_serializer(profile)
-        return Response(serializer.data, status=status.HTTP_200_OK)
-
-
-class ProfilePreferencesView(BaseProfileAPIView):
-    serializer_class = PreferencesPatchSerializer
-    response_serializer_class = PreferencesResponseSerializer
-
-    @transaction.atomic
-    def patch(self, request, *args, **kwargs):
-        serializer = self.get_serializer(data=request.data, partial=True)
+    def patch(self, request):
+        profile, SerializerClass = _get_profile(request.user)
+        serializer = SerializerClass(profile, data=request.data, partial=True)
         serializer.is_valid(raise_exception=True)
-
-        profile = self.get_profile()
-        changed_fields = ProfileService.apply_updates(profile, serializer.validated_data)
-
-        if changed_fields:
-            profile.save(update_fields=[*changed_fields, "last_update"])
-
-        response_data = self.response_serializer_class(profile).data
-        return Response(response_data, status=status.HTTP_200_OK)
+        serializer.save()
+        return Response(serializer.data)
 
 
-class ProfileAppearanceView(BaseProfileAPIView):
-    serializer_class = AppearancePatchSerializer
-    response_serializer_class = AppearanceResponseSerializer
+# ---------------------------------------------------------------------------
+# PATCH /api/profile/appearance/
+# Updates: theme, auto_seasonal, semantic_colors (any combination).
+# ---------------------------------------------------------------------------
 
-    @transaction.atomic
-    def patch(self, request, *args, **kwargs):
-        serializer = self.get_serializer(data=request.data, partial=True)
+class AppearanceView(APIView):
+    permission_classes = [IsAuthenticated]
+
+    def patch(self, request):
+        profile, ProfileSerializerClass = _get_profile(request.user)
+        serializer = AppearanceSerializer(data=request.data, partial=True)
         serializer.is_valid(raise_exception=True)
+        serializer.update(profile, serializer.validated_data)
 
-        profile = self.get_profile()
-        changed_fields = ProfileService.apply_updates(profile, serializer.validated_data)
+        # Return the full profile so the frontend can update its cache.
+        return Response(ProfileSerializerClass(profile).data)
 
-        if changed_fields:
-            profile.save(update_fields=[*changed_fields, "last_update"])
 
-        response_data = self.response_serializer_class(profile).data
-        return Response(response_data, status=status.HTTP_200_OK)
+# ---------------------------------------------------------------------------
+# PATCH /api/profile/preferences/
+# Updates: wants_acknowledgement, wants_results.
+# ---------------------------------------------------------------------------
+
+class PreferencesView(APIView):
+    permission_classes = [IsAuthenticated]
+
+    def patch(self, request):
+        profile, ProfileSerializerClass = _get_profile(request.user)
+        serializer = PreferencesSerializer(data=request.data, partial=True)
+        serializer.is_valid(raise_exception=True)
+        serializer.update(profile, serializer.validated_data)
+
+        return Response(ProfileSerializerClass(profile).data)
+
+
+# ---------------------------------------------------------------------------
+# GET / PATCH /api/profile/colors/
+#
+# Dedicated endpoint for semantic color sync.
+#
+# GET  — returns just the semantic_colors blob (merged with defaults).
+# PATCH — accepts a full or partial semantic_colors object, validates,
+#         persists, and returns the merged result.
+#
+# The frontend calls this on:
+#   1. Preset switch in ColorSettingsPanel
+#   2. Individual swatch change (debounced 800ms)
+#   3. ProfilePage "Save appearance" button
+# ---------------------------------------------------------------------------
+
+class SemanticColorsView(APIView):
+    permission_classes = [IsAuthenticated]
+
+    def get(self, request):
+        profile, _ = _get_profile(request.user)
+        return Response({"semantic_colors": profile.get_semantic_colors()})
+
+    def patch(self, request):
+        profile, ProfileSerializerClass = _get_profile(request.user)
+        serializer = SemanticColorsSerializer(data=request.data)
+        serializer.is_valid(raise_exception=True)
+        serializer.update(profile, serializer.validated_data)
+
+        return Response(
+            {
+                "semantic_colors": profile.get_semantic_colors(),
+                # Echo the full profile so a single roundtrip is enough.
+                "profile": ProfileSerializerClass(profile).data,
+            }
+        )
+
+
+# ---------------------------------------------------------------------------
+# POST /api/profile/colors/reset/
+# Resets semantic_colors to DEFAULT_SEMANTIC_COLORS.
+# ---------------------------------------------------------------------------
+
+class ResetSemanticColorsView(APIView):
+    permission_classes = [IsAuthenticated]
+
+    def post(self, request):
+        from profiles.models import DEFAULT_SEMANTIC_COLORS
+        import copy
+
+        profile, ProfileSerializerClass = _get_profile(request.user)
+        profile.semantic_colors = copy.deepcopy(DEFAULT_SEMANTIC_COLORS)
+        profile.save(update_fields=["semantic_colors", "last_update"])
+
+        return Response(
+            {
+                "semantic_colors": profile.get_semantic_colors(),
+                "profile": ProfileSerializerClass(profile).data,
+            }
+        )
