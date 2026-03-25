@@ -13,7 +13,6 @@ services:
     #     - HTTPS_PROXY=${HTTPS_PROXY}
     image: ghcr.io/thalesgroup-cert/suspicious:${SUSPICIOUS_VERSION}
     container_name: suspicious
-    image: ghcr.io/thalesgroup-cert/suspicious:${SUSPICIOUS_VERSION}
     depends_on:
       db_suspicious:
         condition: service_healthy
