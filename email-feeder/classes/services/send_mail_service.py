@@ -10,12 +10,20 @@ DEFAULT_BASE_DELAY = 1  # in seconds
 class SendMailService:
     __server: smtplib.SMTP | None = None
 
-    def __init__(self, host: str, port: int) -> None:
+    def __init__(self, host: str, port: int, login: str, password: str) -> None:
         self.__host = host
         self.__port = port
+        self.__login = login
+        self.__password = password
 
     def connect(self) -> None:
         self.__server = smtplib.SMTP(self.__host, self.__port)
+
+    def start_tls(self) -> None:
+        self.__server.starttls()
+
+    def login(self) -> None:
+        self.__server.login(user=self.__login, password=self.__password)
 
     def __create_mail(
         self,

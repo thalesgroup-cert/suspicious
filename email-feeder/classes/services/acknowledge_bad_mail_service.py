@@ -50,8 +50,10 @@ class AcknowledgeBadMailServiceConfig(pydantic.BaseModel):
         mail_config: classes.models.configs.internals.mail.MailConfig,
     ) -> "AcknowledgeBadMailServiceConfig":
         return AcknowledgeBadMailServiceConfig(
+            tls=mail_config.tls,
             username=mail_config.username,
             server=mail_config.server,
+            password=mail_config.password,
             port=mail_config.port,
             company_name=mail_config.group,
             company_logo=mail_config.logos.get("company", "#"),
@@ -119,10 +121,15 @@ class AcknowledgeBadMailService:
         )
 
         send_mail_service = classes.services.send_mail_service.SendMailService(
-            host=self.__config.server, port=self.__config.port
+            host=self.__config.server, port=self.__config.port,
+            login=self.__config.username, password=self.__config.password
         )
 
         send_mail_service.connect()
+        if self.__config.tls:
+            send_mail_service.start_tls()
+
+        send_mail_service.login()
 
         send_mail_service.publish_email(
             subject=subject,

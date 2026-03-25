@@ -44,9 +44,11 @@
     "secure": false
   },
   "mail": {
-    "server": "localhost",
-    "port": 3025,
-    "username": "SUSPICIOUS",
+    "tls": true,
+    "server" : "smtp_server",
+    "port" : 25,
+    "password": "smtp_password",
+    "username" : "smtp_user",
     "footer": "Limited Distribution",
     "group": "Your Cybersecurity Team Name",
     "suspicious_web": "https://suspicious.test/submissions/",
