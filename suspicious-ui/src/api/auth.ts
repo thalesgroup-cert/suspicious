@@ -1,8 +1,26 @@
 // src/api/auth.ts
+//
+// Semantic color hydration strategy:
+//
+//   The backend now embeds semantic_colors directly in GET /auth/me/
+//   (via MeResponseSerializer → AuthenticatedUserSerializer).
+//
+//   This eliminates the previous second roundtrip to /profile/colors/
+//   that was fired on every page load. Colors are now available in the
+//   very first authenticated response — before any page component mounts.
+//
+//   Flow:
+//     1. login() sets the token, React Query invalidates ["me"]
+//     2. ProtectedRoute mounts → useQuery(["me"]) → getMe()
+//     3. getMe() receives Me response with semantic_colors embedded
+//     4. hydrateColorsFromMe() pushes them into the Zustand colorStore
+//     5. Every dashboard panel, chip, and indicator already has the
+//        correct user-configured colors by the time they render
 
 import { api, setAccessToken } from "@/api/client";
 import { endpoints } from "@/api/endpoints";
 import { useColorStore } from "@/styles/colorStore";
+import type { ResultColors, StatusColors } from "@/styles/colorStore";
 
 // ---------------------------------------------------------------------------
 // Types
@@ -16,6 +34,12 @@ export type Me = {
   last_name?: string;
   groups: string[];
   ciso_scope?: string;
+  // Embedded by MeResponseSerializer. Optional so the type stays compatible
+  // with pre-migration backends that don't yet return this field.
+  semantic_colors?: {
+    result: ResultColors;
+    status: StatusColors;
+  };
 };
 
 export type LoginResponse = {
@@ -31,33 +55,21 @@ export type LoginResponse = {
   };
 };
 
+// ---------------------------------------------------------------------------
+// Color hydration — called with every successful getMe() response
+// ---------------------------------------------------------------------------
 
-let _colorsFetched = false; // session-level guard — one fetch per reload
-
-async function hydrateColorsFromServer(): Promise<void> {
-  if (_colorsFetched) return;
-
+function hydrateColorsFromMe(me: Me): void {
   try {
-    const res = await api.get<{
-      semantic_colors: {
-        result: Record<string, { main: string }>;
-        status: Record<string, { main: string }>;
-      };
-    }>("/profile/colors/");
-
-    const colors = res.data?.semantic_colors;
+    const colors = me.semantic_colors;
     if (colors?.result && colors?.status) {
-      useColorStore.getState().hydrateFromProfile(colors as any);
+      // hydrateFromProfile deep-merges with defaults so partial or missing
+      // data from pre-migration backends never breaks the UI.
+      useColorStore.getState().hydrateFromProfile(colors);
     }
-
-    _colorsFetched = true;
   } catch {
+    // Never surface a color sync error to the auth flow.
   }
-}
-
-// Exposed so tests or manual flows can reset the session guard.
-export function resetColorsFetchedFlag() {
-  _colorsFetched = false;
 }
 
 // ---------------------------------------------------------------------------
@@ -75,7 +87,9 @@ export async function login(
 
   setAccessToken(res.data.token);
 
-  hydrateColorsFromServer();
+  // LoginResponseSerializer only returns a minimal user object (no colors).
+  // Colors are hydrated on the subsequent getMe() call which React Query
+  // fires automatically via the ["me"] query on mount.
 
   return res.data;
 }
@@ -85,15 +99,31 @@ export async function logout(): Promise<void> {
     await api.post(endpoints.logout);
   } finally {
     setAccessToken(null);
-    // Reset the session guard so the next login fetches fresh colors.
-    resetColorsFetchedFlag();
+    // Keep colors in localStorage — they won't flash on the login page
+    // and will be overwritten by the next user's getMe() on login.
+  }
+}
+
+// ---------------------------------------------------------------------------
+// SSO helper — called by LoginPage after setting the token from the fragment.
+// Fires getMe() to both verify the token and hydrate colors in one shot,
+// since the SSO path bypasses the normal login() → getMe() sequence.
+// ---------------------------------------------------------------------------
+
+export async function hydrateColorsAfterSso(): Promise<void> {
+  try {
+    await getMe();
+  } catch {
+    // Non-fatal — the token is already stored; colors fall back to localStorage.
   }
 }
 
 export async function getMe(): Promise<Me> {
   const res = await api.get<Me>(endpoints.me);
 
-  hydrateColorsFromServer();
+  // Hydrate color store from the embedded semantic_colors.
+  // Runs on: initial page load, hard refresh, tab focus re-auth.
+  hydrateColorsFromMe(res.data);
 
   return res.data;
 }

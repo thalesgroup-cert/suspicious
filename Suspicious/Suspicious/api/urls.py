@@ -51,6 +51,7 @@ from api.views.submissions import (
     SubmissionDetailsView,
     SubmissionListView,
 )
+from api.views.oidc import OIDCCallbackView, OIDCLoginView
 
 urlpatterns = [
     path("schema/", SpectacularAPIView.as_view(), name="schema"),
@@ -60,6 +61,9 @@ urlpatterns = [
     path("auth/login/", LoginView.as_view(), name="login"),
     path("auth/logout/", LogoutView.as_view(), name="logout"),
     path("auth/me/", MeView.as_view(), name="me"),
+
+    path("oidc/login/",    OIDCLoginView.as_view(),    name="oidc-login"),
+    path("oidc/callback/", OIDCCallbackView.as_view(), name="oidc-callback"),
 
     # Global monthly statistics
     path("stats/monthly-cases/", MonthlyCasesSummaryListView.as_view(), name="monthly-cases-list"),

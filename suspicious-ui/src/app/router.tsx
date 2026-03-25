@@ -18,7 +18,7 @@ import AboutPage       from "@/pages/AboutPage";
 import NotFound        from "@/pages/NotFound";
 
 // Groups that unlock elevated routes.
-const ELEVATED = ["CISO", "CERT"];
+const ELEVATED = ["Admin", "CISO", "CERT"];
 const ADMIN    = ["Admin", "CERT"];
 
 export const router = createBrowserRouter([
