@@ -18,12 +18,12 @@ import {
   Visibility,
   VisibilityOff,
   ArrowForwardOutlined,
-  LockOutlined,
   ShieldOutlined,
 } from "@mui/icons-material";
 import { useNavigate } from "react-router-dom";
 import { useQuery } from "@tanstack/react-query";
-import { getMe, login } from "@/api/auth";
+import { getMe, login, hydrateColorsAfterSso } from "@/api/auth";
+import { setAccessToken } from "@/api/client";
 
 // ---------------------------------------------------------------------------
 // Env config
@@ -138,13 +138,17 @@ function SidePanel() {
           bottom: "10%",
           right: 0,
           width: 1,
-          background: `linear-gradient(180deg, transparent, ${alpha(theme.palette.divider, isDark ? 0.35 : 0.6)}, transparent)`,
+          background:  isDark
+          ? `linear-gradient(180deg, ${alpha("#fff", 0.05)}, ${alpha("#fff", 0.03)})`
+          : `linear-gradient(180deg, ${alpha("#fff", 0.95)}, ${alpha(theme.palette.grey[50], 0.98)})`,
         }}
       />
 
       <Stack spacing={4}>
         {/* Wordmark */}
         <Stack spacing={1}>
+          <Box
+            sx={{
           <Box
             component="img"
             src="/icons/suspicious-logo.png"
@@ -292,20 +296,20 @@ function LoginCard({
         <Stack spacing={1.5} alignItems="center" sx={{ textAlign: "center" }}>
           {/* Logo badge */}
           <Box
+            component="img"
+            src="/icons/suspicious-logo.png"
+            alt="Suspicious"
             sx={{
-              width: 52,
-              height: 52,
-              borderRadius: 3,
-              display: "grid",
-              placeItems: "center",
-              background: `linear-gradient(135deg, ${alpha(p, isDark ? 0.22 : 0.14)}, ${alpha(p, isDark ? 0.1 : 0.07)})`,
-              border: `1px solid ${alpha(p, isDark ? 0.32 : 0.25)}`,
-              boxShadow: `0 4px 20px ${alpha(p, isDark ? 0.22 : 0.12)}`,
+              width: 56,
+              height: 56,
+              objectFit: "contain",
               mb: 0.5,
+              filter: isDark
+                ? `drop-shadow(0 6px 20px ${alpha(p, 0.55)})`
+                : `drop-shadow(0 4px 14px ${alpha(p, 0.32)})`,
             }}
-          >
-            <LockOutlined sx={{ fontSize: 24, color: p }} />
-          </Box>
+          />
+
           <Box>
             <Typography variant="h5" fontWeight={950} letterSpacing={-0.5} sx={{ lineHeight: 1.15 }}>
               Sign in
@@ -557,6 +561,7 @@ export default function LoginPage() {
   const [showPassword, setShowPassword] = React.useState(false);
   const [loading, setLoading]           = React.useState(false);
   const [error, setError]               = React.useState<string | null>(null);
+  const [ssoLoading, setSsoLoading]     = React.useState(false);
 
   const { data: me, isLoading: meLoading } = useQuery({
     queryKey: ["me"],
@@ -564,6 +569,56 @@ export default function LoginPage() {
     retry: false,
   });
 
+  React.useEffect(() => {
+    const searchParams = new URLSearchParams(window.location.search);
+
+    // ── SSO error from provider ──
+    const ssoError = searchParams.get("sso_error");
+    if (ssoError) {
+      const messages: Record<string, string> = {
+        provider_unavailable:    "SSO provider is currently unavailable.",
+        state_mismatch:          "SSO session expired or invalid. Please try again.",
+        nonce_mismatch:          "SSO response could not be verified. Please try again.",
+        token_exchange_failed:   "SSO authentication failed. Please try again.",
+        userinfo_failed:         "Could not retrieve your account details from SSO.",
+        user_resolution_failed:  "Could not link your SSO account. Contact your administrator.",
+        account_disabled:        "Your account is disabled. Contact your administrator.",
+      };
+      setError(messages[ssoError] ?? `SSO error: ${ssoError}`);
+      // Clean up the URL
+      window.history.replaceState({}, "", "/login");
+      return;
+    }
+
+    // ── SSO success — token in fragment ──
+    const isSsoCallback = searchParams.get("sso") === "1";
+    if (!isSsoCallback) return;
+
+    setSsoLoading(true);
+    const fragment = new URLSearchParams(window.location.hash.slice(1));
+    const token    = fragment.get("token");
+    const expiry   = fragment.get("expiry") ?? null;
+
+    // Immediately wipe the fragment from the browser URL bar
+    window.history.replaceState({}, "", "/login");
+
+    if (!token) {
+      setError("SSO login failed — no token received. Please try again.");
+      setSsoLoading(false);
+      return;
+    }
+
+    // Store the token (same mechanism as password login)
+    setAccessToken(token);
+
+    // Hydrate semantic colors from the server now that we have a valid token
+    hydrateColorsAfterSso();
+
+    navigate("/", { replace: true });
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
+  // Already authenticated — redirect home
   React.useEffect(() => {
     if (me) navigate("/", { replace: true });
   }, [me, navigate]);
@@ -591,7 +646,7 @@ export default function LoginPage() {
     }
   }
 
-  if (meLoading) {
+  if (meLoading || ssoLoading) {
     return (
       <Box
         sx={{
