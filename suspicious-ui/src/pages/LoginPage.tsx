@@ -18,6 +18,7 @@ import {
   Visibility,
   VisibilityOff,
   ArrowForwardOutlined,
+  LockOutlined,
   ShieldOutlined,
 } from "@mui/icons-material";
 import { useNavigate } from "react-router-dom";
