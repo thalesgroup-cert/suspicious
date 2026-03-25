@@ -31,9 +31,11 @@ class AcknowledgeBadMailServiceConfigSocial(pydantic.BaseModel):
 
 
 class AcknowledgeBadMailServiceConfig(pydantic.BaseModel):
+    tls: bool
     username: str
     server: str
     port: int
+    password: str
     company_name: str
     company_logo: str
     company_online_portal: str
