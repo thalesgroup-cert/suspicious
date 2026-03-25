@@ -148,8 +148,6 @@ function SidePanel() {
         {/* Wordmark */}
         <Stack spacing={1}>
           <Box
-            sx={{
-          <Box
             component="img"
             src="/icons/suspicious-logo.png"
             alt="Suspicious"
