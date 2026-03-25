@@ -41,11 +41,14 @@
                   Thank you for your submission to the {{ company_name }} team.
                 </div>
                 <div style="margin-bottom:16px;">
-                  Unfortunately, your mail could not be processed because it was not sent in the correct format or was signed before submission.
+                  Unfortunately, your submission could not be processed due to the way the email was sent.
+
+                  The analysis system requires the original email in its unmodified form. When an email is digitally signed, a cryptographic signature is added to guarantee the sender’s identity and message integrity. However, this signature alters the message structure and prevents our tools from correctly extracting and analyzing the original content.
                 </div>
                 <div style="margin-bottom:16px;">
-                  <strong>To be analyzed, the suspicious mail must be sent as a full attachment (not forwarded).</strong><br>
-                  Also verify you do <strong>not</strong> sign your mail before sending it to Suspicious.
+                  <strong>To be analyzed, the suspicious email must be sent as a full attachment (not forwarded inline).</strong><br>
+                  This preserves the original headers and content required for forensic analysis.
+                  Please ensure that you do not apply a digital signature when forwarding suspicious emails. Signed messages cannot be reliably analyzed because their content is encapsulated and protected by the signature.
                 </div>
                 <div style="margin-bottom:16px;">
                   In Outlook, you can:
