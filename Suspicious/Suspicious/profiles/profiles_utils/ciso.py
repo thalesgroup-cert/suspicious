@@ -13,7 +13,7 @@ CONFIG_PATH = "/app/settings.json"
 with open(CONFIG_PATH) as config_file:
     config = json.load(config_file)
 
-ldap_config = config.get("ldap", {})
+ldap_config = (config.get("authentication", {}).get("ldap", {}))
 logger = logging.getLogger(__name__)
 
 
@@ -143,7 +143,7 @@ def search_ldap_server(ldap_server, ciso):
     """
     try:
         search_results = ldap_server.search_s(
-            ldap_config.get("auth_ldap_base_dn"),
+            ldap_config.get("base_dn"),
             ldap.SCOPE_SUBTREE,
             f"(&(mail={ciso})(Tpresent=true)(!(ou=admin))(!(TpreferredFirstName=Test)))",
             ["mail", "title", "businessCategory", "c"],

@@ -36,7 +36,7 @@ class MailFormHandler:
         """
         self.user = user
         self.base_path = Path(base_path)
-        cfg = config.get("minio", {})
+        cfg = (config.get("storage", {}).get("minio", {}))
         self.minio = MinioManager(
             endpoint=cfg.get("endpoint", "localhost:9000"),
             access_key=cfg.get("access_key", "minioadmin"),

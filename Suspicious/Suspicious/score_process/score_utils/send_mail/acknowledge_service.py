@@ -23,13 +23,13 @@ class AcknowledgementEmailService:
         sender: str | None = None,
     ) -> None:
         self.config = self._load_config()
-        self.sender = str(sender or self.config["username"])
+        self.sender = str(sender or self.config.get("smtp", {}).get("username"))
         self.template = self._load_template()
 
     @staticmethod
     def _load_config() -> dict:
         with open(CONFIG_PATH) as f:
-            return json.load(f).get("mail", {})
+            return json.load(f).get("email", {})
 
     @staticmethod
     def _load_template():
@@ -45,19 +45,19 @@ class AcknowledgementEmailService:
         return self.template.render(
             subject=subject,
             recipient_name=recipient_name,
-            company_name=self.config["group"],
-            company_logo=self.config["logos"]["company"],
-            acknowledge_logo=self.config["logos"]["acknowledge"],
-            portal_url=self.config["submissions"],
-            glossary_url=self.config["glossary"],
-            inquiry_url=self.config["inquiry"],
-            inquiry_text=self.config["inquiry_text"],
-            global_team=self.config["global"],
-            global_url=self.config["global_url"],
+            company_name=self.config.get("links", {}).get("team_name"),
+            company_logo=self.config.get("logos", {}).get("company"),
+            acknowledge_logo=self.config.get("logos", {}).get("acknowledge"),
+            portal_url=self.config.get("links", {}).get("submissions"),
+            glossary_url=self.config.get("links", {}).get("glossary"),
+            inquiry_url=self.config.get("links", {}).get("inquiry"),
+            inquiry_text=self.config.get("links", {}).get("inquiry_text"),
+            global_team=self.config.get("content", {}).get("global_domain"),
+            global_url=self.config.get("content", {}).get("website"),
             socials=[
                 AcknowledgeMailServiceConfigSocial(
                     name=social,
-                    url=self.config["socials"].get(social, f"https://{social}.com"),
+                    url=self.config.get("socials", {}).get(social, f"https://{social}.com"),
                     logo=SOCIAL_LOGOS.get(social),
                 )
                 for social in self.config.get("socials", {})
@@ -74,12 +74,12 @@ class AcknowledgementEmailService:
         )
 
         send_mail_service = SendMailService(
-            host=self.config["server"], port=self.config["port"],
-            login=self.config["username"], password=self.config["password"]
+            host=self.config.get("smtp", {}).get("server", {}), port=self.config.get("smtp", {}).get("port", {}),
+            login=self.config.get("smtp", {}).get("username", {}), password=self.config.get("smtp", {}).get("password", {})
         )
 
         send_mail_service.connect()
-        if self.config["tls"]:
+        if self.config.get("smtp", {}).get("tls", {}):
             send_mail_service.start_tls()
 
         send_mail_service.login()

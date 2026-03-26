@@ -1,7 +1,6 @@
 # case_handler.py
 
 import logging
-import json
 from pathlib import Path
 from typing import Optional, Tuple, Dict, Union
 
@@ -24,10 +23,6 @@ from settings.models import (
 from cortex_job.cortex_utils.cortex_and_job_management import CortexJob
 
 logger = logging.getLogger(__name__)
-
-CONFIG_PATH = "/app/settings.json"
-with open(CONFIG_PATH) as config_file:
-    config = json.load(config_file)
 
 # Tagging constants
 TAG_STATUS_TODO = "To Do_User"

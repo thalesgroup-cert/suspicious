@@ -36,9 +36,9 @@ CONFIG_PATH = "/app/settings.json"
 with open(CONFIG_PATH) as config_file:
     config = json.load(config_file)
 
-thehive_config = config.get("thehive", {})
-minio_config = config.get("minio", {})
-chromadb_config = config.get("chromadb", {})
+thehive_config = config.get("integrations", {}).get("thehive", {})
+minio_config = config.get("storage", {}).get("minio", {})
+chromadb_config = config.get("integrations", {}).get("chromadb", {})
 
 logger = logging.getLogger("tasp.cron.update_ongoing_case_jobs")
 
@@ -247,7 +247,7 @@ class AnalyzerAI(BaseAnalyzer):
                 minio_config.get("endpoint"),
                 access_key=minio_config.get("access_key"),
                 secret_key=minio_config.get("secret_key"),
-                secure=False,
+                secure=minio_config.get("secure"),
             )
 
             for suspicious_case_id in suspicious_case_ids:

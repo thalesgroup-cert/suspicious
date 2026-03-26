@@ -1,40 +1,83 @@
+# compose_apps.yaml
+#
+# Base service definitions for application containers.
+# These are extended (not run directly) by docker-compose.yml.
+
 services:
+
+  # ── suspicious (Gunicorn WSGI) ────────────────────────────────────────────
+
   suspicious:
     init: true
-    ports:
-      - "127.0.0.1:${SUSPICIOUS_PORT}:9020"
     restart: always
+    command: >
+      gunicorn suspicious.wsgi:application
+        --config /app/gunicorn.conf.py
+    ports:
+      - "127.0.0.1:${SUSPICIOUS_PORT:-9020}:9020"
     volumes:
       - "${CA_PATH}/certfile.pem:/etc/private/certfile.pem:ro"
       - "${CA_PATH}/keyfile.pem:/etc/private/keyfile.pem:ro"
       - "${CA_PATH}/rootcafile.pem:/etc/private/rootcafile.pem:ro"
       - "${SUSPICIOUS_PATH}/logs:/app/log"
-      - "/var/run/docker.sock:/var/run/docker.sock"
-      - "${SUSPICIOUS_PATH}/settings.json:/app/settings.json"
-    command: >
-      /bin/bash -c "
-      python3 manage.py crontab show &&
-      python3 manage.py crontab add &&
-      python3 manage.py crontab show &&
-      service cron start &&
-      python3 manage.py runserver 0.0.0.0:9020 --insecure"
+      - "${SUSPICIOUS_PATH}/settings.json:/app/settings.json:ro"
+      - "${SUSPICIOUS_PATH}/gunicorn.conf.py:/app/gunicorn.conf.py:ro"
     env_file:
       - ".env"
     environment:
-      no_proxy: "${NO_PROXY},cortex,db_suspicious,minio,chromadb"
+      no_proxy: "${NO_PROXY:-},cortex,db_suspicious,minio,chromadb"
     networks:
       - suspicious_network
 
+  # ── suspicious_cron ───────────────────────────────────────────────────────
+
+  suspicious_cron:
+    init: true
+    restart: always
+    command: >
+      /bin/bash -c "
+        python3 manage.py crontab add &&
+        echo '[cron] Jobs registered:' &&
+        python3 manage.py crontab show &&
+        service cron start &&
+        tail -f /app/log/suspicious.log"
+    volumes:
+      - "${CA_PATH}/certfile.pem:/etc/private/certfile.pem:ro"
+      - "${CA_PATH}/keyfile.pem:/etc/private/keyfile.pem:ro"
+      - "${CA_PATH}/rootcafile.pem:/etc/private/rootcafile.pem:ro"
+      - "${SUSPICIOUS_PATH}/logs:/app/log"
+      - "${SUSPICIOUS_PATH}/settings.json:/app/settings.json:ro"
+    env_file:
+      - ".env"
+    environment:
+      no_proxy: "${NO_PROXY:-},cortex,db_suspicious,minio,chromadb"
+    networks:
+      - suspicious_network
+
+  # ── suspicious_ui (Nginx SPA) ─────────────────────────────────────────────
+
+  suspicious_ui:
+    init: true
+    restart: unless-stopped
+    ports:
+      - "127.0.0.1:${SUSPICIOUS_UI_PORT:-9021}:80"
+    environment:
+      no_proxy: "${NO_PROXY:-},suspicious"
+    networks:
+      - suspicious_network
+      - reverse_network
+
+  # ── cortex ────────────────────────────────────────────────────────────────
   cortex:
     init: true
-    ports:
-      - "127.0.0.1:${CORTEX_PORT}:9001"
     restart: unless-stopped
+    ports:
+      - "127.0.0.1:${CORTEX_PORT:-9001}:9001"
     environment:
-      http_proxy: "${HTTP_PROXY}"
-      https_proxy: "${HTTPS_PROXY}"
-      no_proxy: "${NO_PROXY}"
-      JAVA_OPTS: "-Djavax.net.ssl.trustStore=/etc/cortex/keystore.jks"
+      http_proxy:  "${HTTP_PROXY:-}"
+      https_proxy: "${HTTPS_PROXY:-}"
+      no_proxy:    "${NO_PROXY:-}"
+      JAVA_OPTS:   "-Djavax.net.ssl.trustStore=/etc/cortex/keystore.jks"
       job_directory: "${CORTEX_PATH}/jobs"
     volumes:
       # Certificates
@@ -43,24 +86,25 @@ services:
       - "${CORTEX_PATH}/jobs:${CORTEX_PATH}/jobs:Z"
       - "${CORTEX_PATH}/application.conf:/etc/cortex/application.conf:ro"
       - "${CORTEX_PATH}/application-cortex.log:/var/log/cortex/application.log:rw"
-      # Docker configuration
-      - "/var/run/docker.sock:/var/run/docker.sock"
+      # Docker socket — needed by Cortex to launch analyzer containers
+      - "/var/run/docker.sock:/var/run/docker.sock:ro"
       - "${DOCKER_PATH}/config.json:/home/cortex/.docker/config.json:ro"
-      # Neurons Local
+      # Neurons
       - "${CORTEX_PATH}/Cortex-Analyzers/:/opt/Cortex-Analyzers/:ro"
-      # AIMailAnalyzer Neurons
-      - "${AIANALYZER_PATH}/analyzers.json:/opt/Cortex-Analyzers-AI/analyzers/analyzers.json"
-      # Docker Neurons
-      - "${CORTEX_PATH}/Cortex-Analyzers-Public/analyzers/analyzers.json:/opt/Cortex-Analyzers-Public/analyzers/analyzers.json"
-      - "${CORTEX_PATH}/Cortex-Analyzers-Public/responders/responders.json:/opt/Cortex-Analyzers-Public/responders/responders.json"
+      - "${AIANALYZER_PATH}/analyzers.json:/opt/Cortex-Analyzers-AI/analyzers/analyzers.json:ro"
+      - "${CORTEX_PATH}/Cortex-Analyzers-Public/analyzers/analyzers.json:/opt/Cortex-Analyzers-Public/analyzers/analyzers.json:ro"
+      - "${CORTEX_PATH}/Cortex-Analyzers-Public/responders/responders.json:/opt/Cortex-Analyzers-Public/responders/responders.json:ro"
       # Yara rules
-      - "${YARA_PATH}/rules/:/opt/Yara/rules"
+      - "${YARA_PATH}/rules/:/opt/Yara/rules:ro"
     networks:
       - suspicious_network
 
+  # ── feeder ────────────────────────────────────────────────────────────────
+
   feeder:
-    command: >
-      /bin/bash -c "python3 main.py"
+    init: true
+    restart: unless-stopped
+    command: python3 main.py
     volumes:
       - "${FEEDER_PATH}/application.log:/app/application.log"
       - "${CA_PATH}/certfile.pem:/etc/private/certfile.pem:ro"
@@ -69,26 +113,8 @@ services:
     networks:
       - suspicious_network
 
-  suspicious_ui:
-    ports:
-    - "127.0.0.1:${SUSPICIOUS_UI_PORT}:80"
-    init: true
-    restart: unless-stopped
-    environment:
-      no_proxy: "${NO_PROXY},suspicious"
-    networks:
-      - suspicious_network
-      - reverse_network
-
-volumes:
-  cortex_jobs:
-    driver: local
-  chromadb_data:
-    driver: local
-
 networks:
   suspicious_network:
     external: true
     name: ${NETWORK_NAME}
   reverse_network:
-

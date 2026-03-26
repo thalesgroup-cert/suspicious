@@ -39,9 +39,9 @@ class MailNotificationService:
         with open(path) as f:
             raw = json.load(f)
 
-        suspicious_cfg = SuspiciousConfig(**raw.get("suspicious", {}))
+        suspicious_cfg = SuspiciousConfig(email=raw.get("branding", {}).get("contact_email", ""))
         retry_cfg = RetryConfig()
-        subjects = EmailSubjectsConfig(**raw.get("email_subjects", {}))
+        subjects = EmailSubjectsConfig(**raw.get("email", {}).get("templates", {}))
 
         return cls(suspicious_cfg, retry_cfg, subjects)
 

@@ -1,12 +1,14 @@
+# compose_reverse_proxy.yaml
+
 services:
   traefik:
     init: true
     container_name: traefik
     restart: unless-stopped
-    environment:
-      DOMAIN_CORP: ${DOMAIN_CORP}
     security_opt:
       - no-new-privileges:true
+    environment:
+      DOMAIN_CORP: ${DOMAIN_CORP}
     networks:
       - suspicious_network
       - reverse_network
@@ -14,14 +16,23 @@ services:
       - "80:80"
       - "443:443"
     volumes:
-      - ${TRAEFIK_PATH}/traefik.yaml:/etc/traefik/traefik.yaml:ro
-      - ${TRAEFIK_PATH}/dynamic:/dynamic:ro
-      - ${CA_PATH}:/etc/private:ro
-      - ${TRAEFIK_PATH}/logs:/var/log/traefik
+      # Traefik static config
+      - "${TRAEFIK_PATH}/traefik.yaml:/etc/traefik/traefik.yaml:ro"
+      # Dynamic config (security headers middleware, TLS options, etc.)
+      - "${TRAEFIK_PATH}/dynamic:/dynamic:ro"
+      # TLS certificates
+      - "${CA_PATH}:/etc/private:ro"
+      # Access and error logs
+      - "${TRAEFIK_PATH}/logs:/var/log/traefik"
+      # Docker provider — read-only; Traefik only needs to read labels
+      - "/var/run/docker.sock:/var/run/docker.sock:ro"
+    # Traefik dashboard — accessible only from localhost in production.
+    # Remove the port mapping entirely if you use the file provider dashboard.
+    # ports:
+    #   - "127.0.0.1:8080:8080"
 
 networks:
   suspicious_network:
     external: true
     name: ${NETWORK_NAME}
   reverse_network:
-

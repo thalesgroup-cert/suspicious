@@ -19,7 +19,7 @@ def load_config(config_path: str = "/app/settings.json") -> CortexJobConfig:
     try:
         with open(config_path, "r") as config_file:
             config = json.load(config_file)
-        return CortexJobConfig(**config.get("cortex", {}))
+        return CortexJobConfig(**config.get("integrations", {}).get("cortex", {}))
     except FileNotFoundError:
         fetch_mail_logger.error(f"Configuration file not found at {config_path}")
     except json.JSONDecodeError as e:

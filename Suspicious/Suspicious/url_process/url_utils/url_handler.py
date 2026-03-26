@@ -1,6 +1,5 @@
 import logging
 from urllib.parse import urlparse
-import json
 from typing import Optional, Tuple
 
 from domain_process.domain_utils.domain_handler import DomainHandler
@@ -8,16 +7,6 @@ from url_process.models import URL
 from domain_process.models import Domain, DomainInIocs
 
 logger = logging.getLogger(__name__)
-
-try:
-    with open("/app/settings.json") as config_file:
-        config = json.load(config_file)
-except (FileNotFoundError, json.JSONDecodeError) as e:
-    logger.error(f"Config loading error: {e}")
-    config = {}
-
-suspicious_config = config.get('suspicious', {})
-
 
 class URLHandler:
     """

@@ -9,7 +9,7 @@ CONFIG_PATH = "/app/settings.json"
 with open(CONFIG_PATH) as config_file:
     config = json.load(config_file)
 
-misp_config = config.get('misp', {})
+misp_config = config.get('integrations', {}).get('misp', {})
 logger = logging.getLogger(__name__)
 
 class MISPEventManager:
@@ -79,7 +79,7 @@ class MISPEventManager:
     def get_or_create_monthly_event(self) -> Optional[MISPEvent]:
         event_name = current_month_event_name()
         event_date = first_day_of_month()
-        tags_config = misp_config.get('tags', {})
+        tags_config = misp_config.get('default_tags', {})
 
         try:
             event_id = self._find_event_by_name(event_name)
