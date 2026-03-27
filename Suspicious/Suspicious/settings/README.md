@@ -27,10 +27,6 @@ settings/
 ├── views.py
 ├── migrations/
 │   └── *.py
-├── settings_utils/
-│   ├── domain.py
-│   ├── feeder_email.py
-│   └── filetype.py
 ```
 
 ---

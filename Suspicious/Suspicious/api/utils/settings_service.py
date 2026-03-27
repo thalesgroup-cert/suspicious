@@ -90,10 +90,22 @@ def _bulk_create_domain_links(
         ).values_list("domain__value", flat=True)
     )
 
+    existing_in_watcher_monitored = set(
+        WatcherMonitoredDomain.objects.filter(
+            domain__value__in=values
+        ).values_list("domain__value", flat=True)
+    )
+
+    existing_in_watcher_legit = set(
+        WatcherLegitDomain.objects.filter(
+            domain__value__in=values
+        ).values_list("domain__value", flat=True)
+    )
+
     to_create = [
         through_model(domain=domain_map[value], user=user)
         for value in values
-        if value not in existing_links
+        if value not in existing_links and value not in existing_in_watcher_monitored and value not in existing_in_watcher_legit
     ]
 
     if to_create:
