@@ -11,6 +11,7 @@ import {
   Stack,
   TextField,
   Typography,
+  useMediaQuery
 } from "@mui/material";
 import { alpha, useTheme } from "@mui/material/styles";
 import {
@@ -113,128 +114,158 @@ function SidePanel() {
   const p = theme.palette.primary.main;
 
   const features = [
-    { icon: <ShieldOutlined sx={{ fontSize: 16 }} />, text: "Automated threat analysis" },
-    { icon: <LockOutlined sx={{ fontSize: 16 }} />,   text: "Secure artifact triage" },
-    { icon: <SecurityOutlined sx={{ fontSize: 16 }} />, text: "Multi-vector detection" },
+    { icon: <ShieldOutlined sx={{ fontSize: 15 }} />,   text: "Automated threat analysis" },
+    { icon: <LockOutlined sx={{ fontSize: 15 }} />,     text: "Secure artifact triage" },
+    { icon: <SecurityOutlined sx={{ fontSize: 15 }} />, text: "Multi-vector detection" },
   ];
 
   return (
     <Box
       sx={{
-        flex: "0 0 340px",
+        flex: "0 0 320px",
         display: "flex",
         flexDirection: "column",
-        justifyContent: "center",
-        px: 5,
-        py: 6,
+        justifyContent: "space-between",
+        px: 4.5,
+        py: 5,
         position: "relative",
         overflow: "hidden",
+        // Panel background — slightly distinct from the outer card
+        background: isDark
+          ? `linear-gradient(160deg, ${alpha(p, 0.10)} 0%, ${alpha(p, 0.04)} 60%, transparent 100%)`
+          : `linear-gradient(160deg, ${alpha(p, 0.07)} 0%, ${alpha(p, 0.02)} 60%, transparent 100%)`,
       }}
     >
-      {/* Vertical rule between panels */}
+      {/* Thin 1 px vertical separator on the right edge */}
       <Box
         sx={{
           position: "absolute",
-          top: "10%",
-          bottom: "10%",
+          top: "8%",
+          bottom: "8%",
           right: 0,
-          width: 1,
-          background: `linear-gradient(180deg, transparent, ${alpha(theme.palette.divider, isDark ? 0.35 : 0.6)}, transparent)`,
+          width: "1px",
+          background: `linear-gradient(180deg,
+            transparent 0%,
+            ${alpha(theme.palette.divider, isDark ? 0.4 : 0.55)} 30%,
+            ${alpha(theme.palette.divider, isDark ? 0.4 : 0.55)} 70%,
+            transparent 100%)`,
         }}
       />
 
-      <Stack spacing={4}>
-        {/* Wordmark */}
-        <Stack spacing={1}>
+      {/* ── Top: brand identity ──────────────────────────────────────── */}
+      <Stack spacing={2}>
+        <Stack direction="row" spacing={1.5} alignItems="center">
           <Box
             component="img"
             src="/icons/suspicious-logo.png"
             alt="Suspicious"
             sx={{
-              width: 52,
-              height: 52,
+              width: 44,
+              height: 44,
               objectFit: "contain",
-              mb: 0.5,
               filter: isDark
-                ? `drop-shadow(0 4px 16px ${alpha(p, 0.5)})`
-                : `drop-shadow(0 4px 12px ${alpha(p, 0.3)})`,
+                ? `drop-shadow(0 3px 12px ${alpha(p, 0.5)})`
+                : `drop-shadow(0 3px 10px ${alpha(p, 0.3)})`,
             }}
           />
-
           <Typography
             sx={{
               fontWeight: 950,
-              fontSize: 26,
+              fontSize: 22,
               letterSpacing: "-0.04em",
-              lineHeight: 1.05,
+              lineHeight: 1,
               color: "text.primary",
             }}
           >
             Suspicious
           </Typography>
-          <Typography variant="body2" color="text.secondary" sx={{ fontSize: 13.5, lineHeight: 1.6 }}>
-            Security intake and automated analysis for emails, files, URLs, IPs, and hashes.
-          </Typography>
         </Stack>
 
-        {/* Feature list */}
-        <Stack spacing={1.5}>
-          {features.map((f) => (
-            <Stack key={f.text} direction="row" spacing={1.25} alignItems="center">
-              <Box
-                sx={{
-                  width: 30,
-                  height: 30,
-                  borderRadius: 2,
-                  display: "grid",
-                  placeItems: "center",
-                  background: alpha(p, isDark ? 0.12 : 0.08),
-                  border: `1px solid ${alpha(p, isDark ? 0.22 : 0.18)}`,
-                  color: p,
-                  flexShrink: 0,
-                }}
-              >
-                {f.icon}
-              </Box>
-              <Typography variant="body2" sx={{ fontWeight: 600, fontSize: 13, color: "text.secondary" }}>
-                {f.text}
-              </Typography>
-            </Stack>
-          ))}
-        </Stack>
-
-        {/* Company link */}
-        {COMPANY_LOGO_BASE64 || COMPANY_LOGO_URL ? (
-          <Box
-            component="a"
-            href={COMPANY_LINK}
-            target="_blank"
-            rel="noreferrer"
-            sx={{ display: "inline-flex", alignItems: "center", textDecoration: "none", width: "fit-content" }}
-          >
-            <Box
-              component="img"
-              src={COMPANY_LOGO_BASE64 || COMPANY_LOGO_URL}
-              alt={COMPANY_NAME}
-              sx={{
-                height: 28,
-                width: "auto",
-                opacity: isDark ? 0.7 : 0.85,
-                filter: isDark ? "brightness(1.2)" : "none",
-                transition: "opacity .2s",
-                "&:hover": { opacity: 1 },
-              }}
-            />
-          </Box>
-        ) : (
-          <Typography variant="caption" color="text.disabled" sx={{ fontWeight: 700, letterSpacing: "0.05em", textTransform: "uppercase", fontSize: 11 }}>
-            {COMPANY_NAME}
-          </Typography>
-        )}
+        <Typography
+          variant="body2"
+          color="text.secondary"
+          sx={{ fontSize: 13, lineHeight: 1.65, maxWidth: 260 }}
+        >
+          Security intake and automated analysis for emails, files, URLs,
+          IPs, and hashes.
+        </Typography>
       </Stack>
+
+      {/* ── Middle: feature bullets ───────────────────────────────────── */}
+      <Stack spacing={1.25}>
+        {features.map((f) => (
+          <Stack key={f.text} direction="row" spacing={1.25} alignItems="center">
+            <Box
+              sx={{
+                width: 28,
+                height: 28,
+                borderRadius: 2,
+                display: "grid",
+                placeItems: "center",
+                flexShrink: 0,
+                background: alpha(p, isDark ? 0.14 : 0.09),
+                border: `1px solid ${alpha(p, isDark ? 0.25 : 0.2)}`,
+                color: p,
+              }}
+            >
+              {f.icon}
+            </Box>
+            <Typography
+              variant="body2"
+              sx={{ fontWeight: 700, fontSize: 13, color: "text.secondary" }}
+            >
+              {f.text}
+            </Typography>
+          </Stack>
+        ))}
+      </Stack>
+
+      {/* ── Bottom: company logo or name ──────────────────────────────── */}
+      {COMPANY_LOGO_BASE64 || COMPANY_LOGO_URL ? (
+        <Box
+          component="a"
+          href={COMPANY_LINK}
+          target="_blank"
+          rel="noreferrer"
+          sx={{
+            display: "inline-flex",
+            alignItems: "center",
+            textDecoration: "none",
+            width: "fit-content",
+            opacity: isDark ? 0.65 : 0.75,
+            transition: "opacity .2s",
+            "&:hover": { opacity: 1 },
+          }}
+        >
+          <Box
+            component="img"
+            src={COMPANY_LOGO_BASE64 || COMPANY_LOGO_URL}
+            alt={COMPANY_NAME}
+            sx={{
+              height: 26,
+              width: "auto",
+              filter: isDark ? "brightness(1.3)" : "none",
+            }}
+          />
+        </Box>
+      ) : (
+        <Typography
+          variant="caption"
+          sx={{
+            fontWeight: 800,
+            letterSpacing: "0.06em",
+            textTransform: "uppercase",
+            fontSize: 11,
+            color: alpha(theme.palette.text.secondary, 0.6),
+          }}
+        >
+          {COMPANY_NAME}
+        </Typography>
+      )}
     </Box>
   );
 }
+
 
 // ---------------------------------------------------------------------------
 // Login form card
@@ -650,6 +681,9 @@ export default function LoginPage() {
     }
   }
 
+  // Conditionally render SidePanel to prevent mobile layout bleed
+  const isDesktop = useMediaQuery(theme.breakpoints.up("lg"));
+
   if (meLoading || ssoLoading) {
     return (
       <Box
@@ -703,6 +737,8 @@ export default function LoginPage() {
           display: "flex",
         }}
       >
+        {/* Left: decorative panel — only mounted on lg+ to avoid layout bleed on mobile */}
+        {isDesktop ? <SidePanel /> : null}
 
         {/* Right: login form */}
         <Box
