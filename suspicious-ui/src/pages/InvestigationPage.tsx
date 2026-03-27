@@ -55,7 +55,7 @@ import {
   editGlobalCase,
   type InvestigationDetails,
   type InvestigationListResponse,
-  type InvestigationRow,
+  type InvestigationResult,
   type InvestigationStatus,
   type InvestigationType,
 } from "@/features/investigation/api";
@@ -581,6 +581,7 @@ export default function InvestigationPage() {
 
   const [status, setStatus] = React.useState<InvestigationStatus | "ALL">("ALL");
   const [type, setType] = React.useState<InvestigationType | "ALL">("ALL");
+  const [result, setResult] = React.useState<InvestigationResult | "ALL">("ALL");
   const [from, setFrom] = React.useState("");
   const [to, setTo] = React.useState("");
   const [sort, setSort] = React.useState<"date_desc" | "date_asc" | "id_desc" | "id_asc">("date_desc");
@@ -607,8 +608,8 @@ export default function InvestigationPage() {
   );
 
   const investigationListParams = React.useMemo(
-    () => ({ page, pageSize, search: qDebounced, status, type, from, to, sort }),
-    [page, pageSize, qDebounced, status, type, from, to, sort]
+    () => ({ page, pageSize, search: qDebounced, status, type, result, from, to, sort }),
+    [page, pageSize, qDebounced, status, type, result, from, to, sort]
   );
 
   const investigationsQuery = useQuery<InvestigationListResponse>({
@@ -670,7 +671,7 @@ export default function InvestigationPage() {
     }
   }, [searchParams]);
 
-  React.useEffect(() => { setPage(0); }, [qDebounced, status, type, from, to, sort, pageSize]);
+  React.useEffect(() => { setPage(0); }, [qDebounced, status, type, result, from, to, sort, pageSize]);
   React.useEffect(() => { if (!openDrawer) setExpandedAnalyzerIds({}); }, [openDrawer]);
   React.useEffect(() => { setExpandedAnalyzerIds({}); }, [selectedId]);
   React.useEffect(() => { setExpandedAnalyzerIds({}); }, [detailsQuery.data?.analyzer_reports]);
@@ -863,6 +864,21 @@ export default function InvestigationPage() {
                   ))}
                 </Select>
               </FormControl>
+
+              <FormControl sx={{ minWidth: 180 }} fullWidth>
+                <InputLabel id="result-label">Result</InputLabel>
+                <Select
+                  labelId="result-label"
+                  label="Result"
+                  value={result}
+                  onChange={(e) => setResult(e.target.value as InvestigationResult | "ALL")}
+                >
+                  <MenuItem value="ALL">All results</MenuItem>
+                  {(["DANGEROUS", "SUSPICIOUS", "INCONCLUSIVE", "SAFE", "FAILURE", "UNCHALLENGED", "ALLOW_LISTED", "UNKNOWN"] as const).map((r) => (
+                    <MenuItem key={r} value={r}>{r}</MenuItem>
+                  ))}
+                </Select>
+              </FormControl>
             </Stack>
 
             <Stack direction={{ xs: "column", md: "row" }} spacing={1.25} alignItems="stretch">
@@ -963,17 +979,17 @@ export default function InvestigationPage() {
             </Box>
           ) : (
             <Box sx={{ overflowX: "auto" }}>
-              <Table sx={{ minWidth: 1120 }}>
+              <Table sx={{ minWidth: 1060 }}>
                 <TableHead>
                   <TableRow>
-                    <TableCell sx={{ fontWeight: 950 }}>ID</TableCell>
-                    <TableCell sx={{ fontWeight: 950 }}>User mail</TableCell>
-                    <TableCell sx={{ fontWeight: 950 }}>Status</TableCell>
-                    <TableCell sx={{ fontWeight: 950 }}>Artifact</TableCell>
-                    <TableCell sx={{ fontWeight: 950 }}>Date</TableCell>
-                    <TableCell sx={{ fontWeight: 950, textAlign: "right" }}>Tests</TableCell>
-                    <TableCell sx={{ fontWeight: 950 }}>Type</TableCell>
+                    <TableCell sx={{ fontWeight: 950, width: 120 }}>ID</TableCell>
                     <TableCell sx={{ fontWeight: 950 }}>Result</TableCell>
+                    <TableCell sx={{ fontWeight: 950, width: 130 }}>Status</TableCell>
+                    <TableCell sx={{ fontWeight: 950 }}>Artifact</TableCell>
+                    <TableCell sx={{ fontWeight: 950, width: 130 }}>Date</TableCell>
+                    <TableCell sx={{ fontWeight: 950, width: 80 }}>Type</TableCell>
+                    <TableCell sx={{ fontWeight: 950 }}>User mail</TableCell>
+                    <TableCell sx={{ fontWeight: 950, textAlign: "right", width: 60 }}>Tests</TableCell>
                   </TableRow>
                 </TableHead>
 
@@ -993,31 +1009,65 @@ export default function InvestigationPage() {
                         }
                       }}
                     >
+                      {/* ID */}
                       <TableCell>
-                        <Stack direction="row" spacing={1} alignItems="center">
+                        <Stack direction="row" spacing={0.5} alignItems="center">
                           <Button
                             size="small"
                             variant="contained"
                             onClick={(e) => { e.stopPropagation(); setSelectedId(r.id); setOpenDrawer(true); }}
-                            sx={{ borderRadius: 2, textTransform: "none", fontWeight: 950 }}
+                            sx={{ borderRadius: 2, textTransform: "none", fontWeight: 950, minWidth: 0, px: 1.25 }}
                           >
                             {r.id}
                           </Button>
                           <CopyIconButton text={String(r.id)} title="Copy ID" />
-                          <Tooltip title="Open details">
-                            <IconButton
-                              size="small"
-                              onClick={(e) => { e.stopPropagation(); setSelectedId(r.id); setOpenDrawer(true); }}
-                            >
-                              <OpenInNewOutlined fontSize="small" />
-                            </IconButton>
-                          </Tooltip>
                         </Stack>
                       </TableCell>
 
+                      {/* Result — most critical, shown first */}
+                      <TableCell>
+                        <ResultChip result={r.result} minWidth={BADGE_W} />
+                      </TableCell>
+
+                      {/* Status — compact, auto-sized */}
+                      <TableCell>
+                        <StatusChip status={r.status as any} minWidth={96} />
+                      </TableCell>
+
+                      {/* Artifact */}
+                      <TableCell title={r.info}>
+                        <Tooltip title={r.info || ""} arrow placement="top">
+                          <Typography
+                            sx={{
+                              maxWidth: 320,
+                              whiteSpace: "nowrap",
+                              overflow: "hidden",
+                              textOverflow: "ellipsis",
+                              cursor: "help",
+                            }}
+                          >
+                            {short(r.info, 60)}
+                          </Typography>
+                        </Tooltip>
+                      </TableCell>
+
+                      {/* Date */}
+                      <TableCell sx={{ whiteSpace: "nowrap" }}>{fmtDate(r.created_at)}</TableCell>
+
+                      {/* Type — compact chip */}
+                      <TableCell>
+                        <Chip
+                          label={r.type}
+                          size="small"
+                          variant="outlined"
+                          sx={{ fontWeight: 900, fontSize: 11 }}
+                        />
+                      </TableCell>
+
+                      {/* User mail */}
                       <TableCell onClick={(e) => e.stopPropagation()}>
-                        <Stack direction="row" spacing={1} alignItems="center">
-                          <Typography sx={{ fontWeight: 900 }}>
+                        <Stack direction="row" spacing={0.5} alignItems="center">
+                          <Typography variant="body2" sx={{ fontWeight: 700 }}>
                             {r.reporter_email ?? "—"}
                           </Typography>
                           {r.reporter_email ? (
@@ -1030,48 +1080,9 @@ export default function InvestigationPage() {
                         </Stack>
                       </TableCell>
 
-                      <TableCell>
-                        <StatusChip status={r.status as any} minWidth={BADGE_W} />
-                      </TableCell>
-
-                      <TableCell title={r.info}>
-                        <Tooltip title={r.info || ""} arrow placement="top">
-                          <Typography
-                            sx={{
-                              maxWidth: 360,
-                              whiteSpace: "nowrap",
-                              overflow: "hidden",
-                              textOverflow: "ellipsis",
-                              cursor: "help",
-                            }}
-                          >
-                            {short(r.info, 72)}
-                          </Typography>
-                        </Tooltip>
-                      </TableCell>
-
-                      <TableCell>{fmtDate(r.created_at)}</TableCell>
-
+                      {/* Tests */}
                       <TableCell sx={{ textAlign: "right", fontWeight: 900 }}>
                         {r.tests_done}
-                      </TableCell>
-
-                      <TableCell>
-                        <Chip
-                          label={r.type}
-                          size="small"
-                          variant="outlined"
-                          sx={{
-                            fontWeight: 900,
-                            minWidth: BADGE_W,
-                            justifyContent: "center",
-                            "& .MuiChip-label": { width: "100%", textAlign: "center" },
-                          }}
-                        />
-                      </TableCell>
-
-                      <TableCell>
-                        <ResultChip result={r.result} minWidth={BADGE_W} />
                       </TableCell>
                     </TableRow>
                   ))}

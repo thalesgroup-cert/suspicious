@@ -187,22 +187,41 @@ class InvestigationAccessMixin:
         search = validated_filters.get("search")
         status_filter = validated_filters.get("status", "ALL")
         type_filter = validated_filters.get("type", "ALL")
+        result_filter = validated_filters.get("result", "ALL")
         from_date = validated_filters.get("from_date")
         to_date = validated_filters.get("to_date")
         ordering = validated_filters.get("ordering", "-creation_date")
 
         if search:
-            queryset = queryset.filter(
-                Q(pk__icontains=search)
-                | Q(description__icontains=search)
+            # ── ID search ────────────────────────────────────────────────────
+            # pk is an integer field — icontains on an integer raises FieldError
+            # on MySQL/MariaDB. Use exact match only when the search term is
+            # purely numeric.
+            id_q = Q(pk=int(search)) if search.strip().isdigit() else Q()
+
+            # ── Text search across all meaningful string fields ───────────────
+            #
+            # Each nonFileIocs FK traversal goes one level deeper to the actual
+            # string column on the related model:
+            #   nonFileIocs__url__address     (not nonFileIocs__url)
+            #   nonFileIocs__ip__address      (not nonFileIocs__ip)
+            #   nonFileIocs__hash__value      (not nonFileIocs__hash)
+            #
+            # Doing icontains directly on a ForeignKey column (which is an
+            # integer in the DB) raises:
+            #   FieldError: Unsupported lookup 'icontains' for ForeignKey
+            text_q = (
+                Q(description__icontains=search)
                 | Q(reporter__email__icontains=search)
+                | Q(reporter__username__icontains=search)
                 | Q(fileOrMail__mail__subject__icontains=search)
                 | Q(fileOrMail__file__file_path__icontains=search)
                 | Q(nonFileIocs__url__address__icontains=search)
                 | Q(nonFileIocs__ip__address__icontains=search)
                 | Q(nonFileIocs__hash__value__icontains=search)
-                | Q(nonFileIocs__hash__hash__icontains=search)
             )
+
+            queryset = queryset.filter(id_q | text_q)
 
         if status_filter != "ALL":
             if status_filter == "UNKNOWN":
@@ -229,6 +248,18 @@ class InvestigationAccessMixin:
                     nonFileIocs__ip_id__isnull=True,
                     nonFileIocs__hash_id__isnull=True,
                 )
+
+        if result_filter != "ALL":
+            if result_filter == "UNKNOWN":
+                queryset = queryset.exclude(results__in=API_RESULT_TO_INTERNAL.values())
+            elif result_filter in API_RESULT_TO_INTERNAL:
+                queryset = queryset.filter(results=API_RESULT_TO_INTERNAL[result_filter])
+
+        if result_filter != "ALL":
+            if result_filter == "UNKNOWN":
+                queryset = queryset.exclude(results__in=API_RESULT_TO_INTERNAL.values())
+            elif result_filter in API_RESULT_TO_INTERNAL:
+                queryset = queryset.filter(results=API_RESULT_TO_INTERNAL[result_filter])
 
         if from_date:
             queryset = queryset.filter(creation_date__date__gte=from_date)
@@ -259,6 +290,7 @@ class InvestigationAccessMixin:
         OpenApiParameter(name="from_date", type=str, location=OpenApiParameter.QUERY),
         OpenApiParameter(name="to_date", type=str, location=OpenApiParameter.QUERY),
         OpenApiParameter(name="ordering", type=str, location=OpenApiParameter.QUERY),
+        OpenApiParameter(name="result",   type=str, location=OpenApiParameter.QUERY),
     ],
     responses={
         200: OpenApiResponse(description="Paginated investigation list."),
