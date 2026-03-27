@@ -1,26 +1,129 @@
 // src/shared/components/ResultChip.tsx
-import * as React from "react";
-import { Badge } from "@/shared/components/Badge";
+//
+// Renders an analysis result badge whose color comes from the semantic
+// color store (useResultColors). Preset changes in ProfilePage propagate
+// here automatically via Zustand reactivity.
+//
+// Dual encoding: every result also carries a distinct icon so the badge
+// remains accessible when color perception is limited.
 
-const RESULT_META: Record<
-  string,
-  { label: string; color: "success" | "warning" | "error" | "info" | "default" }
-> = {
-  SAFE: { label: "SAFE", color: "success" },
-  "SAFE-ALLOW_LISTED": { label: "SAFE", color: "success" },
-  SUSPICIOUS: { label: "SUSPICIOUS", color: "warning" },
-  UNWANTED: { label: "UNWANTED", color: "warning" },
-  INCONCLUSIVE: { label: "INCONCLUSIVE", color: "info" },
-  FAILURE: { label: "FAILURE", color: "default" },
-  FAILED: { label: "FAILED", color: "default" },
-  DANGEROUS: { label: "DANGEROUS", color: "error" },
-  MALICIOUS: { label: "MALICIOUS", color: "error" },
-  UNKNOWN: { label: "UNKNOWN", color: "default" },
+import * as React from "react";
+import {
+  CheckCircleOutlined,
+  WarningAmberOutlined,
+  ErrorOutlined,
+  HelpOutlineOutlined,
+  RemoveCircleOutlineOutlined,
+  GppBadOutlined,
+} from "@mui/icons-material";
+import { useResultColors, useStatusColors } from "@/styles/colorStore";
+import { Badge } from "@/shared/components/Badge";
+import type { ResultKey, StatusKey } from "@/styles/colorStore";
+
+// Each API result maps to:
+//   group    — "result" | "status" (which store to read from)
+//   storeKey — the key within that group
+//   label    — display text
+//   icon     — distinct icon
+type ResultMeta = {
+  group:    "result" | "status";
+  storeKey: ResultKey | StatusKey;
+  label:    string;
+  icon:     React.ReactNode;
 };
 
-export function ResultChip({ result, minWidth }: { result: string; minWidth?: number }) {
-  const r = (result ?? "UNKNOWN").toUpperCase();
-  const m = RESULT_META[r] ?? { label: r, color: "default" as const };
+const RESULT_META: Record<string, ResultMeta> = {
+  SAFE: {
+    group:    "result",
+    storeKey: "safe",
+    label:    "SAFE",
+    icon:     <CheckCircleOutlined fontSize="small" />,
+  },
+  "SAFE-ALLOW_LISTED": {
+    group:    "result",
+    storeKey: "safe",
+    label:    "SAFE",
+    icon:     <CheckCircleOutlined fontSize="small" />,
+  },
+  SUSPICIOUS: {
+    group:    "result",
+    storeKey: "suspicious",
+    label:    "SUSPICIOUS",
+    icon:     <WarningAmberOutlined fontSize="small" />,
+  },
+  UNWANTED: {
+    group:    "result",
+    storeKey: "suspicious",   // unwanted = suspicious severity
+    label:    "UNWANTED",
+    icon:     <WarningAmberOutlined fontSize="small" />,
+  },
+  INCONCLUSIVE: {
+    group:    "result",
+    storeKey: "inconclusive",
+    label:    "INCONCLUSIVE",
+    icon:     <RemoveCircleOutlineOutlined fontSize="small" />,
+  },
+  DANGEROUS: {
+    group:    "result",
+    storeKey: "dangerous",
+    label:    "DANGEROUS",
+    icon:     <ErrorOutlined fontSize="small" />,
+  },
+  MALICIOUS: {
+    group:    "result",
+    storeKey: "dangerous",    // malicious = dangerous tier
+    label:    "MALICIOUS",
+    icon:     <GppBadOutlined fontSize="small" />,
+  },
+  FAILURE: {
+    group:    "status",
+    storeKey: "failure",      // processing failure, not an analysis result
+    label:    "FAILURE",
+    icon:     <ErrorOutlined fontSize="small" />,
+  },
+  FAILED: {
+    group:    "status",
+    storeKey: "failure",
+    label:    "FAILED",
+    icon:     <ErrorOutlined fontSize="small" />,
+  },
+  UNKNOWN: {
+    group:    "status",
+    storeKey: "unknown",
+    label:    "UNKNOWN",
+    icon:     <HelpOutlineOutlined fontSize="small" />,
+  },
+};
 
-  return <Badge label={m.label} color={m.color} minWidth={minWidth ?? 128} />;
+export function ResultChip({
+  result,
+  minWidth,
+}: {
+  result: string;
+  minWidth?: number;
+}) {
+  const resultColors = useResultColors();
+  const statusColors  = useStatusColors();
+
+  const key  = (result ?? "UNKNOWN").toUpperCase();
+  const meta = RESULT_META[key] ?? {
+    group:    "status",
+    storeKey: "unknown",
+    label:    key,
+    icon:     <HelpOutlineOutlined fontSize="small" />,
+  } satisfies ResultMeta;
+
+  const hex =
+    meta.group === "result"
+      ? resultColors[meta.storeKey as ResultKey]?.main
+      : statusColors[meta.storeKey as StatusKey]?.main;
+
+  return (
+    <Badge
+      label={meta.label}
+      color={hex}
+      icon={meta.icon}
+      minWidth={minWidth ?? 128}
+    />
+  );
 }

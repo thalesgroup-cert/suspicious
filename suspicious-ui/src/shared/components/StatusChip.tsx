@@ -1,27 +1,99 @@
 // src/shared/components/StatusChip.tsx
-import * as React from "react";
-import HourglassTopOutlined from "@mui/icons-material/HourglassTopOutlined";
-import CheckCircleOutlined from "@mui/icons-material/CheckCircleOutlined";
-import ErrorOutlineOutlined from "@mui/icons-material/ErrorOutlineOutlined";
-import ReportProblemOutlined from "@mui/icons-material/ReportProblemOutlined";
-import type { SubmissionStatus } from "@/shared/hooks/api";
-import { Badge } from "@/shared/components/Badge";
+//
+// Renders a submission status badge whose color comes from the semantic
+// color store (useStatusColors). Switching to the Okabe-Ito colorblind-safe
+// preset in ProfilePage updates these chips everywhere immediately.
+//
+// Color + icon dual encoding: every status has a distinct icon so color
+// is never the sole differentiator — accessible by design.
 
+import * as React from "react";
+import {
+  HourglassTopOutlined,
+  CheckCircleOutlined,
+  ErrorOutlineOutlined,
+  ReportProblemOutlined,
+  HelpOutlineOutlined,
+  NewReleasesOutlined,
+} from "@mui/icons-material";
+import { useStatusColors } from "@/styles/colorStore";
+import { Badge } from "@/shared/components/Badge";
+import type { StatusKey } from "@/styles/colorStore";
+
+// SubmissionStatus values as they arrive from the API
+export type SubmissionStatus =
+  | "NEW"
+  | "IN_PROGRESS"
+  | "DONE"
+  | "FAILED"
+  | "REJECTED"
+  | "CHALLENGED"
+  | "UNKNOWN";
+
+// Maps each API status to:
+//   storeKey — the StatusKey used to look up the hex color
+//   label    — display text
+//   icon     — distinct icon (color is never the sole indicator)
 const STATUS_META: Record<
   SubmissionStatus | "UNKNOWN",
-  { label: string; color: "success" | "warning" | "error" | "info" | "default"; icon: React.ReactNode }
+  { storeKey: StatusKey; label: string; icon: React.ReactNode }
 > = {
-  NEW: { label: "NEW", color: "info", icon: <HourglassTopOutlined fontSize="small" /> },
-  IN_PROGRESS: { label: "IN PROGRESS", color: "warning", icon: <HourglassTopOutlined fontSize="small" /> },
-  DONE: { label: "DONE", color: "success", icon: <CheckCircleOutlined fontSize="small" /> },
-  FAILED: { label: "FAILED", color: "error", icon: <ErrorOutlineOutlined fontSize="small" /> },
-  REJECTED: { label: "REJECTED", color: "error", icon: <ReportProblemOutlined fontSize="small" /> },
-  CHALLENGED: { label: "CHALLENGED", color: "warning", icon: <ReportProblemOutlined fontSize="small" /> },
-  UNKNOWN: { label: "UNKNOWN", color: "default", icon: <ErrorOutlineOutlined fontSize="small" /> },
+  NEW: {
+    storeKey: "new",
+    label:    "NEW",
+    icon:     <NewReleasesOutlined fontSize="small" />,
+  },
+  IN_PROGRESS: {
+    storeKey: "in_progress",
+    label:    "IN PROGRESS",
+    icon:     <HourglassTopOutlined fontSize="small" />,
+  },
+  DONE: {
+    storeKey: "done",
+    label:    "DONE",
+    icon:     <CheckCircleOutlined fontSize="small" />,
+  },
+  FAILED: {
+    storeKey: "failure",
+    label:    "FAILED",
+    icon:     <ErrorOutlineOutlined fontSize="small" />,
+  },
+  REJECTED: {
+    storeKey: "failure",       // rejected = processing failed
+    label:    "REJECTED",
+    icon:     <ReportProblemOutlined fontSize="small" />,
+  },
+  CHALLENGED: {
+    storeKey: "challenged",
+    label:    "CHALLENGED",
+    icon:     <ReportProblemOutlined fontSize="small" />,
+  },
+  UNKNOWN: {
+    storeKey: "unknown",
+    label:    "UNKNOWN",
+    icon:     <HelpOutlineOutlined fontSize="small" />,
+  },
 };
 
-export function StatusChip({ status, minWidth }: { status: SubmissionStatus; minWidth?: number }) {
-  const s = ((status ?? "UNKNOWN") as string).toUpperCase() as SubmissionStatus | "UNKNOWN";
-  const m = STATUS_META[s] ?? STATUS_META.UNKNOWN;
-  return <Badge label={m.label} color={m.color} icon={m.icon} minWidth={minWidth ?? 128} />;
+export function StatusChip({
+  status,
+  minWidth,
+}: {
+  status: SubmissionStatus | string;
+  minWidth?: number;
+}) {
+  const statusColors = useStatusColors();
+
+  const key = ((status ?? "UNKNOWN") as string).toUpperCase() as SubmissionStatus | "UNKNOWN";
+  const meta = STATUS_META[key] ?? STATUS_META.UNKNOWN;
+  const hex  = statusColors[meta.storeKey]?.main;
+
+  return (
+    <Badge
+      label={meta.label}
+      color={hex}
+      icon={meta.icon}
+      minWidth={minWidth ?? 128}
+    />
+  );
 }

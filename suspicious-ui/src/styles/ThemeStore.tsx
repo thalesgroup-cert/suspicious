@@ -11,6 +11,10 @@ const STORAGE_KEY      = "suspicious.theme";
 const STORAGE_KEY_AUTO = "suspicious.theme.auto"; // "1" | "0"
 const DEFAULT_THEME: ThemeName = "graphite";
 
+// Custom event dispatched by hydrateThemeFromServer() so AppThemeProvider
+// can react immediately without a page reload.
+const THEME_HYDRATE_EVENT = "suspicious:theme-hydrate";
+
 // ---------------------------------------------------------------------------
 // Context type
 // ---------------------------------------------------------------------------
@@ -33,6 +37,40 @@ export function useThemeMode() {
   const ctx = React.useContext(ThemeContext);
   if (!ctx) throw new Error("useThemeMode must be used inside AppThemeProvider");
   return ctx;
+}
+
+// ---------------------------------------------------------------------------
+// Out-of-React hydration
+//
+// Called by auth.ts → getMe() immediately after a successful /auth/me/
+// response. Cannot use React hooks (we're outside the component tree) so
+// we write directly to localStorage and fire a custom DOM event that
+// AppThemeProvider listens for — same approach as BroadcastChannel for
+// multi-tab sync, but simpler.
+//
+// Priority:
+//   1. Server value (always wins — reflects the user's saved preference)
+//   2. localStorage (offline / pre-login fallback)
+//   3. OS preference (absolute default for new users)
+// ---------------------------------------------------------------------------
+
+export function hydrateThemeFromServer(theme: string, autoSeasonal: boolean): void {
+  try {
+    if (isValidThemeName(theme)) {
+      localStorage.setItem(STORAGE_KEY, theme);
+    }
+    localStorage.setItem(STORAGE_KEY_AUTO, autoSeasonal ? "1" : "0");
+
+    // Notify AppThemeProvider to re-read and update its React state.
+    window.dispatchEvent(
+      new CustomEvent(THEME_HYDRATE_EVENT, {
+        detail: { theme, autoSeasonal },
+      })
+    );
+  } catch {
+    // localStorage unavailable (private browsing extreme mode) — silently
+    // fall through; the event still fires if dispatchEvent hasn't thrown.
+  }
 }
 
 // ---------------------------------------------------------------------------
@@ -61,8 +99,8 @@ function writeBool(key: string, v: boolean) {
 }
 
 /**
- * Initial theme resolution:
- * 1. Stored preference → use it
+ * Initial theme resolution (runs once on mount, before getMe() resolves):
+ * 1. Stored localStorage preference → use it
  * 2. No preference → follow OS dark/light preference
  */
 function getInitialTheme(): ThemeName {
@@ -87,10 +125,11 @@ function getInitialTheme(): ThemeName {
 export function AppThemeProvider({ children }: { children: React.ReactNode }) {
   const [themeName, setThemeNameState] = React.useState<ThemeName>(getInitialTheme);
 
-  // autoSeasonal defaults to true on first run
   const [autoSeasonal, setAutoSeasonalState] = React.useState<boolean>(
     () => readBool(STORAGE_KEY_AUTO, true)
   );
+
+  // ── Setters (used by ProfilePage) ────────────────────────────────────────
 
   const setThemeName = React.useCallback((t: ThemeName) => {
     if (!isValidThemeName(t)) return;
@@ -103,8 +142,35 @@ export function AppThemeProvider({ children }: { children: React.ReactNode }) {
     writeBool(STORAGE_KEY_AUTO, v);
   }, []);
 
-  // When autoSeasonal is on, override with the current seasonal theme.
-  // The manual preference is still saved under STORAGE_KEY for when seasonal is turned off.
+  // ── Auth-time hydration via custom event ─────────────────────────────────
+  //
+  // When getMe() resolves (login, page load, tab focus), hydrateThemeFromServer()
+  // fires THEME_HYDRATE_EVENT. We listen here and update React state so the
+  // theme switches immediately without requiring a visit to ProfilePage.
+
+  React.useEffect(() => {
+    function onHydrate(e: Event) {
+      const { theme, autoSeasonal: auto } = (e as CustomEvent<{
+        theme: string;
+        autoSeasonal: boolean;
+      }>).detail;
+
+      if (isValidThemeName(theme)) {
+        setThemeNameState(theme);
+      }
+      setAutoSeasonalState(auto);
+    }
+
+    window.addEventListener(THEME_HYDRATE_EVENT, onHydrate);
+    return () => window.removeEventListener(THEME_HYDRATE_EVENT, onHydrate);
+  }, []); // stable — no deps, listener identity doesn't matter
+
+  // ── Seasonal resolution ───────────────────────────────────────────────────
+  //
+  // When autoSeasonal is on, the resolved theme is the current seasonal
+  // theme. The manual preference is still stored under STORAGE_KEY so it
+  // survives when the user turns seasonal off.
+
   const resolvedThemeName: ThemeName = React.useMemo(() => {
     if (!autoSeasonal) return themeName;
     const seasonal = getSeasonalThemeName(new Date());
@@ -113,11 +179,12 @@ export function AppThemeProvider({ children }: { children: React.ReactNode }) {
 
   const theme = themes[resolvedThemeName];
 
-  // Track OS preference reactively — only applies when no stored preference exists
+  // ── OS preference (fallback for new users with no stored preference) ─────
+
   React.useEffect(() => {
     try {
       const hasStored = isValidThemeName(localStorage.getItem(STORAGE_KEY));
-      if (hasStored) return;
+      if (hasStored) return; // server/user preference wins — don't override
 
       const mq = window.matchMedia?.("(prefers-color-scheme: dark)");
       if (!mq) return;
@@ -128,6 +195,8 @@ export function AppThemeProvider({ children }: { children: React.ReactNode }) {
       return () => mq.removeEventListener?.("change", onChange);
     } catch { /* ignore */ }
   }, []);
+
+  // ── Context value ─────────────────────────────────────────────────────────
 
   const value = React.useMemo<ThemeCtx>(
     () => ({

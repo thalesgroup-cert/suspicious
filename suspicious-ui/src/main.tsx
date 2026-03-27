@@ -5,7 +5,7 @@ import { QueryClientProvider } from "@tanstack/react-query";
 import { CssBaseline, ThemeProvider } from "@mui/material";
 import { router } from "@/app/router";
 import { queryClient } from "@/app/queryClient";
-import { AppThemeProvider } from "@/styles/themeStore";
+import { AppThemeProvider } from "@/styles/ThemeStore";
 import { SnackbarProvider } from "notistack";
 
 /* ---------- Dynamic favicon from env ---------- */
