@@ -80,13 +80,21 @@ def _load_chroma_settings() -> Dict[str, Any]:
     try:
         with open(config_path, "r", encoding="utf-8") as fh:
             settings = json.load(fh)
-        chromadb_conf = settings.get("chromadb", {}) if isinstance(settings, dict) else {}
+
+        if not isinstance(settings, dict):
+            raise ValueError("Invalid settings format")
+
+        chromadb_conf = (
+            settings
+            .get("integrations", {})
+            .get("chromadb", {})
+        )
+
         return {
-            "host": chromadb_conf.get("host", DEFAULT_CHROMA_HOST),
-            "port": chromadb_conf.get("port", DEFAULT_CHROMA_PORT),
-            "collection_name": chromadb_conf.get(
-                "collection_name",
-                DEFAULT_CHROMA_COLLECTION_NAME,
+            "host": str(chromadb_conf.get("host", DEFAULT_CHROMA_HOST)),
+            "port": int(chromadb_conf.get("port", DEFAULT_CHROMA_PORT)),
+            "collection_name": str(
+                chromadb_conf.get("collection_name", DEFAULT_CHROMA_COLLECTION_NAME)
             ),
         }
     except Exception as exc:

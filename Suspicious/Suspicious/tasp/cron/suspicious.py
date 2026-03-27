@@ -13,7 +13,7 @@ CONFIG_PATH = "/app/settings.json"
 
 with open(CONFIG_PATH, "r") as f:
     settings = json.load(f)
-chromadb_conf = settings.get("chromadb", {})
+chromadb_conf = settings.get("integrations", {}).get("chromadb", {})
 CHROMA_HOST = chromadb_conf.get("host", "chromadb")
 CHROMA_PORT = chromadb_conf.get("port", 8000)
 CHROMA_COLLECTION_NAME = chromadb_conf.get("collection_name", "suspicious")

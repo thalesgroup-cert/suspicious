@@ -4,13 +4,12 @@ from django.contrib.auth.models import Group
 from profiles.models import CISOProfile, UserProfile
 from django.contrib.auth import get_user_model
 import json
-from pathlib import Path
 
 CONFIG_PATH = "/app/settings.json"
 with open(CONFIG_PATH) as config_file:
     config = json.load(config_file)
 
-ldap_config = config.get('ldap', {})
+ldap_config = (config.get("authentication", {}).get("ldap", {}))
 
 CISO = {
     "CISO",
@@ -49,9 +48,9 @@ class Ldap:
         """
         try:
             ldap.set_option(ldap.OPT_X_TLS_REQUIRE_CERT, ldap.OPT_X_TLS_NEVER)
-            ldap_server = ldap.initialize(ldap_config.get("auth_ldap_server_uri", "ldap://localhost"))
-            ldap_server.simple_bind_s(ldap_config.get("auth_ldap_bind_dn", "cn=admin,dc=example,dc=com"),
-                                    ldap_config.get("auth_ldap_bind_password", "password"))
+            ldap_server = ldap.initialize(ldap_config.get("server_uri", "ldap://localhost"))
+            ldap_server.simple_bind_s(ldap_config.get("bind_dn", "cn=admin,dc=example,dc=com"),
+                                    ldap_config.get("bind_password", "password"))
             return ldap_server
         except ldap.LDAPError as e:
             print(f"Error while binding to the LDAP server: {e}")
@@ -71,7 +70,7 @@ class Ldap:
         """
         try:
             print('searching user')
-            search_results = ldap_server.search_s(ldap_config.get("auth_ldap_base_dn"), ldap.SCOPE_SUBTREE,
+            search_results = ldap_server.search_s(ldap_config.get("base_dn"), ldap.SCOPE_SUBTREE,
                                                   f'(&(mail={instance.username})(Tpresent=true)(!(ou=admin))(!(TpreferredFirstName=Test)))',
                                                   ['mail', 'title', 'businessCategory', 'c'])
             print(search_results)

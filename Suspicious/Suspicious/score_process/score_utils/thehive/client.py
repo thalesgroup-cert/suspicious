@@ -39,7 +39,7 @@ class TheHiveService:
     @classmethod
     def from_settings(cls, path: str = CONFIG_PATH) -> "TheHiveService":
         with open(path) as f:
-            raw = json.load(f).get("thehive", {})
+            raw = json.load(f).get("integrations", {}).get("thehive", {})
         return cls(TheHiveConfig(**raw))
 
     # ---------- alerts ----------

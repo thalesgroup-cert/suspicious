@@ -19,7 +19,7 @@ CONFIG_PATH = "/app/settings.json"
 with open(CONFIG_PATH, "r") as f:
     settings_data = json.load(f)
 
-watcher_conf = settings_data.get("watcher", {})
+watcher_conf = settings_data.get("integrations", {}).get("watcher", {})
 
 
 class WatcherConfig:

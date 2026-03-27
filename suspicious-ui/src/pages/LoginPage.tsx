@@ -623,7 +623,7 @@ export default function LoginPage() {
   }, [me, navigate]);
 
   function onSSO() {
-    window.location.assign("/oidc/login/");
+    window.location.assign("/api/oidc/login/");
   }
 
   async function onSubmit(e: React.FormEvent) {

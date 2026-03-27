@@ -1,5 +1,4 @@
 import logging
-import json
 from django.db import transaction
 from typing import List, Optional
 
@@ -10,6 +9,7 @@ from mail_feeder.models import (
     ArtifactIsDomain, ArtifactIsHash, ArtifactIsIp,
     ArtifactIsMailAddress, ArtifactIsUrl, MailArtifact
 )
+from settings.models import WatcherLegitDomain
 
 from domain_process.domain_utils.domain_handler import DomainHandler
 from email_process.email_utils.email_handler import MailAddressHandler
@@ -22,13 +22,9 @@ from mail_feeder.utils.user_creation.creation import UserCreationService
 
 logger = logging.getLogger("tasp.cron.fetch_and_process_emails")
 
-CONFIG_PATH = "/app/settings.json"
-with open(CONFIG_PATH) as config_file:
-    config = json.load(config_file)
-
 class ArtifactService:
-    def __init__(self, company_config: Optional[list[str]] = None):
-        self.company_config = config.get('company_domains', None)
+    def __init__(self):
+        self.company_config = WatcherLegitDomain.objects.select_related('domain').values_list('domain__value', flat=True)
 
     # --- Dispatcher ---
     def handle_artifacts(self, artifacts: List[ArtifactModel], mail_instance) -> None:

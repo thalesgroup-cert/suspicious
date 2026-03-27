@@ -29,7 +29,7 @@ except json.JSONDecodeError as e:
     fetch_mail_logger.error(f"Error parsing JSON config: {e}")
     config = {}
 
-cortex_config = config.get("cortex", {})
+cortex_config = (config.get("integrations", {}).get("cortex", {}))
 
 # ------------------------
 # API settings
@@ -87,7 +87,7 @@ class CortexJob:
             # --- FILE and MAIL_BODY special handling ---
             if data_type in ["file", "mail_body"]:
                 if data_type == "mail_body":
-                    yara_name = cortex_config.get("yara_analyzer")
+                    yara_name = (cortex_config.get("analyzers").get("yara"))
                     yara_analyzer = api_launchjob.analyzers.get_by_name(yara_name)
                     if yara_analyzer:
                         analyzers.append(yara_analyzer)
@@ -104,10 +104,10 @@ class CortexJob:
                         value, "file_path", None
                     ) and value.file_path.name.endswith(".eml"):
                         excluded = {
-                            cortex_config.get("ai_analyzer"),
-                            cortex_config.get("yara_analyzer"),
-                            cortex_config.get("sandbox_analyzer"),
-                            cortex_config.get("header_analyzer"),
+                            (cortex_config.get("analyzers", {}).get("ai", {})),
+                            (cortex_config.get("analyzers", {}).get("yara", {})),
+                            (cortex_config.get("analyzers", {}).get("sandbox", {})),
+                            (cortex_config.get("analyzers", {}).get("header", {})),
                         }
                         analyzers = [
                             a for a in analyzers if a and a.name not in excluded
@@ -115,7 +115,7 @@ class CortexJob:
 
             # --- MAIL_HEADER handling ---
             elif data_type == "mail_header":
-                header_name = cortex_config.get("header_analyzer")
+                header_name = (cortex_config.get("analyzers", {}).get("header", {}))
                 header_analyzer = api_launchjob.analyzers.get_by_name(header_name)
                 if header_analyzer:
                     analyzers.append(header_analyzer)
@@ -175,7 +175,7 @@ class CortexJob:
 
         try:
             # Get AI analyzer by name from config
-            ai_analyzer_name = cortex_config.get("ai_analyzer")
+            ai_analyzer_name = (cortex_config.get("analyzers", {}).get("ai", {}))
             analyzer = self.api.analyzers.get_by_name(ai_analyzer_name)
             if not analyzer:
                 fetch_mail_logger.warning(f"AI analyzer '{ai_analyzer_name}' not found")
@@ -227,9 +227,9 @@ class CortexJob:
         analyzer_names = filter(
             None,
             [
-                cortex_config.get("yara_analyzer"),
-                cortex_config.get("file_info_analyzer"),
-                cortex_config.get("sandbox_analyzer"),
+                (cortex_config.get("analyzers", {}).get("yara", {})),
+                (cortex_config.get("analyzers", {}).get("file_info", {})),
+                (cortex_config.get("analyzers", {}).get("sandbox", {})),
             ],
         )
 
@@ -237,7 +237,7 @@ class CortexJob:
 
         for analyzer_name in analyzer_names:
             # Skip Yara analyzer for .eml files
-            if analyzer_name == "Yara_3_0" and file.file_path.name.endswith(".eml"):
+            if analyzer_name == (cortex_config.get("analyzers", {}).get("yara", {})) and file.file_path.name.endswith(".eml"):
                 continue
 
             try:
@@ -279,9 +279,9 @@ class CortexJob:
             filter(
                 None,
                 [
-                    cortex_config.get("yara_analyzer"),
-                    cortex_config.get("sandbox_analyzer"),
-                    cortex_config.get("header_analyzer"),
+                    (cortex_config.get("analyzers", {}).get("yara", {})),
+                    (cortex_config.get("analyzers", {}).get("sandbox", {})),
+                    (cortex_config.get("analyzers", {}).get("header", {})),
                 ],
             )
         )
@@ -1312,7 +1312,7 @@ class CortexJobManager:
         # Get AI analyzer report
         try:
             analyzer = AnalyzerReport.objects.get(
-                analyzer__name=cortex_config.get("ai_analyzer"),
+                analyzer__name=(cortex_config.get("analyzers", {}).get("ai", {})),
                 file=mail_archive.archive,
             )
             update_cases_logger.info("AI Mail Analyzer report found: %s", analyzer)

@@ -1,4 +1,14 @@
+# compose_databases.yaml
+#
+# Base service definitions for data stores.
+# Extended (not run directly) by docker-compose.yml.
+#
+# Volumes are declared in docker-compose.yml to avoid the "volume declared
+# in multiple files" warning that Compose emits when volumes appear in both
+# a base file and the override.
+
 services:
+
   db_suspicious:
     init: true
     expose:
@@ -38,17 +48,22 @@ services:
       nofile:
         soft: 65536
         hard: 65536
+      memlock:
+        soft: -1
+        hard: -1
     environment:
-      http_proxy: "${HTTP_PROXY}"
-      https_proxy: "${HTTPS_PROXY}"
-      no_proxy: "localhost"
-      discovery.type: "single-node"
-      xpack.security.enabled: "false"
-      http.host: "0.0.0.0"
-      cluster.name: "suspicious"
-      script.allowed_types: "inline,stored"
-      bootstrap.memory_lock: "true"
-      ES_JAVA_OPTS: "-Xms5g -Xmx5g"
+      http_proxy:               "${HTTP_PROXY:-}"
+      https_proxy:              "${HTTPS_PROXY:-}"
+      no_proxy:                 "localhost"
+      discovery.type:           "single-node"
+      xpack.security.enabled:   "false"
+      http.host:                "0.0.0.0"
+      cluster.name:             "suspicious"
+      script.allowed_types:     "inline,stored"
+      bootstrap.memory_lock:    "true"
+      ES_JAVA_OPTS:             "${ES_JAVA_OPTS:--Xms3g -Xmx3g}"
+    security_opt:
+      - no-new-privileges:true
     networks:
       - suspicious_network
 
@@ -56,37 +71,40 @@ services:
     restart: always
     expose:
       - "9000"
+    # Console only accessible from localhost — not exposed to the world.
     ports:
-      - "127.0.0.1:${MINIO_PORT}:9001"
+      - "127.0.0.1:${MINIO_PORT:-35000}:9001"
     environment:
-      MINIO_ROOT_USER: ${MINIO_ROOT_USER}
+      MINIO_ROOT_USER:     ${MINIO_ROOT_USER}
       MINIO_ROOT_PASSWORD: ${MINIO_ROOT_PASSWORD}
     volumes:
       - "minio_data:/data:Z"
+    security_opt:
+      - no-new-privileges:true
     networks:
       - suspicious_network
 
   chromadb:
-    image: chromadb/chroma:latest
     restart: unless-stopped
     expose:
       - "8000"
     volumes:
       - "chromadb_data:/data:Z"
+    security_opt:
+      - no-new-privileges:true
     networks:
       - suspicious_network
 
+# Volume stubs — the named volumes are declared in docker-compose.yml.
+# These stubs satisfy Compose's requirement that volumes referenced by
+# a service must be declared somewhere in the same file or be external.
 volumes:
   db_suspicious_data:
     driver: local
   elasticsearch_data:
-    driver: local
   elasticsearch_logs:
-    driver: local
   minio_data:
-    driver: local
   chromadb_data:
-    driver: local
 
 networks:
   suspicious_network:

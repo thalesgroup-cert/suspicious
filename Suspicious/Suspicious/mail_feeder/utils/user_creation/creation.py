@@ -7,18 +7,18 @@ from .utils import load_config, initialize_email_validator, create_ldap_user
 from mail_feeder.utils.kpi_updating.kpis import (
     KpiService
 )
-
+from settings.models import WatcherLegitDomain
 
 CONFIG_PATH = "/app/settings.json"
 CONFIG = load_config(CONFIG_PATH)
-COMPANY_DOMAINS = CONFIG.get("company_domains", [])
-SUSPICIOUS_EMAIL = CONFIG.get("suspicious", {}).get("email")
+SUSPICIOUS_EMAIL = CONFIG.get("branding", {}).get("contact_email")
 
 fetch_mail_logger = logging.getLogger("tasp.cron.fetch_and_process_emails")
 
 
 class UserCreationService:
     def __init__(self):
+        COMPANY_DOMAINS = WatcherLegitDomain.objects.select_related('domain').values_list('domain__value', flat=True)
         self.email_validator = initialize_email_validator(COMPANY_DOMAINS)
 
     def get_or_create_user(self, username: str) -> User:

@@ -5,14 +5,7 @@ import ipaddress
 from django.db.models import F
 
 from ip_process.models import IP
-import json
-from pathlib import Path
 
-CONFIG_PATH = "/app/settings.json"
-with open(CONFIG_PATH) as config_file:
-    config = json.load(config_file)
-
-suspicious_config = config.get('suspicious', {})
 logger = logging.getLogger(__name__)
 
 class IPHandler:

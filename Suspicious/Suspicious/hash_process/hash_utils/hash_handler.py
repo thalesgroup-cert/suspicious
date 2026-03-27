@@ -5,14 +5,6 @@ from django.db.models import F
 from django.db import transaction
 from hash_process.models import Hash
 from hashid import HashID
-import json
-from pathlib import Path
-
-CONFIG_PATH = "/app/settings.json"
-with open(CONFIG_PATH) as config_file:
-    config = json.load(config_file)
-
-suspicious_config = config.get('suspicious', {})
 logger = logging.getLogger(__name__)
 
 class HashHandler:

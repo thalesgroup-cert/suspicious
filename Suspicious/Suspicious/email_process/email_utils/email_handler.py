@@ -5,14 +5,8 @@ from domain_process.models import Domain, DomainInIocs
 from domain_process.domain_utils.domain_handler import DomainHandler
 from email_validator import validate_email, EmailNotValidError
 from email_process.models import MailAddress
-import json
-from pathlib import Path
+from settings.models import WatcherLegitDomain
 
-CONFIG_PATH = "/app/settings.json"
-with open(CONFIG_PATH) as config_file:
-    config = json.load(config_file)
-
-company_config = config.get('company_domains', None)
 fetch_mail_logger = logging.getLogger('tasp.cron.fetch_and_process_emails')
 
 class MailAddressHandler:
@@ -128,15 +122,12 @@ def is_valid_email(email):
 
 def is_valid_company_email(email):
     try:
-        # Validate email syntax and deliverability
         v = validate_email(email)
-        normalized_email = v.email
-        domain = normalized_email.split('@')[1].lower()
-        for company_domain in company_config:
-            company_domain = company_domain.lower()
-            if domain == company_domain:
-                return True
-            else:
-                return False
+        domain = v.email.split('@')[1].lower()
+
+        return WatcherLegitDomain.objects.filter(
+            domain__value__iexact=domain
+        ).exists()
+
     except EmailNotValidError:
         return False

@@ -33,11 +33,18 @@ CONFIG_PATH = "/app/settings.json"
 with open(CONFIG_PATH) as _f:
     _config = json.load(_f)
 
-_suspicious  = _config.get("suspicious",  {})
-_db          = _config.get("database",    {})
-_ldap_cfg    = _config.get("ldap",        {})
-_minio       = _config.get("minio",       {})
-_cortex      = _config.get("cortex",      {})
+_app        = _config.get("app", {})
+_db         = _config.get("database", {})
+_auth       = _config.get("authentication", {})
+_ldap_cfg   = _auth.get("ldap", {})
+_oidc       = _auth.get("oidc", {})
+_storage    = _config.get("storage", {})
+_minio      = _storage.get("minio", {})
+_integr     = _config.get("integrations", {})
+_cortex     = _integr.get("cortex", {})
+_chromadb   = _integr.get("chromadb", {})
+_features   = _config.get("features", {})
+_email_cfg  = _config.get("email", {})
 
 # ---------------------------------------------------------------------------
 # Base directories
@@ -52,27 +59,23 @@ FILES_BASE_DIR = Path(__file__).resolve().parent.parent
 # Security
 # ---------------------------------------------------------------------------
 
-SECRET_KEY = _suspicious["django_secret_key"]   # required — fail loudly if absent
+SECRET_KEY = _app["secret_key"]
 
-# DEBUG must be a real boolean.  The JSON value may be a string "False"/"True"
-# because some editors serialize booleans as strings.
-_debug_raw = _suspicious.get("django_debug", False)
+_debug_raw = _app.get("debug", False)
 DEBUG = str(_debug_raw).lower() not in {"false", "0", "no", "off"}
 
-ALLOWED_HOSTS = [
-    _suspicious.get("allowed_host", "localhost"),
+ALLOWED_HOSTS = _app.get("allowed_hosts", ["localhost"]) + [
     "127.0.0.1",
     "localhost",
 ]
-
 # Add the Cortex host if provided (needed for internal callbacks)
-_cortex_url = _cortex.get("cortex_url", "")
+_cortex_url = _cortex.get("url", "")
 if _cortex_url:
     ALLOWED_HOSTS.append(_cortex_url)
 
 # CSRF — at least one trusted origin is required for POST requests in
 # Django 4.x.  Must be a full scheme+host (e.g. https://suspicious.corp).
-CSRF_TRUSTED_ORIGINS = [_suspicious.get("csrf_trusted_origins", "https://localhost")]
+CSRF_TRUSTED_ORIGINS = _app.get("csrf_trusted_origins", ["https://localhost"])
 
 # Reverse-proxy headers — the proxy must set these explicitly.
 SECURE_PROXY_SSL_HEADER = ("HTTP_X_FORWARDED_PROTO", "https")
@@ -127,9 +130,11 @@ INSTALLED_APPS = [
     "settings.apps.SettingsConfig",
     "url_process.apps.URLConfig",
     "score_process.apps.ScoreConfig",
+    "submission_queue.apps.SubmissionQueueConfig"
 ]
 
 MIDDLEWARE = [
+    "whitenoise.middleware.WhiteNoiseMiddleware",
     "django.middleware.security.SecurityMiddleware",
     "django.contrib.sessions.middleware.SessionMiddleware",
     "django.middleware.common.CommonMiddleware",
@@ -181,23 +186,23 @@ else:
     DATABASES = {
         "default": {
             "ENGINE":   "django.db.backends.mysql",
-            "NAME":     _db["mysql_database"],
-            "USER":     _db["mysql_user"],
-            "PASSWORD": _db["mysql_password"],
-            "HOST":     _db.get("mysql_host", "localhost"),
-            "PORT":     _db.get("mysql_port", "3306"),
+            "NAME":     _db["name"],
+            "USER":     _db["user"],
+            "PASSWORD": _db["password"],
+            "HOST":     _db.get("host", "localhost"),
+            "PORT":     _db.get("port", "3306"),
             "OPTIONS":  {"charset": "utf8mb4"},
         }
     }
-
+    _db_opts = _db.get("options", {})
     # Optional SSL
-    if _db.get("db_use_ssl", "NO").upper() == "YES":
+    if _db_opts.get("ssl"):
         DATABASES["default"]["OPTIONS"]["ssl"] = {"ca": "/cert.pem"}
 
     # Optional connection pooling / persistence
-    if _db.get("db_use_persistent_connections", "NO").upper() == "YES":
+    if _db_opts.get("connection_pooling"):
         DATABASES["default"]["CONN_MAX_AGE"] = None       # persistent
-    elif _db.get("db_use_connection_pooling", "NO").upper() == "YES":
+    elif _db_opts.get("persistent_connections"):
         DATABASES["default"]["CONN_MAX_AGE"] = 600        # 10 min pool
 
 DEFAULT_AUTO_FIELD = "django.db.models.BigAutoField"
@@ -224,7 +229,7 @@ SESSION_COOKIE_SAMESITE      = "Lax"   # CSRF protection; Strict breaks OIDC red
 
 AUTHENTICATION_BACKENDS = []
 
-_ldap_uri = _ldap_cfg.get("auth_ldap_server_uri")
+_ldap_uri = _ldap_cfg.get("server_uri")
 if _ldap_uri:
     # Only wire up LDAP when a server is actually configured.
     # This avoids ImportError / connection errors on setups that use
@@ -234,12 +239,12 @@ if _ldap_uri:
         from django_auth_ldap.config import LDAPSearch
 
         AUTH_LDAP_SERVER_URI      = _ldap_uri
-        AUTH_LDAP_BIND_DN         = _ldap_cfg.get("auth_ldap_bind_dn", "")
-        AUTH_LDAP_BIND_PASSWORD   = _ldap_cfg.get("auth_ldap_bind_password", "")
+        AUTH_LDAP_BIND_DN         = _ldap_cfg.get("bind_dn", "")
+        AUTH_LDAP_BIND_PASSWORD   = _ldap_cfg.get("bind_password", "")
         AUTH_LDAP_USER_SEARCH     = LDAPSearch(
-            _ldap_cfg["auth_ldap_base_dn"],
+            _ldap_cfg["base_dn"],
             ldap.SCOPE_SUBTREE,
-            _ldap_cfg.get("auth_ldap_filter", "(uid=%(user)s)"),
+            _ldap_cfg.get("filter", "(uid=%(user)s)"),
         )
         AUTH_LDAP_USER_ATTR_MAP   = {
             "first_name": "givenName",
@@ -249,7 +254,7 @@ if _ldap_uri:
         AUTH_LDAP_ALWAYS_UPDATE_USER = True
         AUTH_LDAP_CACHE_TIMEOUT      = 3600
 
-        _verify_ssl = str(_ldap_cfg.get("auth_ldap_verify_ssl", "False")).lower()
+        _verify_ssl = str(_ldap_cfg.get("verify_ssl", "False")).lower()
         if _verify_ssl in ("false", "0", "no"):
             AUTH_LDAP_GLOBAL_OPTIONS = {
                 ldap.OPT_X_TLS_REQUIRE_CERT: ldap.OPT_X_TLS_NEVER
@@ -274,11 +279,11 @@ AUTHENTICATION_BACKENDS.append("django.contrib.auth.backends.ModelBackend")
 # are set.
 # ---------------------------------------------------------------------------
 
-OIDC_SERVER_URL    = _suspicious.get("oidc_server_url", "")
-OIDC_CLIENT_ID     = _suspicious.get("oidc_client_id",  "")
-OIDC_CLIENT_SECRET = _suspicious.get("oidc_client_secret", "")
-OIDC_SCOPES        = _suspicious.get("oidc_scopes", "openid email profile")
-OIDC_REDIRECT_URI = _suspicious.get("oidc_redirect_uri", "")
+OIDC_SERVER_URL    = _oidc.get("server_url", "")
+OIDC_CLIENT_ID     = _oidc.get("client_id", "")
+OIDC_CLIENT_SECRET = _oidc.get("client_secret", "")
+OIDC_SCOPES        = _oidc.get("scopes", "openid email profile")
+OIDC_REDIRECT_URI  = _oidc.get("redirect_uri", "")
 
 # Note: SOCIALACCOUNT_PROVIDERS (allauth) is removed — allauth is not in
 # INSTALLED_APPS and the custom OIDC views do not use it.
@@ -345,7 +350,7 @@ SPECTACULAR_SETTINGS = {
 #   dual   — write to both MinIO and local (useful during migrations)
 # ---------------------------------------------------------------------------
 
-_storage_backend = _suspicious.get("storage_backend", "local").lower()
+_storage_backend = _storage.get("backend", "local").lower()
 
 if _storage_backend in {"minio", "dual"}:
     INSTALLED_APPS.append("minio_storage")
@@ -353,13 +358,11 @@ if _storage_backend in {"minio", "dual"}:
     MINIO_STORAGE_ENDPOINT      = _minio.get("endpoint",   "minio:9000")
     MINIO_STORAGE_ACCESS_KEY    = _minio["access_key"]
     MINIO_STORAGE_SECRET_KEY    = _minio["secret_key"]
-    MINIO_STORAGE_USE_HTTPS     = str(
-        _minio.get("secure", "0")
-    ).lower() in {"1", "true", "yes", "on"}
-    MINIO_STORAGE_MEDIA_BUCKET_NAME       = _suspicious.get("minio_media_bucket", "suspicious-media")
+    MINIO_STORAGE_USE_HTTPS = bool(_minio.get("secure", False))
+    MINIO_STORAGE_MEDIA_BUCKET_NAME = _minio.get("media_bucket", "suspicious-media")
     MINIO_STORAGE_AUTO_CREATE_MEDIA_BUCKET = True
 
-_DUAL_WRITE = str(_suspicious.get("storage_dual_write", "0")).lower() in {"1", "true", "yes", "on"}
+_DUAL_WRITE = str(_features.get("dual_storage_write", "0")).lower()
 
 if _storage_backend == "minio":
     DEFAULT_FILE_STORAGE = "minio_storage.storage.MinioMediaStorage"
@@ -372,6 +375,7 @@ else:
 # Static and media files
 # ---------------------------------------------------------------------------
 
+STATICFILES_STORAGE = "whitenoise.storage.CompressedManifestStaticFilesStorage"
 STATIC_URL  = "/static/"
 STATIC_ROOT = FILES_BASE_DIR / "static"
 
@@ -407,7 +411,7 @@ AUTH_PASSWORD_VALIDATORS = [
 # ---------------------------------------------------------------------------
 
 LANGUAGE_CODE = "en-us"
-TIME_ZONE     = _suspicious.get("tz", "UTC")
+TIME_ZONE = _app.get("timezone", "UTC")
 USE_I18N      = True
 USE_L10N      = True
 USE_TZ        = True
@@ -442,7 +446,7 @@ CRONJOBS = [
 # Logging
 # ---------------------------------------------------------------------------
 
-_trace_level = _suspicious.get("trace_level", "INFO").upper()
+_trace_level = _app.get("log_level", "INFO").upper()
 
 LOGGING = {
     "version": 1,

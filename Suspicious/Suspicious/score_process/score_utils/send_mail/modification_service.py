@@ -24,7 +24,7 @@ class ModificationEmailService:
         case,
     ):
         with open(CONFIG_PATH) as f:
-            self.config = json.load(f).get("mail", {})
+            self.config = json.load(f).get("email", {})
 
         self.subject = subject
         self.sender = str(sender)
@@ -53,8 +53,8 @@ class ModificationEmailService:
         return "item"
 
     def _result_block(self, case_type: str) -> dict:
-        cert_url = self.config.get("security")
-        cert_msg = self.config.get("security_msg")
+        cert_url = self.config.get("links", {}).get("security_contact")
+        cert_msg = self.config.get("links", {}).get("security_text")
 
         mapping = {
             "Dangerous": {
@@ -100,23 +100,23 @@ class ModificationEmailService:
         return self.template.render(
             subject=subject,
             recipient_name=recipient_name,
-            company=self.config["group"],
+            company=self.config.get("links", {}).get("team_name"),
             logos={
-                "company": self.config["logos"]["company"],
-                "final": self.config["logos"]["final"],
+                "company": self.config.get("logos", {}).get("company"),
+                "final": self.config.get("logos", {}).get("final"),
             },
             urls={
-                "portal": self.config["submissions"],
-                "glossary": self.config["glossary"],
-                "inquiry": self.config["inquiry"],
-                "global": self.config["global_url"],
+                "portal": self.config.get("links", {}).get("submissions"),
+                "glossary": self.config.get("links", {}).get("glossary"),
+                "inquiry": self.config.get("links", {}).get("inquiry"),
+                "global": self.config.get("content", {}).get("website"),
             },
-            inquiry_text=self.config["inquiry_text"],
-            global_team=self.config["global"],
+            inquiry_text=self.config.get("links", {}).get("inquiry_text"),
+            global_team=self.config.get("content", {}).get("global_domain"),
             socials=[
                 ModificationMailServiceConfigSocial(
                     name=social,
-                    url=self.config["socials"].get(
+                    url=self.config.get("socials", {}).get(
                         social, f"https://{social}.com"
                     ),
                     logo=SOCIAL_LOGOS.get(social),
@@ -138,12 +138,12 @@ class ModificationEmailService:
         )
 
         send_mail_service = SendMailService(
-            host=self.config["server"], port=self.config["port"],
-            login=self.config["username"], password=self.config["password"]
+            host=self.config.get("smtp", {}).get("server", {}), port=self.config.get("smtp", {}).get("port", {}),
+            login=self.config.get("smtp", {}).get("username", {}), password=self.config.get("smtp", {}).get("password", {})
         )
 
         send_mail_service.connect()
-        if self.config["tls"]:
+        if self.config.get("smtp", {}).get("tls", {}):
             send_mail_service.start_tls()
 
         send_mail_service.login()

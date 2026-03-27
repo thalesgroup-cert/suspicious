@@ -67,7 +67,8 @@ class MailModel(BaseModel):
 class TheHiveConfig(BaseModel):
     url: str
     api_key: str
-    the_hive_verify_ssl: bool = False
+    verify_ssl: bool = False
+    certificate_path: str
 
 
 class MinioConfig(BaseModel):

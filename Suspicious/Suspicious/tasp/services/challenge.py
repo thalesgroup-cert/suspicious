@@ -15,17 +15,17 @@ CONFIG_PATH = os.environ.get("SUSPICIOUS_SETTINGS_PATH", "/app/settings.json")
 @lru_cache(maxsize=1)
 def _load_mail_config() -> dict:
     with open(CONFIG_PATH) as config_file:
-        return json.load(config_file).get("mail", {})
+        return json.load(config_file).get("email", {})
 
 
 @lru_cache(maxsize=1)
 def _load_thehive_config() -> dict:
     with open(CONFIG_PATH) as config_file:
-        return json.load(config_file).get("thehive", {})
+        return json.load(config_file).get("integrations", {}).get("thehive", {})
 
 
 def get_submissions_url() -> str:
-    return _load_mail_config().get("submissions", "/submissions/")
+    return _load_mail_config().get("links", {}).get("submissions", "/submissions/")
 
 
 class CaseChallengeService:

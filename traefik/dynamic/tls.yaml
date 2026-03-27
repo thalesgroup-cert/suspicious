@@ -1,28 +1,144 @@
+# traefik/dynamic/tls.yaml
+#
+# Dynamic configuration — reloaded automatically by Traefik when this file
+# changes (providers.file.watch=true in the compose command).
+#
+# Routing strategy:
+#
+#   https://<DOMAIN>/api/*       → Django (Gunicorn) on suspicious:9020
+#   https://<DOMAIN>/admin/*     → Django admin on suspicious:9020
+#   https://<DOMAIN>/static/*    → Django static files on suspicious:9020
+#   https://<DOMAIN>/media/*     → Django media files on suspicious:9020
+#   https://<DOMAIN>/oidc/*      → Django OIDC views on suspicious:9020
+#   https://<DOMAIN>/docs/*      → Django API docs (drf-spectacular) on suspicious:9020
+#   https://<DOMAIN>/*           → Nginx SPA (suspicious_ui:80) — catch-all
+#
+# The SPA router has a lower priority than the API router so path-prefix
+# rules win when both could match.
+#
+# Security headers middleware is applied to ALL routes.
+
 http:
+
+  # ── Middlewares ────────────────────────────────────────────────────────────
+
   middlewares:
-    set-host:
+
+    # Security headers — applied to every response
+    security-headers:
+      headers:
+        # HSTS — tell browsers to always use HTTPS
+        stsSeconds: 31536000
+        stsIncludeSubdomains: true
+        stsPreload: true
+        forceSTSHeader: true
+        # Framing — prevent clickjacking
+        frameDeny: true
+        # Content type sniffing
+        contentTypeNosniff: true
+        # XSS protection (legacy header, still useful for older browsers)
+        browserXssFilter: true
+        # Referrer policy
+        referrerPolicy: "strict-origin-when-cross-origin"
+        # Permissions policy — disable unused browser APIs
+        permissionsPolicy: "camera=(), microphone=(), geolocation=(), payment=()"
+        # Remove server identification headers
+        customResponseHeaders:
+          Server: ""
+          X-Powered-By: ""
+
+    # Strip /api prefix before forwarding to Django
+    # Django's urls.py does NOT include /api/ — Traefik strips it at the edge.
+    # If your urls.py already includes /api/, remove this middleware and the
+    # StripPrefix from the api router below.
+    strip-api-prefix:
+      stripPrefix:
+        prefixes:
+          - "/api"
+
+    # Forward real client IP to Django so request.META['REMOTE_ADDR'] is correct
+    forward-real-ip:
       headers:
         customRequestHeaders:
-          Host: "suspicious:9020"
+          X-Forwarded-Proto: "https"
+          X-Forwarded-For: ""   # Traefik fills this automatically
+
+  # ── Routers ───────────────────────────────────────────────────────────────
 
   routers:
-    suspicious:
+
+    # ── API router (Django) — high priority ──────────────────────────────
+    # Matches all backend paths. Priority 20 ensures these win over the
+    # SPA catch-all (priority 10).
+
+    suspicious-api:
       entryPoints:
         - websecure
-      rule: "Host(`suspicious`)" # <-- To Be Changed
-      service: suspicious-service
+      rule: >-
+        PathPrefix(`/api`)
+        || PathPrefix(`/admin`)
+        || PathPrefix(`/static`)
+        || PathPrefix(`/media`)
+        || PathPrefix(`/oidc`)
+        || PathPrefix(`/docs`)
+        || PathPrefix(`/schema`)
+      priority: 20
+      service: suspicious-api-service
       middlewares:
-        - set-host
+        - security-headers
+        - forward-real-ip
+      tls: {}
 
+    # ── SPA router (Nginx) — catch-all ───────────────────────────────────
+    # Handles everything else: /, /login, /submissions, /dashboard, etc.
+    # React Router handles client-side navigation; Nginx returns index.html
+    # for all unknown paths (try_files $uri /index.html in nginx.conf).
+
+    suspicious-ui:
+      entryPoints:
+        - websecure
+      rule: "PathPrefix(`/`)"
+      priority: 10
+      service: suspicious-ui-service
+      middlewares:
+        - security-headers
+      tls: {}
+
+  # ── Services ──────────────────────────────────────────────────────────────
 
   services:
-    suspicious-service:
+
+    # Django / Gunicorn
+    suspicious-api-service:
       loadBalancer:
         servers:
           - url: "http://suspicious:9020"
-        passHostHeader: true
+        passHostHeader: false   # Django checks ALLOWED_HOSTS against DOMAIN_CORP,
+                                # not the internal container hostname
+
+    # Nginx SPA
+    suspicious-ui-service:
+      loadBalancer:
+        servers:
+          - url: "http://suspicious_ui:80"
+        passHostHeader: false
+
+# ── TLS ───────────────────────────────────────────────────────────────────
 
 tls:
   certificates:
     - certFile: /etc/private/certfile.pem
-      keyFile: /etc/private/keyfile.pem
+      keyFile:  /etc/private/keyfile.pem
+
+  # Enforce TLS 1.2+ and strong cipher suites
+  options:
+    default:
+      minVersion: VersionTLS12
+      cipherSuites:
+        - TLS_ECDHE_ECDSA_WITH_AES_256_GCM_SHA384
+        - TLS_ECDHE_RSA_WITH_AES_256_GCM_SHA384
+        - TLS_ECDHE_ECDSA_WITH_AES_128_GCM_SHA256
+        - TLS_ECDHE_RSA_WITH_AES_128_GCM_SHA256
+        - TLS_ECDHE_ECDSA_WITH_CHACHA20_POLY1305_SHA256
+        - TLS_ECDHE_RSA_WITH_CHACHA20_POLY1305_SHA256
+      sniStrict: false

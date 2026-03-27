@@ -15,14 +15,7 @@ from .objects import (build_email_object,
         finalize_misp_object)
 from .events import MISPEventManager
 
-import json
 from .config_loader import load_misp_settings
-
-CONFIG_PATH = "/app/settings.json"
-with open(CONFIG_PATH) as config_file:
-    config = json.load(config_file)
-
-misp_config = config.get('misp', {})
 
 logger = logging.getLogger('tasp.cron.update_ongoing_case_jobs')
 

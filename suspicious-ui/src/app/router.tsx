@@ -53,7 +53,7 @@ export const router = createBrowserRouter([
       {
         path: "campaigns",
         element: (
-          <ProtectedRoute requireGroups={ELEVATED}>
+          <ProtectedRoute>
             <CampaignsPage />
           </ProtectedRoute>
         ),
@@ -61,7 +61,7 @@ export const router = createBrowserRouter([
       {
         path: "dashboard",
         element: (
-          <ProtectedRoute requireGroups={ELEVATED}>
+          <ProtectedRoute>
             <DashboardPage />
           </ProtectedRoute>
         ),

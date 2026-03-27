@@ -1,5 +1,4 @@
 import logging
-import json
 from pathlib import Path
 
 import validators
@@ -9,28 +8,8 @@ from domain_process.models import Domain
 
 logger = logging.getLogger(__name__)
 
-CONFIG_PATH = Path("/app/settings.json")
 TLD_CACHE_DIR = Path("/app/Suspicious/domain_process/domain_utils/public")
 
-def load_config(path: Path) -> dict:
-    """
-    Load the configuration JSON file from the specified path.
-
-    Args:
-        path (Path): Path to the JSON configuration file.
-
-    Returns:
-        dict: Parsed configuration dictionary, or empty dict if error.
-    """
-    try:
-        with path.open() as f:
-            return json.load(f)
-    except Exception as e:
-        logger.error("Failed to load config: %s", e)
-        return {}
-
-config = load_config(CONFIG_PATH)
-suspicious_config = config.get('suspicious', {})
 extractor = tldextract.TLDExtract(
     cache_dir=str(TLD_CACHE_DIR),
     fallback_to_snapshot=True

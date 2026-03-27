@@ -36,7 +36,7 @@ class FinalEmailService:
     @staticmethod
     def _load_config() -> dict:
         with open(CONFIG_PATH) as f:
-            return json.load(f).get("mail", {})
+            return json.load(f).get("email", {})
 
     @staticmethod
     def _load_template():
@@ -55,23 +55,23 @@ class FinalEmailService:
         return self.template.render(
             subject=subject,
             recipient_name=self.recipient_name,
-            company=self.config["group"],
+            company=self.config.get("links", {}).get("team_name"),
             logos={
-                "company": self.config["logos"]["company"],
-                "final": self.config["logos"]["final"],
+                "company": self.config.get("logos", {}).get("company"),
+                "final": self.config.get("logos", {}).get("final"),
             },
             urls={
-                "portal": self.config["submissions"],
-                "glossary": self.config["glossary"],
-                "inquiry": self.config["inquiry"],
-                "global": self.config["global_url"],
+                "portal": self.config.get("links", {}).get("submissions"),
+                "glossary": self.config.get("links", {}).get("glossary"),
+                "inquiry": self.config.get("links", {}).get("inquiry"),
+                "global": self.config.get("content", {}).get("website"),
             },
-            inquiry_text=self.config["inquiry_text"],
-            global_team=self.config["global"],
+            inquiry_text=self.config.get("links", {}).get("inquiry_text"),
+            global_team=self.config.get("content", {}).get("global_domain"),
             socials=[
                 FinalMailServiceConfigSocial(
                     name=s,
-                    url=self.config["socials"].get(s, f"https://{s}.com"),
+                    url=self.config.get("socials", {}).get(s, f"https://{s}.com"),
                     logo=SOCIAL_LOGOS.get(s),
                 )
                 for s in self.config.get("socials", {})
@@ -122,7 +122,7 @@ class FinalEmailService:
         }
 
     def _result_block(self) -> dict:
-        online = self.config["submissions"]
+        online = self.config.get("links", {}).get("submissions")
 
         mapping = {
             "Dangerous": {
@@ -163,7 +163,7 @@ class FinalEmailService:
         return mapping.get(self.case.results, mapping["Suspicious"])
 
     def _challenge_url(self) -> str:
-        api_base = self.config.get("api_base")
+        api_base = self.config.get("api_base", None)
         if not api_base:
             parsed = urlparse(self.config.get("submissions", ""))
             if parsed.scheme and parsed.netloc:
@@ -181,12 +181,12 @@ class FinalEmailService:
         )
 
         send_mail_service = SendMailService(
-            host=self.config["server"], port=self.config["port"],
-            login=self.config["username"], password=self.config["password"]
+            host=self.config.get("smtp", {}).get("server", {}), port=self.config.get("smtp", {}).get("port", {}),
+            login=self.config.get("smtp", {}).get("username", {}), password=self.config.get("smtp", {}).get("password", {})
         )
 
         send_mail_service.connect()
-        if self.config["tls"]:
+        if self.config.get("smtp", {}).get("tls", {}):
             send_mail_service.start_tls()
 
         send_mail_service.login()

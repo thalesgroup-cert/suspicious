@@ -13,7 +13,7 @@ CONFIG_PATH = "/app/settings.json"
 with open(CONFIG_PATH) as config_file:
     config = json.load(config_file)
 
-thehive_config = config.get('thehive', {})
+thehive_config = config.get("integrations", {}).get("thehive", {})
 
 certificate_path = thehive_config.get('certificate_path', '')
 
