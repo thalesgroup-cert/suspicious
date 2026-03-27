@@ -20,6 +20,7 @@
 import { api, setAccessToken } from "@/api/client";
 import { endpoints } from "@/api/endpoints";
 import { useColorStore } from "@/styles/colorStore";
+import { hydrateThemeFromServer } from "@/styles/ThemeStore";
 import type { ResultColors, StatusColors } from "@/styles/colorStore";
 
 // ---------------------------------------------------------------------------
@@ -35,11 +36,15 @@ export type Me = {
   groups: string[];
   ciso_scope?: string;
   // Embedded by MeResponseSerializer. Optional so the type stays compatible
-  // with pre-migration backends that don't yet return this field.
+  // with pre-migration backends that don't yet return these fields.
   semantic_colors?: {
     result: ResultColors;
     status: StatusColors;
   };
+  // Theme preference — embedded alongside colors so a single getMe()
+  // call gives us everything needed to render the correct appearance.
+  theme?: string;
+  auto_seasonal?: boolean;
 };
 
 export type LoginResponse = {
@@ -56,19 +61,35 @@ export type LoginResponse = {
 };
 
 // ---------------------------------------------------------------------------
-// Color hydration — called with every successful getMe() response
+// Appearance hydration — called with every successful getMe() response.
+// Applies both the color preset and the theme/seasonal preference so the
+// correct appearance is active before any page component renders.
 // ---------------------------------------------------------------------------
 
-function hydrateColorsFromMe(me: Me): void {
+function hydrateAppearanceFromMe(me: Me): void {
+  // ── Semantic colors ───────────────────────────────────────────────────────
   try {
     const colors = me.semantic_colors;
     if (colors?.result && colors?.status) {
-      // hydrateFromProfile deep-merges with defaults so partial or missing
-      // data from pre-migration backends never breaks the UI.
       useColorStore.getState().hydrateFromProfile(colors);
     }
   } catch {
     // Never surface a color sync error to the auth flow.
+  }
+
+  // ── Theme + auto_seasonal ─────────────────────────────────────────────────
+  // Only hydrate if the server actually returned these fields.
+  // Pre-migration backends that don't include them are silently skipped —
+  // the localStorage value (or OS preference) continues to be used.
+  try {
+    if (me.theme || me.auto_seasonal !== undefined) {
+      hydrateThemeFromServer(
+        me.theme ?? "graphite",
+        me.auto_seasonal ?? false,
+      );
+    }
+  } catch {
+    // Non-fatal.
   }
 }
 
@@ -121,9 +142,9 @@ export async function hydrateColorsAfterSso(): Promise<void> {
 export async function getMe(): Promise<Me> {
   const res = await api.get<Me>(endpoints.me);
 
-  // Hydrate color store from the embedded semantic_colors.
-  // Runs on: initial page load, hard refresh, tab focus re-auth.
-  hydrateColorsFromMe(res.data);
+  // Hydrate both colors and theme from the embedded appearance fields.
+  // Runs on: initial page load, hard refresh, SSO callback, tab focus re-auth.
+  hydrateAppearanceFromMe(res.data);
 
   return res.data;
 }

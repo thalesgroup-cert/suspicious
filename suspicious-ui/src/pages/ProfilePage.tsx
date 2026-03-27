@@ -47,7 +47,7 @@ import {
   updatePreferences,
   type UserProfile,
 } from "@/features/profile/api";
-import { useThemeMode } from "@/styles/themeStore";
+import { useThemeMode } from "@/styles/ThemeStore";
 import type { ThemeName } from "@/styles/themes";
 import { useHudModes } from "@/shared/hooks/useHudModes";
 import { useColorStore, useResultColors, useStatusColors } from "@/styles/colorStore";

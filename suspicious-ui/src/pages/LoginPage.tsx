@@ -18,8 +18,8 @@ import {
   Visibility,
   VisibilityOff,
   ArrowForwardOutlined,
-  LockOutlined,
   ShieldOutlined,
+  LockOutlined
 } from "@mui/icons-material";
 import { useNavigate } from "react-router-dom";
 import { useQuery } from "@tanstack/react-query";
@@ -122,7 +122,7 @@ function SidePanel() {
     <Box
       sx={{
         flex: "0 0 340px",
-        display: { xs: "none", lg: "flex" },
+        display: "flex",
         flexDirection: "column",
         justifyContent: "center",
         px: 5,
@@ -139,9 +139,7 @@ function SidePanel() {
           bottom: "10%",
           right: 0,
           width: 1,
-          background:  isDark
-          ? `linear-gradient(180deg, ${alpha("#fff", 0.05)}, ${alpha("#fff", 0.03)})`
-          : `linear-gradient(180deg, ${alpha("#fff", 0.95)}, ${alpha(theme.palette.grey[50], 0.98)})`,
+          background: `linear-gradient(180deg, transparent, ${alpha(theme.palette.divider, isDark ? 0.35 : 0.6)}, transparent)`,
         }}
       />
 
@@ -568,6 +566,13 @@ export default function LoginPage() {
     retry: false,
   });
 
+  // ── SSO callback handler ──────────────────────────────────────────────
+  // The Django callback view redirects to:
+  //   /login?sso=1#token=<knox>&expiry=<iso>     on success
+  //   /login?sso_error=<reason>                  on failure
+  //
+  // The token is in the fragment so it never appears in server logs.
+  // We consume it once, store it, clear the fragment, then navigate to /.
   React.useEffect(() => {
     const searchParams = new URLSearchParams(window.location.search);
 
@@ -698,8 +703,6 @@ export default function LoginPage() {
           display: "flex",
         }}
       >
-        {/* Left: decorative panel (desktop) */}
-        <SidePanel />
 
         {/* Right: login form */}
         <Box

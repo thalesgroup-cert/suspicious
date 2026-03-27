@@ -251,8 +251,22 @@ if _ldap_uri:
             "last_name":  "sn",
             "email":      "mail",
         }
+        # Keep the local user record in sync with the directory on every
+        # login (name/email changes propagate automatically).
         AUTH_LDAP_ALWAYS_UPDATE_USER = True
-        AUTH_LDAP_CACHE_TIMEOUT      = 3600
+
+        # Cache LDAP group memberships for 1 hour so repeated requests
+        # don't re-query the directory on every login attempt.
+        AUTH_LDAP_CACHE_TIMEOUT = 3600
+ 
+        # Reuse the LDAP connection across requests instead of opening a
+        # new TCP connection for every authentication call.
+        # This is the most impactful setting for latency — without it,
+        # each LDAP auth pays a full TCP handshake + bind RTT.
+        AUTH_LDAP_CONNECTION_OPTIONS = {
+            ldap.OPT_NETWORK_TIMEOUT: 5,    # fail fast if LDAP is unreachable
+            ldap.OPT_TIMEOUT:         10,   # total operation timeout
+        }
 
         _verify_ssl = str(_ldap_cfg.get("verify_ssl", "False")).lower()
         if _verify_ssl in ("false", "0", "no"):

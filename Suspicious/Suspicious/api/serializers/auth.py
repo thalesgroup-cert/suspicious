@@ -39,14 +39,18 @@ class AuthenticatedUserSerializer(serializers.ModelSerializer):
       - groups           list of group names (for role-based routing)
       - ciso_scope       CISO scope string from CISOProfile, or "" for regular users
       - semantic_colors  user's color preferences, merged with defaults
+      - theme            user's active theme name (e.g. "graphite", "future")
+      - auto_seasonal    whether seasonal auto-theming is enabled
 
-    Having semantic_colors here means the frontend can hydrate the color
-    store from the /auth/me/ response without a separate /profile/colors/
-    roundtrip — saving a request on every page load and hard refresh.
+    Having all appearance fields here means the frontend can fully hydrate
+    colors AND the theme from a single /auth/me/ response — no separate
+    /profile/ or /profile/colors/ roundtrip needed on page load.
     """
-    groups = serializers.SerializerMethodField()
-    ciso_scope = serializers.SerializerMethodField()
+    groups          = serializers.SerializerMethodField()
+    ciso_scope      = serializers.SerializerMethodField()
     semantic_colors = serializers.SerializerMethodField()
+    theme           = serializers.SerializerMethodField()
+    auto_seasonal   = serializers.SerializerMethodField()
 
     class Meta:
         model = User
@@ -59,35 +63,45 @@ class AuthenticatedUserSerializer(serializers.ModelSerializer):
             "groups",
             "ciso_scope",
             "semantic_colors",
+            "theme",
+            "auto_seasonal",
         )
 
     def get_groups(self, obj):
         return list(obj.groups.values_list("name", flat=True))
 
     def get_ciso_scope(self, obj) -> str:
-        """
-        Returns the CISO scope string if the user has a CISOProfile,
-        otherwise returns an empty string. Using SerializerMethodField
-        (not a plain CharField with default) ensures we never accidentally
-        read a non-existent attribute on the User model.
-        """
         try:
             return obj.cisoprofile.scope or ""
         except CISOProfile.DoesNotExist:
             return ""
 
     def get_semantic_colors(self, obj) -> dict:
-        """
-        Returns the merged semantic colors for this user.
-        Looks up CISOProfile first, then UserProfile, then falls back to
-        DEFAULT_SEMANTIC_COLORS so the response is always complete.
-        """
         profile = _get_profile_for_user(obj)
         if profile is not None:
             return profile.get_semantic_colors()
-        # No profile yet (new user before first profile creation)
         import copy
         return copy.deepcopy(DEFAULT_SEMANTIC_COLORS)
+
+    def get_theme(self, obj) -> str:
+        """
+        Returns the user's saved theme name. Falls back to "graphite" if no
+        profile exists yet (new user before first profile creation).
+        """
+        profile = _get_profile_for_user(obj)
+        if profile is not None:
+            return profile.theme or "graphite"
+        return "graphite"
+
+    def get_auto_seasonal(self, obj) -> bool:
+        """
+        Returns the user's auto_seasonal preference.
+        Falls back to False so new users get explicit theme control by default.
+        """
+        profile = _get_profile_for_user(obj)
+        if profile is not None:
+            return bool(profile.auto_seasonal)
+        return False
 
 
 class LoginUserSerializer(serializers.ModelSerializer):

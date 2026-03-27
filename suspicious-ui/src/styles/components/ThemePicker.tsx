@@ -62,7 +62,7 @@ const META: Partial<Record<ThemeName, ThemeMeta>> = {
   sunrise:       { label: "Sunrise",       description: "Peach + coral. Warm, bright, friendly.",        group: "Classic", emoji: "🌅" },
   valentine:     { label: "Valentine",     description: "Pink + berry. Soft and bold accents.",          group: "Classic", emoji: "💜" },
   cyber:         { label: "Cyber",         description: "Neon cyan/green on deep black.",                group: "Classic", emoji: "💻" },
-  metal:         { label: "Metal",         description: "A Metal...Theme ? A 'solid' option...",       group: "Special", emoji: "📦" },
+  metal:         { label: "Metal",         description: "Metal...Theme ? A 'solid' option...",       group: "Special", emoji: "📦" },
   winter:        { label: "Winter",        description: "Deep navy with icy highlights.",                group: "Seasonal", emoji: "❄️" },
   spring:        { label: "Spring",        description: "Fresh green with lilac accents.",               group: "Seasonal", emoji: "🌸" },
   summer:        { label: "Summer",        description: "Bright sky blue with sun amber.",               group: "Seasonal", emoji: "🌞" },
