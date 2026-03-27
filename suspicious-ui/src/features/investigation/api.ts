@@ -111,6 +111,7 @@ export type InvestigationListParams = {
   search?: string;
   status?: InvestigationStatus | "ALL";
   type?: InvestigationType | "ALL";
+  result?: InvestigationResult | "ALL";   // ← added for backend result filter
   from?: string;
   to?: string;
   sort?: InvestigationSort;
@@ -139,129 +140,75 @@ type InvestigationListApiResponse = {
 function asString(value: unknown, fallback = ""): string {
   return typeof value === "string" ? value : fallback;
 }
-
 function asNullableString(value: unknown): string | null {
   return typeof value === "string" ? value : null;
 }
-
 function asBoolean(value: unknown, fallback = false): boolean {
   return typeof value === "boolean" ? value : fallback;
 }
-
 function asNumber(value: unknown, fallback = 0): number {
-  if (typeof value === "number" && Number.isFinite(value)) {
-    return value;
-  }
-
+  if (typeof value === "number" && Number.isFinite(value)) return value;
   if (typeof value === "string" && value.trim() !== "") {
     const parsed = Number(value);
-    if (Number.isFinite(parsed)) {
-      return parsed;
-    }
+    if (Number.isFinite(parsed)) return parsed;
   }
-
   return fallback;
 }
-
 function asNullableNumber(value: unknown): number | null {
-  if (value == null || value === "") {
-    return null;
-  }
-
-  if (typeof value === "number" && Number.isFinite(value)) {
-    return value;
-  }
-
+  if (value == null || value === "") return null;
+  if (typeof value === "number" && Number.isFinite(value)) return value;
   if (typeof value === "string") {
     const parsed = Number(value);
-    if (Number.isFinite(parsed)) {
-      return parsed;
-    }
+    if (Number.isFinite(parsed)) return parsed;
   }
-
   return null;
 }
-
 function asStringArray(value: unknown): string[] {
-  if (!Array.isArray(value)) {
-    return [];
-  }
+  if (!Array.isArray(value)) return [];
   return value.map((item) => String(item));
 }
-
 function isObject(value: unknown): value is Record<string, unknown> {
   return typeof value === "object" && value !== null && !Array.isArray(value);
 }
 
 function normalizeStatus(value: unknown): InvestigationStatus {
-  const v = String(value ?? "").toUpperCase();
-
-  switch (v) {
-    case "NEW":
-      return "NEW";
-    case "IN_PROGRESS":
-      return "IN_PROGRESS";
-    case "DONE":
-      return "DONE";
-    case "CHALLENGED":
-      return "CHALLENGED";
-    case "FAILED":
-      return "FAILED";
-    case "REJECTED":
-      return "REJECTED";
-    default:
-      return "UNKNOWN";
+  switch (String(value ?? "").toUpperCase()) {
+    case "NEW": return "NEW";
+    case "IN_PROGRESS": return "IN_PROGRESS";
+    case "DONE": return "DONE";
+    case "CHALLENGED": return "CHALLENGED";
+    case "FAILED": return "FAILED";
+    case "REJECTED": return "REJECTED";
+    default: return "UNKNOWN";
   }
 }
-
 function normalizeType(value: unknown): InvestigationType {
-  const v = String(value ?? "").toUpperCase();
-
-  switch (v) {
-    case "FILE":
-      return "FILE";
-    case "MAIL":
-      return "MAIL";
-    case "URL":
-      return "URL";
-    case "IP":
-      return "IP";
-    case "HASH":
-      return "HASH";
-    default:
-      return "UNKNOWN";
+  switch (String(value ?? "").toUpperCase()) {
+    case "FILE": return "FILE";
+    case "MAIL": return "MAIL";
+    case "URL": return "URL";
+    case "IP": return "IP";
+    case "HASH": return "HASH";
+    default: return "UNKNOWN";
   }
 }
-
 function normalizeResult(value: unknown): InvestigationResult | string {
-  const v = String(value ?? "").toUpperCase();
-
-  switch (v) {
-    case "SAFE":
-      return "SAFE";
-    case "INCONCLUSIVE":
-      return "INCONCLUSIVE";
-    case "UNCHALLENGED":
-      return "UNCHALLENGED";
-    case "ALLOW_LISTED":
-      return "ALLOW_LISTED";
-    case "FAILURE":
-      return "FAILURE";
-    case "SUSPICIOUS":
-      return "SUSPICIOUS";
-    case "DANGEROUS":
-      return "DANGEROUS";
-    default:
-      return v || "UNKNOWN";
+  switch (String(value ?? "").toUpperCase()) {
+    case "SAFE": return "SAFE";
+    case "INCONCLUSIVE": return "INCONCLUSIVE";
+    case "UNCHALLENGED": return "UNCHALLENGED";
+    case "ALLOW_LISTED": return "ALLOW_LISTED";
+    case "FAILURE": return "FAILURE";
+    case "SUSPICIOUS": return "SUSPICIOUS";
+    case "DANGEROUS": return "DANGEROUS";
+    default: return String(value ?? "").toUpperCase() || "UNKNOWN";
   }
 }
 
 function normalizeRow(input: unknown): InvestigationRow {
   const row = isObject(input) ? input : {};
-
   const artifact = asString(row.artifact);
   const info = asString(row.info, artifact);
-
   return {
     id: asNumber(row.id, 0),
     reporter_email: asString(row.reporter_email),
@@ -278,15 +225,9 @@ function normalizeRow(input: unknown): InvestigationRow {
 }
 
 function normalizeAnalyzerTarget(value: unknown): InvestigationAnalyzerTarget | null {
-  if (!isObject(value)) {
-    return null;
-  }
-
+  if (!isObject(value)) return null;
   let normalizedId: string | number | null = null;
-  if (typeof value.id === "number" || typeof value.id === "string") {
-    normalizedId = value.id;
-  }
-
+  if (typeof value.id === "number" || typeof value.id === "string") normalizedId = value.id;
   return {
     kind: asString(value.kind, "unknown"),
     id: normalizedId,
@@ -296,7 +237,6 @@ function normalizeAnalyzerTarget(value: unknown): InvestigationAnalyzerTarget | 
 
 function normalizeAnalyzerReport(input: unknown): InvestigationAnalyzerReport {
   const report = isObject(input) ? input : {};
-
   return {
     id: asNumber(report.id, 0),
     cortex_job_id: asString(report.cortex_job_id),
@@ -318,10 +258,7 @@ function normalizeAnalyzerReport(input: unknown): InvestigationAnalyzerReport {
 }
 
 function normalizeCaseInfos(value: unknown): InvestigationCaseInfos | undefined {
-  if (!isObject(value)) {
-    return undefined;
-  }
-
+  if (!isObject(value)) return undefined;
   return value as InvestigationCaseInfos;
 }
 
@@ -329,10 +266,7 @@ function normalizeDetails(input: unknown): InvestigationDetails {
   const data = isObject(input) ? input : {};
   const artifact = asString(data.artifact);
   const info = asString(data.info, artifact);
-  const analyzerReportsRaw = Array.isArray(data.analyzer_reports)
-    ? data.analyzer_reports
-    : [];
-
+  const analyzerReportsRaw = Array.isArray(data.analyzer_reports) ? data.analyzer_reports : [];
   return {
     ...data,
     id: asNumber(data.id, 0),
@@ -354,21 +288,16 @@ function normalizeDetails(input: unknown): InvestigationDetails {
 
 function mapSort(sort: InvestigationListParams["sort"]): string {
   switch (sort) {
-    case "date_asc":
-      return "creation_date";
-    case "id_desc":
-      return "-id";
-    case "id_asc":
-      return "id";
+    case "date_asc": return "creation_date";
+    case "id_desc": return "-id";
+    case "id_asc": return "id";
     case "date_desc":
-    default:
-      return "-creation_date";
+    default: return "-creation_date";
   }
 }
 
 function normalizeListResponse(data: unknown): InvestigationListResponse {
   const payload: InvestigationListApiResponse = isObject(data) ? data : {};
-
   return {
     count: asNumber(payload.count, 0),
     next: typeof payload.next === "string" ? payload.next : null,
@@ -384,6 +313,7 @@ function buildInvestigationListParams(params: InvestigationListParams) {
     search: params.search?.trim() || undefined,
     status: params.status && params.status !== "ALL" ? params.status : undefined,
     type: params.type && params.type !== "ALL" ? params.type : undefined,
+    result: params.result && params.result !== "ALL" ? params.result : undefined,  // ← added
     from_date: params.from || undefined,
     to_date: params.to || undefined,
     ordering: mapSort(params.sort),
@@ -396,7 +326,6 @@ export async function getAllInvestigations(
   const res = await api.get("/investigations/", {
     params: buildInvestigationListParams(params),
   });
-
   return normalizeListResponse(res.data);
 }
 
@@ -413,12 +342,7 @@ export async function editGlobalCase(
   confidence: number,
   classification: string,
 ): Promise<InvestigationDetails> {
-  const payload: EditGlobalCasePayload = {
-    score,
-    confidence,
-    classification,
-  };
-
+  const payload: EditGlobalCasePayload = { score, confidence, classification };
   const res = await api.patch(`/investigations/${caseId}/edit-global/`, payload);
   return normalizeDetails(res.data);
 }

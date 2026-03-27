@@ -34,6 +34,7 @@ API_STATUS_TO_INTERNAL = {
 }
 
 INVESTIGATION_TYPE_CHOICES = ("FILE", "MAIL", "URL", "IP", "HASH", "UNKNOWN")
+INVESTIGATION_RESULT_CHOICES = tuple(API_RESULT_TO_INTERNAL.keys()) + ("UNKNOWN",)
 INVESTIGATION_ORDERING_CHOICES = ("-creation_date", "creation_date", "-id", "id")
 
 
@@ -103,9 +104,9 @@ def get_case_info_value(obj: Case) -> str:
         if non_file_iocs.ip_id and non_file_iocs.ip:
             return getattr(non_file_iocs.ip, "address", "") or obj.description or ""
         if non_file_iocs.hash_id and non_file_iocs.hash:
+            # Hash model has field `value` (CharField) — confirmed from models
             return (
                 getattr(non_file_iocs.hash, "value", "")
-                or getattr(non_file_iocs.hash, "hash", "")
                 or obj.description
                 or ""
             )
@@ -114,7 +115,9 @@ def get_case_info_value(obj: Case) -> str:
 
 
 class InvestigationListQuerySerializer(serializers.Serializer):
-    search = serializers.CharField(required=False, allow_blank=True, trim_whitespace=True, max_length=255)
+    search = serializers.CharField(
+        required=False, allow_blank=True, trim_whitespace=True, max_length=255
+    )
     status = serializers.ChoiceField(
         choices=("ALL", "NEW", "IN_PROGRESS", "DONE", "CHALLENGED", "UNKNOWN"),
         required=False,
@@ -122,6 +125,13 @@ class InvestigationListQuerySerializer(serializers.Serializer):
     )
     type = serializers.ChoiceField(
         choices=("ALL",) + INVESTIGATION_TYPE_CHOICES,
+        required=False,
+        default="ALL",
+    )
+    # Dedicated result filter — allows filtering to DANGEROUS-only, SAFE-only, etc.
+    # without having to guess the right freetext search term.
+    result = serializers.ChoiceField(
+        choices=("ALL",) + INVESTIGATION_RESULT_CHOICES,
         required=False,
         default="ALL",
     )
@@ -176,22 +186,9 @@ class InvestigationAnalyzerReportSerializer(serializers.ModelSerializer):
     class Meta:
         model = AnalyzerReport
         fields = [
-            "id",
-            "cortex_job_id",
-            "type",
-            "status",
-            "analyzer_name",
-            "analyzer_id",
-            "level",
-            "confidence",
-            "score",
-            "category",
-            "categories",
-            "report_summary",
-            "report_taxonomy",
-            "report_full",
-            "target",
-            "created_at",
+            "id", "cortex_job_id", "type", "status", "analyzer_name", "analyzer_id",
+            "level", "confidence", "score", "category", "categories",
+            "report_summary", "report_taxonomy", "report_full", "target", "created_at",
         ]
 
     def get_categories(self, obj: AnalyzerReport) -> list[str]:
@@ -199,56 +196,23 @@ class InvestigationAnalyzerReportSerializer(serializers.ModelSerializer):
 
     def get_target(self, obj: AnalyzerReport) -> dict[str, Any]:
         if obj.url_id:
-            return {
-                "kind": "url",
-                "id": obj.url_id,
-                "value": getattr(obj.url, "address", str(obj.url_id)),
-            }
+            return {"kind": "url", "id": obj.url_id, "value": getattr(obj.url, "address", str(obj.url_id))}
         if obj.domain_id:
-            return {
-                "kind": "domain",
-                "id": obj.domain_id,
-                "value": getattr(obj.domain, "domain_name", str(obj.domain_id)),
-            }
+            return {"kind": "domain", "id": obj.domain_id, "value": getattr(obj.domain, "domain_name", str(obj.domain_id))}
         if obj.mail_id:
-            return {
-                "kind": "mail",
-                "id": obj.mail_id,
-                "value": getattr(obj.mail, "address", str(obj.mail_id)),
-            }
+            return {"kind": "mail", "id": obj.mail_id, "value": getattr(obj.mail, "address", str(obj.mail_id))}
         if obj.hash_id:
-            return {
-                "kind": "hash",
-                "id": obj.hash_id,
-                "value": getattr(obj.hash, "value", str(obj.hash_id)),
-            }
+            return {"kind": "hash", "id": obj.hash_id, "value": getattr(obj.hash, "value", str(obj.hash_id))}
         if obj.file_id:
             file_field = getattr(obj.file, "file_path", None)
             file_name = getattr(file_field, "name", None)
-            return {
-                "kind": "file",
-                "id": obj.file_id,
-                "value": file_name or str(obj.file_id),
-            }
+            return {"kind": "file", "id": obj.file_id, "value": file_name or str(obj.file_id)}
         if obj.ip_id:
-            return {
-                "kind": "ip",
-                "id": obj.ip_id,
-                "value": getattr(obj.ip, "address", str(obj.ip_id)),
-            }
+            return {"kind": "ip", "id": obj.ip_id, "value": getattr(obj.ip, "address", str(obj.ip_id))}
         if obj.mail_body_id:
-            return {
-                "kind": "mail_body",
-                "id": obj.mail_body_id,
-                "value": getattr(obj.mail_body, "fuzzy_hash", str(obj.mail_body_id)),
-            }
+            return {"kind": "mail_body", "id": obj.mail_body_id, "value": getattr(obj.mail_body, "fuzzy_hash", str(obj.mail_body_id))}
         if obj.mail_header_id:
-            return {
-                "kind": "mail_header",
-                "id": obj.mail_header_id,
-                "value": getattr(obj.mail_header, "fuzzy_hash", str(obj.mail_header_id)),
-            }
-
+            return {"kind": "mail_header", "id": obj.mail_header_id, "value": getattr(obj.mail_header, "fuzzy_hash", str(obj.mail_header_id))}
         return {"kind": "unknown", "id": None, "value": None}
 
 
@@ -264,16 +228,8 @@ class InvestigationRowSerializer(serializers.ModelSerializer):
     class Meta:
         model = Case
         fields = [
-            "id",
-            "reporter_email",
-            "status",
-            "info",
-            "created_at",
-            "tests_done",
-            "type",
-            "result",
-            "is_challengeable",
-            "is_challenged",
+            "id", "reporter_email", "status", "info", "created_at",
+            "tests_done", "type", "result", "is_challengeable", "is_challenged",
         ]
 
     def get_status(self, obj: Case) -> str:
@@ -295,11 +251,7 @@ class InvestigationDetailsSerializer(InvestigationRowSerializer):
     raw = serializers.SerializerMethodField()
 
     class Meta(InvestigationRowSerializer.Meta):
-        fields = InvestigationRowSerializer.Meta.fields + [
-            "analyzer_reports",
-            "case_infos",
-            "raw",
-        ]
+        fields = InvestigationRowSerializer.Meta.fields + ["analyzer_reports", "case_infos", "raw"]
 
     def get_analyzer_reports(self, obj: Case) -> list[dict[str, Any]]:
         queryset = self.context.get("analyzer_reports_qs")

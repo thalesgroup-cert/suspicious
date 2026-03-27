@@ -321,6 +321,55 @@ function SoftCard(props: React.PropsWithChildren<{ sx?: object }>) {
 }
 
 // ---------------------------------------------------------------------------
+// Group analyzer reports by artifact (target.kind + target.value)
+// ---------------------------------------------------------------------------
+
+type ReportGroup = {
+  key: string;
+  kind: string;
+  value: string;
+  reports: SubmissionAnalyzerReport[];
+};
+
+function groupReportsByArtifact(
+  reports: SubmissionAnalyzerReport[]
+): ReportGroup[] {
+  const order: string[] = [];
+  const map: Record<string, ReportGroup> = {};
+
+  for (const report of reports) {
+    const kind  = report.target?.kind  ?? "UNKNOWN";
+    const value = report.target?.value ?? "—";
+    const key   = `${kind}::${value}`;
+
+    if (!map[key]) {
+      order.push(key);
+      map[key] = { key, kind, value, reports: [] };
+    }
+    map[key].reports.push(report);
+  }
+
+  return order.map((k) => map[k]);
+}
+
+// Icon label for each target kind
+function kindLabel(kind: string) {
+  const labels: Record<string, string> = {
+    FILE:        "File",
+    URL:         "URL",
+    IP:          "IP address",
+    HASH:        "Hash",
+    DOMAIN:      "Domain",
+    MAIL:        "Email address",
+    MAIL_BODY:   "Mail body",
+    MAIL_HEADER: "Mail header",
+    UNKNOWN:     "Unknown",
+  };
+  return labels[kind] ?? kind;
+}
+
+
+// ---------------------------------------------------------------------------
 // AnalyzerReportCard
 // ---------------------------------------------------------------------------
 
@@ -773,6 +822,12 @@ export default function SubmissionsPage() {
 
   const analyzerReports = detailsQuery.data?.analyzer_reports ?? [];
   const hasRawDetails = typeof detailsQuery.data?.raw !== "undefined";
+
+  // Group reports by artifact so the drawer shows one section per checked item
+  const reportGroups = React.useMemo(
+    () => groupReportsByArtifact(analyzerReports),
+    [analyzerReports]
+  );
 
   const expandAllAnalyzers = React.useCallback(() => {
     setExpandedAnalyzerIds(Object.fromEntries(analyzerReports.map((r) => [r.id, true])));
@@ -1351,19 +1406,79 @@ export default function SubmissionsPage() {
                         No analysis details are available for this submission yet.
                       </Alert>
                     ) : (
-                      <Stack spacing={1.25}>
-                        {detailsQuery.data.analyzer_reports.map((report) => (
-                          <AnalyzerReportCard
-                            key={report.id}
-                            report={report}
-                            expanded={!!expandedAnalyzerIds[report.id]}
-                            onToggle={() =>
-                              setExpandedAnalyzerIds((prev) => ({
-                                ...prev,
-                                [report.id]: !prev[report.id],
-                              }))
-                            }
-                          />
+                      <Stack spacing={2}>
+                        {reportGroups.map((group) => (
+                          <Box key={group.key}>
+                            {/* Artifact group header */}
+                            <Stack
+                              direction="row"
+                              spacing={1}
+                              alignItems="center"
+                              sx={{ mb: 1 }}
+                            >
+                              <Box
+                                sx={{
+                                  px: 1,
+                                  py: 0.3,
+                                  borderRadius: 1.5,
+                                  fontSize: 10.5,
+                                  fontWeight: 800,
+                                  letterSpacing: "0.05em",
+                                  textTransform: "uppercase",
+                                  bgcolor: isDark
+                                    ? "rgba(255,255,255,.07)"
+                                    : alpha(theme.palette.primary.main, 0.08),
+                                  color: isDark
+                                    ? "text.secondary"
+                                    : "primary.main",
+                                  border: `1px solid ${isDark
+                                    ? "rgba(255,255,255,.12)"
+                                    : alpha(theme.palette.primary.main, 0.2)}`,
+                                  flexShrink: 0,
+                                }}
+                              >
+                                {kindLabel(group.kind)}
+                              </Box>
+                              <Typography
+                                variant="body2"
+                                fontWeight={700}
+                                sx={{
+                                  overflow: "hidden",
+                                  textOverflow: "ellipsis",
+                                  whiteSpace: "nowrap",
+                                  minWidth: 0,
+                                  flex: 1,
+                                }}
+                                title={group.value}
+                              >
+                                {group.value}
+                              </Typography>
+                              <Typography
+                                variant="caption"
+                                color="text.disabled"
+                                sx={{ flexShrink: 0 }}
+                              >
+                                {group.reports.length} analyzer{group.reports.length === 1 ? "" : "s"}
+                              </Typography>
+                            </Stack>
+
+                            {/* Reports for this artifact */}
+                            <Stack spacing={1}>
+                              {group.reports.map((report) => (
+                                <AnalyzerReportCard
+                                  key={report.id}
+                                  report={report}
+                                  expanded={!!expandedAnalyzerIds[report.id]}
+                                  onToggle={() =>
+                                    setExpandedAnalyzerIds((prev) => ({
+                                      ...prev,
+                                      [report.id]: !prev[report.id],
+                                    }))
+                                  }
+                                />
+                              ))}
+                            </Stack>
+                          </Box>
                         ))}
                       </Stack>
                     )}
