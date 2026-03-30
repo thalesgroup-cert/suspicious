@@ -196,24 +196,24 @@ class InvestigationAnalyzerReportSerializer(serializers.ModelSerializer):
 
     def get_target(self, obj: AnalyzerReport) -> dict[str, Any]:
         if obj.url_id:
-            return {"kind": "url", "id": obj.url_id, "value": getattr(obj.url, "address", str(obj.url_id))}
+            return {"kind": "URL", "id": obj.url_id, "value": getattr(obj.url, "address", str(obj.url_id))}
         if obj.domain_id:
-            return {"kind": "domain", "id": obj.domain_id, "value": getattr(obj.domain, "domain_name", str(obj.domain_id))}
+            return {"kind": "DOMAIN", "id": obj.domain_id, "value": getattr(obj.domain, "value", str(obj.domain_id))}
         if obj.mail_id:
-            return {"kind": "mail", "id": obj.mail_id, "value": getattr(obj.mail, "address", str(obj.mail_id))}
+            return {"kind": "MAIL", "id": obj.mail_id, "value": getattr(obj.mail, "address", str(obj.mail_id))}
         if obj.hash_id:
-            return {"kind": "hash", "id": obj.hash_id, "value": getattr(obj.hash, "value", str(obj.hash_id))}
+            return {"kind": "HASH", "id": obj.hash_id, "value": getattr(obj.hash, "value", str(obj.hash_id))}
         if obj.file_id:
             file_field = getattr(obj.file, "file_path", None)
             file_name = getattr(file_field, "name", None)
-            return {"kind": "file", "id": obj.file_id, "value": file_name or str(obj.file_id)}
+            return {"kind": "FILE", "id": obj.file_id, "value": file_name or str(obj.file_id)}
         if obj.ip_id:
-            return {"kind": "ip", "id": obj.ip_id, "value": getattr(obj.ip, "address", str(obj.ip_id))}
+            return {"kind": "IP", "id": obj.ip_id, "value": getattr(obj.ip, "address", str(obj.ip_id))}
         if obj.mail_body_id:
-            return {"kind": "mail_body", "id": obj.mail_body_id, "value": getattr(obj.mail_body, "fuzzy_hash", str(obj.mail_body_id))}
+            return {"kind": "MAIL_BODY", "id": obj.mail_body_id, "value": getattr(obj.mail_body, "fuzzy_hash", str(obj.mail_body_id))}
         if obj.mail_header_id:
-            return {"kind": "mail_header", "id": obj.mail_header_id, "value": getattr(obj.mail_header, "fuzzy_hash", str(obj.mail_header_id))}
-        return {"kind": "unknown", "id": None, "value": None}
+            return {"kind": "MAIL_HEADER", "id": obj.mail_header_id, "value": getattr(obj.mail_header, "fuzzy_hash", str(obj.mail_header_id))}
+        return {"kind": "UNKNOWN", "id": None, "value": None}
 
 
 class InvestigationRowSerializer(serializers.ModelSerializer):
@@ -272,10 +272,13 @@ class InvestigationDetailsSerializer(InvestigationRowSerializer):
 
     def get_raw(self, obj: Case) -> dict[str, Any]:
         analyzer_reports_qs = self.context.get("analyzer_reports_qs", AnalyzerReport.objects.none())
-
+        ids = []
         file_or_mail = None
         non_file_iocs = None
-
+        if hasattr(analyzer_reports_qs, "values_list"):
+            ids = analyzer_reports_qs.values_list("id", flat=True)
+        else:
+            ids = [obj.id for obj in analyzer_reports_qs]
         if obj.fileOrMail_id and obj.fileOrMail:
             file_or_mail = {
                 "id": obj.fileOrMail_id,
@@ -317,5 +320,5 @@ class InvestigationDetailsSerializer(InvestigationRowSerializer):
             },
             "fileOrMail": file_or_mail,
             "nonFileIocs": non_file_iocs,
-            "analyzer_report_ids": list(analyzer_reports_qs.values_list("id", flat=True)),
+            "analyzer_report_ids": list(ids),
         }

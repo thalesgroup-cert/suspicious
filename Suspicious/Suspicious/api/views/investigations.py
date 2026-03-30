@@ -69,6 +69,44 @@ class IsInvestigator(BasePermission):
         return bool(user and user.is_authenticated and user_is_investigator(user))
 
 
+
+def _dedup_analyzer_reports(reports) -> list:
+    """
+    Keep only the most recent AnalyzerReport per (analyzer_id, target_key).
+
+    The queryset is already ordered by -creation_date, -pk so the first
+    occurrence of each key is the newest. We preserve that order in the
+    returned list so the caller doesn't need to re-sort.
+
+    target_key is the first non-null FK among url/domain/mail/hash/file/ip/
+    mail_body/mail_header — same priority as resolve_analyzer_report_target.
+    """
+    def _target_key(r) -> tuple:
+        for attr, label in (
+            ("url_id",         "url"),
+            ("domain_id",      "domain"),
+            ("mail_id",        "mail"),
+            ("hash_id",        "hash"),
+            ("file_id",        "file"),
+            ("ip_id",          "ip"),
+            ("mail_body_id",   "mail_body"),
+            ("mail_header_id", "mail_header"),
+        ):
+            val = getattr(r, attr, None)
+            if val:
+                return (label, val)
+        return ("unknown", None)
+
+    seen: set = set()
+    result: list = []
+    for report in reports:
+        key = (report.analyzer_id, _target_key(report))
+        if key not in seen:
+            seen.add(key)
+            result.append(report)
+    return result
+
+
 class InvestigationAccessMixin:
     analyzer_report_select_related = ANALYZER_REPORT_SELECT_RELATED
 
@@ -175,13 +213,14 @@ class InvestigationAccessMixin:
         if not query.children:
             return AnalyzerReport.objects.none()
 
-        return (
+        qs = (
             AnalyzerReport.objects
             .filter(query)
             .select_related(*self.analyzer_report_select_related)
             .order_by("-creation_date", "-pk")
             .distinct()
         )
+        return _dedup_analyzer_reports(qs)
 
     def filter_case_queryset(self, queryset, validated_filters: dict):
         search = validated_filters.get("search")

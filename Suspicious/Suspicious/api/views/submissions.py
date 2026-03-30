@@ -38,6 +38,40 @@ CASE_DETAIL_SELECT_RELATED = CASE_LIST_SELECT_RELATED + (
 )
 
 
+def _dedup_analyzer_reports(reports) -> list:
+    """
+    Keep only the most recent AnalyzerReport per (analyzer_id, target_key).
+
+    The queryset is already ordered by -creation_date, -pk so the first
+    occurrence of each key is the newest. We preserve that order.
+    """
+    def _target_key(r) -> tuple:
+        for attr, label in (
+            ("url_id",         "url"),
+            ("domain_id",      "domain"),
+            ("mail_id",        "mail"),
+            ("hash_id",        "hash"),
+            ("file_id",        "file"),
+            ("ip_id",          "ip"),
+            ("mail_body_id",   "mail_body"),
+            ("mail_header_id", "mail_header"),
+        ):
+            val = getattr(r, attr, None)
+            if val:
+                return (label, val)
+        return ("unknown", None)
+
+    seen: set = set()
+    result: list = []
+    for report in reports:
+        key = (report.analyzer_id, _target_key(report))
+        if key not in seen:
+            seen.add(key)
+            result.append(report)
+    return result
+
+
+
 class SubmissionPagination(PageNumberPagination):
     page_size = 10
     page_size_query_param = "page_size"
@@ -93,54 +127,16 @@ class SubmissionListView(ListAPIView):
     @extend_schema(
         summary="List submissions",
         parameters=[
-            OpenApiParameter(
-                name="mine",
-                type=bool,
-                location=OpenApiParameter.QUERY,
-                required=False,
-                description=(
-                    "When true, restricts results to the authenticated user's submissions. "
-                    "For non-elevated users this is effectively always true."
-                ),
-            ),
-            OpenApiParameter(
-                name="ordering",
-                type=str,
-                location=OpenApiParameter.QUERY,
-                required=False,
-                enum=[
-                    "created_at",
-                    "-created_at",
-                    "id",
-                    "-id",
-                    "status",
-                    "-status",
-                    "result",
-                    "-result",
-                ],
-                description="Ordering field.",
-            ),
-            OpenApiParameter(
-                name="page",
-                type=int,
-                location=OpenApiParameter.QUERY,
-                required=False,
-            ),
-            OpenApiParameter(
-                name="page_size",
-                type=int,
-                location=OpenApiParameter.QUERY,
-                required=False,
-                description="Maximum 100.",
-            ),
+            OpenApiParameter(name="mine", type=bool, location=OpenApiParameter.QUERY, required=False,
+                description="When true, restricts results to the authenticated user's submissions."),
+            OpenApiParameter(name="ordering", type=str, location=OpenApiParameter.QUERY, required=False,
+                enum=["created_at", "-created_at", "id", "-id", "status", "-status", "result", "-result"],
+                description="Ordering field."),
+            OpenApiParameter(name="page", type=int, location=OpenApiParameter.QUERY, required=False),
+            OpenApiParameter(name="page_size", type=int, location=OpenApiParameter.QUERY, required=False,
+                description="Maximum 100."),
         ],
-        examples=[
-            OpenApiExample(
-                "Only my submissions",
-                value={"mine": True, "ordering": "-created_at"},
-                request_only=True,
-            ),
-        ],
+        examples=[OpenApiExample("Only my submissions", value={"mine": True, "ordering": "-created_at"}, request_only=True)],
     )
     def get(self, request, *args, **kwargs):
         return super().get(request, *args, **kwargs)
@@ -187,14 +183,11 @@ class SubmissionDetailsView(RetrieveAPIView):
             if linked_file_or_mail.mail_id and getattr(linked_file_or_mail, "mail", None):
                 mail = linked_file_or_mail.mail
 
-                # Direct analyzable mail components
                 if mail.mail_body_id:
                     filters |= Q(mail_body_id=mail.mail_body_id)
-
                 if mail.mail_header_id:
                     filters |= Q(mail_header_id=mail.mail_header_id)
 
-                # Mail attachments -> AnalyzerReport.file
                 attachment_file_ids = list(
                     mail.mail_attachments.exclude(file_id__isnull=True)
                     .values_list("file_id", flat=True)
@@ -202,95 +195,52 @@ class SubmissionDetailsView(RetrieveAPIView):
                 if attachment_file_ids:
                     filters |= Q(file_id__in=attachment_file_ids)
 
-                # Mail artifacts -> AnalyzerReport.url/ip/hash/domain/mail(MailAddress)
-                artifact_url_ids = []
-                artifact_ip_ids = []
-                artifact_hash_ids = []
-                artifact_domain_ids = []
-                artifact_mail_address_ids = []
+                artifact_url_ids, artifact_ip_ids, artifact_hash_ids = [], [], []
+                artifact_domain_ids, artifact_mail_address_ids = [], []
 
                 for artifact in mail.mail_artifacts.select_related(
-                    "artifactIsUrl",
-                    "artifactIsIp",
-                    "artifactIsHash",
-                    "artifactIsDomain",
-                    "artifactIsMailAddress",
+                    "artifactIsUrl", "artifactIsIp", "artifactIsHash",
+                    "artifactIsDomain", "artifactIsMailAddress",
                 ):
-                    if (
-                        artifact.artifactIsUrl_id
-                        and artifact.artifactIsUrl
-                        and artifact.artifactIsUrl.url_id
-                    ):
+                    if artifact.artifactIsUrl_id and artifact.artifactIsUrl and artifact.artifactIsUrl.url_id:
                         artifact_url_ids.append(artifact.artifactIsUrl.url_id)
-
-                    if (
-                        artifact.artifactIsIp_id
-                        and artifact.artifactIsIp
-                        and artifact.artifactIsIp.ip_id
-                    ):
+                    if artifact.artifactIsIp_id and artifact.artifactIsIp and artifact.artifactIsIp.ip_id:
                         artifact_ip_ids.append(artifact.artifactIsIp.ip_id)
-
-                    if (
-                        artifact.artifactIsHash_id
-                        and artifact.artifactIsHash
-                        and artifact.artifactIsHash.hash_id
-                    ):
+                    if artifact.artifactIsHash_id and artifact.artifactIsHash and artifact.artifactIsHash.hash_id:
                         artifact_hash_ids.append(artifact.artifactIsHash.hash_id)
-
-                    if (
-                        artifact.artifactIsDomain_id
-                        and artifact.artifactIsDomain
-                        and artifact.artifactIsDomain.domain_id
-                    ):
+                    if artifact.artifactIsDomain_id and artifact.artifactIsDomain and artifact.artifactIsDomain.domain_id:
                         artifact_domain_ids.append(artifact.artifactIsDomain.domain_id)
+                    if (artifact.artifactIsMailAddress_id and artifact.artifactIsMailAddress
+                            and artifact.artifactIsMailAddress.mail_address_id):
+                        artifact_mail_address_ids.append(artifact.artifactIsMailAddress.mail_address_id)
 
-                    if (
-                        artifact.artifactIsMailAddress_id
-                        and artifact.artifactIsMailAddress
-                        and artifact.artifactIsMailAddress.mail_address_id
-                    ):
-                        artifact_mail_address_ids.append(
-                            artifact.artifactIsMailAddress.mail_address_id
-                        )
-
-                if artifact_url_ids:
-                    filters |= Q(url_id__in=artifact_url_ids)
-                if artifact_ip_ids:
-                    filters |= Q(ip_id__in=artifact_ip_ids)
-                if artifact_hash_ids:
-                    filters |= Q(hash_id__in=artifact_hash_ids)
-                if artifact_domain_ids:
-                    filters |= Q(domain_id__in=artifact_domain_ids)
-                if artifact_mail_address_ids:
-                    filters |= Q(mail_id__in=artifact_mail_address_ids)
+                if artifact_url_ids:          filters |= Q(url_id__in=artifact_url_ids)
+                if artifact_ip_ids:           filters |= Q(ip_id__in=artifact_ip_ids)
+                if artifact_hash_ids:         filters |= Q(hash_id__in=artifact_hash_ids)
+                if artifact_domain_ids:       filters |= Q(domain_id__in=artifact_domain_ids)
+                if artifact_mail_address_ids: filters |= Q(mail_id__in=artifact_mail_address_ids)
 
         if obj.nonFileIocs_id and linked_non_file_iocs is not None:
-            if linked_non_file_iocs.url_id:
-                filters |= Q(url_id=linked_non_file_iocs.url_id)
-            if linked_non_file_iocs.ip_id:
-                filters |= Q(ip_id=linked_non_file_iocs.ip_id)
-            if linked_non_file_iocs.hash_id:
-                filters |= Q(hash_id=linked_non_file_iocs.hash_id)
+            if linked_non_file_iocs.url_id:  filters |= Q(url_id=linked_non_file_iocs.url_id)
+            if linked_non_file_iocs.ip_id:   filters |= Q(ip_id=linked_non_file_iocs.ip_id)
+            if linked_non_file_iocs.hash_id: filters |= Q(hash_id=linked_non_file_iocs.hash_id)
 
         if not filters.children:
-            return AnalyzerReport.objects.none()
+            return []
 
-        return (
+        qs = (
             AnalyzerReport.objects.filter(filters)
             .select_related(
-                "analyzer",
-                "url",
-                "domain",
-                "mail",
-                "hash",
-                "file",
-                "ip",
-                "mail_body",
-                "mail_header",
+                "analyzer", "url", "domain", "mail", "hash",
+                "file", "ip", "mail_body", "mail_header",
             )
             .order_by("-creation_date", "-id")
             .distinct()
         )
+        # Keep only the most recent report per (analyzer, target).
+        # Re-analyses create new rows for the same analyzer+target;
+        # _dedup_analyzer_reports retains the first (newest) occurrence.
+        return _dedup_analyzer_reports(qs)
 
     @extend_schema(summary="Retrieve submission details")
     def retrieve(self, request, *args, **kwargs):
@@ -312,13 +262,7 @@ class SubmissionChallengeView(APIView):
 
     def get_object(self, submission_id: int):
         obj = get_object_or_404(
-            Case.objects.only(
-                "id",
-                "reporter_id",
-                "is_challenged",
-                "is_challengeable",
-                "status",
-            ),
+            Case.objects.only("id", "reporter_id", "is_challenged", "is_challengeable", "status"),
             pk=submission_id,
         )
         self.check_object_permissions(self.request, obj)
@@ -330,7 +274,6 @@ class SubmissionChallengeView(APIView):
 
         if obj.is_challenged:
             raise ValidationError({"detail": "Submission already challenged."})
-
         if not obj.is_challengeable:
             raise ValidationError({"detail": "Submission cannot be challenged."})
 
