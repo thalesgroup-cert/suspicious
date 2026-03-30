@@ -57,7 +57,6 @@ import {
   buildSortOrdering,
   type InvestigationDetails,
   type InvestigationListResponse,
-  type InvestigationRow,
   type InvestigationResult,
   type InvestigationStatus,
   type InvestigationType,
@@ -229,6 +228,40 @@ function pickConfidence(d?: InvestigationDetails) {
 function pickClassification(d?: InvestigationDetails) {
   return d?.case_infos?.classification ?? "UNKNOWN";
 }
+
+// ---------------------------------------------------------------------------
+// Group analyzer reports by artifact — shared with SubmissionsPage
+// ---------------------------------------------------------------------------
+
+type ReportGroup = {
+  key: string;
+  kind: string;
+  value: string;
+  reports: any[];
+};
+
+function groupReportsByArtifact(reports: any[]): ReportGroup[] {
+  const order: string[] = [];
+  const map: Record<string, ReportGroup> = {};
+  for (const report of reports) {
+    const kind  = report.target?.kind  ?? "UNKNOWN";
+    const value = report.target?.value ?? "—";
+    const key   = `${kind}::${value}`;
+    if (!map[key]) { order.push(key); map[key] = { key, kind, value, reports: [] }; }
+    map[key].reports.push(report);
+  }
+  return order.map((k) => map[k]);
+}
+
+function kindLabel(kind: string) {
+  const labels: Record<string, string> = {
+    FILE: "File", URL: "URL", IP: "IP address", HASH: "Hash",
+    DOMAIN: "Domain", MAIL: "Email address",
+    MAIL_BODY: "Mail body", MAIL_HEADER: "Mail header", UNKNOWN: "Unknown",
+  };
+  return labels[kind.toUpperCase()] ?? kind;
+}
+
 
 // ---------------------------------------------------------------------------
 // SoftCard — theme-aware, identical to SubmitPage / HomePage / SubmissionsPage
@@ -618,6 +651,7 @@ export default function InvestigationPage() {
   const [editClassification, setEditClassification] = React.useState<string>("UNKNOWN");
 
   const [expandedAnalyzerIds, setExpandedAnalyzerIds] = React.useState<Record<number, boolean>>({});
+  const [expandedGroups, setExpandedGroups] = React.useState<Record<string, boolean>>({});
 
   const meQuery = useQuery<Me>({ queryKey: ["me"], queryFn: getMe, retry: false });
   const me = meQuery.data;
@@ -708,8 +742,8 @@ export default function InvestigationPage() {
   }, [searchParams]);
 
   React.useEffect(() => { setPage(0); }, [qDebounced, status, type, result, from, to, sort, pageSize]);
-  React.useEffect(() => { if (!openDrawer) setExpandedAnalyzerIds({}); }, [openDrawer]);
-  React.useEffect(() => { setExpandedAnalyzerIds({}); }, [selectedId]);
+  React.useEffect(() => { if (!openDrawer) { setExpandedAnalyzerIds({}); setExpandedGroups({}); } }, [openDrawer]);
+  React.useEffect(() => { setExpandedAnalyzerIds({}); setExpandedGroups({}); }, [selectedId]);
   React.useEffect(() => { setExpandedAnalyzerIds({}); }, [detailsQuery.data?.analyzer_reports]);
   React.useEffect(() => { setEditMode(false); editMutation.reset(); }, [selectedIdNum]); // eslint-disable-line react-hooks/exhaustive-deps
 
@@ -739,6 +773,10 @@ export default function InvestigationPage() {
   const currentClassification = pickClassification(detailsQuery.data);
 
   const analyzerReports = detailsQuery.data?.analyzer_reports ?? [];
+  const reportGroups = React.useMemo(
+    () => groupReportsByArtifact(analyzerReports),
+    [analyzerReports]
+  );
 
   const expandAllAnalyzers = React.useCallback(() => {
     setExpandedAnalyzerIds(Object.fromEntries(analyzerReports.map((r) => [r.id, true])));
@@ -1274,248 +1312,293 @@ export default function InvestigationPage() {
               </Stack>
             </Box>
 
-            {/* Drawer body */}
-            <Box sx={{ flex: 1, overflowY: "auto", p: 2 }}>
-              <Stack spacing={2}>
-                {/* Overview */}
-                <Card sx={{ borderRadius: 2, border: `1px solid ${drawerCardBorder}`, background: drawerCardBg }}>
-                  <CardContent sx={{ p: 2 }}>
-                    <Typography variant="subtitle2" fontWeight={900} sx={{ mb: 1.25 }}>
-                      Overview
+            {/* Drawer body — redesigned */}
+            <Box sx={{ flex: 1, overflowY: "auto" }}>
+
+              {/* ── Summary strip ──────────────────────────────────────────────── */}
+              <Box
+                sx={{
+                  px: 2.25,
+                  py: 1.5,
+                  display: "grid",
+                  gridTemplateColumns: "repeat(3, 1fr)",
+                  gap: 1,
+                  borderBottom: `1px solid ${alpha(theme.palette.divider, isDark ? 0.18 : 0.55)}`,
+                  background: isDark ? alpha("#fff", 0.015) : alpha(theme.palette.grey[50], 0.6),
+                }}
+              >
+                {[
+                  { label: "Submission", value: `#${drawerRow.id}` },
+                  { label: "Tests run", value: drawerRow.tests_done ?? "—" },
+                  { label: "Submitted", value: fmtDate(drawerRow.created_at) },
+                ].map(({ label, value }) => (
+                  <Box key={label}>
+                    <Typography sx={{ fontSize: 10, fontWeight: 700, textTransform: "uppercase", letterSpacing: "0.07em", color: "text.disabled", mb: 0.2 }}>
+                      {label}
                     </Typography>
-                    <Box
-                      sx={{
-                        display: "grid",
-                        gridTemplateColumns: { xs: "1fr", sm: "120px 1fr" },
-                        gap: 1.25,
-                      }}
-                    >
-                      <Typography color="text.secondary">Artifact</Typography>
-                      <Typography sx={{ wordBreak: "break-word" }}>{drawerRow.info || "—"}</Typography>
+                    <Typography sx={{ fontWeight: 900, fontSize: 13 }}>{String(value)}</Typography>
+                  </Box>
+                ))}
+              </Box>
 
-                      <Typography color="text.secondary">User mail</Typography>
-                      <Stack direction="row" spacing={1} alignItems="center">
-                        <Typography sx={{ wordBreak: "break-word" }}>
-                          {drawerRow.reporter_email || "—"}
-                        </Typography>
-                        {drawerRow.reporter_email ? (
-                          <IconButton size="small" onClick={() => copyEmail(drawerRow.reporter_email)}>
-                            <ContentCopyOutlined fontSize="small" />
-                          </IconButton>
-                        ) : null}
-                      </Stack>
+              <Stack spacing={0} divider={<Divider sx={{ opacity: isDark ? 0.12 : 0.35 }} />}>
 
-                      <Typography color="text.secondary">Created</Typography>
-                      <Typography>{fmtDate(drawerRow.created_at)}</Typography>
+                {/* ── Artifact ──────────────────────────────────────────────────── */}
+                <Box sx={{ px: 2.25, py: 2 }}>
+                  <Typography sx={{ fontSize: 10, fontWeight: 700, textTransform: "uppercase", letterSpacing: "0.08em", color: "text.disabled", mb: 0.75 }}>
+                    Artifact
+                  </Typography>
+                  <Typography sx={{ wordBreak: "break-all", fontWeight: 700, fontSize: 13.5 }}>
+                    {drawerRow.info || "—"}
+                  </Typography>
+                </Box>
 
-                      <Typography color="text.secondary">Investigation ID</Typography>
-                      <Stack direction="row" spacing={1} alignItems="center">
-                        <Typography>{drawerRow.id}</Typography>
-                        <CopyIconButton text={String(drawerRow.id)} title="Copy ID" />
-                      </Stack>
-                    </Box>
-                  </CardContent>
-                </Card>
-
-                {/* Global override */}
-                <Card sx={{ borderRadius: 2, border: `1px solid ${drawerCardBorder}`, background: drawerCardBg }}>
-                  <CardContent sx={{ p: 2 }}>
-                    <Typography variant="subtitle2" fontWeight={900} sx={{ mb: 1.25 }}>
-                      Global override
+                {/* ── Reporter ──────────────────────────────────────────────────── */}
+                <Box sx={{ px: 2.25, py: 2 }}>
+                  <Typography sx={{ fontSize: 10, fontWeight: 700, textTransform: "uppercase", letterSpacing: "0.08em", color: "text.disabled", mb: 0.75 }}>
+                    Reported by
+                  </Typography>
+                  <Stack direction="row" spacing={1} alignItems="center">
+                    <Typography sx={{ fontWeight: 700, fontSize: 13.5 }}>
+                      {drawerRow.reporter_email || "—"}
                     </Typography>
+                    {drawerRow.reporter_email ? (
+                      <Tooltip title="Copy email">
+                        <IconButton size="small" onClick={() => copyEmail(drawerRow.reporter_email)}
+                          sx={{ opacity: 0.5, "&:hover": { opacity: 1 } }}>
+                          <ContentCopyOutlined sx={{ fontSize: 13 }} />
+                        </IconButton>
+                      </Tooltip>
+                    ) : null}
+                  </Stack>
+                </Box>
 
-                    {detailsQuery.isLoading ? (
-                      <Stack direction="row" spacing={1} alignItems="center">
-                        <CircularProgress size={18} />
-                        <Typography variant="body2" color="text.secondary">Loading details…</Typography>
-                      </Stack>
-                    ) : detailsQuery.isError ? (
-                      <Alert severity="warning">Could not load details.</Alert>
-                    ) : (
-                      <Stack spacing={1.25}>
-                        <Stack direction="row" spacing={1} sx={{ flexWrap: "wrap" }}>
-                          <Chip size="small" label={`AI score: ${detailsQuery.data?.case_infos?.score_ai ?? "—"}`} variant="outlined" />
-                          <Chip size="small" label={`AI confidence: ${detailsQuery.data?.case_infos?.confidence_ai ?? "—"}`} variant="outlined" />
-                          <Chip size="small" label={`AI result: ${detailsQuery.data?.case_infos?.classification_ai ?? "—"}`} variant="outlined" />
-                          <Chip size="small" label={`AI category: ${detailsQuery.data?.case_infos?.category_ai ?? "—"}`} variant="outlined" />
-                        </Stack>
+                {/* ── Global verdict override ───────────────────────────────────── */}
+                <Box sx={{ px: 2.25, py: 2 }}>
+                  <Stack direction="row" alignItems="center" justifyContent="space-between" sx={{ mb: 1 }}>
+                    <Typography sx={{ fontSize: 10, fontWeight: 700, textTransform: "uppercase", letterSpacing: "0.08em", color: "text.disabled" }}>
+                      Verdict override
+                    </Typography>
+                    {detailsReady && !editMode ? (
+                      <Button
+                        size="small"
+                        startIcon={<EditOutlined sx={{ fontSize: "13px !important" }} />}
+                        onClick={() => {
+                          const score = pickScore(detailsQuery.data);
+                          const confidence = pickConfidence(detailsQuery.data);
+                          const classification = pickClassification(detailsQuery.data);
+                          setEditScore(score == null ? "" : String(score));
+                          setEditConfidence(confidence == null ? "" : String(confidence));
+                          setEditClassification(String(classification).toUpperCase());
+                          editMutation.reset();
+                          setEditMode(true);
+                        }}
+                        sx={{ textTransform: "none", fontWeight: 800, borderRadius: 2, fontSize: 12, py: 0.3 }}
+                      >
+                        Edit
+                      </Button>
+                    ) : editMode ? (
+                      <Button
+                        size="small"
+                        startIcon={<CloseOutlined sx={{ fontSize: "13px !important" }} />}
+                        onClick={() => { setEditMode(false); editMutation.reset(); }}
+                        sx={{ textTransform: "none", fontWeight: 800, borderRadius: 2, fontSize: 12, py: 0.3 }}
+                      >
+                        Cancel
+                      </Button>
+                    ) : null}
+                  </Stack>
 
-                        {!editMode ? (
-                          <Stack direction="row" spacing={1} sx={{ flexWrap: "wrap" }}>
-                            <Chip size="small" label={`Score: ${currentScore ?? "—"} / 10`} variant="outlined" sx={{ fontWeight: 900 }} />
-                            <Chip size="small" label={`Confidence: ${currentConfidence ?? "—"} %`} variant="outlined" sx={{ fontWeight: 900 }} />
-                            <Chip size="small" label="Classification" variant="outlined" />
-                            <ResultChip result={String(currentClassification ?? "UNKNOWN")} minWidth={BADGE_W} />
-                          </Stack>
-                        ) : (
-                          <Stack spacing={1.25}>
-                            <Stack direction={{ xs: "column", sm: "row" }} spacing={1.25}>
-                              <TextField
-                                label="Score (0-10)"
-                                value={editScore}
-                                onChange={(e) => setEditScore(e.target.value)}
-                                type="number"
-                                inputProps={{ min: 0, max: 10, step: 0.1 }}
-                                fullWidth
-                              />
-                              <TextField
-                                label="Confidence (0-100)"
-                                value={editConfidence}
-                                onChange={(e) => setEditConfidence(e.target.value)}
-                                type="number"
-                                inputProps={{ min: 0, max: 100, step: 0.1 }}
-                                fullWidth
-                              />
-                            </Stack>
-
-                            <FormControl fullWidth>
-                              <InputLabel id="classification-label">Classification</InputLabel>
-                              <Select
-                                labelId="classification-label"
-                                label="Classification"
-                                value={editClassification}
-                                onChange={(e) => setEditClassification(String(e.target.value))}
-                              >
-                                {classificationOptions.map((c) => (
-                                  <MenuItem key={c} value={c}>{c}</MenuItem>
-                                ))}
-                              </Select>
-                            </FormControl>
-
-                            <Stack direction="row" spacing={1} alignItems="center" sx={{ flexWrap: "wrap" }}>
-                              <Button
-                                variant="contained"
-                                startIcon={<SaveOutlined />}
-                                disabled={!canSave || !hasNumericSelectedId}
-                                onClick={() => {
-                                  if (!hasNumericSelectedId) return;
-                                  editMutation.mutate({
-                                    caseId: selectedIdNum,
-                                    score: scoreNum,
-                                    confidence: confNum,
-                                    classification: editClassification,
-                                  });
-                                }}
-                                sx={{ textTransform: "none", fontWeight: 950, borderRadius: 2 }}
-                              >
-                                {editMutation.isPending ? "Saving…" : "Save"}
-                              </Button>
-                              {editMutation.isError ? (
-                                <Alert severity="error" sx={{ py: 0.5 }}>Save failed.</Alert>
-                              ) : null}
-                            </Stack>
-                          </Stack>
-                        )}
-                      </Stack>
-                    )}
-                  </CardContent>
-                </Card>
-
-                {/* Analysis results */}
-                <Card sx={{ borderRadius: 2, border: `1px solid ${drawerCardBorder}`, background: drawerCardBg }}>
-                  <CardContent sx={{ p: 2 }}>
-                    <Stack
-                      direction={{ xs: "column", sm: "row" }}
-                      justifyContent="space-between"
-                      alignItems={{ xs: "flex-start", sm: "center" }}
-                      spacing={1}
-                      sx={{ mb: 1.25 }}
-                    >
-                      <Typography variant="subtitle2" fontWeight={900}>Analysis results</Typography>
-
-                      {!detailsQuery.isLoading && !detailsQuery.isError ? (
-                        <Stack direction="row" spacing={1} alignItems="center" flexWrap="wrap">
-                          <Typography variant="caption" color="text.secondary">
-                            {analyzerReports.length} report{analyzerReports.length === 1 ? "" : "s"}
-                          </Typography>
-                          {!!analyzerReports.length ? (
-                            <>
-                              <Button size="small" variant="outlined" onClick={expandAllAnalyzers} sx={{ textTransform: "none", borderRadius: 2, fontWeight: 800 }}>
-                                Expand all
-                              </Button>
-                              <Button size="small" variant="outlined" onClick={collapseAllAnalyzers} sx={{ textTransform: "none", borderRadius: 2, fontWeight: 800 }}>
-                                Collapse all
-                              </Button>
-                              <Button size="small" variant="outlined" onClick={invertAnalyzers} sx={{ textTransform: "none", borderRadius: 2, fontWeight: 800 }}>
-                                Invert
-                              </Button>
-                            </>
-                          ) : null}
-                        </Stack>
-                      ) : null}
+                  {detailsQuery.isLoading ? (
+                    <Stack direction="row" spacing={1} alignItems="center">
+                      <CircularProgress size={14} />
+                      <Typography variant="caption" color="text.secondary">Loading…</Typography>
                     </Stack>
-
-                    {detailsQuery.isLoading ? (
-                      <Stack direction="row" spacing={1} alignItems="center">
-                        <CircularProgress size={18} />
-                        <Typography variant="body2" color="text.secondary">Loading details…</Typography>
+                  ) : detailsQuery.isError ? (
+                    <Alert severity="warning" sx={{ py: 0.5 }}>Could not load details.</Alert>
+                  ) : !editMode ? (
+                    <Stack spacing={1.25}>
+                      {/* Human override */}
+                      <Stack direction="row" spacing={1} alignItems="center" flexWrap="wrap">
+                        <ResultChip result={String(currentClassification ?? "UNKNOWN")} minWidth={BADGE_W} />
+                        <Chip size="small" label={`Score ${currentScore ?? "—"}/10`} variant="outlined" sx={{ fontWeight: 800 }} />
+                        <Chip size="small" label={`Confidence ${currentConfidence ?? "—"}%`} variant="outlined" sx={{ fontWeight: 800 }} />
                       </Stack>
-                    ) : detailsQuery.isError ? (
-                      <Alert severity="warning">Could not load details.</Alert>
-                    ) : !analyzerReports.length ? (
-                      <Alert severity="info">No analysis details are available for this investigation yet.</Alert>
-                    ) : (
-                      <Stack spacing={1.25}>
-                        {analyzerReports.map((report) => (
-                          <InvestigationAnalyzerReportCard
-                            key={report.id}
-                            report={report}
-                            expanded={!!expandedAnalyzerIds[report.id]}
-                            onToggle={() =>
-                              setExpandedAnalyzerIds((prev) => ({
-                                ...prev,
-                                [report.id]: !prev[report.id],
-                              }))
-                            }
-                          />
+                      {/* AI reference row */}
+                      <Stack direction="row" spacing={0.75} flexWrap="wrap" sx={{ opacity: 0.65 }}>
+                        <Typography variant="caption" color="text.secondary" sx={{ fontWeight: 700, mr: 0.25 }}>AI:</Typography>
+                        {[
+                          `${detailsQuery.data?.case_infos?.classification_ai ?? "—"}`,
+                          `score ${detailsQuery.data?.case_infos?.score_ai ?? "—"}`,
+                          `conf ${detailsQuery.data?.case_infos?.confidence_ai ?? "—"}%`,
+                          detailsQuery.data?.case_infos?.category_ai ? `cat ${detailsQuery.data.case_infos.category_ai}` : null,
+                        ].filter(Boolean).map((label) => (
+                          <Chip key={label as string} size="small" label={label as string} variant="outlined"
+                            sx={{ height: 18, fontSize: 10, "& .MuiChip-label": { px: 0.75 } }} />
                         ))}
                       </Stack>
-                    )}
-                  </CardContent>
-                </Card>
+                    </Stack>
+                  ) : (
+                    <Stack spacing={1.25}>
+                      <Stack direction={{ xs: "column", sm: "row" }} spacing={1.25}>
+                        <TextField label="Score (0-10)" value={editScore}
+                          onChange={(e) => setEditScore(e.target.value)}
+                          type="number" inputProps={{ min: 0, max: 10, step: 0.1 }} size="small" fullWidth />
+                        <TextField label="Confidence (0-100)" value={editConfidence}
+                          onChange={(e) => setEditConfidence(e.target.value)}
+                          type="number" inputProps={{ min: 0, max: 100, step: 0.1 }} size="small" fullWidth />
+                      </Stack>
+                      <FormControl fullWidth size="small">
+                        <InputLabel id="classification-label">Classification</InputLabel>
+                        <Select labelId="classification-label" label="Classification"
+                          value={editClassification}
+                          onChange={(e) => setEditClassification(String(e.target.value))}>
+                          {classificationOptions.map((c) => (
+                            <MenuItem key={c} value={c}>{c}</MenuItem>
+                          ))}
+                        </Select>
+                      </FormControl>
+                      <Stack direction="row" spacing={1} alignItems="center">
+                        <Button variant="contained" startIcon={editMutation.isPending ? <CircularProgress size={13} color="inherit" /> : <SaveOutlined />}
+                          disabled={!canSave || !hasNumericSelectedId}
+                          onClick={() => {
+                            if (!hasNumericSelectedId) return;
+                            editMutation.mutate({ caseId: selectedIdNum, score: scoreNum, confidence: confNum, classification: editClassification });
+                          }}
+                          sx={{ textTransform: "none", fontWeight: 950, borderRadius: 2 }}>
+                          {editMutation.isPending ? "Saving…" : "Save"}
+                        </Button>
+                        {editMutation.isError ? <Alert severity="error" sx={{ py: 0.3, flex: 1 }}>Save failed.</Alert> : null}
+                      </Stack>
+                    </Stack>
+                  )}
+                </Box>
 
-                {/* Raw details */}
-                <Card
-                  sx={{
-                    borderRadius: 2,
-                    border: `1px solid ${drawerCardBorder}`,
-                    background: isDark ? "rgba(255,255,255,.02)" : alpha(theme.palette.background.paper, 0.5),
-                  }}
-                >
-                  <Accordion
-                    disableGutters
-                    sx={{
-                      borderRadius: 2,
-                      border: "none",
-                      background: "transparent",
-                      "&:before": { display: "none" },
-                    }}
-                  >
-                    <AccordionSummary expandIcon={<ExpandMoreOutlined />}>
-                      <Typography variant="subtitle2" fontWeight={900}>Raw details (API)</Typography>
-                    </AccordionSummary>
-                    <AccordionDetails>
-                      {detailsQuery.isLoading ? (
-                        <CircularProgress size={18} />
-                      ) : detailsQuery.isError ? (
-                        <Alert severity="warning">Could not load details.</Alert>
-                      ) : (
-                        <Box
-                          component="pre"
-                          sx={(theme) => ({
-                            m: 0, p: 1.5, borderRadius: 2,
-                            border: `1px solid ${theme.palette.divider}`,
-                            backgroundColor: alpha(theme.palette.action.hover, 0.55),
-                            color: theme.palette.text.primary,
-                            overflow: "auto", maxHeight: 320, fontSize: 12, lineHeight: 1.45,
-                          })}
-                        >
-                          {JSON.stringify(detailsQuery.data?.raw ?? detailsQuery.data, null, 2)}
-                        </Box>
-                      )}
-                    </AccordionDetails>
-                  </Accordion>
-                </Card>
+                {/* ── Analysis results — grouped by artifact ────────────────────── */}
+                <Box sx={{ px: 2.25, pt: 2, pb: 1 }}>
+                  <Stack direction="row" alignItems="center" justifyContent="space-between" sx={{ mb: 1.25 }}>
+                    <Typography sx={{ fontSize: 10, fontWeight: 700, textTransform: "uppercase", letterSpacing: "0.08em", color: "text.disabled" }}>
+                      Analysis · {analyzerReports.length} report{analyzerReports.length !== 1 ? "s" : ""}
+                    </Typography>
+                    {reportGroups.length > 0 ? (
+                      <Stack direction="row" spacing={0.5}>
+                        <Button size="small" onClick={() => setExpandedGroups(Object.fromEntries(reportGroups.map((g) => [g.key, true])))}
+                          sx={{ textTransform: "none", fontWeight: 800, borderRadius: 2, fontSize: 11, py: 0.2, minWidth: 0 }}>
+                          Expand all
+                        </Button>
+                        <Button size="small" onClick={() => setExpandedGroups({})}
+                          sx={{ textTransform: "none", fontWeight: 800, borderRadius: 2, fontSize: 11, py: 0.2, minWidth: 0 }}>
+                          Collapse
+                        </Button>
+                      </Stack>
+                    ) : null}
+                  </Stack>
+
+                  {detailsQuery.isLoading ? (
+                    <Stack direction="row" spacing={1} alignItems="center" sx={{ py: 2 }}>
+                      <CircularProgress size={16} />
+                      <Typography variant="caption" color="text.secondary">Loading analysis…</Typography>
+                    </Stack>
+                  ) : detailsQuery.isError ? (
+                    <Alert severity="warning" sx={{ mb: 1.5 }}>Could not load analysis details.</Alert>
+                  ) : !reportGroups.length ? (
+                    <Alert severity="info" sx={{ mb: 1.5 }}>No analysis reports yet.</Alert>
+                  ) : (
+                    <Stack spacing={1} sx={{ mb: 1.5 }}>
+                      {reportGroups.map((group) => {
+                        const isGroupOpen = !!expandedGroups[group.key];
+                        return (
+                          <Box key={group.key}
+                            sx={{
+                              borderRadius: 2.5,
+                              border: `1px solid ${alpha(theme.palette.divider, isDark ? 0.18 : 0.55)}`,
+                              background: isDark ? alpha("#fff", 0.02) : alpha(theme.palette.background.paper, 0.5),
+                              overflow: "hidden",
+                            }}
+                          >
+                            {/* Group header — clickable to collapse */}
+                            <Box
+                              role="button" tabIndex={0}
+                              onClick={() => setExpandedGroups((prev) => ({ ...prev, [group.key]: !prev[group.key] }))}
+                              onKeyDown={(e) => { if (e.key === "Enter" || e.key === " ") { e.preventDefault(); setExpandedGroups((prev) => ({ ...prev, [group.key]: !prev[group.key] })); } }}
+                              sx={{
+                                px: 1.75, py: 1.1,
+                                display: "flex", alignItems: "center", gap: 1.25,
+                                cursor: "pointer", userSelect: "none",
+                                background: isDark ? alpha("#fff", 0.03) : alpha(theme.palette.background.paper, 0.7),
+                                "&:hover": { background: isDark ? alpha("#fff", 0.05) : alpha(theme.palette.primary.main, 0.04) },
+                                transition: "background .15s ease",
+                              }}
+                            >
+                              <Box sx={{
+                                px: 0.9, py: 0.2, borderRadius: 1.25,
+                                fontSize: 10, fontWeight: 800, letterSpacing: "0.05em", textTransform: "uppercase",
+                                bgcolor: isDark ? alpha(theme.palette.primary.main, 0.15) : alpha(theme.palette.primary.main, 0.08),
+                                color: isDark ? alpha(theme.palette.primary.light, 0.9) : theme.palette.primary.main,
+                                border: `1px solid ${alpha(theme.palette.primary.main, isDark ? 0.25 : 0.18)}`,
+                                flexShrink: 0,
+                              }}>
+                                {kindLabel(group.kind)}
+                              </Box>
+                              <Typography variant="body2" fontWeight={700} sx={{ flex: 1, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap", fontSize: 12.5 }} title={group.value}>
+                                {group.value}
+                              </Typography>
+                              <Typography variant="caption" color="text.disabled" sx={{ flexShrink: 0, fontSize: 11 }}>
+                                {group.reports.length} analyzer{group.reports.length !== 1 ? "s" : ""}
+                              </Typography>
+                              <ExpandMoreOutlined sx={{
+                                fontSize: 18, flexShrink: 0, opacity: 0.6,
+                                transform: isGroupOpen ? "rotate(180deg)" : "rotate(0deg)",
+                                transition: "transform .2s ease",
+                              }} />
+                            </Box>
+
+                            {/* Reports inside the group */}
+                            {isGroupOpen ? (
+                              <Box sx={{ p: 1.25 }}>
+                                <Stack spacing={0.9}>
+                                  {group.reports.map((report) => (
+                                    <InvestigationAnalyzerReportCard
+                                      key={report.id}
+                                      report={report}
+                                      expanded={!!expandedAnalyzerIds[report.id]}
+                                      onToggle={() => setExpandedAnalyzerIds((prev) => ({ ...prev, [report.id]: !prev[report.id] }))}
+                                    />
+                                  ))}
+                                </Stack>
+                              </Box>
+                            ) : null}
+                          </Box>
+                        );
+                      })}
+                    </Stack>
+                  )}
+                </Box>
+
+                {/* ── Raw details ───────────────────────────────────────────────── */}
+                <Accordion disableGutters sx={{ background: "transparent", "&:before": { display: "none" } }}>
+                  <AccordionSummary expandIcon={<ExpandMoreOutlined />} sx={{ px: 2.25, py: 1 }}>
+                    <Typography sx={{ fontSize: 10, fontWeight: 700, textTransform: "uppercase", letterSpacing: "0.08em", color: "text.disabled" }}>
+                      Raw API payload
+                    </Typography>
+                  </AccordionSummary>
+                  <AccordionDetails sx={{ px: 2.25, pt: 0, pb: 2 }}>
+                    {detailsQuery.isLoading ? <CircularProgress size={16} /> : detailsQuery.isError ? (
+                      <Alert severity="warning">Could not load.</Alert>
+                    ) : (
+                      <Box component="pre" sx={(t) => ({
+                        m: 0, p: 1.25, borderRadius: 2,
+                        border: `1px solid ${t.palette.divider}`,
+                        backgroundColor: alpha(t.palette.action.hover, 0.55),
+                        color: t.palette.text.primary,
+                        overflow: "auto", maxHeight: 280, fontSize: 11.5, lineHeight: 1.45,
+                      })}>
+                        {JSON.stringify(detailsQuery.data?.raw ?? detailsQuery.data, null, 2)}
+                      </Box>
+                    )}
+                  </AccordionDetails>
+                </Accordion>
+
               </Stack>
             </Box>
           </Stack>

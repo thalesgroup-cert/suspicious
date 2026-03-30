@@ -250,14 +250,13 @@ function SeverityCard(props: {
           {/* Bullets */}
           <Stack spacing={0.6}>
             {props.bullets.map((bullet) => (
-              <Stack key={bullet} direction="row" spacing={0.75} alignItems="flex-start">
+              <Stack direction="row" spacing={0.75} alignItems="center">
                 <Box
                   sx={{
                     width: 5,
                     height: 5,
                     borderRadius: 99,
                     bgcolor: tone,
-                    mt: "7px",
                     flexShrink: 0,
                     opacity: 0.75,
                   }}
@@ -645,8 +644,8 @@ export default function AboutPage() {
                   </Typography>
                   <Stack spacing={0.5}>
                     {["Credential theft", "Malware delivery", "Invoice or payment fraud"].map((b) => (
-                      <Stack key={b} direction="row" spacing={0.75} alignItems="flex-start">
-                        <Box sx={{ width: 5, height: 5, borderRadius: 99, bgcolor: "warning.main", mt: "7px", flexShrink: 0, opacity: 0.75 }} />
+                      <Stack key={b} direction="row" spacing={0.75} alignItems="center">
+                        <Box sx={{ width: 5, height: 5, borderRadius: 99, bgcolor: "warning.main", flexShrink: 0, opacity: 0.75 }} />
                         <Typography variant="body2" color="text.secondary" sx={{ fontSize: 12.5 }}>{b}</Typography>
                       </Stack>
                     ))}

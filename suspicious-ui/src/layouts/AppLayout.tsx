@@ -358,11 +358,13 @@ function UserCard({
   me,
   isElevated,
   groups,
+  onClick,
 }: {
   slim: boolean;
   me: Me | undefined;
   isElevated: boolean;
   groups: string[];
+  onClick?: () => void;
 }) {
   const theme = useTheme();
   const isDark = theme.palette.mode === "dark";
@@ -376,7 +378,14 @@ function UserCard({
     return (
       <Tooltip title={displayName} placement="right" arrow>
         <Box
+          onClick={onClick}
+          role="button"
+          tabIndex={0}
+          onKeyDown={(e) => {
+            if (e.key === "Enter" || e.key === " ") onClick?.();
+          }}
           sx={{
+            cursor: onClick ? "pointer" : "default",
             width: 38,
             height: 38,
             borderRadius: 2.5,
@@ -402,7 +411,14 @@ function UserCard({
 
   return (
     <Box
+      onClick={onClick}
+      role="button"
+      tabIndex={0}
+      onKeyDown={(e) => {
+        if (e.key === "Enter" || e.key === " ") onClick?.();
+      }}
       sx={{
+        cursor: onClick ? "pointer" : "default",
         px: 1.25,
         py: 1,
         borderRadius: 2.5,
@@ -722,7 +738,13 @@ export default function AppLayout() {
 
         <Stack spacing={0.75}>
           {/* User identity */}
-          <UserCard slim={isSlim} me={me} isElevated={isElevated} groups={groups} />
+          <UserCard
+            slim={isSlim}
+            me={me}
+            isElevated={isElevated}
+            groups={groups}
+            onClick={() => navigate("/profile")}
+          />
 
           {/* Logout */}
           <List disablePadding>
