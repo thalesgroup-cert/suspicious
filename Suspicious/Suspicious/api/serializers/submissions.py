@@ -103,7 +103,9 @@ def resolve_analyzer_report_target(obj: AnalyzerReport) -> dict:
         return {
             "kind": "DOMAIN",
             "id": obj.domain_id,
-            "value": getattr(obj.domain, "domain_name", str(obj.domain_id)),
+            # Domain model stores the domain string in the `value` field — NOT domain_name.
+            # Using domain_name caused domain artifacts to fall back to the integer PK id.
+            "value": getattr(obj.domain, "value", str(obj.domain_id)),
         }
     if obj.mail_id:
         return {
