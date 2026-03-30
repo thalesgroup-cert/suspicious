@@ -1,3 +1,4 @@
+# mail_service/mail_notification_service.py
 import json
 import logging
 from pathlib import Path
@@ -20,6 +21,10 @@ CONFIG_PATH = "/app/settings.json"
 class MailNotificationService:
     """
     Service responsible for user-facing email notifications.
+
+    Each send method resolves the recipient's UserProfile so the
+    individual email services can theme the message according to the
+    user's chosen theme and semantic colors.
     """
 
     def __init__(
@@ -32,7 +37,7 @@ class MailNotificationService:
         self.retry_cfg = retry_cfg
         self.subjects = subjects
 
-    # ---------- factory ----------
+    # ── factory ────────────────────────────────────────────────────────────
 
     @classmethod
     def from_settings(cls, path: str = CONFIG_PATH) -> "MailNotificationService":
@@ -45,7 +50,7 @@ class MailNotificationService:
 
         return cls(suspicious_cfg, retry_cfg, subjects)
 
-    # ---------- helpers ----------
+    # ── helpers ────────────────────────────────────────────────────────────
 
     def _send_with_retry(self, action, *, email_type: str, **context) -> bool:
         success = send_with_retry(
@@ -53,7 +58,6 @@ class MailNotificationService:
             self.retry_cfg.max_retries,
             self.retry_cfg.base_delay,
         )
-
         log_event(
             logging.INFO if success else logging.ERROR,
             "email_send",
@@ -62,7 +66,6 @@ class MailNotificationService:
             retries=self.retry_cfg.max_retries,
             **context,
         )
-
         return success
 
     def _get_recipient(self, user) -> str | None:
@@ -80,16 +83,22 @@ class MailNotificationService:
         if not self._get_recipient(user):
             return False
         if opt_field and not self._user_allows(user, opt_field):
-            log_event(
-                logging.INFO,
-                "email_opt_out",
-                user_id=user.id,
-                field=opt_field,
-            )
+            log_event(logging.INFO, "email_opt_out", user_id=user.id, field=opt_field)
             return False
         return True
 
-    # ---------- public API ----------
+    def _get_profile(self, user) -> "UserProfile | None":
+        """
+        Return the UserProfile for a user, or None if not found.
+        The profile carries .theme and .semantic_colors which are
+        forwarded to the email service so the message is rendered
+        in the user's chosen visual style.
+        """
+        if not user:
+            return None
+        return UserProfile.objects.filter(user=user).first()
+
+    # ── public API ─────────────────────────────────────────────────────────
 
     def send_review_email(self, case) -> None:
         user = case.reporter
@@ -97,11 +106,9 @@ class MailNotificationService:
             return
 
         recipient = user.email
-        subject = self.subjects.review.format(
-            case_id=case.id,
-            result=case.results,
-        )
+        subject = self.subjects.review.format(case_id=case.id, result=case.results)
         user_infos = build_user_infos(user)
+        profile = self._get_profile(user)
 
         def action():
             ModificationEmailService(
@@ -110,6 +117,7 @@ class MailNotificationService:
                 recipient=recipient,
                 recipient_name=user_infos,
                 case=case,
+                profile=profile,        # ← theme context
             )._send_action(
                 user=recipient,
                 user_infos=user_infos,
@@ -134,9 +142,12 @@ class MailNotificationService:
         recipient = user.email
         subject = self.subjects.acknowledgement
         user_infos = build_user_infos(user)
+        profile = self._get_profile(user)
 
         def action():
-            AcknowledgementEmailService()._send_action(
+            AcknowledgementEmailService(
+                profile=profile,        # ← theme context
+            )._send_action(
                 user=recipient,
                 user_infos=user_infos,
                 subject=subject,
@@ -162,6 +173,7 @@ class MailNotificationService:
         recipient = user.email
         subject = self.subjects.final.format(case_id=case.id)
         user_infos = build_user_infos(user)
+        profile = self._get_profile(user)
 
         def action():
             FinalEmailService(
@@ -169,6 +181,7 @@ class MailNotificationService:
                 sender=self.suspicious_email,
                 recipient=recipient,
                 recipient_name=user_infos,
+                profile=profile,        # ← theme context
             )._send_action(user=recipient, subject=subject)
 
         if self._send_with_retry(

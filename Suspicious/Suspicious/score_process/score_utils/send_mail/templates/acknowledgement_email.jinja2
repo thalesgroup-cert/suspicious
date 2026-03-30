@@ -1,104 +1,262 @@
 <!DOCTYPE html>
-<html lang="en">
+<html lang="en" xmlns="http://www.w3.org/1999/xhtml">
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <meta name="color-scheme" content="light dark">
-  <meta name="supported-color-schemes" content="light dark">
+  <meta http-equiv="X-UA-Compatible" content="IE=edge">
   <title>{{ subject }}</title>
+  <!--
+    Color variables injected by resolve_email_theme(profile):
+      bg, surface, header_bg, header_text, accent, accent_text,
+      body_text, muted, border, link, cta_bg, cta_text,
+      color_safe, color_suspicious, color_dangerous, color_inconclusive
+  -->
 </head>
 
-<body style="margin:0;padding:0;background:#EDF1F4;">
-<center>
-<table width="100%" role="presentation">
-<tr>
-<td align="center">
+<body style="margin:0;padding:0;background-color:{{ bg }};font-family:Arial,Helvetica,sans-serif;">
 
-<table width="600" role="presentation" style="max-width:600px;">
-  <!-- Header -->
+<table width="100%" cellpadding="0" cellspacing="0" border="0" role="presentation"
+       style="background-color:{{ bg }};min-width:100%;">
   <tr>
-    <td style="background:#242A75;padding:30px;text-align:center;">
-      <img src="{{ company_logo }}" alt="{{ company_name }}" style="max-width:120px;">
+    <td align="center" style="padding:32px 16px;">
+
+      <!-- ── Outer container ── -->
+      <table width="600" cellpadding="0" cellspacing="0" border="0" role="presentation"
+             style="max-width:600px;width:100%;border-radius:12px;overflow:hidden;
+                    border:1px solid {{ border }};">
+
+        <!-- ══════════════════════════════════════════
+             HEADER BAND — company logo
+        ══════════════════════════════════════════ -->
+        <tr>
+          <td style="background-color:{{ header_bg }};padding:28px 32px;text-align:center;">
+            {% if company_logo %}
+              <img src="{{ company_logo }}" alt="{{ company_name }}"
+                   style="max-width:130px;max-height:48px;display:block;margin:0 auto;">
+            {% else %}
+              <span style="font-size:20px;font-weight:bold;color:{{ header_text }};
+                           letter-spacing:-0.5px;">{{ company_name }}</span>
+            {% endif %}
+          </td>
+        </tr>
+
+        <!-- Hero banner (optional — rendered only when acknowledge_logo is set) -->
+        {% if acknowledge_logo %}
+        <tr>
+          <td style="background-color:{{ header_bg }};padding:0;text-align:center;
+                     border-bottom:2px solid {{ accent }};">
+            <img src="{{ acknowledge_logo }}" alt=""
+                 style="width:100%;max-width:600px;max-height:180px;
+                        object-fit:cover;display:block;">
+          </td>
+        </tr>
+        {% else %}
+        <!-- Accent rule when no banner image -->
+        <tr>
+          <td style="background-color:{{ accent }};height:4px;font-size:0;line-height:0;">&nbsp;</td>
+        </tr>
+        {% endif %}
+
+        <!-- ══════════════════════════════════════════
+             BODY — main content card
+        ══════════════════════════════════════════ -->
+        <tr>
+          <td style="background-color:{{ surface }};padding:36px 40px;
+                     color:{{ body_text }};font-size:15px;line-height:1.7;">
+
+            <!-- Greeting -->
+            <p style="margin:0 0 20px;font-size:19px;font-weight:700;
+                      color:{{ accent }};">Dear {{ recipient_name }},</p>
+
+            <p style="margin:0 0 16px;">
+              The <strong>{{ company_name }}</strong> team thanks you for your vigilance
+              and for submitting a suspicious item for analysis.
+            </p>
+
+            <p style="margin:0 0 24px;">
+              Your submission has been successfully registered and is now being processed
+              by our security analyzers.
+            </p>
+
+            <!-- CTA button -->
+            <table cellpadding="0" cellspacing="0" border="0" role="presentation"
+                   style="margin:0 auto 28px;">
+              <tr>
+                <td style="background-color:{{ cta_bg }};border-radius:8px;
+                           text-align:center;">
+                  <a href="{{ portal_url }}" target="_blank"
+                     style="display:inline-block;padding:13px 32px;
+                            color:{{ cta_text }};font-size:14px;font-weight:700;
+                            text-decoration:none;letter-spacing:0.3px;">
+                    Track my submission →
+                  </a>
+                </td>
+              </tr>
+            </table>
+
+            <!-- Verdict legend — uses the user's own semantic colors -->
+            <table cellpadding="0" cellspacing="0" border="0" role="presentation"
+                   style="width:100%;border-radius:8px;overflow:hidden;
+                          border:1px solid {{ border }};margin-bottom:28px;">
+              <tr>
+                <td colspan="2"
+                    style="background-color:{{ header_bg }};padding:10px 16px;
+                           color:{{ header_text }};font-size:12px;font-weight:700;
+                           letter-spacing:0.08em;text-transform:uppercase;">
+                  Possible conclusions
+                </td>
+              </tr>
+
+              <!-- Dangerous -->
+              <tr>
+                <td style="width:6px;background-color:{{ color_dangerous }};
+                           font-size:0;line-height:0;">&nbsp;</td>
+                <td style="padding:10px 16px;border-bottom:1px solid {{ border }};
+                           font-size:13px;">
+                  <strong style="color:{{ color_dangerous }};">Dangerous</strong>
+                  <span style="color:{{ muted }};margin-left:6px;">—</span>
+                  <span style="color:{{ body_text }};margin-left:4px;">
+                    High confidence threat detected. Immediate action may be required.
+                  </span>
+                </td>
+              </tr>
+
+              <!-- Suspicious -->
+              <tr>
+                <td style="width:6px;background-color:{{ color_suspicious }};
+                           font-size:0;line-height:0;">&nbsp;</td>
+                <td style="padding:10px 16px;border-bottom:1px solid {{ border }};
+                           font-size:13px;">
+                  <strong style="color:{{ color_suspicious }};">Suspicious</strong>
+                  <span style="color:{{ muted }};margin-left:6px;">—</span>
+                  <span style="color:{{ body_text }};margin-left:4px;">
+                    Indicators of risk found. Review recommended.
+                  </span>
+                </td>
+              </tr>
+
+              <!-- Inconclusive -->
+              <tr>
+                <td style="width:6px;background-color:{{ color_inconclusive }};
+                           font-size:0;line-height:0;">&nbsp;</td>
+                <td style="padding:10px 16px;border-bottom:1px solid {{ border }};
+                           font-size:13px;">
+                  <strong style="color:{{ color_inconclusive }};">Inconclusive</strong>
+                  <span style="color:{{ muted }};margin-left:6px;">—</span>
+                  <span style="color:{{ body_text }};margin-left:4px;">
+                    Analysis could not reach a definitive conclusion.
+                  </span>
+                </td>
+              </tr>
+
+              <!-- Safe -->
+              <tr>
+                <td style="width:6px;background-color:{{ color_safe }};
+                           font-size:0;line-height:0;">&nbsp;</td>
+                <td style="padding:10px 16px;font-size:13px;">
+                  <strong style="color:{{ color_safe }};">Safe</strong>
+                  <span style="color:{{ muted }};margin-left:6px;">—</span>
+                  <span style="color:{{ body_text }};margin-left:4px;">
+                    No threats detected. Item appears clean.
+                  </span>
+                </td>
+              </tr>
+            </table>
+
+            <p style="margin:0;font-size:13px;color:{{ muted }};font-style:italic;">
+              You will be notified by email once the analysis is complete.
+            </p>
+
+          </td>
+        </tr>
+
+        <!-- ══════════════════════════════════════════
+             FOOTER
+        ══════════════════════════════════════════ -->
+        <tr>
+          <td style="background-color:{{ header_bg }};padding:24px 40px;
+                     color:{{ header_text }};font-size:13px;line-height:1.7;">
+
+            <table cellpadding="0" cellspacing="0" border="0" role="presentation"
+                   style="width:100%;">
+              <tr>
+                <!-- Links column -->
+                <td style="vertical-align:top;padding-right:16px;">
+                  <p style="margin:0 0 6px;">
+                    <a href="{{ glossary_url }}" target="_blank"
+                       style="color:{{ accent }};text-decoration:none;">
+                      Cybersecurity glossary
+                    </a>
+                  </p>
+                  <p style="margin:0 0 6px;">
+                    <a href="{{ portal_url }}" target="_blank"
+                       style="color:{{ accent }};text-decoration:none;">
+                      Submission portal
+                    </a>
+                  </p>
+                  {% if inquiry_url %}
+                  <p style="margin:0;">
+                    <a href="{{ inquiry_url }}" target="_blank"
+                       style="color:{{ accent }};text-decoration:none;">
+                      {{ inquiry_text or "Contact us" }}
+                    </a>
+                  </p>
+                  {% endif %}
+                </td>
+
+                <!-- Company column -->
+                <td style="vertical-align:top;text-align:right;">
+                  <p style="margin:0 0 4px;font-weight:700;font-size:14px;">
+                    {{ company_name }}
+                  </p>
+                  {% if global_url %}
+                  <p style="margin:0;">
+                    <a href="{{ global_url }}" target="_blank"
+                       style="color:{{ accent }};text-decoration:none;font-size:12px;">
+                      {{ global_team }}
+                    </a>
+                  </p>
+                  {% endif %}
+                </td>
+              </tr>
+            </table>
+
+          </td>
+        </tr>
+
+        <!-- Social icons -->
+        {% if socials %}
+        <tr>
+          <td style="background-color:{{ header_bg }};padding:12px 40px 20px;
+                     text-align:center;border-top:1px solid {{ border }};">
+            {% for social in socials %}
+              <a href="{{ social.url }}" target="_blank"
+                 style="display:inline-block;margin:0 6px;opacity:0.85;">
+                <img src="{{ social.logo }}" alt="{{ social.name }}"
+                     width="24" height="24"
+                     style="display:inline-block;vertical-align:middle;">
+              </a>
+            {% endfor %}
+          </td>
+        </tr>
+        {% endif %}
+
+        <!-- Legal strip -->
+        <tr>
+          <td style="background-color:{{ bg }};padding:16px 40px;text-align:center;
+                     color:{{ muted }};font-size:11px;line-height:1.6;
+                     border-top:1px solid {{ border }};">
+            This message was sent automatically by the {{ company_name }} security platform.
+            Please do not reply directly to this email.
+          </td>
+        </tr>
+
+      </table>
+      <!-- /outer container -->
+
     </td>
   </tr>
-
-  <tr>
-    <td style="background:#242A75;text-align:center;">
-      <img src="{{ acknowledge_logo }}" alt="" style="width:100%;max-width:600px;">
-    </td>
-  </tr>
-
-  <!-- Body -->
-  <tr>
-    <td style="background:#FFFFFF;padding:30px;font-family:Arial;font-size:14px;color:#333;">
-      <p style="font-size:18px;color:#00BBDD;">Dear {{ recipient_name }},</p>
-
-      <p>{{ company_name }} team thanks you for your submission.</p>
-
-      <p style="text-align:center;">
-        Your submission has been registered.  
-        Follow the analysis on the portal
-        <a href="{{ portal_url }}" target="_blank">here</a>.
-      </p>
-
-      <p style="text-align:center;">
-        You will receive one of the following conclusions:
-        <strong style="color:#FF0000;">dangerous</strong>,
-        <strong style="color:#FF9A00;">most likely suspicious</strong>,
-        <strong style="color:#37A65B;">most likely safe</strong>,
-        <strong style="color:#00A4E9;">inconclusive</strong>.
-      </p>
-    </td>
-  </tr>
-
-  <!-- Footer -->
-  <tr>
-    <td style="background:#242A75;padding:30px;color:#FFFFFF;font-style:italic;text-align:center;">
-      <p>
-        Definitions are available in the
-        <a href="{{ glossary_url }}" style="color:#FFF;">cybersecurity glossary</a>.
-        Questions?
-        <a href="{{ inquiry_url }}" style="color:#FFF;">{{ inquiry_text }}</a>.
-      </p>
-
-      <p>
-        Portal access:
-        <a href="{{ portal_url }}" style="color:#FFF;">here</a>
-      </p>
-
-      <p>With our kindest regards,</p>
-    </td>
-  </tr>
-
-  <!-- Signature -->
-  <tr>
-    <td style="background:#242A75;padding:10px;text-align:center;">
-      <strong style="color:#FFF;">{{ company_name }}</strong>
-    </td>
-  </tr>
-
-  <tr>
-    <td style="background:#242A75;padding:20px;text-align:center;">
-      <a href="{{ global_url }}" style="color:#FFF;">{{ global_team }}</a>
-    </td>
-  </tr>
-
-  <!-- Socials -->
-  <tr>
-    <td style="background:#242A75;padding:15px;text-align:center;">
-      {% for social in socials %}
-        <a href="{{ social.url }}" target="_blank">
-          <img src="{{ social.logo }}" alt="{{ social.name }}" width="24" height="24">
-        </a>
-      {% endfor %}
-    </td>
-  </tr>
-
 </table>
 
-</td>
-</tr>
-</table>
-</center>
 </body>
 </html>
