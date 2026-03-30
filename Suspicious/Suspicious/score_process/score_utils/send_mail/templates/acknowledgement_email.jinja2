@@ -1,262 +1,382 @@
 <!DOCTYPE html>
-<html lang="en" xmlns="http://www.w3.org/1999/xhtml">
+<html lang="en" xmlns="http://www.w3.org/1999/xhtml" xmlns:v="urn:schemas-microsoft-com:vml" xmlns:o="urn:schemas-microsoft-com:office:office">
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <meta http-equiv="X-UA-Compatible" content="IE=edge">
-  <title>{{ subject }}</title>
-  <!--
-    Color variables injected by resolve_email_theme(profile):
-      bg, surface, header_bg, header_text, accent, accent_text,
-      body_text, muted, border, link, cta_bg, cta_text,
-      color_safe, color_suspicious, color_dangerous, color_inconclusive
-  -->
+  <meta name="x-apple-disable-message-reformatting">
+  <meta name="format-detection" content="telephone=no,address=no,email=no,date=no,url=no">
+  <title>{{ subject | default("Submission Received") }}</title>
+  <!--[if mso]>
+  <noscript><xml>
+    <o:OfficeDocumentSettings>
+      <o:AllowPNG/>
+      <o:PixelsPerInch>96</o:PixelsPerInch>
+    </o:OfficeDocumentSettings>
+  </xml></noscript>
+  <![endif]-->
+  <style>
+    /* Resets */
+    body,table,td,a{-webkit-text-size-adjust:100%;-ms-text-size-adjust:100%;}
+    table{border-collapse:collapse!important;mso-table-lspace:0pt;mso-table-rspace:0pt;}
+    img{border:0;height:auto;line-height:100%;outline:none;text-decoration:none;-ms-interpolation-mode:bicubic;}
+    a[x-apple-data-detectors]{color:inherit!important;text-decoration:none!important;}
+
+    /* Responsive */
+    @media screen and (max-width:620px){
+      .email-container{width:100%!important;border-radius:0!important;}
+      .content-pad{padding:24px 20px!important;}
+      .footer-pad{padding:20px!important;}
+      .two-col td{display:block!important;width:100%!important;text-align:left!important;padding-bottom:12px;}
+    }
+  </style>
 </head>
 
-<body style="margin:0;padding:0;background-color:{{ bg }};font-family:Arial,Helvetica,sans-serif;">
+{# ========================================================================= #}
+{# Available theme variables (all plain hex — from email_theme.py):           #}
+{#   bg, surface, header_bg, header_text, accent, accent_text,                #}
+{#   body_text, muted, border, link, cta_bg, cta_text                         #}
+{#   color_safe, color_suspicious, color_dangerous, color_inconclusive        #}
+{# ========================================================================= #}
 
-<table width="100%" cellpadding="0" cellspacing="0" border="0" role="presentation"
-       style="background-color:{{ bg }};min-width:100%;">
+<body style="margin:0;padding:0;word-break:break-word;-webkit-font-smoothing:antialiased;background-color:{{ bg }};">
+
+{# ── Inbox preview text (hidden) ──────────────────────────────────────── #}
+{# The zwj + hair-space padding pushes the fallback "..." out of view in   #}
+{# clients that show more characters than the preheader alone              #}
+<div style="display:none;max-height:0;overflow:hidden;mso-hide:all;
+            font-size:1px;line-height:1px;color:{{ bg }};">
+  Your submission has been received and is being analyzed by our security systems.
+  &#847;&zwj;&#847;&zwj;&#847;&zwj;&#847;&zwj;&#847;&zwj;&#847;&zwj;&#847;&zwj;&#847;&zwj;&#847;&zwj;&#847;&zwj;
+</div>
+
+<!--[if mso | IE]>
+<table role="presentation" border="0" cellpadding="0" cellspacing="0"
+       width="100%" style="background-color:{{ bg }};"><tr><td align="center">
+<![endif]-->
+
+<table role="presentation" border="0" cellpadding="0" cellspacing="0" width="100%"
+       style="background-color:{{ bg }};">
   <tr>
     <td align="center" style="padding:32px 16px;">
 
-      <!-- ── Outer container ── -->
-      <table width="600" cellpadding="0" cellspacing="0" border="0" role="presentation"
+
+      {# ================================================================== #}
+      {# OUTER CONTAINER                                                      #}
+      {# ================================================================== #}
+      <table class="email-container"
+             role="article" aria-label="Security submission confirmation"
+             border="0" cellpadding="0" cellspacing="0"
+             width="600"
              style="max-width:600px;width:100%;border-radius:12px;overflow:hidden;
                     border:1px solid {{ border }};">
 
-        <!-- ══════════════════════════════════════════
-             HEADER BAND — company logo
-        ══════════════════════════════════════════ -->
+
+        {# ─────────────────────────────────────────────────────────────── #}
+        {# 1. HEADER — logo or wordmark                                     #}
+        {# ─────────────────────────────────────────────────────────────── #}
         <tr>
-          <td style="background-color:{{ header_bg }};padding:28px 32px;text-align:center;">
+          <td align="center"
+              style="background-color:{{ header_bg }};padding:28px 40px;">
             {% if company_logo %}
-              <img src="{{ company_logo }}" alt="{{ company_name }}"
-                   style="max-width:130px;max-height:48px;display:block;margin:0 auto;">
+              <img src="{{ company_logo }}"
+                   alt="{{ company_name | default('') }}"
+                   width="130"
+                   style="max-width:130px;height:auto;display:block;margin:0 auto;">
             {% else %}
-              <span style="font-size:20px;font-weight:bold;color:{{ header_text }};
-                           letter-spacing:-0.5px;">{{ company_name }}</span>
+              <span style="font-size:22px;font-weight:800;letter-spacing:-0.5px;
+                           color:{{ header_text }};
+                           font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,Arial,sans-serif;">
+                {{ company_name | default("Security Portal") }}
+              </span>
             {% endif %}
           </td>
         </tr>
 
-        <!-- Hero banner (optional — rendered only when acknowledge_logo is set) -->
+
+        {# ─────────────────────────────────────────────────────────────── #}
+        {# 2. HERO — banner image OR accent gradient rule                   #}
+        {# ─────────────────────────────────────────────────────────────── #}
         {% if acknowledge_logo %}
         <tr>
-          <td style="background-color:{{ header_bg }};padding:0;text-align:center;
-                     border-bottom:2px solid {{ accent }};">
-            <img src="{{ acknowledge_logo }}" alt=""
-                 style="width:100%;max-width:600px;max-height:180px;
-                        object-fit:cover;display:block;">
+          <td style="background-color:{{ header_bg }};padding:0;line-height:0;font-size:0;
+                     border-bottom:3px solid {{ accent }};">
+            <img src="{{ acknowledge_logo }}" alt="" role="presentation"
+                 width="600"
+                 style="width:100%;max-width:600px;height:auto;display:block;">
           </td>
         </tr>
         {% else %}
-        <!-- Accent rule when no banner image -->
+        {# Gradient rule — full accent → muted so it reads on any bg        #}
         <tr>
-          <td style="background-color:{{ accent }};height:4px;font-size:0;line-height:0;">&nbsp;</td>
+          <td style="padding:0;font-size:0;line-height:0;height:4px;
+                     background:linear-gradient(90deg,{{ accent }},{{ muted }});">
+            <!--[if mso]>&nbsp;<![endif]-->
+          </td>
         </tr>
         {% endif %}
 
-        <!-- ══════════════════════════════════════════
-             BODY — main content card
-        ══════════════════════════════════════════ -->
+
+        {# ─────────────────────────────────────────────────────────────── #}
+        {# 3. BODY CARD                                                     #}
+        {# ─────────────────────────────────────────────────────────────── #}
         <tr>
-          <td style="background-color:{{ surface }};padding:36px 40px;
-                     color:{{ body_text }};font-size:15px;line-height:1.7;">
+          <td class="content-pad"
+              style="background-color:{{ surface }};padding:40px 40px 36px;">
 
-            <!-- Greeting -->
-            <p style="margin:0 0 20px;font-size:19px;font-weight:700;
-                      color:{{ accent }};">Dear {{ recipient_name }},</p>
-
-            <p style="margin:0 0 16px;">
-              The <strong>{{ company_name }}</strong> team thanks you for your vigilance
-              and for submitting a suspicious item for analysis.
+            {# Greeting -------------------------------------------------- #}
+            <p style="margin:0 0 22px;font-size:20px;font-weight:800;
+                      letter-spacing:-0.3px;color:{{ accent }};
+                      font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,Arial,sans-serif;">
+              Dear {{ recipient_name | default("Security Contributor") }},
             </p>
 
-            <p style="margin:0 0 24px;">
-              Your submission has been successfully registered and is now being processed
-              by our security analyzers.
+            <p style="margin:0 0 14px;font-size:15px;line-height:1.7;
+                      color:{{ body_text }};
+                      font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,Arial,sans-serif;">
+              The <strong style="color:{{ body_text }};">{{ company_name | default("security team") }}</strong>
+              has received your submission and it is now being processed by our security analyzers.
             </p>
 
-            <!-- CTA button -->
-            <table cellpadding="0" cellspacing="0" border="0" role="presentation"
-                   style="margin:0 auto 28px;">
+            <p style="margin:0 0 28px;font-size:15px;line-height:1.7;
+                      color:{{ body_text }};
+                      font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,Arial,sans-serif;">
+              You will receive a final verdict by email once the analysis is complete.
+              You can also track progress live on the portal at any time.
+            </p>
+
+            {# Hairline rule --------------------------------------------- #}
+            <table role="presentation" border="0" cellpadding="0" cellspacing="0" width="100%">
+              <tr><td style="border-top:1px solid {{ border }};font-size:0;padding:0;">&nbsp;</td></tr>
+            </table>
+
+            {# CTA button — VML for Outlook, HTML for everyone else -------- #}
+            <table role="presentation" border="0" cellpadding="0" cellspacing="0" width="100%"
+                   style="margin:28px 0;">
               <tr>
-                <td style="background-color:{{ cta_bg }};border-radius:8px;
-                           text-align:center;">
-                  <a href="{{ portal_url }}" target="_blank"
-                     style="display:inline-block;padding:13px 32px;
-                            color:{{ cta_text }};font-size:14px;font-weight:700;
-                            text-decoration:none;letter-spacing:0.3px;">
-                    Track my submission →
+                <td align="center">
+                  <!--[if mso]>
+                  <v:roundrect xmlns:v="urn:schemas-microsoft-com:vml"
+                               xmlns:w="urn:schemas-microsoft-com:office:word"
+                               href="{{ portal_url | default('#') }}"
+                               style="height:44px;v-text-anchor:middle;width:240px;"
+                               arcsize="18%"
+                               strokecolor="{{ cta_bg }}"
+                               fillcolor="{{ cta_bg }}">
+                    <w:anchorlock/>
+                    <center style="color:{{ cta_text }};font-family:Arial,sans-serif;
+                                   font-size:14px;font-weight:bold;letter-spacing:0.3px;">
+                      Track my submission &#8594;
+                    </center>
+                  </v:roundrect>
+                  <![endif]-->
+                  <!--[if !mso]><!-->
+                  <a href="{{ portal_url | default('#') }}"
+                     target="_blank" rel="noopener noreferrer"
+                     style="display:inline-block;background-color:{{ cta_bg }};
+                            color:{{ cta_text }};padding:13px 36px;border-radius:8px;
+                            font-size:14px;font-weight:700;text-decoration:none;
+                            letter-spacing:0.3px;mso-hide:all;
+                            font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,Arial,sans-serif;">
+                    Track my submission &#8594;
                   </a>
+                  <!--<![endif]-->
                 </td>
               </tr>
             </table>
 
-            <!-- Verdict legend — uses the user's own semantic colors -->
-            <table cellpadding="0" cellspacing="0" border="0" role="presentation"
-                   style="width:100%;border-radius:8px;overflow:hidden;
-                          border:1px solid {{ border }};margin-bottom:28px;">
+
+            {# ── Verdict legend ──────────────────────────────────────── #}
+            {# Left colour bar is a narrow TD, not a border — borders on  #}
+            {# TR/TD are clipped differently across clients               #}
+            <table role="presentation" border="0" cellpadding="0" cellspacing="0" width="100%"
+                   style="border:1px solid {{ border }};border-radius:8px;
+                          overflow:hidden;margin-bottom:28px;">
+
+              {# Legend header #}
               <tr>
                 <td colspan="2"
                     style="background-color:{{ header_bg }};padding:10px 16px;
-                           color:{{ header_text }};font-size:12px;font-weight:700;
-                           letter-spacing:0.08em;text-transform:uppercase;">
+                           color:{{ header_text }};font-size:11px;font-weight:700;
+                           letter-spacing:0.08em;text-transform:uppercase;
+                           font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,Arial,sans-serif;">
                   Possible conclusions
                 </td>
               </tr>
 
-              <!-- Dangerous -->
+              {# DANGEROUS #}
               <tr>
-                <td style="width:6px;background-color:{{ color_dangerous }};
-                           font-size:0;line-height:0;">&nbsp;</td>
-                <td style="padding:10px 16px;border-bottom:1px solid {{ border }};
-                           font-size:13px;">
+                <td width="6" style="background-color:{{ color_dangerous }};
+                             width:6px;padding:0;font-size:0;line-height:0;">&nbsp;</td>
+                <td style="padding:11px 16px;border-bottom:1px solid {{ border }};
+                           font-size:13px;line-height:1.55;
+                           font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,Arial,sans-serif;">
                   <strong style="color:{{ color_dangerous }};">Dangerous</strong>
-                  <span style="color:{{ muted }};margin-left:6px;">—</span>
-                  <span style="color:{{ body_text }};margin-left:4px;">
-                    High confidence threat detected. Immediate action may be required.
-                  </span>
+                  <span style="color:{{ muted }};"> &mdash; </span>
+                  <span style="color:{{ body_text }};">High-confidence threat detected. Immediate action may be required.</span>
                 </td>
               </tr>
 
-              <!-- Suspicious -->
+              {# SUSPICIOUS #}
               <tr>
-                <td style="width:6px;background-color:{{ color_suspicious }};
-                           font-size:0;line-height:0;">&nbsp;</td>
-                <td style="padding:10px 16px;border-bottom:1px solid {{ border }};
-                           font-size:13px;">
+                <td width="6" style="background-color:{{ color_suspicious }};
+                             width:6px;padding:0;font-size:0;line-height:0;">&nbsp;</td>
+                <td style="padding:11px 16px;border-bottom:1px solid {{ border }};
+                           font-size:13px;line-height:1.55;
+                           font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,Arial,sans-serif;">
                   <strong style="color:{{ color_suspicious }};">Suspicious</strong>
-                  <span style="color:{{ muted }};margin-left:6px;">—</span>
-                  <span style="color:{{ body_text }};margin-left:4px;">
-                    Indicators of risk found. Review recommended.
-                  </span>
+                  <span style="color:{{ muted }};"> &mdash; </span>
+                  <span style="color:{{ body_text }};">Indicators of risk found. Review is recommended.</span>
                 </td>
               </tr>
 
-              <!-- Inconclusive -->
+              {# INCONCLUSIVE #}
               <tr>
-                <td style="width:6px;background-color:{{ color_inconclusive }};
-                           font-size:0;line-height:0;">&nbsp;</td>
-                <td style="padding:10px 16px;border-bottom:1px solid {{ border }};
-                           font-size:13px;">
+                <td width="6" style="background-color:{{ color_inconclusive }};
+                             width:6px;padding:0;font-size:0;line-height:0;">&nbsp;</td>
+                <td style="padding:11px 16px;border-bottom:1px solid {{ border }};
+                           font-size:13px;line-height:1.55;
+                           font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,Arial,sans-serif;">
                   <strong style="color:{{ color_inconclusive }};">Inconclusive</strong>
-                  <span style="color:{{ muted }};margin-left:6px;">—</span>
-                  <span style="color:{{ body_text }};margin-left:4px;">
-                    Analysis could not reach a definitive conclusion.
-                  </span>
+                  <span style="color:{{ muted }};"> &mdash; </span>
+                  <span style="color:{{ body_text }};">Analysis could not reach a definitive conclusion.</span>
                 </td>
               </tr>
 
-              <!-- Safe -->
+              {# SAFE — no bottom border (last row) #}
               <tr>
-                <td style="width:6px;background-color:{{ color_safe }};
-                           font-size:0;line-height:0;">&nbsp;</td>
-                <td style="padding:10px 16px;font-size:13px;">
+                <td width="6" style="background-color:{{ color_safe }};
+                             width:6px;padding:0;font-size:0;line-height:0;">&nbsp;</td>
+                <td style="padding:11px 16px;
+                           font-size:13px;line-height:1.55;
+                           font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,Arial,sans-serif;">
                   <strong style="color:{{ color_safe }};">Safe</strong>
-                  <span style="color:{{ muted }};margin-left:6px;">—</span>
-                  <span style="color:{{ body_text }};margin-left:4px;">
-                    No threats detected. Item appears clean.
-                  </span>
+                  <span style="color:{{ muted }};"> &mdash; </span>
+                  <span style="color:{{ body_text }};">No threats detected. The item appears clean.</span>
                 </td>
               </tr>
-            </table>
 
-            <p style="margin:0;font-size:13px;color:{{ muted }};font-style:italic;">
-              You will be notified by email once the analysis is complete.
+            </table>
+            {# / verdict legend #}
+
+            <p style="margin:0;font-size:13px;line-height:1.6;
+                      color:{{ muted }};font-style:italic;
+                      font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,Arial,sans-serif;">
+              This is an automated notification. You will receive a follow-up email once the analysis is complete.
             </p>
 
           </td>
         </tr>
+        {# / body card #}
 
-        <!-- ══════════════════════════════════════════
-             FOOTER
-        ══════════════════════════════════════════ -->
+
+        {# ─────────────────────────────────────────────────────────────── #}
+        {# 4. FOOTER — links + company identity                            #}
+        {# ─────────────────────────────────────────────────────────────── #}
         <tr>
-          <td style="background-color:{{ header_bg }};padding:24px 40px;
-                     color:{{ header_text }};font-size:13px;line-height:1.7;">
-
-            <table cellpadding="0" cellspacing="0" border="0" role="presentation"
-                   style="width:100%;">
+          <td class="footer-pad"
+              style="background-color:{{ header_bg }};padding:24px 40px;">
+            <table class="two-col" role="presentation"
+                   border="0" cellpadding="0" cellspacing="0" width="100%">
               <tr>
-                <!-- Links column -->
+
+                {# Links #}
                 <td style="vertical-align:top;padding-right:16px;">
-                  <p style="margin:0 0 6px;">
-                    <a href="{{ glossary_url }}" target="_blank"
-                       style="color:{{ accent }};text-decoration:none;">
+                  <p style="margin:0 0 7px;">
+                    <a href="{{ glossary_url | default('#') }}"
+                       style="color:{{ accent }};text-decoration:none;font-size:13px;font-weight:600;
+                              font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,Arial,sans-serif;">
                       Cybersecurity glossary
                     </a>
                   </p>
-                  <p style="margin:0 0 6px;">
-                    <a href="{{ portal_url }}" target="_blank"
-                       style="color:{{ accent }};text-decoration:none;">
+                  <p style="margin:0 0 7px;">
+                    <a href="{{ portal_url | default('#') }}"
+                       style="color:{{ accent }};text-decoration:none;font-size:13px;font-weight:600;
+                              font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,Arial,sans-serif;">
                       Submission portal
                     </a>
                   </p>
                   {% if inquiry_url %}
                   <p style="margin:0;">
-                    <a href="{{ inquiry_url }}" target="_blank"
-                       style="color:{{ accent }};text-decoration:none;">
-                      {{ inquiry_text or "Contact us" }}
+                    <a href="{{ inquiry_url }}"
+                       style="color:{{ accent }};text-decoration:none;font-size:13px;font-weight:600;
+                              font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,Arial,sans-serif;">
+                      {{ inquiry_text | default("Contact us") }}
                     </a>
                   </p>
                   {% endif %}
                 </td>
 
-                <!-- Company column -->
+                {# Company #}
                 <td style="vertical-align:top;text-align:right;">
-                  <p style="margin:0 0 4px;font-weight:700;font-size:14px;">
-                    {{ company_name }}
+                  <p style="margin:0 0 5px;font-size:14px;font-weight:800;
+                            color:{{ header_text }};
+                            font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,Arial,sans-serif;">
+                    {{ company_name | default("Company") }}
                   </p>
                   {% if global_url %}
                   <p style="margin:0;">
-                    <a href="{{ global_url }}" target="_blank"
-                       style="color:{{ accent }};text-decoration:none;font-size:12px;">
-                      {{ global_team }}
+                    <a href="{{ global_url }}"
+                       style="color:{{ accent }};text-decoration:none;font-size:12px;
+                              font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,Arial,sans-serif;">
+                      {{ global_team | default("") }}
                     </a>
                   </p>
                   {% endif %}
                 </td>
+
               </tr>
             </table>
-
           </td>
         </tr>
 
-        <!-- Social icons -->
+
+        {# ─────────────────────────────────────────────────────────────── #}
+        {# 5. SOCIAL ICONS                                                  #}
+        {# ─────────────────────────────────────────────────────────────── #}
         {% if socials %}
         <tr>
-          <td style="background-color:{{ header_bg }};padding:12px 40px 20px;
-                     text-align:center;border-top:1px solid {{ border }};">
+          <td align="center"
+              style="background-color:{{ header_bg }};padding:14px 40px 22px;
+                     border-top:1px solid {{ border }};">
             {% for social in socials %}
-              <a href="{{ social.url }}" target="_blank"
-                 style="display:inline-block;margin:0 6px;opacity:0.85;">
-                <img src="{{ social.logo }}" alt="{{ social.name }}"
-                     width="24" height="24"
-                     style="display:inline-block;vertical-align:middle;">
-              </a>
+            <a href="{{ social.url }}" target="_blank" rel="noopener noreferrer"
+               style="display:inline-block;margin:0 5px;">
+              <img src="{{ social.logo }}" alt="{{ social.name }}"
+                   width="24" height="24"
+                   style="display:inline-block;vertical-align:middle;opacity:0.88;">
+            </a>
             {% endfor %}
           </td>
         </tr>
         {% endif %}
 
-        <!-- Legal strip -->
+
+        {# ─────────────────────────────────────────────────────────────── #}
+        {# 6. LEGAL STRIP                                                   #}
+        {# ─────────────────────────────────────────────────────────────── #}
         <tr>
-          <td style="background-color:{{ bg }};padding:16px 40px;text-align:center;
+          <td align="center"
+              style="background-color:{{ bg }};padding:16px 40px;
+                     border-top:1px solid {{ border }};
                      color:{{ muted }};font-size:11px;line-height:1.6;
-                     border-top:1px solid {{ border }};">
-            This message was sent automatically by the {{ company_name }} security platform.
+                     font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,Arial,sans-serif;">
+            This message was sent automatically by the
+            <strong>{{ company_name | default("security platform") }}</strong>.
             Please do not reply directly to this email.
           </td>
         </tr>
 
       </table>
-      <!-- /outer container -->
+      {# / outer container #}
 
     </td>
   </tr>
 </table>
+
+<!--[if mso | IE]>
+</td></tr></table>
+<![endif]-->
 
 </body>
 </html>
