@@ -742,6 +742,7 @@ export default function SubmissionsPage() {
   const [selectedId, setSelectedId] = React.useState<number | string | null>(null);
   const [challengeId, setChallengeId] = React.useState<number | null>(null);
   const [expandedAnalyzerIds, setExpandedAnalyzerIds] = React.useState<Record<number, boolean>>({});
+  const [expandedGroups, setExpandedGroups] = React.useState<Record<string, boolean>>({});
 
   const meQuery = useQuery<Me>({
     queryKey: ["me"],
@@ -830,8 +831,8 @@ export default function SubmissionsPage() {
   }, [searchParams]);
 
   React.useEffect(() => { setPage(0); }, [qDebounced, status, type, result, from, to, sort, sortField, sortDir, pageSize]);
-  React.useEffect(() => { if (!openDrawer) setExpandedAnalyzerIds({}); }, [openDrawer]);
-  React.useEffect(() => { setExpandedAnalyzerIds({}); }, [selectedId]);
+  React.useEffect(() => { if (!openDrawer) { setExpandedAnalyzerIds({}); setExpandedGroups({}); } }, [openDrawer]);
+  React.useEffect(() => { setExpandedAnalyzerIds({}); setExpandedGroups({}); }, [selectedId]);
   React.useEffect(() => { setExpandedAnalyzerIds({}); }, [detailsQuery.data?.analyzer_reports]);
 
   const rows = submissionsQuery.data?.results ?? [];
@@ -1331,17 +1332,13 @@ export default function SubmissionsPage() {
           </Box>
         ) : (
           <Stack sx={{ height: "100%" }}>
-            {/* Drawer header */}
+            {/* Drawer header — result-focused */}
             <Box
               sx={(theme) => ({
                 px: 2.25,
                 py: 1.75,
                 borderBottom: `1px solid ${theme.palette.divider}`,
-                background: `linear-gradient(
-                  180deg,
-                  ${alpha(theme.palette.action.hover, 0.22)} 0%,
-                  ${alpha(theme.palette.background.paper, 0)} 100%
-                )`,
+                background: `linear-gradient(180deg, ${alpha(theme.palette.action.hover, 0.22)} 0%, ${alpha(theme.palette.background.paper, 0)} 100%)`,
               })}
             >
               <Stack direction="row" alignItems="flex-start" justifyContent="space-between" spacing={2}>
@@ -1353,277 +1350,188 @@ export default function SubmissionsPage() {
                     </Typography>
                     <CopyIconButton text={String(selectedRow.id)} title="Copy ID" />
                   </Stack>
-                  <Typography variant="body2" color="text.secondary" sx={{ mt: 0.75 }}>
-                    Created {fmtDate(selectedRow.created_at)}
-                  </Typography>
                 </Box>
-                <Button
-                  onClick={() => setOpenDrawer(false)}
-                  sx={{ textTransform: "none", borderRadius: 2, alignSelf: "flex-start" }}
-                >
+                <Button onClick={() => setOpenDrawer(false)}
+                  sx={{ textTransform: "none", borderRadius: 2, alignSelf: "flex-start" }}>
                   Close
                 </Button>
               </Stack>
 
-              <Stack direction="row" spacing={1} sx={{ mt: 1.75, flexWrap: "wrap" }}>
-                <StatusChip status={selectedRow.status} minWidth={BADGE_W} />
-                <Chip
-                  size="small"
-                  label={selectedRow.type}
-                  variant="outlined"
-                  sx={{
-                    fontWeight: 900,
-                    minWidth: BADGE_W,
-                    justifyContent: "center",
-                    "& .MuiChip-label": { width: "100%", textAlign: "center" },
-                  }}
-                />
+              {/* Verdict + status chips — the key info at a glance */}
+              <Stack direction="row" spacing={1} sx={{ mt: 1.5, flexWrap: "wrap" }}>
                 <ResultChip result={selectedRow.result} minWidth={BADGE_W} />
-                <Chip
-                  size="small"
-                  label={`${selectedRow.tests_done} tests`}
-                  variant="outlined"
-                  sx={{ fontWeight: 900 }}
-                />
+                <StatusChip status={selectedRow.status} minWidth={96} />
+                <Chip size="small" label={selectedRow.type} variant="outlined"
+                  sx={{ fontWeight: 900, justifyContent: "center" }} />
+                <Chip size="small" label={`${selectedRow.tests_done} tests`} variant="outlined"
+                  sx={{ fontWeight: 900 }} />
               </Stack>
             </Box>
 
-            {/* Drawer body */}
-            <Box sx={{ flex: 1, overflowY: "auto", p: 2 }}>
-              <Stack spacing={2}>
-                {/* Overview card */}
-                <Card
-                  sx={{
-                    borderRadius: 2,
-                    border: `1px solid ${drawerCardBorder}`,
-                    background: drawerCardBg,
-                  }}
-                >
-                  <CardContent sx={{ p: 2 }}>
-                    <Typography variant="subtitle2" fontWeight={900} sx={{ mb: 1.25 }}>
-                      Overview
+            {/* Drawer body — redesigned */}
+            <Box sx={{ flex: 1, overflowY: "auto" }}>
+
+              {/* ── Summary strip ──────────────────────────────────────────────── */}
+              <Box
+                sx={{
+                  px: 2.25, py: 1.5,
+                  display: "grid", gridTemplateColumns: "repeat(3, 1fr)", gap: 1,
+                  borderBottom: `1px solid ${alpha(theme.palette.divider, isDark ? 0.18 : 0.55)}`,
+                  background: isDark ? alpha("#fff", 0.015) : alpha(theme.palette.grey[50], 0.6),
+                }}
+              >
+                {[
+                  { label: "Submission", value: `#${selectedRow.id}` },
+                  { label: "Tests run", value: selectedRow.tests_done ?? "—" },
+                  { label: "Submitted", value: fmtDate(selectedRow.created_at) },
+                ].map(({ label, value }) => (
+                  <Box key={label}>
+                    <Typography sx={{ fontSize: 10, fontWeight: 700, textTransform: "uppercase", letterSpacing: "0.07em", color: "text.disabled", mb: 0.2 }}>
+                      {label}
                     </Typography>
-                    <Box
-                      sx={{
-                        display: "grid",
-                        gridTemplateColumns: { xs: "1fr", sm: "120px 1fr" },
-                        gap: 1.25,
-                      }}
-                    >
-                      <Typography color="text.secondary">Artifact</Typography>
-                      <Typography sx={{ wordBreak: "break-word" }}>
-                        {selectedRow.artifact || "—"}
-                      </Typography>
+                    <Typography sx={{ fontWeight: 900, fontSize: 13 }}>{String(value)}</Typography>
+                  </Box>
+                ))}
+              </Box>
 
-                      <Typography color="text.secondary">Created</Typography>
-                      <Typography>{fmtDate(selectedRow.created_at)}</Typography>
+              <Stack spacing={0} divider={<Divider sx={{ opacity: isDark ? 0.12 : 0.35 }} />}>
 
-                      <Typography color="text.secondary">Submission ID</Typography>
-                      <Stack direction="row" spacing={1} alignItems="center">
-                        <Typography>{selectedRow.id}</Typography>
-                        <CopyIconButton text={String(selectedRow.id)} title="Copy ID" />
+                {/* ── Artifact ──────────────────────────────────────────────────── */}
+                <Box sx={{ px: 2.25, py: 2 }}>
+                  <Typography sx={{ fontSize: 10, fontWeight: 700, textTransform: "uppercase", letterSpacing: "0.08em", color: "text.disabled", mb: 0.75 }}>
+                    Artifact
+                  </Typography>
+                  <Typography sx={{ wordBreak: "break-all", fontWeight: 700, fontSize: 13.5 }}>
+                    {selectedRow.artifact || "—"}
+                  </Typography>
+                </Box>
+
+                {/* ── Analysis results — grouped by artifact ────────────────────── */}
+                <Box sx={{ px: 2.25, pt: 2, pb: 1 }}>
+                  <Stack direction="row" alignItems="center" justifyContent="space-between" sx={{ mb: 1.25 }}>
+                    <Typography sx={{ fontSize: 10, fontWeight: 700, textTransform: "uppercase", letterSpacing: "0.08em", color: "text.disabled" }}>
+                      Analysis · {analyzerReports.length} report{analyzerReports.length !== 1 ? "s" : ""}
+                    </Typography>
+                    {reportGroups.length > 0 ? (
+                      <Stack direction="row" spacing={0.5}>
+                        <Button size="small"
+                          onClick={() => setExpandedGroups(Object.fromEntries(reportGroups.map((g) => [g.key, true])))}
+                          sx={{ textTransform: "none", fontWeight: 800, borderRadius: 2, fontSize: 11, py: 0.2, minWidth: 0 }}>
+                          Expand all
+                        </Button>
+                        <Button size="small" onClick={() => setExpandedGroups({})}
+                          sx={{ textTransform: "none", fontWeight: 800, borderRadius: 2, fontSize: 11, py: 0.2, minWidth: 0 }}>
+                          Collapse
+                        </Button>
                       </Stack>
-                    </Box>
-                  </CardContent>
-                </Card>
+                    ) : null}
+                  </Stack>
 
-                {/* Analysis results card */}
-                <Card
-                  sx={{
-                    borderRadius: 2,
-                    border: `1px solid ${drawerCardBorder}`,
-                    background: drawerCardBg,
-                  }}
-                >
-                  <CardContent sx={{ p: 2 }}>
-                    <Stack
-                      direction={{ xs: "column", sm: "row" }}
-                      justifyContent="space-between"
-                      alignItems={{ xs: "flex-start", sm: "center" }}
-                      spacing={1}
-                      sx={{ mb: 1.25 }}
-                    >
-                      <Typography variant="subtitle2" fontWeight={900}>
-                        Analysis results
-                      </Typography>
-
-                      {!detailsQuery.isLoading && !detailsQuery.isError ? (
-                        <Stack direction="row" spacing={1} alignItems="center" flexWrap="wrap">
-                          <Typography variant="caption" color="text.secondary">
-                            {detailsQuery.data?.analyzer_reports?.length ?? 0} report
-                            {(detailsQuery.data?.analyzer_reports?.length ?? 0) === 1 ? "" : "s"}
-                          </Typography>
-
-                          {!!analyzerReports.length ? (
-                            <>
-                              <Button
-                                size="small"
-                                variant="outlined"
-                                onClick={expandAllAnalyzers}
-                                sx={{ textTransform: "none", borderRadius: 2, fontWeight: 800 }}
-                              >
-                                Expand all
-                              </Button>
-                              <Button
-                                size="small"
-                                variant="outlined"
-                                onClick={collapseAllAnalyzers}
-                                sx={{ textTransform: "none", borderRadius: 2, fontWeight: 800 }}
-                              >
-                                Collapse all
-                              </Button>
-                              <Button
-                                size="small"
-                                variant="outlined"
-                                onClick={invertAnalyzers}
-                                sx={{ textTransform: "none", borderRadius: 2, fontWeight: 800 }}
-                              >
-                                Invert
-                              </Button>
-                            </>
-                          ) : null}
-                        </Stack>
-                      ) : null}
+                  {detailsQuery.isLoading ? (
+                    <Stack direction="row" spacing={1} alignItems="center" sx={{ py: 2 }}>
+                      <CircularProgress size={16} />
+                      <Typography variant="caption" color="text.secondary">Loading analysis…</Typography>
                     </Stack>
-
-                    {detailsQuery.isLoading ? (
-                      <Stack direction="row" spacing={1} alignItems="center">
-                        <CircularProgress size={18} />
-                        <Typography variant="body2" color="text.secondary">
-                          Loading details…
-                        </Typography>
-                      </Stack>
-                    ) : detailsQuery.isError ? (
-                      <Alert severity="warning">Could not load details.</Alert>
-                    ) : !detailsQuery.data?.analyzer_reports?.length ? (
-                      <Alert severity="info">
-                        No analysis details are available for this submission yet.
-                      </Alert>
-                    ) : (
-                      <Stack spacing={2}>
-                        {reportGroups.map((group) => (
-                          <Box key={group.key}>
-                            {/* Artifact group header */}
-                            <Stack
-                              direction="row"
-                              spacing={1}
-                              alignItems="center"
-                              sx={{ mb: 1 }}
+                  ) : detailsQuery.isError ? (
+                    <Alert severity="warning" sx={{ mb: 1.5 }}>Could not load analysis details.</Alert>
+                  ) : !reportGroups.length ? (
+                    <Alert severity="info" sx={{ mb: 1.5 }}>No analysis reports yet.</Alert>
+                  ) : (
+                    <Stack spacing={1} sx={{ mb: 1.5 }}>
+                      {reportGroups.map((group) => {
+                        const isGroupOpen = !!expandedGroups[group.key];
+                        return (
+                          <Box key={group.key}
+                            sx={{
+                              borderRadius: 2.5,
+                              border: `1px solid ${alpha(theme.palette.divider, isDark ? 0.18 : 0.55)}`,
+                              background: isDark ? alpha("#fff", 0.02) : alpha(theme.palette.background.paper, 0.5),
+                              overflow: "hidden",
+                            }}
+                          >
+                            {/* Group header */}
+                            <Box
+                              role="button" tabIndex={0}
+                              onClick={() => setExpandedGroups((prev) => ({ ...prev, [group.key]: !prev[group.key] }))}
+                              onKeyDown={(e) => { if (e.key === "Enter" || e.key === " ") { e.preventDefault(); setExpandedGroups((prev) => ({ ...prev, [group.key]: !prev[group.key] })); } }}
+                              sx={{
+                                px: 1.75, py: 1.1,
+                                display: "flex", alignItems: "center", gap: 1.25,
+                                cursor: "pointer", userSelect: "none",
+                                background: isDark ? alpha("#fff", 0.03) : alpha(theme.palette.background.paper, 0.7),
+                                "&:hover": { background: isDark ? alpha("#fff", 0.05) : alpha(theme.palette.primary.main, 0.04) },
+                                transition: "background .15s ease",
+                              }}
                             >
-                              <Box
-                                sx={{
-                                  px: 1,
-                                  py: 0.3,
-                                  borderRadius: 1.5,
-                                  fontSize: 10.5,
-                                  fontWeight: 800,
-                                  letterSpacing: "0.05em",
-                                  textTransform: "uppercase",
-                                  bgcolor: isDark
-                                    ? "rgba(255,255,255,.07)"
-                                    : alpha(theme.palette.primary.main, 0.08),
-                                  color: isDark
-                                    ? "text.secondary"
-                                    : "primary.main",
-                                  border: `1px solid ${isDark
-                                    ? "rgba(255,255,255,.12)"
-                                    : alpha(theme.palette.primary.main, 0.2)}`,
-                                  flexShrink: 0,
-                                }}
-                              >
+                              <Box sx={{
+                                px: 0.9, py: 0.2, borderRadius: 1.25,
+                                fontSize: 10, fontWeight: 800, letterSpacing: "0.05em", textTransform: "uppercase",
+                                bgcolor: isDark ? alpha(theme.palette.primary.main, 0.15) : alpha(theme.palette.primary.main, 0.08),
+                                color: isDark ? alpha(theme.palette.primary.light, 0.9) : theme.palette.primary.main,
+                                border: `1px solid ${alpha(theme.palette.primary.main, isDark ? 0.25 : 0.18)}`,
+                                flexShrink: 0,
+                              }}>
                                 {kindLabel(group.kind)}
                               </Box>
-                              <Typography
-                                variant="body2"
-                                fontWeight={700}
-                                sx={{
-                                  overflow: "hidden",
-                                  textOverflow: "ellipsis",
-                                  whiteSpace: "nowrap",
-                                  minWidth: 0,
-                                  flex: 1,
-                                }}
-                                title={group.value}
-                              >
+                              <Typography variant="body2" fontWeight={700}
+                                sx={{ flex: 1, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap", fontSize: 12.5 }}
+                                title={group.value}>
                                 {group.value}
                               </Typography>
-                              <Typography
-                                variant="caption"
-                                color="text.disabled"
-                                sx={{ flexShrink: 0 }}
-                              >
-                                {group.reports.length} analyzer{group.reports.length === 1 ? "" : "s"}
+                              <Typography variant="caption" color="text.disabled" sx={{ flexShrink: 0, fontSize: 11 }}>
+                                {group.reports.length} analyzer{group.reports.length !== 1 ? "s" : ""}
                               </Typography>
-                            </Stack>
+                              <ExpandMoreOutlined sx={{
+                                fontSize: 18, flexShrink: 0, opacity: 0.6,
+                                transform: isGroupOpen ? "rotate(180deg)" : "rotate(0deg)",
+                                transition: "transform .2s ease",
+                              }} />
+                            </Box>
 
-                            {/* Reports for this artifact */}
-                            <Stack spacing={1}>
-                              {group.reports.map((report) => (
-                                <AnalyzerReportCard
-                                  key={report.id}
-                                  report={report}
-                                  expanded={!!expandedAnalyzerIds[report.id]}
-                                  onToggle={() =>
-                                    setExpandedAnalyzerIds((prev) => ({
-                                      ...prev,
-                                      [report.id]: !prev[report.id],
-                                    }))
-                                  }
-                                />
-                              ))}
-                            </Stack>
+                            {/* Reports inside the group */}
+                            {isGroupOpen ? (
+                              <Box sx={{ p: 1.25 }}>
+                                <Stack spacing={0.9}>
+                                  {group.reports.map((report) => (
+                                    <AnalyzerReportCard
+                                      key={report.id}
+                                      report={report}
+                                      expanded={!!expandedAnalyzerIds[report.id]}
+                                      onToggle={() => setExpandedAnalyzerIds((prev) => ({ ...prev, [report.id]: !prev[report.id] }))}
+                                    />
+                                  ))}
+                                </Stack>
+                              </Box>
+                            ) : null}
                           </Box>
-                        ))}
-                      </Stack>
-                    )}
-                  </CardContent>
-                </Card>
+                        );
+                      })}
+                    </Stack>
+                  )}
+                </Box>
 
-                {/* Raw details */}
+                {/* ── Raw details ───────────────────────────────────────────────── */}
                 {hasRawDetails ? (
-                  <Card
-                    sx={{
-                      borderRadius: 2,
-                      border: `1px solid ${drawerCardBorder}`,
-                      background: isDark ? "rgba(255,255,255,.02)" : alpha(theme.palette.background.paper, 0.5),
-                    }}
-                  >
-                    <Accordion
-                      disableGutters
-                      sx={{
-                        borderRadius: 2,
-                        border: "none",
-                        background: "transparent",
-                        "&:before": { display: "none" },
-                      }}
-                    >
-                      <AccordionSummary expandIcon={<ExpandMoreOutlined />}>
-                        <Typography variant="subtitle2" fontWeight={900}>
-                          Raw details (admin/debug)
-                        </Typography>
-                      </AccordionSummary>
-                      <AccordionDetails>
-                        <Box
-                          component="pre"
-                          sx={(theme) => ({
-                            m: 0,
-                            p: 1.5,
-                            borderRadius: 2,
-                            border: `1px solid ${theme.palette.divider}`,
-                            backgroundColor: alpha(theme.palette.action.hover, 0.55),
-                            color: theme.palette.text.primary,
-                            overflow: "auto",
-                            maxHeight: 320,
-                            fontSize: 12,
-                            lineHeight: 1.45,
-                          })}
-                        >
-                          {JSON.stringify(detailsQuery.data?.raw, null, 2)}
-                        </Box>
-                      </AccordionDetails>
-                    </Accordion>
-                  </Card>
+                  <Accordion disableGutters sx={{ background: "transparent", "&:before": { display: "none" } }}>
+                    <AccordionSummary expandIcon={<ExpandMoreOutlined />} sx={{ px: 2.25, py: 1 }}>
+                      <Typography sx={{ fontSize: 10, fontWeight: 700, textTransform: "uppercase", letterSpacing: "0.08em", color: "text.disabled" }}>
+                        Raw details (admin/debug)
+                      </Typography>
+                    </AccordionSummary>
+                    <AccordionDetails sx={{ px: 2.25, pt: 0, pb: 2 }}>
+                      <Box component="pre" sx={(t) => ({
+                        m: 0, p: 1.25, borderRadius: 2,
+                        border: `1px solid ${t.palette.divider}`,
+                        backgroundColor: alpha(t.palette.action.hover, 0.55),
+                        color: t.palette.text.primary,
+                        overflow: "auto", maxHeight: 280, fontSize: 11.5, lineHeight: 1.45,
+                      })}>
+                        {JSON.stringify(detailsQuery.data?.raw, null, 2)}
+                      </Box>
+                    </AccordionDetails>
+                  </Accordion>
                 ) : null}
+
               </Stack>
             </Box>
           </Stack>
