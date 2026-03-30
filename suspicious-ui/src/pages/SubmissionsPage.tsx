@@ -28,6 +28,7 @@ import {
   TableCell,
   TableHead,
   TableRow,
+  TableSortLabel,
   TextField,
   Tooltip,
   Typography,
@@ -288,6 +289,11 @@ const STATUS_OPTIONS: Array<SubmissionStatus | "ALL"> = [
 
 const TYPE_OPTIONS: Array<SubmissionType | "ALL"> = [
   "ALL", "FILE", "MAIL", "URL", "IP", "HASH", "UNKNOWN",
+];
+
+const RESULT_OPTIONS: Array<SubmissionResult | "ALL"> = [
+  "ALL", "DANGEROUS", "SUSPICIOUS", "INCONCLUSIVE", "SAFE",
+  "FAILURE", "UNCHALLENGED", "ALLOW_LISTED", "UNKNOWN",
 ];
 
 // ---------------------------------------------------------------------------
@@ -700,6 +706,32 @@ export default function SubmissionsPage() {
 
   const [status, setStatus] = React.useState<SubmissionStatus | "ALL">("ALL");
   const [type, setType] = React.useState<SubmissionType | "ALL">("ALL");
+  const [result, setResult] = React.useState<SubmissionResult | "ALL">("ALL");
+
+  const [sortField, setSortField] = React.useState<"created_at" | "id" | "status" | "result" | "artifact" | "type">("created_at");
+  const [sortDir,   setSortDir]   = React.useState<"asc" | "desc">("desc");
+
+  // Derived backend ordering — maps sortField/sortDir to SubmissionOrdering
+  const backendOrderingFromSort = React.useMemo((): import("@/features/submissions/api").SubmissionOrdering => {
+    const prefix = sortDir === "desc" ? "-" : "";
+    if (sortField === "created_at") return `${prefix}created_at` as any;
+    if (sortField === "id")         return `${prefix}id` as any;
+    if (sortField === "status")     return `${prefix}status` as any;
+    if (sortField === "result")     return `${prefix}result` as any;
+    // artifact/type have no backend ordering — fall back to date
+    return "-created_at";
+  }, [sortField, sortDir]);
+
+  function handleColumnSort(field: typeof sortField) {
+    if (sortField === field) {
+      setSortDir((d) => (d === "asc" ? "desc" : "asc"));
+    } else {
+      setSortField(field);
+      setSortDir("desc");
+    }
+    setPage(0);
+  }
+
   const [from, setFrom] = React.useState("");
   const [to, setTo] = React.useState("");
   const [sort, setSort] = React.useState<"date_desc" | "date_asc" | "id_desc" | "id_asc">("date_desc");
@@ -719,7 +751,8 @@ export default function SubmissionsPage() {
 
   const me: Me | undefined = React.useMemo(() => meQuery.data, [meQuery.data]);
 
-  const backendOrdering = React.useMemo(() => toBackendOrdering(sort), [sort]);
+  // sort dropdown kept for backwards-compat; column clicks take precedence
+  const backendOrdering = backendOrderingFromSort;
 
   const submissionsQuery = useQuery<PaginatedSubmissionsResponse>({
     queryKey: ["submissions", { mine: true, ordering: backendOrdering, fetchSize: 100 }],
@@ -796,16 +829,28 @@ export default function SubmissionsPage() {
     }
   }, [searchParams]);
 
-  React.useEffect(() => { setPage(0); }, [qDebounced, status, type, from, to, sort, pageSize]);
+  React.useEffect(() => { setPage(0); }, [qDebounced, status, type, result, from, to, sort, sortField, sortDir, pageSize]);
   React.useEffect(() => { if (!openDrawer) setExpandedAnalyzerIds({}); }, [openDrawer]);
   React.useEffect(() => { setExpandedAnalyzerIds({}); }, [selectedId]);
   React.useEffect(() => { setExpandedAnalyzerIds({}); }, [detailsQuery.data?.analyzer_reports]);
 
   const rows = submissionsQuery.data?.results ?? [];
-  const filtered = rows
+  // Client-side sort for artifact/type fields (not supported by backend ordering)
+  const clientSorted = React.useMemo(() => {
+    if (sortField !== "artifact" && sortField !== "type") return rows;
+    return [...rows].sort((a, b) => {
+      const va = (sortField === "artifact" ? a.artifact : a.type) ?? "";
+      const vb = (sortField === "artifact" ? b.artifact : b.type) ?? "";
+      const cmp = va.localeCompare(vb);
+      return sortDir === "asc" ? cmp : -cmp;
+    });
+  }, [rows, sortField, sortDir]);
+
+  const filtered = clientSorted
     .filter((r) => matches(r, qDebounced))
     .filter((r) => (status === "ALL" ? true : r.status === status))
     .filter((r) => (type === "ALL" ? true : r.type === type))
+    .filter((r) => (result === "ALL" ? true : r.result === result))
     .filter((r) => withinDates(r.created_at, from || undefined, to || undefined));
 
   const total = filtered.length;
@@ -981,6 +1026,20 @@ export default function SubmissionsPage() {
                   ))}
                 </Select>
               </FormControl>
+
+              <FormControl sx={{ minWidth: 180 }} fullWidth>
+                <InputLabel id="result-label">Result</InputLabel>
+                <Select
+                  labelId="result-label"
+                  label="Result"
+                  value={result}
+                  onChange={(e) => setResult(e.target.value as SubmissionResult | "ALL")}
+                >
+                  {RESULT_OPTIONS.map((r) => (
+                    <MenuItem key={r} value={r}>{r === "ALL" ? "All results" : r}</MenuItem>
+                  ))}
+                </Select>
+              </FormControl>
             </Stack>
 
             <Stack direction={{ xs: "column", md: "row" }} spacing={1.25} alignItems="stretch">
@@ -1007,9 +1066,15 @@ export default function SubmissionsPage() {
                   labelId="sort-label"
                   label="Sort"
                   value={sort}
-                  onChange={(e) =>
-                    setSort(e.target.value as "date_desc" | "date_asc" | "id_desc" | "id_asc")
-                  }
+                  onChange={(e) => {
+                    const v = e.target.value as "date_desc" | "date_asc" | "id_desc" | "id_asc";
+                    setSort(v);
+                    if (v === "date_desc") { setSortField("created_at"); setSortDir("desc"); }
+                    else if (v === "date_asc") { setSortField("created_at"); setSortDir("asc"); }
+                    else if (v === "id_desc") { setSortField("id"); setSortDir("desc"); }
+                    else { setSortField("id"); setSortDir("asc"); }
+                    setPage(0);
+                  }}
                 >
                   <MenuItem value="date_desc">Date (new → old)</MenuItem>
                   <MenuItem value="date_asc">Date (old → new)</MenuItem>
@@ -1079,16 +1144,52 @@ export default function SubmissionsPage() {
             </Box>
           ) : (
             <Box sx={{ overflowX: "auto" }}>
-              <Table sx={{ minWidth: 980 }}>
+              <Table sx={{ minWidth: 1020 }}>
                 <TableHead>
                   <TableRow>
-                    <TableCell sx={{ fontWeight: 950 }}>ID</TableCell>
-                    <TableCell sx={{ fontWeight: 950 }}>Status</TableCell>
-                    <TableCell sx={{ fontWeight: 950 }}>Artifact</TableCell>
-                    <TableCell sx={{ fontWeight: 950 }}>Date</TableCell>
-                    <TableCell sx={{ fontWeight: 950, textAlign: "right" }}>Tests</TableCell>
-                    <TableCell sx={{ fontWeight: 950 }}>Type</TableCell>
-                    <TableCell sx={{ fontWeight: 950 }}>Result</TableCell>
+                    <TableCell sx={{ fontWeight: 950, width: 140 }}>
+                      <TableSortLabel
+                        active={sortField === "id"}
+                        direction={sortField === "id" ? sortDir : "desc"}
+                        onClick={() => handleColumnSort("id")}
+                      >ID</TableSortLabel>
+                    </TableCell>
+                    <TableCell sx={{ fontWeight: 950 }}>
+                      <TableSortLabel
+                        active={sortField === "result"}
+                        direction={sortField === "result" ? sortDir : "desc"}
+                        onClick={() => handleColumnSort("result")}
+                      >Result</TableSortLabel>
+                    </TableCell>
+                    <TableCell sx={{ fontWeight: 950, width: 120 }}>
+                      <TableSortLabel
+                        active={sortField === "status"}
+                        direction={sortField === "status" ? sortDir : "desc"}
+                        onClick={() => handleColumnSort("status")}
+                      >Status</TableSortLabel>
+                    </TableCell>
+                    <TableCell sx={{ fontWeight: 950 }}>
+                      <TableSortLabel
+                        active={sortField === "artifact"}
+                        direction={sortField === "artifact" ? sortDir : "asc"}
+                        onClick={() => handleColumnSort("artifact")}
+                      >Artifact</TableSortLabel>
+                    </TableCell>
+                    <TableCell sx={{ fontWeight: 950, width: 130 }}>
+                      <TableSortLabel
+                        active={sortField === "created_at"}
+                        direction={sortField === "created_at" ? sortDir : "desc"}
+                        onClick={() => handleColumnSort("created_at")}
+                      >Date</TableSortLabel>
+                    </TableCell>
+                    <TableCell sx={{ fontWeight: 950, textAlign: "right", width: 60 }}>Tests</TableCell>
+                    <TableCell sx={{ fontWeight: 950, width: 80 }}>
+                      <TableSortLabel
+                        active={sortField === "type"}
+                        direction={sortField === "type" ? sortDir : "asc"}
+                        onClick={() => handleColumnSort("type")}
+                      >Type</TableSortLabel>
+                    </TableCell>
                     <TableCell sx={{ fontWeight: 950 }}>Challenge</TableCell>
                   </TableRow>
                 </TableHead>
@@ -1111,8 +1212,9 @@ export default function SubmissionsPage() {
                           }
                         }}
                       >
+                        {/* ID */}
                         <TableCell>
-                          <Stack direction="row" spacing={1} alignItems="center">
+                          <Stack direction="row" spacing={0.5} alignItems="center">
                             <Button
                               size="small"
                               variant="contained"
@@ -1121,65 +1223,57 @@ export default function SubmissionsPage() {
                                 setSelectedId(r.id);
                                 setOpenDrawer(true);
                               }}
-                              sx={{ borderRadius: 2, textTransform: "none", fontWeight: 950 }}
+                              sx={{ borderRadius: 2, textTransform: "none", fontWeight: 950, minWidth: 0, px: 1.25 }}
                             >
                               {r.id}
                             </Button>
                             <CopyIconButton text={String(r.id)} title="Copy ID" />
-                            <Tooltip title="Open details">
-                              <IconButton
-                                size="small"
-                                onClick={(e) => {
-                                  e.stopPropagation();
-                                  setSelectedId(r.id);
-                                  setOpenDrawer(true);
-                                }}
-                              >
-                                <OpenInNewOutlined fontSize="small" />
-                              </IconButton>
-                            </Tooltip>
                           </Stack>
                         </TableCell>
 
+                        {/* Result — most critical, shown immediately after ID */}
                         <TableCell>
-                          <StatusChip status={r.status} minWidth={BADGE_W} />
+                          <ResultChip result={r.result} minWidth={BADGE_W} />
                         </TableCell>
 
+                        {/* Status — compact */}
+                        <TableCell>
+                          <StatusChip status={r.status} minWidth={96} />
+                        </TableCell>
+
+                        {/* Artifact */}
                         <TableCell title={r.artifact}>
-                          <Typography
-                            sx={{
-                              maxWidth: 340,
-                              whiteSpace: "nowrap",
-                              overflow: "hidden",
-                              textOverflow: "ellipsis",
-                            }}
-                          >
-                            {short(r.artifact, 64)}
-                          </Typography>
+                          <Tooltip title={r.artifact || ""} arrow placement="top">
+                            <Typography
+                              sx={{
+                                maxWidth: 320,
+                                whiteSpace: "nowrap",
+                                overflow: "hidden",
+                                textOverflow: "ellipsis",
+                                cursor: "help",
+                              }}
+                            >
+                              {short(r.artifact, 60)}
+                            </Typography>
+                          </Tooltip>
                         </TableCell>
 
-                        <TableCell>{fmtDate(r.created_at)}</TableCell>
+                        {/* Date */}
+                        <TableCell sx={{ whiteSpace: "nowrap" }}>{fmtDate(r.created_at)}</TableCell>
 
+                        {/* Tests */}
                         <TableCell sx={{ textAlign: "right", fontWeight: 900 }}>
                           {r.tests_done}
                         </TableCell>
 
+                        {/* Type — compact chip */}
                         <TableCell>
                           <Chip
                             label={r.type}
                             size="small"
                             variant="outlined"
-                            sx={{
-                              fontWeight: 900,
-                              minWidth: BADGE_W,
-                              justifyContent: "center",
-                              "& .MuiChip-label": { width: "100%", textAlign: "center" },
-                            }}
+                            sx={{ fontWeight: 900, fontSize: 11 }}
                           />
-                        </TableCell>
-
-                        <TableCell>
-                          <ResultChip result={r.result} minWidth={BADGE_W} />
                         </TableCell>
 
                         <TableCell onClick={(e) => e.stopPropagation()}>

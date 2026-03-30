@@ -273,6 +273,14 @@ class InvestigationAccessMixin:
             queryset = queryset.order_by("-pk")
         elif ordering == "creation_date":
             queryset = queryset.order_by("creation_date", "pk")
+        elif ordering == "status":
+            queryset = queryset.order_by("status", "-creation_date")
+        elif ordering == "-status":
+            queryset = queryset.order_by("-status", "-creation_date")
+        elif ordering == "result":
+            queryset = queryset.order_by("results", "-creation_date")
+        elif ordering == "-result":
+            queryset = queryset.order_by("-results", "-creation_date")
         else:
             queryset = queryset.order_by("-creation_date", "-pk")
 
@@ -291,6 +299,7 @@ class InvestigationAccessMixin:
         OpenApiParameter(name="to_date", type=str, location=OpenApiParameter.QUERY),
         OpenApiParameter(name="ordering", type=str, location=OpenApiParameter.QUERY),
         OpenApiParameter(name="result",   type=str, location=OpenApiParameter.QUERY),
+        OpenApiParameter(name="sort_field", type=str, location=OpenApiParameter.QUERY),
     ],
     responses={
         200: OpenApiResponse(description="Paginated investigation list."),
