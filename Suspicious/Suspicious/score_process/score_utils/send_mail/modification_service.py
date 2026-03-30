@@ -100,7 +100,7 @@ class ModificationEmailService:
         return self.template.render(
             subject=subject,
             recipient_name=recipient_name,
-            company=self.config.get("links", {}).get("team_name"),
+            company=self.config.get("content", {}).get("team_name"),
             logos={
                 "company": self.config.get("logos", {}).get("company"),
                 "final": self.config.get("logos", {}).get("final"),
