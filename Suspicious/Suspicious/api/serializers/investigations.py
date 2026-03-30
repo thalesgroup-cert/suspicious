@@ -35,7 +35,7 @@ API_STATUS_TO_INTERNAL = {
 
 INVESTIGATION_TYPE_CHOICES = ("FILE", "MAIL", "URL", "IP", "HASH", "UNKNOWN")
 INVESTIGATION_RESULT_CHOICES = tuple(API_RESULT_TO_INTERNAL.keys()) + ("UNKNOWN",)
-INVESTIGATION_ORDERING_CHOICES = ("-creation_date", "creation_date", "-id", "id")
+INVESTIGATION_ORDERING_CHOICES = ("-creation_date", "creation_date", "-id", "id", "status", "-status", "result", "-result")
 
 
 def normalize_result_to_api(value: Any) -> str:

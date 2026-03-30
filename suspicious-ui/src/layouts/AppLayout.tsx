@@ -136,23 +136,23 @@ function NavItem({
             { duration: 150 }
           ),
 
-          // ── Idle icon shell ─────────────────────────────────────────────
+          // ── Idle icon shell — matches SoftCard divider/bg system ────────
           "& .nav-icon": {
-            width: 34,
-            height: 34,
+            width: 32,
+            height: 32,
             borderRadius: 2,
             display: "grid",
             placeItems: "center",
             flexShrink: 0,
-            border: `1px solid ${alpha(theme.palette.divider, isDark ? 0.18 : 0.55)}`,
+            border: `1px solid ${alpha(theme.palette.divider, isDark ? 0.22 : 0.65)}`,
             background: isDark
-              ? alpha("#fff", 0.025)
-              : alpha(theme.palette.background.paper, 0.7),
+              ? alpha("#fff", 0.03)
+              : alpha(theme.palette.background.paper, 0.8),
             transition: theme.transitions.create(
               ["background", "border-color", "box-shadow"],
               { duration: 150 }
             ),
-            "& svg": { fontSize: 18, transition: "color 150ms" },
+            "& svg": { fontSize: 17, transition: "color 150ms" },
           },
 
           // ── Label ────────────────────────────────────────────────────────
@@ -180,20 +180,21 @@ function NavItem({
             },
           },
 
-          // ── Active ───────────────────────────────────────────────────────
+          // ── Active — SoftCard glassmorphism treatment ────────────────────
           "&.active": {
             color: theme.palette.text.primary,
             background: isDark
-              ? `linear-gradient(135deg, ${alpha(primary, 0.16)}, ${alpha(primary, 0.08)})`
-              : `linear-gradient(135deg, ${alpha(primary, 0.1)}, ${alpha(primary, 0.05)})`,
-            borderColor: alpha(primary, isDark ? 0.3 : 0.22),
+              ? `linear-gradient(135deg, ${alpha(primary, 0.14)}, ${alpha(primary, 0.07)})`
+              : `linear-gradient(135deg, ${alpha(primary, 0.09)}, ${alpha(primary, 0.04)})`,
+            borderColor: alpha(primary, isDark ? 0.28 : 0.2),
             boxShadow: isDark
-              ? `inset 0 1px 0 ${alpha("#fff", 0.06)}, 0 4px 12px ${alpha(primary, 0.14)}`
-              : `inset 0 1px 0 ${alpha("#fff", 0.6)}, 0 4px 12px ${alpha(primary, 0.08)}`,
+              ? `0 2px 8px ${alpha(primary, 0.12)}`
+              : `0 2px 8px ${alpha(primary, 0.06)}`,
             "& .nav-icon": {
-              borderColor: alpha(primary, isDark ? 0.32 : 0.26),
-              background: alpha(primary, isDark ? 0.16 : 0.1),
-              boxShadow: `0 0 0 3px ${alpha(primary, isDark ? 0.08 : 0.06)}`,
+              borderColor: alpha(primary, isDark ? 0.32 : 0.25),
+              background: isDark
+                ? alpha(primary, 0.15)
+                : `linear-gradient(135deg, ${alpha(primary, 0.12)}, ${alpha(primary, 0.06)})`,
               "& svg": { color: primary },
             },
           },
@@ -243,12 +244,13 @@ function NavSection({
           variant="overline"
           sx={{
             display: "block",
-            px: 1.5,
-            pb: 0.5,
-            fontSize: 10,
-            fontWeight: 800,
-            letterSpacing: "0.12em",
-            color: alpha(theme.palette.text.secondary, isDark ? 0.7 : 0.65),
+            px: 1.75,
+            pb: 0.4,
+            pt: 0.2,
+            fontSize: 9.5,
+            fontWeight: 700,
+            letterSpacing: "0.1em",
+            color: alpha(theme.palette.text.secondary, isDark ? 0.55 : 0.5),
           }}
         >
           {label}
@@ -516,7 +518,18 @@ export default function AppLayout() {
 
   const [mobileOpen, setMobileOpen] = React.useState(false);
   const [hovered,    setHovered]    = React.useState(false);
-  const [pinned,     setPinned]     = React.useState(false);
+
+  // Pin state persists across page reloads via localStorage
+  const [pinned, setPinned] = React.useState<boolean>(() => {
+    try { return localStorage.getItem("suspicious.sidebar.pinned") === "1"; }
+    catch { return false; }
+  });
+
+  // Write pin state whenever it changes
+  React.useEffect(() => {
+    try { localStorage.setItem("suspicious.sidebar.pinned", pinned ? "1" : "0"); }
+    catch { /* localStorage blocked in this env */ }
+  }, [pinned]);
 
   // Close mobile drawer on navigation
   React.useEffect(() => { setMobileOpen(false); }, [location.pathname]);
@@ -545,13 +558,10 @@ export default function AppLayout() {
   }
 
   // ── Sidebar background — fully theme-aware ──────────────────────────────
+  // Match SoftCard: subtle primary tint + same gradient/border system as app cards
   const sidebarBg = isDark
-    ? `radial-gradient(ellipse 140% 60% at 0% 0%, ${alpha(primary, 0.1)}, transparent 55%),
-       radial-gradient(ellipse 100% 40% at 100% 100%, ${alpha(primary, 0.06)}, transparent 50%),
-       linear-gradient(180deg, ${alpha(theme.palette.background.paper, 0.97)}, ${alpha(theme.palette.background.default, 0.99)})`
-    : `radial-gradient(ellipse 140% 60% at 0% 0%, ${alpha(primary, 0.07)}, transparent 55%),
-       radial-gradient(ellipse 100% 40% at 100% 100%, ${alpha(primary, 0.04)}, transparent 50%),
-       linear-gradient(180deg, ${alpha("#fff", 0.98)}, ${alpha(theme.palette.grey[50], 0.99)})`;
+    ? `linear-gradient(180deg, ${alpha("#fff", 0.04)} 0%, ${alpha("#fff", 0.02)} 100%)`
+    : `linear-gradient(180deg, ${alpha("#fff", 0.92)} 0%, ${alpha(theme.palette.grey[50], 0.97)} 100%)`;
 
   // ── Shell background ─────────────────────────────────────────────────────
   const shellBg = isDark
@@ -561,7 +571,8 @@ export default function AppLayout() {
        ${theme.palette.background.default}`;
 
   // ── Sidebar border ───────────────────────────────────────────────────────
-  const sidebarBorder = `1px solid ${alpha(theme.palette.divider, isDark ? 0.28 : 0.85)}`;
+  // SoftCard's divider system: 0.28 dark / 0.9 light
+  const sidebarBorder = `1px solid ${alpha(theme.palette.divider, isDark ? 0.28 : 0.9)}`;
 
   // ─────────────────────────────────────────────────────────────────────────
   // Drawer content
@@ -580,9 +591,9 @@ export default function AppLayout() {
       {/* ── Logo + pin ─────────────────────────────────────────────────── */}
       <Box
         sx={{
-          px: isSlim ? 1 : 1.75,
-          pt: 1.75,
-          pb: 1.5,
+          px: isSlim ? 1 : 1.5,
+          pt: 1.5,
+          pb: 1.25,
           display: "flex",
           alignItems: "center",
           justifyContent: isSlim ? "center" : "space-between",
@@ -618,7 +629,18 @@ export default function AppLayout() {
               >
                 Suspicious
               </Typography>
-
+              <Typography
+                variant="caption"
+                sx={{
+                  fontSize: 10.5,
+                  fontWeight: 600,
+                  letterSpacing: "0.06em",
+                  color: alpha(theme.palette.text.secondary, 0.7),
+                  textTransform: "uppercase",
+                }}
+              >
+                Security Triage
+              </Typography>
             </Box>
           )}
         </Stack>

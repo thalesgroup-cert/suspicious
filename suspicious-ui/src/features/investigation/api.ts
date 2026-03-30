@@ -111,7 +111,8 @@ export type InvestigationListParams = {
   search?: string;
   status?: InvestigationStatus | "ALL";
   type?: InvestigationType | "ALL";
-  result?: InvestigationResult | "ALL";   // ← added for backend result filter
+  result?: InvestigationResult | "ALL";   // added for backend result filter
+  ordering?: string;                        // raw ordering string (from column header clicks)
   from?: string;
   to?: string;
   sort?: InvestigationSort;
@@ -296,6 +297,19 @@ function mapSort(sort: InvestigationListParams["sort"]): string {
   }
 }
 
+// Called directly by sortable column headers with field + direction
+export function buildSortOrdering(
+  field: "creation_date" | "id" | "status" | "result",
+  dir: "asc" | "desc"
+): string {
+  const prefix = dir === "desc" ? "-" : "";
+  if (field === "creation_date") return `${prefix}creation_date`;
+  if (field === "id") return `${prefix}id`;
+  if (field === "status") return `${prefix}status`;
+  if (field === "result") return `${prefix}result`;
+  return "-creation_date";
+}
+
 function normalizeListResponse(data: unknown): InvestigationListResponse {
   const payload: InvestigationListApiResponse = isObject(data) ? data : {};
   return {
@@ -313,10 +327,10 @@ function buildInvestigationListParams(params: InvestigationListParams) {
     search: params.search?.trim() || undefined,
     status: params.status && params.status !== "ALL" ? params.status : undefined,
     type: params.type && params.type !== "ALL" ? params.type : undefined,
-    result: params.result && params.result !== "ALL" ? params.result : undefined,  // ← added
+    result: params.result && params.result !== "ALL" ? params.result : undefined,
     from_date: params.from || undefined,
     to_date: params.to || undefined,
-    ordering: mapSort(params.sort),
+    ordering: params.ordering ?? mapSort(params.sort),
   };
 }
 

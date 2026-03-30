@@ -361,13 +361,10 @@ function PreferencesPanel({
 
 function AppearancePanel({
   pickedTheme, setPickedTheme, autoSeasonal, setAutoSeasonal,
-  pixel, setPixel, alert: alertMode, setAlert,
   themeName, dirty, saving, onSave, onReset,
 }: {
   pickedTheme: ThemeName; setPickedTheme: (t: ThemeName) => void;
   autoSeasonal: boolean; setAutoSeasonal: (v: boolean) => void;
-  pixel: boolean; setPixel: (v: boolean) => void;
-  alert: boolean; setAlert: (v: boolean) => void;
   themeName: ThemeName; dirty: boolean; saving: boolean;
   onSave: () => void; onReset: () => void;
 }) {
@@ -467,23 +464,6 @@ function AppearancePanel({
       <Stack spacing={1}>
         <CaptionLabel>Manual theme</CaptionLabel>
         <ThemePicker value={pickedTheme} onChange={setPickedTheme} />
-      </Stack>
-
-      {/* HUD extras */}
-      <Stack spacing={1}>
-        <CaptionLabel>Display extras</CaptionLabel>
-        <ToggleRow
-          icon={<DisplaySettingsOutlined />}
-          title="Pixel background"
-          subtitle="Enable the animated pixel grid background effect."
-          checked={pixel} onChange={setPixel} accentColor="#F59E0B"
-        />
-        <ToggleRow
-          icon={<NotificationsActiveOutlined />}
-          title="ALERT mode"
-          subtitle="Enable high-visibility alert HUD overlay."
-          checked={alertMode} onChange={setAlert} accentColor={statusColors.failure.main}
-        />
       </Stack>
 
       {/* Bottom save bar */}
@@ -908,8 +888,6 @@ export default function ProfilePage() {
               <AppearancePanel
                 pickedTheme={pickedTheme} setPickedTheme={setPickedTheme}
                 autoSeasonal={autoSeasonal} setAutoSeasonal={setAutoSeasonal}
-                pixel={pixel} setPixel={setPixel}
-                alert={alert} setAlert={setAlert}
                 themeName={themeName}
                 dirty={themeDirty} saving={appearanceMutation.isPending}
                 onSave={saveAppearance} onReset={resetAppearance}

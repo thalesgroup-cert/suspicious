@@ -27,6 +27,7 @@ import {
   TableCell,
   TableHead,
   TableRow,
+  TableSortLabel,
   TextField,
   Tooltip,
   Typography,
@@ -53,8 +54,10 @@ import {
   getAllInvestigations,
   getInvestigationDetails,
   editGlobalCase,
+  buildSortOrdering,
   type InvestigationDetails,
   type InvestigationListResponse,
+  type InvestigationRow,
   type InvestigationResult,
   type InvestigationStatus,
   type InvestigationType,
@@ -584,7 +587,25 @@ export default function InvestigationPage() {
   const [result, setResult] = React.useState<InvestigationResult | "ALL">("ALL");
   const [from, setFrom] = React.useState("");
   const [to, setTo] = React.useState("");
-  const [sort, setSort] = React.useState<"date_desc" | "date_asc" | "id_desc" | "id_asc">("date_desc");
+  const [sortField, setSortField] = React.useState<"creation_date" | "id" | "status" | "result">("creation_date");
+  const [sortDir,   setSortDir]   = React.useState<"asc" | "desc">("desc");
+
+  // Derived sort value for backwards-compat with the sort dropdown and API
+  const sort = React.useMemo((): "date_desc" | "date_asc" | "id_desc" | "id_asc" => {
+    if (sortField === "creation_date") return sortDir === "desc" ? "date_desc" : "date_asc";
+    if (sortField === "id") return sortDir === "desc" ? "id_desc" : "id_asc";
+    return sortDir === "desc" ? "date_desc" : "date_asc";
+  }, [sortField, sortDir]);
+
+  function handleColumnSort(field: "creation_date" | "id" | "status" | "result") {
+    if (sortField === field) {
+      setSortDir((d) => (d === "asc" ? "desc" : "asc"));
+    } else {
+      setSortField(field);
+      setSortDir("desc");
+    }
+    setPage(0);
+  }
   const [page, setPage] = React.useState(0);
   const [pageSize, setPageSize] = React.useState(10);
 
@@ -607,10 +628,25 @@ export default function InvestigationPage() {
     [groups]
   );
 
-  const investigationListParams = React.useMemo(
-    () => ({ page, pageSize, search: qDebounced, status, type, result, from, to, sort }),
-    [page, pageSize, qDebounced, status, type, result, from, to, sort]
-  );
+  // For status/result sort fields (not covered by the dropdown "sort" presets),
+  // pass the raw ordering string so the backend gets e.g. "-result".
+  const investigationListParams = React.useMemo(() => {
+    const needsRawOrdering = sortField === "status" || sortField === "result";
+    return {
+      page,
+      pageSize,
+      search: qDebounced,
+      status,
+      type,
+      result,
+      from,
+      to,
+      sort: needsRawOrdering ? "date_desc" : sort, // fallback for mapSort
+      ordering: needsRawOrdering
+        ? buildSortOrdering(sortField, sortDir)
+        : undefined,
+    };
+  }, [page, pageSize, qDebounced, status, type, result, from, to, sort, sortField, sortDir]);
 
   const investigationsQuery = useQuery<InvestigationListResponse>({
     queryKey: ["investigation", investigationListParams],
@@ -905,9 +941,14 @@ export default function InvestigationPage() {
                   labelId="sort-label"
                   label="Sort"
                   value={sort}
-                  onChange={(e) =>
-                    setSort(e.target.value as "date_desc" | "date_asc" | "id_desc" | "id_asc")
-                  }
+                  onChange={(e) => {
+                    const v = e.target.value as "date_desc" | "date_asc" | "id_desc" | "id_asc";
+                    if (v === "date_desc") { setSortField("creation_date"); setSortDir("desc"); }
+                    else if (v === "date_asc") { setSortField("creation_date"); setSortDir("asc"); }
+                    else if (v === "id_desc") { setSortField("id"); setSortDir("desc"); }
+                    else { setSortField("id"); setSortDir("asc"); }
+                    setPage(0);
+                  }}
                 >
                   <MenuItem value="date_desc">Date (new → old)</MenuItem>
                   <MenuItem value="date_asc">Date (old → new)</MenuItem>
@@ -982,11 +1023,35 @@ export default function InvestigationPage() {
               <Table sx={{ minWidth: 1060 }}>
                 <TableHead>
                   <TableRow>
-                    <TableCell sx={{ fontWeight: 950, width: 120 }}>ID</TableCell>
-                    <TableCell sx={{ fontWeight: 950 }}>Result</TableCell>
-                    <TableCell sx={{ fontWeight: 950, width: 130 }}>Status</TableCell>
+                    <TableCell sx={{ fontWeight: 950, width: 120 }}>
+                      <TableSortLabel
+                        active={sortField === "id"}
+                        direction={sortField === "id" ? sortDir : "desc"}
+                        onClick={() => handleColumnSort("id")}
+                      >ID</TableSortLabel>
+                    </TableCell>
+                    <TableCell sx={{ fontWeight: 950 }}>
+                      <TableSortLabel
+                        active={sortField === "result"}
+                        direction={sortField === "result" ? sortDir : "desc"}
+                        onClick={() => handleColumnSort("result")}
+                      >Result</TableSortLabel>
+                    </TableCell>
+                    <TableCell sx={{ fontWeight: 950, width: 130 }}>
+                      <TableSortLabel
+                        active={sortField === "status"}
+                        direction={sortField === "status" ? sortDir : "desc"}
+                        onClick={() => handleColumnSort("status")}
+                      >Status</TableSortLabel>
+                    </TableCell>
                     <TableCell sx={{ fontWeight: 950 }}>Artifact</TableCell>
-                    <TableCell sx={{ fontWeight: 950, width: 130 }}>Date</TableCell>
+                    <TableCell sx={{ fontWeight: 950, width: 130 }}>
+                      <TableSortLabel
+                        active={sortField === "creation_date"}
+                        direction={sortField === "creation_date" ? sortDir : "desc"}
+                        onClick={() => handleColumnSort("creation_date")}
+                      >Date</TableSortLabel>
+                    </TableCell>
                     <TableCell sx={{ fontWeight: 950, width: 80 }}>Type</TableCell>
                     <TableCell sx={{ fontWeight: 950 }}>User mail</TableCell>
                     <TableCell sx={{ fontWeight: 950, textAlign: "right", width: 60 }}>Tests</TableCell>
