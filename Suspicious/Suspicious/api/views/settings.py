@@ -52,12 +52,18 @@ class SettingsListView(generics.GenericAPIView):
         serializer = self.get_serializer(data=request.data)
         serializer.is_valid(raise_exception=True)
 
-        created_ids = SettingsListSectionService.create_items(
+        result = SettingsListSectionService.create_items(
             section=section,
             values=serializer.validated_data["values"],
             user=request.user,
         )
-        return Response({"created": created_ids}, status=status.HTTP_201_CREATED)
+
+        # result = {
+        #   "created": [id, ...],
+        #   "duplicates": ["val", ...],
+        #   "watcher_conflicts": ["val", ...],
+        # }
+        return Response(result, status=status.HTTP_201_CREATED)
 
 
 class SettingsListItemDeleteView(generics.GenericAPIView):

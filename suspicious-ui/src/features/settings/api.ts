@@ -49,8 +49,19 @@ export type EditableListSection =
   | "filetypes_allow";
 
 /**
- * Sections that return list-shaped data from /settings/list/<section>/
+ * Structured response from POST /settings/list/<section>/.
+ *
+ * created           — IDs of newly created entries
+ * duplicates        — values that already existed in this list (skipped)
+ * watcher_conflicts — values already present in the paired Watcher list
+ *                     (legit for allow, monitored for deny) — no action needed
  */
+export type AddItemsResult = {
+  created: (string | number)[];
+  duplicates: string[];
+  watcher_conflicts: string[];
+};
+
 type ListResponseSection =
   | "domains_allow"
   | "domains_deny"
@@ -81,8 +92,8 @@ export async function listItems<T extends keyof SectionResponseMap>(
 export async function addItems(
   section: EditableListSection,
   values: string[]
-) {
-  const res = await api.post(`/settings/list/${section}/`, { values });
+): Promise<AddItemsResult> {
+  const res = await api.post<AddItemsResult>(`/settings/list/${section}/`, { values });
   return res.data;
 }
 
@@ -119,7 +130,7 @@ export async function updateAnalyzerWeight(id: number, weight: number) {
 export async function addFromFile(
   section: EditableListSection,
   file: File
-) {
+): Promise<AddItemsResult> {
   const text = await file.text();
   const values = text
     .split(/[\r\n,;]+/g)

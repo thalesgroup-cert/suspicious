@@ -481,9 +481,45 @@ function EditableListPanel({
 
   const addMutation = useMutation({
     mutationFn: (values: string[]) => addItems(section, values),
-    onSuccess: (_, vars) => {
+    onSuccess: (res) => {
       qc.invalidateQueries({ queryKey: ["settings", "list", section] });
-      enqueueSnackbar(`${vars.length} value${vars.length !== 1 ? "s" : ""} added.`, { variant: "success" });
+
+      const created  = (res?.created  ?? []).length;
+      const dupes    = (res?.duplicates ?? []) as string[];
+      const watchers = (res?.watcher_conflicts ?? []) as string[];
+
+      // ── Success: items created ───────────────────────────────────────
+      if (created > 0) {
+        enqueueSnackbar(
+          `${created} value${created !== 1 ? "s" : ""} added.`,
+          { variant: "success" }
+        );
+      }
+
+      // ── Warning: already in this list ────────────────────────────────
+      if (dupes.length > 0) {
+        const preview = dupes.slice(0, 3).join(", ");
+        const extra   = dupes.length > 3 ? ` +${dupes.length - 3} more` : "";
+        enqueueSnackbar(
+          `Already in list: ${preview}${extra}`,
+          { variant: "warning" }
+        );
+      }
+
+      // ── Info: already in paired Watcher list ─────────────────────────
+      if (watchers.length > 0) {
+        const preview = watchers.slice(0, 3).join(", ");
+        const extra   = watchers.length > 3 ? ` +${watchers.length - 3} more` : "";
+        enqueueSnackbar(
+          `Already in Watcher list: ${preview}${extra} — no action needed`,
+          { variant: "info" }
+        );
+      }
+
+      // ── Nothing happened ─────────────────────────────────────────────
+      if (created === 0 && dupes.length === 0 && watchers.length === 0) {
+        enqueueSnackbar("No values were added.", { variant: "info" });
+      }
     },
     onError: () => enqueueSnackbar("Failed to add values.", { variant: "error" }),
   });
