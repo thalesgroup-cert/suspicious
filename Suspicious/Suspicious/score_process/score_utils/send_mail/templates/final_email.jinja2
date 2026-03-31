@@ -80,30 +80,11 @@
   <tr>
     <td align="center"
         style="background-color:{{ header_bg }};padding:26px 40px;">
-      {% if company_logo.is_image %}
-        {# SVG: hidden from Outlook MSO (no SVG support) — text wordmark shown instead #}
-        {% if company_logo.is_svg %}
-        <!--[if !mso]><!-->
-        <img src="{{ company_logo.src }}"
-             alt="{{ company_name | default('') }}"
-             width="130"
-             style="max-width:130px;height:auto;display:block;margin:0 auto;mso-hide:all;">
-        <!--<![endif]-->
-        <!--[if mso]>
-        <span style="font-size:20px;font-weight:800;letter-spacing:-0.5px;
-                     color:{{ header_text }};font-family:Arial,sans-serif;">
-          {{ company_name | default("Security Portal") }}
-        </span>
-        <![endif]-->
-        {% else %}
-        {# PNG / JPEG / GIF / URL — all clients render this fine #}
-        <img src="{{ company_logo.src }}"
-             alt="{{ company_name | default('') }}"
+      {% if company_logo %}
+        <img src="{{ company_logo }}" alt="{{ company_name | default('') }}"
              width="130"
              style="max-width:130px;height:auto;display:block;margin:0 auto;">
-        {% endif %}
       {% else %}
-        {# No logo configured — plain text wordmark #}
         <span style="font-size:22px;font-weight:800;letter-spacing:-0.5px;
                      color:{{ header_text }};
                      font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,Arial,sans-serif;">
@@ -117,26 +98,12 @@
      2 · HERO — banner or verdict-coloured gradient rule
      The rule colour changes per result so the email "feels" like the verdict
   ══════════════════════════════════════════════════════════════════════ #}
-  {% if final_logo.is_image %}
+  {% if final_logo %}
   <tr>
     <td style="background-color:{{ header_bg }};padding:0;line-height:0;font-size:0;
                border-bottom:4px solid {{ case.result_color }};">
-      {# SVG banner — hidden from Outlook MSO, verdict-coloured rule shown instead #}
-      {% if final_logo.is_svg %}
-      <!--[if !mso]><!-->
-      <img src="{{ final_logo.src }}" alt="" role="presentation" width="600"
-           style="width:100%;max-width:600px;height:auto;display:block;mso-hide:all;">
-      <!--<![endif]-->
-      <!--[if mso]>
-      <table role="presentation" border="0" cellpadding="0" cellspacing="0" width="600">
-      <tr><td height="5" style="background:{{ case.result_color }};font-size:0;">&nbsp;</td></tr>
-      </table>
-      <![endif]-->
-      {% else %}
-      {# PNG / JPEG / data URI — universal support #}
-      <img src="{{ final_logo.src }}" alt="" role="presentation" width="600"
+      <img src="{{ final_logo }}" alt="" role="presentation" width="600"
            style="width:100%;max-width:600px;height:auto;display:block;">
-      {% endif %}
     </td>
   </tr>
   {% else %}

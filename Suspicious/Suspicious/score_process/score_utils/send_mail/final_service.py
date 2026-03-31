@@ -8,7 +8,6 @@ from jinja2 import Environment, FileSystemLoader, select_autoescape
 from .models import FinalMailServiceConfigSocial
 from .send_email_service import SendMailService
 from .email_theme import resolve_email_theme
-from .email_logo import resolve_logo
 from case_handler.models import CaseChallengeToken
 
 CONFIG_PATH = "/app/settings.json"
@@ -117,7 +116,7 @@ class FinalEmailService:
             subject=subject,
             recipient_name=self.recipient_name,
             company_name=self.config.get("links", {}).get("team_name"),
-            company_logo=resolve_logo(self.config.get("logos", {}).get("company")),
+            company_logo=self.config.get("logos", {}).get("company"),
             final_logo=self.config.get("logos", {}).get("suspicious"),
             portal_url=self.config.get("links", {}).get("submissions"),
             glossary_url=self.config.get("links", {}).get("glossary"),
