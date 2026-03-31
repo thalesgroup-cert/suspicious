@@ -1092,7 +1092,6 @@ export default function InvestigationPage() {
                     </TableCell>
                     <TableCell sx={{ fontWeight: 950, width: 80 }}>Type</TableCell>
                     <TableCell sx={{ fontWeight: 950 }}>User mail</TableCell>
-                    <TableCell sx={{ fontWeight: 950, textAlign: "right", width: 60 }}>Tests</TableCell>
                   </TableRow>
                 </TableHead>
 
@@ -1181,11 +1180,6 @@ export default function InvestigationPage() {
                             </Tooltip>
                           ) : null}
                         </Stack>
-                      </TableCell>
-
-                      {/* Tests */}
-                      <TableCell sx={{ textAlign: "right", fontWeight: 900 }}>
-                        {r.tests_done}
                       </TableCell>
                     </TableRow>
                   ))}

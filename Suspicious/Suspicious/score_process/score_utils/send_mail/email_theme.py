@@ -57,9 +57,10 @@ THEME_PALETTES: dict[str, dict[str, str]] = {
         "body_text":   "#E6ECF8",
         "muted":       "#7A91B8",
         "border":      "#0D1E3A",
-        "link":        "#03050D",
+        "link":        "#4D8FFF",
         "cta_bg":      "#4D8FFF",
         "cta_text":    "#03050D",
+        "footer_text": "#E6ECF8",
     },
 
     # ── 2. GRAPHITE ───────────────────────────────────────────────────────
@@ -75,9 +76,10 @@ THEME_PALETTES: dict[str, dict[str, str]] = {
         "body_text":   "#E8EDF4",
         "muted":       "#7A8A9C",
         "border":      "#1C2028",
-        "link":        "#0A0C10",
+        "link":        "#4FB3FF",
         "cta_bg":      "#4FB3FF",
         "cta_text":    "#0A0C10",
+        "footer_text": "#E8EDF4",
     },
 
     # ── 3. SLATE ──────────────────────────────────────────────────────────
@@ -93,9 +95,10 @@ THEME_PALETTES: dict[str, dict[str, str]] = {
         "body_text":   "#DDE8F8",
         "muted":       "#728EAF",
         "border":      "#142040",
-        "link":        "#08101E",
+        "link":        "#6EC2F5",
         "cta_bg":      "#5D9EFF",
         "cta_text":    "#08101E",
+        "footer_text": "#DDE8F8",
     },
 
     # ── 4. LIGHT ──────────────────────────────────────────────────────────
@@ -111,9 +114,10 @@ THEME_PALETTES: dict[str, dict[str, str]] = {
         "body_text":   "#0B1220",
         "muted":       "#5A6677",
         "border":      "#DDE2EA",
-        "link":        "#FFFFFF",
+        "link":        "#1B5FFF",
         "cta_bg":      "#1B5FFF",
         "cta_text":    "#FFFFFF",
+        "footer_text": "#0B1220",
     },
 
     # ── 5. PAPER ──────────────────────────────────────────────────────────
@@ -129,9 +133,10 @@ THEME_PALETTES: dict[str, dict[str, str]] = {
         "body_text":   "#111827",
         "muted":       "#6B7280",
         "border":      "#E0DAD0",
-        "link":        "#FFFFFF",
+        "link":        "#0F4CFF",
         "cta_bg":      "#0F4CFF",
         "cta_text":    "#FFFFFF",
+        "footer_text": "#111827",
     },
 
     # ── 6. HIGH CONTRAST ─────────────────────────────────────────────────
@@ -147,9 +152,10 @@ THEME_PALETTES: dict[str, dict[str, str]] = {
         "body_text":   "#FFFFFF",
         "muted":       "#AAAAAA",
         "border":      "#E0E0E0",
-        "link":        "#000000",
+        "link":        "#FFFFFF",
         "cta_bg":      "#FFFFFF",
         "cta_text":    "#000000",
+        "footer_text": "#FFFFFF",
     },
 
     # ── 7. SUNRISE ────────────────────────────────────────────────────────
@@ -165,9 +171,10 @@ THEME_PALETTES: dict[str, dict[str, str]] = {
         "body_text":   "#1A1A2E",
         "muted":       "#7A5050",
         "border":      "#FFD5CC",
-        "link":        "#FFFFFF",
+        "link":        "#F03D2F",
         "cta_bg":      "#F03D2F",
         "cta_text":    "#FFFFFF",
+        "footer_text": "#1A1A2E",
     },
 
     # ── 8. VALENTINE ─────────────────────────────────────────────────────
@@ -183,9 +190,10 @@ THEME_PALETTES: dict[str, dict[str, str]] = {
         "body_text":   "#1A0814",
         "muted":       "#7A3050",
         "border":      "#FCCDD8",
-        "link":        "#FFFFFF",
+        "link":        "#C2185B",
         "cta_bg":      "#C2185B",
         "cta_text":    "#FFFFFF",
+        "footer_text": "#1A0814",
     },
 
     # ── 9. CYBER ─────────────────────────────────────────────────────────
@@ -201,9 +209,10 @@ THEME_PALETTES: dict[str, dict[str, str]] = {
         "body_text":   "#E8F4FF",
         "muted":       "#6A8FA0",
         "border":      "#002933",
-        "link":        "#000000",
+        "link":        "#00E5FF",
         "cta_bg":      "#00E5FF",
         "cta_text":    "#000000",
+        "footer_text": "#E8F4FF",
     },
 
     # ── 10. THE ONE ───────────────────────────────────────────────────────
@@ -219,9 +228,10 @@ THEME_PALETTES: dict[str, dict[str, str]] = {
         "body_text":   "#F0ECD8",
         "muted":       "#8C7E60",
         "border":      "#201A0A",
-        "link":        "#060606",
+        "link":        "#E8D5A3",
         "cta_bg":      "#C9A84C",
         "cta_text":    "#060606",
+        "footer_text": "#F0ECD8",
     },
 
     # ── 11. METAL ─────────────────────────────────────────────────────────
@@ -238,9 +248,10 @@ THEME_PALETTES: dict[str, dict[str, str]] = {
         "body_text":   "#EDEDED",
         "muted":       "#7A8090",
         "border":      "#1A1D22",
-        "link":        "#FFFFFF",
+        "link":        "#37D6C7",
         "cta_bg":      "#E1061B",
         "cta_text":    "#FFFFFF",
+        "footer_text": "#EDEDED",
     },
 
     # ── 12. WINTER ────────────────────────────────────────────────────────
@@ -256,9 +267,10 @@ THEME_PALETTES: dict[str, dict[str, str]] = {
         "body_text":   "#E8F2FF",
         "muted":       "#6A8AAA",
         "border":      "#0C1C36",
-        "link":        "#04080F",
+        "link":        "#A5B4FC",
         "cta_bg":      "#7DD3FC",
         "cta_text":    "#04080F",
+        "footer_text": "#E8F2FF",
     },
 
     # ── 13. SPRING ────────────────────────────────────────────────────────
@@ -274,9 +286,10 @@ THEME_PALETTES: dict[str, dict[str, str]] = {
         "body_text":   "#0B1A10",
         "muted":       "#4D7060",
         "border":      "#C6EED4",
-        "link":        "#FFFFFF",
+        "link":        "#15803D",
         "cta_bg":      "#15803D",
         "cta_text":    "#FFFFFF",
+        "footer_text": "#0B1A10",
     },
 
     # ── 14. SUMMER ────────────────────────────────────────────────────────
@@ -292,9 +305,10 @@ THEME_PALETTES: dict[str, dict[str, str]] = {
         "body_text":   "#1A1000",
         "muted":       "#7A5020",
         "border":      "#FDECC4",
-        "link":        "#FFFFFF",
+        "link":        "#D97706",
         "cta_bg":      "#D97706",
         "cta_text":    "#FFFFFF",
+        "footer_text": "#1A1000",
     },
 
     # ── 15. AUTUMN ────────────────────────────────────────────────────────
@@ -310,9 +324,10 @@ THEME_PALETTES: dict[str, dict[str, str]] = {
         "body_text":   "#F5EDE0",
         "muted":       "#8A7060",
         "border":      "#211008",
-        "link":        "#0C0805",
+        "link":        "#EAB308",
         "cta_bg":      "#F97316",
         "cta_text":    "#0C0805",
+        "footer_text": "#F5EDE0",
     },
 
     # ── 16. FUTURE ────────────────────────────────────────────────────────
@@ -329,9 +344,10 @@ THEME_PALETTES: dict[str, dict[str, str]] = {
         "body_text":   "#E8DED0",
         "muted":       "#7A6E60",
         "border":      "#2A1A0C",
-        "link":        "#0D0905",
+        "link":        "#4A90D9",
         "cta_bg":      "#E8720C",
         "cta_text":    "#0D0905",
+        "footer_text": "#E8DED0",
     },
 }
 

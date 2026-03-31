@@ -649,9 +649,6 @@ export default function HomePage() {
                         <TableCell sx={{ fontWeight: 950 }}>Status</TableCell>
                         <TableCell sx={{ fontWeight: 950 }}>Artifact</TableCell>
                         <TableCell sx={{ fontWeight: 950 }}>Date</TableCell>
-                        <TableCell sx={{ fontWeight: 950, textAlign: "right" }}>
-                          Tests
-                        </TableCell>
                         <TableCell sx={{ fontWeight: 950 }}>Type</TableCell>
                         <TableCell sx={{ fontWeight: 950 }}>Result</TableCell>
                       </TableRow>
@@ -710,10 +707,6 @@ export default function HomePage() {
                           </TableCell>
 
                           <TableCell>{fmtDate(r.created_at)}</TableCell>
-
-                          <TableCell sx={{ textAlign: "right", fontWeight: 900 }}>
-                            {typeof r.tests_done === "number" ? r.tests_done : "—"}
-                          </TableCell>
 
                           <TableCell>
                             <Chip

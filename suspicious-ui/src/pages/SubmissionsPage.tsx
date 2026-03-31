@@ -1183,7 +1183,6 @@ export default function SubmissionsPage() {
                         onClick={() => handleColumnSort("created_at")}
                       >Date</TableSortLabel>
                     </TableCell>
-                    <TableCell sx={{ fontWeight: 950, textAlign: "right", width: 60 }}>Tests</TableCell>
                     <TableCell sx={{ fontWeight: 950, width: 80 }}>
                       <TableSortLabel
                         active={sortField === "type"}
@@ -1261,11 +1260,6 @@ export default function SubmissionsPage() {
 
                         {/* Date */}
                         <TableCell sx={{ whiteSpace: "nowrap" }}>{fmtDate(r.created_at)}</TableCell>
-
-                        {/* Tests */}
-                        <TableCell sx={{ textAlign: "right", fontWeight: 900 }}>
-                          {r.tests_done}
-                        </TableCell>
 
                         {/* Type — compact chip */}
                         <TableCell>
