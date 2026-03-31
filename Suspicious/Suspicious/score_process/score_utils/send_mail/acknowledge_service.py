@@ -5,6 +5,7 @@ from .models import AcknowledgeMailServiceConfigSocial
 from jinja2 import Environment, FileSystemLoader, select_autoescape
 from .send_email_service import SendMailService
 from .email_theme import resolve_email_theme
+from .email_logo import resolve_logo
 
 CONFIG_PATH = "/app/settings.json"
 TEMPLATES_DIR = Path(__file__).parent / "templates"
@@ -54,8 +55,8 @@ class AcknowledgementEmailService:
             subject=subject,
             recipient_name=recipient_name,
             company_name=self.config.get("content", {}).get("team_name"),
-            company_logo=self.config.get("logos", {}).get("company"),
-            acknowledge_logo=self.config.get("logos", {}).get("suspicious"),
+            company_logo=resolve_logo(self.config.get("logos", {}).get("company")),
+            acknowledge_logo=resolve_logo(self.config.get("logos", {}).get("suspicious")),
             portal_url=self.config.get("links", {}).get("submissions"),
             glossary_url=self.config.get("links", {}).get("glossary"),
             inquiry_url=self.config.get("links", {}).get("inquiry"),
