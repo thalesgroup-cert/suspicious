@@ -3,7 +3,7 @@ FROM node:alpine AS build
 WORKDIR /app
 
 # Install pnpm without corepack
-RUN npm install -g pnpm@9
+RUN npm install -g pnpm@latest --no-corepack
 
 COPY package.json ./
 RUN pnpm install

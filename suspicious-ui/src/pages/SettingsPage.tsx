@@ -1499,7 +1499,7 @@ export default function SettingsPage() {
         {/* ---------------------------------------------------------------- */}
         {/* Sidebar nav                                                       */}
         {/* ---------------------------------------------------------------- */}
-        <Grid item xs={12} md={3.5} lg={3}>
+        <Grid size={{ xs: 12, md: 3.5, lg: 3 }}>
           <SoftCard sx={{ overflow: "hidden", position: { md: "sticky" }, top: { md: 16 } }}>
             <CardContent sx={{ p: 1.5 }}>
               {/* Console identity */}
@@ -1575,7 +1575,7 @@ export default function SettingsPage() {
         {/* ---------------------------------------------------------------- */}
         {/* Main content panel                                               */}
         {/* ---------------------------------------------------------------- */}
-        <Grid item xs={12} md={8.5} lg={9}>
+        <Grid size={{ xs: 12, md: 8.5, lg: 9 }}>
           <SoftCard>
             <CardContent sx={{ p: { xs: 2, md: 3 } }}>
               {/* Section header */}
