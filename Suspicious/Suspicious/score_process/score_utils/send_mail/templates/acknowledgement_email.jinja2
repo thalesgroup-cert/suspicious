@@ -78,12 +78,30 @@
         <tr>
           <td align="center"
               style="background-color:{{ header_bg }};padding:28px 40px;">
-            {% if company_logo %}
-              <img src="{{ company_logo }}"
+            {% if company_logo.is_image %}
+              {# data: URI or SVG — Outlook blocks both; show img only to other clients #}
+              {% if company_logo.is_data_uri or company_logo.is_svg %}
+              <!--[if !mso]><!-->
+              <img src="{{ company_logo.src }}"
                    alt="{{ company_name | default('') }}"
                    width="130"
                    style="max-width:130px;height:auto;display:block;margin:0 auto;">
+              <!--<![endif]-->
+              <!--[if mso]>
+              <span style="font-size:20px;font-weight:800;letter-spacing:-0.5px;
+                           color:{{ header_text }};font-family:Arial,sans-serif;">
+                {{ company_name | default("Security Portal") }}
+              </span>
+              <![endif]-->
+              {% else %}
+              {# URL-based image — safe for all clients including Outlook #}
+              <img src="{{ company_logo.src }}"
+                   alt="{{ company_name | default('') }}"
+                   width="130"
+                   style="max-width:130px;height:auto;display:block;margin:0 auto;">
+              {% endif %}
             {% else %}
+              {# No logo — plain text wordmark #}
               <span style="font-size:22px;font-weight:800;letter-spacing:-0.5px;
                            color:{{ header_text }};
                            font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,Arial,sans-serif;">
@@ -97,17 +115,32 @@
         {# ─────────────────────────────────────────────────────────────── #}
         {# 2. HERO — banner image OR accent gradient rule                   #}
         {# ─────────────────────────────────────────────────────────────── #}
-        {% if acknowledge_logo %}
+        {% if acknowledge_logo.is_image %}
         <tr>
           <td style="background-color:{{ header_bg }};padding:0;line-height:0;font-size:0;
                      border-bottom:3px solid {{ accent }};">
-            <img src="{{ acknowledge_logo }}" alt="" role="presentation"
+            {# data: URI or SVG — Outlook blocks both #}
+            {% if acknowledge_logo.is_data_uri or acknowledge_logo.is_svg %}
+            <!--[if !mso]><!-->
+            <img src="{{ acknowledge_logo.src }}" alt="" role="presentation"
                  width="600"
                  style="width:100%;max-width:600px;height:auto;display:block;">
+            <!--<![endif]-->
+            <!--[if mso]>
+            <table role="presentation" border="0" cellpadding="0" cellspacing="0" width="600">
+            <tr><td height="60" style="background:{{ header_bg }};font-size:0;">&nbsp;</td></tr>
+            </table>
+            <![endif]-->
+            {% else %}
+            {# URL-based — safe for all clients #}
+            <img src="{{ acknowledge_logo.src }}" alt="" role="presentation"
+                 width="600"
+                 style="width:100%;max-width:600px;height:auto;display:block;">
+            {% endif %}
           </td>
         </tr>
         {% else %}
-        {# Gradient rule — full accent → muted so it reads on any bg        #}
+        {# No banner configured — gradient accent rule #}
         <tr>
           <td style="padding:0;font-size:0;line-height:0;height:4px;
                      background:linear-gradient(90deg,{{ accent }},{{ muted }});">

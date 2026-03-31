@@ -73,17 +73,21 @@ def resolve_logo(raw: str | None) -> dict:
     """
     Return a normalised logo descriptor dict from any logo value.
 
-    Template usage:
-        {% if logo.is_image %}
-          <!--[if !mso]><!-->
-          <img src="{{ logo.src }}" ...>
-          <!--<![endif]-->
-          <!--[if mso]>
-          <span ...>{{ company_name }}</span>
-          <![endif]-->
-        {% endif %}
+    Fields:
+      src          — ready-to-use src= value
+      mime         — detected MIME type string
+      is_svg       — True when mime == image/svg+xml
+      is_data_uri  — True when src starts with "data:" (Outlook blocks these)
+      is_url       — True when src is an http(s) URL (safe for Outlook <img>)
+      is_image     — True when any image content is present
+
+    Outlook notes:
+      Outlook 2007-2019 desktop blocks data: URI images (shows broken icon).
+      Only is_url=True images should be shown to Outlook via <img>.
+      For data: URIs, use <!--[if mso]> text wordmark fallback.
     """
-    empty = {"src": "", "mime": "", "is_svg": False, "is_image": False}
+    empty = {"src": "", "mime": "", "is_svg": False,
+             "is_data_uri": False, "is_url": False, "is_image": False}
 
     if not raw or not isinstance(raw, str):
         return empty
@@ -96,10 +100,12 @@ def resolve_logo(raw: str | None) -> dict:
     for prefix, mime in _DATA_PREFIXES.items():
         if raw.startswith(prefix):
             return {
-                "src":      raw,
-                "mime":     mime,
-                "is_svg":   mime == "image/svg+xml",
-                "is_image": True,
+                "src":         raw,
+                "mime":        mime,
+                "is_svg":      mime == "image/svg+xml",
+                "is_data_uri": raw.startswith("data:"),
+                "is_url":      raw.startswith("http://") or raw.startswith("https://"),
+                "is_image":    True,
             }
 
     # ── URL or file path — pass through unchanged ────────────────────────
@@ -115,10 +121,12 @@ def resolve_logo(raw: str | None) -> dict:
         else:
             mime = ""
         return {
-            "src":      raw,
-            "mime":     mime,
-            "is_svg":   mime == "image/svg+xml",
-            "is_image": True,
+            "src":         raw,
+            "mime":        mime,
+            "is_svg":      mime == "image/svg+xml",
+            "is_data_uri": False,
+            "is_url":      raw.startswith("http://") or raw.startswith("https://"),
+            "is_image":    True,
         }
 
     # ── Raw base64 — detect and wrap in data URI ─────────────────────────
@@ -127,16 +135,20 @@ def resolve_logo(raw: str | None) -> dict:
     mime = _sniff_raw_base64(b64)
     if mime:
         return {
-            "src":      f"data:{mime};base64,{b64}",
-            "mime":     mime,
-            "is_svg":   mime == "image/svg+xml",
-            "is_image": True,
+            "src":         f"data:{mime};base64,{b64}",
+            "mime":        mime,
+            "is_svg":      mime == "image/svg+xml",
+            "is_data_uri": True,
+            "is_url":      False,
+            "is_image":    True,
         }
 
     # Unknown — still try to use it as-is (might be a URL fragment)
     return {
-        "src":      raw,
-        "mime":     "",
-        "is_svg":   False,
-        "is_image": bool(raw),
+        "src":         raw,
+        "mime":        "",
+        "is_svg":      False,
+        "is_data_uri": raw.startswith("data:") if raw else False,
+        "is_url":      raw.startswith("http") if raw else False,
+        "is_image":    bool(raw),
     }
