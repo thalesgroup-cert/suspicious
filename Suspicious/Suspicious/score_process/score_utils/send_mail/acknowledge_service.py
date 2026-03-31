@@ -55,7 +55,7 @@ class AcknowledgementEmailService:
             recipient_name=recipient_name,
             company_name=self.config.get("content", {}).get("team_name"),
             company_logo=self.config.get("logos", {}).get("company"),
-            acknowledge_logo=self.config.get("branding", {}).get("assets").get("logo"),
+            acknowledge_logo=self.config.get("logos", {}).get("suspicious"),
             portal_url=self.config.get("links", {}).get("submissions"),
             glossary_url=self.config.get("links", {}).get("glossary"),
             inquiry_url=self.config.get("links", {}).get("inquiry"),
