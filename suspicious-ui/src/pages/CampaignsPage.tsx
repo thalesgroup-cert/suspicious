@@ -762,7 +762,7 @@ export default function CampaignsPage() {
                     <CartesianGrid strokeDasharray="3 3" opacity={gridOpacity} />
                     <XAxis type="number" dataKey="x" name="PC1" tick={tickStyle} />
                     <YAxis type="number" dataKey="y" name="PC2" tick={tickStyle} />
-                    <ZAxis type="number" range={[18]} />
+                    <ZAxis type="number" range={[0, 18]} />
                     <Tooltip
                       content={<PcaTooltip />}
                       cursor={{ stroke: isDark ? "#94A3B8" : alpha(theme.palette.divider, 0.8), strokeDasharray: "4 4" }}

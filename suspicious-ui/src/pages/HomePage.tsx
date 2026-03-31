@@ -397,7 +397,7 @@ export default function HomePage() {
           {/* -------------------------------------------------------------- */}
           {/* Threat distribution                                             */}
           {/* -------------------------------------------------------------- */}
-          <Grid item xs={12} md={7}>
+          <Grid size={{ xs: 12, md: 7 }}>
             <DashboardCard
               title="Threat distribution"
               icon={<DonutLargeOutlined />}
@@ -525,7 +525,7 @@ export default function HomePage() {
           {/* -------------------------------------------------------------- */}
           {/* Snapshot                                                        */}
           {/* -------------------------------------------------------------- */}
-          <Grid item xs={12} md={5}>
+          <Grid size={{ xs: 12, md: 5 }}>
             <DashboardCard
               title="Snapshot"
               icon={<ShieldOutlined />}
@@ -603,7 +603,7 @@ export default function HomePage() {
           {/* -------------------------------------------------------------- */}
           {/* Recent submissions                                              */}
           {/* -------------------------------------------------------------- */}
-          <Grid item xs={12}>
+          <Grid size={{ xs: 12 }}>
             <DashboardCard
               title="Recent submissions"
               icon={<HistoryOutlined />}

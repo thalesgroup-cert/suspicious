@@ -561,7 +561,7 @@ export default function AboutPage() {
                 },
               ] as const
             ).map((card) => (
-              <Grid key={card.severity} item xs={12} sm={6} md={3}>
+              <Grid key={card.severity} size={{ xs: 12, sm: 6, md: 3 }}>
                 <SeverityCard {...card} />
               </Grid>
             ))}
@@ -578,21 +578,21 @@ export default function AboutPage() {
           />
 
           <Grid container spacing={2}>
-            <Grid item xs={12} md={4}>
+            <Grid size={{ xs: 12, md: 4 }}>
               <StepCard
                 number={1}
                 title="Submit"
                 description="Users submit emails, files, URLs, IPs, or hashes through the interface or by forwarding suspicious mail."
               />
             </Grid>
-            <Grid item xs={12} md={4}>
+            <Grid size={{ xs: 12, md: 4 }}>
               <StepCard
                 number={2}
                 title="Analyze"
                 description="Relevant parts are extracted and checked by analyzers to identify signals, metadata, and known matches."
               />
             </Grid>
-            <Grid item xs={12} md={4}>
+            <Grid size={{ xs: 12, md: 4 }}>
               <StepCard
                 number={3}
                 title="Classify"
@@ -613,7 +613,7 @@ export default function AboutPage() {
           />
 
           <Grid container spacing={2}>
-            <Grid item xs={12} md={4}>
+            <Grid size={{ xs: 12, md: 4 }}>
               <TopicCard
                 icon={<SecurityOutlined />}
                 title="What is Suspicious?"
@@ -631,7 +631,7 @@ export default function AboutPage() {
               </TopicCard>
             </Grid>
 
-            <Grid item xs={12} md={4}>
+            <Grid size={{ xs: 12, md: 4 }}>
               <TopicCard
                 icon={<WarningAmberOutlined />}
                 title="What is phishing?"
@@ -654,7 +654,7 @@ export default function AboutPage() {
               </TopicCard>
             </Grid>
 
-            <Grid item xs={12} md={4}>
+            <Grid size={{ xs: 12, md: 4 }}>
               <TopicCard
                 icon={<InsertDriveFileOutlined />}
                 title="File analysis"
