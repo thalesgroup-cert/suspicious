@@ -78,11 +78,26 @@
         <tr>
           <td align="center"
               style="background-color:{{ header_bg }};padding:28px 40px;">
-            {% if company_logo %}
-              <img src="{{ company_logo }}"
+            {% if company_logo.is_image %}
+              {% if company_logo.is_svg %}
+              <!--[if !mso]><!-->
+              <img src="{{ company_logo.src }}"
+                   alt="{{ company_name | default('') }}"
+                   width="130"
+                   style="max-width:130px;height:auto;display:block;margin:0 auto;mso-hide:all;">
+              <!--<![endif]-->
+              <!--[if mso]>
+              <span style="font-size:20px;font-weight:800;letter-spacing:-0.5px;
+                           color:{{ header_text }};font-family:Arial,sans-serif;">
+                {{ company_name | default("Security Portal") }}
+              </span>
+              <![endif]-->
+              {% else %}
+              <img src="{{ company_logo.src }}"
                    alt="{{ company_name | default('') }}"
                    width="130"
                    style="max-width:130px;height:auto;display:block;margin:0 auto;">
+              {% endif %}
             {% else %}
               <span style="font-size:22px;font-weight:800;letter-spacing:-0.5px;
                            color:{{ header_text }};
@@ -97,17 +112,32 @@
         {# ─────────────────────────────────────────────────────────────── #}
         {# 2. HERO — banner image OR accent gradient rule                   #}
         {# ─────────────────────────────────────────────────────────────── #}
-        {% if acknowledge_logo %}
+        {% if acknowledge_logo.is_image %}
         <tr>
           <td style="background-color:{{ header_bg }};padding:0;line-height:0;font-size:0;
                      border-bottom:3px solid {{ accent }};">
-            <img src="{{ acknowledge_logo }}" alt="" role="presentation"
+            {# SVG banner — hidden from Outlook MSO, gradient rule shown instead #}
+            {% if acknowledge_logo.is_svg %}
+            <!--[if !mso]><!-->
+            <img src="{{ acknowledge_logo.src }}" alt="" role="presentation"
+                 width="600"
+                 style="width:100%;max-width:600px;height:auto;display:block;mso-hide:all;">
+            <!--<![endif]-->
+            <!--[if mso]>
+            <table role="presentation" border="0" cellpadding="0" cellspacing="0" width="600">
+            <tr><td height="4" style="background:{{ accent }};font-size:0;">&nbsp;</td></tr>
+            </table>
+            <![endif]-->
+            {% else %}
+            {# PNG / JPEG / data URI — universal support #}
+            <img src="{{ acknowledge_logo.src }}" alt="" role="presentation"
                  width="600"
                  style="width:100%;max-width:600px;height:auto;display:block;">
+            {% endif %}
           </td>
         </tr>
         {% else %}
-        {# Gradient rule — full accent → muted so it reads on any bg        #}
+        {# No banner configured — gradient accent rule #}
         <tr>
           <td style="padding:0;font-size:0;line-height:0;height:4px;
                      background:linear-gradient(90deg,{{ accent }},{{ muted }});">

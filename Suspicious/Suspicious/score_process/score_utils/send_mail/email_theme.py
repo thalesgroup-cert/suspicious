@@ -335,9 +335,9 @@ THEME_PALETTES: dict[str, dict[str, str]] = {
     # MuiCard border: alpha(#E8720C,0.20) on #0D0905 → #2A1A0C
     # Top rule gradient amber→blue; links use Brigade blue #4A90D9
     "future": {
-        "bg":          "#0D0905",
+        "bg":          "#2A1A0C",
         "surface":     "#160E08",
-        "header_bg":   "#0D0905",
+        "header_bg":   "#E8720C",
         "header_text": "#E8DED0",
         "accent":      "#E8720C",
         "accent_text": "#0D0905",
