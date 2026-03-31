@@ -135,37 +135,102 @@
         </tr>
       </table>
 
-      {# Score + confidence #}
-      {% if case.score is not none or case.confidence is not none %}
+      {# Score + confidence + AI result — three equal numerals in a strip #}
+      {% if case.score is not none or case.confidence is not none or case.result_ai %}
+      {# Thin separator above the metric strip #}
       <table role="presentation" border="0" cellpadding="0" cellspacing="0"
-             style="margin:14px auto 0;">
+             width="100%" style="margin-top:20px;">
         <tr>
+          <td style="border-top:1px solid {{ border }};font-size:0;padding:0;">&nbsp;</td>
+        </tr>
+      </table>
+
+      <table role="presentation" border="0" cellpadding="0" cellspacing="0"
+             width="100%" style="margin:0;">
+        <tr>
+
+          {# RISK SCORE #}
           {% if case.score is not none %}
           <td class="score-cell"
-              style="padding:0 16px;text-align:center;vertical-align:middle;
+              style="width:33%;padding:16px 8px;text-align:center;vertical-align:middle;
+                     border-right:1px solid {{ border }};
                      font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,Arial,sans-serif;">
-            <span style="font-size:36px;font-weight:900;line-height:1;
+            <span style="font-size:34px;font-weight:900;line-height:1;
                          color:{{ case.result_color }};">
               {{ "%.1f"|format(case.score) }}
             </span>
-            <span style="font-size:12px;color:{{ muted }};display:block;margin-top:3px;">
+            <span style="font-size:11px;font-weight:700;color:{{ muted }};
+                         display:block;margin-top:5px;text-transform:uppercase;
+                         letter-spacing:0.06em;">
               Risk score&nbsp;/&nbsp;10
             </span>
           </td>
           {% endif %}
+
+          {# CONFIDENCE #}
           {% if case.confidence is not none %}
           <td class="score-cell"
-              style="padding:0 16px;text-align:center;vertical-align:middle;
+              style="width:33%;padding:16px 8px;text-align:center;vertical-align:middle;
+                     {% if case.result_ai %}border-right:1px solid {{ border }};{% endif %}
                      font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,Arial,sans-serif;">
-            <span style="font-size:36px;font-weight:900;line-height:1;
+            <span style="font-size:34px;font-weight:900;line-height:1;
                          color:{{ accent }};">
               {{ "%.0f"|format(case.confidence) }}%
             </span>
-            <span style="font-size:12px;color:{{ muted }};display:block;margin-top:3px;">
+            <span style="font-size:11px;font-weight:700;color:{{ muted }};
+                         display:block;margin-top:5px;text-transform:uppercase;
+                         letter-spacing:0.06em;">
               Confidence
             </span>
           </td>
           {% endif %}
+
+          {# AI VERDICT — same visual weight as the numeric metrics #}
+          {% if case.result_ai %}
+          <td class="score-cell"
+              style="width:34%;padding:16px 8px;text-align:center;vertical-align:middle;
+                     font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,Arial,sans-serif;">
+            {# AI verdict pill — same style as the main verdict pill but smaller #}
+            <div>
+              <!--[if mso]>
+              <table role="presentation" border="0" cellpadding="0" cellspacing="0" align="center">
+              <tr><td style="background-color:{{ muted }};border-radius:4px;
+                             padding:4px 12px;font-size:11px;font-weight:700;
+                             color:{{ surface }};font-family:Arial,sans-serif;">
+                {{ case.result_ai }}
+              </td></tr></table>
+              <![endif]-->
+              <!--[if !mso]><!-->
+              <span style="display:inline-block;background-color:{{ muted }};
+                           border-radius:4px;padding:4px 12px;
+                           font-size:11px;font-weight:800;letter-spacing:0.06em;
+                           text-transform:uppercase;color:{{ surface }};
+                           mso-hide:all;">
+                {{ case.result_ai }}
+              </span>
+              <!--<![endif]-->
+            </div>
+            {% if case.category_ai %}
+            <span style="font-size:12px;font-weight:700;color:{{ body_text }};
+                         display:block;margin-top:6px;">
+              {{ case.category_ai }}
+            </span>
+            {% endif %}
+            <span style="font-size:11px;font-weight:700;color:{{ muted }};
+                         display:block;margin-top:5px;text-transform:uppercase;
+                         letter-spacing:0.06em;">
+              AI assessment
+            </span>
+          </td>
+          {% endif %}
+
+        </tr>
+      </table>
+
+      {# Bottom separator #}
+      <table role="presentation" border="0" cellpadding="0" cellspacing="0" width="100%">
+        <tr>
+          <td style="border-top:1px solid {{ border }};font-size:0;padding:0;">&nbsp;</td>
         </tr>
       </table>
       {% endif %}
@@ -412,23 +477,6 @@
       {# / verdict card #}
 
 
-      {# ── AI reference row ───────────────────────────────────────── #}
-      {% if case.result_ai or case.category_ai %}
-      <table role="presentation" border="0" cellpadding="0" cellspacing="0" width="100%"
-             style="margin-top:14px;">
-        <tr>
-          <td style="padding:10px 14px;background-color:{{ header_bg }};
-                     border-radius:6px;border:1px solid {{ border }};
-                     font-size:12px;color:{{ muted }};
-                     font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,Arial,sans-serif;">
-            <strong style="color:{{ muted }};">AI assessment:</strong>
-            {% if case.result_ai %}&nbsp;{{ case.result_ai }}{% endif %}
-            {% if case.category_ai %}&mdash; {{ case.category_ai }}{% endif %}
-          </td>
-        </tr>
-      </table>
-      {% endif %}
-
 
       {# ── CTA buttons ────────────────────────────────────────────── #}
       <table role="presentation" border="0" cellpadding="0" cellspacing="0" width="100%"
@@ -505,210 +553,6 @@
     </td>
   </tr>
   {# / body #}
-
-
-  {# ══════════════════════════════════════════════════════════════════════
-     5 · CLASSIFICATION LEGEND
-     Mirrors the about-page four-card grid — 2×2 table in email
-  ══════════════════════════════════════════════════════════════════════ #}
-  <tr>
-    <td style="background-color:{{ header_bg }};
-               border-top:1px solid {{ border }};
-               padding:28px 32px;">
-
-      <p style="margin:0 0 5px;font-size:13px;font-weight:800;color:{{ header_text }};
-                font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,Arial,sans-serif;">
-        Classification outcomes
-      </p>
-      <p style="margin:0 0 18px;font-size:12px;color:{{ muted }};
-                font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,Arial,sans-serif;">
-        Every submission resolves to one of four outcomes.
-      </p>
-
-      {# 2-column grid — row 1: Dangerous + Suspicious #}
-      <table class="verdict-cards" role="presentation"
-             border="0" cellpadding="0" cellspacing="0" width="100%">
-        <tr>
-
-          {# DANGEROUS #}
-          <td width="50%" style="padding:0 6px 12px 0;vertical-align:top;">
-            <table role="presentation" border="0" cellpadding="0" cellspacing="0" width="100%"
-                   style="border:1px solid {{ color_dangerous }};border-radius:10px;
-                          background-color:{{ surface }};overflow:hidden;">
-              <tr>
-                <td width="5" style="background-color:{{ color_dangerous }};
-                             width:5px;padding:0;font-size:0;">&nbsp;</td>
-                <td style="padding:14px 14px 14px 12px;">
-                  {# Icon + label #}
-                  <table role="presentation" border="0" cellpadding="0" cellspacing="0">
-                    <tr>
-                      <td width="28" style="padding-right:8px;vertical-align:middle;">
-                        <div style="width:26px;height:26px;border-radius:50%;
-                                    border:1.5px solid {{ color_dangerous }};
-                                    background-color:{{ color_dangerous }}1A;
-                                    text-align:center;line-height:26px;font-size:13px;">
-                          <span style="color:{{ color_dangerous }};">&#9888;</span>
-                        </div>
-                      </td>
-                      <td style="vertical-align:middle;">
-                        <span style="font-size:13px;font-weight:800;color:{{ color_dangerous }};
-                                     font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,Arial,sans-serif;">
-                          Dangerous
-                        </span>
-                      </td>
-                    </tr>
-                  </table>
-                  <p style="margin:8px 0 4px;font-size:11px;color:{{ muted }};
-                             font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,Arial,sans-serif;">
-                    High confidence malicious
-                  </p>
-                  <p style="margin:0;font-size:11px;line-height:1.55;color:{{ body_text }};
-                             font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,Arial,sans-serif;">
-                    &bull; Do not open or execute.<br>
-                    &bull; Treat content as untrusted.<br>
-                    &bull; Escalate immediately.
-                  </p>
-                </td>
-              </tr>
-            </table>
-          </td>
-
-          {# SUSPICIOUS #}
-          <td width="50%" style="padding:0 0 12px 6px;vertical-align:top;">
-            <table role="presentation" border="0" cellpadding="0" cellspacing="0" width="100%"
-                   style="border:1px solid {{ color_suspicious }};border-radius:10px;
-                          background-color:{{ surface }};overflow:hidden;">
-              <tr>
-                <td width="5" style="background-color:{{ color_suspicious }};
-                             width:5px;padding:0;font-size:0;">&nbsp;</td>
-                <td style="padding:14px 14px 14px 12px;">
-                  <table role="presentation" border="0" cellpadding="0" cellspacing="0">
-                    <tr>
-                      <td width="28" style="padding-right:8px;vertical-align:middle;">
-                        <div style="width:26px;height:26px;border-radius:50%;
-                                    border:1.5px solid {{ color_suspicious }};
-                                    background-color:{{ color_suspicious }}1A;
-                                    text-align:center;line-height:26px;font-size:13px;">
-                          <span style="color:{{ color_suspicious }};">&#9650;</span>
-                        </div>
-                      </td>
-                      <td style="vertical-align:middle;">
-                        <span style="font-size:13px;font-weight:800;color:{{ color_suspicious }};
-                                     font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,Arial,sans-serif;">
-                          Suspicious
-                        </span>
-                      </td>
-                    </tr>
-                  </table>
-                  <p style="margin:8px 0 4px;font-size:11px;color:{{ muted }};
-                             font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,Arial,sans-serif;">
-                    Indicators suggest risk
-                  </p>
-                  <p style="margin:0;font-size:11px;line-height:1.55;color:{{ body_text }};
-                             font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,Arial,sans-serif;">
-                    &bull; Avoid links or attachments.<br>
-                    &bull; Prefer analyst validation.<br>
-                    &bull; Monitor related activity.
-                  </p>
-                </td>
-              </tr>
-            </table>
-          </td>
-
-        </tr>
-        <tr>
-
-          {# INCONCLUSIVE #}
-          <td width="50%" style="padding:0 6px 0 0;vertical-align:top;">
-            <table role="presentation" border="0" cellpadding="0" cellspacing="0" width="100%"
-                   style="border:1px solid {{ color_inconclusive }};border-radius:10px;
-                          background-color:{{ surface }};overflow:hidden;">
-              <tr>
-                <td width="5" style="background-color:{{ color_inconclusive }};
-                             width:5px;padding:0;font-size:0;">&nbsp;</td>
-                <td style="padding:14px 14px 14px 12px;">
-                  <table role="presentation" border="0" cellpadding="0" cellspacing="0">
-                    <tr>
-                      <td width="28" style="padding-right:8px;vertical-align:middle;">
-                        <div style="width:26px;height:26px;border-radius:50%;
-                                    border:1.5px solid {{ color_inconclusive }};
-                                    background-color:{{ color_inconclusive }}1A;
-                                    text-align:center;line-height:26px;font-size:13px;">
-                          <span style="color:{{ color_inconclusive }};">&#63;</span>
-                        </div>
-                      </td>
-                      <td style="vertical-align:middle;">
-                        <span style="font-size:13px;font-weight:800;color:{{ color_inconclusive }};
-                                     font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,Arial,sans-serif;">
-                          Inconclusive
-                        </span>
-                      </td>
-                    </tr>
-                  </table>
-                  <p style="margin:8px 0 4px;font-size:11px;color:{{ muted }};
-                             font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,Arial,sans-serif;">
-                    Insufficient signal
-                  </p>
-                  <p style="margin:0;font-size:11px;line-height:1.55;color:{{ body_text }};
-                             font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,Arial,sans-serif;">
-                    &bull; Proceed with caution.<br>
-                    &bull; Source trust may be unclear.<br>
-                    &bull; Re-submit if behaviour changes.
-                  </p>
-                </td>
-              </tr>
-            </table>
-          </td>
-
-          {# SAFE #}
-          <td width="50%" style="padding:0 0 0 6px;vertical-align:top;">
-            <table role="presentation" border="0" cellpadding="0" cellspacing="0" width="100%"
-                   style="border:1px solid {{ color_safe }};border-radius:10px;
-                          background-color:{{ surface }};overflow:hidden;">
-              <tr>
-                <td width="5" style="background-color:{{ color_safe }};
-                             width:5px;padding:0;font-size:0;">&nbsp;</td>
-                <td style="padding:14px 14px 14px 12px;">
-                  <table role="presentation" border="0" cellpadding="0" cellspacing="0">
-                    <tr>
-                      <td width="28" style="padding-right:8px;vertical-align:middle;">
-                        <div style="width:26px;height:26px;border-radius:50%;
-                                    border:1.5px solid {{ color_safe }};
-                                    background-color:{{ color_safe }}1A;
-                                    text-align:center;line-height:26px;font-size:13px;">
-                          <span style="color:{{ color_safe }};">&#10003;</span>
-                        </div>
-                      </td>
-                      <td style="vertical-align:middle;">
-                        <span style="font-size:13px;font-weight:800;color:{{ color_safe }};
-                                     font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,Arial,sans-serif;">
-                          Safe
-                        </span>
-                      </td>
-                    </tr>
-                  </table>
-                  <p style="margin:8px 0 4px;font-size:11px;color:{{ muted }};
-                             font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,Arial,sans-serif;">
-                    Low signal detected
-                  </p>
-                  <p style="margin:0;font-size:11px;line-height:1.55;color:{{ body_text }};
-                             font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,Arial,sans-serif;">
-                    &bull; No strong indicators found.<br>
-                    &bull; Still apply normal hygiene.<br>
-                    &bull; Re-submit if behaviour changes.
-                  </p>
-                </td>
-              </tr>
-            </table>
-          </td>
-
-        </tr>
-      </table>
-      {# / classification legend #}
-
-    </td>
-  </tr>
-
 
   {# ══════════════════════════════════════════════════════════════════════
      6 · FOOTER LINKS
