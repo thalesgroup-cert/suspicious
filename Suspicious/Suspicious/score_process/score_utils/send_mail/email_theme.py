@@ -117,7 +117,7 @@ THEME_PALETTES: dict[str, dict[str, str]] = {
         "link":        "#1B5FFF",
         "cta_bg":      "#1B5FFF",
         "cta_text":    "#FFFFFF",
-        "footer_text": "#0B1220",
+        "footer_text": "#F4F5F7",
     },
 
     # ── 5. PAPER ──────────────────────────────────────────────────────────
@@ -136,7 +136,7 @@ THEME_PALETTES: dict[str, dict[str, str]] = {
         "link":        "#0F4CFF",
         "cta_bg":      "#0F4CFF",
         "cta_text":    "#FFFFFF",
-        "footer_text": "#111827",
+        "footer_text": "#FAF7F2",
     },
 
     # ── 6. HIGH CONTRAST ─────────────────────────────────────────────────
