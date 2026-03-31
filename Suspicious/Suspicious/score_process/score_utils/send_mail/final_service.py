@@ -116,7 +116,7 @@ class FinalEmailService:
             # ── Content ───────────────────────────────────────────────────
             subject=subject,
             recipient_name=self.recipient_name,
-            company_name=self.config.get("links", {}).get("team_name"),
+            company_name=self.config.get("content", {}).get("team_name"),
             company_logo=resolve_logo(self.config.get("logos", {}).get("company")),
             final_logo=resolve_logo(self.config.get("logos", {}).get("suspicious")),
             portal_url=self.config.get("links", {}).get("submissions"),
