@@ -67,18 +67,21 @@ services:
     networks:
       - suspicious_network
 
-  minio:
+  rustfs:
     restart: always
     expose:
       - "9000"
-    # Console only accessible from localhost — not exposed to the world.
     ports:
       - "127.0.0.1:${MINIO_PORT:-35000}:9001"
     environment:
-      MINIO_ROOT_USER:     ${MINIO_ROOT_USER}
-      MINIO_ROOT_PASSWORD: ${MINIO_ROOT_PASSWORD}
+      RUSTFS_ACCESS_KEY:    ${MINIO_ROOT_USER}
+      RUSTFS_SECRET_KEY:    ${MINIO_ROOT_PASSWORD}
+      RUSTFS_VOLUMES:       /data
+      RUSTFS_ADDRESS:       0.0.0.0:9000
+      RUSTFS_CONSOLE_ENABLE: "true"
+      RUSTFS_CONSOLE_ADDRESS: 0.0.0.0:9001
     volumes:
-      - "minio_data:/data:Z"
+      - "rustfs_data:/data:Z"
     security_opt:
       - no-new-privileges:true
     networks:
@@ -103,7 +106,7 @@ volumes:
     driver: local
   elasticsearch_data:
   elasticsearch_logs:
-  minio_data:
+  rustfs_data:
   chromadb_data:
 
 networks:

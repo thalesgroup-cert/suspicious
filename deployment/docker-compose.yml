@@ -103,15 +103,17 @@ services:
       retries: 30
       start_period: 60s
 
-  minio:
+  rustfs:                          # renamed from minio
     extends:
       file: compose_databases.yaml
-      service: minio
-    image: minio/minio:${MINIO_VERSION:?MINIO_VERSION is required}
-    container_name: minio
-    command: server /data --console-address ":9001"
+      service: rustfs
+    image: rustfs/rustfs:${RUSTFS_VERSION:?RUSTFS_VERSION is required}
+    container_name: rustfs
+    command: /data --console-address ":9001"
     healthcheck:
-      test: ["CMD-SHELL", "curl -sf http://localhost:9000/minio/health/live || exit 1"]
+      test:
+        - "CMD-SHELL"
+        - "curl -sf http://localhost:9000/health && curl -sf http://localhost:9001/rustfs/console/health || exit 1"
       interval: 30s
       timeout: 10s
       retries: 5
@@ -196,7 +198,7 @@ volumes:
     driver: local
   elasticsearch_logs:
     driver: local
-  minio_data:
+  rustfs_data:
     driver: local
   chromadb_data:
     driver: local
