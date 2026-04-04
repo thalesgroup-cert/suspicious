@@ -145,7 +145,7 @@
             "website": "https://www.test.com/en"
         },
         "links": {
-            "submissions": "https://suspicious.test/submissions/",
+            "submissions": "https://suspicious.test/submissions",
             "security_contact": "mailto:security@test.com",
             "security_text": "security@test.com",
             "inquiry": "mailto:inquiry@test.com",
