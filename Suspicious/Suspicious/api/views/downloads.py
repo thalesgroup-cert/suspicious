@@ -42,9 +42,9 @@ def load_minio_config(path: str) -> dict | None:
         logger.exception("Unable to read settings file: %s", path)
         return None
 
-    minio_config = (config.get("storage", {}).get("minio", {}))
+    minio_config = (config.get("storage", {}).get("s3", {}))
     if not isinstance(minio_config, dict):
-        logger.warning("Missing or invalid 'minio' configuration in %s", path)
+        logger.warning("Missing or invalid 's3 Bucket' configuration in %s", path)
         return None
 
     return minio_config

@@ -35,7 +35,7 @@ Suspicious offers a **scalable, automated, AI-augmented defense** that helps you
 - ✅ Classify results into actionable categories (Safe / Inconclusive / Suspicious / Dangerous)
 - 📄 Provide full analysis reports and dashboards through an intuitive web interface
 - 📤 Automatically notify or alert users via email
-- 🔌 Integrate optionally with **TheHive**, **MISP**, **LDAP**, **MinIO**, **Elasticsearch**, and more
+- 🔌 Integrate optionally with **TheHive**, **MISP**, **LDAP**, **RustFS**, **Elasticsearch**, and more
 
 ## Getting Started (Quick Setup)
 
@@ -74,7 +74,7 @@ Suspicious uses three main configuration files:
 | -------------------------- | --------------------------------------------------------------------------------------------------------------------- |
 | `.env`                     | Environment variables for Docker services (versions, ports, paths, credentials)                                       |
 | `Suspicious/settings.json` | App-level config: branding, SMTP, LDAP, Cortex & MISP credentials, allowed domains, UI settings, etc.                 |
-| `email-feeder/config.json` | Email ingestion config: IMAP/IMAPS connectors, MinIO settings, polling, working directory, notification SMTP settings |
+| `email-feeder/config.json` | Email ingestion config: IMAP/IMAPS connectors, RustFS settings, polling, working directory, notification SMTP settings |
 
 For full parameter documentation and examples, refer to **[CONFIG.md](CONFIG.md)**.
 
@@ -98,7 +98,7 @@ For full parameter documentation and examples, refer to **[CONFIG.md](CONFIG.md)
 - **Extensible integrations and stack support**
   - **Cortex** for analyzer execution (YARA, AI, sandboxing, metadata analysis…)
   - **Elasticsearch** for search capabilities
-  - **MinIO (S3-compatible)** for storage of artifacts
+  - **RustFS (S3-compatible)** for storage of artifacts
   - Optional integration with **TheHive** / **MISP** for incident or threat-intel workflows
   - Optional **LDAP authentication** for enterprise setups
 
@@ -137,7 +137,7 @@ Suspicious includes a built-in AI module (via `Analyzers/AIMailAnalyzer`) that c
 | **Database**       | Stores metadata, results, user settings |
 | **Elasticsearch**  | Search engine & indexing |
 | **Cortex**         | Analyzer engine (runs YARA, AI, sandbox, metadata analyzers) |
-| **MinIO (S3)**     | Stores uploaded files, extracted attachments, artifacts |
+| **RustFS (S3)**     | Stores uploaded files, extracted attachments, artifacts |
 | **Email Feeder**   | Monitors mailboxes, imports incoming emails automatically |
 | **Traefik (optional)** | Reverse-proxy, TLS/HTTPS termination, domain routing |
 

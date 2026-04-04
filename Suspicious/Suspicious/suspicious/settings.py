@@ -39,7 +39,7 @@ _auth       = _config.get("authentication", {})
 _ldap_cfg   = _auth.get("ldap", {})
 _oidc       = _auth.get("oidc", {})
 _storage    = _config.get("storage", {})
-_minio      = _storage.get("minio", {})
+_minio      = _storage.get("s3", {})
 _integr     = _config.get("integrations", {})
 _cortex     = _integr.get("cortex", {})
 _chromadb   = _integr.get("chromadb", {})
@@ -366,10 +366,10 @@ SPECTACULAR_SETTINGS = {
 
 _storage_backend = _storage.get("backend", "local").lower()
 
-if _storage_backend in {"minio", "dual"}:
+if _storage_backend in {"s3", "dual"}:
     INSTALLED_APPS.append("minio_storage")
 
-    MINIO_STORAGE_ENDPOINT      = _minio.get("endpoint",   "minio:9000")
+    MINIO_STORAGE_ENDPOINT      = _minio.get("endpoint",   "rustfs:9000")
     MINIO_STORAGE_ACCESS_KEY    = _minio["access_key"]
     MINIO_STORAGE_SECRET_KEY    = _minio["secret_key"]
     MINIO_STORAGE_USE_HTTPS = bool(_minio.get("secure", False))
@@ -378,7 +378,7 @@ if _storage_backend in {"minio", "dual"}:
 
 _DUAL_WRITE = str(_features.get("dual_storage_write", "0")).lower()
 
-if _storage_backend == "minio":
+if _storage_backend == "s3":
     DEFAULT_FILE_STORAGE = "minio_storage.storage.MinioMediaStorage"
 elif _storage_backend == "dual" or (_storage_backend == "local" and _DUAL_WRITE):
     DEFAULT_FILE_STORAGE = "suspicious.storage_backends.DualStorage"

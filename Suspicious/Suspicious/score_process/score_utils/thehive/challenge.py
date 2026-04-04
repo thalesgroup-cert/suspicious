@@ -21,7 +21,7 @@ TEMPLATES_DIR = Path(__file__).parent.parent / "send_mail/templates"
 CONFIG_PATH = "/app/settings.json"
 with open(CONFIG_PATH) as config_file:
     config = json.load(config_file)
-minio_config = config.get("storage", {}).get("minio", {})
+minio_config = config.get("storage", {}).get("s3", {})
 thehive_config = config.get('integrations', {}).get('thehive', {})
 
 SOCIAL_LOGOS = {

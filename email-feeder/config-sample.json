@@ -37,8 +37,8 @@
   },
   "working-path": "/tmp/suspicious",
   "timer-inbox-emails": 10,
-  "minio": {
-    "endpoint": "localhost:9000",
+  "s3": {
+    "endpoint": "rustfs:9000",
     "access_key": "minioadmin",
     "secret_key": "minioadmin",
     "secure": false

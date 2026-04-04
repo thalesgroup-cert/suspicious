@@ -1,79 +1,90 @@
-# **Setup Guide Complete Deployment (Docker + Make + Automatic Checks)**
+# Suspicious — Deployment Guide (Docker + Make)
 
-This guide explains how to install, initialize, and run **Suspicious** using:
+This guide describes how to install, initialize, and run **Suspicious** using:
 
-* **Docker Engine & Docker Compose v2**
-* **Environment-based configuration**
-* **Self-contained setup scripts**
-* **Optional Makefile shortcuts**
+* Docker Engine + Docker Compose v2
+* Environment-based configuration (`.env`)
+* Automated setup and validation scripts
+* Makefile commands for common operations
 
-The system includes a **full checklist** to automatically validate directories, configs, certificates, permissions, and Cortex components.
+The deployment includes automated checks for:
+
+* directory structure
+* configuration files
+* TLS certificates
+* permissions
+* network configuration
+* Cortex dependencies
 
 # Prerequisites
 
-Make sure the following are installed on your system.
+## Required
 
-## ✔ Required
+| Component         | Purpose               |
+| ----------------- | --------------------- |
+| Docker Engine     | Runs all services     |
+| Docker Compose v2 | Service orchestration |
+| Git               | Repository cloning    |
+| curl              | Used by setup scripts |
 
-| Component             | Purpose                          |
-| --------------------- | -------------------------------- |
-| **Docker Engine**     | Runs all services                |
-| **Docker Compose v2** | Orchestration (`docker compose`) |
-| **Git**               | Clone the repository             |
-| **curl**              | Used by setup scripts            |
-
-Installation guides:
+Installation:
 
 * Docker: [https://docs.docker.com/get-docker](https://docs.docker.com/get-docker)
 * Git: [https://git-scm.com](https://git-scm.com)
 
-## ✔ Recommended
+## Optional
 
-* **make** provides quality-of-life shortcuts
+`make` simplifies operations but is not required.
 
 ### Install `make`
 
-**Linux/macOS** (if missing):
+**Linux**
 
 ```bash
 sudo apt install make        # Debian/Ubuntu
 sudo dnf install make        # Fedora/RHEL
 ```
 
+**macOS**
+
+```bash
+brew install make
+```
+
 **Windows (recommended)**
-Use **WSL2 + Ubuntu**:
+Use WSL2:
 
 ```powershell
 wsl --install
 ```
 
-Inside WSL:
+Then inside WSL:
 
 ```bash
 sudo apt install make
 ```
 
-> 📝 *You do NOT need `make`. All actions have direct script or Docker equivalents.*
+All Make targets have direct script or Docker equivalents.
 
 # Clone the Repository
 
 ```bash
 git clone https://github.com/thalesgroup-cert/Suspicious.git
-cd suspicious/deployment
+cd Suspicious/deployment
 ```
 
-# Initialize the Environment (Important)
+# Initialization (Required)
 
-The initialization phase performs:
+The initialization step prepares the environment:
 
-* `.env` creation (if missing)
-* Directory structure validation
-* Copying sample configs when needed
-* Certificate generation
-* Cortex catalogs download
-* Docker socket permission checks
-* Traefik/TLS hostname updates
-* Creation of missing log files and folders
+* creates `.env` if missing
+* validates directory structure
+* copies default configuration files
+* generates TLS certificates
+* downloads Cortex catalogs
+* checks Docker socket permissions
+* configures Traefik/TLS hostname
+* creates required log files and directories
 
 Run:
 
@@ -81,173 +92,237 @@ Run:
 make init
 ```
 
-This MUST be executed at least once before starting the stack.
+This step must be executed once before starting the stack.
 
-# Configure Your `.env`
+# Configuration (`.env`)
 
-If you didn’t run `make init` (which auto-creates it), create the file manually:
+If not created automatically:
 
 ```bash
 cp .env.example .env
 ```
 
-Edit `.env` and fill in:
+Edit `.env` and define:
 
 * service versions
 * ports
 * database credentials
-* paths to storage directories
-* domain name (for Traefik/TLS)
-* optional proxy configuration
+* storage paths
+* domain name (Traefik / TLS)
+* optional proxy settings
 
-`.env` is ignored by Git for security.
+The `.env` file is not tracked by Git.
 
-# Start the Application
+# Starting the Platform
 
-You have two options.
+## Option A — Using Make (recommended)
 
-## ✔ Option A Using Make (Recommended)
-
-### Start all services
+Start services:
 
 ```bash
 make up
 ```
 
-### Stop all services
+Stop services:
 
 ```bash
 make down
 ```
 
-### Rebuild images
+Build images:
 
 ```bash
 make build
 ```
 
-### Redeploy (pull + build + safe restart)
+Full deployment (production flow):
 
 ```bash
 make deploy
 ```
 
-This uses:
+This runs:
 
-* `check-network.sh`
-* `replace-tls.sh`
-* `wait-empty.sh`
-* `deploy.sh`
+* network validation
+* TLS configuration update
+* queue checks
+* image pull + restart
+* migrations
 
-## ✔ Option B Using Docker Compose directly
+---
+
+## Option B — Using Docker Compose
 
 ```bash
 docker compose --env-file .env up -d
 ```
 
-Access Suspicious:
+# Access
 
-👉 **[http://localhost:9020](http://localhost:9020)**
+Web interface:
+
+👉 [http://localhost:9020](http://localhost:9020)
 
 # Database Setup
 
-After the containers are up, run the migrations.
-
-## Using Make
+## Run migrations
 
 ```bash
 make migrate
 ```
 
-## Create a superuser
-
-Recommended (Make):
+## Create administrator account
 
 ```bash
-make superuser
+make createsuperuser
 ```
 
-Manual:
+Alternative:
 
 ```bash
-docker compose exec web python manage.py createsuperuser
+docker compose exec suspicious python manage.py createsuperuser
 ```
 
-# Using Suspicious
+# Usage
 
 ## Web Interface
 
-Open:
+Access:
+👉 [http://localhost:9020](http://localhost:9020)
 
-👉 **[http://localhost:9020](http://localhost:9020)**
+## Email ingestion
 
-## 📧 Email Submission
-
-Send a suspicious message **as an attachment** to the mailbox configured in:
+Send emails **as attachments** to the mailbox configured in:
 
 ```
 FEEDER_PATH/config.json
 ```
 
-The system will ingest and analyze it automatically.
+## Manual submission
 
-## 📤 Manual Submission (Web Form)
+Supported inputs:
 
-You can submit:
-
-* Emails (EML/MBOX)
-* Files
+* email files (EML, MBOX)
+* files
 * URLs
 * IP addresses
-* Hashes
+* hashes
 
-# Useful Commands
+---
 
-## 🔍 View logs
+# Common Operations
 
-```bash
-docker compose logs -f
-```
+## Logs
 
-## Backup the database
-
-Using Make:
+All services:
 
 ```bash
-make backup
+make logs
 ```
 
-Direct script:
+Specific service:
 
 ```bash
-./scripts/backup-db.sh
+make logs s=<service>
 ```
 
-## Rebuild after code changes
+## Service status
 
-Using Make:
+```bash
+make status
+```
+
+## Shell access
+
+Web container:
+
+```bash
+make shell
+```
+
+Database shell:
+
+```bash
+make db-shell
+```
+
+## Backup
+
+```bash
+make backup-db
+```
+
+Backups are stored in:
+
+```
+./backups/
+```
+
+## Restore
+
+```bash
+make restore-db f=./backups/<file>.sql.gz
+```
+
+A 5-second delay allows abort before execution.
+
+## Rebuild
 
 ```bash
 make build
+make up
 ```
 
-Manual:
-
-```bash
-docker compose build --no-cache
-docker compose up -d
-```
-
-# Stopping the Application
-
-Using Make:
+# Stopping the Platform
 
 ```bash
 make down
 ```
 
-Using Docker Compose:
+Or:
 
 ```bash
 docker compose --env-file .env down
 ```
+
+# Maintenance
+
+## Restart services
+
+```bash
+make restart
+```
+
+## Pull updated images
+
+```bash
+make pull
+```
+
+## Cleanup stopped containers
+
+```bash
+make clean
+```
+
+## Full Docker cleanup (destructive)
+
+```bash
+make prune
+```
+
+Removes unused images, containers, and volumes.
+
+# Summary
+
+| Task         | Command                |
+| ------------ | ---------------------- |
+| Initialize   | `make init`            |
+| Start        | `make up`              |
+| Stop         | `make down`            |
+| Deploy       | `make deploy`          |
+| Migrate DB   | `make migrate`         |
+| Create admin | `make createsuperuser` |
+| Logs         | `make logs`            |
+| Backup DB    | `make backup-db`       |
+| Restore DB   | `make restore-db`      |

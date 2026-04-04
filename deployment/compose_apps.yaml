@@ -25,7 +25,7 @@ services:
     env_file:
       - ".env"
     environment:
-      no_proxy: "${NO_PROXY:-},cortex,db_suspicious,minio,chromadb"
+      no_proxy: "${NO_PROXY:-},cortex,db_suspicious,rustfs,chromadb"
     networks:
       - suspicious_network
 
@@ -50,7 +50,7 @@ services:
     env_file:
       - ".env"
     environment:
-      no_proxy: "${NO_PROXY:-},cortex,db_suspicious,minio,chromadb"
+      no_proxy: "${NO_PROXY:-},cortex,db_suspicious,rustfs,chromadb"
     networks:
       - suspicious_network
 

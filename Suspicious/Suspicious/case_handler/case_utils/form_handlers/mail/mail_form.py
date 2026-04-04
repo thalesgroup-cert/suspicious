@@ -36,9 +36,9 @@ class MailFormHandler:
         """
         self.user = user
         self.base_path = Path(base_path)
-        cfg = (config.get("storage", {}).get("minio", {}))
+        cfg = (config.get("storage", {}).get("s3", {}))
         self.minio = MinioManager(
-            endpoint=cfg.get("endpoint", "localhost:9000"),
+            endpoint=cfg.get("endpoint", "rustfs:9000"),
             access_key=cfg.get("access_key", "minioadmin"),
             secret_key=cfg.get("secret_key", "minioadmin"),
             secure=cfg.get("secure", False),

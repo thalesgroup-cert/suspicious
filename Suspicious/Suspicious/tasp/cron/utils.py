@@ -31,12 +31,12 @@ def load_config(path: str) -> CronConfig:
     raw = json.loads(Path(path).read_text())
 
     try:
-        minio_raw = raw.get("storage", {}).get("minio")
+        minio_raw = raw.get("storage", {}).get("s3")
 
         cortex_raw = raw.get("integrations", {}).get("cortex")
 
         config_data = {
-            "minio": {
+            "s3": {
                 "endpoint": minio_raw.get("endpoint"),
                 "access_key": minio_raw.get("access_key"),
                 "secret_key": minio_raw.get("secret_key"),
