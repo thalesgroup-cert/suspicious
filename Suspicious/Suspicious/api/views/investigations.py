@@ -1,5 +1,7 @@
 from __future__ import annotations
 
+import logging
+
 from django.db.models import Q
 from drf_spectacular.utils import OpenApiParameter, OpenApiResponse, extend_schema
 from rest_framework import status
@@ -19,6 +21,9 @@ from api.serializers.investigations import (
     InvestigationListQuerySerializer,
     InvestigationRowSerializer,
 )
+from score_process.score_utils.send_mail.service import MailNotificationService
+
+logger = logging.getLogger(__name__)
 
 
 CASE_LIST_SELECT_RELATED = (
@@ -423,6 +428,17 @@ class InvestigationGlobalEditView(InvestigationAccessMixin, APIView):
                 "last_update",
             ]
         )
+
+        # Send modification email to the reporter.
+        # Best-effort — a failure must not prevent the 200 response.
+        try:
+            MailNotificationService.from_settings().send_review_email(obj)
+        except Exception as exc:
+            logger.error(
+                "Failed to send modification email for case %s: %s",
+                obj.id, exc,
+                exc_info=True,
+            )
 
         analyzer_reports_qs = self.get_analyzer_reports_queryset(obj)
         serializer = InvestigationDetailsSerializer(
