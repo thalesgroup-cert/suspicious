@@ -1,113 +1,345 @@
 <!DOCTYPE html>
-<html lang="en">
+<html lang="en" xmlns="http://www.w3.org/1999/xhtml" xmlns:v="urn:schemas-microsoft-com:vml" xmlns:o="urn:schemas-microsoft-com:office:office">
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <meta name="color-scheme" content="light dark">
-  <meta name="supported-color-schemes" content="light dark">
-  <title>Suspicious: Submission Registered</title>
-  <style type="text/css">
-    @media only screen and (max-width: 600px) {
-      .full-width { width:100% !important; }
-      .stack { display:block !important; width:100% !important; }
-      .hide-mobile { display:none !important; max-height:0 !important; overflow:hidden !important; }
+  <meta http-equiv="X-UA-Compatible" content="IE=edge">
+  <meta name="x-apple-disable-message-reformatting">
+  <meta name="format-detection" content="telephone=no,address=no,email=no,date=no,url=no">
+  <title>{{ subject | default("Submission could not be processed") }}</title>
+  <!--[if mso]>
+  <noscript><xml>
+    <o:OfficeDocumentSettings>
+      <o:AllowPNG/>
+      <o:PixelsPerInch>96</o:PixelsPerInch>
+    </o:OfficeDocumentSettings>
+  </xml></noscript>
+  <![endif]-->
+  <style>
+    body,table,td,a{-webkit-text-size-adjust:100%;-ms-text-size-adjust:100%;}
+    table{border-collapse:collapse!important;mso-table-lspace:0pt;mso-table-rspace:0pt;}
+    img{border:0;height:auto;line-height:100%;outline:none;text-decoration:none;-ms-interpolation-mode:bicubic;}
+    a[x-apple-data-detectors]{color:inherit!important;text-decoration:none!important;}
+    @media screen and (max-width:620px){
+      .email-container{width:100%!important;border-radius:0!important;}
+      .content-pad{padding:24px 18px!important;}
+      .footer-pad{padding:20px 18px!important;}
+      .two-col td{display:block!important;width:100%!important;text-align:left!important;padding-bottom:10px;}
     }
-    [data-ogsc] body { background-color: #EDF1F4; color: #333333; }
-    [data-ogsb] .dark-section { background-color: #242a75; }
   </style>
 </head>
-<body style="margin:0; padding:0; background-color:#EDF1F4; width:100% !important; -webkit-text-size-adjust:100%; -ms-text-size-adjust:100%;" data-ogsc data-ogsb>
-  <center style="width:100%; background-color:#EDF1F4;">
-    <table width="100%" border="0" cellpadding="0" cellspacing="0" role="presentation">
-      <tr>
-        <td align="center">
-          <table class="full-width" width="600" border="0" cellpadding="0" cellspacing="0" role="presentation" style="max-width:600px;">
-            <tr>
-              <td style="background-color:#242A75; padding:30px 20px 0 20px; text-align:center;">
-                <img src="{{ company_logo }}" alt="{{ company_name }} logo" style="display:block; max-width:120px; width:100%; height:auto;">
-              </td>
-            </tr>
-            <tr>
-              <td style="background-color:#242A75; padding:0 20px; text-align:center;">
-                <img src="{{ acknowledge_bad_mail_logo }}" alt="Banner" style="display:block; width:100%; max-width:1600px; height:auto;">
-              </td>
-            </tr>
-            <tr>
-              <td class="dark-white-bg" style="background-color:#FFFFFF; padding:30px 20px; font-family:Arial,Helvetica,sans-serif; font-size:14px; color:#333333; line-height:20px;">
-                <div style="margin-bottom:16px;">
-                  <span style="font-size:18px; color:#00BBDD;">Dear {{ recipient }},</span>
-                </div>
-                <div style="margin-bottom:16px;">
-                  Thank you for your submission to the {{ company_name }} team.
-                </div>
-                <div style="margin-bottom:16px;">
-                  Unfortunately, your submission could not be processed due to the way the email was sent.
 
-                  The analysis system requires the original email in its unmodified form. When an email is digitally signed, a cryptographic signature is added to guarantee the sender’s identity and message integrity. However, this signature alters the message structure and prevents our tools from correctly extracting and analyzing the original content.
-                </div>
-                <div style="margin-bottom:16px;">
-                  <strong>To be analyzed, the suspicious email must be sent as a full attachment (not forwarded inline).</strong><br>
-                  This preserves the original headers and content required for forensic analysis.
-                  Please ensure that you do not apply a digital signature when forwarding suspicious emails. Signed messages cannot be reliably analyzed because their content is encapsulated and protected by the signature.
-                </div>
-                <div style="margin-bottom:16px;">
-                  In Outlook, you can:
-                  <ul style="padding-left:20px; margin:8px 0 16px; list-style-type: disc;">
-                    <li>Right-click on the mail and select “Forward as Attachment”</li>
-                    <li>Or use <em>Ctrl + Alt + F</em> when the mail is selected</li>
-                  </ul>
-                </div>
-              </td>
-            </tr>
-            <tr>
-              <td class="dark-section" style="background-color:#242A75; padding:30px 20px; font-family:Arial,Helvetica,sans-serif; font-size:14px; color:#FFFFFF; line-height:20px;">
-                <div style="margin-bottom:12px; font-style:italic;">
-                  To see the definition of these conclusion terms, visit the cybersecurity glossary, <a href="{{ glossary }}" target="_blank" style="color:#FFFFFF; text-decoration:underline;">available here</a>. In case of questions, contact <a href="{{ inquiry }}" target="_blank" style="color:#FFFFFF; text-decoration:underline;">{{ inquiry_details }}</a>.
-                </div>
-                <div style="margin-bottom:12px; font-style:italic;">
-                  You can also access the portal <a href="{{ company_online_portal }}" target="_blank" style="color:#FFFFFF; text-decoration:underline;">here</a> to view technical analysis.
-                </div>
-                <div style="margin-bottom:12px; font-style:italic;">
-                  Your contribution to the Group security is fundamental to reinforce detection and response capabilities.
-                </div>
-                <div style="margin-bottom:12px; font-style:italic;">
-                  With our kindest regards,
-                </div>
-              </td>
-            </tr>
-            <tr>
-              <td style="background-color:#FFFFFF; text-align:center; padding:0 0 0 0;">
-                <div style="background-color:#242A75; padding:10px 0; border-top:2px solid #FFFFFF; border-bottom:2px solid #FFFFFF;">
-                  <strong style="font-size:15px; color:#FFFFFF; font-family:Arial,Helvetica,sans-serif;">{{ company_name }}</strong>
-                </div>
-              </td>
-            </tr>
-            <tr>
-              <td style="background-color:#242A75; text-align:center; padding:35px 20px; font-family:Arial,Helvetica,sans-serif; font-size:14px; color:#FFFFFF;">
-                <a href="{{ company_global_security_url }}" target="_blank" style="color:#FFFFFF; text-decoration:underline; font-family:Arial,Helvetica,sans-serif; font-size:14px;">
-                  {{ company_global_security_team }}
-                </a>
-              </td>
-            </tr>
-            <tr>
-              <td align="center" style="background-color:#242A75; padding:15px 0 20px 0;">
-                <table border="0" cellpadding="0" cellspacing="0" role="presentation">
-                  <tr>
-                    {% for company_social in company_socials %}
-                    <td style="padding:0 5px;">
-                      <a href="{{ company_social.url }}" target="_blank" style="text-decoration:none; border:0;">
-                        <img src="{{ company_social.logo }}" alt="{{ company_social.name }} icon" width="24" height="24" style="display:block; border:0;">
-                      </a>
-                    </td>
-                    {% endfor %}
-                  </tr>
-                </table>
-              </td>
-            </tr>
-          </table>
-        </td>
-      </tr>
-    </table>
-  </center>
+{# =========================================================================
+   Theme variables — all plain hex from resolve_email_theme(profile):
+     bg  surface  header_bg  header_text  accent  body_text  muted  border
+     cta_bg  cta_text  link
+   Logo dicts from resolve_logo():
+     company_logo.src  .is_image  .is_svg  .is_data_uri
+     acknowledge_bad_mail_logo.src  .is_image  .is_svg  .is_data_uri
+   ========================================================================= #}
+
+<body style="margin:0;padding:0;word-break:break-word;
+             -webkit-font-smoothing:antialiased;background-color:{{ bg }};">
+
+{# Preheader #}
+<div style="display:none;max-height:0;overflow:hidden;mso-hide:all;
+            font-size:1px;line-height:1px;color:{{ bg }};">
+  Your submission could not be processed. Please re-submit using the correct format.
+  &#847;&zwj;&#847;&zwj;&#847;&zwj;&#847;&zwj;&#847;&zwj;&#847;&zwj;&#847;&zwj;
+</div>
+
+<!--[if mso | IE]>
+<table role="presentation" border="0" cellpadding="0" cellspacing="0" width="100%"
+       style="background-color:{{ bg }};"><tr><td align="center">
+<![endif]-->
+
+<table role="presentation" border="0" cellpadding="0" cellspacing="0" width="100%"
+       style="background-color:{{ bg }};">
+<tr><td align="center" style="padding:32px 16px;">
+
+<table class="email-container"
+       role="article" aria-label="Submission processing error"
+       border="0" cellpadding="0" cellspacing="0"
+       width="600"
+       style="max-width:600px;width:100%;border-radius:14px;overflow:hidden;
+              border:1px solid {{ border }};">
+
+
+  {# ── 1. HEADER ───────────────────────────────────────────────────────── #}
+  <tr>
+    <td align="center" style="background-color:{{ header_bg }};padding:26px 40px;">
+      {% if company_logo.is_image %}
+        {% if company_logo.is_data_uri or company_logo.is_svg %}
+        <!--[if !mso]><!-->
+        <img src="{{ company_logo.src }}" alt="{{ company_name | default('') }}"
+             width="130"
+             style="max-width:130px;height:auto;display:block;margin:0 auto;">
+        <!--<![endif]-->
+        <!--[if mso]>
+        <span style="font-size:20px;font-weight:800;color:{{ header_text }};
+                     font-family:Arial,sans-serif;">
+          {{ company_name | default("Security Portal") }}
+        </span>
+        <![endif]-->
+        {% else %}
+        <img src="{{ company_logo.src }}" alt="{{ company_name | default('') }}"
+             width="130"
+             style="max-width:130px;height:auto;display:block;margin:0 auto;">
+        {% endif %}
+      {% else %}
+        <span style="font-size:22px;font-weight:800;letter-spacing:-0.5px;
+                     color:{{ header_text }};
+                     font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,Arial,sans-serif;">
+          {{ company_name | default("Security Portal") }}
+        </span>
+      {% endif %}
+    </td>
+  </tr>
+
+
+  {# ── 2. HERO — banner or warning-coloured gradient rule ──────────────── #}
+  {% if acknowledge_bad_mail_logo.is_image %}
+  <tr>
+    <td style="background-color:{{ header_bg }};padding:0;line-height:0;font-size:0;
+               border-bottom:4px solid {{ color_failure }};">
+      {% if acknowledge_bad_mail_logo.is_data_uri or acknowledge_bad_mail_logo.is_svg %}
+      <!--[if !mso]><!-->
+      <img src="{{ acknowledge_bad_mail_logo.src }}" alt="" role="presentation" width="600"
+           style="width:100%;max-width:600px;height:auto;display:block;">
+      <!--<![endif]-->
+      <!--[if mso]>
+      <table role="presentation" border="0" cellpadding="0" cellspacing="0" width="600">
+      <tr><td height="60" style="background:{{ header_bg }};font-size:0;">&nbsp;</td></tr>
+      </table>
+      <![endif]-->
+      {% else %}
+      <img src="{{ acknowledge_bad_mail_logo.src }}" alt="" role="presentation" width="600"
+           style="width:100%;max-width:600px;height:auto;display:block;">
+      {% endif %}
+    </td>
+  </tr>
+  {% else %}
+  {# No banner — warning-coloured gradient rule #}
+  <tr>
+    <td style="padding:0;font-size:0;line-height:0;height:5px;
+               background:linear-gradient(90deg,{{ color_failure }},{{ muted }});">
+      <!--[if mso]>&nbsp;<![endif]-->
+    </td>
+  </tr>
+  {% endif %}
+
+
+  {# ── 3. BODY ─────────────────────────────────────────────────────────── #}
+  <tr>
+    <td class="content-pad"
+        style="background-color:{{ surface }};padding:36px 40px 32px;">
+
+      {# Greeting #}
+      <p style="margin:0 0 20px;font-size:20px;font-weight:800;
+                letter-spacing:-0.3px;color:{{ accent }};
+                font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,Arial,sans-serif;">
+        Dear {{ recipient | default("Security Contributor") }},
+      </p>
+
+      <p style="margin:0 0 16px;font-size:15px;line-height:1.7;color:{{ body_text }};
+                font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,Arial,sans-serif;">
+        Thank you for forwarding a suspicious item to the
+        {% if company_name %}<strong style="color:{{ body_text }};">{{ company_name }}</strong>
+        {% else %}security{% endif %} team.
+      </p>
+
+      <p style="margin:0 0 20px;font-size:15px;line-height:1.7;color:{{ body_text }};
+                font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,Arial,sans-serif;">
+        Unfortunately, <strong style="color:{{ color_failure }};">your submission could not be processed.</strong>
+        The email was not received in the format required for automated analysis.
+      </p>
+
+      {# Hairline #}
+      <table role="presentation" border="0" cellpadding="0" cellspacing="0" width="100%">
+        <tr><td style="border-top:1px solid {{ border }};font-size:0;padding:0;">&nbsp;</td></tr>
+      </table>
+
+      {# What went wrong block #}
+      <table role="presentation" border="0" cellpadding="0" cellspacing="0" width="100%"
+             style="margin:22px 0;border:1px solid {{ color_failure }};
+                    border-radius:8px;overflow:hidden;">
+        <tr>
+          <td width="5" style="background-color:{{ color_failure }};
+                       width:5px;padding:0;font-size:0;line-height:0;">&nbsp;</td>
+          <td style="padding:14px 18px;background-color:{{ surface }};">
+            <p style="margin:0 0 6px;font-size:13px;font-weight:800;
+                      color:{{ color_failure }};
+                      font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,Arial,sans-serif;">
+              Submission could not be processed
+            </p>
+            <p style="margin:0;font-size:13px;line-height:1.65;color:{{ body_text }};
+                      font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,Arial,sans-serif;">
+              To be analyzed, the original email must be submitted as a full attachment
+              with its headers and content intact. Please re-submit following the instructions below.
+            </p>
+          </td>
+        </tr>
+      </table>
+
+      {# How to re-submit — clean instructions, no signature-specific content #}
+      <p style="margin:0 0 12px;font-size:14px;font-weight:800;color:{{ body_text }};
+                font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,Arial,sans-serif;">
+        How to re-submit correctly
+      </p>
+
+      {# Step rows #}
+      {% set steps = [
+        ("Forward as attachment", "Open the suspicious email and use your email client\\'s \\'Forward as Attachment\\' option. This preserves the original headers and content required for analysis."),
+        ("Do not forward inline", "Forwarding inline embeds the message as body text and strips the metadata needed for forensic review."),
+        ("Do not modify the email", "Do not alter the subject, body, or headers before forwarding. Send the original message unchanged."),
+      ] %}
+      {% for title, desc in steps %}
+      <table role="presentation" border="0" cellpadding="0" cellspacing="0" width="100%"
+             style="margin-bottom:10px;border:1px solid {{ border }};
+                    border-radius:8px;overflow:hidden;
+                    background-color:{{ surface }};">
+        <tr>
+          <td width="5" style="background-color:{{ accent }};
+                       width:5px;padding:0;font-size:0;line-height:0;">&nbsp;</td>
+          <td style="padding:12px 16px;">
+            <p style="margin:0 0 3px;font-size:13px;font-weight:800;color:{{ body_text }};
+                      font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,Arial,sans-serif;">
+              {{ title }}
+            </p>
+            <p style="margin:0;font-size:13px;line-height:1.6;color:{{ muted }};
+                      font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,Arial,sans-serif;">
+              {{ desc }}
+            </p>
+          </td>
+        </tr>
+      </table>
+      {% endfor %}
+
+      {# Outlook tip #}
+      <table role="presentation" border="0" cellpadding="0" cellspacing="0" width="100%"
+             style="margin:18px 0 0;border:1px solid {{ border }};
+                    border-radius:8px;overflow:hidden;
+                    background-color:{{ header_bg }};">
+        <tr>
+          <td style="padding:12px 16px;">
+            <p style="margin:0 0 4px;font-size:11px;font-weight:700;
+                      text-transform:uppercase;letter-spacing:0.07em;
+                      color:{{ muted }};
+                      font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,Arial,sans-serif;">
+              In Outlook
+            </p>
+            <p style="margin:0;font-size:13px;line-height:1.6;color:{{ header_text }};
+                      font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,Arial,sans-serif;">
+              Right-click the email and choose
+              <strong style="color:{{ header_text }};">"Forward as Attachment"</strong>
+              — or select the email and press
+              <strong style="color:{{ header_text }};">Ctrl&nbsp;+&nbsp;Alt&nbsp;+&nbsp;F</strong>.
+            </p>
+          </td>
+        </tr>
+      </table>
+
+    </td>
+  </tr>
+
+
+  {# ── 4. FOOTER ───────────────────────────────────────────────────────── #}
+  <tr>
+    <td class="footer-pad"
+        style="background-color:{{ header_bg }};padding:22px 40px;">
+      <table class="two-col" role="presentation"
+             border="0" cellpadding="0" cellspacing="0" width="100%">
+        <tr>
+          <td style="vertical-align:top;padding-right:16px;">
+            {% if glossary %}
+            <p style="margin:0 0 6px;">
+              <a href="{{ glossary }}"
+                 style="color:{{ accent }};text-decoration:none;font-size:13px;font-weight:600;
+                        font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,Arial,sans-serif;">
+                Cybersecurity glossary
+              </a>
+            </p>
+            {% endif %}
+            {% if company_online_portal %}
+            <p style="margin:0 0 6px;">
+              <a href="{{ company_online_portal }}"
+                 style="color:{{ accent }};text-decoration:none;font-size:13px;font-weight:600;
+                        font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,Arial,sans-serif;">
+                Submission portal
+              </a>
+            </p>
+            {% endif %}
+            {% if inquiry %}
+            <p style="margin:0;">
+              <a href="{{ inquiry }}"
+                 style="color:{{ accent }};text-decoration:none;font-size:13px;font-weight:600;
+                        font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,Arial,sans-serif;">
+                {{ inquiry_details | default("Contact us") }}
+              </a>
+            </p>
+            {% endif %}
+          </td>
+          <td style="vertical-align:top;text-align:right;">
+            <p style="margin:0 0 4px;font-size:14px;font-weight:800;
+                      color:{{ header_text }};
+                      font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,Arial,sans-serif;">
+              {{ company_name | default("Company") }}
+            </p>
+            {% if company_global_security_url %}
+            <p style="margin:0;">
+              <a href="{{ company_global_security_url }}"
+                 style="color:{{ accent }};text-decoration:none;font-size:12px;
+                        font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,Arial,sans-serif;">
+                {{ company_global_security_team | default("") }}
+              </a>
+            </p>
+            {% endif %}
+          </td>
+        </tr>
+      </table>
+    </td>
+  </tr>
+
+
+  {# ── 5. SOCIAL ICONS ─────────────────────────────────────────────────── #}
+  {% if company_socials %}
+  <tr>
+    <td align="center"
+        style="background-color:{{ header_bg }};padding:12px 40px 20px;
+               border-top:1px solid {{ border }};">
+      {% for social in company_socials %}
+      <a href="{{ social.url }}" target="_blank" rel="noopener noreferrer"
+         style="display:inline-block;margin:0 5px;">
+        <img src="{{ social.logo }}" alt="{{ social.name }}"
+             width="24" height="24"
+             style="display:inline-block;vertical-align:middle;opacity:0.88;">
+      </a>
+      {% endfor %}
+    </td>
+  </tr>
+  {% endif %}
+
+
+  {# ── 6. LEGAL STRIP ──────────────────────────────────────────────────── #}
+  <tr>
+    <td align="center"
+        style="background-color:{{ bg }};padding:16px 40px;
+               border-top:1px solid {{ border }};
+               color:{{ muted }};font-size:11px;line-height:1.6;
+               font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,Arial,sans-serif;">
+      This message was sent automatically by
+      <strong>{{ company_name | default("the security platform") }}</strong>.
+      Please do not reply directly to this email.
+    </td>
+  </tr>
+
+</table>
+</td></tr>
+</table>
+
+<!--[if mso | IE]>
+</td></tr></table>
+<![endif]-->
+
 </body>
 </html>
