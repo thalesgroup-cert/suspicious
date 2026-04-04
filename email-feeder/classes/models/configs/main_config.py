@@ -72,9 +72,9 @@ class MainConfig(pydantic.BaseModel):
 
         timer_inbox_emails = json_object.get("timer-inbox-emails", 10)
 
-        raw_minio = json_object.get("minio")
+        raw_minio = json_object.get("s3")
         if raw_minio is None:
-            raise ValueError("You must provide a configuration for 'minio'.")
+            raise ValueError("You must provide a configuration for 'S3 Bucket'.")
         required_minio_keys = {"endpoint", "access_key", "secret_key"}
         if set(raw_minio) < required_minio_keys:
             raise ValueError(

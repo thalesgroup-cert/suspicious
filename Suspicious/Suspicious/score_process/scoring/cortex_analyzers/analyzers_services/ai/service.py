@@ -37,7 +37,7 @@ with open(CONFIG_PATH) as config_file:
     config = json.load(config_file)
 
 thehive_config = config.get("integrations", {}).get("thehive", {})
-minio_config = config.get("storage", {}).get("minio", {})
+minio_config = config.get("storage", {}).get("s3", {})
 chromadb_config = config.get("integrations", {}).get("chromadb", {})
 
 logger = logging.getLogger("tasp.cron.update_ongoing_case_jobs")

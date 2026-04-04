@@ -40,12 +40,12 @@ can use it to send the response email.
 If you are trying to implement a feature of fix a bug, you will likely want to
 test whether you broke something.
 
-There is a minimal IMAP and Minio setup by the `docker-compose.dev.yaml` file.
+There is a minimal IMAP and RustFS setup by the `docker-compose.dev.yaml` file.
 
 It contains both services and expose ports allowing you to test the `email-feeder`
 service without deploying a whole architecture.
 
-To start the IMAP server and the Minio storage services, you can type the
+To start the IMAP server and the RustFS storage services, you can type the
 following command :
 ```bash
 docker compose -f docker-compose.dev.yaml up -d
@@ -59,8 +59,8 @@ Once all services are up, you can access them through those ports :
 3465 -- SMTPS
 3995 -- POP3S
 3993 -- IMAPS
-9000 -- Minio S3 server
-9001 -- Minio admin web panel
+9000 -- RustFS S3 server
+9001 -- RustFS admin web panel
 ```
 
 The default IMAP user credentials are :
@@ -69,7 +69,7 @@ username: imap_user@localhost
 password: imap_password
 ```
 
-The default Minio user credentials are :
+The default RustFS user credentials are :
 ```
 username: minioadmin
 password: minioadmin
@@ -117,8 +117,8 @@ For the default setup, here is a possible matching `config.json` file :
   },
   "working-path": "/tmp/suspicious",
   "timer-inbox-emails": 10,
-  "minio": {
-    "endpoint": "localhost:9000",
+  "s3": {
+    "endpoint": "rustfs:9000",
     "access_key": "minioadmin",
     "secret_key": "minioadmin",
     "secure": false

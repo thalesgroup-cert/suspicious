@@ -20,20 +20,25 @@ services:
       - greenmail_data:/data
     restart: unless-stopped
 
-  minio:
-    image: quay.io/minio/minio:latest
-    container_name: minio
-    command: server /data --console-address ":9001"
+  rustfs:
+    image: rustfs/rustfs:latest
+    container_name: rustfs
+    command: /data --console-address ":9001"
+    restart: always
+    expose:
+      - "9000"
     ports:
-      - "9000:9000" # S3 API
-      - "9001:9001" # Web console
+      - "127.0.0.1:9001:9001"
     environment:
-      MINIO_ROOT_USER: minioadmin
-      MINIO_ROOT_PASSWORD: minioadmin
+      RUSTFS_ACCESS_KEY:    ${MINIO_ROOT_USER}
+      RUSTFS_SECRET_KEY:    ${MINIO_ROOT_PASSWORD}
+      RUSTFS_VOLUMES:       /data
+      RUSTFS_ADDRESS:       0.0.0.0:9000
+      RUSTFS_CONSOLE_ENABLE: "true"
+      RUSTFS_CONSOLE_ADDRESS: 0.0.0.0:9001
     volumes:
-      - minio_data:/data
-    restart: unless-stopped
+      - "rustfs_data:/data:Z"
 
 volumes:
-  minio_data:
+  rustfs_data:
   greenmail_data:

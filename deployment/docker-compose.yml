@@ -154,7 +154,7 @@ services:
       context: ${FEEDER_PATH:?FEEDER_PATH is required}/
       dockerfile: Dockerfile
       args:
-        - NO_PROXY=localhost,minio,chromadb
+        - NO_PROXY=localhost,rustfs,chromadb
         - HTTP_PROXY=${HTTP_PROXY:-}
         - HTTPS_PROXY=${HTTPS_PROXY:-}
     container_name: email_feeder

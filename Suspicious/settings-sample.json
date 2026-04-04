@@ -43,8 +43,8 @@
     },
     "storage": {
         "backend": "local",
-        "minio": {
-            "endpoint": "minio:9000",
+        "s3": {
+            "endpoint": "rustfs:9000",
             "access_key": "MINIO_ACCESS_KEY",
             "secret_key": "MINIO_SECRET_KEY",
             "secure": false,
