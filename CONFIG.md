@@ -28,10 +28,11 @@ cp .env.example .env
 ```env
 SUSPICIOUS_VERSION=latest
 DB_SUSPICIOUS_VERSION=12
-MINIO_VERSION=RELEASE.2025-04-22T22-12-26Z
-CORTEX_VERSION=4.0
+RUSTFS_VERSION=1.0.0-alpha.90
+CORTEX_VERSION=4.0.0-1
 ELASTICSEARCH_VERSION=8.19.7
-TRAEFIK_VERSION=v3.5
+TRAEFIK_VERSION=v3.6
+CHROMADB_VERSION=1.5.5
 ```
 
 Update only when you know compatibility. Mismatched versions can break services.
@@ -40,9 +41,9 @@ Update only when you know compatibility. Mismatched versions can break services.
 
 ```env
 SUSPICIOUS_PORT=9020
-MINIO_PORT=35000
+SUSPICIOUS_UI_PORT=9021
+MINIO_PORT=35000          # RUSTFS console — local access only
 CORTEX_PORT=9001
-ELASTICSEARCH_PORT=9200
 ```
 
 Change these only if port conflicts appear on your host system.
@@ -96,6 +97,7 @@ If changed, ensure all references (in Compose files, scripts, configs) match.
 ```env
 ROOT_PATH=../
 SUSPICIOUS_PATH=../Suspicious
+SUSPICIOUS_UI_PATH=../suspicious-ui
 FEEDER_PATH=../email-feeder
 DOCKER_PATH=../docker
 YARA_PATH=../yara-rules
@@ -127,50 +129,59 @@ Key configuration categories:
 ### 2.1 Core Application Settings
 
 ```json
-{
-  "allowed_host": "suspicious",
-  "csrf_trusted_origins": "https://localhost",
-  "django_debug": "True",
-  "django_secret_key": "django-insecure-test",
-  "email": "suspicious@test.com",
-  "tz": "Europe/Paris"
-}
+    "app": {
+        "name": "suspicious",
+        "debug": false,
+        "secret_key": "CHANGE_ME",
+        "allowed_hosts": [
+            "suspicious"
+        ],
+        "csrf_trusted_origins": [
+            "https://suspicious.test"
+        ],
+        "timezone": "Europe/Paris",
+        "log_level": "INFO"
+    },
 ```
 
-* Replace `django_secret_key` with a secure random value in production use `openssl rand -base64 33` to generate.
-* Ensure `django_debug` is set to `False` in a production environment.
+* Replace `secret_key` with a secure random value in production use `openssl rand -base64 33` to generate.
+* Ensure `debug` is set to `False` in a production environment.
 
 ### 2.2 Branding & UI Customization
 
 ```json
-"footer": "Your Company Name",
-"ico": "data:image/png;base64,...",
-"logo": "data:image/png;base64,...",
-"banner": "data:image/png;base64,...",
-"sign": "data:image/png;base64,..."
+    "branding": {
+        "company_name": "Test",
+        "contact_email": "suspicious@test.com",
+        "footer": "Your Group",
+        "intranet_link": "https://intranet.local",
+        "assets": {
+            "logo": "BASE64_LOGO",
+            "icon": "BASE64_ICON",
+            "banner": "BASE64_BANNER",
+            "signature": "BASE64_SIGNATURE"
+        }
+    },
 ```
 
 You may embed Base64-encoded images or use external URLs. This allows corporate-branded look & feel for your deployment.
-
-### 2.3 Email Pattern Matching
-
-```json
-"pattern": "regex_for_company_mail_addresses"
-```
-
-Used to identify internal / trusted senders by matching their email domain or address pattern.
 
 ### 2.4 External Integrations
 
 #### 2.4.1 TheHive (optional)
 
 ```json
-"thehive": {
-  "enabled": false,
-  "url": "...",
-  "api_key": "...",
-  "the_hive_verify_ssl": false
-}
+        "thehive": {
+            "enabled": false,
+            "url": "https://thehive",
+            "api_key": "CHANGE_ME",
+            "verify_ssl" : false,
+            "custom_field" : "",
+            "email_sender" : "",
+            "tags" : "",
+            "certificate_path" : "/app/cert.pem",
+            "user": "exemple@user.com"
+        },
 ```
 
 Enable if you wish Suspicious to forward alerts / create incidents in TheHive automatically.
@@ -178,15 +189,17 @@ Enable if you wish Suspicious to forward alerts / create incidents in TheHive au
 #### 2.4.2 Cortex (required for analyzers)
 
 ```json
-"cortex": {
-  "url": "http://cortex:9001",
-  "api_key": "your_cortex_api_key",
-  "header_analyzer": "MailHeader_4_0",
-  "ai_analyzer": "AI_Mail_Analyzer_1_4",
-  "sandbox_analyzer": "ThreatGridOnPrem_1_0",
-  "yara_analyzer": "Yara_Boosted_3_2",
-  "file_info_analyzer": "FileInfo_8_0"
-}
+        "cortex": {
+            "url": "http://cortex:9001",
+            "api_key": "CHANGE_ME",
+            "analyzers": {
+                "header": "MailHeader_4_0",
+                "ai": "AI_Mail_Analyzer_1_4",
+                "sandbox": "ThreatGridOnPrem_1_0",
+                "yara": "Yara_Boosted_3_2",
+                "file_info": "FileInfo_8_0"
+            }
+        },
 ```
 
 * Ensure that each analyzer name matches exactly those installed in your Cortex instance.
@@ -197,10 +210,30 @@ Enable if you wish Suspicious to forward alerts / create incidents in TheHive au
 Allows pushing indicators to one or more MISP instances:
 
 ```json
-"misp": {
-  "suspicious": { "url": "...", "key": "...", "ssl_verify": false },
-  "security":   { "url": "...", "key": "...", "ssl_verify": false }
-}
+        "misp": {
+            "default_tags": {
+                "tlp": "clear",
+                "pap": "clear",
+                "categories": [
+                    "MalSpam",
+                    "Phishing"
+                ]
+            },
+            "instances": {
+                "primary": {
+                    "url": "http://misp",
+                    "api_key": "CHANGE_ME",
+                    "ssl_verify": false,
+                    "ssl_ca_certs": "/etc/ssl/certs/ca-certificates.crt"
+                },
+                "secondary": {
+                    "url": "https://secondary-misp",
+                    "api_key": "CHANGE_ME",
+                    "ssl_verify": false,
+                    "ssl_ca_certs": "/etc/ssl/certs/ca-certificates.crt"
+                }
+            }
+        }
 ```
 
 Configure only if you use MISP.
@@ -216,17 +249,20 @@ Used to detect and allows to create users from legitimate internal senders, whit
 ### 2.6 Database Access (Mirrors `.env`)
 
 ```json
-"database": {
-  "mysql_database": "db_suspicious",
-  "mysql_host": "db_suspicious",
-  "mysql_password": "your_db_password",
-  "mysql_user": "suspicious",
-  "mysql_port": 3306,
-  "mysql_root_password": "your_root_password",
-  "db_use_ssl": "NO",
-  "db_use_connection_pooling": "NO",
-  "db_use_persistent_connections": "NO"
-}
+    "database": {
+        "engine": "mysql",
+        "host": "db_suspicious",
+        "port": 3306,
+        "name": "db_suspicious",
+        "user": "suspicious",
+        "password": "password",
+        "root_password": "strongpassword",
+        "options": {
+            "ssl": false,
+            "connection_pooling": false,
+            "persistent_connections": false
+        }
+    },
 ```
 
 Ensure consistency with `.env`. Changing these after first initialization may cause database connection issues.
@@ -234,18 +270,25 @@ Ensure consistency with `.env`. Changing these after first initialization may ca
 ### 2.7 LDAP Authentication (Optional)
 
 ```json
-"ldap": {
-  "auth_ldap_server_uri": "ldaps://ldap.example.com",
-  "auth_ldap_base_dn": "ou=People,o=Example",
-  "auth_ldap_bind_dn": "...",
-  "auth_ldap_bind_password": "...",
-  "auth_ldap_filter": "...",
-  "auth_ldap_verify_ssl": false
-}
+    "authentication": {
+        "oidc": {
+            "server_url": "https://oidc-server",
+            "client_id": "client-id",
+            "client_secret": "client-secret"
+        },
+        "ldap": {
+            "server_uri": "ldaps://ldap",
+            "bind_dn": "ou=Applications,ou=Gresources,o=Group",
+            "bind_password": "CHANGE_ME",
+            "base_dn": "ou=People,o=group",
+            "filter": "(&(mail=%(user)s)(Tpresent=true)(!(ou=admin)))",
+            "verify_ssl": false
+        }
+    },
 ```
 
 Enable only if you plan to use LDAP for user authentication.
-For production, strongly prefer SSL verification (`auth_ldap_verify_ssl: true`).
+For production, strongly prefer SSL verification (`verify_ssl: true`).
 
 ### 2.8 Outgoing Mail & Notification Templates
 
@@ -264,24 +307,28 @@ Key sections:
 
 ```json
 "mail-connectors": {
-  "imap-dev": {
-    "enable": true,
-    "host": "mail.example.com",
-    "port": 143,
-    "login": "user",
-    "password": "pass",
-    "mailbox_to_monitor": "INBOX"
+  "imap": {
+    "imap-dev": {
+      "enable": true,
+      "host": "localhost",
+      "port": 3143,
+      "login": "imap_user",
+      "password": "imap_password",
+      "mailbox_to_monitor": "INBOX"
+    }
   },
-  "imaps-dev": {
-    "enable": false,
-    "host": "secure-mail.example.com",
-    "port": 993,
-    "login": "user",
-    "password": "pass",
-    "certfile": "/path/to/cert.pem",
-    "keyfile": "/path/to/key.pem",
-    "rootcafile": "/path/to/rootCA.pem",
-    "mailbox_to_monitor": "INBOX"
+  "imaps": {
+    "imaps-dev": {
+      "enable": false,
+      "host": "localhost",
+      "port": 3993,
+      "login": "imap_user",
+      "password": "imap_password",
+      "certfile": "/path/to/dev/certfile.pem",
+      "keyfile": "/path/to/dev/keyfile.pem",
+      "rootcafile": "/path/to/dev/rootcafile.pem",
+      "mailbox_to_monitor": "INBOX"
+    }
   }
 }
 ```
@@ -302,12 +349,17 @@ Set `"enable": false"` for unused connectors.
 ### 3.3 MinIO Storage (Mirrors `.env`)
 
 ```json
-"minio": {
-  "endpoint": "minio:9000",
-  "access_key": "minioadmin",
-  "secret_key": "minioadmin",
-  "secure": false
-}
+    "storage": {
+        "backend": "local",
+        "minio": {
+            "endpoint": "minio:9000",
+            "access_key": "MINIO_ACCESS_KEY",
+            "secret_key": "MINIO_SECRET_KEY",
+            "secure": false,
+            "auto_create_bucket": true,
+            "media_bucket": "suspicious-media"
+        }
+    },
 ```
 
 Ensure values match `.env`. This lets Email Feeder store attachments and extraction results in object storage.
