@@ -119,7 +119,7 @@ class FinalEmailService:
             company_name=self.config.get("content", {}).get("team_name"),
             company_logo=resolve_logo(self.config.get("logos", {}).get("company")),
             final_logo=resolve_logo(self.config.get("logos", {}).get("suspicious")),
-            portal_url=self.config.get("links", {}).get("submissions"),
+            portal_url=self.config.get("links", {}).get("submissions")+f"?q={self.case.id}&open={self.case.id}",
             glossary_url=self.config.get("links", {}).get("glossary"),
             inquiry_url=self.config.get("links", {}).get("inquiry"),
             inquiry_text=self.config.get("links", {}).get("inquiry_text"),

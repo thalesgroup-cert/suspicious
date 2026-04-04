@@ -151,7 +151,7 @@ class ModificationEmailService:
             company_name=content.get("team_name"),
             company_logo=resolve_logo(self.config.get("logos", {}).get("company")),
             final_logo=resolve_logo(self.config.get("logos", {}).get("final")),
-            portal_url=links.get("submissions"),
+            portal_url=links.get("submissions")+f"?q={getattr(self.case, 'id', '')}&open={getattr(self.case, 'id', '')}",
             glossary_url=links.get("glossary"),
             inquiry_url=links.get("inquiry"),
             inquiry_text=links.get("inquiry_text"),
