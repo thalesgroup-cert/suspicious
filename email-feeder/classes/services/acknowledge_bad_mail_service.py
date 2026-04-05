@@ -205,9 +205,16 @@ class AcknowledgeBadMailService:
             infos=infos,
         )
 
+        # Exclude raw logo strings from model_dump — they are passed below
+        # as resolved dicts. Including both would give Jinja2 duplicate
+        # keyword arguments and raise TypeError.
+        config_vars = self.__config.model_dump(
+            exclude={"company_logo", "acknowledge_bad_mail_logo"}
+        )
+
         return self.__template.render(
-            # Config fields
-            **self.__config.model_dump(),
+            # Config fields (logos excluded — passed as resolved dicts below)
+            **config_vars,
             # Template variables
             **template_variables.model_dump(),
             # Resolved logo dicts (is_image, is_svg, is_data_uri, src)
