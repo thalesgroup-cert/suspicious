@@ -86,19 +86,19 @@ def _resolve_logo(raw: str | None) -> dict:
 # ---------------------------------------------------------------------------
 
 _STANDARD_THEME: dict[str, str] = {
-    # ── Graphite palette (bg:#0A0C10 paper:#10141C primary:#4FB3FF) ──────
-    "bg":          "#0A0C10",
-    "surface":     "#10141C",
-    "header_bg":   "#0A0C10",
-    "header_text": "#E8EDF4",
-    "accent":      "#4FB3FF",
-    "accent_text": "#0A0C10",
-    "body_text":   "#E8EDF4",
-    "muted":       "#7A8A9C",
-    "border":      "#1C2028",
-    "link":        "#0A0C10",
-    "cta_bg":      "#4FB3FF",
-    "cta_text":    "#0A0C10",
+    "bg":          "#F4F5F7",
+    "surface":     "#FFFFFF",
+    "header_bg":   "#0B1220",
+    "header_text": "#F4F5F7",
+    "accent":      "#1B5FFF",
+    "accent_text": "#FFFFFF",
+    "body_text":   "#0B1220",
+    "muted":       "#5A6677",
+    "border":      "#DDE2EA",
+    "link":        "#1B5FFF",
+    "cta_bg":      "#1B5FFF",
+    "cta_text":    "#FFFFFF",
+    "footer_text": "#F4F5F7",
     # ── Default semantic colors ───────────────────────────────────────────
     "color_safe":         "#22C55E",
     "color_suspicious":   "#F59E0B",
