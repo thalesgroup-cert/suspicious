@@ -886,6 +886,7 @@ class CampaignPcaView(APIView):
                     "y": float(ys[idx]),
                     "label": _normalize_classification(meta.get("classification")),
                     "suspicious_case_id": _extract_case_id(meta),
+                    "mail_subject": _extract_mail_subject(meta),
                     "sourceRefs": list(_parse_source_refs(meta.get("sourceRefs"))),
                 })
 
