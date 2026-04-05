@@ -36,7 +36,11 @@ import {
   Area,
   Cell,
 } from "recharts";
-import { Responsive, WidthProvider, type Layout } from "react-grid-layout/legacy";
+import {
+  Responsive,
+  WidthProvider,
+  type Layout,
+} from "react-grid-layout/legacy";
 
 import "react-grid-layout/css/styles.css";
 import "react-resizable/css/styles.css";
@@ -81,24 +85,24 @@ const ROW_HEIGHT = 32;
 // volume (full width) on bottom row.
 const DEFAULT_LAYOUTS: Partial<Record<string, Layout>> = {
   lg: [
-    { i: PANEL_KEYS.CLASSIFICATION, x: 0,  y: 0,  w: 4,  h: 14, minW: 3, minH: 8 },
-    { i: PANEL_KEYS.PCA,            x: 4,  y: 0,  w: 8,  h: 14, minW: 4, minH: 8 },
-    { i: PANEL_KEYS.VOLUME,         x: 0,  y: 14, w: 12, h: 12, minW: 6, minH: 8 },
+    { i: PANEL_KEYS.CLASSIFICATION, x: 0, y: 0, w: 4, h: 14, minW: 3, minH: 8 },
+    { i: PANEL_KEYS.PCA, x: 4, y: 0, w: 8, h: 14, minW: 4, minH: 8 },
+    { i: PANEL_KEYS.VOLUME, x: 0, y: 14, w: 12, h: 12, minW: 6, minH: 8 },
   ],
   md: [
-    { i: PANEL_KEYS.CLASSIFICATION, x: 0,  y: 0,  w: 5,  h: 14, minW: 3, minH: 8 },
-    { i: PANEL_KEYS.PCA,            x: 5,  y: 0,  w: 7,  h: 14, minW: 4, minH: 8 },
-    { i: PANEL_KEYS.VOLUME,         x: 0,  y: 14, w: 12, h: 12, minW: 6, minH: 8 },
+    { i: PANEL_KEYS.CLASSIFICATION, x: 0, y: 0, w: 5, h: 14, minW: 3, minH: 8 },
+    { i: PANEL_KEYS.PCA, x: 5, y: 0, w: 7, h: 14, minW: 4, minH: 8 },
+    { i: PANEL_KEYS.VOLUME, x: 0, y: 14, w: 12, h: 12, minW: 6, minH: 8 },
   ],
   sm: [
-    { i: PANEL_KEYS.CLASSIFICATION, x: 0, y: 0,  w: 6, h: 14, minH: 8 },
-    { i: PANEL_KEYS.PCA,            x: 0, y: 14, w: 6, h: 14, minH: 8 },
-    { i: PANEL_KEYS.VOLUME,         x: 0, y: 28, w: 6, h: 12, minH: 8 },
+    { i: PANEL_KEYS.CLASSIFICATION, x: 0, y: 0, w: 6, h: 14, minH: 8 },
+    { i: PANEL_KEYS.PCA, x: 0, y: 14, w: 6, h: 14, minH: 8 },
+    { i: PANEL_KEYS.VOLUME, x: 0, y: 28, w: 6, h: 12, minH: 8 },
   ],
   xs: [
-    { i: PANEL_KEYS.CLASSIFICATION, x: 0, y: 0,  w: 1, h: 14, minH: 8 },
-    { i: PANEL_KEYS.PCA,            x: 0, y: 14, w: 1, h: 14, minH: 8 },
-    { i: PANEL_KEYS.VOLUME,         x: 0, y: 28, w: 1, h: 12, minH: 8 },
+    { i: PANEL_KEYS.CLASSIFICATION, x: 0, y: 0, w: 1, h: 14, minH: 8 },
+    { i: PANEL_KEYS.PCA, x: 0, y: 14, w: 1, h: 14, minH: 8 },
+    { i: PANEL_KEYS.VOLUME, x: 0, y: 28, w: 1, h: 12, minH: 8 },
   ],
 };
 
@@ -126,7 +130,11 @@ function loadLayouts(): Partial<Record<string, Layout>> {
 
 function saveLayouts(layouts: Partial<Record<string, Layout>>) {
   if (typeof window === "undefined") return;
-  try { window.localStorage.setItem(STORAGE_KEY, JSON.stringify(layouts)); } catch { /* ignore */ }
+  try {
+    window.localStorage.setItem(STORAGE_KEY, JSON.stringify(layouts));
+  } catch {
+    /* ignore */
+  }
 }
 
 // ---------------------------------------------------------------------------
@@ -138,7 +146,9 @@ function compactLabel(text: string, max = 22) {
 }
 
 function classColor(label: string) {
-  return CLASS_COLORS[(label || "UNKNOWN").toUpperCase()] ?? CLASS_COLORS.UNKNOWN;
+  return (
+    CLASS_COLORS[(label || "UNKNOWN").toUpperCase()] ?? CLASS_COLORS.UNKNOWN
+  );
 }
 
 function normalizeLabel(label: string) {
@@ -162,10 +172,13 @@ function computeCampaignRects(points: PcaPoint[]) {
   >();
 
   for (const p of points) {
-    const refs = Array.isArray(p.sourceRefs) ? p.sourceRefs.filter(Boolean) : [];
+    const refs = Array.isArray(p.sourceRefs)
+      ? p.sourceRefs.filter(Boolean)
+      : [];
     if (!refs.length) continue;
     const key = refs.slice().sort().join(" | ");
-    const name = refs.length <= 3 ? refs.join(", ") : `${refs.slice(0, 3).join(", ")}…`;
+    const name =
+      refs.length <= 3 ? refs.join(", ") : `${refs.slice(0, 3).join(", ")}…`;
     const current = map.get(key);
     if (!current) {
       map.set(key, { name, minX: p.x, maxX: p.x, minY: p.y, maxY: p.y });
@@ -181,9 +194,12 @@ function computeCampaignRects(points: PcaPoint[]) {
     const padX = Math.max(0.2, (b.maxX - b.minX) * 0.1);
     const padY = Math.max(0.2, (b.maxY - b.minY) * 0.1);
     return {
-      id: idx, name: b.name,
-      x1: b.minX - padX, x2: b.maxX + padX,
-      y1: b.minY - padY, y2: b.maxY + padY,
+      id: idx,
+      name: b.name,
+      x1: b.minX - padX,
+      x2: b.maxX + padX,
+      y1: b.minY - padY,
+      y2: b.maxY + padY,
     };
   });
 }
@@ -204,7 +220,15 @@ function DragDots({ dotColor }: { dotColor: string }) {
       }}
     >
       {Array.from({ length: 6 }).map((_, i) => (
-        <Box key={i} sx={{ width: 4, height: 4, borderRadius: 99, backgroundColor: dotColor }} />
+        <Box
+          key={i}
+          sx={{
+            width: 4,
+            height: 4,
+            borderRadius: 99,
+            backgroundColor: dotColor,
+          }}
+        />
       ))}
     </Box>
   );
@@ -213,7 +237,9 @@ function DragDots({ dotColor }: { dotColor: string }) {
 function DragHandle() {
   const theme = useTheme();
   const isDark = theme.palette.mode === "dark";
-  const dotColor = isDark ? "rgba(255,255,255,.38)" : alpha(theme.palette.divider, 0.9);
+  const dotColor = isDark
+    ? "rgba(255,255,255,.38)"
+    : alpha(theme.palette.divider, 0.9);
 
   return (
     <Box
@@ -231,10 +257,14 @@ function DragHandle() {
         userSelect: "none",
         opacity: 0,
         transition: "opacity .18s ease, background .18s ease",
-        background: isDark ? alpha("#fff", 0.04) : alpha(theme.palette.grey[400], 0.1),
+        background: isDark
+          ? alpha("#fff", 0.04)
+          : alpha(theme.palette.grey[400], 0.1),
         "&:active": {
           cursor: "grabbing",
-          background: isDark ? alpha("#fff", 0.08) : alpha(theme.palette.grey[400], 0.18),
+          background: isDark
+            ? alpha("#fff", 0.08)
+            : alpha(theme.palette.grey[400], 0.18),
         },
       }}
     >
@@ -256,14 +286,15 @@ const PanelShell = React.memo(function PanelShell({
         display: "flex",
         flexDirection: "column",
         overflow: "hidden",
-        "& .react-resizable-handle": { opacity: 0, transition: "opacity .18s ease" },
+        "& .react-resizable-handle": {
+          opacity: 0,
+          transition: "opacity .18s ease",
+        },
         "&:hover .react-resizable-handle": { opacity: 1 },
       }}
     >
       <DragHandle />
-      <Box sx={{ flex: 1, minHeight: 0, overflow: "hidden" }}>
-        {children}
-      </Box>
+      <Box sx={{ flex: 1, minHeight: 0, overflow: "hidden" }}>{children}</Box>
     </Box>
   );
 });
@@ -276,7 +307,9 @@ function GridStyles() {
   const theme = useTheme();
   const isDark = theme.palette.mode === "dark";
 
-  const handleColor = isDark ? "rgba(255,255,255,.55)" : alpha(theme.palette.grey[500], 0.7);
+  const handleColor = isDark
+    ? "rgba(255,255,255,.55)"
+    : alpha(theme.palette.grey[500], 0.7);
   const handleBg = isDark
     ? "rgba(30,41,59,0.92)"
     : alpha(theme.palette.background.paper, 0.95);
@@ -361,7 +394,9 @@ function ClassificationTooltip({
   return (
     <Box
       sx={{
-        background: isDark ? "rgba(15,23,42,0.95)" : alpha(theme.palette.background.paper, 0.97),
+        background: isDark
+          ? "rgba(15,23,42,0.95)"
+          : alpha(theme.palette.background.paper, 0.97),
         border: `1px solid ${alpha(theme.palette.divider, isDark ? 0.18 : 0.7)}`,
         borderRadius: 2,
         px: 1.25,
@@ -370,7 +405,9 @@ function ClassificationTooltip({
         minWidth: 130,
       }}
     >
-      <Typography sx={{ fontSize: 12, fontWeight: 700, color: "text.primary", mb: 0.5 }}>
+      <Typography
+        sx={{ fontSize: 12, fontWeight: 700, color: "text.primary", mb: 0.5 }}
+      >
         {label}
       </Typography>
       <Typography sx={{ fontSize: 12, fontWeight: 600, color }}>
@@ -399,31 +436,67 @@ function PcaTooltip({
   return (
     <Box
       sx={{
-        background: isDark ? "rgba(15,23,42,0.96)" : alpha(theme.palette.background.paper, 0.97),
+        background: isDark
+          ? "rgba(15,23,42,0.96)"
+          : alpha(theme.palette.background.paper, 0.97),
         border: `1px solid ${alpha(theme.palette.divider, isDark ? 0.18 : 0.7)}`,
         borderRadius: 2,
         px: 1.25,
         py: 1,
-        minWidth: 180,
-        maxWidth: 260,
+        minWidth: 200,
+        maxWidth: 300,
         backdropFilter: "blur(6px)",
       }}
     >
-      <Typography sx={{ fontSize: 12, fontWeight: 800, color: "text.primary", mb: 0.5 }}>
+      {/* Verdict label */}
+      <Typography
+        sx={{ fontSize: 12, fontWeight: 800, color: "text.primary", mb: 0.5 }}
+      >
         {point.label || "UNKNOWN"}
       </Typography>
-      {point.suspicious_case_id ? (
-        <Typography sx={{ fontSize: 12, color: "text.secondary", mb: 0.5 }}>
-          Case: {point.suspicious_case_id}
+
+      {/* Mail subject — primary context line */}
+      {point.mail_subject ? (
+        <Typography
+          sx={{
+            fontSize: 12,
+            color: "text.primary",
+            mb: 0.5,
+            fontStyle: "italic",
+            overflow: "hidden",
+            textOverflow: "ellipsis",
+            display: "-webkit-box",
+            WebkitLineClamp: 2,
+            WebkitBoxOrient: "vertical",
+          }}
+        >
+          {point.mail_subject}
         </Typography>
       ) : null}
+
+      {/* Case ID */}
+      {point.suspicious_case_id ? (
+        <Typography sx={{ fontSize: 11, color: "text.secondary", mb: 0.5 }}>
+          Case #{point.suspicious_case_id}
+        </Typography>
+      ) : null}
+
+      {/* Campaign source refs */}
       {refs.length ? (
-        <Typography sx={{ fontSize: 12, color: isDark ? "#93C5FD" : theme.palette.primary.main, wordBreak: "break-word" }}>
+        <Typography
+          sx={{
+            fontSize: 11,
+            color: isDark ? "#93C5FD" : theme.palette.primary.main,
+            wordBreak: "break-word",
+          }}
+        >
           {refs.slice(0, 3).join(", ")}
           {refs.length > 3 ? "…" : ""}
         </Typography>
       ) : (
-        <Typography sx={{ fontSize: 12, color: "text.disabled" }}>No campaign refs</Typography>
+        <Typography sx={{ fontSize: 11, color: "text.disabled" }}>
+          No campaign refs
+        </Typography>
       )}
     </Box>
   );
@@ -435,7 +508,12 @@ function VolumeTooltip({
   label,
 }: {
   active?: boolean;
-  payload?: Array<{ dataKey?: string; name?: string; value?: number; color?: string }>;
+  payload?: Array<{
+    dataKey?: string;
+    name?: string;
+    value?: number;
+    color?: string;
+  }>;
   label?: string;
 }) {
   const theme = useTheme();
@@ -445,7 +523,9 @@ function VolumeTooltip({
   return (
     <Box
       sx={{
-        background: isDark ? "rgba(15,23,42,0.95)" : alpha(theme.palette.background.paper, 0.97),
+        background: isDark
+          ? "rgba(15,23,42,0.95)"
+          : alpha(theme.palette.background.paper, 0.97),
         border: `1px solid ${alpha(theme.palette.divider, isDark ? 0.18 : 0.7)}`,
         borderRadius: 2,
         px: 1.5,
@@ -453,11 +533,16 @@ function VolumeTooltip({
         backdropFilter: "blur(6px)",
       }}
     >
-      <Typography sx={{ fontSize: 12, fontWeight: 700, color: "text.primary", mb: 0.5 }}>
+      <Typography
+        sx={{ fontSize: 12, fontWeight: 700, color: "text.primary", mb: 0.5 }}
+      >
         {label}
       </Typography>
       {payload.map((p) => (
-        <Typography key={p.dataKey} sx={{ fontSize: 12, fontWeight: 600, color: p.color }}>
+        <Typography
+          key={p.dataKey}
+          sx={{ fontSize: 12, fontWeight: 600, color: p.color }}
+        >
           {p.name}: {p.value}
         </Typography>
       ))}
@@ -477,11 +562,14 @@ export default function CampaignsPage() {
   const [pcaFilter] = React.useState("");
   const [highlightCampaigns] = React.useState(true);
   const [visibleLabels, setVisibleLabels] = React.useState<string[]>([
-    "SAFE", "UNWANTED", "SUSPICIOUS", "DANGEROUS",
+    "SAFE",
+    "UNWANTED",
+    "SUSPICIOUS",
+    "DANGEROUS",
   ]);
 
-  const [layouts, setLayouts] = React.useState<Partial<Record<string, Layout>>>(() =>
-    loadLayouts()
+  const [layouts, setLayouts] = React.useState<Partial<Record<string, Layout>>>(
+    () => loadLayouts(),
   );
 
   const countsQuery = useQuery<ClassificationCounts>({
@@ -504,7 +592,7 @@ export default function CampaignsPage() {
 
   const toggleLabel = React.useCallback((label: string) => {
     setVisibleLabels((prev) =>
-      prev.includes(label) ? prev.filter((x) => x !== label) : [...prev, label]
+      prev.includes(label) ? prev.filter((x) => x !== label) : [...prev, label],
     );
   }, []);
 
@@ -513,7 +601,7 @@ export default function CampaignsPage() {
       setLayouts(all);
       saveLayouts(all);
     },
-    []
+    [],
   );
 
   const resetLayouts = React.useCallback(() => {
@@ -521,7 +609,8 @@ export default function CampaignsPage() {
     saveLayouts(DEFAULT_LAYOUTS);
   }, []);
 
-  const loading = countsQuery.isLoading || pcaQuery.isLoading || volumeQuery.isLoading;
+  const loading =
+    countsQuery.isLoading || pcaQuery.isLoading || volumeQuery.isLoading;
 
   if (loading) {
     return (
@@ -542,8 +631,16 @@ export default function CampaignsPage() {
   }
 
   const counts = countsQuery.data ?? { SAFE: 0, UNWANTED: 0, DANGEROUS: 0 };
-  const pca = pcaQuery.data ?? { points: [], explained_variance: [0, 0] as [number, number] };
-  const volume = volumeQuery.data ?? { dates: [], non_danger: [], dangerous: [], campaigns: [] };
+  const pca = pcaQuery.data ?? {
+    points: [],
+    explained_variance: [0, 0] as [number, number],
+  };
+  const volume = volumeQuery.data ?? {
+    dates: [],
+    non_danger: [],
+    dangerous: [],
+    campaigns: [],
+  };
 
   const classBars = ["SAFE", "UNWANTED", "DANGEROUS"].map((k) => ({
     label: k,
@@ -556,7 +653,8 @@ export default function CampaignsPage() {
   const points = allPoints.filter((pt) => {
     const lbl = normalizeLabel(pt.label);
     const refs = (pt.sourceRefs ?? []).join(" ").toLowerCase();
-    const passesText = !filter || lbl.toLowerCase().includes(filter) || refs.includes(filter);
+    const passesText =
+      !filter || lbl.toLowerCase().includes(filter) || refs.includes(filter);
     return passesText && visibleLabels.includes(lbl);
   });
 
@@ -568,7 +666,10 @@ export default function CampaignsPage() {
     byLabel.set(key, arr);
   }
 
-  const scatterSeries = Array.from(byLabel.entries()).map(([label, pts]) => ({ label, pts }));
+  const scatterSeries = Array.from(byLabel.entries()).map(([label, pts]) => ({
+    label,
+    pts,
+  }));
   const campaignRects = highlightCampaigns ? computeCampaignRects(points) : [];
 
   const chartData = volume.dates.map((d, i) => ({
@@ -597,7 +698,9 @@ export default function CampaignsPage() {
   // Chart axis tick color adapts to theme
   const tickStyle = { fontSize: 11, fill: theme.palette.text.secondary };
   const gridOpacity = isDark ? 0.25 : 0.4;
-  const cursorFill = isDark ? "rgba(148,163,184,0.10)" : alpha(theme.palette.action.hover, 0.14);
+  const cursorFill = isDark
+    ? "rgba(148,163,184,0.10)"
+    : alpha(theme.palette.action.hover, 0.14);
 
   return (
     <Box sx={{ p: { xs: 1.5, md: 2 } }}>
@@ -617,12 +720,18 @@ export default function CampaignsPage() {
             Campaign Dashboard
           </Typography>
           <Typography color="text.secondary" fontSize={14}>
-            Phishing campaigns visibility: classification, clusters, and volume over time.
+            Phishing campaigns visibility: classification, clusters, and volume
+            over time.
           </Typography>
         </Stack>
 
         <Stack direction="row" spacing={1} alignItems="center">
-          <Chip icon={<CampaignOutlined />} label="Live" variant="outlined" size="small" />
+          <Chip
+            icon={<CampaignOutlined />}
+            label="Live"
+            variant="outlined"
+            size="small"
+          />
           <Box
             component="button"
             type="button"
@@ -694,7 +803,10 @@ export default function CampaignsPage() {
               <Box sx={{ flex: 1, minHeight: 0 }}>
                 <ResponsiveContainer width="100%" height="100%">
                   <BarChart data={classBars}>
-                    <CartesianGrid strokeDasharray="3 3" opacity={gridOpacity} />
+                    <CartesianGrid
+                      strokeDasharray="3 3"
+                      opacity={gridOpacity}
+                    />
                     <XAxis dataKey="label" tick={tickStyle} />
                     <YAxis tick={tickStyle} />
                     <Tooltip
@@ -705,7 +817,9 @@ export default function CampaignsPage() {
                       {classBars.map((entry) => (
                         <Cell
                           key={entry.label}
-                          fill={CLASS_COLORS[entry.label] ?? CLASS_COLORS.UNKNOWN}
+                          fill={
+                            CLASS_COLORS[entry.label] ?? CLASS_COLORS.UNKNOWN
+                          }
                         />
                       ))}
                     </Bar>
@@ -735,7 +849,11 @@ export default function CampaignsPage() {
               fillHeight
             >
               {/* Label toggles */}
-              <Stack direction="row" spacing={0.75} sx={{ flexWrap: "wrap", mb: 0.75, flexShrink: 0 }}>
+              <Stack
+                direction="row"
+                spacing={0.75}
+                sx={{ flexWrap: "wrap", mb: 0.75, flexShrink: 0 }}
+              >
                 {PCA_LABELS.map((label) => {
                   const active = visibleLabels.includes(label);
                   return (
@@ -758,23 +876,52 @@ export default function CampaignsPage() {
 
               <Box sx={{ flex: 1, minHeight: 0 }}>
                 <ResponsiveContainer width="100%" height="100%">
-                  <ScatterChart margin={{ top: 8, right: 8, left: 0, bottom: 0 }}>
-                    <CartesianGrid strokeDasharray="3 3" opacity={gridOpacity} />
-                    <XAxis type="number" dataKey="x" name="PC1" tick={tickStyle} />
-                    <YAxis type="number" dataKey="y" name="PC2" tick={tickStyle} />
+                  <ScatterChart
+                    margin={{ top: 8, right: 8, left: 0, bottom: 0 }}
+                  >
+                    <CartesianGrid
+                      strokeDasharray="3 3"
+                      opacity={gridOpacity}
+                    />
+                    <XAxis
+                      type="number"
+                      dataKey="x"
+                      name="PC1"
+                      tick={tickStyle}
+                    />
+                    <YAxis
+                      type="number"
+                      dataKey="y"
+                      name="PC2"
+                      tick={tickStyle}
+                    />
                     <ZAxis type="number" range={[0, 18]} />
                     <Tooltip
                       content={<PcaTooltip />}
-                      cursor={{ stroke: isDark ? "#94A3B8" : alpha(theme.palette.divider, 0.8), strokeDasharray: "4 4" }}
+                      cursor={{
+                        stroke: isDark
+                          ? "#94A3B8"
+                          : alpha(theme.palette.divider, 0.8),
+                        strokeDasharray: "4 4",
+                      }}
                     />
                     {campaignRects.map((r) => (
                       <ReferenceArea
                         key={r.id}
-                        x1={r.x1} x2={r.x2} y1={r.y1} y2={r.y2}
+                        x1={r.x1}
+                        x2={r.x2}
+                        y1={r.y1}
+                        y2={r.y2}
                         ifOverflow="extendDomain"
-                        stroke={isDark ? "#94A3B8" : alpha(theme.palette.divider, 0.7)}
+                        stroke={
+                          isDark ? "#94A3B8" : alpha(theme.palette.divider, 0.7)
+                        }
                         strokeOpacity={0.45}
-                        fill={isDark ? "#94A3B8" : alpha(theme.palette.grey[400], 0.15)}
+                        fill={
+                          isDark
+                            ? "#94A3B8"
+                            : alpha(theme.palette.grey[400], 0.15)
+                        }
                         fillOpacity={0.05}
                         strokeDasharray="5 4"
                       />
@@ -812,21 +959,46 @@ export default function CampaignsPage() {
                   <ComposedChart data={chartData}>
                     <defs>
                       <linearGradient id="blueArea" x1="0" y1="0" x2="0" y2="1">
-                        <stop offset="5%"  stopColor="#3B82F6" stopOpacity={isDark ? 0.4 : 0.3} />
-                        <stop offset="95%" stopColor="#3B82F6" stopOpacity={0} />
+                        <stop
+                          offset="5%"
+                          stopColor="#3B82F6"
+                          stopOpacity={isDark ? 0.4 : 0.3}
+                        />
+                        <stop
+                          offset="95%"
+                          stopColor="#3B82F6"
+                          stopOpacity={0}
+                        />
                       </linearGradient>
                       <linearGradient id="redArea" x1="0" y1="0" x2="0" y2="1">
-                        <stop offset="5%"  stopColor="#EF4444" stopOpacity={isDark ? 0.5 : 0.35} />
-                        <stop offset="95%" stopColor="#EF4444" stopOpacity={0} />
+                        <stop
+                          offset="5%"
+                          stopColor="#EF4444"
+                          stopOpacity={isDark ? 0.5 : 0.35}
+                        />
+                        <stop
+                          offset="95%"
+                          stopColor="#EF4444"
+                          stopOpacity={0}
+                        />
                       </linearGradient>
                     </defs>
 
-                    <CartesianGrid strokeDasharray="3 3" opacity={gridOpacity} />
+                    <CartesianGrid
+                      strokeDasharray="3 3"
+                      opacity={gridOpacity}
+                    />
                     <XAxis dataKey="label" tick={tickStyle} />
                     <YAxis tick={tickStyle} />
                     <Tooltip
                       content={<VolumeTooltip />}
-                      cursor={{ stroke: isDark ? "#94A3B8" : alpha(theme.palette.divider, 0.8), strokeWidth: 1, strokeDasharray: "4 4" }}
+                      cursor={{
+                        stroke: isDark
+                          ? "#94A3B8"
+                          : alpha(theme.palette.divider, 0.8),
+                        strokeWidth: 1,
+                        strokeDasharray: "4 4",
+                      }}
                     />
 
                     {campaignBands.map((b, i) => (
@@ -835,7 +1007,11 @@ export default function CampaignsPage() {
                         x1={chartData[b.startIdx]?.label}
                         x2={chartData[b.endIdx]?.label}
                         ifOverflow="extendDomain"
-                        fill={isDark ? "rgba(255,255,255,0.04)" : alpha(theme.palette.primary.main, 0.05)}
+                        fill={
+                          isDark
+                            ? "rgba(255,255,255,0.04)"
+                            : alpha(theme.palette.primary.main, 0.05)
+                        }
                         fillOpacity={1}
                       />
                     ))}
@@ -844,12 +1020,20 @@ export default function CampaignsPage() {
                       <React.Fragment key={`line-${i}`}>
                         <ReferenceLine
                           x={chartData[b.startIdx]?.label}
-                          stroke={isDark ? "rgba(255,255,255,.25)" : alpha(theme.palette.divider, 0.7)}
+                          stroke={
+                            isDark
+                              ? "rgba(255,255,255,.25)"
+                              : alpha(theme.palette.divider, 0.7)
+                          }
                           strokeDasharray="6 4"
                         />
                         <ReferenceLine
                           x={chartData[b.endIdx]?.label}
-                          stroke={isDark ? "rgba(255,255,255,.25)" : alpha(theme.palette.divider, 0.7)}
+                          stroke={
+                            isDark
+                              ? "rgba(255,255,255,.25)"
+                              : alpha(theme.palette.divider, 0.7)
+                          }
                           strokeDasharray="6 4"
                         />
                       </React.Fragment>
@@ -887,20 +1071,28 @@ export default function CampaignsPage() {
 
               {/* Campaign band chips */}
               {campaignBands.length ? (
-                <Stack direction="row" spacing={0.75} sx={{ mt: 1, flexWrap: "wrap", flexShrink: 0 }}>
+                <Stack
+                  direction="row"
+                  spacing={0.75}
+                  sx={{ mt: 1, flexWrap: "wrap", flexShrink: 0 }}
+                >
                   {campaignBands.slice(0, 6).map((b) => (
                     <Chip
                       key={b.name}
                       size="small"
                       label={compactLabel(
                         `${b.name}: ${volume.dates[b.startIdx]} → ${volume.dates[b.endIdx]}`,
-                        28
+                        28,
                       )}
                       variant="outlined"
                     />
                   ))}
                   {campaignBands.length > 6 ? (
-                    <Chip size="small" label={`+${campaignBands.length - 6} more`} variant="outlined" />
+                    <Chip
+                      size="small"
+                      label={`+${campaignBands.length - 6} more`}
+                      variant="outlined"
+                    />
                   ) : null}
                 </Stack>
               ) : (

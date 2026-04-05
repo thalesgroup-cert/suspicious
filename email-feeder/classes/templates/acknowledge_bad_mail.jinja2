@@ -181,6 +181,30 @@
         </tr>
       </table>
 
+      {# Outlook tip #}
+      <table role="presentation" border="0" cellpadding="0" cellspacing="0" width="100%"
+             style="margin:18px 0 0;border:1px solid {{ border }};
+                    border-radius:8px;overflow:hidden;
+                    background-color:{{ header_bg }};">
+        <tr>
+          <td style="padding:12px 16px;">
+            <p style="margin:0 0 4px;font-size:11px;font-weight:700;
+                      text-transform:uppercase;letter-spacing:0.07em;
+                      color:{{ muted }};
+                      font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,Arial,sans-serif;">
+              In Outlook
+            </p>
+            <p style="margin:0;font-size:13px;line-height:1.6;color:{{ header_text }};
+                      font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,Arial,sans-serif;">
+              Right-click the email and choose
+              <strong style="color:{{ header_text }};">"Forward as Attachment"</strong>
+              or select the email and press
+              <strong style="color:{{ header_text }};">Ctrl&nbsp;+&nbsp;Alt&nbsp;+&nbsp;F</strong>.
+            </p>
+          </td>
+        </tr>
+      </table>
+
       {# How to re-submit — clean instructions, no signature-specific content #}
       <p style="margin:0 0 12px;font-size:14px;font-weight:800;color:{{ body_text }};
                 font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,Arial,sans-serif;">
@@ -189,7 +213,7 @@
 
       {# Step rows #}
       {% set steps = [
-        ("Forward as attachment", "Open the suspicious email and use your email client\\'s \\'Forward as Attachment\\' option. This preserves the original headers and content required for analysis."),
+        ("Forward as attachment", "Open the suspicious email and use your email client's 'Forward as Attachment' option. This preserves the original headers and content required for analysis."),
         ("Do not forward inline", "Forwarding inline embeds the message as body text and strips the metadata needed for forensic review."),
         ("Do not modify the email", "Do not alter the subject, body, or headers before forwarding. Send the original message unchanged."),
       ] %}
@@ -215,29 +239,7 @@
       </table>
       {% endfor %}
 
-      {# Outlook tip #}
-      <table role="presentation" border="0" cellpadding="0" cellspacing="0" width="100%"
-             style="margin:18px 0 0;border:1px solid {{ border }};
-                    border-radius:8px;overflow:hidden;
-                    background-color:{{ header_bg }};">
-        <tr>
-          <td style="padding:12px 16px;">
-            <p style="margin:0 0 4px;font-size:11px;font-weight:700;
-                      text-transform:uppercase;letter-spacing:0.07em;
-                      color:{{ muted }};
-                      font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,Arial,sans-serif;">
-              In Outlook
-            </p>
-            <p style="margin:0;font-size:13px;line-height:1.6;color:{{ header_text }};
-                      font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,Arial,sans-serif;">
-              Right-click the email and choose
-              <strong style="color:{{ header_text }};">"Forward as Attachment"</strong>
-              — or select the email and press
-              <strong style="color:{{ header_text }};">Ctrl&nbsp;+&nbsp;Alt&nbsp;+&nbsp;F</strong>.
-            </p>
-          </td>
-        </tr>
-      </table>
+      
 
     </td>
   </tr>

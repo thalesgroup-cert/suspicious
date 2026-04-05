@@ -447,6 +447,45 @@ def _extract_case_id(meta_obj: Any) -> Optional[str]:
     return text or None
 
 
+MAIL_SUBJECT_KEYS = (
+    "subject",
+    "mail_subject",
+    "email_subject",
+    "Subject",
+)
+ 
+ 
+def _extract_mail_subject(meta: Dict[str, Any]) -> Optional[str]:
+    """
+    Extract the mail subject from a ChromaDB metadata dict.
+ 
+    Tries direct key lookups first, then parses the stored headers dict
+    (which carries the RFC 2822 Subject header from the original email).
+    Returns None — not an empty string — when nothing usable is found.
+    """
+    for key in MAIL_SUBJECT_KEYS:
+        value = meta.get(key)
+        if value and isinstance(value, str):
+            stripped = value.strip()
+            if stripped:
+                return stripped
+ 
+    # Headers fallback — Subject is often stored here even when not at the
+    # top level of the metadata dict
+    headers_dict = _extract_headers_dict(meta.get("headers"))
+    if headers_dict:
+        for key in ("Subject", "subject"):
+            value = headers_dict.get(key)
+            if isinstance(value, list):
+                value = value[0] if value else None
+            if value and isinstance(value, str):
+                stripped = value.strip()
+                if stripped:
+                    return stripped
+ 
+    return None
+ 
+
 def _iter_collection_pages(
     collection,
     *,

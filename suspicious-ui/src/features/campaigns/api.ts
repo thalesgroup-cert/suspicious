@@ -11,6 +11,7 @@ export type PcaPoint = {
   y: number;
   label: string;
   suspicious_case_id?: string | null;
+  mail_subject?: string | null;
   sourceRefs?: string[];
 };
 
@@ -41,8 +42,8 @@ export async function getClassificationCounts(): Promise<ClassificationCounts> {
   const data = res.data ?? {};
 
   return {
-    SAFE: toNumber(data.SAFE),
-    UNWANTED: toNumber(data.UNWANTED),
+    SAFE:      toNumber(data.SAFE),
+    UNWANTED:  toNumber(data.UNWANTED),
     DANGEROUS: toNumber(data.DANGEROUS),
   };
 }
@@ -58,11 +59,13 @@ export async function getPca(limit = 1500): Promise<PcaResponse> {
     ],
     points: Array.isArray(data?.points)
       ? data.points.map((p: any) => ({
-          x: toNumber(p?.x),
-          y: toNumber(p?.y),
+          x:     toNumber(p?.x),
+          y:     toNumber(p?.y),
           label: typeof p?.label === "string" ? p.label : "UNKNOWN",
           suspicious_case_id:
             typeof p?.suspicious_case_id === "string" ? p.suspicious_case_id : null,
+          mail_subject:
+            typeof p?.mail_subject === "string" ? p.mail_subject : null,
           sourceRefs: Array.isArray(p?.sourceRefs)
             ? p.sourceRefs.filter((x: unknown): x is string => typeof x === "string")
             : [],
@@ -88,9 +91,9 @@ export async function getMailVolume(): Promise<MailVolumeResponse> {
     campaigns: Array.isArray(data?.campaigns)
       ? data.campaigns
           .map((c: any) => ({
-            name: typeof c?.name === "string" ? c.name : "Campaign",
+            name:  typeof c?.name  === "string" ? c.name  : "Campaign",
             start: typeof c?.start === "string" ? c.start : "",
-            end: typeof c?.end === "string" ? c.end : "",
+            end:   typeof c?.end   === "string" ? c.end   : "",
           }))
           .filter((c: MailVolumeCampaign) => !!c.start && !!c.end)
       : [],

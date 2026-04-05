@@ -16,6 +16,7 @@ class CampaignPcaPointSerializer(serializers.Serializer):
     y = serializers.FloatField()
     label = serializers.CharField()
     suspicious_case_id = serializers.CharField(allow_null=True, required=False)
+    mail_subject = serializers.CharField(allow_null=True, required=False, default=None)
     sourceRefs = serializers.ListField(
         child=serializers.CharField(),
         required=False,
