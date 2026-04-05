@@ -197,7 +197,7 @@ def fetch_and_process_emails(config_path: str = CONFIG_PATH) -> None:
 
 
 def _process_minio_buckets(cfg: CronConfig, base_path: str) -> None:
-    client = _init_minio_client(cfg.minio)
+    client = _init_minio_client(cfg.s3)
     if not client:
         return
 
