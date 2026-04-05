@@ -254,7 +254,7 @@
             {% if glossary %}
             <p style="margin:0 0 6px;">
               <a href="{{ glossary }}"
-                 style="color:{{ accent }};text-decoration:none;font-size:13px;font-weight:600;
+                 style="color:{{ footer_text }};text-decoration:none;font-size:13px;font-weight:600;
                         font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,Arial,sans-serif;">
                 Cybersecurity glossary
               </a>
@@ -263,7 +263,7 @@
             {% if company_online_portal %}
             <p style="margin:0 0 6px;">
               <a href="{{ company_online_portal }}"
-                 style="color:{{ accent }};text-decoration:none;font-size:13px;font-weight:600;
+                 style="color:{{ footer_text }};text-decoration:none;font-size:13px;font-weight:600;
                         font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,Arial,sans-serif;">
                 Submission portal
               </a>
@@ -272,7 +272,7 @@
             {% if inquiry %}
             <p style="margin:0;">
               <a href="{{ inquiry }}"
-                 style="color:{{ accent }};text-decoration:none;font-size:13px;font-weight:600;
+                 style="color:{{ footer_text }};text-decoration:none;font-size:13px;font-weight:600;
                         font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,Arial,sans-serif;">
                 {{ inquiry_details | default("Contact us") }}
               </a>
@@ -288,7 +288,7 @@
             {% if company_global_security_url %}
             <p style="margin:0;">
               <a href="{{ company_global_security_url }}"
-                 style="color:{{ accent }};text-decoration:none;font-size:12px;
+                 style="color:{{ footer_text }};text-decoration:none;font-size:12px;
                         font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,Arial,sans-serif;">
                 {{ company_global_security_team | default("") }}
               </a>
