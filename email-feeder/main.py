@@ -142,7 +142,7 @@ def main() -> int:
         )
     )
 
-    minio_service = classes.services.minio_service.MinioService(config.s3)
+    minio_service = classes.services.minio_service.MinioService(config.minio)
     try:
         minio_service.connect()
         logger.info("MinIO client initialized from config.")
