@@ -8,7 +8,7 @@ from __future__ import annotations
 import logging
 from typing import Any, Dict, Optional
 
-from score_process.scoring.cortex_analyzers.base_helpers import (
+from score_process.scoring.cortex_analyzers.response import (
     analyze_results,
     analyze_taxonomy,
     analyze_whitelist,

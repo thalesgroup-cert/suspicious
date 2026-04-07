@@ -7,7 +7,7 @@ import logging
 import re
 from typing import Any, Dict, Optional, Tuple
 from .base import BaseAnalyzer
-from score_process.scoring.cortex_analyzers.base_helpers import get_level_score_confidence
+from score_process.scoring.cortex_analyzers.response import get_level_score_confidence
 
 logger = logging.getLogger("tasp.cron.update_ongoing_case_jobs")
 
