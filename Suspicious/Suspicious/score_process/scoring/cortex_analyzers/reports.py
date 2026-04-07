@@ -8,7 +8,7 @@ from django.db.models import Max, Subquery, OuterRef
 
 from .service import CortexAnalyzerService
 from cortex_job.models import AnalyzerReport
-from score_process.scoring.score_check import (
+from score_process.scoring.processing import (
     process_file_ioc,
     process_mail,
     process_ioc,
