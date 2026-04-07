@@ -1,46 +1,56 @@
+# analyzers_services/maxmind.py
+"""
+MaxMind GeoIP analyzer — enriches an IP with geographic context.
+"""
+from __future__ import annotations
 import logging
+from typing import Any, Dict
 from .base import BaseAnalyzer
-from score_process.scoring.cortex_analyzers.response import get_level_score_confidence
+from score_process.scoring.cortex_analyzers.base_helpers import get_level_score_confidence
 
 logger = logging.getLogger("tasp.cron.update_ongoing_case_jobs")
 
 
 class AnalyzerMaxMind(BaseAnalyzer):
-    def process(self):
+    def process(self) -> Dict[str, Any]:
         response = super().process()
-
         try:
-            for taxonomy in self.summary.get("taxonomies", []):
-                if (
-                    taxonomy.get("namespace") == "MaxMind"
-                    and taxonomy.get("predicate") == "Location"
-                ):
-                    level = taxonomy.get("level", "info").lower()
+            taxonomies = self.summary.get("taxonomies", []) if self.summary else []
 
-                    details = {
-                        "MaxMind Location": taxonomy.get("value", "")
-                    }
+            matching = next(
+                (
+                    t for t in taxonomies
+                    if t.get("namespace") == "MaxMind"
+                    and t.get("predicate") == "Location"
+                ),
+                None,
+            )
 
-                    if self.full:
-                        details.update({
-                            "City": self.full.get("city", {}),
-                            "Continent": self.full.get("continent", {}),
-                            "Country": self.full.get("country", {}),
-                            "Location": self.full.get("location", {}),
-                            "Registered Country": self.full.get("registered_country", {}),
-                            "Represented Country": self.full.get("represented_country", {}),
-                            "Subdivisions": self.full.get("subdivisions", {}),
-                            "Traits": self.full.get("traits", {}),
-                        })
+            if matching is None:
+                return response
 
-                    response["level"] = level
-                    response["details"] = details
-                    response["score"], response["confidence"] = (
-                        get_level_score_confidence(level)
-                    )
-                    break
+            level     = str(matching.get("level", "info")).lower()
+            raw_value = matching.get("value", "")
+            full      = self.full or {}
+
+            details: Dict[str, Any] = {"MaxMind Location": raw_value}
+            details.update({
+                "City":                 full.get("city",                 {}),
+                "Continent":            full.get("continent",            {}),
+                "Country":              full.get("country",              {}),
+                "Location":             full.get("location",             {}),
+                "Registered Country":   full.get("registered_country",   {}),
+                "Represented Country":  full.get("represented_country",  {}),
+                "Subdivisions":         full.get("subdivisions",         {}),
+                "Traits":               full.get("traits",               {}),
+            })
+
+            response["level"]      = level
+            response["score"], response["confidence"] = get_level_score_confidence(level)
+            response["category"]   = ["MaxMind Location"]
+            response["details"]    = details
 
         except Exception as exc:
-            logger.error("[AnalyzerMaxMind] error: %s", exc, exc_info=True)
+            logger.error("[AnalyzerMaxMind] processing error: %s", exc, exc_info=True)
 
         return response

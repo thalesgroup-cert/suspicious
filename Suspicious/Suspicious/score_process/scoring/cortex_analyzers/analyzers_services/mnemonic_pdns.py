@@ -1,40 +1,52 @@
+# analyzers_services/mnemonic_pdns.py
+"""
+Mnemonic passive DNS (PDNS) analyzer.
+"""
+from __future__ import annotations
 import logging
+from typing import Any, Dict
 from .base import BaseAnalyzer
-from score_process.scoring.cortex_analyzers.response import get_level_score_confidence
+from score_process.scoring.cortex_analyzers.base_helpers import get_level_score_confidence
 
 logger = logging.getLogger("tasp.cron.update_ongoing_case_jobs")
 
 
 class AnalyzerMN_PDNS(BaseAnalyzer):
-    def process(self):
+    def process(self) -> Dict[str, Any]:
         response = super().process()
-
         try:
-            for taxonomy in self.summary.get("taxonomies", []):
-                if (
-                    taxonomy.get("namespace") == "MN_PDNS"
-                    and taxonomy.get("predicate") == "Public"
-                ):
-                    level = taxonomy.get("level", "info").lower()
+            taxonomies = self.summary.get("taxonomies", []) if self.summary else []
+            full       = self.full or {}
 
-                    details = {
-                        "MN_PDNS Public Value": taxonomy.get("value", 0)
-                    }
+            matching = next(
+                (
+                    t for t in taxonomies
+                    if t.get("namespace") == "MN_PDNS"
+                    and t.get("predicate") == "Public"
+                ),
+                None,
+            )
 
-                    if self.full and "findings" in self.full:
-                        details.update({
-                            "Findings Count": self.full["findings"].get("count", 0),
-                            "Data": self.full["findings"].get("data", []),
-                        })
+            if matching is None:
+                return response
 
-                    response["level"] = level
-                    response["details"] = details
-                    response["score"], response["confidence"] = (
-                        get_level_score_confidence(level)
-                    )
-                    break
+            level     = str(matching.get("level", "info")).lower()
+            raw_value = matching.get("value", 0)
+            findings  = full.get("findings", {})
+            score, confidence = get_level_score_confidence(level)
+
+            response["level"]      = level
+            response["score"]      = score
+            response["confidence"] = confidence
+            response["category"]   = ["MN_PDNS Public"]
+            response["details"]    = {
+                "MN_PDNS Public Value": raw_value,
+                "Findings Count":       findings.get("count", 0),
+                "Data":                 findings.get("data",  []),
+                "level":                level,
+            }
 
         except Exception as exc:
-            logger.error("[AnalyzerMN_PDNS] error: %s", exc, exc_info=True)
+            logger.error("[AnalyzerMN_PDNS] processing error: %s", exc, exc_info=True)
 
         return response
