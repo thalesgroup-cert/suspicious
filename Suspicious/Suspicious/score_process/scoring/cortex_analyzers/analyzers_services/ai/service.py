@@ -1,13 +1,22 @@
-import logging
+# analyzers_services/ai/service.py
+"""
+AI mail analyzer — scores a mail with the AI model and creates/updates
+a TheHive campaign alert when the mail is considered dangerous.
+"""
+from __future__ import annotations
+
 import json
-import io
-import zipfile
-import requests
+import logging
+from functools import cached_property
+from typing import Any, Dict, List, Optional
+
 import chromadb
 from minio import Minio
-from minio.error import S3Error
+
 from case_handler.models import Case
 from ..base import BaseAnalyzer
+from .minio_utils import build_mail_zip_from_minio, fetch_mail_files_from_minio
+from .thehive_utils import add_binary_attachment_to_item
 
 from score_process.score_utils.thehive.utils import (
     parse_and_decode_defaultdict,
@@ -33,300 +42,294 @@ from score_process.score_utils.thehive.phishing import (
 )
 
 CONFIG_PATH = "/app/settings.json"
-with open(CONFIG_PATH) as config_file:
-    config = json.load(config_file)
-
-thehive_config = config.get("integrations", {}).get("thehive", {})
-minio_config = config.get("storage", {}).get("s3", {})
-chromadb_config = config.get("integrations", {}).get("chromadb", {})
+DANGEROUS_MALSCORE_THRESHOLD = 6.5
 
 logger = logging.getLogger("tasp.cron.update_ongoing_case_jobs")
 
 
-# ------------------------------------------------------------------
-# TheHive binary attachment helper
-# ------------------------------------------------------------------
+def _load_config() -> Dict[str, Any]:
+    """Load settings.json lazily — raises at call time, not at import time."""
+    with open(CONFIG_PATH) as fh:
+        return json.load(fh)
 
-def add_binary_attachment_to_item(item_type, item_id, filename, file_bytes, hive_url, hive_key):
-    if item_type not in ["alert", "case"]:
-        raise ValueError("item_type must be 'alert' or 'case'")
-
-    url = f"{hive_url}/api/v1/{item_type}/{item_id}/attachment"
-    headers = {"Authorization": f"Bearer {hive_key}"}
-    files = {"file": (filename, file_bytes, "application/zip")}
-
-    response = requests.post(url, headers=headers, files=files, timeout=60)
-
-    if response.status_code not in (200, 201):
-        raise Exception(f"Attachment upload failed ({response.status_code}): {response.text}")
-
-    return response.json()
-
-
-# ------------------------------------------------------------------
-# MinIO ZIP builder
-# ------------------------------------------------------------------
-
-def build_mail_zip_from_minio(minio_client, bucket_name, mail_id, reporter_name):
-    zip_buffer = io.BytesIO()
-    prefix = f"{mail_id}/"
-
-    with zipfile.ZipFile(zip_buffer, "w", zipfile.ZIP_DEFLATED) as zf:
-        objects = minio_client.list_objects(bucket_name, prefix=prefix, recursive=True)
-
-        for obj in objects:
-            try:
-                data = minio_client.get_object(bucket_name, obj.object_name)
-                content = data.read()
-                arcname = obj.object_name.replace(prefix, "")
-                zf.writestr(arcname, content)
-            except Exception as e:
-                logger.error(f"MinIO read error {obj.object_name}: {e}")
-
-    zip_buffer.seek(0)
-    safe_reporter = reporter_name.replace(" ", "_").replace("/", "_")
-    filename = f"{safe_reporter}_{mail_id}.zip"
-
-    return filename, zip_buffer.read()
-
-
-# ------------------------------------------------------------------
-# Analyzer
-# ------------------------------------------------------------------
 
 class AnalyzerAI(BaseAnalyzer):
-    def process(self):
+    """
+    AI-powered mail analyzer.
+
+    Reads the AI model output from self.full / self.summary, enriches
+    ChromaDB with the embedding, and creates or updates a TheHive campaign
+    alert when the mail is dangerous and part of an active campaign.
+    """
+
+    # ── lazy config access ────────────────────────────────────────────────
+
+    @cached_property
+    def _config(self) -> Dict[str, Any]:
+        return _load_config()
+
+    @cached_property
+    def _thehive(self) -> Dict[str, str]:
+        cfg = self._config.get("integrations", {}).get("thehive", {})
+        return {
+            "url": cfg.get("url", ""),
+            "key": cfg.get("api_key", ""),
+        }
+
+    @cached_property
+    def _minio_cfg(self) -> Dict[str, Any]:
+        return self._config.get("storage", {}).get("s3", {})
+
+    @cached_property
+    def _chromadb_cfg(self) -> Dict[str, Any]:
+        return self._config.get("integrations", {}).get("chromadb", {})
+
+    # ── ChromaDB singleton ────────────────────────────────────────────────
+    # One client per AnalyzerAI instance — avoids reconnecting on every call.
+
+    @cached_property
+    def _chroma_collection(self):
+        try:
+            client = chromadb.HttpClient(
+                host=self._chromadb_cfg.get("host", "chromadb"),
+                port=int(self._chromadb_cfg.get("port", 8000)),
+            )
+            return get_suspicious_collection(client)
+        except Exception as exc:
+            logger.error("ChromaDB init failed: %s", exc)
+            return None
+
+    # ── MinIO client factory ──────────────────────────────────────────────
+
+    def _make_minio_client(self) -> Minio:
+        cfg = self._minio_cfg
+        return Minio(
+            cfg.get("endpoint", ""),
+            access_key=cfg.get("access_key", ""),
+            secret_key=cfg.get("secret_key", ""),
+            secure=bool(cfg.get("secure", False)),
+        )
+
+    # ── main entry point ──────────────────────────────────────────────────
+
+    def process(self) -> Dict[str, Any]:
         response = super().process()
 
         try:
-            # ----------------------
-            # Base scoring
-            # ----------------------
-            if self.summary:
-                response["score"] = int(round(float(self.summary.get("malscore", 5))))
-                response["confidence"] = int(round(float(self.summary.get("confidence", 0)) * 10))
-                response["level"] = self.summary.get("classification", "info").lower()
-
-            response.setdefault("details", {})
+            response = self._apply_base_scoring(response)
 
             if not self.full:
                 return response
 
-            # Merge details
-            for key in ["classification_probabilities", "report", "malscore", "confidence", "classification"]:
-                if key in self.full:
-                    response["details"][key] = self.full[key]
+            self._merge_details(response)
 
-            # ----------------------
-            # Chroma init
-            # ----------------------
-            try:
-                chroma_client = chromadb.HttpClient(
-                    host=chromadb_config.get("host", "chromadb"),
-                    port=int(chromadb_config.get("port", 8000)),
-                )
-                suspicious_collection = get_suspicious_collection(chroma_client)
-            except Exception as e:
-                logger.error(f"Chroma init error: {e}")
-                suspicious_collection = None
+            malscore = self._get_malscore(response)
+            collection = self._chroma_collection
 
-            # ----------------------
-            # Danger threshold
-            # ----------------------
-            try:
-                malscore_val = float(response["details"].get("malscore", response.get("score", 5)))
-            except Exception:
-                malscore_val = 5.0
-
-            if malscore_val <= 6.5:
-                logger.info("Mail not considered dangerous")
-                try:
-                    logger.info("Adding mail to suspicious collection...")
-                    add_to_suspicious_collection(
-                        self.full,
-                        "",
-                        "",
-                        self.suspicious_case_id,
-                        suspicious_collection,
-                    )
-                    logger.info("Mail added to suspicious collection!")
-                except Exception as e:
-                    logger.error(f"Error adding to suspicious collection: {e}")
+            if malscore <= DANGEROUS_MALSCORE_THRESHOLD:
+                logger.info("Mail (case=%s) not dangerous (malscore=%.2f).", self.suspicious_case_id, malscore)
+                self._add_to_chroma(collection, alert_id="", source_ref="")
                 return response
 
-            logger.info("Mail considered dangerous")
+            logger.info("Mail (case=%s) considered dangerous (malscore=%.2f).", self.suspicious_case_id, malscore)
 
-            # Decode headers
-            try:
-                self.full["report"]["analyzed_mail_headers"] = parse_and_decode_defaultdict(
-                    str(self.full["report"]["analyzed_mail_headers"])
-                )
-            except Exception as e:
-                logger.error(f"Header decode error: {e}")
+            self._decode_headers()
 
-            # Allow list check
-            sender_domain = extract_sender_domain_from_headers(self.full["report"]["analyzed_mail_headers"])
+            sender_domain = extract_sender_domain_from_headers(
+                self.full["report"].get("analyzed_mail_headers", {})
+            )
             if sender_domain and is_domain_in_campaign_allow_list(sender_domain):
-                logger.info(f"Sender domain {sender_domain} allow‑listed")
-                return response
+                logger.info("Sender domain %r is allow-listed — skipping campaign detection.", sender_domain)
+                return response   # ← explicit return added
 
-            # ----------------------
-            # Campaign detection
-            # ----------------------
-            THE_HIVE_URL = thehive_config.get("url", "")
-            THE_HIVE_KEY = thehive_config.get("api_key", "")
+            self._handle_campaign(response, collection)
 
-            embedding = response["details"]["report"]["email_embedding"]
-            similar_dangerous_mails = get_similar_dangerous_mails(embedding, suspicious_collection)
-            phishing_campaign = get_phishing_campaign(similar_dangerous_mails)
-
-            if not phishing_campaign:
-                logger.info("No phishing campaign detected")
-                try:
-                    logger.info("Adding mail to suspicious collection...")
-                    add_to_suspicious_collection(
-                        self.full,
-                        "",
-                        "",
-                        self.suspicious_case_id,
-                        suspicious_collection,
-                    )
-                    logger.info("Mail added to suspicious collection!")
-                except Exception as e:
-                    logger.error(f"Error adding to suspicious collection: {e}")
-                return response
-
-            logger.info("Phishing campaign detected")
-
-            # ----------------------
-            # Alert handling
-            # ----------------------
-            try:
-                alert_id = get_most_common_alert_id(phishing_campaign)
-            except Exception:
-                alert_id = ""
-
-            if alert_id:
-                item_type, item = get_item_from_id(alert_id, THE_HIVE_URL, THE_HIVE_KEY)
-            else:
-                item = create_new_alert(
-                    None,
-                    PHISHING_CAMPAIGN_TEMPLATE["title"](get_most_common_subject(phishing_campaign)),
-                    PHISHING_CAMPAIGN_TEMPLATE["description"](
-                        self.full["classification"],
-                        self.full["sub_classification"],
-                        self.full["report"]["analyzed_mail_content"],
-                    ),
-                    PHISHING_CAMPAIGN_TEMPLATE["severity"],
-                    PHISHING_CAMPAIGN_TEMPLATE["tlp"],
-                    PHISHING_CAMPAIGN_TEMPLATE["pap"],
-                    "Suspicious",
-                    THE_HIVE_URL,
-                    THE_HIVE_KEY,
-                    PHISHING_CAMPAIGN_TEMPLATE["tags"],
-                )
-                alert_id = item["_id"]
-                item_type = "alert"
-
-                update_suspicious_collection(
-                    phishing_campaign,
-                    alert_id,
-                    item["sourceRef"],
-                    suspicious_collection,
-                )
-
-            # ----------------------
-            # Attachments & observables
-            # ----------------------
-            suspicious_case_ids = (
-                [int(m["suspicious_case_id"]) for m in phishing_campaign["metadatas"][0]]
-                + [self.suspicious_case_id]
-            )
-
-            minio_client = Minio(
-                minio_config.get("endpoint"),
-                access_key=minio_config.get("access_key"),
-                secret_key=minio_config.get("secret_key"),
-                secure=minio_config.get("secure"),
-            )
-
-            for suspicious_case_id in suspicious_case_ids:
-                try:
-                    case = Case.objects.get(id=suspicious_case_id)
-                    mail_id = str(case.fileOrMail.mail.mail_id)
-                    reporter_name = case.reporter.username
-
-                    zip_name = None
-                    zip_bytes = None
-                    headers = ""
-                    html = ""
-
-                    for bucket in minio_client.list_buckets():
-                        if bucket.name.endswith(f"-{mail_id.split('-')[0]}"):
-                            zip_name, zip_bytes = build_mail_zip_from_minio(
-                                minio_client,
-                                bucket.name,
-                                mail_id,
-                                reporter_name,
-                            )
-
-                            try:
-                                h = minio_client.get_object(bucket.name, f"{mail_id}/{mail_id}.headers")
-                                headers = h.read().decode("utf-8")
-                            except Exception:
-                                pass
-
-                            try:
-                                h = minio_client.get_object(bucket.name, f"{mail_id}/{mail_id}.html")
-                                html = h.read().decode("utf-8")
-                            except Exception:
-                                pass
-
-                            break
-
-                    if zip_bytes:
-                        add_binary_attachment_to_item(
-                            item_type,
-                            alert_id,
-                            zip_name,
-                            zip_bytes,
-                            THE_HIVE_URL,
-                            THE_HIVE_KEY,
-                        )
-
-                    if headers:
-                        add_observables_to_item(
-                            item_type,
-                            alert_id,
-                            build_mail_observables_from_headers(headers),
-                            THE_HIVE_URL,
-                            THE_HIVE_KEY,
-                        )
-
-                    if html:
-                        add_observables_to_item(
-                            item_type,
-                            alert_id,
-                            build_mail_observables_from_html(html),
-                            THE_HIVE_URL,
-                            THE_HIVE_KEY,
-                        )
-
-                except Exception as e:
-                    logger.error(f"Attachment/observable error for case {suspicious_case_id}: {e}")
-
-            # ----------------------
-            # Persist in Chroma
-            # ----------------------
-            add_to_suspicious_collection(
-                self.full,
-                alert_id,
-                item.get("sourceRef", ""),
-                self.suspicious_case_id,
-                suspicious_collection,
-            )
-
-        except Exception as e:
-            logger.error(f"AnalyzerAI processing error: {e}")
+        except Exception as exc:
+            logger.error("AnalyzerAI.process error (case=%s): %s", self.suspicious_case_id, exc, exc_info=True)
 
         return response
+
+    # ── private helpers ───────────────────────────────────────────────────
+
+    def _apply_base_scoring(self, response: Dict[str, Any]) -> Dict[str, Any]:
+        if self.summary:
+            try:
+                response["score"]      = int(round(float(self.summary.get("malscore",      5))))
+                response["confidence"] = int(round(float(self.summary.get("confidence",    0)) * 10))
+                response["level"]      = str(self.summary.get("classification", "info")).lower()
+            except (TypeError, ValueError) as exc:
+                logger.warning("Could not parse AI summary scores: %s", exc)
+        response.setdefault("details", {})
+        return response
+
+    def _merge_details(self, response: Dict[str, Any]) -> None:
+        for key in (
+            "classification_probabilities", "report",
+            "malscore", "confidence", "classification",
+        ):
+            if key in self.full:
+                response["details"][key] = self.full[key]
+
+    def _get_malscore(self, response: Dict[str, Any]) -> float:
+        try:
+            return float(response["details"].get("malscore", response.get("score", 5)))
+        except (TypeError, ValueError):
+            return 5.0
+
+    def _decode_headers(self) -> None:
+        try:
+            raw = self.full.get("report", {}).get("analyzed_mail_headers", "")
+            self.full["report"]["analyzed_mail_headers"] = parse_and_decode_defaultdict(str(raw))
+        except Exception as exc:
+            logger.error("Header decode error (case=%s): %s", self.suspicious_case_id, exc)
+
+    def _add_to_chroma(
+        self,
+        collection,
+        *,
+        alert_id: str,
+        source_ref: str,
+    ) -> None:
+        if collection is None:
+            return
+        try:
+            add_to_suspicious_collection(
+                self.full, alert_id, source_ref,
+                self.suspicious_case_id, collection,
+            )
+        except Exception as exc:
+            logger.error("add_to_suspicious_collection error (case=%s): %s", self.suspicious_case_id, exc)
+
+    def _handle_campaign(
+        self,
+        response: Dict[str, Any],
+        collection,
+    ) -> None:
+        hive_url = self._thehive["url"]
+        hive_key = self._thehive["key"]
+
+        embedding = response["details"]["report"].get("email_embedding")
+        similar   = get_similar_dangerous_mails(embedding, collection) if embedding else {}
+        campaign  = get_phishing_campaign(similar)
+
+        if not campaign:
+            logger.info("No campaign detected for case %s.", self.suspicious_case_id)
+            self._add_to_chroma(collection, alert_id="", source_ref="")
+            return
+
+        logger.info("Campaign detected for case %s.", self.suspicious_case_id)
+
+        alert_id, item_type, item = self._get_or_create_alert(campaign, hive_url, hive_key)
+
+        if item_type == "new":
+            update_suspicious_collection(
+                campaign, alert_id, item.get("sourceRef", ""), collection
+            )
+            item_type = "alert"
+
+        # Collect all case IDs in the campaign plus the current one.
+        # metadatas is a list-of-lists from ChromaDB — flatten it to get
+        # individual metadata dicts.
+        meta_dicts: List[Dict] = [
+            m for sublist in (similar.get("metadatas") or []) for m in sublist
+        ]
+        campaign_case_ids: List[int] = []
+        for m in meta_dicts:
+            try:
+                campaign_case_ids.append(int(m["suspicious_case_id"]))
+            except (KeyError, TypeError, ValueError):
+                pass
+        all_case_ids = list(dict.fromkeys(campaign_case_ids + [self.suspicious_case_id]))
+
+        # Create Minio client ONCE before the loop
+        minio_client = self._make_minio_client()
+
+        for case_id in all_case_ids:
+            self._attach_case_to_alert(
+                case_id, alert_id, item_type, minio_client, hive_url, hive_key
+            )
+
+        self._add_to_chroma(collection, alert_id=alert_id, source_ref=item.get("sourceRef", ""))
+
+    def _get_or_create_alert(
+        self,
+        campaign,
+        hive_url: str,
+        hive_key: str,
+    ):
+        """
+        Return (alert_id, item_type, item_dict).
+
+        item_type is "alert" for an existing item, "new" for a freshly
+        created alert (so the caller knows to call update_suspicious_collection).
+        """
+        try:
+            alert_id = get_most_common_alert_id(campaign)
+        except Exception:
+            alert_id = ""
+
+        if alert_id:
+            item_type, item = get_item_from_id(alert_id, hive_url, hive_key)
+            return alert_id, item_type, item
+
+        # Create a new alert
+        item = create_new_alert(
+            None,
+            PHISHING_CAMPAIGN_TEMPLATE["title"](get_most_common_subject(campaign)),
+            PHISHING_CAMPAIGN_TEMPLATE["description"](
+                self.full.get("classification", ""),
+                self.full.get("sub_classification", ""),
+                self.full.get("report", {}).get("analyzed_mail_content", ""),
+            ),
+            PHISHING_CAMPAIGN_TEMPLATE["severity"],
+            PHISHING_CAMPAIGN_TEMPLATE["tlp"],
+            PHISHING_CAMPAIGN_TEMPLATE["pap"],
+            "Suspicious",
+            hive_url,
+            hive_key,
+            PHISHING_CAMPAIGN_TEMPLATE["tags"],
+        )
+        alert_id = item["_id"]
+        return alert_id, "new", item
+
+    def _attach_case_to_alert(
+        self,
+        case_id: int,
+        alert_id: str,
+        item_type: str,
+        minio_client: Minio,
+        hive_url: str,
+        hive_key: str,
+    ) -> None:
+        try:
+            case        = Case.objects.get(id=case_id)
+            mail_id     = str(case.fileOrMail.mail.mail_id)
+            reporter    = case.reporter.username
+
+            zip_name, zip_bytes = build_mail_zip_from_minio(minio_client, mail_id, reporter)
+            headers, _eml, _txt, html = fetch_mail_files_from_minio(minio_client, mail_id)
+
+            if zip_bytes:
+                add_binary_attachment_to_item(
+                    item_type, alert_id, zip_name, zip_bytes, hive_url, hive_key
+                )
+            if headers:
+                add_observables_to_item(
+                    item_type, alert_id,
+                    build_mail_observables_from_headers(headers),
+                    hive_url, hive_key,
+                )
+            if html:
+                add_observables_to_item(
+                    item_type, alert_id,
+                    build_mail_observables_from_html(html),
+                    hive_url, hive_key,
+                )
+
+        except Case.DoesNotExist:
+            logger.warning("Case %s not found — skipping attachment.", case_id)
+        except Exception as exc:
+            logger.error(
+                "Attachment/observable error for case %s (alert %s): %s",
+                case_id, alert_id, exc, exc_info=True,
+            )

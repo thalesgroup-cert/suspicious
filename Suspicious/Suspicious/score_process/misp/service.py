@@ -1,127 +1,221 @@
-from .client import MISPClient
-from pymisp import  MISPObject
+# misp/service.py
+"""
+MISP service — orchestrates case and artifact pushing.
+"""
+from __future__ import annotations
+import logging
+from typing import Any, Optional
+
+from pymisp import MISPObject
+
+from case_handler.models import Case
 from ip_process.models import IP
 from url_process.models import URL
 from hash_process.models import Hash
 from domain_process.models import Domain
-from case_handler.models import Case
-from typing import Optional, Any
-import logging
-from .objects import (build_email_object,
-        build_url_object,
-        build_ip_object,
-        build_hash_object,
-        build_domain_object,
-        finalize_misp_object)
-from .events import MISPEventManager
 
+from .client import MISPClient
 from .config_loader import load_misp_settings
+from .events import MISPEventManager
+from .objects import (
+    build_domain_object,
+    build_email_object,
+    build_hash_object,
+    build_ip_object,
+    build_url_object,
+    finalize_misp_object,
+)
+from .utils import SECONDARY_MISP_LEVELS
 
-logger = logging.getLogger('tasp.cron.update_ongoing_case_jobs')
+logger = logging.getLogger("tasp.cron.update_ongoing_case_jobs")
 
 
 class MISPService:
-    def __init__(self, primary: bool = True):
-        settings = load_misp_settings()
-        config = settings.suspicious if primary else settings.security
-        self.client = MISPClient(config=config)
+    def __init__(self, primary: bool = True) -> None:
+        settings     = load_misp_settings()
+        config       = settings.suspicious if primary else settings.security
+        self.client  = MISPClient(config=config)
         self.primary = primary
 
-    # ----------------------
-    # Case update
-    # ----------------------
+    # ── Case update ───────────────────────────────────────────────────────
+
     def update_misp(self, case: Case) -> None:
         try:
-            mem = MISPEventManager(self.client)
+            mem   = MISPEventManager(self.client)
             event = mem.get_or_create_event(case)
-            if not event or not hasattr(event, 'id'):
-                logger.error(f"Could not create or retrieve event for case {case.id}.")
+            if not event or not getattr(event, "id", None):
+                logger.error("Could not get/create MISP event for case %s.", case.id)
                 return
 
-            if case.fileOrMail and hasattr(case.fileOrMail, 'mail'):
-                mail = case.fileOrMail.mail
-                obj = build_email_object(mail, case.id, case.results)
-                self.check_and_update_monthly_misp(obj, case.id, case.results)
-                finalize_misp_object(event.id, obj)
-                if hasattr(mail, 'mail_attachments'):
-                    for attachment in mail.mail_attachments.all():
-                        self.add_attachment_object(event.id, attachment, case.id, case.results)
-
-                if hasattr(mail, 'mail_artifacts'):
-                    for artifact in mail.mail_artifacts.all():
-                        self.add_artifact_object(event.id, artifact, case.id, case.results)
-
-            if hasattr(case, 'nonFileIocs') and case.nonFileIocs:
-                ioc_data = case.nonFileIocs.get_iocs()
-                for ioc_type, ioc in ioc_data.items():
-                    if ioc:
-                        self.add_artifact_object(event.id, ioc, case.id, case.results, ioc_type=ioc_type)
-        except Exception as e:
-            logger.error(f"Error updating MISP for case {case.id}: {e}", exc_info=True)
-
-    def add_artifact_object(self, event_id: str, artifact: Any, case_number: Any, detection_level: str, ioc_type: Optional[str] = None) -> None:
-        """
-        Add an artifact (URL, IP, hash, domain, email) to a MISP event.
-
-        Args:
-            event_id (str): ID of the MISP event.
-            artifact: The artifact data.
-            case_number: The case number.
-            detection_level (str): The detection level.
-            ioc_type (Optional[str]): For non-file artifacts, the type (e.g., 'url', 'ip', 'hash').
-        """
-        try:
-            obj = None
-            if ioc_type:
-                if ioc_type == 'url' and isinstance(artifact, URL):
-                    obj = build_url_object(event_id, artifact, case_number)
-                elif ioc_type == 'domain' and isinstance(artifact, Domain):
-                    obj = build_domain_object(event_id, artifact, case_number)
-                elif ioc_type == 'ip' and isinstance(artifact, IP):
-                    obj = build_ip_object(event_id, artifact, case_number)
-                elif ioc_type == 'hash' and isinstance(artifact, Hash):
-                    obj = build_hash_object(event_id, artifact, case_number)
-                else:
-                    logger.warning(f"[MISPHandler] Unsupported or missing artifact type '{ioc_type}' for case {case_number}. Skipping.")
+            # Create the secondary handler ONCE per case, not per artifact
+            if case.results in SECONDARY_MISP_LEVELS:
+                secondary_client = MISPClient(config=load_misp_settings().security)
+                secondary_mem    = MISPEventManager(secondary_client)
             else:
-                artifact_type = artifact.artifact_type.lower()
-                if artifact_type == 'url' and hasattr(artifact, 'artifactIsUrl'):
-                    obj = build_url_object(event_id, artifact.artifactIsUrl.url, case_number)
-                elif artifact_type == 'ip' and hasattr(artifact, 'artifactIsIp'):
-                    obj = build_ip_object(event_id, artifact.artifactIsIp.ip, case_number)
-                elif artifact_type == 'hash' and hasattr(artifact, 'artifactIsHash'):
-                    obj = build_hash_object(event_id, artifact.artifactIsHash.hash, case_number)
-                elif artifact_type == 'domain' and hasattr(artifact, 'artifactIsDomain'):
-                    obj = build_domain_object(event_id, artifact.artifactIsDomain.domain, case_number)
-                else:
-                    logger.warning(f"[MISPHandler] Unsupported or missing artifact type '{artifact_type}' for case {case_number}. Skipping.")
+                secondary_client = None
+                secondary_mem    = None
+
+            if case.fileOrMail and getattr(case.fileOrMail, "mail", None):
+                mail = case.fileOrMail.mail
+                obj  = build_email_object(mail, case.id, case.results)
+                if obj:
+                    # Correct signature: (misp_instance, event_id, obj)
+                    finalize_misp_object(self.client.misp, event.id, obj)
+                    self._maybe_push_monthly(
+                        obj, case.id, case.results, secondary_mem, secondary_client
+                    )
+
+                if getattr(mail, "mail_attachments", None):
+                    for attachment in mail.mail_attachments.all():
+                        self.add_attachment_object(
+                            event.id, attachment, case.id, case.results,
+                            secondary_mem=secondary_mem,
+                            secondary_client=secondary_client,
+                        )
+
+                if getattr(mail, "mail_artifacts", None):
+                    for artifact in mail.mail_artifacts.all():
+                        self.add_artifact_object(
+                            event.id, artifact, case.id, case.results,
+                            secondary_mem=secondary_mem,
+                            secondary_client=secondary_client,
+                        )
+
+            if getattr(case, "nonFileIocs", None) and case.nonFileIocs:
+                for ioc_type, ioc in case.nonFileIocs.get_iocs().items():
+                    if ioc:
+                        self.add_artifact_object(
+                            event.id, ioc, case.id, case.results,
+                            ioc_type=ioc_type,
+                            secondary_mem=secondary_mem,
+                            secondary_client=secondary_client,
+                        )
+
+        except Exception as exc:
+            logger.error("Error updating MISP for case %s: %s", case.id, exc, exc_info=True)
+
+    # ── Artifact routing ──────────────────────────────────────────────────
+
+    def add_artifact_object(
+        self,
+        event_id: str,
+        artifact: Any,
+        case_number: Any,
+        detection_level: str,
+        ioc_type: Optional[str] = None,
+        *,
+        secondary_mem:    Optional[MISPEventManager] = None,
+        secondary_client: Optional[MISPClient]       = None,
+    ) -> None:
+        try:
+            obj = self._build_artifact_object(artifact, case_number, detection_level, ioc_type)
             if not obj:
                 return
-            self.check_and_update_monthly_misp(obj, case_number, detection_level)
-            finalize_misp_object(event_id, obj)
+            # Correct signature: (misp_instance, event_id, obj)
+            finalize_misp_object(self.client.misp, event_id, obj)
+            self._maybe_push_monthly(
+                obj, case_number, detection_level, secondary_mem, secondary_client
+            )
+        except Exception as exc:
+            logger.error(
+                "[MISPHandler] Error adding artifact to event %s: %s",
+                event_id, exc, exc_info=True,
+            )
 
-        except Exception as e:
-            logger.error(f"[MISPHandler] Error adding artifact to event {event_id}: {e}", exc_info=True)
+    def _build_artifact_object(
+        self,
+        artifact: Any,
+        case_number: Any,
+        detection_level: str,
+        ioc_type: Optional[str],
+    ) -> Optional[MISPObject]:
+        # Named IOC (from nonFileIocs)
+        if ioc_type:
+            if ioc_type == "url" and isinstance(artifact, URL):
+                return build_url_object(artifact, case_number, detection_level)
+            if ioc_type == "domain" and isinstance(artifact, Domain):
+                return build_domain_object(artifact, case_number, detection_level)
+            if ioc_type == "ip" and isinstance(artifact, IP):
+                return build_ip_object(artifact, case_number, detection_level)
+            if ioc_type == "hash" and isinstance(artifact, Hash):
+                return build_hash_object(artifact, case_number, detection_level)
+            logger.warning(
+                "[MISPHandler] Unsupported ioc_type %r for case %s — skipping.",
+                ioc_type, case_number,
+            )
+            return None
 
-    def add_attachment_object(self, event_id: str, attachment: Any, case_number: Any, detection_level: str) -> None:
-        # Implementation for adding attachment object
+        # Mail artifact (from mail_artifacts)
+        artifact_type = (getattr(artifact, "artifact_type", None) or "").lower()
+        if artifact_type == "url" and getattr(artifact, "artifactIsUrl", None):
+            return build_url_object(artifact.artifactIsUrl.url, case_number, detection_level)
+        if artifact_type == "ip" and getattr(artifact, "artifactIsIp", None):
+            return build_ip_object(artifact.artifactIsIp.ip, case_number, detection_level)
+        if artifact_type == "hash" and getattr(artifact, "artifactIsHash", None):
+            return build_hash_object(artifact.artifactIsHash.hash, case_number, detection_level)
+        if artifact_type == "domain" and getattr(artifact, "artifactIsDomain", None):
+            return build_domain_object(artifact.artifactIsDomain.domain, case_number, detection_level)
+
+        logger.warning(
+            "[MISPHandler] Unsupported artifact_type %r for case %s — skipping.",
+            artifact_type, case_number,
+        )
+        return None
+
+    def add_attachment_object(
+        self,
+        event_id: str,
+        attachment: Any,
+        case_number: Any,
+        detection_level: str,
+        *,
+        secondary_mem:    Optional[MISPEventManager] = None,
+        secondary_client: Optional[MISPClient]       = None,
+    ) -> None:
+        # Placeholder — attachment builder not yet implemented
         pass
 
-    # ----------------------
-    # Secondary monthly MISP
-    # ----------------------
-    def check_and_update_monthly_misp(self, misp_object: MISPObject, case_number: Any, ioc_level: str) -> None:
-        if ioc_level.upper() not in ['MALICIOUS', 'SUSPICIOUS']:
+    # ── Monthly event push ────────────────────────────────────────────────
+
+    def _maybe_push_monthly(
+        self,
+        misp_object:     MISPObject,
+        case_number:     Any,
+        detection_level: str,
+        mem:             Optional[MISPEventManager],
+        client:          Optional[MISPClient],
+    ) -> None:
+        """Push a copy of misp_object to the secondary monthly event when warranted."""
+        # Use capitalised comparison — case.results is "Suspicious"/"Dangerous", not uppercase
+        if detection_level not in SECONDARY_MISP_LEVELS or not mem or not client:
             return
         try:
-            secondary_handler = MISPService(primary=False)
-            mem = MISPEventManager(secondary_handler.client)
             monthly_event = mem.get_or_create_monthly_event()
+            if not monthly_event:
+                return
+
+            # get_or_create_monthly_event uses pythonify=True — result is a
+            # MISPEvent object, so use .id attribute, not ['Event']['id'] dict access
+            monthly_id = getattr(monthly_event, "id", None)
+            if not monthly_id:
+                logger.warning(
+                    "Monthly MISP event has no id for case %s.", case_number
+                )
+                return
+
             new_obj = MISPObject(misp_object.name)
             for attr in misp_object.attributes:
                 if attr.object_relation and attr.value:
-                    attr_type = attr.type if getattr(attr, 'type', None) else attr.object_relation
-                    new_obj.add_attribute(attr.object_relation, type=attr_type, value=attr.value)
-            secondary_handler.finalize_misp_object(monthly_event['Event']['id'], new_obj, case_number, ioc_level)
-        except Exception as e:
-            logger.error(f"Error updating monthly event in secondary MISP for case {case_number}: {e}", exc_info=True)
+                    attr_type = getattr(attr, "type", None) or attr.object_relation
+                    new_obj.add_attribute(
+                        attr.object_relation, type=attr_type, value=attr.value
+                    )
+
+            # Correct call: module-level finalize_misp_object with client.misp
+            finalize_misp_object(client.misp, str(monthly_id), new_obj)
+
+        except Exception as exc:
+            logger.error(
+                "Error pushing to monthly MISP event for case %s: %s",
+                case_number, exc, exc_info=True,
+            )

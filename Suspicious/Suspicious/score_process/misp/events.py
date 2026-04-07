@@ -1,112 +1,137 @@
-from pymisp import MISPEvent
-from typing import Optional
-from case_handler.models import Case
-from datetime import datetime
+# misp/events.py
+"""
+MISP event manager — get-or-create logic for case and monthly events.
+"""
+from __future__ import annotations
 import logging
-import json
-from .utils import parse_tags, current_month_event_name, first_day_of_month
-CONFIG_PATH = "/app/settings.json"
-with open(CONFIG_PATH) as config_file:
-    config = json.load(config_file)
+from datetime import datetime
+from typing import Optional
 
-misp_config = config.get('integrations', {}).get('misp', {})
+from pymisp import MISPEvent
+
+from case_handler.models import Case
+from .client import MISPClient
+from .config_loader import load_misp_settings
+from .utils import (
+    add_case_number_attribute,
+    current_month_event_name,
+    first_day_of_month,
+    get_detection_level_tag,
+    parse_tags,
+)
+
 logger = logging.getLogger(__name__)
 
+
 class MISPEventManager:
-    def __init__(self, misp):
-        self.misp = misp
+    """
+    Encapsulates get-or-create logic for MISP events.
+
+    Receives a MISPClient so it does not reconnect on every call.
+    """
+
+    def __init__(self, client: MISPClient) -> None:
+        self.client = client          # MISPClient wrapper
+        self._misp  = client.misp     # ExpandedPyMISP instance — direct access
+
+    # ── Internal helpers ──────────────────────────────────────────────────
 
     def _find_event_by_name(self, event_name: str) -> Optional[str]:
-        """
-        Find a MISP event ID by its info field (event name).
-        """
+        """Return the MISP event ID whose info field equals event_name, or None."""
         try:
-            results = self.misp.search(
+            results = self._misp.search(
                 controller="events",
                 value=event_name,
                 metadata=True,
             )
-
             if not results:
                 return None
-
             for event in results:
-                info = event.get("Event", {}).get("info")
-                if info == event_name:
+                if event.get("Event", {}).get("info") == event_name:
                     return event["Event"]["id"]
+            return None
+        except Exception as exc:
+            logger.error("Error searching for MISP event %r: %s", event_name, exc, exc_info=True)
+            return None
 
-            return None
-        except Exception as e:
-            logger.error(f"Error searching for event '{event_name}': {e}", exc_info=True)
-            return None
+    # ── Public API ────────────────────────────────────────────────────────
 
     def get_or_create_event(self, case: Case) -> Optional[MISPEvent]:
-        event_name = f"Email Analysis - Case {case.id}"
+        event_name = "Email Analysis - Case %s" % str(case.id)
         try:
             event_id = self._find_event_by_name(event_name)
+
             if event_id:
-                logger.info(f"Found existing event {event_id} for {event_name}")
-                event_data = self.client.misp.get_event(event_id)
-                self.add_case_number_attribute(event_data['Event'], case.id)
-                event_obj = MISPEvent().load(event_data['Event'])
-                detection_tag = self.get_detection_level_tag(case.results)
-                if detection_tag:
-                    event_obj.add_tag(detection_tag)
-                self.client.misp.update_event(event_obj)
+                logger.info("Found existing MISP event %s for %r.", event_id, event_name)
+                event_data = self._misp.get_event(event_id)
+                # add_case_number_attribute is a module-level function
+                add_case_number_attribute(self._misp, event_data["Event"]["id"], case.id)
+                event_obj = MISPEvent().load(event_data["Event"])
+                # get_detection_level_tag is a module-level function
+                tag = get_detection_level_tag(case.results or "")
+                if tag:
+                    event_obj.add_tag(tag)
+                self._misp.update_event(event_obj)
                 return event_obj
 
-            # Create new event
-            event = MISPEvent()
-            event.info = event_name
-            event.date = datetime.now().strftime("%Y-%m-%d")
-            event.distribution = 0
+            # Create a new event
+            event                 = MISPEvent()
+            event.info            = event_name
+            event.date            = datetime.now().strftime("%Y-%m-%d")
+            event.distribution    = 0
             event.threat_level_id = 3
-            event.analysis = 1
-            created_event = self.client.misp.add_event(event)
-            if 'Event' in created_event and 'id' in created_event['Event']:
-                self.add_case_number_attribute(created_event['Event'], case.id)
-                event_obj = MISPEvent().load(created_event['Event'])
-                detection_tag = self.get_detection_level_tag(case.results)
-                if detection_tag:
-                    event_obj.add_tag(detection_tag)
-                self.client.misp.update_event(event_obj)
+            event.analysis        = 1
+
+            created = self._misp.add_event(event)
+            if "Event" in created and "id" in created["Event"]:
+                add_case_number_attribute(self._misp, created["Event"]["id"], case.id)
+                event_obj = MISPEvent().load(created["Event"])
+                tag = get_detection_level_tag(case.results or "")
+                if tag:
+                    event_obj.add_tag(tag)
+                self._misp.update_event(event_obj)
                 return event_obj
+
+            logger.warning("add_event returned unexpected structure for %r.", event_name)
             return None
-        except Exception as e:
-            logger.error(f"Error processing event for {event_name}: {e}", exc_info=True)
+
+        except Exception as exc:
+            logger.error("Error processing MISP event for %r: %s", event_name, exc, exc_info=True)
             return None
 
     def get_or_create_monthly_event(self) -> Optional[MISPEvent]:
-        event_name = current_month_event_name()
-        event_date = first_day_of_month()
-        tags_config = misp_config.get('default_tags', {})
+        event_name  = current_month_event_name()
+        event_date  = first_day_of_month()
+        # Load lazily — not from a module-level global
+        tags_config = load_misp_settings().tags or {}
 
         try:
             event_id = self._find_event_by_name(event_name)
+
             if event_id:
-                logger.info(f"Found existing monthly event {event_id} for {event_name}")
-                event = self.client.misp.get_event(event_id, pythonify=True)
+                logger.info("Found existing monthly MISP event %s for %r.", event_id, event_name)
+                # pythonify=True returns a MISPEvent object
+                event = self._misp.get_event(event_id, pythonify=True)
                 if event:
-                    tags = self.parse_tags(tags_config)
-                    for tag in tags:
+                    # parse_tags is a module-level function, not self.parse_tags
+                    for tag in parse_tags(tags_config):
                         event.add_tag(tag["name"])
-                    return self.client.misp.update_event(event, pythonify=True)
+                    return self._misp.update_event(event, pythonify=True)
                 return None
 
-            # Create new monthly event
-            event = MISPEvent()
-            event.info = event_name
-            event.date = event_date
-            event.distribution = 3
+            # Create a new monthly event
+            event                 = MISPEvent()
+            event.info            = event_name
+            event.date            = event_date
+            event.distribution    = 3
             event.threat_level_id = 3
-            event.analysis = 1
+            event.analysis        = 1
 
-            tags = parse_tags(tags_config)
-            for tag in tags:
+            for tag in parse_tags(tags_config):
                 event.add_tag(tag["name"])
 
-            created = self.client.misp.add_event(event, pythonify=True)
-            return created
-        except Exception as e:
-            logger.error(f"Error creating or retrieving monthly event: {e}", exc_info=True)
+            return self._misp.add_event(event, pythonify=True)
+
+        except Exception as exc:
+            logger.error("Error in get_or_create_monthly_event for %r: %s", event_name, exc, exc_info=True)
             return None

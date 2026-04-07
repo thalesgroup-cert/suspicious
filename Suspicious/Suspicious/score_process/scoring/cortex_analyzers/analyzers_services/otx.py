@@ -1,42 +1,68 @@
+# analyzers_services/otx.py
+"""
+OTX (AlienVault OTX) analyzer — scores based on number of OTX Pulses.
+"""
+from __future__ import annotations
 import logging
+from typing import Any, Dict
 from .base import BaseAnalyzer
-from score_process.scoring.cortex_analyzers.response import get_level_score_confidence
+from score_process.scoring.cortex_analyzers.base_helpers import get_level_score_confidence
 
 logger = logging.getLogger("tasp.cron.update_ongoing_case_jobs")
 
+OTX_MALICIOUS_PULSE_THRESHOLD  = 50   # >= this → malicious
+OTX_SUSPICIOUS_PULSE_THRESHOLD = 10   # >= this → suspicious
+# count > 0 and < SUSPICIOUS threshold → info
+# count == 0 → safe
+
+
+def _classify_otx_pulses(count: int) -> str:
+    if count >= OTX_MALICIOUS_PULSE_THRESHOLD:
+        return "malicious"
+    if count >= OTX_SUSPICIOUS_PULSE_THRESHOLD:
+        return "suspicious"
+    if count > 0:
+        return "info"
+    return "safe"
+
 
 class AnalyzerOTXQuery(BaseAnalyzer):
-    def process(self):
+    def process(self) -> Dict[str, Any]:
         response = super().process()
-
         try:
-            for taxonomy in self.summary.get("taxonomies", []):
-                if (
-                    taxonomy.get("namespace") == "OTX"
-                    and taxonomy.get("predicate") == "Pulses"
-                ):
-                    try:
-                        count = int(taxonomy.get("value", 0))
-                    except Exception:
-                        count = 0
+            taxonomies = self.summary.get("taxonomies", []) if self.summary else []
 
-                    if count == 0:
-                        level = "safe"
-                    elif count >= 100:
-                        level = "suspicious"
-                    elif count >= 50:
-                        level = "malicious"
-                    else:
-                        level = "info"
+            matching = next(
+                (
+                    t for t in taxonomies
+                    if t.get("namespace") == "OTX"
+                    and t.get("predicate") == "Pulses"
+                ),
+                None,
+            )
 
-                    response["level"] = level
-                    response["details"] = {"Pulses": count}
-                    response["score"], response["confidence"] = (
-                        get_level_score_confidence(level)
-                    )
-                    break
+            if matching is None:
+                return response
+
+            try:
+                count = int(matching.get("value", 0))
+            except (TypeError, ValueError):
+                logger.warning("[AnalyzerOTXQuery] non-integer Pulses value %r — defaulting to 0.", matching.get("value"))
+                count = 0
+
+            level = _classify_otx_pulses(count)
+            score, confidence = get_level_score_confidence(level)
+
+            response["level"]      = level
+            response["score"]      = score
+            response["confidence"] = confidence
+            response["category"]   = ["OTX Pulses"]
+            response["details"]    = {
+                "Pulses": count,
+                "level":  level,
+            }
 
         except Exception as exc:
-            logger.error("[AnalyzerOTXQuery] error: %s", exc, exc_info=True)
+            logger.error("[AnalyzerOTXQuery] processing error: %s", exc, exc_info=True)
 
         return response

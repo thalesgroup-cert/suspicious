@@ -1,34 +1,53 @@
+# analyzers_services/zscaler.py
+"""
+Zscaler URL classification analyzer.
+"""
+from __future__ import annotations
 import logging
+from typing import Any, Dict
 from .base import BaseAnalyzer
-from score_process.scoring.cortex_analyzers.response import get_level_score_confidence
+from score_process.scoring.cortex_analyzers.base_helpers import get_level_score_confidence
 
 logger = logging.getLogger("tasp.cron.update_ongoing_case_jobs")
 
 
 class AnalyzerZscaler(BaseAnalyzer):
-    def process(self):
+    def process(self) -> Dict[str, Any]:
         response = super().process()
-
         try:
-            for taxonomy in self.summary.get("taxonomies", []):
-                if taxonomy.get("namespace") == "Zscaler" and taxonomy.get("predicate") == "Classification":
-                    classification_value = taxonomy.get("value", "").strip()
-                    level = taxonomy.get("level", "safe").lower()
+            taxonomies = self.summary.get("taxonomies", []) if self.summary else []
+            full       = self.full or {}
 
-                    details = {"Zscaler Classification": classification_value}
-                    if self.full:
-                        details.update({
-                            "URL": self.full.get("url", ""),
-                            "URL Classifications": self.full.get("urlClassifications", []),
-                            "URL Classifications with Security Alert": self.full.get("urlClassificationsWithSecurityAlert", [])
-                        })
+            matching = next(
+                (
+                    t for t in taxonomies
+                    if t.get("namespace") == "Zscaler"
+                    and t.get("predicate") == "Classification"
+                ),
+                None,
+            )
 
-                    response["level"] = level
-                    response["details"] = details
-                    response["score"], response["confidence"] = get_level_score_confidence(level)
-                    break
+            if matching is None:
+                return response
 
-        except Exception as e:
-            logger.error(f"[AnalyzerZscaler] error: {e}", exc_info=True)
+            raw_class = matching.get("value", "")
+            class_val = str(raw_class).strip() if raw_class is not None else ""
+            level     = str(matching.get("level", "safe")).lower()
+            score, confidence = get_level_score_confidence(level)
+
+            response["level"]      = level
+            response["score"]      = score
+            response["confidence"] = confidence
+            response["category"]   = [class_val] if class_val else ["Zscaler"]
+            response["details"]    = {
+                "Zscaler Classification":                      class_val,
+                "URL":                                         full.get("url", ""),
+                "URL Classifications":                         full.get("urlClassifications", []),
+                "URL Classifications with Security Alert":     full.get("urlClassificationsWithSecurityAlert", []),
+                "level":                                       level,
+            }
+
+        except Exception as exc:
+            logger.error("[AnalyzerZscaler] processing error: %s", exc, exc_info=True)
 
         return response
