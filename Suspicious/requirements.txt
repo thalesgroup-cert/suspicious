@@ -64,4 +64,4 @@ Sphinx==8.2.3
 sphinx-rtd-theme==3.0.2
 myst-parser==4.0.1
 pillow==12.1.1
-CairoSVG==2.9.0
+cairosvg==2.9.0

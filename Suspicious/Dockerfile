@@ -92,6 +92,12 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
         wkhtmltopdf \
         libmariadb3 \
         libmagic1 \
+        libcairo2 \
+        libpango-1.0-0 \
+        libgdk-pixbuf-2.0-0 \
+        libffi8 \
+        shared-mime-info \
+        fonts-dejavu-core \
         cron \
     && rm -rf /var/lib/apt/lists/* \
     && mkdir -p /var/log \
