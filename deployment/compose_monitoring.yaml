@@ -1,0 +1,98 @@
+# compose_monitoring.yaml
+#
+# Optional observability stack — Prometheus + Grafana.
+#
+# Usage:
+#   docker compose --profile monitoring up -d
+#   docker compose --profile monitoring down
+#
+# Or via Makefile:
+#   make monitor-up
+#   make monitor-down
+#
+# Grafana:  http://localhost:3000  (admin / admin on first login)
+# Prometheus: http://localhost:9090  (internal only — not exposed by default)
+#
+# This file is intentionally separate from docker-compose.yml so the default
+# stack remains lean. Teams that want metrics enable this profile explicitly.
+
+services:
+
+  prometheus:
+    image: prom/prometheus:v2.52.0
+    container_name: prometheus
+    profiles: [monitoring]
+    restart: unless-stopped
+    expose:
+      - "9090"
+    ports:
+      - "127.0.0.1:9090:9090"
+    volumes:
+      - "${DOCKER_PATH:-../docker}/monitoring/prometheus.yml:/etc/prometheus/prometheus.yml:ro"
+      - prometheus_data:/prometheus
+    command:
+      - "--config.file=/etc/prometheus/prometheus.yml"
+      - "--storage.tsdb.path=/prometheus"
+      - "--storage.tsdb.retention.time=30d"
+      - "--web.enable-lifecycle"
+      - "--web.console.libraries=/usr/share/prometheus/console_libraries"
+      - "--web.console.templates=/usr/share/prometheus/consoles"
+    security_opt:
+      - no-new-privileges:true
+    networks:
+      - suspicious_network
+
+  grafana:
+    image: grafana/grafana:10.4.0
+    container_name: grafana
+    profiles: [monitoring]
+    restart: unless-stopped
+    ports:
+      - "127.0.0.1:3000:3000"
+    volumes:
+      - grafana_data:/var/lib/grafana
+      - "${DOCKER_PATH:-../docker}/monitoring/grafana/provisioning:/etc/grafana/provisioning:ro"
+    environment:
+      GF_SECURITY_ADMIN_PASSWORD: "${GRAFANA_ADMIN_PASSWORD:-admin}"
+      GF_USERS_ALLOW_SIGN_UP: "false"
+      GF_SERVER_ROOT_URL: "http://localhost:3000"
+      GF_ANALYTICS_REPORTING_ENABLED: "false"
+      GF_ANALYTICS_CHECK_FOR_UPDATES: "false"
+    security_opt:
+      - no-new-privileges:true
+    depends_on:
+      - prometheus
+    networks:
+      - suspicious_network
+
+  # MariaDB exporter — exposes DB metrics to Prometheus
+  mariadb-exporter:
+    image: prom/mysqld-exporter:v0.15.1
+    container_name: mariadb_exporter
+    profiles: [monitoring]
+    restart: unless-stopped
+    expose:
+      - "9104"
+    environment:
+      DATA_SOURCE_NAME: "${MYSQL_USER}:${MYSQL_PASSWORD}@(db_suspicious:3306)/"
+    command:
+      - "--collect.global_status"
+      - "--collect.info_schema.tables"
+      - "--collect.info_schema.innodb_metrics"
+    security_opt:
+      - no-new-privileges:true
+    depends_on:
+      - db_suspicious
+    networks:
+      - suspicious_network
+
+volumes:
+  prometheus_data:
+    driver: local
+  grafana_data:
+    driver: local
+
+networks:
+  suspicious_network:
+    external: true
+    name: ${NETWORK_NAME}

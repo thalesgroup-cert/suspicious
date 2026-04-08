@@ -1,11 +1,17 @@
 # compose_apps.yaml
 #
 # Base service definitions for application containers.
-# These are extended (not run directly) by docker-compose.yml.
+# Extended (not run directly) by docker-compose.yml.
+#
+# Changes from previous version
+# ──────────────────────────────
+# - feeder: healthcheck added (was missing — make status showed unknown)
+# - suspicious_cron: healthcheck added so dependent services can gate on it
+# - Both use `test: ["CMD-SHELL", ...]` to keep the check inline
 
 services:
 
-  # ── suspicious (Gunicorn WSGI) ────────────────────────────────────────────
+  # ── suspicious (Gunicorn WSGI) ─────────────────────────────────────────
 
   suspicious:
     init: true
@@ -29,7 +35,7 @@ services:
     networks:
       - suspicious_network
 
-  # ── suspicious_cron ───────────────────────────────────────────────────────
+  # ── suspicious_cron ────────────────────────────────────────────────────
 
   suspicious_cron:
     init: true
@@ -51,10 +57,17 @@ services:
       - ".env"
     environment:
       no_proxy: "${NO_PROXY:-},cortex,db_suspicious,rustfs,chromadb"
+    # Healthcheck: verify cron daemon is running inside the container
+    healthcheck:
+      test: ["CMD-SHELL", "service cron status | grep -q running || exit 1"]
+      interval: 60s
+      timeout: 5s
+      retries: 3
+      start_period: 30s
     networks:
       - suspicious_network
 
-  # ── suspicious_ui (Nginx SPA) ─────────────────────────────────────────────
+  # ── suspicious_ui (Nginx SPA) ──────────────────────────────────────────
 
   suspicious_ui:
     init: true
@@ -67,7 +80,8 @@ services:
       - suspicious_network
       - reverse_network
 
-  # ── cortex ────────────────────────────────────────────────────────────────
+  # ── cortex ─────────────────────────────────────────────────────────────
+
   cortex:
     init: true
     restart: unless-stopped
@@ -80,26 +94,21 @@ services:
       JAVA_OPTS:   "-Djavax.net.ssl.trustStore=/etc/cortex/keystore.jks"
       job_directory: "${CORTEX_PATH}/jobs"
     volumes:
-      # Certificates
       - "${CA_PATH}/keystore.jks:/etc/cortex/keystore.jks:ro"
-      # Cortex config
       - "${CORTEX_PATH}/jobs:${CORTEX_PATH}/jobs:Z"
       - "${CORTEX_PATH}/application.conf:/etc/cortex/application.conf:ro"
       - "${CORTEX_PATH}/application-cortex.log:/var/log/cortex/application.log:rw"
-      # Docker socket — needed by Cortex to launch analyzer containers
       - "/var/run/docker.sock:/var/run/docker.sock:ro"
       - "${DOCKER_PATH}/config.json:/home/cortex/.docker/config.json:ro"
-      # Neurons
       - "${CORTEX_PATH}/Cortex-Analyzers/:/opt/Cortex-Analyzers/:ro"
       - "${AIANALYZER_PATH}/analyzers.json:/opt/Cortex-Analyzers-AI/analyzers/analyzers.json:ro"
       - "${CORTEX_PATH}/Cortex-Analyzers-Public/analyzers/analyzers.json:/opt/Cortex-Analyzers-Public/analyzers/analyzers.json:ro"
       - "${CORTEX_PATH}/Cortex-Analyzers-Public/responders/responders.json:/opt/Cortex-Analyzers-Public/responders/responders.json:ro"
-      # Yara rules
       - "${YARA_PATH}/rules/:/opt/Yara/rules:ro"
     networks:
       - suspicious_network
 
-  # ── feeder ────────────────────────────────────────────────────────────────
+  # ── feeder ─────────────────────────────────────────────────────────────
 
   feeder:
     init: true
@@ -110,6 +119,20 @@ services:
       - "${CA_PATH}/certfile.pem:/etc/private/certfile.pem:ro"
       - "${CA_PATH}/keyfile.pem:/etc/private/keyfile.pem:ro"
       - "${CA_PATH}/rootcafile.pem:/etc/private/rootcafile.pem:ro"
+    # Healthcheck: verify the feeder process is alive and writing its log.
+    # The log is updated at every polling cycle (timer-inbox-emails seconds).
+    # A 120-second-stale log indicates the process has hung.
+    healthcheck:
+      test:
+        - "CMD-SHELL"
+        - >
+          test -f /app/application.log &&
+          test $(( $(date +%s) - $(date -r /app/application.log +%s) )) -lt 120
+          || exit 1
+      interval: 60s
+      timeout: 10s
+      retries: 3
+      start_period: 60s
     networks:
       - suspicious_network
 

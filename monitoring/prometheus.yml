@@ -1,0 +1,37 @@
+# monitoring/prometheus.yml
+#
+# Prometheus scrape configuration for the Suspicious stack.
+# Place at: docker/monitoring/prometheus.yml
+
+global:
+  scrape_interval:     15s
+  evaluation_interval: 15s
+  external_labels:
+    monitor: "suspicious"
+
+scrape_configs:
+
+  # ── Suspicious Django app (django-prometheus) ─────────────────────────
+  # Requires: pip install django-prometheus, add to INSTALLED_APPS,
+  # and include(django_prometheus.urls) at /metrics/ in urls.py.
+  - job_name: "suspicious"
+    static_configs:
+      - targets: ["suspicious:9020"]
+    metrics_path: "/metrics/"
+    scheme: http
+
+  # ── Traefik ───────────────────────────────────────────────────────────
+  - job_name: "traefik"
+    static_configs:
+      - targets: ["traefik:8082"]
+    metrics_path: "/metrics"
+
+  # ── MariaDB (via mysqld-exporter) ─────────────────────────────────────
+  - job_name: "mariadb"
+    static_configs:
+      - targets: ["mariadb_exporter:9104"]
+
+  # ── Prometheus self-monitoring ────────────────────────────────────────
+  - job_name: "prometheus"
+    static_configs:
+      - targets: ["localhost:9090"]
