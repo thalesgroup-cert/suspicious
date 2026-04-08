@@ -15,7 +15,7 @@ CYAN='\033[0;36m'
 BOLD='\033[1m'
 RESET='\033[0m'
 
-IMAGE="ghcr.io/your-org/suspicious"
+IMAGE="ghcr.io/thalesgroup-cert/suspicious"
 SERVICES=("suspicious" "suspicious_ui")
 
 updates_available=0

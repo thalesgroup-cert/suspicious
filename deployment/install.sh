@@ -5,7 +5,7 @@
 #   bash install.sh
 #
 # Or piped from curl (one-command install):
-#   curl -fsSL https://raw.githubusercontent.com/your-org/suspicious/main/install.sh | bash
+#   curl -fsSL https://raw.githubusercontent.com/thalesgroup-cert/suspicious/main/install.sh | bash
 #
 # What this script does:
 #   1. Checks system requirements (Docker, Python 3.10+, git, curl)
@@ -24,7 +24,7 @@ CYAN='\033[0;36m'
 BOLD='\033[1m'
 RESET='\033[0m'
 
-REPO_URL="https://github.com/your-org/suspicious"
+REPO_URL="https://github.com/thalesgroup-cert/suspicious"
 REPO_DIR="suspicious-deploy"
 MIN_PYTHON_MINOR=10
 
@@ -72,13 +72,13 @@ check_python() {
             minor=$(echo "$ver" | cut -d. -f2)
             if [ "${minor:-0}" -ge "$MIN_PYTHON_MINOR" ]; then
                 py_cmd="$cmd"
-                echo -e "${GREEN}✓ Python $ver${RESET}"
+                echo -e "${GREEN}✓ Python $ver${RESET}" >&2
                 break
             fi
         fi
     done
     if [ -z "$py_cmd" ]; then
-        echo -e "${RED}✗ Python 3.${MIN_PYTHON_MINOR}+ required — https://python.org/downloads${RESET}"
+        echo -e "${RED}✗ Python 3.${MIN_PYTHON_MINOR}+ required — https://python.org/downloads${RESET}" >&2
         exit 1
     fi
     echo "$py_cmd"
@@ -108,7 +108,7 @@ fi
 # ── Install Python TUI dependencies ──────────────────────────────────────
 echo ""
 echo -e "${YELLOW}Installing installer dependencies...${RESET}"
-"$PY" -m pip install --quiet --upgrade questionary rich
+#"$PY" -m pip install --quiet --upgrade questionary rich
 
 # ── Launch interactive wizard ─────────────────────────────────────────────
 echo ""

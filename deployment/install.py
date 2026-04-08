@@ -213,7 +213,7 @@ def section_branding(settings: dict) -> None:
 def section_versions(env: dict) -> None:
     header("6 / 7 — Image Versions")
     console.print("  [yellow]Pinning versions is strongly recommended for production.[/yellow]")
-    console.print("  Check https://github.com/your-org/suspicious/releases for the latest.\n")
+    console.print("  Check https://github.com/thalesgroup-cert/suspicious/releases for the latest.\n")
 
     current_version = env.get("SUSPICIOUS_VERSION", "latest")
     version = ask(f"Suspicious version [{current_version}]: ", default=current_version)
