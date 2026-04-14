@@ -21,9 +21,7 @@ class AlertCreate(BaseModel):
 
 
 class Observable(BaseModel):
-    dataType: Literal[
-        "url", "mail", "mail-subject", "other"
-    ]
+    dataType: Literal["url", "mail", "mail-subject", "other"]
     data: str
     tlp: int = 1
     pap: int = 1
@@ -36,9 +34,9 @@ class Comment(BaseModel):
 
 
 class ChallengerModel(BaseModel):
-    firstname: Optional[str]
-    lastname: Optional[str]
-    email: Optional[EmailStr]
+    firstname: Optional[str] = None
+    lastname: Optional[str] = None
+    email: Optional[EmailStr] = None
     groups: List[str] = []
 
 
@@ -49,26 +47,19 @@ class ArtifactModel(BaseModel):
 
 class CaseModel(BaseModel):
     id: int
-    score: Optional[float]
-    confidence: Optional[float]
-    results: Optional[str]
-    categoryAI: Optional[str]
-    resultsAI: Optional[str]
-    scoreAI: Optional[float]
-    confidenceAI: Optional[float]
+    score: Optional[float] = None
+    confidence: Optional[float] = None
+    results: Optional[str] = None
+    categoryAI: Optional[str] = None
+    resultsAI: Optional[str] = None
+    scoreAI: Optional[float] = None
+    confidenceAI: Optional[float] = None
 
 
 class MailModel(BaseModel):
-    subject: Optional[str]
-    mail_from: Optional[str]
-    mail_id: Optional[str]
-
-
-class TheHiveConfig(BaseModel):
-    url: str
-    api_key: str
-    verify_ssl: bool = False
-    certificate_path: str
+    subject: Optional[str] = None
+    mail_from: Optional[str] = None
+    mail_id: Optional[str] = None
 
 
 class MinioConfig(BaseModel):

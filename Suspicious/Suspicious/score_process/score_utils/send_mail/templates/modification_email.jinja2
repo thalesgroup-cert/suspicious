@@ -79,18 +79,18 @@
         <tr>
           <td align="center"
               style="background-color:{{ header_bg }};padding:28px 40px;">
-            {% if company_logo.is_image %}
+            {% if company_logo_svg.is_image  or company_logo_png.is_image %}
               {# data: URI or SVG — Outlook blocks both; show img only to other clients #}
-              {% if company_logo.is_data_uri or company_logo.is_svg %}
+              {% if company_logo_svg.is_data_uri or company_logo_svg.is_svg %}
               <!--[if !mso]><!-->
-              <img src="{{ company_logo.src }}"
+              <img src="{{ company_logo_svg.src }}"
                    alt="{{ company_name | default('') }}"
                    width="130"
                    style="max-width:130px;height:auto;display:block;margin:0 auto;">
               <!--<![endif]-->
               <!--[if mso]>
-              {% if company_logo.outlook_src %}
-              <img src="{{ company_logo.outlook_src }}"
+              {% if company_logo_png.outlook_src %}
+              <img src="{{ company_logo_png.outlook_src }}"
                    alt="{{ company_name | default('') }}"
                    width="130"
                    style="max-width:130px;height:auto;display:block;margin:0 auto;">
@@ -103,7 +103,7 @@
               <![endif]-->
               {% else %}
               {# URL-based image — safe for all clients including Outlook #}
-              <img src="{{ company_logo.src }}"
+              <img src="{{ company_logo_png.src }}"
                    alt="{{ company_name | default('') }}"
                    width="130"
                    style="max-width:130px;height:auto;display:block;margin:0 auto;">
@@ -308,16 +308,20 @@
   {# ── 6. SOCIAL ICONS ─────────────────────────────────────────────────── #}
   {% if socials %}
   <tr>
-    <td align="center"
-        style="background-color:{{ header_bg }};padding:12px 40px 20px;
-               border-top:1px solid {{ border }};">
-      {% for social in socials %}
-      <a href="{{ social.url }}" target="_blank" rel="noopener noreferrer"
-         style="display:inline-block;margin:0 5px;">
-        <img src="{{ social.logo }}" alt="{{ social.name }}"
-             width="24" height="24"
-             style="display:inline-block;vertical-align:middle;opacity:0.88;">
-      </a>
+    <td style="background:#242A75;text-align:center;padding:15px;">
+      {% for s in socials %}
+        <a href="{{ s.url }}" target="_blank">
+          {# Outlook: PNG fallback #}
+          <!--[if mso]>
+          <img src="{{ s.logo_png }}" alt="{{ s.name }}" width="20" height="20"
+              style="display:inline-block;vertical-align:middle;">
+          <![endif]-->
+          {# All other clients: SVG #}
+          <!--[if !mso]><!-->
+          <img src="{{ s.logo_svg }}" alt="{{ s.name }}" width="20" height="20"
+              style="display:inline-block;vertical-align:middle;">
+          <!--<![endif]-->
+        </a>
       {% endfor %}
     </td>
   </tr>
