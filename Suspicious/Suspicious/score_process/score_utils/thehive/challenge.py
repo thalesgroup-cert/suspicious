@@ -12,7 +12,7 @@ from jinja2 import Environment, FileSystemLoader, select_autoescape
 from mail_feeder.models import MailArtifact, MailAttachment
 
 from .utils import generate_ref, build_mail_attachments_paths
-from .social_logos import SOCIAL_LOGOS
+from score_process.score_utils.send_mail.social_logos import SOCIAL_LOGOS
 
 logger = logging.getLogger(__name__)
 TEMPLATES_DIR = Path(__file__).parent.parent / "send_mail/templates"
