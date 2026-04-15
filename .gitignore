@@ -13,7 +13,7 @@ chromadb
 
 config.json
 settings.json
-
+.claude/
 # System
 .vscode
 .DS_Store

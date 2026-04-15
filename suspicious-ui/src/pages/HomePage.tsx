@@ -39,6 +39,7 @@ import {
 import { useNavigate, Link as RouterLink } from "react-router-dom";
 import { useMutation, useQuery } from "@tanstack/react-query";
 import { useTheme } from "@mui/material/styles";
+import { useThemeMode, type ThemeCapabilities } from "@/styles/ThemeStore";
 import { api } from "@/api/client";
 import { getMe, type Me } from "@/api/auth";
 import {
@@ -157,12 +158,20 @@ function sum(values: number[]) {
 // Shared card shell — mirrors SubmitPage's SoftCard exactly
 // ---------------------------------------------------------------------------
 
-function SoftCard(props: React.PropsWithChildren<{ sx?: object }>) {
+function SoftCard(props: React.PropsWithChildren<{
+  sx?: object;
+  className?: string;
+  onMouseEnter?: React.MouseEventHandler;
+  onMouseLeave?: React.MouseEventHandler;
+}>) {
   const theme = useTheme();
   const isDark = theme.palette.mode === "dark";
 
   return (
     <Card
+      className={props.className}
+      onMouseEnter={props.onMouseEnter}
+      onMouseLeave={props.onMouseLeave}
       sx={{
         height: "100%",
         borderRadius: 4,
@@ -193,16 +202,51 @@ function DashboardCard(
     title: string;
     icon?: React.ReactNode;
     right?: React.ReactNode;
+    titleBadge?: React.ReactNode;
     sx?: object;
     contentSx?: object;
+    className?: string;
   }>
 ) {
-  const { title, icon, right, sx, contentSx, children } = props;
+  const { title, icon, right, titleBadge, sx, contentSx, className, children } = props;
   const theme = useTheme();
   const isDark = theme.palette.mode === "dark";
+  const { capabilities } = useThemeMode();
+  const isMetal = capabilities.effects.hasAlertStates;
+
+  const [hovered, setHovered] = React.useState(false);
+  const [showExcl, setShowExcl] = React.useState(false);
+  const timerRef = React.useRef<ReturnType<typeof setTimeout> | undefined>(undefined);
+
+  React.useEffect(() => {
+    if (!isMetal || !hovered) {
+      clearTimeout(timerRef.current);
+      setShowExcl(false);
+      return;
+    }
+
+    function schedule() {
+      const delay = 600 + Math.random() * 180;
+      timerRef.current = setTimeout(() => {
+        setShowExcl(true);
+        timerRef.current = setTimeout(() => {
+          setShowExcl(false);
+          schedule();
+        }, 1100);
+      }, delay);
+    }
+
+    schedule();
+    return () => clearTimeout(timerRef.current);
+  }, [isMetal, hovered]);
 
   return (
-    <SoftCard sx={sx}>
+    <SoftCard
+      sx={sx}
+      className={className}
+      onMouseEnter={() => setHovered(true)}
+      onMouseLeave={() => setHovered(false)}
+    >
       <CardContent sx={{ p: { xs: 1.5, md: 2 }, ...contentSx }}>
         <Stack
           direction="row"
@@ -232,6 +276,31 @@ function DashboardCard(
             <Typography fontWeight={900} fontSize={15}>
               {title}
             </Typography>
+            {titleBadge}
+            {showExcl && (
+              <Box
+                component="span"
+                aria-hidden
+                sx={{
+                  display: "inline-flex",
+                  alignItems: "center",
+                  justifyContent: "center",
+                  width: 18,
+                  height: 18,
+                  borderRadius: "3px",
+                  fontSize: 11,
+                  fontWeight: 900,
+                  fontFamily: '"IBM Plex Mono", monospace',
+                  backgroundColor: "var(--mgs-alert, #E1061B)",
+                  color: "#fff",
+                  ml: 0.75,
+                  flexShrink: 0,
+                  animation: "exclamation 300ms cubic-bezier(.34,1.56,.64,1) both",
+                }}
+              >
+                !
+              </Box>
+            )}
           </Stack>
 
           {right}
@@ -242,6 +311,82 @@ function DashboardCard(
       </CardContent>
     </SoftCard>
   );
+}
+
+// ---------------------------------------------------------------------------
+// ThemeGreeting — lore-aware sub-headline, only rendered for themed variants
+// ---------------------------------------------------------------------------
+
+function ThemeGreeting({ caps, name }: { caps: ThemeCapabilities; name: string }) {
+  const codename = name.toUpperCase().replace(/\s+/g, "_");
+
+  // ── Le Visiteur du Futur ────────────────────────────────────────────────
+  if (caps.effects.hasPortalEffect) {
+    return (
+      <Box
+        className="visitor-briefing"
+        sx={{ mt: 0.75, display: "inline-block", fontSize: "11px !important" }}
+      >
+        {`// TEMPORAL_AGENT: ${codename}`}
+      </Box>
+    );
+  }
+
+  // ── Metal ────────────────────────────────────────────────────
+  if (caps.effects.hasStealthMode) {
+    return (
+      <Typography
+        variant="caption"
+        sx={{
+          display: "block",
+          mt: 0.5,
+          fontFamily: '"IBM Plex Mono", monospace',
+          letterSpacing: "0.08em",
+          color: "var(--mgs-codec, #37D6C7)",
+          opacity: 0.85,
+        }}
+      >
+        {`CODEC :: CH ${caps.cssVars.includes("--mgs-codec-snake") ? "140.85" : "???"}  ▸  AGENT: ${codename}`}
+      </Typography>
+    );
+  }
+
+  // ── Cyber / matrix ──────────────────────────────────────────────────────
+  if (caps.effects.hasNeonEffect) {
+    return (
+      <Typography
+        variant="caption"
+        sx={{
+          display: "block",
+          mt: 0.5,
+          fontFamily: '"IBM Plex Mono", monospace',
+          letterSpacing: "0.1em",
+          color: "#00E5FF",
+          textShadow: "0 0 8px rgba(0,229,255,.5)",
+          opacity: 0.88,
+        }}
+      >
+        {`SYS: ACCESS_GRANTED  //  USER: ${codename}  //  THREAT_MATRIX: ONLINE`}
+      </Typography>
+    );
+  }
+
+  // ── Seasonal ────────────────────────────────────────────────────────────
+  const seasonLine: Record<string, string> = {
+    spring: "Spring cycle underway — threats don't take the season off.",
+    summer: "Peak season. Stay cool, stay vigilant.",
+    autumn: "Autumn watch — threat embers persist.",
+    winter: "Festive season — peak phishing window. Watch your inbox.",
+  };
+  if (caps.season && seasonLine[caps.season]) {
+    return (
+      <Typography variant="caption" color="text.secondary" sx={{ display: "block", mt: 0.5 }}>
+        {seasonLine[caps.season]}
+      </Typography>
+    );
+  }
+
+  return null;
 }
 
 // ---------------------------------------------------------------------------
@@ -265,8 +410,17 @@ const DANGER_COLORS: Record<DangerLabel, string> = {
 export default function HomePage() {
   const navigate = useNavigate();
   const theme = useTheme();
+  const { capabilities } = useThemeMode();
   const resultColors = useResultColors();
   const statusColors  = useStatusColors();
+
+  // Entrance / ambient class applied to every DashboardCard.
+  const cardClass = React.useMemo(() => {
+    const { effects } = capabilities;
+    if (effects.hasPortalEffect)   return "temporal-arrive"; // Le Visiteur — portal step-in
+    if (effects.hasAlertStates)    return "hud-alertable";   // MGS — cards respond to alert state
+    return undefined;
+  }, [capabilities]);
 
   const dangerColors: Record<DangerLabel, string> = React.useMemo(() => ({
     Safe:         resultColors.safe.main,
@@ -350,6 +504,28 @@ export default function HomePage() {
     dangerous: home?.danger_counts?.dangerous ?? 0,
   };
 
+  React.useEffect(() => {
+    if (!capabilities.effects.hasAlertStates || !home) {
+      document.body.removeAttribute("data-alert");
+      document.body.removeAttribute("data-caution");
+      return;
+    }
+    if (danger.dangerous > 0) {
+      document.body.dataset.alert   = "on";
+      document.body.removeAttribute("data-caution");
+    } else if (danger.suspicious > 0) {
+      document.body.dataset.caution = "on";
+      document.body.removeAttribute("data-alert");
+    } else {
+      document.body.removeAttribute("data-alert");
+      document.body.removeAttribute("data-caution");
+    }
+    return () => {
+      document.body.removeAttribute("data-alert");
+      document.body.removeAttribute("data-caution");
+    };
+  }, [capabilities.effects.hasAlertStates, danger.dangerous, danger.suspicious, home]);
+
   const donut = (DANGER_ORDER as readonly DangerLabel[])
     .map(label => {
       const key = label.toLowerCase() as keyof DangerCounts;
@@ -379,9 +555,10 @@ export default function HomePage() {
         >
           <Stack direction="row" spacing={1.5} alignItems="flex-start" sx={{ minWidth: 0 }}>
             <Box sx={{ minWidth: 0 }}>
-              <Typography variant="h5" fontWeight={980} letterSpacing={-0.6} noWrap>
+              <Typography variant="h5" fontWeight={980} letterSpacing={-0.6} noWrap >
                 Welcome, {displayName}
               </Typography>
+              <ThemeGreeting caps={capabilities} name={displayName} />
             </Box>
           </Stack>
         </Stack>
@@ -400,10 +577,73 @@ export default function HomePage() {
           <Grid size={{ xs: 12, md: 7 }}>
             <DashboardCard
               title="Threat distribution"
-              icon={<DonutLargeOutlined />}
+              icon={
+                <DonutLargeOutlined
+                  sx={
+                    capabilities.effects.hasAlertStates
+                      ? { animation: "radarSweep 4s linear infinite", transformOrigin: "center" }
+                      : capabilities.effects.hasEmberEffect
+                      ? { animation: "leafSway 4s ease-in-out infinite", display: "block" }
+                      : capabilities.effects.hasBloomEffect
+                      ? { animation: "dewPulse 3s ease-in-out infinite", display: "block" }
+                      : undefined
+                  }
+                />
+              }
               right={<Chip size="small" label="Monthly" variant="outlined" />}
+              className={cardClass}
+              titleBadge={
+                capabilities.effects.hasAlertStates && danger.dangerous > 0 ? (
+                  <Box
+                    component="span"
+                    aria-label="ALERT"
+                    sx={{
+                      display: "inline-flex",
+                      alignItems: "center",
+                      justifyContent: "center",
+                      width: 18, height: 18,
+                      borderRadius: "3px",
+                      fontSize: 11,
+                      fontWeight: 900,
+                      fontFamily: '"IBM Plex Mono", monospace',
+                      backgroundColor: "var(--mgs-alert, #E1061B)",
+                      color: "#fff",
+                      ml: 0.75,
+                      flexShrink: 0,
+                      animation: "exclamation 300ms cubic-bezier(.34,1.56,.64,1) both",
+                    }}
+                  >
+                    !
+                  </Box>
+                ) : capabilities.effects.hasAlertStates && danger.suspicious > 0 ? (
+                  <Box
+                    component="span"
+                    aria-label="CAUTION"
+                    sx={{
+                      display: "inline-flex",
+                      alignItems: "center",
+                      justifyContent: "center",
+                      width: 18, height: 18,
+                      borderRadius: "3px",
+                      fontSize: 11,
+                      fontWeight: 900,
+                      fontFamily: '"IBM Plex Mono", monospace',
+                      backgroundColor: "var(--mgs-caution, #F2C94C)",
+                      color: "#000",
+                      ml: 0.75,
+                      flexShrink: 0,
+                      animation: "exclamation 300ms cubic-bezier(.34,1.56,.64,1) both",
+                    }}
+                  >
+                    ?
+                  </Box>
+                ) : null
+              }
             >
-              <Box sx={{ height: 220 }}>
+              <Box
+                sx={{ height: 220 }}
+                className={capabilities.effects.hasHeatEffect ? "sun-orb" : undefined}
+              >
                 {homeQuery.isLoading ? (
                   <Stack sx={{ height: "100%" }} alignItems="center" justifyContent="center">
                     <CircularProgress size={22} />
@@ -529,6 +769,9 @@ export default function HomePage() {
             <DashboardCard
               title="Snapshot"
               icon={<ShieldOutlined />}
+              className={[
+                cardClass
+              ].filter(Boolean).join(" ") || undefined}
               right={
                 <Chip
                   size="small"
@@ -607,6 +850,7 @@ export default function HomePage() {
             <DashboardCard
               title="Recent submissions"
               icon={<HistoryOutlined />}
+              className={cardClass}
               right={
                 <Button
                   variant="outlined"
@@ -626,9 +870,20 @@ export default function HomePage() {
               {recentQuery.isLoading ? (
                 <Box sx={{ px: { xs: 1.5, md: 2 }, pb: 2 }}>
                   <Stack direction="row" spacing={1} alignItems="center">
-                    <CircularProgress size={18} />
+                    <CircularProgress
+                      size={18}
+                      sx={capabilities.effects.hasAlertStates
+                        ? { animation: "codecStatic 2s ease-in-out infinite, CircularProgress-keyframes-circular-rotate 1.4s linear infinite" }
+                        : undefined}
+                    />
                     <Typography color="text.secondary" variant="body2">
-                      Loading submissions…
+                      {capabilities.effects.hasPortalEffect
+                        ? "// SCANNING TEMPORAL RECORDS…"
+                        : capabilities.effects.hasStealthMode
+                        ? "ACCESSING MISSION ARCHIVE…"
+                        : capabilities.effects.hasNeonEffect
+                        ? "QUERYING THREAT_MATRIX…"
+                        : "Loading submissions…"}
                     </Typography>
                   </Stack>
                 </Box>
@@ -637,9 +892,32 @@ export default function HomePage() {
                   <Alert severity="error">Recent submissions unavailable.</Alert>
                 </Box>
               ) : recent.length === 0 ? (
-                <Box sx={{ px: { xs: 1.5, md: 2 }, pb: 2 }}>
-                  <Alert severity="info">No submissions yet.</Alert>
-                </Box>
+                capabilities.effects.hasStealthMode ? (
+                  <Box
+                    className="cardboard-box"
+                    sx={{
+                      mx: { xs: 1.5, md: 2 },
+                      mb: 2,
+                      px: 2,
+                      py: 1.5,
+                      borderRadius: "4px",
+                      fontFamily: '"IBM Plex Mono", monospace',
+                      fontSize: 11,
+                      fontWeight: 900,
+                      letterSpacing: "0.1em",
+                    }}
+                  >
+                    // NO TARGETS ACQUIRED — AREA CLEAR
+                  </Box>
+                ) : (
+                  <Box sx={{ px: { xs: 1.5, md: 2 }, pb: 2 }}>
+                    <Alert severity="info">
+                      {capabilities.effects.hasPortalEffect
+                        ? "// NO TEMPORAL RECORDS FOUND — submit your first case to begin the timeline."
+                        : "No submissions yet."}
+                    </Alert>
+                  </Box>
+                )
               ) : (
                 <Box sx={{ overflowX: "auto" }}>
                   <Table sx={{ minWidth: 920 }}>

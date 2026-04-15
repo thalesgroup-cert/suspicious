@@ -9,6 +9,8 @@ services:
       - no-new-privileges:true
     environment:
       DOMAIN_CORP: ${DOMAIN_CORP}
+      NO_PROXY: ${NO_PROXY}
+      no_proxy: ${NO_PROXY}
     networks:
       - suspicious_network
       - reverse_network

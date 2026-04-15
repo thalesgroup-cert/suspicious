@@ -15,6 +15,7 @@ import {
   Typography,
 } from "@mui/material";
 import { RefreshOutlined, SettingsOutlined } from "@mui/icons-material";
+import { useThemeMode } from "@/styles/ThemeStore";
 
 function monthName(m: number) {
   return new Date(2000, m - 1, 1).toLocaleString("en", { month: "long" });
@@ -49,6 +50,22 @@ export default function OverviewHeader(props: {
   const [anchorEl, setAnchorEl] = React.useState<HTMLElement | null>(null);
   const open = Boolean(anchorEl);
 
+  const { capabilities } = useThemeMode();
+  const { effects } = capabilities;
+
+  // Sticky bar border glow for themed sidebars
+  const barGlow = React.useMemo(() => {
+    if (effects.hasNeonEffect)
+      return "0 1px 0 rgba(0,229,255,.25), 0 4px 24px rgba(0,229,255,.06)";
+    if (effects.hasSolarEffect)
+      return "0 1px 0 rgba(201,164,76,.22), 0 4px 24px rgba(201,164,76,.06)";
+    if (effects.hasPortalEffect)
+      return "0 1px 0 rgba(74,144,217,.22), 0 4px 24px rgba(74,144,217,.06)";
+    if (effects.hasAlertStates)
+      return "0 1px 0 rgba(55,214,199,.18), 0 4px 24px rgba(55,214,199,.04)";
+    return undefined;
+  }, [effects]);
+
   return (
     <Box
       sx={{
@@ -58,12 +75,16 @@ export default function OverviewHeader(props: {
         borderBottom: "1px solid",
         borderColor: "divider",
         backdropFilter: "blur(14px)",
+        boxShadow: barGlow,
       }}
     >
       <Box sx={{ px: { xs: 2, md: 3 }, py: 1.5 }}>
         <Stack direction="row" alignItems="flex-start" justifyContent="space-between" spacing={2}>
           <Box>
-            <Typography variant="h5" sx={{ fontWeight: 950, letterSpacing: -0.4, lineHeight: 1.1 }}>
+            <Typography
+              variant="h5"
+              sx={{ fontWeight: 950, letterSpacing: -0.4, lineHeight: 1.1 }}
+            >
               {props.title}
             </Typography>
           </Box>

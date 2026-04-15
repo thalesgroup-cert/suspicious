@@ -11,6 +11,7 @@ import "react-resizable/css/styles.css";
 
 import { getMe } from "@/api/auth";
 import { getDashboardSummary, type DashboardSummary } from "@/features/dashboard/api";
+import { useThemeMode } from "@/styles/ThemeStore";
 
 import OverviewHeader from "@/features/dashboard/components/OverviewHeader";
 import ThreatDistributionPanel from "@/features/dashboard/components/ThreatDistributionPanel";
@@ -244,6 +245,8 @@ function DragDots({ isDark, dividerColor }: { isDark: boolean; dividerColor: str
 function GridStyles() {
   const theme = useTheme();
   const isDark = theme.palette.mode === "dark";
+  const { capabilities } = useThemeMode();
+  const { effects } = capabilities;
 
   const handleColor = isDark ? "rgba(255,255,255,.55)" : alpha(theme.palette.grey[500], 0.7);
   const handleBg = isDark
@@ -252,6 +255,39 @@ function GridStyles() {
   const handleBorder = isDark
     ? "1px solid rgba(255,255,255,.12)"
     : `1px solid ${alpha(theme.palette.divider, 0.7)}`;
+
+  // Drag placeholder color follows theme
+  const placeholderBg = effects.hasNeonEffect
+    ? "rgba(0,229,255,.1)"
+    : effects.hasSolarEffect
+    ? "rgba(201,164,76,.1)"
+    : effects.hasPortalEffect
+    ? "rgba(74,144,217,.1)"
+    : effects.hasAlertStates
+    ? "rgba(55,214,199,.1)"
+    : effects.hasEmberEffect
+    ? "rgba(255,140,0,.1)"
+    : effects.hasBloomEffect
+    ? "rgba(236,72,153,.08)"
+    : isDark
+    ? "rgba(56,189,248,.14)"
+    : alpha(theme.palette.primary.main, 0.08);
+
+  const placeholderBorder = effects.hasNeonEffect
+    ? "2px dashed rgba(0,229,255,.4)"
+    : effects.hasSolarEffect
+    ? "2px dashed rgba(201,164,76,.45)"
+    : effects.hasPortalEffect
+    ? "2px dashed rgba(74,144,217,.5)"
+    : effects.hasAlertStates
+    ? "2px dashed rgba(55,214,199,.45)"
+    : effects.hasEmberEffect
+    ? "2px dashed rgba(255,140,0,.4)"
+    : effects.hasBloomEffect
+    ? "2px dashed rgba(236,72,153,.35)"
+    : isDark
+    ? "2px dashed rgba(56,189,248,.45)"
+    : `2px dashed ${alpha(theme.palette.primary.main, 0.4)}`;
 
   return (
     <style>{`
@@ -293,8 +329,8 @@ function GridStyles() {
 
       /* Dragging placeholder */
       .react-grid-item.react-grid-placeholder {
-        background: ${isDark ? "rgba(56,189,248,.14)" : alpha(theme.palette.primary.main, 0.08)} !important;
-        border: 2px dashed ${isDark ? "rgba(56,189,248,.45)" : alpha(theme.palette.primary.main, 0.4)} !important;
+        background: ${placeholderBg} !important;
+        border: ${placeholderBorder} !important;
         border-radius: 12px !important;
         opacity: 1 !important;
       }
