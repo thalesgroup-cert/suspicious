@@ -17,7 +17,7 @@
 //     5. Every dashboard panel, chip, and indicator already has the
 //        correct user-configured colors by the time they render
 
-import { api, setAccessToken } from "@/api/client";
+import { api } from "@/api/client";
 import { endpoints } from "@/api/endpoints";
 import { useColorStore } from "@/styles/colorStore";
 import { hydrateThemeFromServer } from "@/styles/ThemeStore";
@@ -48,7 +48,10 @@ export type Me = {
 };
 
 export type LoginResponse = {
-  token: string;
+  // token is still present in the response body for API clients that use the
+  // Authorization header — the browser SPA ignores it and relies on the
+  // httpOnly cookie set by the server.
+  token?: string;
   expiry: string | null;
   user: {
     id: number;
@@ -106,11 +109,9 @@ export async function login(
     password,
   });
 
-  setAccessToken(res.data.token);
-
-  // LoginResponseSerializer only returns a minimal user object (no colors).
-  // Colors are hydrated on the subsequent getMe() call which React Query
-  // fires automatically via the ["me"] query on mount.
+  // The server sets the httpOnly knox_token cookie in the response — nothing
+  // to store here. Colors are hydrated on the subsequent getMe() call which
+  // React Query fires automatically via the ["me"] query on mount.
 
   return res.data;
 }
@@ -119,8 +120,8 @@ export async function logout(): Promise<void> {
   try {
     await api.post(endpoints.logout);
   } finally {
-    setAccessToken(null);
-    // Keep colors in localStorage — they won't flash on the login page
+    // The server deletes the knox_token cookie in the response.
+    // Colors stay in localStorage — they won't flash on the login page
     // and will be overwritten by the next user's getMe() on login.
   }
 }
@@ -135,7 +136,8 @@ export async function hydrateColorsAfterSso(): Promise<void> {
   try {
     await getMe();
   } catch {
-    // Non-fatal — the token is already stored; colors fall back to localStorage.
+    // Non-fatal — the httpOnly cookie is already set by the server;
+    // colors fall back to localStorage defaults.
   }
 }
 

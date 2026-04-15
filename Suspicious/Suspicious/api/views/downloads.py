@@ -6,9 +6,10 @@ import zipfile
 from typing import Iterator
 
 from django.http import FileResponse
-from rest_framework.exceptions import APIException, NotFound, PermissionDenied
-from rest_framework.permissions import IsAuthenticated
+from rest_framework.exceptions import APIException, NotFound
 from rest_framework.views import APIView
+
+from api.permissions.settings import IsAdminOrCERT
 from minio.error import S3Error
 
 from case_handler.models import Case
@@ -18,7 +19,6 @@ from api.storage import StorageClient
 
 logger = logging.getLogger(__name__)
 
-ALLOWED_DOWNLOAD_GROUPS = {"Admin", "CERT"}
 CONFIG_PATH = os.environ.get("SUSPICIOUS_SETTINGS_PATH", "/app/settings.json")
 
 
@@ -50,10 +50,6 @@ def load_minio_config(path: str) -> dict | None:
     return minio_config
 
 
-def user_can_download(user) -> bool:
-    return user.groups.filter(name__in=ALLOWED_DOWNLOAD_GROUPS).exists()
-
-
 def get_request_ip(request) -> str | None:
     forwarded_for = request.META.get("HTTP_X_FORWARDED_FOR")
     if forwarded_for:
@@ -62,16 +58,9 @@ def get_request_ip(request) -> str | None:
 
 
 class DownloadCaseArchiveView(APIView):
-    permission_classes = [IsAuthenticated]
+    permission_classes = [IsAdminOrCERT]
 
     def get(self, request, case_id: int):
-        if not user_can_download(request.user):
-            logger.warning(
-                "Unauthorized archive download attempt: user_id=%s case_id=%s",
-                getattr(request.user, "id", None),
-                case_id,
-            )
-            raise PermissionDenied("Not authorized")
 
         case = self._get_case(case_id)
         archive = self._get_archive(case)

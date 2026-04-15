@@ -23,6 +23,7 @@ import json
 import sys
 from datetime import timedelta
 from pathlib import Path
+import logging
 
 # ---------------------------------------------------------------------------
 # Load configuration file
@@ -308,6 +309,10 @@ OIDC_REDIRECT_URI  = _oidc.get("redirect_uri", "")
 
 REST_FRAMEWORK = {
     "DEFAULT_AUTHENTICATION_CLASSES": (
+        # Cookie auth first — used by the browser SPA (httpOnly cookie, XSS-safe).
+        # Falls through when the cookie is absent so API clients can still
+        # authenticate via Authorization: Token <token>.
+        "api.authentication.KnoxCookieAuthentication",
         "knox.auth.TokenAuthentication",
     ),
     "DEFAULT_PERMISSION_CLASSES": (
@@ -460,20 +465,23 @@ CRONJOBS = [
 # Logging
 # ---------------------------------------------------------------------------
 
-_trace_level = _app.get("log_level", "INFO").upper()
+_trace_level = getattr(logging, _app.get("log_level", "INFO").upper(), logging.INFO)
 
 LOGGING = {
     "version": 1,
     "disable_existing_loggers": False,
 
     "formatters": {
-        "verbose": {
-            "format":  "{levelname} {asctime} | {name} | {message}",
-            "style":   "{",
+        # Structured JSON — consumed by log aggregators (ELK, Loki, etc.).
+        # Fields: level, time, logger, message, plus any extra= keys passed
+        # at the call site (e.g. user_id, case_id on audit events).
+        "json": {
+            "()": "pythonjsonlogger.jsonlogger.JsonFormatter",
+            "format": "%(levelname)s %(asctime)s %(name)s %(message)s",
         },
-        "simple": {
-            "format":  "{levelname} {message}",
-            "style":   "{",
+        # Plain-text fallback kept for local development / docker logs tailing.
+        "verbose": {
+            "format": "%(levelname)s %(asctime)s | %(name)s | %(message)s",
         },
     },
 
@@ -482,12 +490,16 @@ LOGGING = {
             "class":     "logging.StreamHandler",
             "formatter": "verbose",
         },
+        "json_console": {
+            "class": "logging.StreamHandler",
+            "formatter": "json",
+        },
         "app_file": {
             "class":     "logging.handlers.RotatingFileHandler",
             "filename":  "/app/log/suspicious.log",
             "maxBytes":  10 * 1024 * 1024,   # 10 MB
             "backupCount": 5,
-            "formatter": "verbose",
+            "formatter": "json",
             "level":     _trace_level,
         },
         "fetch_mail": {
@@ -495,7 +507,7 @@ LOGGING = {
             "filename":  "/app/log/fetched_mail.log",
             "maxBytes":  10 * 1024 * 1024,
             "backupCount": 3,
-            "formatter": "verbose",
+            "formatter": "json",
             "level":     _trace_level,
         },
         "update_cases": {
@@ -503,7 +515,7 @@ LOGGING = {
             "filename":  "/app/log/case_updating.log",
             "maxBytes":  10 * 1024 * 1024,
             "backupCount": 3,
-            "formatter": "verbose",
+            "formatter": "json",
             "level":     _trace_level,
         },
         "fetch_analyzer": {
@@ -511,7 +523,7 @@ LOGGING = {
             "filename":  "/app/log/fetch_analyzer.log",
             "maxBytes":  10 * 1024 * 1024,
             "backupCount": 3,
-            "formatter": "verbose",
+            "formatter": "json",
             "level":     _trace_level,
         },
         "cleanup": {
@@ -519,7 +531,7 @@ LOGGING = {
             "filename":  "/app/log/cleanup_phishing.log",
             "maxBytes":  10 * 1024 * 1024,
             "backupCount": 3,
-            "formatter": "verbose",
+            "formatter": "json",
             "level":     _trace_level,
         },
         "watcher_sync": {
@@ -527,15 +539,15 @@ LOGGING = {
             "filename":  "/app/log/watcher_sync.log",
             "maxBytes":  10 * 1024 * 1024,
             "backupCount": 3,
-            "formatter": "verbose",
+            "formatter": "json",
             "level":     _trace_level,
         },
         "audit": {
             "class":     "logging.handlers.RotatingFileHandler",
-            "filename":  "/var/log/cert_downloads.log",
+            "filename":  "/app/log/cert_downloads.log",
             "maxBytes":  50 * 1024 * 1024,
             "backupCount": 10,
-            "formatter": "verbose",
+            "formatter": "json",
             "level":     "INFO",
         },
     },
@@ -550,12 +562,12 @@ LOGGING = {
 
         # Main application
         "tasp": {
-            "handlers":  ["app_file", "console"],
+            "handlers": ["app_file", "json_console"],
             "level":     _trace_level,
             "propagate": False,
         },
         "case_handler": {
-            "handlers":  ["app_file", "console"],
+            "handlers":  ["app_file", "json_console"],
             "level":     _trace_level,
             "propagate": False,
         },
@@ -596,7 +608,7 @@ LOGGING = {
 
         # LDAP debug (can be very verbose — consider raising to WARNING)
         "django_auth_ldap": {
-            "handlers":  ["console"],
+            "handlers":  ["json_console"],
             "level":     _trace_level,
             "propagate": False,
         },
@@ -604,7 +616,7 @@ LOGGING = {
         # Audit trail for certificate downloads
         "audit.cert_download": {
             "handlers":  ["audit"],
-            "level":     "INFO",
+            "level":     _trace_level,
             "propagate": False,
         },
     },

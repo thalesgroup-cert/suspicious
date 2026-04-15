@@ -58,6 +58,9 @@ vt-py==0.21.0
 # Vector store
 chromadb==1.4.0
 
+# Logging
+python-json-logger==4.1.0  # v4.x changed the API; pin to v3 until we migrate
+
 # Docs
 docutils==0.21.2
 Sphinx==8.2.3

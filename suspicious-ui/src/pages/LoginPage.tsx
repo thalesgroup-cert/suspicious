@@ -25,7 +25,6 @@ import {
 import { useNavigate } from "react-router-dom";
 import { useQuery } from "@tanstack/react-query";
 import { getMe, login, hydrateColorsAfterSso } from "@/api/auth";
-import { setAccessToken } from "@/api/client";
 
 // ---------------------------------------------------------------------------
 // Env config
@@ -625,31 +624,19 @@ export default function LoginPage() {
       return;
     }
 
-    // ── SSO success — token in fragment ──
+    // ── SSO success — cookie already set by the Django redirect response ──
     const isSsoCallback = searchParams.get("sso") === "1";
     if (!isSsoCallback) return;
 
     setSsoLoading(true);
-    const fragment = new URLSearchParams(window.location.hash.slice(1));
-    const token    = fragment.get("token");
-    const expiry   = fragment.get("expiry") ?? null;
-
-    // Immediately wipe the fragment from the browser URL bar
+    // Clean up the ?sso=1 query param from the URL bar
     window.history.replaceState({}, "", "/login");
 
-    if (!token) {
-      setError("SSO login failed — no token received. Please try again.");
+    // Hydrate semantic colors now that the httpOnly cookie is in the browser
+    hydrateColorsAfterSso().finally(() => {
+      navigate("/", { replace: true });
       setSsoLoading(false);
-      return;
-    }
-
-    // Store the token (same mechanism as password login)
-    setAccessToken(token);
-
-    // Hydrate semantic colors from the server now that we have a valid token
-    hydrateColorsAfterSso();
-
-    navigate("/", { replace: true });
+    });
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 

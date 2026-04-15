@@ -37,7 +37,6 @@ import {
 import { NavLink, Outlet, useLocation, useNavigate } from "react-router-dom";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { getMe, logout, type Me } from "@/api/auth";
-import { getAccessToken } from "@/api/client";
 import { useThemeMode } from "@/styles/ThemeStore";
 
 // ---------------------------------------------------------------------------
@@ -520,13 +519,10 @@ export default function AppLayout() {
   const isDark = theme.palette.mode === "dark";
   const primary = theme.palette.primary.main;
 
-  const token = getAccessToken();
-
   const meQuery = useQuery<Me>({
     queryKey: ["me"],
     queryFn: getMe,
     retry: false,
-    enabled: !!token,
   });
 
   const me = meQuery.data;
