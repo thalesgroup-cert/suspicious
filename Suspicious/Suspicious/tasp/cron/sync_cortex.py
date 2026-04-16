@@ -1,4 +1,5 @@
 import logging
+import requests
 from django.db import transaction
 from cortex4py.api import Api
 from cortex4py.exceptions import CortexException
@@ -48,6 +49,9 @@ def sync_cortex_analyzers(config_path: str = CONFIG_PATH) -> None:
         return
     except CortexException as exc:
         log_analyzers.error("Cortex fetch failed: %s", exc)
+        return
+    except requests.RequestException as exc:
+        log_analyzers.error("Network error syncing Cortex analyzers: %s", exc)
         return
 
     if not remote_analyzers:

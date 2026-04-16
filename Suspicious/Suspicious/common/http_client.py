@@ -4,9 +4,9 @@ common/http_client.py
 Shared HTTP client utilities:
   - TimeoutHTTPAdapter  — injects default connect/read timeout
   - make_session()      — returns a Session with the adapter mounted
-  - BREAKERS            — per-integration pybreaker.CircuitBreaker registry (added in next task)
-  - get_breaker()       — look up a breaker by integration name (added in next task)
-  - RETRY               — tenacity retry decorator (added in next task)
+  - BREAKERS            — per-integration pybreaker.CircuitBreaker registry
+  - get_breaker()       — look up a breaker by integration name
+  - RETRY               — tenacity retry decorator
 """
 from __future__ import annotations
 

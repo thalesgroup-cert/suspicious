@@ -178,3 +178,144 @@ class TestAddObservablesToItem(unittest.TestCase):
         with patch("score_process.score_utils.thehive.phishing._thehive_request") as mock_req:
             add_observables_to_item("invalid", "~42", [{}], "https://hive.local", "key123")
         mock_req.assert_not_called()
+
+
+class TestAddAttachmentsToItem(unittest.TestCase):
+
+    def test_posts_attachment_successfully(self):
+        from score_process.score_utils.thehive.phishing import add_attachments_to_item
+        import tempfile, os
+
+        with tempfile.NamedTemporaryFile(delete=False, suffix=".txt") as f:
+            f.write(b"test content")
+            tmp_path = f.name
+
+        try:
+            mock_resp = MagicMock()
+            with patch("score_process.score_utils.thehive.phishing._thehive_request", return_value=mock_resp) as mock_req:
+                add_attachments_to_item("alert", "~42", [tmp_path], "https://hive.local", "key123")
+            self.assertEqual(mock_req.call_count, 1)
+            call_args = mock_req.call_args
+            self.assertEqual(call_args[0][0], "POST")
+        finally:
+            os.unlink(tmp_path)
+
+    def test_stops_on_circuit_breaker_open(self):
+        from score_process.score_utils.thehive.phishing import add_attachments_to_item
+        import tempfile, os
+
+        # Create two temp files — only one POST should be attempted before breaker stops loop
+        paths = []
+        for _ in range(2):
+            with tempfile.NamedTemporaryFile(delete=False, suffix=".txt") as f:
+                f.write(b"x")
+                paths.append(f.name)
+
+        try:
+            with patch(
+                "score_process.score_utils.thehive.phishing._thehive_request",
+                side_effect=pybreaker.CircuitBreakerError(),
+            ) as mock_req:
+                add_attachments_to_item("alert", "~42", paths, "https://hive.local", "key123")
+            # Loop should exit after first breaker-open — only 1 attempt
+            self.assertEqual(mock_req.call_count, 1)
+        finally:
+            for p in paths:
+                os.unlink(p)
+
+    def test_skips_invalid_item_type(self):
+        from score_process.score_utils.thehive.phishing import add_attachments_to_item
+        with patch("score_process.score_utils.thehive.phishing._thehive_request") as mock_req:
+            add_attachments_to_item("invalid", "~42", ["/tmp/x.txt"], "https://hive.local", "key")
+        mock_req.assert_not_called()
+
+
+class TestAddCommentToItem(unittest.TestCase):
+
+    def _call(self, **overrides):
+        from score_process.score_utils.thehive.phishing import add_comment_to_item
+        kwargs = dict(
+            item_type="alert",
+            item_id="~42",
+            comment={"message": "test comment"},
+            thehive_url="https://hive.local",
+            api_key="key123",
+        )
+        kwargs.update(overrides)
+        return add_comment_to_item(**kwargs)
+
+    def test_posts_new_comment_when_no_existing(self):
+        # Query returns empty list → POST new comment
+        responses = [
+            MagicMock(**{"json.return_value": []}),  # query response
+            MagicMock(),  # POST new comment
+        ]
+        with patch(
+            "score_process.score_utils.thehive.phishing._thehive_request",
+            side_effect=responses,
+        ) as mock_req:
+            self._call()
+        self.assertEqual(mock_req.call_count, 2)
+        # Second call should be POST to add_comment URL
+        second_call = mock_req.call_args_list[1]
+        self.assertEqual(second_call[0][0], "POST")
+
+    def test_patches_existing_recent_comment(self):
+        import time
+        existing = {
+            "_id": "comment1",
+            "createdAt": int(time.time() * 1000) - 1000,  # 1 second ago — recent
+            "createdBy": "suspicious",  # match thehive_config user
+        }
+        responses = [
+            MagicMock(**{"json.return_value": [existing]}),
+            MagicMock(),
+        ]
+        # Patch thehive_config to return matching user
+        with patch("score_process.score_utils.thehive.phishing.thehive_config", {"user": "suspicious"}):
+            with patch(
+                "score_process.score_utils.thehive.phishing._thehive_request",
+                side_effect=responses,
+            ) as mock_req:
+                self._call()
+        self.assertEqual(mock_req.call_count, 2)
+        # Second call should be PATCH
+        second_call = mock_req.call_args_list[1]
+        self.assertEqual(second_call[0][0], "PATCH")
+
+    def test_circuit_breaker_open_skips_silently(self):
+        with patch(
+            "score_process.score_utils.thehive.phishing._thehive_request",
+            side_effect=pybreaker.CircuitBreakerError(),
+        ):
+            # Should not raise
+            self._call()
+
+    def test_request_exception_triggers_fallback_post(self):
+        # Query fails → fallback POST fires
+        fallback_resp = MagicMock()
+        with patch(
+            "score_process.score_utils.thehive.phishing._thehive_request",
+            side_effect=[requests.ConnectionError("query failed"), fallback_resp],
+        ) as mock_req:
+            self._call()
+        self.assertEqual(mock_req.call_count, 2)
+        # Second call must be POST
+        second_call = mock_req.call_args_list[1]
+        self.assertEqual(second_call[0][0], "POST")
+
+    def test_fallback_post_breaker_open_no_crash(self):
+        # Query fails, then breaker open on fallback — must not raise
+        with patch(
+            "score_process.score_utils.thehive.phishing._thehive_request",
+            side_effect=[
+                requests.ConnectionError("query failed"),
+                pybreaker.CircuitBreakerError(),
+            ],
+        ):
+            self._call()  # must not raise
+
+    def test_skips_invalid_item_type(self):
+        with patch("score_process.score_utils.thehive.phishing._thehive_request") as mock_req:
+            self._call(item_type="invalid")
+        mock_req.assert_not_called()
