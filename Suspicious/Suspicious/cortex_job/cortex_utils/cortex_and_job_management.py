@@ -3,7 +3,9 @@ import logging
 import os
 from datetime import datetime, timedelta
 
+import pybreaker
 from cortex4py.api import Api
+from common.http_client import TimeoutHTTPAdapter, get_breaker, RETRY
 from cortex_job.models import Analyzer, AnalyzerReport
 from mail_feeder.models import MailBody, MailArchive, MailInfo, MailHeader
 from score_process.scoring.cortex_analyzers.reports import CortexAnalyzerReports
@@ -39,9 +41,33 @@ API_KEY = cortex_config.get("api_key", "your_api_key_here")
 
 try:
     API = Api(API_URL, API_KEY, proxies={"http": "", "https": ""})
+    _adapter = TimeoutHTTPAdapter()
+    try:
+        API._Api__session.mount("https://", _adapter)
+        API._Api__session.mount("http://", _adapter)
+    except AttributeError:
+        fetch_mail_logger.warning(
+            "Could not mount TimeoutHTTPAdapter on module-level Cortex API session"
+        )
 except Exception as e:
     fetch_mail_logger.error(f"Failed to initialize Cortex API: {e}")
     API = None
+
+_cortex_breaker = get_breaker("cortex")
+
+
+@RETRY
+def _fetch_job(api, job_id: str):
+    """Fetch a Cortex job by ID with retry and circuit breaker."""
+    with _cortex_breaker:
+        return api.jobs.get_by_id(job_id)
+
+
+@RETRY
+def _fetch_report(api, job_id: str):
+    """Fetch a Cortex job report by ID with retry and circuit breaker."""
+    with _cortex_breaker:
+        return api.jobs.get_report(job_id)
 
 
 class CortexJob:
@@ -68,6 +94,16 @@ class CortexJob:
         except Exception as e:
             fetch_mail_logger.error(f"Failed to initialize Cortex API: {e}")
             self.api = None
+
+        if self.api is not None:
+            _inst_adapter = TimeoutHTTPAdapter()
+            try:
+                self.api._Api__session.mount("https://", _inst_adapter)
+                self.api._Api__session.mount("http://", _inst_adapter)
+            except AttributeError:
+                fetch_mail_logger.warning(
+                    "Could not mount TimeoutHTTPAdapter on CortexJob API session"
+                )
 
     def launch_cortex_jobs(self, value, data_type):
         """
@@ -597,26 +633,36 @@ class CortexJobManager:
 
     @staticmethod
     def get_job_from_api(job_id):
-        apis = [API]  # extendable list of APIs
-        for api in apis:
+        for api in [API]:
+            if api is None:
+                continue
             try:
-                job = api.jobs.get_by_id(job_id)
+                job = _fetch_job(api, job_id)
                 if job:
                     return job
+            except pybreaker.CircuitBreakerError as e:
+                update_cases_logger.warning(
+                    "[breaker:cortex] open — get_job_from_api skipped for job %s: %s", job_id, e
+                )
             except Exception as e:
                 update_cases_logger.error(
                     f"Error fetching job {job_id}: {e}", exc_info=True
                 )
-        return "old_job"  # return "old_job" only if not found in any API
+        return "old_job"
 
     @staticmethod
     def get_report_from_api(job_id):
-        apis = [API]
-        for api in apis:
+        for api in [API]:
+            if api is None:
+                continue
             try:
-                report = api.jobs.get_report(job_id)
+                report = _fetch_report(api, job_id)
                 if report:
                     return getattr(report, "report", None)
+            except pybreaker.CircuitBreakerError as e:
+                update_cases_logger.warning(
+                    "[breaker:cortex] open — get_report_from_api skipped for job %s: %s", job_id, e
+                )
             except Exception as e:
                 update_cases_logger.error(
                     f"Error fetching report for job {job_id}: {e}", exc_info=True
