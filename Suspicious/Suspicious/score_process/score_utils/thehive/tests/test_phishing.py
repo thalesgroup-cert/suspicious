@@ -1,0 +1,180 @@
+"""
+Tests for score_process.score_utils.thehive.phishing
+
+Patches _thehive_request directly — retry/breaker behaviour is tested
+separately in common/tests/test_http_client.py.
+"""
+import sys
+import json
+import unittest
+from unittest.mock import MagicMock, patch, mock_open
+
+import pybreaker
+import requests
+
+
+# ---------------------------------------------------------------------------
+# Stub out heavy / unavailable dependencies before any import of phishing.py
+# ---------------------------------------------------------------------------
+
+# Stub pydantic (not installed in test environment)
+_pydantic_stub = MagicMock()
+sys.modules.setdefault("pydantic", _pydantic_stub)
+
+# Stub the utils / models sub-modules so we don't need pydantic at all
+_utils_stub = MagicMock()
+_models_stub = MagicMock()
+sys.modules.setdefault("score_process.score_utils.thehive.utils", _utils_stub)
+sys.modules.setdefault("score_process.score_utils.thehive.models", _models_stub)
+
+# Provide a fake settings.json so the module-level open() call succeeds
+_FAKE_SETTINGS = json.dumps({
+    "integrations": {
+        "thehive": {
+            "certificate_path": None,
+            "user": "admin",
+        }
+    }
+})
+
+
+def _patch_open():
+    """Return a context manager that stubs open('/app/settings.json')."""
+    return patch("builtins.open", mock_open(read_data=_FAKE_SETTINGS))
+
+
+# ---------------------------------------------------------------------------
+# Helper: import phishing with patched open so module-level code works
+# ---------------------------------------------------------------------------
+
+def _import_phishing():
+    # Remove cached module so open() patch takes effect on first real import
+    for key in list(sys.modules):
+        if "phishing" in key and "test" not in key:
+            del sys.modules[key]
+    with _patch_open():
+        import score_process.score_utils.thehive.phishing as ph
+    return ph
+
+
+# Pre-import once so subsequent test-method imports are cheap
+with _patch_open():
+    import score_process.score_utils.thehive.phishing  # noqa: F401 — side-effect import
+
+
+# ---------------------------------------------------------------------------
+# Tests
+# ---------------------------------------------------------------------------
+
+class TestCreateNewAlert(unittest.TestCase):
+
+    def _call(self, **overrides):
+        from score_process.score_utils.thehive.phishing import create_new_alert
+        kwargs = dict(
+            ticket_id="REF-001",
+            title="Test alert",
+            description="Desc",
+            severity=2,
+            tlp=1,
+            pap=1,
+            app_name="suspicious",
+            thehive_url="https://hive.local",
+            api_key="key123",
+        )
+        kwargs.update(overrides)
+        return create_new_alert(**kwargs)
+
+    def test_returns_alert_dict_on_success(self):
+        mock_resp = MagicMock()
+        mock_resp.json.return_value = {"_id": "~alert42"}
+
+        with patch("score_process.score_utils.thehive.phishing._thehive_request", return_value=mock_resp):
+            result = self._call()
+
+        self.assertEqual(result, {"_id": "~alert42"})
+
+    def test_returns_none_on_request_exception(self):
+        with patch(
+            "score_process.score_utils.thehive.phishing._thehive_request",
+            side_effect=requests.ConnectionError("down"),
+        ):
+            result = self._call()
+
+        self.assertIsNone(result)
+
+    def test_returns_none_on_circuit_breaker_open(self):
+        with patch(
+            "score_process.score_utils.thehive.phishing._thehive_request",
+            side_effect=pybreaker.CircuitBreakerError(),
+        ):
+            result = self._call()
+
+        self.assertIsNone(result)
+
+    def test_auto_generates_ticket_id_when_none(self):
+        mock_resp = MagicMock()
+        mock_resp.json.return_value = {"_id": "~auto"}
+
+        with patch("score_process.score_utils.thehive.phishing._thehive_request", return_value=mock_resp):
+            result = self._call(ticket_id=None)
+
+        self.assertEqual(result, {"_id": "~auto"})
+
+
+class TestGetItemFromId(unittest.TestCase):
+
+    def _call(self, item_id="~42"):
+        from score_process.score_utils.thehive.phishing import get_item_from_id
+        return get_item_from_id(item_id, "https://hive.local", "key123")
+
+    def test_returns_case_type_and_data(self):
+        mock_resp = MagicMock()
+        mock_resp.json.return_value = {"_id": "~42", "title": "case"}
+
+        with patch("score_process.score_utils.thehive.phishing._thehive_request", return_value=mock_resp):
+            item_type, data = self._call()
+
+        self.assertEqual(item_type, "case")
+        self.assertEqual(data["_id"], "~42")
+
+    def test_returns_none_none_when_not_found(self):
+        err = requests.HTTPError()
+        err.response = MagicMock(status_code=404)
+
+        with patch("score_process.score_utils.thehive.phishing._thehive_request", side_effect=err):
+            item_type, data = self._call()
+
+        self.assertIsNone(item_type)
+        self.assertIsNone(data)
+
+    def test_returns_none_none_on_breaker_open(self):
+        with patch(
+            "score_process.score_utils.thehive.phishing._thehive_request",
+            side_effect=pybreaker.CircuitBreakerError(),
+        ):
+            item_type, data = self._call()
+
+        self.assertIsNone(item_type)
+        self.assertIsNone(data)
+
+
+class TestAddObservablesToItem(unittest.TestCase):
+
+    def _call(self):
+        from score_process.score_utils.thehive.phishing import add_observables_to_item
+        return add_observables_to_item(
+            "alert", "~42", [{"dataType": "url", "data": "http://evil.test"}],
+            "https://hive.local", "key123",
+        )
+
+    def test_posts_each_observable(self):
+        mock_resp = MagicMock()
+        with patch("score_process.score_utils.thehive.phishing._thehive_request", return_value=mock_resp) as mock_req:
+            self._call()
+        self.assertEqual(mock_req.call_count, 1)
+
+    def test_skips_invalid_item_type(self):
+        from score_process.score_utils.thehive.phishing import add_observables_to_item
+        with patch("score_process.score_utils.thehive.phishing._thehive_request") as mock_req:
+            add_observables_to_item("invalid", "~42", [{}], "https://hive.local", "key123")
+        mock_req.assert_not_called()
