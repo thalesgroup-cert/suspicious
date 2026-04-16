@@ -75,3 +75,123 @@ class TestMakeSession(unittest.TestCase):
         adapter = session.get_adapter("https://example.com")
         self.assertEqual(adapter.connect_timeout, 2)
         self.assertEqual(adapter.read_timeout, 15)
+
+
+class TestBreakers(unittest.TestCase):
+    """BREAKERS dict has one CircuitBreaker per integration, correctly configured."""
+
+    def test_all_four_integrations_present(self):
+        from common.http_client import BREAKERS
+        for name in ("cortex", "thehive", "misp", "virustotal"):
+            self.assertIn(name, BREAKERS, f"Missing breaker for {name!r}")
+
+    def test_breaker_fail_max_and_reset_timeout(self):
+        from common.http_client import BREAKERS, BREAKER_FAIL_MAX, BREAKER_RESET_TIMEOUT
+        self.assertEqual(BREAKER_FAIL_MAX, 5)
+        self.assertEqual(BREAKER_RESET_TIMEOUT, 60)
+        for name, breaker in BREAKERS.items():
+            self.assertEqual(breaker.fail_max, BREAKER_FAIL_MAX, name)
+            self.assertEqual(breaker.reset_timeout, BREAKER_RESET_TIMEOUT, name)
+
+    def test_get_breaker_returns_same_instance(self):
+        from common.http_client import BREAKERS, get_breaker
+        self.assertIs(get_breaker("thehive"), BREAKERS["thehive"])
+
+    def test_get_breaker_raises_for_unknown_name(self):
+        from common.http_client import get_breaker
+        with self.assertRaises(KeyError):
+            get_breaker("unknown_integration")
+
+
+class TestRetryDecorator(unittest.TestCase):
+    """RETRY retries on ConnectionError/Timeout/5xx but not 4xx."""
+
+    def test_retries_on_connection_error_and_succeeds(self):
+        from common.http_client import RETRY
+        call_count = 0
+
+        @RETRY
+        def flaky():
+            nonlocal call_count
+            call_count += 1
+            if call_count < 3:
+                raise requests.ConnectionError("down")
+            return "ok"
+
+        with patch("tenacity.nap.time.sleep"):  # suppress actual sleep
+            result = flaky()
+
+        self.assertEqual(result, "ok")
+        self.assertEqual(call_count, 3)
+
+    def test_raises_after_three_failed_attempts(self):
+        from common.http_client import RETRY
+        call_count = 0
+
+        @RETRY
+        def always_fails():
+            nonlocal call_count
+            call_count += 1
+            raise requests.ConnectionError("always down")
+
+        with patch("tenacity.nap.time.sleep"):
+            with self.assertRaises(requests.ConnectionError):
+                always_fails()
+
+        self.assertEqual(call_count, 3)
+
+    def test_does_not_retry_on_4xx(self):
+        from common.http_client import RETRY
+        call_count = 0
+
+        @RETRY
+        def client_error():
+            nonlocal call_count
+            call_count += 1
+            resp = MagicMock()
+            resp.status_code = 404
+            raise requests.HTTPError(response=resp)
+
+        with patch("tenacity.nap.time.sleep"):
+            with self.assertRaises(requests.HTTPError):
+                client_error()
+
+        self.assertEqual(call_count, 1)  # no retry on 4xx
+
+    def test_retries_on_5xx_and_succeeds(self):
+        from common.http_client import RETRY
+        call_count = 0
+
+        @RETRY
+        def server_error():
+            nonlocal call_count
+            call_count += 1
+            resp = MagicMock()
+            resp.status_code = 503
+            if call_count < 3:
+                raise requests.HTTPError(response=resp)
+            return "ok"
+
+        with patch("tenacity.nap.time.sleep"):
+            result = server_error()
+
+        self.assertEqual(result, "ok")
+        self.assertEqual(call_count, 3)
+
+    def test_retries_on_timeout(self):
+        from common.http_client import RETRY
+        call_count = 0
+
+        @RETRY
+        def timeout_once():
+            nonlocal call_count
+            call_count += 1
+            if call_count == 1:
+                raise requests.Timeout("timed out")
+            return "ok"
+
+        with patch("tenacity.nap.time.sleep"):
+            result = timeout_once()
+
+        self.assertEqual(result, "ok")
+        self.assertEqual(call_count, 2)

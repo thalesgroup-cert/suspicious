@@ -46,3 +46,57 @@ def make_session(
     session.mount("https://", adapter)
     session.mount("http://", adapter)
     return session
+
+
+import pybreaker
+import tenacity
+from tenacity import (
+    retry_if_exception,
+    retry_if_exception_type,
+    stop_after_attempt,
+    wait_exponential,
+)
+
+BREAKER_FAIL_MAX: int      = 5
+BREAKER_RESET_TIMEOUT: int = 60  # seconds
+
+BREAKERS: dict[str, pybreaker.CircuitBreaker] = {
+    "cortex":     pybreaker.CircuitBreaker(fail_max=BREAKER_FAIL_MAX, reset_timeout=BREAKER_RESET_TIMEOUT),
+    "thehive":    pybreaker.CircuitBreaker(fail_max=BREAKER_FAIL_MAX, reset_timeout=BREAKER_RESET_TIMEOUT),
+    "misp":       pybreaker.CircuitBreaker(fail_max=BREAKER_FAIL_MAX, reset_timeout=BREAKER_RESET_TIMEOUT),
+    "virustotal": pybreaker.CircuitBreaker(fail_max=BREAKER_FAIL_MAX, reset_timeout=BREAKER_RESET_TIMEOUT),
+}
+
+
+def get_breaker(name: str) -> pybreaker.CircuitBreaker:
+    """Return the CircuitBreaker for the named integration.
+
+    Raises KeyError if *name* is not registered in BREAKERS.
+    """
+    if name not in BREAKERS:
+        raise KeyError(f"No circuit breaker registered for {name!r}")
+    return BREAKERS[name]
+
+
+def _is_retryable_http_error(exc: BaseException) -> bool:
+    """Return True for HTTP 5xx errors only — 4xx are client errors, never retried."""
+    return (
+        isinstance(exc, requests.HTTPError)
+        and getattr(exc, "response", None) is not None
+        and exc.response.status_code >= 500
+    )
+
+
+#: Retry decorator for outbound integration calls.
+#: Retries on ConnectionError, Timeout, and HTTP 5xx.
+#: Does NOT retry on HTTP 4xx or CircuitBreakerError.
+#: After 3 attempts the original exception is re-raised (reraise=True).
+RETRY = tenacity.retry(
+    retry=(
+        retry_if_exception_type((requests.ConnectionError, requests.Timeout))
+        | retry_if_exception(_is_retryable_http_error)
+    ),
+    wait=wait_exponential(multiplier=1, min=1, max=4),
+    stop=stop_after_attempt(3),
+    reraise=True,
+)
