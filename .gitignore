@@ -18,7 +18,7 @@ settings.json
 .vscode
 .DS_Store
 Thumbs.db
-
+docs/superpowers
 # Node.js
 node_modules
 

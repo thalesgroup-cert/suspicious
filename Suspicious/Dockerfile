@@ -7,7 +7,7 @@
 #################################################
 #               BUILD ARGS                      #
 #################################################
-ARG PYTHON_VERSION=3.11.14
+ARG PYTHON_VERSION=3.12.13
 ARG DEBIAN_SUITE=bookworm
 ARG HTTP_PROXY
 ARG HTTPS_PROXY
