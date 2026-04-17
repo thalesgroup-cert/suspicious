@@ -39,7 +39,8 @@ def _check_no_ssrf_ip(url: str) -> None:
     here — DNS-time checks are phase-2 work.
 
     Blocked: loopback, RFC-1918 private, link-local (169.254.x.x / fe80::),
-             unique-local IPv6 (fc00::/7), multicast, reserved, unspecified.
+             unique-local IPv6 (fc00::/7), multicast, reserved, unspecified,
+             CGNAT (100.64.0.0/10, RFC 6598).
     """
     hostname = urlparse(url).hostname  # strips [] from IPv6 literals; None-safe
     if not hostname:
