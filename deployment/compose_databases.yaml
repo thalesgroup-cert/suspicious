@@ -98,6 +98,26 @@ services:
     networks:
       - suspicious_network
 
+  redis_broker:
+    init: true
+    restart: always
+    expose:
+      - "6379"
+    security_opt:
+      - no-new-privileges:true
+    networks:
+      - suspicious_network
+
+  redis_cache:
+    init: true
+    restart: always
+    expose:
+      - "6379"
+    security_opt:
+      - no-new-privileges:true
+    networks:
+      - suspicious_network
+
 # Volume stubs — the named volumes are declared in docker-compose.yml.
 # These stubs satisfy Compose's requirement that volumes referenced by
 # a service must be declared somewhere in the same file or be external.
