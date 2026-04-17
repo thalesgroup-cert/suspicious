@@ -33,6 +33,8 @@ services:
         condition: service_healthy
       chromadb:
         condition: service_started
+      redis_cache:
+        condition: service_healthy
     healthcheck:
       test: ["CMD-SHELL", "curl -sf http://localhost:9020/admin/login/?next=/admin/ -o /dev/null || exit 1"]
       interval: 30s
@@ -73,7 +75,7 @@ services:
       suspicious:
         condition: service_healthy
       redis_broker:
-        condition: service_started
+        condition: service_healthy
 
   # ── Data stores ───────────────────────────────────────────────────────────
 

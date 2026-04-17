@@ -6,7 +6,7 @@
 # Changes from previous version
 # ──────────────────────────────
 # - feeder: healthcheck added (was missing — make status showed unknown)
-# - suspicious_cron: healthcheck added so dependent services can gate on it
+# - suspicious_cron: replaced by suspicious_celery (Celery worker + Beat scheduler)
 # - Both use `test: ["CMD-SHELL", ...]` to keep the check inline
 
 services:
