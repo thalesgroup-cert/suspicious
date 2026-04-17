@@ -31,12 +31,17 @@ def sync_cortex_analyzers(config_path: str = CONFIG_PATH) -> None:
 
     api = Api(str(cfg.cortex.url), cfg.cortex.api_key)
 
-    # Mount a timeout adapter on cortex4py's internal session
+    # Mount a timeout adapter on cortex4py's internal session.
+    # Probe known attribute names across cortex4py versions.
     _adapter = TimeoutHTTPAdapter()
-    try:
-        api._Api__session.mount("https://", _adapter)
-        api._Api__session.mount("http://", _adapter)
-    except AttributeError:
+    _sess = next(
+        (getattr(api, a) for a in ("_Api__session", "_session", "session") if hasattr(api, a)),
+        None,
+    )
+    if _sess is not None:
+        _sess.mount("https://", _adapter)
+        _sess.mount("http://", _adapter)
+    else:
         log_analyzers.warning(
             "Could not mount TimeoutHTTPAdapter on cortex4py session — "
             "timeout not guaranteed for Cortex calls"

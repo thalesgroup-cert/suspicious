@@ -42,10 +42,14 @@ API_KEY = cortex_config.get("api_key", "your_api_key_here")
 try:
     API = Api(API_URL, API_KEY, proxies={"http": "", "https": ""})
     _adapter = TimeoutHTTPAdapter()
-    try:
-        API._Api__session.mount("https://", _adapter)
-        API._Api__session.mount("http://", _adapter)
-    except AttributeError:
+    _sess = next(
+        (getattr(API, a) for a in ("_Api__session", "_session", "session") if hasattr(API, a)),
+        None,
+    )
+    if _sess is not None:
+        _sess.mount("https://", _adapter)
+        _sess.mount("http://", _adapter)
+    else:
         fetch_mail_logger.warning(
             "Could not mount TimeoutHTTPAdapter on module-level Cortex API session"
         )
@@ -97,10 +101,14 @@ class CortexJob:
 
         if self.api is not None:
             _inst_adapter = TimeoutHTTPAdapter()
-            try:
-                self.api._Api__session.mount("https://", _inst_adapter)
-                self.api._Api__session.mount("http://", _inst_adapter)
-            except AttributeError:
+            _inst_sess = next(
+                (getattr(self.api, a) for a in ("_Api__session", "_session", "session") if hasattr(self.api, a)),
+                None,
+            )
+            if _inst_sess is not None:
+                _inst_sess.mount("https://", _inst_adapter)
+                _inst_sess.mount("http://", _inst_adapter)
+            else:
                 fetch_mail_logger.warning(
                     "Could not mount TimeoutHTTPAdapter on CortexJob API session"
                 )
