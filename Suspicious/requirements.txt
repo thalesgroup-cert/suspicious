@@ -32,7 +32,6 @@ simhash==2.1.2
 fontawesomefree==6.6.0
 
 # Web Framework and Application Enhancements
-django-crontab==0.7.1
 django-import-export==4.4.0
 
 # Request Handling
@@ -70,3 +69,7 @@ sphinx-rtd-theme==3.0.2
 myst-parser==4.0.1
 pillow==12.1.1
 cairosvg==2.9.0
+
+# Task Queue
+celery[redis]~=5.3
+django-celery-results~=2.5
