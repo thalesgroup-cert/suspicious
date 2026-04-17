@@ -5,7 +5,7 @@
 #   1. Pull latest images (no downtime — just downloads)
 #   2. Run database migrations (forward-compatible migrations first)
 #   3. Restart suspicious (rolling — healthcheck gates the cutover)
-#   4. Restart suspicious_cron (simple restart, no web traffic)
+#   4. Restart suspicious_celery (Celery worker + Beat, no web traffic)
 #   5. Restart feeder (simple restart)
 #   6. Restart suspicious_ui (static files, near-instant)
 #
@@ -56,10 +56,10 @@ $COMPOSE up -d --no-deps suspicious
 bash "${SCRIPTS}/health-wait.sh" suspicious 120
 ok "suspicious restarted"
 
-# ── 6. Restart cron worker ────────────────────────────────────────────────
-step "Restarting suspicious_cron"
-$COMPOSE up -d --no-deps suspicious_cron
-ok "suspicious_cron restarted"
+# ── 6. Restart Celery worker + Beat ──────────────────────────────────────
+step "Restarting suspicious_celery"
+$COMPOSE up -d --no-deps suspicious_celery
+ok "suspicious_celery restarted"
 
 # ── 7. Restart feeder ────────────────────────────────────────────────────
 step "Restarting feeder"

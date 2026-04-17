@@ -33,6 +33,8 @@ services:
         condition: service_healthy
       chromadb:
         condition: service_started
+      redis_cache:
+        condition: service_healthy
     healthcheck:
       test: ["CMD-SHELL", "curl -sf http://localhost:9020/admin/login/?next=/admin/ -o /dev/null || exit 1"]
       interval: 30s
@@ -40,16 +42,16 @@ services:
       retries: 10
       start_period: 60s
 
-  # Cron worker — same image, separate container, no web server.
-  # Keeps the web container lean and makes cron failures independently visible.
-  suspicious_cron:
+  suspicious_celery:
     extends:
       file: compose_apps.yaml
-      service: suspicious_cron
+      service: suspicious_celery
     image: ghcr.io/thalesgroup-cert/suspicious:${SUSPICIOUS_VERSION:?SUSPICIOUS_VERSION is required}
-    container_name: suspicious_cron
+    container_name: suspicious_celery
     depends_on:
       suspicious:
+        condition: service_healthy
+      redis_broker:
         condition: service_healthy
 
   suspicious_ui:
@@ -125,6 +127,20 @@ services:
       service: chromadb
     image: chromadb/chroma:${CHROMADB_VERSION:?CHROMADB_VERSION is required}
     container_name: chromadb
+
+  redis_broker:
+    extends:
+      file: compose_databases.yaml
+      service: redis_broker
+    image: redis:${REDIS_BROKER_VERSION:-7-alpine}
+    container_name: redis_broker
+
+  redis_cache:
+    extends:
+      file: compose_databases.yaml
+      service: redis_cache
+    image: redis:${REDIS_CACHE_VERSION:-7-alpine}
+    container_name: redis_cache
 
   # ── Analyzers ─────────────────────────────────────────────────────────────
 

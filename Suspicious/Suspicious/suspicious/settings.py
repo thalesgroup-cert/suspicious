@@ -476,6 +476,10 @@ CELERY_TASK_SERIALIZER    = "json"
 CELERY_ACCEPT_CONTENT     = ["json"]
 CELERY_TIMEZONE           = _app.get("timezone", "UTC")
 
+if "test" in sys.argv:
+    CELERY_TASK_ALWAYS_EAGER    = True
+    CELERY_TASK_EAGER_PROPAGATES = True
+
 CELERY_BEAT_SCHEDULE = {
     "fetch-emails": {
         "task": "tasp.tasks.fetch_emails",
