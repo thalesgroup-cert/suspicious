@@ -74,6 +74,7 @@ class AnalyzerAI(BaseAnalyzer):
         return {
             "url": cfg.get("url", ""),
             "key": cfg.get("api_key", ""),
+            "verify": bool(cfg.get("certificate_path", True)),
         }
 
     @cached_property
@@ -207,6 +208,7 @@ class AnalyzerAI(BaseAnalyzer):
     ) -> None:
         hive_url = self._thehive["url"]
         hive_key = self._thehive["key"]
+        hive_verify = self._thehive["verify"]
 
         embedding = response["details"]["report"].get("email_embedding")
         similar   = get_similar_dangerous_mails(embedding, collection) if embedding else {}
@@ -246,7 +248,7 @@ class AnalyzerAI(BaseAnalyzer):
 
         for case_id in all_case_ids:
             self._attach_case_to_alert(
-                case_id, alert_id, item_type, minio_client, hive_url, hive_key
+                case_id, alert_id, item_type, minio_client, hive_url, hive_key, hive_verify
             )
 
         self._add_to_chroma(collection, alert_id=alert_id, source_ref=item.get("sourceRef", ""))
@@ -300,6 +302,7 @@ class AnalyzerAI(BaseAnalyzer):
         minio_client: Minio,
         hive_url: str,
         hive_key: str,
+        verify: str | bool = True,
     ) -> None:
         try:
             case        = Case.objects.get(id=case_id)
@@ -311,7 +314,7 @@ class AnalyzerAI(BaseAnalyzer):
 
             if zip_bytes:
                 add_binary_attachment_to_item(
-                    item_type, alert_id, zip_name, zip_bytes, hive_url, hive_key
+                    item_type, alert_id, zip_name, zip_bytes, hive_url, hive_key, verify
                 )
             if headers:
                 add_observables_to_item(
