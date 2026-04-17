@@ -10,6 +10,10 @@ DEFAULT_CONTEXT_MAX_LENGTH = 2000
 DEFAULT_OTHER_MAX_LENGTH = 4096
 DEFAULT_UPLOAD_MAX_BYTES = 25 * 1024 * 1024  # 25 MB
 
+_BLOCKED_NETWORKS = (
+    ipaddress.ip_network("100.64.0.0/10"),   # RFC 6598 CGNAT
+)
+
 
 class OptionalContextMixin(serializers.Serializer):
     context = serializers.CharField(
@@ -53,6 +57,7 @@ def _check_no_ssrf_ip(url: str) -> None:
         or addr.is_multicast
         or addr.is_reserved
         or addr.is_unspecified
+        or any(addr in net for net in _BLOCKED_NETWORKS)
     ):
         raise ValueError("URL targets a private or reserved address.")
 

@@ -101,6 +101,12 @@ class TestCheckNoSsrfIp(unittest.TestCase):
         with self.assertRaises(ValueError):
             _check_no_ssrf_ip("http://0.0.0.0/")
 
+    # ── Blocked: CGNAT (RFC 6598) ──────────────────────────────────────────
+
+    def test_blocks_cgnat(self):
+        with self.assertRaises(ValueError):
+            _check_no_ssrf_ip("http://100.64.0.1/")
+
     # ── Allowed: public IPs ────────────────────────────────────────────────
 
     def test_allows_public_ip(self):
