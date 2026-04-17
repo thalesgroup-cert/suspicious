@@ -99,6 +99,7 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
         shared-mime-info \
         fonts-dejavu-core \
         cron \
+        celery \
     && rm -rf /var/lib/apt/lists/* \
     && mkdir -p /var/log \
     && touch /var/log/cron.log

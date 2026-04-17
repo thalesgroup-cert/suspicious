@@ -33,5 +33,9 @@ class TaskResultAdmin(_Base):
     requeue_failed.short_description = "Requeue selected failed tasks"
 
 
-admin.site.register(TaskResult, TaskResultAdmin)
+try:
+    admin.site.unregister(TaskResult)
+except admin.sites.NotRegistered:
+    pass
 
+admin.site.register(TaskResult, TaskResultAdmin)

@@ -42,18 +42,6 @@ services:
       retries: 10
       start_period: 60s
 
-  suspicious_celery:
-    extends:
-      file: compose_apps.yaml
-      service: suspicious_celery
-    image: ghcr.io/thalesgroup-cert/suspicious:${SUSPICIOUS_VERSION:?SUSPICIOUS_VERSION is required}
-    container_name: suspicious_celery
-    depends_on:
-      suspicious:
-        condition: service_healthy
-      redis_broker:
-        condition: service_healthy
-
   suspicious_ui:
     extends:
       file: compose_apps.yaml
@@ -76,6 +64,18 @@ services:
       - "traefik.http.services.suspicious-ui.loadbalancer.server.port=80"
       # Security headers via Traefik middleware
       - "traefik.http.routers.suspicious-ui.middlewares=security-headers@file"
+
+  suspicious_celery:
+    extends:
+      file: compose_apps.yaml
+      service: suspicious_celery
+    image: ghcr.io/thalesgroup-cert/suspicious:${SUSPICIOUS_VERSION:?SUSPICIOUS_VERSION is required}
+    container_name: suspicious_celery
+    depends_on:
+      suspicious:
+        condition: service_healthy
+      redis_broker:
+        condition: service_healthy
 
   # ── Data stores ───────────────────────────────────────────────────────────
 
@@ -132,14 +132,14 @@ services:
     extends:
       file: compose_databases.yaml
       service: redis_broker
-    image: redis:${REDIS_BROKER_VERSION:-7-alpine}
+    image: valkey/valkey:${REDIS_BROKER_VERSION:-9-alpine}
     container_name: redis_broker
 
   redis_cache:
     extends:
       file: compose_databases.yaml
       service: redis_cache
-    image: redis:${REDIS_CACHE_VERSION:-7-alpine}
+    image: valkey/valkey:${REDIS_CACHE_VERSION:-9-alpine}
     container_name: redis_cache
 
   # ── Analyzers ─────────────────────────────────────────────────────────────
