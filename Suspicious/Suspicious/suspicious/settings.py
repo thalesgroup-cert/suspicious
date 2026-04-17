@@ -215,12 +215,15 @@ DEFAULT_AUTO_FIELD = "django.db.models.BigAutoField"
 
 _redis_cache_host = _redis_cfg.get("cache_host", "redis_cache")
 
-CACHES = {
-    "default": {
-        "BACKEND": "django.core.cache.backends.redis.RedisCache",
-        "LOCATION": f"redis://{_redis_cache_host}:6379/0",
+if "test" in sys.argv:
+    CACHES = {"default": {"BACKEND": "django.core.cache.backends.locmem.LocMemCache"}}
+else:
+    CACHES = {
+        "default": {
+            "BACKEND": "django.core.cache.backends.redis.RedisCache",
+            "LOCATION": f"redis://{_redis_cache_host}:6379/0",
+        }
     }
-}
 
 # ---------------------------------------------------------------------------
 # Sessions — Redis cache backend (eliminates per-request DB session lookup)
@@ -462,7 +465,7 @@ SUBMISSION_ELEVATED_GROUPS = ("CERT", "CISO", "Admin")
 # Celery — broker (redis_broker container) + result backend (MariaDB)
 # ---------------------------------------------------------------------------
 
-from celery.schedules import crontab  # noqa: E402 — after sys.path setup
+from celery.schedules import crontab  # noqa: E402 — intentional mid-file import for BEAT_SCHEDULE
 
 _redis_broker_host = _redis_cfg.get("broker_host", "redis_broker")
 
@@ -471,6 +474,7 @@ CELERY_RESULT_BACKEND     = "django-db"
 CELERY_TASK_TRACK_STARTED = True
 CELERY_TASK_SERIALIZER    = "json"
 CELERY_ACCEPT_CONTENT     = ["json"]
+CELERY_TIMEZONE           = _app.get("timezone", "UTC")
 
 CELERY_BEAT_SCHEDULE = {
     "fetch-emails": {
