@@ -1,4 +1,7 @@
 # api/serializers/submit.py
+import ipaddress
+from urllib.parse import urlparse
+
 from django.conf import settings
 from rest_framework import serializers
 
@@ -24,6 +27,36 @@ class OptionalContextMixin(serializers.Serializer):
         return context.strip()
 
 
+def _check_no_ssrf_ip(url: str) -> None:
+    """
+    Reject URLs whose hostname is a private/reserved IP address literal.
+
+    Raises ValueError for blocked addresses. Domain names are not resolved
+    here — DNS-time checks are phase-2 work.
+
+    Blocked: loopback, RFC-1918 private, link-local (169.254.x.x / fe80::),
+             unique-local IPv6 (fc00::/7), multicast, reserved, unspecified.
+    """
+    hostname = urlparse(url).hostname  # strips [] from IPv6 literals; None-safe
+    if not hostname:
+        return
+
+    try:
+        addr = ipaddress.ip_address(hostname)
+    except ValueError:
+        return  # hostname is a domain name — pass through
+
+    if (
+        addr.is_loopback
+        or addr.is_private
+        or addr.is_link_local
+        or addr.is_multicast
+        or addr.is_reserved
+        or addr.is_unspecified
+    ):
+        raise ValueError("URL targets a private or reserved address.")
+
+
 class SubmitUrlSerializer(OptionalContextMixin, serializers.Serializer):
     url = serializers.URLField(required=True)
 
@@ -34,6 +67,10 @@ class SubmitUrlSerializer(OptionalContextMixin, serializers.Serializer):
         # acts as a safety net in case the value slips through uncorrected.
         if value and not value.startswith(("http://", "https://")):
             value = f"http://{value}"
+        try:
+            _check_no_ssrf_ip(value)
+        except ValueError as exc:
+            raise serializers.ValidationError(str(exc)) from exc
         return value
 
 
