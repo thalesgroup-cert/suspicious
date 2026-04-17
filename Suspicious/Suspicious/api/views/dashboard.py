@@ -36,11 +36,13 @@ from api.views.mixins import MonthYearQueryMixin
 from dashboard.models import UserCasesMonthlyStats, GroupMonthlyStats
 from api.serializers.dashboard import TopPrefixesResponseSerializer
 
+DASHBOARD_CACHE_TTL = 120  # 2 minutes — matches KPI sync cadence
+
+
 class DashboardSummaryView(APIView):
     permission_classes = [IsAuthenticated]
 
     DEFAULT_TOP_PREFIXES_LIMIT = 10
-    DASHBOARD_CACHE_TTL = 120  # 2 minutes
 
     @extend_schema(
         parameters=[
@@ -73,7 +75,7 @@ class DashboardSummaryView(APIView):
         payload = cache.get(cache_key)
         if payload is None:
             payload = self._build_summary_payload(month=month, year=year, scope=scope)
-            cache.set(cache_key, payload, self.DASHBOARD_CACHE_TTL)
+            cache.set(cache_key, payload, DASHBOARD_CACHE_TTL)
 
         response_serializer = DashboardSummaryResponseSerializer(instance=payload)
         return Response(response_serializer.data)
@@ -277,7 +279,7 @@ class MonthlyCasesSummaryAggregateView(MonthYearQueryMixin, APIView):
                 internal_cases=Coalesce(Sum("internal_cases"), 0),
                 external_cases=Coalesce(Sum("external_cases"), 0),
             )
-            cache.set(cache_key, data, 120)
+            cache.set(cache_key, data, DASHBOARD_CACHE_TTL)
 
         payload = {"month": month, "year": year, **data}
         serializer = MonthlyCasesSummaryAggregateSerializer(instance=payload)
@@ -357,7 +359,7 @@ class UserCasesMonthlyStatsAggregateView(MonthYearQueryMixin, APIView):
             for row in rows
         ]
 
-        cache.set(cache_key, payload, 120)
+        cache.set(cache_key, payload, DASHBOARD_CACHE_TTL)
         serializer = UserCasesMonthlyStatsAggregateRowSerializer(instance=payload, many=True)
         return Response(serializer.data)
 

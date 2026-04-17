@@ -176,3 +176,105 @@ class TestDashboardSummaryViewCache(unittest.TestCase):
             key_used = mock_cache.get.call_args[0][0]
             self.assertIn("CISO", key_used)
             self.assertNotIn("ALL", key_used)
+
+
+class TestMonthlyCasesSummaryAggregateViewCache(unittest.TestCase):
+
+    def _get_view(self):
+        sys.modules.pop("api.views.dashboard", None)
+        from api.views.dashboard import MonthlyCasesSummaryAggregateView
+        return MonthlyCasesSummaryAggregateView
+
+    def test_cache_miss_runs_aggregate_and_caches(self):
+        view_cls = self._get_view()
+        view = view_cls()
+
+        fake_data = {"suspicious_cases": 5, "safe_cases": 3}
+
+        with patch("api.views.dashboard.cache") as mock_cache, \
+             patch.object(view_cls, "get_month_year", return_value=(4, 2026)), \
+             patch("api.views.dashboard.MonthlyCasesSummary") as mock_model, \
+             patch("api.views.dashboard.MonthlyCasesSummaryAggregateSerializer") as mock_serial:
+
+            mock_cache.get.return_value = None
+            mock_model.objects.filter.return_value.aggregate.return_value = fake_data
+            mock_serial.return_value.data = fake_data
+
+            view.get(MagicMock())
+
+            mock_cache.get.assert_called_once_with("dashboard:monthly-cases:2026:4")
+            mock_cache.set.assert_called_once()
+            args = mock_cache.set.call_args[0]
+            self.assertEqual(args[0], "dashboard:monthly-cases:2026:4")
+            self.assertEqual(args[2], 120)
+
+    def test_cache_hit_skips_aggregate(self):
+        view_cls = self._get_view()
+        view = view_cls()
+
+        cached_data = {"suspicious_cases": 5}
+
+        with patch("api.views.dashboard.cache") as mock_cache, \
+             patch.object(view_cls, "get_month_year", return_value=(4, 2026)), \
+             patch("api.views.dashboard.MonthlyCasesSummary") as mock_model, \
+             patch("api.views.dashboard.MonthlyCasesSummaryAggregateSerializer") as mock_serial:
+
+            mock_cache.get.return_value = cached_data
+            mock_serial.return_value.data = cached_data
+
+            view.get(MagicMock())
+
+            mock_model.objects.filter.assert_not_called()
+            mock_cache.set.assert_not_called()
+
+
+class TestUserCasesMonthlyStatsAggregateViewCache(unittest.TestCase):
+
+    def _get_view(self):
+        sys.modules.pop("api.views.dashboard", None)
+        from api.views.dashboard import UserCasesMonthlyStatsAggregateView
+        return UserCasesMonthlyStatsAggregateView
+
+    def test_cache_miss_runs_query_and_caches(self):
+        view_cls = self._get_view()
+        view = view_cls()
+
+        fake_payload = [{"username": "alice", "total_cases": 3}]
+
+        with patch("api.views.dashboard.cache") as mock_cache, \
+             patch.object(view_cls, "get_month_year", return_value=(4, 2026)), \
+             patch("api.views.dashboard.UserCasesMonthlyStats") as mock_model, \
+             patch("api.views.dashboard.UserCasesMonthlyStatsAggregateRowSerializer") as mock_serial:
+
+            mock_cache.get.return_value = None
+            # Simulate queryset chain
+            mock_qs = MagicMock()
+            mock_model.objects.filter.return_value.values.return_value.annotate.return_value.order_by.return_value = mock_qs
+            mock_qs.__iter__ = MagicMock(return_value=iter([]))
+            mock_serial.return_value.data = []
+
+            view.get(MagicMock())
+
+            mock_cache.get.assert_called_once_with("dashboard:user-stats:2026:4")
+            mock_cache.set.assert_called_once()
+            key_used = mock_cache.set.call_args[0][0]
+            self.assertEqual(key_used, "dashboard:user-stats:2026:4")
+
+    def test_cache_hit_returns_early(self):
+        view_cls = self._get_view()
+        view = view_cls()
+
+        cached_payload = [{"username": "alice", "total_cases": 3}]
+
+        with patch("api.views.dashboard.cache") as mock_cache, \
+             patch.object(view_cls, "get_month_year", return_value=(4, 2026)), \
+             patch("api.views.dashboard.UserCasesMonthlyStats") as mock_model, \
+             patch("api.views.dashboard.UserCasesMonthlyStatsAggregateRowSerializer") as mock_serial:
+
+            mock_cache.get.return_value = cached_payload
+            mock_serial.return_value.data = cached_payload
+
+            view.get(MagicMock())
+
+            mock_model.objects.filter.assert_not_called()
+            mock_cache.set.assert_not_called()
