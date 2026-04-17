@@ -22,7 +22,7 @@ _thehive_breaker = get_breaker("thehive")
 @RETRY
 def _upload(url: str, headers: dict, files: dict, timeout: int, verify) -> requests.Response:
     """POST a file upload with retry and circuit breaker. Raises HTTPError on non-2xx."""
-    with _thehive_breaker:
+    with _thehive_breaker.calling():
         response = _session.post(url, headers=headers, files=files, timeout=timeout, verify=verify)
         response.raise_for_status()
         return response

@@ -19,7 +19,7 @@ _cortex_breaker = get_breaker("cortex")
 @RETRY
 def _fetch_all_analyzers(api):
     """Fetch all remote analyzers with retry and circuit breaker."""
-    with _cortex_breaker:
+    with _cortex_breaker.calling():
         return api.analyzers.find_all({}, range="all")
 
 

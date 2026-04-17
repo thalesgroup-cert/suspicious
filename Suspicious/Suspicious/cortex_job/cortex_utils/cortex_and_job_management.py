@@ -59,14 +59,14 @@ _cortex_breaker = get_breaker("cortex")
 @RETRY
 def _fetch_job(api, job_id: str):
     """Fetch a Cortex job by ID with retry and circuit breaker."""
-    with _cortex_breaker:
+    with _cortex_breaker.calling():
         return api.jobs.get_by_id(job_id)
 
 
 @RETRY
 def _fetch_report(api, job_id: str):
     """Fetch a Cortex job report by ID with retry and circuit breaker."""
-    with _cortex_breaker:
+    with _cortex_breaker.calling():
         return api.jobs.get_report(job_id)
 
 

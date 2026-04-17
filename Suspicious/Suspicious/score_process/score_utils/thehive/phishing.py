@@ -57,7 +57,7 @@ def _thehive_request(method: str, url: str, **kwargs) -> requests.Response:
     Calls response.raise_for_status() so callers get HTTPError on non-2xx.
     CircuitBreakerError is NOT retried by RETRY — it propagates immediately.
     """
-    with _thehive_breaker:
+    with _thehive_breaker.calling():
         response = _session.request(method, url, **kwargs)
         response.raise_for_status()
         return response
