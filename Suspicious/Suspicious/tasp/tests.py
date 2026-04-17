@@ -256,6 +256,8 @@ class TestRequeueFailedAction(unittest.TestCase):
         base_admin_cls = MagicMock()
 
         sys.modules["celery"] = celery_stub
+        sys.modules["django"] = MagicMock()
+        sys.modules["django.contrib"] = MagicMock()
         sys.modules["django.contrib.admin"] = django_stub
         sys.modules["django_celery_results"] = results_stub
         sys.modules["django_celery_results.models"] = MagicMock(TaskResult=task_result_cls)
@@ -282,6 +284,8 @@ class TestRequeueFailedAction(unittest.TestCase):
         django_stub = MagicMock()
 
         sys.modules["celery"] = celery_stub
+        sys.modules["django"] = MagicMock()
+        sys.modules["django.contrib"] = MagicMock()
         sys.modules["django.contrib.admin"] = django_stub
         sys.modules["django_celery_results"] = MagicMock()
         sys.modules["django_celery_results.models"] = MagicMock(TaskResult=MagicMock())
