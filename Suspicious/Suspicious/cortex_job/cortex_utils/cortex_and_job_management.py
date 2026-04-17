@@ -5,7 +5,7 @@ from datetime import datetime, timedelta
 
 import pybreaker
 from cortex4py.api import Api
-from common.http_client import TimeoutHTTPAdapter, get_breaker, RETRY
+from common.http_client import get_breaker, RETRY
 from cortex_job.models import Analyzer, AnalyzerReport
 from mail_feeder.models import MailBody, MailArchive, MailInfo, MailHeader
 from score_process.scoring.cortex_analyzers.reports import CortexAnalyzerReports
@@ -40,19 +40,9 @@ API_URL = cortex_config.get("url", "https://cortex.example.com")
 API_KEY = cortex_config.get("api_key", "your_api_key_here")
 
 try:
+    # cortex4py makes bare requests.get/post calls — no session to mount adapters on.
+    # Timeout protection comes from the RETRY decorator and circuit breaker.
     API = Api(API_URL, API_KEY, proxies={"http": "", "https": ""})
-    _adapter = TimeoutHTTPAdapter()
-    _sess = next(
-        (getattr(API, a) for a in ("_Api__session", "_session", "session") if hasattr(API, a)),
-        None,
-    )
-    if _sess is not None:
-        _sess.mount("https://", _adapter)
-        _sess.mount("http://", _adapter)
-    else:
-        fetch_mail_logger.warning(
-            "Could not mount TimeoutHTTPAdapter on module-level Cortex API session"
-        )
 except Exception as e:
     fetch_mail_logger.error(f"Failed to initialize Cortex API: {e}")
     API = None
@@ -99,19 +89,8 @@ class CortexJob:
             fetch_mail_logger.error(f"Failed to initialize Cortex API: {e}")
             self.api = None
 
-        if self.api is not None:
-            _inst_adapter = TimeoutHTTPAdapter()
-            _inst_sess = next(
-                (getattr(self.api, a) for a in ("_Api__session", "_session", "session") if hasattr(self.api, a)),
-                None,
-            )
-            if _inst_sess is not None:
-                _inst_sess.mount("https://", _inst_adapter)
-                _inst_sess.mount("http://", _inst_adapter)
-            else:
-                fetch_mail_logger.warning(
-                    "Could not mount TimeoutHTTPAdapter on CortexJob API session"
-                )
+        # cortex4py makes bare requests.get/post calls — no session to mount adapters on.
+        # Timeout protection comes from the RETRY decorator and circuit breaker.
 
     def launch_cortex_jobs(self, value, data_type):
         """

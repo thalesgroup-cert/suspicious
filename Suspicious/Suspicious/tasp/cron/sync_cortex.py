@@ -7,7 +7,7 @@ from .utils import load_config
 from .models import CronConfig
 from cortex_job.models import Analyzer
 import pybreaker
-from common.http_client import TimeoutHTTPAdapter, get_breaker, RETRY
+from common.http_client import get_breaker, RETRY
 
 logger = logging.getLogger("cron.sync_cortex")
 log_analyzers = logging.getLogger("tasp.cron.fetch_analyzer")
@@ -31,22 +31,8 @@ def sync_cortex_analyzers(config_path: str = CONFIG_PATH) -> None:
 
     api = Api(str(cfg.cortex.url), cfg.cortex.api_key)
 
-    # Mount a timeout adapter on cortex4py's internal session.
-    # Probe known attribute names across cortex4py versions.
-    _adapter = TimeoutHTTPAdapter()
-    _sess = next(
-        (getattr(api, a) for a in ("_Api__session", "_session", "session") if hasattr(api, a)),
-        None,
-    )
-    if _sess is not None:
-        _sess.mount("https://", _adapter)
-        _sess.mount("http://", _adapter)
-    else:
-        log_analyzers.warning(
-            "Could not mount TimeoutHTTPAdapter on cortex4py session — "
-            "timeout not guaranteed for Cortex calls"
-        )
-
+    # cortex4py makes bare requests.get/post calls — no session to mount adapters on.
+    # Timeout protection comes from the RETRY decorator and circuit breaker.
     try:
         remote_analyzers = _fetch_all_analyzers(api)
     except pybreaker.CircuitBreakerError as exc:
