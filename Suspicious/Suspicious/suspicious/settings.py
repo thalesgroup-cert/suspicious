@@ -23,6 +23,7 @@ import json
 import sys
 from datetime import timedelta
 from pathlib import Path
+from urllib.parse import urlparse
 import logging
 
 # ---------------------------------------------------------------------------
@@ -73,7 +74,14 @@ ALLOWED_HOSTS = _app.get("allowed_hosts", ["localhost"]) + [
 # Add the Cortex host if provided (needed for internal callbacks)
 _cortex_url = _cortex.get("url", "")
 if _cortex_url:
-    ALLOWED_HOSTS.append(_cortex_url)
+    _cortex_hostname = urlparse(_cortex_url).hostname
+    if _cortex_hostname:
+        ALLOWED_HOSTS.append(_cortex_hostname)
+
+# Shared secret for the Cortex → Suspicious job-completion webhook.
+# Set in settings.json under integrations.cortex.webhook_secret.
+# If absent, the webhook endpoint rejects all requests.
+CORTEX_WEBHOOK_SECRET: str = _cortex.get("webhook_secret", "")
 
 # CSRF — at least one trusted origin is required for POST requests in
 # Django 4.x.  Must be a full scheme+host (e.g. https://suspicious.corp).
@@ -108,6 +116,7 @@ INSTALLED_APPS = [
     "django.contrib.sites",
 
     # Third-party
+    "django_prometheus",
     "rest_framework",
     "drf_spectacular",
     "knox",
@@ -136,6 +145,7 @@ INSTALLED_APPS = [
 ]
 
 MIDDLEWARE = [
+    "django_prometheus.middleware.PrometheusBeforeMiddleware",
     "whitenoise.middleware.WhiteNoiseMiddleware",
     "django.middleware.security.SecurityMiddleware",
     "django.contrib.sessions.middleware.SessionMiddleware",
@@ -144,6 +154,7 @@ MIDDLEWARE = [
     "django.contrib.auth.middleware.AuthenticationMiddleware",
     "django.contrib.messages.middleware.MessageMiddleware",
     "django.middleware.clickjacking.XFrameOptionsMiddleware",
+    "django_prometheus.middleware.PrometheusAfterMiddleware",
 ]
 
 ROOT_URLCONF    = "suspicious.urls"
@@ -429,6 +440,10 @@ FILE_UPLOAD_HANDLERS = [
 
 MAX_UPLOAD_SIZE = 5 * 1024 * 1024  # 5 MB — enforced at the serializer level
 
+DATA_UPLOAD_MAX_MEMORY_SIZE = MAX_UPLOAD_SIZE  # cap in-memory multipart parsing
+FILE_UPLOAD_MAX_MEMORY_SIZE = 0               # always spool uploads to disk
+SUBMIT_FILE_MAX_BYTES       = MAX_UPLOAD_SIZE  # serializer-level guard; keep in sync
+
 # ---------------------------------------------------------------------------
 # Password validation
 # ---------------------------------------------------------------------------
@@ -516,6 +531,10 @@ CELERY_BEAT_SCHEDULE = {
     "watcher-sync": {
         "task": "tasp.tasks.watcher_sync",
         "schedule": 300.0,
+    },
+    "materialise-dashboard-snapshots": {
+        "task": "tasp.tasks.materialise_dashboard_snapshots",
+        "schedule": crontab(hour=2, minute=0),
     },
 }
 

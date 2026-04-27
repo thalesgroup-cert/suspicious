@@ -169,6 +169,25 @@ class UserCasesMonthlyStats(models.Model):
 
         self.save()
 
+class DashboardSnapshot(models.Model):
+    """Pre-materialised dashboard payload for a given month/year.
+
+    Populated nightly by the materialise_dashboard_snapshots Celery task.
+    DashboardSummaryView serves this when the snapshot is < 24 h old,
+    falling back to live DB queries otherwise.
+    """
+    month = models.PositiveSmallIntegerField()
+    year = models.PositiveSmallIntegerField()
+    payload = models.JSONField()
+    updated_at = models.DateTimeField(auto_now=True)
+
+    class Meta:
+        unique_together = ("month", "year")
+
+    def __str__(self):
+        return f"DashboardSnapshot {self.year}-{self.month:02d}"
+
+
 class GroupMonthlyStats(models.Model):
     group_name = models.CharField(max_length=200)
     month = models.CharField(max_length=200)

@@ -85,3 +85,29 @@ def watcher_sync(self):
         run_watcher_sync()
     except Exception as exc:
         raise self.retry(exc=exc, countdown=60 * 2 ** self.request.retries)
+
+
+@shared_task(bind=True, **_RETRY)
+def materialise_dashboard_snapshots(self):
+    from tasp.cron.dashboard_snapshot import materialise_dashboard_snapshots as _run
+    try:
+        _run()
+    except Exception as exc:
+        raise self.retry(exc=exc, countdown=60 * 2 ** self.request.retries)
+
+
+@shared_task(bind=True, **_RETRY)
+def process_cortex_webhook_case(self, case_id: int):
+    """Update a single On Going case after a Cortex job-completion webhook fires."""
+    from case_handler.models import Case
+    from cortex_job.cortex_utils.cortex_and_job_management import CortexJobManager
+    try:
+        case = Case.objects.get(pk=case_id, status="On Going")
+    except Case.DoesNotExist:
+        return  # Already processed or doesn't exist — nothing to do
+    try:
+        manager = CortexJobManager()
+        manager.manage_jobs(case)
+        case.save()
+    except Exception as exc:
+        raise self.retry(exc=exc, countdown=30 * 2 ** self.request.retries)

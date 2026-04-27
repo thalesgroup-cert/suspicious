@@ -1,25 +1,38 @@
 // src/app/router.tsx
-import { createBrowserRouter, Navigate } from "react-router-dom";
+import React, { lazy, Suspense } from "react";
+import { createBrowserRouter } from "react-router-dom";
 import AppLayout from "@/layouts/AppLayout";
-
 import ProtectedRoute from "@/app/ProtectedRoute";
 import PublicOnlyRoute from "@/app/PublicOnlyRoute";
+import PageLoader from "@/styles/components/PageLoader";
 
-import LoginPage       from "@/pages/LoginPage";
-import HomePage        from "@/pages/HomePage";
-import DashboardPage   from "@/pages/DashboardPage";
-import SubmitPage      from "@/pages/SubmitPage";
-import ProfilePage     from "@/pages/ProfilePage";
-import CampaignsPage   from "@/pages/CampaignsPage";
-import SettingsPage    from "@/pages/SettingsPage";
-import SubmissionsPage from "@/pages/SubmissionsPage";
-import InvestigationPage from "@/pages/InvestigationPage";
-import AboutPage       from "@/pages/AboutPage";
-import NotFound        from "@/pages/NotFound";
+// ---------------------------------------------------------------------------
+// Route-level lazy chunks.
+// Each import() becomes a separate JS chunk — loaded only when the user
+// navigates to that route for the first time.
+// ---------------------------------------------------------------------------
+
+const LoginPage        = lazy(() => import("@/pages/LoginPage"));
+const HomePage         = lazy(() => import("@/pages/HomePage"));
+const DashboardPage    = lazy(() => import("@/pages/DashboardPage"));
+const SubmitPage       = lazy(() => import("@/pages/SubmitPage"));
+const ProfilePage      = lazy(() => import("@/pages/ProfilePage"));
+const CampaignsPage    = lazy(() => import("@/pages/CampaignsPage"));
+const SettingsPage     = lazy(() => import("@/pages/SettingsPage"));
+const SubmissionsPage  = lazy(() => import("@/pages/SubmissionsPage"));
+const InvestigationPage = lazy(() => import("@/pages/InvestigationPage"));
+const AboutPage        = lazy(() => import("@/pages/AboutPage"));
+const NotFound         = lazy(() => import("@/pages/NotFound"));
 
 // Groups that unlock elevated routes.
 const ELEVATED = ["Admin", "CISO", "CERT"];
 const ADMIN    = ["Admin", "CERT"];
+
+// Thin wrapper — keeps route definitions readable without repeating Suspense.
+const fallback = <PageLoader />;
+function S({ children }: { children: React.ReactElement }) {
+  return <Suspense fallback={fallback}>{children}</Suspense>;
+}
 
 export const router = createBrowserRouter([
   // ── Public routes (redirect to "/" if already authenticated) ───────────
@@ -28,7 +41,7 @@ export const router = createBrowserRouter([
     path: "/login",
     element: (
       <PublicOnlyRoute>
-        <LoginPage />
+        <S><LoginPage /></S>
       </PublicOnlyRoute>
     ),
   },
@@ -43,18 +56,18 @@ export const router = createBrowserRouter([
     ),
     children: [
       // ── General (any authenticated user) ──────────────────────────────
-      { index: true,                  element: <HomePage /> },
-      { path: "submit",               element: <SubmitPage /> },
-      { path: "submissions",          element: <SubmissionsPage /> },
-      { path: "profile",              element: <ProfilePage /> },
-      { path: "about",                element: <AboutPage /> },
+      { index: true,         element: <S><HomePage /></S> },
+      { path: "submit",      element: <S><SubmitPage /></S> },
+      { path: "submissions", element: <S><SubmissionsPage /></S> },
+      { path: "profile",     element: <S><ProfilePage /></S> },
+      { path: "about",       element: <S><AboutPage /></S> },
 
       // ── Elevated (CISO / CERT) ─────────────────────────────────────────
       {
         path: "campaigns",
         element: (
           <ProtectedRoute>
-            <CampaignsPage />
+            <S><CampaignsPage /></S>
           </ProtectedRoute>
         ),
       },
@@ -62,7 +75,7 @@ export const router = createBrowserRouter([
         path: "dashboard",
         element: (
           <ProtectedRoute>
-            <DashboardPage />
+            <S><DashboardPage /></S>
           </ProtectedRoute>
         ),
       },
@@ -70,7 +83,7 @@ export const router = createBrowserRouter([
         path: "investigation",
         element: (
           <ProtectedRoute requireGroups={ELEVATED}>
-            <InvestigationPage />
+            <S><InvestigationPage /></S>
           </ProtectedRoute>
         ),
       },
@@ -80,20 +93,16 @@ export const router = createBrowserRouter([
         path: "settings",
         element: (
           <ProtectedRoute requireGroups={ADMIN}>
-            <SettingsPage />
+            <S><SettingsPage /></S>
           </ProtectedRoute>
         ),
       },
 
       // ── 404 inside the authenticated shell ────────────────────────────
-      // Renders the NotFound page inside the AppLayout (sidebar stays
-      // visible — the user can navigate away without using the back button).
-      { path: "*", element: <NotFound /> },
+      { path: "*", element: <S><NotFound /></S> },
     ],
   },
 
-  // ── Top-level 404 for paths that don't match any route at all ──────────
-  // We DON'T silently redirect unknown paths to "/" — that hides bugs
-  // and confuses users who follow a stale or typo'd link.
-  { path: "*", element: <NotFound standalone /> },
+  // ── Top-level 404 ──────────────────────────────────────────────────────
+  { path: "*", element: <S><NotFound standalone /></S> },
 ]);

@@ -1,0 +1,36 @@
+global:
+  scrape_interval: 30s
+  evaluation_interval: 30s
+  external_labels:
+    cluster: suspicious
+
+alerting:
+  alertmanagers:
+    - static_configs:
+        - targets: ['alertmanager:9093']
+
+rule_files:
+  - /etc/prometheus/rules/*.yml
+
+scrape_configs:
+  # Django application metrics (django-prometheus /metrics endpoint)
+  - job_name: django
+    static_configs:
+      - targets: ['suspicious:9020']
+    metrics_path: /metrics
+
+  # MariaDB metrics via mysqld-exporter
+  - job_name: mariadb
+    static_configs:
+      - targets: ['mariadb_exporter:9104']
+
+  # Email feeder metrics (built-in health server on port 9091)
+  - job_name: email_feeder
+    static_configs:
+      - targets: ['feeder:9091']
+    metrics_path: /metrics
+
+  # Prometheus self-monitoring
+  - job_name: prometheus
+    static_configs:
+      - targets: ['localhost:9090']

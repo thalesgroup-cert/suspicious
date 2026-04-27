@@ -182,6 +182,7 @@ def fetch_and_process_emails(config_path: str = CONFIG_PATH) -> None:
     metadata.json manifest, then hands each email subdirectory to
     MinioEmailService for processing. Tags the bucket as Done on success.
     """
+    import time
     cfg = load_config(config_path)
     base_temp = cfg.temp_dir
     ensure_dir(base_temp)
@@ -194,6 +195,11 @@ def fetch_and_process_emails(config_path: str = CONFIG_PATH) -> None:
         except Exception:
             logger.exception("Failed to remove temp dir")
     logger.info("Email fetch job completed")
+    try:
+        from api.metrics import email_feeder_last_poll_seconds
+        email_feeder_last_poll_seconds.set(time.time())
+    except Exception:
+        pass
 
 
 def _process_minio_buckets(cfg: CronConfig, base_path: str) -> None:

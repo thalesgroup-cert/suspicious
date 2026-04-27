@@ -3,7 +3,7 @@ from collections import defaultdict
 from django.conf import settings
 from django.core.cache import cache
 from django.db.models import Sum, Value, CharField, F, Case, When
-from django.db.models.functions import Lower, StrIndex, Substr, Coalesce
+from django.db.models.functions import Coalesce, Lower, StrIndex, Substr
 from django_filters.rest_framework import DjangoFilterBackend
 from drf_spectacular.utils import OpenApiParameter, extend_schema
 from rest_framework import generics, status
@@ -17,6 +17,7 @@ from dashboard.models import (
     TotalCasesStats,
     UserCasesMonthlyStats,
 )
+from dashboard.snapshot import build_dashboard_payload, get_snapshot
 from api.serializers.dashboard import (
     DashboardSummaryQuerySerializer,
     DashboardSummaryResponseSerializer,
@@ -71,136 +72,25 @@ class DashboardSummaryView(APIView):
         requested_scope = query.validated_data.get("scope", "ALL")
         scope = self._resolve_scope(requested_scope=requested_scope)
 
+        # 1. Pre-materialised snapshot (< 24 h) — supersedes Redis short-term cache
+        snap = get_snapshot(month, year)
+        if snap is not None:
+            payload = {**snap, "scope": scope}
+            return Response(DashboardSummaryResponseSerializer(instance=payload).data)
+
+        # 2. Redis short-term cache (2 min) — covers gap between nightly runs
         cache_key = f"dashboard:summary:{year}:{month}:{scope}"
         payload = cache.get(cache_key)
         if payload is None:
-            payload = self._build_summary_payload(month=month, year=year, scope=scope)
+            payload = build_dashboard_payload(month=month, year=year, scope=scope)
             cache.set(cache_key, payload, DASHBOARD_CACHE_TTL)
 
-        response_serializer = DashboardSummaryResponseSerializer(instance=payload)
-        return Response(response_serializer.data)
+        return Response(DashboardSummaryResponseSerializer(instance=payload).data)
 
     def _resolve_scope(self, requested_scope: str) -> str:
-        """
-        Scope is currently not backed by a database dimension in these stats tables.
-        Until that exists, we only normalize and echo it for eligible users.
-        """
         if not self.request.user.groups.filter(name="CISO").exists():
             return "ALL"
         return requested_scope
-
-    def _build_summary_payload(self, *, month: int, year: int, scope: str) -> dict:
-        cases_agg = self._get_cases_aggregate(month=month, year=year)
-        reporters_agg = self._get_reporters_aggregate(month=month, year=year)
-        total_cases_agg = self._get_total_cases_aggregate(month=month, year=year)
-
-        malicious_total = (
-            cases_agg["classic_phishing_cases"]
-            + cases_agg["clone_cases"]
-            + cases_agg["blackmail_cases"]
-            + cases_agg["whaling_cases"]
-        )
-
-        return {
-            "month": month,
-            "year": year,
-            "scope": scope,
-            "kpis": {
-                "new_users": reporters_agg["new_users"],
-                "total_reporters": reporters_agg["total_reporters"],
-                "total_cases": total_cases_agg["total_cases"],
-            },
-            "danger_counts": {
-                "failure": cases_agg["failure_cases"],
-                "safe": cases_agg["safe_cases"],
-                "inconclusive": cases_agg["inconclusive_cases"],
-                "suspicious": cases_agg["suspicious_cases"],
-                "dangerous": cases_agg["dangerous_cases"],
-                "malicious": malicious_total,
-            },
-            "top_prefixes": self._get_top_prefixes(
-                month=month,
-                year=year,
-                limit=self.DEFAULT_TOP_PREFIXES_LIMIT,
-            ),
-        }
-
-    @staticmethod
-    def _get_cases_aggregate(*, month: int, year: int) -> dict:
-        return MonthlyCasesSummary.objects.filter(
-            creation_date__month=month,
-            creation_date__year=year,
-        ).aggregate(
-            failure_cases=Coalesce(Sum("failure_cases"), 0),
-            safe_cases=Coalesce(Sum("safe_cases"), 0),
-            inconclusive_cases=Coalesce(Sum("inconclusive_cases"), 0),
-            suspicious_cases=Coalesce(Sum("suspicious_cases"), 0),
-            dangerous_cases=Coalesce(Sum("dangerous_cases"), 0),
-            classic_phishing_cases=Coalesce(Sum("classic_phishing_cases"), 0),
-            clone_cases=Coalesce(Sum("clone_cases"), 0),
-            blackmail_cases=Coalesce(Sum("blackmail_cases"), 0),
-            whaling_cases=Coalesce(Sum("whaling_cases"), 0),
-        )
-
-    @staticmethod
-    def _get_reporters_aggregate(*, month: int, year: int) -> dict:
-        return MonthlyReporterStats.objects.filter(
-            creation_date__month=month,
-            creation_date__year=year,
-        ).aggregate(
-            new_users=Coalesce(Sum("new_reporters"), 0),
-            total_reporters=Coalesce(Sum("total_reporters"), 0),
-        )
-
-    @staticmethod
-    def _get_total_cases_aggregate(*, month: int, year: int) -> dict:
-        return TotalCasesStats.objects.filter(
-            creation_date__month=month,
-            creation_date__year=year,
-        ).aggregate(
-            total_cases=Coalesce(Sum("total_cases"), 0),
-        )
-
-    def _get_top_prefixes(self, *, month: int, year: int, limit: int) -> list[dict]:
-        month_str = str(month)
-        year_str = str(year)
-        suspicious_email = getattr(settings, "SUSPICIOUS_EMAIL", None)
-
-        qs = UserCasesMonthlyStats.objects.filter(
-            month=month_str,
-            year=year_str,
-        )
-
-        if suspicious_email:
-            qs = qs.exclude(user__username=suspicious_email)
-
-        rows = qs.values_list("user__username", "total_cases")
-
-        totals_by_prefix: dict[str, int] = defaultdict(int)
-        for username, total_cases in rows:
-            label = self._extract_email_prefix(username)
-            if not label:
-                continue
-            totals_by_prefix[label] += int(total_cases or 0)
-
-        sorted_items = sorted(
-            totals_by_prefix.items(),
-            key=lambda item: (-item[1], item[0]),
-        )[:limit]
-
-        return [
-            {"label": label, "value": value}
-            for label, value in sorted_items
-        ]
-
-    @staticmethod
-    def _extract_email_prefix(value: str) -> str:
-        if not value:
-            return ""
-        local_part, sep, _domain = value.strip().partition("@")
-        if sep == "@":
-            return local_part
-        return value.strip()
 
 
 class MonthlyCasesSummaryListView(generics.ListAPIView):
