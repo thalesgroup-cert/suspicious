@@ -1,0 +1,34 @@
+global:
+  resolve_timeout: 5m
+
+route:
+  group_by: ['alertname', 'severity']
+  group_wait: 30s
+  group_interval: 5m
+  repeat_interval: 4h
+  receiver: default
+
+  routes:
+    - match:
+        severity: critical
+      receiver: default
+      repeat_interval: 1h
+
+receivers:
+  - name: default
+    # Replace with your preferred receiver (email, Slack, PagerDuty, etc.).
+    # Example email config:
+    #
+    # email_configs:
+    #   - to: 'cert-team@example.com'
+    #     from: 'alertmanager@example.com'
+    #     smarthost: 'smtp.example.com:587'
+    #     auth_username: 'alertmanager@example.com'
+    #     auth_password: '<password>'
+
+inhibit_rules:
+  - source_match:
+      severity: critical
+    target_match:
+      severity: warning
+    equal: ['alertname']

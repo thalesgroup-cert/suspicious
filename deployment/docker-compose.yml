@@ -30,7 +30,7 @@ services:
       db_suspicious:
         condition: service_healthy
       cortex:
-        condition: service_healthy
+        condition: service_started   # R2: decoupled — circuit breaker handles unavailability at call time
       chromadb:
         condition: service_started
       redis_cache:

@@ -1,7 +1,10 @@
-import time
+import json
 import shutil
 import pathlib
 import sys
+import threading
+import time
+from http.server import BaseHTTPRequestHandler, HTTPServer
 
 import classes.models.configs.main_config
 import classes.services.config_service
@@ -12,6 +15,74 @@ import classes.services.acknowledge_bad_mail_service
 import classes.services.logger_service
 
 logger = classes.services.logger_service.setup_logging()
+
+# ---------------------------------------------------------------------------
+# Health / metrics state — written by the poll loop, read by the HTTP server
+# ---------------------------------------------------------------------------
+
+_HEALTH_PORT = 9091
+
+_stats: dict = {
+    "last_successful_poll": 0.0,   # Unix timestamp; 0 = never polled
+    "emails_processed_total": 0,
+    "errors_total": 0,
+}
+_stats_lock = threading.Lock()
+
+
+def _inc(key: str, amount: int = 1) -> None:
+    with _stats_lock:
+        _stats[key] += amount
+
+
+def _set(key: str, value) -> None:
+    with _stats_lock:
+        _stats[key] = value
+
+
+class _HealthHandler(BaseHTTPRequestHandler):
+    def do_GET(self):
+        with _stats_lock:
+            snap = dict(_stats)
+
+        if self.path == "/health":
+            body = json.dumps(snap, indent=2).encode()
+            self._respond(200, "application/json", body)
+        elif self.path == "/metrics":
+            lines = [
+                "# HELP email_feeder_last_successful_poll_timestamp_seconds Unix timestamp of last successful poll cycle.",
+                "# TYPE email_feeder_last_successful_poll_timestamp_seconds gauge",
+                f"email_feeder_last_successful_poll_timestamp_seconds {snap['last_successful_poll']}",
+                "# HELP email_feeder_emails_processed_total Total number of emails processed since startup.",
+                "# TYPE email_feeder_emails_processed_total counter",
+                f"email_feeder_emails_processed_total {snap['emails_processed_total']}",
+                "# HELP email_feeder_errors_total Total number of mailbox processing errors since startup.",
+                "# TYPE email_feeder_errors_total counter",
+                f"email_feeder_errors_total {snap['errors_total']}",
+                "",
+            ]
+            body = "\n".join(lines).encode()
+            self._respond(200, "text/plain; version=0.0.4; charset=utf-8", body)
+        else:
+            self.send_response(404)
+            self.end_headers()
+
+    def _respond(self, code: int, content_type: str, body: bytes) -> None:
+        self.send_response(code)
+        self.send_header("Content-Type", content_type)
+        self.send_header("Content-Length", str(len(body)))
+        self.end_headers()
+        self.wfile.write(body)
+
+    def log_message(self, fmt, *args):  # suppress per-request access logs
+        pass
+
+
+def _start_health_server() -> None:
+    server = HTTPServer(("", _HEALTH_PORT), _HealthHandler)
+    thread = threading.Thread(target=server.serve_forever, daemon=True, name="health-server")
+    thread.start()
+    logger.info("Health/metrics server listening on :%d (/health, /metrics)", _HEALTH_PORT)
 
 
 # --- Helper Functions ---
@@ -88,6 +159,7 @@ def process_emails_from_mailboxes(
             logger.info(
                 f"Fetched {len(email_list)} email(s) from {mailbox_identifier}."
             )
+            _inc("emails_processed_total", len(email_list))
             for mail in email_list:
                 case_path = pathlib.Path(mail.case_path)
                 acknowledge_bad_mail_service.process_single_email(
@@ -110,6 +182,7 @@ def process_emails_from_mailboxes(
                 f"Error processing mailbox {mailbox_identifier}: {e}",
                 exc_info=True,
             )
+            _inc("errors_total")
         logger.info(f"Finished processing cycle for mailbox: {mailbox_identifier}.")
 
 
@@ -182,6 +255,8 @@ def main() -> int:
         )
         sleep_interval = config.timer_inbox_emails
 
+    _start_health_server()
+
     logger.info(f"Starting email processing loop. Interval: {sleep_interval}s")
     try:
         while True:
@@ -192,6 +267,7 @@ def main() -> int:
                 mailboxes=mailboxes,
                 minio_service=minio_service,
             )
+            _set("last_successful_poll", time.time())
             logger.info(
                 f"Email processing cycle complete. Sleeping for {sleep_interval}s."
             )

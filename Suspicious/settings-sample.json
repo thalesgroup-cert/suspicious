@@ -62,7 +62,8 @@
                 "sandbox": "ThreatGridOnPrem_1_0",
                 "yara": "Yara_Boosted_3_2",
                 "file_info": "FileInfo_8_0"
-            }
+            },
+            "webhook_secret": "CHANGE_ME"
         },
         "chromadb": {
             "url": "http://chromadb:8000",

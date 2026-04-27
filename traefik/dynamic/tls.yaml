@@ -46,6 +46,17 @@ http:
         customResponseHeaders:
           Server: ""
           X-Powered-By: ""
+          # CSP — MUI/Emotion requires 'unsafe-inline' for style-src (inline
+          # style attributes generated at runtime); script-src stays strict.
+          Content-Security-Policy: >-
+            default-src 'self';
+            script-src 'self';
+            style-src 'self' 'unsafe-inline';
+            img-src 'self' data:;
+            font-src 'self';
+            connect-src 'self';
+            object-src 'none';
+            frame-ancestors 'none'
 
     # Strip /api prefix before forwarding to Django
     # Django's urls.py does NOT include /api/ — Traefik strips it at the edge.

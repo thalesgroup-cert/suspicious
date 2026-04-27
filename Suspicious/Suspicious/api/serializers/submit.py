@@ -1,5 +1,6 @@
 # api/serializers/submit.py
 import ipaddress
+import zipfile as _zipfile
 from urllib.parse import urlparse
 
 from django.conf import settings
@@ -94,6 +95,39 @@ class SubmitOtherSerializer(OptionalContextMixin, serializers.Serializer):
         return normalized
 
 
+_ZIP_MAX_ENTRIES       = 1_000
+_ZIP_MAX_UNCOMPRESSED  = 100 * 1024 * 1024   # 100 MB
+_ZIP_MAX_RATIO         = 100                 # uncompressed / compressed
+
+
+def _check_zip_bomb(uploaded_file) -> None:
+    name = (getattr(uploaded_file, "name", "") or "").lower()
+    if not name.endswith(".zip"):
+        return
+    try:
+        uploaded_file.seek(0)
+        with _zipfile.ZipFile(uploaded_file) as zf:
+            entries = zf.infolist()
+            if len(entries) > _ZIP_MAX_ENTRIES:
+                raise serializers.ValidationError(
+                    f"Archive contains too many entries ({len(entries)} > {_ZIP_MAX_ENTRIES})."
+                )
+            total_uncompressed = sum(e.file_size for e in entries)
+            if total_uncompressed > _ZIP_MAX_UNCOMPRESSED:
+                raise serializers.ValidationError(
+                    f"Archive uncompressed size exceeds {_ZIP_MAX_UNCOMPRESSED} bytes."
+                )
+            compressed = uploaded_file.size or 1
+            if compressed > 0 and total_uncompressed / compressed > _ZIP_MAX_RATIO:
+                raise serializers.ValidationError(
+                    "Archive compression ratio is suspiciously high."
+                )
+    except _zipfile.BadZipFile:
+        raise serializers.ValidationError("File is not a valid ZIP archive.")
+    finally:
+        uploaded_file.seek(0)
+
+
 class SubmitFileSerializer(OptionalContextMixin, serializers.Serializer):
     file = serializers.FileField(required=True)
 
@@ -110,6 +144,8 @@ class SubmitFileSerializer(OptionalContextMixin, serializers.Serializer):
         filename = getattr(uploaded_file, "name", "") or ""
         if len(filename) > 255:
             raise serializers.ValidationError("Filename is too long.")
+
+        _check_zip_bomb(uploaded_file)
 
         return uploaded_file
 

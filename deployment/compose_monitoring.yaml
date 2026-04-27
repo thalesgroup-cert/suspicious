@@ -29,6 +29,7 @@ services:
       - "127.0.0.1:9090:9090"
     volumes:
       - "${DOCKER_PATH:-../docker}/monitoring/prometheus.yml:/etc/prometheus/prometheus.yml:ro"
+      - "${DOCKER_PATH:-../docker}/monitoring/rules:/etc/prometheus/rules:ro"
       - prometheus_data:/prometheus
     command:
       - "--config.file=/etc/prometheus/prometheus.yml"
@@ -58,6 +59,26 @@ services:
       GF_SERVER_ROOT_URL: "http://localhost:3000"
       GF_ANALYTICS_REPORTING_ENABLED: "false"
       GF_ANALYTICS_CHECK_FOR_UPDATES: "false"
+    security_opt:
+      - no-new-privileges:true
+    depends_on:
+      - prometheus
+    networks:
+      - suspicious_network
+
+  # AlertManager — routes Prometheus alerts to receivers (email, Slack, etc.)
+  alertmanager:
+    image: prom/alertmanager:v0.27.0
+    container_name: alertmanager
+    profiles: [monitoring]
+    restart: unless-stopped
+    expose:
+      - "9093"
+    volumes:
+      - "${DOCKER_PATH:-../docker}/monitoring/alertmanager:/etc/alertmanager:ro"
+    command:
+      - "--config.file=/etc/alertmanager/alertmanager.yml"
+      - "--storage.path=/alertmanager"
     security_opt:
       - no-new-privileges:true
     depends_on:

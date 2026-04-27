@@ -52,6 +52,7 @@ from api.views.submissions import (
     SubmissionListView,
 )
 from api.views.oidc import OIDCCallbackView, OIDCLoginView
+from api.views.cortex_webhook import CortexWebhookView
 
 urlpatterns = [
     path("schema/", SpectacularAPIView.as_view(), name="schema"),
@@ -123,4 +124,7 @@ urlpatterns = [
 
     # Home summary
     path("home/summary/", HomeSummaryView.as_view(), name="home-summary"),
+
+    # Cortex job-completion webhook (called by Cortex, not by browser users)
+    path("cortex/webhook/", CortexWebhookView.as_view(), name="cortex-webhook"),
 ]
