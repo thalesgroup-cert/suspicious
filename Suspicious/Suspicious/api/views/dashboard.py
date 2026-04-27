@@ -1,6 +1,7 @@
 from collections import defaultdict
 
 from django.conf import settings
+from django.core.cache import cache
 from django.db.models import Sum, Value, CharField, F, Case, When
 from django.db.models.functions import Lower, StrIndex, Substr, Coalesce
 from django_filters.rest_framework import DjangoFilterBackend
@@ -35,6 +36,9 @@ from api.views.mixins import MonthYearQueryMixin
 from dashboard.models import UserCasesMonthlyStats, GroupMonthlyStats
 from api.serializers.dashboard import TopPrefixesResponseSerializer
 
+DASHBOARD_CACHE_TTL = 120  # 2 minutes — matches KPI sync cadence
+
+
 class DashboardSummaryView(APIView):
     permission_classes = [IsAuthenticated]
 
@@ -65,14 +69,13 @@ class DashboardSummaryView(APIView):
         month = query.validated_data["month"]
         year = query.validated_data["year"]
         requested_scope = query.validated_data.get("scope", "ALL")
-
         scope = self._resolve_scope(requested_scope=requested_scope)
 
-        payload = self._build_summary_payload(
-            month=month,
-            year=year,
-            scope=scope,
-        )
+        cache_key = f"dashboard:summary:{year}:{month}:{scope}"
+        payload = cache.get(cache_key)
+        if payload is None:
+            payload = self._build_summary_payload(month=month, year=year, scope=scope)
+            cache.set(cache_key, payload, DASHBOARD_CACHE_TTL)
 
         response_serializer = DashboardSummaryResponseSerializer(instance=payload)
         return Response(response_serializer.data)
@@ -252,34 +255,33 @@ class MonthlyCasesSummaryAggregateView(MonthYearQueryMixin, APIView):
     def get(self, request):
         month, year = self.get_month_year()
 
-        data = MonthlyCasesSummary.objects.filter(
-            creation_date__month=month,
-            creation_date__year=year,
-        ).aggregate(
-            suspicious_cases=Coalesce(Sum("suspicious_cases"), 0),
-            inconclusive_cases=Coalesce(Sum("inconclusive_cases"), 0),
-            failure_cases=Coalesce(Sum("failure_cases"), 0),
-            dangerous_cases=Coalesce(Sum("dangerous_cases"), 0),
-            safe_cases=Coalesce(Sum("safe_cases"), 0),
-            challenged_cases=Coalesce(Sum("challenged_cases"), 0),
-            allow_listed_cases=Coalesce(Sum("allow_listed_cases"), 0),
-            uncategorized_cases=Coalesce(Sum("uncategorized_cases"), 0),
-            spam_cases=Coalesce(Sum("spam_cases"), 0),
-            newsletter_cases=Coalesce(Sum("newsletter_cases"), 0),
-            classic_phishing_cases=Coalesce(Sum("classic_phishing_cases"), 0),
-            clone_cases=Coalesce(Sum("clone_cases"), 0),
-            blackmail_cases=Coalesce(Sum("blackmail_cases"), 0),
-            whaling_cases=Coalesce(Sum("whaling_cases"), 0),
-            internal_cases=Coalesce(Sum("internal_cases"), 0),
-            external_cases=Coalesce(Sum("external_cases"), 0),
-        )
+        cache_key = f"dashboard:monthly-cases:{year}:{month}"
+        data = cache.get(cache_key)
+        if data is None:
+            data = MonthlyCasesSummary.objects.filter(
+                creation_date__month=month,
+                creation_date__year=year,
+            ).aggregate(
+                suspicious_cases=Coalesce(Sum("suspicious_cases"), 0),
+                inconclusive_cases=Coalesce(Sum("inconclusive_cases"), 0),
+                failure_cases=Coalesce(Sum("failure_cases"), 0),
+                dangerous_cases=Coalesce(Sum("dangerous_cases"), 0),
+                safe_cases=Coalesce(Sum("safe_cases"), 0),
+                challenged_cases=Coalesce(Sum("challenged_cases"), 0),
+                allow_listed_cases=Coalesce(Sum("allow_listed_cases"), 0),
+                uncategorized_cases=Coalesce(Sum("uncategorized_cases"), 0),
+                spam_cases=Coalesce(Sum("spam_cases"), 0),
+                newsletter_cases=Coalesce(Sum("newsletter_cases"), 0),
+                classic_phishing_cases=Coalesce(Sum("classic_phishing_cases"), 0),
+                clone_cases=Coalesce(Sum("clone_cases"), 0),
+                blackmail_cases=Coalesce(Sum("blackmail_cases"), 0),
+                whaling_cases=Coalesce(Sum("whaling_cases"), 0),
+                internal_cases=Coalesce(Sum("internal_cases"), 0),
+                external_cases=Coalesce(Sum("external_cases"), 0),
+            )
+            cache.set(cache_key, data, DASHBOARD_CACHE_TTL)
 
-        payload = {
-            "month": month,
-            "year": year,
-            **data,
-        }
-
+        payload = {"month": month, "year": year, **data}
         serializer = MonthlyCasesSummaryAggregateSerializer(instance=payload)
         return Response(serializer.data)
 
@@ -299,6 +301,12 @@ class UserCasesMonthlyStatsAggregateView(MonthYearQueryMixin, APIView):
         month, year = self.get_month_year()
         month_str = str(month)
         year_str = str(year)
+
+        cache_key = f"dashboard:user-stats:{year}:{month}"
+        cached = cache.get(cache_key)
+        if cached is not None:
+            serializer = UserCasesMonthlyStatsAggregateRowSerializer(instance=cached, many=True)
+            return Response(serializer.data)
 
         rows = (
             UserCasesMonthlyStats.objects.filter(month=month_str, year=year_str)
@@ -351,6 +359,7 @@ class UserCasesMonthlyStatsAggregateView(MonthYearQueryMixin, APIView):
             for row in rows
         ]
 
+        cache.set(cache_key, payload, DASHBOARD_CACHE_TTL)
         serializer = UserCasesMonthlyStatsAggregateRowSerializer(instance=payload, many=True)
         return Response(serializer.data)
 

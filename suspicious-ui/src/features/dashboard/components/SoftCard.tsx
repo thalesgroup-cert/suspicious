@@ -3,6 +3,7 @@ import * as React from "react";
 import { Box, Card, CardContent, Divider, Stack, Typography } from "@mui/material";
 import { alpha } from "@mui/material/styles";
 import { useTheme } from "@mui/material/styles";
+import { useThemeMode } from "@/styles/ThemeStore";
 
 // ---------------------------------------------------------------------------
 // SoftCard — theme-aware card shell shared across all dashboard panels.
@@ -33,9 +34,39 @@ export function SoftCard({
 }: SoftCardProps) {
   const theme = useTheme();
   const isDark = theme.palette.mode === "dark";
+  const { capabilities } = useThemeMode();
+  const { effects } = capabilities;
+
+  // Metal theme: periodic ! badge on hover
+  const isMetal = effects.hasAlertStates;
+  const [hovered, setHovered] = React.useState(false);
+  const [showExcl, setShowExcl] = React.useState(false);
+  const timerRef = React.useRef<ReturnType<typeof setTimeout> | undefined>(undefined);
+
+  React.useEffect(() => {
+    if (!isMetal || !hovered) {
+      clearTimeout(timerRef.current);
+      setShowExcl(false);
+      return;
+    }
+    function schedule() {
+      const delay = 600 + Math.random() * 1800;
+      timerRef.current = setTimeout(() => {
+        setShowExcl(true);
+        timerRef.current = setTimeout(() => {
+          setShowExcl(false);
+          schedule();
+        }, 1100);
+      }, delay);
+    }
+    schedule();
+    return () => clearTimeout(timerRef.current);
+  }, [isMetal, hovered]);
 
   return (
     <Card
+      onMouseEnter={isMetal ? () => setHovered(true) : undefined}
+      onMouseLeave={isMetal ? () => setHovered(false) : undefined}
       sx={{
         height: "100%",
         borderRadius: 3,
@@ -91,6 +122,20 @@ export function SoftCard({
             <Typography fontWeight={900} fontSize={15}>
               {title}
             </Typography>
+            {showExcl && (
+              <Box
+                component="span"
+                aria-hidden
+                sx={{
+                  display: "inline-flex", alignItems: "center", justifyContent: "center",
+                  width: 18, height: 18, borderRadius: "3px",
+                  fontSize: 11, fontWeight: 900, fontFamily: '"IBM Plex Mono", monospace',
+                  backgroundColor: "var(--mgs-alert, #E1061B)", color: "#fff",
+                  ml: 0.75, flexShrink: 0,
+                  animation: "exclamation 300ms cubic-bezier(.34,1.56,.64,1) both",
+                }}
+              >!</Box>
+            )}
           </Stack>
 
           {right ?? null}

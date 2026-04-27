@@ -1,13 +1,13 @@
 # LDAP Authentication and Database Connectivity
 django-auth-ldap==5.3.0
 django-mysql==4.19.0
-mysqlclient==2.2.7
+mysqlclient==2.2.8
 python-ldap==3.4.5
-djangorestframework==3.16.1
-django-rest-knox==4.2.0
+djangorestframework==3.17.1
+django-rest-knox==5.0.4
 django-filter==25.2
 drf-spectacular==0.29.0
-gunicorn==25.2.0
+gunicorn==25.3.0
 whitenoise==6.12.0
 # Environment Configuration
 docker==7.1.0
@@ -25,43 +25,51 @@ msg_parser==1.2.0
 eml2png==0.0.2
 
 # Natural Language Processing and Similarity Checking
-nltk==3.9.3
+nltk==3.9.4
 simhash==2.1.2
 
 # Image and Font Utilities
 fontawesomefree==6.6.0
 
 # Web Framework and Application Enhancements
-django-crontab==0.7.1
 django-import-export==4.4.0
 
 # Request Handling
-requests==2.32.5
-PyJWT==2.12.0
+requests==2.33.1
+PyJWT==2.12.1
 minio==7.2.20
 zipstream==1.1.4
+tenacity==9.1.4
+pybreaker==1.4.1
 
 # Email Handling
-chardet==5.2.0
+chardet==7.4.3
 
 # Data Analysis and Machine Learning
-numpy==2.4.1
+numpy==2.4.4
 validators==0.35.0
 hashid==3.1.4
 
 # Cybersecurity and Incident Response
 thehive4py==2.0.3
 cortex4py==2.1.0
-pymisp==2.5.17.3
-vt-py==0.21.0
+pymisp==2.5.33.1
+vt-py==0.22.0
 
 # Vector store
-chromadb==1.4.0
+chromadb==1.5.8
+
+# Logging
+python-json-logger==4.1.0  # v4.x changed the API; pin to v3 until we migrate
 
 # Docs
-docutils==0.21.2
-Sphinx==8.2.3
-sphinx-rtd-theme==3.0.2
-myst-parser==4.0.1
-pillow==12.1.1
+docutils==0.22.4
+Sphinx==9.1.0
+sphinx-rtd-theme==3.1.0
+myst-parser==5.0.0
+pillow==12.2.0
 cairosvg==2.9.0
+
+# Task Queue
+celery[redis]==5.6.3
+django-celery-results==2.6.0

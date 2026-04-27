@@ -14,6 +14,7 @@ import {
 
 import { SoftCard } from "./SoftCard";
 import { useResultColors, useStatusColors } from "@/styles/colorStore";
+import { useThemeMode } from "@/styles/ThemeStore";
 
 type DangerCounts = {
   failure: number;
@@ -82,6 +83,8 @@ function ThreatTooltip({
 export default function ThreatDistributionPanel(props: { dangerCounts: DangerCounts }) {
   const theme = useTheme();
   const isDark = theme.palette.mode === "dark";
+  const { capabilities } = useThemeMode();
+  const { effects } = capabilities;
 
   // Read from the user's semantic color store so this panel respects
   // colorblind-safe presets and custom color choices from ProfilePage.
@@ -118,7 +121,10 @@ export default function ThreatDistributionPanel(props: { dangerCounts: DangerCou
       right={<Chip size="small" label="Monthly" variant="outlined" />}
       fillHeight
     >
-      <Box sx={{ flex: 1, minHeight: 220 }}>
+      <Box
+        className={effects.hasHeatEffect ? "sun-orb" : undefined}
+        sx={{ flex: 1, minHeight: 220 }}
+      >
         {donut.length ? (
           <ResponsiveContainer width="100%" height="100%">
             <PieChart>
@@ -176,7 +182,13 @@ export default function ThreatDistributionPanel(props: { dangerCounts: DangerCou
           const value = (danger[key] ?? 0) as number;
 
           return (
-            <Stack key={label} direction="row" justifyContent="space-between" alignItems="center">
+            <Stack
+              key={label}
+              direction="row"
+              justifyContent="space-between"
+              alignItems="center"
+              className={effects.hasContaminationEffect && label === "Dangerous" ? "contaminated" : undefined}
+            >
               <Stack direction="row" spacing={1} alignItems="center">
                 <Box
                   aria-hidden

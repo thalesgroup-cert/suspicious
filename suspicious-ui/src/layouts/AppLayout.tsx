@@ -37,7 +37,7 @@ import {
 import { NavLink, Outlet, useLocation, useNavigate } from "react-router-dom";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { getMe, logout, type Me } from "@/api/auth";
-import { getAccessToken } from "@/api/client";
+import { useThemeMode } from "@/styles/ThemeStore";
 
 // ---------------------------------------------------------------------------
 // Constants
@@ -519,13 +519,10 @@ export default function AppLayout() {
   const isDark = theme.palette.mode === "dark";
   const primary = theme.palette.primary.main;
 
-  const token = getAccessToken();
-
   const meQuery = useQuery<Me>({
     queryKey: ["me"],
     queryFn: getMe,
     retry: false,
-    enabled: !!token,
   });
 
   const me = meQuery.data;
@@ -534,6 +531,33 @@ export default function AppLayout() {
 
   const [mobileOpen, setMobileOpen] = React.useState(false);
   const [hovered,    setHovered]    = React.useState(false);
+
+  const { capabilities } = useThemeMode();
+  const { effects } = capabilities;
+
+  // Logo Avatar gets a per-theme ambient animation
+  const logoClass = React.useMemo(() => {
+    if (effects.hasHeatEffect)     return "sun-orb";
+    if (effects.hasSeasonalLights) return "christmas-lights";
+    if (effects.hasBloomEffect)    return "dew-pulse";
+    if (effects.hasEmberEffect)    return "leaf-sway";
+    if (effects.hasPortalEffect)   return "fennec";
+    return undefined;
+  }, [effects]);
+
+  // Brand label gets a glitch flicker on Future theme
+  const brandClass = effects.hasPortalEffect ? "temporal-glitch" : undefined;
+
+  // Sidebar Paper picks up a neon / solar rim glow
+  const sidebarGlow = React.useMemo(() => {
+    if (effects.hasNeonEffect)
+      return `4px 0 40px rgba(0,0,0,.6), 0 0 28px rgba(0,229,255,.07), inset -1px 0 0 rgba(0,229,255,.18)`;
+    if (effects.hasSolarEffect)
+      return `4px 0 40px rgba(0,0,0,.5), 0 0 28px rgba(201,164,76,.08), inset -1px 0 0 rgba(201,164,76,.2)`;
+    if (effects.hasContaminationEffect)
+      return `4px 0 40px rgba(0,0,0,.6), 0 0 20px rgba(92,184,92,.05), inset -1px 0 0 rgba(92,184,92,.15)`;
+    return undefined;
+  }, [effects]);
 
   // Pin state persists across page reloads via localStorage
   const [pinned, setPinned] = React.useState<boolean>(() => {
@@ -622,6 +646,7 @@ export default function AppLayout() {
             variant="rounded"
             src="/icons/suspicious-logo.png"
             alt="Suspicious"
+            className={logoClass}
             sx={{
               width: 36,
               height: 36,
@@ -635,6 +660,7 @@ export default function AppLayout() {
           {!isSlim && (
             <Box>
               <Typography
+                className={brandClass}
                 sx={{
                   fontWeight: 950,
                   fontSize: 15,
@@ -864,7 +890,7 @@ export default function AppLayout() {
                 border: "none",
                 borderRight: sidebarBorder,
                 background: "transparent",
-                boxShadow: "none",
+                boxShadow: sidebarGlow ?? "none",
                 transition: theme.transitions.create("width", {
                   duration: theme.transitions.duration.standard,
                   easing: theme.transitions.easing.easeInOut,

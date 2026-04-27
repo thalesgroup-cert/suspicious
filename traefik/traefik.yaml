@@ -14,8 +14,7 @@ entryPoints:
         options: default
 
 api:
-  dashboard: true
-  insecure: true
+  dashboard: false
 
 providers:
   file:

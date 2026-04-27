@@ -47,6 +47,8 @@ from rest_framework.permissions import AllowAny
 from rest_framework.views import APIView
 from django.shortcuts import redirect
 
+from api.views.auth import _set_auth_cookies
+
 try:
     import jwt
     from jwt import PyJWKClient
@@ -342,14 +344,15 @@ class OIDCCallbackView(APIView):
             user.username, email,
         )
 
-        # Redirect to the React SPA with the token in the URL fragment.
-        # Fragments are never sent to the server, so the token never appears
-        # in Traefik or Nginx access logs.
-        fragment = urllib.parse.urlencode({
-            "token":  knox_token,
-            "expiry": expiry_iso,
-        })
-        return redirect(_frontend_url(f"/login?sso=1#{fragment}"))
+        # Set the Knox token as an httpOnly cookie and redirect the browser
+        # to the SPA login page with ?sso=1 to trigger color hydration.
+        # The token never appears in URLs or server logs.
+        ttl = settings.REST_KNOX.get("TOKEN_TTL")
+        max_age = int(ttl.total_seconds()) if ttl else 36_000
+
+        response = redirect(_frontend_url("/login?sso=1"))
+        _set_auth_cookies(response, knox_token, max_age, secure=not settings.DEBUG)
+        return response
 
 
 # ---------------------------------------------------------------------------

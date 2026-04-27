@@ -23,6 +23,7 @@ import json
 import sys
 from datetime import timedelta
 from pathlib import Path
+import logging
 
 # ---------------------------------------------------------------------------
 # Load configuration file
@@ -45,6 +46,7 @@ _cortex     = _integr.get("cortex", {})
 _chromadb   = _integr.get("chromadb", {})
 _features   = _config.get("features", {})
 _email_cfg  = _config.get("email", {})
+_redis_cfg  = _config.get("redis", {})
 
 # ---------------------------------------------------------------------------
 # Base directories
@@ -110,7 +112,7 @@ INSTALLED_APPS = [
     "drf_spectacular",
     "knox",
     "django_filters",
-    "django_crontab",
+    "django_celery_results",
     "import_export",
     "fontawesomefree",
 
@@ -208,14 +210,31 @@ else:
 DEFAULT_AUTO_FIELD = "django.db.models.BigAutoField"
 
 # ---------------------------------------------------------------------------
-# Sessions
+# Cache — Redis (redis_cache container)
+# ---------------------------------------------------------------------------
+
+_redis_cache_host = _redis_cfg.get("cache_host", "redis_cache")
+
+if "test" in sys.argv:
+    CACHES = {"default": {"BACKEND": "django.core.cache.backends.locmem.LocMemCache"}}
+else:
+    CACHES = {
+        "default": {
+            "BACKEND": "django.core.cache.backends.redis.RedisCache",
+            "LOCATION": f"redis://{_redis_cache_host}:6379/0",
+        }
+    }
+
+# ---------------------------------------------------------------------------
+# Sessions — Redis cache backend (eliminates per-request DB session lookup)
 #
 # The OIDC callback view stores state/nonce in the session between the
 # login redirect and the provider callback, so the session backend must
 # be functional even for unauthenticated requests.
 # ---------------------------------------------------------------------------
 
-SESSION_ENGINE               = "django.contrib.sessions.backends.db"
+SESSION_ENGINE               = "django.contrib.sessions.backends.cache"
+SESSION_CACHE_ALIAS          = "default"
 SESSION_EXPIRE_AT_BROWSER_CLOSE = True
 SESSION_COOKIE_HTTPONLY      = True     # prevent JS access
 SESSION_COOKIE_SAMESITE      = "Lax"   # CSRF protection; Strict breaks OIDC redirects
@@ -308,6 +327,10 @@ OIDC_REDIRECT_URI  = _oidc.get("redirect_uri", "")
 
 REST_FRAMEWORK = {
     "DEFAULT_AUTHENTICATION_CLASSES": (
+        # Cookie auth first — used by the browser SPA (httpOnly cookie, XSS-safe).
+        # Falls through when the cookie is absent so API clients can still
+        # authenticate via Authorization: Token <token>.
+        "api.authentication.KnoxCookieAuthentication",
         "knox.auth.TokenAuthentication",
     ),
     "DEFAULT_PERMISSION_CLASSES": (
@@ -439,41 +462,84 @@ USE_TZ        = True
 SUBMISSION_ELEVATED_GROUPS = ("CERT", "CISO", "Admin")
 
 # ---------------------------------------------------------------------------
-# Cron jobs
+# Celery — broker (redis_broker container) + result backend (MariaDB)
 # ---------------------------------------------------------------------------
 
-CRONTAB_LOCK_JOBS = True   # prevent overlapping runs
+from celery.schedules import crontab  # noqa: E402 — intentional mid-file import for BEAT_SCHEDULE
 
-CRONJOBS = [
-    ("*/1 * * * *",  "tasp.cron.fetch_emails.fetch_and_process_emails",       ">> /app/log/fetched_mail.log"),
-    ("*/1 * * * *",  "tasp.cron.sync_cortex.sync_cortex_analyzers"),
-    ("*/1 * * * *",  "tasp.cron.user_and_cases.update_ongoing_case_jobs",     ">> /app/log/case_updating.log"),
-    ("0 0 * * *",    "tasp.cron.suspicious.check_challengeable",              ">> /app/log/case_challengeable.log"),
-    ("*/5 * * * *",  "tasp.cron.kpi.sync_monthly_kpi"),
-    ("*/10 * * * *", "tasp.cron.user_and_cases.sync_user_profiles"),
-    ("0 0 1 * *",    "tasp.cron.cleanup.delete_old_analyzer_reports",         ">> /app/log/cleanup_phishing.log"),
-    ("0 0 * * *",    "tasp.cron.suspicious.remove_old_suspicious_emails",     ">> /app/log/cleanup_phishing.log"),
-    ("*/5 * * * *",  "tasp.cron.watcher.run_watcher_sync",                   ">> /app/log/watcher_sync.log"),
-]
+_redis_broker_host = _redis_cfg.get("broker_host", "redis_broker")
+
+CELERY_BROKER_URL         = f"redis://{_redis_broker_host}:6379/0"
+CELERY_RESULT_BACKEND     = "django-db"
+CELERY_TASK_TRACK_STARTED = True
+CELERY_TASK_SERIALIZER    = "json"
+CELERY_ACCEPT_CONTENT     = ["json"]
+CELERY_TIMEZONE           = _app.get("timezone", "UTC")
+
+if "test" in sys.argv:
+    CELERY_TASK_ALWAYS_EAGER    = True
+    CELERY_TASK_EAGER_PROPAGATES = True
+
+CELERY_BEAT_SCHEDULE = {
+    "fetch-emails": {
+        "task": "tasp.tasks.fetch_emails",
+        "schedule": 60.0,
+    },
+    "sync-cortex": {
+        "task": "tasp.tasks.sync_cortex",
+        "schedule": 60.0,
+    },
+    "update-ongoing-cases": {
+        "task": "tasp.tasks.update_ongoing_cases",
+        "schedule": 60.0,
+    },
+    "check-challengeable": {
+        "task": "tasp.tasks.check_challengeable",
+        "schedule": crontab(hour=0, minute=0),
+    },
+    "sync-monthly-kpi": {
+        "task": "tasp.tasks.sync_monthly_kpi",
+        "schedule": 300.0,
+    },
+    "sync-user-profiles": {
+        "task": "tasp.tasks.sync_user_profiles",
+        "schedule": 600.0,
+    },
+    "delete-old-reports": {
+        "task": "tasp.tasks.delete_old_reports",
+        "schedule": crontab(day_of_month=1, hour=0, minute=0),
+    },
+    "remove-old-emails": {
+        "task": "tasp.tasks.remove_old_emails",
+        "schedule": crontab(hour=0, minute=0),
+    },
+    "watcher-sync": {
+        "task": "tasp.tasks.watcher_sync",
+        "schedule": 300.0,
+    },
+}
 
 # ---------------------------------------------------------------------------
 # Logging
 # ---------------------------------------------------------------------------
 
-_trace_level = _app.get("log_level", "INFO").upper()
+_trace_level = getattr(logging, _app.get("log_level", "INFO").upper(), logging.INFO)
 
 LOGGING = {
     "version": 1,
     "disable_existing_loggers": False,
 
     "formatters": {
-        "verbose": {
-            "format":  "{levelname} {asctime} | {name} | {message}",
-            "style":   "{",
+        # Structured JSON — consumed by log aggregators (ELK, Loki, etc.).
+        # Fields: level, time, logger, message, plus any extra= keys passed
+        # at the call site (e.g. user_id, case_id on audit events).
+        "json": {
+            "()": "pythonjsonlogger.jsonlogger.JsonFormatter",
+            "format": "%(levelname)s %(asctime)s %(name)s %(message)s",
         },
-        "simple": {
-            "format":  "{levelname} {message}",
-            "style":   "{",
+        # Plain-text fallback kept for local development / docker logs tailing.
+        "verbose": {
+            "format": "%(levelname)s %(asctime)s | %(name)s | %(message)s",
         },
     },
 
@@ -482,12 +548,16 @@ LOGGING = {
             "class":     "logging.StreamHandler",
             "formatter": "verbose",
         },
+        "json_console": {
+            "class": "logging.StreamHandler",
+            "formatter": "json",
+        },
         "app_file": {
             "class":     "logging.handlers.RotatingFileHandler",
             "filename":  "/app/log/suspicious.log",
             "maxBytes":  10 * 1024 * 1024,   # 10 MB
             "backupCount": 5,
-            "formatter": "verbose",
+            "formatter": "json",
             "level":     _trace_level,
         },
         "fetch_mail": {
@@ -495,7 +565,7 @@ LOGGING = {
             "filename":  "/app/log/fetched_mail.log",
             "maxBytes":  10 * 1024 * 1024,
             "backupCount": 3,
-            "formatter": "verbose",
+            "formatter": "json",
             "level":     _trace_level,
         },
         "update_cases": {
@@ -503,7 +573,7 @@ LOGGING = {
             "filename":  "/app/log/case_updating.log",
             "maxBytes":  10 * 1024 * 1024,
             "backupCount": 3,
-            "formatter": "verbose",
+            "formatter": "json",
             "level":     _trace_level,
         },
         "fetch_analyzer": {
@@ -511,7 +581,7 @@ LOGGING = {
             "filename":  "/app/log/fetch_analyzer.log",
             "maxBytes":  10 * 1024 * 1024,
             "backupCount": 3,
-            "formatter": "verbose",
+            "formatter": "json",
             "level":     _trace_level,
         },
         "cleanup": {
@@ -519,7 +589,7 @@ LOGGING = {
             "filename":  "/app/log/cleanup_phishing.log",
             "maxBytes":  10 * 1024 * 1024,
             "backupCount": 3,
-            "formatter": "verbose",
+            "formatter": "json",
             "level":     _trace_level,
         },
         "watcher_sync": {
@@ -527,15 +597,15 @@ LOGGING = {
             "filename":  "/app/log/watcher_sync.log",
             "maxBytes":  10 * 1024 * 1024,
             "backupCount": 3,
-            "formatter": "verbose",
+            "formatter": "json",
             "level":     _trace_level,
         },
         "audit": {
             "class":     "logging.handlers.RotatingFileHandler",
-            "filename":  "/var/log/cert_downloads.log",
+            "filename":  "/app/log/cert_downloads.log",
             "maxBytes":  50 * 1024 * 1024,
             "backupCount": 10,
-            "formatter": "verbose",
+            "formatter": "json",
             "level":     "INFO",
         },
     },
@@ -550,12 +620,12 @@ LOGGING = {
 
         # Main application
         "tasp": {
-            "handlers":  ["app_file", "console"],
+            "handlers": ["app_file", "json_console"],
             "level":     _trace_level,
             "propagate": False,
         },
         "case_handler": {
-            "handlers":  ["app_file", "console"],
+            "handlers":  ["app_file", "json_console"],
             "level":     _trace_level,
             "propagate": False,
         },
@@ -596,7 +666,7 @@ LOGGING = {
 
         # LDAP debug (can be very verbose — consider raising to WARNING)
         "django_auth_ldap": {
-            "handlers":  ["console"],
+            "handlers":  ["json_console"],
             "level":     _trace_level,
             "propagate": False,
         },
@@ -604,7 +674,7 @@ LOGGING = {
         # Audit trail for certificate downloads
         "audit.cert_download": {
             "handlers":  ["audit"],
-            "level":     "INFO",
+            "level":     _trace_level,
             "propagate": False,
         },
     },

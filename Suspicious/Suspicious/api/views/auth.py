@@ -1,14 +1,45 @@
+from django.conf import settings
 from knox.models import AuthToken
 from drf_spectacular.utils import OpenApiResponse, extend_schema
 from rest_framework import generics, permissions, serializers, status, throttling
 from rest_framework.response import Response
 
+from api.authentication import KNOX_COOKIE_NAME, SESSION_INDICATOR_COOKIE
 from api.serializers.auth import (
     LoginResponseSerializer,
     LoginSerializer,
     LogoutResponseSerializer,
     MeResponseSerializer,
 )
+
+
+def _set_auth_cookies(response, token: str, max_age: int, secure: bool) -> None:
+    """Set the httpOnly token cookie and the JS-readable session indicator."""
+    response.set_cookie(
+        KNOX_COOKIE_NAME,
+        token,
+        httponly=True,
+        secure=secure,
+        samesite="Strict",
+        max_age=max_age,
+        path="/",
+    )
+    # The indicator has the same lifetime so both expire together.
+    response.set_cookie(
+        SESSION_INDICATOR_COOKIE,
+        "1",
+        httponly=False,
+        secure=secure,
+        samesite="Strict",
+        max_age=max_age,
+        path="/",
+    )
+
+
+def _clear_auth_cookies(response) -> None:
+    """Clear both auth cookies on logout."""
+    response.delete_cookie(KNOX_COOKIE_NAME, path="/", samesite="Strict")
+    response.delete_cookie(SESSION_INDICATOR_COOKIE, path="/", samesite="Strict")
 
 
 class LoginRateThrottle(throttling.AnonRateThrottle):
@@ -61,10 +92,15 @@ class LoginView(generics.GenericAPIView):
             "user": user,
         }
 
-        return Response(
+        ttl = settings.REST_KNOX.get("TOKEN_TTL")
+        max_age = int(ttl.total_seconds()) if ttl else 36_000
+
+        response = Response(
             LoginResponseSerializer(response_data).data,
             status=status.HTTP_200_OK,
         )
+        _set_auth_cookies(response, token, max_age, secure=not settings.DEBUG)
+        return response
 
 
 class LogoutView(generics.GenericAPIView):
@@ -85,7 +121,6 @@ class LogoutView(generics.GenericAPIView):
         if token is not None:
             token.delete()
 
-        return Response(
-            {"detail": "Logged out."},
-            status=status.HTTP_200_OK,
-        )
+        response = Response({"detail": "Logged out."}, status=status.HTTP_200_OK)
+        _clear_auth_cookies(response)
+        return response

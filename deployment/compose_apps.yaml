@@ -6,7 +6,7 @@
 # Changes from previous version
 # ──────────────────────────────
 # - feeder: healthcheck added (was missing — make status showed unknown)
-# - suspicious_cron: healthcheck added so dependent services can gate on it
+# - suspicious_cron: replaced by suspicious_celery (Celery worker + Beat scheduler)
 # - Both use `test: ["CMD-SHELL", ...]` to keep the check inline
 
 services:
@@ -35,18 +35,12 @@ services:
     networks:
       - suspicious_network
 
-  # ── suspicious_cron ────────────────────────────────────────────────────
+  # ── suspicious_celery (Celery worker + Beat) ──────────────────────────
 
-  suspicious_cron:
+  suspicious_celery:
     init: true
     restart: always
-    command: >
-      /bin/bash -c "
-        python3 manage.py crontab add &&
-        echo '[cron] Jobs registered:' &&
-        python3 manage.py crontab show &&
-        service cron start &&
-        tail -f /app/log/suspicious.log"
+    command: celery -A suspicious worker --beat --loglevel=info
     volumes:
       - "${CA_PATH}/certfile.pem:/etc/private/certfile.pem:ro"
       - "${CA_PATH}/keyfile.pem:/etc/private/keyfile.pem:ro"
@@ -56,12 +50,11 @@ services:
     env_file:
       - ".env"
     environment:
-      no_proxy: "${NO_PROXY:-},cortex,db_suspicious,rustfs,chromadb"
-    # Healthcheck: verify cron daemon is running inside the container
+      no_proxy: "${NO_PROXY:-},cortex,db_suspicious,rustfs,chromadb,redis_broker,redis_cache"
     healthcheck:
-      test: ["CMD-SHELL", "service cron status | grep -q running || exit 1"]
+      test: ["CMD-SHELL", "celery -A suspicious inspect ping -d celery@$$HOSTNAME || exit 1"]
       interval: 60s
-      timeout: 5s
+      timeout: 10s
       retries: 3
       start_period: 30s
     networks:

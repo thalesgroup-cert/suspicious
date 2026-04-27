@@ -7,25 +7,28 @@ type Props = {
   children: React.ReactElement;
 };
 
-export default function PublicOnlyRoute({ children }: Props) {
-  const token = localStorage.getItem("token");
+/** Returns true when the non-httpOnly session_active cookie is present. */
+function hasSessionCookie(): boolean {
+  return document.cookie.split(";").some((c) => c.trim().startsWith("session_active="));
+}
 
-  const { data, isLoading, isError } = useQuery({
+export default function PublicOnlyRoute({ children }: Props) {
+  const maybeLoggedIn = hasSessionCookie();
+
+  const { data, isLoading } = useQuery({
     queryKey: ["me"],
     queryFn: getMe,
     retry: false,
-    enabled: !!token,
+    // Skip the network round-trip when there's no session indicator — avoids
+    // a 401 log entry and a loading spinner on every visit to /login.
+    enabled: maybeLoggedIn,
   });
 
-  if (!token) {
-    return children;
-  }
-
-  if (isLoading) {
+  if (maybeLoggedIn && isLoading) {
     return <PageLoader />;
   }
 
-  if (!isError && data) {
+  if (data) {
     return <Navigate to="/" replace />;
   }
 

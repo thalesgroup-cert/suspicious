@@ -7,7 +7,7 @@
 #################################################
 #               BUILD ARGS                      #
 #################################################
-ARG PYTHON_VERSION=3.11.14
+ARG PYTHON_VERSION=3.12.13
 ARG DEBIAN_SUITE=bookworm
 ARG HTTP_PROXY
 ARG HTTPS_PROXY
@@ -99,6 +99,7 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
         shared-mime-info \
         fonts-dejavu-core \
         cron \
+        celery \
     && rm -rf /var/lib/apt/lists/* \
     && mkdir -p /var/log \
     && touch /var/log/cron.log

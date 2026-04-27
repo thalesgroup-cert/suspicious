@@ -13,12 +13,12 @@ chromadb
 
 config.json
 settings.json
-
+.claude/
 # System
 .vscode
 .DS_Store
 Thumbs.db
-
+docs/superpowers
 # Node.js
 node_modules
 
