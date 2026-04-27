@@ -115,14 +115,4 @@ COPY . .
 
 WORKDIR /app/Suspicious
 
-# S7: run as non-root — gunicorn binds port 9020 (unprivileged, no cap needed).
-# The host log directory (${SUSPICIOUS_PATH}/logs) must be owned/writable by
-# uid 1000 (chown 1000:1000 on the host before first start).
-# settings.json is mounted :ro — ensure host file has mode 600.
-RUN groupadd --gid 1000 suspicious \
- && useradd --uid 1000 --gid suspicious --no-create-home --shell /sbin/nologin suspicious \
- && chown -R suspicious:suspicious /app
-
-USER suspicious
-
 EXPOSE 9020
