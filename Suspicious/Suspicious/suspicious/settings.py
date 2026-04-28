@@ -565,11 +565,17 @@ LOGGING = {
         # at the call site (e.g. user_id, case_id on audit events).
         "json": {
             "()": "pythonjsonlogger.jsonlogger.JsonFormatter",
-            "format": "%(levelname)s %(asctime)s %(name)s %(message)s",
+            "format": "%(levelname)s %(asctime)s %(name)s %(message)s %(trace_id)s %(span_id)s",
         },
         # Plain-text fallback kept for local development / docker logs tailing.
         "verbose": {
             "format": "%(levelname)s %(asctime)s | %(name)s | %(message)s",
+        },
+    },
+
+    "filters": {
+        "trace_id": {
+            "()": "suspicious.otel.TraceIdFilter",
         },
     },
 
@@ -581,6 +587,7 @@ LOGGING = {
         "json_console": {
             "class": "logging.StreamHandler",
             "formatter": "json",
+            "filters": ["trace_id"],
         },
         "app_file": {
             "class":     "logging.handlers.RotatingFileHandler",
@@ -588,6 +595,7 @@ LOGGING = {
             "maxBytes":  10 * 1024 * 1024,   # 10 MB
             "backupCount": 5,
             "formatter": "json",
+            "filters":   ["trace_id"],
             "level":     _trace_level,
         },
         "fetch_mail": {
@@ -596,6 +604,7 @@ LOGGING = {
             "maxBytes":  10 * 1024 * 1024,
             "backupCount": 3,
             "formatter": "json",
+            "filters":   ["trace_id"],
             "level":     _trace_level,
         },
         "update_cases": {
@@ -604,6 +613,7 @@ LOGGING = {
             "maxBytes":  10 * 1024 * 1024,
             "backupCount": 3,
             "formatter": "json",
+            "filters":   ["trace_id"],
             "level":     _trace_level,
         },
         "fetch_analyzer": {
@@ -612,6 +622,7 @@ LOGGING = {
             "maxBytes":  10 * 1024 * 1024,
             "backupCount": 3,
             "formatter": "json",
+            "filters":   ["trace_id"],
             "level":     _trace_level,
         },
         "cleanup": {
@@ -620,6 +631,7 @@ LOGGING = {
             "maxBytes":  10 * 1024 * 1024,
             "backupCount": 3,
             "formatter": "json",
+            "filters":   ["trace_id"],
             "level":     _trace_level,
         },
         "watcher_sync": {
@@ -628,6 +640,7 @@ LOGGING = {
             "maxBytes":  10 * 1024 * 1024,
             "backupCount": 3,
             "formatter": "json",
+            "filters":   ["trace_id"],
             "level":     _trace_level,
         },
         "audit": {
@@ -636,6 +649,7 @@ LOGGING = {
             "maxBytes":  50 * 1024 * 1024,
             "backupCount": 10,
             "formatter": "json",
+            "filters":   ["trace_id"],
             "level":     "INFO",
         },
     },
