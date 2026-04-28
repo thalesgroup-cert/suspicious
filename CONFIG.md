@@ -393,6 +393,44 @@ Controls SMTP settings, email content, links, social icons, and per-template log
 | `templates.*` | Subject line templates. `{case_id}` and `{result}` are interpolated at send time |
 | `logos.*` | Per-template logos. Accept `data:image/png;base64,...`, `data:image/svg+xml;base64,...`, or `https://` URLs. Outlook-safe rendering is handled automatically |
 
+### 2.10 Observability
+
+```json
+"observability": {
+    "opentelemetry": {
+        "enabled": false,
+        "service_name": "suspicious",
+        "otlp_endpoint": "http://tempo:4318"
+    }
+}
+```
+
+| Key | Type | Default | Description |
+|---|---|---|---|
+| `enabled` | bool | `false` | Enable OTel tracing. Set `true` in production. |
+| `service_name` | string | `"suspicious"` | Service name shown in Tempo/Grafana. |
+| `otlp_endpoint` | string | `"http://tempo:4318"` | OTLP HTTP collector URL. Use `http://tempo:4318` when Tempo runs in the monitoring Docker profile. |
+
+**Example production configuration:**
+
+```json
+{
+  "observability": {
+    "opentelemetry": {
+      "enabled": true,
+      "service_name": "suspicious-prod",
+      "otlp_endpoint": "http://tempo:4318"
+    }
+  }
+}
+```
+
+To enable the Tempo backend in Docker Compose, run:
+
+```bash
+make monitor-up
+```
+
 ## 3. `email-feeder/config.json` — Email Ingestion Service
 
 Created by `make init` from `config-sample.json` if absent.
