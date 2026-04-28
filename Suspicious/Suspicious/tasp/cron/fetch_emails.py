@@ -221,9 +221,7 @@ def _process_minio_buckets(cfg: CronConfig, base_path: str) -> None:
                 continue
 
             lock_key = f"lock:minio_bucket:{bucket.name}"
-            lock = cache.lock(lock_key, timeout=900)  # 15 min
-
-            if not lock.acquire(blocking=False):
+            if not cache.add(lock_key, "1", timeout=900):
                 logger.debug("Bucket %s already locked, skipping", bucket.name)
                 continue
 
@@ -284,17 +282,11 @@ def _process_minio_buckets(cfg: CronConfig, base_path: str) -> None:
 
                     shutil.make_archive(entry.path, "gztar", entry.path)
 
-                    try:
-                        minio_processor.process_emails_from_minio_workdir(
-                            entry.path,
-                            bucket.name,
-                            reported_by=manifest["reported_by"],
-                        )
-                    except Exception:
-                        logger.exception(
-                            "Email dir %s in bucket %s failed; bucket will still be marked Done",
-                            entry.name, bucket.name,
-                        )
+                    minio_processor.process_emails_from_minio_workdir(
+                        entry.path,
+                        bucket.name,
+                        reported_by=manifest["reported_by"],
+                    )
 
                 try:
                     done_tags = Tags.new_bucket_tags()
@@ -314,4 +306,5 @@ def _process_minio_buckets(cfg: CronConfig, base_path: str) -> None:
                     logger.warning("Failed to rollback status for %s", bucket.name)
 
             finally:
-                lock.release()
+                # release
+                cache.delete(lock_key)
