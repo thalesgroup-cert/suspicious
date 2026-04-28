@@ -50,21 +50,15 @@ class UserCreationService:
         return user
 
     def create_user(self, username: str) -> User:
-        try:
-            User.objects.get(username=username)
+        user, created = User.objects.get_or_create(username=username)
+        if created:
+            user.set_unusable_password()
+            user.full_clean()
+            user.save()
+            fetch_mail_logger.info(f"User created: {username}")
+        else:
             fetch_mail_logger.warning(f"User {username} already exists.")
-            return None
-        except User.DoesNotExist:
-            try:
-                user = User.objects.create_user(username=username, password=None)
-                user.set_unusable_password()
-                user.full_clean()
-                user.save()
-                fetch_mail_logger.info(f"User created: {username}")
-                return user
-            except Exception as e:
-                fetch_mail_logger.error(f"Error creating user {username}: {e}")
-                return None
+        return user
 
     def create_default_user(self) -> User:
         user, created = User.objects.get_or_create(username=SUSPICIOUS_EMAIL)

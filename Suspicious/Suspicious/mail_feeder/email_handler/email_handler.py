@@ -165,22 +165,22 @@ class EmailHandlerService:
         """
         
         if body_list:
-            fetch_mail_logger.error("Existing mail body found, updating times_sent.")
+            fetch_mail_logger.info("Existing mail body found, updating times_sent.")
             self.body_service.update_mail_body_times_sent(body_list[0])
             mail_instance.mail_body = body_list[0]
         else:
-            fetch_mail_logger.error("No existing mail body found, creating new one.")
+            fetch_mail_logger.info("No existing mail body found, creating new one.")
             body = self.body_service.create_mail_body_instance(data.reportedText)
             if body:
                 self.body_service.save_mail_body_instance(body)
                 mail_instance.mail_body = body
 
         if header_list:
-            fetch_mail_logger.error("Existing mail header found, updating times_sent.")
+            fetch_mail_logger.info("Existing mail header found, updating times_sent.")
             self.header_service.update_mail_header_times_sent(header_list[0])
             mail_instance.mail_header = header_list[0]
         else:
-            fetch_mail_logger.error("No existing mail header found, creating new one.")
+            fetch_mail_logger.info("No existing mail header found, creating new one.")
             header = self.header_service.create_mail_header_instance(str(data.headers))
             if header:
                 self.header_service.save_mail_header_instance(header)
