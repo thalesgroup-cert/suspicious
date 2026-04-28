@@ -4,7 +4,7 @@ from case_handler.models import Case
 from cortex_job.cortex_utils.cortex_and_job_management import CortexJobManager
 from profiles.profiles_utils.ldap import Ldap
 
-logger = logging.getLogger("cron.users_cases")
+logger = logging.getLogger("tasp.cron.users_cases")
 log_cases = logging.getLogger("tasp.cron.update_ongoing_case_jobs")
 
 
@@ -22,7 +22,7 @@ def update_ongoing_case_jobs() -> None:
     from opentelemetry import trace
 
     tracer = trace.get_tracer(__name__)
-    cases = Case.objects.filter(status="On Going")
+    cases = list(Case.objects.filter(status="On Going"))
     if not cases:
         log_cases.info("No ongoing cases found.")
         return
