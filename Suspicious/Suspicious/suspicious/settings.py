@@ -48,6 +48,8 @@ _chromadb   = _integr.get("chromadb", {})
 _features   = _config.get("features", {})
 _email_cfg  = _config.get("email", {})
 _redis_cfg  = _config.get("redis", {})
+_observ  = _config.get("observability", {})
+_otel    = _observ.get("opentelemetry", {})
 
 # ---------------------------------------------------------------------------
 # Base directories
@@ -126,6 +128,7 @@ INSTALLED_APPS = [
     "fontawesomefree",
 
     # Internal apps
+    "suspicious.apps.SuspiciousConfig",
     "api.apps.ApiConfig",
     "tasp.apps.TaspConfig",
     "dashboard.apps.DashboardConfig",
@@ -355,6 +358,14 @@ REST_FRAMEWORK = {
     ],
     "DEFAULT_SCHEMA_CLASS": "drf_spectacular.openapi.AutoSchema",
 }
+
+# ---------------------------------------------------------------------------
+# OpenTelemetry
+# ---------------------------------------------------------------------------
+
+OTEL_ENABLED                 = _otel.get("enabled", False)
+OTEL_SERVICE_NAME            = _otel.get("service_name", "suspicious")
+OTEL_EXPORTER_OTLP_ENDPOINT  = _otel.get("otlp_endpoint", "http://tempo:4318")
 
 # ---------------------------------------------------------------------------
 # Knox (token auth)
