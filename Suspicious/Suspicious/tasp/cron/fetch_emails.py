@@ -8,6 +8,7 @@ import logging
 from datetime import datetime, timezone
 from typing import Optional
 from minio import Minio
+from django.core.cache import cache
 from minio.commonconfig import Tags
 from pathlib import Path
 
@@ -211,77 +212,99 @@ def _process_minio_buckets(cfg: CronConfig, base_path: str) -> None:
 
     for bucket in client.list_buckets():
         with safe_execution(f"process bucket {bucket.name}"):
-            # Skip buckets not tagged Status=To Do
+
             try:
-                if client.get_bucket_tags(bucket.name).get("Status") != "To Do":
+                tags = client.get_bucket_tags(bucket.name)
+                if tags.get("Status") != "To Do":
                     continue
             except Exception:
                 continue
 
-            logger.debug("Processing bucket %s", bucket.name)
+            lock_key = f"lock:minio_bucket:{bucket.name}"
+            if not cache.add(lock_key, "1", timeout=900):
+                logger.debug("Bucket %s already locked, skipping", bucket.name)
+                continue
 
-            bucket_path = os.path.join(base_path, bucket.name)
-            ensure_dir(bucket_path)
+            try:
+                logger.debug("Processing bucket %s", bucket.name)
 
-            # Download all objects, sanitising object names before writing to disk
-            submission_path: Optional[str] = None
-            for obj in client.list_objects(bucket.name, recursive=True):
                 try:
-                    safe_name = _safe_object_name(obj.object_name)
-                except ValueError:
-                    logger.warning(
-                        "Skipping unsafe object name %r in bucket %s",
-                        obj.object_name, bucket.name,
+                    processing_tags = Tags.new_bucket_tags()
+                    processing_tags["Status"] = "Processing"
+                    client.set_bucket_tags(bucket.name, processing_tags)
+                except Exception:
+                    logger.warning("Failed to set Processing tag for %s", bucket.name)
+
+                bucket_path = os.path.join(base_path, bucket.name)
+                ensure_dir(bucket_path)
+
+                submission_path: Optional[str] = None
+
+                for obj in client.list_objects(bucket.name, recursive=True):
+                    try:
+                        safe_name = _safe_object_name(obj.object_name)
+                    except ValueError:
+                        logger.warning(
+                            "Skipping unsafe object name %r in bucket %s",
+                            obj.object_name, bucket.name,
+                        )
+                        continue
+
+                    dst = os.path.join(bucket_path, safe_name)
+                    ensure_dir(os.path.dirname(dst))
+                    client.fget_object(bucket.name, obj.object_name, dst)
+
+                    if obj.object_name.endswith(SUBMISSION_EML_SUFFIX):
+                        submission_path = dst
+
+                if not submission_path:
+                    logger.debug("No submission.eml found in %s — skipping", bucket.name)
+                    continue
+
+                manifest = _collect_manifest_fields(bucket_path, submission_path, bucket.name)
+                _write_manifest(client, bucket.name, manifest, bucket_path)
+
+                logger.debug(
+                    "Bucket %s: %d email(s), reported_by=%s",
+                    bucket.name,
+                    len(manifest["emails_to_analyze"]),
+                    manifest["reported_by"],
+                )
+
+                for entry in os.scandir(bucket_path):
+                    if not (entry.is_dir() and EMAIL_DIR_PATTERN.match(entry.name)):
+                        continue
+
+                    shutil.copy(
+                        submission_path,
+                        os.path.join(entry.path, "user_submission.eml"),
                     )
-                    continue
 
-                dst = os.path.join(bucket_path, safe_name)
-                ensure_dir(os.path.dirname(dst))
-                client.fget_object(bucket.name, obj.object_name, dst)
+                    shutil.make_archive(entry.path, "gztar", entry.path)
 
-                if obj.object_name.endswith(SUBMISSION_EML_SUFFIX):
-                    submission_path = dst
+                    minio_processor.process_emails_from_minio_workdir(
+                        entry.path,
+                        bucket.name,
+                        reported_by=manifest["reported_by"],
+                    )
 
-            if not submission_path:
-                logger.debug("No submission.eml found in %s — skipping", bucket.name)
-                continue
+                try:
+                    done_tags = Tags.new_bucket_tags()
+                    done_tags["Status"] = "Done"
+                    client.set_bucket_tags(bucket.name, done_tags)
+                except Exception:
+                    logger.exception("Failed to tag bucket %s as Done", bucket.name)
 
-            # Build and write metadata.json now that all objects are local
-            manifest = _collect_manifest_fields(bucket_path, submission_path, bucket.name)
-            _write_manifest(client, bucket.name, manifest, bucket_path)
-
-            logger.debug(
-                "Bucket %s: %d email(s) to analyse, reported_by=%s",
-                bucket.name,
-                len(manifest["emails_to_analyze"]),
-                manifest["reported_by"],
-            )
-
-            # Process each email subdirectory (pattern: YYYYMMDDHHMMSS-<hex>)
-            for entry in os.scandir(bucket_path):
-                if not (entry.is_dir() and EMAIL_DIR_PATTERN.match(entry.name)):
-                    continue
-
-                # Copy submission.eml into the subdir as user_submission.eml
-                # so that GlobalSubmissionService._extract_reported_by_from_user_submission
-                # can still find it (backward-compatible with existing call chain).
-                shutil.copy(
-                    submission_path,
-                    os.path.join(entry.path, "user_submission.eml"),
-                )
-                # Create the archive expected by handle_attachments
-                shutil.make_archive(entry.path, "gztar", entry.path)
-                # Pass reported_by from the manifest so MinioEmailService
-                # can resolve the user directly without path-convention parsing.
-                minio_processor.process_emails_from_minio_workdir(
-                    entry.path, bucket.name,
-                    reported_by=manifest["reported_by"],
-                )
-
-            # Tag bucket as Done
-            try:
-                tags = Tags.new_bucket_tags()
-                tags["Status"] = "Done"
-                client.set_bucket_tags(bucket.name, tags)
             except Exception:
-                logger.exception("Failed to tag bucket %s as Done", bucket.name)
+                logger.exception("Error while processing bucket %s", bucket.name)
+
+                try:
+                    error_tags = Tags.new_bucket_tags()
+                    error_tags["Status"] = "To Do"
+                    client.set_bucket_tags(bucket.name, error_tags)
+                except Exception:
+                    logger.warning("Failed to rollback status for %s", bucket.name)
+
+            finally:
+                # release
+                cache.delete(lock_key)

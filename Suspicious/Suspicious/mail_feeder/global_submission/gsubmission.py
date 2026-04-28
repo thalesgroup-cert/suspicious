@@ -126,7 +126,13 @@ class GlobalSubmissionService:
         """
         Handle artifacts, attachments, headers, bodies, and case creation.
         """
+
         user = UserCreationService().get_or_create_user(instance.reportedBy)
+        if user is None:
+            fetch_mail_logger.warning(
+                "Could not resolve user for mail %s; falling back to system default", instance.mail_id
+            )
+            user = UserCreationService().create_default_user()
         fetch_mail_logger.debug(f"Handling artifacts and attachments for email: {email_id}")
         artifact_ids = Handlers().handle_artifacts(instance)
         fetch_mail_logger.debug(f"Handling attachments for email: {email_id}")

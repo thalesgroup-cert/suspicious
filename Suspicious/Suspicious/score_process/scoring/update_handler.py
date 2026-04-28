@@ -75,7 +75,7 @@ def save_case_results(case, mail):
         from profiles.models import UserProfile
         profile = UserProfile.objects.filter(user=case.reporter).first()
         svc = MailNotificationService.from_settings()
-        svc.send_final(mail_info, case, profile=profile)
+        svc.send_final(mail_info, case)
         update_cases_logger.info("Final email sent for case %s.", case.id)
     except Exception as exc:
         update_cases_logger.error(

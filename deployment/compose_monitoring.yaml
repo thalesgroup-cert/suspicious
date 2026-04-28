@@ -86,6 +86,25 @@ services:
     networks:
       - suspicious_network
 
+  # Grafana Tempo — distributed tracing backend
+  tempo:
+    image: grafana/tempo:2.4.1
+    container_name: tempo
+    profiles: [monitoring]
+    restart: unless-stopped
+    command: ["-config.file=/etc/tempo/tempo.yaml"]
+    volumes:
+      - "${DOCKER_PATH:-../docker}/monitoring/tempo.yaml:/etc/tempo/tempo.yaml:ro"
+      - tempo_data:/var/tempo
+    expose:
+      - "3200"
+      - "4317"
+      - "4318"
+    security_opt:
+      - no-new-privileges:true
+    networks:
+      - suspicious_network
+
   # MariaDB exporter — exposes DB metrics to Prometheus
   mariadb-exporter:
     image: prom/mysqld-exporter:v0.15.1
@@ -111,6 +130,8 @@ volumes:
   prometheus_data:
     driver: local
   grafana_data:
+    driver: local
+  tempo_data:
     driver: local
 
 networks:
