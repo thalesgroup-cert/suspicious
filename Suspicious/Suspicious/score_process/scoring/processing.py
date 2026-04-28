@@ -3,6 +3,7 @@
 Mail, attachment, and IOC scoring pipeline.
 """
 import logging
+from opentelemetry import trace
 
 from django.db import transaction
 
@@ -15,6 +16,7 @@ from score_process.scoring.updating import (
 
 logger              = logging.getLogger(__name__)
 update_cases_logger = logging.getLogger("tasp.cron.update_ongoing_case_jobs")
+_tracer = trace.get_tracer(__name__)
 
 
 # ── Helpers ───────────────────────────────────────────────────────────────────
@@ -24,13 +26,17 @@ def log_and_process(
     total_scores, total_confidences, is_malicious, case_id,
 ):
     update_cases_logger.info("Processing %s.", item_name)
-    try:
-        failures = process_func(
-            item, reports, total_scores, total_confidences, is_malicious, case_id
-        )
-    except (ValueError, TypeError, RuntimeError) as exc:
-        update_cases_logger.exception("Error processing %s: %s", item_name, exc)
-        failures = 1
+    with _tracer.start_as_current_span("score.process_item") as span:
+        span.set_attribute("item.type", item_name)
+        span.set_attribute("case.id", case_id)
+        try:
+            failures = process_func(
+                item, reports, total_scores, total_confidences, is_malicious, case_id
+            )
+        except (ValueError, TypeError, RuntimeError) as exc:
+            span.record_exception(exc)
+            update_cases_logger.exception("Error processing %s: %s", item_name, exc)
+            failures = 1
     update_cases_logger.info("Finished processing %s.", item_name)
     return failures
 
