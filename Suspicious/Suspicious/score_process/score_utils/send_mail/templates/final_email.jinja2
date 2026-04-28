@@ -78,45 +78,39 @@
         {# 1. HEADER — logo or wordmark                                     #}
         {# ─────────────────────────────────────────────────────────────── #}
         <tr>
-          <td align="center"
-              style="background-color:{{ header_bg }};padding:28px 40px;">
-            {% if company_logo_svg.is_image  or company_logo_png.is_image %}
-              {# data: URI or SVG — Outlook blocks both; show img only to other clients #}
-              {% if company_logo_svg.is_data_uri or company_logo_svg.is_svg %}
+          <td align="center" style="background-color:{{ header_bg }};padding:28px 40px;">
+
+            {% if company_logo_svg.is_image %}
+
               <!--[if !mso]><!-->
               <img src="{{ company_logo_svg.src }}"
-                   alt="{{ company_name | default('') }}"
-                   width="130"
-                   style="max-width:130px;height:auto;display:block;margin:0 auto;">
+                  alt="{{ company_name | default('') }}"
+                  width="130"
+                  style="max-width:130px;height:auto;display:block;margin:0 auto;">
               <!--<![endif]-->
+
               <!--[if mso]>
-              {% if company_logo_png.outlook_src %}
-              <img src="{{ company_logo_png.outlook_src }}"
-                   alt="{{ company_name | default('') }}"
-                   width="130"
-                   style="max-width:130px;height:auto;display:block;margin:0 auto;">
-              {% else %}
-              <span style="font-size:20px;font-weight:800;letter-spacing:-0.5px;
-                           color:{{ header_text }};font-family:Arial,sans-serif;">
-                {{ company_name | default("Security Portal") }}
-              </span>
-              {% endif %}
+                {% if company_logo_png.src %}
+                  <img src="{{ company_logo_png.src }}"
+                      alt="{{ company_name | default('') }}"
+                      width="130"
+                      style="max-width:130px;height:auto;display:block;margin:0 auto;">
+                {% else %}
+                  <span style="font-size:20px;font-weight:800;color:{{ header_text }};
+                              font-family:Arial,sans-serif;">
+                    {{ company_name | default("Security Portal") }}
+                  </span>
+                {% endif %}
               <![endif]-->
-              {% else %}
-              {# URL-based image — safe for all clients including Outlook #}
-              <img src="{{ company_logo_png.src }}"
-                   alt="{{ company_name | default('') }}"
-                   width="130"
-                   style="max-width:130px;height:auto;display:block;margin:0 auto;">
-              {% endif %}
+
             {% else %}
-              {# No logo — plain text wordmark #}
-              <span style="font-size:22px;font-weight:800;letter-spacing:-0.5px;
-                           color:{{ header_text }};
-                           font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,Arial,sans-serif;">
+
+              <span style="font-size:22px;font-weight:800;color:{{ header_text }};">
                 {{ company_name | default("Security Portal") }}
               </span>
+
             {% endif %}
+
           </td>
         </tr>
 
