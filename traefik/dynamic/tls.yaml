@@ -26,12 +26,16 @@ http:
     swagger-csp:
       headers:
         customResponseHeaders:
+          # Swagger UI ships inline <script> and <style> blocks for its
+          # bootstrap config — script-src-elem / style-src-elem must allow
+          # 'unsafe-inline' too, otherwise they override the broader
+          # script-src / style-src directives for inline elements.
           Content-Security-Policy: >-
             default-src 'self';
             script-src 'self' 'unsafe-inline' https://cdn.jsdelivr.net;
-            script-src-elem 'self' https://cdn.jsdelivr.net;
+            script-src-elem 'self' 'unsafe-inline' https://cdn.jsdelivr.net;
             style-src 'self' 'unsafe-inline' https://cdn.jsdelivr.net;
-            style-src-elem 'self' https://cdn.jsdelivr.net;
+            style-src-elem 'self' 'unsafe-inline' https://cdn.jsdelivr.net;
             img-src 'self' data: https://cdn.jsdelivr.net;
             font-src 'self' https://cdn.jsdelivr.net;
             connect-src 'self' https://cdn.jsdelivr.net;
