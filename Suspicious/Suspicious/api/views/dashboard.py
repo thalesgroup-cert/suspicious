@@ -1,5 +1,6 @@
 from collections import defaultdict
 
+import django_filters
 from django.conf import settings
 from django.core.cache import cache
 from django.db.models import Sum, Value, CharField, F, Case, When
@@ -7,11 +8,13 @@ from django.db.models.functions import Coalesce, Lower, StrIndex, Substr
 from django_filters.rest_framework import DjangoFilterBackend
 from drf_spectacular.utils import OpenApiParameter, extend_schema
 from rest_framework import generics, status
+from rest_framework.pagination import LimitOffsetPagination
 from rest_framework.permissions import IsAuthenticated
 from rest_framework.response import Response
 from rest_framework.views import APIView
 
 from dashboard.models import (
+    GroupMonthlyStats,
     MonthlyCasesSummary,
     MonthlyReporterStats,
     TotalCasesStats,
@@ -24,6 +27,7 @@ from api.serializers.dashboard import (
     MonthlyCasesSummaryAggregateSerializer,
     MonthlyCasesSummarySerializer,
     MonthlyReporterStatsSerializer,
+    TopPrefixesResponseSerializer,
     TotalCasesStatsSerializer,
     UserCasesMonthlyStatsAggregateRowSerializer,
     UserCasesMonthlyStatsSerializer,
@@ -34,10 +38,24 @@ from api.views.filters import (
     TotalCasesStatsFilter,
 )
 from api.views.mixins import MonthYearQueryMixin
-from dashboard.models import UserCasesMonthlyStats, GroupMonthlyStats
-from api.serializers.dashboard import TopPrefixesResponseSerializer
 
 DASHBOARD_CACHE_TTL = 120  # 2 minutes — matches KPI sync cadence
+TOP_PREFIXES_CACHE_TTL = 120
+
+
+class DashboardLimitOffsetPagination(LimitOffsetPagination):
+    default_limit = 100
+    max_limit = 1000
+
+
+class UserCasesMonthlyStatsFilter(django_filters.FilterSet):
+    month = django_filters.CharFilter(field_name="month", required=True)
+    year = django_filters.CharFilter(field_name="year", required=True)
+    user = django_filters.NumberFilter(field_name="user")
+
+    class Meta:
+        model = UserCasesMonthlyStats
+        fields = ["user", "month", "year"]
 
 
 class DashboardSummaryView(APIView):
@@ -72,13 +90,11 @@ class DashboardSummaryView(APIView):
         requested_scope = query.validated_data.get("scope", "ALL")
         scope = self._resolve_scope(requested_scope=requested_scope)
 
-        # 1. Pre-materialised snapshot (< 24 h) — supersedes Redis short-term cache
         snap = get_snapshot(month, year)
         if snap is not None:
             payload = {**snap, "scope": scope}
             return Response(DashboardSummaryResponseSerializer(instance=payload).data)
 
-        # 2. Redis short-term cache (2 min) — covers gap between nightly runs
         cache_key = f"dashboard:summary:{year}:{month}:{scope}"
         payload = cache.get(cache_key)
         if payload is None:
@@ -99,6 +115,7 @@ class MonthlyCasesSummaryListView(generics.ListAPIView):
     serializer_class = MonthlyCasesSummarySerializer
     filter_backends = [DjangoFilterBackend]
     filterset_class = MonthlyCasesSummaryFilter
+    pagination_class = DashboardLimitOffsetPagination
 
 
 class MonthlyReporterStatsListView(generics.ListAPIView):
@@ -107,6 +124,7 @@ class MonthlyReporterStatsListView(generics.ListAPIView):
     serializer_class = MonthlyReporterStatsSerializer
     filter_backends = [DjangoFilterBackend]
     filterset_class = MonthlyReporterStatsFilter
+    pagination_class = DashboardLimitOffsetPagination
 
 
 class TotalCasesStatsListView(generics.ListAPIView):
@@ -115,19 +133,23 @@ class TotalCasesStatsListView(generics.ListAPIView):
     serializer_class = TotalCasesStatsSerializer
     filter_backends = [DjangoFilterBackend]
     filterset_class = TotalCasesStatsFilter
+    pagination_class = DashboardLimitOffsetPagination
 
 
 class UserCasesMonthlyStatsListView(generics.ListAPIView):
+    """List per-user monthly stats. month + year are required filters
+    to prevent unbounded scans (e.g. from Power BI imports)."""
     permission_classes = [IsAuthenticated]
-    queryset = UserCasesMonthlyStats.objects.all()
+    queryset = UserCasesMonthlyStats.objects.select_related("user").all()
     serializer_class = UserCasesMonthlyStatsSerializer
     filter_backends = [DjangoFilterBackend]
-    filterset_fields = ["user", "month", "year"]
+    filterset_class = UserCasesMonthlyStatsFilter
+    pagination_class = DashboardLimitOffsetPagination
 
 
 class UserCasesMonthlyStatsDetailView(generics.RetrieveAPIView):
     permission_classes = [IsAuthenticated]
-    queryset = UserCasesMonthlyStats.objects.all()
+    queryset = UserCasesMonthlyStats.objects.select_related("user").all()
     serializer_class = UserCasesMonthlyStatsSerializer
 
 
@@ -253,6 +275,7 @@ class UserCasesMonthlyStatsAggregateView(MonthYearQueryMixin, APIView):
         serializer = UserCasesMonthlyStatsAggregateRowSerializer(instance=payload, many=True)
         return Response(serializer.data)
 
+
 class TopPrefixesView(APIView):
     permission_classes = [IsAuthenticated]
 
@@ -277,6 +300,11 @@ class TopPrefixesView(APIView):
 
         limit = max(1, min(limit, self.MAX_LIMIT))
 
+        cache_key = f"dashboard:top-prefixes:{ranking_type}:{year}:{month}:{limit}"
+        cached = cache.get(cache_key)
+        if cached is not None:
+            return Response(TopPrefixesResponseSerializer(cached).data)
+
         if ranking_type == "user":
             rows = self._query_user_prefixes(month=month, year=year, limit=limit)
         else:
@@ -288,6 +316,7 @@ class TopPrefixesView(APIView):
             "year": year,
             "data": list(rows),
         }
+        cache.set(cache_key, payload, TOP_PREFIXES_CACHE_TTL)
         return Response(TopPrefixesResponseSerializer(payload).data)
 
     def _query_user_prefixes(self, month=None, year=None, limit=10):
@@ -301,11 +330,21 @@ class TopPrefixesView(APIView):
         username_expr = Lower(Coalesce(F("user__username"), Value("")))
         at_pos = StrIndex(username_expr, Value("@"))
 
+        # Guard Substr length: at_pos may be 0 when no '@' is present.
+        # The When() branch only fires when '@' exists, but we still wrap
+        # the length in a Case to be safe across DB backends.
         qs = qs.annotate(
             prefix=Case(
                 When(
-                    **{"user__username__icontains": "@"},
-                    then=Substr(username_expr, 1, at_pos - 1),
+                    user__username__contains="@",
+                    then=Substr(
+                        username_expr,
+                        1,
+                        Case(
+                            When(pk__isnull=False, then=at_pos - 1),
+                            default=Value(0),
+                        ),
+                    ),
                 ),
                 default=username_expr,
                 output_field=CharField(),
@@ -316,12 +355,12 @@ class TopPrefixesView(APIView):
             qs.exclude(prefix="")
             .values("prefix")
             .annotate(
-                total=Sum("total_cases"),
-                safe=Sum("safe_cases"),
-                suspicious=Sum("suspicious_cases"),
-                dangerous=Sum("dangerous_cases"),
-                failure=Sum("failure_cases"),
-                inconclusive=Sum("inconclusive_cases"),
+                total=Coalesce(Sum("total_cases"), 0),
+                safe=Coalesce(Sum("safe_cases"), 0),
+                suspicious=Coalesce(Sum("suspicious_cases"), 0),
+                dangerous=Coalesce(Sum("dangerous_cases"), 0),
+                failure=Coalesce(Sum("failure_cases"), 0),
+                inconclusive=Coalesce(Sum("inconclusive_cases"), 0),
             )
             .order_by("-total")[:limit]
         )
@@ -340,7 +379,7 @@ class TopPrefixesView(APIView):
         qs = qs.annotate(
             prefix=Case(
                 When(
-                    group_name__icontains=" ",
+                    group_name__contains=" ",
                     then=Substr(group_expr, 1, space_pos - 1),
                 ),
                 default=group_expr,
@@ -352,12 +391,12 @@ class TopPrefixesView(APIView):
             qs.exclude(prefix="")
             .values("prefix")
             .annotate(
-                total=Sum("total_cases"),
-                safe=Sum("safe_cases"),
-                suspicious=Sum("suspicious_cases"),
-                dangerous=Sum("dangerous_cases"),
-                failure=Sum("failure_cases"),
-                inconclusive=Sum("inconclusive_cases"),
+                total=Coalesce(Sum("total_cases"), 0),
+                safe=Coalesce(Sum("safe_cases"), 0),
+                suspicious=Coalesce(Sum("suspicious_cases"), 0),
+                dangerous=Coalesce(Sum("dangerous_cases"), 0),
+                failure=Coalesce(Sum("failure_cases"), 0),
+                inconclusive=Coalesce(Sum("inconclusive_cases"), 0),
             )
             .order_by("-total")[:limit]
         )
