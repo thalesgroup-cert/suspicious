@@ -1,9 +1,6 @@
 from django.urls import path
 from drf_spectacular.views import SpectacularAPIView, SpectacularSwaggerView
 
-# django-csp: relax script-src to allow Swagger UI's inline bootstrap script.
-# Scoped to the /docs/ view only — the rest of the app keeps strict CSP.
-
 from api.views.auth import LoginView, LogoutView, MeView
 from api.views.campaigns import (
     CampaignClassificationCountsView,
@@ -57,23 +54,9 @@ from api.views.submissions import (
 from api.views.oidc import OIDCCallbackView, OIDCLoginView
 from api.views.cortex_webhook import CortexWebhookView
 
-
-from csp.decorators import csp_replace
-
-swagger_ui_view = csp_replace(
-    {
-        "script-src": [
-            "'self'",
-            "'sha256-SqHD5f4U8mwfRSsZLyd7Ab59FXc743aUduSc/EgIYYo='",
-        ],
-        "style-src": ["'self'", "'unsafe-inline'"],
-    }
-)(SpectacularSwaggerView.as_view(url_name="schema"))
-
-
 urlpatterns = [
     path("schema/", SpectacularAPIView.as_view(), name="schema"),
-    path("docs/", swagger_ui_view, name="swagger-ui"),
+    path("docs/", SpectacularSwaggerView.as_view(url_name="schema"), name="swagger-ui"),
 
     # Authentication
     path("auth/login/", LoginView.as_view(), name="login"),
@@ -109,8 +92,10 @@ urlpatterns = [
 
     # Profile
     path("profile/",             ProfileView.as_view(),             name="profile"),
+    # Dedicated partial-update endpoints (used by ProfilePage panels)
     path("profile/appearance/",  AppearanceView.as_view(),          name="profile-appearance"),
     path("profile/preferences/", PreferencesView.as_view(),         name="profile-preferences"),
+    # Semantic colors — standalone sync
     path("profile/colors/",      SemanticColorsView.as_view(),      name="profile-colors"),
     path("profile/colors/reset/",ResetSemanticColorsView.as_view(), name="profile-colors-reset"),
 
@@ -140,6 +125,6 @@ urlpatterns = [
     # Home summary
     path("home/summary/", HomeSummaryView.as_view(), name="home-summary"),
 
-    # Cortex job-completion webhook
+    # Cortex job-completion webhook (called by Cortex, not by browser users)
     path("cortex/webhook/", CortexWebhookView.as_view(), name="cortex-webhook"),
 ]
