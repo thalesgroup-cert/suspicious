@@ -58,11 +58,11 @@ def handle_attachment(id, level, case_id):
         case = Case.objects.get(id=case_id)
         case_infos = {
             "id": case.id,
-            "score": case.finalScore,
-            "confidence": case.finalConfidence,
+            "score": case.final_score,
+            "confidence": case.final_confidence,
             "results": case.results,
         }
-        update_cases_logger.info(f"Case updated with id {case.id}, score {case.finalScore}, confidence {case.finalConfidence}, and results {case.results}")
+        update_cases_logger.info(f"Case updated with id {case.id}, score {case.final_score}, confidence {case.final_confidence}, and results {case.results}")
         return JsonResponse({'success': True, 'score': obj_score, 'confidence': obj_confidence, 'level': obj_level, 'hash_score': hash_obj_score, 'hash_confidence': hash_obj_confidence, 'hash_level': hash_obj_level, 'case_infos': case_infos})
     else:
         update_cases_logger.error(f"File with linked hash {id} not found")
@@ -104,11 +104,11 @@ def handle_artifact(id, level, case_id):
         case = Case.objects.get(id=case_id)
         case_infos = {
             "id": case.id,
-            "score": case.finalScore,
-            "confidence": case.finalConfidence,
+            "score": case.final_score,
+            "confidence": case.final_confidence,
             "results": case.results,
         }
-        print(f"Case updated with id {case.id}, score {case.finalScore}, confidence {case.finalConfidence}, and results {case.results}")
+        print(f"Case updated with id {case.id}, score {case.final_score}, confidence {case.final_confidence}, and results {case.results}")
         return JsonResponse({'success': True, 'score': obj_score, 'confidence': obj_confidence, 'level': obj_level, 'case_infos': case_infos})
     else:
         print(f"Artifact with id {id} not found")
@@ -159,13 +159,13 @@ def handle_mail(ioc_id: int, mail_type: str, level: int, case_id: int) -> JsonRe
 
     case_infos = {
         "id": case.id,
-        "score": case.finalScore,
-        "confidence": case.finalConfidence,
+        "score": case.final_score,
+        "confidence": case.final_confidence,
         "results": case.results,
     }
 
     print(
-        f"Case {case.id} updated (score={case.finalScore}, confidence={case.finalConfidence})"
+        f"Case {case.id} updated (score={case.final_score}, confidence={case.final_confidence})"
     )
 
     return JsonResponse(
@@ -214,11 +214,11 @@ def handle_file(id, level, case_id):
         case = Case.objects.get(id=case_id)
         case_infos = {
             "id": case.id,
-            "score": case.finalScore,
-            "confidence": case.finalConfidence,
+            "score": case.final_score,
+            "confidence": case.final_confidence,
             "results": case.results,
         }
-        print(f"Case updated with id {case.id}, score {case.finalScore}, confidence {case.finalConfidence}, and results {case.results}")
+        print(f"Case updated with id {case.id}, score {case.final_score}, confidence {case.final_confidence}, and results {case.results}")
         return JsonResponse({'success': True, 'score': obj_score, 'confidence': obj_confidence, 'level': obj_level, 'hash_score': hash_obj_score, 'hash_confidence': hash_obj_confidence, 'hash_level': hash_obj_level, 'case_infos': case_infos})
     else:
         print(f"File with linked hash {id} not found")
@@ -264,11 +264,11 @@ def handle_ioc(id, ioc_type, level, case_id):
         case = Case.objects.get(id=case_id)
         case_infos = {
             "id": case.id,
-            "score": case.finalScore,
-            "confidence": case.finalConfidence,
+            "score": case.final_score,
+            "confidence": case.final_confidence,
             "results": case.results,
         }
-        print(f"Case updated with id {case.id}, score {case.finalScore}, confidence {case.finalConfidence}, and results {case.results}")
+        print(f"Case updated with id {case.id}, score {case.final_score}, confidence {case.final_confidence}, and results {case.results}")
         return JsonResponse({'success': True, 'score': obj_score, 'confidence': obj_confidence, 'level': obj_level, 'case_infos': case_infos})
     else:
         print(f"{ioc_type} with id {id} not found")

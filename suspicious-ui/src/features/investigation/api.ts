@@ -78,12 +78,12 @@ export type InvestigationCaseInfos = {
   confidence?: number | null;
   results?: string | null;
   classification?: string | null;
-  finalScore?: number | null;
-  finalConfidence?: number | null;
-  resultsAI?: string | null;
-  scoreAI?: number | null;
-  confidenceAI?: number | null;
-  categoryAI?: string | null;
+  final_score?: number | null;
+  final_confidence?: number | null;
+  results_ai?: string | null;
+  score_ai?: number | null;
+  confidence_ai?: number | null;
+  category_ai?: string | null;
   [key: string]: unknown;
 };
 

@@ -222,10 +222,10 @@ class FinalEmailService:
                 "Please review the case details on the portal."
             ),
             # AI fields — shown as reference chips
-            "result_ai":        getattr(self.case, "resultsAI",  None),
-            "category_ai":      getattr(self.case, "categoryAI", None),
-            "score":            getattr(self.case, "finalScore",      None),
-            "confidence":       getattr(self.case, "finalConfidence", None),
+            "result_ai":        getattr(self.case, "results_ai",  None),
+            "category_ai":      getattr(self.case, "category_ai", None),
+            "score":            getattr(self.case, "final_score",      None),
+            "confidence":       getattr(self.case, "final_confidence", None),
             # Challenge URL — empty string if not available
             "challenge_url":    self._challenge_url(),
         }

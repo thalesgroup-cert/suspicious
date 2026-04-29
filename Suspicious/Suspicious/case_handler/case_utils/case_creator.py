@@ -59,8 +59,8 @@ class CaseCreator:
             fetch_mail_logger.debug(f"Processing key: {key}, value: {getattr(value, 'id', 'None')}")
             if key == 'allow_listed' and value == True:
                 case.results = "SAFE-ALLOW_LISTED"
-                case.finalScore = 0
-                case.finalConfidence = 100
+                case.final_score = 0
+                case.final_confidence = 100
                 case.status = "Done"
                 break
 

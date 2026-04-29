@@ -38,9 +38,9 @@ def update_linked_cases(object, type):
         if old_results != case.results:
             cls = MailNotificationService.from_settings()
             cls.send_review_email(case)
-            print(f"Case with id {case.id} has been updated from {old_results} to {case.results} with score {case.finalScore} and confidence {case.finalConfidence}")
+            print(f"Case with id {case.id} has been updated from {old_results} to {case.results} with score {case.final_score} and confidence {case.final_confidence}")
         else:
-            print(f"Case with id {case.id} has been updated with score {case.finalScore} and confidence {case.finalConfidence}")
+            print(f"Case with id {case.id} has been updated with score {case.final_score} and confidence {case.final_confidence}")
 
 def update_ioc_level_and_cases(obj, obj_type, level):
     """Update the IOC level and associated cases for the given object.
@@ -165,21 +165,21 @@ def update_case_score(case):
             if (mail_header_score > 9 and high_scores_count >= 2) or (mail_header_score <= 9 and high_scores_count >= 1):
                 avg_score = max(avg_score, 7)
 
-            case.finalScore = min(round(avg_score), 10)
-            update_cases_logger.info(f"Final score: {case.finalScore}")
-            case.finalConfidence = min(round(avg_confidence), 100)
-            update_cases_logger.info(f"Final confidence: {case.finalConfidence}")
+            case.final_score = min(round(avg_score), 10)
+            update_cases_logger.info(f"Final score: {case.final_score}")
+            case.final_confidence = min(round(avg_confidence), 100)
+            update_cases_logger.info(f"Final confidence: {case.final_confidence}")
         else:
             # Default to 0 if there are no scores
             update_cases_logger.info("No scores available, defaulting to 0.")
-            case.finalScore = 0
-            case.finalConfidence = 0
+            case.final_score = 0
+            case.final_confidence = 0
 
         # Update the results based on the final score
-        case.results = calculate_result_ranges(case.finalScore)
+        case.results = calculate_result_ranges(case.final_score)
         case.save()
 
-        update_cases_logger.info(f"Case with id {case.id} updated with score {case.finalScore} and confidence {case.finalConfidence}")
+        update_cases_logger.info(f"Case with id {case.id} updated with score {case.final_score} and confidence {case.final_confidence}")
 
     except Exception as e:
         update_cases_logger.error(f"Error occurred while updating case score: {str(e)}")

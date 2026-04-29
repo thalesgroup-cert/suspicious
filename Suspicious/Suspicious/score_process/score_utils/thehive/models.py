@@ -50,10 +50,10 @@ class CaseModel(BaseModel):
     score: Optional[float] = None
     confidence: Optional[float] = None
     results: Optional[str] = None
-    categoryAI: Optional[str] = None
-    resultsAI: Optional[str] = None
-    scoreAI: Optional[float] = None
-    confidenceAI: Optional[float] = None
+    category_ai: Optional[str] = None
+    results_ai: Optional[str] = None
+    score_ai: Optional[float] = None
+    confidence_ai: Optional[float] = None
 
 
 class MailModel(BaseModel):

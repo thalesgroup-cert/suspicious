@@ -415,14 +415,14 @@ class InvestigationGlobalEditView(InvestigationAccessMixin, APIView):
         payload.is_valid(raise_exception=True)
 
         validated = payload.validated_data
-        obj.finalScore = validated["score"]
-        obj.finalConfidence = validated["confidence"]
+        obj.final_score = validated["score"]
+        obj.final_confidence = validated["confidence"]
         obj.results = API_RESULT_TO_INTERNAL[validated["classification"]]
         obj.last_update_by = request.user
         obj.save(
             update_fields=[
-                "finalScore",
-                "finalConfidence",
+                "final_score",
+                "final_confidence",
                 "results",
                 "last_update_by",
                 "last_update",

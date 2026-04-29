@@ -288,8 +288,8 @@ def _calculate_and_set_final_scores(
 ) -> None:
     if not total_scores:
         _logger.info("No scores available — defaulting to %s/%s.", DEFAULT_SCORE, DEFAULT_CONFIDENCE)
-        case.finalScore      = DEFAULT_SCORE
-        case.finalConfidence = DEFAULT_CONFIDENCE
+        case.final_score      = DEFAULT_SCORE
+        case.final_confidence = DEFAULT_CONFIDENCE
         return
 
     avg_score      = sum(total_scores)      / len(total_scores)
@@ -313,18 +313,18 @@ def _calculate_and_set_final_scores(
     _logger.info("Processed score=%s confidence=%s.", case.score, case.confidence)
 
     # Use AI scores when they carry higher confidence
-    if case.confidenceAI > case.confidence:
-        _logger.info("AI confidence (%s) > human confidence (%s) — using AI scores.", case.confidenceAI, case.confidence)
-        case.finalScore      = case.scoreAI
-        case.finalConfidence = case.confidenceAI
+    if case.confidence_ai > case.confidence:
+        _logger.info("AI confidence (%s) > human confidence (%s) — using AI scores.", case.confidence_ai, case.confidence)
+        case.final_score      = case.score_ai
+        case.final_confidence = case.confidence_ai
     else:
-        case.finalScore      = case.score
-        case.finalConfidence = case.confidence
+        case.final_score      = case.score
+        case.final_confidence = case.confidence
 
-    _logger.info("Final score=%s confidence=%s.", case.finalScore, case.finalConfidence)
+    _logger.info("Final score=%s confidence=%s.", case.final_score, case.final_confidence)
 
     # Persist — this was previously missing; values were computed in memory only.
-    case.save(update_fields=["score", "confidence", "finalScore", "finalConfidence"])
+    case.save(update_fields=["score", "confidence", "final_score", "final_confidence"])
 
 
 def calculate_final_scores(
@@ -346,16 +346,16 @@ def calculate_final_scores(
             mail_header_score = getattr(getattr(mail, "mail_header", None), "header_score", None)
 
             if _check_mail_artifacts_for_deny_list(mail, deny_listed_domains_set, _logger):
-                case.finalScore      = DENY_LIST_SCORE
-                case.finalConfidence = DENY_LIST_CONFIDENCE
+                case.final_score      = DENY_LIST_SCORE
+                case.final_confidence = DENY_LIST_CONFIDENCE
                 deny_listed = True
 
         if not deny_listed and case.nonFileIocs and getattr(case.nonFileIocs, "url", None):
             url_address = case.nonFileIocs.url.address
             _logger.info("Checking non-file IOC URL: %s", url_address)
             if _is_address_deny_listed(url_address, deny_listed_domains_set, _logger):
-                case.finalScore      = DENY_LIST_SCORE
-                case.finalConfidence = DENY_LIST_CONFIDENCE
+                case.final_score      = DENY_LIST_SCORE
+                case.final_confidence = DENY_LIST_CONFIDENCE
                 deny_listed = True
 
         if not deny_listed:

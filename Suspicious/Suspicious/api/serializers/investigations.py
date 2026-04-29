@@ -261,13 +261,13 @@ class InvestigationDetailsSerializer(InvestigationRowSerializer):
 
     def get_case_infos(self, obj: Case) -> dict[str, Any]:
         return {
-            "score": obj.finalScore,
-            "confidence": obj.finalConfidence,
+            "score": obj.final_score,
+            "confidence": obj.final_confidence,
             "classification": normalize_result_to_api(obj.results),
-            "score_ai": obj.scoreAI,
-            "confidence_ai": obj.confidenceAI,
-            "classification_ai": normalize_result_to_api(obj.resultsAI),
-            "category_ai": obj.categoryAI,
+            "score_ai": obj.score_ai,
+            "confidence_ai": obj.confidence_ai,
+            "classification_ai": normalize_result_to_api(obj.results_ai),
+            "category_ai": obj.category_ai,
         }
 
     def get_raw(self, obj: Case) -> dict[str, Any]:
@@ -303,14 +303,14 @@ class InvestigationDetailsSerializer(InvestigationRowSerializer):
                 "analysis_done": obj.analysis_done,
                 "status": obj.status,
                 "results": obj.results,
-                "finalScore": obj.finalScore,
-                "finalConfidence": obj.finalConfidence,
+                "final_score": obj.final_score,
+                "final_confidence": obj.final_confidence,
                 "score": obj.score,
                 "confidence": obj.confidence,
-                "resultsAI": obj.resultsAI,
-                "scoreAI": obj.scoreAI,
-                "confidenceAI": obj.confidenceAI,
-                "categoryAI": obj.categoryAI,
+                "results_ai": obj.results_ai,
+                "score_ai": obj.score_ai,
+                "confidence_ai": obj.confidence_ai,
+                "category_ai": obj.category_ai,
                 "is_challenged": obj.is_challenged,
                 "is_challengeable": obj.is_challengeable,
                 "challenged_result": obj.challenged_result,
