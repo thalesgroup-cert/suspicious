@@ -28,11 +28,13 @@ http:
         customResponseHeaders:
           Content-Security-Policy: >-
             default-src 'self';
-            script-src 'self' 'unsafe-inline';
-            style-src 'self' 'unsafe-inline';
-            img-src 'self' data:;
-            font-src 'self';
-            connect-src 'self';
+            script-src 'self' 'unsafe-inline' https://cdn.jsdelivr.net;
+            script-src-elem 'self' https://cdn.jsdelivr.net;
+            style-src 'self' 'unsafe-inline' https://cdn.jsdelivr.net;
+            style-src-elem 'self' https://cdn.jsdelivr.net;
+            img-src 'self' data: https://cdn.jsdelivr.net;
+            font-src 'self' https://cdn.jsdelivr.net;
+            connect-src 'self' https://cdn.jsdelivr.net;
             object-src 'none';
             frame-ancestors 'none'
     # Security headers — applied to every response
@@ -95,8 +97,13 @@ http:
     suspicious-docs:
       entryPoints:
         - websecure
-      rule: "PathPrefix(`/docs`)"
-      priority: 30
+      # Django mounts Swagger at /api/docs/ via api.urls (drf-spectacular).
+      # Match both /api/docs (real path) and /docs (alias) so swagger-csp
+      # is applied before suspicious-api can claim the request.
+      rule: "PathPrefix(`/api/docs`) || PathPrefix(`/api/schema`) || PathPrefix(`/docs`)"
+      # High explicit priority so this beats suspicious-api (priority 20)
+      # and any future Host(...) router that gets a high length-based default.
+      priority: 100
       service: suspicious-api-service
       middlewares:
         - swagger-csp

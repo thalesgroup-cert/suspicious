@@ -56,14 +56,10 @@ services:
     depends_on:
       suspicious:
         condition: service_healthy
-    labels:
-      - "traefik.enable=true"
-      - "traefik.http.routers.suspicious-ui.rule=Host(`${DOMAIN_CORP:?DOMAIN_CORP is required}`)"
-      - "traefik.http.routers.suspicious-ui.entrypoints=websecure"
-      - "traefik.http.routers.suspicious-ui.tls=true"
-      - "traefik.http.services.suspicious-ui.loadbalancer.server.port=80"
-      # Security headers via Traefik middleware
-      - "traefik.http.routers.suspicious-ui.middlewares=security-headers@file"
+    # Routing handled by the file provider (traefik/dynamic/tls.yaml).
+    # Do NOT add traefik labels here — the file provider already defines
+    # the suspicious-ui router and adding a competing @docker router
+    # caused /docs requests to bypass the swagger-csp middleware.
 
   suspicious_celery:
     extends:
