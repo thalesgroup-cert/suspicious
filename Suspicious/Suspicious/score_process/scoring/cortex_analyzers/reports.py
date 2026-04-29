@@ -178,11 +178,12 @@ class CortexAnalyzerReports:
             report.confidence = result_dict.get("confidence", 0)
             report.category   = category
             report.level      = result_dict.get("level",    "info")
-            report.details    = result_dict.get("details",     {})
 
-            # Only update the five scoring columns — prevents overwriting
+            # Only update the four scoring columns — prevents overwriting
             # foreign keys or timestamps that another process may have changed.
-            report.save(update_fields=["score", "confidence", "category", "level", "details"])
+            # AnalyzerReport has no `details` column; raw payload is already in
+            # report_full / report_summary / report_taxonomy from initial save.
+            report.save(update_fields=["score", "confidence", "category", "level"])
 
         except Exception as exc:
             update_cases_logger.error(
