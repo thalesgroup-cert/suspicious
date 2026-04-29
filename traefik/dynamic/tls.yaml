@@ -97,9 +97,12 @@ http:
     suspicious-docs:
       entryPoints:
         - websecure
-      rule: "PathPrefix(`/docs`)"
-      # High explicit priority so any future Host(...) router can't
-      # accidentally outrank us via Traefik's rule-length default.
+      # Django mounts Swagger at /api/docs/ via api.urls (drf-spectacular).
+      # Match both /api/docs (real path) and /docs (alias) so swagger-csp
+      # is applied before suspicious-api can claim the request.
+      rule: "PathPrefix(`/api/docs`) || PathPrefix(`/api/schema`) || PathPrefix(`/docs`)"
+      # High explicit priority so this beats suspicious-api (priority 20)
+      # and any future Host(...) router that gets a high length-based default.
       priority: 100
       service: suspicious-api-service
       middlewares:
