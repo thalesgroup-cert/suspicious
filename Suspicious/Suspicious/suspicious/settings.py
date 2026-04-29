@@ -25,6 +25,7 @@ from datetime import timedelta
 from pathlib import Path
 from urllib.parse import urlparse
 import logging
+from drf_spectacular.utils import OpenApiParameter
 
 # ---------------------------------------------------------------------------
 # Load configuration file
@@ -116,18 +117,19 @@ INSTALLED_APPS = [
     "django.contrib.messages",
     "django.contrib.staticfiles",
     "django.contrib.sites",
-
+ 
     # Third-party
     "django_prometheus",
     "rest_framework",
     "drf_spectacular",
+    "drf_spectacular_sidecar",  # serves swagger-ui assets locally
     "knox",
     "django_filters",
     "django_celery_results",
     "import_export",
     "fontawesomefree",
-
-    # Internal apps
+ 
+    # Internal apps (unchanged)
     "suspicious.apps.SuspiciousConfig",
     "api.apps.ApiConfig",
     "tasp.apps.TaspConfig",
@@ -144,7 +146,7 @@ INSTALLED_APPS = [
     "settings.apps.SettingsConfig",
     "url_process.apps.URLConfig",
     "score_process.apps.ScoreConfig",
-    "submission_queue.apps.SubmissionQueueConfig"
+    "submission_queue.apps.SubmissionQueueConfig",
 ]
 
 MIDDLEWARE = [
@@ -409,17 +411,25 @@ REST_KNOX = {
 # ---------------------------------------------------------------------------
 
 SPECTACULAR_SETTINGS = {
-    "TITLE":               "Suspicious API",
-    "DESCRIPTION":         "Suspicious — security intake and automated analysis platform.",
-    "VERSION":             "1.0.0",
+    "TITLE": "Suspicious API",
+    "DESCRIPTION": "Suspicious — security intake and automated analysis platform.",
+    "VERSION": "1.0.0",
     "SERVE_INCLUDE_SCHEMA": False,
+ 
+    # Serve Swagger UI assets from the sidecar package (local /static/)
+    # instead of cdn.jsdelivr.net. Required because the production CSP
+    # blocks external script/style/img sources.
+    "SWAGGER_UI_DIST": "SIDECAR",
+    "SWAGGER_UI_FAVICON_HREF": "SIDECAR",
+    "REDOC_DIST": "SIDECAR",
+ 
     "SECURITY": [{"TokenAuth": []}],
     "COMPONENTS": {
         "securitySchemes": {
             "TokenAuth": {
-                "type":        "apiKey",
-                "in":          "header",
-                "name":        "Authorization",
+                "type": "apiKey",
+                "in": "header",
+                "name": "Authorization",
                 "description": "Format: Token <your_api_token>",
             }
         }
