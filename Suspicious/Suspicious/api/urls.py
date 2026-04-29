@@ -3,7 +3,6 @@ from drf_spectacular.views import SpectacularAPIView, SpectacularSwaggerView
 
 # django-csp: relax script-src to allow Swagger UI's inline bootstrap script.
 # Scoped to the /docs/ view only — the rest of the app keeps strict CSP.
-from csp.decorators import csp_update
 
 from api.views.auth import LoginView, LogoutView, MeView
 from api.views.campaigns import (
@@ -59,12 +58,15 @@ from api.views.oidc import OIDCCallbackView, OIDCLoginView
 from api.views.cortex_webhook import CortexWebhookView
 
 
-# Swagger UI ships an inline <script> bootstrap and uses inline styles.
-# Relax CSP only for this view.
-swagger_ui_view = csp_update(
+from csp.decorators import csp_replace
+
+swagger_ui_view = csp_replace(
     {
-        "script-src": ["'unsafe-inline'"],
-        "style-src": ["'unsafe-inline'"],
+        "script-src": [
+            "'self'",
+            "'sha256-SqHD5f4U8mwfRSsZLyd7Ab59FXc743aUduSc/EgIYYo='",
+        ],
+        "style-src": ["'self'", "'unsafe-inline'"],
     }
 )(SpectacularSwaggerView.as_view(url_name="schema"))
 
