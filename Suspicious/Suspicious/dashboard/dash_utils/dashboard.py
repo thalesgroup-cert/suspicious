@@ -78,8 +78,10 @@ def update_group_monthly_stats(current_month: int, current_year: int) -> None:
         )
 
         for entry in result_counts:
-            result_label = entry['results'].lower()
-            field_name = f"{result_label}_cases"
+            raw = entry['results']
+            if not raw:
+                continue
+            field_name = f"{raw.lower()}_cases"
             if hasattr(group_stat, field_name):
                 setattr(group_stat, field_name, entry['count'])
 
@@ -93,8 +95,10 @@ def update_group_monthly_stats(current_month: int, current_year: int) -> None:
         )
 
         for entry in category_counts:
-            category_label = entry['categoryAI'].lower().replace(" ", "_")
-            field_name = f"{category_label}_cases"
+            raw = entry['categoryAI']
+            if not raw:
+                continue
+            field_name = f"{raw.lower().replace(' ', '_')}_cases"
             if hasattr(group_stat, field_name):
                 setattr(group_stat, field_name, entry['count'])
 
@@ -107,6 +111,13 @@ def update_monthly_cases_summary(kpi, current_month: int, current_year: int) -> 
     if kpi.monthly_cases_summary is None:
         kpi.monthly_cases_summary = MonthlyCasesSummary()
 
+    summary = kpi.monthly_cases_summary
+
+    # Reset all counters before recomputing to avoid stale data from previous runs
+    for field in MonthlyCasesSummary._meta.get_fields():
+        if hasattr(field, 'default') and field.name.endswith('_cases'):
+            setattr(summary, field.name, 0)
+
     case_counts = (
         Case.objects.filter(
             creation_date__month=current_month,
@@ -117,10 +128,12 @@ def update_monthly_cases_summary(kpi, current_month: int, current_year: int) -> 
     )
 
     for entry in case_counts:
-        result_label = entry['results'].lower()
-        field_name = f"{result_label}_cases"
-        if hasattr(kpi.monthly_cases_summary, field_name):
-            setattr(kpi.monthly_cases_summary, field_name, entry['count'])
+        raw = entry['results']
+        if not raw:
+            continue
+        field_name = f"{raw.lower()}_cases"
+        if hasattr(summary, field_name):
+            setattr(summary, field_name, entry['count'])
 
     category_counts = (
         Case.objects.filter(
@@ -131,12 +144,14 @@ def update_monthly_cases_summary(kpi, current_month: int, current_year: int) -> 
         .annotate(count=Count('categoryAI'))
     )
     for entry in category_counts:
-        category_label = entry['categoryAI'].lower()
-        field_name = f"{category_label}_cases"
-        if hasattr(kpi.monthly_cases_summary, field_name):
-            setattr(kpi.monthly_cases_summary, field_name, entry['count'])
+        raw = entry['categoryAI']
+        if not raw:
+            continue
+        field_name = f"{raw.lower()}_cases"
+        if hasattr(summary, field_name):
+            setattr(summary, field_name, entry['count'])
 
-    kpi.monthly_cases_summary.save()
+    summary.save()
 
 
 def update_total_cases_stats(kpi, current_month: int, current_year: int) -> None:
