@@ -221,6 +221,32 @@ else:
     elif _db_opts.get("persistent_connections"):
         DATABASES["default"]["CONN_MAX_AGE"] = 600        # 10 min pool
 
+    # Optional read-replica — opt-in via settings.json `database.replica`.
+    # When present, reads from apps listed in REPLICA_READ_APPS route to
+    # this alias; writes always stay on "default". See suspicious.db_router.
+    _db_replica = _db.get("replica") or {}
+    if _db_replica:
+        DATABASES["replica"] = {
+            "ENGINE":   "django.db.backends.mysql",
+            "NAME":     _db_replica.get("name", _db["name"]),
+            "USER":     _db_replica.get("user", _db["user"]),
+            "PASSWORD": _db_replica.get("password", _db["password"]),
+            "HOST":     _db_replica.get("host", "db_suspicious_replica"),
+            "PORT":     _db_replica.get("port", _db.get("port", "3306")),
+            "OPTIONS":  {"charset": "utf8mb4"},
+        }
+        if _db_opts.get("ssl"):
+            DATABASES["replica"]["OPTIONS"]["ssl"] = {"ca": "/cert.pem"}
+        if _db_opts.get("connection_pooling"):
+            DATABASES["replica"]["CONN_MAX_AGE"] = None
+        elif _db_opts.get("persistent_connections"):
+            DATABASES["replica"]["CONN_MAX_AGE"] = 600
+
+        DATABASE_ROUTERS = ["suspicious.db_router.PrimaryReplicaRouter"]
+        REPLICA_READ_APPS = tuple(
+            _db.get("replica_read_apps", ["dashboard", "case_handler"])
+        )
+
 DEFAULT_AUTO_FIELD = "django.db.models.BigAutoField"
 
 # ---------------------------------------------------------------------------

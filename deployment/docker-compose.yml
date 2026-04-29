@@ -92,6 +92,19 @@ services:
       retries: 20
       start_period: 30s
 
+  db_suspicious_replica:
+    extends:
+      file: compose_databases.yaml
+      service: db_suspicious_replica
+    image: mariadb:${DB_SUSPICIOUS_VERSION:?DB_SUSPICIOUS_VERSION is required}
+    container_name: db_suspicious_replica
+    healthcheck:
+      test: ["CMD", "mariadb-admin", "--user=${MYSQL_USER}", "--password=${MYSQL_PASSWORD}", "status"]
+      interval: 5s
+      timeout: 3s
+      retries: 20
+      start_period: 30s
+
   elasticsearch:
     extends:
       file: compose_databases.yaml

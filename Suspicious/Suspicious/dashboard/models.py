@@ -19,6 +19,11 @@ class Kpi(models.Model):
     creation_date = models.DateTimeField(auto_now_add=True)
     last_update = models.DateTimeField(auto_now=True)
 
+    class Meta:
+        indexes = [
+            models.Index(fields=["year", "month"], name="kpi_year_month_idx"),
+        ]
+
     def __str__(self):
         return f"{self.month} - {self.year}"
 
@@ -26,7 +31,6 @@ class Kpi(models.Model):
 class MonthlyCasesSummary(models.Model):
     id = models.AutoField(primary_key=True)
 
-    # Existing high-level fields
     suspicious_cases = models.PositiveIntegerField(default=0)
     inconclusive_cases = models.PositiveIntegerField(default=0)
     failure_cases = models.PositiveIntegerField(default=0)
@@ -35,34 +39,30 @@ class MonthlyCasesSummary(models.Model):
     challenged_cases = models.PositiveIntegerField(default=0)
     allow_listed_cases = models.PositiveIntegerField(default=0)
 
-    # 🆕 New detailed categories
-    # Uncategorized
     uncategorized_cases = models.PositiveIntegerField(default=0)
-    # Suspicious / Unwanted
     spam_cases = models.PositiveIntegerField(default=0)
     newsletter_cases = models.PositiveIntegerField(default=0)
 
-    # Dangerous
     classic_phishing_cases = models.PositiveIntegerField(default=0)
     clone_cases = models.PositiveIntegerField(default=0)
     blackmail_cases = models.PositiveIntegerField(default=0)
     whaling_cases = models.PositiveIntegerField(default=0)
 
-    # Safe
     internal_cases = models.PositiveIntegerField(default=0)
     external_cases = models.PositiveIntegerField(default=0)
 
     creation_date = models.DateTimeField(auto_now_add=True)
     last_update = models.DateTimeField(auto_now=True)
 
+    class Meta:
+        indexes = [
+            models.Index(fields=["creation_date"], name="mcs_creation_idx"),
+        ]
+
     def __str__(self):
         return f"{self.id}"
 
     def update_case_results(self, case_result):
-        """
-        Increment counters based on a case result or category.
-        """
-        # High-level results
         if case_result in {"Safe", "Inconclusive", "Suspicious", "Dangerous", "Failure"}:
             setattr(
                 self,
@@ -70,7 +70,6 @@ class MonthlyCasesSummary(models.Model):
                 getattr(self, f"{case_result.lower()}_cases") + 1
             )
 
-        # Detailed categories
         detailed_map = {
             "Uncategorized": "uncategorized_cases",
             "Spam": "spam_cases",
@@ -96,6 +95,11 @@ class MonthlyReporterStats(models.Model):
     creation_date = models.DateTimeField(auto_now_add=True)
     last_update = models.DateTimeField(auto_now=True)
 
+    class Meta:
+        indexes = [
+            models.Index(fields=["creation_date"], name="mrs_creation_idx"),
+        ]
+
     def __str__(self):
         return str(self.id)
 
@@ -106,6 +110,11 @@ class TotalCasesStats(models.Model):
     creation_date = models.DateTimeField(auto_now_add=True)
     last_update = models.DateTimeField(auto_now=True)
 
+    class Meta:
+        indexes = [
+            models.Index(fields=["creation_date"], name="tcs_creation_idx"),
+        ]
+
     def __str__(self):
         return str(self.id)
 
@@ -113,7 +122,6 @@ class TotalCasesStats(models.Model):
 class UserCasesMonthlyStats(models.Model):
     user = models.ForeignKey(settings.AUTH_USER_MODEL, on_delete=models.CASCADE, related_name='user_cases_monthly_stats')
 
-    # High-level
     suspicious_cases = models.PositiveIntegerField(default=0)
     inconclusive_cases = models.PositiveIntegerField(default=0)
     failure_cases = models.PositiveIntegerField(default=0)
@@ -122,7 +130,6 @@ class UserCasesMonthlyStats(models.Model):
     challenged_cases = models.PositiveIntegerField(default=0)
     allow_listed_cases = models.PositiveIntegerField(default=0)
 
-    # 🆕 Detailed categories
     uncategorized_cases = models.PositiveIntegerField(default=0)
     spam_cases = models.PositiveIntegerField(default=0)
     newsletter_cases = models.PositiveIntegerField(default=0)
@@ -139,11 +146,17 @@ class UserCasesMonthlyStats(models.Model):
     creation_date = models.DateTimeField(auto_now_add=True)
     last_update = models.DateTimeField(auto_now=True)
 
+    class Meta:
+        indexes = [
+            models.Index(fields=["year", "month"], name="ucms_year_month_idx"),
+            models.Index(fields=["year", "month", "user"], name="ucms_ymu_idx"),
+            models.Index(fields=["user", "year", "month"], name="ucms_uym_idx"),
+        ]
+
     def __str__(self):
         return f"{self.user.username} - {self.month} - {self.year}"
 
     def update_case_results(self, case_result):
-        # High-level
         if case_result in {"Safe", "Inconclusive", "Suspicious", "Dangerous", "Failure"}:
             setattr(
                 self,
@@ -151,7 +164,6 @@ class UserCasesMonthlyStats(models.Model):
                 getattr(self, f"{case_result.lower()}_cases") + 1
             )
 
-        # Detailed
         detailed_map = {
             "Uncategorized": "uncategorized_cases",
             "Spam": "spam_cases",
@@ -169,13 +181,9 @@ class UserCasesMonthlyStats(models.Model):
 
         self.save()
 
-class DashboardSnapshot(models.Model):
-    """Pre-materialised dashboard payload for a given month/year.
 
-    Populated nightly by the materialise_dashboard_snapshots Celery task.
-    DashboardSummaryView serves this when the snapshot is < 24 h old,
-    falling back to live DB queries otherwise.
-    """
+class DashboardSnapshot(models.Model):
+    """Pre-materialised dashboard payload for a given month/year."""
     month = models.PositiveSmallIntegerField()
     year = models.PositiveSmallIntegerField()
     payload = models.JSONField()
@@ -183,6 +191,9 @@ class DashboardSnapshot(models.Model):
 
     class Meta:
         unique_together = ("month", "year")
+        indexes = [
+            models.Index(fields=["year", "month"], name="snapshot_ym_idx"),
+        ]
 
     def __str__(self):
         return f"DashboardSnapshot {self.year}-{self.month:02d}"
@@ -202,7 +213,6 @@ class GroupMonthlyStats(models.Model):
     challenged_cases = models.PositiveIntegerField(default=0)
     allow_listed_cases = models.PositiveIntegerField(default=0)
 
-    # 🆕 Detailed categories
     uncategorized_cases = models.PositiveIntegerField(default=0)
     spam_cases = models.PositiveIntegerField(default=0)
     newsletter_cases = models.PositiveIntegerField(default=0)
@@ -215,6 +225,12 @@ class GroupMonthlyStats(models.Model):
 
     creation_date = models.DateTimeField(auto_now_add=True)
     last_update = models.DateTimeField(auto_now=True)
+
+    class Meta:
+        indexes = [
+            models.Index(fields=["year", "month"], name="gms_year_month_idx"),
+            models.Index(fields=["year", "month", "group_name"], name="gms_ymg_idx"),
+        ]
 
     def __str__(self):
         return f"{self.group_name} - {self.month} - {self.year}"
