@@ -239,7 +239,7 @@ def email_analysis(filename, exclude_private_ip, check_spf, check_dkim, file_out
             if received:
                 received.reverse()
                 for line in received:
-                    hops = re.findall("from\s+(.*?)\s+by(.*?)(?:(?:with|via)(.*?)(?:id|$)|id|$)", line, re.DOTALL | re.X)
+                    hops = re.findall(r"from\s+(.*?)\s+by(.*?)(?:(?:with|via)(.*?)(?:id|$)|id|$)", line, re.DOTALL | re.X)
                     for hop in hops:
 
                         #ipv4_address = re.findall(r"\b((25[0-5]|2[0-4][0-9]|1[0-9]{2}|[1-9]?[0-9])\.){3}(25[0-5]|2[0-4][0-9]|1[0-9]{2}|[1-9]?[0-9])\b", hop[0])

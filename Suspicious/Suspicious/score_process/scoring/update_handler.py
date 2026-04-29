@@ -26,11 +26,16 @@ def update_case_results(case, reports, is_malicious, failure):
         case.results      = calculate_result_ranges(case.final_score)
         case.analysis_done = max(0, len(reports) - failure)
 
-        # Override to Dangerous when a clear majority of reports flagged malicious
-        if is_malicious >= len(reports) // 3:
+        # Override to Dangerous when at least one third of analyzers — and at
+        # least one — flagged malicious. The `max(1, …)` floor prevents
+        # `len(reports) // 3 == 0` from short-circuiting the comparison and
+        # forcing every case (including 0-report and 0-malicious ones) into
+        # Dangerous.
+        threshold = max(1, len(reports) // 3)
+        if is_malicious >= threshold:
             update_cases_logger.info(
                 "Malicious report count (%s) >= threshold (%s) — forcing Dangerous.",
-                is_malicious, len(reports) // 3,
+                is_malicious, threshold,
             )
             case.results = "Dangerous"
 
