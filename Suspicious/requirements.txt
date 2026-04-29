@@ -1,6 +1,7 @@
 # LDAP Authentication and Database Connectivity
 django-auth-ldap==5.3.0
 django-mysql==4.19.0
+django-csp==4.0
 mysqlclient==2.2.8
 python-ldap==3.4.5
 djangorestframework==3.17.1
