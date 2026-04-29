@@ -15,6 +15,9 @@ services:
       - "3306"
     restart: always
     command: "\
+      --server-id=${DB_SERVER_ID:-1} \
+      --log-bin=mysql-bin \
+      --binlog-format=ROW \
       --default-authentication-plugin=mysql_native_password \
       --innodb-buffer-pool-size=${INNODB_BUFFER_POOL_SIZE:-2048M} \
       --innodb-change-buffering=${INNODB_CHANGE_BUFFERING:-none} \
@@ -33,6 +36,39 @@ services:
       MYSQL_USER: ${MYSQL_USER}
       MYSQL_PASSWORD: ${MYSQL_PASSWORD}
       MYSQL_ROOT_PASSWORD: ${MYSQL_ROOT_PASSWORD}
+    networks:
+      - suspicious_network
+
+  # Read replica — opt-in via `--profile replica`.
+  # Run `make db-replica-init` once to bootstrap from primary, then
+  # `make replica-up`. The replica is started in --read-only mode and
+  # tails primary's binlog. See deployment/scripts/init-replica.sh.
+  db_suspicious_replica:
+    init: true
+    profiles: [replica]
+    expose:
+      - "3306"
+    restart: always
+    command: "\
+      --server-id=2 \
+      --read-only=1 \
+      --relay-log=relay-bin \
+      --log-bin=mysql-bin \
+      --binlog-format=ROW \
+      --default-authentication-plugin=mysql_native_password \
+      --innodb-buffer-pool-size=${INNODB_BUFFER_POOL_SIZE:-2048M} \
+      --innodb-log-file-size=${INNODB_LOG_FILE_SIZE:-600M}"
+    volumes:
+      - "db_suspicious_replica_data:/var/lib/mysql:Z"
+    cap_add:
+      - SYS_NICE
+    environment:
+      MYSQL_DATABASE: ${MYSQL_DATABASE}
+      MYSQL_USER: ${MYSQL_USER}
+      MYSQL_PASSWORD: ${MYSQL_PASSWORD}
+      MYSQL_ROOT_PASSWORD: ${MYSQL_ROOT_PASSWORD}
+    depends_on:
+      - db_suspicious
     networks:
       - suspicious_network
 
@@ -135,6 +171,8 @@ services:
 # a service must be declared somewhere in the same file or be external.
 volumes:
   db_suspicious_data:
+    driver: local
+  db_suspicious_replica_data:
     driver: local
   elasticsearch_data:
   elasticsearch_logs:

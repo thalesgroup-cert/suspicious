@@ -201,6 +201,32 @@ restore-db:
 	$(OK) "Restore complete."
 
 # ---------------------------------------------------------------------------
+# Read replica (R6)
+# ---------------------------------------------------------------------------
+
+## Bootstrap the read replica from primary (one-time, run after `make up`).
+## Requires REPL_PASSWORD in .env. Wipes any existing replica volume.
+db-replica-init:
+	@$(SCRIPTS)/init-replica.sh
+	$(OK) "Replica initialized. Add database.replica block to settings.json to route reads."
+
+## Start the replica (after init)
+replica-up:
+	@$(COMPOSE) --profile replica up -d db_suspicious_replica
+	$(OK) "Replica started."
+
+## Stop the replica
+replica-down:
+	@$(COMPOSE) --profile replica stop db_suspicious_replica
+	$(OK) "Replica stopped."
+
+## Show replication status (Slave_IO_Running, Seconds_Behind_Master, etc.)
+replica-status:
+	@$(COMPOSE) exec db_suspicious_replica mariadb \
+		--user=root --password=$$(grep ^MYSQL_ROOT_PASSWORD .env | cut -d= -f2) \
+		-e 'SHOW SLAVE STATUS\G'
+
+# ---------------------------------------------------------------------------
 # Observability
 # ---------------------------------------------------------------------------
 

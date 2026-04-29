@@ -39,7 +39,15 @@
             "ssl": false,
             "connection_pooling": false,
             "persistent_connections": false
-        }
+        },
+        "replica": {
+            "host": "db_suspicious_replica",
+            "port": 3306,
+            "user": "suspicious",
+            "password": "password",
+            "name": "db_suspicious"
+        },
+        "replica_read_apps": ["dashboard", "case_handler"]
     },
     "storage": {
         "backend": "local",
