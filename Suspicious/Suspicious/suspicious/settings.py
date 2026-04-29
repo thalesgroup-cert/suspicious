@@ -21,10 +21,16 @@
 
 import json
 import sys
+import warnings
 from datetime import timedelta
 from pathlib import Path
 from urllib.parse import urlparse
 import logging
+
+# Silence SyntaxWarnings from third-party packages we cannot patch
+# (pyspf, simhash use bare-string regexes in docstrings/code).
+warnings.filterwarnings("ignore", category=SyntaxWarning, module=r"spf$")
+warnings.filterwarnings("ignore", category=SyntaxWarning, module=r"simhash(\..*)?$")
 
 # ---------------------------------------------------------------------------
 # Load configuration file
