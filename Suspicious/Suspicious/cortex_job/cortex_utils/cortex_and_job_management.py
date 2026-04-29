@@ -1361,23 +1361,23 @@ class CortexJobManager:
 
         # Update case with AI analysis
         try:
-            case.scoreAI = analyzer.score
-            case.confidenceAI = analyzer.confidence * 10
-            case.categoryAI = self.get_sub_class(analyzer)
-            case.resultsAI = analyzer.level.capitalize()
+            case.score_ai = analyzer.score
+            case.confidence_ai = analyzer.confidence * 10
+            case.category_ai = self.get_sub_class(analyzer)
+            case.results_ai = analyzer.level.capitalize()
             case.save()
 
             update_cases_logger.info(
                 "AI Mail Analyzer updated for case %s: score=%f, confidence=%f, category=%s",
                 case.id,
-                case.scoreAI,
-                case.confidenceAI,
-                case.categoryAI,
+                case.score_ai,
+                case.confidence_ai,
+                case.category_ai,
             )
 
             # Update associated MailInfo
             mail_info = MailInfo.objects.get(mail=eml)
-            self.update_mail_models(mail_info, case.categoryAI, case.resultsAI)
+            self.update_mail_models(mail_info, case.category_ai, case.results_ai)
 
         except Exception as e:
             update_cases_logger.exception("Error updating case or mail info: %s", e)

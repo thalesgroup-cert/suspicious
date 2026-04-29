@@ -22,8 +22,8 @@ def update_case_results(case, reports, is_malicious, failure):
     from score_process.scoring.case_score_calculation import calculate_result_ranges
 
     try:
-        update_cases_logger.info("Deriving case results from final score %s.", case.finalScore)
-        case.results      = calculate_result_ranges(case.finalScore)
+        update_cases_logger.info("Deriving case results from final score %s.", case.final_score)
+        case.results      = calculate_result_ranges(case.final_score)
         case.analysis_done = max(0, len(reports) - failure)
 
         # Override to Dangerous when a clear majority of reports flagged malicious
@@ -90,7 +90,7 @@ def update_kpi_and_user_stats(case):
         kpi = sync_monthly_kpi()
 
         kpi.monthly_cases_summary.update_case_results(case.results)
-        kpi.monthly_cases_summary.update_case_results(case.categoryAI)
+        kpi.monthly_cases_summary.update_case_results(case.category_ai)
         kpi.monthly_cases_summary.save()
 
         kpi.total_cases_stats.total_cases += 1
@@ -103,7 +103,7 @@ def update_kpi_and_user_stats(case):
             stats = UserCasesMonthlyStats(user=case.reporter, month=kpi.month, year=kpi.year)
 
         stats.update_case_results(case.results)
-        stats.update_case_results(case.categoryAI)
+        stats.update_case_results(case.category_ai)
         stats.total_cases += 1
         stats.save()
 

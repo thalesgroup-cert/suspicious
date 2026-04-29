@@ -58,5 +58,5 @@
 #     def test_case_defaults(self):
 #         self.assertEqual(self.case.status, 'To Do')
 #         self.assertEqual(self.case.results, 'Suspicious')
-#         self.assertEqual(self.case.resultsAI, 'Suspicious')
-#         self.assertEqual(self.case.categoryAI, 'Uncategorized')
+#         self.assertEqual(self.case.results_ai, 'Suspicious')
+#         self.assertEqual(self.case.category_ai, 'Uncategorized')

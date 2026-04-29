@@ -88,14 +88,14 @@ def update_group_monthly_stats(current_month: int, current_year: int) -> None:
         # Count challenged cases
         group_stat.challenged_cases = base_qs.filter(is_challenged=True).count()
 
-        # Count by categoryAI
+        # Count by category_ai
         category_counts = (
-            base_qs.values('categoryAI')
-            .annotate(count=Count('categoryAI'))
+            base_qs.values('category_ai')
+            .annotate(count=Count('category_ai'))
         )
 
         for entry in category_counts:
-            raw = entry['categoryAI']
+            raw = entry['category_ai']
             if not raw:
                 continue
             field_name = f"{raw.lower().replace(' ', '_')}_cases"
@@ -140,11 +140,11 @@ def update_monthly_cases_summary(kpi, current_month: int, current_year: int) -> 
             creation_date__month=current_month,
             creation_date__year=current_year
         )
-        .values('categoryAI')
-        .annotate(count=Count('categoryAI'))
+        .values('category_ai')
+        .annotate(count=Count('category_ai'))
     )
     for entry in category_counts:
-        raw = entry['categoryAI']
+        raw = entry['category_ai']
         if not raw:
             continue
         field_name = f"{raw.lower()}_cases"

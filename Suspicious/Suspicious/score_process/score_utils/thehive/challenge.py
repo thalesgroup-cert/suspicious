@@ -111,10 +111,10 @@ class ChallengeToTheHiveService:
             "result":     self.case.results,
             "result_color": _RESULT_COLOR.get(self.case.results, "#000"),
             "ai": {
-                "category":   self.case.categoryAI,
-                "result":     self.case.resultsAI,
-                "score":      _safe_round(self.case.scoreAI),
-                "confidence": _safe_round(self.case.confidenceAI),
+                "category":   self.case.category_ai,
+                "result":     self.case.results_ai,
+                "score":      _safe_round(self.case.score_ai),
+                "confidence": _safe_round(self.case.confidence_ai),
             },
             "artifacts":   artifacts,
             "attachments": attachments,
@@ -303,9 +303,9 @@ def create_alert_from_challenge(api_url, api_key, case, mail, challenger,
         f"|From|{safe(getattr(mail, 'mail_from', None))}|\n"
         f"|Case Score|{safe(getattr(case, 'score', None))}|\n"
         f"|Case Confidence|{safe(getattr(case, 'confidence', None))}|\n"
-        f"|AI Suggestion|{safe(getattr(case, 'categoryAI', None))} / {safe(getattr(case, 'resultsAI', None))} "
-        f"(Score: {_safe_round(getattr(case, 'scoreAI', None))}, "
-        f"Confidence: {_safe_round(getattr(case, 'confidenceAI', None))})|\n"
+        f"|AI Suggestion|{safe(getattr(case, 'category_ai', None))} / {safe(getattr(case, 'results_ai', None))} "
+        f"(Score: {_safe_round(getattr(case, 'score_ai', None))}, "
+        f"Confidence: {_safe_round(getattr(case, 'confidence_ai', None))})|\n"
         f"|Results|{safe(getattr(case, 'results', None))}|"
     )
 

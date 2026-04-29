@@ -20,7 +20,7 @@ class CaseResource(resources.ModelResource):
         model = Case
         fields = (
             'id', 'description', 'reporter__username', 'analysis_done',
-            'status', 'results', 'finalScore', 'finalConfidence',
+            'status', 'results', 'final_score', 'final_confidence',
             'is_challenged', 'challenged_result', 'creation_date', 'last_update',
         )
         export_order = fields
