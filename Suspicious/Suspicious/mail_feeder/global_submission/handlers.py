@@ -59,15 +59,26 @@ class Handlers:
             if not mail_archive:
                 fetch_mail_logger.debug(f"Creating mail archive for mail ID: {instance.mail_id}")
                 archive, _ = FileHandler.handle_file(file=None, mail=mail_zip)
+                if archive is None:
+                    fetch_mail_logger.warning(
+                        f"Skipping mail archive for mail ID {instance.mail_id}: "
+                        f"could not load file from {mail_zip}"
+                    )
+                    return ArtifactResult(ids=attachment_ids, ai_ids=attachment_id_ai)
                 mail_archive = MailArchive.objects.create(mail=instance, archive=archive, bucket_name=bucket_name)
 
-            with safe_execution("launching cortex AI jobs"):
-                cortex_job = CortexJob()
-                fetch_mail_logger.debug(f"Launching Cortex AI jobs for mail archive ID: {mail_archive.id}")
-                id_ai = cortex_job.launch_cortex_ai_jobs(mail_archive, "file")
-                if id_ai:
-                    fetch_mail_logger.debug(f"Received AI ID: {id_ai} for mail archive ID: {mail_archive.id}")
-                    attachment_id_ai.append(str(id_ai))
+            if mail_archive.archive is None:
+                fetch_mail_logger.info(
+                    f"Mail archive {mail_archive.id} has no file attached; skipping Cortex AI"
+                )
+            else:
+                with safe_execution("launching cortex AI jobs"):
+                    cortex_job = CortexJob()
+                    fetch_mail_logger.debug(f"Launching Cortex AI jobs for mail archive ID: {mail_archive.id}")
+                    id_ai = cortex_job.launch_cortex_ai_jobs(mail_archive, "file")
+                    if id_ai:
+                        fetch_mail_logger.debug(f"Received AI ID: {id_ai} for mail archive ID: {mail_archive.id}")
+                        attachment_id_ai.append(str(id_ai))
 
         return ArtifactResult(ids=attachment_ids, ai_ids=attachment_id_ai)
 

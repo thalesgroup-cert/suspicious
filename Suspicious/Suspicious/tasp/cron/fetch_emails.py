@@ -190,8 +190,8 @@ def fetch_and_process_emails(config_path: str = CONFIG_PATH) -> None:
     logger.info("Starting email fetch job")
     try:
         _process_minio_buckets(cfg, base_temp)
-    finally:
-        shutil.rmtree(base_temp, ignore_errors=True)
+    except Exception:
+        logger.exception("Error in email fetch job")
     logger.info("Email fetch job completed")
     try:
         from api.metrics import email_feeder_last_poll_seconds
@@ -303,5 +303,5 @@ def _process_minio_buckets(cfg: CronConfig, base_path: str) -> None:
                     logger.warning("Failed to rollback status for %s", bucket.name)
 
             finally:
-                # release
+                shutil.rmtree(bucket_path, ignore_errors=True)
                 cache.delete(lock_key)
