@@ -43,6 +43,7 @@ import {
   SaveOutlined,
   CloseOutlined,
   ExpandMoreOutlined,
+  RestartAltOutlined,
 } from "@mui/icons-material";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useNavigate, useSearchParams } from "react-router-dom";
@@ -642,6 +643,28 @@ export default function InvestigationPage() {
   const [page, setPage] = React.useState(0);
   const [pageSize, setPageSize] = React.useState(10);
 
+  const filtersActive =
+    q !== "" ||
+    status !== "ALL" ||
+    type !== "ALL" ||
+    result !== "ALL" ||
+    from !== "" ||
+    to !== "" ||
+    sortField !== "creation_date" ||
+    sortDir !== "desc";
+
+  const resetFilters = React.useCallback(() => {
+    setQ("");
+    setStatus("ALL");
+    setType("ALL");
+    setResult("ALL");
+    setFrom("");
+    setTo("");
+    setSortField("creation_date");
+    setSortDir("desc");
+    setPage(0);
+  }, []);
+
   const [openDrawer, setOpenDrawer] = React.useState(false);
   const [selectedId, setSelectedId] = React.useState<number | null>(null);
 
@@ -994,6 +1017,21 @@ export default function InvestigationPage() {
                   <MenuItem value="id_asc">ID (low → high)</MenuItem>
                 </Select>
               </FormControl>
+
+              <Tooltip title={filtersActive ? "Reset filters" : "No filters applied"}>
+                <span>
+                  <Button
+                    variant="outlined"
+                    color="inherit"
+                    disabled={!filtersActive}
+                    onClick={resetFilters}
+                    startIcon={<RestartAltOutlined />}
+                    sx={{ borderRadius: 2, textTransform: "none", fontWeight: 900, minWidth: 140 }}
+                  >
+                    Reset
+                  </Button>
+                </span>
+              </Tooltip>
             </Stack>
 
             <Divider sx={{ opacity: 0.25 }} />

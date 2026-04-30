@@ -191,10 +191,7 @@ def fetch_and_process_emails(config_path: str = CONFIG_PATH) -> None:
     try:
         _process_minio_buckets(cfg, base_temp)
     finally:
-        try:
-            shutil.rmtree(base_temp)
-        except Exception:
-            logger.exception("Failed to remove temp dir")
+        shutil.rmtree(base_temp, ignore_errors=True)
     logger.info("Email fetch job completed")
     try:
         from api.metrics import email_feeder_last_poll_seconds

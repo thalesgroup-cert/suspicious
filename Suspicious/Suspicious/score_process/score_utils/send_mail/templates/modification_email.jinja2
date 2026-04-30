@@ -20,6 +20,11 @@
     table{border-collapse:collapse!important;mso-table-lspace:0pt;mso-table-rspace:0pt;}
     img{border:0;height:auto;line-height:100%;outline:none;text-decoration:none;-ms-interpolation-mode:bicubic;}
     a[x-apple-data-detectors]{color:inherit!important;text-decoration:none!important;}
+    span.no-link a, span.no-link {
+      color:inherit !important;
+      text-decoration:none !important;
+      pointer-events:none;
+    }
     @media screen and (max-width:620px){
       .email-container{width:100%!important;border-radius:0!important;}
       .content-pad{padding:24px 18px!important;}
@@ -28,23 +33,6 @@
     }
   </style>
 </head>
-
-{# =========================================================================
-   Theme variables — all plain hex from resolve_email_theme(profile):
-     bg  surface  header_bg  header_text  accent  body_text  muted  border
-     cta_bg  cta_text  link
-     color_safe  color_suspicious  color_dangerous  color_inconclusive
-     color_failure  color_challenged
-
-   Case context from ModificationEmailService._build_case_context():
-     case.id           case.type         case.result
-     case.result_label case.result_color (resolved hex)
-     case.result_guidance              case.contact_cta
-
-   Logo dicts from resolve_logo():
-     company_logo.src  .is_image  .is_svg  .is_data_uri
-     final_logo.src    .is_image  .is_svg  .is_data_uri
-   ========================================================================= #}
 
 <body style="margin:0;padding:0;word-break:break-word;
              -webkit-font-smoothing:antialiased;background-color:{{ bg }};">
@@ -73,52 +61,61 @@
               border:1px solid {{ border }};">
 
 
-        {# ─────────────────────────────────────────────────────────────── #}
-        {# 1. HEADER — logo or wordmark                                     #}
-        {# ─────────────────────────────────────────────────────────────── #}
-        <tr>
-          <td align="center" style="background-color:{{ header_bg }};padding:28px 40px;">
-
-            {% if company_logo_svg.is_image %}
-
-              <!--[if !mso]><!-->
-              <img src="{{ company_logo_svg.src }}"
-                  alt="{{ company_name | default('') }}"
-                  width="130"
-                  style="max-width:130px;height:auto;display:block;margin:0 auto;">
-              <!--<![endif]-->
-
-              <!--[if mso]>
-                {% if company_logo_png.src %}
-                  <img src="{{ company_logo_png.src }}"
-                      alt="{{ company_name | default('') }}"
-                      width="130"
-                      style="max-width:130px;height:auto;display:block;margin:0 auto;">
-                {% else %}
-                  <span style="font-size:20px;font-weight:800;color:{{ header_text }};
-                              font-family:Arial,sans-serif;">
-                    {{ company_name | default("Security Portal") }}
-                  </span>
-                {% endif %}
-              <![endif]-->
-
-            {% else %}
-
-              <span style="font-size:22px;font-weight:800;color:{{ header_text }};">
-                {{ company_name | default("Security Portal") }}
-              </span>
-
-            {% endif %}
-
-          </td>
-        </tr>
+  {# ─────────────── 1. HEADER ─────────────── #}
+  <tr>
+    <td align="center" style="background-color:{{ header_bg }};padding:28px 40px;">
+      {% if company_logo_svg.is_image %}
+        <!--[if !mso]><!-->
+        <img src="{{ company_logo_svg.src }}"
+            alt="{{ company_name | default('') }}"
+            width="130"
+            style="max-width:130px;height:auto;display:block;margin:0 auto;">
+        <!--<![endif]-->
+        <!--[if mso]>
+          {% if company_logo_png.src %}
+            <img src="{{ company_logo_png.src }}"
+                alt="{{ company_name | default('') }}"
+                width="130"
+                style="max-width:130px;height:auto;display:block;margin:0 auto;">
+          {% else %}
+            <span style="font-size:20px;font-weight:800;color:{{ header_text }};
+                        font-family:Arial,sans-serif;">
+              {{ company_name | default("Security Portal") }}
+            </span>
+          {% endif %}
+        <![endif]-->
+      {% else %}
+        <span style="font-size:22px;font-weight:800;color:{{ header_text }};">
+          {{ company_name | default("Security Portal") }}
+        </span>
+      {% endif %}
+    </td>
+  </tr>
 
 
-  {# ── 3. VERDICT STRIP — pill + case reference ────────────────────────── #}
+  {# ─────────────── 3. VERDICT STRIP ─────────────── #}
   <tr>
     <td style="background-color:{{ surface }};padding:28px 40px 0;text-align:center;">
 
-      <table role="presentation" border="0" cellpadding="0" cellspacing="0" align="center">
+      {# Outlook-safe verdict pill #}
+      <!--[if mso]>
+      <v:roundrect xmlns:v="urn:schemas-microsoft-com:vml"
+                   xmlns:w="urn:schemas-microsoft-com:office:word"
+                   style="height:28px;v-text-anchor:middle;width:160px;mso-position-horizontal:center;"
+                   arcsize="50%"
+                   strokecolor="{{ case.result_color }}"
+                   fillcolor="{{ case.result_color }}">
+        <w:anchorlock/>
+        <center style="color:{{ surface }};font-family:Arial,sans-serif;
+                       font-size:11px;font-weight:bold;letter-spacing:1px;
+                       text-transform:uppercase;">
+          {{ case.result_label }}
+        </center>
+      </v:roundrect>
+      <![endif]-->
+      <!--[if !mso]><!-->
+      <table role="presentation" border="0" cellpadding="0" cellspacing="0" align="center"
+             style="margin:0 auto;mso-hide:all;">
         <tr>
           <td style="background-color:{{ case.result_color }};border-radius:999px;
                      padding:7px 26px;font-size:11px;font-weight:800;
@@ -129,12 +126,12 @@
           </td>
         </tr>
       </table>
+      <!--<![endif]-->
 
       {% if case.id %}
       <p style="margin:10px 0 0;font-size:12px;color:{{ muted }};
                 font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,Arial,sans-serif;">
-        Submission&nbsp;#{{ case.id }}
-        {% if case.type %}&nbsp;&mdash;&nbsp;{{ case.type }}{% endif %}
+        <span class="no-link" style="color:{{ muted }};text-decoration:none;">Submission&nbsp;#{{ case.id }}{% if case.type %}&nbsp;&mdash;&nbsp;{{ case.type }}{% endif %}</span>
       </p>
       {% endif %}
 
@@ -142,15 +139,15 @@
   </tr>
 
 
-  {# ── 4. BODY ─────────────────────────────────────────────────────────── #}
+  {# ─────────────── 4. BODY ─────────────── #}
   <tr>
     <td class="content-pad"
         style="background-color:{{ surface }};padding:24px 40px 36px;">
 
-      {# Greeting #}
       <p style="margin:0 0 20px;font-size:20px;font-weight:800;
                 letter-spacing:-0.3px;color:{{ accent }};
-                font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,Arial,sans-serif;">
+                font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,Arial,sans-serif;
+                mso-line-height-rule:exactly;line-height:24px;">
         Dear {{ recipient_name | default("Security Contributor") }},
       </p>
 
@@ -166,18 +163,17 @@
         of your submission.
       </p>
 
-      {# Hairline #}
       <table role="presentation" border="0" cellpadding="0" cellspacing="0" width="100%">
-        <tr><td style="border-top:1px solid {{ border }};font-size:0;padding:0;">&nbsp;</td></tr>
+        <tr><td style="border-top:1px solid {{ border }};font-size:0;padding:0;line-height:0;">&nbsp;</td></tr>
       </table>
 
-      {# ── Revised verdict card ─────────────────────────────────────────── #}
+      {# Revised verdict card #}
       <table role="presentation" border="0" cellpadding="0" cellspacing="0" width="100%"
              style="margin:22px 0 0;border:1px solid {{ case.result_color }};
                     border-radius:8px;overflow:hidden;">
         <tr>
           <td width="5" style="background-color:{{ case.result_color }};
-                       width:5px;padding:0;font-size:0;line-height:0;">&nbsp;</td>
+                       width:5px;padding:0;font-size:0;line-height:0;mso-line-height-rule:exactly;">&nbsp;</td>
           <td style="padding:16px 18px;background-color:{{ surface }};">
             <p style="margin:0 0 6px;font-size:13px;font-weight:800;
                       color:{{ case.result_color }};
@@ -198,7 +194,7 @@
         </tr>
       </table>
 
-      {# ── CTA button ───────────────────────────────────────────────────── #}
+      {# CTA button #}
       <table role="presentation" border="0" cellpadding="0" cellspacing="0" width="100%"
              style="margin:24px 0 22px;">
         <tr>
@@ -242,7 +238,7 @@
   </tr>
 
 
-  {# ── 5. FOOTER ───────────────────────────────────────────────────────── #}
+  {# ─────────────── 5. FOOTER ─────────────── #}
   <tr>
     <td class="footer-pad"
         style="background-color:{{ header_bg }};padding:22px 40px;">
@@ -299,18 +295,16 @@
   </tr>
 
 
-  {# ── 6. SOCIAL ICONS ─────────────────────────────────────────────────── #}
+  {# ─────────────── 6. SOCIAL ICONS ─────────────── #}
   {% if socials %}
   <tr>
     <td style="background:#242A75;text-align:center;padding:15px;">
       {% for s in socials %}
         <a href="{{ s.url }}" target="_blank">
-          {# Outlook: PNG fallback #}
           <!--[if mso]>
           <img src="{{ s.logo_png }}" alt="{{ s.name }}" width="20" height="20"
               style="display:inline-block;vertical-align:middle;">
           <![endif]-->
-          {# All other clients: SVG #}
           <!--[if !mso]><!-->
           <img src="{{ s.logo_svg }}" alt="{{ s.name }}" width="20" height="20"
               style="display:inline-block;vertical-align:middle;">
@@ -322,7 +316,7 @@
   {% endif %}
 
 
-  {# ── 7. LEGAL STRIP ──────────────────────────────────────────────────── #}
+  {# ─────────────── 7. LEGAL STRIP ─────────────── #}
   <tr>
     <td align="center"
         style="background-color:{{ bg }};padding:16px 40px;

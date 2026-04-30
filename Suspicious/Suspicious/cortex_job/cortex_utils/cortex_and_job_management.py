@@ -343,6 +343,12 @@ class CortexJob:
             fetch_mail_logger.error(f"Error extracting data value for {data_type}: {e}")
             return None
 
+        if not data_value or (isinstance(data_value, str) and not data_value.strip()):
+            fetch_mail_logger.debug(
+                f"Skip analyzer '{analyzer.name}' on {data_type}: empty data value"
+            )
+            return None
+
         # Prepare payload for analyzer
         payload = {
             "data": data_value,
@@ -353,8 +359,8 @@ class CortexJob:
         try:
             report = api.analyzers.run_by_name(analyzer.name, payload)
         except Exception as e:
-            fetch_mail_logger.error(
-                f"Error running analyzer '{analyzer.name}' on {data_type}: {e}"
+            fetch_mail_logger.warning(
+                f"Analyzer '{analyzer.name}' rejected {data_type} input: {e}"
             )
             return None
 
@@ -803,8 +809,12 @@ class CortexJobManager:
             mail_archive = None
             update_cases_logger.info(f"No archive file found for mail {mail.id}")
 
-        if mail_archive:
+        if mail_archive and mail_archive.archive:
             self.process_mail_archive(mail_archive.archive)
+        elif mail_archive:
+            update_cases_logger.info(
+                f"MailArchive {mail_archive.id} for mail {mail.id} has no archive file"
+            )
 
         # --- Process mail attachments ---
         mail_attachments = mail.mail_attachments.all()
