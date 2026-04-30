@@ -20,6 +20,12 @@
     table{border-collapse:collapse!important;mso-table-lspace:0pt;mso-table-rspace:0pt;}
     img{border:0;height:auto;line-height:100%;outline:none;text-decoration:none;-ms-interpolation-mode:bicubic;}
     a[x-apple-data-detectors]{color:inherit!important;text-decoration:none!important;}
+    /* Kill Outlook's auto-link styling on emails/URLs we don't want as links */
+    span.no-link a, span.no-link {
+      color:inherit !important;
+      text-decoration:none !important;
+      pointer-events:none;
+    }
 
     @media screen and (max-width:620px){
       .email-container  { width:100%!important; border-radius:0!important; }
@@ -32,25 +38,10 @@
   </style>
 </head>
 
-{# =========================================================================
-   Theme variables injected via **resolve_email_theme(profile):
-     bg  surface  header_bg  header_text  accent  accent_text
-     body_text  muted  border  link  cta_bg  cta_text
-     color_safe  color_suspicious  color_dangerous  color_inconclusive
-     color_done  color_in_progress  color_new  color_failure  color_challenged
-
-   Case context from FinalEmailService._build_case_context():
-     case.type         case.subject      case.sender     case.recipient
-     case.result       case.result_label case.result_color (resolved hex)
-     case.result_guidance
-     case.result_ai    case.category_ai
-     case.score        case.confidence   case.challenge_url
-   ========================================================================= #}
-
 <body style="margin:0;padding:0;word-break:break-word;
              -webkit-font-smoothing:antialiased;background-color:{{ bg }};">
 
-{# Preheader — inbox snippet #}
+{# Preheader #}
 <div style="display:none;max-height:0;overflow:hidden;mso-hide:all;
             font-size:1px;line-height:1px;color:{{ bg }};">
   Analysis complete: {{ case.result_label }}. Open to see the full verdict and recommended actions.
@@ -74,56 +65,65 @@
               border:1px solid {{ border }};">
 
 
-        {# ─────────────────────────────────────────────────────────────── #}
-        {# 1. HEADER — logo or wordmark                                     #}
-        {# ─────────────────────────────────────────────────────────────── #}
-        <tr>
-          <td align="center" style="background-color:{{ header_bg }};padding:28px 40px;">
-
-            {% if company_logo_svg.is_image %}
-
-              <!--[if !mso]><!-->
-              <img src="{{ company_logo_svg.src }}"
-                  alt="{{ company_name | default('') }}"
-                  width="130"
-                  style="max-width:130px;height:auto;display:block;margin:0 auto;">
-              <!--<![endif]-->
-
-              <!--[if mso]>
-                {% if company_logo_png.src %}
-                  <img src="{{ company_logo_png.src }}"
-                      alt="{{ company_name | default('') }}"
-                      width="130"
-                      style="max-width:130px;height:auto;display:block;margin:0 auto;">
-                {% else %}
-                  <span style="font-size:20px;font-weight:800;color:{{ header_text }};
-                              font-family:Arial,sans-serif;">
-                    {{ company_name | default("Security Portal") }}
-                  </span>
-                {% endif %}
-              <![endif]-->
-
-            {% else %}
-
-              <span style="font-size:22px;font-weight:800;color:{{ header_text }};">
-                {{ company_name | default("Security Portal") }}
-              </span>
-
-            {% endif %}
-
-          </td>
-        </tr>
+  {# ─────────────── 1. HEADER ─────────────── #}
+  <tr>
+    <td align="center" style="background-color:{{ header_bg }};padding:28px 40px;">
+      {% if company_logo_svg.is_image %}
+        <!--[if !mso]><!-->
+        <img src="{{ company_logo_svg.src }}"
+            alt="{{ company_name | default('') }}"
+            width="130"
+            style="max-width:130px;height:auto;display:block;margin:0 auto;">
+        <!--<![endif]-->
+        <!--[if mso]>
+          {% if company_logo_png.src %}
+            <img src="{{ company_logo_png.src }}"
+                alt="{{ company_name | default('') }}"
+                width="130"
+                style="max-width:130px;height:auto;display:block;margin:0 auto;">
+          {% else %}
+            <span style="font-size:20px;font-weight:800;color:{{ header_text }};
+                        font-family:Arial,sans-serif;">
+              {{ company_name | default("Security Portal") }}
+            </span>
+          {% endif %}
+        <![endif]-->
+      {% else %}
+        <span style="font-size:22px;font-weight:800;color:{{ header_text }};">
+          {{ company_name | default("Security Portal") }}
+        </span>
+      {% endif %}
+    </td>
+  </tr>
 
 
-
-  {# ══════════════════════════════════════════════════════════════════════
-     3 · VERDICT HERO — pill + score numerals
-  ══════════════════════════════════════════════════════════════════════ #}
+  {# ─────────────── 3. VERDICT HERO ─────────────── #}
   <tr>
     <td style="background-color:{{ surface }};padding:32px 40px 0;text-align:center;">
 
-      {# Verdict pill #}
-      <table role="presentation" border="0" cellpadding="0" cellspacing="0" align="center">
+      {# ============================================================
+         VERDICT PILL — Outlook-safe
+         Use VML roundrect for Outlook (gives rounded corners + auto-width)
+         Use a centered table with auto width for everything else
+         ============================================================ #}
+      <!--[if mso]>
+      <v:roundrect xmlns:v="urn:schemas-microsoft-com:vml"
+                   xmlns:w="urn:schemas-microsoft-com:office:word"
+                   style="height:28px;v-text-anchor:middle;width:160px;mso-position-horizontal:center;"
+                   arcsize="50%"
+                   strokecolor="{{ case.result_color }}"
+                   fillcolor="{{ case.result_color }}">
+        <w:anchorlock/>
+        <center style="color:{{ surface }};font-family:Arial,sans-serif;
+                       font-size:11px;font-weight:bold;letter-spacing:1px;
+                       text-transform:uppercase;">
+          {{ case.result_label }}
+        </center>
+      </v:roundrect>
+      <![endif]-->
+      <!--[if !mso]><!-->
+      <table role="presentation" border="0" cellpadding="0" cellspacing="0" align="center"
+             style="margin:0 auto;mso-hide:all;">
         <tr>
           <td style="background-color:{{ case.result_color }};
                      border-radius:999px;padding:7px 26px;
@@ -134,14 +134,14 @@
           </td>
         </tr>
       </table>
+      <!--<![endif]-->
 
-      {# Score + confidence + AI result — three equal numerals in a strip #}
+      {# Score + confidence + AI result strip #}
       {% if case.score is not none or case.confidence is not none or case.result_ai %}
-      {# Thin separator above the metric strip #}
       <table role="presentation" border="0" cellpadding="0" cellspacing="0"
              width="100%" style="margin-top:20px;">
         <tr>
-          <td style="border-top:1px solid {{ border }};font-size:0;padding:0;">&nbsp;</td>
+          <td style="border-top:1px solid {{ border }};font-size:0;padding:0;line-height:0;">&nbsp;</td>
         </tr>
       </table>
 
@@ -155,15 +155,16 @@
               style="width:33%;padding:16px 8px;text-align:center;vertical-align:middle;
                      border-right:1px solid {{ border }};
                      font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,Arial,sans-serif;">
-            <span style="font-size:34px;font-weight:900;line-height:1;
-                         color:{{ case.result_color }};">
+            <div style="font-size:34px;font-weight:900;line-height:1;
+                        color:{{ case.result_color }};
+                        mso-line-height-rule:exactly;">
               {{ "%.1f"|format(case.score) }}
-            </span>
-            <span style="font-size:11px;font-weight:700;color:{{ muted }};
-                         display:block;margin-top:5px;text-transform:uppercase;
-                         letter-spacing:0.06em;">
+            </div>
+            <div style="font-size:11px;font-weight:700;color:{{ muted }};
+                        margin-top:5px;text-transform:uppercase;
+                        letter-spacing:0.06em;mso-line-height-rule:exactly;line-height:14px;">
               Risk score&nbsp;/&nbsp;10
-            </span>
+            </div>
           </td>
           {% endif %}
 
@@ -173,64 +174,61 @@
               style="width:33%;padding:16px 8px;text-align:center;vertical-align:middle;
                      {% if case.result_ai %}border-right:1px solid {{ border }};{% endif %}
                      font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,Arial,sans-serif;">
-            <span style="font-size:34px;font-weight:900;line-height:1;
-                         color:{{ accent }};">
+            <div style="font-size:34px;font-weight:900;line-height:1;
+                        color:{{ accent }};mso-line-height-rule:exactly;">
               {{ "%.0f"|format(case.confidence) }}%
-            </span>
-            <span style="font-size:11px;font-weight:700;color:{{ muted }};
-                         display:block;margin-top:5px;text-transform:uppercase;
-                         letter-spacing:0.06em;">
+            </div>
+            <div style="font-size:11px;font-weight:700;color:{{ muted }};
+                        margin-top:5px;text-transform:uppercase;
+                        letter-spacing:0.06em;mso-line-height-rule:exactly;line-height:14px;">
               Confidence
-            </span>
+            </div>
           </td>
           {% endif %}
 
-          {# AI VERDICT — same visual weight as the numeric metrics #}
+          {# ============================================================
+             AI VERDICT — Outlook-safe pill using nested table
+             ============================================================ #}
           {% if case.result_ai %}
           <td class="score-cell"
               style="width:34%;padding:16px 8px;text-align:center;vertical-align:middle;
                      font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,Arial,sans-serif;">
-            {# AI verdict pill — same style as the main verdict pill but smaller #}
-            <div>
-              <!--[if mso]>
-              <table role="presentation" border="0" cellpadding="0" cellspacing="0" align="center">
-              <tr><td style="background-color:{{ muted }};border-radius:4px;
-                             padding:4px 12px;font-size:11px;font-weight:700;
-                             color:{{ surface }};font-family:Arial,sans-serif;">
-                {{ case.result_ai }}
-              </td></tr></table>
-              <![endif]-->
-              <!--[if !mso]><!-->
-              <span style="display:inline-block;background-color:{{ muted }};
+
+            {# AI verdict pill — centered nested table forces auto-width in Outlook #}
+            <table role="presentation" border="0" cellpadding="0" cellspacing="0"
+                   align="center" style="margin:0 auto;">
+              <tr>
+                <td style="background-color:{{ muted }};
                            border-radius:4px;padding:4px 12px;
                            font-size:11px;font-weight:800;letter-spacing:0.06em;
                            text-transform:uppercase;color:{{ surface }};
-                           mso-hide:all;">
-                {{ case.result_ai }}
-              </span>
-              <!--<![endif]-->
-            </div>
+                           font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,Arial,sans-serif;
+                           mso-line-height-rule:exactly;line-height:14px;">
+                  {{ case.result_ai }}
+                </td>
+              </tr>
+            </table>
+
             {% if case.category_ai %}
-            <span style="font-size:12px;font-weight:700;color:{{ body_text }};
-                         display:block;margin-top:6px;">
+            <div style="font-size:12px;font-weight:700;color:{{ body_text }};
+                        margin-top:6px;mso-line-height-rule:exactly;line-height:16px;">
               {{ case.category_ai }}
-            </span>
+            </div>
             {% endif %}
-            <span style="font-size:11px;font-weight:700;color:{{ muted }};
-                         display:block;margin-top:5px;text-transform:uppercase;
-                         letter-spacing:0.06em;">
+            <div style="font-size:11px;font-weight:700;color:{{ muted }};
+                        margin-top:5px;text-transform:uppercase;
+                        letter-spacing:0.06em;mso-line-height-rule:exactly;line-height:14px;">
               AI assessment
-            </span>
+            </div>
           </td>
           {% endif %}
 
         </tr>
       </table>
 
-      {# Bottom separator #}
       <table role="presentation" border="0" cellpadding="0" cellspacing="0" width="100%">
         <tr>
-          <td style="border-top:1px solid {{ border }};font-size:0;padding:0;">&nbsp;</td>
+          <td style="border-top:1px solid {{ border }};font-size:0;padding:0;line-height:0;">&nbsp;</td>
         </tr>
       </table>
       {% endif %}
@@ -239,17 +237,15 @@
   </tr>
 
 
-  {# ══════════════════════════════════════════════════════════════════════
-     4 · BODY
-  ══════════════════════════════════════════════════════════════════════ #}
+  {# ─────────────── 4. BODY ─────────────── #}
   <tr>
     <td class="content-pad"
         style="background-color:{{ surface }};padding:28px 40px 36px;">
 
-      {# Greeting #}
       <p style="margin:0 0 18px;font-size:20px;font-weight:800;
                 letter-spacing:-0.3px;color:{{ accent }};
-                font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,Arial,sans-serif;">
+                font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,Arial,sans-serif;
+                mso-line-height-rule:exactly;line-height:24px;">
         Dear {{ recipient_name | default("Security Contributor") }},
       </p>
 
@@ -260,13 +256,12 @@
         Here is a summary of what was found and what you should do next.
       </p>
 
-      {# ── Hairline ────────────────────────────────────────────────── #}
       <table role="presentation" border="0" cellpadding="0" cellspacing="0" width="100%">
-        <tr><td style="border-top:1px solid {{ border }};font-size:0;padding:0;">&nbsp;</td></tr>
+        <tr><td style="border-top:1px solid {{ border }};font-size:0;padding:0;line-height:0;">&nbsp;</td></tr>
       </table>
 
 
-      {# ── Submission details card ─────────────────────────────────── #}
+      {# ─────────────── Submission details card ─────────────── #}
       <table role="presentation" border="0" cellpadding="0" cellspacing="0" width="100%"
              style="margin:22px 0 0;border:1px solid {{ border }};
                     border-radius:10px;overflow:hidden;">
@@ -281,7 +276,6 @@
           </td>
         </tr>
 
-        {# Type #}
         <tr>
           <td width="110"
               style="padding:10px 16px;border-bottom:1px solid {{ border }};
@@ -297,7 +291,6 @@
           </td>
         </tr>
 
-        {# Subject / artifact #}
         <tr>
           <td style="padding:10px 16px;
                      {% if case.sender or case.recipient %}border-bottom:1px solid {{ border }};{% endif %}
@@ -310,7 +303,8 @@
                      {% if case.sender or case.recipient %}border-bottom:1px solid {{ border }};{% endif %}
                      font-size:13px;color:{{ body_text }};word-break:break-all;
                      font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,Arial,sans-serif;">
-            {{ case.subject | default("—") }}
+            {# Wrap in span with no-link class to suppress Outlook auto-detection styling #}
+            <span class="no-link" style="color:{{ body_text }};text-decoration:none;">{{ case.subject | default("—") }}</span>
           </td>
         </tr>
 
@@ -327,7 +321,7 @@
                      {% if case.recipient %}border-bottom:1px solid {{ border }};{% endif %}
                      font-size:13px;color:{{ body_text }};word-break:break-all;
                      font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,Arial,sans-serif;">
-            {{ case.sender }}
+            <span class="no-link" style="color:{{ body_text }};text-decoration:none;">{{ case.sender }}</span>
           </td>
         </tr>
         {% endif %}
@@ -341,39 +335,59 @@
           </td>
           <td style="padding:10px 16px;font-size:13px;color:{{ body_text }};word-break:break-all;
                      font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,Arial,sans-serif;">
-            {{ case.recipient }}
+            <span class="no-link" style="color:{{ body_text }};text-decoration:none;">{{ case.recipient }}</span>
           </td>
         </tr>
         {% endif %}
 
       </table>
-      {# / submission details #}
 
 
-      {# ══════════════════════════════════════════════════════════════
-         VERDICT CARD — mirrors the about-page classification cards
-         Icon circle + coloured title + bullet list
-      ══════════════════════════════════════════════════════════════ #}
+      {# ============================================================
+         VERDICT CARD — Outlook-safe
+         Outlook-only path: split table that mimics the icon+title row
+         and uses character bullets instead of CSS-shaped spans
+         ============================================================ #}
       <table role="presentation" border="0" cellpadding="0" cellspacing="0" width="100%"
              style="margin:20px 0 0;border:1px solid {{ case.result_color }};
                     border-radius:10px;overflow:hidden;">
         <tr>
-          {# Left colour accent bar — same 6 px trick as the legend rows #}
+          {# Left accent bar #}
           <td width="5"
               style="background-color:{{ case.result_color }};
-                     width:5px;padding:0;font-size:0;line-height:0;">&nbsp;</td>
+                     width:5px;padding:0;font-size:0;line-height:0;mso-line-height-rule:exactly;">&nbsp;</td>
           <td style="padding:18px 20px;background-color:{{ surface }};">
 
-            {# Icon + title row #}
+            {# Icon + title row — fixed-width icon cell #}
             <table role="presentation" border="0" cellpadding="0" cellspacing="0">
               <tr>
-                {# Icon circle #}
-                <td width="36" style="vertical-align:middle;padding-right:12px;">
+                <td width="36" style="vertical-align:middle;padding-right:12px;width:36px;">
+
+                  {# Icon — VML circle for Outlook, div for everyone else #}
+                  <!--[if mso]>
+                  <v:roundrect xmlns:v="urn:schemas-microsoft-com:vml"
+                               style="height:36px;width:36px;v-text-anchor:middle;"
+                               arcsize="50%"
+                               strokecolor="{{ case.result_color }}"
+                               strokeweight="1.5pt"
+                               fillcolor="{{ surface }}">
+                    <w:anchorlock/>
+                    <center style="color:{{ case.result_color }};font-family:Arial,sans-serif;
+                                   font-size:17px;font-weight:bold;">
+                      {% if case.result == "Dangerous" %}&#9888;
+                      {% elif case.result == "Suspicious" %}&#9650;
+                      {% elif case.result == "Safe" or case.result == "AllowListed" %}&#10003;
+                      {% elif case.result == "Failure" %}&#10005;
+                      {% else %}?{% endif %}
+                    </center>
+                  </v:roundrect>
+                  <![endif]-->
+                  <!--[if !mso]><!-->
                   <div style="width:36px;height:36px;border-radius:50%;
                               background-color:{{ case.result_color }}1A;
                               border:1.5px solid {{ case.result_color }};
-                              text-align:center;line-height:36px;font-size:17px;">
-                    {# Unicode icon per verdict type — renders in all major clients #}
+                              text-align:center;line-height:36px;font-size:17px;
+                              mso-hide:all;">
                     {% if case.result == "Dangerous" %}
                       <span style="color:{{ case.result_color }};">&#9888;</span>
                     {% elif case.result == "Suspicious" %}
@@ -386,8 +400,9 @@
                       <span style="color:{{ case.result_color }};">&#63;</span>
                     {% endif %}
                   </div>
+                  <!--<![endif]-->
+
                 </td>
-                {# Title + subtitle #}
                 <td style="vertical-align:middle;">
                   <span style="font-size:16px;font-weight:800;color:{{ case.result_color }};
                                font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,Arial,sans-serif;">
@@ -397,22 +412,18 @@
               </tr>
             </table>
 
-            {# Divider #}
             <table role="presentation" border="0" cellpadding="0" cellspacing="0" width="100%"
                    style="margin:14px 0 12px;">
               <tr>
-                <td style="border-top:1px solid {{ border }};font-size:0;padding:0;">&nbsp;</td>
+                <td style="border-top:1px solid {{ border }};font-size:0;padding:0;line-height:0;">&nbsp;</td>
               </tr>
             </table>
 
-            {# Guidance full text #}
             <p style="margin:0 0 12px;font-size:13px;line-height:1.65;color:{{ body_text }};
                       font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,Arial,sans-serif;">
               {{ case.result_guidance }}
             </p>
 
-            {# Recommended actions — bullet list per verdict
-               These are static copy that matches the about-page cards #}
             {% if case.result == "Dangerous" %}
               {% set bullets = [
                 "Do not open or execute any files or links.",
@@ -450,14 +461,21 @@
               ] %}
             {% endif %}
 
+            {# ============================================================
+               BULLETS — Outlook-safe
+               Use a fixed-width cell with a Unicode bullet character
+               instead of a shaped span (border-radius is dropped by Outlook)
+               ============================================================ #}
             {% for bullet in bullets %}
             <table role="presentation" border="0" cellpadding="0" cellspacing="0" width="100%"
                    style="margin-bottom:6px;">
               <tr>
-                <td width="18" style="vertical-align:top;padding-top:1px;">
-                  <span style="display:inline-block;width:6px;height:6px;
-                               border-radius:50%;background-color:{{ case.result_color }};
-                               margin-top:5px;">&nbsp;</span>
+                <td width="14" style="vertical-align:top;width:14px;
+                                      font-size:14px;line-height:1.6;
+                                      color:{{ case.result_color }};
+                                      font-family:Arial,sans-serif;
+                                      padding-top:1px;">
+                  &#8226;
                 </td>
                 <td style="font-size:13px;line-height:1.6;color:{{ body_text }};
                            font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,Arial,sans-serif;">
@@ -470,15 +488,12 @@
           </td>
         </tr>
       </table>
-      {# / verdict card #}
 
 
-
-      {# ── CTA buttons ────────────────────────────────────────────── #}
+      {# ─────────────── CTA buttons ─────────────── #}
       <table role="presentation" border="0" cellpadding="0" cellspacing="0" width="100%"
              style="margin-top:24px;margin-bottom:22px;">
         <tr>
-          {# Primary — view case #}
           <td align="center" style="padding-right:{% if case.challenge_url %}8px{% else %}0{% endif %};">
             <!--[if mso]>
             <v:roundrect xmlns:v="urn:schemas-microsoft-com:vml"
@@ -506,7 +521,6 @@
             <!--<![endif]-->
           </td>
 
-          {# Secondary — challenge (conditional) #}
           {% if case.challenge_url %}
           <td align="center" style="padding-left:8px;">
             <!--[if mso]>
@@ -538,7 +552,6 @@
         </tr>
       </table>
 
-      {# Footnote #}
       <p style="margin:0;font-size:12px;line-height:1.6;
                 color:{{ muted }};font-style:italic;
                 font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,Arial,sans-serif;">
@@ -548,11 +561,9 @@
 
     </td>
   </tr>
-  {# / body #}
 
-  {# ══════════════════════════════════════════════════════════════════════
-     6 · FOOTER LINKS
-  ══════════════════════════════════════════════════════════════════════ #}
+
+  {# ─────────────── 6. FOOTER LINKS ─────────────── #}
   <tr>
     <td class="footer-pad"
         style="background-color:{{ header_bg }};padding:20px 40px;
@@ -606,20 +617,16 @@
   </tr>
 
 
-  {# ══════════════════════════════════════════════════════════════════════
-     7 · SOCIAL ICONS
-  ══════════════════════════════════════════════════════════════════════ #}
+  {# ─────────────── 7. SOCIAL ICONS ─────────────── #}
   {% if socials %}
   <tr>
     <td style="background:#242A75;text-align:center;padding:15px;">
       {% for s in socials %}
         <a href="{{ s.url }}" target="_blank">
-          {# Outlook: PNG fallback #}
           <!--[if mso]>
           <img src="{{ s.logo_png }}" alt="{{ s.name }}" width="20" height="20"
               style="display:inline-block;vertical-align:middle;">
           <![endif]-->
-          {# All other clients: SVG #}
           <!--[if !mso]><!-->
           <img src="{{ s.logo_svg }}" alt="{{ s.name }}" width="20" height="20"
               style="display:inline-block;vertical-align:middle;">
@@ -631,9 +638,7 @@
   {% endif %}
 
 
-  {# ══════════════════════════════════════════════════════════════════════
-     8 · LEGAL STRIP
-  ══════════════════════════════════════════════════════════════════════ #}
+  {# ─────────────── 8. LEGAL STRIP ─────────────── #}
   <tr>
     <td align="center"
         style="background-color:{{ bg }};padding:16px 40px;
@@ -647,7 +652,6 @@
   </tr>
 
 </table>
-{# / outer container #}
 
 </td></tr>
 </table>

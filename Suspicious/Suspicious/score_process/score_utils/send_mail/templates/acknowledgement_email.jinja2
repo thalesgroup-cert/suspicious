@@ -16,13 +16,15 @@
   </xml></noscript>
   <![endif]-->
   <style>
-    /* Resets */
     body,table,td,a{-webkit-text-size-adjust:100%;-ms-text-size-adjust:100%;}
     table{border-collapse:collapse!important;mso-table-lspace:0pt;mso-table-rspace:0pt;}
     img{border:0;height:auto;line-height:100%;outline:none;text-decoration:none;-ms-interpolation-mode:bicubic;}
     a[x-apple-data-detectors]{color:inherit!important;text-decoration:none!important;}
-
-    /* Responsive */
+    span.no-link a, span.no-link {
+      color:inherit !important;
+      text-decoration:none !important;
+      pointer-events:none;
+    }
     @media screen and (max-width:620px){
       .email-container{width:100%!important;border-radius:0!important;}
       .content-pad{padding:24px 20px!important;}
@@ -32,18 +34,8 @@
   </style>
 </head>
 
-{# ========================================================================= #}
-{# Available theme variables (all plain hex — from email_theme.py):           #}
-{#   bg, surface, header_bg, header_text, accent, accent_text,                #}
-{#   body_text, muted, border, link, cta_bg, cta_text                         #}
-{#   color_safe, color_suspicious, color_dangerous, color_inconclusive        #}
-{# ========================================================================= #}
-
 <body style="margin:0;padding:0;word-break:break-word;-webkit-font-smoothing:antialiased;background-color:{{ bg }};">
 
-{# ── Inbox preview text (hidden) ──────────────────────────────────────── #}
-{# The zwj + hair-space padding pushes the fallback "..." out of view in   #}
-{# clients that show more characters than the preheader alone              #}
 <div style="display:none;max-height:0;overflow:hidden;mso-hide:all;
             font-size:1px;line-height:1px;color:{{ bg }};">
   Your submission has been received and is being analyzed by our security systems.
@@ -60,10 +52,6 @@
   <tr>
     <td align="center" style="padding:32px 16px;">
 
-
-      {# ================================================================== #}
-      {# OUTER CONTAINER                                                      #}
-      {# ================================================================== #}
       <table class="email-container"
              role="article" aria-label="Security submission confirmation"
              border="0" cellpadding="0" cellspacing="0"
@@ -72,21 +60,16 @@
                     border:1px solid {{ border }};">
 
 
-        {# ─────────────────────────────────────────────────────────────── #}
-        {# 1. HEADER — logo or wordmark                                     #}
-        {# ─────────────────────────────────────────────────────────────── #}
+        {# ─────────────── 1. HEADER ─────────────── #}
         <tr>
           <td align="center" style="background-color:{{ header_bg }};padding:28px 40px;">
-
             {% if company_logo_svg.is_image %}
-
               <!--[if !mso]><!-->
               <img src="{{ company_logo_svg.src }}"
                   alt="{{ company_name | default('') }}"
                   width="130"
                   style="max-width:130px;height:auto;display:block;margin:0 auto;">
               <!--<![endif]-->
-
               <!--[if mso]>
                 {% if company_logo_png.src %}
                   <img src="{{ company_logo_png.src }}"
@@ -100,31 +83,24 @@
                   </span>
                 {% endif %}
               <![endif]-->
-
             {% else %}
-
               <span style="font-size:22px;font-weight:800;color:{{ header_text }};">
                 {{ company_name | default("Security Portal") }}
               </span>
-
             {% endif %}
-
           </td>
         </tr>
 
 
-
-        {# ─────────────────────────────────────────────────────────────── #}
-        {# 3. BODY CARD                                                     #}
-        {# ─────────────────────────────────────────────────────────────── #}
+        {# ─────────────── 3. BODY CARD ─────────────── #}
         <tr>
           <td class="content-pad"
               style="background-color:{{ surface }};padding:40px 40px 36px;">
 
-            {# Greeting -------------------------------------------------- #}
             <p style="margin:0 0 22px;font-size:20px;font-weight:800;
                       letter-spacing:-0.3px;color:{{ accent }};
-                      font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,Arial,sans-serif;">
+                      font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,Arial,sans-serif;
+                      mso-line-height-rule:exactly;line-height:24px;">
               Dear {{ recipient_name | default("Security Contributor") }},
             </p>
 
@@ -142,12 +118,11 @@
               You can also track progress live on the portal at any time.
             </p>
 
-            {# Hairline rule --------------------------------------------- #}
             <table role="presentation" border="0" cellpadding="0" cellspacing="0" width="100%">
-              <tr><td style="border-top:1px solid {{ border }};font-size:0;padding:0;">&nbsp;</td></tr>
+              <tr><td style="border-top:1px solid {{ border }};font-size:0;padding:0;line-height:0;">&nbsp;</td></tr>
             </table>
 
-            {# CTA button — VML for Outlook, HTML for everyone else -------- #}
+            {# CTA button #}
             <table role="presentation" border="0" cellpadding="0" cellspacing="0" width="100%"
                    style="margin:28px 0;">
               <tr>
@@ -183,14 +158,11 @@
             </table>
 
 
-            {# ── Verdict legend ──────────────────────────────────────── #}
-            {# Left colour bar is a narrow TD, not a border — borders on  #}
-            {# TR/TD are clipped differently across clients               #}
+            {# Verdict legend #}
             <table role="presentation" border="0" cellpadding="0" cellspacing="0" width="100%"
                    style="border:1px solid {{ border }};border-radius:8px;
                           overflow:hidden;margin-bottom:28px;">
 
-              {# Legend header #}
               <tr>
                 <td colspan="2"
                     style="background-color:{{ header_bg }};padding:10px 16px;
@@ -201,10 +173,9 @@
                 </td>
               </tr>
 
-              {# DANGEROUS #}
               <tr>
                 <td width="6" style="background-color:{{ color_dangerous }};
-                             width:6px;padding:0;font-size:0;line-height:0;">&nbsp;</td>
+                             width:6px;padding:0;font-size:0;line-height:0;mso-line-height-rule:exactly;">&nbsp;</td>
                 <td style="padding:11px 16px;border-bottom:1px solid {{ border }};
                            font-size:13px;line-height:1.55;
                            font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,Arial,sans-serif;">
@@ -214,10 +185,9 @@
                 </td>
               </tr>
 
-              {# SUSPICIOUS #}
               <tr>
                 <td width="6" style="background-color:{{ color_suspicious }};
-                             width:6px;padding:0;font-size:0;line-height:0;">&nbsp;</td>
+                             width:6px;padding:0;font-size:0;line-height:0;mso-line-height-rule:exactly;">&nbsp;</td>
                 <td style="padding:11px 16px;border-bottom:1px solid {{ border }};
                            font-size:13px;line-height:1.55;
                            font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,Arial,sans-serif;">
@@ -227,10 +197,9 @@
                 </td>
               </tr>
 
-              {# INCONCLUSIVE #}
               <tr>
                 <td width="6" style="background-color:{{ color_inconclusive }};
-                             width:6px;padding:0;font-size:0;line-height:0;">&nbsp;</td>
+                             width:6px;padding:0;font-size:0;line-height:0;mso-line-height-rule:exactly;">&nbsp;</td>
                 <td style="padding:11px 16px;border-bottom:1px solid {{ border }};
                            font-size:13px;line-height:1.55;
                            font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,Arial,sans-serif;">
@@ -240,10 +209,9 @@
                 </td>
               </tr>
 
-              {# SAFE — no bottom border (last row) #}
               <tr>
                 <td width="6" style="background-color:{{ color_safe }};
-                             width:6px;padding:0;font-size:0;line-height:0;">&nbsp;</td>
+                             width:6px;padding:0;font-size:0;line-height:0;mso-line-height-rule:exactly;">&nbsp;</td>
                 <td style="padding:11px 16px;
                            font-size:13px;line-height:1.55;
                            font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,Arial,sans-serif;">
@@ -254,7 +222,6 @@
               </tr>
 
             </table>
-            {# / verdict legend #}
 
             <p style="margin:0;font-size:13px;line-height:1.6;
                       color:{{ muted }};font-style:italic;
@@ -264,20 +231,15 @@
 
           </td>
         </tr>
-        {# / body card #}
 
 
-        {# ─────────────────────────────────────────────────────────────── #}
-        {# 4. FOOTER — links + company identity                            #}
-        {# ─────────────────────────────────────────────────────────────── #}
+        {# ─────────────── 4. FOOTER ─────────────── #}
         <tr>
           <td class="footer-pad"
               style="background-color:{{ header_bg }};padding:24px 40px;">
             <table class="two-col" role="presentation"
                    border="0" cellpadding="0" cellspacing="0" width="100%">
               <tr>
-
-                {# Links #}
                 <td style="vertical-align:top;padding-right:16px;">
                   <p style="margin:0 0 7px;">
                     <a href="{{ glossary_url | default('#') }}"
@@ -303,8 +265,6 @@
                   </p>
                   {% endif %}
                 </td>
-
-                {# Company #}
                 <td style="vertical-align:top;text-align:right;">
                   <p style="margin:0 0 5px;font-size:14px;font-weight:800;
                             color:{{ header_text }};
@@ -321,27 +281,22 @@
                   </p>
                   {% endif %}
                 </td>
-
               </tr>
             </table>
           </td>
         </tr>
 
 
-        {# ─────────────────────────────────────────────────────────────── #}
-        {# 5. SOCIAL ICONS                                                  #}
-        {# ─────────────────────────────────────────────────────────────── #}
+        {# ─────────────── 5. SOCIAL ICONS ─────────────── #}
         {% if socials %}
         <tr>
           <td style="background:#242A75;text-align:center;padding:15px;">
             {% for s in socials %}
               <a href="{{ s.url }}" target="_blank">
-                {# Outlook: PNG fallback #}
                 <!--[if mso]>
                 <img src="{{ s.logo_png }}" alt="{{ s.name }}" width="20" height="20"
                     style="display:inline-block;vertical-align:middle;">
                 <![endif]-->
-                {# All other clients: SVG #}
                 <!--[if !mso]><!-->
                 <img src="{{ s.logo_svg }}" alt="{{ s.name }}" width="20" height="20"
                     style="display:inline-block;vertical-align:middle;">
@@ -353,9 +308,7 @@
         {% endif %}
 
 
-        {# ─────────────────────────────────────────────────────────────── #}
-        {# 6. LEGAL STRIP                                                   #}
-        {# ─────────────────────────────────────────────────────────────── #}
+        {# ─────────────── 6. LEGAL STRIP ─────────────── #}
         <tr>
           <td align="center"
               style="background-color:{{ bg }};padding:16px 40px;
@@ -369,7 +322,6 @@
         </tr>
 
       </table>
-      {# / outer container #}
 
     </td>
   </tr>

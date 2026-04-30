@@ -115,8 +115,20 @@ def extract_domain_value(value: str) -> str:
     if not value:
         return ""
 
-    parsed = urlparse(value if "://" in value else f"https://{value}")
-    return (parsed.hostname or value).strip().lower()
+    # Refang defanged indicators (e.g. "example[.]com", "hxxp://...", "[:]")
+    refanged = (
+        value.replace("[.]", ".")
+        .replace("(.)", ".")
+        .replace("[:]", ":")
+        .replace("hxxp://", "http://")
+        .replace("hxxps://", "https://")
+    )
+
+    try:
+        parsed = urlparse(refanged if "://" in refanged else f"https://{refanged}")
+        return (parsed.hostname or refanged).strip().lower()
+    except ValueError:
+        return refanged
 
 
 def get_or_create_domain(domain_value: str) -> Optional[Domain]:
