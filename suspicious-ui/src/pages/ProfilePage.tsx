@@ -334,7 +334,7 @@ function PreferencesPanel({
           title="Acknowledgements"
           subtitle="Receive a confirmation when your report is received and queued."
           checked={wantsAck} onChange={setWantsAck}
-          accentColor={resultColors.done.main}
+          accentColor={statusColors.done.main}
         />
         <ToggleRow
           icon={<NotificationsActiveOutlined />}
