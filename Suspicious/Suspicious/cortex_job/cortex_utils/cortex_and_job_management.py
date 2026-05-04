@@ -1,7 +1,6 @@
 import json
 import logging
 import os
-from datetime import datetime, timedelta
 
 import pybreaker
 from cortex4py.api import Api
@@ -530,7 +529,6 @@ class CortexJobManager:
 
     def __init__(self):
         self.case = None
-        self.last_processed = {}  # Track last processed report IDs per data_type
 
         # Define the structure for results with sets for unique report IDs per data type and status
         categories = [
@@ -714,7 +712,7 @@ class CortexJobManager:
         if not case:
             raise ValueError("Case is required.")
 
-        # Set current case for last_processed tracking
+        # Set current case for downstream processing
         self.case = case
 
         # Process file and/or mail
@@ -741,19 +739,13 @@ class CortexJobManager:
 
     def get_new_reports(self, data_type, filter_kwargs):
         """
-        Fetch only new AnalyzerReport objects since last_processed checkpoint
-        for this case and data_type.
+        Fetch all non-Deleted AnalyzerReport objects for this data_type
+        and artifact filter. Cortex API calls are deduplicated via the
+        class-level _job_cache / _report_cache during a single tick.
         """
-        key = (self.case.id, data_type)  # unique tracker per case/type
-        last_seen = self.last_processed.get(key, datetime.now() - timedelta(days=1))
-
-        reports = AnalyzerReport.objects.filter(
-            type=data_type, creation_date__gt=last_seen, **filter_kwargs
-        )
-
-        # Move the checkpoint forward
-        self.last_processed[key] = datetime.now()
-        return reports
+        return AnalyzerReport.objects.filter(
+            type=data_type, **filter_kwargs
+        ).exclude(status="Deleted")
 
     def process_file(self, file):
         """
