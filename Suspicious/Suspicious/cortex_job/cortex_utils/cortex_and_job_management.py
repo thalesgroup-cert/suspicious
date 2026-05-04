@@ -377,6 +377,7 @@ class CortexJob:
                 cortex_job_id=report.id,
                 type=data_type,
                 analyzer=analyzer_db,
+                status="InProgress",
                 level="info",
                 confidence=0,
                 score=0,
