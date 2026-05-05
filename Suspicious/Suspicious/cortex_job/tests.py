@@ -234,3 +234,102 @@ class GenerateDescriptionTests(TestCase):
         self.manager.calculate_total_results()
         self.manager.generate_description(self.case)
         self.assertEqual(self.case.status, "Done")
+
+
+class FullCycleScoringTests(TestCase):
+    """
+    All five fixes cooperate: an old InProgress row with the real
+    domaintools.com VT payload gets fetched, scored, and the case flips
+    to Done with the right values.
+
+    Drives the loop manually (get_new_reports → update_results →
+    calculate_total_results → generate_description) instead of through
+    update_ongoing_case_jobs() to avoid wiring the full Artifact /
+    CaseHasNonFileIocs chain.
+    """
+
+    def test_full_cycle_vt_domain_scoring(self):
+        from django.contrib.auth import get_user_model
+        from django.db.models.signals import post_save
+        from case_handler.models import Case
+        from case_handler.signals import on_case_created
+
+        # case_handler.signals.on_case_created imports the deleted
+        # api.metrics module (unrelated monitoring rip-out). Disconnect
+        # for the duration of this test.
+        post_save.disconnect(on_case_created, sender=Case)
+        self.addCleanup(post_save.connect, on_case_created, sender=Case)
+
+        User = get_user_model()
+        reporter = User.objects.create_user(username="tester", password="x")
+
+        analyzer = Analyzer.objects.create(
+            analyzer_cortex_id="vt-1",
+            name="VirusTotal_GetReport_3_1",
+            weight=0.2,
+        )
+        domain = Domain.objects.create(value="domaintools.com")
+        case = Case.objects.create(
+            description="",
+            reporter=reporter,
+            status="On Going",
+        )
+
+        old = AnalyzerReport.objects.create(
+            cortex_job_id="TP2J3p0B7embIO9oHKlU",
+            type="domain",
+            status="InProgress",
+            analyzer=analyzer,
+            domain=domain,
+            level="info",
+            confidence=0,
+            score=0,
+            report_summary={},
+            report_full={},
+            report_taxonomy={},
+        )
+        # Force creation_date older than 24h to prove we no longer drop old rows
+        AnalyzerReport.objects.filter(pk=old.pk).update(
+            creation_date=timezone.now() - timedelta(days=5)
+        )
+
+        job = MagicMock(status="Success", dataType="domain")
+        job.id = "TP2J3p0B7embIO9oHKlU"
+        vt_payload = {
+            "summary": {
+                "taxonomies": [
+                    {"level": "info",      "namespace": "VT", "predicate": "GetReport", "value": "0/91"},
+                    {"level": "malicious", "namespace": "VT", "predicate": "GetReport", "value": "7 resolution(s)"},
+                    {"level": "malicious", "namespace": "VT", "predicate": "GetReport", "value": "14 downloaded file(s)"},
+                ]
+            },
+            "full": {"results": []},
+        }
+
+        CortexJobManager._job_cache.clear()
+        CortexJobManager._report_cache.clear()
+
+        manager = CortexJobManager()
+        manager.case = case
+
+        with patch.object(
+            CortexJobManager, "get_job_from_api", return_value=job,
+        ), patch.object(
+            CortexJobManager, "get_report_from_api", return_value=vt_payload,
+        ):
+            reports = list(
+                manager.get_new_reports("domain", {"domain": domain})
+            )
+            self.assertIn(old, reports)
+            manager.update_results("domain", reports)
+            manager.calculate_total_results()
+            manager.generate_description(case)
+
+        old.refresh_from_db()
+        case.refresh_from_db()
+
+        self.assertEqual(old.status, "Success")
+        self.assertEqual(old.level, "malicious")
+        self.assertEqual(old.score, 10)
+        self.assertEqual(old.confidence, 100)
+        self.assertEqual(case.status, "Done")
