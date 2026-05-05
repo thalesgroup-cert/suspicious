@@ -112,5 +112,6 @@ class UserCasesMonthlyStatsAdmin(ImportExportModelAdmin):
     resource_class = UserCasesMonthlyStatsResource
     list_display = ('id', 'user', 'month', 'year', 'total_cases', 'creation_date', 'last_update')
     list_filter = ('month', 'year', 'creation_date')
+    list_select_related = ('user',)
     search_fields = ('user__username', 'month', 'year')
     ordering = ('-creation_date',)

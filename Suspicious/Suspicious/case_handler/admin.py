@@ -78,6 +78,7 @@ class CaseAdmin(ImportExportModelAdmin):
     resource_class = CaseResource
     list_display = ('id', 'description', 'reporter', 'status', 'results', 'is_challenged', 'creation_date')
     list_filter = ('status', 'results', 'is_challenged', 'creation_date')
+    list_select_related = ('reporter',)
     search_fields = ('id', 'description', 'reporter__username')
     ordering = ('-creation_date',)
 
@@ -86,6 +87,7 @@ class CaseAdmin(ImportExportModelAdmin):
 class CaseHasFileOrMailAdmin(ImportExportModelAdmin):
     resource_class = CaseHasFileOrMailResource
     list_display = ('id', 'case', 'file', 'mail', 'creation_date')
+    list_select_related = ('case', 'file', 'mail')
     search_fields = ('case__id', 'file__file_path', 'mail__subject')
     ordering = ('-creation_date',)
 
@@ -94,6 +96,7 @@ class CaseHasFileOrMailAdmin(ImportExportModelAdmin):
 class CaseHasNonFileIocsAdmin(ImportExportModelAdmin):
     resource_class = CaseHasNonFileIocsResource
     list_display = ('id', 'case', 'url', 'ip', 'hash', 'creation_date')
+    list_select_related = ('case', 'url', 'ip', 'hash')
     search_fields = ('case__id', 'url__address', 'ip__address', 'hash__value')
     ordering = ('-creation_date',)
 
@@ -102,6 +105,7 @@ class CaseHasNonFileIocsAdmin(ImportExportModelAdmin):
 class IpInCasesAdmin(ImportExportModelAdmin):
     resource_class = IpInCasesResource
     list_display = ('id', 'ip', 'creation_date')
+    list_select_related = ('ip',)
     search_fields = ('ip__address',)
     ordering = ('-creation_date',)
 
@@ -110,6 +114,7 @@ class IpInCasesAdmin(ImportExportModelAdmin):
 class UrlInCasesAdmin(ImportExportModelAdmin):
     resource_class = UrlInCasesResource
     list_display = ('id', 'url', 'creation_date')
+    list_select_related = ('url',)
     search_fields = ('url__address',)
     ordering = ('-creation_date',)
 
@@ -118,6 +123,7 @@ class UrlInCasesAdmin(ImportExportModelAdmin):
 class HashInCasesAdmin(ImportExportModelAdmin):
     resource_class = HashInCasesResource
     list_display = ('id', 'hash', 'creation_date')
+    list_select_related = ('hash',)
     search_fields = ('hash__value',)
     ordering = ('-creation_date',)
 
@@ -126,6 +132,7 @@ class HashInCasesAdmin(ImportExportModelAdmin):
 class MailInCasesAdmin(ImportExportModelAdmin):
     resource_class = MailInCasesResource
     list_display = ('id', 'associated_mail', 'creation_date')
+    list_select_related = ('associated_mail',)
     search_fields = ('associated_mail__subject',)
     ordering = ('-creation_date',)
 
@@ -134,5 +141,6 @@ class MailInCasesAdmin(ImportExportModelAdmin):
 class FileInCasesAdmin(ImportExportModelAdmin):
     resource_class = FileInCasesResource
     list_display = ('id', 'file', 'creation_date')
+    list_select_related = ('file',)
     search_fields = ('file__file_path',)
     ordering = ('-creation_date',)

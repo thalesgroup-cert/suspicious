@@ -43,8 +43,9 @@ class AnalyzerReportAdmin(ImportExportModelAdmin):
     resource_class = AnalyzerReportResource
     list_display = ('id', 'analyzer', 'type', 'status', 'level', 'score', 'creation_date')
     list_filter = ('type', 'status', 'level', 'creation_date')
-    search_fields = (
-        'analyzer__name', 'cortex_job_id', 'url__address', 'hash__value',
-        'file__file_path', 'ip__address', 'mail_body__fuzzy_hash', 'mail_header__fuzzy_hash',
+    list_select_related = (
+        'analyzer', 'url', 'hash', 'file', 'ip', 'domain',
+        'mail', 'mail_body', 'mail_header',
     )
+    search_fields = ('analyzer__name', 'cortex_job_id')
     ordering = ('-creation_date',)

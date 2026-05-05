@@ -58,19 +58,25 @@ class AnalyzerReport(models.Model):
         ]
 
     def __str__(self):
-        # Selects the first available field for display.
-        if self.url:
+        # Use *_id checks to avoid extra DB lookups when the FK row is not
+        # already prefetched. Falls back to the linked object only for the
+        # one slot that is populated.
+        if self.url_id:
             display_value = self.url.address
-        elif self.hash:
+        elif self.hash_id:
             display_value = self.hash.value
-        elif self.file:
+        elif self.file_id:
             display_value = self.file.file_path.name
-        elif self.ip:
+        elif self.ip_id:
             display_value = self.ip.address
-        elif self.mail_body:
+        elif self.mail_body_id:
             display_value = self.mail_body.fuzzy_hash
-        elif self.mail_header:
+        elif self.mail_header_id:
             display_value = self.mail_header.fuzzy_hash
+        elif self.domain_id:
+            display_value = self.domain.value
+        elif self.mail_id:
+            display_value = self.mail.address
         else:
             display_value = str(self.creation_date)
         return f"{self.analyzer.name} - {self.type} Report - {display_value}"

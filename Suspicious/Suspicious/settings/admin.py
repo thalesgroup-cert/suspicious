@@ -120,9 +120,10 @@ class AllowListDomainResource(resources.ModelResource):
 class AllowListDomainAdmin(ImportExportModelAdmin):
     resource_class = AllowListDomainResource
     list_display = ("domain", "user", "creation_date", "last_update")
-    list_filter = ("domain", "user", "creation_date")
+    list_filter = ("creation_date",)
+    list_select_related = ("domain", "user")
     search_fields = ("domain__value", "user__username")
-    ordering = ("creation_date",)
+    ordering = ("-creation_date",)
 
 
 # =========================
@@ -178,8 +179,9 @@ class WatcherLegitDomainAdmin(ImportExportModelAdmin):
         "last_update",
     )
     list_filter = ("status", "creation_date", "last_update", "remote_last_update")
+    list_select_related = ("domain",)
     search_fields = ("domain__value", "status", "watcher_id")
-    ordering = ("creation_date",)
+    ordering = ("-creation_date",)
 
 
 # =========================
@@ -214,9 +216,10 @@ class DenyListDomainResource(resources.ModelResource):
 class DenyListDomainAdmin(ImportExportModelAdmin):
     resource_class = DenyListDomainResource
     list_display = ("domain", "user", "creation_date", "last_update")
-    list_filter = ("domain", "user", "creation_date")
+    list_filter = ("creation_date",)
+    list_select_related = ("domain", "user")
     search_fields = ("domain__value", "user__username")
-    ordering = ("creation_date",)
+    ordering = ("-creation_date",)
 
 
 # =========================
@@ -272,8 +275,9 @@ class WatcherMonitoredDomainAdmin(ImportExportModelAdmin):
         "last_update",
     )
     list_filter = ("status", "creation_date", "last_update", "remote_last_update")
+    list_select_related = ("domain",)
     search_fields = ("domain__value", "status", "watcher_id")
-    ordering = ("creation_date",)
+    ordering = ("-creation_date",)
 
 
 # =========================
@@ -308,9 +312,10 @@ class CampaignDomainAllowListResource(resources.ModelResource):
 class CampaignDomainAllowListAdmin(ImportExportModelAdmin):
     resource_class = CampaignDomainAllowListResource
     list_display = ("domain", "user", "creation_date", "last_update")
-    list_filter = ("domain", "user", "creation_date")
+    list_filter = ("creation_date",)
+    list_select_related = ("domain", "user")
     search_fields = ("domain__value", "user__username")
-    ordering = ("creation_date",)
+    ordering = ("-creation_date",)
 
 
 # =========================
@@ -345,9 +350,10 @@ class AllowListFileResource(resources.ModelResource):
 class AllowListFileAdmin(ImportExportModelAdmin):
     resource_class = AllowListFileResource
     list_display = ("linked_file_hash", "user", "creation_date", "last_update")
-    list_filter = ("linked_file_hash", "user", "creation_date")
+    list_filter = ("creation_date",)
+    list_select_related = ("linked_file_hash", "user")
     search_fields = ("linked_file_hash__value", "user__username")
-    ordering = ("creation_date",)
+    ordering = ("-creation_date",)
 
 
 # =========================
@@ -382,9 +388,10 @@ class DenyListFileResource(resources.ModelResource):
 class DenyListFileAdmin(ImportExportModelAdmin):
     resource_class = DenyListFileResource
     list_display = ("linked_file_hash", "user", "creation_date", "last_update")
-    list_filter = ("linked_file_hash", "user", "creation_date")
+    list_filter = ("creation_date",)
+    list_select_related = ("linked_file_hash", "user")
     search_fields = ("linked_file_hash__value", "user__username")
-    ordering = ("creation_date",)
+    ordering = ("-creation_date",)
 
 
 # =========================
@@ -408,6 +415,7 @@ class AllowListFiletypeResource(resources.ModelResource):
 class AllowListFiletypeAdmin(ImportExportModelAdmin):
     resource_class = AllowListFiletypeResource
     list_display = ("filetype", "user", "creation_date", "last_update")
-    list_filter = ("filetype", "user", "creation_date")
+    list_filter = ("filetype", "creation_date")
+    list_select_related = ("user",)
     search_fields = ("filetype", "user__username")
-    ordering = ("creation_date",)
+    ordering = ("-creation_date",)
