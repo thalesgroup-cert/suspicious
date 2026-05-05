@@ -204,81 +204,84 @@ class CaseHasNonFileIocs(models.Model):
         return f"Case #{self.case_id} - " + ", ".join(parts)
 
 
-class FileInCases(models.Model):
+class CaseArtifact(models.Model):
     """
-    Many-to-many association between files and cases.
+    Per-(case, artifact) link replacing the old FileInCases / HashInCases /
+    UrlInCases / IpInCases / MailInCases models. Exactly one of file, hash,
+    url, ip, mail is populated per row; artifact_type matches the populated
+    FK.
     """
-    file = models.ForeignKey(File, on_delete=models.CASCADE, related_name='file_cases', db_index=True)
-    case = models.ManyToManyField('Case', related_name='file_cases', blank=True)
+
+    class ArtifactType(models.TextChoices):
+        FILE = 'file', 'File'
+        HASH = 'hash', 'Hash'
+        URL = 'url', 'URL'
+        IP = 'ip', 'IP'
+        MAIL = 'mail', 'Mail'
+
+    case = models.ForeignKey(
+        'Case', on_delete=models.CASCADE,
+        related_name='case_artifacts', db_index=True,
+    )
+    artifact_type = models.CharField(
+        max_length=10, choices=ArtifactType.choices, db_index=True,
+    )
+    file = models.ForeignKey(
+        File, on_delete=models.CASCADE, related_name='case_artifacts',
+        null=True, blank=True, db_index=True,
+    )
+    hash = models.ForeignKey(
+        Hash, on_delete=models.CASCADE, related_name='case_artifacts',
+        null=True, blank=True, db_index=True,
+    )
+    url = models.ForeignKey(
+        URL, on_delete=models.CASCADE, related_name='case_artifacts',
+        null=True, blank=True, db_index=True,
+    )
+    ip = models.ForeignKey(
+        IP, on_delete=models.CASCADE, related_name='case_artifacts',
+        null=True, blank=True, db_index=True,
+    )
+    mail = models.ForeignKey(
+        Mail, on_delete=models.CASCADE, related_name='case_artifacts',
+        null=True, blank=True, db_index=True,
+    )
     creation_date = models.DateTimeField(auto_now_add=True, db_index=True)
     last_update = models.DateTimeField(auto_now=True)
 
     class Meta:
         ordering = ['-creation_date']
+        constraints = [
+            models.UniqueConstraint(
+                fields=['case', 'artifact_type', 'file'],
+                name='caseartifact_unique_file',
+                condition=models.Q(file__isnull=False),
+            ),
+            models.UniqueConstraint(
+                fields=['case', 'artifact_type', 'hash'],
+                name='caseartifact_unique_hash',
+                condition=models.Q(hash__isnull=False),
+            ),
+            models.UniqueConstraint(
+                fields=['case', 'artifact_type', 'url'],
+                name='caseartifact_unique_url',
+                condition=models.Q(url__isnull=False),
+            ),
+            models.UniqueConstraint(
+                fields=['case', 'artifact_type', 'ip'],
+                name='caseartifact_unique_ip',
+                condition=models.Q(ip__isnull=False),
+            ),
+            models.UniqueConstraint(
+                fields=['case', 'artifact_type', 'mail'],
+                name='caseartifact_unique_mail',
+                condition=models.Q(mail__isnull=False),
+            ),
+        ]
 
     def __str__(self):
-        return f"File ID: {self.file_id}"
-
-
-class HashInCases(models.Model):
-    """
-    Many-to-many association between hashes and cases.
-    """
-    hash = models.ForeignKey(Hash, on_delete=models.CASCADE, related_name='hash_cases', db_index=True)
-    case = models.ManyToManyField('Case', related_name='hash_cases', blank=True)
-    creation_date = models.DateTimeField(auto_now_add=True, db_index=True)
-    last_update = models.DateTimeField(auto_now=True)
-
-    class Meta:
-        ordering = ['-creation_date']
-
-    def __str__(self):
-        return f"Hash ID: {self.hash_id}"
-
-
-class UrlInCases(models.Model):
-    """
-    Many-to-many association between URLs and cases.
-    """
-    url = models.ForeignKey(URL, on_delete=models.CASCADE, related_name='url_cases', db_index=True)
-    case = models.ManyToManyField('Case', related_name='url_cases', blank=True)
-    creation_date = models.DateTimeField(auto_now_add=True, db_index=True)
-    last_update = models.DateTimeField(auto_now=True)
-
-    class Meta:
-        ordering = ['-creation_date']
-
-    def __str__(self):
-        return f"URL ID: {self.url_id}"
-
-
-class IpInCases(models.Model):
-    """
-    Many-to-many association between IPs and cases.
-    """
-    ip = models.ForeignKey(IP, on_delete=models.CASCADE, related_name='ip_cases', db_index=True)
-    case = models.ManyToManyField('Case', related_name='ip_cases', blank=True)
-    creation_date = models.DateTimeField(auto_now_add=True, db_index=True)
-    last_update = models.DateTimeField(auto_now=True)
-
-    class Meta:
-        ordering = ['-creation_date']
-
-    def __str__(self):
-        return f"IP ID: {self.ip_id}"
-
-
-class MailInCases(models.Model):
-    """
-    Many-to-many association between mails and cases.
-    """
-    associated_mail = models.ForeignKey(Mail, on_delete=models.CASCADE, related_name='cases_associated_with_mail', db_index=True)
-    associated_cases = models.ManyToManyField('Case', related_name='mail_cases', blank=True)
-    creation_date = models.DateTimeField(auto_now_add=True, db_index=True)
-    last_update = models.DateTimeField(auto_now=True)
-
-    class Meta:
-        ordering = ['-creation_date']
-
-    def __str__(self):
-        return f"Mail ID: {self.associated_mail_id}"
+        artifact_id = (
+            self.file_id or self.hash_id or self.url_id
+            or self.ip_id or self.mail_id or 'orphan'
+        )
+        return f"Case #{self.case_id} - {self.artifact_type}: {artifact_id}"
