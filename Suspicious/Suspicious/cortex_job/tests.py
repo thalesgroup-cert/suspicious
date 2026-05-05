@@ -135,3 +135,76 @@ class ArtifactValueTests(TestCase):
         r = self._make_report()
         with self.assertRaises(ValueError):
             CortexJobManager._artifact_value(r)
+
+
+class GetCortexJobsResultsScoringTests(TestCase):
+    def setUp(self):
+        self.analyzer = Analyzer.objects.create(
+            analyzer_cortex_id="vt-1",
+            name="VirusTotal_GetReport_3_1",
+            weight=0.2,
+        )
+        self.domain = Domain.objects.create(value="domaintools.com")
+        self.report = AnalyzerReport.objects.create(
+            cortex_job_id="TP2J3p0B7embIO9oHKlU",
+            type="domain",
+            status="InProgress",
+            analyzer=self.analyzer,
+            domain=self.domain,
+            level="info",
+            confidence=0,
+            score=0,
+            report_summary={},
+            report_full={},
+            report_taxonomy={},
+        )
+
+    @staticmethod
+    def _vt_report():
+        return {
+            "summary": {
+                "taxonomies": [
+                    {"level": "info",      "namespace": "VT", "predicate": "GetReport", "value": "0/91"},
+                    {"level": "malicious", "namespace": "VT", "predicate": "GetReport", "value": "7 resolution(s)"},
+                    {"level": "malicious", "namespace": "VT", "predicate": "GetReport", "value": "14 downloaded file(s)"},
+                ]
+            },
+            "full": {"results": []},
+        }
+
+    def test_scores_written_on_success(self):
+        job = MagicMock(status="Success", dataType="domain")
+        report = self._vt_report()
+
+        with patch.object(
+            CortexJobManager, "get_job_from_api", return_value=job,
+        ), patch.object(
+            CortexJobManager, "get_report_from_api", return_value=report,
+        ):
+            CortexJobManager._job_cache.clear()
+            CortexJobManager._report_cache.clear()
+            CortexJobManager.get_cortex_jobs_results(self.report, "domain")
+
+        self.report.refresh_from_db()
+        self.assertEqual(self.report.status, "Success")
+        self.assertEqual(self.report.level, "malicious")
+        self.assertEqual(self.report.score, 10)
+        self.assertEqual(self.report.confidence, 100)
+
+    def test_no_score_written_when_inprogress(self):
+        job = MagicMock(status="InProgress", dataType="domain")
+        report = self._vt_report()
+
+        with patch.object(
+            CortexJobManager, "get_job_from_api", return_value=job,
+        ), patch.object(
+            CortexJobManager, "get_report_from_api", return_value=report,
+        ):
+            CortexJobManager._job_cache.clear()
+            CortexJobManager._report_cache.clear()
+            CortexJobManager.get_cortex_jobs_results(self.report, "domain")
+
+        self.report.refresh_from_db()
+        self.assertEqual(self.report.status, "InProgress")
+        self.assertEqual(self.report.score, 0)
+        self.assertEqual(self.report.level, "info")

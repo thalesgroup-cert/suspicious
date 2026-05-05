@@ -644,6 +644,22 @@ class CortexJobManager:
                         f"Error updating report {job_id}: {e}", exc_info=True
                     )
 
+            # Score immediately on success so the UI does not wait for the
+            # case to flip to Done. create_and_save_report is idempotent.
+            if job.status == "Success":
+                try:
+                    from score_process.scoring.cortex_analyzers.reports import (
+                        CortexAnalyzerReports,
+                    )
+                    artifact_value = cls._artifact_value(report_instance)
+                    CortexAnalyzerReports.create_and_save_report(
+                        report_instance, artifact_value, None
+                    )
+                except Exception as e:
+                    update_cases_logger.error(
+                        f"Error scoring report {job_id}: {e}", exc_info=True
+                    )
+
         return report_instance.status
 
     @staticmethod
