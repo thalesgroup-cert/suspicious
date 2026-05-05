@@ -251,33 +251,10 @@ class CaseArtifact(models.Model):
 
     class Meta:
         ordering = ['-creation_date']
-        constraints = [
-            models.UniqueConstraint(
-                fields=['case', 'artifact_type', 'file'],
-                name='caseartifact_unique_file',
-                condition=models.Q(file__isnull=False),
-            ),
-            models.UniqueConstraint(
-                fields=['case', 'artifact_type', 'hash'],
-                name='caseartifact_unique_hash',
-                condition=models.Q(hash__isnull=False),
-            ),
-            models.UniqueConstraint(
-                fields=['case', 'artifact_type', 'url'],
-                name='caseartifact_unique_url',
-                condition=models.Q(url__isnull=False),
-            ),
-            models.UniqueConstraint(
-                fields=['case', 'artifact_type', 'ip'],
-                name='caseartifact_unique_ip',
-                condition=models.Q(ip__isnull=False),
-            ),
-            models.UniqueConstraint(
-                fields=['case', 'artifact_type', 'mail'],
-                name='caseartifact_unique_mail',
-                condition=models.Q(mail__isnull=False),
-            ),
-        ]
+        # NOTE: MariaDB does not support partial unique constraints
+        # (Django raises models.W036 when conditions are present), so
+        # uniqueness is enforced at the application layer via the
+        # get_or_create call in CaseCreator instead.
 
     def __str__(self):
         artifact_id = (
