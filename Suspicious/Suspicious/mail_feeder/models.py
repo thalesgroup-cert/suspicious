@@ -44,7 +44,7 @@ class MailHeader(models.Model):
     header_confidence = models.FloatField(default=0)
     header_level = models.CharField(max_length=20, default='info')
     header_value = models.TextField()
-    fuzzy_hash = models.TextField()
+    fuzzy_hash = models.CharField(max_length=64, db_index=True)
     times_sent = models.PositiveIntegerField(default=0)
     other_values = models.TextField(blank=True)
     creation_date = models.DateTimeField(auto_now_add=True, db_index=True)
@@ -52,9 +52,6 @@ class MailHeader(models.Model):
 
     class Meta:
         ordering = ['-creation_date']
-        indexes = [
-            models.Index(fields=['fuzzy_hash']),
-        ]
 
     def __str__(self):
         return f"Header ID: {self.pk} - Hash: {self.fuzzy_hash[:20]}"
@@ -65,7 +62,7 @@ class MailBody(models.Model):
     body_confidence = models.FloatField(default=0)
     body_level = models.CharField(max_length=20, default='info')
     body_value = models.TextField()
-    fuzzy_hash = models.TextField()
+    fuzzy_hash = models.CharField(max_length=64, db_index=True)
     times_sent = models.PositiveIntegerField(default=0)
     other_values = models.TextField(blank=True)
     creation_date = models.DateTimeField(auto_now_add=True, db_index=True)
@@ -73,9 +70,6 @@ class MailBody(models.Model):
 
     class Meta:
         ordering = ['-creation_date']
-        indexes = [
-            models.Index(fields=['fuzzy_hash']),
-        ]
 
     def __str__(self):
         return f"Body ID: {self.pk} - Hash: {self.fuzzy_hash[:20]}"

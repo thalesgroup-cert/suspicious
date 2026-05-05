@@ -250,15 +250,7 @@ class FullCycleScoringTests(TestCase):
 
     def test_full_cycle_vt_domain_scoring(self):
         from django.contrib.auth import get_user_model
-        from django.db.models.signals import post_save
         from case_handler.models import Case
-        from case_handler.signals import on_case_created
-
-        # case_handler.signals.on_case_created imports the deleted
-        # api.metrics module (unrelated monitoring rip-out). Disconnect
-        # for the duration of this test.
-        post_save.disconnect(on_case_created, sender=Case)
-        self.addCleanup(post_save.connect, on_case_created, sender=Case)
 
         User = get_user_model()
         reporter = User.objects.create_user(username="tester", password="x")

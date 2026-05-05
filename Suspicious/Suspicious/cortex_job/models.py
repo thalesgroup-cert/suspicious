@@ -48,6 +48,19 @@ class AnalyzerReport(models.Model):
 
     class Meta:
         ordering = ['-creation_date']
+        indexes = [
+            # Hot path: get_new_reports filters by (type, <fk>_id) and excludes
+            # status='Deleted'. One composite per artifact FK lets the optimizer
+            # do a single index seek instead of fk-index + status filter.
+            models.Index(fields=['type', 'status', 'domain']),
+            models.Index(fields=['type', 'status', 'url']),
+            models.Index(fields=['type', 'status', 'ip']),
+            models.Index(fields=['type', 'status', 'hash']),
+            models.Index(fields=['type', 'status', 'mail']),
+            models.Index(fields=['type', 'status', 'file']),
+            models.Index(fields=['type', 'status', 'mail_body']),
+            models.Index(fields=['type', 'status', 'mail_header']),
+        ]
 
     def __str__(self):
         # Use *_id checks to avoid extra DB lookups when the FK row is not
