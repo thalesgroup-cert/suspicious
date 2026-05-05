@@ -79,7 +79,7 @@ export default function OverviewHeader(props: {
       }}
     >
       <Box sx={{ px: { xs: 2, md: 3 }, py: 1.5 }}>
-        <Stack direction="row" alignItems="flex-start" justifyContent="space-between" spacing={2}>
+        <Stack direction="row" spacing={2} sx={{ alignItems: "flex-start", justifyContent: "space-between" }} >
           <Box>
             <Typography
               variant="h5"
@@ -89,7 +89,7 @@ export default function OverviewHeader(props: {
             </Typography>
           </Box>
 
-          <Stack direction="row" spacing={1} alignItems="center">
+          <Stack direction="row" spacing={1} sx={{ alignItems: "center" }} >
             <Tooltip title="Refresh">
               <span>
                 <IconButton
@@ -120,14 +120,16 @@ export default function OverviewHeader(props: {
                   onClose={() => setAnchorEl(null)}
                   anchorOrigin={{ vertical: "bottom", horizontal: "right" }}
                   transformOrigin={{ vertical: "top", horizontal: "right" }}
-                  PaperProps={{
-                    sx: {
-                      mt: 1,
-                      borderRadius: 3,
-                      border: "1px solid",
-                      borderColor: "divider",
-                      width: 320,
-                      p: 1.5,
+                  slotProps={{
+                    paper: {
+                      sx: {
+                        mt: 1,
+                        borderRadius: 3,
+                        border: "1px solid",
+                        borderColor: "divider",
+                        width: 320,
+                        p: 1.5,
+                      },
                     },
                   }}
                 >

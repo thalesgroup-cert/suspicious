@@ -302,7 +302,7 @@ function ModeSelectorCard(props: {
         },
       }}
     >
-      <Stack direction="row" spacing={1.5} alignItems="flex-start">
+      <Stack direction="row" spacing={1.5} sx={{ alignItems: "flex-start" }} >
         <Box
           sx={{
             width: 42,
@@ -323,11 +323,10 @@ function ModeSelectorCard(props: {
           <Stack
             direction="row"
             spacing={1}
-            alignItems="center"
             useFlexGap
-            flexWrap="wrap"
-          >
-            <Typography fontWeight={850}>{props.title}</Typography>
+            sx={{ alignItems: "center", flexWrap: "wrap" }}
+>
+            <Typography sx={{ fontWeight: 850 }} >{props.title}</Typography>
 
             {props.helper ? (
               <Chip
@@ -361,7 +360,7 @@ function ModeSelectorCard(props: {
 function SectionHeader(props: { title: string; subtitle: string }) {
   return (
     <Stack spacing={0.5}>
-      <Typography variant="h5" fontWeight={850} letterSpacing={-0.4}>
+      <Typography variant="h5" sx={{ fontWeight: 850, letterSpacing: -0.4 }} >
         {props.title}
       </Typography>
       <Typography color="text.secondary">{props.subtitle}</Typography>
@@ -376,9 +375,9 @@ function SidePanel(
     <SoftCard>
       <CardContent sx={{ p: 2.25 }}>
         <Stack spacing={1.25}>
-          <Stack direction="row" spacing={1} alignItems="center">
+          <Stack direction="row" spacing={1} sx={{ alignItems: "center" }} >
             {props.icon}
-            <Typography fontWeight={850}>{props.title}</Typography>
+            <Typography sx={{ fontWeight: 850 }} >{props.title}</Typography>
           </Stack>
           {props.children}
         </Stack>
@@ -552,7 +551,7 @@ export default function SubmitPage() {
           <CardContent sx={{ p: { xs: 2.25, md: 3 } }}>
             <Stack spacing={2}>
               <Stack spacing={0.6}>
-                <Typography variant="h4" fontWeight={900} letterSpacing={-0.6}>
+                <Typography variant="h4" sx={{ fontWeight: 900, letterSpacing: -0.6 }} >
                   Submit
                 </Typography>
                 <Typography color="text.secondary" sx={{ maxWidth: 760 }}>
@@ -642,7 +641,7 @@ export default function SubmitPage() {
                   >
                     <input {...dropzone.getInputProps()} />
 
-                    <Stack spacing={1.5} alignItems="center" textAlign="center">
+                    <Stack spacing={1.5} sx={{ alignItems: "center", textAlign: "center" }} >
                       <Box
                         sx={{
                           width: 58,
@@ -659,7 +658,7 @@ export default function SubmitPage() {
                       </Box>
 
                       <Box>
-                        <Typography fontWeight={850}>
+                        <Typography sx={{ fontWeight: 850 }} >
                           {selectedFile
                             ? "File selected"
                             : dropzone.isDragActive
@@ -681,9 +680,8 @@ export default function SubmitPage() {
                           direction="row"
                           spacing={1}
                           useFlexGap
-                          flexWrap="wrap"
-                          justifyContent="center"
-                        >
+                          sx={{ flexWrap: "wrap", justifyContent: "center" }}
+>
                           <Chip label={selectedFile.name} variant="outlined" />
                           <Chip
                             label={formatBytes(selectedFile.size)}
@@ -731,7 +729,7 @@ export default function SubmitPage() {
                     </Alert>
                   ) : null}
 
-                  <Stack direction="row" justifyContent="flex-end">
+                  <Stack direction="row" sx={{ justifyContent: "flex-end" }} >
                     <Button
                       variant="contained"
                       disabled={!selectedFile || fileMutation.isPending}
@@ -801,7 +799,7 @@ export default function SubmitPage() {
                     </Alert>
                   ) : null}
 
-                  <Stack direction="row" justifyContent="flex-end">
+                  <Stack direction="row" sx={{ justifyContent: "flex-end" }} >
                     <Button
                       variant="contained"
                       disabled={
@@ -848,25 +846,25 @@ export default function SubmitPage() {
               icon={<InsertDriveFileOutlined fontSize="small" />}
             >
               <Stack spacing={1}>
-                <Stack direction="row" spacing={1} alignItems="center">
+                <Stack direction="row" spacing={1} sx={{ alignItems: "center" }} >
                   <InsertDriveFileOutlined fontSize="small" color="action" />
                   <Typography variant="body2" color="text.secondary">
                     Files and attachments
                   </Typography>
                 </Stack>
-                <Stack direction="row" spacing={1} alignItems="center">
+                <Stack direction="row" spacing={1} sx={{ alignItems: "center" }} >
                   <LinkOutlined fontSize="small" color="action" />
                   <Typography variant="body2" color="text.secondary">
                     Full URLs and bare domains
                   </Typography>
                 </Stack>
-                <Stack direction="row" spacing={1} alignItems="center">
+                <Stack direction="row" spacing={1} sx={{ alignItems: "center" }} >
                   <FingerprintOutlined fontSize="small" color="action" />
                   <Typography variant="body2" color="text.secondary">
                     Hashes and file indicators
                   </Typography>
                 </Stack>
-                <Stack direction="row" spacing={1} alignItems="center">
+                <Stack direction="row" spacing={1} sx={{ alignItems: "center" }} >
                   <PublicOutlined fontSize="small" color="action" />
                   <Typography variant="body2" color="text.secondary">
                     IP addresses
@@ -912,9 +910,9 @@ export default function SubmitPage() {
       {/* ------------------------------------------------------------------ */}
       <Dialog open={loadingOpen} onClose={() => {}} maxWidth="xs" fullWidth>
         <DialogContent sx={{ py: 4 }}>
-          <Stack spacing={2} alignItems="center" textAlign="center">
+          <Stack spacing={2} sx={{ alignItems: "center", textAlign: "center" }} >
             <CircularProgress />
-            <Typography fontWeight={850}>Processing submission</Typography>
+            <Typography sx={{ fontWeight: 850 }} >Processing submission</Typography>
             <Typography variant="body2" color="text.secondary">
               Waiting for the backend to validate and queue the artifact.
             </Typography>

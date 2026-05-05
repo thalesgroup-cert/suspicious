@@ -181,7 +181,7 @@ function ColorGroup<K extends string>({ title, keys, labels, colors, onChange, s
     <Stack spacing={1.25}>
       <CaptionLabel>{title}</CaptionLabel>
       <InnerCard sx={{ px: 2, py: 1.75 }}>
-        <Stack direction="row" spacing={1} flexWrap="wrap" useFlexGap sx={{ justifyContent: "space-between" }}>
+        <Stack direction="row" spacing={1} useFlexGap sx={{ justifyContent: "space-between", flexWrap: "wrap" }}>
           {keys.map((key) => (
             <ColorSwatch key={key} color={colors[key].main} label={labels[key]} onChange={(hex) => onChange(key, hex)} saving={saving} />
           ))}
@@ -205,14 +205,14 @@ function LivePreview() {
         <Stack spacing={1.5}>
           <Stack>
             <Typography variant="caption" color="text.disabled" sx={{ fontSize: 10.5, fontWeight: 600, mb: 0.75 }}>Analysis results</Typography>
-            <Stack direction="row" spacing={0.75} flexWrap="wrap" useFlexGap>
+            <Stack direction="row" spacing={0.75} useFlexGap sx={{ flexWrap: "wrap" }} >
               {(["safe", "suspicious", "dangerous", "inconclusive"] as ResultKey[]).map((k) => <ResultChip key={k} value={k} />)}
             </Stack>
           </Stack>
           <Divider sx={{ opacity: isDark ? 0.14 : 0.4 }} />
           <Stack>
             <Typography variant="caption" color="text.disabled" sx={{ fontSize: 10.5, fontWeight: 600, mb: 0.75 }}>Task / submission status</Typography>
-            <Stack direction="row" spacing={0.75} flexWrap="wrap" useFlexGap>
+            <Stack direction="row" spacing={0.75} useFlexGap sx={{ flexWrap: "wrap" }} >
               {(["done", "in_progress", "new", "failure", "challenged", "unknown"] as StatusKey[]).map((k) => <StatusChip key={k} value={k} />)}
             </Stack>
           </Stack>
@@ -288,17 +288,17 @@ export function ColorSettingsPanel() {
     <Stack spacing={2.5}>
 
       {/* Header */}
-      <Stack direction="row" spacing={1.5} alignItems="center">
+      <Stack direction="row" spacing={1.5} sx={{ alignItems: "center" }} >
         <Box sx={{ width: 46, height: 46, borderRadius: 3, display: "grid", placeItems: "center", background: "linear-gradient(135deg, rgba(56,189,248,.14), rgba(120,119,198,.12))", border: "1px solid rgba(56,189,248,.2)", "& svg": { fontSize: 22 } }}>
           <AccessibilityNewOutlined />
         </Box>
         <Box>
-          <Stack direction="row" spacing={1} alignItems="center">
-            <Typography variant="h6" fontWeight={950} letterSpacing={-0.2}>Semantic colors</Typography>
+          <Stack direction="row" spacing={1} sx={{ alignItems: "center" }} >
+            <Typography variant="h6" sx={{ fontWeight: 950, letterSpacing: -0.2 }} >Semantic colors</Typography>
             {isSaving ? (
               <Typography variant="caption" color="text.disabled" sx={{ fontSize: 11 }}>Saving…</Typography>
             ) : updateMutation.isSuccess ? (
-              <Stack direction="row" spacing={0.4} alignItems="center">
+              <Stack direction="row" spacing={0.4} sx={{ alignItems: "center" }} >
                 <CloudDoneOutlined sx={{ fontSize: 13, color: "success.main" }} />
                 <Typography variant="caption" sx={{ fontSize: 11, color: "success.main" }}>Synced</Typography>
               </Stack>
@@ -351,7 +351,7 @@ export function ColorSettingsPanel() {
       />
 
       {/* Reset */}
-      <Stack direction="row" justifyContent="flex-end">
+      <Stack direction="row" sx={{ justifyContent: "flex-end" }} >
         <Button size="small" startIcon={<RestoreOutlined />} disabled={isSaving} onClick={handleReset}
           sx={{ textTransform: "none", fontWeight: 800, borderRadius: 2, color: "text.secondary" }}>
           {resetMutation.isPending ? "Resetting…" : "Reset to defaults"}

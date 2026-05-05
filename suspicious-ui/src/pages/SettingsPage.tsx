@@ -27,18 +27,18 @@ import {
 } from "@mui/material";
 import {
   AddOutlined,
-  DeleteOutline,
+  DeleteOutlined,
   FileUploadOutlined,
   RefreshOutlined,
   SearchOutlined,
   SettingsOutlined,
   BlockOutlined,
-  CheckCircleOutline,
+  CheckCircleOutlined,
   CampaignOutlined,
   InsertDriveFileOutlined,
   ExtensionOutlined,
   GroupsOutlined,
-  MailOutline,
+  MailOutlined,
   TuneOutlined,
   ShieldOutlined,
   ContentCopyOutlined,
@@ -182,7 +182,7 @@ function parseMulti(input: string) {
 function EmptyList({ message }: { message: string }) {
   const theme = useTheme();
   return (
-    <Stack alignItems="center" justifyContent="center" spacing={1} sx={{ py: 5 }}>
+    <Stack spacing={1} sx={{ py: 5, alignItems: "center", justifyContent: "center" }}>
       <Box
         sx={{
           width: 48,
@@ -304,7 +304,7 @@ function ListItemRow({
           >
             {deleting
               ? <CircularProgress size={13} color="error" />
-              : <DeleteOutline sx={{ fontSize: 14 }} />}
+              : <DeleteOutlined sx={{ fontSize: 14 }} />}
           </IconButton>
         </Tooltip>
       </Stack>
@@ -336,7 +336,7 @@ function AddBar({
   };
 
   return (
-    <Stack direction="row" spacing={1} alignItems="flex-start">
+    <Stack direction="row" spacing={1} sx={{ alignItems: "flex-start" }} >
       <TextField
         size="small"
         placeholder={placeholder}
@@ -402,15 +402,12 @@ function BulkToolbar({
   return (
     <Stack
       direction="row"
-      alignItems="center"
       spacing={1}
-      sx={{
-        px: 1.25,
+      sx={{ px: 1.25,
         py: 0.75,
         borderRadius: 2,
         background: alpha(theme.palette.primary.main, 0.07),
-        border: `1px solid ${alpha(theme.palette.primary.main, 0.2)}`,
-      }}
+        border: `1px solid ${alpha(theme.palette.primary.main, 0.2)}`, alignItems: "center" }}
     >
       <IconButton size="small" onClick={allSelected ? onClearSelection : onSelectAll} sx={{ p: 0.25 }}>
         {allSelected
@@ -420,7 +417,7 @@ function BulkToolbar({
           : <CheckBoxOutlineBlank fontSize="small" />}
       </IconButton>
 
-      <Typography variant="body2" fontWeight={700} sx={{ flex: 1 }}>
+      <Typography variant="body2" sx={{ flex: 1, fontWeight: 700 }}>
         {selected > 0 ? `${selected} selected` : `${total} item${total !== 1 ? "s" : ""}`}
       </Typography>
 
@@ -437,7 +434,7 @@ function BulkToolbar({
             size="small"
             variant="outlined"
             color="error"
-            startIcon={deleting ? <CircularProgress size={12} color="error" /> : <DeleteOutline />}
+            startIcon={deleting ? <CircularProgress size={12} color="error" /> : <DeleteOutlined />}
             disabled={deleting}
             onClick={onDeleteSelected}
             sx={{ textTransform: "none", fontWeight: 900, borderRadius: 2 }}
@@ -584,7 +581,7 @@ function EditableListPanel({
       />
 
       {/* Toolbar row */}
-      <Stack direction="row" spacing={1} alignItems="center" flexWrap="wrap">
+      <Stack direction="row" spacing={1} sx={{ alignItems: "center", flexWrap: "wrap" }} >
         <Button
           size="small"
           variant="outlined"
@@ -637,12 +634,14 @@ function EditableListPanel({
           onChange={(e) => setFilter(e.target.value)}
           autoFocus
           fullWidth
-          InputProps={{
-            startAdornment: (
-              <InputAdornment position="start">
-                <SearchOutlined fontSize="small" />
-              </InputAdornment>
-            ),
+          slotProps={{
+            input: {
+              startAdornment: (
+                <InputAdornment position="start">
+                  <SearchOutlined fontSize="small" />
+                </InputAdornment>
+              ),
+            },
           }}
         />
       </Collapse>
@@ -745,15 +744,15 @@ function ReadOnlyListPanel({
   return (
     <InnerCard sx={{ p: 2 }}>
       <Stack spacing={1.5}>
-        <Stack direction="row" alignItems="flex-start" justifyContent="space-between" spacing={1}>
+        <Stack direction="row" spacing={1} sx={{ alignItems: "flex-start", justifyContent: "space-between" }} >
           <Box>
-            <Stack direction="row" spacing={0.75} alignItems="center">
+            <Stack direction="row" spacing={0.75} sx={{ alignItems: "center" }} >
               <LockOutlined sx={{ fontSize: 14, opacity: 0.55 }} />
-              <Typography fontWeight={950} fontSize={14}>{title}</Typography>
+              <Typography sx={{ fontWeight: 950, fontSize: 14 }} >{title}</Typography>
             </Stack>
             <Typography variant="caption" color="text.secondary">{subtitle}</Typography>
           </Box>
-          <Stack direction="row" spacing={0.75} alignItems="center">
+          <Stack direction="row" spacing={0.75} sx={{ alignItems: "center" }} >
             <Chip size="small" label="Watcher sync" color="info" variant="outlined" />
             <Chip size="small" label={`${items.length}`} variant="outlined" />
           </Stack>
@@ -766,12 +765,14 @@ function ReadOnlyListPanel({
             value={filter}
             onChange={(e) => setFilter(e.target.value)}
             fullWidth
-            InputProps={{
-              startAdornment: (
-                <InputAdornment position="start">
-                  <SearchOutlined fontSize="small" />
-                </InputAdornment>
-              ),
+            slotProps={{
+              input: {
+                startAdornment: (
+                  <InputAdornment position="start">
+                    <SearchOutlined fontSize="small" />
+                  </InputAdornment>
+                ),
+              },
             }}
           />
           <Tooltip title={showItems ? "Hide list" : "Show list"}>
@@ -896,12 +897,10 @@ function FeederPanel() {
 
         <Stack
           direction={{ xs: "column", sm: "row" }}
-          alignItems={{ sm: "center" }}
-          justifyContent="space-between"
           spacing={2}
-          sx={{ p: 2.5 }}
+          sx={{ p: 2.5, alignItems: { sm: "center" }, justifyContent: "space-between" }}
         >
-          <Stack direction="row" spacing={1.75} alignItems="center">
+          <Stack direction="row" spacing={1.75} sx={{ alignItems: "center" }} >
             <Box
               sx={{
                 width: 48,
@@ -921,14 +920,14 @@ function FeederPanel() {
             </Box>
 
             <Box>
-              <Typography fontWeight={950} fontSize={15}>Email feeder</Typography>
+              <Typography sx={{ fontWeight: 950, fontSize: 15 }} >Email feeder</Typography>
               <Typography variant="body2" color="text.secondary">
                 Automatically ingest suspicious emails and create cases.
               </Typography>
             </Box>
           </Stack>
 
-          <Stack direction="row" spacing={1.5} alignItems="center">
+          <Stack direction="row" spacing={1.5} sx={{ alignItems: "center" }} >
             <Chip
               size="small"
               label={pending ? "…" : enabled ? "Running" : "Stopped"}
@@ -1034,7 +1033,7 @@ function ScoringPanel() {
             background: alpha(theme.palette.warning.main, isDark ? 0.06 : 0.04),
           }}
         >
-          <Typography variant="body2" fontWeight={700} sx={{ flex: 1 }}>
+          <Typography variant="body2" sx={{ flex: 1, fontWeight: 700 }}>
             {dirtyIds.length} unsaved change{dirtyIds.length !== 1 ? "s" : ""}
           </Typography>
           <Button
@@ -1088,10 +1087,10 @@ function ScoringPanel() {
               }}
             >
               <Stack spacing={1.75}>
-                <Stack direction="row" alignItems="flex-start" justifyContent="space-between" spacing={1}>
+                <Stack direction="row" spacing={1} sx={{ alignItems: "flex-start", justifyContent: "space-between" }} >
                   <Box sx={{ minWidth: 0 }}>
-                    <Stack direction="row" spacing={0.75} alignItems="center">
-                      <Typography fontWeight={950} fontSize={14} sx={{ overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
+                    <Stack direction="row" spacing={0.75} sx={{ alignItems: "center" }} >
+                      <Typography sx={{ overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap", fontWeight: 950, fontSize: 14 }}>
                         {a.name}
                       </Typography>
                       {!a.is_active ? (
@@ -1161,7 +1160,7 @@ function ScoringPanel() {
                     }}
                   />
 
-                  <Stack direction="row" justifyContent="space-between">
+                  <Stack direction="row" sx={{ justifyContent: "space-between" }} >
                     {[0, 0.1, 0.2, 0.3, 0.4, 0.5, 0.6, 0.7, 0.8, 0.9, 1].map((v) => (
                       <Typography key={v} variant="caption" color={draft === v ? "text.primary" : "text.disabled"}
                         sx={{ fontSize: 10, fontWeight: draft === v ? 900 : 400, cursor: "pointer", lineHeight: 1 }}
@@ -1173,7 +1172,7 @@ function ScoringPanel() {
                   </Stack>
                 </Stack>
 
-                <Stack direction="row" justifyContent="flex-end" spacing={1}>
+                <Stack direction="row" spacing={1} sx={{ justifyContent: "flex-end" }} >
                   {isDirty ? (
                     <Button
                       size="small"
@@ -1237,17 +1236,19 @@ function CisoUsersPanel() {
 
   return (
     <Stack spacing={2}>
-      <Stack direction="row" spacing={1} alignItems="center">
+      <Stack direction="row" spacing={1} sx={{ alignItems: "center" }} >
         <TextField
           size="small"
           placeholder="Search by username, email, scope, region…"
           value={filter}
           onChange={(e) => setFilter(e.target.value)}
           fullWidth
-          InputProps={{
-            startAdornment: (
-              <InputAdornment position="start"><SearchOutlined fontSize="small" /></InputAdornment>
-            ),
+          slotProps={{
+            input: {
+              startAdornment: (
+                <InputAdornment position="start"><SearchOutlined fontSize="small" /></InputAdornment>
+              ),
+            },
           }}
         />
         <Chip size="small" label={`${filtered.length} / ${items.length}`} variant="outlined" />
@@ -1264,8 +1265,8 @@ function CisoUsersPanel() {
           {filtered.map((user) => (
             <InnerCard key={user.id} hover sx={{ p: 2 }}>
               <Stack spacing={1.25}>
-                <Stack direction={{ xs: "column", sm: "row" }} justifyContent="space-between" spacing={1} alignItems={{ sm: "center" }}>
-                  <Stack direction="row" spacing={1.25} alignItems="center">
+                <Stack direction={{ xs: "column", sm: "row" }} spacing={1} sx={{ justifyContent: "space-between", alignItems: { sm: "center" } }} >
+                  <Stack direction="row" spacing={1.25} sx={{ alignItems: "center" }} >
                     <Box
                       sx={{
                         width: 40,
@@ -1277,12 +1278,12 @@ function CisoUsersPanel() {
                         border: `1px solid ${alpha(theme.palette.primary.main, 0.2)}`,
                       }}
                     >
-                      <Typography fontWeight={950} fontSize={15} color="primary">
+                      <Typography color="primary" sx={{ fontWeight: 950, fontSize: 15 }} >
                         {(user.username?.[0] ?? "?").toUpperCase()}
                       </Typography>
                     </Box>
                     <Box>
-                      <Typography fontWeight={950} fontSize={14}>{user.username}</Typography>
+                      <Typography sx={{ fontWeight: 950, fontSize: 14 }} >{user.username}</Typography>
                       <Typography variant="caption" color="text.secondary">{user.email || "No email"}</Typography>
                     </Box>
                   </Stack>
@@ -1319,7 +1320,7 @@ function CisoUsersPanel() {
                       <Typography variant="caption" color="text.disabled" sx={{ fontWeight: 700, fontSize: 10, textTransform: "uppercase", letterSpacing: 0.5 }}>
                         {label}
                       </Typography>
-                      <Typography variant="body2" fontWeight={700} sx={{ fontSize: 13 }}>
+                      <Typography variant="body2" sx={{ fontSize: 13, fontWeight: 700 }}>
                         {value || "—"}
                       </Typography>
                     </Box>
@@ -1373,7 +1374,7 @@ const SECTIONS: SectionMeta[] = [
     key: "domains_allow",
     title: "Domains allowlist",
     subtitle: "Manage local allowlist and Watcher legit domains.",
-    icon: <CheckCircleOutline />,
+    icon: <CheckCircleOutlined />,
     kind: "domain_pair",
   },
   {
@@ -1415,7 +1416,7 @@ const SECTIONS: SectionMeta[] = [
     key: "email_feeder",
     title: "Email feeder",
     subtitle: "Enable or disable the feeder service.",
-    icon: <MailOutline />,
+    icon: <MailOutlined />,
     kind: "toggle",
   },
   {
@@ -1467,12 +1468,11 @@ export default function SettingsPage() {
       {/* ---------------------------------------------------------------- */}
       <Stack
         direction={{ xs: "column", md: "row" }}
-        justifyContent="space-between"
         spacing={1.5}
-        sx={{ mb: 2.5 }}
+        sx={{ mb: 2.5, justifyContent: "space-between" }}
       >
         <Stack spacing={0.3}>
-          <Typography variant="h4" fontWeight={950} letterSpacing={-0.5}>
+          <Typography variant="h4" sx={{ fontWeight: 950, letterSpacing: -0.5 }} >
             Settings
           </Typography>
           <Typography color="text.secondary">
@@ -1495,7 +1495,7 @@ export default function SettingsPage() {
         </Tooltip>
       </Stack>
 
-      <Grid container spacing={2} alignItems="flex-start">
+      <Grid container spacing={2} sx={{ alignItems: "flex-start" }} >
         {/* ---------------------------------------------------------------- */}
         {/* Sidebar nav                                                       */}
         {/* ---------------------------------------------------------------- */}
@@ -1503,7 +1503,7 @@ export default function SettingsPage() {
           <SoftCard sx={{ overflow: "hidden", position: { md: "sticky" }, top: { md: 16 } }}>
             <CardContent sx={{ p: 1.5 }}>
               {/* Console identity */}
-              <Stack direction="row" spacing={1.25} alignItems="center" sx={{ px: 1, py: 1, mb: 0.5 }}>
+              <Stack direction="row" spacing={1.25} sx={{ px: 1, py: 1, mb: 0.5, alignItems: "center" }}>
                 <Box
                   sx={{
                     width: 42,
@@ -1519,7 +1519,7 @@ export default function SettingsPage() {
                   <SettingsOutlined />
                 </Box>
                 <Box sx={{ minWidth: 0 }}>
-                  <Typography fontWeight={950} fontSize={14}>Admin console</Typography>
+                  <Typography sx={{ fontWeight: 950, fontSize: 14 }} >Admin console</Typography>
                   <Typography variant="caption" color="text.secondary" noWrap>{me.username}</Typography>
                 </Box>
               </Stack>
@@ -1555,13 +1555,17 @@ export default function SettingsPage() {
                         primary={s.title}
                         secondary={s.subtitle}
                         sx={{ ml: 1.25 }}
-                        primaryTypographyProps={{
-                          fontWeight: isActive ? 950 : 800,
-                          fontSize: 13.5,
-                          color: isActive ? "primary.main" : undefined,
-                        }}
-                        secondaryTypographyProps={{
-                          sx: { display: { xs: "none", md: "block" }, fontSize: 11, mt: 0.15 },
+                        slotProps={{
+                          primary: {
+                            sx: {
+                              fontWeight: isActive ? 950 : 800,
+                              fontSize: 13.5,
+                              color: isActive ? "primary.main" : undefined,
+                            },
+                          },
+                          secondary: {
+                            sx: { display: { xs: "none", md: "block" }, fontSize: 11, mt: 0.15 },
+                          },
                         }}
                       />
                     </ListItemButton>
@@ -1582,11 +1586,9 @@ export default function SettingsPage() {
               <Stack
                 direction={{ xs: "column", sm: "row" }}
                 spacing={1.25}
-                justifyContent="space-between"
-                alignItems={{ sm: "center" }}
-                sx={{ mb: 2.5 }}
+                sx={{ mb: 2.5, justifyContent: "space-between", alignItems: { sm: "center" } }}
               >
-                <Stack direction="row" spacing={1.5} alignItems="center">
+                <Stack direction="row" spacing={1.5} sx={{ alignItems: "center" }} >
                   <Box
                     sx={{
                       width: 46,
@@ -1603,7 +1605,7 @@ export default function SettingsPage() {
                     {activeMeta.icon}
                   </Box>
                   <Box>
-                    <Typography variant="h6" fontWeight={950} letterSpacing={-0.2}>
+                    <Typography variant="h6" sx={{ fontWeight: 950, letterSpacing: -0.2 }} >
                       {activeMeta.title}
                     </Typography>
                     <Typography variant="body2" color="text.secondary">

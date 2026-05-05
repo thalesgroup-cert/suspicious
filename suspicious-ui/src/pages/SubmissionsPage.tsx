@@ -443,11 +443,10 @@ function AnalyzerReportCard({
         <Stack
           direction={{ xs: "column", sm: "row" }}
           spacing={1.25}
-          justifyContent="space-between"
-          alignItems={{ xs: "flex-start", sm: "center" }}
-        >
+          sx={{ justifyContent: "space-between", alignItems: { xs: "flex-start", sm: "center" } }}
+>
           <Box>
-            <Typography variant="subtitle1" fontWeight={900}>
+            <Typography variant="subtitle1" sx={{ fontWeight: 900 }} >
               {report.analyzer_name || "Unknown analyzer"}
             </Typography>
             <Typography variant="body2" color="text.secondary">
@@ -455,7 +454,7 @@ function AnalyzerReportCard({
             </Typography>
           </Box>
 
-          <Stack direction="row" spacing={1} alignItems="center" sx={{ flexWrap: "wrap" }}>
+          <Stack direction="row" spacing={1} sx={{ flexWrap: "wrap", alignItems: "center" }}>
             <Chip
               size="small"
               label={risk.label}
@@ -497,7 +496,7 @@ function AnalyzerReportCard({
                 background: detailBg,
               }}
             >
-              <Typography variant="body2" fontWeight={800} sx={{ mb: 0.75 }}>
+              <Typography variant="body2" sx={{ mb: 0.75, fontWeight: 800 }}>
                 What this means
               </Typography>
               <Typography variant="body2" sx={{ lineHeight: 1.6 }}>
@@ -507,9 +506,9 @@ function AnalyzerReportCard({
 
             <Stack spacing={1.25}>
               <Box>
-                <Stack direction="row" justifyContent="space-between" sx={{ mb: 0.5 }}>
-                  <Typography variant="body2" fontWeight={700}>Risk score</Typography>
-                  <Typography variant="body2" fontWeight={900}>
+                <Stack direction="row" sx={{ mb: 0.5, justifyContent: "space-between" }}>
+                  <Typography variant="body2" sx={{ fontWeight: 700 }} >Risk score</Typography>
+                  <Typography variant="body2" sx={{ fontWeight: 900 }} >
                     {typeof report.score === "number"
                       ? report.score.toFixed(report.score <= 10 ? 1 : 0)
                       : "—"}
@@ -526,9 +525,9 @@ function AnalyzerReportCard({
               </Box>
 
               <Box>
-                <Stack direction="row" justifyContent="space-between" sx={{ mb: 0.5 }}>
-                  <Typography variant="body2" fontWeight={700}>Confidence</Typography>
-                  <Typography variant="body2" fontWeight={900}>
+                <Stack direction="row" sx={{ mb: 0.5, justifyContent: "space-between" }}>
+                  <Typography variant="body2" sx={{ fontWeight: 700 }} >Confidence</Typography>
+                  <Typography variant="body2" sx={{ fontWeight: 900 }} >
                     {Math.round(confidencePct)}%
                   </Typography>
                 </Stack>
@@ -586,7 +585,7 @@ function AnalyzerReportCard({
               }}
             >
               <AccordionSummary expandIcon={<ExpandMoreOutlined />} onClick={(e) => e.stopPropagation()}>
-                <Typography variant="body2" fontWeight={800}>Technical details</Typography>
+                <Typography variant="body2" sx={{ fontWeight: 800 }} >Technical details</Typography>
               </AccordionSummary>
               <AccordionDetails onClick={(e) => e.stopPropagation()}>
                 <Stack spacing={1.5}>
@@ -625,7 +624,7 @@ function AnalyzerReportCard({
                       }}
                     >
                       <AccordionSummary expandIcon={<ExpandMoreOutlined />} onClick={(e) => e.stopPropagation()}>
-                        <Typography variant="body2" fontWeight={800}>Taxonomy JSON</Typography>
+                        <Typography variant="body2" sx={{ fontWeight: 800 }} >Taxonomy JSON</Typography>
                       </AccordionSummary>
                       <AccordionDetails onClick={(e) => e.stopPropagation()}>
                         <Box
@@ -659,7 +658,7 @@ function AnalyzerReportCard({
                       }}
                     >
                       <AccordionSummary expandIcon={<ExpandMoreOutlined />} onClick={(e) => e.stopPropagation()}>
-                        <Typography variant="body2" fontWeight={800}>Summary JSON</Typography>
+                        <Typography variant="body2" sx={{ fontWeight: 800 }} >Summary JSON</Typography>
                       </AccordionSummary>
                       <AccordionDetails onClick={(e) => e.stopPropagation()}>
                         <Box
@@ -952,16 +951,15 @@ export default function SubmissionsPage() {
       <Stack
         direction={{ xs: "column", md: "row" }}
         spacing={2}
-        justifyContent="space-between"
-        sx={{ mb: 2 }}
+        sx={{ mb: 2, justifyContent: "space-between" }}
       >
         <Stack spacing={0.4}>
-          <Stack direction="row" spacing={1.25} alignItems="center">
+          <Stack direction="row" spacing={1.25} sx={{ alignItems: "center" }} >
             <Avatar sx={{ width: 46, height: 46, fontWeight: 950 }}>
               {(me.username?.[0] ?? "U").toUpperCase()}
             </Avatar>
             <Box>
-              <Typography variant="h4" fontWeight={950} letterSpacing={-0.5}>
+              <Typography variant="h4" sx={{ fontWeight: 950, letterSpacing: -0.5 }} >
                 Submissions
               </Typography>
               <Typography color="text.secondary">
@@ -984,7 +982,7 @@ export default function SubmissionsPage() {
           </Stack>
         </Stack>
 
-        <Stack direction="row" spacing={1} alignItems="center">
+        <Stack direction="row" spacing={1} sx={{ alignItems: "center" }} >
           <Button
             variant="contained"
             onClick={() => navigate("/submit")}
@@ -1009,19 +1007,21 @@ export default function SubmissionsPage() {
       <SoftCard sx={{ mb: 2 }}>
         <CardContent sx={{ p: { xs: 2.25, md: 3 } }}>
           <Stack spacing={1.5}>
-            <Stack direction={{ xs: "column", md: "row" }} spacing={1.25} alignItems="stretch">
+            <Stack direction={{ xs: "column", md: "row" }} spacing={1.25} sx={{ alignItems: "stretch" }} >
               <TextField
                 value={q}
                 onChange={(e) => setQ(e.target.value)}
                 label="Search"
                 placeholder="id, status, artifact, type, result"
                 fullWidth
-                InputProps={{
-                  startAdornment: (
-                    <InputAdornment position="start">
-                      <SearchOutlined fontSize="small" />
-                    </InputAdornment>
-                  ),
+                slotProps={{
+                  input: {
+                    startAdornment: (
+                      <InputAdornment position="start">
+                        <SearchOutlined fontSize="small" />
+                      </InputAdornment>
+                    ),
+                  },
                 }}
               />
 
@@ -1068,13 +1068,13 @@ export default function SubmissionsPage() {
               </FormControl>
             </Stack>
 
-            <Stack direction={{ xs: "column", md: "row" }} spacing={1.25} alignItems="stretch">
+            <Stack direction={{ xs: "column", md: "row" }} spacing={1.25} sx={{ alignItems: "stretch" }} >
               <TextField
                 label="From"
                 type="date"
                 value={from}
                 onChange={(e) => setFrom(e.target.value)}
-                InputLabelProps={{ shrink: true }}
+                slotProps={{ inputLabel: { shrink: true } }}
                 fullWidth
               />
               <TextField
@@ -1082,7 +1082,7 @@ export default function SubmissionsPage() {
                 type="date"
                 value={to}
                 onChange={(e) => setTo(e.target.value)}
-                InputLabelProps={{ shrink: true }}
+                slotProps={{ inputLabel: { shrink: true } }}
                 fullWidth
               />
 
@@ -1130,14 +1130,13 @@ export default function SubmissionsPage() {
             <Stack
               direction={{ xs: "column", md: "row" }}
               spacing={1}
-              justifyContent="space-between"
-              alignItems={{ md: "center" }}
-            >
+              sx={{ justifyContent: "space-between", alignItems: { md: "center" } }}
+>
               <Typography variant="body2" color="text.secondary">
                 {total === 0 ? "No results" : `Showing ${start + 1}-${end} of ${total}`}
               </Typography>
 
-              <Stack direction="row" spacing={1} alignItems="center">
+              <Stack direction="row" spacing={1} sx={{ alignItems: "center" }} >
                 <FormControl sx={{ width: 140 }}>
                   <InputLabel id="pagesize-label">Rows</InputLabel>
                   <Select
@@ -1254,7 +1253,7 @@ export default function SubmissionsPage() {
                       >
                         {/* ID */}
                         <TableCell>
-                          <Stack direction="row" spacing={0.5} alignItems="center">
+                          <Stack direction="row" spacing={0.5} sx={{ alignItems: "center" }} >
                             <Button
                               size="small"
                               variant="contained"
@@ -1345,19 +1344,21 @@ export default function SubmissionsPage() {
         anchor="right"
         open={openDrawer}
         onClose={() => setOpenDrawer(false)}
-        PaperProps={{
-          sx: (theme) => ({
-            width: { xs: "100%", sm: 620 },
-            p: 0,
-            borderLeft: `1px solid ${theme.palette.divider}`,
-            background: `linear-gradient(
-              180deg,
-              ${theme.palette.background.paper} 0%,
-              ${alpha(theme.palette.background.default, 0.98)} 100%
-            )`,
-            color: theme.palette.text.primary,
-            overflow: "hidden",
-          }),
+        slotProps={{
+          paper: {
+            sx: (theme) => ({
+              width: { xs: "100%", sm: 620 },
+              p: 0,
+              borderLeft: `1px solid ${theme.palette.divider}`,
+              background: `linear-gradient(
+                180deg,
+                ${theme.palette.background.paper} 0%,
+                ${alpha(theme.palette.background.default, 0.98)} 100%
+              )`,
+              color: theme.palette.text.primary,
+              overflow: "hidden",
+            }),
+          },
         }}
       >
         {!selectedRow ? (
@@ -1375,11 +1376,11 @@ export default function SubmissionsPage() {
                 background: `linear-gradient(180deg, ${alpha(theme.palette.action.hover, 0.22)} 0%, ${alpha(theme.palette.background.paper, 0)} 100%)`,
               })}
             >
-              <Stack direction="row" alignItems="flex-start" justifyContent="space-between" spacing={2}>
+              <Stack direction="row" spacing={2} sx={{ alignItems: "flex-start", justifyContent: "space-between" }} >
                 <Box>
                   <Typography variant="overline" color="text.secondary">Submission</Typography>
-                  <Stack direction="row" spacing={1} alignItems="center" sx={{ mt: 0.25 }}>
-                    <Typography variant="h5" fontWeight={950} lineHeight={1.1}>
+                  <Stack direction="row" spacing={1} sx={{ mt: 0.25, alignItems: "center" }}>
+                    <Typography variant="h5" sx={{ fontWeight: 950, lineHeight: 1.1 }} >
                       #{selectedRow.id}
                     </Typography>
                     <CopyIconButton text={String(selectedRow.id)} title="Copy ID" />
@@ -1442,7 +1443,7 @@ export default function SubmissionsPage() {
 
                 {/* ── Analysis results — grouped by artifact ────────────────────── */}
                 <Box sx={{ px: 2.25, pt: 2, pb: 1 }}>
-                  <Stack direction="row" alignItems="center" justifyContent="space-between" sx={{ mb: 1.25 }}>
+                  <Stack direction="row" sx={{ mb: 1.25, alignItems: "center", justifyContent: "space-between" }}>
                     <Typography sx={{ fontSize: 10, fontWeight: 700, textTransform: "uppercase", letterSpacing: "0.08em", color: "text.disabled" }}>
                       Analysis · {analyzerReports.length} report{analyzerReports.length !== 1 ? "s" : ""}
                     </Typography>
@@ -1462,7 +1463,7 @@ export default function SubmissionsPage() {
                   </Stack>
 
                   {detailsQuery.isLoading ? (
-                    <Stack direction="row" spacing={1} alignItems="center" sx={{ py: 2 }}>
+                    <Stack direction="row" spacing={1} sx={{ py: 2, alignItems: "center" }}>
                       <CircularProgress size={16} />
                       <Typography variant="caption" color="text.secondary">Loading analysis…</Typography>
                     </Stack>
@@ -1507,8 +1508,8 @@ export default function SubmissionsPage() {
                               }}>
                                 {kindLabel(group.kind)}
                               </Box>
-                              <Typography variant="body2" fontWeight={700}
-                                sx={{ flex: 1, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap", fontSize: 12.5 }}
+                              <Typography variant="body2"
+                                sx={{ flex: 1, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap", fontSize: 12.5, fontWeight: 700 }}
                                 title={group.value}>
                                 {group.value}
                               </Typography>
@@ -1557,7 +1558,7 @@ export default function SubmissionsPage() {
         onClose={() => setChallengeId(null)}
         maxWidth="xs"
         fullWidth
-        PaperProps={{ sx: { borderRadius: DIALOG_RADIUS } }}
+        slotProps={{ paper: { sx: { borderRadius: DIALOG_RADIUS } } }}
       >
         <DialogTitle>Challenge submission</DialogTitle>
         <DialogContent>

@@ -20,5 +20,4 @@ urlpatterns = [
     path("accounts/", include("django.contrib.auth.urls"), name="login"),
     path('admin/', admin.site.urls),
     path('api/', include('api.urls')),
-    path('', include('django_prometheus.urls')),
 ]

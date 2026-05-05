@@ -153,7 +153,7 @@ function SidePanel() {
 
       {/* ── Top: brand identity ──────────────────────────────────────── */}
       <Stack spacing={2}>
-        <Stack direction="row" spacing={1.5} alignItems="center">
+        <Stack direction="row" spacing={1.5} sx={{ alignItems: "center" }} >
           <Box
             component="img"
             src="/icons/suspicious-logo.png"
@@ -193,7 +193,7 @@ function SidePanel() {
       {/* ── Middle: feature bullets ───────────────────────────────────── */}
       <Stack spacing={1.25}>
         {features.map((f) => (
-          <Stack key={f.text} direction="row" spacing={1.25} alignItems="center">
+          <Stack key={f.text} direction="row" spacing={1.25} sx={{ alignItems: "center" }} >
             <Box
               sx={{
                 width: 28,
@@ -320,7 +320,7 @@ function LoginCard({
     >
       <Stack spacing={2.75}>
         {/* Header */}
-        <Stack spacing={1.5} alignItems="center" sx={{ textAlign: "center" }}>
+        <Stack spacing={1.5} sx={{ textAlign: "center", alignItems: "center" }}>
           {/* Logo badge */}
           <Box
             component="img"
@@ -338,7 +338,7 @@ function LoginCard({
           />
 
           <Box>
-            <Typography variant="h5" fontWeight={950} letterSpacing={-0.5} sx={{ lineHeight: 1.15 }}>
+            <Typography variant="h5" sx={{ lineHeight: 1.15, fontWeight: 950, letterSpacing: -0.5 }}>
               Sign in
             </Typography>
             <Typography variant="body2" color="text.secondary" sx={{ mt: 0.4, fontSize: 13.5 }}>
@@ -450,22 +450,24 @@ function LoginCard({
                     fontSize: 14,
                   },
                 }}
-                InputProps={{
-                  endAdornment: (
-                    <InputAdornment position="end">
-                      <IconButton
-                        aria-label={showPassword ? "Hide password" : "Show password"}
-                        onClick={() => setShowPassword(!showPassword)}
-                        edge="end"
-                        size="small"
-                        sx={{ mr: 0.25 }}
-                      >
-                        {showPassword
-                          ? <VisibilityOff sx={{ fontSize: 18 }} />
-                          : <Visibility sx={{ fontSize: 18 }} />}
-                      </IconButton>
-                    </InputAdornment>
-                  ),
+                slotProps={{
+                  input: {
+                    endAdornment: (
+                      <InputAdornment position="end">
+                        <IconButton
+                          aria-label={showPassword ? "Hide password" : "Show password"}
+                          onClick={() => setShowPassword(!showPassword)}
+                          edge="end"
+                          size="small"
+                          sx={{ mr: 0.25 }}
+                        >
+                          {showPassword
+                            ? <VisibilityOff sx={{ fontSize: 18 }} />
+                            : <Visibility sx={{ fontSize: 18 }} />}
+                        </IconButton>
+                      </InputAdornment>
+                    ),
+                  },
                 }}
               />
             </Box>
@@ -515,7 +517,7 @@ function LoginCard({
             </Button>
 
             {/* Divider */}
-            <Stack direction="row" alignItems="center" spacing={1.5}>
+            <Stack direction="row" spacing={1.5} sx={{ alignItems: "center" }} >
               <Box sx={{ flex: 1, height: 1, bgcolor: alpha(theme.palette.divider, isDark ? 0.3 : 0.6) }} />
               <Typography variant="caption" color="text.disabled" sx={{ fontWeight: 600, fontSize: 11 }}>
                 OR

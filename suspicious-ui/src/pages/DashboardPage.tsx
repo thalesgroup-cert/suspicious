@@ -524,9 +524,7 @@ export default function DashboardPage() {
           {/* Section header */}
           <Stack
             direction="row"
-            alignItems="center"
-            justifyContent="space-between"
-            sx={{ mb: 1 }}
+            sx={{ mb: 1, alignItems: "center", justifyContent: "space-between" }}
           >
             <Box>
               <Box sx={{ fontWeight: 900, fontSize: 14 }}>Overview</Box>

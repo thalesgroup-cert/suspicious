@@ -352,7 +352,7 @@ function ThemeCard({
           }`,
         }}
       >
-        <Stack direction="row" spacing={0.6} alignItems="center" sx={{ mb: 0.35 }}>
+        <Stack component="div" direction="row" spacing={0.6} sx={{ mb: 0.35, alignItems: "center" }}>
           {meta?.emoji ? (
             <Typography sx={{ fontSize: 11, lineHeight: 1 }}>{meta.emoji}</Typography>
           ) : null}
@@ -407,7 +407,7 @@ function ThemeCard({
         </Typography>
 
         {/* Mini palette strip — real colors from the theme */}
-        <Stack direction="row" spacing={0.4} sx={{ mt: 1 }}>
+        <Stack component="div" direction="row" spacing={0.4} sx={{ mt: 1 }}>
           {[
             t.palette.primary.main,
             (t.palette as any).secondary?.main,
@@ -446,8 +446,8 @@ function GroupHeader({ title, description }: { title: string; description: strin
   const isDark = theme.palette.mode === "dark";
 
   return (
-    <Stack spacing={0.25} sx={{ mt: 0.75 }}>
-      <Stack direction="row" alignItems="center" spacing={1.25}>
+    <Stack component="div" spacing={0.25} sx={{ mt: 0.75 }}>
+      <Stack component="div" direction="row" spacing={1.25} sx={{ alignItems: "center" }}>
         <Typography
           sx={{
             fontWeight: 950,
@@ -496,13 +496,13 @@ export function ThemePicker({ value, onChange }: Props) {
   }, []);
 
   return (
-    <Stack spacing={2}>
+    <Stack component="div" spacing={2}>
       {GROUP_ORDER.map((group) => {
         const names = grouped[group];
         if (!names?.length) return null;
 
         return (
-          <Stack key={group} spacing={1.25}>
+          <Stack component="div" key={group} spacing={1.25}>
             <GroupHeader title={group} description={GROUP_DESCRIPTIONS[group]} />
 
             <Box

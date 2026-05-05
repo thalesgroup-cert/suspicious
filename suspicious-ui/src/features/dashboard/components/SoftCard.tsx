@@ -96,11 +96,9 @@ export function SoftCard({
         {/* Card header */}
         <Stack
           direction="row"
-          alignItems="center"
-          justifyContent="space-between"
-          sx={{ mb: 1, flexShrink: 0 }}
+          sx={{ mb: 1, flexShrink: 0, alignItems: "center", justifyContent: "space-between" }}
         >
-          <Stack direction="row" spacing={0.9} alignItems="center">
+          <Stack direction="row" spacing={0.9} sx={{ alignItems: "center" }} >
             {icon ? (
               <Box
                 sx={{
@@ -119,7 +117,7 @@ export function SoftCard({
               </Box>
             ) : null}
 
-            <Typography fontWeight={900} fontSize={15}>
+            <Typography sx={{ fontWeight: 900, fontSize: 15 }} >
               {title}
             </Typography>
             {showExcl && (

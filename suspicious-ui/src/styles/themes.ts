@@ -411,16 +411,6 @@ export const themes: Record<ThemeName, ReturnType<typeof createTheme>> = {
       },
       MuiButton: {
         styleOverrides: {
-          containedPrimary: {
-            backgroundImage: `linear-gradient(180deg, ${alpha("#5A9BFF", 1)}, ${alpha("#3A7AE8", 0.94)})`,
-            boxShadow: `0 4px 20px ${alpha("#4D8FFF", 0.38)}, inset 0 1px 0 ${alpha("#8FC4FF", 0.22)}`,
-            "&:hover": {
-              backgroundImage: `linear-gradient(180deg, #6AABFF, #4A8AF8)`,
-              boxShadow: `0 6px 28px ${alpha("#4D8FFF", 0.55)}`,
-              transform: "translateY(-1px)",
-            },
-            "&:active": { transform: "translateY(0)" },
-          },
           outlined: {
             border: `1px solid ${alpha("#4D8FFF", 0.38)}`,
             backgroundColor: alpha("#4D8FFF", 0.06),
@@ -433,9 +423,30 @@ export const themes: Record<ThemeName, ReturnType<typeof createTheme>> = {
           },
           text: {
             color: alpha("#7BB3FF", 0.88),
-            "&:hover": { backgroundColor: alpha("#4D8FFF", 0.08), color: "#7BB3FF" },
+            "&:hover": {
+              backgroundColor: alpha("#4D8FFF", 0.08),
+              color: "#7BB3FF",
+            },
           },
         },
+
+        variants: [
+          {
+            props: { variant: "contained", color: "primary" },
+            style: {
+              backgroundImage: `linear-gradient(180deg, ${alpha("#5A9BFF", 1)}, ${alpha("#3A7AE8", 0.94)})`,
+              boxShadow: `0 4px 20px ${alpha("#4D8FFF", 0.38)}, inset 0 1px 0 ${alpha("#8FC4FF", 0.22)}`,
+              "&:hover": {
+                backgroundImage: `linear-gradient(180deg, #6AABFF, #4A8AF8)`,
+                boxShadow: `0 6px 28px ${alpha("#4D8FFF", 0.55)}`,
+                transform: "translateY(-1px)",
+              },
+              "&:active": {
+                transform: "translateY(0)",
+              },
+            },
+          },
+        ],
       },
       MuiOutlinedInput: {
         styleOverrides: {
@@ -587,16 +598,6 @@ export const themes: Record<ThemeName, ReturnType<typeof createTheme>> = {
       },
       MuiButton: {
         styleOverrides: {
-          containedPrimary: {
-            backgroundColor: "#4FB3FF",
-            backgroundImage: "none",
-            color: "#06090E",
-            boxShadow: "none",
-            "&:hover": {
-              backgroundColor: "#65BBFF",
-              boxShadow: `0 2px 10px ${alpha("#4FB3FF", 0.28)}`,
-            },
-          },
           outlined: {
             border: `1px solid ${alpha("#4FB3FF", 0.34)}`,
             color: alpha("#4FB3FF", 0.88),
@@ -607,9 +608,28 @@ export const themes: Record<ThemeName, ReturnType<typeof createTheme>> = {
           },
           text: {
             color: alpha("#7A9EB8", 0.9),
-            "&:hover": { backgroundColor: alpha("#4FB3FF", 0.07), color: "#4FB3FF" },
+            "&:hover": {
+              backgroundColor: alpha("#4FB3FF", 0.07),
+              color: "#4FB3FF",
+            },
           },
         },
+
+        variants: [
+          {
+            props: { variant: "contained", color: "primary" },
+            style: {
+              backgroundColor: "#4FB3FF",
+              backgroundImage: "none",
+              color: "#06090E",
+              boxShadow: "none",
+              "&:hover": {
+                backgroundColor: "#65BBFF",
+                boxShadow: `0 2px 10px ${alpha("#4FB3FF", 0.28)}`,
+              },
+            },
+          },
+        ],
       },
       MuiOutlinedInput: {
         styleOverrides: {
@@ -769,18 +789,6 @@ export const themes: Record<ThemeName, ReturnType<typeof createTheme>> = {
       },
       MuiButton: {
         styleOverrides: {
-          containedPrimary: {
-            backgroundColor: "#5D9EFF",
-            backgroundImage: "none",
-            color: "#04090F",
-            fontFamily: monoStack,
-            letterSpacing: "0.05em",
-            boxShadow: `0 0 0 1px ${alpha("#5D9EFF", 0.4)}`,
-            "&:hover": {
-              backgroundColor: "#6EAAFF",
-              boxShadow: `0 4px 16px ${alpha("#5D9EFF", 0.35)}, 0 0 0 1px ${alpha("#5D9EFF", 0.5)}`,
-            },
-          },
           outlined: {
             border: `1px solid ${alpha("#5D9EFF", 0.4)}`,
             color: "#6EC2F5",
@@ -795,9 +803,29 @@ export const themes: Record<ThemeName, ReturnType<typeof createTheme>> = {
             color: alpha("#6EC2F5", 0.88),
             fontFamily: monoStack,
             letterSpacing: "0.04em",
-            "&:hover": { backgroundColor: alpha("#5D9EFF", 0.08) },
+            "&:hover": {
+              backgroundColor: alpha("#5D9EFF", 0.08),
+            },
           },
         },
+
+        variants: [
+          {
+            props: { variant: "contained", color: "primary" },
+            style: {
+              backgroundColor: "#5D9EFF",
+              backgroundImage: "none",
+              color: "#04090F",
+              fontFamily: monoStack,
+              letterSpacing: "0.05em",
+              boxShadow: `0 0 0 1px ${alpha("#5D9EFF", 0.4)}`,
+              "&:hover": {
+                backgroundColor: "#6EAAFF",
+                boxShadow: `0 4px 16px ${alpha("#5D9EFF", 0.35)}, 0 0 0 1px ${alpha("#5D9EFF", 0.5)}`,
+              },
+            },
+          },
+        ],
       },
       MuiOutlinedInput: {
         styleOverrides: {
@@ -966,16 +994,6 @@ export const themes: Record<ThemeName, ReturnType<typeof createTheme>> = {
       },
       MuiButton: {
         styleOverrides: {
-          containedPrimary: {
-            backgroundImage: `linear-gradient(180deg, #2868FF, #1450E8)`,
-            boxShadow: `0 2px 8px ${alpha("#1B5FFF", 0.32)}, inset 0 1px 0 rgba(255,255,255,.15)`,
-            "&:hover": {
-              backgroundImage: `linear-gradient(180deg, #3A78FF, #1B5FFF)`,
-              boxShadow: `0 4px 14px ${alpha("#1B5FFF", 0.42)}`,
-              transform: "translateY(-1px)",
-            },
-            "&:active": { transform: "translateY(0)", boxShadow: `0 1px 4px ${alpha("#1B5FFF", 0.3)}` },
-          },
           outlined: {
             border: `1px solid ${alpha("#1B5FFF", 0.35)}`,
             color: "#1B5FFF",
@@ -988,9 +1006,30 @@ export const themes: Record<ThemeName, ReturnType<typeof createTheme>> = {
           },
           text: {
             color: "#1B5FFF",
-            "&:hover": { backgroundColor: alpha("#1B5FFF", 0.07) },
+            "&:hover": {
+              backgroundColor: alpha("#1B5FFF", 0.07),
+            },
           },
         },
+
+        variants: [
+          {
+            props: { variant: "contained", color: "primary" },
+            style: {
+              backgroundImage: `linear-gradient(180deg, #2868FF, #1450E8)`,
+              boxShadow: `0 2px 8px ${alpha("#1B5FFF", 0.32)}, inset 0 1px 0 rgba(255,255,255,.15)`,
+              "&:hover": {
+                backgroundImage: `linear-gradient(180deg, #3A78FF, #1B5FFF)`,
+                boxShadow: `0 4px 14px ${alpha("#1B5FFF", 0.42)}`,
+                transform: "translateY(-1px)",
+              },
+              "&:active": {
+                transform: "translateY(0)",
+                boxShadow: `0 1px 4px ${alpha("#1B5FFF", 0.3)}`,
+              },
+            },
+          },
+        ],
       },
       MuiOutlinedInput: {
         styleOverrides: {
@@ -1182,23 +1221,6 @@ export const themes: Record<ThemeName, ReturnType<typeof createTheme>> = {
       },
       MuiButton: {
         styleOverrides: {
-          containedPrimary: {
-            backgroundImage: "none",
-            backgroundColor: "#0F4CFF",
-            fontFamily: serifStack,
-            fontWeight: 800,
-            // Letterpress stamp — inset highlight at top, ink shadow below
-            boxShadow: `inset 0 1px 0 rgba(255,255,255,.12), 0 2px 6px ${alpha("#0F4CFF", 0.32)}`,
-            "&:hover": {
-              backgroundColor: "#1A58FF",
-              boxShadow: `inset 0 1px 0 rgba(255,255,255,.12), 0 4px 12px ${alpha("#0F4CFF", 0.4)}`,
-            },
-            // Stamped-down effect on click
-            "&:active": {
-              transform: "translateY(1px)",
-              boxShadow: `inset 0 2px 4px rgba(0,0,0,.16)`,
-            },
-          },
           outlined: {
             border: "1px solid rgba(26,18,9,.24)",
             color: "#1A1209",
@@ -1215,6 +1237,27 @@ export const themes: Record<ThemeName, ReturnType<typeof createTheme>> = {
             "&:hover": { backgroundColor: alpha("#0F4CFF", 0.07) },
           },
         },
+
+        variants: [
+          {
+            props: { variant: "contained", color: "primary" },
+            style: {
+              backgroundImage: "none",
+              backgroundColor: "#0F4CFF",
+              fontFamily: serifStack,
+              fontWeight: 800,
+              boxShadow: `inset 0 1px 0 rgba(255,255,255,.12), 0 2px 6px ${alpha("#0F4CFF", 0.32)}`,
+              "&:hover": {
+                backgroundColor: "#1A58FF",
+                boxShadow: `inset 0 1px 0 rgba(255,255,255,.12), 0 4px 12px ${alpha("#0F4CFF", 0.4)}`,
+              },
+              "&:active": {
+                transform: "translateY(1px)",
+                boxShadow: `inset 0 2px 4px rgba(0,0,0,.16)`,
+              },
+            },
+          },
+        ],
       },
       MuiOutlinedInput: {
         styleOverrides: {
@@ -1417,30 +1460,45 @@ export const themes: Record<ThemeName, ReturnType<typeof createTheme>> = {
             border: "2px solid rgba(255,255,255,.85)",
             letterSpacing: "0.1em",
           },
-          containedPrimary: {
-            backgroundColor: "#FFD600",
-            color: "#000000",
-            border: "2px solid #FFD600",
-            boxShadow: "none",
-            "&:hover": {
-              backgroundColor: "#FFE033",
-              boxShadow: `0 0 0 2px #FFD600`,
-            },
-            "&:focus-visible": { outline: "3px solid #FFFFFF", outlineOffset: 2 },
-          },
           outlined: {
             border: "2px solid #FFD600",
             color: "#FFD600",
             backgroundColor: "transparent",
-            "&:hover": { backgroundColor: alpha("#FFD600", 0.1), border: "2px solid #FFE033" },
+            "&:hover": {
+              backgroundColor: alpha("#FFD600", 0.1),
+              border: "2px solid #FFE033",
+            },
           },
           text: {
             color: "#FFD600",
             textDecoration: "underline",
             textUnderlineOffset: 3,
-            "&:hover": { backgroundColor: alpha("#FFD600", 0.1), textDecoration: "underline" },
+            "&:hover": {
+              backgroundColor: alpha("#FFD600", 0.1),
+              textDecoration: "underline",
+            },
           },
         },
+
+        variants: [
+          {
+            props: { variant: "contained", color: "primary" },
+            style: {
+              backgroundColor: "#FFD600",
+              color: "#000000",
+              border: "2px solid #FFD600",
+              boxShadow: "none",
+              "&:hover": {
+                backgroundColor: "#FFE033",
+                boxShadow: `0 0 0 2px #FFD600`,
+              },
+              "&:focus-visible": {
+                outline: "3px solid #FFFFFF",
+                outlineOffset: 2,
+              },
+            },
+          },
+        ],
       },
       MuiIconButton: {
         styleOverrides: {
@@ -1569,11 +1627,38 @@ export const themes: Record<ThemeName, ReturnType<typeof createTheme>> = {
             borderWidth: 2,
             fontFamily: monoStack,
           },
-          outlinedError: { borderColor: "#FF3B30", color: "#FF3B30" },
-          outlinedWarning: { borderColor: "#FFD600", color: "#FFD600" },
-          outlinedSuccess: { borderColor: "#00FF88", color: "#00FF88" },
-          outlinedInfo: { borderColor: "#00E5FF", color: "#00E5FF" },
         },
+
+        variants: [
+          {
+            props: { variant: "outlined", severity: "error" },
+            style: {
+              borderColor: "#FF3B30",
+              color: "#FF3B30",
+            },
+          },
+          {
+            props: { variant: "outlined", severity: "warning" },
+            style: {
+              borderColor: "#FFD600",
+              color: "#FFD600",
+            },
+          },
+          {
+            props: { variant: "outlined", severity: "success" },
+            style: {
+              borderColor: "#00FF88",
+              color: "#00FF88",
+            },
+          },
+          {
+            props: { variant: "outlined", severity: "info" },
+            style: {
+              borderColor: "#00E5FF",
+              color: "#00E5FF",
+            },
+          },
+        ],
       },
     },
   }),
@@ -1663,18 +1748,15 @@ export const themes: Record<ThemeName, ReturnType<typeof createTheme>> = {
       },
       MuiButton: {
         styleOverrides: {
-          root: { borderRadius: 999, height: 36 },
-          sizeSmall: { borderRadius: 999 },
-          sizeLarge: { borderRadius: 999 },
-          containedPrimary: {
-            backgroundImage: `linear-gradient(135deg, #F03D2F 0%, #FF6035 45%, #FF8C00 100%)`,
-            boxShadow: `0 4px 20px ${alpha("#F03D2F", 0.4)}, inset 0 1px 0 rgba(255,255,255,.18)`,
-            "&:hover": {
-              backgroundImage: `linear-gradient(135deg, #F54D40 0%, #FF7040 45%, #FF9A10 100%)`,
-              boxShadow: `0 6px 28px ${alpha("#F03D2F", 0.52)}`,
-              transform: "translateY(-1px)",
-            },
-            "&:active": { transform: "translateY(0)" },
+          root: {
+            borderRadius: 999,
+            height: 36,
+          },
+          sizeSmall: {
+            borderRadius: 999,
+          },
+          sizeLarge: {
+            borderRadius: 999,
           },
           outlined: {
             borderRadius: 999,
@@ -1689,9 +1771,29 @@ export const themes: Record<ThemeName, ReturnType<typeof createTheme>> = {
           text: {
             borderRadius: 999,
             color: "#F03D2F",
-            "&:hover": { backgroundColor: alpha("#F03D2F", 0.08) },
+            "&:hover": {
+              backgroundColor: alpha("#F03D2F", 0.08),
+            },
           },
         },
+
+        variants: [
+          {
+            props: { variant: "contained", color: "primary" },
+            style: {
+              backgroundImage: `linear-gradient(135deg, #F03D2F 0%, #FF6035 45%, #FF8C00 100%)`,
+              boxShadow: `0 4px 20px ${alpha("#F03D2F", 0.4)}, inset 0 1px 0 rgba(255,255,255,.18)`,
+              "&:hover": {
+                backgroundImage: `linear-gradient(135deg, #F54D40 0%, #FF7040 45%, #FF9A10 100%)`,
+                boxShadow: `0 6px 28px ${alpha("#F03D2F", 0.52)}`,
+                transform: "translateY(-1px)",
+              },
+              "&:active": {
+                transform: "translateY(0)",
+              },
+            },
+          },
+        ],
       },
       MuiOutlinedInput: {
         styleOverrides: {
@@ -1879,17 +1981,9 @@ export const themes: Record<ThemeName, ReturnType<typeof createTheme>> = {
       },
       MuiButton: {
         styleOverrides: {
-          root: { borderRadius: 14, height: 36 },
-          containedPrimary: {
-            // Crimson to magenta — the rose unfolding
-            backgroundImage: `linear-gradient(135deg, #A81048 0%, #C2185B 45%, #E91E8C 100%)`,
-            boxShadow: `0 4px 20px ${alpha("#C2185B", 0.42)}, inset 0 1px 0 rgba(255,255,255,.15)`,
-            "&:hover": {
-              backgroundImage: `linear-gradient(135deg, #B81858 0%, #D2286B 45%, #F92E9C 100%)`,
-              boxShadow: `0 6px 28px ${alpha("#C2185B", 0.55)}`,
-              transform: "translateY(-1px)",
-            },
-            "&:active": { transform: "translateY(0)" },
+          root: {
+            borderRadius: 14,
+            height: 36,
           },
           outlined: {
             borderRadius: 14,
@@ -1904,9 +1998,29 @@ export const themes: Record<ThemeName, ReturnType<typeof createTheme>> = {
           text: {
             borderRadius: 14,
             color: "#C2185B",
-            "&:hover": { backgroundColor: alpha("#C2185B", 0.07) },
+            "&:hover": {
+              backgroundColor: alpha("#C2185B", 0.07),
+            },
           },
         },
+
+        variants: [
+          {
+            props: { variant: "contained", color: "primary" },
+            style: {
+              backgroundImage: `linear-gradient(135deg, #A81048 0%, #C2185B 45%, #E91E8C 100%)`,
+              boxShadow: `0 4px 20px ${alpha("#C2185B", 0.42)}, inset 0 1px 0 rgba(255,255,255,.15)`,
+              "&:hover": {
+                backgroundImage: `linear-gradient(135deg, #B81858 0%, #D2286B 45%, #F92E9C 100%)`,
+                boxShadow: `0 6px 28px ${alpha("#C2185B", 0.55)}`,
+                transform: "translateY(-1px)",
+              },
+              "&:active": {
+                transform: "translateY(0)",
+              },
+            },
+          },
+        ],
       },
       MuiOutlinedInput: {
         styleOverrides: {
@@ -2165,17 +2279,7 @@ export const themes: Record<ThemeName, ReturnType<typeof createTheme>> = {
               boxShadow: `0 0 18px ${alpha("#00E5FF", 0.3)}, inset 0 0 12px ${alpha("#00E5FF", 0.05)}`,
             },
           },
-          containedPrimary: {
-            backgroundColor: "#00E5FF",
-            backgroundImage: "none",
-            color: "#000000",
-            border: `1px solid ${alpha("#00E5FF", 0.6)}`,
-            boxShadow: `0 0 24px ${alpha("#00E5FF", 0.5)}, inset 0 1px 0 rgba(255,255,255,.15)`,
-            "&:hover": {
-              backgroundColor: "#33ECFF",
-              boxShadow: `0 0 36px ${alpha("#00E5FF", 0.7)}, 0 0 60px ${alpha("#00E5FF", 0.3)}`,
-            },
-          },
+
           outlined: {
             borderRadius: 4,
             border: `1px solid ${alpha("#FF00CC", 0.45)}`,
@@ -2186,6 +2290,7 @@ export const themes: Record<ThemeName, ReturnType<typeof createTheme>> = {
               boxShadow: `0 0 18px ${alpha("#FF00CC", 0.3)}`,
             },
           },
+
           text: {
             color: alpha("#00E5FF", 0.85),
             "&:hover": {
@@ -2195,6 +2300,23 @@ export const themes: Record<ThemeName, ReturnType<typeof createTheme>> = {
             },
           },
         },
+
+        variants: [
+          {
+            props: { variant: "contained", color: "primary" },
+            style: {
+              backgroundColor: "#00E5FF",
+              backgroundImage: "none",
+              color: "#000000",
+              border: `1px solid ${alpha("#00E5FF", 0.6)}`,
+              boxShadow: `0 0 24px ${alpha("#00E5FF", 0.5)}, inset 0 1px 0 rgba(255,255,255,.15)`,
+              "&:hover": {
+                backgroundColor: "#33ECFF",
+                boxShadow: `0 0 36px ${alpha("#00E5FF", 0.7)}, 0 0 60px ${alpha("#00E5FF", 0.3)}`,
+              },
+            },
+          },
+        ],
       },
       MuiOutlinedInput: {
         styleOverrides: {
@@ -2456,28 +2578,6 @@ export const themes: Record<ThemeName, ReturnType<typeof createTheme>> = {
       // Liquid gold buttons — the absolute
       MuiButton: {
         styleOverrides: {
-          containedPrimary: {
-            color: "#060606",
-            // Three-stop gold gradient: sunrise gold → rich gold → deep gold
-            backgroundImage: `linear-gradient(180deg, #E0C060 0%, #C9A84C 50%, #A88830 100%)`,
-            border: `1px solid ${alpha("#E8D5A3", 0.35)}`,
-            boxShadow: `
-              0 4px 20px ${alpha("#C9A84C", 0.4)},
-              inset 0 1px 0 rgba(255,255,255,.2),
-              inset 0 -1px 0 rgba(0,0,0,.2)
-            `,
-            fontWeight: 900,
-            "&:hover": {
-              backgroundImage: `linear-gradient(180deg, #EAC868 0%, #D9B85A 50%, #B89840 100%)`,
-              boxShadow: `
-                0 6px 32px ${alpha("#C9A84C", 0.58)},
-                0 0 60px ${alpha("#C9A84C", 0.2)},
-                inset 0 1px 0 rgba(255,255,255,.25)
-              `,
-              transform: "translateY(-1px)",
-            },
-            "&:active": { transform: "translateY(0)", boxShadow: `inset 0 2px 6px rgba(0,0,0,.25)` },
-          },
           outlined: {
             border: `1px solid ${alpha("#C9A84C", 0.45)}`,
             color: "#E8D5A3",
@@ -2488,6 +2588,7 @@ export const themes: Record<ThemeName, ReturnType<typeof createTheme>> = {
               boxShadow: `0 0 20px ${alpha("#C9A84C", 0.2)}`,
             },
           },
+
           text: {
             color: alpha("#E8D5A3", 0.85),
             "&:hover": {
@@ -2496,6 +2597,36 @@ export const themes: Record<ThemeName, ReturnType<typeof createTheme>> = {
             },
           },
         },
+
+        variants: [
+          {
+            props: { variant: "contained", color: "primary" },
+            style: {
+              color: "#060606",
+              backgroundImage: `linear-gradient(180deg, #E0C060 0%, #C9A84C 50%, #A88830 100%)`,
+              border: `1px solid ${alpha("#E8D5A3", 0.35)}`,
+              boxShadow: `
+                0 4px 20px ${alpha("#C9A84C", 0.4)},
+                inset 0 1px 0 rgba(255,255,255,.2),
+                inset 0 -1px 0 rgba(0,0,0,.2)
+              `,
+              fontWeight: 900,
+              "&:hover": {
+                backgroundImage: `linear-gradient(180deg, #EAC868 0%, #D9B85A 50%, #B89840 100%)`,
+                boxShadow: `
+                  0 6px 32px ${alpha("#C9A84C", 0.58)},
+                  0 0 60px ${alpha("#C9A84C", 0.2)},
+                  inset 0 1px 0 rgba(255,255,255,.25)
+                `,
+                transform: "translateY(-1px)",
+              },
+              "&:active": {
+                transform: "translateY(0)",
+                boxShadow: `inset 0 2px 6px rgba(0,0,0,.25)`,
+              },
+            },
+          },
+        ],
       },
       MuiOutlinedInput: {
         styleOverrides: {
@@ -2786,7 +2917,10 @@ export const themes: Record<ThemeName, ReturnType<typeof createTheme>> = {
         },
       },
       MuiButton: {
-        defaultProps: { disableElevation: true },
+        defaultProps: {
+          disableElevation: true,
+        },
+
         styleOverrides: {
           root: {
             borderRadius: 4,
@@ -2794,18 +2928,7 @@ export const themes: Record<ThemeName, ReturnType<typeof createTheme>> = {
             backgroundImage: `linear-gradient(180deg, ${alpha("#EDEDED", 0.07)}, ${alpha("#EDEDED", 0.02)})`,
             transition: "all 120ms ease",
           },
-          // PRIMARY — RED ALERT
-          containedPrimary: {
-            borderColor: alpha("#E1061B", 0.65),
-            backgroundImage: `linear-gradient(180deg, #E8202E, #C0040E)`,
-            color: "#FFFFFF",
-            boxShadow: `0 0 20px ${alpha("#E1061B", 0.35)}, inset 0 1px 0 rgba(255,255,255,.1)`,
-            "&:hover": {
-              backgroundImage: `linear-gradient(180deg, #F03040, #D00818)`,
-              boxShadow: `0 0 32px ${alpha("#E1061B", 0.55)}`,
-            },
-          },
-          // OUTLINED — CODEC teal
+
           outlined: {
             borderColor: alpha("#37D6C7", 0.45),
             color: "#37D6C7",
@@ -2816,11 +2939,31 @@ export const themes: Record<ThemeName, ReturnType<typeof createTheme>> = {
               boxShadow: `0 0 16px ${alpha("#37D6C7", 0.22)}`,
             },
           },
+
           text: {
             color: alpha("#EDEDED", 0.75),
-            "&:hover": { backgroundColor: alpha("#EDEDED", 0.06), color: "#EDEDED" },
+            "&:hover": {
+              backgroundColor: alpha("#EDEDED", 0.06),
+              color: "#EDEDED",
+            },
           },
         },
+
+        variants: [
+          {
+            props: { variant: "contained", color: "primary" },
+            style: {
+              borderColor: alpha("#E1061B", 0.65),
+              backgroundImage: `linear-gradient(180deg, #E8202E, #C0040E)`,
+              color: "#FFFFFF",
+              boxShadow: `0 0 20px ${alpha("#E1061B", 0.35)}, inset 0 1px 0 rgba(255,255,255,.1)`,
+              "&:hover": {
+                backgroundImage: `linear-gradient(180deg, #F03040, #D00818)`,
+                boxShadow: `0 0 32px ${alpha("#E1061B", 0.55)}`,
+              },
+            },
+          },
+        ],
       },
       MuiOutlinedInput: {
         styleOverrides: {
@@ -2948,14 +3091,49 @@ export const themes: Record<ThemeName, ReturnType<typeof createTheme>> = {
         },
       },
       MuiAlert: {
-        defaultProps: { variant: "outlined" },
-        styleOverrides: {
-          root: { borderRadius: 4, fontFamily: monoStack, fontSize: 12.5, backgroundColor: alpha("#06080C", 0.7) },
-          outlinedError:   { borderColor: alpha("#E1061B", 0.6), color: "#FF4050" },
-          outlinedWarning: { borderColor: alpha("#F2C94C", 0.5), color: "#F2C94C" },
-          outlinedInfo:    { borderColor: alpha("#37D6C7", 0.4), color: "#37D6C7" },
-          outlinedSuccess: { borderColor: alpha("#2DE39A", 0.4), color: "#2DE39A" },
+        defaultProps: {
+          variant: "outlined",
         },
+
+        styleOverrides: {
+          root: {
+            borderRadius: 4,
+            fontFamily: monoStack,
+            fontSize: 12.5,
+            backgroundColor: alpha("#06080C", 0.7),
+          },
+        },
+
+        variants: [
+          {
+            props: { variant: "outlined", severity: "error" },
+            style: {
+              borderColor: alpha("#E1061B", 0.6),
+              color: "#FF4050",
+            },
+          },
+          {
+            props: { variant: "outlined", severity: "warning" },
+            style: {
+              borderColor: alpha("#F2C94C", 0.5),
+              color: "#F2C94C",
+            },
+          },
+          {
+            props: { variant: "outlined", severity: "info" },
+            style: {
+              borderColor: alpha("#37D6C7", 0.4),
+              color: "#37D6C7",
+            },
+          },
+          {
+            props: { variant: "outlined", severity: "success" },
+            style: {
+              borderColor: alpha("#2DE39A", 0.4),
+              color: "#2DE39A",
+            },
+          },
+        ],
       },
       MuiSlider: {
         styleOverrides: {
@@ -3101,19 +3279,6 @@ export const themes: Record<ThemeName, ReturnType<typeof createTheme>> = {
       },
       MuiButton: {
         styleOverrides: {
-          // Gold star — the primary action
-          containedPrimary: {
-            backgroundImage: `linear-gradient(180deg, #FCCF40, #E8A820)`,
-            color: "#05091A",
-            boxShadow: `0 4px 18px ${alpha("#F5C030", 0.4)}, inset 0 1px 0 rgba(255,255,255,.2)`,
-            "&:hover": {
-              backgroundImage: `linear-gradient(180deg, #FFD845, #F0B025)`,
-              boxShadow: `0 6px 26px ${alpha("#F5C030", 0.56)}`,
-              transform: "translateY(-1px)",
-            },
-            "&:active": { transform: "translateY(0)" },
-          },
-          // Santa red — secondary action
           outlined: {
             border: `1px solid ${alpha("#CC2828", 0.45)}`,
             color: "#FF6060",
@@ -3123,11 +3288,34 @@ export const themes: Record<ThemeName, ReturnType<typeof createTheme>> = {
               boxShadow: `0 4px 14px ${alpha("#CC2828", 0.22)}`,
             },
           },
+
           text: {
             color: alpha("#EEF4FF", 0.75),
-            "&:hover": { backgroundColor: alpha("#7DD3FC", 0.08), color: "#EEF4FF" },
+            "&:hover": {
+              backgroundColor: alpha("#7DD3FC", 0.08),
+              color: "#EEF4FF",
+            },
           },
         },
+
+        variants: [
+          {
+            props: { variant: "contained", color: "primary" },
+            style: {
+              backgroundImage: `linear-gradient(180deg, #FCCF40, #E8A820)`,
+              color: "#05091A",
+              boxShadow: `0 4px 18px ${alpha("#F5C030", 0.4)}, inset 0 1px 0 rgba(255,255,255,.2)`,
+              "&:hover": {
+                backgroundImage: `linear-gradient(180deg, #FFD845, #F0B025)`,
+                boxShadow: `0 6px 26px ${alpha("#F5C030", 0.56)}`,
+                transform: "translateY(-1px)",
+              },
+              "&:active": {
+                transform: "translateY(0)",
+              },
+            },
+          },
+        ],
       },
       MuiOutlinedInput: {
         styleOverrides: {
@@ -3349,20 +3537,16 @@ export const themes: Record<ThemeName, ReturnType<typeof createTheme>> = {
       },
       MuiButton: {
         styleOverrides: {
-          root: { borderRadius: 999 },
-          sizeSmall: { borderRadius: 999 },
-          sizeLarge: { borderRadius: 999 },
-          containedPrimary: {
-            backgroundImage: `linear-gradient(180deg, #1A9648, #146830)`,
-            color: "#FFFFFF",
-            boxShadow: `0 4px 16px ${alpha("#15803D", 0.38)}, inset 0 1px 0 rgba(255,255,255,.15)`,
-            "&:hover": {
-              backgroundImage: `linear-gradient(180deg, #20A050, #178538)`,
-              boxShadow: `0 6px 24px ${alpha("#15803D", 0.5)}`,
-              transform: "translateY(-1px)",
-            },
-            "&:active": { transform: "translateY(0)" },
+          root: {
+            borderRadius: 999,
           },
+          sizeSmall: {
+            borderRadius: 999,
+          },
+          sizeLarge: {
+            borderRadius: 999,
+          },
+
           outlined: {
             borderRadius: 999,
             border: `1.5px solid ${alpha("#15803D", 0.4)}`,
@@ -3373,12 +3557,34 @@ export const themes: Record<ThemeName, ReturnType<typeof createTheme>> = {
               boxShadow: `0 4px 14px ${alpha("#15803D", 0.18)}`,
             },
           },
+
           text: {
             borderRadius: 999,
             color: "#15803D",
-            "&:hover": { backgroundColor: alpha("#15803D", 0.08) },
+            "&:hover": {
+              backgroundColor: alpha("#15803D", 0.08),
+            },
           },
         },
+
+        variants: [
+          {
+            props: { variant: "contained", color: "primary" },
+            style: {
+              backgroundImage: `linear-gradient(180deg, #1A9648, #146830)`,
+              color: "#FFFFFF",
+              boxShadow: `0 4px 16px ${alpha("#15803D", 0.38)}, inset 0 1px 0 rgba(255,255,255,.15)`,
+              "&:hover": {
+                backgroundImage: `linear-gradient(180deg, #20A050, #178538)`,
+                boxShadow: `0 6px 24px ${alpha("#15803D", 0.5)}`,
+                transform: "translateY(-1px)",
+              },
+              "&:active": {
+                transform: "translateY(0)",
+              },
+            },
+          },
+        ],
       },
       MuiOutlinedInput: {
         styleOverrides: {
@@ -3586,34 +3792,57 @@ export const themes: Record<ThemeName, ReturnType<typeof createTheme>> = {
       },
       MuiButton: {
         styleOverrides: {
-          root: { borderRadius: 8, textTransform: "none", fontWeight: 650 },
-          containedPrimary: {
-            background: `linear-gradient(135deg, #FBBF24 0%, #D97706 50%, #B45309 100%)`,
-            boxShadow: `0 2px 8px ${alpha("#D97706", 0.4)}`,
-            color: "#fff",
-            "&:hover": {
-              background: `linear-gradient(135deg, #FCD34D 0%, #D97706 50%, #92400E 100%)`,
-              boxShadow: `0 4px 16px ${alpha("#D97706", 0.55)}`,
-            },
+          root: {
+            borderRadius: 8,
+            textTransform: "none",
+            fontWeight: 650,
           },
-          containedSecondary: {
-            background: `linear-gradient(135deg, #F87171 0%, #DC2626 60%, #991B1B 100%)`,
-            color: "#fff",
-            boxShadow: `0 2px 8px ${alpha("#DC2626", 0.4)}`,
-            "&:hover": { boxShadow: `0 4px 16px ${alpha("#DC2626", 0.55)}` },
-          },
-          outlinedPrimary: {
-            borderColor: alpha("#D97706", 0.55),
-            color: "#D97706",
-            "&:hover": {
-              borderColor: "#D97706",
-              backgroundColor: alpha("#D97706", 0.07),
-            },
-          },
+
           text: {
-            "&:hover": { backgroundColor: alpha("#D97706", 0.08) },
+            "&:hover": {
+              backgroundColor: alpha("#D97706", 0.08),
+            },
           },
         },
+
+        variants: [
+          {
+            props: { variant: "contained", color: "primary" },
+            style: {
+              background: `linear-gradient(135deg, #FBBF24 0%, #D97706 50%, #B45309 100%)`,
+              boxShadow: `0 2px 8px ${alpha("#D97706", 0.4)}`,
+              color: "#fff",
+              "&:hover": {
+                background: `linear-gradient(135deg, #FCD34D 0%, #D97706 50%, #92400E 100%)`,
+                boxShadow: `0 4px 16px ${alpha("#D97706", 0.55)}`,
+              },
+            },
+          },
+
+          {
+            props: { variant: "contained", color: "secondary" },
+            style: {
+              background: `linear-gradient(135deg, #F87171 0%, #DC2626 60%, #991B1B 100%)`,
+              color: "#fff",
+              boxShadow: `0 2px 8px ${alpha("#DC2626", 0.4)}`,
+              "&:hover": {
+                boxShadow: `0 4px 16px ${alpha("#DC2626", 0.55)}`,
+              },
+            },
+          },
+
+          {
+            props: { variant: "outlined", color: "primary" },
+            style: {
+              borderColor: alpha("#D97706", 0.55),
+              color: "#D97706",
+              "&:hover": {
+                borderColor: "#D97706",
+                backgroundColor: alpha("#D97706", 0.07),
+              },
+            },
+          },
+        ],
       },
       MuiChip: {
         styleOverrides: {
@@ -3780,35 +4009,58 @@ export const themes: Record<ThemeName, ReturnType<typeof createTheme>> = {
       },
       MuiButton: {
         styleOverrides: {
-          root: { borderRadius: 6, textTransform: "none", fontWeight: 650 },
-          containedPrimary: {
-            background: `linear-gradient(135deg, #FDBA74 0%, #F97316 45%, #C2410C 100%)`,
-            color: "#fff",
-            boxShadow: `0 2px 10px ${alpha("#F97316", 0.45)}`,
-            "&:hover": {
-              background: `linear-gradient(135deg, #FB923C 0%, #EA6007 45%, #9A3412 100%)`,
-              boxShadow: `0 4px 18px ${alpha("#F97316", 0.6)}`,
-            },
+          root: {
+            borderRadius: 6,
+            textTransform: "none",
+            fontWeight: 650,
           },
-          containedSecondary: {
-            background: `linear-gradient(135deg, #FDE68A 0%, #EAB308 60%, #A16207 100%)`,
-            color: "#1C0A00",
-            fontWeight: 700,
-            boxShadow: `0 2px 10px ${alpha("#EAB308", 0.4)}`,
-            "&:hover": { boxShadow: `0 4px 18px ${alpha("#EAB308", 0.55)}` },
-          },
-          outlinedPrimary: {
-            borderColor: alpha("#F97316", 0.5),
-            color: "#F97316",
+
+          text: {
             "&:hover": {
-              borderColor: "#F97316",
               backgroundColor: alpha("#F97316", 0.1),
             },
           },
-          text: {
-            "&:hover": { backgroundColor: alpha("#F97316", 0.1) },
-          },
         },
+
+        variants: [
+          {
+            props: { variant: "contained", color: "primary" },
+            style: {
+              background: `linear-gradient(135deg, #FDBA74 0%, #F97316 45%, #C2410C 100%)`,
+              color: "#fff",
+              boxShadow: `0 2px 10px ${alpha("#F97316", 0.45)}`,
+              "&:hover": {
+                background: `linear-gradient(135deg, #FB923C 0%, #EA6007 45%, #9A3412 100%)`,
+                boxShadow: `0 4px 18px ${alpha("#F97316", 0.6)}`,
+              },
+            },
+          },
+
+          {
+            props: { variant: "contained", color: "secondary" },
+            style: {
+              background: `linear-gradient(135deg, #FDE68A 0%, #EAB308 60%, #A16207 100%)`,
+              color: "#1C0A00",
+              fontWeight: 700,
+              boxShadow: `0 2px 10px ${alpha("#EAB308", 0.4)}`,
+              "&:hover": {
+                boxShadow: `0 4px 18px ${alpha("#EAB308", 0.55)}`,
+              },
+            },
+          },
+
+          {
+            props: { variant: "outlined", color: "primary" },
+            style: {
+              borderColor: alpha("#F97316", 0.5),
+              color: "#F97316",
+              "&:hover": {
+                borderColor: "#F97316",
+                backgroundColor: alpha("#F97316", 0.1),
+              },
+            },
+          },
+        ],
       },
       MuiChip: {
         styleOverrides: {
@@ -4204,7 +4456,10 @@ export const themes: Record<ThemeName, ReturnType<typeof createTheme>> = {
 
       // ── Buttons ─────────────────────────────────────────────────────────
       MuiButton: {
-        defaultProps: { disableElevation: true },
+        defaultProps: {
+          disableElevation: true,
+        },
+
         styleOverrides: {
           root: {
             borderRadius: 6,
@@ -4214,37 +4469,7 @@ export const themes: Record<ThemeName, ReturnType<typeof createTheme>> = {
             letterSpacing: "0.08em",
             transition: "all 150ms ease",
           },
-          // Activate the bracelet — Visitor's amber
-          containedPrimary: {
-            backgroundColor: "#E8720C",
-            color: "#0D0905",
-            fontWeight: 900,
-            border: `1px solid ${alpha("#F5A623", 0.4)}`,
-            boxShadow: `0 4px 16px ${alpha("#E8720C", 0.4)}`,
-            backgroundImage: `linear-gradient(180deg, #F08030, #D4600A)`,
-            animation: "fennecPulse 3s ease-in-out infinite",
-            "&:hover": {
-              backgroundImage: `linear-gradient(180deg, #F59030, #E8720C)`,
-              boxShadow: `0 6px 24px ${alpha("#E8720C", 0.58)}`,
-              transform: "translateY(-1px)",
-            },
-            "&:active": { transform: "translateY(0)" },
-          },
-          // Brigade channel — steel blue, cold authority
-          containedSecondary: {
-            backgroundColor: "#4A90D9",
-            color: "#0D0905",
-            fontWeight: 900,
-            backgroundImage: `linear-gradient(180deg, #5BA0E9, #3A80C9)`,
-            boxShadow: `0 4px 16px ${alpha("#4A90D9", 0.38)}`,
-            animation: "brigadeSweep 3s ease-in-out infinite",
-            "&:hover": {
-              backgroundImage: `linear-gradient(180deg, #6BB0F9, #4A90D9)`,
-              boxShadow: `0 6px 24px ${alpha("#4A90D9", 0.5)}`,
-              transform: "translateY(-1px)",
-            },
-          },
-          // Outlined: Brigade communiqué — request through official channels
+
           outlined: {
             border: `1px solid ${alpha("#4A90D9", 0.45)}`,
             backgroundColor: alpha("#4A90D9", 0.06),
@@ -4255,14 +4480,66 @@ export const themes: Record<ThemeName, ReturnType<typeof createTheme>> = {
               boxShadow: `0 0 14px ${alpha("#4A90D9", 0.22)}`,
             },
           },
-          // Text: survivor-scrawled, no frame
+
           text: {
             color: alpha("#E8DED0", 0.75),
-            "&:hover": { backgroundColor: alpha("#E8720C", 0.07), color: "#E8DED0" },
+            "&:hover": {
+              backgroundColor: alpha("#E8720C", 0.07),
+              color: "#E8DED0",
+            },
           },
-          sizeSmall: { height: 28, paddingInline: 10, fontSize: 11 },
-          sizeLarge: { height: 42, paddingInline: 18 },
+
+          sizeSmall: {
+            height: 28,
+            paddingInline: 10,
+            fontSize: 11,
+          },
+
+          sizeLarge: {
+            height: 42,
+            paddingInline: 18,
+          },
         },
+
+        variants: [
+          {
+            props: { variant: "contained", color: "primary" },
+            style: {
+              backgroundColor: "#E8720C",
+              color: "#0D0905",
+              fontWeight: 900,
+              border: `1px solid ${alpha("#F5A623", 0.4)}`,
+              boxShadow: `0 4px 16px ${alpha("#E8720C", 0.4)}`,
+              backgroundImage: `linear-gradient(180deg, #F08030, #D4600A)`,
+              animation: "fennecPulse 3s ease-in-out infinite",
+              "&:hover": {
+                backgroundImage: `linear-gradient(180deg, #F59030, #E8720C)`,
+                boxShadow: `0 6px 24px ${alpha("#E8720C", 0.58)}`,
+                transform: "translateY(-1px)",
+              },
+              "&:active": {
+                transform: "translateY(0)",
+              },
+            },
+          },
+
+          {
+            props: { variant: "contained", color: "secondary" },
+            style: {
+              backgroundColor: "#4A90D9",
+              color: "#0D0905",
+              fontWeight: 900,
+              backgroundImage: `linear-gradient(180deg, #5BA0E9, #3A80C9)`,
+              boxShadow: `0 4px 16px ${alpha("#4A90D9", 0.38)}`,
+              animation: "brigadeSweep 3s ease-in-out infinite",
+              "&:hover": {
+                backgroundImage: `linear-gradient(180deg, #6BB0F9, #4A90D9)`,
+                boxShadow: `0 6px 24px ${alpha("#4A90D9", 0.5)}`,
+                transform: "translateY(-1px)",
+              },
+            },
+          },
+        ],
       },
 
       MuiIconButton: {
@@ -4395,7 +4672,10 @@ export const themes: Record<ThemeName, ReturnType<typeof createTheme>> = {
 
       // ── Alerts — Brigade communiqué ────────────────────────────────────
       MuiAlert: {
-        defaultProps: { variant: "outlined" },
+        defaultProps: {
+          variant: "outlined",
+        },
+
         styleOverrides: {
           root: {
             borderRadius: 8,
@@ -4403,27 +4683,42 @@ export const themes: Record<ThemeName, ReturnType<typeof createTheme>> = {
             fontSize: 12.5,
             backgroundColor: alpha("#0D0905", 0.65),
           },
-          outlinedError: {
-            borderColor: alpha("#C42B0A", 0.6),
-            backgroundColor: alpha("#C42B0A", 0.07),
-            color: "#FF8070",
-          },
-          outlinedWarning: {
-            borderColor: alpha("#F5A623", 0.5),
-            backgroundColor: alpha("#F5A623", 0.06),
-            color: "#F5A623",
-          },
-          outlinedInfo: {
-            borderColor: alpha("#5CB85C", 0.4),
-            backgroundColor: alpha("#5CB85C", 0.06),
-            color: "#80D880",
-          },
-          outlinedSuccess: {
-            borderColor: alpha("#5CB85C", 0.4),
-            backgroundColor: alpha("#5CB85C", 0.06),
-            color: "#80D880",
-          },
         },
+
+        variants: [
+          {
+            props: { variant: "outlined", severity: "error" },
+            style: {
+              borderColor: alpha("#C42B0A", 0.6),
+              backgroundColor: alpha("#C42B0A", 0.07),
+              color: "#FF8070",
+            },
+          },
+          {
+            props: { variant: "outlined", severity: "warning" },
+            style: {
+              borderColor: alpha("#F5A623", 0.5),
+              backgroundColor: alpha("#F5A623", 0.06),
+              color: "#F5A623",
+            },
+          },
+          {
+            props: { variant: "outlined", severity: "info" },
+            style: {
+              borderColor: alpha("#5CB85C", 0.4),
+              backgroundColor: alpha("#5CB85C", 0.06),
+              color: "#80D880",
+            },
+          },
+          {
+            props: { variant: "outlined", severity: "success" },
+            style: {
+              borderColor: alpha("#5CB85C", 0.4),
+              backgroundColor: alpha("#5CB85C", 0.06),
+              color: "#80D880",
+            },
+          },
+        ],
       },
 
       // ── Tables — survivor registry / Brigade dossier ───────────────────

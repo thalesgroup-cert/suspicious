@@ -250,11 +250,9 @@ function DashboardCard(
       <CardContent sx={{ p: { xs: 1.5, md: 2 }, ...contentSx }}>
         <Stack
           direction="row"
-          alignItems="center"
-          justifyContent="space-between"
-          sx={{ mb: 1 }}
+          sx={{ mb: 1, alignItems: "center", justifyContent: "space-between" }}
         >
-          <Stack direction="row" spacing={0.9} alignItems="center">
+          <Stack direction="row" spacing={0.9} sx={{ alignItems: "center" }} >
             {icon ? (
               <Box
                 sx={{
@@ -273,7 +271,7 @@ function DashboardCard(
               </Box>
             ) : null}
 
-            <Typography fontWeight={900} fontSize={15}>
+            <Typography sx={{ fontWeight: 900, fontSize: 15 }} >
               {title}
             </Typography>
             {titleBadge}
@@ -550,12 +548,11 @@ export default function HomePage() {
         <Stack
           direction={{ xs: "column", md: "row" }}
           spacing={1.5}
-          sx={{ mb: 2 }}
-          justifyContent="space-between"
+          sx={{ mb: 2, justifyContent: "space-between" }}
         >
-          <Stack direction="row" spacing={1.5} alignItems="flex-start" sx={{ minWidth: 0 }}>
+          <Stack direction="row" spacing={1.5} sx={{ minWidth: 0, alignItems: "flex-start" }}>
             <Box sx={{ minWidth: 0 }}>
-              <Typography variant="h5" fontWeight={980} letterSpacing={-0.6} noWrap >
+              <Typography variant="h5" noWrap sx={{ fontWeight: 980, letterSpacing: -0.6 }} >
                 Welcome, {displayName}
               </Typography>
               <ThemeGreeting caps={capabilities} name={displayName} />
@@ -645,7 +642,7 @@ export default function HomePage() {
                 className={capabilities.effects.hasHeatEffect ? "sun-orb" : undefined}
               >
                 {homeQuery.isLoading ? (
-                  <Stack sx={{ height: "100%" }} alignItems="center" justifyContent="center">
+                  <Stack sx={{ height: "100%", alignItems: "center", justifyContent: "center" }}>
                     <CircularProgress size={22} />
                   </Stack>
                 ) : donut.length ? (
@@ -692,7 +689,7 @@ export default function HomePage() {
                     </PieChart>
                   </ResponsiveContainer>
                 ) : (
-                  <Stack sx={{ height: "100%" }} alignItems="center" justifyContent="center">
+                  <Stack sx={{ height: "100%", alignItems: "center", justifyContent: "center" }}>
                     <Typography color="text.secondary" variant="body2">
                       No data
                     </Typography>
@@ -709,10 +706,9 @@ export default function HomePage() {
                     <Stack
                       key={label}
                       direction="row"
-                      justifyContent="space-between"
-                      alignItems="center"
-                    >
-                      <Stack direction="row" spacing={1} alignItems="center">
+                      sx={{ justifyContent: "space-between", alignItems: "center" }}
+>
+                      <Stack direction="row" spacing={1} sx={{ alignItems: "center" }} >
                         <Box
                           aria-hidden
                           sx={{
@@ -728,7 +724,7 @@ export default function HomePage() {
                         </Typography>
                       </Stack>
 
-                      <Typography variant="body2" fontWeight={800}>
+                      <Typography variant="body2" sx={{ fontWeight: 800 }} >
                         {value}
                       </Typography>
                     </Stack>
@@ -788,11 +784,11 @@ export default function HomePage() {
                 {isCiso ? (
                   <Typography color="text.secondary">
                     Scope{" "}
-                    <Typography component="span" fontWeight={950} color="text.primary">
+                    <Typography component="span" color="text.primary" sx={{ fontWeight: 950 }} >
                       ({scopeLabel ?? "N/A"})
                     </Typography>{" "}
                     published{" "}
-                    <Typography component="span" fontWeight={950} color="text.primary">
+                    <Typography component="span" color="text.primary" sx={{ fontWeight: 950 }} >
                       {scopeCount}
                     </Typography>{" "}
                     items.
@@ -800,7 +796,7 @@ export default function HomePage() {
                 ) : (
                   <Typography color="text.secondary">
                     Everyone published{" "}
-                    <Typography component="span" fontWeight={950} color="text.primary">
+                    <Typography component="span" color="text.primary" sx={{ fontWeight: 950 }} >
                       {everyoneCount}
                     </Typography>{" "}
                     items.
@@ -813,14 +809,14 @@ export default function HomePage() {
                   <Divider sx={{ opacity: 0.25, my: 1.5 }} />
 
                   <Stack spacing={1}>
-                    <Stack direction="row" spacing={1} alignItems="center">
+                    <Stack direction="row" spacing={1} sx={{ alignItems: "center" }} >
                       <RocketLaunchOutlined fontSize="small" />
-                      <Typography fontWeight={900} fontSize={15}>
+                      <Typography sx={{ fontWeight: 900, fontSize: 15 }} >
                         Spotlight
                       </Typography>
                     </Stack>
 
-                    <Typography variant="h6" fontWeight={950} letterSpacing={-0.2}>
+                    <Typography variant="h6" sx={{ fontWeight: 950, letterSpacing: -0.2 }} >
                       {home.spotlight.title}
                     </Typography>
 
@@ -869,7 +865,7 @@ export default function HomePage() {
 
               {recentQuery.isLoading ? (
                 <Box sx={{ px: { xs: 1.5, md: 2 }, pb: 2 }}>
-                  <Stack direction="row" spacing={1} alignItems="center">
+                  <Stack direction="row" spacing={1} sx={{ alignItems: "center" }} >
                     <CircularProgress
                       size={18}
                       sx={capabilities.effects.hasAlertStates
@@ -936,7 +932,7 @@ export default function HomePage() {
                       {recent.map((r) => (
                         <TableRow key={String(r.id)} hover>
                           <TableCell>
-                            <Stack direction="row" spacing={1} alignItems="center">
+                            <Stack direction="row" spacing={1} sx={{ alignItems: "center" }} >
                               <Button
                                 size="small"
                                 variant="contained"
@@ -1036,7 +1032,7 @@ export default function HomePage() {
               >
                 <CardContent>
                   <Stack spacing={1}>
-                    <Typography fontWeight={900}>Suggested scopes</Typography>
+                    <Typography sx={{ fontWeight: 900 }} >Suggested scopes</Typography>
 
                     <Stack direction="row" spacing={1} sx={{ flexWrap: "wrap" }}>
                       {suggested.region ? (

@@ -34,8 +34,7 @@ endef
         backup-db restore-db \
         logs status shell db-shell \
         create-certs network clean prune \
-        check-secrets check-updates \
-        monitor-up monitor-down monitor-logs
+        check-secrets check-updates
 
 # ---------------------------------------------------------------------------
 # Help
@@ -66,11 +65,6 @@ help:
 	@echo "$(BOLD)Database$(RESET)"
 	@echo "  backup-db        Dump MariaDB to ./backups/ (gzipped, timestamped)"
 	@echo "  restore-db f=<file>   Restore from a .sql.gz dump"
-	@echo ""
-	@echo "$(BOLD)Observability$(RESET)"
-	@echo "  monitor-up       Start Prometheus + Grafana (optional profile)"
-	@echo "  monitor-down     Stop monitoring stack"
-	@echo "  monitor-logs     Follow Prometheus/Grafana logs"
 	@echo ""
 	@echo "$(BOLD)Diagnostics$(RESET)"
 	@echo "  check-secrets    Verify no placeholder secrets remain in .env"
@@ -226,28 +220,6 @@ replica-status:
 		--user=root --password=$$(grep ^MYSQL_ROOT_PASSWORD .env | cut -d= -f2) \
 		-e 'SHOW SLAVE STATUS\G'
 
-# ---------------------------------------------------------------------------
-# Observability
-# ---------------------------------------------------------------------------
-
-## Start Prometheus + Grafana
-monitor-up:
-	@$(COMPOSE) --file docker-compose.yml --file compose_monitoring.yaml \
-		--profile monitoring up -d prometheus grafana mariadb-exporter
-	$(OK) "Monitoring stack started."
-	@echo "  Grafana:    http://localhost:3000  (admin / admin)"
-	@echo "  Prometheus: http://localhost:9090"
-
-## Stop monitoring stack
-monitor-down:
-	@$(COMPOSE) --file docker-compose.yml --file compose_monitoring.yaml \
-		--profile monitoring stop prometheus grafana mariadb-exporter
-	$(OK) "Monitoring stack stopped."
-
-## Follow monitoring logs
-monitor-logs:
-	@$(COMPOSE) --file docker-compose.yml --file compose_monitoring.yaml \
-		--profile monitoring logs -f prometheus grafana
 
 # ---------------------------------------------------------------------------
 # Diagnostics

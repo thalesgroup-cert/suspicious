@@ -89,10 +89,8 @@ function TrendIcon(props: { values: Array<number | null> }) {
 
   return (
     <Stack
-      alignItems="center"
-      justifyContent="center"
       spacing={1}
-      sx={{ flex: 1, minHeight: 0, color }}
+      sx={{ flex: 1, minHeight: 0, color, alignItems: "center", justifyContent: "center" }}
     >
       <Box sx={{ display: "grid", placeItems: "center", lineHeight: 1 }}>
         {icon}

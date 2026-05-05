@@ -220,7 +220,7 @@ export default function TopPrefixesPanel({
       title={`Top ${limit} Reporters`}
       icon={<SellOutlined />}
       right={
-        <Stack direction="row" spacing={1} alignItems="center">
+        <Stack direction="row" spacing={1} sx={{ alignItems: "center" }} >
           <ToggleButtonGroup
             size="small"
             exclusive
@@ -239,15 +239,15 @@ export default function TopPrefixesPanel({
     >
       <Box sx={{ height: "100%", minHeight: 0, overflow: "auto" }}>
         {loading ? (
-          <Stack sx={{ height: "100%" }} alignItems="center" justifyContent="center">
+          <Stack sx={{ height: "100%", alignItems: "center", justifyContent: "center" }}>
             <CircularProgress size={24} />
           </Stack>
         ) : error ? (
-          <Stack sx={{ height: "100%" }} alignItems="center" justifyContent="center">
+          <Stack sx={{ height: "100%", alignItems: "center", justifyContent: "center" }}>
             <Typography color="error" variant="body2">{error}</Typography>
           </Stack>
         ) : rows.length === 0 ? (
-          <Stack sx={{ height: "100%" }} alignItems="center" justifyContent="center">
+          <Stack sx={{ height: "100%", alignItems: "center", justifyContent: "center" }}>
             <Typography color="text.secondary" variant="body2">
               No prefixes for this period
             </Typography>
@@ -272,16 +272,13 @@ export default function TopPrefixesPanel({
                   {/* Row header: rank badge + prefix label + total chip */}
                   <Stack
                     direction="row"
-                    alignItems="center"
-                    justifyContent="space-between"
                     spacing={2}
-                    sx={{ mb: 0.75 }}
+                    sx={{ mb: 0.75, alignItems: "center", justifyContent: "space-between" }}
                   >
                     <Stack
                       direction="row"
                       spacing={1}
-                      alignItems="center"
-                      sx={{ minWidth: 0 }}
+                      sx={{ minWidth: 0, alignItems: "center" }}
                     >
                       <Box
                         sx={{
@@ -365,8 +362,7 @@ export default function TopPrefixesPanel({
                     direction="row"
                     spacing={1.5}
                     useFlexGap
-                    flexWrap="wrap"
-                    sx={{ mt: 0.75 }}
+                    sx={{ mt: 0.75, flexWrap: "wrap" }}
                   >
                     {CATEGORY_CONFIG.map((category) => {
                       const value = item[category.key] as number;

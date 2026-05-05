@@ -170,7 +170,7 @@ export default function ThreatDistributionPanel(props: { dangerCounts: DangerCou
             </PieChart>
           </ResponsiveContainer>
         ) : (
-          <Stack sx={{ height: "100%" }} alignItems="center" justifyContent="center">
+          <Stack sx={{ height: "100%", alignItems: "center", justifyContent: "center" }}>
             <Typography color="text.secondary" variant="body2">No data</Typography>
           </Stack>
         )}
@@ -185,11 +185,10 @@ export default function ThreatDistributionPanel(props: { dangerCounts: DangerCou
             <Stack
               key={label}
               direction="row"
-              justifyContent="space-between"
-              alignItems="center"
               className={effects.hasContaminationEffect && label === "Dangerous" ? "contaminated" : undefined}
-            >
-              <Stack direction="row" spacing={1} alignItems="center">
+              sx={{ justifyContent: "space-between", alignItems: "center" }}
+>
+              <Stack direction="row" spacing={1} sx={{ alignItems: "center" }} >
                 <Box
                   aria-hidden
                   sx={{

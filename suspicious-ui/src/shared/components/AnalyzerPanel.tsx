@@ -40,7 +40,7 @@ export function AnalyzerPanel({ analyzers }: { analyzers: AnalyzerHit[] }) {
       }}
     >
       <Stack spacing={1}>
-        <Typography fontWeight={950}>Analyzers</Typography>
+        <Typography sx={{ fontWeight: 950 }} >Analyzers</Typography>
         <Typography variant="body2" color="text.secondary">
           Score (0–10) and Confidence (0–100).
         </Typography>
@@ -53,19 +53,19 @@ export function AnalyzerPanel({ analyzers }: { analyzers: AnalyzerHit[] }) {
 
           return (
             <Box key={`${a.analyzer_name}-${idx}`} sx={{ py: 0.75 }}>
-              <Stack direction="row" spacing={1} alignItems="center" justifyContent="space-between">
-                <Typography fontWeight={900} sx={{ pr: 1, minWidth: 0, flex: 1 }}>
+              <Stack direction="row" spacing={1} sx={{ alignItems: "center", justifyContent: "space-between" }} >
+                <Typography sx={{ pr: 1, minWidth: 0, flex: 1, fontWeight: 900 }}>
                   {a.analyzer_name}
                 </Typography>
 
-                <Stack direction="row" spacing={0.75} alignItems="center">
+                <Stack direction="row" spacing={0.75} sx={{ alignItems: "center" }} >
                   {st ? <Chip size="small" label={st} variant="outlined" sx={{ fontWeight: 850 }} /> : null}
                   {lvl ? <Chip size="small" label={lvl.toUpperCase()} variant="outlined" sx={{ fontWeight: 850 }} /> : null}
                 </Stack>
               </Stack>
 
               <Stack spacing={0.5} sx={{ mt: 0.75 }}>
-                <Stack direction="row" spacing={1} alignItems="center">
+                <Stack direction="row" spacing={1} sx={{ alignItems: "center" }} >
                   <Typography variant="caption" sx={{ width: 82 }} color="text.secondary">
                     Score
                   </Typography>
@@ -82,7 +82,7 @@ export function AnalyzerPanel({ analyzers }: { analyzers: AnalyzerHit[] }) {
                   </Typography>
                 </Stack>
 
-                <Stack direction="row" spacing={1} alignItems="center">
+                <Stack direction="row" spacing={1} sx={{ alignItems: "center" }} >
                   <Typography variant="caption" sx={{ width: 82 }} color="text.secondary">
                     Confidence
                   </Typography>

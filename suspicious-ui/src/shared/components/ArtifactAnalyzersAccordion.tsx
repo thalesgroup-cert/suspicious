@@ -1,4 +1,5 @@
 // src/shared/components/ArtifactAnalyzersAccordion.tsx
+
 import * as React from "react";
 import {
   Accordion,
@@ -15,11 +16,14 @@ import type { AnalyzerGroup } from "@/shared/hooks/detailsNormalize";
 import { AnalyzerRows } from "@/shared/components/AnalyzerRows";
 
 function worstColor(groups: AnalyzerGroup[]) {
-  // choose a quick visual hint (like old background coloring by level)
   let max = 0;
+
   for (const g of groups) {
-    for (const a of g.analyzers) max = Math.max(max, a.score);
+    for (const a of g.analyzers) {
+      max = Math.max(max, a.score);
+    }
   }
+
   if (max >= 6) return "rgba(255, 0, 0, .10)";
   if (max >= 3) return "rgba(255, 165, 0, .10)";
   return "rgba(0, 128, 0, .10)";
@@ -32,16 +36,21 @@ export function ArtifactAnalyzersAccordion({
   groups: AnalyzerGroup[];
   defaultExpanded?: boolean;
 }) {
-  if (!groups.length) return <Alert severity="info">No analyzers triggered for this submission.</Alert>;
-
-  // group into “sections” (file/hash/url/ip/mail/etc), each section can contain multiple artifacts
-  const byKind = new Map<string, AnalyzerGroup[]>();
-  for (const g of groups) {
-    const k = g.kind;
-    const arr = byKind.get(k) ?? [];
-    arr.push(g);
-    byKind.set(k, arr);
+  if (!groups.length) {
+    return <Alert severity="info">No analyzers triggered for this submission.</Alert>;
   }
+
+  const byKind = React.useMemo(() => {
+    const map = new Map<string, AnalyzerGroup[]>();
+
+    for (const g of groups) {
+      const arr = map.get(g.kind) ?? [];
+      arr.push(g);
+      map.set(g.kind, arr);
+    }
+
+    return map;
+  }, [groups]);
 
   const kindsInOrder: Array<AnalyzerGroup["kind"]> = [
     "file",
@@ -57,9 +66,9 @@ export function ArtifactAnalyzersAccordion({
 
   return (
     <Box>
-      <Stack spacing={1}>
+      <Stack spacing={1} component="div">
         {kindsInOrder
-          .filter((k) => (byKind.get(k) ?? []).length > 0)
+          .filter((k) => (byKind.get(k)?.length ?? 0) > 0)
           .map((k) => {
             const sectionGroups = byKind.get(k)!;
             const bg = worstColor(sectionGroups);
@@ -77,17 +86,32 @@ export function ArtifactAnalyzersAccordion({
                 }}
               >
                 <AccordionSummary expandIcon={<ExpandMoreOutlined />}>
-                  <Stack direction="row" spacing={1} alignItems="center" sx={{ width: "100%" }}>
-                    <Typography fontWeight={950} sx={{ textTransform: "capitalize" }}>
+                  <Stack
+                    direction="row"
+                    spacing={1}
+                    sx={{ alignItems: "center", width: "100%" }}
+                    component="div"
+                  >
+                    <Typography
+                      sx={{
+                        fontWeight: 950,
+                        textTransform: "capitalize",
+                      }}
+                    >
                       {titleForKind(k)}
                     </Typography>
+
                     <Chip
                       size="small"
-                      label={`${sectionGroups.length} ${sectionGroups.length === 1 ? "item" : "items"}`}
+                      label={`${sectionGroups.length} ${
+                        sectionGroups.length === 1 ? "item" : "items"
+                      }`}
                       variant="outlined"
                       sx={{ fontWeight: 850 }}
                     />
+
                     <Box sx={{ flex: 1 }} />
+
                     <Chip
                       size="small"
                       label={`Top score: ${topScore(sectionGroups).toFixed(1)}`}
@@ -98,22 +122,32 @@ export function ArtifactAnalyzersAccordion({
                 </AccordionSummary>
 
                 <AccordionDetails>
-                  <Stack spacing={1.25}>
+                  <Stack spacing={1.25} component="div">
                     {sectionGroups.map((g) => (
                       <Box key={g.key}>
-                        <Stack spacing={0.5} sx={{ mb: 0.75 }}>
-                          <Typography fontWeight={900}>
+                        <Stack spacing={0.5} sx={{ mb: 0.75 }} component="div">
+                          <Typography sx={{ fontWeight: 900 }}>
                             {g.title}
                             {g.subtitle ? " — " : ""}
                             {g.subtitle ? (
-                              <Typography component="span" color="text.secondary" fontWeight={700}>
+                              <Typography
+                                component="span"
+                                sx={{
+                                  color: "text.secondary",
+                                  fontWeight: 700,
+                                }}
+                              >
                                 {g.subtitle}
                               </Typography>
                             ) : null}
                           </Typography>
 
                           {g.artifact ? (
-                            <Typography variant="body2" color="text.secondary" sx={{ wordBreak: "break-word" }}>
+                            <Typography
+                              variant="body2"
+                              color="text.secondary"
+                              sx={{ wordBreak: "break-word" }}
+                            >
                               {g.artifact}
                             </Typography>
                           ) : null}
@@ -157,8 +191,12 @@ function titleForKind(kind: AnalyzerGroup["kind"]) {
 
 function topScore(groups: AnalyzerGroup[]) {
   let max = 0;
+
   for (const g of groups) {
-    for (const a of g.analyzers) max = Math.max(max, a.score);
+    for (const a of g.analyzers) {
+      max = Math.max(max, a.score);
+    }
   }
+
   return max;
 }
