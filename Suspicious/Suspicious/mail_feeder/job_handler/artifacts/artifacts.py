@@ -23,6 +23,10 @@ class ArtifactJobLauncherService:
         """
         Validate artifacts and dispatch them to the correct handler.
         Returns a list of launched job IDs.
+
+        Deduplicates by (artifact_type, value) within a single call so the
+        same URL / domain / hash extracted multiple times from one email
+        does not trigger N×analyzer Cortex jobs.
         """
         handlers = {
             "IP": self._process_ip_artifact,
@@ -31,12 +35,24 @@ class ArtifactJobLauncherService:
             "Domain": self._process_domain_artifact,
             "MailAddress": self._process_mail_artifact,
         }
+        seen: set = set()
         for artifact in artifacts:
             try:
                 artifact_data = ArtifactModel(artifact_type=artifact.artifact_type)
             except ValidationError as e:
                 fetch_mail_logger.error(f"Artifact validation failed: {e}")
                 continue
+
+            value = self._artifact_value(artifact, artifact_data.artifact_type)
+            if value is not None:
+                key = (artifact_data.artifact_type, value)
+                if key in seen:
+                    fetch_mail_logger.debug(
+                        "Skipping duplicate %s artifact: %s",
+                        artifact_data.artifact_type, value,
+                    )
+                    continue
+                seen.add(key)
 
             handler = handlers.get(artifact_data.artifact_type)
             if handler:
@@ -46,6 +62,24 @@ class ArtifactJobLauncherService:
                 fetch_mail_logger.warning(f"No handler for artifact type {artifact_data.artifact_type}")
 
         return self.launched_job_ids
+
+    @staticmethod
+    def _artifact_value(artifact, artifact_type: str):
+        """Return the comparable value for de-duplication, or None."""
+        try:
+            if artifact_type == "IP" and artifact.artifactIsIp:
+                return artifact.artifactIsIp.ip.address
+            if artifact_type == "URL" and artifact.artifactIsUrl:
+                return artifact.artifactIsUrl.url.address
+            if artifact_type == "Hash" and artifact.artifactIsHash:
+                return artifact.artifactIsHash.hash.value
+            if artifact_type == "Domain" and artifact.artifactIsDomain:
+                return artifact.artifactIsDomain.domain.value
+            if artifact_type == "MailAddress" and artifact.artifactIsMailAddress:
+                return artifact.artifactIsMailAddress.mail_address.address
+        except Exception:
+            return None
+        return None
 
     def _process_ip_artifact(self, artifact):
         if artifact.artifactIsIp:
