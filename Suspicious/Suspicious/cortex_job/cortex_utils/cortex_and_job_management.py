@@ -559,6 +559,29 @@ class CortexJobManager:
         self.api_urls = API_URL
         self.api_keys = API_KEY
 
+    @staticmethod
+    def _artifact_value(report_instance):
+        """Return the scoring value for the artifact linked to this report."""
+        if report_instance.url_id:
+            return report_instance.url.address
+        if report_instance.ip_id:
+            return report_instance.ip.address
+        if report_instance.mail_id:
+            return report_instance.mail.address
+        if report_instance.domain_id:
+            return report_instance.domain.value
+        if report_instance.hash_id:
+            return report_instance.hash.value
+        if report_instance.file_id:
+            return str(report_instance.file.file_path.name)
+        if report_instance.mail_body_id:
+            return report_instance.mail_body.fuzzy_hash
+        if report_instance.mail_header_id:
+            return report_instance.mail_header.fuzzy_hash
+        raise ValueError(
+            f"AnalyzerReport {report_instance.pk} has no linked artifact"
+        )
+
     @classmethod
     def get_cortex_jobs_results(cls, report_instance, data_type):
         """
