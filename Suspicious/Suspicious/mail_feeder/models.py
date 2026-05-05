@@ -34,10 +34,6 @@ class Mail(models.Model):
 
     class Meta:
         ordering = ['-date']
-        indexes = [
-            models.Index(fields=['mail_id']),
-            models.Index(fields=['date']),
-        ]
 
     def __str__(self):
         return f"Mail ID: {self.pk} - Subject: {self.subject[:50]}"
@@ -125,9 +121,6 @@ class MailArtifact(models.Model):
 
     class Meta:
         ordering = ['-creation_date']
-        indexes = [
-            models.Index(fields=['artifact_type']),
-        ]
 
     def __str__(self):
         return f"{self.artifact_type} - Artifact ID: {self.pk}"

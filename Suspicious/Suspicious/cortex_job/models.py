@@ -18,9 +18,6 @@ class Analyzer(models.Model):
 
     class Meta:
         ordering = ['-creation_date']
-        indexes = [
-            models.Index(fields=['analyzer_cortex_id']),
-        ]
 
     def __str__(self):
         return self.name
@@ -51,11 +48,6 @@ class AnalyzerReport(models.Model):
 
     class Meta:
         ordering = ['-creation_date']
-        indexes = [
-            models.Index(fields=['cortex_job_id']),
-            models.Index(fields=['type']),
-            models.Index(fields=['status']),
-        ]
 
     def __str__(self):
         # Use *_id checks to avoid extra DB lookups when the FK row is not

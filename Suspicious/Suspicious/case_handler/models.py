@@ -68,10 +68,6 @@ class Case(models.Model):
 
     class Meta:
         ordering = ['-creation_date']
-        indexes = [
-            models.Index(fields=['status']),
-            models.Index(fields=['results']),
-        ]
 
     def __str__(self):
         """
