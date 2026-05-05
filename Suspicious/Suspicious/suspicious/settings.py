@@ -41,6 +41,17 @@ CONFIG_PATH = "/app/settings.json"
 with open(CONFIG_PATH) as _f:
     _config = json.load(_f)
 
+# Validate against the SuspiciousConfig schema so missing or malformed
+# required keys (SECRET_KEY, DB credentials, …) fail at boot with a
+# readable error instead of much later at the first call site.
+from suspicious.config_schema import validate_config, ConfigValidationError  # noqa: E402
+
+try:
+    _config = validate_config(_config, source=CONFIG_PATH)
+except ConfigValidationError as exc:
+    sys.stderr.write(f"\nFATAL: {exc}\n\n")
+    raise SystemExit(1)
+
 _app        = _config.get("app", {})
 _db         = _config.get("database", {})
 _auth       = _config.get("authentication", {})
