@@ -3,6 +3,8 @@ import logging
 import os
 
 import pybreaker
+from django.utils import timezone
+
 from cortex4py.api import Api
 from common.http_client import get_breaker, RETRY
 from cortex_job.models import Analyzer, AnalyzerReport
@@ -37,6 +39,13 @@ cortex_config = (config.get("integrations", {}).get("cortex", {}))
 # ------------------------
 API_URL = cortex_config.get("url", "https://cortex.example.com")
 API_KEY = cortex_config.get("api_key", "your_api_key_here")
+
+# Reports stuck in Waiting/InProgress beyond this many seconds are
+# auto-failed so the parent case can finish. 24h matches the worst-case
+# Cortex analyzer (sandbox detonation) we have observed.
+STALE_JOB_TIMEOUT_SECONDS: int = int(
+    cortex_config.get("stale_job_timeout_seconds", 86400)
+)
 
 try:
     # cortex4py makes bare requests.get/post calls — no session to mount adapters on.
@@ -659,6 +668,22 @@ class CortexJobManager:
                     update_cases_logger.error(
                         f"Error scoring report {job_id}: {e}", exc_info=True
                     )
+
+        # Stale-job rescue: reports that have been Waiting / InProgress
+        # for longer than STALE_JOB_TIMEOUT_SECONDS are auto-failed so
+        # the parent case can finish instead of looping forever.
+        if (
+            report_instance.status in {"Waiting", "InProgress"}
+            and report_instance.creation_date is not None
+        ):
+            age = (timezone.now() - report_instance.creation_date).total_seconds()
+            if age > STALE_JOB_TIMEOUT_SECONDS:
+                update_cases_logger.warning(
+                    "Auto-failing stale %s report cortex_job_id=%s after %.0fs",
+                    report_instance.status, job_id, age,
+                )
+                report_instance.status = "Failure"
+                report_instance.save(update_fields=["status"])
 
         return report_instance.status
 

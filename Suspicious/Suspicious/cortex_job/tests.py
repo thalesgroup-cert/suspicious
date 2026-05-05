@@ -209,6 +209,28 @@ class GetCortexJobsResultsScoringTests(TestCase):
         self.assertEqual(self.report.score, 0)
         self.assertEqual(self.report.level, "info")
 
+    def test_stale_inprogress_report_auto_failed(self):
+        # Force creation_date older than the stale-job threshold.
+        AnalyzerReport.objects.filter(pk=self.report.pk).update(
+            creation_date=timezone.now() - timedelta(days=5)
+        )
+        self.report.refresh_from_db()
+
+        job = MagicMock(status="InProgress", dataType="domain")
+
+        with patch.object(
+            CortexJobManager, "get_job_from_api", return_value=job,
+        ), patch.object(
+            CortexJobManager, "get_report_from_api", return_value=self._vt_report(),
+        ):
+            CortexJobManager._job_cache.clear()
+            CortexJobManager._report_cache.clear()
+            result = CortexJobManager.get_cortex_jobs_results(self.report, "domain")
+
+        self.report.refresh_from_db()
+        self.assertEqual(result, "Failure")
+        self.assertEqual(self.report.status, "Failure")
+
 
 from case_handler.models import Case
 
