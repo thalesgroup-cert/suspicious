@@ -208,3 +208,29 @@ class GetCortexJobsResultsScoringTests(TestCase):
         self.assertEqual(self.report.status, "InProgress")
         self.assertEqual(self.report.score, 0)
         self.assertEqual(self.report.level, "info")
+
+
+from case_handler.models import Case
+
+
+class GenerateDescriptionTests(TestCase):
+    def setUp(self):
+        self.case = MagicMock(spec=Case)
+        self.case.id = 1
+        self.case.status = "On Going"
+        self.case.description = ""
+        self.case.save = MagicMock()
+
+        self.manager = CortexJobManager()
+
+    def test_empty_results_keep_case_ongoing(self):
+        self.manager.calculate_total_results()
+        self.manager.generate_description(self.case)
+        self.assertEqual(self.case.status, "On Going")
+
+    def test_all_terminal_with_reports_marks_done(self):
+        self.manager.results["domain"]["reports"].add("r1")
+        self.manager.results["domain"]["success"].add("r1")
+        self.manager.calculate_total_results()
+        self.manager.generate_description(self.case)
+        self.assertEqual(self.case.status, "Done")

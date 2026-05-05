@@ -1261,7 +1261,7 @@ class CortexJobManager:
         success_ratio = success_count / adjusted_total if adjusted_total else 0
         failure_ratio = failure_count / adjusted_total if adjusted_total else 0
 
-        all_done = total_reports == (success | failure | deleted)
+        all_done = bool(total_reports) and total_reports == (success | failure | deleted)
         all_finished = all_done and (ongoing_count == 0 and waiting_count == 0)
 
         if all_finished:
