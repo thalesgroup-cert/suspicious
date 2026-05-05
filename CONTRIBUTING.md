@@ -25,6 +25,20 @@ Switch to a feature branch:
 git checkout -b feature/<short_feature_name>
 ```
 
+Wire the repo's git hooks (Conventional Commits validator):
+
+```bash
+git config core.hooksPath .githooks
+# or, from deployment/:
+make install-hooks
+```
+
+The `commit-msg` hook rejects any subject that does not match
+`<type>(scope)?!?: <subject>` (max 72 chars). Allowed types: `feat`,
+`fix`, `chore`, `docs`, `refactor`, `perf`, `test`, `ci`, `build`,
+`style`, `revert`. Merge / revert / fixup / squash auto-subjects are
+allowed through.
+
 ---
 
 ## Contribution Workflow

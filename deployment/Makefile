@@ -30,7 +30,7 @@ define require_script
 	@test -x $(1) || (echo "Missing or non-executable: $(1)" && exit 1)
 endef
 
-.PHONY: help install init up down build pull deploy upgrade redeploy restart \
+.PHONY: help install init install-hooks up down build pull deploy upgrade redeploy restart \
         migrate collectstatic createsuperuser \
         backup-db restore-db \
         logs status shell db-shell \
@@ -54,6 +54,7 @@ help:
 	@echo "  upgrade          Alias for deploy"
 	@echo "  up               Start all services (no pull, no migration)"
 	@echo "  redeploy [s=<svc>]  Force-recreate containers (picks up new images)"
+	@echo "  install-hooks    Configure git core.hooksPath -> .githooks (commit-msg validator)"
 	@echo "  down             Stop and remove containers (data preserved)"
 	@echo "  restart          Restart all running services"
 	@echo "  build            Build local images"
@@ -95,6 +96,11 @@ init:
 	@echo "$(BOLD)Initializing project…$(RESET)"
 	@$(SCRIPTS)/init.sh
 	$(OK) "Initialization complete."
+
+## Wire the repo .githooks (Conventional Commits validator etc.) for this clone.
+install-hooks:
+	@cd ../ && git config core.hooksPath .githooks
+	$(OK) "git core.hooksPath -> .githooks"
 
 ## Create the Docker bridge network (idempotent)
 network:

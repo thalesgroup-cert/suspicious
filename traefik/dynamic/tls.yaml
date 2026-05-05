@@ -91,6 +91,18 @@ http:
           X-Forwarded-Proto: "https"
           X-Forwarded-For: ""   # Traefik fills this automatically
 
+    # Restrict /admin/ to internal CIDRs (S9). Defaults below cover the
+    # local Docker network and RFC-1918 ranges; tighten by editing this
+    # list (or override via traefik/dynamic/ipallowlist.local.yaml).
+    admin-ip-allowlist:
+      ipAllowList:
+        sourceRange:
+          - "127.0.0.1/32"
+          - "::1/128"
+          - "10.0.0.0/8"
+          - "172.16.0.0/12"
+          - "192.168.0.0/16"
+
   # ── Routers ───────────────────────────────────────────────────────────────
 
   routers:
@@ -113,12 +125,26 @@ http:
         - swagger-csp
         - forward-real-ip
       tls: {}
+    # ── Admin router — IP allowlist gated (S9) ───────────────────────────
+    # Priority 50 wins over suspicious-api so the allowlist always runs
+    # before any /admin/* request hits Django.
+    suspicious-admin:
+      entryPoints:
+        - websecure
+      rule: "PathPrefix(`/admin`)"
+      priority: 50
+      service: suspicious-api-service
+      middlewares:
+        - admin-ip-allowlist
+        - security-headers
+        - forward-real-ip
+      tls: {}
+
     suspicious-api:
       entryPoints:
         - websecure
       rule: >-
         PathPrefix(`/api`)
-        || PathPrefix(`/admin`)
         || PathPrefix(`/static`)
         || PathPrefix(`/media`)
         || PathPrefix(`/oidc`)
