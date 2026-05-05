@@ -22,7 +22,7 @@ import { alpha, useTheme } from "@mui/material/styles";
 import {
   TuneOutlined,
   PaletteOutlined,
-  MailOutline,
+  MailOutlined,
   ShieldOutlined,
   AutoModeOutlined,
   CheckCircleOutlined,
@@ -31,7 +31,7 @@ import {
   DoneOutlined,
   RestoreOutlined,
   DisplaySettingsOutlined,
-  PersonOutline,
+  PersonOutlined,
   SaveOutlined,
   CircleOutlined,
   AccessibilityNewOutlined,
@@ -212,13 +212,13 @@ function ToggleRow({
       </Box>
 
       <Box sx={{ flex: 1, minWidth: 0 }}>
-        <Typography fontWeight={900} fontSize={14}>{title}</Typography>
+        <Typography sx={{ fontWeight: 900, fontSize: 14 }} >{title}</Typography>
         <Typography variant="body2" color="text.secondary" sx={{ fontSize: 12.5 }}>
           {subtitle}
         </Typography>
       </Box>
 
-      <Stack direction="row" spacing={1} alignItems="center" sx={{ flexShrink: 0 }}>
+      <Stack direction="row" spacing={1} sx={{ flexShrink: 0, alignItems: "center" }}>
         <Chip
           size="small"
           label={checked ? "On" : "Off"}
@@ -267,7 +267,7 @@ function DirtyBar({
           bgcolor: theme.palette.warning.main,
           boxShadow: `0 0 8px ${alpha(theme.palette.warning.main, 0.6)}`,
         }} />
-        <Typography variant="body2" fontWeight={700} sx={{ flex: 1, color: "text.secondary" }}>{label}</Typography>
+        <Typography variant="body2" sx={{ flex: 1, color: "text.secondary", fontWeight: 700 }}>{label}</Typography>
         {onReset ? (
           <Button size="small" startIcon={<RestoreOutlined />} onClick={onReset}
             sx={{ textTransform: "none", fontWeight: 800, borderRadius: 2 }}>
@@ -306,7 +306,7 @@ function PreferencesPanel({
 
   return (
     <Stack spacing={2}>
-      <Stack direction="row" spacing={1.5} alignItems="center">
+      <Stack direction="row" spacing={1.5} sx={{ alignItems: "center" }} >
         <Box sx={{
           width: 46, height: 46, borderRadius: 3, display: "grid", placeItems: "center",
           background: "linear-gradient(135deg, rgba(56,189,248,.14), rgba(120,119,198,.12))",
@@ -315,7 +315,7 @@ function PreferencesPanel({
           <TuneOutlined />
         </Box>
         <Box>
-          <Typography variant="h6" fontWeight={950} letterSpacing={-0.2}>Preferences</Typography>
+          <Typography variant="h6" sx={{ fontWeight: 950, letterSpacing: -0.2 }} >Preferences</Typography>
           <Typography variant="body2" color="text.secondary">
             Control communications related to your submissions.
           </Typography>
@@ -346,7 +346,7 @@ function PreferencesPanel({
       </Stack>
 
       {!dirty ? (
-        <Stack direction="row" spacing={0.75} alignItems="center">
+        <Stack direction="row" spacing={0.75} sx={{ alignItems: "center" }} >
           <DoneOutlined sx={{ fontSize: 15, color: "success.main" }} />
           <Typography variant="caption" color="text.secondary">Preferences are up to date.</Typography>
         </Stack>
@@ -376,7 +376,7 @@ function AppearancePanel({
 
   return (
     <Stack spacing={2.5}>
-      <Stack direction="row" spacing={1.5} alignItems="center">
+      <Stack direction="row" spacing={1.5} sx={{ alignItems: "center" }} >
         <Box sx={{
           width: 46, height: 46, borderRadius: 3, display: "grid", placeItems: "center",
           background: "linear-gradient(135deg, rgba(120,119,198,.2), rgba(56,189,248,.12))",
@@ -385,7 +385,7 @@ function AppearancePanel({
           <PaletteOutlined />
         </Box>
         <Box>
-          <Typography variant="h6" fontWeight={950} letterSpacing={-0.2}>Appearance</Typography>
+          <Typography variant="h6" sx={{ fontWeight: 950, letterSpacing: -0.2 }} >Appearance</Typography>
           <Typography variant="body2" color="text.secondary">
             Pick a theme. Preview is instant — save to persist across sessions.
           </Typography>
@@ -402,7 +402,7 @@ function AppearancePanel({
 
       {/* Active theme status */}
       <InnerCard sx={{ px: 2, py: 1.25 }}>
-        <Stack direction="row" spacing={1} alignItems="center" flexWrap="wrap">
+        <Stack direction="row" spacing={1} sx={{ alignItems: "center", flexWrap: "wrap" }} >
           <Typography variant="caption" color="text.secondary" sx={{ fontWeight: 700 }}>Active theme:</Typography>
           <Chip
             size="small" label={themeName} variant="outlined"
@@ -470,7 +470,7 @@ function AppearancePanel({
       <DirtyBar dirty={dirty} saving={saving} onSave={onSave} onReset={onReset} label="Unsaved appearance changes" />
 
       {!dirty ? (
-        <Stack direction="row" spacing={0.75} alignItems="center">
+        <Stack direction="row" spacing={0.75} sx={{ alignItems: "center" }} >
           <DoneOutlined sx={{ fontSize: 15, color: "success.main" }} />
           <Typography variant="caption" color="text.secondary">Appearance is up to date.</Typography>
         </Stack>
@@ -711,11 +711,10 @@ export default function ProfilePage() {
           <Stack
             direction={{ xs: "column", md: "row" }}
             spacing={2.5}
-            alignItems={{ md: "center" }}
-            justifyContent="space-between"
-          >
+            sx={{ alignItems: { md: "center" }, justifyContent: "space-between" }}
+>
             {/* Identity */}
-            <Stack direction="row" spacing={2.25} alignItems="center" sx={{ minWidth: 0 }}>
+            <Stack direction="row" spacing={2.25} sx={{ minWidth: 0, alignItems: "center" }}>
               {/* Avatar with gradient ring */}
               <Box sx={{ position: "relative", flexShrink: 0 }}>
                 <Box sx={{
@@ -737,12 +736,12 @@ export default function ProfilePage() {
               </Box>
 
               <Box sx={{ minWidth: 0 }}>
-                <Typography variant="h4" fontWeight={950} letterSpacing={-0.6} noWrap sx={{ lineHeight: 1.15 }}>
+                <Typography variant="h4" noWrap sx={{ lineHeight: 1.15, fontWeight: 950, letterSpacing: -0.6 }}>
                   {displayName}
                 </Typography>
                 <Stack direction="row" spacing={0.75} sx={{ mt: 1, flexWrap: "wrap" }}>
                   {me.email ? (
-                    <Chip size="small" icon={<MailOutline />} label={me.email} variant="outlined"
+                    <Chip size="small" icon={<MailOutlined />} label={me.email} variant="outlined"
                       sx={{ height: 24, "& .MuiChip-label": { fontSize: 12 } }} />
                   ) : null}
                   {isElevated ? (
@@ -761,12 +760,12 @@ export default function ProfilePage() {
             </Stack>
 
             {/* Account info + global save status */}
-            <Stack alignItems={{ xs: "flex-start", md: "flex-end" }} spacing={0.4} sx={{ flexShrink: 0 }}>
+            <Stack spacing={0.4} sx={{ flexShrink: 0, alignItems: { xs: "flex-start", md: "flex-end" } }}>
               <Typography variant="caption" color="text.disabled"
                 sx={{ fontWeight: 700, textTransform: "uppercase", letterSpacing: 0.5, fontSize: 10 }}>
                 Account
               </Typography>
-              <Typography fontWeight={900} fontSize={14}>{me.username}</Typography>
+              <Typography sx={{ fontWeight: 900, fontSize: 14 }} >{me.username}</Typography>
               <Stack direction="row" spacing={0.5}>
                 {anyDirty ? (
                   <Chip size="small" label="Unsaved changes" sx={{
@@ -806,17 +805,17 @@ export default function ProfilePage() {
         <SoftCard sx={{ position: { md: "sticky" }, top: { md: 16 }, overflow: "hidden" }}>
           <CardContent sx={{ p: 1.5 }}>
             {/* Identity mini */}
-            <Stack direction="row" spacing={1.25} alignItems="center" sx={{ px: 1, py: 1, mb: 0.5 }}>
+            <Stack direction="row" spacing={1.25} sx={{ px: 1, py: 1, mb: 0.5, alignItems: "center" }}>
               <Box sx={{
                 width: 42, height: 42, borderRadius: 3, display: "grid", placeItems: "center",
                 border: `1px solid ${alpha(theme.palette.divider, isDark ? 0.22 : 0.6)}`,
                 background: "linear-gradient(135deg, rgba(56,189,248,.14), rgba(120,119,198,.12))",
                 "& svg": { fontSize: 22 },
               }}>
-                <PersonOutline />
+                <PersonOutlined />
               </Box>
               <Box sx={{ minWidth: 0 }}>
-                <Typography fontWeight={950} fontSize={14}>My profile</Typography>
+                <Typography sx={{ fontWeight: 950, fontSize: 14 }} >My profile</Typography>
                 <Typography variant="caption" color="text.secondary" noWrap>{me.username}</Typography>
               </Box>
             </Stack>
@@ -843,7 +842,7 @@ export default function ProfilePage() {
                     <NavIcon icon={item.icon} isDark={isDark} />
                     <ListItemText
                       primary={
-                        <Stack direction="row" spacing={0.75} alignItems="center">
+                        <Stack direction="row" spacing={0.75} sx={{ alignItems: "center" }} >
                           <span>{item.label}</span>
                           {item.dirty ? (
                             <Box sx={{ width: 6, height: 6, borderRadius: 99, bgcolor: "warning.main", flexShrink: 0 }} />
@@ -852,13 +851,17 @@ export default function ProfilePage() {
                       }
                       secondary={item.sub}
                       sx={{ ml: 1.25 }}
-                      primaryTypographyProps={{
-                        fontWeight: isActive ? 950 : 800,
-                        fontSize: 13.5,
-                        color: isActive ? "primary.main" : undefined,
-                      }}
-                      secondaryTypographyProps={{
-                        sx: { display: { xs: "none", md: "block" }, fontSize: 11, mt: 0.15 },
+                      slotProps={{
+                        primary: {
+                          sx: {
+                            fontWeight: isActive ? 950 : 800,
+                            fontSize: 13.5,
+                            color: isActive ? "primary.main" : undefined,
+                          },
+                        },
+                        secondary: {
+                          sx: { display: { xs: "none", md: "block" }, fontSize: 11, mt: 0.15 },
+                        },
                       }}
                     />
                   </ListItemButton>

@@ -24,14 +24,11 @@ export default function NotFound({ standalone = false }: Props) {
   const content = (
     <Stack
       spacing={3}
-      alignItems="center"
-      sx={{
-        textAlign: "center",
+      sx={{ textAlign: "center",
         maxWidth: 480,
         mx: "auto",
         px: 3,
-        py: standalone ? 0 : 8,
-      }}
+        py: standalone ? 0 : 8, alignItems: "center" }}
     >
       {/* Icon badge */}
       <Box
@@ -53,23 +50,19 @@ export default function NotFound({ standalone = false }: Props) {
       <Stack spacing={0.75}>
         <Typography
           variant="h3"
-          fontWeight={950}
-          letterSpacing={-0.8}
-          sx={{
-            fontSize: { xs: 40, sm: 56 },
+          sx={{ fontSize: { xs: 40, sm: 56 },
             lineHeight: 1,
             background: isDark
               ? `linear-gradient(135deg, ${theme.palette.text.primary}, ${alpha(theme.palette.text.primary, 0.55)})`
               : `linear-gradient(135deg, ${theme.palette.text.primary}, ${alpha(theme.palette.text.primary, 0.5)})`,
             WebkitBackgroundClip: "text",
             WebkitTextFillColor: "transparent",
-            backgroundClip: "text",
-          }}
+            backgroundClip: "text", fontWeight: 950, letterSpacing: -0.8 }}
         >
           404
         </Typography>
 
-        <Typography variant="h6" fontWeight={800} letterSpacing={-0.3}>
+        <Typography variant="h6" sx={{ fontWeight: 800, letterSpacing: -0.3 }} >
           Page not found
         </Typography>
 

@@ -359,11 +359,10 @@ function InvestigationAnalyzerReportCard({
         <Stack
           direction={{ xs: "column", sm: "row" }}
           spacing={1.25}
-          justifyContent="space-between"
-          alignItems={{ xs: "flex-start", sm: "center" }}
-        >
+          sx={{ justifyContent: "space-between", alignItems: { xs: "flex-start", sm: "center" } }}
+>
           <Box>
-            <Typography variant="subtitle1" fontWeight={900}>
+            <Typography variant="subtitle1" sx={{ fontWeight: 900 }} >
               {report.analyzer_name || "Unknown analyzer"}
             </Typography>
             <Typography variant="body2" color="text.secondary">
@@ -371,7 +370,7 @@ function InvestigationAnalyzerReportCard({
             </Typography>
           </Box>
 
-          <Stack direction="row" spacing={1} alignItems="center" sx={{ flexWrap: "wrap" }}>
+          <Stack direction="row" spacing={1} sx={{ flexWrap: "wrap", alignItems: "center" }}>
             <Chip
               size="small"
               label={risk.label}
@@ -416,7 +415,7 @@ function InvestigationAnalyzerReportCard({
                 background: detailBg,
               }}
             >
-              <Typography variant="body2" fontWeight={800} sx={{ mb: 0.75 }}>
+              <Typography variant="body2" sx={{ mb: 0.75, fontWeight: 800 }}>
                 What this means
               </Typography>
               <Typography variant="body2" sx={{ lineHeight: 1.6 }}>
@@ -427,9 +426,9 @@ function InvestigationAnalyzerReportCard({
             {/* Score + confidence bars */}
             <Stack spacing={1.25}>
               <Box>
-                <Stack direction="row" justifyContent="space-between" sx={{ mb: 0.5 }}>
-                  <Typography variant="body2" fontWeight={700}>Risk score</Typography>
-                  <Typography variant="body2" fontWeight={900}>
+                <Stack direction="row" sx={{ mb: 0.5, justifyContent: "space-between" }}>
+                  <Typography variant="body2" sx={{ fontWeight: 700 }} >Risk score</Typography>
+                  <Typography variant="body2" sx={{ fontWeight: 900 }} >
                     {typeof report.score === "number"
                       ? report.score.toFixed(report.score <= 10 ? 1 : 0)
                       : "—"}
@@ -443,9 +442,9 @@ function InvestigationAnalyzerReportCard({
               </Box>
 
               <Box>
-                <Stack direction="row" justifyContent="space-between" sx={{ mb: 0.5 }}>
-                  <Typography variant="body2" fontWeight={700}>Confidence</Typography>
-                  <Typography variant="body2" fontWeight={900}>
+                <Stack direction="row" sx={{ mb: 0.5, justifyContent: "space-between" }}>
+                  <Typography variant="body2" sx={{ fontWeight: 700 }} >Confidence</Typography>
+                  <Typography variant="body2" sx={{ fontWeight: 900 }} >
                     {Math.round(confidencePct)}%
                   </Typography>
                 </Stack>
@@ -503,7 +502,7 @@ function InvestigationAnalyzerReportCard({
               }}
             >
               <AccordionSummary expandIcon={<ExpandMoreOutlined />} onClick={(e) => e.stopPropagation()}>
-                <Typography variant="body2" fontWeight={800}>Technical details</Typography>
+                <Typography variant="body2" sx={{ fontWeight: 800 }} >Technical details</Typography>
               </AccordionSummary>
               <AccordionDetails onClick={(e) => e.stopPropagation()}>
                 <Stack spacing={1.5}>
@@ -544,7 +543,7 @@ function InvestigationAnalyzerReportCard({
                       }}
                     >
                       <AccordionSummary expandIcon={<ExpandMoreOutlined />} onClick={(e) => e.stopPropagation()}>
-                        <Typography variant="body2" fontWeight={800}>Taxonomy JSON</Typography>
+                        <Typography variant="body2" sx={{ fontWeight: 800 }} >Taxonomy JSON</Typography>
                       </AccordionSummary>
                       <AccordionDetails onClick={(e) => e.stopPropagation()}>
                         <Box
@@ -575,7 +574,7 @@ function InvestigationAnalyzerReportCard({
                       }}
                     >
                       <AccordionSummary expandIcon={<ExpandMoreOutlined />} onClick={(e) => e.stopPropagation()}>
-                        <Typography variant="body2" fontWeight={800}>Summary JSON</Typography>
+                        <Typography variant="body2" sx={{ fontWeight: 800 }} >Summary JSON</Typography>
                       </AccordionSummary>
                       <AccordionDetails onClick={(e) => e.stopPropagation()}>
                         <Box
@@ -866,16 +865,15 @@ export default function InvestigationPage() {
       <Stack
         direction={{ xs: "column", md: "row" }}
         spacing={2}
-        justifyContent="space-between"
-        sx={{ mb: 2 }}
+        sx={{ mb: 2, justifyContent: "space-between" }}
       >
         <Stack spacing={0.4}>
-          <Stack direction="row" spacing={1.25} alignItems="center">
+          <Stack direction="row" spacing={1.25} sx={{ alignItems: "center" }} >
             <Avatar sx={{ width: 46, height: 46, fontWeight: 950 }}>
               {(me.username?.[0] ?? "A").toUpperCase()}
             </Avatar>
             <Box>
-              <Typography variant="h4" fontWeight={950} letterSpacing={-0.5}>
+              <Typography variant="h4" sx={{ fontWeight: 950, letterSpacing: -0.5 }} >
                 Investigation
               </Typography>
               <Typography color="text.secondary">
@@ -891,7 +889,7 @@ export default function InvestigationPage() {
           </Stack>
         </Stack>
 
-        <Stack direction="row" spacing={1} alignItems="center">
+        <Stack direction="row" spacing={1} sx={{ alignItems: "center" }} >
           <Button
             variant="contained"
             onClick={() => navigate("/submit")}
@@ -916,19 +914,21 @@ export default function InvestigationPage() {
       <SoftCard sx={{ mb: 2 }}>
         <CardContent sx={{ p: { xs: 2.25, md: 3 } }}>
           <Stack spacing={1.5}>
-            <Stack direction={{ xs: "column", md: "row" }} spacing={1.25} alignItems="stretch">
+            <Stack direction={{ xs: "column", md: "row" }} spacing={1.25} sx={{ alignItems: "stretch" }} >
               <TextField
                 value={q}
                 onChange={(e) => setQ(e.target.value)}
                 label="Search"
                 placeholder="id, user mail, status, artifact, type, result"
                 fullWidth
-                InputProps={{
-                  startAdornment: (
-                    <InputAdornment position="start">
-                      <SearchOutlined fontSize="small" />
-                    </InputAdornment>
-                  ),
+                slotProps={{
+                  input: {
+                    startAdornment: (
+                      <InputAdornment position="start">
+                        <SearchOutlined fontSize="small" />
+                      </InputAdornment>
+                    ),
+                  },
                 }}
               />
 
@@ -978,13 +978,13 @@ export default function InvestigationPage() {
               </FormControl>
             </Stack>
 
-            <Stack direction={{ xs: "column", md: "row" }} spacing={1.25} alignItems="stretch">
+            <Stack direction={{ xs: "column", md: "row" }} spacing={1.25} sx={{ alignItems: "stretch" }} >
               <TextField
                 label="From"
                 type="date"
                 value={from}
                 onChange={(e) => setFrom(e.target.value)}
-                InputLabelProps={{ shrink: true }}
+                slotProps={{ inputLabel: { shrink: true } }}
                 fullWidth
               />
               <TextField
@@ -992,7 +992,7 @@ export default function InvestigationPage() {
                 type="date"
                 value={to}
                 onChange={(e) => setTo(e.target.value)}
-                InputLabelProps={{ shrink: true }}
+                slotProps={{ inputLabel: { shrink: true } }}
                 fullWidth
               />
 
@@ -1039,14 +1039,13 @@ export default function InvestigationPage() {
             <Stack
               direction={{ xs: "column", md: "row" }}
               spacing={1}
-              justifyContent="space-between"
-              alignItems={{ md: "center" }}
-            >
+              sx={{ justifyContent: "space-between", alignItems: { md: "center" } }}
+>
               <Typography variant="body2" color="text.secondary">
                 {total === 0 ? "No results" : `Showing ${start + 1}-${end} of ${total}`}
               </Typography>
 
-              <Stack direction="row" spacing={1} alignItems="center">
+              <Stack direction="row" spacing={1} sx={{ alignItems: "center" }} >
                 <FormControl sx={{ width: 140 }}>
                   <InputLabel id="pagesize-label">Rows</InputLabel>
                   <Select
@@ -1151,7 +1150,7 @@ export default function InvestigationPage() {
                     >
                       {/* ID */}
                       <TableCell>
-                        <Stack direction="row" spacing={0.5} alignItems="center">
+                        <Stack direction="row" spacing={0.5} sx={{ alignItems: "center" }} >
                           <Button
                             size="small"
                             variant="contained"
@@ -1206,7 +1205,7 @@ export default function InvestigationPage() {
 
                       {/* User mail */}
                       <TableCell onClick={(e) => e.stopPropagation()}>
-                        <Stack direction="row" spacing={0.5} alignItems="center">
+                        <Stack direction="row" spacing={0.5} sx={{ alignItems: "center" }} >
                           <Typography variant="body2" sx={{ fontWeight: 700 }}>
                             {r.reporter_email ?? "—"}
                           </Typography>
@@ -1235,20 +1234,22 @@ export default function InvestigationPage() {
         anchor="right"
         open={openDrawer}
         onClose={closeDrawer}
-        PaperProps={{
-          sx: (theme) => ({
-            width: { xs: "100%", sm: 620 },
-            p: 0,
-            borderLeft: `1px solid ${theme.palette.divider}`,
-            background: `linear-gradient(
-              180deg,
-              ${theme.palette.background.paper} 0%,
-              ${alpha(theme.palette.background.default, 0.98)} 100%
-            )`,
-            color: theme.palette.text.primary,
-            overflow: "hidden",
-            borderRadius: DRAWER_RADIUS,
-          }),
+        slotProps={{
+          paper: {
+            sx: (theme) => ({
+              width: { xs: "100%", sm: 620 },
+              p: 0,
+              borderLeft: `1px solid ${theme.palette.divider}`,
+              background: `linear-gradient(
+                180deg,
+                ${theme.palette.background.paper} 0%,
+                ${alpha(theme.palette.background.default, 0.98)} 100%
+              )`,
+              color: theme.palette.text.primary,
+              overflow: "hidden",
+              borderRadius: DRAWER_RADIUS,
+            }),
+          },
         }}
       >
         {!drawerRow ? (
@@ -1268,11 +1269,11 @@ export default function InvestigationPage() {
                 )`,
               })}
             >
-              <Stack direction="row" alignItems="flex-start" justifyContent="space-between" spacing={2}>
+              <Stack direction="row" spacing={2} sx={{ alignItems: "flex-start", justifyContent: "space-between" }} >
                 <Box>
                   <Typography variant="overline" color="text.secondary">Investigation</Typography>
-                  <Stack direction="row" spacing={1} alignItems="center" sx={{ mt: 0.25 }}>
-                    <Typography variant="h5" fontWeight={950} lineHeight={1.1}>
+                  <Stack direction="row" spacing={1} sx={{ mt: 0.25, alignItems: "center" }}>
+                    <Typography variant="h5" sx={{ fontWeight: 950, lineHeight: 1.1 }} >
                       #{drawerRow.id}
                     </Typography>
                     <CopyIconButton text={String(drawerRow.id)} title="Copy ID" />
@@ -1282,7 +1283,7 @@ export default function InvestigationPage() {
                   </Typography>
                 </Box>
 
-                <Stack direction="row" spacing={1} alignItems="center">
+                <Stack direction="row" spacing={1} sx={{ alignItems: "center" }} >
                   <Tooltip
                     title={detailsReady ? "" : "Load details to edit global override"}
                     arrow
@@ -1390,7 +1391,7 @@ export default function InvestigationPage() {
                   <Typography sx={{ fontSize: 10, fontWeight: 700, textTransform: "uppercase", letterSpacing: "0.08em", color: "text.disabled", mb: 0.75 }}>
                     Reported by
                   </Typography>
-                  <Stack direction="row" spacing={1} alignItems="center">
+                  <Stack direction="row" spacing={1} sx={{ alignItems: "center" }} >
                     <Typography sx={{ fontWeight: 700, fontSize: 13.5 }}>
                       {drawerRow.reporter_email || "—"}
                     </Typography>
@@ -1407,7 +1408,7 @@ export default function InvestigationPage() {
 
                 {/* ── Global verdict override ───────────────────────────────────── */}
                 <Box sx={{ px: 2.25, py: 2 }}>
-                  <Stack direction="row" alignItems="center" justifyContent="space-between" sx={{ mb: 1 }}>
+                  <Stack direction="row" sx={{ mb: 1, alignItems: "center", justifyContent: "space-between" }}>
                     <Typography sx={{ fontSize: 10, fontWeight: 700, textTransform: "uppercase", letterSpacing: "0.08em", color: "text.disabled" }}>
                       Verdict override
                     </Typography>
@@ -1442,7 +1443,7 @@ export default function InvestigationPage() {
                   </Stack>
 
                   {detailsQuery.isLoading ? (
-                    <Stack direction="row" spacing={1} alignItems="center">
+                    <Stack direction="row" spacing={1} sx={{ alignItems: "center" }} >
                       <CircularProgress size={14} />
                       <Typography variant="caption" color="text.secondary">Loading…</Typography>
                     </Stack>
@@ -1451,13 +1452,13 @@ export default function InvestigationPage() {
                   ) : !editMode ? (
                     <Stack spacing={1.25}>
                       {/* Human override */}
-                      <Stack direction="row" spacing={1} alignItems="center" flexWrap="wrap">
+                      <Stack direction="row" spacing={1} sx={{ alignItems: "center", flexWrap: "wrap" }} >
                         <ResultChip result={String(currentClassification ?? "UNKNOWN")} minWidth={BADGE_W} />
                         <Chip size="small" label={`Score ${currentScore ?? "—"}/10`} variant="outlined" sx={{ fontWeight: 800 }} />
                         <Chip size="small" label={`Confidence ${currentConfidence ?? "—"}%`} variant="outlined" sx={{ fontWeight: 800 }} />
                       </Stack>
                       {/* AI reference row */}
-                      <Stack direction="row" spacing={0.75} flexWrap="wrap" sx={{ opacity: 0.65 }}>
+                      <Stack direction="row" spacing={0.75} sx={{ opacity: 0.65, flexWrap: "wrap" }}>
                         <Typography variant="caption" color="text.secondary" sx={{ fontWeight: 700, mr: 0.25 }}>AI:</Typography>
                         {[
                           `${detailsQuery.data?.case_infos?.classification_ai ?? "—"}`,
@@ -1475,10 +1476,10 @@ export default function InvestigationPage() {
                       <Stack direction={{ xs: "column", sm: "row" }} spacing={1.25}>
                         <TextField label="Score (0-10)" value={editScore}
                           onChange={(e) => setEditScore(e.target.value)}
-                          type="number" inputProps={{ min: 0, max: 10, step: 0.1 }} size="small" fullWidth />
+                          type="number" slotProps={{ htmlInput: { min: 0, max: 10, step: 0.1 } }} size="small" fullWidth />
                         <TextField label="Confidence (0-100)" value={editConfidence}
                           onChange={(e) => setEditConfidence(e.target.value)}
-                          type="number" inputProps={{ min: 0, max: 100, step: 0.1 }} size="small" fullWidth />
+                          type="number" slotProps={{ htmlInput: { min: 0, max: 100, step: 0.1 } }} size="small" fullWidth />
                       </Stack>
                       <FormControl fullWidth size="small">
                         <InputLabel id="classification-label">Classification</InputLabel>
@@ -1490,7 +1491,7 @@ export default function InvestigationPage() {
                           ))}
                         </Select>
                       </FormControl>
-                      <Stack direction="row" spacing={1} alignItems="center">
+                      <Stack direction="row" spacing={1} sx={{ alignItems: "center" }} >
                         <Button variant="contained" startIcon={editMutation.isPending ? <CircularProgress size={13} color="inherit" /> : <SaveOutlined />}
                           disabled={!canSave || !hasNumericSelectedId}
                           onClick={() => {
@@ -1508,7 +1509,7 @@ export default function InvestigationPage() {
 
                 {/* ── Analysis results — grouped by artifact ────────────────────── */}
                 <Box sx={{ px: 2.25, pt: 2, pb: 1 }}>
-                  <Stack direction="row" alignItems="center" justifyContent="space-between" sx={{ mb: 1.25 }}>
+                  <Stack direction="row" sx={{ mb: 1.25, alignItems: "center", justifyContent: "space-between" }}>
                     <Typography sx={{ fontSize: 10, fontWeight: 700, textTransform: "uppercase", letterSpacing: "0.08em", color: "text.disabled" }}>
                       Analysis · {analyzerReports.length} report{analyzerReports.length !== 1 ? "s" : ""}
                     </Typography>
@@ -1527,7 +1528,7 @@ export default function InvestigationPage() {
                   </Stack>
 
                   {detailsQuery.isLoading ? (
-                    <Stack direction="row" spacing={1} alignItems="center" sx={{ py: 2 }}>
+                    <Stack direction="row" spacing={1} sx={{ py: 2, alignItems: "center" }}>
                       <CircularProgress size={16} />
                       <Typography variant="caption" color="text.secondary">Loading analysis…</Typography>
                     </Stack>
@@ -1572,7 +1573,7 @@ export default function InvestigationPage() {
                               }}>
                                 {kindLabel(group.kind)}
                               </Box>
-                              <Typography variant="body2" fontWeight={700} sx={{ flex: 1, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap", fontSize: 12.5 }} title={group.value}>
+                              <Typography variant="body2" sx={{ flex: 1, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap", fontSize: 12.5, fontWeight: 700 }} title={group.value}>
                                 {group.value}
                               </Typography>
                               <Typography variant="caption" color="text.disabled" sx={{ flexShrink: 0, fontSize: 11 }}>

@@ -216,9 +216,7 @@ function KpiCard(props: {
     >
       <Stack
         direction="row"
-        alignItems="baseline"
-        justifyContent="space-between"
-        sx={{ mb: 0.5 }}
+        sx={{ mb: 0.5, alignItems: "baseline", justifyContent: "space-between" }}
       >
         <Typography sx={{ fontSize: 30, fontWeight: 950, lineHeight: 1.05 }}>
           {props.value}

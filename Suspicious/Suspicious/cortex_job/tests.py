@@ -1,0 +1,335 @@
+"""Unit + integration tests for the Cortex scoring pipeline."""
+from datetime import timedelta
+from unittest.mock import MagicMock, patch
+
+from django.test import TestCase
+from django.utils import timezone
+
+from cortex_job.cortex_utils.cortex_and_job_management import (
+    CortexJob,
+    CortexJobManager,
+)
+from cortex_job.models import Analyzer, AnalyzerReport
+from domain_process.models import Domain
+from url_process.models import URL
+from ip_process.models import IP
+from hash_process.models import Hash
+from email_process.models import MailAddress
+
+
+class RunAnalyzerStatusTests(TestCase):
+    def test_run_analyzer_creates_report_with_inprogress_status(self):
+        analyzer = MagicMock()
+        analyzer.id = "ana-1"
+        analyzer.name = "VirusTotal_GetReport_3_1"
+
+        domain = Domain.objects.create(value="example.com")
+
+        api = MagicMock()
+        report_obj = MagicMock()
+        report_obj.id = "job-xyz"
+        api.analyzers.run_by_name.return_value = report_obj
+
+        result = CortexJob.run_analyzer(api, analyzer, domain, "domain")
+
+        self.assertIsNotNone(result)
+        row = AnalyzerReport.objects.get(cortex_job_id="job-xyz")
+        self.assertEqual(row.status, "InProgress")
+
+
+class GetNewReportsTests(TestCase):
+    def setUp(self):
+        self.analyzer = Analyzer.objects.create(
+            analyzer_cortex_id="vt-1",
+            name="VirusTotal_GetReport_3_1",
+            weight=0.2,
+        )
+        self.domain = Domain.objects.create(value="example.com")
+        self.manager = CortexJobManager()
+        self.manager.case = MagicMock(id=42)
+
+    def _make_report(self, status, days_old=0):
+        report = AnalyzerReport.objects.create(
+            cortex_job_id=f"job-{status}-{days_old}",
+            type="domain",
+            status=status,
+            analyzer=self.analyzer,
+            domain=self.domain,
+            level="info",
+            confidence=0,
+            score=0,
+            report_summary={},
+            report_full={},
+            report_taxonomy={},
+        )
+        if days_old:
+            AnalyzerReport.objects.filter(pk=report.pk).update(
+                creation_date=timezone.now() - timedelta(days=days_old)
+            )
+            report.refresh_from_db()
+        return report
+
+    def test_returns_old_inprogress_report(self):
+        old = self._make_report("InProgress", days_old=7)
+        result = list(self.manager.get_new_reports("domain", {"domain": self.domain}))
+        self.assertIn(old, result)
+
+    def test_excludes_deleted_reports(self):
+        deleted = self._make_report("Deleted")
+        result = list(self.manager.get_new_reports("domain", {"domain": self.domain}))
+        self.assertNotIn(deleted, result)
+
+    def test_returns_success_reports(self):
+        ok = self._make_report("Success", days_old=3)
+        result = list(self.manager.get_new_reports("domain", {"domain": self.domain}))
+        self.assertIn(ok, result)
+
+
+class ArtifactValueTests(TestCase):
+    def setUp(self):
+        self.analyzer = Analyzer.objects.create(
+            analyzer_cortex_id="any", name="any", weight=0.2,
+        )
+
+    def _make_report(self, **fk):
+        return AnalyzerReport.objects.create(
+            cortex_job_id="job-art",
+            type="any",
+            status="Success",
+            analyzer=self.analyzer,
+            level="info",
+            confidence=0,
+            score=0,
+            report_summary={},
+            report_full={},
+            report_taxonomy={},
+            **fk,
+        )
+
+    def test_domain_value(self):
+        d = Domain.objects.create(value="example.com")
+        r = self._make_report(domain=d)
+        self.assertEqual(CortexJobManager._artifact_value(r), "example.com")
+
+    def test_url_address(self):
+        u = URL.objects.create(address="https://example.com/x")
+        r = self._make_report(url=u)
+        self.assertEqual(CortexJobManager._artifact_value(r), "https://example.com/x")
+
+    def test_ip_address(self):
+        ip = IP.objects.create(address="1.2.3.4")
+        r = self._make_report(ip=ip)
+        self.assertEqual(CortexJobManager._artifact_value(r), "1.2.3.4")
+
+    def test_hash_value(self):
+        h = Hash.objects.create(value="deadbeef")
+        r = self._make_report(hash=h)
+        self.assertEqual(CortexJobManager._artifact_value(r), "deadbeef")
+
+    def test_mail_address(self):
+        m = MailAddress.objects.create(address="a@b.com")
+        r = self._make_report(mail=m)
+        self.assertEqual(CortexJobManager._artifact_value(r), "a@b.com")
+
+    def test_orphan_raises(self):
+        r = self._make_report()
+        with self.assertRaises(ValueError):
+            CortexJobManager._artifact_value(r)
+
+
+class GetCortexJobsResultsScoringTests(TestCase):
+    def setUp(self):
+        self.analyzer = Analyzer.objects.create(
+            analyzer_cortex_id="vt-1",
+            name="VirusTotal_GetReport_3_1",
+            weight=0.2,
+        )
+        self.domain = Domain.objects.create(value="domaintools.com")
+        self.report = AnalyzerReport.objects.create(
+            cortex_job_id="TP2J3p0B7embIO9oHKlU",
+            type="domain",
+            status="InProgress",
+            analyzer=self.analyzer,
+            domain=self.domain,
+            level="info",
+            confidence=0,
+            score=0,
+            report_summary={},
+            report_full={},
+            report_taxonomy={},
+        )
+
+    @staticmethod
+    def _vt_report():
+        return {
+            "summary": {
+                "taxonomies": [
+                    {"level": "info",      "namespace": "VT", "predicate": "GetReport", "value": "0/91"},
+                    {"level": "malicious", "namespace": "VT", "predicate": "GetReport", "value": "7 resolution(s)"},
+                    {"level": "malicious", "namespace": "VT", "predicate": "GetReport", "value": "14 downloaded file(s)"},
+                ]
+            },
+            "full": {"results": []},
+        }
+
+    def test_scores_written_on_success(self):
+        job = MagicMock(status="Success", dataType="domain")
+        report = self._vt_report()
+
+        with patch.object(
+            CortexJobManager, "get_job_from_api", return_value=job,
+        ), patch.object(
+            CortexJobManager, "get_report_from_api", return_value=report,
+        ):
+            CortexJobManager._job_cache.clear()
+            CortexJobManager._report_cache.clear()
+            CortexJobManager.get_cortex_jobs_results(self.report, "domain")
+
+        self.report.refresh_from_db()
+        self.assertEqual(self.report.status, "Success")
+        self.assertEqual(self.report.level, "malicious")
+        self.assertEqual(self.report.score, 10)
+        self.assertEqual(self.report.confidence, 100)
+
+    def test_no_score_written_when_inprogress(self):
+        job = MagicMock(status="InProgress", dataType="domain")
+        report = self._vt_report()
+
+        with patch.object(
+            CortexJobManager, "get_job_from_api", return_value=job,
+        ), patch.object(
+            CortexJobManager, "get_report_from_api", return_value=report,
+        ):
+            CortexJobManager._job_cache.clear()
+            CortexJobManager._report_cache.clear()
+            CortexJobManager.get_cortex_jobs_results(self.report, "domain")
+
+        self.report.refresh_from_db()
+        self.assertEqual(self.report.status, "InProgress")
+        self.assertEqual(self.report.score, 0)
+        self.assertEqual(self.report.level, "info")
+
+
+from case_handler.models import Case
+
+
+class GenerateDescriptionTests(TestCase):
+    def setUp(self):
+        self.case = MagicMock(spec=Case)
+        self.case.id = 1
+        self.case.status = "On Going"
+        self.case.description = ""
+        self.case.save = MagicMock()
+
+        self.manager = CortexJobManager()
+
+    def test_empty_results_keep_case_ongoing(self):
+        self.manager.calculate_total_results()
+        self.manager.generate_description(self.case)
+        self.assertEqual(self.case.status, "On Going")
+
+    def test_all_terminal_with_reports_marks_done(self):
+        self.manager.results["domain"]["reports"].add("r1")
+        self.manager.results["domain"]["success"].add("r1")
+        self.manager.calculate_total_results()
+        self.manager.generate_description(self.case)
+        self.assertEqual(self.case.status, "Done")
+
+
+class FullCycleScoringTests(TestCase):
+    """
+    All five fixes cooperate: an old InProgress row with the real
+    domaintools.com VT payload gets fetched, scored, and the case flips
+    to Done with the right values.
+
+    Drives the loop manually (get_new_reports → update_results →
+    calculate_total_results → generate_description) instead of through
+    update_ongoing_case_jobs() to avoid wiring the full Artifact /
+    CaseHasNonFileIocs chain.
+    """
+
+    def test_full_cycle_vt_domain_scoring(self):
+        from django.contrib.auth import get_user_model
+        from django.db.models.signals import post_save
+        from case_handler.models import Case
+        from case_handler.signals import on_case_created
+
+        # case_handler.signals.on_case_created imports the deleted
+        # api.metrics module (unrelated monitoring rip-out). Disconnect
+        # for the duration of this test.
+        post_save.disconnect(on_case_created, sender=Case)
+        self.addCleanup(post_save.connect, on_case_created, sender=Case)
+
+        User = get_user_model()
+        reporter = User.objects.create_user(username="tester", password="x")
+
+        analyzer = Analyzer.objects.create(
+            analyzer_cortex_id="vt-1",
+            name="VirusTotal_GetReport_3_1",
+            weight=0.2,
+        )
+        domain = Domain.objects.create(value="domaintools.com")
+        case = Case.objects.create(
+            description="",
+            reporter=reporter,
+            status="On Going",
+        )
+
+        old = AnalyzerReport.objects.create(
+            cortex_job_id="TP2J3p0B7embIO9oHKlU",
+            type="domain",
+            status="InProgress",
+            analyzer=analyzer,
+            domain=domain,
+            level="info",
+            confidence=0,
+            score=0,
+            report_summary={},
+            report_full={},
+            report_taxonomy={},
+        )
+        # Force creation_date older than 24h to prove we no longer drop old rows
+        AnalyzerReport.objects.filter(pk=old.pk).update(
+            creation_date=timezone.now() - timedelta(days=5)
+        )
+
+        job = MagicMock(status="Success", dataType="domain")
+        job.id = "TP2J3p0B7embIO9oHKlU"
+        vt_payload = {
+            "summary": {
+                "taxonomies": [
+                    {"level": "info",      "namespace": "VT", "predicate": "GetReport", "value": "0/91"},
+                    {"level": "malicious", "namespace": "VT", "predicate": "GetReport", "value": "7 resolution(s)"},
+                    {"level": "malicious", "namespace": "VT", "predicate": "GetReport", "value": "14 downloaded file(s)"},
+                ]
+            },
+            "full": {"results": []},
+        }
+
+        CortexJobManager._job_cache.clear()
+        CortexJobManager._report_cache.clear()
+
+        manager = CortexJobManager()
+        manager.case = case
+
+        with patch.object(
+            CortexJobManager, "get_job_from_api", return_value=job,
+        ), patch.object(
+            CortexJobManager, "get_report_from_api", return_value=vt_payload,
+        ):
+            reports = list(
+                manager.get_new_reports("domain", {"domain": domain})
+            )
+            self.assertIn(old, reports)
+            manager.update_results("domain", reports)
+            manager.calculate_total_results()
+            manager.generate_description(case)
+
+        old.refresh_from_db()
+        case.refresh_from_db()
+
+        self.assertEqual(old.status, "Success")
+        self.assertEqual(old.level, "malicious")
+        self.assertEqual(old.score, 10)
+        self.assertEqual(old.confidence, 100)
+        self.assertEqual(case.status, "Done")

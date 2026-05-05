@@ -23,7 +23,7 @@ export default function PageLoader(props: { label?: string }) {
         }}
       >
         <CardContent>
-          <Stack spacing={2} alignItems="center">
+          <Stack component="div" spacing={2} sx={{ alignItems: "center" }}>
             <CircularProgress
                 size={26}
                 sx={{

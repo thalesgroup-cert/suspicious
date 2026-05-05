@@ -43,3 +43,5 @@ minio
 *.key
 *.pem
 *.jks
+
+suspicious-ui/.pnpm-store/

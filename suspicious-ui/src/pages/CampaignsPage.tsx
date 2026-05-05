@@ -712,20 +712,19 @@ export default function CampaignsPage() {
       <Stack
         direction={{ xs: "column", md: "row" }}
         spacing={1.5}
-        justifyContent="space-between"
-        sx={{ mb: 1.5 }}
+        sx={{ mb: 1.5, justifyContent: "space-between" }}
       >
         <Stack spacing={0.2}>
-          <Typography variant="h5" fontWeight={900} letterSpacing={-0.4}>
+          <Typography variant="h5" sx={{ fontWeight: 900, letterSpacing: -0.4 }} >
             Campaign Dashboard
           </Typography>
-          <Typography color="text.secondary" fontSize={14}>
+          <Typography color="text.secondary" sx={{ fontSize: 14 }} >
             Phishing campaigns visibility: classification, clusters, and volume
             over time.
           </Typography>
         </Stack>
 
-        <Stack direction="row" spacing={1} alignItems="center">
+        <Stack direction="row" spacing={1} sx={{ alignItems: "center" }} >
           <Chip
             icon={<CampaignOutlined />}
             label="Live"

@@ -53,7 +53,7 @@ export function DashboardEmpty(props: {
         mb: 2,
       }}
     >
-      <Stack direction={{ xs: "column", sm: "row" }} alignItems={{ xs: "flex-start", sm: "center" }} justifyContent="space-between" spacing={2}>
+      <Stack direction={{ xs: "column", sm: "row" }} spacing={2} sx={{ alignItems: { xs: "flex-start", sm: "center" }, justifyContent: "space-between" }} >
         <Box>
           <Typography sx={{ fontWeight: 950 }}>{props.title}</Typography>
           <Typography variant="body2" color="text.secondary" sx={{ mt: 0.25 }}>

@@ -124,7 +124,6 @@ INSTALLED_APPS = [
     "django.contrib.sites",
 
     # Third-party
-    "django_prometheus",
     "rest_framework",
     "drf_spectacular",
     "knox",
@@ -154,7 +153,6 @@ INSTALLED_APPS = [
 ]
 
 MIDDLEWARE = [
-    "django_prometheus.middleware.PrometheusBeforeMiddleware",
     "whitenoise.middleware.WhiteNoiseMiddleware",
     "django.middleware.security.SecurityMiddleware",
     "django.contrib.sessions.middleware.SessionMiddleware",
@@ -163,7 +161,6 @@ MIDDLEWARE = [
     "django.contrib.auth.middleware.AuthenticationMiddleware",
     "django.contrib.messages.middleware.MessageMiddleware",
     "django.middleware.clickjacking.XFrameOptionsMiddleware",
-    "django_prometheus.middleware.PrometheusAfterMiddleware",
 ]
 
 ROOT_URLCONF    = "suspicious.urls"

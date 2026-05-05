@@ -28,7 +28,7 @@ import {
   LogoutOutlined,
   ManageSearchOutlined,
   MenuRounded,
-  PersonOutline,
+  PersonOutlined,
   PushPinOutlined,
   SettingsOutlined,
   UploadFileOutlined,
@@ -70,7 +70,7 @@ const WORKSPACE_NAV: NavItemConfig[] = [
 ];
 
 const ACCOUNT_NAV: NavItemConfig[] = [
-  { to: "/profile",  label: "Profile",  icon: <PersonOutline /> },
+  { to: "/profile",  label: "Profile",  icon: <PersonOutlined /> },
   { to: "/settings", label: "Settings", icon: <SettingsOutlined />, elevatedOnly: true },
   { to: "/about",    label: "About",    icon: <InfoOutlined /> },
 ];
@@ -477,7 +477,7 @@ function UserCard({
         >
           {displayName}
         </Typography>
-        <Stack direction="row" spacing={0.5} alignItems="center">
+        <Stack direction="row" spacing={0.5} sx={{ alignItems: "center" }} >
           <Box
             sx={{
               width: 5,
@@ -641,7 +641,7 @@ export default function AppLayout() {
         }}
       >
         {/* Brand */}
-        <Stack direction="row" spacing={isSlim ? 0 : 1.25} alignItems="center">
+        <Stack direction="row" spacing={isSlim ? 0 : 1.25} sx={{ alignItems: "center" }} >
           <Avatar
             variant="rounded"
             src="/icons/suspicious-logo.png"
@@ -810,9 +810,7 @@ export default function AppLayout() {
         <Toolbar sx={{ minHeight: 60, px: 2 }}>
           <Stack
             direction="row"
-            alignItems="center"
-            justifyContent="space-between"
-            sx={{ width: "100%" }}
+            sx={{ width: "100%", alignItems: "center", justifyContent: "space-between" }}
           >
             <IconButton
               edge="start"
@@ -863,16 +861,18 @@ export default function AppLayout() {
             variant="temporary"
             open={mobileOpen}
             onClose={() => setMobileOpen(false)}
-            ModalProps={{ keepMounted: true }}
-            PaperProps={{
-              sx: {
-                width: DRAWER_WIDE,
-                border: "none",
-                borderRight: sidebarBorder,
-                background: "transparent",
-                boxShadow: isDark
-                  ? `4px 0 40px ${alpha("#000", 0.45)}`
-                  : `4px 0 40px ${alpha(primary, 0.08)}`,
+            slotProps={{
+              root: { keepMounted: true },
+              paper: {
+                sx: {
+                  width: DRAWER_WIDE,
+                  border: "none",
+                  borderRight: sidebarBorder,
+                  background: "transparent",
+                  boxShadow: isDark
+                    ? `4px 0 40px ${alpha("#000", 0.45)}`
+                    : `4px 0 40px ${alpha(primary, 0.08)}`,
+                },
               },
             }}
           >
@@ -883,18 +883,20 @@ export default function AppLayout() {
           <Drawer
             variant="permanent"
             open
-            PaperProps={{
-              sx: {
-                width: drawerW,
-                overflowX: "hidden",
-                border: "none",
-                borderRight: sidebarBorder,
-                background: "transparent",
-                boxShadow: sidebarGlow ?? "none",
-                transition: theme.transitions.create("width", {
-                  duration: theme.transitions.duration.standard,
-                  easing: theme.transitions.easing.easeInOut,
-                }),
+            slotProps={{
+              paper: {
+                sx: {
+                  width: drawerW,
+                  overflowX: "hidden",
+                  border: "none",
+                  borderRight: sidebarBorder,
+                  background: "transparent",
+                  boxShadow: sidebarGlow ?? "none",
+                  transition: theme.transitions.create("width", {
+                    duration: theme.transitions.duration.standard,
+                    easing: theme.transitions.easing.easeInOut,
+                  }),
+                },
               },
             }}
           >

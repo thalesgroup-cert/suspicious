@@ -139,7 +139,7 @@ function SectionHeader({
 }) {
   return (
     <Stack spacing={0.5} sx={{ mb: 2 }}>
-      <Typography variant="h5" fontWeight={950} letterSpacing={-0.4}>
+      <Typography variant="h5" sx={{ fontWeight: 950, letterSpacing: -0.4 }} >
         {title}
       </Typography>
       {subtitle ? (
@@ -233,10 +233,10 @@ function SeverityCard(props: {
       <Box sx={{ p: 2.25 }}>
         <Stack spacing={1.75}>
           {/* Header */}
-          <Stack direction="row" spacing={1.25} alignItems="center">
+          <Stack direction="row" spacing={1.25} sx={{ alignItems: "center" }} >
             <IconBadge icon={cfg.icon} size={40} color={tone} />
             <Box>
-              <Typography fontWeight={950} fontSize={15} sx={{ color: tone }}>
+              <Typography sx={{ color: tone, fontWeight: 950, fontSize: 15 }}>
                 {props.title}
               </Typography>
               <Typography variant="body2" color="text.secondary" sx={{ fontSize: 12 }}>
@@ -250,7 +250,7 @@ function SeverityCard(props: {
           {/* Bullets */}
           <Stack spacing={0.6}>
             {props.bullets.map((bullet) => (
-              <Stack direction="row" spacing={0.75} alignItems="center">
+              <Stack direction="row" spacing={0.75} sx={{ alignItems: "center" }} >
                 <Box
                   sx={{
                     width: 5,
@@ -291,7 +291,7 @@ function StepCard(props: {
       <Box sx={{ p: 2.5 }}>
         <Stack spacing={1.25}>
           {/* Step number badge */}
-          <Stack direction="row" spacing={1.5} alignItems="center">
+          <Stack direction="row" spacing={1.5} sx={{ alignItems: "center" }} >
             <Box
               sx={{
                 width: 36,
@@ -316,7 +316,7 @@ function StepCard(props: {
               </Typography>
             </Box>
 
-            <Typography fontWeight={950} fontSize={15}>{props.title}</Typography>
+            <Typography sx={{ fontWeight: 950, fontSize: 15 }} >{props.title}</Typography>
 
             {!props.isLast ? (
               <ArrowForwardOutlined
@@ -356,10 +356,10 @@ function TopicCard(props: {
     <SoftCard sx={{ height: "100%" }}>
       <Box sx={{ p: 2.5 }}>
         <Stack spacing={1.75}>
-          <Stack direction="row" spacing={1.25} alignItems="center">
+          <Stack direction="row" spacing={1.25} sx={{ alignItems: "center" }} >
             <IconBadge icon={props.icon} size={42} />
             <Box>
-              <Typography fontWeight={950} fontSize={15} letterSpacing={-0.2}>
+              <Typography sx={{ fontWeight: 950, fontSize: 15, letterSpacing: -0.2 }} >
                 {props.title}
               </Typography>
               <Typography variant="body2" color="text.secondary" sx={{ fontSize: 12 }}>
@@ -418,10 +418,10 @@ function SimpleAccordion(props: {
           "& .MuiAccordionSummary-content": { my: 1.25 },
         }}
       >
-        <Stack direction="row" spacing={1.5} alignItems="center" sx={{ pr: 2 }}>
+        <Stack direction="row" spacing={1.5} sx={{ pr: 2, alignItems: "center" }}>
           <IconBadge icon={props.icon} size={36} />
           <Box>
-            <Typography fontWeight={900} fontSize={14}>{props.title}</Typography>
+            <Typography sx={{ fontWeight: 900, fontSize: 14 }} >{props.title}</Typography>
             <Typography variant="body2" color="text.secondary" sx={{ fontSize: 12.5 }}>
               {props.summary}
             </Typography>
@@ -470,11 +470,11 @@ export default function AboutPage() {
           <Box sx={{ p: { xs: 2.5, md: 3.5 } }}>
             <Stack spacing={2.5}>
               {/* Identity row */}
-              <Stack direction={{ xs: "column", sm: "row" }} spacing={2} alignItems={{ sm: "center" }}>
-                <Stack direction="row" spacing={1.75} alignItems="center" sx={{ flex: 1, minWidth: 0 }}>
+              <Stack direction={{ xs: "column", sm: "row" }} spacing={2} sx={{ alignItems: { sm: "center" } }} >
+                <Stack direction="row" spacing={1.75} sx={{ flex: 1, minWidth: 0, alignItems: "center" }}>
                   <IconBadge icon={<InfoOutlined />} size={52} />
                   <Box>
-                    <Typography variant="h4" fontWeight={950} letterSpacing={-0.8} sx={{ lineHeight: 1.15 }}>
+                    <Typography variant="h4" sx={{ lineHeight: 1.15, fontWeight: 950, letterSpacing: -0.8 }}>
                       About Suspicious
                     </Typography>
                     <Typography color="text.secondary" sx={{ mt: 0.35, fontSize: 14 }}>
@@ -485,7 +485,7 @@ export default function AboutPage() {
               </Stack>
 
               {/* Artifact type pills */}
-              <Stack direction="row" spacing={0.75} useFlexGap flexWrap="wrap">
+              <Stack direction="row" spacing={0.75} useFlexGap sx={{ flexWrap: "wrap" }} >
                 <InfoPill icon={<EmailOutlined fontSize="small" />} label="Mail" />
                 <InfoPill icon={<InsertDriveFileOutlined fontSize="small" />} label="Files" />
                 <InfoPill icon={<LinkOutlined fontSize="small" />} label="URLs" />
@@ -644,7 +644,7 @@ export default function AboutPage() {
                   </Typography>
                   <Stack spacing={0.5}>
                     {["Credential theft", "Malware delivery", "Invoice or payment fraud"].map((b) => (
-                      <Stack key={b} direction="row" spacing={0.75} alignItems="center">
+                      <Stack key={b} direction="row" spacing={0.75} sx={{ alignItems: "center" }} >
                         <Box sx={{ width: 5, height: 5, borderRadius: 99, bgcolor: "warning.main", flexShrink: 0, opacity: 0.75 }} />
                         <Typography variant="body2" color="text.secondary" sx={{ fontSize: 12.5 }}>{b}</Typography>
                       </Stack>
@@ -694,7 +694,7 @@ export default function AboutPage() {
                 <InnerCard sx={{ p: 2 }}>
                   <Stack spacing={0.75}>
                     <CaptionLabel>Submission types</CaptionLabel>
-                    <Stack direction="row" spacing={0.75} flexWrap="wrap" useFlexGap>
+                    <Stack direction="row" spacing={0.75} useFlexGap sx={{ flexWrap: "wrap" }} >
                       {["Emails", "Files", "URLs", "IP addresses", "Hashes"].map((t) => (
                         <Chip key={t} size="small" label={t} variant="outlined"
                           sx={{ borderRadius: 2, height: 24, fontWeight: 700, "& .MuiChip-label": { px: 1 } }} />
@@ -729,7 +729,7 @@ export default function AboutPage() {
                   <Stack spacing={0.5}>
                     <CaptionLabel>Good outcomes to consider</CaptionLabel>
                     {["Isolate the artifact", "Escalate to security team", "Request context from the reporter", "Close with note if safe"].map((o) => (
-                      <Stack key={o} direction="row" spacing={0.75} alignItems="center">
+                      <Stack key={o} direction="row" spacing={0.75} sx={{ alignItems: "center" }} >
                         <Box sx={{ width: 5, height: 5, borderRadius: 99, bgcolor: "primary.main", flexShrink: 0, opacity: 0.7 }} />
                         <Typography variant="body2" color="text.secondary" sx={{ fontSize: 12.5 }}>{o}</Typography>
                       </Stack>

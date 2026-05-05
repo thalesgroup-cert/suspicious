@@ -1,7 +1,6 @@
 import json
 import logging
 import os
-from datetime import datetime, timedelta
 
 import pybreaker
 from cortex4py.api import Api
@@ -377,6 +376,7 @@ class CortexJob:
                 cortex_job_id=report.id,
                 type=data_type,
                 analyzer=analyzer_db,
+                status="InProgress",
                 level="info",
                 confidence=0,
                 score=0,
@@ -529,7 +529,6 @@ class CortexJobManager:
 
     def __init__(self):
         self.case = None
-        self.last_processed = {}  # Track last processed report IDs per data_type
 
         # Define the structure for results with sets for unique report IDs per data type and status
         categories = [
@@ -559,6 +558,29 @@ class CortexJobManager:
         # API configuration
         self.api_urls = API_URL
         self.api_keys = API_KEY
+
+    @staticmethod
+    def _artifact_value(report_instance):
+        """Return the scoring value for the artifact linked to this report."""
+        if report_instance.url_id:
+            return report_instance.url.address
+        if report_instance.ip_id:
+            return report_instance.ip.address
+        if report_instance.mail_id:
+            return report_instance.mail.address
+        if report_instance.domain_id:
+            return report_instance.domain.value
+        if report_instance.hash_id:
+            return report_instance.hash.value
+        if report_instance.file_id:
+            return str(report_instance.file.file_path.name)
+        if report_instance.mail_body_id:
+            return report_instance.mail_body.fuzzy_hash
+        if report_instance.mail_header_id:
+            return report_instance.mail_header.fuzzy_hash
+        raise ValueError(
+            f"AnalyzerReport {report_instance.pk} has no linked artifact"
+        )
 
     @classmethod
     def get_cortex_jobs_results(cls, report_instance, data_type):
@@ -620,6 +642,22 @@ class CortexJobManager:
                 except Exception as e:
                     update_cases_logger.error(
                         f"Error updating report {job_id}: {e}", exc_info=True
+                    )
+
+            # Score immediately on success so the UI does not wait for the
+            # case to flip to Done. create_and_save_report is idempotent.
+            if job.status == "Success":
+                try:
+                    from score_process.scoring.cortex_analyzers.reports import (
+                        CortexAnalyzerReports,
+                    )
+                    artifact_value = cls._artifact_value(report_instance)
+                    CortexAnalyzerReports.create_and_save_report(
+                        report_instance, artifact_value, None
+                    )
+                except Exception as e:
+                    update_cases_logger.error(
+                        f"Error scoring report {job_id}: {e}", exc_info=True
                     )
 
         return report_instance.status
@@ -713,7 +751,7 @@ class CortexJobManager:
         if not case:
             raise ValueError("Case is required.")
 
-        # Set current case for last_processed tracking
+        # Set current case for downstream processing
         self.case = case
 
         # Process file and/or mail
@@ -740,19 +778,13 @@ class CortexJobManager:
 
     def get_new_reports(self, data_type, filter_kwargs):
         """
-        Fetch only new AnalyzerReport objects since last_processed checkpoint
-        for this case and data_type.
+        Fetch all non-Deleted AnalyzerReport objects for this data_type
+        and artifact filter. Cortex API calls are deduplicated via the
+        class-level _job_cache / _report_cache during a single tick.
         """
-        key = (self.case.id, data_type)  # unique tracker per case/type
-        last_seen = self.last_processed.get(key, datetime.now() - timedelta(days=1))
-
-        reports = AnalyzerReport.objects.filter(
-            type=data_type, creation_date__gt=last_seen, **filter_kwargs
-        )
-
-        # Move the checkpoint forward
-        self.last_processed[key] = datetime.now()
-        return reports
+        return AnalyzerReport.objects.filter(
+            type=data_type, **filter_kwargs
+        ).exclude(status="Deleted")
 
     def process_file(self, file):
         """
@@ -1229,7 +1261,7 @@ class CortexJobManager:
         success_ratio = success_count / adjusted_total if adjusted_total else 0
         failure_ratio = failure_count / adjusted_total if adjusted_total else 0
 
-        all_done = total_reports == (success | failure | deleted)
+        all_done = bool(total_reports) and total_reports == (success | failure | deleted)
         all_finished = all_done and (ongoing_count == 0 and waiting_count == 0)
 
         if all_finished:
