@@ -8,6 +8,14 @@ import logging
 
 logger = logging.getLogger(__name__)
 
+# Hoist `trace` to module scope so tests can patch suspicious.otel.trace
+# directly. Falls back to None when opentelemetry is not installed; the
+# filter handles that branch.
+try:
+    from opentelemetry import trace
+except ImportError:  # pragma: no cover — import-time only
+    trace = None  # type: ignore[assignment]
+
 
 class TraceIdFilter(logging.Filter):
     """
@@ -20,7 +28,8 @@ class TraceIdFilter(logging.Filter):
 
     def filter(self, record: logging.LogRecord) -> bool:
         try:
-            from opentelemetry import trace
+            if trace is None:
+                raise RuntimeError("opentelemetry not installed")
             span = trace.get_current_span()
             ctx = span.get_span_context()
             if ctx.is_valid:

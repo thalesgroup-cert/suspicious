@@ -110,9 +110,27 @@ COPY --from=builder /usr/local /usr/local
 # Copy NLTK data
 COPY --from=builder /usr/local/share/nltk_data /usr/local/share/nltk_data
 
+# Create non-root runtime user (S7).
+# UID/GID 1000 matches the typical host developer account so bind-mounted
+# settings.json / logs / certificates remain readable. Override via build
+# args if your host uses a different UID range.
+ARG APP_UID=1000
+ARG APP_GID=1000
+RUN groupadd --system --gid ${APP_GID} suspicious \
+    && useradd --system --uid ${APP_UID} --gid ${APP_GID} \
+        --home /app --shell /usr/sbin/nologin suspicious
+
 # Copy application code
 COPY . .
 
+# Logs directory must be writable by the runtime user; settings.json is
+# bind-mounted read-only at /app/settings.json so its host permissions
+# (chmod 600 expected) govern access.
+RUN mkdir -p /app/log \
+    && chown -R suspicious:suspicious /app /var/log/cron.log
+
 WORKDIR /app/Suspicious
+
+USER suspicious
 
 EXPOSE 9020

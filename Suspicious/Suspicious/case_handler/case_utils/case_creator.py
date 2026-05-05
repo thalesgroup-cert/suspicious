@@ -2,13 +2,9 @@ from django.utils import timezone
 
 from case_handler.models import (
     Case,
+    CaseArtifact,
     CaseHasFileOrMail,
-    FileInCases,
-    IpInCases,
-    UrlInCases,
-    HashInCases,
     CaseHasNonFileIocs,
-    MailInCases
 )
 import logging
 
@@ -77,47 +73,39 @@ class CaseCreator:
             fetch_mail_logger.error(f"Error creating case: {str(e)}")
             return None
 
+    _ARTIFACT_KEY_MAP = {
+        'file_instance': ('file', CaseArtifact.ArtifactType.FILE),
+        'hash_instance': ('hash', CaseArtifact.ArtifactType.HASH),
+        'url_instance': ('url', CaseArtifact.ArtifactType.URL),
+        'ip_instance': ('ip', CaseArtifact.ArtifactType.IP),
+        'mail_instance': ('mail', CaseArtifact.ArtifactType.MAIL),
+    }
+
     def _create_related_model(self, key, value, case):
         """
-        Creates or updates a related model based on the provided key, value, and case.
-
-        Args:
-            key (str): The key used to identify the related model.
-            value: The value associated with the key.
-            case: The case object to which the related model is associated.
-
-        Returns:
-            None
-
-        Raises:
-            Exception: If there is an error creating or updating the related model.
+        Records the (case, artifact) link in CaseArtifact, then attaches the
+        artifact to the appropriate Case bundle (CaseHasFileOrMail for
+        file/mail, CaseHasNonFileIocs for ip/url/hash).
         """
         case.save()
-        related_model = self._get_related_model(key)
-        key_split = key.split('_')[0]
 
-        if not related_model:
-            print(f"No related model found for key: {key}")
+        mapping = self._ARTIFACT_KEY_MAP.get(key)
+        if mapping is None:
+            logger.warning("Unknown artifact key: %s", key)
             return
-
-        if key_split == 'mail':
-            key_split = 'associated_mail'
+        fk_name, artifact_type = mapping
 
         try:
-            related_model_in_cases, created = related_model.objects.get_or_create(**{key_split: value})
-            if created:
-                print(f"Created new instance of {related_model.__name__} for case: {case.id}")
-            else:
-                print(f"Found existing instance of {related_model.__name__} for case: {case.id}")
-
-            if key_split == 'associated_mail':
-                related_model_in_cases.associated_cases.add(case)
-            else:
-                related_model_in_cases.case.add(case)
-
-            related_model_in_cases.save()
+            CaseArtifact.objects.get_or_create(
+                case=case,
+                artifact_type=artifact_type,
+                **{fk_name: value},
+            )
         except Exception as e:
-            print(f"Error creating or updating related model: {str(e)}")
+            logger.exception(
+                "Error creating CaseArtifact for case=%s key=%s: %s",
+                case.id, key, e,
+            )
             return
         if key == 'file_instance' or key == 'mail_instance':
             try:
@@ -253,27 +241,16 @@ class CaseCreator:
 
     def _get_related_model(self, key):
         """
-        Returns the related model based on the given key.
-
-        Args:
-            key (str): The key representing the related model.
-
-        Returns:
-            Model: The related model corresponding to the key, or None if the key is not found.
+        Deprecated. Kept for backwards compatibility — returns CaseArtifact
+        for any known key. Prefer the consolidated write path in
+        _create_related_model.
         """
-        related_models = {
-            'file_instance': FileInCases,
-            'ip_instance': IpInCases,
-            'url_instance': UrlInCases,
-            'hash_instance': HashInCases,
-            'mail_instance': MailInCases
-        }
-
-        # Check if the key exists in the dictionary
-        if key not in related_models:
-            raise ValueError(f"Invalid key: {key}. Valid keys are {', '.join(related_models.keys())}")
-
-        return related_models.get(key)
+        if key not in self._ARTIFACT_KEY_MAP:
+            raise ValueError(
+                f"Invalid key: {key}. Valid keys are "
+                f"{', '.join(self._ARTIFACT_KEY_MAP.keys())}"
+            )
+        return CaseArtifact
 
     def _get_related_field(self, key):
         """

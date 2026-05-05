@@ -7,6 +7,7 @@
 #   make deploy           → zero-downtime rolling deploy
 #   make upgrade          → same as deploy (alias for clarity)
 #   make up               → start all services
+#   make redeploy         → force-recreate containers (picks up new images)
 #   make down             → stop all containers
 #   make monitor-up       → start Prometheus + Grafana (optional)
 #   make check-updates    → compare running images vs registry
@@ -29,7 +30,7 @@ define require_script
 	@test -x $(1) || (echo "Missing or non-executable: $(1)" && exit 1)
 endef
 
-.PHONY: help install init up down build pull deploy upgrade restart \
+.PHONY: help install init install-hooks up down build pull deploy upgrade redeploy restart \
         migrate collectstatic createsuperuser \
         backup-db restore-db \
         logs status shell db-shell \
@@ -52,6 +53,8 @@ help:
 	@echo "  deploy           Zero-downtime rolling deploy (pull → migrate → restart)"
 	@echo "  upgrade          Alias for deploy"
 	@echo "  up               Start all services (no pull, no migration)"
+	@echo "  redeploy [s=<svc>]  Force-recreate containers (picks up new images)"
+	@echo "  install-hooks    Configure git core.hooksPath -> .githooks (commit-msg validator)"
 	@echo "  down             Stop and remove containers (data preserved)"
 	@echo "  restart          Restart all running services"
 	@echo "  build            Build local images"
@@ -93,6 +96,11 @@ init:
 	@echo "$(BOLD)Initializing project…$(RESET)"
 	@$(SCRIPTS)/init.sh
 	$(OK) "Initialization complete."
+
+## Wire the repo .githooks (Conventional Commits validator etc.) for this clone.
+install-hooks:
+	@cd ../ && git config core.hooksPath .githooks
+	$(OK) "git core.hooksPath -> .githooks"
 
 ## Create the Docker bridge network (idempotent)
 network:
@@ -143,6 +151,23 @@ down:
 restart:
 	@$(COMPOSE) restart
 	$(OK) "Services restarted."
+
+## Force-recreate containers so freshly built images are picked up.
+## Use after `make build` when `make up` would otherwise reuse the old
+## containers. Pass `s=<service>` to redeploy a single service.
+##
+## Examples:
+##   make redeploy             # all services
+##   make redeploy s=suspicious
+redeploy: check-secrets
+	@if [ -n "$(s)" ]; then \
+		echo "Force-recreating $(s)…"; \
+		$(COMPOSE) up -d --force-recreate --no-deps $(s); \
+	else \
+		echo "Force-recreating all services…"; \
+		$(COMPOSE) up -d --force-recreate --remove-orphans; \
+	fi
+	$(OK) "Redeploy complete."
 
 ## Build local images
 build:
