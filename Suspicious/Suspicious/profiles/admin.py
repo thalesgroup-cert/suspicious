@@ -248,8 +248,9 @@ class UserProfileAdmin(ImportExportModelAdmin):
         "wants_acknowledgement", "wants_results", "creation_date",
     )
     list_filter = ("country", "region", "gbu", "wants_acknowledgement", "wants_results", "creation_date")
+    list_select_related = ("user",)
     search_fields = ("user__username", "function", "gbu", "country", "region")
-    ordering = ("creation_date",)
+    ordering = ("-creation_date",)
     actions = ("enable_acknowledgement", "disable_acknowledgement")
 
     # Actions
@@ -286,6 +287,7 @@ class CISOProfileAdmin(ImportExportModelAdmin):
 
     list_display = ("user", "function", "gbu", "country", "region", "scope", "creation_date")
     list_filter = ("country", "region", "gbu", "scope", "creation_date")
+    list_select_related = ("user",)
     search_fields = ("user__username", "function", "gbu", "country", "region", "scope")
-    ordering = ("creation_date",)
+    ordering = ("-creation_date",)
     readonly_fields = ("scope",)

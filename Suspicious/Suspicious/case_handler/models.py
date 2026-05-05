@@ -49,29 +49,25 @@ class Case(models.Model):
     analysis_done = models.PositiveIntegerField(default=0)
     status = models.CharField(max_length=20, choices=Status.choices, default=Status.TODO, verbose_name='Status', db_index=True)
     results = models.CharField(max_length=20, choices=Result.choices, default=Result.SUSPICIOUS, verbose_name='Results', db_index=True)
-    final_score = models.FloatField(default=0, db_index=True)
-    final_confidence = models.FloatField(default=0, db_index=True)
-    score = models.FloatField(default=0, db_index=True)
-    confidence = models.FloatField(default=0, db_index=True)
-    results_ai = models.CharField(max_length=20, default="Suspicious", verbose_name='ResultsAI', db_index=True)
-    score_ai = models.FloatField(default=0, db_index=True)
-    confidence_ai = models.FloatField(default=0, db_index=True)
+    final_score = models.FloatField(default=0)
+    final_confidence = models.FloatField(default=0)
+    score = models.FloatField(default=0)
+    confidence = models.FloatField(default=0)
+    results_ai = models.CharField(max_length=20, default="Suspicious", verbose_name='ResultsAI')
+    score_ai = models.FloatField(default=0)
+    confidence_ai = models.FloatField(default=0)
     category_ai = models.CharField(max_length=20, default='Uncategorized', verbose_name='Category AI', db_index=True)
     fileOrMail = models.ForeignKey('CaseHasFileOrMail', on_delete=models.CASCADE, related_name='cases', null=True, blank=True, db_index=True)
     nonFileIocs = models.ForeignKey('CaseHasNonFileIocs', on_delete=models.CASCADE, related_name='cases', null=True, blank=True, db_index=True)
     is_challenged = models.BooleanField(default=False)
     is_challengeable = models.BooleanField(default=True)
-    challenged_result = models.CharField(max_length=20, choices=Result.choices, default=Result.UNCHALLENGED, verbose_name='Challenged Result', db_index=True)
+    challenged_result = models.CharField(max_length=20, choices=Result.choices, default=Result.UNCHALLENGED, verbose_name='Challenged Result')
     creation_date = models.DateTimeField(auto_now_add=True, db_index=True)
     last_update = models.DateTimeField(auto_now=True)
     last_update_by = models.ForeignKey(settings.AUTH_USER_MODEL, on_delete=models.CASCADE, related_name='cases_last_update_by', null=True, blank=True, db_index=True)
 
     class Meta:
         ordering = ['-creation_date']
-        indexes = [
-            models.Index(fields=['status']),
-            models.Index(fields=['results']),
-        ]
 
     def __str__(self):
         """
