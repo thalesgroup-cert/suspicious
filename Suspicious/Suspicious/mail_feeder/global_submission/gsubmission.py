@@ -104,11 +104,16 @@ class GlobalSubmissionService:
     def _extract_reported_by_from_user_submission(self, workdir: str) -> Optional[str]:
         """
         Extract the reporter's email address from 'user_submission.eml'.
+
+        Opens the file in binary mode and parses with
+        ``email.message_from_binary_file`` so non-UTF-8 payloads (e.g.
+        ISO-8859-1 French content) do not blow up on a default-encoding
+        decode in the text reader.
         """
         path = os.path.join(workdir, "user_submission.eml")
         with safe_execution("extracting reportedBy"):
-            with open(path, "r") as f:
-                user_submission = email.message_from_file(f)
+            with open(path, "rb") as f:
+                user_submission = email.message_from_binary_file(f)
             from_header = user_submission.get("From")
             email_addr = extract_email_address(from_header)
             if not email_addr:
