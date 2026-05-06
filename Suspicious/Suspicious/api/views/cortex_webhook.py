@@ -4,13 +4,19 @@ Cortex calls this endpoint when a job finishes (Success or Failure).
 We look up which On Going case owns the job and dispatch a targeted
 Celery task instead of waiting for the 60-second cron poll.
 
-Authentication: Bearer <CORTEX_WEBHOOK_SECRET> in the Authorization header.
+Authentication: Bearer <CORTEX_WEBHOOK_SECRET> in the Authorization header,
+compared via hmac.compare_digest to defeat timing oracles.
 The cron poll (update_ongoing_cases beat task) remains active as a
 fallback for any webhook deliveries that are missed or delayed.
+
+Idempotency: each jobId is recorded in Redis (TTL 1h) on first delivery;
+duplicate webhook deliveries (Cortex retry, network resend) short-circuit.
 """
+import hmac
 import logging
 
 from django.conf import settings
+from django.core.cache import cache
 from django.db.models import Q
 from rest_framework import status
 from rest_framework.request import Request
@@ -18,6 +24,10 @@ from rest_framework.response import Response
 from rest_framework.views import APIView
 
 logger = logging.getLogger(__name__)
+
+# How long to remember a processed jobId. Cortex retries within minutes;
+# 1 hour is comfortably above the upper bound of legitimate retry windows.
+_WEBHOOK_DEDUP_TTL = 3600
 
 
 def _find_case_ids_for_job(job_id: str) -> list[int]:
@@ -78,7 +88,7 @@ class CortexWebhookView(APIView):
             return Response({"detail": "Webhook not configured."}, status=status.HTTP_503_SERVICE_UNAVAILABLE)
 
         auth_header = request.headers.get("Authorization", "")
-        if not auth_header.startswith("Bearer ") or auth_header[7:] != secret:
+        if not auth_header.startswith("Bearer ") or not hmac.compare_digest(auth_header[7:], secret):
             logger.warning("Cortex webhook: invalid or missing Authorization header")
             return Response({"detail": "Unauthorized."}, status=status.HTTP_401_UNAUTHORIZED)
 
@@ -89,6 +99,11 @@ class CortexWebhookView(APIView):
 
         job_id = str(job_id).strip()
         logger.info("Cortex webhook received for jobId=%s", job_id)
+
+        # ── Idempotency: drop duplicate deliveries for the same jobId ────────
+        if not cache.add(f"cortex_job_processed:{job_id}", 1, timeout=_WEBHOOK_DEDUP_TTL):
+            logger.info("Cortex webhook duplicate jobId=%s; skipping", job_id)
+            return Response({"detail": "Already processed."}, status=status.HTTP_200_OK)
 
         # ── Dispatch targeted case update(s) ─────────────────────────────────
         case_ids = _find_case_ids_for_job(job_id)

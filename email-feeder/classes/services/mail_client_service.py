@@ -13,6 +13,7 @@ MAILBOX_LOGGER_NAME = "email-feeder.mailbox"
 ATTACHMENTS_DIR_NAME = "attachments"
 ANALYSIS_DIR_PREFIX = "analysis_"
 USER_SUBMISSION_PREFIX = "user_submission_"
+_IMAP_TIMEOUT = 30  # seconds — bound socket connect + SSL handshake
 
 
 class MailClient:
@@ -108,7 +109,9 @@ class MailClient:
     def __imap_login(self):
         """Handles non-SSL IMAP login."""
         self.__imap_client = imaplib.IMAP4(
-            self.__instance_config.host, self.__instance_config.port
+            self.__instance_config.host,
+            self.__instance_config.port,
+            timeout=_IMAP_TIMEOUT,
         )
         self.__imap_client.login(
             user=self.__instance_config.login, password=self.__instance_config.password
@@ -140,6 +143,7 @@ class MailClient:
             self.__instance_config.host,
             self.__instance_config.port,
             ssl_context=ssl_context,
+            timeout=_IMAP_TIMEOUT,
         )
         self.__imap_client.login(
             user=self.__instance_config.login, password=self.__instance_config.password
