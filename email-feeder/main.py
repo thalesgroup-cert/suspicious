@@ -42,30 +42,15 @@ def _set(key: str, value) -> None:
 
 class _HealthHandler(BaseHTTPRequestHandler):
     def do_GET(self):
-        with _stats_lock:
-            snap = dict(_stats)
-
-        if self.path == "/health":
-            body = json.dumps(snap, indent=2).encode()
-            self._respond(200, "application/json", body)
-        elif self.path == "/metrics":
-            lines = [
-                "# HELP email_feeder_last_successful_poll_timestamp_seconds Unix timestamp of last successful poll cycle.",
-                "# TYPE email_feeder_last_successful_poll_timestamp_seconds gauge",
-                f"email_feeder_last_successful_poll_timestamp_seconds {snap['last_successful_poll']}",
-                "# HELP email_feeder_emails_processed_total Total number of emails processed since startup.",
-                "# TYPE email_feeder_emails_processed_total counter",
-                f"email_feeder_emails_processed_total {snap['emails_processed_total']}",
-                "# HELP email_feeder_errors_total Total number of mailbox processing errors since startup.",
-                "# TYPE email_feeder_errors_total counter",
-                f"email_feeder_errors_total {snap['errors_total']}",
-                "",
-            ]
-            body = "\n".join(lines).encode()
-            self._respond(200, "text/plain; version=0.0.4; charset=utf-8", body)
-        else:
+        if self.path != "/health":
             self.send_response(404)
             self.end_headers()
+            return
+
+        with _stats_lock:
+            snap = dict(_stats)
+        body = json.dumps(snap, indent=2).encode()
+        self._respond(200, "application/json", body)
 
     def _respond(self, code: int, content_type: str, body: bytes) -> None:
         self.send_response(code)
@@ -82,7 +67,7 @@ def _start_health_server() -> None:
     server = HTTPServer(("", _HEALTH_PORT), _HealthHandler)
     thread = threading.Thread(target=server.serve_forever, daemon=True, name="health-server")
     thread.start()
-    logger.info("Health/metrics server listening on :%d (/health, /metrics)", _HEALTH_PORT)
+    logger.info("Health server listening on :%d (/health)", _HEALTH_PORT)
 
 
 # --- Helper Functions ---

@@ -1,11 +1,20 @@
 import logging
 from django.contrib.auth.models import User
+from django.core.cache import cache
 from case_handler.models import Case
 from cortex_job.cortex_utils.cortex_and_job_management import CortexJobManager
 from profiles.profiles_utils.ldap import Ldap
 
 logger = logging.getLogger("tasp.cron.users_cases")
 log_cases = logging.getLogger("tasp.cron.update_ongoing_case_jobs")
+
+# Bound work per cron tick. Cases beyond this batch wait for the next tick;
+# STALE_JOB_TIMEOUT auto-fails any zombie reports independently.
+CRON_BATCH_SIZE = 200
+
+# Per-case Redis lock TTL. Long enough to cover one manage_jobs() call,
+# short enough that a crashed worker doesn't strand the lock for hours.
+CASE_LOCK_TTL = 120
 
 
 def sync_user_profiles() -> None:
@@ -18,11 +27,20 @@ def sync_user_profiles() -> None:
 
 
 def update_ongoing_case_jobs() -> None:
-    """Mise à jour des jobs Cortex pour les cases en cours."""
+    """Update of ongoing case jobs.
+
+    Bounded scan: at most CRON_BATCH_SIZE oldest cases per tick. Per-case
+    Redis lock (`case_update_lock:<id>`) prevents racing with the webhook
+    task `process_cortex_webhook_case` on the same case.
+    """
     from opentelemetry import trace
 
     tracer = trace.get_tracer(__name__)
-    cases = list(Case.objects.filter(status="On Going"))
+    cases = list(
+        Case.objects
+        .filter(status="On Going")
+        .order_by("creation_date")[:CRON_BATCH_SIZE]
+    )
     if not cases:
         log_cases.info("No ongoing cases found.")
         return
@@ -31,6 +49,10 @@ def update_ongoing_case_jobs() -> None:
         span.set_attribute("cases.count", len(cases))
         manager = CortexJobManager()
         for case in cases:
+            lock_key = f"case_update_lock:{case.id}"
+            if not cache.add(lock_key, 1, timeout=CASE_LOCK_TTL):
+                # Webhook task or another worker is already updating this case.
+                continue
             try:
                 with tracer.start_as_current_span("cron.manage_case_jobs") as case_span:
                     case_span.set_attribute("case.id", case.id)
@@ -40,3 +62,5 @@ def update_ongoing_case_jobs() -> None:
                 log_cases.exception(
                     "Case %s update failed", getattr(case, "id", "<unknown>")
                 )
+            finally:
+                cache.delete(lock_key)

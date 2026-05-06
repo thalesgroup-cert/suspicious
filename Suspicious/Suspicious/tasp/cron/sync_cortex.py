@@ -24,39 +24,6 @@ def _fetch_all_analyzers(api):
 
 
 def sync_cortex_analyzers(config_path: str = CONFIG_PATH) -> None:
-    try:
-        from api.metrics import (
-            cortex_calls_total,
-            cortex_errors_total,
-            cortex_sync_duration_seconds,
-        )
-        _metrics_available = True
-    except Exception:
-        _metrics_available = False
-
-    if _metrics_available:
-        cortex_calls_total.inc()
-        _timer = cortex_sync_duration_seconds.time()
-        _timer.__enter__()
-
-    try:
-        _sync_cortex_analyzers_inner(config_path)
-    except Exception:
-        if _metrics_available:
-            cortex_errors_total.labels(error_type="unexpected").inc()
-        raise
-    finally:
-        if _metrics_available:
-            _timer.__exit__(None, None, None)
-
-
-def _sync_cortex_analyzers_inner(config_path: str = CONFIG_PATH) -> None:
-    try:
-        from api.metrics import cortex_errors_total
-        _metrics_available = True
-    except Exception:
-        _metrics_available = False
-
     cfg: CronConfig = load_config(config_path)
     if not cfg.cortex:
         log_analyzers.error("Missing Cortex config")
@@ -70,18 +37,12 @@ def _sync_cortex_analyzers_inner(config_path: str = CONFIG_PATH) -> None:
         remote_analyzers = _fetch_all_analyzers(api)
     except pybreaker.CircuitBreakerError as exc:
         log_analyzers.warning("[breaker:cortex] open — sync_cortex_analyzers skipped: %s", exc)
-        if _metrics_available:
-            cortex_errors_total.labels(error_type="circuit_open").inc()
         return
     except CortexException as exc:
         log_analyzers.error("Cortex fetch failed: %s", exc)
-        if _metrics_available:
-            cortex_errors_total.labels(error_type="api").inc()
         return
     except requests.RequestException as exc:
         log_analyzers.error("Network error syncing Cortex analyzers: %s", exc)
-        if _metrics_available:
-            cortex_errors_total.labels(error_type="network").inc()
         return
 
     if not remote_analyzers:

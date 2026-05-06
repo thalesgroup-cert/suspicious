@@ -211,7 +211,6 @@ services:
       - "--log.level=INFO"
       - "--accesslog=true"
       - "--accesslog.filepath=/var/log/traefik/access.log"
-      - "--metrics.prometheus=true"
 
 # ── Volumes ───────────────────────────────────────────────────────────────
 # Declared once here; referenced by extends in the sub-files.
