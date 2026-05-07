@@ -9,7 +9,8 @@ from case_handler.models import Case
 
 logger = logging.getLogger("cron.suspicious")
 cleanup_logger = logging.getLogger("tasp.cron.cleanup_phishing")
-CONFIG_PATH = "/app/settings.json"
+import os as _os_cfg
+CONFIG_PATH = _os_cfg.environ.get("SUSPICIOUS_CONFIG_PATH", "/app/settings.json")
 
 with open(CONFIG_PATH, "r") as f:
     settings = json.load(f)

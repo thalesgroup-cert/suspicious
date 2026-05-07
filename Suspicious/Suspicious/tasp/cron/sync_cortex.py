@@ -11,7 +11,8 @@ from common.http_client import get_breaker, RETRY
 
 logger = logging.getLogger("cron.sync_cortex")
 log_analyzers = logging.getLogger("tasp.cron.fetch_analyzer")
-CONFIG_PATH = "/app/settings.json"
+import os as _os_cfg
+CONFIG_PATH = _os_cfg.environ.get("SUSPICIOUS_CONFIG_PATH", "/app/settings.json")
 
 _cortex_breaker = get_breaker("cortex")
 

@@ -8,7 +8,8 @@ from .email_theme import resolve_email_theme
 from .email_logo import resolve_logo
 from .social_logos import SOCIAL_LOGOS
 
-CONFIG_PATH = "/app/settings.json"
+import os as _os_cfg
+CONFIG_PATH = _os_cfg.environ.get("SUSPICIOUS_CONFIG_PATH", "/app/settings.json")
 TEMPLATES_DIR = Path(__file__).parent / "templates"
 
 class AcknowledgementEmailService:

@@ -10,7 +10,8 @@ import json
 from email.header import decode_header, make_header
 import re
 
-CONFIG_PATH = "/app/settings.json"
+import os as _os_cfg
+CONFIG_PATH = _os_cfg.environ.get("SUSPICIOUS_CONFIG_PATH", "/app/settings.json")
 with open(CONFIG_PATH) as config_file:
     config = json.load(config_file)
 

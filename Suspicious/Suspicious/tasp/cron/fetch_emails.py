@@ -18,7 +18,8 @@ from mail_feeder.minio_submission.minio import MinioEmailService
 
 logger = logging.getLogger("tasp.cron.fetch_and_process_emails")
 
-CONFIG_PATH = "/app/settings.json"
+import os as _os_cfg
+CONFIG_PATH = _os_cfg.environ.get("SUSPICIOUS_CONFIG_PATH", "/app/settings.json")
 
 MANIFEST_OBJECT_NAME = "metadata.json"
 SUBMISSION_EML_SUFFIX = "submission.eml"

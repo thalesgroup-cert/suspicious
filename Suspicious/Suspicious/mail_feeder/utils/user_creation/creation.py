@@ -9,7 +9,8 @@ from mail_feeder.utils.kpi_updating.kpis import (
 )
 from settings.models import WatcherLegitDomain
 
-CONFIG_PATH = "/app/settings.json"
+import os as _os_cfg
+CONFIG_PATH = _os_cfg.environ.get("SUSPICIOUS_CONFIG_PATH", "/app/settings.json")
 CONFIG = load_config(CONFIG_PATH)
 SUSPICIOUS_EMAIL = CONFIG.get("branding", {}).get("contact_email")
 

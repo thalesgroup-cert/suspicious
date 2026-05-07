@@ -13,7 +13,8 @@ from case_handler.case_utils.form_handlers.mail.email_processing.service import 
 from case_handler.case_utils.form_handlers.mail.email_processing.utils import generate_object_reference
 from case_handler.case_utils.form_handlers.mail.minio import MinioManager
 
-CONFIG_PATH = "/app/settings.json"
+import os as _os_cfg
+CONFIG_PATH = _os_cfg.environ.get("SUSPICIOUS_CONFIG_PATH", "/app/settings.json")
 with open(CONFIG_PATH) as config_file:
     config = json.load(config_file)
 
