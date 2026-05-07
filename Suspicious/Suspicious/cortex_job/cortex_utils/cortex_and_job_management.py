@@ -3,11 +3,12 @@ import logging
 import os
 
 import pybreaker
+from django.db import transaction
 from django.utils import timezone
 
 from cortex4py.api import Api
 from common.http_client import get_breaker, RETRY
-from cortex_job.models import Analyzer, AnalyzerReport
+from cortex_job.models import Analyzer, AnalyzerReport, CaseAnalyzerJob
 from mail_feeder.models import MailBody, MailArchive, MailInfo, MailHeader
 from score_process.scoring.cortex_analyzers.reports import CortexAnalyzerReports
 
@@ -100,13 +101,14 @@ class CortexJob:
         # cortex4py makes bare requests.get/post calls — no session to mount adapters on.
         # Timeout protection comes from the RETRY decorator and circuit breaker.
 
-    def launch_cortex_jobs(self, value, data_type):
+    def launch_cortex_jobs(self, value, data_type, case):
         """
         Launch Cortex jobs for the given value and data type.
 
         Args:
             value: The object to be analyzed (file, mail, domain, etc.).
             data_type (str): The type of data ('file', 'url', 'mail_body', etc.).
+            case (Case): The case the dispatched jobs belong to.
 
         Returns:
             list[str]: A list of job IDs for the launched Cortex jobs.
@@ -163,7 +165,7 @@ class CortexJob:
             r_ids = []
             for analyzer in analyzers:
                 try:
-                    report = CortexJob.run(api_launchjob, analyzer, value, data_type)
+                    report = CortexJob.run(api_launchjob, analyzer, value, data_type, case)
                     if report and hasattr(report, "id"):
                         r_ids.append(report.id)
                 except Exception as e:
@@ -177,13 +179,14 @@ class CortexJob:
             fetch_mail_logger.error(f"Error launching Cortex jobs for {data_type}: {e}")
             return []
 
-    def launch_cortex_ai_jobs(self, value, data_type):
+    def launch_cortex_ai_jobs(self, value, data_type, case):
         """
         Launch Cortex AI jobs for the given value and data type.
 
         Args:
             value: The object to analyze (file, archive, etc.).
             data_type (str): The type of data ('file', 'mail_body', etc.).
+            case (Case): The case the dispatched jobs belong to.
 
         Returns:
             str or None: The job ID of the launched Cortex AI job, or None if launch failed.
@@ -213,14 +216,14 @@ class CortexJob:
                 return None
 
             # Run analyzer using CortexJob.run
-            report = CortexJob.run(self.api, analyzer, archive, "file")
+            report = CortexJob.run(self.api, analyzer, archive, "file", case)
             return getattr(report, "id", None)
         except Exception as e:
             fetch_mail_logger.error(f"Error launching Cortex AI job: {e}")
             return None
 
     @staticmethod
-    def run(api, analyzer, value, data_type):
+    def run(api, analyzer, value, data_type, case):
         """
         Run an analyzer on the provided value using the Cortex API.
 
@@ -229,16 +232,14 @@ class CortexJob:
             analyzer: Analyzer object.
             value: Data to analyze.
             data_type (str): Type of the data ('file', 'mail_body', 'url', 'ip', 'hash', etc.)
+            case (Case): The case the analyzer is being run for.
 
         Returns:
             The Cortex job report object if successful, None otherwise.
         """
-        # Handle mail_body as 'file' internally in run_analyzer
         if data_type == "mail_body":
-            return CortexJob.run_analyzer(api, analyzer, value, "mail_body")
-
-        # Default case: run analyzer for given data_type
-        return CortexJob.run_analyzer(api, analyzer, value, data_type)
+            return CortexJob.run_analyzer(api, analyzer, value, "mail_body", case)
+        return CortexJob.run_analyzer(api, analyzer, value, data_type, case)
 
     @staticmethod
     def get_file_analyzers(api, file):
@@ -332,19 +333,18 @@ class CortexJob:
         return filtered_analyzers
 
     @staticmethod
-    def run_analyzer(api, analyzer, data, data_type):
+    @transaction.atomic
+    def run_analyzer(api, analyzer, data, data_type, case):
         """
-        Run a Cortex analyzer on the given data using the provided API.
+        Run a Cortex analyzer on the given data; record AnalyzerReport +
+        CaseAnalyzerJob atomically.
 
-        Args:
-            api: Cortex API object.
-            analyzer: Analyzer object containing `id` and `name`.
-            data: The data object to analyze.
-            data_type (str): Type of data ('file', 'url', 'ip', 'hash', 'domain', 'mail', 'mail_body', 'mail_header').
-
-        Returns:
-            report: The Cortex job report object if successful, None otherwise.
+        The whole function runs inside a transaction so a CaseAnalyzerJob
+        failure rolls back the AnalyzerReport row.
         """
+        if case is None:
+            raise TypeError("run_analyzer requires a non-None case")
+
         try:
             data_value = CortexJob.get_data_value(data, data_type)
         except Exception as e:
@@ -357,7 +357,6 @@ class CortexJob:
             )
             return None
 
-        # Prepare payload for analyzer
         payload = {
             "data": data_value,
             "dataType": "file" if data_type == "mail_body" else data_type,
@@ -372,10 +371,8 @@ class CortexJob:
             )
             return None
 
-        # Ensure Analyzer DB record exists
         analyzer_db = CortexJob.get_analyzer_db(analyzer)
 
-        # Create AnalyzerReport entry if report was successfully returned
         if report:
             fetch_mail_logger.debug(
                 f"Analyzer '{analyzer.name}' run successfully for data type '{data_type}'"
@@ -394,11 +391,21 @@ class CortexJob:
                 report_taxonomy={"ongoing": "analysis"},
             )
 
-            # Set specific data fields (file, url, ip, etc.)
-            try:
-                CortexJob.set_analyzer_report_data(analyzer_report, data, data_type)
-            except Exception as e:
-                fetch_mail_logger.error(f"Error setting analyzer report data: {e}")
+            # set_analyzer_report_data saves analyzer_report internally
+            # (see set_analyzer_report_data body). Let any exception
+            # propagate so the outer transaction.atomic rolls back the
+            # report row alongside the CaseAnalyzerJob that we are about
+            # to create. The previous try/except here silently swallowed
+            # save errors and is removed.
+            CortexJob.set_analyzer_report_data(analyzer_report, data, data_type)
+
+            CaseAnalyzerJob.objects.create(
+                case=case,
+                cortex_job_id=report.id,
+                analyzer=analyzer_db,
+                analyzer_report=analyzer_report,
+                status=CaseAnalyzerJob.STATUS_INPROGRESS,
+            )
 
         return report
 
