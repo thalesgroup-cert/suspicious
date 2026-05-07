@@ -125,7 +125,7 @@ class CaseAnalyzerJob(models.Model):
         on_delete=models.CASCADE,
         related_name="analyzer_jobs",
     )
-    cortex_job_id = models.CharField(max_length=50, db_index=True)
+    cortex_job_id = models.CharField(max_length=50)
     analyzer = models.ForeignKey(
         Analyzer, on_delete=models.PROTECT, related_name="case_jobs"
     )
@@ -138,7 +138,7 @@ class CaseAnalyzerJob(models.Model):
     status = models.CharField(
         max_length=20, choices=STATUS_CHOICES, default=STATUS_INPROGRESS
     )
-    created_at = models.DateTimeField(auto_now_add=True, db_index=True)
+    created_at = models.DateTimeField(auto_now_add=True)
     completed_at = models.DateTimeField(null=True, blank=True)
 
     class Meta:

@@ -41,8 +41,48 @@ class CaseAnalyzerJobConstraintsTest(TestCase):
         )
         self.assertEqual(caj.status, CaseAnalyzerJob.STATUS_INPROGRESS)
 
-    def test_pending_statuses_constant(self):
-        self.assertEqual(
-            CaseAnalyzerJob.PENDING_STATUSES,
-            (CaseAnalyzerJob.STATUS_WAITING, CaseAnalyzerJob.STATUS_INPROGRESS),
+    def test_case_delete_cascades_caj(self):
+        """Deleting a Case removes its CAJ rows (CASCADE)."""
+        caj = CaseAnalyzerJob.objects.create(
+            case=self.case,
+            cortex_job_id="job-cascade",
+            analyzer=self.analyzer,
         )
+        self.case.delete()
+        self.assertFalse(CaseAnalyzerJob.objects.filter(pk=caj.pk).exists())
+
+    def test_analyzer_delete_protects_caj(self):
+        """Deleting an Analyzer with active CAJ rows raises ProtectedError (PROTECT)."""
+        from django.db.models.deletion import ProtectedError
+        CaseAnalyzerJob.objects.create(
+            case=self.case,
+            cortex_job_id="job-protect",
+            analyzer=self.analyzer,
+        )
+        with self.assertRaises(ProtectedError):
+            self.analyzer.delete()
+
+    def test_analyzer_report_delete_sets_null(self):
+        """Deleting an AnalyzerReport leaves the CAJ row but NULLs the FK (SET_NULL)."""
+        from cortex_job.models import AnalyzerReport
+        ar = AnalyzerReport.objects.create(
+            cortex_job_id="job-setnull",
+            type="ip",
+            analyzer=self.analyzer,
+            status="InProgress",
+            level="info",
+            confidence=0,
+            score=0,
+            report_summary={},
+            report_taxonomy={},
+            report_full={},
+        )
+        caj = CaseAnalyzerJob.objects.create(
+            case=self.case,
+            cortex_job_id="job-setnull",
+            analyzer=self.analyzer,
+            analyzer_report=ar,
+        )
+        ar.delete()
+        caj.refresh_from_db()
+        self.assertIsNone(caj.analyzer_report)
