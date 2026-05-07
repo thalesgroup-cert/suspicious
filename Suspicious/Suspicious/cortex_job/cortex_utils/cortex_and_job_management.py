@@ -464,38 +464,34 @@ class CortexJob:
             analyzer: An object with `id` and `name` attributes representing the Cortex analyzer.
 
         Returns:
-            Analyzer: The retrieved or newly created Analyzer instance.
+            Analyzer: The retrieved or newly created Analyzer instance, or None if
+            creation failed and no row could be located by name.
         """
         if not hasattr(analyzer, "id") or not hasattr(analyzer, "name"):
             raise TypeError("analyzer must have 'id' and 'name' attributes")
 
         try:
-            # Try fetching the Analyzer by Cortex ID
-            analyzer_db = Analyzer.objects.get(analyzer_cortex_id=analyzer.id)
-            return analyzer_db
+            return Analyzer.objects.get(analyzer_cortex_id=analyzer.id)
         except Analyzer.DoesNotExist:
             pass
 
-        # Attempt to create a new Analyzer
+        # Wrap create in a nested savepoint so an IntegrityError from a concurrent
+        # dispatch race does not poison the surrounding transaction.atomic block
+        # (run_analyzer wraps this call in atomic).
         try:
-            analyzer_db = Analyzer.objects.create(
-                analyzer_cortex_id=analyzer.id, name=analyzer.name, weight=0.2
-            )
-            return analyzer_db
+            with transaction.atomic():
+                return Analyzer.objects.create(
+                    analyzer_cortex_id=analyzer.id,
+                    name=analyzer.name,
+                    weight=0.2,
+                )
         except Exception as e:
             fetch_mail_logger.warning(
                 f"Error creating analyzer '{analyzer.name}': {str(e)}"
             )
 
-        # Fallback: find existing Analyzer by name
-        analyzer_db = Analyzer.objects.filter(name=analyzer.name).first()
-        if analyzer_db:
-            # Update second Cortex ID if needed
-            if analyzer_db.analyzer_cortex_2_id != analyzer.id:
-                analyzer_db.analyzer_cortex_2_id = analyzer.id
-                analyzer_db.save(update_fields=["analyzer_cortex_2_id"])
-
-        return analyzer_db
+        # Fallback: another worker created the row first — return it.
+        return Analyzer.objects.filter(name=analyzer.name).first()
 
     @staticmethod
     def set_analyzer_report_data(analyzer_report, data, data_type):
