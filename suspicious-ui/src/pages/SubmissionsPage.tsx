@@ -67,6 +67,7 @@ import { useDebounced } from "@/shared/hooks/useDebounced";
 import { StatusChip } from "@/shared/components/StatusChip";
 import { ResultChip } from "@/shared/components/ResultChip";
 import { CopyIconButton } from "@/shared/components/CopyIconButton";
+import MailPreview from "@/shared/components/MailPreview";
 
 // ---------------------------------------------------------------------------
 // Score / confidence helpers
@@ -1280,21 +1281,30 @@ export default function SubmissionsPage() {
                           <StatusChip status={r.status} minWidth={96} />
                         </TableCell>
 
-                        {/* Artifact */}
+                        {/* Artifact (with email preview thumbnail when available) */}
                         <TableCell title={r.artifact}>
-                          <Tooltip title={r.artifact || ""} arrow placement="top">
-                            <Typography
-                              sx={{
-                                maxWidth: 320,
-                                whiteSpace: "nowrap",
-                                overflow: "hidden",
-                                textOverflow: "ellipsis",
-                                cursor: "help",
-                              }}
-                            >
-                              {short(r.artifact, 60)}
-                            </Typography>
-                          </Tooltip>
+                          <Stack direction="row" spacing={1.25} sx={{ alignItems: "center" }}>
+                            {r.mail_preview_url ? (
+                              <MailPreview
+                                url={r.mail_preview_url}
+                                variant="thumbnail"
+                                alt={`Preview of email for case ${r.id}`}
+                              />
+                            ) : null}
+                            <Tooltip title={r.artifact || ""} arrow placement="top">
+                              <Typography
+                                sx={{
+                                  maxWidth: 320,
+                                  whiteSpace: "nowrap",
+                                  overflow: "hidden",
+                                  textOverflow: "ellipsis",
+                                  cursor: "help",
+                                }}
+                              >
+                                {short(r.artifact, 60)}
+                              </Typography>
+                            </Tooltip>
+                          </Stack>
                         </TableCell>
 
                         {/* Date */}
@@ -1440,6 +1450,20 @@ export default function SubmissionsPage() {
                     {selectedRow.artifact || "—"}
                   </Typography>
                 </Box>
+
+                {/* ── Email preview (only when the case is a mail) ─────────────── */}
+                {selectedRow.mail_preview_url ? (
+                  <Box sx={{ px: 2.25, py: 2 }}>
+                    <Typography sx={{ fontSize: 10, fontWeight: 700, textTransform: "uppercase", letterSpacing: "0.08em", color: "text.disabled", mb: 0.75 }}>
+                      Email preview
+                    </Typography>
+                    <MailPreview
+                      url={selectedRow.mail_preview_url}
+                      variant="full"
+                      alt={`Preview of email for case ${selectedRow.id}`}
+                    />
+                  </Box>
+                ) : null}
 
                 {/* ── Analysis results — grouped by artifact ────────────────────── */}
                 <Box sx={{ px: 2.25, pt: 2, pb: 1 }}>

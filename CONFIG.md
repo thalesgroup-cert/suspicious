@@ -215,6 +215,8 @@ Set `"backend": "s3"` to use object storage. Must match `.env` `MINIO_*` credent
 "cortex": {
     "url": "http://cortex:9001",
     "api_key": "CHANGE_ME",
+    "webhook_secret": "CHANGE_ME_LONG_RANDOM_STRING",
+    "stale_job_timeout_seconds": 86400,
     "analyzers": {
         "header":    "MailHeader_4_0",
         "ai":        "AI_Mail_Analyzer_1_4",
@@ -225,7 +227,15 @@ Set `"backend": "s3"` to use object storage. Must match `.env` `MINIO_*` credent
 }
 ```
 
-Analyzer names must match exactly those installed in your Cortex instance. Generate the API key via Cortex → Organization → User → API keys.
+| Key | Type | Default | Notes |
+|---|---|---|---|
+| `url` | string | — | Cortex API base URL. |
+| `api_key` | string | — | Cortex API key. Generate via Cortex → Organization → User → API keys. |
+| `webhook_secret` | string | `""` (disabled) | Bearer token Cortex sends to `POST /api/cortex/webhook/`. Compared via `hmac.compare_digest` to defeat timing oracles. Empty → webhook returns 503; configure Cortex with the matching shared secret. |
+| `stale_job_timeout_seconds` | int | `86400` (24 h) | `CaseAnalyzerJob` rows pending past this window are auto-failed by the `fail_stale_jobs` Celery task every 600 s, so cases never stall when Cortex drops a delivery. |
+| `analyzers` | object | — | Analyzer names must match those installed in your Cortex instance, exactly. |
+
+The webhook view writes `cortex_job_processed:<jobId>` into the Redis cache with a 1 hour TTL on first delivery; duplicate Cortex retries short-circuit there. The cron fallback (`update_ongoing_cases`, every 300 s) covers any delivery that is missed entirely.
 
 #### ChromaDB (AI vector store)
 

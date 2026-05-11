@@ -133,13 +133,25 @@ Suspicious includes a built-in AI module (via `Analyzers/AIMailAnalyzer`) that c
 
 | Component          | Role |
 |--------------------|------|
-| **Web (Django)**   | Core logic + UI – submission, analysis, reports |
-| **Database**       | Stores metadata, results, user settings |
-| **Elasticsearch**  | Search engine & indexing |
-| **Cortex**         | Analyzer engine (runs YARA, AI, sandbox, metadata analyzers) |
-| **RustFS (S3)**     | Stores uploaded files, extracted attachments, artifacts |
-| **Email Feeder**   | Monitors mailboxes, imports incoming emails automatically |
-| **Traefik (optional)** | Reverse-proxy, TLS/HTTPS termination, domain routing |
+| **Web (Django REST API)** | Core logic + UI – submission, analysis, reports. Gunicorn on port 9020. |
+| **Web UI (React 19 + Vite + MUI v9)** | Frontend served by Nginx on port 9021. |
+| **Celery beat + worker** | Background jobs: case finalisation, Cortex sync, stale-job rescue, KPI snapshots. Brokered by Valkey/Redis. |
+| **Redis / Valkey** | Celery broker + Django cache (per-case lock, Cortex webhook jobId dedup). |
+| **MariaDB 12** | Stores metadata, results, KPIs, user settings. Holds the `CaseAnalyzerJob` ledger that powers per-job Cortex webhook lookups. |
+| **Elasticsearch**  | Search engine & indexing. |
+| **Cortex**         | Analyzer engine (runs YARA, AI, sandbox, metadata, FileInfo). Reports back via HMAC-signed `/api/cortex/webhook/`. |
+| **ChromaDB**       | Vector store used by AIMailAnalyzer for semantic similarity against past cases. |
+| **RustFS (S3-compatible)** | Stores uploaded files, extracted attachments, artifacts. |
+| **Email Feeder**   | Standalone Python service. Monitors IMAP/IMAPS mailboxes, imports incoming emails automatically. Runs as a non-root `feeder` UID. |
+| **Traefik (optional)** | Reverse-proxy, TLS/HTTPS termination, domain routing. |
+| **Tempo + Grafana (optional)** | OpenTelemetry trace store + dashboards (`make monitor-up`). Replaces the legacy Prometheus stack. |
+
+### Cortex job lifecycle (high level)
+
+1. Django persists the `Case`, then for every analyzer dispatch `CortexJob.run_analyzer` writes an `AnalyzerReport` *and* a `CaseAnalyzerJob` row inside a single transaction. The CAJ row pins the `(case_id, cortex_job_id)` mapping at dispatch time.
+2. Cortex completes each analyzer asynchronously and posts to the HMAC-signed webhook.
+3. The webhook performs an O(1) indexed lookup on `CaseAnalyzerJob` and enqueues a per-job Celery task (`process_cortex_job`), which takes a Redis lock, syncs the analyzer status, and once the case's pending-CAJ count reaches zero calls `finalise_case` to score + notify.
+4. A Celery beat schedule (every 300 s) re-checks any case the webhook missed; a second beat task (every 600 s) auto-fails CAJ rows older than `STALE_JOB_TIMEOUT_SECONDS` so cases never stall forever.
 
 The AI analyzer (from `Analyzers/AIMailAnalyzer`) is fully compatible with this architecture, allowing ML-driven detection alongside traditional analyzers.
 

@@ -224,13 +224,26 @@ class InvestigationRowSerializer(serializers.ModelSerializer):
     type = serializers.SerializerMethodField()
     result = serializers.SerializerMethodField()
     reporter_email = serializers.EmailField(source="reporter.email", read_only=True)
+    mail_preview_url = serializers.SerializerMethodField()
 
     class Meta:
         model = Case
         fields = [
             "id", "reporter_email", "status", "info", "created_at",
             "tests_done", "type", "result", "is_challengeable", "is_challenged",
+            "mail_preview_url",
         ]
+
+    def get_mail_preview_url(self, obj: Case):
+        """Relative URL to the rendered eml→png preview, or null."""
+        file_or_mail = getattr(obj, "fileOrMail", None)
+        mail = getattr(file_or_mail, "mail", None) if file_or_mail else None
+        if not mail:
+            return None
+        preview = getattr(mail, "preview_png", None)
+        if not preview or not getattr(preview, "name", ""):
+            return None
+        return f"/api/cases/{obj.pk}/mail-preview.png"
 
     def get_status(self, obj: Case) -> str:
         return STATUS_TO_API.get(obj.status, "UNKNOWN")

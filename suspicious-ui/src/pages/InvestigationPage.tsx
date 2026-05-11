@@ -66,6 +66,7 @@ import { useDebounced } from "@/shared/hooks/useDebounced";
 import { StatusChip } from "@/shared/components/StatusChip";
 import { ResultChip } from "@/shared/components/ResultChip";
 import { CopyIconButton } from "@/shared/components/CopyIconButton";
+import MailPreview from "@/shared/components/MailPreview";
 
 // ---------------------------------------------------------------------------
 // Score / confidence helpers  (identical to SubmissionsPage)
@@ -1506,6 +1507,20 @@ export default function InvestigationPage() {
                     </Stack>
                   )}
                 </Box>
+
+                {/* ── Email preview (only when the case is a mail) ──────────────── */}
+                {(detailsQuery.data?.mail_preview_url || drawerRow?.mail_preview_url) ? (
+                  <Box sx={{ px: 2.25, py: 2 }}>
+                    <Typography sx={{ fontSize: 10, fontWeight: 700, textTransform: "uppercase", letterSpacing: "0.08em", color: "text.disabled", mb: 0.75 }}>
+                      Email preview
+                    </Typography>
+                    <MailPreview
+                      url={detailsQuery.data?.mail_preview_url ?? drawerRow?.mail_preview_url ?? null}
+                      variant="full"
+                      alt={`Preview of email for case ${selectedIdNum}`}
+                    />
+                  </Box>
+                ) : null}
 
                 {/* ── Analysis results — grouped by artifact ────────────────────── */}
                 <Box sx={{ px: 2.25, pt: 2, pb: 1 }}>
