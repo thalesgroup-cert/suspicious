@@ -202,7 +202,7 @@ def process_ioc(ioc, ioc_type, reports, total_scores, total_confidences, is_mali
         if not analyzer_reports:
             return failure
 
-        artifact_value = ioc.value if ioc_type == "hash" else ioc.address
+        artifact_value = ioc.value if ioc_type in ("hash", "domain") else ioc.address
         failure = CortexAnalyzerReports.process_analyzer_reports(
             reports, analyzer_reports, artifact_value, None
         )
