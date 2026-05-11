@@ -97,35 +97,6 @@ def materialise_dashboard_snapshots(self):
 
 
 @shared_task(bind=True, **_RETRY)
-def process_cortex_webhook_case(self, case_id: int):
-    """Update a single On Going case after a Cortex job-completion webhook fires.
-
-    Acquires a Redis lock (`case_update_lock:<id>`) to serialise with the
-    cron poll `update_ongoing_case_jobs` and any concurrent webhook tasks
-    targeting the same case. If the lock is held, returns early — the
-    other holder will finish the update.
-    """
-    from django.core.cache import cache
-    from case_handler.models import Case
-    from cortex_job.cortex_utils.cortex_and_job_management import CortexJobManager
-
-    lock_key = f"case_update_lock:{case_id}"
-    if not cache.add(lock_key, 1, timeout=120):
-        return  # Another worker (cron or webhook) is processing this case
-    try:
-        case = Case.objects.get(pk=case_id, status="On Going")
-        manager = CortexJobManager()
-        manager.manage_jobs(case)
-        case.save()
-    except Case.DoesNotExist:
-        return
-    except Exception as exc:
-        raise self.retry(exc=exc, countdown=30 * 2 ** self.request.retries)
-    finally:
-        cache.delete(lock_key)
-
-
-@shared_task(bind=True, **_RETRY)
 def fail_stale_jobs(self):
     """Auto-fail CaseAnalyzerJob rows pending beyond STALE_JOB_TIMEOUT.
 

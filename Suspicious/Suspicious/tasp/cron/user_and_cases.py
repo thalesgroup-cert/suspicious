@@ -33,7 +33,7 @@ def update_ongoing_case_jobs() -> None:
 
     Bounded scan: at most CRON_BATCH_SIZE oldest cases per tick. Per-case
     Redis lock (`case_update_lock:<id>`) prevents racing with the webhook
-    task `process_cortex_webhook_case` on the same case.
+    task `process_cortex_job` on the same case.
     """
     from opentelemetry import trace
 
