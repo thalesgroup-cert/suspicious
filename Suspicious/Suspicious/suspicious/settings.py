@@ -45,8 +45,6 @@ CONFIG_PATH = _os.environ.get("SUSPICIOUS_CONFIG_PATH", "/app/settings.json")
 # SQLite for MySQL so no external services are needed.
 _is_test = (
     "test" in sys.argv
-    or "makemigrations" in sys.argv
-    or "migrate" in sys.argv
     or not _os.path.isdir("/app/log")
 )
 
