@@ -41,7 +41,8 @@ from score_process.score_utils.thehive.phishing import (
     build_mail_observables_from_html,
 )
 
-CONFIG_PATH = "/app/settings.json"
+import os as _os_cfg
+CONFIG_PATH = _os_cfg.environ.get("SUSPICIOUS_CONFIG_PATH", "/app/settings.json")
 DANGEROUS_MALSCORE_THRESHOLD = 6.5
 
 logger = logging.getLogger("tasp.cron.update_ongoing_case_jobs")

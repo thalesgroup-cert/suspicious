@@ -2,7 +2,7 @@
 
 import logging
 from pathlib import Path
-from typing import Optional, Tuple, Dict, Union
+from typing import Any, Optional, Tuple, Dict, Union
 
 from cortex_job.models import AnalyzerReport
 from case_handler.case_utils.case_creator import CaseCreator
@@ -52,6 +52,7 @@ class CaseHandler:
         self.url_form = url_form
         self.other_form = other_form
         self.base_case_path = Path(base_case_path)
+        self.pending_dispatch_intents: list[tuple[Any, str]] = []
 
     def validate_forms(self) -> Dict[str, Optional[object]]:
         """
@@ -202,18 +203,39 @@ class CaseHandler:
             logger.exception("Failed to create case")
             return None
 
-    def _launch_analysis(self, instance, hash_inst, data_type: str) -> list:
+    def _launch_analysis(self, instance, hash_inst, data_type: str) -> None:
         """
-        Launch Cortex analysis and update AnalyzerReport accordingly.
-        """ 
-        existing = AnalyzerReport.objects.filter(**{data_type: instance}).values_list("id", flat=True)
-        if existing:
-            return list(existing)
+        Queue a Cortex dispatch intent for (instance, data_type). Actual dispatch
+        happens after the Case is created via `dispatch_pending(case)`.
 
-        ids = CortexJob().launch_cortex_jobs(value=instance, data_type=data_type)
-
+        Skips queueing when an existing AnalyzerReport already covers this
+        artifact (preserves prior idempotency behaviour).
+        """
+        if AnalyzerReport.objects.filter(**{data_type: instance}).exists():
+            return
+        self.pending_dispatch_intents.append((instance, data_type))
         if data_type == "file" and hash_inst:
             self._launch_analysis(hash_inst, None, "hash")
 
-        AnalyzerReport.objects.filter(cortex_job_id__in=ids).update(**{data_type: instance})
-        return list(ids)
+    def dispatch_pending(self, case) -> None:
+        """Replay queued dispatch intents now that Case exists."""
+        if case is None:
+            if self.pending_dispatch_intents:
+                logger.warning(
+                    "Dropping %d pending Cortex dispatch intents because no Case was created",
+                    len(self.pending_dispatch_intents),
+                )
+            self.pending_dispatch_intents = []
+            return
+        cortex = CortexJob()
+        for value, data_type in self.pending_dispatch_intents:
+            try:
+                cortex.launch_cortex_jobs(value=value, data_type=data_type, case=case)
+            except Exception:
+                logger.exception(
+                    "Failed to launch Cortex jobs (case=%s data_type=%s value=%r)",
+                    getattr(case, "id", None),
+                    data_type,
+                    value,
+                )
+        self.pending_dispatch_intents = []

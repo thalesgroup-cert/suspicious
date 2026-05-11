@@ -36,7 +36,17 @@ warnings.filterwarnings("ignore", category=SyntaxWarning, module=r"simhash(\..*)
 # Load configuration file
 # ---------------------------------------------------------------------------
 
-CONFIG_PATH = "/app/settings.json"
+import os as _os
+CONFIG_PATH = _os.environ.get("SUSPICIOUS_CONFIG_PATH", "/app/settings.json")
+
+# Detect non-production execution contexts: test runner, migration helpers,
+# or any context where /app/log does not exist (e.g. local dev checkouts).
+# Used below to substitute NullHandlers for file-based log handlers and
+# SQLite for MySQL so no external services are needed.
+_is_test = (
+    "test" in sys.argv
+    or not _os.path.isdir("/app/log")
+)
 
 with open(CONFIG_PATH) as _f:
     _config = json.load(_f)
@@ -204,8 +214,9 @@ TEMPLATES = [
 # Database
 # ---------------------------------------------------------------------------
 
-if "test" in sys.argv:
-    # Use SQLite in-memory for the test suite — no MySQL required.
+if _is_test:
+    # Use SQLite in-memory for the test suite / migration generation —
+    # no MySQL required outside Docker.
     DATABASES = {
         "default": {
             "ENGINE": "django.db.backends.sqlite3",
@@ -269,7 +280,7 @@ DEFAULT_AUTO_FIELD = "django.db.models.BigAutoField"
 
 _redis_cache_host = _redis_cfg.get("cache_host", "redis_cache")
 
-if "test" in sys.argv:
+if _is_test:
     CACHES = {"default": {"BACKEND": "django.core.cache.backends.locmem.LocMemCache"}}
 else:
     CACHES = {
@@ -557,7 +568,11 @@ CELERY_BEAT_SCHEDULE = {
     },
     "update-ongoing-cases": {
         "task": "tasp.tasks.update_ongoing_cases",
-        "schedule": 60.0,
+        "schedule": 300.0,
+    },
+    "fail-stale-jobs": {
+        "task": "tasp.tasks.fail_stale_jobs",
+        "schedule": 600.0,
     },
     "check-challengeable": {
         "task": "tasp.tasks.check_challengeable",
@@ -595,44 +610,21 @@ CELERY_BEAT_SCHEDULE = {
 
 _trace_level = getattr(logging, _app.get("log_level", "INFO").upper(), logging.INFO)
 
-LOGGING = {
-    "version": 1,
-    "disable_existing_loggers": False,
-
-    "formatters": {
-        # Structured JSON — consumed by log aggregators (ELK, Loki, etc.).
-        # Fields: level, time, logger, message, plus any extra= keys passed
-        # at the call site (e.g. user_id, case_id on audit events).
-        "json": {
-            "()": "pythonjsonlogger.jsonlogger.JsonFormatter",
-            "format": "%(levelname)s %(asctime)s %(name)s %(message)s %(trace_id)s %(span_id)s",
-        },
-        # Plain-text fallback kept for local development / docker logs tailing.
-        "verbose": {
-            "format": "%(levelname)s %(asctime)s | %(name)s | %(message)s",
-        },
-    },
-
-    "filters": {
-        "trace_id": {
-            "()": "suspicious.otel.TraceIdFilter",
-        },
-    },
-
-    "handlers": {
-        "console": {
-            "class":     "logging.StreamHandler",
-            "formatter": "verbose",
-        },
-        "json_console": {
-            "class": "logging.StreamHandler",
-            "formatter": "json",
-            "filters": ["trace_id"],
-        },
+# Build file-based log handlers.  During test runs there is no /app/log
+# directory, so replace every RotatingFileHandler with a NullHandler to
+# avoid FileNotFoundError / PermissionError on startup.
+if _is_test:
+    _file_handlers: dict = {
+        name: {"class": "logging.NullHandler"}
+        for name in ("app_file", "fetch_mail", "update_cases",
+                     "fetch_analyzer", "cleanup", "watcher_sync", "audit")
+    }
+else:
+    _file_handlers = {
         "app_file": {
             "class":     "logging.handlers.RotatingFileHandler",
             "filename":  "/app/log/suspicious.log",
-            "maxBytes":  10 * 1024 * 1024,   # 10 MB
+            "maxBytes":  10 * 1024 * 1024,
             "backupCount": 5,
             "formatter": "json",
             "filters":   ["trace_id"],
@@ -692,6 +684,43 @@ LOGGING = {
             "filters":   ["trace_id"],
             "level":     "INFO",
         },
+    }
+
+LOGGING = {
+    "version": 1,
+    "disable_existing_loggers": False,
+
+    "formatters": {
+        # Structured JSON — consumed by log aggregators (ELK, Loki, etc.).
+        # Fields: level, time, logger, message, plus any extra= keys passed
+        # at the call site (e.g. user_id, case_id on audit events).
+        "json": {
+            "()": "pythonjsonlogger.jsonlogger.JsonFormatter",
+            "format": "%(levelname)s %(asctime)s %(name)s %(message)s %(trace_id)s %(span_id)s",
+        },
+        # Plain-text fallback kept for local development / docker logs tailing.
+        "verbose": {
+            "format": "%(levelname)s %(asctime)s | %(name)s | %(message)s",
+        },
+    },
+
+    "filters": {
+        "trace_id": {
+            "()": "suspicious.otel.TraceIdFilter",
+        },
+    },
+
+    "handlers": {
+        "console": {
+            "class":     "logging.StreamHandler",
+            "formatter": "verbose",
+        },
+        "json_console": {
+            "class": "logging.StreamHandler",
+            "formatter": "json",
+            "filters": ["trace_id"],
+        },
+        **_file_handlers,
     },
 
     "loggers": {

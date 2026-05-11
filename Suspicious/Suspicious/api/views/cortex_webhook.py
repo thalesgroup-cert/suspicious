@@ -1,7 +1,8 @@
 """POST /api/cortex/webhook/ — Cortex job-completion callback.
 
 Cortex calls this endpoint when a job finishes (Success or Failure).
-We look up which On Going case owns the job and dispatch a targeted
+We look up which cases own the job via the CaseAnalyzerJob ledger
+(written atomically at dispatch time) and dispatch a targeted per-(case, job)
 Celery task instead of waiting for the 60-second cron poll.
 
 Authentication: Bearer <CORTEX_WEBHOOK_SECRET> in the Authorization header,
@@ -17,7 +18,6 @@ import logging
 
 from django.conf import settings
 from django.core.cache import cache
-from django.db.models import Q
 from rest_framework import status
 from rest_framework.request import Request
 from rest_framework.response import Response
@@ -30,48 +30,20 @@ logger = logging.getLogger(__name__)
 _WEBHOOK_DEDUP_TTL = 3600
 
 
-def _find_case_ids_for_job(job_id: str) -> list[int]:
-    """Return IDs of On Going cases that contain the artifact for this job."""
-    from cortex_job.models import AnalyzerReport
-    from case_handler.models import Case
+def _find_cases_for_job(job_id: str) -> list[int]:
+    """Return case IDs awaiting this Cortex job. O(1) indexed lookup.
 
-    try:
-        report = (
-            AnalyzerReport.objects
-            .filter(cortex_job_id=job_id)
-            .order_by("-creation_date")
-            .first()
-        )
-    except Exception:
-        logger.exception("DB error looking up AnalyzerReport for job %s", job_id)
-        return []
-
-    if report is None:
-        return []
-
-    q = Q()
-    # Direct file/IOC linkage
-    if report.file_id:
-        q |= Q(fileOrMail__file_id=report.file_id)
-    if report.url_id:
-        q |= Q(nonFileIocs__url_id=report.url_id)
-    if report.ip_id:
-        q |= Q(nonFileIocs__ip_id=report.ip_id)
-    if report.hash_id:
-        q |= Q(nonFileIocs__hash_id=report.hash_id)
-    # Mail body/header linkage
-    if report.mail_body_id:
-        q |= Q(fileOrMail__mail__mail_body_id=report.mail_body_id)
-    if report.mail_header_id:
-        q |= Q(fileOrMail__mail__mail_header_id=report.mail_header_id)
-
-    if not q.children:
-        logger.warning("AnalyzerReport %s has no recognised artifact FK; cannot map to case", report.pk)
-        return []
-
+    Uses the CaseAnalyzerJob ledger written atomically at dispatch time.
+    Returns the IDs of cases that still have a pending CaseAnalyzerJob row
+    for this jobId. Cases whose CAJ row has already transitioned to
+    Success/Failure/Deleted are not returned — those re-deliveries are
+    no-ops.
+    """
+    from cortex_job.models import CaseAnalyzerJob
     return list(
-        Case.objects.filter(q, status="On Going")
-        .values_list("id", flat=True)
+        CaseAnalyzerJob.objects
+        .filter(cortex_job_id=job_id, status__in=CaseAnalyzerJob.PENDING_STATUSES)
+        .values_list("case_id", flat=True)
         .distinct()
     )
 
@@ -106,16 +78,24 @@ class CortexWebhookView(APIView):
             return Response({"detail": "Already processed."}, status=status.HTTP_200_OK)
 
         # ── Dispatch targeted case update(s) ─────────────────────────────────
-        case_ids = _find_case_ids_for_job(job_id)
+        case_ids = _find_cases_for_job(job_id)
         if not case_ids:
-            # Job may belong to an artifact inside a mail (complex traversal) —
-            # the 60-second cron fallback will catch it.
-            logger.info("No On Going case found for jobId=%s; cron fallback will handle it", job_id)
-            return Response({"detail": "No matching case found; cron fallback active."}, status=status.HTTP_202_ACCEPTED)
+            logger.info(
+                "No pending CaseAnalyzerJob for jobId=%s; cron fallback covers it", job_id
+            )
+            return Response(
+                {"detail": "No pending case found."},
+                status=status.HTTP_202_ACCEPTED,
+            )
 
-        from tasp.tasks import process_cortex_webhook_case
+        from tasp.tasks import process_cortex_job
         for case_id in case_ids:
-            process_cortex_webhook_case.delay(case_id)
-            logger.info("Queued cortex update for case_id=%s (jobId=%s)", case_id, job_id)
+            process_cortex_job.delay(case_id, job_id)
+            logger.info(
+                "Queued cortex update for case=%s job=%s", case_id, job_id
+            )
 
-        return Response({"detail": f"Queued update for {len(case_ids)} case(s)."}, status=status.HTTP_202_ACCEPTED)
+        return Response(
+            {"detail": f"Queued update for {len(case_ids)} case(s)."},
+            status=status.HTTP_202_ACCEPTED,
+        )

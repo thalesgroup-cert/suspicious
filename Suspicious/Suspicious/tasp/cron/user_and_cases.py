@@ -1,8 +1,10 @@
 import logging
 from django.contrib.auth.models import User
 from django.core.cache import cache
+from django.db.models import Exists, OuterRef
 from case_handler.models import Case
 from cortex_job.cortex_utils.cortex_and_job_management import CortexJobManager
+from cortex_job.models import CaseAnalyzerJob
 from profiles.profiles_utils.ldap import Ldap
 
 logger = logging.getLogger("tasp.cron.users_cases")
@@ -31,14 +33,20 @@ def update_ongoing_case_jobs() -> None:
 
     Bounded scan: at most CRON_BATCH_SIZE oldest cases per tick. Per-case
     Redis lock (`case_update_lock:<id>`) prevents racing with the webhook
-    task `process_cortex_webhook_case` on the same case.
+    task `process_cortex_job` on the same case.
     """
     from opentelemetry import trace
 
     tracer = trace.get_tracer(__name__)
+    pending_jobs = CaseAnalyzerJob.objects.filter(
+        case_id=OuterRef("pk"),
+        status__in=CaseAnalyzerJob.PENDING_STATUSES,
+    )
     cases = list(
         Case.objects
         .filter(status="On Going")
+        .annotate(has_pending=Exists(pending_jobs))
+        .filter(has_pending=True)
         .order_by("creation_date")[:CRON_BATCH_SIZE]
     )
     if not cases:

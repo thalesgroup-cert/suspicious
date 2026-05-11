@@ -15,7 +15,8 @@ from .utils import log_event, build_user_infos, send_with_retry
 
 logger = logging.getLogger("tasp.cron.update_ongoing_case_jobs")
 
-CONFIG_PATH = "/app/settings.json"
+import os as _os_cfg
+CONFIG_PATH = _os_cfg.environ.get("SUSPICIOUS_CONFIG_PATH", "/app/settings.json")
 
 
 class MailNotificationService:

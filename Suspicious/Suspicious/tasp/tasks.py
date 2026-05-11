@@ -97,28 +97,79 @@ def materialise_dashboard_snapshots(self):
 
 
 @shared_task(bind=True, **_RETRY)
-def process_cortex_webhook_case(self, case_id: int):
-    """Update a single On Going case after a Cortex job-completion webhook fires.
+def fail_stale_jobs(self):
+    """Auto-fail CaseAnalyzerJob rows pending beyond STALE_JOB_TIMEOUT.
 
-    Acquires a Redis lock (`case_update_lock:<id>`) to serialise with the
-    cron poll `update_ongoing_case_jobs` and any concurrent webhook tasks
-    targeting the same case. If the lock is held, returns early — the
-    other holder will finish the update.
+    Mirrors the existing AnalyzerReport stale-rescue but operates on the
+    ledger so per-case visibility is preserved even when AnalyzerReport
+    rows have been GC'd by delete_old_reports.
+    """
+    from datetime import timedelta
+    from django.utils import timezone
+    from cortex_job.models import CaseAnalyzerJob
+    from cortex_job.cortex_utils.cortex_and_job_management import (
+        STALE_JOB_TIMEOUT_SECONDS,
+    )
+
+    cutoff = timezone.now() - timedelta(seconds=STALE_JOB_TIMEOUT_SECONDS)
+    n = CaseAnalyzerJob.objects.filter(
+        status__in=CaseAnalyzerJob.PENDING_STATUSES,
+        created_at__lt=cutoff,
+    ).update(status=CaseAnalyzerJob.STATUS_FAILURE, completed_at=timezone.now())
+    if n:
+        logger.warning(
+            "fail_stale_jobs: marked %d CaseAnalyzerJob rows as Failure", n
+        )
+
+
+def _case_has_pending_jobs(case_id: int) -> bool:
+    """Return True if any CaseAnalyzerJob for this case is still pending."""
+    from cortex_job.models import CaseAnalyzerJob
+    return CaseAnalyzerJob.objects.filter(
+        case_id=case_id, status__in=CaseAnalyzerJob.PENDING_STATUSES
+    ).exists()
+
+
+@shared_task(bind=True, **_RETRY)
+def process_cortex_job(self, case_id: int, job_id: str):
+    """Sync one (case, cortex_job) pair after the webhook fires.
+
+    Acquires a per-case Redis lock to serialise with the cron poll
+    `update_ongoing_case_jobs` and other concurrent webhook tasks on the
+    same case. Idempotent: the status precheck drops re-deliveries of an
+    already-finalised job.
+
+    When this update transitions the case's last pending CAJ to a
+    non-pending state, `finalise_case` is invoked to compute the final
+    description, status, and CortexAnalyzerReports.get_report.
     """
     from django.core.cache import cache
-    from case_handler.models import Case
+    from cortex_job.models import CaseAnalyzerJob
     from cortex_job.cortex_utils.cortex_and_job_management import CortexJobManager
 
     lock_key = f"case_update_lock:{case_id}"
     if not cache.add(lock_key, 1, timeout=120):
-        return  # Another worker (cron or webhook) is processing this case
+        return  # Cron or another webhook task is currently updating this case
     try:
-        case = Case.objects.get(pk=case_id, status="On Going")
+        try:
+            caj = CaseAnalyzerJob.objects.select_related(
+                "case", "analyzer_report"
+            ).get(case_id=case_id, cortex_job_id=job_id)
+        except CaseAnalyzerJob.DoesNotExist:
+            logger.warning(
+                "CaseAnalyzerJob missing (case=%s job=%s)", case_id, job_id
+            )
+            return
+
+        if caj.status not in CaseAnalyzerJob.PENDING_STATUSES:
+            # Already updated by a prior webhook delivery or by the cron.
+            return
+
         manager = CortexJobManager()
-        manager.manage_jobs(case)
-        case.save()
-    except Case.DoesNotExist:
-        return
+        manager.update_single_job(caj)
+
+        if not _case_has_pending_jobs(caj.case_id):
+            manager.finalise_case(caj.case)
     except Exception as exc:
         raise self.retry(exc=exc, countdown=30 * 2 ** self.request.retries)
     finally:

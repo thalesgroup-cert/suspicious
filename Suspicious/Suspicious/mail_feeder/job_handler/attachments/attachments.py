@@ -1,6 +1,6 @@
 import logging
 import os
-from typing import List, Tuple
+from typing import Any, List, Tuple
 from django.db import transaction
 
 from settings.models import AllowListFile, AllowListFiletype
@@ -22,23 +22,47 @@ class AttachmentJobLauncherService:
     """
 
     def __init__(self):
-        self.job_ids: List[int] = []
+        self.pending_dispatch_intents: list[tuple[Any, str]] = []
         self.artifact_id: int | None = None
 
-    def process_attachment(self, file_model: FileModel) -> Tuple[List[int], int | None]:
+    def process_attachment(self, file_model: FileModel) -> Tuple["AttachmentJobLauncherService", int | None]:
         """
         Main entry point to process a file attachment.
+        Returns (self, artifact_id) so the caller holds the service for
+        later dispatch_pending(case).
         """
         with safe_execution("process_attachment"):
             fetch_mail_logger.debug(f"Processing attachment file: {file_model.file_path}")
             hash_value = self.compute_file_hash(file_model)
             if hash_value is None:
                 fetch_mail_logger.warning(f"Failed to compute hash for file: {file_model.file_path}")
-                return self.job_ids, self.artifact_id
+                return self, self.artifact_id
             fetch_mail_logger.debug(f"Computed hash {hash_value} for file: {file_model.file_path}")
             self.handle_hash_and_file(file_model, hash_value)
-            fetch_mail_logger.debug(f"Completed processing for file: {file_model.file_path} with jobs: {self.job_ids}")
-            return self.job_ids, self.artifact_id
+            fetch_mail_logger.debug(f"Completed processing for file: {file_model.file_path} with pending intents: {len(self.pending_dispatch_intents)}")
+            return self, self.artifact_id
+
+    def dispatch_pending(self, case) -> list:
+        """
+        Replay queued dispatch intents now that Case exists. Returns the
+        flat list of Cortex job IDs returned across all dispatches.
+        Intents are consumed (cleared) on success.
+        """
+        job_ids: list = []
+        cortex = CortexJob()
+        for value, data_type in self.pending_dispatch_intents:
+            try:
+                job_ids.extend(cortex.launch_cortex_jobs(value, data_type, case=case))
+            except Exception as e:
+                fetch_mail_logger.error(
+                    "Failed to launch Cortex jobs (case=%s data_type=%s value=%r): %s",
+                    getattr(case, "id", None),
+                    data_type,
+                    value,
+                    e,
+                )
+        self.pending_dispatch_intents = []
+        return job_ids
 
     def compute_file_hash(self, file_model: FileModel) -> str | None:
         """
@@ -118,13 +142,9 @@ class AttachmentJobLauncherService:
             self._allowlist_file_and_hash(file_model, hash_model)
 
     def _launch_cortex_jobs(self, file_model: FileModel, hash_model: HashModel):
-        """
-        Launch Cortex jobs for the file and its hash.
-        """
-        with safe_execution("launch_cortex_jobs"):
-            cortex = CortexJob()
-            self.job_ids.extend(cortex.launch_cortex_jobs(file_model, "file"))
-            self.job_ids.extend(cortex.launch_cortex_jobs(hash_model, "hash"))
+        """Queue (file, hash) dispatch intents. Dispatch happens after Case creation."""
+        self.pending_dispatch_intents.append((file_model, "file"))
+        self.pending_dispatch_intents.append((hash_model, "hash"))
 
     def _allowlist_file_and_hash(self, file_model: FileModel, hash_model: HashModel):
         """

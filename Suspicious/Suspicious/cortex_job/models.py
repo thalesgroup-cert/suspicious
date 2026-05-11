@@ -93,3 +93,63 @@ class AnalyzerReport(models.Model):
     def get_category(self):
         """Return the report categories as a list."""
         return self.category.split(',') if self.category else []
+
+
+class CaseAnalyzerJob(models.Model):
+    """Per-case ledger of dispatched Cortex jobs.
+
+    One row per (case, cortex_job_id). Multiple cases may share the same
+    cortex_job_id when a deduplicated artifact (file, URL, hash, etc.) is
+    referenced by several cases — that's why this is a junction table and
+    not an FK on AnalyzerReport.
+
+    Status mirrors AnalyzerReport.status but is per-case so we can answer
+    'which jobs is this case waiting on' without joining.
+    """
+    STATUS_WAITING = "Waiting"
+    STATUS_INPROGRESS = "InProgress"
+    STATUS_SUCCESS = "Success"
+    STATUS_FAILURE = "Failure"
+    STATUS_DELETED = "Deleted"
+    STATUS_CHOICES = [
+        (STATUS_WAITING, "Waiting"),
+        (STATUS_INPROGRESS, "InProgress"),
+        (STATUS_SUCCESS, "Success"),
+        (STATUS_FAILURE, "Failure"),
+        (STATUS_DELETED, "Deleted"),
+    ]
+    PENDING_STATUSES = (STATUS_WAITING, STATUS_INPROGRESS)
+
+    case = models.ForeignKey(
+        "case_handler.Case",
+        on_delete=models.CASCADE,
+        related_name="analyzer_jobs",
+    )
+    cortex_job_id = models.CharField(max_length=50)
+    analyzer = models.ForeignKey(
+        Analyzer, on_delete=models.PROTECT, related_name="case_jobs"
+    )
+    analyzer_report = models.ForeignKey(
+        AnalyzerReport,
+        on_delete=models.SET_NULL,
+        related_name="case_jobs",
+        null=True, blank=True,
+    )
+    status = models.CharField(
+        max_length=20, choices=STATUS_CHOICES, default=STATUS_INPROGRESS
+    )
+    created_at = models.DateTimeField(auto_now_add=True)
+    completed_at = models.DateTimeField(null=True, blank=True)
+
+    class Meta:
+        constraints = [
+            models.UniqueConstraint(
+                fields=["case", "cortex_job_id"],
+                name="uniq_case_cortexjob",
+            ),
+        ]
+        indexes = [
+            models.Index(fields=["cortex_job_id"]),
+            models.Index(fields=["case", "status"]),
+            models.Index(fields=["status", "created_at"]),
+        ]

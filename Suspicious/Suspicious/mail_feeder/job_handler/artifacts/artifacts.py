@@ -1,5 +1,5 @@
 import logging
-from typing import List
+from typing import Any, List
 from pydantic import ValidationError
 
 from .models import ArtifactModel
@@ -17,12 +17,12 @@ class ArtifactJobLauncherService:
     """
 
     def __init__(self):
-        self.launched_job_ids: List[int] = []
+        self.pending_dispatch_intents: list[tuple[Any, str]] = []
 
-    def process_artifacts(self, artifacts: list) -> List[int]:
+    def process_artifacts(self, artifacts: list) -> "ArtifactJobLauncherService":
         """
-        Validate artifacts and dispatch them to the correct handler.
-        Returns a list of launched job IDs.
+        Validate artifacts and queue dispatch intents for later dispatch.
+        Returns self so the caller can later call dispatch_pending(case).
 
         Deduplicates by (artifact_type, value) within a single call so the
         same URL / domain / hash extracted multiple times from one email
@@ -61,7 +61,29 @@ class ArtifactJobLauncherService:
             else:
                 fetch_mail_logger.warning(f"No handler for artifact type {artifact_data.artifact_type}")
 
-        return self.launched_job_ids
+        return self
+
+    def dispatch_pending(self, case) -> list:
+        """
+        Replay queued dispatch intents now that Case exists. Returns the
+        flat list of Cortex job IDs returned across all dispatches.
+        Intents are consumed (cleared) on success.
+        """
+        job_ids: list = []
+        cortex = CortexJob()
+        for value, data_type in self.pending_dispatch_intents:
+            try:
+                job_ids.extend(cortex.launch_cortex_jobs(value, data_type, case=case))
+            except Exception as e:
+                fetch_mail_logger.error(
+                    "Failed to launch Cortex jobs (case=%s data_type=%s value=%r): %s",
+                    getattr(case, "id", None),
+                    data_type,
+                    value,
+                    e,
+                )
+        self.pending_dispatch_intents = []
+        return job_ids
 
     @staticmethod
     def _artifact_value(artifact, artifact_type: str):
@@ -130,13 +152,8 @@ class ArtifactJobLauncherService:
             mail_obj.save()
 
     def _launch_cortex_jobs(self, obj, artifact_type: str):
-        """
-        Launch Cortex jobs for the given object and artifact type.
-        """
-        try:
-            self.launched_job_ids += CortexJob().launch_cortex_jobs(obj, artifact_type)
-        except Exception as e:
-            fetch_mail_logger.error(f"Failed to launch Cortex jobs for {artifact_type}: {e}")
+        """Queue a (value, data_type) intent. Dispatch happens after Case creation."""
+        self.pending_dispatch_intents.append((obj, artifact_type))
 
     def _is_hash_allow_listed(self, hash_obj) -> bool:
         """

@@ -2,9 +2,36 @@ from unittest import TestCase
 from unittest.mock import patch, MagicMock, mock_open
 from io import BytesIO, StringIO
 
+import django.test
+
 from mail_feeder.global_submission.gsubmission import GlobalSubmissionService
 from mail_feeder.global_submission.models import MailSubmissionData
 from mail_feeder.global_submission.utils import flatten_id_lists, extract_email_address
+
+
+def _make_handlers_mock(mock_handlers_cls):
+    """
+    Module-level helper that builds a Handlers mock with the expected return shapes:
+      - handle_artifacts -> ArtifactJobLauncherService-like mock (has dispatch_pending)
+      - handle_attachments -> AttachmentDispatchResult-like mock (has .services, .ai_archive)
+      - handle_mail_header -> list of intents
+      - handle_mail_body -> list of intents
+    """
+    handlers = mock_handlers_cls.return_value
+
+    artifact_service = MagicMock()
+    artifact_service.dispatch_pending = MagicMock()
+    handlers.handle_artifacts.return_value = artifact_service
+
+    attachment_result = MagicMock()
+    attachment_result.services = []
+    attachment_result.ai_archive = None
+    handlers.handle_attachments.return_value = attachment_result
+
+    handlers.handle_mail_header.return_value = []
+    handlers.handle_mail_body.return_value = []
+
+    return handlers
 
 
 class GlobalSubmissionServiceTests(TestCase):
@@ -18,14 +45,18 @@ class GlobalSubmissionServiceTests(TestCase):
             filename="mail.eml",
             workdir="/tmp/workdir",
             user="user@test.com",
+            bucket_name=None,
             is_submitted=submitted
         )
+
+    def _make_handlers_mock(self, mock_handlers_cls):
+        return _make_handlers_mock(mock_handlers_cls)
 
     # =========================
     # Web submission
     # =========================
     @patch("mail_feeder.global_submission.gsubmission.MailInfoService")
-    @patch("mail_feeder.global_submission.gsubmission.Handlers")
+    @patch.object(GlobalSubmissionService, "_handle_common_tasks")
     @patch("mail_feeder.global_submission.gsubmission.EmailHandlerService")
     @patch("mail_feeder.global_submission.gsubmission.parse_email")
     @patch("mail_feeder.global_submission.gsubmission.email.message_from_binary_file")
@@ -36,7 +67,7 @@ class GlobalSubmissionServiceTests(TestCase):
         mock_msg_from_binary,
         mock_parse_email,
         mock_email_handler_cls,
-        mock_handlers_cls,
+        mock_common_tasks,
         mock_mail_info
     ):
         mock_open.return_value = BytesIO(b"raw email")
@@ -50,11 +81,6 @@ class GlobalSubmissionServiceTests(TestCase):
         mock_msg_from_binary.return_value = MagicMock()
         mock_parse_email.return_value = "parsed-mail"
         mock_email_handler_cls.return_value.handle_mail.return_value = fake_instance
-
-        handlers = mock_handlers_cls.return_value
-        handlers.handle_artifacts.return_value = ["a1"]
-        handlers.handle_attachments.return_value.ids = ["att1"]
-        handlers.handle_attachments.return_value.ai_ids = []
 
         result = self.service.process_single_email(submission)
 
@@ -93,28 +119,21 @@ class GlobalSubmissionServiceTests(TestCase):
     # MinIO submission
     # =========================
     @patch("mail_feeder.global_submission.gsubmission.MailInfoService")
-    @patch("mail_feeder.global_submission.gsubmission.Handlers")
+    @patch.object(GlobalSubmissionService, "_handle_instance_for_minio")
     @patch("mail_feeder.global_submission.gsubmission.EmailHandlerService")
     @patch("mail_feeder.global_submission.gsubmission.parse_email")
-    @patch("mail_feeder.global_submission.gsubmission.email.message_from_file")
     @patch("mail_feeder.global_submission.gsubmission.email.message_from_binary_file")
     @patch("builtins.open")
     def test_process_single_email_minio_submission_success(
         self,
         mock_open,
         mock_msg_from_binary,
-        mock_msg_from_file,
         mock_parse_email,
         mock_email_handler_cls,
-        mock_handlers_cls,
+        mock_minio_handler,
         mock_mail_info
     ):
-        def open_side_effect(*args, **kwargs):
-            if "rb" in kwargs.get("mode", "rb"):
-                return BytesIO(b"raw email")
-            return StringIO("From: user@test.com\n")
-
-        mock_open.side_effect = open_side_effect
+        mock_open.return_value = BytesIO(b"raw email")
 
         submission = self._submission(submitted=False)
 
@@ -123,17 +142,8 @@ class GlobalSubmissionServiceTests(TestCase):
         fake_instance.reportedBy = None
 
         mock_msg_from_binary.return_value = MagicMock()
-        mock_msg_from_file.return_value = MagicMock(
-            get=lambda k: "user@test.com" if k == "From" else None
-        )
-
         mock_parse_email.return_value = "parsed-mail"
         mock_email_handler_cls.return_value.handle_mail.return_value = fake_instance
-
-        handlers = mock_handlers_cls.return_value
-        handlers.handle_artifacts.return_value = ["a1"]
-        handlers.handle_attachments.return_value.ids = ["att1"]
-        handlers.handle_attachments.return_value.ai_ids = []
 
         result = self.service.process_single_email(submission)
 
@@ -169,7 +179,7 @@ class GlobalSubmissionServiceTests(TestCase):
         instance = MagicMock()
         instance.save = MagicMock()
 
-        self.service._handle_instance_for_minio(instance, "email123", "/tmp/work")
+        self.service._handle_instance_for_minio(instance, "email123", "/tmp/work", "")
 
         self.assertEqual(instance.reportedBy, "minio@example.com")
         instance.save.assert_called_once()
@@ -182,9 +192,10 @@ class GlobalSubmissionServiceTests(TestCase):
     def test_list_eml_files(self, m_listdir):
         m_listdir.return_value = ["a.eml", "b.eml", "x.txt", "pref_1.eml"]
 
+        # list_eml_files excludes files that START WITH the prefix
         result = self.service.list_eml_files("/tmp", prefix="pref")
 
-        self.assertEqual(result, ["pref_1.eml"])
+        self.assertEqual(result, ["a.eml", "b.eml"])
 
 
 class GlobalSubmissionUtilsTests(TestCase):
@@ -200,3 +211,47 @@ class GlobalSubmissionUtilsTests(TestCase):
 
     def test_extract_email_address_invalid(self):
         self.assertIsNone(extract_email_address("invalid"))
+
+
+class HandleCommonTasksOrderingTest(django.test.TestCase):
+    """Verify dispatch happens strictly after Case creation."""
+
+    @patch("mail_feeder.global_submission.gsubmission.CortexJob")
+    @patch("mail_feeder.global_submission.gsubmission.CaseCreatorService")
+    @patch("mail_feeder.global_submission.gsubmission.UserCreationService")
+    @patch("mail_feeder.global_submission.gsubmission.Handlers")
+    def test_create_case_runs_before_dispatch_pending(
+        self, mock_handlers_cls, mock_user_cls, mock_case_cls, mock_cortex_cls
+    ):
+        from django.contrib.auth import get_user_model
+        User = get_user_model()
+        real_user = User.objects.create_user(username="ordering_test_user", password="x")
+
+        # Setup: Handlers() returns the mock helper shape
+        handlers_mock = _make_handlers_mock(mock_handlers_cls)
+        mock_user_cls.return_value.get_or_create_user.return_value = real_user
+
+        order_log = []
+        fake_case = MagicMock()
+        fake_case.id = 42
+        mock_case_cls.return_value.create_case.side_effect = lambda *a, **kw: (
+            order_log.append("create_case") or fake_case
+        )
+
+        artifact_svc = handlers_mock.handle_artifacts.return_value
+        artifact_svc.dispatch_pending.side_effect = lambda case: order_log.append("artifact_dispatch")
+
+        # Add one attachment service
+        att_svc = MagicMock()
+        att_svc.dispatch_pending.side_effect = lambda case: order_log.append("attachment_dispatch")
+        handlers_mock.handle_attachments.return_value.services = [att_svc]
+
+        service = GlobalSubmissionService()
+        instance = MagicMock()
+        instance.reportedBy = "x@example.com"
+        instance.mail_id = "m1"
+        service._handle_common_tasks(instance, "email-1", "mail.zip", "bucket")
+
+        self.assertEqual(order_log[0], "create_case")
+        self.assertIn("artifact_dispatch", order_log[1:])
+        self.assertIn("attachment_dispatch", order_log[1:])

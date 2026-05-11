@@ -17,7 +17,8 @@ from score_process.score_utils.send_mail.social_logos import SOCIAL_LOGOS
 logger = logging.getLogger(__name__)
 TEMPLATES_DIR = Path(__file__).parent.parent / "send_mail/templates"
 
-CONFIG_PATH = "/app/settings.json"
+import os as _os_cfg
+CONFIG_PATH = _os_cfg.environ.get("SUSPICIOUS_CONFIG_PATH", "/app/settings.json")
 with open(CONFIG_PATH) as _f:
     _global_config = json.load(_f)
 
