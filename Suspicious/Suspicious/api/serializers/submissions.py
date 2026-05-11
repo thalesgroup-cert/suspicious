@@ -197,6 +197,7 @@ class BaseSubmissionSerializer(serializers.ModelSerializer):
     tests_done = serializers.IntegerField(source="analysis_done", read_only=True)
     type = serializers.SerializerMethodField()
     result = serializers.SerializerMethodField()
+    mail_preview_url = serializers.SerializerMethodField()
 
     class Meta:
         model = Case
@@ -208,7 +209,20 @@ class BaseSubmissionSerializer(serializers.ModelSerializer):
             "tests_done",
             "type",
             "result",
+            "mail_preview_url",
         ]
+
+    @extend_schema_field(serializers.CharField(allow_null=True, read_only=True))
+    def get_mail_preview_url(self, obj):
+        """Relative URL to the rendered eml→png preview, or null."""
+        file_or_mail = getattr(obj, "fileOrMail", None)
+        mail = getattr(file_or_mail, "mail", None) if file_or_mail else None
+        if not mail:
+            return None
+        preview = getattr(mail, "preview_png", None)
+        if not preview or not getattr(preview, "name", ""):
+            return None
+        return f"/api/cases/{obj.pk}/mail-preview.png"
 
     @extend_schema_field(serializers.ChoiceField(choices=SUBMISSION_STATUS_CHOICES, read_only=True))
     def get_status(self, obj):

@@ -45,6 +45,8 @@ export type InvestigationRow = {
   result: InvestigationResult | string;
   is_challengeable: boolean;
   is_challenged: boolean;
+  /** Relative URL to the rendered .eml→png preview, or null when absent / not a mail. */
+  mail_preview_url?: string | null;
 };
 
 export type InvestigationAnalyzerTarget = {
@@ -99,6 +101,8 @@ export type InvestigationDetails = {
   result: InvestigationResult | string;
   is_challengeable: boolean;
   is_challenged: boolean;
+  /** Relative URL to the rendered .eml→png preview, or null when absent / not a mail. */
+  mail_preview_url?: string | null;
   raw?: unknown;
   analyzer_reports: InvestigationAnalyzerReport[];
   case_infos?: InvestigationCaseInfos;

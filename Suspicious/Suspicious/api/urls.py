@@ -21,6 +21,7 @@ from api.views.dashboard import (
 )
 from api.views.downloads import DownloadCaseArchiveView
 from api.views.home import HomeSummaryView
+from api.views.mail_preview import MailPreviewView
 from api.views.investigations import (
     InvestigationDetailsView,
     InvestigationGlobalEditView,
@@ -80,6 +81,7 @@ urlpatterns = [
 
     # Case artifacts
     path("cases/<int:case_id>/download/", DownloadCaseArchiveView.as_view(), name="case-download"),
+    path("cases/<int:case_id>/mail-preview.png", MailPreviewView.as_view(), name="case-mail-preview"),
     path("cases/<int:case_id>/challenge/", CaseChallengeTokenView.as_view(), name="case-challenge"),
 
     # Dashboard summary
