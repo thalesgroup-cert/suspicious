@@ -14,7 +14,7 @@ whitenoise==6.12.0
 docker==7.1.0
 
 # Parsing and Text Extraction
-beautifulsoup4==4.14.3
+beautifulsoup4==4.13.5
 compoundfiles==0.3
 compressed-rtf==1.0.7
 extract-msg==0.55.0
