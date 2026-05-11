@@ -125,6 +125,32 @@ def process_cortex_webhook_case(self, case_id: int):
         cache.delete(lock_key)
 
 
+@shared_task(bind=True, **_RETRY)
+def fail_stale_jobs(self):
+    """Auto-fail CaseAnalyzerJob rows pending beyond STALE_JOB_TIMEOUT.
+
+    Mirrors the existing AnalyzerReport stale-rescue but operates on the
+    ledger so per-case visibility is preserved even when AnalyzerReport
+    rows have been GC'd by delete_old_reports.
+    """
+    from datetime import timedelta
+    from django.utils import timezone
+    from cortex_job.models import CaseAnalyzerJob
+    from cortex_job.cortex_utils.cortex_and_job_management import (
+        STALE_JOB_TIMEOUT_SECONDS,
+    )
+
+    cutoff = timezone.now() - timedelta(seconds=STALE_JOB_TIMEOUT_SECONDS)
+    n = CaseAnalyzerJob.objects.filter(
+        status__in=CaseAnalyzerJob.PENDING_STATUSES,
+        created_at__lt=cutoff,
+    ).update(status=CaseAnalyzerJob.STATUS_FAILURE, completed_at=timezone.now())
+    if n:
+        logger.warning(
+            "fail_stale_jobs: marked %d CaseAnalyzerJob rows as Failure", n
+        )
+
+
 def _case_has_pending_jobs(case_id: int) -> bool:
     """Return True if any CaseAnalyzerJob for this case is still pending."""
     from cortex_job.models import CaseAnalyzerJob

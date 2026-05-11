@@ -570,7 +570,11 @@ CELERY_BEAT_SCHEDULE = {
     },
     "update-ongoing-cases": {
         "task": "tasp.tasks.update_ongoing_cases",
-        "schedule": 60.0,
+        "schedule": 300.0,
+    },
+    "fail-stale-jobs": {
+        "task": "tasp.tasks.fail_stale_jobs",
+        "schedule": 600.0,
     },
     "check-challengeable": {
         "task": "tasp.tasks.check_challengeable",
