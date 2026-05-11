@@ -117,6 +117,23 @@ export async function setFeederStatus(
   return res.data;
 }
 
+/** Live runtime status of the email_feeder container (proxied from its /health endpoint). */
+export type FeederHealth = {
+  online: boolean;
+  last_successful_poll: number | null;
+  emails_processed_total: number;
+  errors_total: number;
+  stale_seconds: number;
+  stale: boolean;
+  checked_at: number;
+  error: string | null;
+};
+
+export async function getFeederHealth(): Promise<FeederHealth> {
+  const res = await api.get(`/feeder/health/`);
+  return res.data;
+}
+
 export async function listAnalyzers(): Promise<Analyzer[]> {
   const res = await api.get(`/settings/analyzers/`);
   return res.data;

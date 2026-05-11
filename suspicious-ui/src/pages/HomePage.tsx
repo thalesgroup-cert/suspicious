@@ -53,6 +53,7 @@ import { useResultColors, useStatusColors } from "@/styles/colorStore";
 
 import { StatusChip } from "@/shared/components/StatusChip";
 import { ResultChip } from "@/shared/components/ResultChip";
+import FeederHealthBadge from "@/shared/components/FeederHealthBadge";
 
 // ---------------------------------------------------------------------------
 // Types
@@ -548,7 +549,7 @@ export default function HomePage() {
         <Stack
           direction={{ xs: "column", md: "row" }}
           spacing={1.5}
-          sx={{ mb: 2, justifyContent: "space-between" }}
+          sx={{ mb: 2, justifyContent: "space-between", alignItems: { md: "center" } }}
         >
           <Stack direction="row" spacing={1.5} sx={{ minWidth: 0, alignItems: "flex-start" }}>
             <Box sx={{ minWidth: 0 }}>
@@ -558,6 +559,11 @@ export default function HomePage() {
               <ThemeGreeting caps={capabilities} name={displayName} />
             </Box>
           </Stack>
+
+          {/* Live email_feeder runtime status — Admin / CERT only */}
+          {(groups.includes("Admin") || groups.includes("CERT")) ? (
+            <FeederHealthBadge />
+          ) : null}
         </Stack>
 
         {homeQuery.isError ? (

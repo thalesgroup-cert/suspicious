@@ -73,6 +73,7 @@ import {
   type SettingsSection,
   type EditableListSection,
 } from "@/features/settings/api";
+import FeederHealthBadge from "@/shared/components/FeederHealthBadge";
 
 // ---------------------------------------------------------------------------
 // Types
@@ -927,7 +928,10 @@ function FeederPanel() {
             </Box>
           </Stack>
 
-          <Stack direction="row" spacing={1.5} sx={{ alignItems: "center" }} >
+          <Stack direction="row" spacing={1.5} sx={{ alignItems: "center", flexWrap: "wrap" }} >
+            {/* Live runtime status — polled from feeder /health */}
+            <FeederHealthBadge />
+            {/* Operator-controlled toggle (Django settings) */}
             <Chip
               size="small"
               label={pending ? "…" : enabled ? "Running" : "Stopped"}
