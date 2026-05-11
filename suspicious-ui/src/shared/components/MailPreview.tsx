@@ -94,7 +94,7 @@ export default function MailPreview({ url, variant = "thumbnail", alt }: MailPre
 
 function NoPreviewInline() {
   return (
-    <Stack direction="row" spacing={0.5} alignItems="center" sx={{ p: 1 }}>
+    <Stack direction="row" spacing={0.5} sx={{ p: 1, alignItems: "center" }}>
       <AttachEmailRoundedIcon fontSize="small" color="disabled" />
       <Typography variant="caption" color="text.disabled">
         No preview
