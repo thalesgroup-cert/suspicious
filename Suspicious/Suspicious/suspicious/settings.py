@@ -352,10 +352,28 @@ if _ldap_uri:
             ldap.OPT_TIMEOUT:         10,   # total operation timeout
         }
 
-        _verify_ssl = str(_ldap_cfg.get("verify_ssl", "False")).lower()
+        # LDAP TLS verification — default-secure. Audit S3:
+        # historically `verify_ssl` defaulted to "False", silently
+        # downgrading to OPT_X_TLS_NEVER and exposing the bind
+        # credentials to anyone on the path. We now default to
+        # OPT_X_TLS_DEMAND (full cert + hostname check) and require an
+        # explicit opt-out via `verify_ssl: false` in settings.json.
+        # The opt-out path emits a startup WARNING so the regression
+        # is visible in `make logs`.
+        _verify_ssl = str(_ldap_cfg.get("verify_ssl", "True")).lower()
         if _verify_ssl in ("false", "0", "no"):
+            logging.getLogger("suspicious.boot").warning(
+                "LDAP TLS verification disabled via settings.json "
+                "(integrations.ldap.verify_ssl=false). Bind credentials "
+                "are exposed to MITM. Set verify_ssl=true and supply a "
+                "trusted CA bundle for production."
+            )
             AUTH_LDAP_GLOBAL_OPTIONS = {
-                ldap.OPT_X_TLS_REQUIRE_CERT: ldap.OPT_X_TLS_NEVER
+                ldap.OPT_X_TLS_REQUIRE_CERT: ldap.OPT_X_TLS_NEVER,
+            }
+        else:
+            AUTH_LDAP_GLOBAL_OPTIONS = {
+                ldap.OPT_X_TLS_REQUIRE_CERT: ldap.OPT_X_TLS_DEMAND,
             }
 
         AUTHENTICATION_BACKENDS.append("django_auth_ldap.backend.LDAPBackend")
