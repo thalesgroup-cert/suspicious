@@ -15,9 +15,10 @@ from mail_feeder.email_info.email_info import MailInfoService
 
 from mail_feeder.utils.user_creation.creation import UserCreationService
 
+from cortex_job.cortex_utils.cortex_and_job_management import CortexJob
 
 from .models import MailSubmissionData
-from .utils import safe_execution, flatten_id_lists, extract_email_address
+from .utils import safe_execution, extract_email_address
 from .handlers import Handlers
 
 
@@ -130,6 +131,8 @@ class GlobalSubmissionService:
     def _handle_common_tasks(self, instance, email_id: str, mail_zip: str, bucket_name: str):
         """
         Handle artifacts, attachments, headers, bodies, and case creation.
+        Collects dispatch intents first, creates the Case, then replays intents
+        with case= so CaseAnalyzerJob rows have a valid FK.
         """
 
         user = UserCreationService().get_or_create_user(instance.reportedBy)
@@ -138,23 +141,42 @@ class GlobalSubmissionService:
                 "Could not resolve user for mail %s; falling back to system default", instance.mail_id
             )
             user = UserCreationService().create_default_user()
-        fetch_mail_logger.debug(f"Handling artifacts and attachments for email: {email_id}")
-        artifact_ids = Handlers().handle_artifacts(instance)
-        fetch_mail_logger.debug(f"Handling attachments for email: {email_id}")
-        attachment_result = Handlers().handle_attachments(instance, mail_zip, bucket_name=bucket_name)
-        attachment_ids, attachment_id_ai = attachment_result.ids, attachment_result.ai_ids
-        fetch_mail_logger.debug(f"Handling mail header for email: {email_id}")
-        Handlers().handle_mail_header(instance)
-        fetch_mail_logger.debug(f"Handling mail body for email: {email_id}")
-        Handlers().handle_mail_body(instance, email_id)
-        fetch_mail_logger.debug(f"Creating case for email: {email_id}")
 
-        related_ids = flatten_id_lists(artifact_ids, attachment_ids)
-        fetch_mail_logger.debug(f"Related IDs for case creation: {related_ids} for email: {email_id}")
-        CaseCreatorService().create_case(CaseInputData(
+        handlers = Handlers()
+        fetch_mail_logger.debug(f"Handling artifacts for email: {email_id}")
+        artifact_service = handlers.handle_artifacts(instance)
+        fetch_mail_logger.debug(f"Handling attachments for email: {email_id}")
+        attachment_result = handlers.handle_attachments(instance, mail_zip, bucket_name=bucket_name)
+        fetch_mail_logger.debug(f"Handling mail header for email: {email_id}")
+        header_intents = handlers.handle_mail_header(instance)
+        fetch_mail_logger.debug(f"Handling mail body for email: {email_id}")
+        body_intents = handlers.handle_mail_body(instance, email_id)
+
+        fetch_mail_logger.debug(f"Creating case for email: {email_id}")
+        # Create case BEFORE Cortex dispatch so CaseAnalyzerJob rows have a valid FK.
+        case = CaseCreatorService().create_case(CaseInputData(
             instance=instance,
             user=user,
-            artifact_ids=related_ids,
-            attachment_ids=attachment_ids,
-            attachment_ai_ids=attachment_id_ai
+            artifact_ids=[],
+            attachment_ids=[],
+            attachment_ai_ids=[],
         ))
+        if case is None:
+            fetch_mail_logger.error("Case creation failed for email %s; skipping dispatch", email_id)
+            return
+
+        # Replay all queued dispatch intents with the new case.
+        artifact_service.dispatch_pending(case)
+        for service in attachment_result.services:
+            service.dispatch_pending(case)
+        cortex = CortexJob()
+        for value, data_type in header_intents + body_intents:
+            try:
+                cortex.launch_cortex_jobs(value=value, data_type=data_type, case=case)
+            except Exception:
+                fetch_mail_logger.exception("Failed to launch Cortex jobs for %s", data_type)
+        if attachment_result.ai_archive is not None:
+            try:
+                cortex.launch_cortex_ai_jobs(attachment_result.ai_archive, "file", case=case)
+            except Exception:
+                fetch_mail_logger.exception("Failed to launch Cortex AI job")
