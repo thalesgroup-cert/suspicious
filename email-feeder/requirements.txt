@@ -5,3 +5,14 @@ minio==7.2.20
 chardet==7.4.3
 jinja2==3.1.6
 pydantic==2.13.4
+
+# Structured logging — JSON formatter consumed by log aggregators.
+# Plain-text fallback kept inside logger_service when this is absent.
+python-json-logger==4.1.0
+
+# Observability — OTel SDK + auto-instrumentation for outbound HTTP.
+# Mirror of the versions pinned in Suspicious/requirements.txt so
+# trace IDs stay consistent across services. Closes audit O5.
+opentelemetry-sdk==1.27.0
+opentelemetry-exporter-otlp-proto-http==1.27.0
+opentelemetry-instrumentation-requests==0.48b0

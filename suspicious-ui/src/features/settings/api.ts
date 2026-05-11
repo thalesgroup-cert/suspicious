@@ -117,6 +117,20 @@ export async function setFeederStatus(
   return res.data;
 }
 
+/** Per-subsystem readiness reported by the feeder /health endpoint. */
+export type FeederHealthChecks = {
+  imap?: {
+    ok: boolean;
+    configured: number;
+    healthy: number;
+    last_ok: Record<string, number>;
+  };
+  minio?: {
+    ok: boolean;
+    last_ok: number | null;
+  };
+};
+
 /** Live runtime status of the email_feeder container (proxied from its /health endpoint). */
 export type FeederHealth = {
   online: boolean;
@@ -127,6 +141,10 @@ export type FeederHealth = {
   stale: boolean;
   checked_at: number;
   error: string | null;
+  /** Self-reported status from the feeder ("ok" | "degraded"). null when the feeder is unreachable. */
+  feeder_status?: "ok" | "degraded" | null;
+  /** Per-subsystem readiness (IMAP, MinIO). Empty object when the feeder is unreachable. */
+  checks?: FeederHealthChecks;
 };
 
 export async function getFeederHealth(): Promise<FeederHealth> {

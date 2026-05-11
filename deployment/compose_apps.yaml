@@ -32,6 +32,15 @@ services:
       - ".env"
     environment:
       no_proxy: "${NO_PROXY:-},cortex,db_suspicious,rustfs,chromadb"
+    healthcheck:
+      # Closes audit O7 / R9. /api/health/ pings DB + Redis; Cortex is
+      # informational (the app degrades gracefully via tenacity + the
+      # circuit breaker, we do not want a Cortex flap to restart Django).
+      test: ["CMD-SHELL", "curl -sf http://localhost:9020/api/health/ || exit 1"]
+      interval: 60s
+      timeout: 10s
+      retries: 3
+      start_period: 30s
     networks:
       - suspicious_network
 

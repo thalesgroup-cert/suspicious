@@ -324,12 +324,14 @@ Allows pushing indicators of compromise to one or more MISP instances.
         "bind_password": "CHANGE_ME",
         "base_dn": "ou=People,o=group",
         "filter": "(&(mail=%(user)s)(Tpresent=true)(!(ou=admin)))",
-        "verify_ssl": false
+        "verify_ssl": true
     }
 }
 ```
 
-Configure either OIDC or LDAP (or both). For production LDAP, set `"verify_ssl": true`.
+Configure either OIDC or LDAP (or both).
+
+**LDAP TLS verification.** `verify_ssl` defaults to `true` (`OPT_X_TLS_DEMAND` — full cert + hostname check). Setting it to `false` downgrades to `OPT_X_TLS_NEVER` and exposes bind credentials to any attacker on the network path; the boot logger emits a `WARNING` so the downgrade is visible in `make logs`. Use `false` only in local dev against a self-signed test LDAP, never in production. To support an internal CA, mount the CA bundle into the container and point libldap at it via the system trust store rather than disabling verification.
 
 ### 2.8 Company Domains
 

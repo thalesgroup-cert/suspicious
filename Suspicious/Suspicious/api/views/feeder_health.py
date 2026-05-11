@@ -102,13 +102,30 @@ class FeederHealthView(APIView):
         last_poll_int = int(last_poll) if last_poll > 0 else None
         stale_seconds = max(0, now_ts - int(last_poll)) if last_poll > 0 else 0
 
+        # Feeder /health now reports a `status` (ok|degraded) plus per-
+        # subsystem checks (IMAP, MinIO). Surface both through the proxy
+        # so the UI can render finer-grained state without each client
+        # re-implementing the staleness logic.
+        feeder_status = data.get("status") or ("ok" if not last_poll_int else "ok")
+        feeder_checks = data.get("checks") or {}
+
         payload.update({
             "online": True,
             "last_successful_poll": last_poll_int,
             "emails_processed_total": int(data.get("emails_processed_total", 0)),
             "errors_total": int(data.get("errors_total", 0)),
             "stale_seconds": stale_seconds,
-            "stale": last_poll_int is None or stale_seconds > _FEEDER_STALE_THRESHOLD_S,
+            # `stale` becomes True if either the proxy thinks the last
+            # poll is too old OR the feeder itself reports degraded —
+            # the latter covers the case where IMAP is responding but
+            # MinIO uploads have been failing.
+            "stale": (
+                last_poll_int is None
+                or stale_seconds > _FEEDER_STALE_THRESHOLD_S
+                or feeder_status == "degraded"
+            ),
+            "feeder_status": feeder_status,
+            "checks": feeder_checks,
             "error": None,
         })
         return Response(payload)

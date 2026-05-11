@@ -22,6 +22,7 @@ from api.views.dashboard import (
 from api.views.downloads import DownloadCaseArchiveView
 from api.views.home import HomeSummaryView
 from api.views.feeder_health import FeederHealthView
+from api.views.health import HealthView
 from api.views.mail_preview import MailPreviewView
 from api.views.investigations import (
     InvestigationDetailsView,
@@ -112,6 +113,7 @@ urlpatterns = [
     path("settings/list/<str:section>/<int:item_id>/", SettingsListItemDeleteView.as_view(), name="settings-list-delete"),
     path("settings/email-feeder/", EmailFeederSettingsView.as_view(), name="settings-email-feeder"),
     path("feeder/health/", FeederHealthView.as_view(), name="feeder-health"),
+    path("health/", HealthView.as_view(), name="suspicious-health"),
     path("settings/analyzers/", AnalyzerSettingsListView.as_view(), name="settings-analyzers"),
     path("settings/analyzers/<int:analyzer_id>/", AnalyzerSettingsDetailView.as_view(), name="settings-analyzer-detail"),
 
