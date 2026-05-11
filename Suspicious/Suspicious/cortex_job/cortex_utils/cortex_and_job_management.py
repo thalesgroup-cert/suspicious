@@ -1329,6 +1329,54 @@ class CortexJobManager:
 
         case.save()
 
+    def update_single_job(self, caj) -> None:
+        """Sync a single CaseAnalyzerJob + its AnalyzerReport from Cortex.
+
+        Mirrors the per-report logic from get_cortex_jobs_results but scoped
+        to a single (case, cortex_job_id) pair. The CaseAnalyzerJob status
+        is updated to match the AnalyzerReport status returned by Cortex.
+        Completed_at is set when the job leaves the pending states.
+        """
+        from cortex_job.models import CaseAnalyzerJob
+        report = caj.analyzer_report
+        if report is None:
+            return
+        data_type = report.type
+        new_status = self.get_cortex_jobs_results(report, data_type)
+
+        if new_status and new_status != caj.status:
+            caj.status = new_status
+            if new_status not in CaseAnalyzerJob.PENDING_STATUSES:
+                caj.completed_at = timezone.now()
+            caj.save(update_fields=["status", "completed_at"])
+
+    def finalise_case(self, case) -> None:
+        """Compute final description + status + trigger CortexAnalyzerReports.
+
+        Called once when the case's CaseAnalyzerJob pending-count drops to 0.
+        Mirrors the tail end of manage_jobs but without the per-case bulk
+        aggregation step that manage_jobs performs.
+
+        CortexAnalyzerReports.get_report is safe to call multiple times for
+        most of its work (create_and_save_report overwrites scoring fields,
+        update_case_results / save_case_results overwrite case fields).
+        HOWEVER: update_kpi_and_user_stats increments total_cases counters
+        unconditionally — calling get_report twice will double-count KPI stats.
+        This is a pre-existing bug (out of scope for Task 5); duplicate webhook
+        deliveries should be deduplicated by the caller (Task 6/7).
+        """
+        self.get_results(case)
+        self.generate_description(case)
+        if case.status == "Done":
+            try:
+                CortexAnalyzerReports.get_report(case)
+            except Exception as e:
+                update_cases_logger.error(
+                    "Error fetching final report for case %s: %s", case.id, e,
+                    exc_info=True,
+                )
+        case.save()
+
     def manage_jobs(self, case):
         """
         Manage and update Cortex jobs for a given case, with user-friendly results and descriptions.
