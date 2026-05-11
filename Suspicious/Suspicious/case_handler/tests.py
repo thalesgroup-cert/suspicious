@@ -1,62 +1,65 @@
-# from django.test import TestCase
-# from django.contrib.auth import get_user_model
-# from django.utils import timezone
-# from cases.models import Case, CaseHasFileOrMail, CaseHasNonFileIocs
-# from mail_process.models import Mail
-# from file_process.models import File, Hash
-# from url_process.models import URL
-# from ip_process.models import IP
+from unittest.mock import MagicMock, patch
+from django.contrib.auth import get_user_model
+from django.test import RequestFactory, TestCase
 
-# User = get_user_model()
+from case_handler.case_utils.case_handler import CaseHandler
+from case_handler.models import Case
 
-# class CaseModelTest(TestCase):
-#     def setUp(self):
-#         self.user = User.objects.create_user(username='analyst', password='securepass')
-#         self.file = File.objects.create(file_path='example.exe')
-#         self.mail = Mail.objects.create(subject='Test Mail')
-#         self.url = URL.objects.create(address='http://example.com')
-#         self.ip = IP.objects.create(address='192.168.0.1')
-#         self.hash = Hash.objects.create(value='1234567890abcdef')
 
-#         self.file_or_mail = CaseHasFileOrMail.objects.create(file=self.file, mail=self.mail)
-#         self.non_file_iocs = CaseHasNonFileIocs.objects.create(url=self.url, ip=self.ip, hash=self.hash)
+class CaseHandlerDispatchPendingTest(TestCase):
+    def setUp(self):
+        User = get_user_model()
+        self.reporter = User.objects.create_user(
+            username="dispatch_pending_user", password="x"
+        )
+        self.case = Case.objects.create(
+            status="On Going", description="", reporter=self.reporter
+        )
+        request = RequestFactory().post("/api/submit")
+        request.user = self.reporter
+        # Forms are not used by dispatch_pending; pass MagicMocks.
+        self.handler = CaseHandler(request, MagicMock(), MagicMock(), MagicMock())
+        self.handler.pending_dispatch_intents = [
+            ("artifact-1", "ip"),
+            ("artifact-2", "url"),
+        ]
 
-#         self.case = Case.objects.create(
-#             description='Suspicious file attached',
-#             reporter=self.user,
-#             fileOrMail=self.file_or_mail,
-#             nonFileIocs=self.non_file_iocs
-#         )
+    @patch("case_handler.case_utils.case_handler.CortexJob")
+    def test_dispatches_each_intent_with_case(self, mock_cortex_cls):
+        mock_cortex = mock_cortex_cls.return_value
+        self.handler.dispatch_pending(self.case)
 
-#     def test_case_str(self):
-#         self.assertEqual(str(self.case), str(self.case.pk).zfill(6))
+        self.assertEqual(mock_cortex.launch_cortex_jobs.call_count, 2)
+        mock_cortex.launch_cortex_jobs.assert_any_call(
+            value="artifact-1", data_type="ip", case=self.case
+        )
+        mock_cortex.launch_cortex_jobs.assert_any_call(
+            value="artifact-2", data_type="url", case=self.case
+        )
+        self.assertEqual(self.handler.pending_dispatch_intents, [])
 
-#     def test_case_recent_publication(self):
-#         self.assertTrue(self.case.was_published_recently())
+    @patch("case_handler.case_utils.case_handler.CortexJob")
+    def test_none_case_drops_intents_with_warning(self, mock_cortex_cls):
+        with self.assertLogs("case_handler.case_utils.case_handler", level="WARNING") as cm:
+            self.handler.dispatch_pending(None)
 
-#     def test_case_has_file_or_mail_str(self):
-#         expected = f"{self.case} - {self.file}"
-#         self.assertIn(str(self.case.fileOrMail), [
-#             f"{self.case} - {self.file}",
-#             f"{self.case} - {self.mail}"
-#         ])
+        mock_cortex_cls.return_value.launch_cortex_jobs.assert_not_called()
+        self.assertEqual(self.handler.pending_dispatch_intents, [])
+        self.assertTrue(any("Dropping 2 pending" in m for m in cm.output))
 
-#     def test_case_has_non_file_iocs_str(self):
-#         expected_strings = [str(self.url.address), str(self.ip.address), str(self.hash.value)]
-#         self.assertTrue(any(e in str(self.case.nonFileIocs) for e in expected_strings))
+    @patch("case_handler.case_utils.case_handler.CortexJob")
+    def test_per_intent_failure_does_not_block_others(self, mock_cortex_cls):
+        mock_cortex = mock_cortex_cls.return_value
+        mock_cortex.launch_cortex_jobs.side_effect = [Exception("boom"), None]
+        self.handler.dispatch_pending(self.case)
 
-#     def test_case_get_iocs(self):
-#         iocs = self.case.fileOrMail.get_iocs()
-#         self.assertEqual(iocs['file'], self.file)
-#         self.assertEqual(iocs['mail'], self.mail)
+        self.assertEqual(mock_cortex.launch_cortex_jobs.call_count, 2)
+        self.assertEqual(self.handler.pending_dispatch_intents, [])
 
-#         iocs_non_file = self.case.nonFileIocs.get_iocs()
-#         self.assertEqual(iocs_non_file['url'], self.url)
-#         self.assertEqual(iocs_non_file['ip'], self.ip)
-#         self.assertEqual(iocs_non_file['hash'], self.hash)
-
-#     def test_case_defaults(self):
-#         self.assertEqual(self.case.status, 'To Do')
-#         self.assertEqual(self.case.results, 'Suspicious')
-#         self.assertEqual(self.case.results_ai, 'Suspicious')
-#         self.assertEqual(self.case.category_ai, 'Uncategorized')
+    @patch("case_handler.case_utils.case_handler.CortexJob")
+    def test_second_call_is_noop(self, mock_cortex_cls):
+        mock_cortex = mock_cortex_cls.return_value
+        self.handler.dispatch_pending(self.case)
+        self.handler.dispatch_pending(self.case)
+        # First call dispatches 2 intents; second call sees empty list.
+        self.assertEqual(mock_cortex.launch_cortex_jobs.call_count, 2)

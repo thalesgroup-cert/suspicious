@@ -76,7 +76,11 @@ class ArtifactJobLauncherService:
                 job_ids.extend(cortex.launch_cortex_jobs(value, data_type, case=case))
             except Exception as e:
                 fetch_mail_logger.error(
-                    f"Failed to launch Cortex jobs for {data_type}: {e}"
+                    "Failed to launch Cortex jobs (case=%s data_type=%s value=%r): %s",
+                    getattr(case, "id", None),
+                    data_type,
+                    value,
+                    e,
                 )
         self.pending_dispatch_intents = []
         return job_ids

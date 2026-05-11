@@ -220,6 +220,11 @@ class CaseHandler:
     def dispatch_pending(self, case) -> None:
         """Replay queued dispatch intents now that Case exists."""
         if case is None:
+            if self.pending_dispatch_intents:
+                logger.warning(
+                    "Dropping %d pending Cortex dispatch intents because no Case was created",
+                    len(self.pending_dispatch_intents),
+                )
             self.pending_dispatch_intents = []
             return
         cortex = CortexJob()
@@ -227,5 +232,10 @@ class CaseHandler:
             try:
                 cortex.launch_cortex_jobs(value=value, data_type=data_type, case=case)
             except Exception:
-                logger.exception("Failed to launch Cortex jobs for %s", data_type)
+                logger.exception(
+                    "Failed to launch Cortex jobs (case=%s data_type=%s value=%r)",
+                    getattr(case, "id", None),
+                    data_type,
+                    value,
+                )
         self.pending_dispatch_intents = []

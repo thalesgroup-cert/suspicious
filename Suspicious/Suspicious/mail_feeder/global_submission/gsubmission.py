@@ -174,9 +174,16 @@ class GlobalSubmissionService:
             try:
                 cortex.launch_cortex_jobs(value=value, data_type=data_type, case=case)
             except Exception:
-                fetch_mail_logger.exception("Failed to launch Cortex jobs for %s", data_type)
+                fetch_mail_logger.exception(
+                    "Failed to launch Cortex jobs (case=%s data_type=%s)",
+                    getattr(case, "id", None),
+                    data_type,
+                )
         if attachment_result.ai_archive is not None:
             try:
                 cortex.launch_cortex_ai_jobs(attachment_result.ai_archive, "file", case=case)
             except Exception:
-                fetch_mail_logger.exception("Failed to launch Cortex AI job")
+                fetch_mail_logger.exception(
+                    "Failed to launch Cortex AI job (case=%s)",
+                    getattr(case, "id", None),
+                )
