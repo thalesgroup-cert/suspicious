@@ -1,4 +1,5 @@
 import json
+import os
 import shutil
 import pathlib
 import sys
@@ -13,8 +14,17 @@ import classes.services.mailbox_setup_service
 import classes.services.mailbox_service
 import classes.services.acknowledge_bad_mail_service
 import classes.services.logger_service
+import classes.services.otel_service
 
 logger = classes.services.logger_service.setup_logging()
+
+# Best-effort OTel init — exporter target read from OTEL_EXPORTER_OTLP_ENDPOINT
+# (defaults to http://tempo:4318 in the compose network). Failures inside
+# configure() are swallowed: the feeder must boot even if Tempo is down.
+classes.services.otel_service.configure(
+    service_name="email-feeder",
+    enabled=os.environ.get("OTEL_ENABLED", "true").lower() != "false",
+)
 
 # ---------------------------------------------------------------------------
 # Health / metrics state — written by the poll loop, read by the HTTP server
