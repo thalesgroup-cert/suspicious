@@ -73,8 +73,17 @@ class Eml2PngRenderer:
         return self._render_html_to_png(html)
 
     def save_preview_to_mail(self, mail, png_bytes: bytes) -> None:
-        """Storage-aware: writes via DEFAULT_FILE_STORAGE (local/MinIO/dual)."""
-        mail.preview_png.save("preview.png", ContentFile(png_bytes), save=False)
+        """Storage-aware: writes via DEFAULT_FILE_STORAGE (local/MinIO/dual).
+
+        The filename includes the Mail PK so each preview lives at a unique
+        key. The previous literal "preview.png" collided on MinIO (no
+        get_available_name() rename) and every mail overwrote the same
+        blob — `/media/mail_previews/preview.png` returning the wrong
+        case's image (or 404'ing once a deploy wiped the volume).
+        """
+        mail.preview_png.save(
+            f"preview_{mail.pk}.png", ContentFile(png_bytes), save=False
+        )
         mail.save(update_fields=["preview_png"])
 
     # ------------------------------------------------------------------
