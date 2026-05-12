@@ -11,7 +11,13 @@ from django.utils.translation import gettext_lazy as _
 class Mail(models.Model):
     subject = models.CharField(max_length=255, db_index=True)
     reportedBy = models.CharField(max_length=255, db_index=True)
-    preview_png = models.ImageField(upload_to="mail_previews/", null=True, blank=True)
+    # Explicit MinIO location for the rendered .eml -> PNG preview. Stored
+    # as (bucket, key) rather than a Django ImageField so the admin and
+    # API never depend on storage-backend URL guessing (DualStorage used
+    # to leak `/media/mail_previews/...` for missing blobs). MailPreviewView
+    # streams directly from MinIO using these two values.
+    preview_bucket = models.CharField(max_length=255, blank=True)
+    preview_object_key = models.CharField(max_length=512, blank=True)
     mail_header = models.ForeignKey(
         'MailHeader', on_delete=models.CASCADE, related_name='mails',
         null=True, blank=True, db_index=True

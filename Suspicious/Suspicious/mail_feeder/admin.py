@@ -78,6 +78,30 @@ class MailAdmin(ImportExportModelAdmin):
     list_select_related = ('mail_header', 'mail_body')
     search_fields = ('subject', 'mail_id', 'reportedBy', 'to', 'cc')
     ordering = ('-creation_date',)
+    readonly_fields = ('preview_link',)
+
+    @admin.display(description="Preview")
+    def preview_link(self, obj):
+        """Render a clickable link to the authed API preview endpoint.
+
+        We deliberately do not embed an <img> here: the admin only
+        serves authenticated staff, and routing all preview reads
+        through /api/cases/<case_id>/mail-preview.png keeps a single
+        access path that respects CanAccessSubmission. The link
+        resolves the linked Case by walking back through CaseHasFileOrMail.
+        """
+        if not obj.preview_object_key:
+            return "No preview"
+
+        link = obj.case_has_file_or_mail.values_list("cases__id", flat=True).first()
+        if not link:
+            return "No case linked"
+
+        from django.utils.html import format_html
+        return format_html(
+            '<a href="/api/cases/{}/mail-preview.png" target="_blank">View preview ({})</a>',
+            link, obj.preview_object_key,
+        )
 
 # Admin classes
 @admin.register(MailArchive)

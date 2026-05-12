@@ -240,8 +240,7 @@ class InvestigationRowSerializer(serializers.ModelSerializer):
         mail = getattr(file_or_mail, "mail", None) if file_or_mail else None
         if not mail:
             return None
-        preview = getattr(mail, "preview_png", None)
-        if not preview or not getattr(preview, "name", ""):
+        if not getattr(mail, "preview_object_key", ""):
             return None
         return f"/api/cases/{obj.pk}/mail-preview.png"
 

@@ -1,17 +1,15 @@
 """
-Regenerate Mail.preview_png PNGs for rows that still point at the legacy
-collision-prone path "mail_previews/preview.png".
+Regenerate Mail preview PNGs for rows that have no
+`preview_object_key` set (or for every row when `--all` is passed).
 
-Background: previously every preview was saved under the literal filename
-"preview.png", which collided on MinIO (no get_available_name() rename).
-Commit f295d39 fixed the writer to use "preview_<mail.pk>.png" per row,
-but historical rows still reference the dead shared blob. This command
-re-fetches each Mail's archived .eml from MinIO and re-renders the PNG
-with the new pk-scoped filename, so the UI can stop returning 404 for
-those cases.
+After migration 0016 the preview is stored as an explicit (bucket, key)
+pair on the Mail row instead of via Django's ImageField + DEFAULT_FILE_STORAGE.
+Historical rows therefore have empty pointers; this command re-fetches each
+Mail's archived .eml from MinIO and re-runs Eml2PngRenderer, which uploads
+the PNG directly to the `mail-previews` bucket and updates the row.
 
 Usage:
-    python manage.py regenerate_mail_previews              # stale rows only
+    python manage.py regenerate_mail_previews              # missing only
     python manage.py regenerate_mail_previews --all        # every row
     python manage.py regenerate_mail_previews --limit 50   # cap iterations
     python manage.py regenerate_mail_previews --dry-run    # show plan only
@@ -34,18 +32,15 @@ from mail_feeder.utils.email_preview.eml2png_renderer import Eml2PngRenderer
 
 logger = logging.getLogger(__name__)
 
-LEGACY_PREVIEW_NAME = "mail_previews/preview.png"
-
 
 class Command(BaseCommand):
-    help = "Regenerate Mail.preview_png entries that point at the legacy shared path."
+    help = "Regenerate Mail previews that are missing or stale, uploading to the mail-previews MinIO bucket."
 
     def add_arguments(self, parser) -> None:
         parser.add_argument(
             "--all",
             action="store_true",
-            help="Regenerate every Mail with a populated preview_png, "
-                 "not just rows pointing at the legacy shared blob.",
+            help="Regenerate every Mail, not just rows whose preview_object_key is empty.",
         )
         parser.add_argument(
             "--limit",
@@ -64,9 +59,9 @@ class Command(BaseCommand):
         limit: Optional[int] = opts["limit"]
         dry_run: bool = opts["dry_run"]
 
-        qs = Mail.objects.exclude(preview_png="").exclude(preview_png__isnull=True)
+        qs = Mail.objects.all()
         if not regenerate_all:
-            qs = qs.filter(preview_png=LEGACY_PREVIEW_NAME)
+            qs = qs.filter(preview_object_key="")
         qs = qs.order_by("pk")
         if limit:
             qs = qs[:limit]
@@ -79,7 +74,7 @@ class Command(BaseCommand):
         self.stdout.write(
             f"Regenerating {total} preview(s) "
             f"({'dry-run' if dry_run else 'live'}, "
-            f"{'all' if regenerate_all else 'legacy only'})."
+            f"{'all' if regenerate_all else 'missing only'})."
         )
 
         renderer = Eml2PngRenderer()
@@ -156,8 +151,15 @@ class Command(BaseCommand):
             return "failed"
 
         renderer.save_preview_to_mail(mail, png_bytes)
+
+        if not mail.preview_object_key:
+            self.stdout.write(self.style.WARNING(
+                f"  mail#{mail.pk}: upload did not persist key — failed"
+            ))
+            return "failed"
+
         self.stdout.write(self.style.SUCCESS(
-            f"  mail#{mail.pk}: regenerated -> {mail.preview_png.name}"
+            f"  mail#{mail.pk}: regenerated -> {mail.preview_bucket}/{mail.preview_object_key}"
         ))
         return "ok"
 
@@ -200,7 +202,6 @@ class Command(BaseCommand):
         if not eml_keys:
             return None
 
-        # Prefer any .eml that is NOT the reporter wrapper.
         non_wrapper = [
             k for k in eml_keys
             if not k.lower().endswith("user_submission.eml")
