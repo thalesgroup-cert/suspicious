@@ -45,7 +45,11 @@ class GlobalSubmissionService:
                 submission.user
             )
 
-            instance = EmailHandlerService().handle_mail(mail_instance, submission.workdir)
+            instance = EmailHandlerService().handle_mail(
+                mail_instance,
+                submission.workdir,
+                source_filename=submission.filename,
+            )
 
             fetch_mail_logger.debug(
                 f"Processed email instance: {instance.mail_id if instance else 'None'}"
