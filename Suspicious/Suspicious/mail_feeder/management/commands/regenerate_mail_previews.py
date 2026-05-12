@@ -183,19 +183,29 @@ class Command(BaseCommand):
 
     @staticmethod
     def _fetch_eml_bytes(storage, bucket_name: str) -> Optional[bytes]:
-        """Stream the first object ending in .eml from the bucket."""
-        objects = storage.client.list_objects(bucket_name, recursive=True)
-        eml_key = None
-        for obj in objects:
-            name = getattr(obj, "object_name", "") or ""
-            if name.lower().endswith(".eml"):
-                eml_key = name
-                # Prefer user_submission.eml when several are present.
-                if name.lower().endswith("user_submission.eml"):
-                    break
+        """Stream the previewable .eml from the bucket.
 
-        if not eml_key:
+        Buckets typically contain both the reporter wrapper
+        (`user_submission.eml`) and the actual reported message (any
+        other .eml). The preview must always render the reported
+        message, never the wrapper. We pick the first non-wrapper .eml
+        and only fall back to user_submission.eml when nothing else
+        exists (e.g. legacy submissions before the split).
+        """
+        objects = list(storage.client.list_objects(bucket_name, recursive=True))
+        eml_keys = [
+            getattr(o, "object_name", "") or "" for o in objects
+            if (getattr(o, "object_name", "") or "").lower().endswith(".eml")
+        ]
+        if not eml_keys:
             return None
+
+        # Prefer any .eml that is NOT the reporter wrapper.
+        non_wrapper = [
+            k for k in eml_keys
+            if not k.lower().endswith("user_submission.eml")
+        ]
+        eml_key = non_wrapper[0] if non_wrapper else eml_keys[0]
 
         response = None
         try:

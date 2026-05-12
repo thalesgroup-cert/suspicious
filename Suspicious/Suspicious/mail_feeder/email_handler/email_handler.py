@@ -26,9 +26,20 @@ class EmailHandlerService:
         self.observables_service = EmailObservablesService()
         self.preview_renderer = Eml2PngRenderer()
 
-    def handle_mail(self, email_data: dict, workdir: str) -> Optional[Mail]:
+    def handle_mail(
+        self,
+        email_data: dict,
+        workdir: str,
+        source_filename: Optional[str] = None,
+    ) -> Optional[Mail]:
         """
         Handles a single email by validating, determining type, and processing it.
+
+        `source_filename` is the basename of the .eml/.msg currently being
+        processed inside `workdir`. When provided it takes precedence over
+        the legacy resolver fallbacks in _generate_mail_preview_png so the
+        preview renders the actual reported message (feeder ingestion:
+        attached .eml) instead of the reporter wrapper (user_submission.eml).
         """
         fetch_mail_logger.debug(email_data)
         data = email_data
@@ -36,12 +47,19 @@ class EmailHandlerService:
 
         if not any([email_list, email_body_list, email_header_list]):
             fetch_mail_logger.debug("Handling new mail")
-            return self._handle_new_mail(data, workdir)
+            return self._handle_new_mail(data, workdir, source_filename)
 
         fetch_mail_logger.debug("Handling existing mail")
-        return self._handle_existing_mail(data, email_list, email_body_list, email_header_list, workdir)
+        return self._handle_existing_mail(
+            data, email_list, email_body_list, email_header_list, workdir, source_filename,
+        )
 
-    def _handle_new_mail(self, data: EmailDataModel, workdir: str) -> Optional[Mail]:
+    def _handle_new_mail(
+        self,
+        data: EmailDataModel,
+        workdir: str,
+        source_filename: Optional[str] = None,
+    ) -> Optional[Mail]:
         with safe_operation("handle_new_mail"):
             fetch_mail_logger.debug("Creating new mail instance")
             try:
@@ -64,7 +82,7 @@ class EmailHandlerService:
 
             mail_instance = self._save_and_update_mail(mail_instance, data)
 
-            self._generate_mail_preview_png(mail_instance, data, workdir)
+            self._generate_mail_preview_png(mail_instance, data, workdir, source_filename)
 
             self._process_rich_observables(mail_instance, data, workdir)
             self._update_times_sent(mail_instance)
@@ -78,6 +96,7 @@ class EmailHandlerService:
         email_body_list: list,
         email_header_list: list,
         workdir: str,
+        source_filename: Optional[str] = None,
     ) -> Optional[Mail]:
         with safe_operation("handle_existing_mail"):
             if email_list:
@@ -91,7 +110,7 @@ class EmailHandlerService:
                 self._save_mail(mail_instance)
                 return mail_instance
 
-        return self._handle_new_mail(data, workdir)
+        return self._handle_new_mail(data, workdir, source_filename)
 
     def _check_existing_data(self, data: EmailDataModel) -> Tuple[List[Mail], list, list]:
         email_list = list(Mail.objects.filter(mail_id=str(data.id)))
@@ -99,23 +118,47 @@ class EmailHandlerService:
         email_header_list = self.header_service.check_email_headers(data.headers) if data.headers else []
         return email_list, email_body_list, email_header_list
 
-    def _generate_mail_preview_png(self, mail_instance: Mail, data: EmailDataModel, workdir: str) -> None:
+    def _generate_mail_preview_png(
+        self,
+        mail_instance: Mail,
+        data: EmailDataModel,
+        workdir: str,
+        source_filename: Optional[str] = None,
+    ) -> None:
         """
         PNG preview generation.
+
+        Resolution order for the source .eml/.msg:
+          1. `source_filename` (the file currently being processed)
+             — this is the *attached* message in feeder ingestion and
+             the renamed `<source_ref>.eml` in web submission. Always
+             the right file to preview when provided.
+          2. `data.id`-based filename (legacy fallback for callers that
+             do not yet thread source_filename through).
+          3. `user_submission.eml` / `.msg` — last-resort fallback so
+             we still produce *some* preview rather than none.
         """
         with safe_operation("generate_mail_preview_png"):
-            try:
-                email_path = self._resolve_file_path(
-                    filename=str(data.id),
-                    workdir=workdir,
-                )
-            except FileNotFoundError:
-                fetch_mail_logger.debug(
-                    "No email file found for preview (mail_id=%s, workdir=%s)",
-                    mail_instance.mail_id,
-                    workdir,
-                )
-                return
+            email_path: Optional[str] = None
+
+            if source_filename:
+                candidate = os.path.join(workdir, source_filename)
+                if os.path.exists(candidate):
+                    email_path = candidate
+
+            if email_path is None:
+                try:
+                    email_path = self._resolve_file_path(
+                        filename=str(data.id),
+                        workdir=workdir,
+                    )
+                except FileNotFoundError:
+                    fetch_mail_logger.debug(
+                        "No email file found for preview (mail_id=%s, workdir=%s)",
+                        mail_instance.mail_id,
+                        workdir,
+                    )
+                    return
 
             png_bytes = self.preview_renderer.render_eml_path_to_png_bytes(
                 Path(email_path)
