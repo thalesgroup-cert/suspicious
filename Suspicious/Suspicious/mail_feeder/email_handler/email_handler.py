@@ -140,11 +140,19 @@ class EmailHandlerService:
         """
         with safe_operation("generate_mail_preview_png"):
             email_path: Optional[str] = None
+            picked_via = "none"
 
             if source_filename:
                 candidate = os.path.join(workdir, source_filename)
                 if os.path.exists(candidate):
                     email_path = candidate
+                    picked_via = "source_filename"
+                else:
+                    fetch_mail_logger.warning(
+                        "preview: source_filename %r missing in workdir %s "
+                        "— falling back to legacy resolver",
+                        source_filename, workdir,
+                    )
 
             if email_path is None:
                 try:
@@ -152,6 +160,7 @@ class EmailHandlerService:
                         filename=str(data.id),
                         workdir=workdir,
                     )
+                    picked_via = "legacy_resolver"
                 except FileNotFoundError:
                     fetch_mail_logger.debug(
                         "No email file found for preview (mail_id=%s, workdir=%s)",
@@ -159,6 +168,11 @@ class EmailHandlerService:
                         workdir,
                     )
                     return
+
+            fetch_mail_logger.info(
+                "preview: mail_id=%s rendering %s (via=%s)",
+                mail_instance.mail_id, email_path, picked_via,
+            )
 
             png_bytes = self.preview_renderer.render_eml_path_to_png_bytes(
                 Path(email_path)
