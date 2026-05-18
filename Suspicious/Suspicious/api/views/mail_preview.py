@@ -2,20 +2,24 @@
 GET /api/cases/<case_id>/mail-preview.png
 
 Streams the cached PNG preview of the email linked to a case
-(`Mail.preview_png`). The preview is generated at ingestion time by
+straight from MinIO, addressed by the explicit (bucket, key) pair on
+Mail.preview_bucket / Mail.preview_object_key. The preview is generated
+at ingestion time by
 `mail_feeder.utils.email_preview.eml2png_renderer.Eml2PngRenderer`.
 
 Returns 404 when:
 - the case does not exist
 - the case has no linked mail (file-only / IOC-only submission)
-- the mail has no rendered preview yet
+- the mail has no rendered preview yet (preview_object_key blank)
+- the MinIO object is missing / unreachable
 """
 from __future__ import annotations
 
 import logging
 
+from django.conf import settings
 from django.http import StreamingHttpResponse
-from rest_framework.exceptions import NotFound, PermissionDenied
+from rest_framework.exceptions import NotFound
 from rest_framework.permissions import IsAuthenticated
 from rest_framework.views import APIView
 
@@ -23,6 +27,8 @@ from api.permissions.submissions import CanAccessSubmission
 from case_handler.models import Case
 
 logger = logging.getLogger(__name__)
+
+_CHUNK_SIZE = 32 * 1024
 
 
 class MailPreviewView(APIView):
@@ -35,21 +41,26 @@ class MailPreviewView(APIView):
         self.check_object_permissions(request, case)
 
         mail = self._get_mail(case)
-        preview = getattr(mail, "preview_png", None)
-        if not preview or not getattr(preview, "name", ""):
+        bucket = getattr(mail, "preview_bucket", "") or ""
+        key = getattr(mail, "preview_object_key", "") or ""
+        if not bucket or not key:
             raise NotFound("No preview available")
 
+        client = self._minio_client()
+        if client is None:
+            raise NotFound("Preview storage unavailable")
+
         try:
-            fh = preview.open("rb")
+            obj = client.get_object(bucket, key)
         except Exception as exc:
             logger.warning(
-                "Failed to open mail preview for case_id=%s mail_id=%s: %s",
-                case.pk, mail.pk, exc,
+                "MinIO get_object failed: case_id=%s bucket=%s key=%s err=%s",
+                case.pk, bucket, key, exc,
             )
             raise NotFound("Preview unavailable") from exc
 
         response = StreamingHttpResponse(
-            _stream(fh), content_type="image/png",
+            _stream(obj), content_type="image/png",
         )
         response["Cache-Control"] = "private, max-age=60"
         response["Content-Disposition"] = (
@@ -72,16 +83,34 @@ class MailPreviewView(APIView):
             raise NotFound("No mail linked to case")
         return mail
 
+    @staticmethod
+    def _minio_client():
+        endpoint = getattr(settings, "MINIO_STORAGE_ENDPOINT", None)
+        access_key = getattr(settings, "MINIO_STORAGE_ACCESS_KEY", None)
+        secret_key = getattr(settings, "MINIO_STORAGE_SECRET_KEY", None)
+        if not (endpoint and access_key and secret_key):
+            logger.error("MinIO storage settings missing for mail preview view")
+            return None
+        try:
+            from minio import Minio
+            return Minio(
+                endpoint=endpoint,
+                access_key=access_key,
+                secret_key=secret_key,
+                secure=bool(getattr(settings, "MINIO_STORAGE_USE_HTTPS", False)),
+            )
+        except Exception:
+            logger.exception("Failed to build MinIO client for mail preview view")
+            return None
 
-def _stream(fh, chunk_size: int = 32 * 1024):
+
+def _stream(obj):
     try:
-        while True:
-            chunk = fh.read(chunk_size)
-            if not chunk:
-                break
+        for chunk in obj.stream(_CHUNK_SIZE):
             yield chunk
     finally:
         try:
-            fh.close()
+            obj.close()
+            obj.release_conn()
         except Exception:
             pass

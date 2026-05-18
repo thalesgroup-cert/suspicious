@@ -8,10 +8,20 @@ already-installed `wkhtmltopdf` binary to rasterise to PNG.
 
 `wkhtmltopdf` is staying in the runtime image for now; imgkit is a
 thin Python wrapper around it.
+
+Storage
+-------
+Rendered PNGs are uploaded directly to MinIO under a dedicated
+`mail-previews` bucket (key = `<mail.pk>.png`). The Mail row records
+the (bucket, key) pair so MailPreviewView can stream straight from
+MinIO without going through Django's storage backend (which used to
+fall back to /media/... URLs the admin then tried to GET and 404'd
+on in production).
 """
 from __future__ import annotations
 
 import email
+import io
 import logging
 from email.message import EmailMessage
 from email.policy import default as email_default_policy
@@ -19,9 +29,13 @@ from html import escape
 from pathlib import Path
 from typing import Optional
 
-from django.core.files.base import ContentFile
+from django.conf import settings
 
 logger = logging.getLogger(__name__)
+
+# Default bucket name for rendered previews. Configurable via
+# settings.MAIL_PREVIEW_BUCKET; falls back to this constant.
+_DEFAULT_PREVIEW_BUCKET = "mail-previews"
 
 
 # Pixel-perfect width matches the eml-thumbnail use case in
@@ -73,18 +87,44 @@ class Eml2PngRenderer:
         return self._render_html_to_png(html)
 
     def save_preview_to_mail(self, mail, png_bytes: bytes) -> None:
-        """Storage-aware: writes via DEFAULT_FILE_STORAGE (local/MinIO/dual).
+        """Upload PNG directly to MinIO and stamp (bucket, key) on the row.
 
-        The filename includes the Mail PK so each preview lives at a unique
-        key. The previous literal "preview.png" collided on MinIO (no
-        get_available_name() rename) and every mail overwrote the same
-        blob — `/media/mail_previews/preview.png` returning the wrong
-        case's image (or 404'ing once a deploy wiped the volume).
+        Bypasses Django's ImageField + DEFAULT_FILE_STORAGE entirely so the
+        admin and API can never end up with a `/media/...` URL that the
+        prod urlconf does not route. The MinIO key is keyed by Mail PK so
+        previews stay unique per row; re-renders overwrite in place.
         """
-        mail.preview_png.save(
-            f"preview_{mail.pk}.png", ContentFile(png_bytes), save=False
-        )
-        mail.save(update_fields=["preview_png"])
+        client = _build_minio_client()
+        if client is None:
+            logger.error(
+                "Mail preview upload skipped: MinIO client not configured "
+                "(settings.MINIO_STORAGE_* missing). mail_id=%s", mail.pk,
+            )
+            return
+
+        bucket = getattr(settings, "MAIL_PREVIEW_BUCKET", _DEFAULT_PREVIEW_BUCKET)
+        key = f"{mail.pk}.png"
+
+        _ensure_bucket(client, bucket)
+
+        try:
+            client.put_object(
+                bucket,
+                key,
+                io.BytesIO(png_bytes),
+                length=len(png_bytes),
+                content_type="image/png",
+            )
+        except Exception:
+            logger.exception(
+                "Failed to upload mail preview to MinIO bucket=%s key=%s "
+                "mail_id=%s", bucket, key, mail.pk,
+            )
+            return
+
+        mail.preview_bucket = bucket
+        mail.preview_object_key = key
+        mail.save(update_fields=["preview_bucket", "preview_object_key"])
 
     # ------------------------------------------------------------------
     # Internals
@@ -221,3 +261,47 @@ class Eml2PngRenderer:
         except Exception as exc:
             logger.error("imgkit failed to render preview: %s", exc)
             return None
+
+
+# ---------------------------------------------------------------------------
+# MinIO helpers
+# ---------------------------------------------------------------------------
+
+def _build_minio_client():
+    """Build a Minio client from Django settings, returning None on failure.
+
+    Reads the same MINIO_STORAGE_* values that django-minio-storage uses,
+    so previews live in the same MinIO instance as every other object the
+    platform stores.
+    """
+    endpoint = getattr(settings, "MINIO_STORAGE_ENDPOINT", None)
+    access_key = getattr(settings, "MINIO_STORAGE_ACCESS_KEY", None)
+    secret_key = getattr(settings, "MINIO_STORAGE_SECRET_KEY", None)
+    if not (endpoint and access_key and secret_key):
+        return None
+
+    try:
+        from minio import Minio
+        return Minio(
+            endpoint=endpoint,
+            access_key=access_key,
+            secret_key=secret_key,
+            secure=bool(getattr(settings, "MINIO_STORAGE_USE_HTTPS", False)),
+        )
+    except Exception:
+        logger.exception("Failed to instantiate Minio client for previews")
+        return None
+
+
+def _ensure_bucket(client, bucket: str) -> None:
+    """Create the preview bucket on first use; idempotent."""
+    try:
+        if not client.bucket_exists(bucket):
+            client.make_bucket(bucket)
+    except Exception:
+        # bucket_exists / make_bucket can race on concurrent creates;
+        # tolerate the race and let put_object surface a real failure.
+        logger.warning(
+            "ensure_bucket(%s) failed (continuing — put_object will retry)",
+            bucket, exc_info=True,
+        )

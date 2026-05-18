@@ -72,7 +72,7 @@ export const mockMe = {
   semantic_colors: undefined,
   theme: undefined,
   auto_seasonal: false,
-} as const;
+};
 
 export const mockMeBasic = {
   ...mockMe,

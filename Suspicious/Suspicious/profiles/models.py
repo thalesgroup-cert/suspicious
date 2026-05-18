@@ -67,7 +67,7 @@ class UserProfile(models.Model):
     region = models.CharField(max_length=200)
     wants_acknowledgement = models.BooleanField(default=True)
     wants_results = models.BooleanField(default=True)
-    theme = models.CharField(max_length=50, choices=Theme.choices, default=Theme.GRAPHITE)
+    theme = models.CharField(max_length=50, choices=Theme.choices, default=Theme.LIGHT)
     auto_seasonal = models.BooleanField(default=False)
     semantic_colors = models.JSONField(
         default= default_semantic_colors,
@@ -106,7 +106,7 @@ class CISOProfile(models.Model):
     scope = models.CharField(max_length=200, default='Not defined')
     wants_acknowledgement = models.BooleanField(default=True)
     wants_results = models.BooleanField(default=True)
-    theme = models.CharField(max_length=50, choices=Theme.choices, default=Theme.GRAPHITE)
+    theme = models.CharField(max_length=50, choices=Theme.choices, default=Theme.LIGHT)
     auto_seasonal = models.BooleanField(default=False)
     semantic_colors = models.JSONField(
         default=default_semantic_colors,
