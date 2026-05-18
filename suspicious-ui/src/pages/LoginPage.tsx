@@ -1099,7 +1099,7 @@ export default function LoginPage() {
                 underline="hover"
                 sx={{ fontWeight: 700, color: "text.primary" }}
               >
-                Contact CERT
+                Get Help
               </Link>
             </Typography>
             {(COMPANY_LOGO_BASE64 || COMPANY_LOGO_URL) && (

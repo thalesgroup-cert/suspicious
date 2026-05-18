@@ -7,7 +7,7 @@ from jinja2 import Environment, FileSystemLoader, select_autoescape
 
 from .models import FinalMailServiceConfigSocial
 from .send_email_service import SendMailService
-from .email_theme import resolve_email_theme
+from .email_theme import THEME_PALETTES, resolve_semantic_colors
 from .email_logo import resolve_logo
 from case_handler.models import CaseChallengeToken
 from .social_logos import SOCIAL_LOGOS
@@ -87,8 +87,12 @@ class FinalEmailService:
         self.recipient_name = recipient_name
         self.config        = self._load_config()
         self.template      = self._load_template()
-        # Resolve once — passed to render_html as **theme_ctx
-        self.theme_ctx     = resolve_email_theme(profile)
+        # Verdict mails always use the light palette, regardless of the
+        # recipient's UI theme. Semantic colors still follow the profile.
+        self.theme_ctx     = {
+            **THEME_PALETTES["light"],
+            **resolve_semantic_colors(profile),
+        }
 
     @staticmethod
     def _load_config() -> dict:

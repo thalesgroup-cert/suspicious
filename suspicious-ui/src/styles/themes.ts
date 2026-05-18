@@ -339,7 +339,7 @@ export function getSeasonalThemeName(date = new Date()): ThemeName {
   if (m >= 2 && m <= 4)  return "spring";
   if (m >= 5 && m <= 7)  return "summer";
   if (m >= 8 && m <= 10) return "autumn";
-  return "graphite";
+  return "light";
 }
 
 // ---------------------------------------------------------------------------

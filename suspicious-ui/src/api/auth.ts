@@ -87,7 +87,7 @@ function hydrateAppearanceFromMe(me: Me): void {
   try {
     if (me.theme || me.auto_seasonal !== undefined) {
       hydrateThemeFromServer(
-        me.theme ?? "graphite",
+        me.theme ?? "light",
         me.auto_seasonal ?? false,
       );
     }
