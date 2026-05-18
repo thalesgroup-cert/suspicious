@@ -277,13 +277,7 @@ function NavSection({
 // LogoutButton
 // ---------------------------------------------------------------------------
 
-function LogoutButton({
-  slim,
-  onLogout,
-}: {
-  slim: boolean;
-  onLogout: () => void;
-}) {
+function LogoutButton({ slim, onLogout }: { slim: boolean; onLogout: () => void }) {
   const theme = useTheme();
   const isDark = theme.palette.mode === "dark";
 
@@ -300,30 +294,28 @@ function LogoutButton({
           justifyContent: slim ? "center" : "flex-start",
           gap: slim ? 0 : 1.25,
           color: alpha(theme.palette.text.primary, isDark ? 0.65 : 0.7),
-          border: `1px solid ${alpha(theme.palette.divider, isDark ? 0.18 : 0.55)}`,
-          background: isDark ? alpha("#fff", 0.025) : alpha(theme.palette.background.paper, 0.7),
-          transition: theme.transitions.create(
-            ["background", "border-color", "color"],
-            { duration: 150 }
-          ),
+          // Outer border/bg ONLY in wide mode
+          border: slim ? "1px solid transparent" : `1px solid ${alpha(theme.palette.divider, isDark ? 0.18 : 0.55)}`,
+          background: slim ? "transparent" : (isDark ? alpha("#fff", 0.025) : alpha(theme.palette.background.paper, 0.7)),
+          transition: theme.transitions.create(["background", "border-color", "color"], { duration: 150 }),
 
           "& .logout-icon": {
-            width: 34,
-            height: 34,
-            borderRadius: 2,
+            width: 38,           // match UserCard avatar size
+            height: 38,
+            borderRadius: 2.5,   // match UserCard radius
             display: "grid",
             placeItems: "center",
             flexShrink: 0,
-            border: `1px solid ${alpha(theme.palette.divider, isDark ? 0.18 : 0.55)}`,
-            background: "transparent",
+            border: `1px solid ${alpha(theme.palette.divider, isDark ? 0.22 : 0.6)}`,
+            background: isDark ? alpha("#fff", 0.03) : alpha(theme.palette.background.paper, 0.8),
             transition: theme.transitions.create(["background", "border-color"], { duration: 150 }),
             "& svg": { fontSize: 18 },
           },
 
           "&:hover": {
             color: theme.palette.error.main,
-            background: alpha(theme.palette.error.main, isDark ? 0.09 : 0.07),
-            borderColor: alpha(theme.palette.error.main, isDark ? 0.22 : 0.2),
+            background: slim ? "transparent" : alpha(theme.palette.error.main, isDark ? 0.09 : 0.07),
+            borderColor: slim ? "transparent" : alpha(theme.palette.error.main, isDark ? 0.22 : 0.2),
             "& .logout-icon": {
               borderColor: alpha(theme.palette.error.main, isDark ? 0.28 : 0.22),
               background: alpha(theme.palette.error.main, isDark ? 0.12 : 0.09),

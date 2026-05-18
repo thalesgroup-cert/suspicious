@@ -9,7 +9,7 @@ import { themes, type ThemeName, getSeasonalThemeName } from "./themes";
 
 const STORAGE_KEY      = "suspicious.theme";
 const STORAGE_KEY_AUTO = "suspicious.theme.auto"; // "1" | "0"
-const DEFAULT_THEME: ThemeName = "graphite";
+const DEFAULT_THEME: ThemeName = "light";
 
 // Custom event dispatched by hydrateThemeFromServer() so AppThemeProvider
 // can react immediately without a page reload.
