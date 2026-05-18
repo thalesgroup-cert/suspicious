@@ -422,12 +422,7 @@ function getInitialTheme(): ThemeName {
   try {
     const raw = localStorage.getItem(STORAGE_KEY);
     if (isValidThemeName(raw)) return raw;
-
-    const prefersDark =
-      typeof window !== "undefined" &&
-      window.matchMedia?.("(prefers-color-scheme: dark)")?.matches;
-
-    return prefersDark ? "graphite" : "light";
+    return DEFAULT_THEME;
   } catch {
     return DEFAULT_THEME;
   }
@@ -441,7 +436,7 @@ export function AppThemeProvider({ children }: { children: React.ReactNode }) {
   const [themeName, setThemeNameState] = React.useState<ThemeName>(getInitialTheme);
 
   const [autoSeasonal, setAutoSeasonalState] = React.useState<boolean>(
-    () => readBool(STORAGE_KEY_AUTO, true)
+    () => readBool(STORAGE_KEY_AUTO, false)
   );
 
   // ── Setters (used by ProfilePage) ────────────────────────────────────────
@@ -494,23 +489,6 @@ export function AppThemeProvider({ children }: { children: React.ReactNode }) {
 
   const theme        = themes[resolvedThemeName];
   const capabilities = THEME_CAPABILITIES[resolvedThemeName];
-
-  // ── OS preference (fallback for new users with no stored preference) ─────
-
-  React.useEffect(() => {
-    try {
-      const hasStored = isValidThemeName(localStorage.getItem(STORAGE_KEY));
-      if (hasStored) return; // server/user preference wins — don't override
-
-      const mq = window.matchMedia?.("(prefers-color-scheme: dark)");
-      if (!mq) return;
-
-      const onChange = () => setThemeNameState(mq.matches ? "graphite" : "light");
-      onChange();
-      mq.addEventListener?.("change", onChange);
-      return () => mq.removeEventListener?.("change", onChange);
-    } catch { /* ignore */ }
-  }, []);
 
   // ── Context value ─────────────────────────────────────────────────────────
 

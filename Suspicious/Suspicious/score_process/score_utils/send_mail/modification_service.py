@@ -6,7 +6,7 @@ from jinja2 import Environment, FileSystemLoader, select_autoescape
 from .send_email_service import SendMailService
 from .models import ModificationMailServiceConfigSocial
 from .email_logo import resolve_logo
-from .email_theme import resolve_email_theme
+from .email_theme import THEME_PALETTES, resolve_semantic_colors
 from .social_logos import SOCIAL_LOGOS
 
 import os as _os_cfg
@@ -82,7 +82,12 @@ class ModificationEmailService:
         self.recipient     = str(recipient)
         self.recipient_name = recipient_name
         self.case          = case
-        self.theme_ctx     = resolve_email_theme(profile)
+        # Modification mails always use the light palette, regardless of the
+        # recipient's UI theme. Semantic colors still follow the profile.
+        self.theme_ctx     = {
+            **THEME_PALETTES["light"],
+            **resolve_semantic_colors(profile),
+        }
 
         env = Environment(
             loader=FileSystemLoader(TEMPLATES_DIR),

@@ -280,64 +280,114 @@ function NavSection({
 function LogoutButton({ slim, onLogout }: { slim: boolean; onLogout: () => void }) {
   const theme = useTheme();
   const isDark = theme.palette.mode === "dark";
-
-  return (
-    <Tooltip title={slim ? "Logout" : ""} placement="right" arrow>
-      <ListItemButton
-        onClick={onLogout}
-        aria-label="Logout"
-        sx={{
-          minHeight: 44,
-          borderRadius: 2.5,
-          px: slim ? 0 : 1.25,
-          py: 0.75,
-          justifyContent: slim ? "center" : "flex-start",
-          gap: slim ? 0 : 1.25,
-          color: alpha(theme.palette.text.primary, isDark ? 0.65 : 0.7),
-          // Outer border/bg ONLY in wide mode
-          border: slim ? "1px solid transparent" : `1px solid ${alpha(theme.palette.divider, isDark ? 0.18 : 0.55)}`,
-          background: slim ? "transparent" : (isDark ? alpha("#fff", 0.025) : alpha(theme.palette.background.paper, 0.7)),
-          transition: theme.transitions.create(["background", "border-color", "color"], { duration: 150 }),
-
-          "& .logout-icon": {
-            width: 38,           // match UserCard avatar size
+ 
+  // Slim variant: render as a 38×38 centered tile, EXACTLY mirroring
+  // UserCard's slim shape so the two stack with perfect vertical centerline.
+  if (slim) {
+    return (
+      <Tooltip title="Logout" placement="right" arrow>
+        <Box
+          onClick={onLogout}
+          role="button"
+          tabIndex={0}
+          aria-label="Logout"
+          onKeyDown={(e) => {
+            if (e.key === "Enter" || e.key === " ") {
+              e.preventDefault();
+              onLogout();
+            }
+          }}
+          sx={{
+            cursor: "pointer",
+            width: 38,
             height: 38,
-            borderRadius: 2.5,   // match UserCard radius
+            borderRadius: 2.5,
             display: "grid",
             placeItems: "center",
-            flexShrink: 0,
+            mx: "auto",
+            color: alpha(theme.palette.text.primary, isDark ? 0.7 : 0.75),
             border: `1px solid ${alpha(theme.palette.divider, isDark ? 0.22 : 0.6)}`,
-            background: isDark ? alpha("#fff", 0.03) : alpha(theme.palette.background.paper, 0.8),
-            transition: theme.transitions.create(["background", "border-color"], { duration: 150 }),
-            "& svg": { fontSize: 18 },
-          },
-
-          "&:hover": {
-            color: theme.palette.error.main,
-            background: slim ? "transparent" : alpha(theme.palette.error.main, isDark ? 0.09 : 0.07),
-            borderColor: slim ? "transparent" : alpha(theme.palette.error.main, isDark ? 0.22 : 0.2),
-            "& .logout-icon": {
+            background: isDark
+              ? alpha("#fff", 0.03)
+              : alpha(theme.palette.background.paper, 0.8),
+            transition: theme.transitions.create(
+              ["background", "border-color", "color"],
+              { duration: 150 }
+            ),
+            "&:hover": {
+              color: theme.palette.error.main,
               borderColor: alpha(theme.palette.error.main, isDark ? 0.28 : 0.22),
               background: alpha(theme.palette.error.main, isDark ? 0.12 : 0.09),
             },
-          },
-
-          "&:focus-visible": {
-            outline: `2px solid ${alpha(theme.palette.error.main, 0.6)}`,
-            outlineOffset: 2,
-          },
-        }}
-      >
-        <Box className="logout-icon">
-          <LogoutOutlined />
+            "&:focus-visible": {
+              outline: `2px solid ${alpha(theme.palette.error.main, 0.6)}`,
+              outlineOffset: 2,
+            },
+          }}
+        >
+          <LogoutOutlined sx={{ fontSize: 18 }} />
         </Box>
-        {!slim && (
-          <Typography sx={{ fontSize: 13.5, fontWeight: 700, whiteSpace: "nowrap" }}>
-            Logout
-          </Typography>
-        )}
-      </ListItemButton>
-    </Tooltip>
+      </Tooltip>
+    );
+  }
+ 
+  // Wide variant: full-row button with icon + label (unchanged behavior)
+  return (
+    <ListItemButton
+      onClick={onLogout}
+      aria-label="Logout"
+      sx={{
+        minHeight: 44,
+        borderRadius: 2.5,
+        px: 1.25,
+        py: 0.75,
+        gap: 1.25,
+        color: alpha(theme.palette.text.primary, isDark ? 0.65 : 0.7),
+        border: `1px solid ${alpha(theme.palette.divider, isDark ? 0.18 : 0.55)}`,
+        background: isDark
+          ? alpha("#fff", 0.025)
+          : alpha(theme.palette.background.paper, 0.7),
+        transition: theme.transitions.create(
+          ["background", "border-color", "color"],
+          { duration: 150 }
+        ),
+ 
+        "& .logout-icon": {
+          width: 38,
+          height: 38,
+          borderRadius: 2.5,
+          display: "grid",
+          placeItems: "center",
+          flexShrink: 0,
+          border: `1px solid ${alpha(theme.palette.divider, isDark ? 0.22 : 0.6)}`,
+          background: isDark ? alpha("#fff", 0.03) : alpha(theme.palette.background.paper, 0.8),
+          transition: theme.transitions.create(["background", "border-color"], { duration: 150 }),
+          "& svg": { fontSize: 18 },
+        },
+ 
+        "&:hover": {
+          color: theme.palette.error.main,
+          background: alpha(theme.palette.error.main, isDark ? 0.09 : 0.07),
+          borderColor: alpha(theme.palette.error.main, isDark ? 0.22 : 0.2),
+          "& .logout-icon": {
+            borderColor: alpha(theme.palette.error.main, isDark ? 0.28 : 0.22),
+            background: alpha(theme.palette.error.main, isDark ? 0.12 : 0.09),
+          },
+        },
+ 
+        "&:focus-visible": {
+          outline: `2px solid ${alpha(theme.palette.error.main, 0.6)}`,
+          outlineOffset: 2,
+        },
+      }}
+    >
+      <Box className="logout-icon">
+        <LogoutOutlined />
+      </Box>
+      <Typography sx={{ fontSize: 13.5, fontWeight: 700, whiteSpace: "nowrap" }}>
+        Logout
+      </Typography>
+    </ListItemButton>
   );
 }
 
@@ -752,10 +802,14 @@ export default function AppLayout() {
           pb: 1.5,
         }}
       >
-        <Divider sx={{ mb: 1.25, borderColor: alpha(theme.palette.divider, isDark ? 0.22 : 0.7) }} />
-
+        <Divider
+          sx={{
+            mb: 1.25,
+            borderColor: alpha(theme.palette.divider, isDark ? 0.22 : 0.7),
+          }}
+        />
+      
         <Stack spacing={0.75}>
-          {/* User identity */}
           <UserCard
             slim={isSlim}
             me={me}
@@ -763,11 +817,7 @@ export default function AppLayout() {
             groups={groups}
             onClick={() => navigate("/profile")}
           />
-
-          {/* Logout */}
-          <List disablePadding>
-            <LogoutButton slim={isSlim} onLogout={handleLogout} />
-          </List>
+          <LogoutButton slim={isSlim} onLogout={handleLogout} />
         </Stack>
       </Box>
     </Box>

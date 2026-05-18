@@ -535,7 +535,7 @@ export default function ProfilePage() {
   const [wantsAck,     setWantsAck]     = React.useState(false);
   const [wantsResults, setWantsResults] = React.useState(false);
   const [pickedTheme,  setPickedTheme]  = React.useState<ThemeName>(
-    (readLocalProfile()?.theme as ThemeName) ?? ("graphite" as ThemeName)
+    (readLocalProfile()?.theme as ThemeName) ?? ("light" as ThemeName)
   );
 
   // Sync from server profile
@@ -544,7 +544,7 @@ export default function ProfilePage() {
     if (!p) return;
     setWantsAck(!!p.wants_acknowledgement);
     setWantsResults(!!p.wants_results);
-    const t = (p.theme as ThemeName) ?? ("graphite" as ThemeName);
+    const t = (p.theme as ThemeName) ?? ("light" as ThemeName);
     setPickedTheme(t);
     setAutoSeasonal(!!p.auto_seasonal);
     if (!p.auto_seasonal) setThemeName(t);
