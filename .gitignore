@@ -45,3 +45,4 @@ minio
 *.jks
 
 suspicious-ui/.pnpm-store/
+.codegraph
