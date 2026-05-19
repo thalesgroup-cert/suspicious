@@ -8,12 +8,8 @@ import { queryClient } from "@/app/queryClient";
 import { AppThemeProvider } from "@/styles/ThemeStore";
 import { SnackbarProvider } from "notistack";
 
-// Boneyard skeleton registry (populated by `boneyard-js build` or the Vite
-// plugin). Side-effect import — calls registerBones() for every captured
-// component so `<Skeleton name="...">` resolves bones automatically.
 import "@/bones/registry";
 
-/* ---------- Dynamic favicon from env ---------- */
 const favicon = import.meta.env.VITE_FAVICON;
 if (favicon) {
   let link = document.querySelector<HTMLLinkElement>("link[rel='icon']");
@@ -24,8 +20,6 @@ if (favicon) {
   }
   link.href = favicon;
 }
-/* --------------------------------------------- */
-
 
 ReactDOM.createRoot(document.getElementById("root")!).render(
   <React.StrictMode>

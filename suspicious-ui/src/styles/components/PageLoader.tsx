@@ -1,14 +1,5 @@
-// src/styles/components/PageLoader.tsx
-//
-// Rendered as the Suspense fallback while a route chunk is loading
-// (router.tsx) and while ProtectedRoute resolves the auth state.
-// Both fire BEFORE the page component mounts, so they happen earlier
-// than the per-page boneyard <Skeleton> wrappers.
-//
-// Showing a centred spinner there made every navigation feel like a
-// full reload. Instead, render a generic MUI <Skeleton> shell that
-// mimics the app chrome (header bar + a few content cards) so the
-// user sees layout immediately and the real page just fades in.
+// Suspense fallback for route chunks + ProtectedRoute auth resolution —
+// fires before per-page boneyard skeletons mount.
 
 import * as React from "react";
 import { Box, Container, Skeleton, Stack, useTheme } from "@mui/material";
@@ -20,7 +11,6 @@ export default function PageLoader(_props: { label?: string }) {
 
   return (
     <Container maxWidth="xl" sx={{ py: { xs: 2, md: 3 } }}>
-      {/* Header bar */}
       <Stack
         direction={{ xs: "column", md: "row" }}
         spacing={2}
@@ -39,7 +29,6 @@ export default function PageLoader(_props: { label?: string }) {
         </Stack>
       </Stack>
 
-      {/* Content cards */}
       <Stack spacing={2}>
         {[0, 1, 2].map((i) => (
           <Box

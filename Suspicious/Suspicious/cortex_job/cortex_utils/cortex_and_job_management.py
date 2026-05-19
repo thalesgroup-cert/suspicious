@@ -49,9 +49,6 @@ STALE_JOB_TIMEOUT_SECONDS: int = int(
 )
 
 try:
-    # SessionCortexApi mounts our TimeoutHTTPAdapter on a shared
-    # requests.Session — gives connect/read timeouts + connection pool
-    # under the RETRY decorator and circuit breaker.
     API = SessionCortexApi(API_URL, API_KEY, proxies={"http": "", "https": ""})
 except Exception as e:
     fetch_mail_logger.error(f"Failed to initialize Cortex API: {e}")
@@ -670,14 +667,9 @@ class CortexJobManager:
                         f"Error scoring report {job_id}: {e}", exc_info=True
                     )
 
-        # Stale-job rescue: reports that have been Waiting / InProgress
-        # for longer than STALE_JOB_TIMEOUT_SECONDS are auto-failed so
-        # the parent case can finish instead of looping forever.
-        #
-        # Age is measured from CaseAnalyzerJob.created_at — the moment we
-        # dispatched the Cortex job — not from AnalyzerReport.creation_date
-        # which can drift if the report row is rewritten (Deleted then
-        # resurrected) or if queue lag delays the report write.
+        # Age anchored to CaseAnalyzerJob.created_at (dispatch time), not
+        # AnalyzerReport.creation_date — that can drift on Deleted/resurrected
+        # rewrites or queue lag.
         if report_instance.status in {"Waiting", "InProgress"}:
             submitted_at = (
                 CaseAnalyzerJob.objects

@@ -1,15 +1,6 @@
-"""
-Cortex API wrapper backed by a shared requests.Session.
-
-Vanilla cortex4py.api.Api calls module-level `requests.get/post/...` for
-every operation: no connection pool, no TLS reuse, and — critically —
-no socket-level timeout. The pybreaker/tenacity layer above only
-catches exceptions after the bare call has already hung.
-
-SessionCortexApi keeps cortex4py's controllers (which delegate via
-do_get/do_post/...) and replaces the transport with a Session mounted
-on common.http_client.TimeoutHTTPAdapter so connect/read timeouts and
-keep-alive are guaranteed.
+"""cortex4py Api subclass that routes do_* through a shared Session
+with TimeoutHTTPAdapter — needed because vanilla Api uses bare
+requests.get/post with no socket timeout.
 """
 from __future__ import annotations
 
