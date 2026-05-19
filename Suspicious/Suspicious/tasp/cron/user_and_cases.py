@@ -20,8 +20,13 @@ CASE_LOCK_TTL = 120
 
 
 def sync_user_profiles() -> None:
-    """Synchronise les profils utilisateurs via LDAP."""
-    for user in User.objects.all():
+    """Synchronise user profiles via LDAP.
+
+    Restricted to active users and streamed in chunks so a large user
+    table is not pulled into memory at every cron tick, and LDAP is
+    not pinged for disabled accounts.
+    """
+    for user in User.objects.filter(is_active=True).iterator(chunk_size=100):
         try:
             Ldap.create_user(user)
         except Exception:
