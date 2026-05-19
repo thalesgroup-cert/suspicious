@@ -15,7 +15,7 @@ def get_suspicious_collection(chroma_client):
     )
 
 
-def get_similar_dangerous_mails(embedding, suspicious_collection):
+def get_similar_dangerous_mails(embedding, suspicious_collection, n_results: int = 20):
     try:
         embedding_data = json.loads(embedding)
         if not isinstance(embedding_data, list):
@@ -27,7 +27,7 @@ def get_similar_dangerous_mails(embedding, suspicious_collection):
     return suspicious_collection.query(
         query_embeddings=embedding_data,
         where={"classification": "DANGEROUS"},
-        n_results=70,
+        n_results=n_results,
         include=["embeddings", "metadatas", "documents", "distances"],
     )
 
