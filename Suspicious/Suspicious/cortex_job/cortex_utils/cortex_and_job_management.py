@@ -673,18 +673,28 @@ class CortexJobManager:
         # Stale-job rescue: reports that have been Waiting / InProgress
         # for longer than STALE_JOB_TIMEOUT_SECONDS are auto-failed so
         # the parent case can finish instead of looping forever.
-        if (
-            report_instance.status in {"Waiting", "InProgress"}
-            and report_instance.creation_date is not None
-        ):
-            age = (timezone.now() - report_instance.creation_date).total_seconds()
-            if age > STALE_JOB_TIMEOUT_SECONDS:
-                update_cases_logger.warning(
-                    "Auto-failing stale %s report cortex_job_id=%s after %.0fs",
-                    report_instance.status, job_id, age,
-                )
-                report_instance.status = "Failure"
-                report_instance.save(update_fields=["status"])
+        #
+        # Age is measured from CaseAnalyzerJob.created_at — the moment we
+        # dispatched the Cortex job — not from AnalyzerReport.creation_date
+        # which can drift if the report row is rewritten (Deleted then
+        # resurrected) or if queue lag delays the report write.
+        if report_instance.status in {"Waiting", "InProgress"}:
+            submitted_at = (
+                CaseAnalyzerJob.objects
+                .filter(cortex_job_id=job_id)
+                .order_by("created_at")
+                .values_list("created_at", flat=True)
+                .first()
+            ) or report_instance.creation_date
+            if submitted_at is not None:
+                age = (timezone.now() - submitted_at).total_seconds()
+                if age > STALE_JOB_TIMEOUT_SECONDS:
+                    update_cases_logger.warning(
+                        "Auto-failing stale %s report cortex_job_id=%s after %.0fs",
+                        report_instance.status, job_id, age,
+                    )
+                    report_instance.status = "Failure"
+                    report_instance.save(update_fields=["status"])
 
         return report_instance.status
 
