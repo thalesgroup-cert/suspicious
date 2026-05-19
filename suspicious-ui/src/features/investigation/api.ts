@@ -27,13 +27,13 @@ export type InvestigationResult =
   | "DANGEROUS"
   | "UNKNOWN";
 
-export type InvestigationSort =
+type InvestigationSort =
   | "date_desc"
   | "date_asc"
   | "id_desc"
   | "id_asc";
 
-export type InvestigationRow = {
+type InvestigationRow = {
   id: number;
   reporter_email: string;
   status: InvestigationStatus;
@@ -49,13 +49,13 @@ export type InvestigationRow = {
   mail_preview_url?: string | null;
 };
 
-export type InvestigationAnalyzerTarget = {
+type InvestigationAnalyzerTarget = {
   kind: string;
   id: number | string | null;
   value: string | null;
 };
 
-export type InvestigationAnalyzerReport = {
+type InvestigationAnalyzerReport = {
   id: number;
   cortex_job_id: string;
   type: string;
@@ -74,7 +74,7 @@ export type InvestigationAnalyzerReport = {
   created_at?: string;
 };
 
-export type InvestigationCaseInfos = {
+type InvestigationCaseInfos = {
   id?: number;
   score?: number | null;
   confidence?: number | null;
