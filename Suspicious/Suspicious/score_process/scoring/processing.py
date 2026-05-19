@@ -19,6 +19,17 @@ update_cases_logger = logging.getLogger("tasp.cron.update_ongoing_case_jobs")
 _tracer = trace.get_tracer(__name__)
 
 
+# ── Prefetch constants ────────────────────────────────────────────────────────
+
+_PROCESS_MAIL_PREFETCH = (
+    "mail_attachments__file",
+    "mail_artifacts__artifactIsIp__ip",
+    "mail_artifacts__artifactIsUrl__url",
+    "mail_artifacts__artifactIsHash__hash",
+    "mail_artifacts__artifactIsDomain__domain",
+    "mail_artifacts__artifactIsMailAddress__mail_address",
+)
+
 # ── Helpers ───────────────────────────────────────────────────────────────────
 
 def log_and_process(
@@ -81,6 +92,8 @@ def process_reports(analyzers_reports, mail_part, part_type, is_malicious):
 # ── Mail processing ───────────────────────────────────────────────────────────
 
 def process_mail(mail, reports, total_scores, total_confidences, is_malicious, case_id):
+    from mail_feeder.models import Mail  # local import: avoid app-loading cycle
+    mail = Mail.objects.prefetch_related(*_PROCESS_MAIL_PREFETCH).get(pk=mail.pk)
     total_failures = 0
     update_cases_logger.info("Starting mail processing.")
     mail_archive = MailArchive.objects.filter(mail=mail).first()
