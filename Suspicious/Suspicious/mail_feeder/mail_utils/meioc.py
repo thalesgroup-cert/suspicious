@@ -54,7 +54,8 @@ def real_email(string):
     try:
         sender_name, email_address = parseaddr(string)
         return email_address.lower() if email_address else None
-    except:
+    except (AttributeError, ValueError, TypeError) as exc:
+        fetch_mail_logger.warning("real_email parseaddr failed for %r: %s", string, exc)
         return result_meioc
 
 def normalize_headers(raw_email_bytes):
@@ -320,8 +321,8 @@ def email_analysis(filename, exclude_private_ip, check_spf, check_dkim, file_out
                             re.IGNORECASE))
                         for pattern in HASH_PATTERNS:
                             body_Hash.extend(re.findall(pattern, part.get_content(), re.IGNORECASE))
-                    except:
-                        pass
+                    except (TypeError, ValueError, UnicodeDecodeError, LookupError) as exc:
+                        fetch_mail_logger.warning("Body IOC extraction skipped (%s)", exc)
 
                 # Extracts information from each file attached to the e-mail
                 if part.get_filename():
@@ -405,8 +406,11 @@ def email_analysis(filename, exclude_private_ip, check_spf, check_dkim, file_out
                         try:
                             domain_from = mail_from.split("@")[1]
                             result_spf = spf.check2(ip, mail_from,domain_from)[0]
-                        except:
-                            pass
+                        except (IndexError, AttributeError, TypeError, ValueError) as exc:
+                            fetch_mail_logger.warning(
+                                "SPF check skipped for ip=%s mail_from=%r: %s",
+                                ip, mail_from, exc,
+                            )
 
                         if result_spf == "pass":
                             test_spf = True
@@ -445,9 +449,9 @@ def email_analysis(filename, exclude_private_ip, check_spf, check_dkim, file_out
                 fetch_mail_logger.debug("Returning JSON result")
                 result = json.dumps(result_meioc, indent=4)
                 return result
-            except:
-                result = None
-                return result
+            except (TypeError, ValueError) as exc:
+                fetch_mail_logger.error("meioc result JSON serialise failed: %s", exc)
+                return None
             
 
 
