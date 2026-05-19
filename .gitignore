@@ -50,3 +50,5 @@ suspicious-ui/tsconfig.tsbuildinfo
 # (or boneyardPlugin on Vite dev). Only the registry.ts entry-point is checked in.
 suspicious-ui/src/bones/*.bones.json
 .codegraph
+suspicious-ui/.playwright
+suspicious-ui/dist
