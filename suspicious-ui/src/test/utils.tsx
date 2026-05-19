@@ -1,12 +1,9 @@
-import { type ReactNode } from "react";
 import { MemoryRouter } from "react-router-dom";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
-import { createTheme, ThemeProvider } from "@mui/material/styles";
 import { CssBaseline } from "@mui/material";
 import { SnackbarProvider } from "notistack";
 import { render, type RenderOptions } from "@testing-library/react";
-
-const testTheme = createTheme();
+import { AppThemeProvider } from "@/styles/ThemeStore";
 
 export function createTestQueryClient() {
   return new QueryClient({
@@ -15,26 +12,6 @@ export function createTestQueryClient() {
       mutations: { retry: false },
     },
   });
-}
-
-function AllProviders({
-  children,
-  initialPath = "/",
-}: {
-  children: ReactNode;
-  initialPath?: string;
-}) {
-  const qc = createTestQueryClient();
-  return (
-    <QueryClientProvider client={qc}>
-      <ThemeProvider theme={testTheme}>
-        <CssBaseline />
-        <SnackbarProvider maxSnack={3}>
-          <MemoryRouter initialEntries={[initialPath]}>{children}</MemoryRouter>
-        </SnackbarProvider>
-      </ThemeProvider>
-    </QueryClientProvider>
-  );
 }
 
 export function renderWithProviders(
@@ -48,14 +25,14 @@ export function renderWithProviders(
   return render(ui, {
     wrapper: ({ children }) => (
       <QueryClientProvider client={queryClient}>
-        <ThemeProvider theme={testTheme}>
+        <AppThemeProvider>
           <CssBaseline />
           <SnackbarProvider maxSnack={3}>
             <MemoryRouter initialEntries={[initialPath ?? "/"]}>
               {children}
             </MemoryRouter>
           </SnackbarProvider>
-        </ThemeProvider>
+        </AppThemeProvider>
       </QueryClientProvider>
     ),
     ...options,
