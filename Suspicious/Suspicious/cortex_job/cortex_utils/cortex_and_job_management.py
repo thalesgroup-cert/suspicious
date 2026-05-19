@@ -6,8 +6,8 @@ import pybreaker
 from django.db import transaction
 from django.utils import timezone
 
-from cortex4py.api import Api
 from common.http_client import get_breaker, RETRY
+from cortex_job.cortex_utils.session_cortex_api import SessionCortexApi
 from cortex_job.models import Analyzer, AnalyzerReport, CaseAnalyzerJob
 from mail_feeder.models import MailBody, MailArchive, MailInfo, MailHeader
 from score_process.scoring.cortex_analyzers.reports import CortexAnalyzerReports
@@ -49,9 +49,10 @@ STALE_JOB_TIMEOUT_SECONDS: int = int(
 )
 
 try:
-    # cortex4py makes bare requests.get/post calls — no session to mount adapters on.
-    # Timeout protection comes from the RETRY decorator and circuit breaker.
-    API = Api(API_URL, API_KEY, proxies={"http": "", "https": ""})
+    # SessionCortexApi mounts our TimeoutHTTPAdapter on a shared
+    # requests.Session — gives connect/read timeouts + connection pool
+    # under the RETRY decorator and circuit breaker.
+    API = SessionCortexApi(API_URL, API_KEY, proxies={"http": "", "https": ""})
 except Exception as e:
     fetch_mail_logger.error(f"Failed to initialize Cortex API: {e}")
     API = None
@@ -93,13 +94,10 @@ class CortexJob:
 
         # Initialize Cortex API connection
         try:
-            self.api = Api(self.api_url, self.api_key, proxies=self.proxies)
+            self.api = SessionCortexApi(self.api_url, self.api_key, proxies=self.proxies)
         except Exception as e:
             fetch_mail_logger.error(f"Failed to initialize Cortex API: {e}")
             self.api = None
-
-        # cortex4py makes bare requests.get/post calls — no session to mount adapters on.
-        # Timeout protection comes from the RETRY decorator and circuit breaker.
 
     def launch_cortex_jobs(self, value, data_type, case):
         """
