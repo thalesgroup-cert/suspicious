@@ -1107,7 +1107,7 @@ export default function LoginPage() {
                 component="a"
                 href={COMPANY_LINK}
                 target="_blank"
-                rel="noreferrer"
+                rel="noopener noreferrer"
                 aria-label={COMPANY_NAME}
                 sx={{
                   display: "inline-flex",
