@@ -13,6 +13,7 @@ from ip_process.models import IP
 from url_process.models import URL
 from hash_process.models import Hash
 from domain_process.models import Domain
+from mail_feeder.models import Mail
 
 from .client import MISPClient
 from .config_loader import load_misp_settings
@@ -28,6 +29,17 @@ from .objects import (
 from .utils import SECONDARY_MISP_LEVELS
 
 logger = logging.getLogger("tasp.cron.update_ongoing_case_jobs")
+
+
+# Deep FK chain accessed in _build_artifact_object per mail_artifact row.
+# Re-fetching the Mail with this prefetch turns N+1 forward-FK lookups
+# into a fixed number of batched queries.
+_UPDATE_MISP_PREFETCH = (
+    "mail_artifacts__artifactIsIp__ip",
+    "mail_artifacts__artifactIsUrl__url",
+    "mail_artifacts__artifactIsHash__hash",
+    "mail_artifacts__artifactIsDomain__domain",
+)
 
 
 class MISPService:
@@ -56,7 +68,9 @@ class MISPService:
                 secondary_mem    = None
 
             if case.fileOrMail and getattr(case.fileOrMail, "mail", None):
-                mail = case.fileOrMail.mail
+                mail = Mail.objects.prefetch_related(*_UPDATE_MISP_PREFETCH).get(
+                    pk=case.fileOrMail.mail.pk
+                )
                 obj  = build_email_object(mail, case.id, case.results)
                 if obj:
                     # Correct signature: (misp_instance, event_id, obj)

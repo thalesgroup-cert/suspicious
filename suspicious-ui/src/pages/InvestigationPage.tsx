@@ -46,6 +46,7 @@ import {
   RestartAltOutlined,
 } from "@mui/icons-material";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
+import { Skeleton } from "boneyard-js/react";
 import { useNavigate, useSearchParams } from "react-router-dom";
 import { alpha } from "@mui/material/styles";
 import { useTheme } from "@mui/material/styles";
@@ -859,6 +860,11 @@ export default function InvestigationPage() {
     : `1px solid ${alpha(theme.palette.divider, 0.6)}`;
 
   return (
+    <Skeleton
+      name="investigation-page"
+      loading={investigationsQuery.isPending || meQuery.isPending}
+      animate="shimmer"
+    >
     <Box sx={{ p: { xs: 2, md: 3 } }}>
       {/* ------------------------------------------------------------------ */}
       {/* Page header                                                         */}
@@ -1653,5 +1659,6 @@ export default function InvestigationPage() {
         )}
       </Drawer>
     </Box>
+    </Skeleton>
   );
 }

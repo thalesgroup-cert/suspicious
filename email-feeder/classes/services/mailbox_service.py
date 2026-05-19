@@ -365,10 +365,18 @@ class Mailbox:
 
         from_decoded = self._decode_header_str(from_header_raw)
         email_from = email.utils.parseaddr(from_decoded)[1]
-        folder_name = f"{email_from.split('@')[0]}-submission"
+        # Sanitise the local-part before composing a filesystem path —
+        # crafted From headers like `<"../x"@a.b>` would otherwise traverse.
+        safe_local = self._sanitize_filename(
+            email_from.split("@")[0], 0, default_base="submitter"
+        )
+        folder_name = f"{safe_local}-submission"
+        safe_ref = self._sanitize_filename(
+            source_ref.split("-", maxsplit=1)[0], 0, default_base="ref"
+        )
 
         processing_root_dir = pathlib.Path(
-            self.__tmp_path, folder_name + f"-{source_ref.split('-', maxsplit=1)[0]}"
+            self.__tmp_path, f"{folder_name}-{safe_ref}"
         )
         try:
             processing_root_dir.mkdir(parents=True, exist_ok=True)

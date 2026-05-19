@@ -20,7 +20,7 @@ export type PcaResponse = {
   explained_variance: [number, number];
 };
 
-export type MailVolumeCampaign = {
+type MailVolumeCampaign = {
   name: string;
   start: string;
   end: string;

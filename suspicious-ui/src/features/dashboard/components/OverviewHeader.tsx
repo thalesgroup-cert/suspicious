@@ -212,12 +212,3 @@ export default function OverviewHeader(props: {
     </Box>
   );
 }
-
-export function OverviewHeaderSkeleton() {
-  return (
-    <Box sx={{ px: { xs: 2, md: 3 }, py: 2 }}>
-      <Skeleton width={180} height={36} />
-      <Skeleton width={260} height={20} />
-    </Box>
-  );
-}

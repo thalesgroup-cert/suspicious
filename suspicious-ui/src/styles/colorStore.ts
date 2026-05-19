@@ -23,7 +23,7 @@ import { persist } from "zustand/middleware";
 export type ResultKey = "safe" | "suspicious" | "dangerous" | "inconclusive";
 export type StatusKey = "done" | "in_progress" | "new" | "failure" | "challenged" | "unknown";
 
-export type SemanticColor = { main: string };
+type SemanticColor = { main: string };
 export type ResultColors  = Record<ResultKey, SemanticColor>;
 export type StatusColors  = Record<StatusKey, SemanticColor>;
 export type PresetName    = "default" | "colorblind" | "mono" | "custom";

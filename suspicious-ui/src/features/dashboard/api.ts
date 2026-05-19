@@ -1,7 +1,7 @@
 import { api } from "@/api/client";
 import { endpoints } from "@/api/endpoints";
 
-export type DangerKey =
+type DangerKey =
   | "failure"
   | "safe"
   | "inconclusive"

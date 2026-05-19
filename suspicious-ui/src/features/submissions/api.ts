@@ -25,7 +25,7 @@ export type SubmissionResult =
   | "DANGEROUS"
   | "UNKNOWN";
 
-export type AnalyzerTargetKind =
+type AnalyzerTargetKind =
   | "URL"
   | "DOMAIN"
   | "MAIL"
@@ -73,7 +73,7 @@ export type SubmissionAnalyzerReport = {
   created_at: string;
 };
 
-export type SubmissionRawDetails = {
+type SubmissionRawDetails = {
   case: Record<string, unknown>;
   fileOrMail: {
     id: number;

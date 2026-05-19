@@ -29,7 +29,7 @@ const THEME_HYDRATE_EVENT = "suspicious:theme-hydrate";
 // ---------------------------------------------------------------------------
 
 /** Named feature flags — each describes a visual capability a theme provides. */
-export type ThemeEffects = {
+type ThemeEffects = {
   /** Glass-morphism surfaces (backdrop-filter: blur). */
   hasGlassEffect?: boolean;
   /** Neon glow and CRT scanlines (cyber). */
@@ -314,44 +314,6 @@ export function useThemeMode() {
   const ctx = React.useContext(ThemeContext);
   if (!ctx) throw new Error("useThemeMode must be used inside AppThemeProvider");
   return ctx;
-}
-
-/**
- * Convenience hook — returns only the capabilities of the active theme.
- *
- * @example
- *   const caps = useThemeCapabilities();
- *   <div className={caps.effects.hasPortalEffect ? "portal-flash" : ""} />
- */
-export function useThemeCapabilities(): ThemeCapabilities {
-  return useThemeMode().capabilities;
-}
-
-/**
- * Returns true if the current theme defines the given utility class.
- *
- * @example
- *   const canGlitch = useThemeHasClass("temporal-glitch");
- */
-export function useThemeHasClass(className: string): boolean {
-  const { utilityClasses } = useThemeCapabilities();
-  return (utilityClasses as string[]).includes(className);
-}
-
-/**
- * Returns the value of a CSS custom property exposed by the current theme,
- * or `undefined` if the theme does not expose it.
- *
- * @example
- *   const brigadeBlue = useThemeCssVar("--brigade-blue"); // "#4A90D9" | undefined
- */
-export function useThemeCssVar(varName: string): string | undefined {
-  const { cssVars } = useThemeCapabilities();
-  if (!(cssVars as string[]).includes(varName)) return undefined;
-  if (typeof window === "undefined") return undefined;
-  return getComputedStyle(document.documentElement)
-    .getPropertyValue(varName)
-    .trim() || undefined;
 }
 
 // ---------------------------------------------------------------------------

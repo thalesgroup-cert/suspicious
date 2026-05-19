@@ -6,8 +6,8 @@ import pybreaker
 from django.db import transaction
 from django.utils import timezone
 
-from cortex4py.api import Api
 from common.http_client import get_breaker, RETRY
+from cortex_job.cortex_utils.session_cortex_api import SessionCortexApi
 from cortex_job.models import Analyzer, AnalyzerReport, CaseAnalyzerJob
 from mail_feeder.models import MailBody, MailArchive, MailInfo, MailHeader
 from score_process.scoring.cortex_analyzers.reports import CortexAnalyzerReports
@@ -49,9 +49,7 @@ STALE_JOB_TIMEOUT_SECONDS: int = int(
 )
 
 try:
-    # cortex4py makes bare requests.get/post calls — no session to mount adapters on.
-    # Timeout protection comes from the RETRY decorator and circuit breaker.
-    API = Api(API_URL, API_KEY, proxies={"http": "", "https": ""})
+    API = SessionCortexApi(API_URL, API_KEY, proxies={"http": "", "https": ""})
 except Exception as e:
     fetch_mail_logger.error(f"Failed to initialize Cortex API: {e}")
     API = None
@@ -93,13 +91,10 @@ class CortexJob:
 
         # Initialize Cortex API connection
         try:
-            self.api = Api(self.api_url, self.api_key, proxies=self.proxies)
+            self.api = SessionCortexApi(self.api_url, self.api_key, proxies=self.proxies)
         except Exception as e:
             fetch_mail_logger.error(f"Failed to initialize Cortex API: {e}")
             self.api = None
-
-        # cortex4py makes bare requests.get/post calls — no session to mount adapters on.
-        # Timeout protection comes from the RETRY decorator and circuit breaker.
 
     def launch_cortex_jobs(self, value, data_type, case):
         """
@@ -672,21 +667,26 @@ class CortexJobManager:
                         f"Error scoring report {job_id}: {e}", exc_info=True
                     )
 
-        # Stale-job rescue: reports that have been Waiting / InProgress
-        # for longer than STALE_JOB_TIMEOUT_SECONDS are auto-failed so
-        # the parent case can finish instead of looping forever.
-        if (
-            report_instance.status in {"Waiting", "InProgress"}
-            and report_instance.creation_date is not None
-        ):
-            age = (timezone.now() - report_instance.creation_date).total_seconds()
-            if age > STALE_JOB_TIMEOUT_SECONDS:
-                update_cases_logger.warning(
-                    "Auto-failing stale %s report cortex_job_id=%s after %.0fs",
-                    report_instance.status, job_id, age,
-                )
-                report_instance.status = "Failure"
-                report_instance.save(update_fields=["status"])
+        # Age anchored to CaseAnalyzerJob.created_at (dispatch time), not
+        # AnalyzerReport.creation_date — that can drift on Deleted/resurrected
+        # rewrites or queue lag.
+        if report_instance.status in {"Waiting", "InProgress"}:
+            submitted_at = (
+                CaseAnalyzerJob.objects
+                .filter(cortex_job_id=job_id)
+                .order_by("created_at")
+                .values_list("created_at", flat=True)
+                .first()
+            ) or report_instance.creation_date
+            if submitted_at is not None:
+                age = (timezone.now() - submitted_at).total_seconds()
+                if age > STALE_JOB_TIMEOUT_SECONDS:
+                    update_cases_logger.warning(
+                        "Auto-failing stale %s report cortex_job_id=%s after %.0fs",
+                        report_instance.status, job_id, age,
+                    )
+                    report_instance.status = "Failure"
+                    report_instance.save(update_fields=["status"])
 
         return report_instance.status
 

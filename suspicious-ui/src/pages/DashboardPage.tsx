@@ -4,6 +4,7 @@ import { Alert, Box, Container, Stack } from "@mui/material";
 import { useTheme } from "@mui/material/styles";
 import { alpha } from "@mui/material/styles";
 import { useQueries, useQuery } from "@tanstack/react-query";
+import { Skeleton } from "boneyard-js/react";
 import { Responsive, WidthProvider, type Layout } from "react-grid-layout/legacy";
 
 import "react-grid-layout/css/styles.css";
@@ -464,8 +465,6 @@ export default function DashboardPage() {
   void openKpiTrends;
   void selectedMetric;
 
-  if (isInitialLoading) return <DashboardLoading />;
-
   if (summaryQuery.isError) {
     return (
       <Container maxWidth="xl" sx={{ py: 3 }}>
@@ -488,6 +487,12 @@ export default function DashboardPage() {
   }
 
   return (
+    <Skeleton
+      name="dashboard-page"
+      loading={isInitialLoading}
+      fallback={<DashboardLoading />}
+      animate="shimmer"
+    >
     <Box>
       {/* Inject grid CSS overrides — theme-aware, re-renders on theme switch */}
       <GridStyles />
@@ -608,5 +613,6 @@ export default function DashboardPage() {
         </Box>
       </Container>
     </Box>
+    </Skeleton>
   );
 }

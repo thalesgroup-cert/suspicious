@@ -212,7 +212,7 @@ class AnalyzerAI(BaseAnalyzer):
         hive_verify = self._thehive["verify"]
 
         embedding = response["details"]["report"].get("email_embedding")
-        similar   = get_similar_dangerous_mails(embedding, collection) if embedding else {}
+        similar   = get_similar_dangerous_mails(embedding, collection, n_results=20) if embedding else {}
         campaign  = get_phishing_campaign(similar)
 
         if not campaign:

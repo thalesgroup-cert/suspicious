@@ -179,32 +179,3 @@ export function StatusChip({ value, ...rest }: StatusChipProps) {
   );
 }
 
-// ---------------------------------------------------------------------------
-// ColorDot — minimal inline dot, used in tables / lists where a full chip
-// would be too heavy. Still dual-encoded: dot + aria-label.
-// ---------------------------------------------------------------------------
-
-type ColorDotProps = {
-  color: string;
-  label: string;
-  size?: number;
-};
-
-export function ColorDot({ color, label, size = 8 }: ColorDotProps) {
-  return (
-    <Tooltip title={label} placement="top" arrow>
-      <Box
-        aria-label={label}
-        role="img"
-        sx={{
-          width: size,
-          height: size,
-          borderRadius: 99,
-          bgcolor: color,
-          flexShrink: 0,
-          boxShadow: `0 0 6px ${alpha(color, 0.5)}`,
-        }}
-      />
-    </Tooltip>
-  );
-}

@@ -118,7 +118,7 @@ export async function setFeederStatus(
 }
 
 /** Per-subsystem readiness reported by the feeder /health endpoint. */
-export type FeederHealthChecks = {
+type FeederHealthChecks = {
   imap?: {
     ok: boolean;
     configured: number;

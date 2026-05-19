@@ -9,7 +9,7 @@ import smtplib
 from email.mime.text import MIMEText
 from email.mime.multipart import MIMEMultipart
 from jinja2 import Environment, FileSystemLoader, select_autoescape
-from mail_feeder.models import MailArtifact, MailAttachment
+from mail_feeder.models import Mail, MailArtifact, MailAttachment
 
 from .utils import generate_ref, build_mail_attachments_paths
 from score_process.score_utils.send_mail.social_logos import SOCIAL_LOGOS
@@ -32,6 +32,19 @@ _RESULT_COLOR = {
     "Safe":        "#00AB84",
     "Inconclusive":"#0085CA",
 }
+
+_CHALLENGE_MAIL_PREFETCH = (
+    "mail_attachments__file",
+    "mail_artifacts__artifactIsIp__ip",
+    "mail_artifacts__artifactIsUrl__url",
+    "mail_artifacts__artifactIsHash__hash",
+    "mail_artifacts__artifactIsDomain__domain",
+    "mail_artifacts__artifactIsMailAddress__mail_address",
+)
+
+
+def _refetch_mail_with_prefetch(mail):
+    return Mail.objects.prefetch_related(*_CHALLENGE_MAIL_PREFETCH).get(pk=mail.pk)
 
 
 def _safe(value, default=None):
@@ -91,18 +104,20 @@ class ChallengeToTheHiveService:
         ]
 
     def _build_case_context(self, mail) -> dict:
+        mail = _refetch_mail_with_prefetch(mail)
+
         artifacts = [
             {
                 "label":      a.artifact_type,
                 "score":      a.artifact_score,
                 "confidence": a.artifact_confidence,
             }
-            for a in MailArtifact.objects.filter(mail=mail)
+            for a in mail.mail_artifacts.all()
         ]
 
         attachments = [
             a.file.file_path.name
-            for a in MailAttachment.objects.filter(mail=mail)
+            for a in mail.mail_attachments.all()
         ]
 
         return {
@@ -227,8 +242,10 @@ class ChallengeToTheHiveService:
             "hash":        lambda a: (_safe(getattr(getattr(a, "artifactIsHash",        None), "hash.value",           None)), "hash"),
         }
 
+        mail = _refetch_mail_with_prefetch(mail)
+
         artifact_summary = []
-        for artifact in MailArtifact.objects.filter(mail=mail):
+        for artifact in mail.mail_artifacts.all():
             artifact_type = _safe(artifact.artifact_type, "").lower()
             if artifact_type in artifact_type_map:
                 data, dtype = artifact_type_map[artifact_type](artifact)
@@ -237,7 +254,7 @@ class ChallengeToTheHiveService:
 
         attachments_summary = [
             _safe(att.file.file_path.name)
-            for att in MailAttachment.objects.filter(mail=mail)
+            for att in mail.mail_attachments.all()
             if _safe(att.file.file_path.name)
         ]
 
