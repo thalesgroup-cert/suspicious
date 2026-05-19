@@ -94,7 +94,8 @@ FILES_BASE_DIR = Path(__file__).resolve().parent.parent
 SECRET_KEY = _app["secret_key"]
 
 _debug_raw = _app.get("debug", False)
-DEBUG = str(_debug_raw).lower() not in {"false", "0", "no", "off"}
+# Opt-in only: unknown/typo values fall back to False (prod-safe).
+DEBUG = str(_debug_raw).strip().lower() in {"true", "1", "yes", "on"}
 
 ALLOWED_HOSTS = _app.get("allowed_hosts", ["localhost"]) + [
     "127.0.0.1",
