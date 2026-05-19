@@ -1,9 +1,19 @@
 import { defineConfig } from "vite";
 import react from "@vitejs/plugin-react";
+import { boneyardPlugin } from "boneyard-js/vite";
 import path from "node:path";
 
 export default defineConfig({
-  plugins: [react()],
+  plugins: [
+    react(),
+    // Captures pixel-exact skeleton bones from the live DOM on dev-server
+    // boot and on HMR. Generated bone files land in src/bones/ and are
+    // imported by main.tsx via src/bones/registry.ts.
+    boneyardPlugin({
+      out: "./src/bones",
+      framework: "react",
+    }),
+  ],
   resolve: {
     alias: {
       "@": path.resolve(__dirname, "./src")

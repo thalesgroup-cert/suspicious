@@ -31,6 +31,7 @@ import {
   CloudUploadOutlined,
 } from "@mui/icons-material";
 import { useMutation, useQuery } from "@tanstack/react-query";
+import { Skeleton } from "boneyard-js/react";
 import { useForm } from "react-hook-form";
 import { z } from "zod";
 import { zodResolver } from "@hookform/resolvers/zod";
@@ -542,6 +543,11 @@ export default function SubmitPage() {
   // -------------------------------------------------------------------------
 
   return (
+    <Skeleton
+      name="submit-page"
+      loading={meQuery.isPending || configQuery.isPending}
+      animate="shimmer"
+    >
     <Container maxWidth="lg" sx={{ py: { xs: 2.5, md: 3.5 }, pb: 8 }}>
       <Stack spacing={2}>
         {/* ---------------------------------------------------------------- */}
@@ -923,5 +929,6 @@ export default function SubmitPage() {
         </DialogContent>
       </Dialog>
     </Container>
+    </Skeleton>
   );
 }

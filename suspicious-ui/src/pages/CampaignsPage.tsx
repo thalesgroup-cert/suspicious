@@ -19,6 +19,7 @@ import {
   TimelineOutlined,
 } from "@mui/icons-material";
 import { useQuery } from "@tanstack/react-query";
+import { Skeleton } from "boneyard-js/react";
 import {
   ResponsiveContainer,
   BarChart,
@@ -703,6 +704,11 @@ export default function CampaignsPage() {
     : alpha(theme.palette.action.hover, 0.14);
 
   return (
+    <Skeleton
+      name="campaigns-page"
+      loading={countsQuery.isPending || pcaQuery.isPending || volumeQuery.isPending}
+      animate="shimmer"
+    >
     <Box sx={{ p: { xs: 1.5, md: 2 } }}>
       <GridStyles />
 
@@ -1108,5 +1114,6 @@ export default function CampaignsPage() {
         </Box>
       </ResponsiveGridLayout>
     </Box>
+    </Skeleton>
   );
 }

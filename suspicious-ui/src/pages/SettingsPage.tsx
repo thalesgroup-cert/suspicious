@@ -55,6 +55,7 @@ import {
 } from "@mui/icons-material";
 import { alpha, useTheme } from "@mui/material/styles";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
+import { Skeleton } from "boneyard-js/react";
 import { useSnackbar } from "notistack";
 
 import { getMe, type Me } from "@/api/auth";
@@ -1466,6 +1467,11 @@ export default function SettingsPage() {
   }
 
   return (
+    <Skeleton
+      name="settings-page"
+      loading={meQuery.isPending}
+      animate="shimmer"
+    >
     <Box sx={{ p: { xs: 1.5, md: 2.5 } }}>
       {/* ---------------------------------------------------------------- */}
       {/* Page header                                                       */}
@@ -1638,5 +1644,6 @@ export default function SettingsPage() {
         </Grid>
       </Grid>
     </Box>
+    </Skeleton>
   );
 }

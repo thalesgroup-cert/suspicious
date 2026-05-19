@@ -46,6 +46,7 @@ import {
   RestartAltOutlined,
 } from "@mui/icons-material";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
+import { Skeleton } from "boneyard-js/react";
 import { useNavigate, useSearchParams } from "react-router-dom";
 import { alpha } from "@mui/material/styles";
 import { useTheme } from "@mui/material/styles";
@@ -945,6 +946,11 @@ export default function SubmissionsPage() {
   }
 
   return (
+    <Skeleton
+      name="submissions-page"
+      loading={submissionsQuery.isPending || meQuery.isPending}
+      animate="shimmer"
+    >
     <Box sx={{ p: { xs: 2, md: 3 } }}>
       {/* ------------------------------------------------------------------ */}
       {/* Page header                                                         */}
@@ -1608,5 +1614,6 @@ export default function SubmissionsPage() {
         </DialogActions>
       </Dialog>
     </Box>
+    </Skeleton>
   );
 }

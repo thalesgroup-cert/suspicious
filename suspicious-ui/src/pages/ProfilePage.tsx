@@ -37,6 +37,7 @@ import {
   AccessibilityNewOutlined,
 } from "@mui/icons-material";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
+import { Skeleton } from "boneyard-js/react";
 import { useSnackbar } from "notistack";
 
 import { ThemePicker } from "@/styles/components/ThemePicker";
@@ -691,6 +692,11 @@ export default function ProfilePage() {
   const anyDirty = prefsDirty || themeDirty;
 
   return (
+    <Skeleton
+      name="profile-page"
+      loading={meQuery.isPending || profileQuery.isPending}
+      animate="shimmer"
+    >
     <Box sx={{ p: { xs: 1.5, md: 2.5 }, maxWidth: 1180, mx: "auto" }}>
 
       {/* ── Hero header ───────────────────────────────────────────────────── */}
@@ -902,5 +908,6 @@ export default function ProfilePage() {
         </SoftCard>
       </Box>
     </Box>
+    </Skeleton>
   );
 }
