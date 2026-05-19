@@ -1,48 +1,65 @@
-// src/components/ui/PageLoader.tsx
+// src/styles/components/PageLoader.tsx
+//
+// Rendered as the Suspense fallback while a route chunk is loading
+// (router.tsx) and while ProtectedRoute resolves the auth state.
+// Both fire BEFORE the page component mounts, so they happen earlier
+// than the per-page boneyard <Skeleton> wrappers.
+//
+// Showing a centred spinner there made every navigation feel like a
+// full reload. Instead, render a generic MUI <Skeleton> shell that
+// mimics the app chrome (header bar + a few content cards) so the
+// user sees layout immediately and the real page just fades in.
 
 import * as React from "react";
-import { Box, Card, CardContent, CircularProgress, Stack, Typography } from "@mui/material";
+import { Box, Container, Skeleton, Stack, useTheme } from "@mui/material";
+import { alpha } from "@mui/material/styles";
 
-export default function PageLoader(props: { label?: string }) {
+export default function PageLoader(_props: { label?: string }) {
+  const theme = useTheme();
+  const border = `1px solid ${alpha(theme.palette.divider, 0.4)}`;
+
   return (
-    <Box
-      sx={{
-        minHeight: "100vh",
-        display: "grid",
-        placeItems: "center",
-      }}
-    >
-      <Card
-        sx={{
-          borderRadius: 3,
-          border: "1px solid rgba(255,255,255,.10)",
-          background:
-            "linear-gradient(180deg, rgba(255,255,255,.06), rgba(255,255,255,.03))",
-          px: 3,
-          py: 2,
-        }}
+    <Container maxWidth="xl" sx={{ py: { xs: 2, md: 3 } }}>
+      {/* Header bar */}
+      <Stack
+        direction={{ xs: "column", md: "row" }}
+        spacing={2}
+        sx={{ mb: 3, alignItems: { md: "center" }, justifyContent: "space-between" }}
       >
-        <CardContent>
-          <Stack component="div" spacing={2} sx={{ alignItems: "center" }}>
-            <CircularProgress
-                size={26}
-                sx={{
-                    color: "#38BDF8",
-                }}
-            />
-
-            <Typography
-              sx={{
-                fontSize: 13,
-                fontWeight: 600,
-                color: "text.secondary",
-              }}
-            >
-              {props.label ?? "Loading data…"}
-            </Typography>
+        <Stack direction="row" spacing={1.5} sx={{ alignItems: "center" }}>
+          <Skeleton variant="circular" width={46} height={46} />
+          <Stack spacing={0.5}>
+            <Skeleton variant="rectangular" width={220} height={28} sx={{ borderRadius: 1 }} />
+            <Skeleton variant="rectangular" width={160} height={14} sx={{ borderRadius: 1 }} />
           </Stack>
-        </CardContent>
-      </Card>
-    </Box>
+        </Stack>
+        <Stack direction="row" spacing={1}>
+          <Skeleton variant="rectangular" width={120} height={36} sx={{ borderRadius: 2 }} />
+          <Skeleton variant="rectangular" width={120} height={36} sx={{ borderRadius: 2 }} />
+        </Stack>
+      </Stack>
+
+      {/* Content cards */}
+      <Stack spacing={2}>
+        {[0, 1, 2].map((i) => (
+          <Box
+            key={i}
+            sx={{
+              border,
+              borderRadius: 3,
+              p: 2,
+              background: alpha(theme.palette.background.paper, 0.6),
+            }}
+          >
+            <Stack spacing={1.25}>
+              <Skeleton variant="rectangular" width="35%" height={20} sx={{ borderRadius: 1 }} />
+              <Skeleton variant="rectangular" width="100%" height={14} sx={{ borderRadius: 1 }} />
+              <Skeleton variant="rectangular" width="92%" height={14} sx={{ borderRadius: 1 }} />
+              <Skeleton variant="rectangular" width="78%" height={14} sx={{ borderRadius: 1 }} />
+            </Stack>
+          </Box>
+        ))}
+      </Stack>
+    </Container>
   );
 }
