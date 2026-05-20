@@ -125,7 +125,9 @@ class CaseChallengeToken(models.Model):
             return ""
         if base.endswith("/api"):
             base = base[:-4]
-        return f"{base}/api/cases/{case_id}/challenge?token={token}"
+        # Token in the path, not the query string — keeps it out of the
+        # query-string fields that proxies/APM tools log separately.
+        return f"{base}/api/cases/{case_id}/challenge/{token}/"
 
     @staticmethod
     def normalize_api_base(submissions_url: str) -> str:

@@ -13,6 +13,8 @@ from rest_framework.permissions import IsAuthenticated
 from rest_framework.response import Response
 from rest_framework.views import APIView
 
+from api.permissions.settings import IsAdminOrCERT
+
 from dashboard.models import (
     GroupMonthlyStats,
     MonthlyCasesSummary,
@@ -138,8 +140,13 @@ class TotalCasesStatsListView(generics.ListAPIView):
 
 class UserCasesMonthlyStatsListView(generics.ListAPIView):
     """List per-user monthly stats. month + year are required filters
-    to prevent unbounded scans (e.g. from Power BI imports)."""
-    permission_classes = [IsAuthenticated]
+    to prevent unbounded scans (e.g. from Power BI imports).
+
+    Per-user breakdowns name individual analysts and their case volumes,
+    so access is limited to Admin/CERT — regular reporters only ever see
+    org-wide aggregates, never colleague-level figures.
+    """
+    permission_classes = [IsAdminOrCERT]
     queryset = UserCasesMonthlyStats.objects.select_related("user").all()
     serializer_class = UserCasesMonthlyStatsSerializer
     filter_backends = [DjangoFilterBackend]
@@ -148,7 +155,7 @@ class UserCasesMonthlyStatsListView(generics.ListAPIView):
 
 
 class UserCasesMonthlyStatsDetailView(generics.RetrieveAPIView):
-    permission_classes = [IsAuthenticated]
+    permission_classes = [IsAdminOrCERT]
     queryset = UserCasesMonthlyStats.objects.select_related("user").all()
     serializer_class = UserCasesMonthlyStatsSerializer
 

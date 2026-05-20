@@ -84,7 +84,10 @@ urlpatterns = [
     # Case artifacts
     path("cases/<int:case_id>/download/", DownloadCaseArchiveView.as_view(), name="case-download"),
     path("cases/<int:case_id>/mail-preview.png", MailPreviewView.as_view(), name="case-mail-preview"),
-    path("cases/<int:case_id>/challenge/", CaseChallengeTokenView.as_view(), name="case-challenge"),
+    path("cases/<int:case_id>/challenge/<str:token>/", CaseChallengeTokenView.as_view(), name="case-challenge"),
+    # Legacy query-string form (?token=) — kept so challenge links already
+    # delivered before this change still resolve until they expire.
+    path("cases/<int:case_id>/challenge/", CaseChallengeTokenView.as_view(), name="case-challenge-legacy"),
 
     # Dashboard summary
     path("dashboard/summary/", DashboardSummaryView.as_view(), name="dashboard-summary"),

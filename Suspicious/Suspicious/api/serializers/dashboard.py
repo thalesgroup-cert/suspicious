@@ -115,7 +115,31 @@ class UserCasesMonthlyStatsSerializer(serializers.ModelSerializer):
 
     class Meta:
         model = UserCasesMonthlyStats
-        fields = "__all__"
+        fields = [
+            "id",
+            "user",
+            "month",
+            "year",
+            "total_cases",
+            "suspicious_cases",
+            "inconclusive_cases",
+            "failure_cases",
+            "dangerous_cases",
+            "safe_cases",
+            "challenged_cases",
+            "allow_listed_cases",
+            "uncategorized_cases",
+            "spam_cases",
+            "newsletter_cases",
+            "classic_phishing_cases",
+            "clone_cases",
+            "blackmail_cases",
+            "whaling_cases",
+            "internal_cases",
+            "external_cases",
+            "creation_date",
+            "last_update",
+        ]
 
 class TopPrefixItemSerializer(serializers.Serializer):
     prefix = serializers.CharField()
