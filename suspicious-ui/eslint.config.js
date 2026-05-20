@@ -72,4 +72,13 @@ export default [
       },
     },
   },
+
+  // Route table: exports lazy() route components + the router object by design,
+  // so the fast-refresh "component-only file" rule doesn't apply.
+  {
+    files: ["src/app/router.tsx"],
+    rules: {
+      "react-refresh/only-export-components": "off",
+    },
+  },
 ];
