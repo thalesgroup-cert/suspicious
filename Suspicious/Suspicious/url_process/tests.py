@@ -70,7 +70,7 @@ class URLHandlerTests(TestCase):
         mock_domain_handler.validate_domain.side_effect = ["Url", "Domain"]
 
         # Domain model behavior
-        mock_domain_instance = MockDomain.objects.get_or_create.return_value = (
+        MockDomain.objects.get_or_create.return_value = (
             MagicMock(),
             True,
         )

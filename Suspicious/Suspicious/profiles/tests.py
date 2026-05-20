@@ -89,14 +89,14 @@ class CISOProcessingTests(TestCase):
         self.assertEqual(result[0]["ciso"], "alice")
 
     def test_handle_json_file(self):
-        import io, json
+        import io
+        import json
         data = json.dumps([{"ciso": "alice"}, {"ciso": "bob"}]).encode("utf-8")
         file = io.BytesIO(data)
         result = handle_json_file(file)
         self.assertEqual(result, ["alice", "bob"])
 
     def test_handle_txt_file(self):
-        import io
         file = [b"alice\n", b"bob\n"]
         result = handle_txt_file(file)
         self.assertEqual(result, ["alice", "bob"])

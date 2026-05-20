@@ -1,11 +1,8 @@
 from enum import Enum
-import email
-import html2text
 import numpy as np
 import torch
 from collections import defaultdict
 import tarfile
-import os
 
 class ClassificationName(Enum):
     SAFE = 0

@@ -105,12 +105,6 @@ class APIKeyAdmin(admin.ModelAdmin):
         token = self._get_auth_token(obj)
         return token.expiry if token else None
 
-    def has_view_permission(self, request, obj=None):
-        if obj and not request.user.is_superuser:
-            token = self._get_auth_token(obj)
-            return token is not None and token.user == request.user
-        return True
-
     display_user.short_description = "User"
     display_digest.short_description = "Digest"
     display_created.short_description = "Created"

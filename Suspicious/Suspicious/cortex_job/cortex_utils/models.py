@@ -1,6 +1,5 @@
-from pydantic import BaseModel, Field, HttpUrl
-from typing import Optional, List, Union
-from datetime import datetime
+from pydantic import BaseModel
+from typing import Optional, Union
 
 
 class MailBody(BaseModel):

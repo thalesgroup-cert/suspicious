@@ -1,6 +1,5 @@
 import logging
 from contextlib import contextmanager
-from typing import Generator, Optional
 import json
 from pathlib import Path
 from .models import CronConfig

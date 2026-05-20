@@ -3,7 +3,6 @@ from functools import lru_cache
 from nltk.tokenize import word_tokenize
 from nltk.corpus import stopwords
 from simhash import Simhash
-from .models import TextInputModel
 
 
 class TextProcessor:

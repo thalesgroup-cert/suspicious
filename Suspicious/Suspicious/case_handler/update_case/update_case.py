@@ -2,7 +2,7 @@ from case_handler.models import Case
 from django.db.models import Q
 import logging
 
-from case_handler.update_case.update_score_calculation import calculate_attachment_scores, calculate_artifact_scores, calculate_body_score, calculate_header_score, calculate_file_score, calculate_non_file_ioc_scores, calculate_total_scores, calculate_result_ranges, get_ioc_score
+from case_handler.update_case.update_score_calculation import calculate_attachment_scores, calculate_artifact_scores, calculate_body_score, calculate_header_score, calculate_file_score, calculate_non_file_ioc_scores, calculate_result_ranges, get_ioc_score
 from score_process.score_utils.send_mail.service import MailNotificationService
 update_cases_logger = logging.getLogger('tasp.cron.update_ongoing_case_jobs')
 

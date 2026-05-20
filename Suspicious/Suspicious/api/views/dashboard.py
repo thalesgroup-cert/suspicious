@@ -1,7 +1,5 @@
-from collections import defaultdict
 
 import django_filters
-from django.conf import settings
 from django.core.cache import cache
 from django.db.models import Sum, Value, CharField, F, Case, When
 from django.db.models.functions import Coalesce, Lower, StrIndex, Substr

@@ -1,7 +1,7 @@
 import base64
 import logging
 from urllib.parse import urlparse, urlunparse, parse_qs
-from typing import Optional, Tuple
+from typing import Optional
 from .models import URLDecodeResult
 
 logger = logging.getLogger(__name__)

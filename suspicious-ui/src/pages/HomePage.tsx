@@ -469,6 +469,34 @@ export default function HomePage() {
     },
   });
 
+  // Body alert/caution data-attributes. Declared before any early return so
+  // hook order stays stable across renders; reads query data directly and
+  // self-guards when it is absent.
+  React.useEffect(() => {
+    const home = homeQuery.data;
+    const dangerous = home?.danger_counts?.dangerous ?? 0;
+    const suspicious = home?.danger_counts?.suspicious ?? 0;
+    if (!capabilities.effects.hasAlertStates || !home) {
+      document.body.removeAttribute("data-alert");
+      document.body.removeAttribute("data-caution");
+      return;
+    }
+    if (dangerous > 0) {
+      document.body.dataset.alert = "on";
+      document.body.removeAttribute("data-caution");
+    } else if (suspicious > 0) {
+      document.body.dataset.caution = "on";
+      document.body.removeAttribute("data-alert");
+    } else {
+      document.body.removeAttribute("data-alert");
+      document.body.removeAttribute("data-caution");
+    }
+    return () => {
+      document.body.removeAttribute("data-alert");
+      document.body.removeAttribute("data-caution");
+    };
+  }, [capabilities.effects.hasAlertStates, homeQuery.data]);
+
   if (meQuery.isLoading) {
     return (
       <Box sx={{ minHeight: "100vh", display: "grid", placeItems: "center" }}>
@@ -502,28 +530,6 @@ export default function HomePage() {
     suspicious: home?.danger_counts?.suspicious ?? 0,
     dangerous: home?.danger_counts?.dangerous ?? 0,
   };
-
-  React.useEffect(() => {
-    if (!capabilities.effects.hasAlertStates || !home) {
-      document.body.removeAttribute("data-alert");
-      document.body.removeAttribute("data-caution");
-      return;
-    }
-    if (danger.dangerous > 0) {
-      document.body.dataset.alert   = "on";
-      document.body.removeAttribute("data-caution");
-    } else if (danger.suspicious > 0) {
-      document.body.dataset.caution = "on";
-      document.body.removeAttribute("data-alert");
-    } else {
-      document.body.removeAttribute("data-alert");
-      document.body.removeAttribute("data-caution");
-    }
-    return () => {
-      document.body.removeAttribute("data-alert");
-      document.body.removeAttribute("data-caution");
-    };
-  }, [capabilities.effects.hasAlertStates, danger.dangerous, danger.suspicious, home]);
 
   const donut = (DANGER_ORDER as readonly DangerLabel[])
     .map(label => {

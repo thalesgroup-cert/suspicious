@@ -1,7 +1,6 @@
 from django.conf import settings
 from django.db import models
 from django.utils.translation import gettext_lazy as _
-from django.contrib.auth.models import User
 from knox.models import AuthToken
 
 DEFAULT_SEMANTIC_COLORS = {

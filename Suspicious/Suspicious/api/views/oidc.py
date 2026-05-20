@@ -335,7 +335,7 @@ class OIDCCallbackView(APIView):
 
         # ── Issue Knox token ─────────────────────────────────────────────
         token_instance, knox_token = AuthToken.objects.create(user=user)
-        expiry_iso = (
+        (
             token_instance.expiry.isoformat() if token_instance.expiry else ""
         )
 

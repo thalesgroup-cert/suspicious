@@ -2,7 +2,7 @@ from unittest.mock import MagicMock, patch
 from django.test import TestCase
 from django.contrib.auth import get_user_model
 from cortex_job.cortex_utils.cortex_and_job_management import CortexJob
-from cortex_job.models import Analyzer, AnalyzerReport, CaseAnalyzerJob
+from cortex_job.models import AnalyzerReport, CaseAnalyzerJob
 from case_handler.models import Case
 from ip_process.models import IP
 

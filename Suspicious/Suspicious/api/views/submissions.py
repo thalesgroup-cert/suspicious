@@ -214,16 +214,24 @@ class SubmissionDetailsView(RetrieveAPIView):
                             and artifact.artifactIsMailAddress.mail_address_id):
                         artifact_mail_address_ids.append(artifact.artifactIsMailAddress.mail_address_id)
 
-                if artifact_url_ids:          filters |= Q(url_id__in=artifact_url_ids)
-                if artifact_ip_ids:           filters |= Q(ip_id__in=artifact_ip_ids)
-                if artifact_hash_ids:         filters |= Q(hash_id__in=artifact_hash_ids)
-                if artifact_domain_ids:       filters |= Q(domain_id__in=artifact_domain_ids)
-                if artifact_mail_address_ids: filters |= Q(mail_id__in=artifact_mail_address_ids)
+                if artifact_url_ids:
+                    filters |= Q(url_id__in=artifact_url_ids)
+                if artifact_ip_ids:
+                    filters |= Q(ip_id__in=artifact_ip_ids)
+                if artifact_hash_ids:
+                    filters |= Q(hash_id__in=artifact_hash_ids)
+                if artifact_domain_ids:
+                    filters |= Q(domain_id__in=artifact_domain_ids)
+                if artifact_mail_address_ids:
+                    filters |= Q(mail_id__in=artifact_mail_address_ids)
 
         if obj.nonFileIocs_id and linked_non_file_iocs is not None:
-            if linked_non_file_iocs.url_id:  filters |= Q(url_id=linked_non_file_iocs.url_id)
-            if linked_non_file_iocs.ip_id:   filters |= Q(ip_id=linked_non_file_iocs.ip_id)
-            if linked_non_file_iocs.hash_id: filters |= Q(hash_id=linked_non_file_iocs.hash_id)
+            if linked_non_file_iocs.url_id:
+                filters |= Q(url_id=linked_non_file_iocs.url_id)
+            if linked_non_file_iocs.ip_id:
+                filters |= Q(ip_id=linked_non_file_iocs.ip_id)
+            if linked_non_file_iocs.hash_id:
+                filters |= Q(hash_id=linked_non_file_iocs.hash_id)
 
         if not filters.children:
             return []

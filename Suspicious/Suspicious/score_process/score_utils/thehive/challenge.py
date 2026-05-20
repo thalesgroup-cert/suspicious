@@ -9,7 +9,7 @@ import smtplib
 from email.mime.text import MIMEText
 from email.mime.multipart import MIMEMultipart
 from jinja2 import Environment, FileSystemLoader, select_autoescape
-from mail_feeder.models import Mail, MailArtifact, MailAttachment
+from mail_feeder.models import Mail
 
 from .utils import generate_ref, build_mail_attachments_paths
 from score_process.score_utils.send_mail.social_logos import SOCIAL_LOGOS

@@ -184,7 +184,8 @@ class TestAddAttachmentsToItem(unittest.TestCase):
 
     def test_posts_attachment_successfully(self):
         from score_process.score_utils.thehive.phishing import add_attachments_to_item
-        import tempfile, os
+        import tempfile
+        import os
 
         with tempfile.NamedTemporaryFile(delete=False, suffix=".txt") as f:
             f.write(b"test content")
@@ -202,7 +203,8 @@ class TestAddAttachmentsToItem(unittest.TestCase):
 
     def test_stops_on_circuit_breaker_open(self):
         from score_process.score_utils.thehive.phishing import add_attachments_to_item
-        import tempfile, os
+        import tempfile
+        import os
 
         # Create two temp files — only one POST should be attempted before breaker stops loop
         paths = []

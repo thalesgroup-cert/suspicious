@@ -1,5 +1,4 @@
 from django.db import models
-from django.utils.translation import gettext_lazy as _
 from file_process.models import File
 from mail_feeder.models import MailBody, MailHeader
 from ip_process.models import IP

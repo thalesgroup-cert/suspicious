@@ -3,7 +3,6 @@ import json
 import logging
 import tempfile
 import zipfile
-from typing import Iterator
 
 from django.http import FileResponse
 from rest_framework.exceptions import APIException, NotFound

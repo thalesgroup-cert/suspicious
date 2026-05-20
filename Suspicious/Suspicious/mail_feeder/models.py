@@ -6,7 +6,6 @@ from ip_process.models import IP
 from domain_process.models import Domain
 from email_process.models import MailAddress
 from file_process.models import File
-from django.utils.translation import gettext_lazy as _
 
 class Mail(models.Model):
     subject = models.CharField(max_length=255, db_index=True)

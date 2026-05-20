@@ -1,7 +1,9 @@
 import logging
+from typing import List, Optional
+
 from cortex4py.api import Api
 from models import CortexJobRequest, Analyzer, AnalyzerReport, CortexJobData
-from utils import load_config, fetch_mail_logger
+from utils import fetch_mail_logger
 
 logger = logging.getLogger(__name__)
 

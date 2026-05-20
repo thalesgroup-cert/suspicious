@@ -1,6 +1,6 @@
 import logging
 from django.db import transaction
-from typing import List, Optional
+from typing import List
 
 from .models import ArtifactModel, ConfigModel
 from .utils import extract_url_info

@@ -3,7 +3,6 @@
 Analyzer factory — maps analyzer names to implementation classes.
 """
 import logging
-from typing import Optional
 
 from .utils import normalize_analyzer_name
 from .models import AnalyzerResult
