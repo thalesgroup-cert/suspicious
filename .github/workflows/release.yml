@@ -34,9 +34,6 @@ jobs:
           - name: suspicious-feeder
             context: ./email-feeder
             image: ghcr.io/thalesgroup-cert/suspicious-feeder
-          - name: suspicious-aimailanalyzer
-            context: ./Analyzers/AIMailAnalyzer
-            image: ghcr.io/thalesgroup-cert/suspicious-aimailanalyzer
     steps:
       - uses: actions/checkout@v4
 
