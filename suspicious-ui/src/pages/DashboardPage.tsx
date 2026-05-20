@@ -379,9 +379,13 @@ export default function DashboardPage() {
     loadLayoutsFromStorage(storageKey)
   );
 
-  React.useEffect(() => {
+  // Reload persisted layouts when the storage key (user) changes — adjusted
+  // during render rather than in an effect.
+  const [prevStorageKey, setPrevStorageKey] = React.useState(storageKey);
+  if (storageKey !== prevStorageKey) {
+    setPrevStorageKey(storageKey);
     setLayouts(loadLayoutsFromStorage(storageKey));
-  }, [storageKey]);
+  }
 
   const summaryQuery = useQuery<DashboardSummary>({
     queryKey: ["dashboardSummary", month, year, effectiveScope],
@@ -443,7 +447,7 @@ export default function DashboardPage() {
   const openTrends = React.useCallback((metric?: string) => {
     setSelectedMetric(metric);
     setOpenKpiTrends(true);
-  }, []);
+  }, [setSelectedMetric, setOpenKpiTrends]);
 
   const handleLayoutsChange = React.useCallback(
     (_currentLayout: Layout, allLayouts: Partial<Record<string, Layout>>) => {

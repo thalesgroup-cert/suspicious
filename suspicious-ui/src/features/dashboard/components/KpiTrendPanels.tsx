@@ -68,7 +68,7 @@ function TrendIcon(props: { values: Array<number | null> }) {
     [props.values]
   );
 
-  let icon: React.ReactNode = null;
+  let icon: React.ReactNode;
   let color: string = theme.palette.text.disabled;
 
   if (typeof prev !== "number" || typeof last !== "number") {

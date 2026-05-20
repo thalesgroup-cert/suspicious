@@ -755,31 +755,68 @@ export default function InvestigationPage() {
     },
   });
 
-  React.useEffect(() => {
+  // Deep-link URL sync (?q, ?open) — adjusted during render, runs on mount
+  // and whenever the params change.
+  const urlSyncKey = `${searchParams.get("q") ?? ""}|${searchParams.get("open") ?? ""}`;
+  const [prevUrlSyncKey, setPrevUrlSyncKey] = React.useState<string | null>(null);
+  if (urlSyncKey !== prevUrlSyncKey) {
+    setPrevUrlSyncKey(urlSyncKey);
     const urlQ = searchParams.get("q") ?? "";
-    const open = searchParams.get("open");
     if (urlQ) setQ(urlQ);
+    const open = searchParams.get("open");
     if (open) {
       const idNum = Number(open);
       if (Number.isFinite(idNum)) { setSelectedId(idNum); setOpenDrawer(true); }
     }
-  }, [searchParams]);
+  }
 
-  React.useEffect(() => { setPage(0); }, [qDebounced, status, type, result, from, to, sort, pageSize]);
-  React.useEffect(() => { if (!openDrawer) { setExpandedAnalyzerIds({}); setExpandedGroups({}); } }, [openDrawer]);
-  React.useEffect(() => { setExpandedAnalyzerIds({}); setExpandedGroups({}); }, [selectedId]);
-  React.useEffect(() => { setExpandedAnalyzerIds({}); }, [detailsQuery.data?.analyzer_reports]);
-  React.useEffect(() => { setEditMode(false); editMutation.reset(); }, [selectedIdNum]); // eslint-disable-line react-hooks/exhaustive-deps
+  // Reset to first page when any filter/sort changes.
+  const filterKey = [qDebounced, status, type, result, from, to, sort, pageSize].join("|");
+  const [prevFilterKey, setPrevFilterKey] = React.useState(filterKey);
+  if (filterKey !== prevFilterKey) { setPrevFilterKey(filterKey); setPage(0); }
 
-  React.useEffect(() => {
-    if (!openDrawer || !detailsQuery.data || editMode) return;
-    const score = pickScore(detailsQuery.data);
-    const confidence = pickConfidence(detailsQuery.data);
-    const classification = pickClassification(detailsQuery.data);
-    setEditScore(score == null ? "" : String(score));
-    setEditConfidence(confidence == null ? "" : String(confidence));
-    setEditClassification(String(classification).toUpperCase());
-  }, [openDrawer, detailsQuery.data, editMode]);
+  // Collapse expansion when the drawer closes.
+  const [prevOpenDrawer, setPrevOpenDrawer] = React.useState(openDrawer);
+  if (openDrawer !== prevOpenDrawer) {
+    setPrevOpenDrawer(openDrawer);
+    if (!openDrawer) { setExpandedAnalyzerIds({}); setExpandedGroups({}); }
+  }
+
+  // Collapse expansion when the selected item changes.
+  const [prevSelectedId, setPrevSelectedId] = React.useState(selectedId);
+  if (selectedId !== prevSelectedId) {
+    setPrevSelectedId(selectedId);
+    setExpandedAnalyzerIds({});
+    setExpandedGroups({});
+  }
+
+  // Collapse analyzer rows when a fresh set of reports arrives.
+  const reportsRef = detailsQuery.data?.analyzer_reports;
+  const [prevReportsRef, setPrevReportsRef] = React.useState(reportsRef);
+  if (reportsRef !== prevReportsRef) { setPrevReportsRef(reportsRef); setExpandedAnalyzerIds({}); }
+
+  // Leave edit mode + clear the mutation when switching to another case.
+  const [prevSelectedIdNum, setPrevSelectedIdNum] = React.useState(selectedIdNum);
+  if (selectedIdNum !== prevSelectedIdNum) {
+    setPrevSelectedIdNum(selectedIdNum);
+    setEditMode(false);
+    editMutation.reset();
+  }
+
+  // Seed the edit form from fetched details (unless actively editing).
+  const editSeedKey = `${openDrawer}|${detailsQuery.dataUpdatedAt}|${editMode}`;
+  const [prevEditSeedKey, setPrevEditSeedKey] = React.useState<string | null>(null);
+  if (editSeedKey !== prevEditSeedKey) {
+    setPrevEditSeedKey(editSeedKey);
+    if (openDrawer && detailsQuery.data && !editMode) {
+      const score = pickScore(detailsQuery.data);
+      const confidence = pickConfidence(detailsQuery.data);
+      const classification = pickClassification(detailsQuery.data);
+      setEditScore(score == null ? "" : String(score));
+      setEditConfidence(confidence == null ? "" : String(confidence));
+      setEditClassification(String(classification).toUpperCase());
+    }
+  }
 
   const rows = investigationsQuery.data?.results ?? [];
   const total = investigationsQuery.data?.count ?? 0;
@@ -796,7 +833,10 @@ export default function InvestigationPage() {
   const currentConfidence = pickConfidence(detailsQuery.data);
   const currentClassification = pickClassification(detailsQuery.data);
 
-  const analyzerReports = detailsQuery.data?.analyzer_reports ?? [];
+  const analyzerReports = React.useMemo(
+    () => detailsQuery.data?.analyzer_reports ?? [],
+    [detailsQuery.data]
+  );
   const reportGroups = React.useMemo(
     () => groupReportsByArtifact(analyzerReports),
     [analyzerReports]

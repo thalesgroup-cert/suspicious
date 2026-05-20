@@ -843,10 +843,15 @@ export default function SubmissionsPage() {
     onSuccess: () => setChallengeId(null),
   });
 
-  React.useEffect(() => {
+  // Sync from deep-link URL params (?q, ?open) on first render and whenever
+  // they change — adjusted during render instead of in an effect.
+  const urlSyncKey = `${searchParams.get("q") ?? ""}|${searchParams.get("open") ?? ""}`;
+  const [prevUrlSyncKey, setPrevUrlSyncKey] = React.useState<string | null>(null);
+  if (urlSyncKey !== prevUrlSyncKey) {
+    setPrevUrlSyncKey(urlSyncKey);
     const urlQ = searchParams.get("q") ?? "";
-    const open = searchParams.get("open");
     if (urlQ) setQ(urlQ);
+    const open = searchParams.get("open");
     if (open) {
       const idNum = Number(open);
       if (!Number.isNaN(idNum)) {
@@ -854,14 +859,46 @@ export default function SubmissionsPage() {
         setOpenDrawer(true);
       }
     }
-  }, [searchParams]);
+  }
 
-  React.useEffect(() => { setPage(0); }, [qDebounced, status, type, result, from, to, sort, sortField, sortDir, pageSize]);
-  React.useEffect(() => { if (!openDrawer) { setExpandedAnalyzerIds({}); setExpandedGroups({}); } }, [openDrawer]);
-  React.useEffect(() => { setExpandedAnalyzerIds({}); setExpandedGroups({}); }, [selectedId]);
-  React.useEffect(() => { setExpandedAnalyzerIds({}); }, [detailsQuery.data?.analyzer_reports]);
+  // Reset to first page when any filter/sort changes.
+  const filterKey = [qDebounced, status, type, result, from, to, sort, sortField, sortDir, pageSize].join("|");
+  const [prevFilterKey, setPrevFilterKey] = React.useState(filterKey);
+  if (filterKey !== prevFilterKey) {
+    setPrevFilterKey(filterKey);
+    setPage(0);
+  }
 
-  const rows = submissionsQuery.data?.results ?? [];
+  // Collapse expansion when the drawer closes.
+  const [prevOpenDrawer, setPrevOpenDrawer] = React.useState(openDrawer);
+  if (openDrawer !== prevOpenDrawer) {
+    setPrevOpenDrawer(openDrawer);
+    if (!openDrawer) {
+      setExpandedAnalyzerIds({});
+      setExpandedGroups({});
+    }
+  }
+
+  // Collapse expansion when the selected item changes.
+  const [prevSelectedId, setPrevSelectedId] = React.useState(selectedId);
+  if (selectedId !== prevSelectedId) {
+    setPrevSelectedId(selectedId);
+    setExpandedAnalyzerIds({});
+    setExpandedGroups({});
+  }
+
+  // Collapse analyzer rows when a fresh set of reports arrives.
+  const reportsRef = detailsQuery.data?.analyzer_reports;
+  const [prevReportsRef, setPrevReportsRef] = React.useState(reportsRef);
+  if (reportsRef !== prevReportsRef) {
+    setPrevReportsRef(reportsRef);
+    setExpandedAnalyzerIds({});
+  }
+
+  const rows = React.useMemo(
+    () => submissionsQuery.data?.results ?? [],
+    [submissionsQuery.data]
+  );
   // Client-side sort for artifact/type fields (not supported by backend ordering)
   const clientSorted = React.useMemo(() => {
     if (sortField !== "artifact" && sortField !== "type") return rows;
@@ -892,7 +929,10 @@ export default function SubmissionsPage() {
   const BADGE_W = 132;
   const DIALOG_RADIUS = 2;
 
-  const analyzerReports = detailsQuery.data?.analyzer_reports ?? [];
+  const analyzerReports = React.useMemo(
+    () => detailsQuery.data?.analyzer_reports ?? [],
+    [detailsQuery.data]
+  );
   const hasRawDetails = typeof detailsQuery.data?.raw !== "undefined";
 
   // Group reports by artifact so the drawer shows one section per checked item

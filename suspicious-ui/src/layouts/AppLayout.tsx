@@ -613,9 +613,20 @@ export default function AppLayout() {
     catch { /* localStorage blocked in this env */ }
   }, [pinned]);
 
-  // Close mobile drawer on navigation
-  React.useEffect(() => { setMobileOpen(false); }, [location.pathname]);
-  React.useEffect(() => { if (!isDesktop) setHovered(false); }, [isDesktop]);
+  // Close mobile drawer on navigation — adjusted during render via prev-value
+  // compare instead of an effect.
+  const [prevPathname, setPrevPathname] = React.useState(location.pathname);
+  if (location.pathname !== prevPathname) {
+    setPrevPathname(location.pathname);
+    setMobileOpen(false);
+  }
+
+  // Clear hover state when leaving the desktop breakpoint.
+  const [prevIsDesktop, setPrevIsDesktop] = React.useState(isDesktop);
+  if (isDesktop !== prevIsDesktop) {
+    setPrevIsDesktop(isDesktop);
+    if (!isDesktop) setHovered(false);
+  }
 
   // Filtered nav items
   const primaryItems   = React.useMemo(() => filterItems(PRIMARY_NAV,   isElevated), [isElevated]);

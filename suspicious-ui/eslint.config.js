@@ -73,10 +73,11 @@ export default [
     },
   },
 
-  // Route table: exports lazy() route components + the router object by design,
-  // so the fast-refresh "component-only file" rule doesn't apply.
+  // Modules that intentionally export more than components (route table;
+  // theme provider + hooks + constants), so the fast-refresh "component-only
+  // file" rule doesn't apply.
   {
-    files: ["src/app/router.tsx"],
+    files: ["src/app/router.tsx", "src/styles/ThemeStore.tsx"],
     rules: {
       "react-refresh/only-export-components": "off",
     },
