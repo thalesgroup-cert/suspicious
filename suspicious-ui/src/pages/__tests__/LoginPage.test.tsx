@@ -58,7 +58,7 @@ describe("LoginPage", () => {
 
     await revealPasswordForm(user);
     expect(screen.getByLabelText(/username/i)).toBeInTheDocument();
-    expect(screen.getByLabelText(/^password$/i)).toBeInTheDocument();
+    expect(screen.getByLabelText(/^password/i)).toBeInTheDocument();
   });
 
   it("submit button is disabled when fields are empty", async () => {
@@ -78,7 +78,7 @@ describe("LoginPage", () => {
     await revealPasswordForm(user);
 
     await user.type(screen.getByLabelText(/username/i), "alice");
-    await user.type(screen.getByLabelText(/^password$/i), "secret");
+    await user.type(screen.getByLabelText(/^password/i), "secret");
 
     const submitBtn = screen.getByRole("button", { name: "Sign in" });
     expect(submitBtn).not.toBeDisabled();
@@ -97,7 +97,7 @@ describe("LoginPage", () => {
     await revealPasswordForm(user);
 
     await user.type(screen.getByLabelText(/username/i), "alice");
-    await user.type(screen.getByLabelText(/^password$/i), "secret");
+    await user.type(screen.getByLabelText(/^password/i), "secret");
     await user.click(screen.getByRole("button", { name: "Sign in" }));
 
     await waitFor(() =>
@@ -116,7 +116,7 @@ describe("LoginPage", () => {
     await revealPasswordForm(user);
 
     await user.type(screen.getByLabelText(/username/i), "alice");
-    await user.type(screen.getByLabelText(/^password$/i), "wrong");
+    await user.type(screen.getByLabelText(/^password/i), "wrong");
     await user.click(screen.getByRole("button", { name: "Sign in" }));
 
     await waitFor(() =>
