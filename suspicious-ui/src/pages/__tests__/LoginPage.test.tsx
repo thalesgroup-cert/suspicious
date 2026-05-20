@@ -119,8 +119,9 @@ describe("LoginPage", () => {
     await user.type(screen.getByLabelText(/^password/i), "wrong");
     await user.click(screen.getByRole("button", { name: "Sign in" }));
 
+    // LoginPage surfaces a generic credential-failure message, not the raw API detail.
     await waitFor(() =>
-      expect(screen.getByText(/invalid credentials/i)).toBeInTheDocument()
+      expect(screen.getByText(/check your credentials/i)).toBeInTheDocument()
     );
   });
 
