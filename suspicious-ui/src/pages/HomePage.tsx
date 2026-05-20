@@ -31,7 +31,7 @@ import {
   OpenInNewOutlined,
   PublicOutlined,
   RocketLaunchOutlined,
-  ShieldOutlined,
+  LeaderboardOutlined,
   UploadFileOutlined,
   DonutLargeOutlined,
   HistoryOutlined,
@@ -548,6 +548,23 @@ export default function HomePage() {
 
   const recent = recentQuery.data ?? [];
 
+  // Scope-pulse derived values. donutTotal = the user's personal submission
+  // total this month (sum of their danger_counts). For a CISO the meaningful
+  // numerator is the scope volume; for everyone else it is their own.
+  const orgCount = everyoneCount;
+  const myCount = donutTotal;
+  const shareNumerator = isCiso ? scopeCount : myCount;
+  const sharePct = orgCount > 0 ? Math.round((shareNumerator / orgCount) * 100) : 0;
+  const scopeDanger: Required<DangerCounts> | null = home?.scope_danger_counts
+    ? {
+        safe: home.scope_danger_counts.safe ?? 0,
+        inconclusive: home.scope_danger_counts.inconclusive ?? 0,
+        suspicious: home.scope_danger_counts.suspicious ?? 0,
+        dangerous: home.scope_danger_counts.dangerous ?? 0,
+      }
+    : null;
+  const showScopeVerdicts = isCiso && scopeDanger !== null;
+
   return (
     <Box sx={{ px: { xs: 2, md: 3 }, pb: 8, pt: 0 }}>
       <Box sx={{ maxWidth: 1280, mx: "auto" }}>
@@ -774,12 +791,12 @@ export default function HomePage() {
           </Grid>
 
           {/* -------------------------------------------------------------- */}
-          {/* Snapshot                                                        */}
+          {/* Scope health (CISO) / Your monthly share (everyone else)        */}
           {/* -------------------------------------------------------------- */}
           <Grid size={{ xs: 12, md: 5 }}>
             <DashboardCard
-              title="Snapshot"
-              icon={<ShieldOutlined />}
+              title={isCiso ? "Scope health" : "Your monthly share"}
+              icon={<LeaderboardOutlined />}
               className={[
                 cardClass
               ].filter(Boolean).join(" ") || undefined}
@@ -791,9 +808,9 @@ export default function HomePage() {
                 />
               }
             >
-              <Stack spacing={0.75}>
+              <Stack spacing={1}>
                 <Typography variant="caption" color="text.secondary" sx={{ mt: -0.5 }}>
-                  Month-to-date volume
+                  Month-to-date share
                 </Typography>
 
                 {isCiso ? (
@@ -802,22 +819,120 @@ export default function HomePage() {
                     <Typography component="span" color="text.primary" sx={{ fontWeight: 950 }} >
                       ({scopeLabel ?? "N/A"})
                     </Typography>{" "}
-                    published{" "}
+                    ran{" "}
                     <Typography component="span" color="text.primary" sx={{ fontWeight: 950 }} >
                       {scopeCount}
                     </Typography>{" "}
-                    items.
+                    of{" "}
+                    <Typography component="span" color="text.primary" sx={{ fontWeight: 950 }} >
+                      {orgCount}
+                    </Typography>{" "}
+                    org cases.
                   </Typography>
                 ) : (
                   <Typography color="text.secondary">
-                    Everyone published{" "}
+                    You ran{" "}
                     <Typography component="span" color="text.primary" sx={{ fontWeight: 950 }} >
-                      {everyoneCount}
+                      {myCount}
                     </Typography>{" "}
-                    items.
+                    of{" "}
+                    <Typography component="span" color="text.primary" sx={{ fontWeight: 950 }} >
+                      {orgCount}
+                    </Typography>{" "}
+                    org cases.
                   </Typography>
                 )}
+
+                {/* Proportion bar — scope (or personal) volume vs the org. */}
+                <Box>
+                  <Box
+                    sx={{
+                      height: 8,
+                      borderRadius: 99,
+                      bgcolor: alpha(theme.palette.divider, 0.4),
+                      overflow: "hidden",
+                    }}
+                  >
+                    <Box
+                      sx={{
+                        width: `${Math.min(100, sharePct)}%`,
+                        height: "100%",
+                        borderRadius: 99,
+                        background: `linear-gradient(90deg, ${theme.palette.primary.main}, ${alpha(
+                          theme.palette.primary.main,
+                          0.65
+                        )})`,
+                        transition: "width .6s cubic-bezier(.4,0,.2,1)",
+                      }}
+                    />
+                  </Box>
+                  <Stack
+                    direction="row"
+                    sx={{ justifyContent: "space-between", mt: 0.5 }}
+                  >
+                    <Typography variant="caption" sx={{ fontWeight: 800 }}>
+                      {sharePct}% {isCiso ? "in scope" : "yours"}
+                    </Typography>
+                    <Typography variant="caption" color="text.secondary">
+                      {orgCount} org-wide
+                    </Typography>
+                  </Stack>
+                </Box>
               </Stack>
+
+              {/* Scope verdict strip — CISO only. Uses scope_danger_counts,
+                  which is distinct from the personal donut on the left card. */}
+              {showScopeVerdicts ? (
+                <>
+                  <Divider sx={{ opacity: 0.25, my: 1.5 }} />
+                  <Typography variant="caption" color="text.secondary">
+                    Scope verdicts this month
+                  </Typography>
+                  <Stack
+                    direction="row"
+                    spacing={0.75}
+                    sx={{ flexWrap: "wrap", gap: 0.75, mt: 0.75 }}
+                  >
+                    {(DANGER_ORDER as readonly DangerLabel[]).map((label) => {
+                      const key = label.toLowerCase() as keyof DangerCounts;
+                      const value = scopeDanger![key] ?? 0;
+                      return (
+                        <Stack
+                          key={label}
+                          direction="row"
+                          spacing={0.6}
+                          sx={{
+                            alignItems: "center",
+                            px: 1,
+                            py: 0.4,
+                            borderRadius: 2,
+                            border: `1px solid ${alpha(
+                              theme.palette.divider,
+                              theme.palette.mode === "dark" ? 0.3 : 0.8
+                            )}`,
+                          }}
+                        >
+                          <Box
+                            aria-hidden
+                            sx={{
+                              width: 9,
+                              height: 9,
+                              borderRadius: 99,
+                              backgroundColor: dangerColors[label],
+                            }}
+                          />
+                          <Typography variant="caption" color="text.secondary">
+                            {label}
+                          </Typography>
+                          <Typography variant="caption" sx={{ fontWeight: 900 }}>
+                            {value}
+                          </Typography>
+                        </Stack>
+                      );
+                    })}
+                  </Stack>
+                </>
+              ) : null}
 
               {home?.spotlight ? (
                 <>
