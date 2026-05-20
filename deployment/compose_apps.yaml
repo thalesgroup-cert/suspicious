@@ -78,6 +78,13 @@ services:
       - "127.0.0.1:${SUSPICIOUS_UI_PORT:-9021}:80"
     environment:
       no_proxy: "${NO_PROXY:-},suspicious"
+    # Runtime SPA config. The container entrypoint reads these VITE_* env
+    # vars at startup and writes them into window.__ENV__ (no rebuild needed).
+    # They come from suspicious-ui/.env; missing file is tolerated (defaults
+    # apply). Copy suspicious-ui/.env.example -> suspicious-ui/.env to set them.
+    env_file:
+      - path: ../suspicious-ui/.env
+        required: false
     networks:
       - suspicious_network
       - reverse_network
@@ -118,6 +125,7 @@ services:
     command: python3 main.py
     volumes:
       - "${FEEDER_PATH}/application.log:/app/application.log"
+      - "${FEEDER_PATH}/config.json:/app/config.json:ro"
       - "${CA_PATH}/certfile.pem:/etc/private/certfile.pem:ro"
       - "${CA_PATH}/keyfile.pem:/etc/private/keyfile.pem:ro"
       - "${CA_PATH}/rootcafile.pem:/etc/private/rootcafile.pem:ro"

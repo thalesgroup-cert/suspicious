@@ -15,16 +15,6 @@ vi.mock("@/api/auth", () => ({
   hydrateAppearanceFromMe: vi.fn(),
 }));
 
-vi.mock("@/styles/ThemeStore", () => ({
-  default: ({ children }: { children: React.ReactNode }) => children,
-  useThemeStore: () => ({ mode: "light", setMode: vi.fn() }),
-}));
-
-vi.mock("@/styles/colorStore", () => ({
-  useColorStore: () => ({ hydrateColors: vi.fn(), result: {}, status: {} }),
-  colorStore: { getState: () => ({ hydrateColors: vi.fn() }) },
-}));
-
 // api.post / api.get used for submissions and config
 vi.mock("@/api/client", () => ({
   api: {

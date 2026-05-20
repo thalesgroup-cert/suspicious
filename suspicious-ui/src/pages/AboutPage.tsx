@@ -1,5 +1,6 @@
 // src/pages/AboutPage.tsx
 import * as React from "react";
+import { env } from "@/lib/runtimeEnv";
 import {
   Alert,
   Box,
@@ -445,8 +446,7 @@ export default function AboutPage() {
   const theme = useTheme();
   const isDark = theme.palette.mode === "dark";
 
-  const suspiciousEmail =
-    (import.meta.env.VITE_SUSPICIOUS_EMAIL as string | undefined) ?? "security@example.com";
+  const suspiciousEmail = env("VITE_SUSPICIOUS_EMAIL") ?? "security@example.com";
 
   return (
     <Container maxWidth="lg" sx={{ py: { xs: 2.5, md: 4 }, pb: 8 }}>

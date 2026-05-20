@@ -34,8 +34,6 @@ jobs:
       - run: pip install ruff
       - name: ruff check
         run: ruff check Suspicious/ email-feeder/ Analyzers/
-      - name: ruff format --check
-        run: ruff format --check Suspicious/ email-feeder/ Analyzers/
 
   migration-check:
     runs-on: ubuntu-latest

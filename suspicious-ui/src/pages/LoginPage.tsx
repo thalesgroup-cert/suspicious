@@ -34,14 +34,15 @@ import {
   type Variants,
 } from "framer-motion";
 import { getMe, login, hydrateColorsAfterSso } from "@/api/auth";
+import { env } from "@/lib/runtimeEnv";
 
 // ─── Env ────────────────────────────────────────────────────────────────────
 
-const COMPANY_NAME        = import.meta.env.VITE_COMPANY_NAME        ?? "Company";
-const COMPANY_LINK        = import.meta.env.VITE_COMPANY_LINK        ?? "/";
-const COMPANY_LOGO_BASE64 = import.meta.env.VITE_COMPANY_LOGO_BASE64 as string | undefined;
-const COMPANY_LOGO_URL    = import.meta.env.VITE_COMPANY_LOGO_URL    as string | undefined;
-const SUPPORT_EMAIL       = import.meta.env.VITE_SUPPORT_EMAIL       ?? "support@company.com";
+const COMPANY_NAME        = env("VITE_COMPANY_NAME")        ?? "Company";
+const COMPANY_LINK        = env("VITE_COMPANY_LINK")        ?? "/";
+const COMPANY_LOGO_BASE64 = env("VITE_COMPANY_LOGO_BASE64");
+const COMPANY_LOGO_URL    = env("VITE_COMPANY_LOGO_URL");
+const SUPPORT_EMAIL       = env("VITE_SUPPORT_EMAIL")       ?? "support@company.com";
 
 const MotionBox = motion(Box);
 

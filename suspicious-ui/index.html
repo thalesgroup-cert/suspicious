@@ -4,6 +4,9 @@
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <title>Suspicious - App</title>
+    <!-- Runtime config: populated per-deployment by the container entrypoint.
+         Must load before the app module so window.__ENV__ is set first. -->
+    <script src="/env-config.js"></script>
   </head>
   <body>
     <div id="root"></div>
