@@ -201,8 +201,8 @@ plus Dependabot live under `.github/`.
 
 | Workflow | Trigger | What it does |
 |---|---|---|
-| `ci.yml` | PR + push to `main` | Conventional-commit lint, `ruff` lint, migration-drift check, full Django test suite, email-feeder unittest, frontend (eslint + tsc + vitest browser mode + build), and a no-push build of all four images. |
-| `release.yml` | push to `main`, tags `v*` | Builds and pushes all four images to GHCR, generates an SPDX SBOM (syft) and a build-provenance attestation per image. |
+| `ci.yml` | PR to `main`, push to `main` + `test` | Conventional-commit lint, `ruff` lint, migration-drift check, full Django test suite, email-feeder unittest, frontend (eslint + tsc + vitest browser mode + build), and a no-push build of all four images. |
+| `release.yml` | push to `main` + `test`, tags `v*` | Builds and pushes all four images to GHCR with SPDX SBOM (syft) + provenance attestation. `main` → `latest` + `sha-<sha>`; `test` → `test` (staging); `v*` → semver tags. |
 | `codeql.yml` | PR + push to `main`, weekly | CodeQL static analysis for Python and JavaScript/TypeScript. |
 | `security.yml` | PR, weekly | Trivy filesystem scan, gitleaks secret scan, `pip-audit` (×3 requirements), `npm audit`. |
 | `dependabot.yml` | weekly | Dependency updates: pip (×3), npm, docker (×4), github-actions. |
