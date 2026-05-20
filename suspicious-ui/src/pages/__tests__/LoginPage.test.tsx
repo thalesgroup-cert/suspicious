@@ -30,6 +30,17 @@ function renderLogin(initialPath = "/login") {
   return renderWithProviders(<LoginPage />, { initialPath });
 }
 
+// The username/password form is disclosed behind a button; SSO is shown first.
+async function revealPasswordForm(user: ReturnType<typeof userEvent.setup>) {
+  const disclose = await screen.findByRole("button", {
+    name: /sign in with username and password/i,
+  });
+  await user.click(disclose);
+  await waitFor(() =>
+    expect(screen.getByLabelText(/username/i)).toBeInTheDocument()
+  );
+}
+
 // ---------------------------------------------------------------------------
 // Tests
 // ---------------------------------------------------------------------------
@@ -42,22 +53,21 @@ describe("LoginPage", () => {
   });
 
   it("renders username and password fields", async () => {
+    const user = userEvent.setup();
     renderLogin();
 
-    await waitFor(() => {
-      expect(screen.getByLabelText(/username/i)).toBeInTheDocument();
-    });
+    await revealPasswordForm(user);
+    expect(screen.getByLabelText(/username/i)).toBeInTheDocument();
     expect(screen.getByLabelText(/password/i)).toBeInTheDocument();
   });
 
   it("submit button is disabled when fields are empty", async () => {
+    const user = userEvent.setup();
     renderLogin();
 
-    await waitFor(() => {
-      expect(screen.getByLabelText(/username/i)).toBeInTheDocument();
-    });
+    await revealPasswordForm(user);
 
-    const submitBtn = screen.getByRole("button", { name: /sign in|log in|login/i });
+    const submitBtn = screen.getByRole("button", { name: "Sign in" });
     expect(submitBtn).toBeDisabled();
   });
 
@@ -65,14 +75,12 @@ describe("LoginPage", () => {
     const user = userEvent.setup();
     renderLogin();
 
-    await waitFor(() =>
-      expect(screen.getByLabelText(/username/i)).toBeInTheDocument()
-    );
+    await revealPasswordForm(user);
 
     await user.type(screen.getByLabelText(/username/i), "alice");
     await user.type(screen.getByLabelText(/password/i), "secret");
 
-    const submitBtn = screen.getByRole("button", { name: /sign in|log in|login/i });
+    const submitBtn = screen.getByRole("button", { name: "Sign in" });
     expect(submitBtn).not.toBeDisabled();
   });
 
@@ -86,13 +94,11 @@ describe("LoginPage", () => {
 
     renderLogin();
 
-    await waitFor(() =>
-      expect(screen.getByLabelText(/username/i)).toBeInTheDocument()
-    );
+    await revealPasswordForm(user);
 
     await user.type(screen.getByLabelText(/username/i), "alice");
     await user.type(screen.getByLabelText(/password/i), "secret");
-    await user.click(screen.getByRole("button", { name: /sign in|log in|login/i }));
+    await user.click(screen.getByRole("button", { name: "Sign in" }));
 
     await waitFor(() =>
       expect(mockLogin).toHaveBeenCalledWith("alice", "secret")
@@ -107,13 +113,11 @@ describe("LoginPage", () => {
 
     renderLogin();
 
-    await waitFor(() =>
-      expect(screen.getByLabelText(/username/i)).toBeInTheDocument()
-    );
+    await revealPasswordForm(user);
 
     await user.type(screen.getByLabelText(/username/i), "alice");
     await user.type(screen.getByLabelText(/password/i), "wrong");
-    await user.click(screen.getByRole("button", { name: /sign in|log in|login/i }));
+    await user.click(screen.getByRole("button", { name: "Sign in" }));
 
     await waitFor(() =>
       expect(screen.getByText(/invalid credentials/i)).toBeInTheDocument()
