@@ -782,12 +782,17 @@ export default function InvestigationPage() {
     if (!openDrawer) { setExpandedAnalyzerIds({}); setExpandedGroups({}); }
   }
 
-  // Collapse expansion when the selected item changes.
+  // Collapse expansion + leave edit mode when the selected item changes.
+  // Keyed on selectedId (number | null), which is stable across renders.
+  // NB: never key a render-phase compare on selectedIdNum — it is NaN when
+  // nothing is selected, and NaN !== NaN makes the compare re-fire every
+  // render → "Too many re-renders".
   const [prevSelectedId, setPrevSelectedId] = React.useState(selectedId);
   if (selectedId !== prevSelectedId) {
     setPrevSelectedId(selectedId);
     setExpandedAnalyzerIds({});
     setExpandedGroups({});
+    setEditMode(false);
   }
 
   // Collapse analyzer rows when a fresh set of reports arrives. Keyed on the
@@ -796,17 +801,11 @@ export default function InvestigationPage() {
   const [prevReportsKey, setPrevReportsKey] = React.useState(reportsKey);
   if (reportsKey !== prevReportsKey) { setPrevReportsKey(reportsKey); setExpandedAnalyzerIds({}); }
 
-  // Leave edit mode when switching to another case.
-  const [prevSelectedIdNum, setPrevSelectedIdNum] = React.useState(selectedIdNum);
-  if (selectedIdNum !== prevSelectedIdNum) {
-    setPrevSelectedIdNum(selectedIdNum);
-    setEditMode(false);
-  }
   // Clear the edit mutation on case change (reset() is a side effect, not setState).
   React.useEffect(() => {
     editMutation.reset();
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [selectedIdNum]);
+  }, [selectedId]);
 
   // Seed the edit form from fetched details (unless actively editing).
   const editSeedKey = `${openDrawer}|${detailsQuery.dataUpdatedAt}|${editMode}`;
