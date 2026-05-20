@@ -861,7 +861,10 @@ export default function SubmissionsPage() {
   React.useEffect(() => { setExpandedAnalyzerIds({}); setExpandedGroups({}); }, [selectedId]);
   React.useEffect(() => { setExpandedAnalyzerIds({}); }, [detailsQuery.data?.analyzer_reports]);
 
-  const rows = submissionsQuery.data?.results ?? [];
+  const rows = React.useMemo(
+    () => submissionsQuery.data?.results ?? [],
+    [submissionsQuery.data]
+  );
   // Client-side sort for artifact/type fields (not supported by backend ordering)
   const clientSorted = React.useMemo(() => {
     if (sortField !== "artifact" && sortField !== "type") return rows;
@@ -892,7 +895,10 @@ export default function SubmissionsPage() {
   const BADGE_W = 132;
   const DIALOG_RADIUS = 2;
 
-  const analyzerReports = detailsQuery.data?.analyzer_reports ?? [];
+  const analyzerReports = React.useMemo(
+    () => detailsQuery.data?.analyzer_reports ?? [],
+    [detailsQuery.data]
+  );
   const hasRawDetails = typeof detailsQuery.data?.raw !== "undefined";
 
   // Group reports by artifact so the drawer shows one section per checked item

@@ -796,7 +796,10 @@ export default function InvestigationPage() {
   const currentConfidence = pickConfidence(detailsQuery.data);
   const currentClassification = pickClassification(detailsQuery.data);
 
-  const analyzerReports = detailsQuery.data?.analyzer_reports ?? [];
+  const analyzerReports = React.useMemo(
+    () => detailsQuery.data?.analyzer_reports ?? [],
+    [detailsQuery.data]
+  );
   const reportGroups = React.useMemo(
     () => groupReportsByArtifact(analyzerReports),
     [analyzerReports]

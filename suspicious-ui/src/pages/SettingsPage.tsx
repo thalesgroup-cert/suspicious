@@ -542,7 +542,7 @@ function EditableListPanel({
     onError: () => enqueueSnackbar("Failed to import file.", { variant: "error" }),
   });
 
-  const items = listQuery.data ?? [];
+  const items = React.useMemo(() => listQuery.data ?? [], [listQuery.data]);
   const filtered = React.useMemo(() => {
     const q = filter.trim().toLowerCase();
     return q ? items.filter((it) => it.value.toLowerCase().includes(q)) : items;
@@ -737,7 +737,7 @@ function ReadOnlyListPanel({
     retry: false,
   });
 
-  const items = listQuery.data ?? [];
+  const items = React.useMemo(() => listQuery.data ?? [], [listQuery.data]);
   const filtered = React.useMemo(() => {
     const q = filter.trim().toLowerCase();
     return q ? items.filter((it) => it.value.toLowerCase().includes(q)) : items;
@@ -1229,7 +1229,7 @@ function CisoUsersPanel() {
     retry: false,
   });
 
-  const items = query.data ?? [];
+  const items = React.useMemo(() => query.data ?? [], [query.data]);
   const filtered = React.useMemo(() => {
     const q = filter.trim().toLowerCase();
     if (!q) return items;

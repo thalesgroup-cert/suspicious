@@ -44,8 +44,10 @@ export default function OverviewHeader(props: {
   trendWindow: number;
   onTrendWindowChange: (n: number) => void;
 }) {
-  const now = new Date();
-  const years = React.useMemo(() => Array.from({ length: 7 }, (_, i) => now.getFullYear() - 3 + i), [now]);
+  const years = React.useMemo(() => {
+    const y = new Date().getFullYear();
+    return Array.from({ length: 7 }, (_, i) => y - 3 + i);
+  }, []);
 
   const [anchorEl, setAnchorEl] = React.useState<HTMLElement | null>(null);
   const open = Boolean(anchorEl);
