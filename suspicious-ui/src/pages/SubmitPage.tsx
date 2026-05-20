@@ -40,6 +40,7 @@ import { useSnackbar } from "notistack";
 import { useNavigate } from "react-router-dom";
 
 import { api } from "@/api/client";
+import { env } from "@/lib/runtimeEnv";
 import { getMe, type Me } from "@/api/auth";
 
 import axios from "axios";
@@ -404,9 +405,7 @@ export default function SubmitPage() {
 
   const me = meQuery.data;
 
-  const suspiciousEmailEnv = import.meta.env.VITE_SUSPICIOUS_EMAIL as
-    | string
-    | undefined;
+  const suspiciousEmailEnv = env("VITE_SUSPICIOUS_EMAIL");
 
   const configQuery = useQuery({
     queryKey: ["submitConfig"],

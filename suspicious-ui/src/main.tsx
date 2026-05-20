@@ -9,8 +9,9 @@ import { AppThemeProvider } from "@/styles/ThemeStore";
 import { SnackbarProvider } from "notistack";
 
 import "@/bones/registry";
+import { env } from "@/lib/runtimeEnv";
 
-const favicon = import.meta.env.VITE_FAVICON;
+const favicon = env("VITE_FAVICON");
 if (favicon) {
   let link = document.querySelector<HTMLLinkElement>("link[rel='icon']");
   if (!link) {
