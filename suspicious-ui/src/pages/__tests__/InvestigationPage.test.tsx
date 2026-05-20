@@ -120,8 +120,9 @@ describe("InvestigationPage", () => {
   it("shows correct result chip for a suspicious case", async () => {
     renderInvestigation();
 
+    // The uppercase chip label "SUSPICIOUS" disambiguates from prose text.
     await waitFor(() => {
-      expect(screen.getByText(/suspicious/i)).toBeInTheDocument();
+      expect(screen.getByText("SUSPICIOUS")).toBeInTheDocument();
     });
   });
 

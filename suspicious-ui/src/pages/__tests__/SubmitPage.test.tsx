@@ -54,59 +54,41 @@ describe("SubmitPage", () => {
   it("renders both submission modes", async () => {
     renderSubmit();
 
-    await waitFor(() => {
-      // Both mode cards should be visible
-      expect(screen.getByText(/file|email/i)).toBeInTheDocument();
-      expect(screen.getByText(/url|artifact|indicator/i)).toBeInTheDocument();
-    });
+    // File mode is the default; both mode cards are present.
+    expect(
+      await screen.findByText("Drag and drop or click to browse")
+    ).toBeInTheDocument();
+    expect(screen.getByText("URL, Domain or Indicator")).toBeInTheDocument();
   });
 
   it("shows file dropzone in file mode (default)", async () => {
     renderSubmit();
 
-    await waitFor(() => {
-      // The drop zone or a label like "Drop a file" or "Choose file"
-      expect(
-        screen.getByText(/drop|drag|upload|choose|select/i)
-      ).toBeInTheDocument();
-    });
+    expect(
+      await screen.findByText("Drag and drop or click to browse")
+    ).toBeInTheDocument();
   });
 
   it("switches to artifact mode and shows text input", async () => {
     const user = userEvent.setup();
     renderSubmit();
 
-    await waitFor(() => {
-      // Look for the artifact/URL mode selector
-      expect(screen.getByText(/url|artifact|indicator/i)).toBeInTheDocument();
-    });
+    await user.click(await screen.findByText("URL, Domain or Indicator"));
 
-    // Click the artifact mode selector
-    const artifactMode = screen.getByText(/url|artifact|indicator/i);
-    await user.click(artifactMode);
-
-    await waitFor(() => {
-      // A text input for the artifact value should appear
-      expect(
-        screen.getByRole("textbox", { name: /url|indicator|value/i })
-      ).toBeInTheDocument();
-    });
+    // The artifact value field (label "URL, domain or indicator") appears.
+    expect(
+      await screen.findByLabelText(/url, domain or indicator/i)
+    ).toBeInTheDocument();
   });
 
   it("submit button is disabled when artifact input is empty", async () => {
     const user = userEvent.setup();
     renderSubmit();
 
-    await waitFor(() =>
-      expect(screen.getByText(/url|artifact|indicator/i)).toBeInTheDocument()
-    );
+    await user.click(await screen.findByText("URL, Domain or Indicator"));
+    await screen.findByLabelText(/url, domain or indicator/i);
 
-    await user.click(screen.getByText(/url|artifact|indicator/i));
-
-    await waitFor(() => {
-      const submitBtn = screen.getByRole("button", { name: /submit|analyze|send/i });
-      expect(submitBtn).toBeDisabled();
-    });
+    expect(screen.getByRole("button", { name: "Submit" })).toBeDisabled();
   });
 
   it("submits a URL artifact and calls api.post", async () => {
@@ -124,24 +106,12 @@ describe("SubmitPage", () => {
 
     renderSubmit();
 
-    await waitFor(() =>
-      expect(screen.getByText(/url|artifact|indicator/i)).toBeInTheDocument()
-    );
+    await user.click(await screen.findByText("URL, Domain or Indicator"));
 
-    await user.click(screen.getByText(/url|artifact|indicator/i));
+    const field = await screen.findByLabelText(/url, domain or indicator/i);
+    await user.type(field, "http://evil.example.com/phishing");
 
-    await waitFor(() =>
-      expect(
-        screen.getByRole("textbox", { name: /url|indicator|value/i })
-      ).toBeInTheDocument()
-    );
-
-    await user.type(
-      screen.getByRole("textbox", { name: /url|indicator|value/i }),
-      "http://evil.example.com/phishing"
-    );
-
-    const submitBtn = screen.getByRole("button", { name: /submit|analyze|send/i });
+    const submitBtn = screen.getByRole("button", { name: "Submit" });
     await waitFor(() => expect(submitBtn).not.toBeDisabled());
     await user.click(submitBtn);
 
