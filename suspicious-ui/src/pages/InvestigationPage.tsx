@@ -790,18 +790,23 @@ export default function InvestigationPage() {
     setExpandedGroups({});
   }
 
-  // Collapse analyzer rows when a fresh set of reports arrives.
-  const reportsRef = detailsQuery.data?.analyzer_reports;
-  const [prevReportsRef, setPrevReportsRef] = React.useState(reportsRef);
-  if (reportsRef !== prevReportsRef) { setPrevReportsRef(reportsRef); setExpandedAnalyzerIds({}); }
+  // Collapse analyzer rows when a fresh set of reports arrives. Keyed on the
+  // query's update timestamp (stable across renders, unlike the data array ref).
+  const reportsKey = detailsQuery.dataUpdatedAt;
+  const [prevReportsKey, setPrevReportsKey] = React.useState(reportsKey);
+  if (reportsKey !== prevReportsKey) { setPrevReportsKey(reportsKey); setExpandedAnalyzerIds({}); }
 
-  // Leave edit mode + clear the mutation when switching to another case.
+  // Leave edit mode when switching to another case.
   const [prevSelectedIdNum, setPrevSelectedIdNum] = React.useState(selectedIdNum);
   if (selectedIdNum !== prevSelectedIdNum) {
     setPrevSelectedIdNum(selectedIdNum);
     setEditMode(false);
-    editMutation.reset();
   }
+  // Clear the edit mutation on case change (reset() is a side effect, not setState).
+  React.useEffect(() => {
+    editMutation.reset();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [selectedIdNum]);
 
   // Seed the edit form from fetched details (unless actively editing).
   const editSeedKey = `${openDrawer}|${detailsQuery.dataUpdatedAt}|${editMode}`;
