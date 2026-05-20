@@ -887,11 +887,12 @@ export default function SubmissionsPage() {
     setExpandedGroups({});
   }
 
-  // Collapse analyzer rows when a fresh set of reports arrives.
-  const reportsRef = detailsQuery.data?.analyzer_reports;
-  const [prevReportsRef, setPrevReportsRef] = React.useState(reportsRef);
-  if (reportsRef !== prevReportsRef) {
-    setPrevReportsRef(reportsRef);
+  // Collapse analyzer rows when a fresh set of reports arrives. Keyed on the
+  // query's update timestamp (stable across renders, unlike the data array ref).
+  const reportsKey = detailsQuery.dataUpdatedAt;
+  const [prevReportsKey, setPrevReportsKey] = React.useState(reportsKey);
+  if (reportsKey !== prevReportsKey) {
+    setPrevReportsKey(reportsKey);
     setExpandedAnalyzerIds({});
   }
 
