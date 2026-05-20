@@ -18,12 +18,6 @@ services:
     extends:
       file: compose_apps.yaml
       service: suspicious
-    build:
-      context: ${SUSPICIOUS_PATH}/
-      dockerfile: Dockerfile
-      args:
-        - HTTP_PROXY=${HTTP_PROXY}
-        - HTTPS_PROXY=${HTTPS_PROXY}
     image: ghcr.io/thalesgroup-cert/suspicious:${SUSPICIOUS_VERSION:?SUSPICIOUS_VERSION is required}
     container_name: suspicious
     depends_on:
@@ -46,12 +40,7 @@ services:
     extends:
       file: compose_apps.yaml
       service: suspicious_ui
-    build:
-      context: ${SUSPICIOUS_UI_PATH:?SUSPICIOUS_UI_PATH is required}/
-      dockerfile: Dockerfile
-      args:
-        - HTTP_PROXY=${HTTP_PROXY:-}
-        - HTTPS_PROXY=${HTTPS_PROXY:-}
+    image: ghcr.io/thalesgroup-cert/suspicious-ui:${SUSPICIOUS_UI_VERSION:-${SUSPICIOUS_VERSION:-latest}}
     container_name: suspicious_ui
     depends_on:
       suspicious:
@@ -175,13 +164,7 @@ services:
     extends:
       file: compose_apps.yaml
       service: feeder
-    build:
-      context: ${FEEDER_PATH:?FEEDER_PATH is required}/
-      dockerfile: Dockerfile
-      args:
-        - NO_PROXY=localhost,rustfs,chromadb
-        - HTTP_PROXY=${HTTP_PROXY:-}
-        - HTTPS_PROXY=${HTTPS_PROXY:-}
+    image: ghcr.io/thalesgroup-cert/suspicious-feeder:${SUSPICIOUS_FEEDER_VERSION:-${SUSPICIOUS_VERSION:-latest}}
     container_name: email_feeder
     depends_on:
       suspicious:

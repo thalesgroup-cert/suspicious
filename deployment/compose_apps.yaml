@@ -78,16 +78,13 @@ services:
       - "127.0.0.1:${SUSPICIOUS_UI_PORT:-9021}:80"
     environment:
       no_proxy: "${NO_PROXY:-},suspicious"
-      # Runtime SPA config — injected into window.__ENV__ by the container
-      # entrypoint at startup (build-time .env is not baked into the image).
-      VITE_API_BASE:            "${VITE_API_BASE:-/api}"
-      VITE_FAVICON:             "${VITE_FAVICON:-}"
-      VITE_COMPANY_NAME:        "${VITE_COMPANY_NAME:-}"
-      VITE_COMPANY_LINK:        "${VITE_COMPANY_LINK:-}"
-      VITE_COMPANY_LOGO_BASE64: "${VITE_COMPANY_LOGO_BASE64:-}"
-      VITE_COMPANY_LOGO_URL:    "${VITE_COMPANY_LOGO_URL:-}"
-      VITE_SUPPORT_EMAIL:       "${VITE_SUPPORT_EMAIL:-}"
-      VITE_SUSPICIOUS_EMAIL:    "${VITE_SUSPICIOUS_EMAIL:-}"
+    # Runtime SPA config. The container entrypoint reads these VITE_* env
+    # vars at startup and writes them into window.__ENV__ (no rebuild needed).
+    # They come from suspicious-ui/.env; missing file is tolerated (defaults
+    # apply). Copy suspicious-ui/.env.example -> suspicious-ui/.env to set them.
+    env_file:
+      - path: ../suspicious-ui/.env
+        required: false
     networks:
       - suspicious_network
       - reverse_network
