@@ -87,3 +87,36 @@ class CortexWebhookTest(TestCase):
         )
         self.assertEqual(resp.status_code, 202)
         mock_delay.assert_not_called()
+
+    @patch("tasp.tasks.process_cortex_job.delay")
+    def test_missing_authorization_header_returns_401(self, mock_delay):
+        resp = self.client.post(
+            "/api/cortex/webhook/",
+            {"jobId": "job-1"},
+            format="json",
+        )
+        self.assertEqual(resp.status_code, 401)
+        mock_delay.assert_not_called()
+
+    @patch("tasp.tasks.process_cortex_job.delay")
+    def test_missing_jobid_returns_400(self, mock_delay):
+        resp = self.client.post(
+            "/api/cortex/webhook/",
+            {},
+            HTTP_AUTHORIZATION="Bearer testsecret",
+            format="json",
+        )
+        self.assertEqual(resp.status_code, 400)
+        mock_delay.assert_not_called()
+
+    @override_settings(CORTEX_WEBHOOK_SECRET="")
+    @patch("tasp.tasks.process_cortex_job.delay")
+    def test_unconfigured_secret_returns_503(self, mock_delay):
+        resp = self.client.post(
+            "/api/cortex/webhook/",
+            {"jobId": "job-1"},
+            HTTP_AUTHORIZATION="Bearer testsecret",
+            format="json",
+        )
+        self.assertEqual(resp.status_code, 503)
+        mock_delay.assert_not_called()
