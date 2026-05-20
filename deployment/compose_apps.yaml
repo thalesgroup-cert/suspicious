@@ -125,6 +125,7 @@ services:
     command: python3 main.py
     volumes:
       - "${FEEDER_PATH}/application.log:/app/application.log"
+      - "${FEEDER_PATH}/config.json:/app/config.json:ro"
       - "${CA_PATH}/certfile.pem:/etc/private/certfile.pem:ro"
       - "${CA_PATH}/keyfile.pem:/etc/private/keyfile.pem:ro"
       - "${CA_PATH}/rootcafile.pem:/etc/private/rootcafile.pem:ro"
