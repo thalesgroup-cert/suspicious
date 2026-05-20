@@ -539,27 +539,40 @@ export default function ProfilePage() {
     (readLocalProfile()?.theme as ThemeName) ?? ("light" as ThemeName)
   );
 
-  // Sync from server profile
-  React.useEffect(() => {
-    const p = profileQuery.data;
-    if (!p) return;
-    setWantsAck(!!p.wants_acknowledgement);
-    setWantsResults(!!p.wants_results);
-    const t = (p.theme as ThemeName) ?? ("light" as ThemeName);
-    setPickedTheme(t);
-    setAutoSeasonal(!!p.auto_seasonal);
-    if (!p.auto_seasonal) setThemeName(t);
-  }, [profileQuery.data, setThemeName, setAutoSeasonal]);
+  // Sync form state from the fetched server profile — adjusted during render
+  // when the data reference changes, instead of in an effect.
+  const profileData = profileQuery.data;
+  const [prevProfileData, setPrevProfileData] = React.useState(profileData);
+  if (profileData !== prevProfileData) {
+    setPrevProfileData(profileData);
+    if (profileData) {
+      setWantsAck(!!profileData.wants_acknowledgement);
+      setWantsResults(!!profileData.wants_results);
+      const t = (profileData.theme as ThemeName) ?? ("light" as ThemeName);
+      setPickedTheme(t);
+      setAutoSeasonal(!!profileData.auto_seasonal);
+      if (!profileData.auto_seasonal) setThemeName(t);
+    }
+  }
 
-  // Sync from localStorage on mount
+  // One-time hydration of local form state from localStorage (render-time).
+  const [localHydrated, setLocalHydrated] = React.useState(false);
+  if (!localHydrated) {
+    setLocalHydrated(true);
+    const lp = readLocalProfile();
+    if (lp) {
+      if (typeof lp.wants_acknowledgement === "boolean") setWantsAck(lp.wants_acknowledgement);
+      if (typeof lp.wants_results === "boolean") setWantsResults(lp.wants_results);
+      if (lp.theme) setPickedTheme(lp.theme as ThemeName);
+    }
+  }
+
+  // Side effects from the stored theme (theme store + query cache) must run in
+  // an effect, not during render.
   React.useEffect(() => {
     const lp = readLocalProfile();
-    if (!lp) return;
-    if (typeof lp.wants_acknowledgement === "boolean") setWantsAck(lp.wants_acknowledgement);
-    if (typeof lp.wants_results === "boolean") setWantsResults(lp.wants_results);
-    if (lp.theme) {
+    if (lp?.theme) {
       const t = lp.theme as ThemeName;
-      setPickedTheme(t);
       setThemeName(t);
       queryClient.setQueryData<UserProfile>(["profile"], (prev) => ({
         ...(prev ?? profileQuery.data as UserProfile),

@@ -369,6 +369,22 @@ function FeatureMosaic({ itemVariants }: { itemVariants: Variants }) {
 
 // ─── Main page ────────────────────────────────────────────────────────────
 
+const SSO_ERROR_MESSAGES: Record<string, string> = {
+  provider_unavailable:    "SSO provider is currently unavailable.",
+  state_mismatch:          "SSO session expired or invalid. Please try again.",
+  nonce_mismatch:          "SSO response could not be verified. Please try again.",
+  token_exchange_failed:   "SSO authentication failed. Please try again.",
+  userinfo_failed:         "Could not retrieve your account details from SSO.",
+  user_resolution_failed:  "Could not link your SSO account. Contact your administrator.",
+  account_disabled:        "Your account is disabled. Contact your administrator.",
+};
+
+function initialSsoError(): string | null {
+  const ssoError = new URLSearchParams(window.location.search).get("sso_error");
+  if (!ssoError) return null;
+  return SSO_ERROR_MESSAGES[ssoError] ?? `SSO error: ${ssoError}`;
+}
+
 export default function LoginPage() {
   const navigate = useNavigate();
   const theme = useTheme();
@@ -381,8 +397,10 @@ export default function LoginPage() {
   const [password, setPassword]         = React.useState("");
   const [showPassword, setShowPassword] = React.useState(false);
   const [loading, setLoading]           = React.useState(false);
-  const [error, setError]               = React.useState<string | null>(null);
-  const [ssoLoading, setSsoLoading]     = React.useState(false);
+  const [error, setError]               = React.useState<string | null>(initialSsoError);
+  const [ssoLoading, setSsoLoading]     = React.useState(
+    () => new URLSearchParams(window.location.search).get("sso") === "1"
+  );
 
   // UI state — password panel collapsed by default (SSO-first)
   const [passwordMode, setPasswordMode] = React.useState(false);
@@ -408,16 +426,8 @@ export default function LoginPage() {
 
     const ssoError = searchParams.get("sso_error");
     if (ssoError) {
-      const messages: Record<string, string> = {
-        provider_unavailable:    "SSO provider is currently unavailable.",
-        state_mismatch:          "SSO session expired or invalid. Please try again.",
-        nonce_mismatch:          "SSO response could not be verified. Please try again.",
-        token_exchange_failed:   "SSO authentication failed. Please try again.",
-        userinfo_failed:         "Could not retrieve your account details from SSO.",
-        user_resolution_failed:  "Could not link your SSO account. Contact your administrator.",
-        account_disabled:        "Your account is disabled. Contact your administrator.",
-      };
-      setError(messages[ssoError] ?? `SSO error: ${ssoError}`);
+      // The error itself is seeded into state via initialSsoError(); here we
+      // only clean the URL.
       window.history.replaceState({}, "", "/login");
       return;
     }
@@ -425,7 +435,7 @@ export default function LoginPage() {
     const isSsoCallback = searchParams.get("sso") === "1";
     if (!isSsoCallback) return;
 
-    setSsoLoading(true);
+    // ssoLoading is seeded true from the URL via the lazy initializer above.
     window.history.replaceState({}, "", "/login");
     hydrateColorsAfterSso().finally(() => {
       navigate("/", { replace: true });

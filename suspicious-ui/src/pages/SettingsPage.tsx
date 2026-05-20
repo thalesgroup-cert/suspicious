@@ -992,12 +992,18 @@ function ScoringPanel() {
 
   const [drafts, setDrafts] = React.useState<Record<number, number>>({});
 
-  React.useEffect(() => {
-    if (!analyzersQuery.data) return;
-    const next: Record<number, number> = {};
-    for (const a of analyzersQuery.data) next[a.id] = a.weight;
-    setDrafts(next);
-  }, [analyzersQuery.data]);
+  // Seed weight drafts from fetched analyzers — adjusted during render when the
+  // data reference changes, instead of in an effect.
+  const analyzersData = analyzersQuery.data;
+  const [prevAnalyzersData, setPrevAnalyzersData] = React.useState(analyzersData);
+  if (analyzersData !== prevAnalyzersData) {
+    setPrevAnalyzersData(analyzersData);
+    if (analyzersData) {
+      const next: Record<number, number> = {};
+      for (const a of analyzersData) next[a.id] = a.weight;
+      setDrafts(next);
+    }
+  }
 
   if (analyzersQuery.isLoading) {
     return <Box sx={{ py: 4, display: "grid", placeItems: "center" }}><CircularProgress /></Box>;

@@ -46,7 +46,6 @@ export function SoftCard({
   React.useEffect(() => {
     if (!isMetal || !hovered) {
       clearTimeout(timerRef.current);
-      setShowExcl(false);
       return;
     }
     function schedule() {
@@ -60,7 +59,11 @@ export function SoftCard({
       }, delay);
     }
     schedule();
-    return () => clearTimeout(timerRef.current);
+    // Reset on cleanup (hover end / unmount) rather than synchronously in the body.
+    return () => {
+      clearTimeout(timerRef.current);
+      setShowExcl(false);
+    };
   }, [isMetal, hovered]);
 
   return (
