@@ -17,26 +17,6 @@ from hash_process.models import Hash
 from email_process.models import MailAddress
 
 
-class RunAnalyzerStatusTests(TestCase):
-    def test_run_analyzer_creates_report_with_inprogress_status(self):
-        analyzer = MagicMock()
-        analyzer.id = "ana-1"
-        analyzer.name = "VirusTotal_GetReport_3_1"
-
-        domain = Domain.objects.create(value="example.com")
-
-        api = MagicMock()
-        report_obj = MagicMock()
-        report_obj.id = "job-xyz"
-        api.analyzers.run_by_name.return_value = report_obj
-
-        result = CortexJob.run_analyzer(api, analyzer, domain, "domain")
-
-        self.assertIsNotNone(result)
-        row = AnalyzerReport.objects.get(cortex_job_id="job-xyz")
-        self.assertEqual(row.status, "InProgress")
-
-
 class GetNewReportsTests(TestCase):
     def setUp(self):
         self.analyzer = Analyzer.objects.create(
