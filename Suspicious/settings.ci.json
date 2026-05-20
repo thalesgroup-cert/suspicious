@@ -1,0 +1,187 @@
+{
+    "app": {
+        "name": "suspicious",
+        "debug": true,
+        "secret_key": "ci-only-not-secret-0123456789abcdef0123456789abcdef",
+        "allowed_hosts": [
+            "suspicious"
+        ],
+        "csrf_trusted_origins": [
+            "https://suspicious.test"
+        ],
+        "timezone": "Europe/Paris",
+        "log_level": "INFO"
+    },
+    "branding": {
+        "company_name": "Test",
+        "contact_email": "suspicious@test.com",
+        "footer": "Your Group",
+        "intranet_link": "https://intranet.local",
+        "assets": {
+            "logo": "BASE64_LOGO",
+            "icon": "BASE64_ICON",
+            "banner": "BASE64_BANNER",
+            "signature": "BASE64_SIGNATURE"
+        }
+    },
+    "features": {
+        "dual_storage_write": false
+    },
+    "database": {
+        "engine": "mysql",
+        "host": "db_suspicious",
+        "port": 3306,
+        "name": "db_suspicious",
+        "user": "suspicious",
+        "password": "password",
+        "root_password": "strongpassword",
+        "options": {
+            "ssl": false,
+            "connection_pooling": false,
+            "persistent_connections": false
+        },
+        "replica": {
+            "host": "db_suspicious_replica",
+            "port": 3306,
+            "user": "suspicious",
+            "password": "password",
+            "name": "db_suspicious"
+        },
+        "replica_read_apps": ["dashboard", "case_handler"]
+    },
+    "storage": {
+        "backend": "local",
+        "s3": {
+            "endpoint": "rustfs:9000",
+            "access_key": "MINIO_ACCESS_KEY",
+            "secret_key": "MINIO_SECRET_KEY",
+            "secure": false,
+            "auto_create_bucket": true,
+            "media_bucket": "suspicious-media"
+        }
+    },
+    "integrations": {
+        "cortex": {
+            "url": "http://cortex:9001",
+            "api_key": "CHANGE_ME",
+            "analyzers": {
+                "header": "MailHeader_4_0",
+                "ai": "AI_Mail_Analyzer_1_4",
+                "sandbox": "ThreatGridOnPrem_1_0",
+                "yara": "Yara_Boosted_3_2",
+                "file_info": "FileInfo_8_0"
+            },
+            "webhook_secret": "CHANGE_ME"
+        },
+        "chromadb": {
+            "url": "http://chromadb:8000",
+            "host": "chromadb",
+            "port": 8000,
+            "collection_name": "suspicious_mails",
+            "ssl_verify": false
+        },
+        "thehive": {
+            "enabled": false,
+            "url": "https://thehive",
+            "api_key": "CHANGE_ME",
+            "verify_ssl" : false,
+            "custom_field" : "",
+            "email_sender" : "",
+            "tags" : "",
+            "certificate_path" : "/app/cert.pem",
+            "user": "exemple@user.com"
+        },
+        "watcher": {
+            "enabled": false,
+            "url": "https://watcher",
+            "api_key": "CHANGE_ME",
+            "timeout": 10,
+            "verify_ssl": false
+        },
+        "misp": {
+            "default_tags": {
+                "tlp": "clear",
+                "pap": "clear",
+                "categories": [
+                    "MalSpam",
+                    "Phishing"
+                ]
+            },
+            "instances": {
+                "primary": {
+                    "url": "http://misp",
+                    "api_key": "CHANGE_ME",
+                    "ssl_verify": false,
+                    "ssl_ca_certs": "/etc/ssl/certs/ca-certificates.crt"
+                },
+                "secondary": {
+                    "url": "https://secondary-misp",
+                    "api_key": "CHANGE_ME",
+                    "ssl_verify": false,
+                    "ssl_ca_certs": "/etc/ssl/certs/ca-certificates.crt"
+                }
+            }
+        }
+    },
+    "authentication": {
+        "oidc": {
+            "server_url": "https://oidc-server",
+            "client_id": "client-id",
+            "client_secret": "client-secret"
+        },
+        "ldap": {
+            "server_uri": "ldaps://ldap",
+            "bind_dn": "ou=Applications,ou=Gresources,o=Group",
+            "bind_password": "CHANGE_ME",
+            "base_dn": "ou=People,o=group",
+            "filter": "(&(mail=%(user)s)(Tpresent=true)(!(ou=admin)))",
+            "verify_ssl": false
+        }
+    },
+    "email": {
+        "api_base": "https://suspicious.test/api/",
+        "smtp": {
+            "server": "smtp.server.local",
+            "port": 25,
+            "username": "smtp_user",
+            "password": "smtp_password",
+            "tls": true
+        },
+        "content": {
+            "footer": "Limited Distribution",
+            "team_name": "Your Cybersecurity Team",
+            "global_domain": "test.com",
+            "website": "https://www.test.com/en"
+        },
+        "links": {
+            "submissions": "https://suspicious.test/submissions",
+            "security_contact": "mailto:security@test.com",
+            "security_text": "security@test.com",
+            "inquiry": "mailto:inquiry@test.com",
+            "inquiry_text": "inquiry@test.com",
+            "glossary": "https://glossary.local"
+        },
+        "socials": {
+            "facebook" : "https://fr-fr.facebook.com/test",
+            "twitter" : "https://x.com/test",
+            "instagram" : "https://www.instagram.com/test",
+            "linkedin" : "https://www.linkedin.com/company/test",
+            "youtube" : "https://www.youtube.com/test"
+        },
+        "templates": {
+            "acknowledgement": "Suspicious – Submission Registered",
+            "review": "Your submission n°{case_id} has been reviewed as: {result}",
+            "final": "SUSPICIOUS EMAIL ANALYSIS - Your analysis [{case_id}] is completed"
+        },
+        "logos" : {
+            "company" : "BASE64_LOGO",
+            "acknowledge" : "BASE64_LOGO",
+            "final" : "BASE64_LOGO",
+            "challenge" : "BASE64_LOGO",
+            "modif" : "BASE64_LOGO"
+        }
+    },
+    "domains": [
+        "testgroup.com"
+    ]
+}
