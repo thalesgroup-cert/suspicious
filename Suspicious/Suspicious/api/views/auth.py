@@ -1,7 +1,7 @@
 from django.conf import settings
 from knox.models import AuthToken
 from drf_spectacular.utils import OpenApiResponse, extend_schema
-from rest_framework import generics, permissions, serializers, status, throttling
+from rest_framework import generics, permissions, status, throttling
 from rest_framework.response import Response
 
 from api.authentication import KNOX_COOKIE_NAME, SESSION_INDICATOR_COOKIE

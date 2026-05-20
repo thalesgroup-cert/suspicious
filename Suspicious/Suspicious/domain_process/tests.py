@@ -1,5 +1,5 @@
 from django.test import TestCase
-from unittest.mock import patch, MagicMock
+from unittest.mock import patch
 
 from domain_process.models import Domain
 from domain_process.domain_utils.domain_handler import DomainHandler, normalize_domain

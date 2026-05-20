@@ -1,7 +1,6 @@
 # mail_service/mail_notification_service.py
 import json
 import logging
-from pathlib import Path
 
 from profiles.models import UserProfile
 

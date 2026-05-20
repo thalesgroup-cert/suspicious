@@ -3,7 +3,7 @@ import re
 from datetime import datetime
 from secrets import token_hex
 from typing import List
-from email.header import decode_header, make_header
+from email.header import decode_header
 
 from .models import Observable
 from collections import Counter, defaultdict
@@ -23,19 +23,6 @@ def safe(value, default=None):
 
 def generate_ref() -> str:
     return datetime.now().strftime("%y%m%d") + "-" + token_hex(3)[:5]
-
-
-def decode_mime_header(value) -> str:
-    try:
-        if isinstance(value, list):
-            value = value[0]
-        if not isinstance(value, str):
-            value = str(value)
-        if re.search(r"=\?.+?\?[bBqQ]\?.+?\?=", value):
-            return str(make_header(decode_header(value)))
-        return value
-    except Exception:
-        return str(value)
 
 
 def build_mail_attachments(

@@ -1,5 +1,3 @@
-import os
-import re
 import logging
 from domain_process.models import Domain, DomainInIocs
 from domain_process.domain_utils.domain_handler import DomainHandler

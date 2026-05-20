@@ -4,7 +4,7 @@ Analyzer report lifecycle: execution, persistence, and querying.
 """
 import logging
 
-from django.db.models import Max, Subquery, OuterRef
+from django.db.models import Max
 
 from .service import CortexAnalyzerService
 from cortex_job.models import AnalyzerReport

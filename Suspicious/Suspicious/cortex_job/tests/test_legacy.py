@@ -6,7 +6,6 @@ from django.test import TestCase
 from django.utils import timezone
 
 from cortex_job.cortex_utils.cortex_and_job_management import (
-    CortexJob,
     CortexJobManager,
 )
 from cortex_job.models import Analyzer, AnalyzerReport

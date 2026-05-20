@@ -1,5 +1,10 @@
+from typing import TYPE_CHECKING
+
 from .utils import TextProcessor
 from .models import TextInputModel
+
+if TYPE_CHECKING:
+    from simhash import Simhash
 
 class SimHashService:
     """

@@ -1,4 +1,4 @@
-from pydantic import BaseModel, EmailStr, Field, PositiveInt, ConfigDict
+from pydantic import BaseModel, Field, ConfigDict
 from typing import Optional, Any
 from django.contrib.auth.models import User
 

@@ -4,9 +4,12 @@ Final score calculation and result range classification.
 """
 import logging
 from enum import Enum
-from typing import List, Optional, Set, Type, Union
+from typing import TYPE_CHECKING, List, Optional, Set, Type, Union
 from urllib.parse import urlparse
 from email.utils import parseaddr
+
+if TYPE_CHECKING:
+    from case_handler.models import Case
 
 from settings.models import CampaignDomainAllowList, DenyListDomain, WatcherMonitoredDomain
 from domain_process.models import Domain

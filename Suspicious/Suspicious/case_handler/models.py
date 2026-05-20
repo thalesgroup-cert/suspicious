@@ -13,9 +13,7 @@ from mail_feeder.models import Mail
 from django.utils.translation import gettext_lazy as _
 from django.utils import timezone
 import datetime
-from datetime import timedelta
 
-import hashlib
 
 class Status(models.TextChoices):
     """

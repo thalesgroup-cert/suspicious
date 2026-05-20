@@ -8,7 +8,7 @@ from __future__ import annotations
 import json
 import logging
 from functools import cached_property
-from typing import Any, Dict, List, Optional
+from typing import Any, Dict, List
 
 import chromadb
 from minio import Minio

@@ -1,7 +1,6 @@
 import logging
 import os
 from typing import Any, List, Tuple
-from django.db import transaction
 
 from settings.models import AllowListFile, AllowListFiletype
 from cortex_job.cortex_utils.cortex_and_job_management import CortexJob

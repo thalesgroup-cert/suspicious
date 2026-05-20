@@ -1,7 +1,5 @@
 # email_processing/service.py
 
-import os
-import shutil
 import logging
 from pathlib import Path
 from typing import Optional

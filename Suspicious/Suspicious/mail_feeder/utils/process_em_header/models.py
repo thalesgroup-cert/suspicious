@@ -1,5 +1,4 @@
 from pydantic import BaseModel, Field, validator
-from typing import Dict, Any
 
 
 class EmailHeaderData(BaseModel):

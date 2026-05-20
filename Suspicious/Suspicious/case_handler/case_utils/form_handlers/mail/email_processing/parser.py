@@ -100,7 +100,7 @@ class EmailParser:
                 enc = chardet.detect(raw)["encoding"] or "utf-8"
                 try:
                     return raw.decode(enc)
-                except:
+                except Exception:
                     return raw.decode("utf-8", errors="replace")
             return raw
 

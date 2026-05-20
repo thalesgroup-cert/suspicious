@@ -78,7 +78,7 @@ def save_case_results(case, mail):
     # ── 3. Send email (best-effort, outside transaction) ─────────────────
     try:
         from profiles.models import UserProfile
-        profile = UserProfile.objects.filter(user=case.reporter).first()
+        UserProfile.objects.filter(user=case.reporter).first()
         svc = MailNotificationService.from_settings()
         svc.send_final(mail_info, case)
         update_cases_logger.info("Final email sent for case %s.", case.id)

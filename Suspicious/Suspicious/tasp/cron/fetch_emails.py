@@ -10,7 +10,6 @@ from typing import Optional
 from minio import Minio
 from django.core.cache import cache
 from minio.commonconfig import Tags
-from pathlib import Path
 
 from .utils import safe_execution, load_config, ensure_dir
 from .models import CronConfig

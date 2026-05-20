@@ -1,8 +1,7 @@
 # api/serializers/settings.py
 from __future__ import annotations
 
-from decimal import Decimal, InvalidOperation
-from typing import Any
+from decimal import Decimal
 
 from rest_framework import serializers
 

@@ -1,5 +1,5 @@
 import logging
-from typing import List, Optional
+from typing import List
 from django.db import transaction
 from mail_feeder.mail_utils.sim_hash.simhash import SimHashService
 from mail_feeder.models import MailBody

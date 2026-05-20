@@ -283,7 +283,8 @@ def add_comment_to_item(item_type, item_id, comment, thehive_url, api_key):
         "Authorization": f"Bearer {api_key}",
     }
     url_add_comment = f"{thehive_url}/api/v1/{item_type}/{item_id}/comment"
-    url_modify_comment = lambda comment_id: f"{thehive_url}/api/v1/comment/{comment_id}/"
+    def url_modify_comment(comment_id):
+        return f"{thehive_url}/api/v1/comment/{comment_id}/"
     url_query_comments = f"{thehive_url}/api/v1/query?name=get-alert-comments-{item_id}"
     query_comments = {
         "query": [

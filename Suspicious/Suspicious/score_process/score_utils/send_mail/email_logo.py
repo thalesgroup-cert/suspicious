@@ -65,7 +65,6 @@ from __future__ import annotations
 
 import base64
 import functools
-import hashlib
 import logging
 import re
 from typing import Optional

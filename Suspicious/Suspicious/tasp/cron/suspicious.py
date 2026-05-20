@@ -4,7 +4,6 @@ from datetime import datetime, timedelta
 
 import chromadb
 from .utils import load_config
-from .models import CronConfig
 from case_handler.models import Case
 
 logger = logging.getLogger("cron.suspicious")
@@ -31,7 +30,7 @@ def check_challengeable():
             case.save(update_fields=["is_challengeable"])
 
 def remove_old_suspicious_emails(config_path: str = CONFIG_PATH, threshold_days: int = 15) -> None:
-    cfg: CronConfig = load_config(config_path)
+    load_config(config_path)
     cutoff = datetime.now() - timedelta(days=threshold_days)
 
     try:

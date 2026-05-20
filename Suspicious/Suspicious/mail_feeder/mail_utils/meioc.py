@@ -13,7 +13,6 @@ from urllib.parse import urlparse
 import spf
 import json
 import dkim
-import email
 import hashlib
 import warnings
 import argparse

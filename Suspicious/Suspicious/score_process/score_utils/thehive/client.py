@@ -2,7 +2,6 @@ import json
 import logging
 from typing import Iterable, Tuple, Optional
 
-import json
 from thehive4py import TheHiveApi
 
 from .models import (

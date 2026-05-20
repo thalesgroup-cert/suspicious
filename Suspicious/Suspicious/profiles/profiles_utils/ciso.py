@@ -1,13 +1,10 @@
 import csv
 import json
-import os
 import ldap
 from django.contrib.auth.models import User
 from profiles.models import CISOProfile
 from profiles.profiles_utils.ldap import Ldap
 import logging
-import json
-from pathlib import Path
 
 import os as _os_cfg
 CONFIG_PATH = _os_cfg.environ.get("SUSPICIOUS_CONFIG_PATH", "/app/settings.json")

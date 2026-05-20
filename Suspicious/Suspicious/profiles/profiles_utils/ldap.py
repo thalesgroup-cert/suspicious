@@ -1,4 +1,3 @@
-import os
 try:
     import ldap
 except ImportError:

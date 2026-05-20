@@ -53,7 +53,7 @@ class CaseCreator:
 
         for key, value in kwargs.items():
             fetch_mail_logger.debug(f"Processing key: {key}, value: {getattr(value, 'id', 'None')}")
-            if key == 'allow_listed' and value == True:
+            if key == 'allow_listed' and value:
                 case.results = "SAFE-ALLOW_LISTED"
                 case.final_score = 0
                 case.final_confidence = 100
