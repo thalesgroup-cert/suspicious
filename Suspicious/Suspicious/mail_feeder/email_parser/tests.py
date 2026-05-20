@@ -33,6 +33,7 @@ class EmailParserTests(TestCase):
                 email_message=msg,
                 working_dir=tmpdir,
                 email_reference="ref-123",
+                reported_by="alice@example.com",
             )
 
         self.assertIsInstance(data, EmailDataModel)
@@ -57,13 +58,15 @@ class EmailParserTests(TestCase):
 
         self.assertEqual(data.reportedBy, "override@example.com")
 
-    def test_invalid_email_fails_validation(self):
+    def test_missing_sender_fails_validation(self):
+        # from_addr is a required field; a mail with no extractable sender
+        # must be rejected by EmailDataModel.
         msg = self._build_basic_email()
-        msg.replace_header("From", "not-an-email")
+        del msg["From"]
 
         with tempfile.TemporaryDirectory() as tmpdir:
             with self.assertRaises(ValidationError):
-                parse_email(msg, tmpdir, "ref-invalid")
+                parse_email(msg, tmpdir, "ref-invalid", reported_by="reporter@example.com")
 
     def test_header_dict_decoding(self):
         msg = self._build_basic_email()
