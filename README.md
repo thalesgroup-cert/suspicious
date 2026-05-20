@@ -194,6 +194,44 @@ You can also open [issues](https://github.com/thalesgroup-cert/suspicious/issues
 
 ![Dashboard Phishing Campaigns](https://github.com/user-attachments/assets/afabf61c-ba64-4b55-8343-e4df2c3061a0)
 
+## CI/CD
+
+Continuous integration and delivery run on GitHub Actions. Four workflows
+plus Dependabot live under `.github/`.
+
+| Workflow | Trigger | What it does |
+|---|---|---|
+| `ci.yml` | PR + push to `main` | Conventional-commit lint, `ruff` lint, migration-drift check, full Django test suite, email-feeder unittest, frontend (eslint + tsc + vitest browser mode + build), and a no-push build of all four images. |
+| `release.yml` | push to `main`, tags `v*` | Builds and pushes all four images to GHCR, generates an SPDX SBOM (syft) and a build-provenance attestation per image. |
+| `codeql.yml` | PR + push to `main`, weekly | CodeQL static analysis for Python and JavaScript/TypeScript. |
+| `security.yml` | PR, weekly | Trivy filesystem scan, gitleaks secret scan, `pip-audit` (×3 requirements), `npm audit`. |
+| `dependabot.yml` | weekly | Dependency updates: pip (×3), npm, docker (×4), github-actions. |
+
+### Published images (GHCR)
+
+| Component | Image |
+|---|---|
+| Django API | `ghcr.io/thalesgroup-cert/suspicious` |
+| Frontend (Nginx) | `ghcr.io/thalesgroup-cert/suspicious-ui` |
+| Email feeder | `ghcr.io/thalesgroup-cert/suspicious-feeder` |
+| AIMailAnalyzer | `ghcr.io/thalesgroup-cert/suspicious-aimailanalyzer` |
+
+Deployment stays manual via `deployment/Makefile` (`make deploy`); CI never
+holds production credentials.
+
+### Required status checks (branch protection on `main`)
+
+Configure under Settings → Branches → branch protection for `main`:
+
+- `commit-lint`
+- `backend-lint`
+- `migration-check`
+- `backend-test`
+- `feeder-test`
+- `frontend`
+- `docker-build (suspicious)`, `docker-build (suspicious-ui)`, `docker-build (suspicious-feeder)`, `docker-build (suspicious-aimailanalyzer)`
+- `Analyze (python)`, `Analyze (javascript-typescript)`
+
 ## License
 
 Suspicious is released under the **GNU Affero General Public License v3 (AGPL-3.0)**.

@@ -1,0 +1,145 @@
+name: CI
+
+on:
+  pull_request:
+    branches: [main]
+  push:
+    branches: [main]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  commit-lint:
+    if: github.event_name == 'pull_request'
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      - uses: wagoid/commitlint-github-action@v6
+
+  backend-lint:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - run: pip install ruff
+      - name: ruff check
+        run: ruff check Suspicious/ email-feeder/ Analyzers/
+      - name: ruff format --check
+        run: ruff format --check Suspicious/ email-feeder/ Analyzers/
+
+  migration-check:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: docker/setup-buildx-action@v3
+      - name: Build backend image
+        uses: docker/build-push-action@v6
+        with:
+          context: ./Suspicious
+          load: true
+          tags: suspicious:ci
+          cache-from: type=gha
+          cache-to: type=gha,mode=max
+      - name: makemigrations --check
+        run: |
+          docker run --rm \
+            -v "${{ github.workspace }}/Suspicious/settings.ci.json":/app/settings.json:ro \
+            -e SUSPICIOUS_CONFIG_PATH=/app/settings.json -w /app/Suspicious \
+            suspicious:ci \
+            python manage.py makemigrations --check --dry-run --settings=suspicious.settings
+
+  backend-test:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: docker/setup-buildx-action@v3
+      - name: Build backend image
+        uses: docker/build-push-action@v6
+        with:
+          context: ./Suspicious
+          load: true
+          tags: suspicious:ci
+          cache-from: type=gha
+          cache-to: type=gha,mode=max
+      - name: Django test suite
+        run: |
+          docker run --rm \
+            -v "${{ github.workspace }}/Suspicious/Suspicious":/app/Suspicious \
+            -v "${{ github.workspace }}/Suspicious/settings.ci.json":/app/settings.json:ro \
+            -e SUSPICIOUS_CONFIG_PATH=/app/settings.json -w /app/Suspicious \
+            suspicious:ci \
+            python manage.py test \
+              api cortex_job tasp score_process case_handler mail_feeder.email_parser suspicious \
+              --settings=suspicious.settings -v2
+
+  feeder-test:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - name: Install feeder deps
+        working-directory: email-feeder
+        run: pip install -r requirements.txt
+      - name: unittest
+        working-directory: email-feeder
+        run: python -m unittest discover -s tests -v
+
+  frontend:
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: suspicious-ui
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "22"
+          cache: npm
+          cache-dependency-path: suspicious-ui/package-lock.json
+      - run: npm ci
+      - name: Lint
+        run: npm run lint
+      - name: Type-check
+        run: npx tsc -b
+      - name: Install Chromium for vitest browser mode
+        run: npx playwright install --with-deps chromium
+      - name: Unit tests (browser mode)
+        run: npx vitest --run
+      - name: Production build
+        run: npm run build
+
+  docker-build:
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - name: suspicious
+            context: ./Suspicious
+          - name: suspicious-ui
+            context: ./suspicious-ui
+          - name: suspicious-feeder
+            context: ./email-feeder
+    steps:
+      - uses: actions/checkout@v4
+      - uses: docker/setup-buildx-action@v3
+      - name: Build ${{ matrix.name }} (no push)
+        uses: docker/build-push-action@v6
+        with:
+          context: ${{ matrix.context }}
+          push: false
+          tags: ${{ matrix.name }}:ci
+          cache-from: type=gha,scope=${{ matrix.name }}
+          cache-to: type=gha,mode=max,scope=${{ matrix.name }}

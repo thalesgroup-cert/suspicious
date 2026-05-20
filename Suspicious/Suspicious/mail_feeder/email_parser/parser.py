@@ -2,12 +2,37 @@ import os
 import logging
 from email.message import Message
 from email.utils import getaddresses
-from typing import List, Dict, Optional
+from pathlib import Path
+from typing import List, Dict, Optional, Tuple
 
 from .utils import decode_email_header, ensure_dir
 from .models import EmailDataModel, AttachmentModel
 
 logger = logging.getLogger("tasp.cron.fetch_and_process_emails")
+
+
+def _safe_attachment_destination(
+    save_dir: str, filename: str
+) -> Optional[Tuple[Path, str]]:
+    """Confine an attachment write to save_dir.
+
+    MIME attachment filenames are attacker-controlled and must never be
+    used as a path: os.path.join(save_dir, "/abs/path") silently discards
+    save_dir, and "../" escapes it. Reduce to a basename, reject empty /
+    dot names, then verify the resolved path is still inside save_dir.
+    """
+    base_dir = Path(save_dir).resolve()
+    safe_filename = os.path.basename(os.path.normpath(filename))
+    if not safe_filename or safe_filename in {".", ".."}:
+        return None
+
+    destination = (base_dir / safe_filename).resolve()
+    try:
+        destination.relative_to(base_dir)
+    except ValueError:
+        return None
+
+    return destination, safe_filename
 
 
 # -------------------------
@@ -56,7 +81,14 @@ def extract_email_attachments(
             continue
 
         decoded_filename = decode_email_header(raw_filename)
-        filepath = os.path.join(save_dir, decoded_filename)
+        destination = _safe_attachment_destination(save_dir, decoded_filename)
+        if destination is None:
+            logger.warning(
+                f"Skipping attachment with unsafe filename: {decoded_filename!r}"
+            )
+            continue
+
+        filepath, safe_filename = destination
 
         try:
             payload = part.get_payload(decode=True)
@@ -66,7 +98,7 @@ def extract_email_attachments(
 
             attachments.append(
                 AttachmentModel(
-                    filename=decoded_filename,
+                    filename=safe_filename,
                     content=payload,
                     headers=dict(part.items()),
                     parent=email_reference
@@ -74,7 +106,7 @@ def extract_email_attachments(
             )
 
         except Exception as e:
-            logger.error(f"Failed to save attachment {decoded_filename}: {e}")
+            logger.error(f"Failed to save attachment {safe_filename}: {e}")
 
     return attachments
 

@@ -420,6 +420,13 @@ REST_FRAMEWORK = {
     "DEFAULT_PERMISSION_CLASSES": (
         "rest_framework.permissions.IsAuthenticated",
     ),
+    # JSON only in production. The Browsable API renderer ships interactive
+    # HTML forms + schema introspection — handy in dev, needless attack/info
+    # surface in prod — so it's only added when DEBUG is on.
+    "DEFAULT_RENDERER_CLASSES": (
+        ["rest_framework.renderers.JSONRenderer"]
+        + (["rest_framework.renderers.BrowsableAPIRenderer"] if DEBUG else [])
+    ),
     "DEFAULT_THROTTLE_RATES": {
         "login": "5/min",
     },

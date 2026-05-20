@@ -22,11 +22,19 @@ class InvalidOrExpiredChallengeToken(Exception):
 class CaseChallengeTokenView(APIView):
     permission_classes = [AllowAny]
 
-    def get(self, request, case_id: int):
-        query_serializer = CaseChallengeTokenQuerySerializer(data=request.query_params)
-        query_serializer.is_valid(raise_exception=True)
-
-        token = query_serializer.validated_data["token"]
+    def get(self, request, case_id: int, token: str | None = None):
+        if token is None:
+            # Legacy ?token= form.
+            query_serializer = CaseChallengeTokenQuerySerializer(data=request.query_params)
+            query_serializer.is_valid(raise_exception=True)
+            token = query_serializer.validated_data["token"]
+        else:
+            token = token.strip()
+            if not token:
+                return Response(
+                    {"detail": "Token is required."},
+                    status=status.HTTP_400_BAD_REQUEST,
+                )
 
         try:
             token_record = self._consume_token(case_id=case_id, raw_token=token)
