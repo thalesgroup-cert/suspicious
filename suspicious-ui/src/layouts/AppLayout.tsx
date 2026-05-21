@@ -724,18 +724,6 @@ export default function AppLayout() {
               >
                 Suspicious
               </Typography>
-              <Typography
-                variant="caption"
-                sx={{
-                  fontSize: 10.5,
-                  fontWeight: 600,
-                  letterSpacing: "0.06em",
-                  color: alpha(theme.palette.text.secondary, 0.7),
-                  textTransform: "uppercase",
-                }}
-              >
-                Security Triage
-              </Typography>
             </Box>
           )}
         </Stack>
