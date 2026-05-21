@@ -1,8 +1,12 @@
-import { describe, it, expect } from "vitest";
-import { fireEvent, render, screen } from "@testing-library/react";
+import { describe, it, expect, vi, afterEach } from "vitest";
+import { act, fireEvent, render, screen } from "@testing-library/react";
 import MailPreview from "@/shared/components/MailPreview";
 
 describe("MailPreview", () => {
+  afterEach(() => {
+    vi.useRealTimers();
+  });
+
   it("renders nothing for thumbnail when url is missing", () => {
     const { container } = render(<MailPreview url={null} variant="thumbnail" />);
     expect(container).toBeEmptyDOMElement();
@@ -28,12 +32,40 @@ describe("MailPreview", () => {
     expect(img.src).toContain("/api/cases/42/mail-preview.png");
   });
 
-  it("falls back to 'No preview' inline when the image fails to load", () => {
-    render(<MailPreview url="/api/cases/42/mail-preview.png" variant="thumbnail" />);
+  it("falls back to 'No preview' immediately on error when retries are disabled", () => {
+    render(
+      <MailPreview url="/api/cases/42/mail-preview.png" variant="thumbnail" maxRetries={0} />
+    );
 
-    const img = screen.getByRole("img");
-    fireEvent.error(img);
+    fireEvent.error(screen.getByRole("img"));
 
-    expect(screen.getByText(/No preview/i)).toBeInTheDocument();
+    expect(screen.getByText(/^No preview$/i)).toBeInTheDocument();
+  });
+
+  it("retries with a cache-busting param before giving up", () => {
+    vi.useFakeTimers();
+    render(
+      <MailPreview
+        url="/api/cases/42/mail-preview.png"
+        variant="full"
+        maxRetries={1}
+        retryDelayMs={1000}
+      />
+    );
+
+    // First failure schedules a retry — not "No preview" yet.
+    fireEvent.error(screen.getByRole("img"));
+    expect(screen.queryByText(/^No preview$/i)).toBeNull();
+
+    // After the delay the <img> remounts with a cache-busting query param.
+    act(() => {
+      vi.advanceTimersByTime(1000);
+    });
+    const retried = screen.getByRole("img") as HTMLImageElement;
+    expect(retried.src).toContain("r=1");
+
+    // The retry also fails — retries exhausted, fall back to "No preview".
+    fireEvent.error(retried);
+    expect(screen.getByText(/^No preview$/i)).toBeInTheDocument();
   });
 });

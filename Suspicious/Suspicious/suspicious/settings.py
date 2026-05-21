@@ -487,31 +487,42 @@ SPECTACULAR_SETTINGS = {
 # ---------------------------------------------------------------------------
 
 _storage_backend = _storage.get("backend", "local").lower()
+_DUAL_WRITE = str(_features.get("dual_storage_write", "0")).strip().lower() in {
+    "1", "true", "yes", "on",
+}
 
 if _storage_backend in {"s3", "dual"}:
-    INSTALLED_APPS.append("minio_storage")
-
+    # Read by suspicious.storage_backends.MinioMediaStorage. We use the
+    # project's own minio==7.2.20 client (via that backend) rather than
+    # django-minio-storage, which caps minio<7.2.19.
     MINIO_STORAGE_ENDPOINT      = _minio.get("endpoint",   "rustfs:9000")
     MINIO_STORAGE_ACCESS_KEY    = _minio["access_key"]
     MINIO_STORAGE_SECRET_KEY    = _minio["secret_key"]
     MINIO_STORAGE_USE_HTTPS = bool(_minio.get("secure", False))
     MINIO_STORAGE_MEDIA_BUCKET_NAME = _minio.get("media_bucket", "suspicious-media")
     MINIO_STORAGE_AUTO_CREATE_MEDIA_BUCKET = True
-
-_DUAL_WRITE = str(_features.get("dual_storage_write", "0")).lower()
+    SUSPICIOUS_STORAGE_DUAL_WRITE = _DUAL_WRITE
 
 if _storage_backend == "s3":
-    DEFAULT_FILE_STORAGE = "minio_storage.storage.MinioMediaStorage"
+    _default_file_backend = "suspicious.storage_backends.MinioMediaStorage"
 elif _storage_backend == "dual" or (_storage_backend == "local" and _DUAL_WRITE):
-    DEFAULT_FILE_STORAGE = "suspicious.storage_backends.DualStorage"
+    _default_file_backend = "suspicious.storage_backends.DualStorage"
 else:
-    DEFAULT_FILE_STORAGE = "django.core.files.storage.FileSystemStorage"
+    _default_file_backend = "django.core.files.storage.FileSystemStorage"
 
 # ---------------------------------------------------------------------------
 # Static and media files
 # ---------------------------------------------------------------------------
 
-STATICFILES_STORAGE = "whitenoise.storage.CompressedManifestStaticFilesStorage"
+# Django 5.1+ removed DEFAULT_FILE_STORAGE / STATICFILES_STORAGE in favour
+# of the STORAGES dict. "default" is the FileField backend selected above;
+# "staticfiles" keeps Django's default (WhiteNoise serves static via its
+# middleware regardless).
+STORAGES = {
+    "default": {"BACKEND": _default_file_backend},
+    "staticfiles": {"BACKEND": "django.contrib.staticfiles.storage.StaticFilesStorage"},
+}
+
 STATIC_URL  = "/static/"
 STATIC_ROOT = FILES_BASE_DIR / "static"
 
@@ -598,6 +609,10 @@ CELERY_BEAT_SCHEDULE = {
     },
     "fail-stale-jobs": {
         "task": "tasp.tasks.fail_stale_jobs",
+        "schedule": 600.0,
+    },
+    "sweep-missing-mail-previews": {
+        "task": "tasp.tasks.sweep_missing_mail_previews",
         "schedule": 600.0,
     },
     "check-challengeable": {

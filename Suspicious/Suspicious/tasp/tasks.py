@@ -122,6 +122,75 @@ def fail_stale_jobs(self):
         )
 
 
+@shared_task(bind=True, **_RETRY)
+def render_mail_preview(self, mail_id: int):
+    """Render + store one mail's .eml->PNG preview from its MinIO archive.
+
+    Sourced from the durable MinIO archive (not the ingestion workdir), so
+    it runs on the worker pool independent of the request that created the
+    mail. No-op when the mail or its fetchable archive is gone; retries on
+    transient MinIO / render errors.
+    """
+    from mail_feeder.models import Mail
+    from mail_feeder.utils.email_preview.eml2png_renderer import Eml2PngRenderer
+    from mail_feeder.utils.email_preview.preview_jobs import (
+        build_storage_client,
+        fetch_eml_bytes,
+        regenerate_mail_preview,
+    )
+
+    try:
+        mail = Mail.objects.filter(pk=mail_id).first()
+        if mail is None:
+            logger.warning("render_mail_preview: mail %s not found", mail_id)
+            return
+
+        storage = build_storage_client()
+        renderer = Eml2PngRenderer()
+        outcome = regenerate_mail_preview(
+            mail,
+            fetch_eml=lambda archive: fetch_eml_bytes(storage, archive.bucket_name),
+            renderer=renderer,
+        )
+        if outcome == "failed":
+            raise RuntimeError(f"preview render failed for mail {mail_id}")
+        logger.info("render_mail_preview: mail %s -> %s", mail_id, outcome)
+    except Exception as exc:
+        raise self.retry(exc=exc, countdown=30 * 2 ** self.request.retries)
+
+
+@shared_task(bind=True, **_RETRY)
+def sweep_missing_mail_previews(self, limit: int = 200):
+    """Self-healing backfill of missing mail previews.
+
+    Replaces the manual `regenerate_mail_previews` command for the steady
+    state: each run enqueues `render_mail_preview` for rows that (a) have
+    no preview yet and (b) own a MinIO archive with a non-empty bucket
+    (i.e. are fetchable). Bucket-less submissions are excluded so they are
+    not re-enqueued every run.
+    """
+    from mail_feeder.models import Mail
+
+    try:
+        pks = list(
+            Mail.objects.filter(
+                preview_object_key="",
+                mail_archive__bucket_name__gt="",
+            )
+            .order_by("pk")
+            .values_list("pk", flat=True)
+            .distinct()[:limit]
+        )
+        for pk in pks:
+            render_mail_preview.delay(pk)
+        if pks:
+            logger.info(
+                "sweep_missing_mail_previews: enqueued %d preview render(s)", len(pks)
+            )
+    except Exception as exc:
+        raise self.retry(exc=exc, countdown=60 * 2 ** self.request.retries)
+
+
 def _case_has_pending_jobs(case_id: int) -> bool:
     """Return True if any CaseAnalyzerJob for this case is still pending."""
     from cortex_job.models import CaseAnalyzerJob

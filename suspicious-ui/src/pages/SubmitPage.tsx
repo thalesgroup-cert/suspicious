@@ -560,7 +560,7 @@ export default function SubmitPage() {
                   Submit
                 </Typography>
                 <Typography color="text.secondary" sx={{ maxWidth: 760 }}>
-                  Send a file, URL, domain, hash, or IP for security triage.
+                  Send a file, URL, domain, hash, or IP for checks.
                   Choose the artifact type, add short factual context, and
                   submit it for analysis.
                 </Typography>

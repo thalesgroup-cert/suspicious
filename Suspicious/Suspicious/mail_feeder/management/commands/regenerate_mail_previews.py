@@ -21,14 +21,16 @@ from __future__ import annotations
 
 import logging
 import os
-import tempfile
-from pathlib import Path
 from typing import Optional
 
 from django.core.management.base import BaseCommand, CommandError
 
 from mail_feeder.models import Mail, MailArchive
 from mail_feeder.utils.email_preview.eml2png_renderer import Eml2PngRenderer
+from mail_feeder.utils.email_preview.preview_jobs import (
+    fetch_eml_bytes,
+    regenerate_mail_preview,
+)
 
 logger = logging.getLogger(__name__)
 
@@ -107,7 +109,7 @@ class Command(BaseCommand):
     def _process_one(self, *, mail: Mail, renderer: Eml2PngRenderer, storage, dry_run: bool) -> str:
         archive = MailArchive.objects.filter(mail=mail).first()
         if archive is None or not archive.bucket_name:
-            self.stdout.write(f"  mail#{mail.pk}: no MailArchive — skipped")
+            self.stdout.write(f"  mail#{mail.pk}: no fetchable MailArchive — skipped")
             return "skipped"
 
         if dry_run:
@@ -116,52 +118,25 @@ class Command(BaseCommand):
             )
             return "ok"
 
-        try:
-            eml_bytes = self._fetch_eml_bytes(storage, archive.bucket_name)
-        except Exception as exc:
-            logger.warning(
-                "regenerate_mail_previews: mail#%s fetch failed bucket=%s err=%s",
-                mail.pk, archive.bucket_name, exc,
-            )
-            self.stdout.write(self.style.WARNING(
-                f"  mail#{mail.pk}: fetch failed ({exc}) — failed"
-            ))
-            return "failed"
+        # Delegate to the shared helper that also backs the Celery tasks,
+        # so the command and the worker render previews identically.
+        outcome = regenerate_mail_preview(
+            mail,
+            fetch_eml=lambda a: fetch_eml_bytes(storage, a.bucket_name),
+            renderer=renderer,
+        )
 
-        if not eml_bytes:
+        if outcome == "ok":
+            self.stdout.write(self.style.SUCCESS(
+                f"  mail#{mail.pk}: regenerated -> {mail.preview_bucket}/{mail.preview_object_key}"
+            ))
+        elif outcome == "skipped":
             self.stdout.write(f"  mail#{mail.pk}: no .eml in bucket — skipped")
-            return "skipped"
-
-        with tempfile.NamedTemporaryFile(suffix=".eml", delete=False) as fp:
-            fp.write(eml_bytes)
-            tmp_path = Path(fp.name)
-
-        try:
-            png_bytes = renderer.render_eml_path_to_png_bytes(tmp_path)
-        finally:
-            try:
-                os.unlink(tmp_path)
-            except OSError:
-                pass
-
-        if not png_bytes:
+        else:
             self.stdout.write(self.style.WARNING(
-                f"  mail#{mail.pk}: renderer returned no bytes — failed"
+                f"  mail#{mail.pk}: render failed (see logs)"
             ))
-            return "failed"
-
-        renderer.save_preview_to_mail(mail, png_bytes)
-
-        if not mail.preview_object_key:
-            self.stdout.write(self.style.WARNING(
-                f"  mail#{mail.pk}: upload did not persist key — failed"
-            ))
-            return "failed"
-
-        self.stdout.write(self.style.SUCCESS(
-            f"  mail#{mail.pk}: regenerated -> {mail.preview_bucket}/{mail.preview_object_key}"
-        ))
-        return "ok"
+        return outcome
 
     # ------------------------------------------------------------------
     # MinIO helpers — reuse the same loader the downloads view uses so
@@ -182,40 +157,3 @@ class Command(BaseCommand):
         if not getattr(storage, "client", None):
             raise CommandError("MinIO client initialisation failed")
         return storage
-
-    @staticmethod
-    def _fetch_eml_bytes(storage, bucket_name: str) -> Optional[bytes]:
-        """Stream the previewable .eml from the bucket.
-
-        Buckets typically contain both the reporter wrapper
-        (`user_submission.eml`) and the actual reported message (any
-        other .eml). The preview must always render the reported
-        message, never the wrapper. We pick the first non-wrapper .eml
-        and only fall back to user_submission.eml when nothing else
-        exists (e.g. legacy submissions before the split).
-        """
-        objects = list(storage.client.list_objects(bucket_name, recursive=True))
-        eml_keys = [
-            getattr(o, "object_name", "") or "" for o in objects
-            if (getattr(o, "object_name", "") or "").lower().endswith(".eml")
-        ]
-        if not eml_keys:
-            return None
-
-        non_wrapper = [
-            k for k in eml_keys
-            if not k.lower().endswith("user_submission.eml")
-        ]
-        eml_key = non_wrapper[0] if non_wrapper else eml_keys[0]
-
-        response = None
-        try:
-            response = storage.client.get_object(bucket_name, eml_key)
-            return response.read()
-        finally:
-            if response is not None:
-                try:
-                    response.close()
-                    response.release_conn()
-                except Exception:
-                    pass
