@@ -600,6 +600,10 @@ CELERY_BEAT_SCHEDULE = {
         "task": "tasp.tasks.fail_stale_jobs",
         "schedule": 600.0,
     },
+    "sweep-missing-mail-previews": {
+        "task": "tasp.tasks.sweep_missing_mail_previews",
+        "schedule": 600.0,
+    },
     "check-challengeable": {
         "task": "tasp.tasks.check_challengeable",
         "schedule": crontab(hour=0, minute=0),
