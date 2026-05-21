@@ -16,7 +16,9 @@ class Mail(models.Model):
     # to leak `/media/mail_previews/...` for missing blobs). MailPreviewView
     # streams directly from MinIO using these two values.
     preview_bucket = models.CharField(max_length=255, blank=True)
-    preview_object_key = models.CharField(max_length=512, blank=True)
+    # Indexed: the sweeper scans `preview_object_key=""` to find rows
+    # still missing a rendered preview.
+    preview_object_key = models.CharField(max_length=512, blank=True, db_index=True)
     mail_header = models.ForeignKey(
         'MailHeader', on_delete=models.CASCADE, related_name='mails',
         null=True, blank=True, db_index=True
