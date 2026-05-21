@@ -5,6 +5,23 @@ import viteConfig from "./vite.config";
 export default mergeConfig(
   viteConfig,
   defineConfig({
+    // Pre-bundle the shared test dependencies up front. Otherwise a suite
+    // can be the first to import e.g. @testing-library/react mid-run, which
+    // triggers a full Vite re-optimize and invalidates the dep URLs other
+    // parallel browser suites are still fetching — surfacing as
+    // "Failed to fetch dynamically imported module .../@testing-library_react.js".
+    optimizeDeps: {
+      include: [
+        "@testing-library/react",
+        "@testing-library/dom",
+        "@testing-library/user-event",
+        "@testing-library/jest-dom",
+        "react",
+        "react-dom",
+        "react-dom/client",
+        "react/jsx-dev-runtime",
+      ],
+    },
     test: {
       globals: true,
       setupFiles: ["./src/test/setup.ts"],
