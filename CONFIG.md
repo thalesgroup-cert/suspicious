@@ -437,11 +437,10 @@ Controls SMTP settings, email content, links, social icons, and per-template log
 }
 ```
 
-To enable the Tempo backend in Docker Compose, run:
-
-```bash
-make monitor-up
-```
+To collect traces, set `observability.opentelemetry.enabled` to `true` (above)
+and start the Tempo + Grafana stack manually from its compose files under
+`deployment/docker/monitoring/` (Grafana serves on port 3000). The old
+`make monitor-up` target has been removed.
 
 ## 3. `email-feeder/config.json` — Email Ingestion Service
 

@@ -54,3 +54,8 @@ suspicious-ui/src/bones/*.bones.json
 .codegraph
 suspicious-ui/.playwright
 suspicious-ui/dist
+
+# MkDocs documentation site
+/site/
+.docs-venv/
+docs/reference/openapi.yaml
