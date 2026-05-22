@@ -43,6 +43,7 @@ validation:
 plugins:
   - search
   - include-markdown
+  - render_swagger
 
 markdown_extensions:
   - admonition
