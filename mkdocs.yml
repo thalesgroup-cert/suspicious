@@ -34,8 +34,15 @@ theme:
 exclude_docs: |
   superpowers/
 
+validation:
+  links:
+    absolute_links: ignore
+    unrecognized_links: ignore
+    not_found: ignore
+
 plugins:
   - search
+  - include-markdown
 
 markdown_extensions:
   - admonition

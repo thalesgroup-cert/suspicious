@@ -1,3 +1,3 @@
 # Contributing
 
-Dev setup, conventions, and tests.
+{% include-markdown "../CONTRIBUTING.md" heading-offset=1 %}

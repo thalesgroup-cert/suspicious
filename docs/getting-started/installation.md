@@ -1,3 +1,5 @@
 # Installation
 
-Full Docker Compose deployment: prerequisites, network, TLS, config.
+Full Docker Compose deployment.
+
+{% include-markdown "../../deployment/README.md" heading-offset=1 %}
