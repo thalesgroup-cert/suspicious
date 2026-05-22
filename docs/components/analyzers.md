@@ -7,8 +7,8 @@ the platform as a Cortex analyzer.
 
 - **Embeddings:** a Sentence Transformers model
   (`paraphrase-multilingual-mpnet-base-v2`) turns email text into vectors.
-- **Classifier:** a custom `ResNetMLP` binary classifier predicts phishing vs.
-  legitimate from the embeddings.
+- **Classifier:** an ensemble of custom `ResNetMLP` networks (several 2-class
+  models plus a 4-class danger model) predicts the verdict from the embeddings.
 - **Similarity:** ChromaDB stores vectors so finalised cases can be matched
   against prior cases for semantic similarity.
 

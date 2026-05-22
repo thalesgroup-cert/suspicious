@@ -15,7 +15,7 @@ make createsuperuser  # Create a Django admin user
 make logs [s=<svc>]   # Follow logs
 make status           # Show container health
 make backup-db        # Backup MariaDB
-make monitor-up       # Enable Tempo + Grafana
+make shell            # Bash into the web container
 ```
 
 The full installation walkthrough is in

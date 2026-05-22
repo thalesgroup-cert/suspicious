@@ -16,9 +16,9 @@ and a Celery worker.
 | `rustfs` | S3-compatible object storage (artifacts/attachments) |
 | `cortex` | Analyzer execution engine (YARA, AI, sandbox) |
 | `chromadb` | Vector DB for semantic similarity search |
-| `email_feeder` | IMAP poller that auto-ingests emails |
+| `feeder` | IMAP poller that auto-ingests emails (container `email_feeder`) |
 | `traefik` | Reverse proxy with TLS termination |
-| `tempo` / `grafana` | Optional OpenTelemetry trace store + dashboards |
+| `tempo` / `grafana` | Optional OpenTelemetry trace store + dashboards (manual setup under `deployment/docker/monitoring/`) |
 
 ## Request / Analysis flow
 
