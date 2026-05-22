@@ -44,6 +44,19 @@ plugins:
   - search
   - include-markdown
   - render_swagger
+  - mkdocstrings:
+      handlers:
+        python:
+          paths:
+            - Suspicious/Suspicious
+            - Analyzers/AIMailAnalyzer
+          options:
+            show_root_heading: true
+            show_source: false
+            members_order: source
+            docstring_section_style: table
+            filters:
+              - "!^_"
 
 markdown_extensions:
   - admonition
@@ -99,4 +112,9 @@ nav:
       - REST API: reference/rest-api.md
       - Python Code:
           - Overview: reference/index.md
+          - cortex_job models: reference/cortex_job-models.md
+          - case_handler models: reference/case_handler-models.md
+          - score_process: reference/score_process.md
+          - tasp tasks: reference/tasp-tasks.md
+          - AI Mail Analyzer: reference/aimailanalyzer.md
   - Contributing: contributing.md
