@@ -89,5 +89,6 @@ nav:
       - Integrations: operations/integrations.md
   - API Reference:
       - REST API: reference/rest-api.md
-      - Python Code: reference/index.md
+      - Python Code:
+          - Overview: reference/index.md
   - Contributing: contributing.md
