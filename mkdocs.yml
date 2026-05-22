@@ -50,3 +50,44 @@ markdown_extensions:
 
 nav:
   - Home: index.md
+  - Getting Started:
+      - Quick Start: getting-started/quick-start.md
+      - Installation: getting-started/installation.md
+      - Configuration: getting-started/configuration.md
+  - User Guide:
+      - Submitting: user-guide/submitting.md
+      - Investigations: user-guide/investigations.md
+      - Campaigns: user-guide/campaigns.md
+      - Alerts: user-guide/alerts.md
+      - Dashboard: user-guide/dashboard.md
+      - Profile & Settings: user-guide/profile.md
+  - Architecture: architecture.md
+  - Components:
+      - Backend (Django):
+          - Overview: components/backend/index.md
+          - api: components/backend/api.md
+          - case_handler: components/backend/case_handler.md
+          - cortex_job: components/backend/cortex_job.md
+          - score_process: components/backend/score_process.md
+          - email_process: components/backend/email_process.md
+          - Observable Processors: components/backend/observable-processors.md
+          - dashboard: components/backend/dashboard.md
+          - mail_feeder: components/backend/mail_feeder.md
+          - submission_queue: components/backend/submission_queue.md
+          - tasp: components/backend/tasp.md
+          - settings: components/backend/settings.md
+          - profiles: components/backend/profiles.md
+      - Frontend (React UI): components/frontend.md
+      - Email Feeder: components/email-feeder.md
+      - AI / ML Analyzers: components/analyzers.md
+      - Cortex + YARA: components/cortex-yara.md
+      - Deployment / Infra: components/deployment.md
+  - Operations:
+      - Deploy & Rollback: operations/deploy.md
+      - Backups: operations/backups.md
+      - Monitoring: operations/monitoring.md
+      - Integrations: operations/integrations.md
+  - API Reference:
+      - REST API: reference/rest-api.md
+      - Python Code: reference/index.md
+  - Contributing: contributing.md
