@@ -24,7 +24,6 @@ make shell              # Bash into the web container
 make db-shell           # Open MariaDB shell
 make backup-db          # Backup MariaDB
 make restore-db f=<file>
-make monitor-up         # Enable Tempo + Grafana (OpenTelemetry traces, port 3000)
 ```
 
 ### Frontend (`suspicious-ui/`)
@@ -65,7 +64,7 @@ python manage.py createsuperuser
 | `chromadb` | Vector DB for semantic similarity search |
 | `email_feeder` | IMAP poller that auto-ingests emails (runs as non-root `feeder` UID) |
 | `traefik` | Reverse proxy with TLS termination |
-| `tempo` / `grafana` (optional) | OpenTelemetry trace store + dashboards, started via `make monitor-up` |
+| `tempo` / `grafana` (optional) | OpenTelemetry trace store + dashboards; enable via `observability.opentelemetry.enabled` in `settings.json` and start the stack manually under `deployment/docker/monitoring/` (Grafana port 3000) |
 
 ### Request / Analysis Flow
 
