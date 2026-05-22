@@ -1,0 +1,52 @@
+site_name: Suspicious
+site_description: AI-powered phishing & threat-analysis platform
+site_url: https://thalesgroup-cert.github.io/suspicious/
+repo_url: https://github.com/thalesgroup-cert/suspicious
+repo_name: thalesgroup-cert/suspicious
+edit_uri: edit/main/docs/
+
+theme:
+  name: material
+  logo: assets/suspicious-logo.png
+  favicon: assets/suspicious-logo.png
+  features:
+    - navigation.sections
+    - navigation.tabs
+    - navigation.top
+    - navigation.indexes
+    - search.suggest
+    - content.code.copy
+    - content.tabs.link
+  palette:
+    - media: "(prefers-color-scheme: light)"
+      scheme: default
+      primary: indigo
+      toggle:
+        icon: material/brightness-7
+        name: Switch to dark mode
+    - media: "(prefers-color-scheme: dark)"
+      scheme: slate
+      primary: indigo
+      toggle:
+        icon: material/brightness-4
+        name: Switch to light mode
+
+exclude_docs: |
+  superpowers/
+
+plugins:
+  - search
+
+markdown_extensions:
+  - admonition
+  - tables
+  - pymdownx.details
+  - pymdownx.superfences
+  - pymdownx.highlight
+  - pymdownx.tabbed:
+      alternate_style: true
+  - toc:
+      permalink: true
+
+nav:
+  - Home: index.md
