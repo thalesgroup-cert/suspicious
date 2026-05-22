@@ -49,10 +49,12 @@ plugins:
         python:
           paths:
             - Suspicious/Suspicious
+            - Suspicious/Suspicious/score_process/scoring
             - Analyzers/AIMailAnalyzer
           options:
             show_root_heading: true
             show_source: false
+            show_if_no_docstring: true
             members_order: source
             docstring_section_style: table
             filters:
