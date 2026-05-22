@@ -22,6 +22,8 @@
 
 # Suspicious
 
+> 📖 **Documentation:** <https://thalesgroup-cert.github.io/suspicious/>
+
 An **AI-powered phishing & threat-analysis platform** to automatically inspect, classify, and report suspicious emails, files, URLs, IPs, and hashes built for teams and organizations.
 
 ## Why Suspicious?
