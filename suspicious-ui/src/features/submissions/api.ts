@@ -89,8 +89,19 @@ type SubmissionRawDetails = {
   analyzer_report_ids: number[];
 };
 
+export type SubmissionCaseInfos = {
+  score: number | null;
+  confidence: number | null;
+  classification: string;
+  score_ai: number | null;
+  confidence_ai: number | null;
+  classification_ai: string;
+  category_ai: string | null;
+};
+
 export type SubmissionDetails = SubmissionRow & {
   analyzer_reports: SubmissionAnalyzerReport[];
+  case_infos?: SubmissionCaseInfos;
   raw?: SubmissionRawDetails;
 };
 
@@ -116,6 +127,7 @@ export type ListSubmissionsParams = {
   ordering?: SubmissionOrdering;
   page?: number;
   page_size?: number;
+  search?: string;
 };
 
 export async function listSubmissions(
