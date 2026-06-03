@@ -110,6 +110,21 @@ class SubmissionListView(ListAPIView):
         if self._is_truthy(mine):
             queryset = queryset.filter(reporter=self.request.user)
 
+        search = (self.request.query_params.get("search") or "").strip()
+        if search:
+            id_q = Q(pk=int(search)) if search.isdigit() else Q()
+            queryset = queryset.filter(
+                id_q
+                | Q(description__icontains=search)
+                | Q(reporter__email__icontains=search)
+                | Q(reporter__username__icontains=search)
+                | Q(fileOrMail__mail__subject__icontains=search)
+                | Q(fileOrMail__file__file_path__icontains=search)
+                | Q(nonFileIocs__url__address__icontains=search)
+                | Q(nonFileIocs__ip__address__icontains=search)
+                | Q(nonFileIocs__hash__value__icontains=search)
+            ).distinct()
+
         ordering = self.request.query_params.get("ordering", "-created_at")
         db_ordering = self.ORDERING_MAP.get(ordering)
         if db_ordering is None:
@@ -129,6 +144,9 @@ class SubmissionListView(ListAPIView):
         parameters=[
             OpenApiParameter(name="mine", type=bool, location=OpenApiParameter.QUERY, required=False,
                 description="When true, restricts results to the authenticated user's submissions."),
+            OpenApiParameter(name="search", type=str, location=OpenApiParameter.QUERY, required=False,
+                description="Case-insensitive substring match across id, description, reporter, "
+                            "mail subject, file path, url/ip/hash."),
             OpenApiParameter(name="ordering", type=str, location=OpenApiParameter.QUERY, required=False,
                 enum=["created_at", "-created_at", "id", "-id", "status", "-status", "result", "-result"],
                 description="Ordering field."),

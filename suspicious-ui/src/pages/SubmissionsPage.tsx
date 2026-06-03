@@ -60,7 +60,6 @@ import {
   type SubmissionDetails,
   type SubmissionOrdering,
   type SubmissionResult,
-  type SubmissionRow,
   type SubmissionStatus,
   type SubmissionType,
 } from "@/features/submissions/api";
@@ -238,23 +237,6 @@ function fmtDate(iso: string) {
   const d = new Date(iso);
   if (Number.isNaN(d.getTime())) return iso;
   return d.toLocaleString(undefined, { year: "numeric", month: "short", day: "2-digit" });
-}
-
-function short(s: string, n = 42) {
-  const t = (s ?? "").trim();
-  return t.length > n ? t.slice(0, n - 1) + "…" : t;
-}
-
-function matches(row: SubmissionRow, q: string) {
-  const v = q.trim().toLowerCase();
-  if (!v) return true;
-  return (
-    String(row.id).includes(v) ||
-    (row.artifact ?? "").toLowerCase().includes(v) ||
-    (row.status ?? "").toLowerCase().includes(v) ||
-    (row.type ?? "").toLowerCase().includes(v) ||
-    (row.result ?? "").toLowerCase().includes(v)
-  );
 }
 
 function withinDates(rowIso: string, from?: string, to?: string) {
@@ -782,9 +764,9 @@ export default function SubmissionsPage() {
   const backendOrdering = backendOrderingFromSort;
 
   const submissionsQuery = useQuery<PaginatedSubmissionsResponse>({
-    queryKey: ["submissions", { mine: true, ordering: backendOrdering, fetchSize: 100 }],
+    queryKey: ["submissions", { mine: true, ordering: backendOrdering, fetchSize: 100, search: qDebounced }],
     queryFn: async () =>
-      listSubmissions({ mine: true, ordering: backendOrdering, page: 1, page_size: 100 }),
+      listSubmissions({ mine: true, ordering: backendOrdering, page: 1, page_size: 100, search: qDebounced || undefined }),
     enabled: !!me,
     retry: false,
     // placeholderData keeps isFetching:true until the real response lands,
@@ -912,7 +894,6 @@ export default function SubmissionsPage() {
   }, [rows, sortField, sortDir]);
 
   const filtered = clientSorted
-    .filter((r) => matches(r, qDebounced))
     .filter((r) => (status === "ALL" ? true : r.status === status))
     .filter((r) => (type === "ALL" ? true : r.type === type))
     .filter((r) => (result === "ALL" ? true : r.result === result))
@@ -1341,14 +1322,16 @@ export default function SubmissionsPage() {
                             <Tooltip title={r.artifact || ""} arrow placement="top">
                               <Typography
                                 sx={{
-                                  maxWidth: 320,
-                                  whiteSpace: "nowrap",
+                                  maxWidth: 520,
+                                  display: "-webkit-box",
+                                  WebkitLineClamp: 2,
+                                  WebkitBoxOrient: "vertical",
                                   overflow: "hidden",
-                                  textOverflow: "ellipsis",
+                                  wordBreak: "break-word",
                                   cursor: "help",
                                 }}
                               >
-                                {short(r.artifact, 60)}
+                                {r.artifact || "—"}
                               </Typography>
                             </Tooltip>
                           </Stack>
@@ -1487,6 +1470,34 @@ export default function SubmissionsPage() {
               </Box>
 
               <Stack spacing={0} divider={<Divider sx={{ opacity: isDark ? 0.12 : 0.35 }} />}>
+
+                {/* ── Verdict (read-only) ───────────────────────────────────────── */}
+                {detailsQuery.data?.case_infos ? (
+                  <Box sx={{ px: 2.25, py: 2 }}>
+                    <Typography sx={{ fontSize: 10, fontWeight: 700, textTransform: "uppercase", letterSpacing: "0.08em", color: "text.disabled", mb: 0.75 }}>
+                      Verdict
+                    </Typography>
+                    <Stack spacing={1.25}>
+                      <Stack direction="row" spacing={1} sx={{ alignItems: "center", flexWrap: "wrap" }}>
+                        <ResultChip result={String(detailsQuery.data.case_infos.classification ?? "UNKNOWN")} minWidth={BADGE_W} />
+                        <Chip size="small" label={`Score ${detailsQuery.data.case_infos.score ?? "—"}/10`} variant="outlined" sx={{ fontWeight: 800 }} />
+                        <Chip size="small" label={`Confidence ${detailsQuery.data.case_infos.confidence ?? "—"}%`} variant="outlined" sx={{ fontWeight: 800 }} />
+                      </Stack>
+                      <Stack direction="row" spacing={0.75} sx={{ opacity: 0.65, flexWrap: "wrap" }}>
+                        <Typography variant="caption" color="text.secondary" sx={{ fontWeight: 700, mr: 0.25 }}>AI:</Typography>
+                        {[
+                          `${detailsQuery.data.case_infos.classification_ai ?? "—"}`,
+                          `score ${detailsQuery.data.case_infos.score_ai ?? "—"}`,
+                          `conf ${detailsQuery.data.case_infos.confidence_ai ?? "—"}%`,
+                          detailsQuery.data.case_infos.category_ai ? `cat ${detailsQuery.data.case_infos.category_ai}` : null,
+                        ].filter(Boolean).map((label) => (
+                          <Chip key={label as string} size="small" label={label as string} variant="outlined"
+                            sx={{ height: 18, fontSize: 10, "& .MuiChip-label": { px: 0.75 } }} />
+                        ))}
+                      </Stack>
+                    </Stack>
+                  </Box>
+                ) : null}
 
                 {/* ── Artifact ──────────────────────────────────────────────────── */}
                 <Box sx={{ px: 2.25, py: 2 }}>

@@ -258,15 +258,28 @@ class SubmissionRowSerializer(BaseSubmissionSerializer):
 
 class SubmissionDetailsSerializer(SubmissionRowSerializer):
     analyzer_reports = serializers.SerializerMethodField()
+    case_infos = serializers.SerializerMethodField()
 
     class Meta(SubmissionRowSerializer.Meta):
         fields = SubmissionRowSerializer.Meta.fields + [
             "analyzer_reports",
+            "case_infos",
         ]
 
     def get_analyzer_reports(self, obj):
         reports = self.context.get("analyzer_reports", [])
         return SubmissionAnalyzerReportSerializer(reports, many=True).data
+
+    def get_case_infos(self, obj):
+        return {
+            "score": obj.final_score,
+            "confidence": obj.final_confidence,
+            "classification": normalize_case_result(obj.results),
+            "score_ai": obj.score_ai,
+            "confidence_ai": obj.confidence_ai,
+            "classification_ai": normalize_case_result(obj.results_ai),
+            "category_ai": obj.category_ai,
+        }
 
 
 class AdminSubmissionDetailsSerializer(SubmissionDetailsSerializer):
