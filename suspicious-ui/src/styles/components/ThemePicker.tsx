@@ -60,7 +60,7 @@ const META: Partial<Record<ThemeName, ThemeMeta>> = {
   paper:         { label: "Paper",         description: "Warm light theme for reviews and audit work.",  group: "Core",    emoji: "📄" },
   high_contrast: { label: "High contrast", description: "Accessibility-oriented dark theme.",            group: "Core",    emoji: "🔳" },
   the_one:       { label: "The One",       description: "A new Theme ? Who decided that ?",        group: "Classic", emoji: "👆" },
-  renee:         { label: "Renée",         description: "Atelier light — orchid, gold leaf & walnut.", group: "Classic", emoji: "🪻" },
+  renee:         { label: "Renée",         description: "Where orchid rests, life becomes memory.", group: "Classic", emoji: "🪻" },
   sunrise:       { label: "Sunrise",       description: "Peach + coral. Warm, bright, friendly.",        group: "Classic", emoji: "🌅" },
   valentine:     { label: "Valentine",     description: "Pink + berry. Soft and bold accents.",          group: "Classic", emoji: "💜" },
   cyber:         { label: "Cyber",         description: "Neon cyan/green on deep black.",                group: "Classic", emoji: "💻" },

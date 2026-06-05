@@ -7,9 +7,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [1.4.0] - 2026-06-05
 
-First release shipping the dedicated web frontend and a full documentation site,
-on top of a substantial backend re-architecture around Celery, observability, and
-resilience.
+Adds the web frontend and the documentation site, plus backend changes for Celery
+task processing, observability, and request resilience.
 
 ### Added
 

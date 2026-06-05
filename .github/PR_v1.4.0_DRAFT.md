@@ -4,10 +4,9 @@
 
 ## Summary
 
-Releases **v1.4.0**. Merges the `test` integration branch into `main`. First version
-to ship a dedicated web frontend (`suspicious-ui`) and a full MkDocs documentation
-site, on top of a large backend re-architecture around Celery, observability, and
-resilience.
+Releases **v1.4.0** by merging the `test` integration branch into `main`. Adds the
+web frontend (`suspicious-ui`) and the MkDocs documentation site, plus backend changes
+for Celery task processing, observability, and request resilience.
 
 - **284** non-merge commits since v1.3.4 — 41 feat, 52 fix, 8 perf, 24 docs, 11 ci.
 - **2766** files changed (`+61,296 / −529,873`) — frontend addition plus large cleanup.
