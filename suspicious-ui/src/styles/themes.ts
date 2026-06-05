@@ -331,7 +331,8 @@ export type ThemeName =
   | "summer"
   | "autumn"
   | "metal"
-  | "future";
+  | "future"
+  | "renee";
 
 export function getSeasonalThemeName(date = new Date()): ThemeName {
   const m = date.getMonth();
@@ -1368,6 +1369,206 @@ export const themes: Record<ThemeName, ReturnType<typeof createTheme>> = {
             backgroundImage: noiseSVG(0.06),
             backgroundBlendMode: "multiply",
           },
+        },
+      },
+    },
+  }),
+
+  // ── 17. RENÉE — atelier light, lacquered botanical ───────────────────
+  // Warm cream desk with faint walnut wood-grain; cards framed in a thin
+  // gold-leaf hairline. Orchid is the brand accent (ink #9B2FA8 for legible
+  // interactive surfaces, bloom #C667D4 for glow/fills), gold + walnut as
+  // supporting warmth, vermilion red reserved for danger.
+  // Signature: Marquetry — wood-grain ground + gold-leaf card edges (static).
+  renee: mkLight({
+    bg: "#F1E8DC",
+    paper: "#FBF6EE",
+    primary: "#9B2FA8",
+    secondary: "#9A6B12",
+    info: "#8A4FA0",
+    success: "#4E7A3A",
+    warning: "#B5730A",
+    error: "#B23A2E",
+    text: "#2A1B10",
+    // Serif display headings only; body/button intentionally inherit sansStack
+    // for legibility contrast (editorial atelier feel).
+    typography: {
+      h1: { fontFamily: serifStack, fontWeight: 800, letterSpacing: -0.5 },
+      h2: { fontFamily: serifStack, fontWeight: 800, letterSpacing: -0.3 },
+      h3: { fontFamily: serifStack, fontWeight: 750, letterSpacing: -0.1 },
+      h4: { fontFamily: serifStack, fontWeight: 700 },
+      h5: { fontFamily: serifStack, fontWeight: 700 },
+    },
+    components: {
+      MuiCssBaseline: {
+        styleOverrides: {
+          body: {
+            backgroundColor: "#F1E8DC",
+            backgroundImage: `
+              repeating-linear-gradient(94deg, rgba(107,74,50,.055) 0px, rgba(107,74,50,.02) 3px, transparent 6px, rgba(120,82,52,.045) 11px),
+              repeating-linear-gradient(94deg, rgba(80,54,34,.03) 0px, transparent 2px, transparent 7px),
+              radial-gradient(ellipse 1100px 600px at 12% -8%, rgba(198,103,212,.10), transparent 58%),
+              radial-gradient(ellipse 800px 500px at 92% 4%, rgba(199,154,46,.10), transparent 55%),
+              ${noiseSVG(0.05)}
+            `,
+            backgroundBlendMode: "normal, normal, normal, normal, multiply",
+            scrollbarWidth: "thin",
+            scrollbarColor: `${alpha("#C667D4", 0.4)} transparent`,
+            "&::-webkit-scrollbar": { width: 8, height: 8 },
+            "&::-webkit-scrollbar-thumb": {
+              borderRadius: 4,
+              backgroundColor: alpha("#C667D4", 0.32),
+              border: "2px solid transparent",
+              backgroundClip: "padding-box",
+              "&:hover": { backgroundColor: alpha("#9B2FA8", 0.45) },
+            },
+            "&::-webkit-scrollbar-track": { backgroundColor: "transparent" },
+            "::selection": { backgroundColor: alpha("#C667D4", 0.28), color: "#2A1B10" },
+          },
+        },
+      },
+      MuiPaper: {
+        styleOverrides: {
+          root: {
+            backgroundImage: "none",
+            backgroundColor: "#FBF6EE",
+            border: "none",
+            boxShadow: `0 0 0 1px ${alpha("#C79A2E", 0.42)}, 0 1px 3px rgba(74,50,30,.08)`,
+          },
+        },
+      },
+      MuiCard: {
+        styleOverrides: {
+          root: {
+            backgroundImage: "none",
+            backgroundColor: "#FBF6EE",
+            border: "none",
+            boxShadow: `0 0 0 1px ${alpha("#C79A2E", 0.55)}, 0 2px 10px rgba(74,50,30,.10)`,
+            transition: "box-shadow 160ms ease, transform 160ms ease",
+            "&:hover": {
+              boxShadow: `0 0 0 1px ${alpha("#C79A2E", 0.7)}, 0 6px 18px rgba(74,50,30,.14)`,
+              transform: "translateY(-1px)",
+            },
+          },
+        },
+      },
+      MuiButton: {
+        styleOverrides: {
+          outlined: {
+            border: `1px solid ${alpha("#9A6B12", 0.5)}`,
+            color: "#7E2390",
+            backgroundColor: alpha("#C667D4", 0.04),
+            "&:hover": {
+              backgroundColor: alpha("#9B2FA8", 0.08),
+              borderColor: alpha("#9B2FA8", 0.55),
+            },
+          },
+          text: {
+            color: "#9B2FA8",
+            "&:hover": { backgroundColor: alpha("#9B2FA8", 0.07) },
+          },
+        },
+        variants: [
+          {
+            props: { variant: "contained", color: "primary" },
+            style: {
+              backgroundImage: "linear-gradient(180deg, #9B2FA8, #7E2390)",
+              color: "#FBF1F6",
+              boxShadow: `inset 0 1px 0 ${alpha("#C79A2E", 0.3)}, 0 2px 8px ${alpha("#9B2FA8", 0.3)}`,
+              "&:hover": {
+                backgroundImage: "linear-gradient(180deg, #A93BB6, #8A2A9C)",
+                boxShadow: `inset 0 1px 0 ${alpha("#C79A2E", 0.35)}, 0 4px 14px ${alpha("#9B2FA8", 0.42)}`,
+                transform: "translateY(-1px)",
+              },
+              "&:active": { transform: "translateY(0)" },
+            },
+          },
+        ],
+      },
+      MuiOutlinedInput: {
+        styleOverrides: {
+          root: {
+            backgroundColor: "#FDFAF4",
+            "&:hover .MuiOutlinedInput-notchedOutline": {
+              borderColor: alpha("#9B2FA8", 0.45),
+            },
+            "&.Mui-focused": { boxShadow: `0 0 0 3px ${alpha("#9B2FA8", 0.12)}` },
+            "&.Mui-focused .MuiOutlinedInput-notchedOutline": { borderColor: "#9B2FA8" },
+          },
+          notchedOutline: { borderColor: alpha("#6B4A32", 0.22) },
+        },
+      },
+      MuiChip: {
+        styleOverrides: {
+          root: {
+            backgroundColor: alpha("#C667D4", 0.14),
+            border: `1px solid ${alpha("#C667D4", 0.4)}`,
+            color: "#7E2390",
+          },
+        },
+      },
+      MuiTableCell: {
+        styleOverrides: {
+          head: {
+            fontSize: 11.5,
+            fontWeight: 750,
+            textTransform: "uppercase",
+            letterSpacing: 0.6,
+            color: alpha("#9A6B12", 0.95),
+            backgroundColor: alpha("#C79A2E", 0.08),
+            borderBottom: `1px solid ${alpha("#6B4A32", 0.18)}`,
+          },
+        },
+      },
+      MuiTableRow: {
+        styleOverrides: {
+          root: { "&:hover": { backgroundColor: alpha("#9B2FA8", 0.03) } },
+        },
+      },
+      MuiDivider: {
+        styleOverrides: {
+          root: { borderColor: alpha("#6B4A32", 0.16) },
+        },
+      },
+      MuiLinearProgress: {
+        styleOverrides: {
+          root: { borderRadius: 999, backgroundColor: alpha("#C79A2E", 0.16), height: 5 },
+          bar: {
+            borderRadius: 999,
+            backgroundImage: "linear-gradient(90deg, #9B2FA8, #C667D4)",
+          },
+        },
+      },
+      MuiSwitch: {
+        styleOverrides: {
+          switchBase: {
+            "&.Mui-checked": {
+              color: "#9B2FA8",
+              "& + .MuiSwitch-track": { backgroundColor: alpha("#9B2FA8", 0.45), opacity: 1 },
+            },
+          },
+          track: { backgroundColor: alpha("#6B4A32", 0.24), opacity: 1 },
+        },
+      },
+      MuiTabs: {
+        styleOverrides: {
+          indicator: {
+            backgroundColor: "#9B2FA8",
+            height: 2,
+            borderRadius: 1,
+            boxShadow: `0 0 8px ${alpha("#C667D4", 0.5)}`,
+          },
+        },
+      },
+      MuiTooltip: {
+        styleOverrides: {
+          tooltip: {
+            backgroundColor: "#2A1B10",
+            color: "#F1E8DC",
+            boxShadow: "0 4px 16px rgba(42,27,16,.3)",
+            border: "none",
+          },
+          arrow: { color: "#2A1B10" },
         },
       },
     },
