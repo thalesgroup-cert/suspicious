@@ -1374,7 +1374,7 @@ export const themes: Record<ThemeName, ReturnType<typeof createTheme>> = {
     },
   }),
 
-  // ── RENÉE — atelier light, lacquered botanical ───────────────────────
+  // ── 17. RENÉE — atelier light, lacquered botanical ───────────────────
   // Warm cream desk with faint walnut wood-grain; cards framed in a thin
   // gold-leaf hairline. Orchid is the brand accent (ink #9B2FA8 for legible
   // interactive surfaces, bloom #C667D4 for glow/fills), gold + walnut as
@@ -1390,6 +1390,8 @@ export const themes: Record<ThemeName, ReturnType<typeof createTheme>> = {
     warning: "#B5730A",
     error: "#B23A2E",
     text: "#2A1B10",
+    // Serif display headings only; body/button intentionally inherit sansStack
+    // for legibility contrast (editorial atelier feel).
     typography: {
       h1: { fontFamily: serifStack, fontWeight: 800, letterSpacing: -0.5 },
       h2: { fontFamily: serifStack, fontWeight: 800, letterSpacing: -0.3 },

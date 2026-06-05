@@ -5,9 +5,9 @@ import {
   AppThemeProvider,
   hydrateThemeFromServer,
   useThemeMode,
+  THEME_CAPABILITIES,
 } from "@/styles/ThemeStore";
 import { themes } from "@/styles/themes";
-import { THEME_CAPABILITIES } from "@/styles/ThemeStore";
 
 const STORAGE_KEY = "suspicious.theme";
 const STORAGE_KEY_AUTO = "suspicious.theme.auto";
@@ -89,6 +89,10 @@ describe("ThemeStore", () => {
 });
 
 describe("Renée theme", () => {
+  beforeEach(() => {
+    localStorage.clear();
+  });
+
   it("is registered as a valid light theme with the orchid-ink palette", () => {
     expect("renee" in themes).toBe(true);
 

@@ -124,6 +124,8 @@ export const THEME_CAPABILITIES: Record<ThemeName, ThemeCapabilities> = {
     effects:        {},
   },
 
+  // Grouped under "Classic" in ThemePicker, but a light theme — kept here with
+  // the other light base themes.
   renee: {
     label:       "Renée",
     description: "Atelier light — orchid, gold leaf & walnut marquetry.",
