@@ -1,5 +1,6 @@
 # api/serializers/submit.py
 import ipaddress
+import socket
 import zipfile as _zipfile
 from urllib.parse import urlparse
 
@@ -32,27 +33,15 @@ class OptionalContextMixin(serializers.Serializer):
         return context.strip()
 
 
-def _check_no_ssrf_ip(url: str) -> None:
+def _is_blocked_addr(addr: ipaddress._BaseAddress) -> bool:
+    """True if an IP address is private, reserved, or otherwise off-limits.
+
+    Unwraps IPv4-mapped IPv6 (``::ffff:127.0.0.1``) so the mapped IPv4 is
+    evaluated, not the harmless-looking IPv6 wrapper.
     """
-    Reject URLs whose hostname is a private/reserved IP address literal.
-
-    Raises ValueError for blocked addresses. Domain names are not resolved
-    here — DNS-time checks are phase-2 work.
-
-    Blocked: loopback, RFC-1918 private, link-local (169.254.x.x / fe80::),
-             unique-local IPv6 (fc00::/7), multicast, reserved, unspecified,
-             CGNAT (100.64.0.0/10, RFC 6598).
-    """
-    hostname = urlparse(url).hostname  # strips [] from IPv6 literals; None-safe
-    if not hostname:
-        return
-
-    try:
-        addr = ipaddress.ip_address(hostname)
-    except ValueError:
-        return  # hostname is a domain name — pass through
-
-    if (
+    if isinstance(addr, ipaddress.IPv6Address) and addr.ipv4_mapped:
+        addr = addr.ipv4_mapped
+    return (
         addr.is_loopback
         or addr.is_private
         or addr.is_link_local
@@ -60,8 +49,84 @@ def _check_no_ssrf_ip(url: str) -> None:
         or addr.is_reserved
         or addr.is_unspecified
         or any(addr in net for net in _BLOCKED_NETWORKS)
-    ):
-        raise ValueError("URL targets a private or reserved address.")
+    )
+
+
+def _looks_like_numeric_host(host: str) -> bool:
+    """True for ambiguous numeric host encodings that HTTP clients resolve to
+    IPv4 but ``ipaddress.ip_address`` rejects as literals — e.g. decimal
+    ``2130706433``, hex ``0x7f000001``, or octal ``0177.0.0.1`` (all 127.0.0.1).
+
+    No legitimate DNS hostname is purely numeric/hex, so treating these as
+    suspicious is safe.
+    """
+    h = host.strip(".")
+    if not h:
+        return False
+    if h.isdigit():                       # packed decimal (e.g. 2130706433)
+        return True
+    if h.lower().startswith("0x"):        # packed hex (e.g. 0x7f000001)
+        return True
+    parts = h.split(".")
+    if len(parts) <= 4:
+        for p in parts:
+            if not p:
+                return True
+            if p.lower().startswith("0x"):               # hex octet
+                return True
+            if p.startswith("0") and p != "0" and p.isdigit():  # octal octet
+                return True
+    return False
+
+
+def _check_no_ssrf_ip(url: str) -> None:
+    """
+    Reject URLs that point at private/reserved addresses, including via DNS.
+
+    Defences:
+      1. IP literals (v4/v6, incl. IPv4-mapped) checked against the block list.
+      2. Ambiguous numeric host encodings (decimal/hex/octal) rejected.
+      3. Domain names are resolved and **every** returned address is checked,
+         so a hostname that resolves to a private/metadata IP is blocked.
+
+    Blocked addresses: loopback, RFC-1918 private, link-local
+    (169.254.x.x / fe80::, covers cloud metadata 169.254.169.254),
+    unique-local IPv6 (fc00::/7), multicast, reserved, unspecified,
+    CGNAT (100.64.0.0/10, RFC 6598).
+
+    Raises ValueError when a blocked target is detected.
+    """
+    hostname = urlparse(url).hostname  # strips [] from IPv6 literals; None-safe
+    if not hostname:
+        return
+
+    # 1. Literal IP address?
+    try:
+        addr = ipaddress.ip_address(hostname)
+    except ValueError:
+        addr = None
+    if addr is not None:
+        if _is_blocked_addr(addr):
+            raise ValueError("URL targets a private or reserved address.")
+        return
+
+    # 2. Ambiguous numeric encodings that aren't valid literals but resolve to IPv4.
+    if _looks_like_numeric_host(hostname):
+        raise ValueError("URL host is an ambiguous numeric address.")
+
+    # 3. Resolve the domain and check every address it maps to (DNS rebinding).
+    try:
+        infos = socket.getaddrinfo(hostname, None)
+    except socket.gaierror:
+        return  # unresolvable now — any later fetch fails closed anyway
+    for info in infos:
+        ip = info[4][0]
+        try:
+            resolved = ipaddress.ip_address(ip)
+        except ValueError:
+            continue
+        if _is_blocked_addr(resolved):
+            raise ValueError("URL resolves to a private or reserved address.")
 
 
 class SubmitUrlSerializer(OptionalContextMixin, serializers.Serializer):

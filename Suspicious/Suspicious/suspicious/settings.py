@@ -130,6 +130,28 @@ if not DEBUG:
     SESSION_COOKIE_SECURE          = True
     CSRF_COOKIE_SECURE             = True
 
+# Fail fast on insecure configuration so a misconfigured production deploy
+# refuses to start instead of running silently exposed.
+from django.core.exceptions import ImproperlyConfigured  # noqa: E402
+
+if SECRET_KEY in ("", "CHANGE_ME"):
+    raise ImproperlyConfigured(
+        "app.secret_key is unset or still the placeholder 'CHANGE_ME'; "
+        "generate a unique random key."
+    )
+
+if not DEBUG:
+    if "*" in ALLOWED_HOSTS:
+        raise ImproperlyConfigured(
+            "ALLOWED_HOSTS must not contain '*' in production; "
+            "set app.allowed_hosts to explicit hostnames."
+        )
+    if SECRET_KEY.startswith("django-insecure") or len(SECRET_KEY) < 50:
+        raise ImproperlyConfigured(
+            "app.secret_key is too weak for production: drop the "
+            "'django-insecure' prefix and use at least 50 random characters."
+        )
+
 # ---------------------------------------------------------------------------
 # Application definition
 # ---------------------------------------------------------------------------
