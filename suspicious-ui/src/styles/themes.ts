@@ -349,10 +349,8 @@ export function getSeasonalThemeName(date = new Date()): ThemeName {
 
 export const themes: Record<ThemeName, ReturnType<typeof createTheme>> = {
 
-  // ── 1. MIDNIGHT — deep space, void black, aurora horizon ─────────────
-  // Not just dark navy — a true cosmic void with electric blue light
-  // bleeding in from the corners like aurora borealis through a server
-  // room window at 3 AM. Glass surfaces, deep depth, cold precision.
+  // ── 1. MIDNIGHT — dark ───────────────────────────────────────────────
+  // Near-black background with blue corner glows and blurred glass surfaces.
   midnight: mkDark({
     bg: "#03050D",
     paper: "#070C1A",
@@ -536,10 +534,8 @@ export const themes: Record<ThemeName, ReturnType<typeof createTheme>> = {
     },
   }),
 
-  // ── 2. GRAPHITE — industrial matte, military briefing room ───────────
-  // Everything recedes except what matters. No glass, no glow, no apology.
-  // Steel blue in a charcoal void. Mission-critical clarity.
-  // Signature: flat matte surfaces + left-stripe cards like classified files.
+  // ── 2. GRAPHITE — dark ───────────────────────────────────────────────
+  // Flat matte charcoal surfaces, steel-blue accent, left-stripe cards.
   graphite: mkDark({
     bg: "#0A0C10",
     paper: "#0F1318",
@@ -715,10 +711,8 @@ export const themes: Record<ThemeName, ReturnType<typeof createTheme>> = {
     },
   }),
 
-  // ── 3. SLATE — blueprint engineering, technical schematic ────────────
-  // Blue ink on dark paper. Fine graph-paper grid, mono everywhere,
-  // dimension-line cards. Reading a CAD schematic at 1x zoom.
-  // Signature: double grid (major + minor) + registration-mark card corners.
+  // ── 3. SLATE — dark ──────────────────────────────────────────────────
+  // Blueprint look: graph-paper grid, monospace, registration-mark cards.
   slate: mkDark({
     bg: "#07101D",
     paper: "#0C1828",
@@ -931,10 +925,8 @@ export const themes: Record<ThemeName, ReturnType<typeof createTheme>> = {
     },
   }),
 
-  // ── 4. LIGHT — clean enterprise product, polished elevation ──────────
-  // White surfaces with a precise three-level shadow system. No textures,
-  // no gradients — clarity is the feature. Blue is the only accent.
-  // Signature: shadow-based depth hierarchy, not borders or color fills.
+  // ── 4. LIGHT — light ─────────────────────────────────────────────────
+  // White surfaces, three-level shadow depth, blue accent, no textures.
   light: mkLight({
     bg: "#F3F4F6",
     paper: "#FFFFFF",
@@ -1132,10 +1124,8 @@ export const themes: Record<ThemeName, ReturnType<typeof createTheme>> = {
     },
   }),
 
-  // ── 5. PAPER — archival ink on physical paper ────────────────────────
-  // Not a flat white UI with a serif font. The whole surface IS paper:
-  // grain, warmth, weight, shadow. Like annotating a printed threat brief.
-  // Signature: stacked-paper shadows, noise on every surface, ink typography.
+  // ── 5. PAPER — light ─────────────────────────────────────────────────
+  // Warm paper surfaces with grain/noise, stacked-paper shadows, serif type.
   paper: mkLight({
     bg: "#EDE8DF",
     paper: "#FAF7F2",
@@ -1374,12 +1364,10 @@ export const themes: Record<ThemeName, ReturnType<typeof createTheme>> = {
     },
   }),
 
-  // ── 17. RENÉE — atelier light, lacquered botanical ───────────────────
-  // Warm cream desk with faint walnut wood-grain; cards framed in a thin
-  // gold-leaf hairline. Orchid is the brand accent (ink #9B2FA8 for legible
-  // interactive surfaces, bloom #C667D4 for glow/fills), gold + walnut as
-  // supporting warmth, vermilion red reserved for danger.
-  // Signature: Marquetry — wood-grain ground + gold-leaf card edges (static).
+  // ── 17. RENÉE — light ────────────────────────────────────────────────
+  // Cream background with walnut wood-grain and gold-leaf card edges.
+  // Orchid primary: ink #9B2FA8 for text/buttons, bloom #C667D4 for fills/glow.
+  // Gold and walnut accents; red reserved for errors.
   renee: mkLight({
     bg: "#F1E8DC",
     paper: "#FBF6EE",
@@ -1574,11 +1562,9 @@ export const themes: Record<ThemeName, ReturnType<typeof createTheme>> = {
     },
   }),
 
-  // ── 6. HIGH CONTRAST — accessible and visually intentional ───────────
-  // WCAG AAA throughout. Pure black + pure white + four vivid semantics.
-  // Yellow (#FFD600) replaces white as primary — 14.7:1 contrast on black,
-  // more distinctive, still fully accessible. Sharp corners, 2px borders.
-  // Signature: yellow-on-black system, dramatic focus rings, no ambiguity.
+  // ── 6. HIGH CONTRAST — dark, WCAG AAA ────────────────────────────────
+  // Black/white + yellow (#FFD600) primary (14.7:1 on black), sharp corners,
+  // 2px borders, strong focus rings.
   high_contrast: mkDark({
     bg: "#000000",
     paper: "#0A0A0A",
@@ -1864,11 +1850,8 @@ export const themes: Record<ThemeName, ReturnType<typeof createTheme>> = {
     },
   }),
 
-  // ── 7. SUNRISE — Miami beach at dawn, Art Deco warmth ────────────────
-  // Hot coral melting into amber melting into gold. The sky before the
-  // city wakes up. Ocean breeze, warm glass, soft shadows like sand.
-  // Pill everything. Gradient everything. Zero sharp edges.
-  // Signature: layered sunrise sky backdrop + warm glass cards + full-pill UI.
+  // ── 7. SUNRISE — light ───────────────────────────────────────────────
+  // Warm coral/amber/gold gradients, glass cards, fully rounded controls.
   sunrise: mkLight({
     bg: "#FFF0E8",
     paper: "#FFFFFF",
@@ -2098,11 +2081,8 @@ export const themes: Record<ThemeName, ReturnType<typeof createTheme>> = {
     },
   }),
 
-  // ── 8. VALENTINE — roses blooming on the battlefield ─────────────────
-  // Deep crimson meets crystal. The contrast between fragile beauty and
-  // dark tension — petal-soft glass surfaces over shadows that hint at
-  // danger. Not pastel pink. Rich rose, velvet dark, magenta bloom.
-  // Signature: rose-petal glass cards + crimson-to-magenta gradients + dark corners.
+  // ── 8. VALENTINE — dark ──────────────────────────────────────────────
+  // Crimson-to-magenta gradients, glass cards, dark corners.
   valentine: mkLight({
     bg: "#FBF0F4",
     paper: "#FFFFFF",
@@ -2326,11 +2306,8 @@ export const themes: Record<ThemeName, ReturnType<typeof createTheme>> = {
     },
   }),
 
-  // ── 9. CYBER — digital abyss, neon matrix, void terminal ─────────────
-  // A black void with depth. Electric cyan + hot magenta neon. CRT
-  // scanlines burned into every surface. Monospace everything.
-  // The digital world staring back — infinite, cold, luminous.
-  // Signature: scanlines in every surface + dual neon border split + heading glow.
+  // ── 9. CYBER — dark ──────────────────────────────────────────────────
+  // Black background, cyan + magenta neon, CRT scanlines, monospace, glow.
   cyber: mkDark({
     bg: "#020408",
     paper: "#040810",
