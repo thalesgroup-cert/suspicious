@@ -1,12 +1,12 @@
 # 🧳 Email Process Module
 
-This module is part of a Django-based application that provides functionality to manage the emails that are submitted to suspicious either via mail or simple submission. It includes standard Django components (models, views, urls) and custom utilities for email handling.
+This module is a Django app that manages the emails that are submitted to suspicious either via mail or simple submission. It includes standard Django components (models, views, urls) and custom utilities for email handling.
 
 ---
 
 ## 📦 Overview
 
-The `email_process` app is designed to:
+The `email_process` app:
 
 - Manage emails through Django models and views
 - Provide APIs for CRUD operations on emails

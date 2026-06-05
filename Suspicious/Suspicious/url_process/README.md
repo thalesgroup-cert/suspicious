@@ -1,12 +1,12 @@
 # 🧳 Url Process Module
 
-This module is part of a Django-based application that provides functionality to manage the urls that are submitted to suspicious either via mail or simple submission. It includes standard Django components (models, views, urls) and custom utilities for url handling.
+This module is a Django app that manages the urls that are submitted to suspicious either via mail or simple submission. It includes standard Django components (models, views, urls) and custom utilities for url handling.
 
 ---
 
 ## 📦 Overview
 
-The `url_process` app is designed to:
+The `url_process` app:
 
 - Manage urls through Django models and views
 - Provide APIs for CRUD operations on urls
