@@ -36,7 +36,7 @@ class APIKey(models.Model):
 
 class Theme(models.TextChoices):
     """
-    Enumeration of possible suspicious theme.
+    Enumeration of available UI themes.
     """
     MIDNIGHT = "midnight", _("Midnight")
     GRAPHITE = "graphite", _("Graphite")
@@ -54,6 +54,7 @@ class Theme(models.TextChoices):
     WINTER = "winter", _("Winter")
     SPRING = "spring", _("Spring")
     AUTUMN = "autumn", _("Autumn")
+    RENEE = "renee", _("Renée")
 
 class UserProfile(models.Model):
     def default_semantic_colors():
