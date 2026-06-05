@@ -176,25 +176,33 @@ You can also open [issues](https://github.com/thalesgroup-cert/suspicious/issues
 
 ## Screenshots
 
+### Login Page
+
+![Login page screenshot](https://github.com/user-attachments/assets/369bb27e-d599-4ce2-8d3b-19a7907118cf)
+
 ### Home Page
 
-![Home page screenshot](https://github.com/user-attachments/assets/51a1a6cb-d58b-4175-996f-dc6cf2fc8345)
+![Home page screenshot](https://github.com/user-attachments/assets/6ef12c50-aa1b-40bc-97cc-0cf44ea5619c)
 
 ### User Submissions
 
-![User Submissions](https://github.com/user-attachments/assets/23c61439-78d4-4aa3-aa54-db8fd21a028f)
+![User Submissions](https://github.com/user-attachments/assets/ff902bf9-b901-4e74-a93a-4f34075268d4)
 
 ### Submit Page
 
-![Submit Page](https://github.com/user-attachments/assets/949d789b-b034-44e7-9a97-57361853c0a0)
+![Submit Page](https://github.com/user-attachments/assets/3e48d701-ecf8-44aa-9ef0-be376d86540f)
+
+### Profile Page
+
+![Profile Page](https://github.com/user-attachments/assets/fc75cdff-45d6-4f28-8018-62178408bb23)
 
 ### Dashboard Classic
 
-![Dashboard Classic](https://github.com/user-attachments/assets/a9b6200a-c6b5-4114-b77d-c36f3214a6af)
+![Dashboard Classic](https://github.com/user-attachments/assets/d1029844-e216-4701-93f6-afaef04764fb)
 
 ### Dashboard Phishing Campaigns
 
-![Dashboard Phishing Campaigns](https://github.com/user-attachments/assets/afabf61c-ba64-4b55-8343-e4df2c3061a0)
+![Dashboard Phishing Campaigns](https://github.com/user-attachments/assets/ef83f242-46c0-43ee-ae58-11064b51f681)
 
 ## CI/CD
 
