@@ -1,12 +1,12 @@
 # 🧳 Score Process Module
 
-This module is part of a Django-based application that provides functionality to manage the scores that are submitted to suspicious either via mail or simple submission. It includes standard Django components (models, views, urls) and custom utilities for score handling.
+This module is a Django app that manages the scores that are submitted to suspicious either via mail or simple submission. It includes standard Django components (models, views, urls) and custom utilities for score handling.
 
 ---
 
 ## 📦 Overview
 
-The `score_process` app is designed to:
+The `score_process` app:
 
 - Manage scores through Django models and views
 - Provide APIs for CRUD operations on scores

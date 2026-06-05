@@ -1,12 +1,12 @@
 # 🧳 Case Handler Module
 
-This module is part of a Django-based application that provides functionality to manage and update cases. It includes standard Django components (models, views, urls) and custom utilities for case creation, handling, and scoring.
+This module is a Django app that manages and updates cases. It includes standard Django components (models, views, urls) and custom utilities for case creation, handling, and scoring.
 
 ---
 
 ## 📦 Overview
 
-The `case_handler` app is designed to:
+The `case_handler` app:
 - Manage cases through Django models and views
 - Provide APIs for CRUD operations on cases
 - Offer utility scripts to handle and automate case creation and updating

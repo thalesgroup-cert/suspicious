@@ -349,6 +349,25 @@ THEME_PALETTES: dict[str, dict[str, str]] = {
         "cta_text":    "#0D0905",
         "footer_text": "#E8DED0",
     },
+
+    # ── 17. RENÉE ─────────────────────────────────────────────────────────
+    # bg:#F1E8DC  paper:#FBF6EE  primary:#9B2FA8  accent bloom:#C667D4  text:#2A1B10
+    # Light atelier theme: orchid ink primary, gold/walnut accents.
+    "renee": {
+        "bg":          "#F1E8DC",
+        "surface":     "#FBF6EE",
+        "header_bg":   "#2A1B10",
+        "header_text": "#F1E8DC",
+        "accent":      "#9B2FA8",
+        "accent_text": "#FBF1F6",
+        "body_text":   "#2A1B10",
+        "muted":       "#6B4A32",
+        "border":      "#E7D6AE",
+        "link":        "#9B2FA8",
+        "cta_bg":      "#9B2FA8",
+        "cta_text":    "#FBF1F6",
+        "footer_text": "#F1E8DC",
+    },
 }
 
 # Fall back to graphite when the theme value is missing or unrecognised

@@ -1,12 +1,12 @@
 # 🧳 Dashboard Module
 
-This module is part of a Django-based application that provides functionality to manage the KPIs and the Dashboard page of the app. It includes standard Django components (models, views, urls) and custom utilities for kpi handling.
+This module is a Django app that manages the KPIs and the Dashboard page of the app. It includes standard Django components (models, views, urls) and custom utilities for kpi handling.
 
 ---
 
 ## 📦 Overview
 
-The `dashboard` app is designed to:
+The `dashboard` app:
 
 - Manage KPIs through Django models and views
 - Provide APIs for CRUD operations on cases

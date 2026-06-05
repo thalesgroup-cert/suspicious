@@ -90,7 +90,7 @@ export const THEME_CAPABILITIES: Record<ThemeName, ThemeCapabilities> = {
 
   graphite: {
     label:       "Graphite",
-    description: "Dark default — carbon surface, neutral accents.",
+    description: "Dark default, carbon surface, neutral accents.",
     isDark: true,
     utilityClasses: [],
     cssVars:        [],
@@ -99,7 +99,7 @@ export const THEME_CAPABILITIES: Record<ThemeName, ThemeCapabilities> = {
 
   slate: {
     label:       "Slate",
-    description: "Cool blue-grey dark — material inspired.",
+    description: "Cool blue-grey dark, material inspired.",
     isDark: true,
     utilityClasses: [],
     cssVars:        [],
@@ -108,7 +108,7 @@ export const THEME_CAPABILITIES: Record<ThemeName, ThemeCapabilities> = {
 
   light: {
     label:       "Light",
-    description: "Clean light theme — high readability, minimal chrome.",
+    description: "Clean light theme, high readability, minimal chrome.",
     isDark: false,
     utilityClasses: [],
     cssVars:        [],
@@ -117,7 +117,7 @@ export const THEME_CAPABILITIES: Record<ThemeName, ThemeCapabilities> = {
 
   paper: {
     label:       "Paper",
-    description: "Warm off-white with grain texture — analogue writing feel.",
+    description: "Warm off-white with grain texture, analogue writing feel.",
     isDark: false,
     utilityClasses: [],
     cssVars:        [],
@@ -128,7 +128,7 @@ export const THEME_CAPABILITIES: Record<ThemeName, ThemeCapabilities> = {
   // the other light base themes.
   renee: {
     label:       "Renée",
-    description: "Atelier light — orchid, gold leaf & walnut marquetry.",
+    description: "Where orchid rests, life becomes memory.",
     isDark: false,
     utilityClasses: [],
     cssVars:        [],
@@ -137,7 +137,7 @@ export const THEME_CAPABILITIES: Record<ThemeName, ThemeCapabilities> = {
 
   high_contrast: {
     label:       "High Contrast",
-    description: "WCAG AAA — maximum legibility, forced-colors passthrough.",
+    description: "WCAG AAA, maximum legibility, forced-colors passthrough.",
     isDark: true,
     utilityClasses: [],
     cssVars:        [],
@@ -148,7 +148,7 @@ export const THEME_CAPABILITIES: Record<ThemeName, ThemeCapabilities> = {
 
   midnight: {
     label:       "Midnight",
-    description: "Deep space glass — deep navy, starfield specks, blur surfaces.",
+    description: "Deep space glass, deep navy, starfield specks, blur surfaces.",
     isDark: true,
     utilityClasses: [],
     cssVars:        [],
@@ -157,7 +157,7 @@ export const THEME_CAPABILITIES: Record<ThemeName, ThemeCapabilities> = {
 
   sunrise: {
     label:       "Sunrise",
-    description: "Miami beach glass — coral & gold on bleached linen.",
+    description: "Miami beach glass, coral & gold on bleached linen.",
     isDark: false,
     utilityClasses: [],
     cssVars:        [],
@@ -166,7 +166,7 @@ export const THEME_CAPABILITIES: Record<ThemeName, ThemeCapabilities> = {
 
   valentine: {
     label:       "Valentine",
-    description: "Rose crystal glass — crimson hearts, bloom petals.",
+    description: "Rose crystal glass, crimson hearts, bloom petals.",
     isDark: true,
     utilityClasses: [],
     cssVars:        [],
@@ -219,7 +219,7 @@ export const THEME_CAPABILITIES: Record<ThemeName, ThemeCapabilities> = {
 
   cyber: {
     label:       "Cyber",
-    description: "Neon cyan/magenta on void black — CRT scanlines, matrix abyss.",
+    description: "Neon cyan/magenta on void black,  CRT scanlines, matrix abyss.",
     isDark: true,
     utilityClasses: [],
     cssVars:        [],
@@ -229,9 +229,7 @@ export const THEME_CAPABILITIES: Record<ThemeName, ThemeCapabilities> = {
   the_one: {
     label:       "The One",
     description: "Escanor's blazing noon — liquid gold, solar crown shimmer.",
-    lore:        "«Who decided that? … It was I.» — Escanor, Seven Deadly Sins. "
-               + "The theme channels The One's divine solar power at high noon: "
-               + "gold that blinds, light that no shadow can withstand.",
+    lore:        "«Who decided that? … It was I.» — Escanor, Seven Deadly Sins. ",
     isDark: true,
     utilityClasses: [],
     cssVars:        [],
@@ -241,10 +239,7 @@ export const THEME_CAPABILITIES: Record<ThemeName, ThemeCapabilities> = {
   metal: {
     label:       "Metal",
     description: "MGS stealth-ops — tactical browns, codec teal, alert siren red.",
-    lore:        "A love letter to Hideo Kojima's Metal Gear Solid saga. "
-               + "Cardboard-box disguise, Codec frequency overlays, "
-               + "ALERT / CAUTION state transitions, radar sweep, and Snake's "
-               + "eternal question: «Are you there, Colonel?»",
+    lore:        "A love letter to Hideo Kojima's Metal Gear Solid saga. ",
     isDark: true,
     utilityClasses: ["cardboard-box", "stealth-camo", "hud-alertable"],
     cssVars: [
@@ -264,10 +259,7 @@ export const THEME_CAPABILITIES: Record<ThemeName, ThemeCapabilities> = {
   future: {
     label:       "Future",
     description: "2555 Paris in ruins — Visitor's amber coat, Brigade steel blue, irradiated green.",
-    lore:        "«Here's what's gonna happen...» — Le Visiteur du Futur (web series 2009–2012, film 2022). "
-               + "The Visitor time-travels to prevent the ecological apocalypse of 2555. "
-               + "The Brigade Temporelle, temporal paradoxes, and a bracelet "
-               + "that always has just enough charge for one more jump.",
+    lore:        "«Here's what's gonna happen...» — Le Visiteur du Futur (web series 2009–2012, film 2022). ",
     isDark: true,
     utilityClasses: [
       "temporal-arrive",  // element enters as if stepping out of a portal

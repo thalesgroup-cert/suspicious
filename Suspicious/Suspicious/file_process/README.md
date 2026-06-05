@@ -1,12 +1,12 @@
 # 🧳 File Process Module
 
-This module is part of a Django-based application that provides functionality to manage the files that are submitted to suspicious either via mail or simple submission. It includes standard Django components (models, views, urls) and custom utilities for file handling.
+This module is a Django app that manages the files that are submitted to suspicious either via mail or simple submission. It includes standard Django components (models, views, urls) and custom utilities for file handling.
 
 ---
 
 ## 📦 Overview
 
-The `file_process` app is designed to:
+The `file_process` app:
 
 - Manage files through Django models and views
 - Provide APIs for CRUD operations on files

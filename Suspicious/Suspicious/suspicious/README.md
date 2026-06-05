@@ -1,6 +1,6 @@
 # 🧳 Suspicious app
 
-This app is part of a Django-based application that provides functionality to manage the overall app.
+The project's core Django app: shared settings, URL routing, and the entry points that tie the other apps together.
 
 ---
 
