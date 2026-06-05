@@ -124,6 +124,15 @@ export const THEME_CAPABILITIES: Record<ThemeName, ThemeCapabilities> = {
     effects:        {},
   },
 
+  renee: {
+    label:       "Renée",
+    description: "Atelier light — orchid, gold leaf & walnut marquetry.",
+    isDark: false,
+    utilityClasses: [],
+    cssVars:        [],
+    effects:        {},
+  },
+
   high_contrast: {
     label:       "High Contrast",
     description: "WCAG AAA — maximum legibility, forced-colors passthrough.",
