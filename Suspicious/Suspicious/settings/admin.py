@@ -16,6 +16,7 @@ from .models import (
     AllowListFile,
     DenyListFile,
     AllowListFiletype,
+    RuntimeConfig,
 )
 from domain_process.models import Domain
 from hash_process.models import Hash
@@ -419,3 +420,13 @@ class AllowListFiletypeAdmin(ImportExportModelAdmin):
     list_select_related = ("user",)
     search_fields = ("filetype", "user__username")
     ordering = ("-creation_date",)
+
+
+# =========================
+# RuntimeConfig
+# =========================
+@admin.register(RuntimeConfig)
+class RuntimeConfigAdmin(admin.ModelAdmin):
+    list_display = ("key", "value", "updated_at")
+    search_fields = ("key",)
+    ordering = ("key",)
