@@ -15,14 +15,11 @@ from typing import Any
 # are collapsed into this one (see the per-site swaps).
 CONFIG_PATH = os.environ.get("SUSPICIOUS_CONFIG_PATH", "/app/settings.json")
 
-_MISSING = object()
-
-
 @lru_cache(maxsize=1)
-def load_settings() -> dict:
-    """Load and cache settings.json. Re-read env each call for testability."""
-    path = os.environ.get("SUSPICIOUS_CONFIG_PATH", CONFIG_PATH)
-    with open(path) as fh:
+def load_settings() -> dict[str, Any]:
+    """Load and cache settings.json. Re-reads env each cache-miss for testability."""
+    path = os.environ.get("SUSPICIOUS_CONFIG_PATH", "/app/settings.json")
+    with open(path, encoding="utf-8") as fh:
         return json.load(fh)
 
 

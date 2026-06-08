@@ -18,3 +18,12 @@ def test_dotted_get_walks_nested_keys():
 
 def test_dotted_get_missing_returns_default():
     assert cc.dotted_get({"a": {}}, "a.b.c", default="x") == "x"
+
+
+def test_settings_get_resolves_dotted_against_file(tmp_path, monkeypatch):
+    p = tmp_path / "settings.json"
+    p.write_text(json.dumps({"app": {"secret_key": "xyz"}}))
+    monkeypatch.setenv("SUSPICIOUS_CONFIG_PATH", str(p))
+    cc.load_settings.cache_clear()
+    assert cc.settings_get("app.secret_key") == "xyz"
+    assert cc.settings_get("app.missing", default="d") == "d"
