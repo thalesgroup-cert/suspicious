@@ -37,6 +37,11 @@ class GetConfigTest(TestCase):
         rc.save()  # save() calls invalidate_cache
         self.assertEqual(cfg.get_config("k"), "v2")
 
+    def test_falsy_db_value_survives_cache(self):
+        RuntimeConfig.objects.create(key="flag", value=False)
+        self.assertIs(cfg.get_config("flag"), False)   # DB hit fills cache
+        self.assertIs(cfg.get_config("flag"), False)   # must come from cache
+
 
 class GetSectionTest(TestCase):
     def setUp(self):

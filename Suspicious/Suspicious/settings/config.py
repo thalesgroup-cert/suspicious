@@ -21,6 +21,7 @@ logger = logging.getLogger("settings.config")
 _CACHE_PREFIX = "runtimeconfig:"
 _CACHE_TTL = 60  # seconds; short so admin edits propagate without restart
 _SENTINEL_MISS = "__miss__"
+_CACHE_NOT_SET = object()
 
 # Leaf field names that are secrets (overlaid from Vault), keyed by section.
 SECRET_FIELDS: dict[str, tuple[str, ...]] = {
@@ -45,8 +46,8 @@ def invalidate_cache(key: str) -> None:
 def get_config(key: str, default: Any = None) -> Any:
     """Resolve one dotted runtime key. DB unreachable -> default + warning."""
     cache_key = _CACHE_PREFIX + key
-    cached = cache.get(cache_key)
-    if cached is not None:
+    cached = cache.get(cache_key, _CACHE_NOT_SET)
+    if cached is not _CACHE_NOT_SET:
         return None if cached == _SENTINEL_MISS else cached
 
     from settings.models import RuntimeConfig
