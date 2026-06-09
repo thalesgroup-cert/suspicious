@@ -31,7 +31,7 @@ define require_script
 endef
 
 .PHONY: help install init install-hooks up down build pull deploy upgrade redeploy restart \
-        migrate collectstatic createsuperuser \
+        migrate seed-config collectstatic createsuperuser \
         backup-db restore-db \
         logs status shell db-shell \
         create-certs network clean prune \
@@ -62,6 +62,7 @@ help:
 	@echo ""
 	@echo "$(BOLD)Django$(RESET)"
 	@echo "  migrate          Run database migrations"
+	@echo "  seed-config      Seed runtime config from settings.json into the DB"
 	@echo "  collectstatic    Collect static files"
 	@echo "  createsuperuser  Create a Django superuser interactively"
 	@echo ""
@@ -187,6 +188,10 @@ migrate:
 	$(call require_script,$(SCRIPTS)/migrate.sh)
 	@$(SCRIPTS)/migrate.sh
 	$(OK) "Migrations applied."
+
+seed-config:
+	@$(COMPOSE) exec -T suspicious python3 manage.py seed_config
+	$(OK) "Runtime config seeded."
 
 collectstatic:
 	@$(COMPOSE) exec suspicious \
