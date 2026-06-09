@@ -1,5 +1,4 @@
 # mail_service/acknowledge_service.py
-import json
 from pathlib import Path
 from .models import AcknowledgeMailServiceConfigSocial
 from jinja2 import Environment, FileSystemLoader, select_autoescape
@@ -8,8 +7,6 @@ from .email_theme import THEME_PALETTES, resolve_semantic_colors
 from .email_logo import resolve_logo
 from .social_logos import SOCIAL_LOGOS
 
-import os as _os_cfg
-CONFIG_PATH = _os_cfg.environ.get("SUSPICIOUS_CONFIG_PATH", "/app/settings.json")
 TEMPLATES_DIR = Path(__file__).parent / "templates"
 
 class AcknowledgementEmailService:
@@ -33,8 +30,8 @@ class AcknowledgementEmailService:
 
     @staticmethod
     def _load_config() -> dict:
-        with open(CONFIG_PATH) as f:
-            return json.load(f).get("email", {})
+        from .utils import load_email_config
+        return load_email_config()
 
     @staticmethod
     def _load_template():

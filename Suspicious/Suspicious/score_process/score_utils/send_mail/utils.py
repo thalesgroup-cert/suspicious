@@ -53,3 +53,17 @@ def send_with_retry(
                 time.sleep(delay)
 
     return False
+
+
+def load_email_config() -> dict:
+    """Return the email section for templating + SMTP.
+
+    Non-secret content (links/content/logos/socials/templates) comes from the
+    runtime tier; the SMTP block is read via the ``email.smtp`` section so the
+    SMTP password is overlaid from Vault. Shape matches the old
+    ``settings.json["email"]`` dict so call sites are unchanged.
+    """
+    from settings.config import get_section
+    cfg = dict(get_section("email"))
+    cfg["smtp"] = get_section("email.smtp")
+    return cfg

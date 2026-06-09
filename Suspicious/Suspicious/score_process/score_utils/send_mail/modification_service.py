@@ -1,5 +1,4 @@
 # mail_service/modification_service.py
-import json
 from pathlib import Path
 from jinja2 import Environment, FileSystemLoader, select_autoescape
 
@@ -8,9 +7,8 @@ from .models import ModificationMailServiceConfigSocial
 from .email_logo import resolve_logo
 from .email_theme import THEME_PALETTES, resolve_semantic_colors
 from .social_logos import SOCIAL_LOGOS
+from .utils import load_email_config
 
-import os as _os_cfg
-CONFIG_PATH = _os_cfg.environ.get("SUSPICIOUS_CONFIG_PATH", "/app/settings.json")
 TEMPLATES_DIR = Path(__file__).parent / "templates"
 
 # Maps case.results (internal Django value) to the semantic color key
@@ -74,8 +72,7 @@ class ModificationEmailService:
         case,
         profile=None,           # UserProfile — drives theme + semantic colors
     ):
-        with open(CONFIG_PATH) as f:
-            self.config = json.load(f).get("email", {})
+        self.config = load_email_config()
 
         self.subject       = subject
         self.sender        = str(sender)

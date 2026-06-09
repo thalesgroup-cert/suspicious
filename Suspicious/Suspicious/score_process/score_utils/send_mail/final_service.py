@@ -1,5 +1,4 @@
 # mail_service/final_service.py
-import json
 from urllib.parse import urlparse
 from pathlib import Path
 
@@ -12,8 +11,6 @@ from .email_logo import resolve_logo
 from case_handler.models import CaseChallengeToken
 from .social_logos import SOCIAL_LOGOS
 
-import os as _os_cfg
-CONFIG_PATH = _os_cfg.environ.get("SUSPICIOUS_CONFIG_PATH", "/app/settings.json")
 TEMPLATES_DIR = Path(__file__).parent / "templates"
 
 # Maps case.results (internal Django value) to the semantic color key in the
@@ -96,8 +93,8 @@ class FinalEmailService:
 
     @staticmethod
     def _load_config() -> dict:
-        with open(CONFIG_PATH) as f:
-            return json.load(f).get("email", {})
+        from .utils import load_email_config
+        return load_email_config()
 
     @staticmethod
     def _load_template():

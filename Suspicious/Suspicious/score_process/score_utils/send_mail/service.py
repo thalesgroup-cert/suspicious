@@ -1,5 +1,4 @@
 # mail_service/mail_notification_service.py
-import json
 import logging
 
 from profiles.models import UserProfile
@@ -13,9 +12,6 @@ from .utils import log_event, build_user_infos, send_with_retry
 
 
 logger = logging.getLogger("tasp.cron.update_ongoing_case_jobs")
-
-import os as _os_cfg
-CONFIG_PATH = _os_cfg.environ.get("SUSPICIOUS_CONFIG_PATH", "/app/settings.json")
 
 
 class MailNotificationService:
@@ -40,14 +36,13 @@ class MailNotificationService:
     # ── factory ────────────────────────────────────────────────────────────
 
     @classmethod
-    def from_settings(cls, path: str = CONFIG_PATH) -> "MailNotificationService":
-        with open(path) as f:
-            raw = json.load(f)
-
-        suspicious_cfg = SuspiciousConfig(email=raw.get("branding", {}).get("contact_email", ""))
+    def from_settings(cls, path: str = None) -> "MailNotificationService":
+        from settings.config import get_section
+        branding = get_section("branding")
+        email_section = get_section("email")
+        suspicious_cfg = SuspiciousConfig(email=branding.get("contact_email", ""))
         retry_cfg = RetryConfig()
-        subjects = EmailSubjectsConfig(**raw.get("email", {}).get("templates", {}))
-
+        subjects = EmailSubjectsConfig(**email_section.get("templates", {}))
         return cls(suspicious_cfg, retry_cfg, subjects)
 
     # ── helpers ────────────────────────────────────────────────────────────
