@@ -91,7 +91,9 @@ FILES_BASE_DIR = Path(__file__).resolve().parent.parent
 # Security
 # ---------------------------------------------------------------------------
 
-SECRET_KEY = _app["secret_key"]
+from suspicious.secrets import get_secret  # noqa: E402
+
+SECRET_KEY = get_secret("app.secret_key", fail_fast=True)
 
 _debug_raw = _app.get("debug", False)
 # Opt-in only: unknown/typo values fall back to False (prod-safe).
@@ -252,7 +254,7 @@ else:
             "ENGINE":   "django.db.backends.mysql",
             "NAME":     _db["name"],
             "USER":     _db["user"],
-            "PASSWORD": _db["password"],
+            "PASSWORD": get_secret("database.password", fail_fast=True),
             "HOST":     _db.get("host", "localhost"),
             "PORT":     _db.get("port", "3306"),
             "OPTIONS":  {"charset": "utf8mb4"},
@@ -278,7 +280,7 @@ else:
             "ENGINE":   "django.db.backends.mysql",
             "NAME":     _db_replica.get("name", _db["name"]),
             "USER":     _db_replica.get("user", _db["user"]),
-            "PASSWORD": _db_replica.get("password", _db["password"]),
+            "PASSWORD": _db_replica.get("password") or get_secret("database.password", fail_fast=True),
             "HOST":     _db_replica.get("host", "db_suspicious_replica"),
             "PORT":     _db_replica.get("port", _db.get("port", "3306")),
             "OPTIONS":  {"charset": "utf8mb4"},
