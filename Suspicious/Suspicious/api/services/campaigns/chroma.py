@@ -2,7 +2,6 @@
 ChromaDB connection, telemetry suppression, and paginated iteration helpers.
 """
 import hashlib
-import json
 import logging
 import os
 from typing import Any, Dict, Iterator, List, Optional, Sequence, Tuple
@@ -20,20 +19,9 @@ CHROMA_FETCH_CHUNK_SIZE = 200
 
 
 def _load_chroma_settings() -> Dict[str, Any]:
-    config_path = os.environ.get("SUSPICIOUS_SETTINGS_PATH", "/app/settings.json")
     try:
-        with open(config_path, "r", encoding="utf-8") as fh:
-            settings = json.load(fh)
-
-        if not isinstance(settings, dict):
-            raise ValueError("Invalid settings format")
-
-        chromadb_conf = (
-            settings
-            .get("integrations", {})
-            .get("chromadb", {})
-        )
-
+        from settings.config import get_section
+        chromadb_conf = get_section("integrations.chromadb")
         return {
             "host": str(chromadb_conf.get("host", DEFAULT_CHROMA_HOST)),
             "port": int(chromadb_conf.get("port", DEFAULT_CHROMA_PORT)),
@@ -43,8 +31,7 @@ def _load_chroma_settings() -> Dict[str, Any]:
         }
     except Exception as exc:
         logger.warning(
-            "Unable to load suspicious settings from %s, using defaults: %s",
-            config_path,
+            "Unable to load chromadb settings via accessor, using defaults: %s",
             exc,
         )
         return {
@@ -52,12 +39,6 @@ def _load_chroma_settings() -> Dict[str, Any]:
             "port": DEFAULT_CHROMA_PORT,
             "collection_name": DEFAULT_CHROMA_COLLECTION_NAME,
         }
-
-
-CHROMA_SETTINGS = _load_chroma_settings()
-CHROMA_HOST = CHROMA_SETTINGS["host"]
-CHROMA_PORT = CHROMA_SETTINGS["port"]
-CHROMA_COLLECTION_NAME = CHROMA_SETTINGS["collection_name"]
 
 
 def _disable_chromadb_telemetry() -> None:
@@ -103,7 +84,11 @@ def _disable_chromadb_telemetry() -> None:
         pass
 
 
-def get_chroma_collection(collection_name: str = CHROMA_COLLECTION_NAME):
+def get_chroma_collection(collection_name: Optional[str] = None):
+    _cs = _load_chroma_settings()
+    if collection_name is None:
+        collection_name = _cs["collection_name"]
+
     try:
         import chromadb
     except Exception as exc:
@@ -114,16 +99,16 @@ def get_chroma_collection(collection_name: str = CHROMA_COLLECTION_NAME):
 
     try:
         client = chromadb.HttpClient(
-            host=CHROMA_HOST,
-            port=int(CHROMA_PORT),
+            host=_cs["host"],
+            port=int(_cs["port"]),
         )
         return client.get_collection(name=collection_name)
     except Exception as exc:
         logger.error(
             "Failed to access ChromaDB collection %s on %s:%s: %s",
             collection_name,
-            CHROMA_HOST,
-            CHROMA_PORT,
+            _cs["host"],
+            _cs["port"],
             exc,
         )
         return None

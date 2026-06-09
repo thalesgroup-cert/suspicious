@@ -1,4 +1,3 @@
-import json
 import logging
 from typing import Any, Optional
 from urllib.parse import urlparse
@@ -14,13 +13,11 @@ from settings.models import (
 )
 
 logger = logging.getLogger("tasp.cron.watcher")
-import os as _os_cfg
-CONFIG_PATH = _os_cfg.environ.get("SUSPICIOUS_CONFIG_PATH", "/app/settings.json")
 
-with open(CONFIG_PATH, "r") as f:
-    settings_data = json.load(f)
 
-watcher_conf = settings_data.get("integrations", {}).get("watcher", {})
+def _watcher_conf() -> dict:
+    from settings.config import get_section
+    return get_section("integrations.watcher")
 
 
 class WatcherConfig:
@@ -40,6 +37,7 @@ class WatcherConfig:
 
 
 def get_watcher_config() -> Optional[WatcherConfig]:
+    watcher_conf = _watcher_conf()
     if not watcher_conf.get("enabled", False):
         logger.info("Watcher sync is disabled in settings.json")
         return None
