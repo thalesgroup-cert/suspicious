@@ -40,7 +40,13 @@ SECRET_FIELDS: dict[str, tuple[str, ...]] = {
 
 
 def invalidate_cache(key: str) -> None:
-    cache.delete(_CACHE_PREFIX + key)
+    # Best-effort: a cache backend outage must not break a RuntimeConfig
+    # save / admin edit / seed_config run. The stale entry expires within the
+    # short TTL anyway. Mirrors get_config's graceful DB-down degradation.
+    try:
+        cache.delete(_CACHE_PREFIX + key)
+    except Exception:  # noqa: BLE001 — cache is non-critical for a write
+        logger.warning("cache unavailable invalidating runtime config '%s'", key)
 
 
 def get_config(key: str, default: Any = None) -> Any:
