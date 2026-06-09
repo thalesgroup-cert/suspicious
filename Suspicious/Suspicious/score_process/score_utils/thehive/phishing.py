@@ -6,18 +6,18 @@ from secrets import token_hex
 import logging
 from score_process.score_utils.thehive.utils import extract_urls, extract_mails, parse_headers
 import os
-import json
 from email.header import decode_header, make_header
 import re
 
-import os as _os_cfg
-CONFIG_PATH = _os_cfg.environ.get("SUSPICIOUS_CONFIG_PATH", "/app/settings.json")
-with open(CONFIG_PATH) as config_file:
-    config = json.load(config_file)
 
-thehive_config = config.get("integrations", {}).get("thehive", {})
+def _thehive_config() -> dict:
+    from settings.config import get_section
+    return get_section("integrations.thehive")
 
-certificate_path = thehive_config.get("certificate_path") or True
+
+def _certificate_path():
+    return _thehive_config().get("certificate_path") or True
+
 
 proxies = {
     "http": None,
@@ -100,7 +100,7 @@ def create_new_alert(ticket_id, title, description, severity, tlp, pap, app_name
 
     url = f"{thehive_url}/api/v1/alert"
     try:
-        response = _thehive_request("POST", url, headers=headers, json=alert_data, verify=certificate_path)
+        response = _thehive_request("POST", url, headers=headers, json=alert_data, verify=_certificate_path())
         return response.json()
     except pybreaker.CircuitBreakerError as e:
         update_cases_logger.warning("[breaker:thehive] open — create_new_alert skipped: %s", e)
@@ -212,7 +212,7 @@ def get_item_from_id(item_id, thehive_url, api_key):
     for item_type in ["case", "alert"]:
         url = f"{thehive_url}/api/v1/{item_type}/{item_id}"
         try:
-            response = _thehive_request("GET", url, headers=headers, verify=certificate_path)
+            response = _thehive_request("GET", url, headers=headers, verify=_certificate_path())
             return item_type, response.json()
         except pybreaker.CircuitBreakerError as e:
             update_cases_logger.warning("[breaker:thehive] open — get_item_from_id skipped: %s", e)
@@ -239,7 +239,7 @@ def add_observables_to_item(item_type, item_id, observable_data, thehive_url, ap
 
     for observable in observable_data:
         try:
-            _thehive_request("POST", url, headers=headers, json=observable, verify=certificate_path)
+            _thehive_request("POST", url, headers=headers, json=observable, verify=_certificate_path())
         except pybreaker.CircuitBreakerError as e:
             update_cases_logger.warning("[breaker:thehive] open — add_observables_to_item skipped: %s", e)
             return
@@ -262,7 +262,7 @@ def add_attachments_to_item(item_type, item_id, attachment_paths, thehive_url, a
                     "POST", url,
                     headers=headers,
                     files=[("attachments", (os.path.basename(file_path), f))],
-                    verify=certificate_path,
+                    verify=_certificate_path(),
                 )
         except pybreaker.CircuitBreakerError as e:
             update_cases_logger.warning("[breaker:thehive] open — add_attachments_to_item skipped: %s", e)
@@ -301,23 +301,23 @@ def add_comment_to_item(item_type, item_id, comment, thehive_url, api_key):
     try:
         response = _thehive_request(
             "POST", url_query_comments,
-            json=query_comments, headers=headers, verify=certificate_path,
+            json=query_comments, headers=headers, verify=_certificate_path(),
         )
         response_data = response.json()
 
         if response_data:
             existing = response_data[0]
             too_old = existing["createdAt"] < (datetime.now().timestamp() * 1000) - 600000
-            wrong_user = existing["createdBy"] != thehive_config.get("user")
+            wrong_user = existing["createdBy"] != _thehive_config().get("user")
             if too_old or wrong_user:
-                _thehive_request("POST", url_add_comment, headers=headers, json=comment, verify=certificate_path)
+                _thehive_request("POST", url_add_comment, headers=headers, json=comment, verify=_certificate_path())
             else:
                 _thehive_request(
                     "PATCH", url_modify_comment(existing["_id"]),
-                    headers=headers, json=comment, verify=certificate_path,
+                    headers=headers, json=comment, verify=_certificate_path(),
                 )
         else:
-            _thehive_request("POST", url_add_comment, headers=headers, json=comment, verify=certificate_path)
+            _thehive_request("POST", url_add_comment, headers=headers, json=comment, verify=_certificate_path())
 
     except pybreaker.CircuitBreakerError as e:
         update_cases_logger.warning("[breaker:thehive] open — add_comment_to_item skipped: %s", e)
@@ -325,7 +325,7 @@ def add_comment_to_item(item_type, item_id, comment, thehive_url, api_key):
         update_cases_logger.error(f"Error querying comments for {item_type} {item_id}: {e}")
         # Fallback: attempt to post a new comment directly
         try:
-            _thehive_request("POST", url_add_comment, headers=headers, json=comment, verify=certificate_path)
+            _thehive_request("POST", url_add_comment, headers=headers, json=comment, verify=_certificate_path())
         except pybreaker.CircuitBreakerError as e2:
             update_cases_logger.warning("[breaker:thehive] open — fallback comment skipped: %s", e2)
         except requests.exceptions.RequestException as e2:

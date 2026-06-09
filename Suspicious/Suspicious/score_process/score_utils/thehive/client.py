@@ -1,4 +1,3 @@
-import json
 import logging
 from typing import Iterable, Tuple, Optional
 
@@ -15,9 +14,6 @@ from .utils import generate_ref
 
 logger = logging.getLogger(__name__)
 update_logger = logging.getLogger("tasp.cron.update_ongoing_case_jobs")
-
-import os as _os_cfg
-CONFIG_PATH = _os_cfg.environ.get("SUSPICIOUS_CONFIG_PATH", "/app/settings.json")
 
 
 class TheHiveService:
@@ -37,9 +33,9 @@ class TheHiveService:
     # ---------- factory ----------
 
     @classmethod
-    def from_settings(cls, path: str = CONFIG_PATH) -> "TheHiveService":
-        with open(path) as f:
-            raw = json.load(f).get("integrations", {}).get("thehive", {})
+    def from_settings(cls, path: str = None) -> "TheHiveService":
+        from settings.config import get_section
+        raw = get_section("integrations.thehive")
         return cls(TheHiveConfig(**raw))
 
     # ---------- alerts ----------

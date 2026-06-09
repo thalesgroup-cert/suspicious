@@ -5,9 +5,8 @@ Patches _thehive_request directly — retry/breaker behaviour is tested
 separately in common/tests/test_http_client.py.
 """
 import sys
-import json
 import unittest
-from unittest.mock import MagicMock, patch, mock_open
+from unittest.mock import MagicMock, patch
 
 import pybreaker
 import requests
@@ -27,39 +26,32 @@ _models_stub = MagicMock()
 sys.modules.setdefault("score_process.score_utils.thehive.utils", _utils_stub)
 sys.modules.setdefault("score_process.score_utils.thehive.models", _models_stub)
 
-# Provide a fake settings.json so the module-level open() call succeeds
-_FAKE_SETTINGS = json.dumps({
-    "integrations": {
-        "thehive": {
-            "certificate_path": None,
-            "user": "admin",
-        }
-    }
-})
+_FAKE_THEHIVE_CONFIG = {"certificate_path": None, "user": "admin"}
 
 
-def _patch_open():
-    """Return a context manager that stubs open('/app/settings.json')."""
-    return patch("builtins.open", mock_open(read_data=_FAKE_SETTINGS))
+def _patch_thehive_config():
+    """Return a context manager that stubs _thehive_config()."""
+    return patch(
+        "score_process.score_utils.thehive.phishing._thehive_config",
+        return_value=_FAKE_THEHIVE_CONFIG,
+    )
 
 
 # ---------------------------------------------------------------------------
-# Helper: import phishing with patched open so module-level code works
+# Helper: import phishing (no open() needed — module-level is now lazy)
 # ---------------------------------------------------------------------------
 
 def _import_phishing():
-    # Remove cached module so open() patch takes effect on first real import
+    # Remove cached module so a clean import occurs
     for key in list(sys.modules):
         if "phishing" in key and "test" not in key:
             del sys.modules[key]
-    with _patch_open():
-        import score_process.score_utils.thehive.phishing as ph
+    import score_process.score_utils.thehive.phishing as ph
     return ph
 
 
 # Pre-import once so subsequent test-method imports are cheap
-with _patch_open():
-    import score_process.score_utils.thehive.phishing  # noqa: F401 — side-effect import
+import score_process.score_utils.thehive.phishing  # noqa: F401 — side-effect import
 
 
 # ---------------------------------------------------------------------------
@@ -273,8 +265,8 @@ class TestAddCommentToItem(unittest.TestCase):
             MagicMock(**{"json.return_value": [existing]}),
             MagicMock(),
         ]
-        # Patch thehive_config to return matching user
-        with patch("score_process.score_utils.thehive.phishing.thehive_config", {"user": "suspicious"}):
+        # Patch _thehive_config to return matching user
+        with patch("score_process.score_utils.thehive.phishing._thehive_config", return_value={"user": "suspicious"}):
             with patch(
                 "score_process.score_utils.thehive.phishing._thehive_request",
                 side_effect=responses,

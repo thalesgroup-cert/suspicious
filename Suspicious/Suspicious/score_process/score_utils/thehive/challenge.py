@@ -1,4 +1,3 @@
-import json
 import logging
 from pathlib import Path
 
@@ -17,14 +16,18 @@ from score_process.score_utils.send_mail.social_logos import SOCIAL_LOGOS
 logger = logging.getLogger(__name__)
 TEMPLATES_DIR = Path(__file__).parent.parent / "send_mail/templates"
 
-import os as _os_cfg
-CONFIG_PATH = _os_cfg.environ.get("SUSPICIOUS_CONFIG_PATH", "/app/settings.json")
-with open(CONFIG_PATH) as _f:
-    _global_config = json.load(_f)
+def _thehive_config() -> dict:
+    from settings.config import get_section
+    return get_section("integrations.thehive")
 
-minio_config   = _global_config.get("storage", {}).get("s3", {})
-thehive_config = _global_config.get("integrations", {}).get("thehive", {})
-_certificate_path = thehive_config.get("certificate_path") or True
+
+def _s3_config() -> dict:
+    from settings.config import get_section
+    return get_section("storage.s3")
+
+
+def _certificate_path():
+    return _thehive_config().get("certificate_path") or True
 
 _RESULT_COLOR = {
     "Dangerous":   "#EF3340",
@@ -61,8 +64,8 @@ def _safe_round(value, default=0):
 class ChallengeToTheHiveService:
 
     def __init__(self, case, recipient: str, subject: str) -> None:
-        with open(CONFIG_PATH) as f:
-            self.config = json.load(f)
+        from suspicious._config_common import load_settings
+        self.config = load_settings()
 
         self.case      = case
         self.recipient = recipient
@@ -185,8 +188,8 @@ class ChallengeToTheHiveService:
     # ── TheHive ────────────────────────────────────────────────────────────
 
     def send_to_thehive(self) -> None:
-        THE_HIVE_URL = thehive_config.get("url", "")
-        THE_HIVE_KEY = thehive_config.get("api_key", "")
+        THE_HIVE_URL = _thehive_config().get("url", "")
+        THE_HIVE_KEY = _thehive_config().get("api_key", "")
 
         challenger = {
             "firstname": _safe(self.challenger_firstname),
@@ -273,7 +276,7 @@ class ChallengeToTheHiveService:
 # ── standalone alert helpers ────────────────────────────────────────────────
 
 def create_alert_from_challenge_without_mail(api_url, api_key, case, file, ioc, datatype, challenger):
-    api       = TheHiveApi(url=api_url, apikey=api_key, verify=_certificate_path)
+    api       = TheHiveApi(url=api_url, apikey=api_key, verify=_certificate_path())
     ticket_id = generate_ref()
 
     title = (
@@ -306,7 +309,7 @@ def create_alert_from_challenge_without_mail(api_url, api_key, case, file, ioc, 
 
 def create_alert_from_challenge(api_url, api_key, case, mail, challenger,
                                 artifact_summary=None, attachments_summary=None):
-    api       = TheHiveApi(url=api_url, apikey=api_key, verify=_certificate_path)
+    api       = TheHiveApi(url=api_url, apikey=api_key, verify=_certificate_path())
     ticket_id = generate_ref()
     eml       = ""
 
@@ -345,10 +348,10 @@ def create_alert_from_challenge(api_url, api_key, case, mail, challenger,
 
     mail_id = safe(getattr(mail, "mail_id", None), "unknown-mail-id")
     minio_client = Minio(
-        minio_config.get("endpoint"),
-        access_key=minio_config.get("access_key"),
-        secret_key=minio_config.get("secret_key"),
-        secure=minio_config.get("secure", False),
+        _s3_config().get("endpoint"),
+        access_key=_s3_config().get("access_key"),
+        secret_key=_s3_config().get("secret_key"),
+        secure=_s3_config().get("secure", False),
     )
 
     for bucket in minio_client.list_buckets():
