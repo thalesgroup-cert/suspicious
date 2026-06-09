@@ -24,10 +24,10 @@ def safe_execution(context: str):
 
 def load_config(path: str) -> CronConfig:
     """
-    Charge le settings.json et mappe uniquement les champs utiles
-    vers CronConfig. Cortex credentials are read via the runtime accessor
-    (url/analyzers from DB, api_key from Vault); S3/minio is still read
-    from the file until Task 13 migrates it.
+    Mappe uniquement les champs utiles vers CronConfig. Cortex and S3/minio
+    config are read via the runtime accessor (non-secret fields from the DB,
+    secrets from Vault), with a settings.json fallback; temp_dir and
+    suspicious_path still come from the file.
     """
     raw = json.loads(Path(path).read_text())
 

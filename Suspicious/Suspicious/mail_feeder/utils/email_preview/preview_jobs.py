@@ -20,7 +20,7 @@ logger = logging.getLogger(__name__)
 
 
 def build_storage_client():
-    """Build a MinIO StorageClient from the active settings.json.
+    """Build a MinIO StorageClient from the runtime config accessor.
 
     Reuses the same loader the downloads view uses so callers work in any
     deployment without extra wiring. Raises on misconfiguration.

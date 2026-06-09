@@ -39,7 +39,7 @@ class WatcherConfig:
 def get_watcher_config() -> Optional[WatcherConfig]:
     watcher_conf = _watcher_conf()
     if not watcher_conf.get("enabled", False):
-        logger.info("Watcher sync is disabled in settings.json")
+        logger.info("Watcher sync is disabled in settings")
         return None
 
     url = watcher_conf.get("url")
