@@ -60,6 +60,14 @@ import score_process.score_utils.thehive.phishing  # noqa: F401 — side-effect 
 
 class TestCreateNewAlert(unittest.TestCase):
 
+    def setUp(self):
+        p = patch(
+            "score_process.score_utils.thehive.phishing._thehive_config",
+            return_value=_FAKE_THEHIVE_CONFIG,
+        )
+        p.start()
+        self.addCleanup(p.stop)
+
     def _call(self, **overrides):
         from score_process.score_utils.thehive.phishing import create_new_alert
         kwargs = dict(
@@ -115,6 +123,14 @@ class TestCreateNewAlert(unittest.TestCase):
 
 class TestGetItemFromId(unittest.TestCase):
 
+    def setUp(self):
+        p = patch(
+            "score_process.score_utils.thehive.phishing._thehive_config",
+            return_value=_FAKE_THEHIVE_CONFIG,
+        )
+        p.start()
+        self.addCleanup(p.stop)
+
     def _call(self, item_id="~42"):
         from score_process.score_utils.thehive.phishing import get_item_from_id
         return get_item_from_id(item_id, "https://hive.local", "key123")
@@ -152,6 +168,14 @@ class TestGetItemFromId(unittest.TestCase):
 
 class TestAddObservablesToItem(unittest.TestCase):
 
+    def setUp(self):
+        p = patch(
+            "score_process.score_utils.thehive.phishing._thehive_config",
+            return_value=_FAKE_THEHIVE_CONFIG,
+        )
+        p.start()
+        self.addCleanup(p.stop)
+
     def _call(self):
         from score_process.score_utils.thehive.phishing import add_observables_to_item
         return add_observables_to_item(
@@ -173,6 +197,14 @@ class TestAddObservablesToItem(unittest.TestCase):
 
 
 class TestAddAttachmentsToItem(unittest.TestCase):
+
+    def setUp(self):
+        p = patch(
+            "score_process.score_utils.thehive.phishing._thehive_config",
+            return_value=_FAKE_THEHIVE_CONFIG,
+        )
+        p.start()
+        self.addCleanup(p.stop)
 
     def test_posts_attachment_successfully(self):
         from score_process.score_utils.thehive.phishing import add_attachments_to_item
@@ -225,6 +257,14 @@ class TestAddAttachmentsToItem(unittest.TestCase):
 
 
 class TestAddCommentToItem(unittest.TestCase):
+
+    def setUp(self):
+        p = patch(
+            "score_process.score_utils.thehive.phishing._thehive_config",
+            return_value=_FAKE_THEHIVE_CONFIG,
+        )
+        p.start()
+        self.addCleanup(p.stop)
 
     def _call(self, **overrides):
         from score_process.score_utils.thehive.phishing import add_comment_to_item
