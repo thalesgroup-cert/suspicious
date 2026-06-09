@@ -70,3 +70,19 @@ def test_boot_fail_fast_when_vault_unreachable(monkeypatch):
     monkeypatch.setattr(sec, "_read_from_vault", boom)
     with pytest.raises(SystemExit):
         sec.get_secret("app.secret_key", fail_fast=True)
+
+
+def test_missing_vault_key_returns_default(monkeypatch):
+    # A key absent in Vault (KV v2 404 -> hvac InvalidPath) must fall through
+    # to the caller default, not raise — so optional, unconfigured secrets
+    # resolve to "" instead of crashing boot/requests.
+    import hvac
+
+    monkeypatch.setenv("VAULT_ADDR", "http://vault:8200")
+
+    def not_found(key):
+        raise hvac.exceptions.InvalidPath("no value found at suspicious/data/...")
+
+    monkeypatch.setattr(sec, "_read_from_vault", not_found)
+    assert sec.get_secret("integrations.thehive.api_key", "") == ""
+    assert sec.get_secret("authentication.oidc.client_secret", "fallback") == "fallback"

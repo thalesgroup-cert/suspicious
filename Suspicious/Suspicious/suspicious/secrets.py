@@ -67,6 +67,15 @@ def get_secret(key: str, default: Any = None, *, fail_fast: bool = False) -> Any
     try:
         value = _read_from_vault(key)
     except Exception as exc:  # noqa: BLE001 — boot must fail readably
+        import hvac
+
+        if isinstance(exc, hvac.exceptions.InvalidPath):
+            # Key absent in Vault (404) — not an error. Fall through to the
+            # caller-supplied default, mirroring a settings.json miss. This is
+            # what lets optional, unconfigured secrets resolve to "" instead of
+            # crashing boot / requests.
+            _CACHE[key] = default
+            return default
         message = (
             f"FATAL: could not read secret '{key}' from Vault at "
             f"{os.environ.get('VAULT_ADDR')}: {exc}"
