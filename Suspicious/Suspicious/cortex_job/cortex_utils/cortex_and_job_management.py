@@ -31,6 +31,23 @@ def _get_cortex_config() -> dict:
         fetch_mail_logger.error(f"Could not load cortex config: {exc}")
         return {}
 
+
+# Backwards-compatible lazy module attributes. Consumers do
+# `from ...cortex_and_job_management import API_URL / API_KEY /
+# STALE_JOB_TIMEOUT_SECONDS`. PEP 562 __getattr__ resolves them on first
+# access via the runtime accessor, so importing this module never triggers
+# a DB/Vault read at import time.
+def __getattr__(name):
+    if name in ("API_URL", "API_KEY", "STALE_JOB_TIMEOUT_SECONDS"):
+        cc = _get_cortex_config()
+        if name == "API_URL":
+            return cc.get("url", "https://cortex.example.com")
+        if name == "API_KEY":
+            return cc.get("api_key", "your_api_key_here")
+        return int(cc.get("stale_job_timeout_seconds", 86400))
+    raise AttributeError(f"module {__name__!r} has no attribute {name!r}")
+
+
 _cortex_breaker = get_breaker("cortex")
 
 
