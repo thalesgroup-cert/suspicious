@@ -573,6 +573,31 @@ This section configures the **email-feeder container's** standalone mail service
 
 ---
 
+## Runtime config + secrets (DB + Vault)
+
+In production, configuration is split across three tiers; `settings.json` stays
+the dev/CI fallback for both.
+
+- **Non-secret runtime config** now lives in the **database**
+  (`settings.RuntimeConfig`). It is seeded from `settings.json` by
+  `python manage.py seed_config` (run automatically by `make deploy`), editable
+  from the Django admin, and read in code via `settings.config.get_config` /
+  `settings.config.get_section`. When the DB has no seeded value, the accessor
+  falls back to `settings.json`.
+- **Secrets** (API keys, passwords, the Django secret key) live in **HashiCorp
+  Vault** (KV v2 at `suspicious/<dotted-key>`, field `value`), read via
+  `suspicious.secrets.get_secret` using AppRole auth. When `VAULT_ADDR` is unset,
+  secrets fall back to `settings.json` / `settings.ci.json`.
+- **Schema caveat:** `settings.json` must still keep schema-valid dummies for
+  `app.secret_key` and `database.password` even under Vault — the boot-time
+  schema check requires them, and the real values are overlaid from Vault when
+  `VAULT_ADDR` is set.
+
+See [deployment/VAULT.md](./deployment/VAULT.md) for the secret map, prod
+bring-up order, and the dev/CI path.
+
+---
+
 ## Best Practices
 
 - **Never commit secrets** — use environment variable injection, Docker secrets, or a secrets manager in production.
@@ -601,5 +626,6 @@ The full stack starts: web UI, API, database, email-feeder, Cortex, MinIO/RustFS
 |----------|-------------|
 | [SETUP.md](./SETUP.md) | Full installation and deployment instructions |
 | [deployment/README.md](./deployment/README.md) | Deployment-specific instructions |
+| [deployment/VAULT.md](./deployment/VAULT.md) | Vault secrets + DB runtime-config runbook |
 | [README.md](./README.md) | Project overview, features, and usage |
 | [CONTRIBUTING.md](./CONTRIBUTING.md) | Development and contribution guidelines |

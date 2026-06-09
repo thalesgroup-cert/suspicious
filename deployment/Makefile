@@ -35,7 +35,7 @@ endef
         backup-db restore-db \
         logs status shell db-shell \
         create-certs network clean prune \
-        check-secrets check-updates provision-vault
+        check-secrets check-updates provision-vault seed-vault-secrets
 
 # ---------------------------------------------------------------------------
 # Help
@@ -56,6 +56,7 @@ help:
 	@echo "  redeploy [s=<svc>]  Force-recreate containers (picks up new images)"
 	@echo "  install-hooks    Configure git core.hooksPath -> .githooks (commit-msg validator)"
 	@echo "  provision-vault  Enable KV+AppRole in Vault, write role/secret IDs to .env"
+	@echo "  seed-vault-secrets  Write secret env vars into Vault KV (suspicious/<key>)"
 	@echo "  down             Stop and remove containers (data preserved)"
 	@echo "  restart          Restart all running services"
 	@echo "  build            Build local images"
@@ -106,6 +107,14 @@ provision-vault:
 	$(call require_script,$(SCRIPTS)/provision-vault.sh)
 	@$(SCRIPTS)/provision-vault.sh
 	$(OK) "Vault provisioned."
+
+## Seed secrets into Vault KV v2 (suspicious/<dotted-key>, field "value").
+## Values come from exported env vars (SECRET_KEY, DB_PASSWORD, …) — never a
+## committed file. Requires VAULT_ADDR + VAULT_TOKEN in the environment.
+seed-vault-secrets:
+	$(call require_script,$(SCRIPTS)/seed-vault-secrets.sh)
+	@$(SCRIPTS)/seed-vault-secrets.sh
+	$(OK) "Secrets seeded into Vault."
 
 ## Wire the repo .githooks (Conventional Commits validator etc.) for this clone.
 install-hooks:

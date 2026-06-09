@@ -2,7 +2,7 @@
     "app": {
         "name": "suspicious",
         "debug": false,
-        "secret_key": "CHANGE_ME",
+        "secret_key": "replace-with-vault-or-a-real-64-char-random-key-0123456789abcdef",
         "allowed_hosts": [
             "suspicious"
         ],
@@ -33,7 +33,7 @@
         "port": 3306,
         "name": "db_suspicious",
         "user": "suspicious",
-        "password": "password",
+        "password": "vault-managed-or-set-here",
         "root_password": "strongpassword",
         "options": {
             "ssl": false,
@@ -54,7 +54,7 @@
         "s3": {
             "endpoint": "rustfs:9000",
             "access_key": "MINIO_ACCESS_KEY",
-            "secret_key": "MINIO_SECRET_KEY",
+            "secret_key": "",
             "secure": false,
             "auto_create_bucket": true,
             "media_bucket": "suspicious-media"
@@ -63,7 +63,7 @@
     "integrations": {
         "cortex": {
             "url": "http://cortex:9001",
-            "api_key": "CHANGE_ME",
+            "api_key": "",
             "analyzers": {
                 "header": "MailHeader_4_0",
                 "ai": "AI_Mail_Analyzer_1_4",
@@ -71,7 +71,7 @@
                 "yara": "Yara_Boosted_3_2",
                 "file_info": "FileInfo_8_0"
             },
-            "webhook_secret": "CHANGE_ME"
+            "webhook_secret": ""
         },
         "chromadb": {
             "url": "http://chromadb:8000",
@@ -83,7 +83,7 @@
         "thehive": {
             "enabled": false,
             "url": "https://thehive",
-            "api_key": "CHANGE_ME",
+            "api_key": "",
             "verify_ssl" : false,
             "custom_field" : "",
             "email_sender" : "",
@@ -94,7 +94,7 @@
         "watcher": {
             "enabled": false,
             "url": "https://watcher",
-            "api_key": "CHANGE_ME",
+            "api_key": "",
             "timeout": 10,
             "verify_ssl": false
         },
@@ -110,13 +110,13 @@
             "instances": {
                 "primary": {
                     "url": "http://misp",
-                    "api_key": "CHANGE_ME",
+                    "api_key": "",
                     "ssl_verify": false,
                     "ssl_ca_certs": "/etc/ssl/certs/ca-certificates.crt"
                 },
                 "secondary": {
                     "url": "https://secondary-misp",
-                    "api_key": "CHANGE_ME",
+                    "api_key": "",
                     "ssl_verify": false,
                     "ssl_ca_certs": "/etc/ssl/certs/ca-certificates.crt"
                 }
@@ -127,12 +127,12 @@
         "oidc": {
             "server_url": "https://oidc-server",
             "client_id": "client-id",
-            "client_secret": "client-secret"
+            "client_secret": ""
         },
         "ldap": {
             "server_uri": "ldaps://ldap",
             "bind_dn": "ou=Applications,ou=Gresources,o=Group",
-            "bind_password": "CHANGE_ME",
+            "bind_password": "",
             "base_dn": "ou=People,o=group",
             "filter": "(&(mail=%(user)s)(Tpresent=true)(!(ou=admin)))",
             "verify_ssl": false
@@ -144,7 +144,7 @@
             "server": "smtp.server.local",
             "port": 25,
             "username": "smtp_user",
-            "password": "smtp_password",
+            "password": "",
             "tls": true
         },
         "content": {
