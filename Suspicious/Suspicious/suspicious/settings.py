@@ -113,7 +113,7 @@ if _cortex_url:
 # Shared secret for the Cortex → Suspicious job-completion webhook.
 # Set in settings.json under integrations.cortex.webhook_secret.
 # If absent, the webhook endpoint rejects all requests.
-CORTEX_WEBHOOK_SECRET: str = _cortex.get("webhook_secret", "")
+CORTEX_WEBHOOK_SECRET: str = get_secret("integrations.cortex.webhook_secret", "")
 
 # CSRF — at least one trusted origin is required for POST requests in
 # Django 4.x.  Must be a full scheme+host (e.g. https://suspicious.corp).
@@ -349,7 +349,7 @@ if _ldap_uri:
 
         AUTH_LDAP_SERVER_URI      = _ldap_uri
         AUTH_LDAP_BIND_DN         = _ldap_cfg.get("bind_dn", "")
-        AUTH_LDAP_BIND_PASSWORD   = _ldap_cfg.get("bind_password", "")
+        AUTH_LDAP_BIND_PASSWORD   = get_secret("authentication.ldap.bind_password", "")
         AUTH_LDAP_USER_SEARCH     = LDAPSearch(
             _ldap_cfg["base_dn"],
             ldap.SCOPE_SUBTREE,
@@ -422,7 +422,7 @@ AUTHENTICATION_BACKENDS.append("django.contrib.auth.backends.ModelBackend")
 
 OIDC_SERVER_URL    = _oidc.get("server_url", "")
 OIDC_CLIENT_ID     = _oidc.get("client_id", "")
-OIDC_CLIENT_SECRET = _oidc.get("client_secret", "")
+OIDC_CLIENT_SECRET = get_secret("authentication.oidc.client_secret", "")
 OIDC_SCOPES        = _oidc.get("scopes", "openid email profile")
 OIDC_REDIRECT_URI  = _oidc.get("redirect_uri", "")
 
@@ -521,7 +521,7 @@ if _storage_backend in {"s3", "dual"}:
     # django-minio-storage, which caps minio<7.2.19.
     MINIO_STORAGE_ENDPOINT      = _minio.get("endpoint",   "rustfs:9000")
     MINIO_STORAGE_ACCESS_KEY    = _minio["access_key"]
-    MINIO_STORAGE_SECRET_KEY    = _minio["secret_key"]
+    MINIO_STORAGE_SECRET_KEY    = get_secret("storage.s3.secret_key", _minio.get("secret_key", ""))
     MINIO_STORAGE_USE_HTTPS = bool(_minio.get("secure", False))
     MINIO_STORAGE_MEDIA_BUCKET_NAME = _minio.get("media_bucket", "suspicious-media")
     MINIO_STORAGE_AUTO_CREATE_MEDIA_BUCKET = True
