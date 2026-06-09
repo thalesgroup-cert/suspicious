@@ -3,26 +3,18 @@
 Lazy MISP settings loader — raises at call time, not at import time.
 """
 from __future__ import annotations
-import json
 import logging
-from pathlib import Path
 from .models import MISPConfig, MISPSettings
 
-CONFIG_PATH = Path("/app/settings.json")
 logger = logging.getLogger(__name__)
 
 
 def load_misp_settings() -> MISPSettings:
-    try:
-        with open(CONFIG_PATH) as fh:
-            raw = json.load(fh)
-    except (OSError, json.JSONDecodeError) as exc:
-        raise RuntimeError("Cannot load MISP settings from %s: %s" % (CONFIG_PATH, exc)) from exc
+    from settings.config import get_section
 
-    misp_cfg = raw.get("integrations", {}).get("misp", {})
-    instances = misp_cfg.get("instances", {})
-    primary   = instances.get("primary",   {})
-    secondary = instances.get("secondary", {})
+    primary   = get_section("integrations.misp.instances.primary")
+    secondary = get_section("integrations.misp.instances.secondary")
+    misp_cfg  = get_section("integrations.misp")
 
     return MISPSettings(
         suspicious=MISPConfig(
