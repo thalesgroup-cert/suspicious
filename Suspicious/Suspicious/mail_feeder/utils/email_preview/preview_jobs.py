@@ -28,10 +28,9 @@ def build_storage_client():
     from api.views.downloads import load_minio_config
     from api.storage import StorageClient
 
-    config_path = os.environ.get("SUSPICIOUS_CONFIG_PATH", "/app/settings.json")
-    cfg = load_minio_config(config_path)
+    cfg = load_minio_config()
     if not cfg:
-        raise RuntimeError(f"Could not load MinIO config from {config_path}")
+        raise RuntimeError("Could not load MinIO config via accessor")
     storage = StorageClient(cfg)
     if not getattr(storage, "client", None):
         raise RuntimeError("MinIO client initialisation failed")

@@ -1,5 +1,3 @@
-import os
-import json
 import logging
 import tempfile
 import zipfile
@@ -18,8 +16,6 @@ from api.storage import StorageClient
 
 logger = logging.getLogger(__name__)
 
-CONFIG_PATH = os.environ.get("SUSPICIOUS_SETTINGS_PATH", "/app/settings.json")
-
 
 class StorageUnavailable(APIException):
     status_code = 503
@@ -27,26 +23,18 @@ class StorageUnavailable(APIException):
     default_code = "storage_unavailable"
 
 
-def load_minio_config(path: str) -> dict | None:
+def load_minio_config(path: str = None) -> dict | None:
+    """storage.s3 config via the accessor (endpoint/access_key from DB,
+    secret_key from Vault). `path` kept for signature compatibility, ignored."""
+    from settings.config import get_section
     try:
-        with open(path, "r", encoding="utf-8") as config_file:
-            config = json.load(config_file)
-    except FileNotFoundError:
-        logger.warning("Settings file not found: %s", path)
+        cfg = get_section("storage.s3")
+    except Exception:
+        logger.warning("Unable to load storage.s3 config via accessor")
         return None
-    except json.JSONDecodeError:
-        logger.warning("Settings file contains invalid JSON: %s", path)
+    if not isinstance(cfg, dict) or not cfg:
         return None
-    except OSError:
-        logger.exception("Unable to read settings file: %s", path)
-        return None
-
-    minio_config = (config.get("storage", {}).get("s3", {}))
-    if not isinstance(minio_config, dict):
-        logger.warning("Missing or invalid 's3 Bucket' configuration in %s", path)
-        return None
-
-    return minio_config
+    return cfg
 
 
 def get_request_ip(request) -> str | None:
@@ -91,7 +79,7 @@ class DownloadCaseArchiveView(APIView):
         return response
 
     def _get_storage_client(self) -> StorageClient:
-        minio_config = load_minio_config(CONFIG_PATH)
+        minio_config = load_minio_config()
         if not minio_config:
             raise StorageUnavailable("Storage backend not configured")
 
