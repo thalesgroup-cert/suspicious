@@ -35,7 +35,7 @@ endef
         backup-db restore-db \
         logs status shell db-shell \
         create-certs network clean prune \
-        check-secrets check-updates
+        check-secrets check-updates provision-vault
 
 # ---------------------------------------------------------------------------
 # Help
@@ -55,6 +55,7 @@ help:
 	@echo "  up               Start all services (no pull, no migration)"
 	@echo "  redeploy [s=<svc>]  Force-recreate containers (picks up new images)"
 	@echo "  install-hooks    Configure git core.hooksPath -> .githooks (commit-msg validator)"
+	@echo "  provision-vault  Enable KV+AppRole in Vault, write role/secret IDs to .env"
 	@echo "  down             Stop and remove containers (data preserved)"
 	@echo "  restart          Restart all running services"
 	@echo "  build            Build local images"
@@ -97,6 +98,14 @@ init:
 	@echo "$(BOLD)Initializing project…$(RESET)"
 	@$(SCRIPTS)/init.sh
 	$(OK) "Initialization complete."
+
+## Provision Vault: enable KV v2 + AppRole, write role/secret IDs to .env.
+## Standalone (not chained into init) so `make init` still works without a
+## running Vault. Requires VAULT_ADDR + VAULT_TOKEN in the environment.
+provision-vault:
+	$(call require_script,$(SCRIPTS)/provision-vault.sh)
+	@$(SCRIPTS)/provision-vault.sh
+	$(OK) "Vault provisioned."
 
 ## Wire the repo .githooks (Conventional Commits validator etc.) for this clone.
 install-hooks:

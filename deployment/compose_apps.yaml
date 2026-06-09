@@ -31,7 +31,11 @@ services:
     env_file:
       - ".env"
     environment:
-      no_proxy: "${NO_PROXY:-},cortex,db_suspicious,rustfs,chromadb"
+      no_proxy: "${NO_PROXY:-},cortex,db_suspicious,rustfs,chromadb,vault"
+      VAULT_ADDR: "${VAULT_ADDR:-http://vault:8200}"
+      VAULT_ROLE_ID: "${VAULT_ROLE_ID:-}"
+      VAULT_SECRET_ID: "${VAULT_SECRET_ID:-}"
+      SUSPICIOUS_CONFIG_PATH: "/app/settings.json"
     healthcheck:
       # Closes audit O7 / R9. /api/health/ pings DB + Redis; Cortex is
       # informational (the app degrades gracefully via tenacity + the
@@ -59,7 +63,11 @@ services:
     env_file:
       - ".env"
     environment:
-      no_proxy: "${NO_PROXY:-},cortex,db_suspicious,rustfs,chromadb,redis_broker,redis_cache"
+      no_proxy: "${NO_PROXY:-},cortex,db_suspicious,rustfs,chromadb,redis_broker,redis_cache,vault"
+      VAULT_ADDR: "${VAULT_ADDR:-http://vault:8200}"
+      VAULT_ROLE_ID: "${VAULT_ROLE_ID:-}"
+      VAULT_SECRET_ID: "${VAULT_SECRET_ID:-}"
+      SUSPICIOUS_CONFIG_PATH: "/app/settings.json"
     healthcheck:
       test: ["CMD-SHELL", "celery -A suspicious inspect ping -d celery@$$HOSTNAME || exit 1"]
       interval: 60s
@@ -135,6 +143,31 @@ services:
       timeout: 10s
       retries: 3
       start_period: 90s
+    networks:
+      - suspicious_network
+
+  # ── vault (HashiCorp Vault — secrets) ──────────────────────────────────
+
+  vault:
+    image: hashicorp/vault:1.18
+    init: true
+    restart: always
+    cap_add:
+      - IPC_LOCK
+    ports:
+      - "127.0.0.1:${VAULT_PORT:-8200}:8200"
+    environment:
+      VAULT_ADDR: "http://0.0.0.0:8200"
+    volumes:
+      - "${VAULT_PATH:-./vault}/config.hcl:/vault/config/config.hcl:ro"
+      - "${VAULT_PATH:-./vault}/data:/vault/file"
+    command: ["vault", "server", "-config=/vault/config/config.hcl"]
+    healthcheck:
+      test: ["CMD-SHELL", "vault status -address=http://127.0.0.1:8200 >/dev/null 2>&1 || [ $$? -eq 2 ]"]
+      interval: 30s
+      timeout: 5s
+      retries: 5
+      start_period: 10s
     networks:
       - suspicious_network
 
