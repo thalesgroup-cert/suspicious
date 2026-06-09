@@ -3,16 +3,17 @@ from datetime import date
 from django.contrib.auth.models import User
 from django.core.exceptions import ObjectDoesNotExist
 from .models import UsernameModel
-from .utils import load_config, initialize_email_validator, create_ldap_user
+from .utils import initialize_email_validator, create_ldap_user
 from mail_feeder.utils.kpi_updating.kpis import (
     KpiService
 )
 from settings.models import WatcherLegitDomain
 
-import os as _os_cfg
-CONFIG_PATH = _os_cfg.environ.get("SUSPICIOUS_CONFIG_PATH", "/app/settings.json")
-CONFIG = load_config(CONFIG_PATH)
-SUSPICIOUS_EMAIL = CONFIG.get("branding", {}).get("contact_email")
+
+def _suspicious_email() -> str:
+    from settings.config import get_section
+    return get_section("branding").get("contact_email")
+
 
 fetch_mail_logger = logging.getLogger("tasp.cron.fetch_and_process_emails")
 
@@ -62,9 +63,10 @@ class UserCreationService:
         return user
 
     def create_default_user(self) -> User:
-        user, created = User.objects.get_or_create(username=SUSPICIOUS_EMAIL)
+        suspicious_email = _suspicious_email()
+        user, created = User.objects.get_or_create(username=suspicious_email)
         if created:
             user.set_unusable_password()
             user.save()
-            fetch_mail_logger.info(f"Default suspicious user created: {SUSPICIOUS_EMAIL}")
+            fetch_mail_logger.info(f"Default suspicious user created: {suspicious_email}")
         return user

@@ -6,12 +6,12 @@ from profiles.models import CISOProfile
 from profiles.profiles_utils.ldap import Ldap
 import logging
 
-import os as _os_cfg
-CONFIG_PATH = _os_cfg.environ.get("SUSPICIOUS_CONFIG_PATH", "/app/settings.json")
-with open(CONFIG_PATH) as config_file:
-    config = json.load(config_file)
 
-ldap_config = (config.get("authentication", {}).get("ldap", {}))
+def _ldap_config() -> dict:
+    from settings.config import get_section
+    return get_section("authentication.ldap")
+
+
 logger = logging.getLogger(__name__)
 
 
@@ -139,6 +139,7 @@ def search_ldap_server(ldap_server, ciso):
     Returns:
         list: A list of search results matching the given CISO.
     """
+    ldap_config = _ldap_config()
     try:
         search_results = ldap_server.search_s(
             ldap_config.get("base_dn"),
