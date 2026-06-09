@@ -1,6 +1,4 @@
-import json
 import logging
-import os
 
 import pybreaker
 from django.db import transaction
@@ -22,18 +20,12 @@ fetch_mail_logger = logging.getLogger("tasp.cron.fetch_and_process_emails")
 # ------------------------
 # Load Cortex configuration
 # ------------------------
-CONFIG_PATH = os.getenv("CONFIG_PATH", "/app/settings.json")
 try:
-    with open(CONFIG_PATH, "r") as config_file:
-        config = json.load(config_file)
-except FileNotFoundError:
-    fetch_mail_logger.error(f"Configuration file not found at {CONFIG_PATH}")
-    config = {}
-except json.JSONDecodeError as e:
-    fetch_mail_logger.error(f"Error parsing JSON config: {e}")
-    config = {}
-
-cortex_config = (config.get("integrations", {}).get("cortex", {}))
+    from settings.config import get_section as _get_section
+    cortex_config = _get_section("integrations.cortex")
+except Exception as _cfg_err:
+    fetch_mail_logger.error(f"Could not load cortex config: {_cfg_err}")
+    cortex_config = {}
 
 # ------------------------
 # API settings
