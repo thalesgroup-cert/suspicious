@@ -1,4 +1,4 @@
-# import os
+import os
 import json
 import logging
 import pathlib
@@ -85,8 +85,11 @@ def _api_to_feeder_json(api: dict, local: dict) -> dict:
     Note: MainConfig.from_json reads the S3 bucket config under the top-level
     ``s3`` key (not ``minio``) and the SMTP config under ``mail``.
     """
+    email = api.get("email", {})
     s3 = api.get("storage", {}).get("s3", {})
-    smtp = api.get("email", {}).get("smtp", {})
+    smtp = email.get("smtp", {})
+    content = email.get("content", {})
+    links = email.get("links", {})
     merged = dict(local)
     merged["s3"] = {
         "endpoint": s3.get("endpoint", ""),
@@ -95,11 +98,25 @@ def _api_to_feeder_json(api: dict, local: dict) -> dict:
         "secure": bool(s3.get("secure", False)),
     }
     merged["mail"] = {
+        # SMTP credentials
         "server": smtp.get("server", ""),
         "port": smtp.get("port", 25),
         "username": smtp.get("username", ""),
         "password": smtp.get("password", ""),
         "tls": bool(smtp.get("tls", True)),
+        # Branding / email content
+        "footer": content.get("footer", ""),
+        "group": content.get("team_name", ""),
+        "company_name": content.get("global_domain", ""),
+        "company_url": content.get("website", ""),
+        "suspicious_web": links.get("submissions", ""),
+        "glossary": links.get("glossary", ""),
+        "inquiry": links.get("inquiry", ""),
+        "inquiry_text": links.get("inquiry_text", ""),
+        "security": links.get("security_contact", ""),
+        "security_msg": links.get("security_text", ""),
+        "socials": email.get("socials", {}),
+        "logos": email.get("logos", {}),
     }
     return merged
 
@@ -126,7 +143,9 @@ def load_config_from_api(
             resp.raise_for_status()
             api = resp.json()
             merged = _api_to_feeder_json(api, local)
-            cache_path.write_text(json.dumps(merged))
+            fd = os.open(cache_path, os.O_WRONLY | os.O_CREAT | os.O_TRUNC, 0o600)
+            with os.fdopen(fd, "w") as _f:
+                _f.write(json.dumps(merged))
             return classes.models.configs.main_config.MainConfig.from_json(merged)
         except Exception as exc:  # noqa: BLE001
             last_exc = exc

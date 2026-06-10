@@ -10,8 +10,26 @@ import classes.services.config_service as cs
 _API_RESPONSE = {
     "storage": {"s3": {"endpoint": "rustfs:9000", "access_key": "AK",
                        "secret_key": "SK", "secure": False}},
-    "email": {"smtp": {"server": "smtp.local", "port": 25,
-                       "username": "u", "password": "PW", "tls": True}},
+    "email": {
+        "smtp": {"server": "smtp.local", "port": 25,
+                 "username": "u", "password": "PW", "tls": True},
+        "content": {
+            "footer": "Restricted",
+            "team_name": "Acme CERT",
+            "global_domain": "acme.com",
+            "website": "https://www.acme.com",
+        },
+        "links": {
+            "submissions": "https://suspicious.acme.com/submissions/",
+            "glossary": "https://acme.com/glossary",
+            "inquiry": "mailto:inquiry@acme.com",
+            "inquiry_text": "inquiry@acme.com",
+            "security_contact": "mailto:security@acme.com",
+            "security_text": "security@acme.com",
+        },
+        "socials": {"twitter": "https://twitter.com/acme"},
+        "logos": {"company": "data:image/png;base64,AAAA"},
+    },
     "branding": {"company_name": "Acme"},
 }
 
@@ -44,6 +62,24 @@ class FeederConfigApiTest(unittest.TestCase):
         self.assertEqual(mc.minio.secret_key, "SK")
         self.assertEqual(str(mc.working_path), "/tmp/suspicious")
         self.assertTrue(self.cache.exists())
+
+    def test_maps_branding_into_mail_config(self):
+        with mock.patch.object(cs.requests, "get", return_value=self._resp()):
+            mc = cs.load_config_from_api("http://backend:9020", "tok",
+                                         self.local, self.cache)
+        self.assertEqual(mc.mail.footer, "Restricted")
+        self.assertEqual(mc.mail.group, "Acme CERT")
+        self.assertEqual(mc.mail.company_name, "acme.com")
+        self.assertEqual(mc.mail.company_url, "https://www.acme.com")
+        self.assertEqual(mc.mail.suspicious_web,
+                         "https://suspicious.acme.com/submissions/")
+        self.assertEqual(mc.mail.glossary, "https://acme.com/glossary")
+        self.assertEqual(mc.mail.inquiry, "mailto:inquiry@acme.com")
+        self.assertEqual(mc.mail.inquiry_text, "inquiry@acme.com")
+        self.assertEqual(mc.mail.security, "mailto:security@acme.com")
+        self.assertEqual(mc.mail.security_msg, "security@acme.com")
+        self.assertEqual(mc.mail.socials, {"twitter": "https://twitter.com/acme"})
+        self.assertEqual(mc.mail.logos, {"company": "data:image/png;base64,AAAA"})
 
     def test_falls_back_to_cache_when_backend_down(self):
         with mock.patch.object(cs.requests, "get", return_value=self._resp()):
