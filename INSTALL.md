@@ -342,6 +342,13 @@ docker compose up -d                          # the whole stack
 docker compose ps                             # all should reach healthy
 ```
 
+> **Two services that are "unhealthy" by design in a bare dev bring-up:**
+> `email_feeder` exits and restart-loops when **no IMAP connector is enabled**
+> in `email-feeder/config.json` (`"No mailboxes were successfully set up …
+> Exiting"`) — enable a connector against a real mailbox to keep it up. `rustfs`
+> may report unhealthy on its alpha healthcheck; it is unused while
+> `storage.backend = local`. Neither affects the backend/UI.
+
 Verify through Traefik (use the `DOMAIN_CORP` host; `-k` for the self-signed cert):
 
 ```bash
