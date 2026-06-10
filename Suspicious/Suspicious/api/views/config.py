@@ -1,9 +1,10 @@
 """GET /api/config/{scope}/ — the config authority endpoint.
 
 Returns a scope's effective config (shared + the scope) with non-secret fields
-from the DB runtime tier and secret leaves overlaid from Vault. Sensitive:
-the body carries secrets, so it is TLS-only (served via Traefik), authenticated,
-and excluded from request logging.
+from the DB runtime tier and secret leaves overlaid from Vault. Sensitive: the
+body carries secrets. Access is restricted to the isolated internal Docker
+network (or TLS when reached via Traefik), requires a scoped token, sets
+Cache-Control: no-store, and is excluded from request logging.
 """
 from __future__ import annotations
 

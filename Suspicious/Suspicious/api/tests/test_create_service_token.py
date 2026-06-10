@@ -30,3 +30,9 @@ class CreateServiceTokenTest(TestCase):
         from django.core.management.base import CommandError
         with self.assertRaises(CommandError):
             call_command("create_service_token", "shared", stdout=StringIO())
+
+    def test_token_has_no_expiry(self):
+        from knox.models import AuthToken
+        call_command("create_service_token", "feeder", stdout=StringIO())
+        tok = AuthToken.objects.filter(user__username="svc-feeder").latest("created")
+        self.assertIsNone(tok.expiry)
