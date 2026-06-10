@@ -131,6 +131,9 @@ services:
     init: true
     restart: unless-stopped
     command: python3 main.py
+    environment:
+      BACKEND_URL: "${BACKEND_URL:-}"
+      FEEDER_API_TOKEN: "${FEEDER_API_TOKEN:-}"
     volumes:
       - "${FEEDER_PATH}/application.log:/app/application.log"
       - "${FEEDER_PATH}/config.json:/app/config.json:ro"
