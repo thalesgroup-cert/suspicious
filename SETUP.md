@@ -1,5 +1,11 @@
 # Suspicious — Deployment Guide (Docker + Make)
 
+> **New contributor?** Start with [`INSTALL.md`](INSTALL.md) — a from-zero,
+> verified setup guide. This document is the operations-oriented reference and
+> predates the `seed_config` and Vault steps. Note: the Django API is on port
+> **9020**; the React web UI is on port **9021**.
+
+
 This guide describes how to install, initialize, and run **Suspicious** using:
 
 * Docker Engine + Docker Compose v2

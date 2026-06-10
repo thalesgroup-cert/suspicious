@@ -1,0 +1,181 @@
+{
+    "app": {
+        "name": "suspicious",
+        "debug": true,
+        "secret_key": "SS765PvR2fRXn82TTdxSWvxyhXe9a1SdFf3EPDo-xgdcJGyO0T4t7_fdX3XWzSlTmU65WhwPGS1yZy9V6W9DNw",
+        "allowed_hosts": [
+            "suspicious",
+            "localhost",
+            "127.0.0.1"
+        ],
+        "csrf_trusted_origins": [
+            "http://localhost:9020",
+            "https://suspicious.meridian.example"
+        ],
+        "timezone": "Europe/Paris",
+        "log_level": "INFO"
+    },
+    "branding": {
+        "company_name": "Meridian Group",
+        "contact_email": "suspicious@meridian.example",
+        "footer": "Meridian Group — Internal Use",
+        "intranet_link": "https://intranet.meridian.example",
+        "assets": {
+            "logo": "",
+            "icon": "",
+            "banner": "",
+            "signature": ""
+        }
+    },
+    "features": {
+        "dual_storage_write": false
+    },
+    "database": {
+        "engine": "mysql",
+        "host": "db_suspicious",
+        "port": 3306,
+        "name": "db_suspicious",
+        "user": "suspicious",
+        "password": "meridian_dev_db_pw",
+        "options": {
+            "ssl": false,
+            "connection_pooling": false,
+            "persistent_connections": false
+        }
+    },
+    "storage": {
+        "backend": "local",
+        "s3": {
+            "endpoint": "rustfs:9000",
+            "access_key": "minio",
+            "secret_key": "meridian_dev_minio_pw",
+            "secure": false,
+            "auto_create_bucket": true,
+            "media_bucket": "suspicious-media"
+        }
+    },
+    "integrations": {
+        "cortex": {
+            "url": "http://cortex:9001",
+            "api_key": "",
+            "analyzers": {
+                "header": "MailHeader_4_0",
+                "ai": "AI_Mail_Analyzer_1_4",
+                "sandbox": "ThreatGridOnPrem_1_0",
+                "yara": "Yara_Boosted_3_2",
+                "file_info": "FileInfo_8_0"
+            },
+            "webhook_secret": ""
+        },
+        "chromadb": {
+            "url": "http://chromadb:8000",
+            "host": "chromadb",
+            "port": 8000,
+            "collection_name": "suspicious_mails",
+            "ssl_verify": false
+        },
+        "thehive": {
+            "enabled": false,
+            "url": "https://thehive",
+            "api_key": "",
+            "verify_ssl": false,
+            "custom_field": "",
+            "email_sender": "",
+            "tags": "",
+            "certificate_path": "/app/cert.pem",
+            "user": "cert@meridian.example"
+        },
+        "watcher": {
+            "enabled": false,
+            "url": "https://watcher",
+            "api_key": "",
+            "timeout": 10,
+            "verify_ssl": false
+        },
+        "misp": {
+            "default_tags": {
+                "tlp": "clear",
+                "pap": "clear",
+                "categories": [
+                    "MalSpam",
+                    "Phishing"
+                ]
+            },
+            "instances": {
+                "primary": {
+                    "url": "http://misp",
+                    "api_key": "",
+                    "ssl_verify": false,
+                    "ssl_ca_certs": "/etc/ssl/certs/ca-certificates.crt"
+                },
+                "secondary": {
+                    "url": "https://secondary-misp",
+                    "api_key": "",
+                    "ssl_verify": false,
+                    "ssl_ca_certs": "/etc/ssl/certs/ca-certificates.crt"
+                }
+            }
+        }
+    },
+    "authentication": {
+        "oidc": {
+            "server_url": "",
+            "client_id": "",
+            "client_secret": ""
+        },
+        "ldap": {
+            "server_uri": "",
+            "bind_dn": "",
+            "bind_password": "",
+            "base_dn": "",
+            "filter": "(&(mail=%(user)s))",
+            "verify_ssl": true
+        }
+    },
+    "email": {
+        "api_base": "https://suspicious.meridian.example/api/",
+        "smtp": {
+            "server": "smtp.meridian.example",
+            "port": 25,
+            "username": "suspicious@meridian.example",
+            "password": "",
+            "tls": true
+        },
+        "content": {
+            "footer": "Meridian Group — Internal Use",
+            "team_name": "Meridian CERT",
+            "global_domain": "meridian.example",
+            "website": "https://www.meridian.example"
+        },
+        "links": {
+            "submissions": "https://suspicious.meridian.example/submissions",
+            "security_contact": "mailto:cert@meridian.example",
+            "security_text": "cert@meridian.example",
+            "inquiry": "mailto:cert@meridian.example",
+            "inquiry_text": "cert@meridian.example",
+            "glossary": "https://intranet.meridian.example/glossary"
+        },
+        "socials": {
+            "facebook": "",
+            "twitter": "",
+            "instagram": "",
+            "linkedin": "https://www.linkedin.com/company/meridian-group",
+            "youtube": ""
+        },
+        "templates": {
+            "acknowledgement": "Suspicious – Submission Registered",
+            "review": "Your submission n°{case_id} has been reviewed as: {result}",
+            "final": "SUSPICIOUS EMAIL ANALYSIS - Your analysis [{case_id}] is completed"
+        },
+        "logos": {
+            "company": "",
+            "acknowledge": "",
+            "final": "",
+            "challenge": "",
+            "modif": ""
+        }
+    },
+    "domains": [
+        "meridian.example"
+    ]
+}
