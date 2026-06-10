@@ -7,6 +7,8 @@ and excluded from request logging.
 """
 from __future__ import annotations
 
+from django.utils.cache import add_never_cache_headers
+from rest_framework import status
 from rest_framework.permissions import IsAuthenticated
 from rest_framework.response import Response
 from rest_framework.throttling import ScopedRateThrottle
@@ -28,5 +30,7 @@ class ServiceConfigView(APIView):
 
     def get(self, request, scope: str):
         if scope == "shared" or scope not in _allowed_scopes(request.user):
-            return Response({"detail": "scope not permitted"}, status=403)
-        return Response(get_scope_config(scope))
+            return Response({"detail": "scope not permitted"}, status=status.HTTP_403_FORBIDDEN)
+        response = Response(get_scope_config(scope))
+        add_never_cache_headers(response)
+        return response

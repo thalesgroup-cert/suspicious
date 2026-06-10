@@ -34,6 +34,7 @@ class ConfigEndpointTest(APITestCase):
         self.assertEqual(resp.json()["storage"]["s3"]["endpoint"], "e")
         self.assertEqual(resp.json()["storage"]["s3"]["secret_key"], "SECRET")
         self.assertNotIn("integrations", resp.json())
+        self.assertNotIn("authentication", resp.json())
 
     def test_feeder_token_cannot_read_backend_scope(self):
         self.client.force_authenticate(self.feeder)
@@ -51,4 +52,10 @@ class ConfigEndpointTest(APITestCase):
     def test_shared_scope_not_requestable(self):
         self.client.force_authenticate(self.feeder)
         resp = self.client.get(self._url("shared"))
+        self.assertEqual(resp.status_code, 403)
+
+    def test_authenticated_no_groups_cannot_read_any_scope(self):
+        nobody = User.objects.create_user("svc-nobody", password="x")
+        self.client.force_authenticate(nobody)
+        resp = self.client.get(self._url("feeder"))
         self.assertEqual(resp.status_code, 403)
