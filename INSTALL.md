@@ -4,13 +4,14 @@ A from-zero setup guide for a **new contributor**, reproduced end-to-end on a
 clean checkout. Every command below was executed; where a step could not be run
 in the author's environment, the blocker is called out explicitly.
 
-> **What "verified" means here.** The core stack — MariaDB, Valkey (Redis),
-> Django backend, DB migrations, `seed_config`, admin login, health endpoint —
-> was brought up from an empty state and is confirmed working. Steps that need
-> outbound access to image registries / PyPI / npm (the `docker compose build`
-> of the backend & UI images) could not run in the author's offline sandbox and
-> are marked **⚠ needs internet**. On a normal network they complete; the
-> running app is identical to the verified core.
+> **What "verified" means here.** Every command was executed against a clean
+> checkout. The **full 13-service stack** was built from source and brought up
+> end-to-end — all services healthy (incl. Cortex, Elasticsearch, Vault), the
+> React UI served with live branding, and Traefik TLS routing confirmed
+> (`/`→UI, `/api`→Django, admin login over HTTPS). Image builds need outbound
+> PyPI/npm/registry access (set a proxy in `.env` if required). The minimal
+> **core dev stack** (DB + Redis + backend, §6) remains the fastest path for
+> day-to-day development.
 
 Example configs for a fictional org (**Meridian Group**) live in
 [`docs/getting-started/examples/`](docs/getting-started/examples/) — the exact
@@ -166,12 +167,13 @@ make seed-config                     # seed runtime config into the DB
 make createsuperuser                 # interactive admin creation
 ```
 
-> ⚠ **Blocker hit by the author:** `docker compose build suspicious` failed in an
-> offline sandbox — `uv pip install` could not reach `pypi.org` (connect
-> timeout). The Dockerfile and build context resolve correctly
-> (`docker compose config` passes); the build itself simply needs network. On a
-> normal connection this step completes and the `make …` commands above run
-> against the freshly built image.
+> **Proxy note (verified):** `docker compose build` fetches from PyPI/npm. If
+> your shell reaches the internet through a proxy, set `HTTP_PROXY`/`HTTPS_PROXY`
+> in `deployment/.env` — the Dockerfiles forward them as build args. With the
+> proxy set the backend image built cleanly from source (hvac + `seed_config`
+> present) and the full stack ran against it. With an empty proxy on a
+> proxy-only network the build fails with a `uv pip install` connect timeout —
+> the symptom to recognize.
 
 ### Option B — Run current source on the published image (verified, no build)
 
@@ -303,13 +305,68 @@ the `suspicious_ui` image — §9).
 | `docker compose build` → `uv pip install` timeout | no outbound PyPI access | build on a connected network / set proxy |
 | `network suspicious_net not found` | external network not created | `make up`, or `docker network create … suspicious_net` (§6.1) |
 | `manage.py seed_config` → `Unknown command` | running the published `:test` image without mounting current source | bind-mount the working tree (§6.3) or build from source |
+| backend exits at boot: `could not read secret … from Vault at http://vault:8200` | Compose used to default `VAULT_ADDR` to the vault host | fixed — default is now empty; leave `VAULT_ADDR` unset for dev |
+| cortex won't create: `mount path must be absolute` | `CORTEX_PATH` is relative | set `CORTEX_PATH` to an absolute path (§9.1) |
+| Traefik path → Django `DisallowedHost` | `app.allowed_hosts` missing `DOMAIN_CORP` | add the domain to `allowed_hosts` (§9.1) |
+| UI `:9021/api/...` returns the SPA HTML, not JSON | nginx does **not** proxy `/api`; Traefik does | use the Traefik domain (`https://…/api/…`), not the UI port directly |
+| `docker compose build` → `uv pip install` timeout | proxy-only network, empty build proxy | set `HTTP_PROXY`/`HTTPS_PROXY` in `.env` (§6 Option A) |
 
 ---
 
 ## 9. Full stack & production (beyond core)
 
-The remaining services need more resources and external access — **not verified
-in the author's offline sandbox**, documented from the compose/config:
+**Verified.** The complete 13-service stack was built from source and brought up
+end-to-end: all services healthy (`db`, `redis`×2, `elasticsearch`, `cortex`,
+`vault`, backend), the React UI served with live branding, and **Traefik TLS
+routing** confirmed — `/` → UI and `/api` → Django, admin login `302` over HTTPS.
+
+### 9.1 Verified full-stack bring-up
+
+```bash
+cd deployment
+# Build from source (needs registry/PyPI/npm egress — set HTTP_PROXY/HTTPS_PROXY
+# in .env if behind a proxy, e.g. on a corporate network):
+docker compose build suspicious suspicious_ui
+
+# make init must have run once (certs, keystore, Cortex catalogs — §5).
+# Bring up data stores + run DB init against the from-source image:
+docker compose up -d db_suspicious            # wait healthy
+docker compose run --rm --no-deps suspicious python manage.py migrate --no-input
+docker compose run --rm --no-deps suspicious python manage.py seed_config
+docker compose run --rm --no-deps \
+  -e DJANGO_SUPERUSER_USERNAME=admin -e DJANGO_SUPERUSER_PASSWORD=<pw> \
+  -e DJANGO_SUPERUSER_EMAIL=admin@your.org \
+  suspicious python manage.py createsuperuser --noinput
+
+docker compose up -d                          # the whole stack
+docker compose ps                             # all should reach healthy
+```
+
+Verify through Traefik (use the `DOMAIN_CORP` host; `-k` for the self-signed cert):
+
+```bash
+curl -sk --noproxy '*' -H "Host: suspicious.meridian.example" https://127.0.0.1/api/health/
+# → {"status":"ok","checks":{"db":true,"redis":true,"cortex":true},...}
+curl -sk --noproxy '*' -H "Host: suspicious.meridian.example" -o /dev/null \
+  -w "%{http_code}\n" https://127.0.0.1/            # UI → 200
+```
+
+Browser: add `127.0.0.1 suspicious.meridian.example` to your hosts file and open
+`https://suspicious.meridian.example/` (accept the self-signed cert).
+
+**Three full-stack requirements that bit during this run** (all now in the
+example configs):
+
+- **`CORTEX_PATH` must be absolute** (e.g. `/opt/suspicious/cortex`) — Cortex
+  mounts analyzer job dirs into sibling containers by host path. Relative →
+  `mount path must be absolute`.
+- **`allowed_hosts` must include `DOMAIN_CORP`** — Traefik forwards the
+  `suspicious.meridian.example` Host; without it Django returns `DisallowedHost`.
+- **Leave `VAULT_ADDR` unset for dev** — Compose now defaults it to empty so the
+  backend falls back to `settings.json`. (Previously it defaulted to
+  `http://vault:8200`, fail-fasting when Vault wasn't provisioned.)
+
+### 9.2 Service notes
 
 - **suspicious_ui** (port 9021): React/Vite + Nginx. `docker compose build
   suspicious_ui` (⚠ needs npm). Branding from `suspicious-ui/.env`.
