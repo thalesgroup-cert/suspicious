@@ -78,9 +78,9 @@ captured in INSTALL.md §8:
   `curl 127.0.0.1:9020` return `403`; use `--noproxy '*'`.
 - **Published image lags the branch.** `ghcr.io/...suspicious:test` predates this
   branch and lacks `seed_config`; run current source via build or bind-mount.
-- **`SETUP.md` is stale.** Predates `seed_config`/Vault and points "the web
-  interface" at `:9020` (that is the Django API; the React UI is `:9021`).
-  Superseded by INSTALL.md — a pointer was added to SETUP.md.
+- **`SETUP.md` was stale and is now removed.** It predated `seed_config`/Vault
+  and pointed "the web interface" at `:9020` (that is the Django API; the React
+  UI is `:9021`). Its content was merged into `INSTALL.md`.
 
 ## Blockers — resolved
 

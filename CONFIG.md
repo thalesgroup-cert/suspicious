@@ -624,7 +624,7 @@ The full stack starts: web UI, API, database, email-feeder, Cortex, MinIO/RustFS
 
 | Document | Description |
 |----------|-------------|
-| [SETUP.md](./SETUP.md) | Full installation and deployment instructions |
+| [INSTALL.md](./INSTALL.md) | Full installation and deployment instructions |
 | [deployment/README.md](./deployment/README.md) | Deployment-specific instructions |
 | [deployment/VAULT.md](./deployment/VAULT.md) | Vault secrets + DB runtime-config runbook |
 | [README.md](./README.md) | Project overview, features, and usage |
