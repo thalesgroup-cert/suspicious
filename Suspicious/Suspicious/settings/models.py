@@ -186,13 +186,19 @@ class RuntimeConfig(models.Model):
     ``value`` is JSON so str/int/bool/list/dict round-trip unchanged.
     """
 
-    key = models.CharField(max_length=200, unique=True)
+    SCOPE_CHOICES = (("shared", "shared"), ("backend", "backend"), ("feeder", "feeder"))
+
+    scope = models.CharField(max_length=20, choices=SCOPE_CHOICES, default="backend")
+    key = models.CharField(max_length=200)
     value = models.JSONField()
     updated_at = models.DateTimeField(auto_now=True)
 
     class Meta:
         verbose_name = "Runtime config entry"
         verbose_name_plural = "Runtime config"
+        constraints = [
+            models.UniqueConstraint(fields=["scope", "key"], name="uniq_scope_key"),
+        ]
 
     def __str__(self):
         return self.key

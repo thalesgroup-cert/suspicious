@@ -427,6 +427,7 @@ class AllowListFiletypeAdmin(ImportExportModelAdmin):
 # =========================
 @admin.register(RuntimeConfig)
 class RuntimeConfigAdmin(admin.ModelAdmin):
-    list_display = ("key", "value", "updated_at")
+    list_display = ("scope", "key", "value", "updated_at")
+    list_filter = ("scope",)
     search_fields = ("key",)
-    ordering = ("key",)
+    ordering = ("scope", "key")
