@@ -60,3 +60,21 @@ class SeedConfigTest(TestCase):
         self.assertEqual(misp["default_tags"], {"tlp": "amber"})
         self.assertNotIn("api_key", misp["instances"]["primary"])
         self.assertEqual(misp["instances"]["primary"]["url"], "http://m")
+
+    def test_sections_seeded_into_their_scope(self):
+        import os, tempfile, pathlib, json as _json
+        from suspicious import _config_common as cc
+        data = {
+            "storage": {"s3": {"endpoint": "e", "secret_key": "SK"}},
+            "integrations": {"cortex": {"url": "u", "api_key": "AK"}},
+            "branding": {"company_name": "Acme"},
+        }
+        p = pathlib.Path(tempfile.mkdtemp()) / "settings.json"
+        p.write_text(_json.dumps(data))
+        os.environ["SUSPICIOUS_CONFIG_PATH"] = str(p)
+        cc.load_settings.cache_clear()
+        call_command("seed_config")
+        self.assertEqual(RuntimeConfig.objects.get(key="storage.s3").scope, "shared")
+        self.assertEqual(RuntimeConfig.objects.get(key="branding").scope, "shared")
+        self.assertEqual(RuntimeConfig.objects.get(key="integrations.cortex").scope, "backend")
+        self.assertNotIn("secret_key", RuntimeConfig.objects.get(key="storage.s3").value)

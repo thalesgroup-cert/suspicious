@@ -12,26 +12,6 @@ from suspicious._config_common import load_settings, settings_get
 from settings.config import SECRET_FIELDS
 from settings.models import RuntimeConfig
 
-# Whole sections seeded as one row each (dotted key -> dict value).
-RUNTIME_SECTIONS = (
-    "integrations.cortex",
-    "integrations.thehive",
-    "integrations.misp",
-    "integrations.misp.instances.primary",
-    "integrations.misp.instances.secondary",
-    "integrations.watcher",
-    "integrations.chromadb",
-    "storage.s3",
-    "authentication.ldap",
-    "email.smtp",
-    "email.content",
-    "email.links",
-    "email.logos",
-    "branding",
-    "branding.assets",
-)
-
-
 def _strip_secrets(section: str, value: dict) -> dict:
     secrets = set(SECRET_FIELDS.get(section, ()))
     cleaned = {k: v for k, v in value.items() if k not in secrets}
@@ -49,13 +29,19 @@ class Command(BaseCommand):
     help = "Seed runtime config (non-secret) from settings.json into the DB."
 
     def handle(self, *args, **options):
+        from settings.config import SCOPE_SECTIONS, _scope_for_section
         load_settings.cache_clear()
+        sections = [s for group in SCOPE_SECTIONS.values() for s in group]
         seeded = 0
-        for section in RUNTIME_SECTIONS:
+        for section in sections:
             raw = settings_get(section, None)
             if not isinstance(raw, dict):
                 continue
             value = _strip_secrets(section, raw)
-            RuntimeConfig.objects.update_or_create(key=section, defaults={"value": value})
+            RuntimeConfig.objects.update_or_create(
+                scope=_scope_for_section(section),
+                key=section,
+                defaults={"value": value},
+            )
             seeded += 1
         self.stdout.write(self.style.SUCCESS(f"Seeded {seeded} runtime config sections."))

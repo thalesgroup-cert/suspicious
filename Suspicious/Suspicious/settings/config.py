@@ -38,6 +38,29 @@ SECRET_FIELDS: dict[str, tuple[str, ...]] = {
     "email.smtp": ("password",),
 }
 
+# Which config sections belong to which scope. A scope's effective sections
+# are its own plus everything in "shared". Drives seed_config and the config API.
+SCOPE_SECTIONS: dict[str, list[str]] = {
+    "shared": [
+        "storage.s3", "email.smtp", "email.content", "email.links",
+        "email.socials", "email.logos", "branding", "branding.assets",
+    ],
+    "backend": [
+        "integrations.cortex", "integrations.thehive", "integrations.misp",
+        "integrations.misp.instances.primary",
+        "integrations.misp.instances.secondary", "integrations.watcher",
+        "integrations.chromadb", "authentication.ldap",
+    ],
+    "feeder": [],  # phase 1: feeder consumes only "shared"
+}
+
+
+def _scope_for_section(section: str) -> str:
+    for scope, sections in SCOPE_SECTIONS.items():
+        if section in sections:
+            return scope
+    return "backend"
+
 
 def invalidate_cache(key: str) -> None:
     # Best-effort: a cache backend outage must not break a RuntimeConfig
