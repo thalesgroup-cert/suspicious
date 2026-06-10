@@ -224,6 +224,26 @@ Two services may report unhealthy in a bare setup, by design:
 Forward suspicious emails (as attachments) to the mailbox configured in
 `email-feeder/config.json`. The feeder imports them and queues analysis.
 
+### Feeder config authority (optional)
+
+When enabled, the feeder fetches its S3, SMTP, and branding config from the
+backend at boot instead of reading those blocks from `email-feeder/config.json`.
+The backend must be reachable on first run; the feeder caches the last-good
+response and tolerates a backend blip after that. With no cache and no backend
+it exits. Leaving `FEEDER_API_TOKEN` blank keeps the feeder on its local
+`config.json`.
+
+```bash
+# 1. Provision the feeder's scoped token (run once)
+docker compose exec suspicious python manage.py create_service_token feeder
+
+# 2. Paste the printed token into deployment/.env
+#    FEEDER_API_TOKEN=<token>      (BACKEND_URL=http://suspicious:9020 is preset)
+
+# 3. Restart the feeder so it fetches shared config from the backend
+docker compose up -d --force-recreate feeder
+```
+
 ---
 
 ## Operations

@@ -640,6 +640,67 @@ the dev/CI fallback for both.
 See [deployment/VAULT.md](./deployment/VAULT.md) for the secret map, prod
 bring-up order, and the dev/CI path.
 
+### Config authority (shared config across services)
+
+The **config authority** is a scoped HTTP endpoint that lets backend services
+pull their effective configuration at boot instead of maintaining separate
+copies of shared values.
+
+#### Scopes
+
+| Scope | What it holds |
+|-------|---------------|
+| `shared` | `storage.s3`, all `email.*` sections, `branding` — values used by more than one service. Never requested directly; always merged into a real scope. |
+| `backend` | Integration settings (Cortex, TheHive, MISP, ChromaDB, LDAP/OIDC) and auth config. |
+| `feeder` | No feeder-specific keys yet; consumes `shared` (S3, SMTP, branding). |
+
+`manage.py seed_config` seeds each `settings.json` section into its scope.
+
+#### Endpoint
+
+```
+GET /api/config/{scope}/
+```
+
+Returns the effective config for `scope`: the `shared` sections merged with the
+scope's own sections. Non-secret fields come from the DB; secret leaves are
+overlaid from Vault. Response always carries `Cache-Control: no-store`, is
+throttled at 30 req/min, and is never written to application logs.
+
+**Auth:** Knox token whose user belongs to the Django group named after the
+scope. Superusers may read any scope.
+
+```bash
+# Example — fetch the feeder scope (requires TLS via Traefik in production)
+curl -s -H "Authorization: Token <feeder-token>" \
+  https://suspicious.example.com/api/config/feeder/
+```
+
+#### Provisioning
+
+```bash
+# Seed config sections into the DB (already run by `make deploy`)
+docker compose exec suspicious python manage.py seed_config
+
+# Create the feeder service account and print its Knox token (run once)
+docker compose exec suspicious python manage.py create_service_token feeder
+```
+
+`create_service_token feeder` creates a `svc-feeder` user in the `feeder`
+group and prints a Knox token. Paste it into `deployment/.env` as
+`FEEDER_API_TOKEN`.
+
+#### Effect on the email feeder
+
+The feeder now fetches S3 credentials, SMTP settings, and branding from
+`GET /api/config/feeder/` at boot when `BACKEND_URL` and `FEEDER_API_TOKEN`
+are set. It writes a last-good cache (`.config-cache.json`, mode 0600) and
+falls back to it on a backend blip; with no cache and no backend it exits
+immediately. As a result, the `storage`, `outgoing-mail`, and `branding`
+blocks have been removed from `email-feeder/config.json` — that file now
+holds only `mail-connectors`, `working-path`, and polling settings
+(see [§3](#3-email-feederconfigurejson--email-ingestion-service)).
+
 ---
 
 ## Best Practices
