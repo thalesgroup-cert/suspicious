@@ -1,0 +1,50 @@
+# docker-compose.override.yml
+#
+# Local-development override — auto-loaded by `docker compose` alongside
+# docker-compose.yml. It adds ONLY the `build:` deltas so contributors run
+# images built from their own working tree instead of the published ones.
+#
+#   docker compose build              # build suspicious / suspicious_ui / feeder from source
+#   docker compose up -d --build      # build + start
+#   docker compose up -d              # start (uses the locally built image if present)
+#
+# Keep this file minimal: a delta, not a duplicate of docker-compose.yml.
+# Redefining whole services here re-applies their `extends:` and produces
+# duplicate list entries (e.g. elasticsearch.security_opt) that fail to merge.
+
+name: suspicious
+
+services:
+
+  suspicious:
+    build:
+      context: ${SUSPICIOUS_PATH:?SUSPICIOUS_PATH is required}/
+      dockerfile: Dockerfile
+      args:
+        - HTTP_PROXY=${HTTP_PROXY:-}
+        - HTTPS_PROXY=${HTTPS_PROXY:-}
+
+  suspicious_ui:
+    build:
+      context: ${SUSPICIOUS_UI_PATH:?SUSPICIOUS_UI_PATH is required}/
+      dockerfile: Dockerfile
+      args:
+        - HTTP_PROXY=${HTTP_PROXY:-}
+        - HTTPS_PROXY=${HTTPS_PROXY:-}
+
+  suspicious_celery:
+    build:
+      context: ${SUSPICIOUS_PATH:?SUSPICIOUS_PATH is required}/
+      dockerfile: Dockerfile
+      args:
+        - HTTP_PROXY=${HTTP_PROXY:-}
+        - HTTPS_PROXY=${HTTPS_PROXY:-}
+
+  feeder:
+    build:
+      context: ${FEEDER_PATH:?FEEDER_PATH is required}/
+      dockerfile: Dockerfile
+      args:
+        - NO_PROXY=localhost,rustfs,chromadb
+        - HTTP_PROXY=${HTTP_PROXY:-}
+        - HTTPS_PROXY=${HTTPS_PROXY:-}
