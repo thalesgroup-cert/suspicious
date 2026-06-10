@@ -32,7 +32,7 @@ services:
       - ".env"
     environment:
       no_proxy: "${NO_PROXY:-},cortex,db_suspicious,rustfs,chromadb,vault"
-      VAULT_ADDR: "${VAULT_ADDR:-http://vault:8200}"
+      VAULT_ADDR: "${VAULT_ADDR:-}"
       VAULT_ROLE_ID: "${VAULT_ROLE_ID:-}"
       VAULT_SECRET_ID: "${VAULT_SECRET_ID:-}"
       SUSPICIOUS_CONFIG_PATH: "/app/settings.json"
@@ -64,7 +64,7 @@ services:
       - ".env"
     environment:
       no_proxy: "${NO_PROXY:-},cortex,db_suspicious,rustfs,chromadb,redis_broker,redis_cache,vault"
-      VAULT_ADDR: "${VAULT_ADDR:-http://vault:8200}"
+      VAULT_ADDR: "${VAULT_ADDR:-}"
       VAULT_ROLE_ID: "${VAULT_ROLE_ID:-}"
       VAULT_SECRET_ID: "${VAULT_SECRET_ID:-}"
       SUSPICIOUS_CONFIG_PATH: "/app/settings.json"

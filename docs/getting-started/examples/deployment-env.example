@@ -88,7 +88,10 @@ FEEDER_PATH=../email-feeder
 DOCKER_PATH=../docker
 YARA_PATH=../yara-rules
 MISP_PATH=../misp
-CORTEX_PATH=../cortex
+# Cortex needs an ABSOLUTE path: it mounts analyzer job dirs into sibling
+# containers via the Docker socket, so the host and in-container paths must be
+# identical. A relative path yields "mount path must be absolute".
+CORTEX_PATH=/opt/suspicious/cortex
 AIANALYZER_PATH=../Analyzers/AIMailAnalyzer
 CA_PATH=./certificates
 TRAEFIK_PATH=../traefik
@@ -104,4 +107,4 @@ WEB_CONTAINER=suspicious
 # =============================================================================
 HTTP_PROXY=
 HTTPS_PROXY=
-NO_PROXY=localhost
+NO_PROXY=localhost,127.0.0.1,db_suspicious,db_suspicious_replica,redis_cache,redis_broker,rustfs,chromadb,cortex,elasticsearch,suspicious,suspicious_ui,vault,traefik
