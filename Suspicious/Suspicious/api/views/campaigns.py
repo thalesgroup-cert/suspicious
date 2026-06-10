@@ -4,10 +4,10 @@ from drf_spectacular.utils import (
     OpenApiResponse,
     extend_schema,
 )
-from rest_framework.permissions import IsAuthenticated
 from rest_framework.response import Response
 from rest_framework.views import APIView
 
+from api.permissions.dashboard import StatsReadPermission
 from api.serializers.campaigns import (
     CampaignClassificationCountsSerializer,
     CampaignMailVolumeResponseSerializer,
@@ -28,7 +28,7 @@ def _validated_response(serializer_cls, payload):
     tags=["Campaigns"],
 )
 class CampaignClassificationCountsView(APIView):
-    permission_classes = [IsAuthenticated]
+    permission_classes = [StatsReadPermission]
 
     @extend_schema(
         operation_id="campaign_classification_counts",
@@ -78,7 +78,7 @@ class CampaignClassificationCountsView(APIView):
     tags=["Campaigns"],
 )
 class CampaignPcaView(APIView):
-    permission_classes = [IsAuthenticated]
+    permission_classes = [StatsReadPermission]
 
     @extend_schema(
         operation_id="campaign_pca",
@@ -160,7 +160,7 @@ class CampaignPcaView(APIView):
     tags=["Campaigns"],
 )
 class CampaignMailVolumeView(APIView):
-    permission_classes = [IsAuthenticated]
+    permission_classes = [StatsReadPermission]
 
     @extend_schema(
         operation_id="campaign_mail_volume",
