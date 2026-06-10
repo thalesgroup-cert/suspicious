@@ -109,3 +109,29 @@ def get_section(name: str) -> dict:
     for field in SECRET_FIELDS.get(name, ()):  # overlay secrets
         section[field] = get_secret(f"{name}.{field}")
     return section
+
+
+def _set_dotted(target: dict, dotted_key: str, value: Any) -> None:
+    """Insert ``value`` into ``target`` at the nested location ``dotted_key``."""
+    parts = dotted_key.split(".")
+    node = target
+    for part in parts[:-1]:
+        node = node.setdefault(part, {})
+    leaf = parts[-1]
+    if isinstance(node.get(leaf), dict) and isinstance(value, dict):
+        node[leaf].update(value)
+    else:
+        node[leaf] = value
+
+
+def get_scope_config(scope: str) -> dict:
+    """Assemble a scope's effective sections (its own + ``shared``) into one
+    nested dict, secrets overlaid from Vault via get_section. Shape matches
+    settings.json."""
+    sections = list(SCOPE_SECTIONS.get("shared", []))
+    if scope != "shared":
+        sections += SCOPE_SECTIONS.get(scope, [])
+    result: dict = {}
+    for section in sections:
+        _set_dotted(result, section, get_section(section))
+    return result
