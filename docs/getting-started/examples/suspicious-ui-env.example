@@ -1,0 +1,12 @@
+# suspicious-ui/.env — SPA runtime config (injected into window.__ENV__ at container start)
+VITE_API_BASE=/api
+VITE_FAVICON=/icons/suspicious-logo.png
+VITE_COMPANY_NAME=Meridian Group
+VITE_COMPANY_LINK=https://www.meridian.example
+VITE_COMPANY_LOGO_BASE64=
+VITE_COMPANY_LOGO_URL=/brand/logo.svg
+
+VITE_SUSPICIOUS_EMAIL=suspicious@meridian.example
+VITE_GITHUB_REPO_URL=https://github.com/thalesgroup-cert/suspicious
+VITE_DOCS_URL=https://github.com/thalesgroup-cert/suspicious
+VITE_CHANGELOG_URL=https://github.com/thalesgroup-cert/suspicious/blob/main/CHANGELOG.md

@@ -170,6 +170,14 @@ services:
       suspicious:
         condition: service_healthy
 
+  # ── Secrets ───────────────────────────────────────────────────────────────
+
+  vault:
+    extends:
+      file: compose_apps.yaml
+      service: vault
+    container_name: vault
+
   # ── Reverse proxy ─────────────────────────────────────────────────────────
 
   traefik:

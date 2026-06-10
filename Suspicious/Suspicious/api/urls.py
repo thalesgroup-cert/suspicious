@@ -56,6 +56,7 @@ from api.views.submissions import (
 )
 from api.views.oidc import OIDCCallbackView, OIDCLoginView
 from api.views.cortex_webhook import CortexWebhookView
+from api.views.config import ServiceConfigView
 
 urlpatterns = [
     path("schema/", SpectacularAPIView.as_view(), name="schema"),
@@ -136,4 +137,7 @@ urlpatterns = [
 
     # Cortex job-completion webhook (called by Cortex, not by browser users)
     path("cortex/webhook/", CortexWebhookView.as_view(), name="cortex-webhook"),
+
+    # Config authority — services fetch their effective scoped config (TLS-only)
+    path("config/<str:scope>/", ServiceConfigView.as_view(), name="service-config"),
 ]

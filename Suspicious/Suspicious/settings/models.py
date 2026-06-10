@@ -177,3 +177,40 @@ class AllowListFiletype(models.Model):
 
     def __str__(self):
         return self.filetype
+
+
+class RuntimeConfig(models.Model):
+    """Non-secret runtime config seeded from settings.json, editable in admin.
+
+    ``key`` is a dotted settings path (e.g. "integrations.cortex.url").
+    ``value`` is JSON so str/int/bool/list/dict round-trip unchanged.
+    """
+
+    SCOPE_CHOICES = (("shared", "shared"), ("backend", "backend"), ("feeder", "feeder"))
+
+    scope = models.CharField(max_length=20, choices=SCOPE_CHOICES, default="backend")
+    key = models.CharField(max_length=200)
+    value = models.JSONField()
+    updated_at = models.DateTimeField(auto_now=True)
+
+    class Meta:
+        verbose_name = "Runtime config entry"
+        verbose_name_plural = "Runtime config"
+        constraints = [
+            models.UniqueConstraint(fields=["scope", "key"], name="uniq_scope_key"),
+        ]
+
+    def __str__(self):
+        return self.key
+
+    def save(self, *args, **kwargs):
+        super().save(*args, **kwargs)
+        # Invalidate the accessor cache so admin edits propagate immediately.
+        from settings.config import invalidate_cache
+        invalidate_cache(self.key)
+
+    def delete(self, *args, **kwargs):
+        key = self.key
+        super().delete(*args, **kwargs)
+        from settings.config import invalidate_cache
+        invalidate_cache(key)

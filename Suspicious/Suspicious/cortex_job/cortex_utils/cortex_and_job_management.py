@@ -1,6 +1,5 @@
 import json
 import logging
-import os
 
 import pybreaker
 from django.db import transaction
@@ -19,40 +18,35 @@ logger = logging.getLogger(__name__)
 update_cases_logger = logging.getLogger("tasp.cron.update_ongoing_case_jobs")
 fetch_mail_logger = logging.getLogger("tasp.cron.fetch_and_process_emails")
 
-# ------------------------
-# Load Cortex configuration
-# ------------------------
-CONFIG_PATH = os.getenv("CONFIG_PATH", "/app/settings.json")
-try:
-    with open(CONFIG_PATH, "r") as config_file:
-        config = json.load(config_file)
-except FileNotFoundError:
-    fetch_mail_logger.error(f"Configuration file not found at {CONFIG_PATH}")
-    config = {}
-except json.JSONDecodeError as e:
-    fetch_mail_logger.error(f"Error parsing JSON config: {e}")
-    config = {}
-
-cortex_config = (config.get("integrations", {}).get("cortex", {}))
 
 # ------------------------
-# API settings
+# Lazy Cortex configuration accessor
 # ------------------------
-API_URL = cortex_config.get("url", "https://cortex.example.com")
-API_KEY = cortex_config.get("api_key", "your_api_key_here")
+def _get_cortex_config() -> dict:
+    """Cortex config via the runtime accessor; empty dict on failure."""
+    try:
+        from settings.config import get_section
+        return get_section("integrations.cortex")
+    except Exception as exc:
+        fetch_mail_logger.error(f"Could not load cortex config: {exc}")
+        return {}
 
-# Reports stuck in Waiting/InProgress beyond this many seconds are
-# auto-failed so the parent case can finish. 24h matches the worst-case
-# Cortex analyzer (sandbox detonation) we have observed.
-STALE_JOB_TIMEOUT_SECONDS: int = int(
-    cortex_config.get("stale_job_timeout_seconds", 86400)
-)
 
-try:
-    API = SessionCortexApi(API_URL, API_KEY, proxies={"http": "", "https": ""})
-except Exception as e:
-    fetch_mail_logger.error(f"Failed to initialize Cortex API: {e}")
-    API = None
+# Backwards-compatible lazy module attributes. Consumers do
+# `from ...cortex_and_job_management import API_URL / API_KEY /
+# STALE_JOB_TIMEOUT_SECONDS`. PEP 562 __getattr__ resolves them on first
+# access via the runtime accessor, so importing this module never triggers
+# a DB/Vault read at import time.
+def __getattr__(name):
+    if name in ("API_URL", "API_KEY", "STALE_JOB_TIMEOUT_SECONDS"):
+        cc = _get_cortex_config()
+        if name == "API_URL":
+            return cc.get("url", "https://cortex.example.com")
+        if name == "API_KEY":
+            return cc.get("api_key", "your_api_key_here")
+        return int(cc.get("stale_job_timeout_seconds", 86400))
+    raise AttributeError(f"module {__name__!r} has no attribute {name!r}")
+
 
 _cortex_breaker = get_breaker("cortex")
 
@@ -81,8 +75,9 @@ class CortexJob:
             api_key (str, optional): Cortex API key. Defaults to API_KEY.
             proxies (dict, optional): Proxy configuration, e.g., {"http": "...", "https": "..."}.
         """
-        self.api_url = api_url or API_URL
-        self.api_key = api_key or API_KEY
+        cortex_config = _get_cortex_config()
+        self.api_url = api_url or cortex_config.get("url", "https://cortex.example.com")
+        self.api_key = api_key or cortex_config.get("api_key", "your_api_key_here")
 
         # Ensure proxies is a dict; default to empty no-proxy configuration
         self.proxies = (
@@ -108,6 +103,7 @@ class CortexJob:
         Returns:
             list[str]: A list of job IDs for the launched Cortex jobs.
         """
+        cortex_config = _get_cortex_config()
         api_launchjob = self.api
         analyzers = []
 
@@ -203,6 +199,7 @@ class CortexJob:
             return None
 
         try:
+            cortex_config = _get_cortex_config()
             # Get AI analyzer by name from config
             ai_analyzer_name = (cortex_config.get("analyzers", {}).get("ai", {}))
             analyzer = self.api.analyzers.get_by_name(ai_analyzer_name)
@@ -251,6 +248,7 @@ class CortexJob:
         if not hasattr(file, "file_path") or not hasattr(file.file_path, "name"):
             raise TypeError("file must have 'file_path.name' attribute")
 
+        cortex_config = _get_cortex_config()
         analyzer_names = filter(
             None,
             [
@@ -301,6 +299,7 @@ class CortexJob:
             )
             return []
 
+        cortex_config = _get_cortex_config()
         # Analyzers to exclude (safely handle missing keys in config)
         analyzers_to_remove = set(
             filter(
@@ -563,8 +562,9 @@ class CortexJobManager:
         }
 
         # API configuration
-        self.api_urls = API_URL
-        self.api_keys = API_KEY
+        _cc = _get_cortex_config()
+        self.api_urls = _cc.get("url", "https://cortex.example.com")
+        self.api_keys = _cc.get("api_key", "your_api_key_here")
 
     @staticmethod
     def _artifact_value(report_instance):
@@ -680,7 +680,8 @@ class CortexJobManager:
             ) or report_instance.creation_date
             if submitted_at is not None:
                 age = (timezone.now() - submitted_at).total_seconds()
-                if age > STALE_JOB_TIMEOUT_SECONDS:
+                stale_timeout = int(_get_cortex_config().get("stale_job_timeout_seconds", 86400))
+                if age > stale_timeout:
                     update_cases_logger.warning(
                         "Auto-failing stale %s report cortex_job_id=%s after %.0fs",
                         report_instance.status, job_id, age,
@@ -692,7 +693,17 @@ class CortexJobManager:
 
     @staticmethod
     def get_job_from_api(job_id):
-        for api in [API]:
+        cc = _get_cortex_config()
+        try:
+            api = SessionCortexApi(
+                cc.get("url", "https://cortex.example.com"),
+                cc.get("api_key", "your_api_key_here"),
+                proxies={"http": "", "https": ""},
+            )
+        except Exception as e:
+            fetch_mail_logger.error(f"Failed to initialize Cortex API: {e}")
+            api = None
+        for api in [api]:
             if api is None:
                 continue
             try:
@@ -711,7 +722,17 @@ class CortexJobManager:
 
     @staticmethod
     def get_report_from_api(job_id):
-        for api in [API]:
+        cc = _get_cortex_config()
+        try:
+            api = SessionCortexApi(
+                cc.get("url", "https://cortex.example.com"),
+                cc.get("api_key", "your_api_key_here"),
+                proxies={"http": "", "https": ""},
+            )
+        except Exception as e:
+            fetch_mail_logger.error(f"Failed to initialize Cortex API: {e}")
+            api = None
+        for api in [api]:
             if api is None:
                 continue
             try:
@@ -1462,6 +1483,7 @@ class CortexJobManager:
 
         # Get AI analyzer report
         try:
+            cortex_config = _get_cortex_config()
             analyzer = AnalyzerReport.objects.get(
                 analyzer__name=(cortex_config.get("analyzers", {}).get("ai", {})),
                 file=mail_archive.archive,

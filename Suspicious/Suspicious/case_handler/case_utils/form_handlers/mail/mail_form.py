@@ -1,4 +1,3 @@
-import json
 import logging
 import shutil
 from email import policy
@@ -12,11 +11,6 @@ from case_handler.case_utils.form_handlers.mail.converters import convert_msg_to
 from case_handler.case_utils.form_handlers.mail.email_processing.service import ProcessEmailService
 from case_handler.case_utils.form_handlers.mail.email_processing.utils import generate_object_reference
 from case_handler.case_utils.form_handlers.mail.minio import MinioManager
-
-import os as _os_cfg
-CONFIG_PATH = _os_cfg.environ.get("SUSPICIOUS_CONFIG_PATH", "/app/settings.json")
-with open(CONFIG_PATH) as config_file:
-    config = json.load(config_file)
 
 logger = logging.getLogger(__name__)
 
@@ -37,7 +31,8 @@ class MailFormHandler:
         """
         self.user = user
         self.base_path = Path(base_path)
-        cfg = (config.get("storage", {}).get("s3", {}))
+        from settings.config import get_section
+        cfg = get_section("storage.s3")
         self.minio = MinioManager(
             endpoint=cfg.get("endpoint", "rustfs:9000"),
             access_key=cfg.get("access_key", "minioadmin"),

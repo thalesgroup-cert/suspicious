@@ -5,14 +5,12 @@ except ImportError:
 from django.contrib.auth.models import Group
 from profiles.models import CISOProfile, UserProfile
 from django.contrib.auth import get_user_model
-import json
 
-import os as _os_cfg
-CONFIG_PATH = _os_cfg.environ.get("SUSPICIOUS_CONFIG_PATH", "/app/settings.json")
-with open(CONFIG_PATH) as config_file:
-    config = json.load(config_file)
 
-ldap_config = (config.get("authentication", {}).get("ldap", {}))
+def _ldap_config() -> dict:
+    from settings.config import get_section
+    return get_section("authentication.ldap")
+
 
 CISO = {
     "CISO",
@@ -49,6 +47,7 @@ class Ldap:
             LDAPError: If there is an error while binding to the LDAP server.
 
         """
+        ldap_config = _ldap_config()
         try:
             ldap.set_option(ldap.OPT_X_TLS_REQUIRE_CERT, ldap.OPT_X_TLS_NEVER)
             ldap_server = ldap.initialize(ldap_config.get("server_uri", "ldap://localhost"))
@@ -73,7 +72,7 @@ class Ldap:
         """
         try:
             print('searching user')
-            search_results = ldap_server.search_s(ldap_config.get("base_dn"), ldap.SCOPE_SUBTREE,
+            search_results = ldap_server.search_s(_ldap_config().get("base_dn"), ldap.SCOPE_SUBTREE,
                                                   f'(&(mail={instance.username})(Tpresent=true)(!(ou=admin))(!(TpreferredFirstName=Test)))',
                                                   ['mail', 'title', 'businessCategory', 'c'])
             print(search_results)

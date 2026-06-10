@@ -2,4 +2,4 @@
 
 Get a local or test instance of Suspicious running in minutes.
 
-{% include-markdown "../../SETUP.md" heading-offset=1 %}
+{% include-markdown "../../INSTALL.md" heading-offset=1 %}

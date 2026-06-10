@@ -12,6 +12,17 @@ This document describes every configuration file and environment variable requir
 
 > **`make init`** checks for these files and — if missing — creates them from sample templates (`.env.example`, `settings-sample.json`, `config-sample.json`). It also verifies directory structure, permissions, and certificates.
 
+> **Tested baseline.** The full 13-service stack was brought up end-to-end with
+> the image versions in [§1.1](#11-application-versions). Four settings decide
+> whether it starts and serves traffic — get these right first:
+>
+> | Setting | Rule |
+> |---|---|
+> | `settings.json` `database.password` | must equal `.env` `MYSQL_PASSWORD` (no Vault) — [§2.4](#24-database) |
+> | `settings.json` `app.debug` | `true` for plain HTTP on `localhost`; `false` forces HTTPS via Traefik — [§2.1](#21-core-application) |
+> | `settings.json` `app.allowed_hosts` | include `DOMAIN_CORP`, or the Traefik path returns `DisallowedHost` — [§2.1](#21-core-application) |
+> | `.env` `CORTEX_PATH` | absolute path when running Cortex — [§1.7](#17-local-paths) |
+
 ---
 
 ## 1. `.env` — Deployment Environment
@@ -23,16 +34,19 @@ cp .env.example .env
 ### 1.1 Application Versions
 
 ```env
-SUSPICIOUS_VERSION=latest
+SUSPICIOUS_VERSION=test          # or a pinned tag; `latest` tracks main
 DB_SUSPICIOUS_VERSION=12
 RUSTFS_VERSION=1.0.0-alpha.90
 CORTEX_VERSION=4.0.0-1
 ELASTICSEARCH_VERSION=8.19.7
-TRAEFIK_VERSION=v3.6
-CHROMADB_VERSION=1.5.5
+TRAEFIK_VERSION=v3.3.4
+CHROMADB_VERSION=0.6.3
+REDIS_BROKER_VERSION=9-alpine
+REDIS_CACHE_VERSION=9-alpine
 ```
 
-> Only update versions when you know compatibility. Mismatched versions can break services.
+> This set was brought up together successfully. Only change versions when you
+> know they are compatible — mismatched versions can break services.
 
 ### 1.2 Service Ports
 
@@ -64,7 +78,13 @@ MYSQL_PASSWORD="your_db_user_password"
 MYSQL_ROOT_PASSWORD="your_db_root_password"
 ```
 
-> ⚠️ Must be set **before first startup**. Changing after initialization requires removing the database volume, which **erases all data**.
+> ⚠️ Must be set **before first startup**. MariaDB applies these only when it
+> initialises an empty data volume. Changing them later — or reusing a volume
+> created with different credentials — gives `Access denied for user
+> 'suspicious'`. To reset for a fresh start (this **erases all data**):
+> `docker compose rm -sf db_suspicious && docker volume rm suspicious_db_suspicious_data`.
+>
+> `MYSQL_PASSWORD` must match `settings.json` → `database.password` (see [§2.4](#24-database)).
 
 ### 1.5 MinIO / RustFS Credentials
 
@@ -92,11 +112,17 @@ FEEDER_PATH=../email-feeder
 DOCKER_PATH=../docker
 YARA_PATH=../yara-rules
 MISP_PATH=../misp
-CORTEX_PATH=../cortex
+CORTEX_PATH=/opt/suspicious/cortex   # ABSOLUTE when running Cortex (see note)
 AIANALYZER_PATH=../Analyzers/AIMailAnalyzer
 CA_PATH=./certificates
 TRAEFIK_PATH=../traefik
 ```
+
+> **`CORTEX_PATH` must be an absolute path when the Cortex service runs.** Cortex
+> mounts analyzer job directories into sibling containers through the Docker
+> socket, so the host and in-container paths must be identical. A relative value
+> fails at startup with `invalid mount path: '../cortex/jobs' mount path must be
+> absolute`. A relative path is fine if you do not run Cortex (core dev stack).
 
 ### 1.8 Proxy Settings
 
@@ -106,7 +132,10 @@ HTTPS_PROXY=
 NO_PROXY=localhost
 ```
 
-Leave blank unless your environment requires an outbound proxy.
+Leave blank unless your environment requires an outbound proxy. These values are
+also passed as **build args** to `docker compose build`, so set them before
+building images on a proxy-only network — otherwise the build fails with a
+`uv pip install` (PyPI) or npm connection timeout.
 
 ---
 
@@ -130,10 +159,10 @@ Created by `make init` from `settings-sample.json` if absent.
 
 | Key | Description |
 |-----|-------------|
-| `secret_key` | Django secret key — generate with `openssl rand -base64 33` |
-| `debug` | Must be `false` in production |
-| `allowed_hosts` | Hostnames Django will respond to |
-| `csrf_trusted_origins` | Full origins allowed to make POST requests (include scheme + host) |
+| `secret_key` | Django secret key. Generate with `python3 -c "import secrets; print(secrets.token_urlsafe(64))"`. The boot-time schema check rejects placeholder/short keys; use 50+ random characters. |
+| `debug` | `false` in production. **Set `true` for local development** — with `false`, Django redirects to HTTPS, so `http://localhost:9020` is unreachable without Traefik. |
+| `allowed_hosts` | Hostnames Django responds to (it always adds `localhost` and `127.0.0.1`). **For the Traefik/HTTPS path, include your `DOMAIN_CORP`** or requests return `DisallowedHost`. |
+| `csrf_trusted_origins` | Full origins allowed to POST (scheme + host), e.g. `http://localhost:9020` for local and `https://<DOMAIN_CORP>` for the proxy. |
 | `timezone` | Django timezone — affects timestamps and scheduled tasks |
 | `log_level` | `DEBUG` / `INFO` / `WARNING` / `ERROR` |
 
@@ -187,7 +216,10 @@ Assets accept either a `data:image/...;base64,...` string or an `https://` URL. 
 }
 ```
 
-Must be consistent with `.env` `MYSQL_*` values.
+`host`, `name`, and `user` must match the `.env` `MYSQL_*` values. Without Vault,
+`password` here **must equal** `.env` `MYSQL_PASSWORD` — the backend reads the
+database password from `settings.json` at boot when `VAULT_ADDR` is unset. A
+mismatch gives `Access denied for user 'suspicious'`.
 
 ### 2.5 Storage (MinIO / RustFS)
 
@@ -205,7 +237,10 @@ Must be consistent with `.env` `MYSQL_*` values.
 }
 ```
 
-Set `"backend": "s3"` to use object storage. Must match `.env` `MINIO_*` credentials.
+`"backend": "local"` (the default) stores files on the container filesystem and
+does **not** require the RustFS service — handy for a minimal dev run. Set
+`"backend": "s3"` to use object storage; then `secret_key` here must match the
+RustFS credentials in `.env` (`MINIO_ROOT_PASSWORD`), and RustFS must be running.
 
 ### 2.6 Integrations
 
@@ -487,7 +522,13 @@ Created by `make init` from `config-sample.json` if absent.
 }
 ```
 
-You can define as many named connectors as needed. Set `"enable": false` to deactivate a connector without removing it.
+You can define as many named connectors as needed. Set `"enable": false` to
+deactivate a connector without removing it.
+
+> The feeder needs **at least one enabled connector**. With every connector
+> disabled it logs `No mailboxes were successfully set up … Exiting` and the
+> container restart-loops. This is expected when you run the stack without a
+> mailbox to poll; it does not affect the backend or UI.
 
 | Key | Description |
 |-----|-------------|
@@ -573,6 +614,95 @@ This section configures the **email-feeder container's** standalone mail service
 
 ---
 
+## Runtime config + secrets (DB + Vault)
+
+In production, configuration is split across three tiers; `settings.json` stays
+the dev/CI fallback for both.
+
+- **Non-secret runtime config** now lives in the **database**
+  (`settings.RuntimeConfig`). It is seeded from `settings.json` by
+  `python manage.py seed_config` (run automatically by `make deploy`), editable
+  from the Django admin, and read in code via `settings.config.get_config` /
+  `settings.config.get_section`. When the DB has no seeded value, the accessor
+  falls back to `settings.json`.
+- **Secrets** (API keys, passwords, the Django secret key) live in **HashiCorp
+  Vault** (KV v2 at `suspicious/<dotted-key>`, field `value`), read via
+  `suspicious.secrets.get_secret` using AppRole auth. When `VAULT_ADDR` is unset,
+  secrets fall back to `settings.json` / `settings.ci.json`. **Leave `VAULT_ADDR`
+  unset for local development** — Compose defaults it to empty, so the backend
+  uses the `settings.json` fallback. Set it only once Vault is provisioned;
+  otherwise the backend fails fast at boot trying to reach Vault.
+- **Schema caveat:** `settings.json` must still keep schema-valid dummies for
+  `app.secret_key` and `database.password` even under Vault — the boot-time
+  schema check requires them, and the real values are overlaid from Vault when
+  `VAULT_ADDR` is set.
+
+See [deployment/VAULT.md](./deployment/VAULT.md) for the secret map, prod
+bring-up order, and the dev/CI path.
+
+### Config authority (shared config across services)
+
+The **config authority** is a scoped HTTP endpoint that lets backend services
+pull their effective configuration at boot instead of maintaining separate
+copies of shared values.
+
+#### Scopes
+
+| Scope | What it holds |
+|-------|---------------|
+| `shared` | `storage.s3`, all `email.*` sections, `branding` — values used by more than one service. Never requested directly; always merged into a real scope. |
+| `backend` | Integration settings (Cortex, TheHive, MISP, ChromaDB, LDAP/OIDC) and auth config. |
+| `feeder` | No feeder-specific keys yet; consumes `shared` (S3, SMTP, branding). |
+
+`manage.py seed_config` seeds each `settings.json` section into its scope.
+
+#### Endpoint
+
+```
+GET /api/config/{scope}/
+```
+
+Returns the effective config for `scope`: the `shared` sections merged with the
+scope's own sections. Non-secret fields come from the DB; secret leaves are
+overlaid from Vault. Response always carries `Cache-Control: no-store`, is
+throttled at 30 req/min, and is never written to application logs.
+
+**Auth:** Knox token whose user belongs to the Django group named after the
+scope. Superusers may read any scope.
+
+```bash
+# Example — fetch the feeder scope (requires TLS via Traefik in production)
+curl -s -H "Authorization: Token <feeder-token>" \
+  https://suspicious.example.com/api/config/feeder/
+```
+
+#### Provisioning
+
+```bash
+# Seed config sections into the DB (already run by `make deploy`)
+docker compose exec suspicious python manage.py seed_config
+
+# Create the feeder service account and print its Knox token (run once)
+docker compose exec suspicious python manage.py create_service_token feeder
+```
+
+`create_service_token feeder` creates a `svc-feeder` user in the `feeder`
+group and prints a Knox token. Paste it into `deployment/.env` as
+`FEEDER_API_TOKEN`.
+
+#### Effect on the email feeder
+
+The feeder now fetches S3 credentials, SMTP settings, and branding from
+`GET /api/config/feeder/` at boot when `BACKEND_URL` and `FEEDER_API_TOKEN`
+are set. It writes a last-good cache (`.config-cache.json`, mode 0600) and
+falls back to it on a backend blip; with no cache and no backend it exits
+immediately. As a result, the `storage`, `outgoing-mail`, and `branding`
+blocks have been removed from `email-feeder/config.json` — that file now
+holds only `mail-connectors`, `working-path`, and polling settings
+(see [§3](#3-email-feederconfigurejson--email-ingestion-service)).
+
+---
+
 ## Best Practices
 
 - **Never commit secrets** — use environment variable injection, Docker secrets, or a secrets manager in production.
@@ -585,13 +715,22 @@ This section configures the **email-feeder container's** standalone mail service
 
 ## Launch
 
-Once `.env`, `settings.json`, and `config.json` are complete:
+Once `.env`, `settings.json`, and `config.json` are complete, build and start,
+then initialise the database on the **first run** (the backend stays unhealthy
+until migrations are applied):
 
 ```bash
+docker compose build suspicious suspicious_ui
 make up
+make migrate
+make seed-config
+make createsuperuser
 ```
 
-The full stack starts: web UI, API, database, email-feeder, Cortex, MinIO/RustFS, Elasticsearch, ChromaDB, Traefik, and optional services.
+The full stack starts: web UI, API, database, email-feeder, Cortex, RustFS,
+Elasticsearch, ChromaDB, Traefik, and Vault. `make seed-config` loads the
+non-secret runtime config into the database (see [Runtime config + secrets](#runtime-config--secrets-db--vault)).
+See [INSTALL.md](./INSTALL.md) for the step-by-step walkthrough and verification.
 
 ---
 
@@ -599,7 +738,8 @@ The full stack starts: web UI, API, database, email-feeder, Cortex, MinIO/RustFS
 
 | Document | Description |
 |----------|-------------|
-| [SETUP.md](./SETUP.md) | Full installation and deployment instructions |
+| [INSTALL.md](./INSTALL.md) | Full installation and deployment instructions |
 | [deployment/README.md](./deployment/README.md) | Deployment-specific instructions |
+| [deployment/VAULT.md](./deployment/VAULT.md) | Vault secrets + DB runtime-config runbook |
 | [README.md](./README.md) | Project overview, features, and usage |
 | [CONTRIBUTING.md](./CONTRIBUTING.md) | Development and contribution guidelines |

@@ -5,7 +5,6 @@ a TheHive campaign alert when the mail is considered dangerous.
 """
 from __future__ import annotations
 
-import json
 import logging
 from functools import cached_property
 from typing import Any, Dict, List
@@ -41,17 +40,9 @@ from score_process.score_utils.thehive.phishing import (
     build_mail_observables_from_html,
 )
 
-import os as _os_cfg
-CONFIG_PATH = _os_cfg.environ.get("SUSPICIOUS_CONFIG_PATH", "/app/settings.json")
 DANGEROUS_MALSCORE_THRESHOLD = 6.5
 
 logger = logging.getLogger("tasp.cron.update_ongoing_case_jobs")
-
-
-def _load_config() -> Dict[str, Any]:
-    """Load settings.json lazily — raises at call time, not at import time."""
-    with open(CONFIG_PATH) as fh:
-        return json.load(fh)
 
 
 class AnalyzerAI(BaseAnalyzer):
@@ -66,12 +57,9 @@ class AnalyzerAI(BaseAnalyzer):
     # ── lazy config access ────────────────────────────────────────────────
 
     @cached_property
-    def _config(self) -> Dict[str, Any]:
-        return _load_config()
-
-    @cached_property
     def _thehive(self) -> Dict[str, str]:
-        cfg = self._config.get("integrations", {}).get("thehive", {})
+        from settings.config import get_section
+        cfg = get_section("integrations.thehive")
         return {
             "url": cfg.get("url", ""),
             "key": cfg.get("api_key", ""),
@@ -80,11 +68,13 @@ class AnalyzerAI(BaseAnalyzer):
 
     @cached_property
     def _minio_cfg(self) -> Dict[str, Any]:
-        return self._config.get("storage", {}).get("s3", {})
+        from settings.config import get_section
+        return get_section("storage.s3")
 
     @cached_property
     def _chromadb_cfg(self) -> Dict[str, Any]:
-        return self._config.get("integrations", {}).get("chromadb", {})
+        from settings.config import get_section
+        return get_section("integrations.chromadb")
 
     # ── ChromaDB singleton ────────────────────────────────────────────────
     # One client per AnalyzerAI instance — avoids reconnecting on every call.

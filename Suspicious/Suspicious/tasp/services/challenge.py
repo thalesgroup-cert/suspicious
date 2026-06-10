@@ -1,7 +1,3 @@
-import json
-import os
-from functools import lru_cache
-
 from django.contrib.auth.models import User
 from django.utils import timezone
 
@@ -9,19 +5,14 @@ from dashboard.models import UserCasesMonthlyStats
 from score_process.score_utils.thehive.challenge import ChallengeToTheHiveService
 
 
-CONFIG_PATH = os.environ.get("SUSPICIOUS_SETTINGS_PATH", "/app/settings.json")
-
-
-@lru_cache(maxsize=1)
 def _load_mail_config() -> dict:
-    with open(CONFIG_PATH) as config_file:
-        return json.load(config_file).get("email", {})
+    from settings.config import get_section
+    return get_section("email")
 
 
-@lru_cache(maxsize=1)
 def _load_thehive_config() -> dict:
-    with open(CONFIG_PATH) as config_file:
-        return json.load(config_file).get("integrations", {}).get("thehive", {})
+    from settings.config import get_section
+    return get_section("integrations.thehive")
 
 
 def get_submissions_url() -> str:

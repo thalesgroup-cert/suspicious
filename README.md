@@ -2,7 +2,7 @@
     <img alt="Suspicious Logo" src="/assets/suspicious-logo.png" height="330" width="260">
 </p>
 <p align="center">
-    <strong>AI Phishing Threat Analysis Platform</strong>
+    <strong>Phishing & threat-analysis platform</strong>
 </p>
 
 <p align="center">
@@ -22,157 +22,129 @@
 
 # Suspicious
 
-> 📖 **Documentation:** <https://thalesgroup-cert.github.io/suspicious/>
+> **Documentation:** <https://thalesgroup-cert.github.io/suspicious/>
 
-An **AI-powered phishing & threat-analysis platform** to automatically inspect, classify, and report suspicious emails, files, URLs, IPs, and hashes built for teams and organizations.
+Suspicious inspects, classifies, and reports suspicious emails, files, URLs, IPs,
+and file hashes. Submit an item from the web UI or forward an email to a
+monitored mailbox; Suspicious runs it through YARA rules, a sandbox, metadata
+checks, and a machine-learning email classifier, then returns a scored verdict
+and a full report.
 
-## Why Suspicious?
+Built and maintained by the [Thales Group CERT](https://www.thalesgroup.com/).
 
-Phishing and social-engineering attacks are becoming more sophisticated, combining deceptive emails, malware, credential theft, malicious links, and more.
+## What it does
 
-Suspicious offers a **scalable, automated, AI-augmented defense** that helps you:
+- **Analyzes** emails (`.eml`, `.msg`), documents, archives, executables, URLs,
+  IP addresses, and file hashes.
+- **Scores** each submission as Safe, Inconclusive, Suspicious, or Dangerous.
+- **Reports** results through a web UI with dashboards, per-analyzer output, and
+  submission history.
+- **Ingests** email automatically from IMAP/IMAPS mailboxes.
+- **Notifies** reporters of the outcome by email.
+- **Integrates** with Cortex, TheHive, MISP, LDAP, Elasticsearch, ChromaDB, and
+  S3-compatible storage.
 
-- 🔎 Analyze suspicious content: emails, documents, URLs, IPs, file hashes…
-- 🧠 Use deep analysis pipelines: YARA rules, sandboxing, metadata inspections, **AI-based classifier**, Cortex analyzers
-- ✅ Classify results into actionable categories (Safe / Inconclusive / Suspicious / Dangerous)
-- 📄 Provide full analysis reports and dashboards through an intuitive web interface
-- 📤 Automatically notify or alert users via email
-- 🔌 Integrate optionally with **TheHive**, **MISP**, **LDAP**, **RustFS**, **Elasticsearch**, and more
+## Quick start
 
-## Getting Started (Quick Setup)
-
-We recommend using Docker + Docker Compose v2. For full instructions, see **[SETUP.md](SETUP.md)** and **[CONFIG.md](CONFIG.md)**.
+Requires Docker and Docker Compose v2.
 
 ```bash
-# 1. Clone the repo
 git clone https://github.com/thalesgroup-cert/suspicious.git
-cd suspicious/deployment
+cd suspicious
 
-# 2. Initialize environment, configs & directory structure
-make init
+# Example configs that run as-is for local development
+cp docs/getting-started/examples/deployment-env.example          deployment/.env
+cp docs/getting-started/examples/Suspicious-settings.example.json Suspicious/settings.json
 
-# 3. Start the stack
-make up
-
-# 4. On first run: run database migrations + create superuser
+cd deployment
+docker network create suspicious_net
+docker compose build suspicious
+docker compose up -d db_suspicious redis_cache redis_broker
+docker compose up -d --no-deps suspicious
 make migrate
-make superuser
-
-# 5. Open the web UI
-#    http://localhost:9020  (or your configured domain/port)
+make seed-config
+make createsuperuser
 ```
 
-Alternatively, you can use Docker Compose directly:
+Open <http://localhost:9020/admin/> and sign in.
+
+> The example configs use throwaway local credentials. Change every secret
+> before exposing the app. Full guide, the complete stack (UI, HTTPS, Cortex),
+> and configuration reference: **[INSTALL.md](INSTALL.md)** and **[CONFIG.md](CONFIG.md)**.
+
+## Configuration
+
+Three files hold all configuration. Templates ship in the repo.
+
+| File | Purpose |
+|------|---------|
+| `deployment/.env` | Image versions, ports, paths, database and storage credentials |
+| `Suspicious/settings.json` | Django settings, integrations, branding, SMTP, allowed domains |
+| `email-feeder/config.json` | IMAP/IMAPS mailboxes, S3 storage, polling interval |
+
+See **[CONFIG.md](CONFIG.md)** for every parameter.
+
+## Architecture
+
+| Component | Role |
+|-----------|------|
+| **Django REST API** | Submission, analysis orchestration, reports. Gunicorn on port 9020. |
+| **React UI** (React 19, Vite, MUI) | Frontend served by Nginx on port 9021. |
+| **Celery worker + beat** | Background jobs: case finalisation, Cortex sync, stale-job rescue, KPI snapshots. |
+| **MariaDB** | Metadata, results, KPIs. Holds the `CaseAnalyzerJob` ledger behind the Cortex webhook lookup. |
+| **Valkey / Redis** | Celery broker and Django cache. |
+| **Elasticsearch** | Search and indexing. |
+| **Cortex** | Analyzer engine — YARA, AI, sandbox, metadata, FileInfo. Reports back via an HMAC-signed webhook. |
+| **ChromaDB** | Vector store for semantic similarity against past cases. |
+| **RustFS** (S3-compatible) | Stores uploads, attachments, artifacts. |
+| **Email Feeder** | Polls IMAP/IMAPS mailboxes and imports emails. Runs as a non-root user. |
+| **Traefik** | Reverse proxy and TLS termination. |
+| **Vault** | Production secret storage. |
+
+### How an analysis runs
+
+1. Django creates a `Case`. For each analyzer it writes an `AnalyzerReport` and a
+   `CaseAnalyzerJob` row in one transaction, pinning the `(case, cortex job)`
+   mapping at dispatch.
+2. Cortex runs each analyzer and posts to the HMAC-signed webhook on completion.
+3. The webhook looks up the case in `CaseAnalyzerJob`, then enqueues a Celery
+   task that takes a per-case lock, updates the job, and calls `finalise_case`
+   once the case has no pending jobs left.
+4. `finalise_case` scores the case, pushes to TheHive/MISP if configured, queries
+   ChromaDB for similar past cases, and emails the reporter.
+5. Celery beat re-checks any webhook the platform missed (every 300 s) and fails
+   jobs stuck past `STALE_JOB_TIMEOUT_SECONDS` (every 600 s), so cases never stall.
+
+## AI email classifier
+
+`Analyzers/AIMailAnalyzer` classifies emails by intent (phishing, malicious,
+suspicious, benign) using a Sentence-Transformers embedding model and a custom
+classifier, with ChromaDB for similarity search. It runs as a Cortex analyzer
+alongside the static rules.
+
+To train it on your own data:
+
+1. Open `Analyzers/AIMailAnalyzer/` for the training scripts.
+2. Prepare a labeled dataset (legitimate vs phishing).
+3. Train the model.
+4. Deploy it in Cortex with the other analyzers.
+5. Review precision and false-positive rates; retrain as needed.
+
+Use it alongside YARA, sandbox, and metadata analyzers. Do not auto-block on the
+classifier alone.
+
+## Contributing
+
+See **[CONTRIBUTING.md](CONTRIBUTING.md)** for coding standards and the pull
+request flow.
 
 ```bash
-docker compose up -d
+git checkout -b feature/your-feature
+# make changes, commit, push
+# open a pull request
 ```
 
-## Configuration Overview
-
-Suspicious uses three main configuration files:
-
-| File                       | Purpose                                                                                                               |
-| -------------------------- | --------------------------------------------------------------------------------------------------------------------- |
-| `.env`                     | Environment variables for Docker services (versions, ports, paths, credentials)                                       |
-| `Suspicious/settings.json` | App-level config: branding, SMTP, LDAP, Cortex & MISP credentials, allowed domains, UI settings, etc.                 |
-| `email-feeder/config.json` | Email ingestion config: IMAP/IMAPS connectors, RustFS settings, polling, working directory, notification SMTP settings |
-
-For full parameter documentation and examples, refer to **[CONFIG.md](CONFIG.md)**.
-
-## Key Features
-
-- **Multi-type submission support**
-  - Emails (`.eml`, `.msg`)
-  - Files (PDF, Office docs, archives, executable, HTML, ZIP, …)
-  - URLs, IP addresses, file hashes
-
-- **Automatic email ingestion**
-  - Forward suspicious emails to a monitored mailbox → ingested via Email Feeder → queued for automated analysis
-
-- **On-demand web submissions**
-  - Use the “Submit an Item” UI to send files, URLs, hashes, IPs, or email files for analysis
-
-- **Smart classification & reporting**
-  - Results are scored and categorized by risk
-  - Dashboards for overall statistics, phishing-campaign overviews, user submission history, detailed analyzer outputs
-
-- **Extensible integrations and stack support**
-  - **Cortex** for analyzer execution (YARA, AI, sandboxing, metadata analysis…)
-  - **Elasticsearch** for search capabilities
-  - **RustFS (S3-compatible)** for storage of artifacts
-  - Optional integration with **TheHive** / **MISP** for incident or threat-intel workflows
-  - Optional **LDAP authentication** for enterprise setups
-
-## AI Mail Analysis
-
-Suspicious includes a built-in AI module (via `Analyzers/AIMailAnalyzer`) that classifies emails by intent (phishing, malicious, suspicious, benign…) complementing static rules and analyzers to deliver smarter detection tailored to your organization.
-
-### What it does
-
-- Uses machine-learning to identify potentially malicious or suspicious email patterns beyond heuristic or rule-based detection.
-- Works alongside standard analyzers (YARA, sandbox, metadata) for a more robust analysis pipeline.
-- Supports organization-specific training allowing adaptation to your internal email norms, languages, and threat landscape.
-- Enables dashboards and KPIs: campaign summaries, volumes of suspicious vs safe emails, historical trends, detection stats.
-
-### Why it matters
-
-- Detects subtle or evolving threats which static rules may miss (e.g. social-engineering, unusual metadata)
-- Provides customization you can train the model on your own data to fit company-specific patterns
-- Gives visibility & analytics over time helpful for SOC, reporting, awareness, and improvement loops
-
-### How to get started
-
-1. Go to `Analyzers/AIMailAnalyzer/` there you’ll find training scripts and instructions.
-2. Collect a representative, labeled dataset (legitimate vs phishing emails).
-3. Train or retrain the model to suit your environment.
-4. Deploy the trained model in Cortex alongside other analyzers.
-5. Review classification results; monitor performance (precision, false-positives/negatives) and retrain periodically if needed.
-
-> 💡 **Best practice:** Combine AI classification with other analyzers (YARA, sandbox, metadata). Never rely solely on AI for blocking/auto-response.
-
-## Architecture Overview
-
-| Component          | Role |
-|--------------------|------|
-| **Web (Django REST API)** | Core logic + UI – submission, analysis, reports. Gunicorn on port 9020. |
-| **Web UI (React 19 + Vite + MUI v9)** | Frontend served by Nginx on port 9021. |
-| **Celery beat + worker** | Background jobs: case finalisation, Cortex sync, stale-job rescue, KPI snapshots. Brokered by Valkey/Redis. |
-| **Redis / Valkey** | Celery broker + Django cache (per-case lock, Cortex webhook jobId dedup). |
-| **MariaDB 12** | Stores metadata, results, KPIs, user settings. Holds the `CaseAnalyzerJob` ledger that powers per-job Cortex webhook lookups. |
-| **Elasticsearch**  | Search engine & indexing. |
-| **Cortex**         | Analyzer engine (runs YARA, AI, sandbox, metadata, FileInfo). Reports back via HMAC-signed `/api/cortex/webhook/`. |
-| **ChromaDB**       | Vector store used by AIMailAnalyzer for semantic similarity against past cases. |
-| **RustFS (S3-compatible)** | Stores uploaded files, extracted attachments, artifacts. |
-| **Email Feeder**   | Standalone Python service. Monitors IMAP/IMAPS mailboxes, imports incoming emails automatically. Runs as a non-root `feeder` UID. |
-| **Traefik (optional)** | Reverse-proxy, TLS/HTTPS termination, domain routing. |
-| **Tempo + Grafana (optional)** | OpenTelemetry trace store + dashboards (`make monitor-up`). Replaces the legacy Prometheus stack. |
-
-### Cortex job lifecycle (high level)
-
-1. Django persists the `Case`, then for every analyzer dispatch `CortexJob.run_analyzer` writes an `AnalyzerReport` *and* a `CaseAnalyzerJob` row inside a single transaction. The CAJ row pins the `(case_id, cortex_job_id)` mapping at dispatch time.
-2. Cortex completes each analyzer asynchronously and posts to the HMAC-signed webhook.
-3. The webhook performs an O(1) indexed lookup on `CaseAnalyzerJob` and enqueues a per-job Celery task (`process_cortex_job`), which takes a Redis lock, syncs the analyzer status, and once the case's pending-CAJ count reaches zero calls `finalise_case` to score + notify.
-4. A Celery beat schedule (every 300 s) re-checks any case the webhook missed; a second beat task (every 600 s) auto-fails CAJ rows older than `STALE_JOB_TIMEOUT_SECONDS` so cases never stall forever.
-
-The AI analyzer (from `Analyzers/AIMailAnalyzer`) is fully compatible with this architecture, allowing ML-driven detection alongside traditional analyzers.
-
-## 🤝 Contributing
-
-We welcome contributions! Please read **[CONTRIBUTING.md](CONTRIBUTING.md)** for coding standards, pull request flow, and guidelines.
-
-Typical workflow:
-
-```bash
-git fork & clone
-git checkout -b feature/YourFeature
-# make changes
-git commit -m "Add feature X"
-git push
-# open pull request
-```
-
-You can also open [issues](https://github.com/thalesgroup-cert/suspicious/issues) if you encounter bugs or have ideas.
+Bug reports and ideas are welcome in [issues](https://github.com/thalesgroup-cert/suspicious/issues).
 
 ## Screenshots
 
@@ -206,50 +178,33 @@ You can also open [issues](https://github.com/thalesgroup-cert/suspicious/issues
 
 ## CI/CD
 
-Continuous integration and delivery run on GitHub Actions. Four workflows
-plus Dependabot live under `.github/`.
+GitHub Actions runs four workflows plus Dependabot under `.github/`.
 
-| Workflow | Trigger | What it does |
-|---|---|---|
-| `ci.yml` | PR to `main`, push to `main` + `test` | Conventional-commit lint, `ruff` lint, migration-drift check, full Django test suite, email-feeder unittest, frontend (eslint + tsc + vitest browser mode + build), and a no-push build of all four images. |
-| `release.yml` | push to `main` + `test`, tags `v*` | Builds and pushes all four images to GHCR with SPDX SBOM (syft) + provenance attestation. `main` → `latest` + `sha-<sha>`; `test` → `test` (staging); `v*` → semver tags. |
-| `codeql.yml` | PR + push to `main`, weekly | CodeQL static analysis for Python and JavaScript/TypeScript. |
-| `security.yml` | PR, weekly | Trivy filesystem scan, gitleaks secret scan, `pip-audit` (×3 requirements), `npm audit`. |
-| `dependabot.yml` | weekly | Dependency updates: pip (×3), npm, docker (×4), github-actions. |
+| Workflow | Trigger | Runs |
+|----------|---------|------|
+| `ci.yml` | PRs and pushes to `main`/`test` | commit-lint, `ruff`, migration-drift check, Django tests, feeder tests, frontend (eslint + tsc + vitest + build), image builds |
+| `release.yml` | pushes to `main`/`test`, `v*` tags | builds and pushes images to GHCR with SBOM and provenance |
+| `codeql.yml` | PRs, pushes to `main`, weekly | CodeQL for Python and JS/TS |
+| `security.yml` | PRs, weekly | Trivy, gitleaks, `pip-audit`, `npm audit` |
 
 ### Published images (GHCR)
 
 | Component | Image |
-|---|---|
+|-----------|-------|
 | Django API | `ghcr.io/thalesgroup-cert/suspicious` |
-| Frontend (Nginx) | `ghcr.io/thalesgroup-cert/suspicious-ui` |
+| Frontend | `ghcr.io/thalesgroup-cert/suspicious-ui` |
 | Email feeder | `ghcr.io/thalesgroup-cert/suspicious-feeder` |
 | AIMailAnalyzer | `ghcr.io/thalesgroup-cert/suspicious-aimailanalyzer` |
 
-Deployment stays manual via `deployment/Makefile` (`make deploy`); CI never
-holds production credentials.
-
-### Required status checks (branch protection on `main`)
-
-Configure under Settings → Branches → branch protection for `main`:
-
-- `commit-lint`
-- `backend-lint`
-- `migration-check`
-- `backend-test`
-- `feeder-test`
-- `frontend`
-- `docker-build (suspicious)`, `docker-build (suspicious-ui)`, `docker-build (suspicious-feeder)`, `docker-build (suspicious-aimailanalyzer)`
-- `Analyze (python)`, `Analyze (javascript-typescript)`
+Deployment is manual via `deployment/Makefile` (`make deploy`); CI never holds
+production credentials.
 
 ## License
 
-Suspicious is released under the **GNU Affero General Public License v3 (AGPL-3.0)**.
+Released under the **GNU Affero General Public License v3 (AGPL-3.0)**. See
+[`LICENSE`](LICENSE).
 
-See the [`LICENSE`](LICENSE) file for full details.
+## Contact
 
-## Contact & Support
-
-Have questions, ideas, or issues?
-
-👉 Open an [issue](https://github.com/thalesgroup-cert/suspicious/issues) feedback is very welcome!
+Questions, ideas, or bugs: open an
+[issue](https://github.com/thalesgroup-cert/suspicious/issues).

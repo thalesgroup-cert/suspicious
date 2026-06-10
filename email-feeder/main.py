@@ -273,9 +273,17 @@ def main() -> int:
     logger.info("Application starting...")
 
     try:
-        config = classes.services.config_service.load_config(
-            config_path=pathlib.Path("config.json"), logger=logger
-        )
+        _backend_url = os.environ.get("BACKEND_URL")
+        _api_token = os.environ.get("FEEDER_API_TOKEN")
+        _config_path = pathlib.Path(os.environ.get("FEEDER_CONFIG_PATH", "config.json"))
+        _cache_path = _config_path.parent / ".config-cache.json"
+
+        if _backend_url and _api_token:
+            config = classes.services.config_service.load_config_from_api(
+                _backend_url, _api_token, _config_path, _cache_path
+            )
+        else:
+            config = classes.services.config_service.load_config(_config_path, logger)
         if not config:
             logger.critical("Configuration could not be loaded. Exiting.")
             return 1

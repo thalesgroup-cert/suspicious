@@ -24,15 +24,19 @@ def safe_execution(context: str):
 
 def load_config(path: str) -> CronConfig:
     """
-    Charge le settings.json et mappe uniquement les champs utiles
-    vers CronConfig.
+    Mappe uniquement les champs utiles vers CronConfig. Cortex and S3/minio
+    config are read via the runtime accessor (non-secret fields from the DB,
+    secrets from Vault), with a settings.json fallback; temp_dir and
+    suspicious_path still come from the file.
     """
     raw = json.loads(Path(path).read_text())
 
     try:
-        minio_raw = raw.get("storage", {}).get("s3")
-
-        cortex_raw = raw.get("integrations", {}).get("cortex")
+        try:
+            from settings.config import get_section
+            minio_raw = get_section("storage.s3")
+        except Exception:
+            minio_raw = raw.get("storage", {}).get("s3") or {}
 
         config_data = {
             "s3": {
@@ -47,10 +51,17 @@ def load_config(path: str) -> CronConfig:
             ),
         }
 
+        # Cortex: read via accessor (DB runtime config + Vault secrets overlay).
+        try:
+            from settings.config import get_section
+            cortex_raw = get_section("integrations.cortex")
+        except Exception:
+            cortex_raw = raw.get("integrations", {}).get("cortex") or {}
+
         if cortex_raw:
             config_data["cortex"] = {
                 "url": cortex_raw.get("url", "http://cortex:9001"),
-                "api_key": cortex_raw.get("api_key", "http://cortex:9001"),
+                "api_key": cortex_raw.get("api_key", ""),
             }
 
         return CronConfig(**config_data)

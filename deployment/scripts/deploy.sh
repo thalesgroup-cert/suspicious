@@ -43,6 +43,11 @@ step "Running database migrations"
 $COMPOSE exec -T "${WEB_CONTAINER}" python manage.py migrate --no-input
 ok "Migrations applied"
 
+# ── 3b. Seed runtime config (idempotent) ─────────────────────────────────
+step "Seeding runtime config"
+$COMPOSE exec -T "${WEB_CONTAINER}" python manage.py seed_config
+ok "Runtime config seeded"
+
 # ── 4. Collect static files ───────────────────────────────────────────────
 step "Collecting static files"
 $COMPOSE exec -T "${WEB_CONTAINER}" python manage.py collectstatic --no-input --clear

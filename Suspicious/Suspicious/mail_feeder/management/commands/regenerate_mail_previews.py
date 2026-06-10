@@ -20,7 +20,6 @@ archive can't abort the whole run; per-mail outcomes are logged.
 from __future__ import annotations
 
 import logging
-import os
 from typing import Optional
 
 from django.core.management.base import BaseCommand, CommandError
@@ -147,12 +146,9 @@ class Command(BaseCommand):
         from api.views.downloads import load_minio_config
         from api.storage import StorageClient
 
-        config_path = os.environ.get("SUSPICIOUS_CONFIG_PATH", "/app/settings.json")
-        cfg = load_minio_config(config_path)
+        cfg = load_minio_config()
         if not cfg:
-            raise CommandError(
-                f"Could not load MinIO config from {config_path}"
-            )
+            raise CommandError("Could not load MinIO config via accessor")
         storage = StorageClient(cfg)
         if not getattr(storage, "client", None):
             raise CommandError("MinIO client initialisation failed")

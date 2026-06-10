@@ -84,6 +84,7 @@ class MainConfig(pydantic.BaseModel):
             endpoint=raw_minio["endpoint"],
             access_key=raw_minio["access_key"],
             secret_key=raw_minio["secret_key"],
+            secure=raw_minio.get("secure", False),
         )
 
         raw_mail = json_object.get("mail")
