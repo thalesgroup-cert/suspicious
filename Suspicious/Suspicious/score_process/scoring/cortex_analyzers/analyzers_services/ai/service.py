@@ -15,9 +15,9 @@ from minio import Minio
 from case_handler.models import Case
 from ..base import BaseAnalyzer
 from .minio_utils import build_mail_zip_from_minio, fetch_mail_files_from_minio
-from .thehive_utils import add_binary_attachment_to_item
+from connectors.contrib.thehive.attachments import add_binary_attachment_to_item
 
-from score_process.score_utils.thehive.utils import (
+from connectors.contrib.thehive.utils import (
     parse_and_decode_defaultdict,
     get_phishing_campaign,
     get_most_common_subject,
@@ -31,7 +31,7 @@ from score_process.score_utils.chromadb_utils import (
     add_to_suspicious_collection,
     update_suspicious_collection,
 )
-from score_process.score_utils.thehive.phishing import (
+from connectors.contrib.thehive.phishing import (
     PHISHING_CAMPAIGN_TEMPLATE,
     create_new_alert,
     get_item_from_id,

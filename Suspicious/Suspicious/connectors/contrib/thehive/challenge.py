@@ -4,17 +4,15 @@ from pathlib import Path
 from thehive4py import TheHiveApi
 from minio import Minio
 from minio.error import S3Error
-import smtplib
-from email.mime.text import MIMEText
-from email.mime.multipart import MIMEMultipart
 from jinja2 import Environment, FileSystemLoader, select_autoescape
 from mail_feeder.models import Mail
 
 from .utils import generate_ref, build_mail_attachments_paths
 from score_process.score_utils.send_mail.social_logos import SOCIAL_LOGOS
+from score_process.score_utils.send_mail.send_email_service import SendMailService
 
 logger = logging.getLogger(__name__)
-TEMPLATES_DIR = Path(__file__).parent.parent / "send_mail/templates"
+TEMPLATES_DIR = Path(__file__).parent.parent.parent.parent / "score_process/score_utils/send_mail/templates"
 
 def _thehive_config() -> dict:
     from settings.config import get_section
@@ -175,15 +173,25 @@ class ChallengeToTheHiveService:
     def send(self) -> None:
         html     = self.template.render(self._context())
         smtp_cfg = self._smtp_cfg()
+        sender   = smtp_cfg.get("username") or smtp_cfg.get("from", "")
 
-        msg = MIMEMultipart("alternative")
-        msg["From"]    = smtp_cfg.get("username") or smtp_cfg.get("from", "")
-        msg["To"]      = self.recipient
-        msg["Subject"] = self.subject
-        msg.attach(MIMEText(html, "html"))
-
-        with smtplib.SMTP(smtp_cfg["server"], smtp_cfg["port"]) as smtp:
-            smtp.send_message(msg)
+        service = SendMailService(
+            host=smtp_cfg["server"],
+            port=smtp_cfg["port"],
+            login=smtp_cfg.get("username", ""),
+            password=smtp_cfg.get("password", ""),
+        )
+        service.connect()
+        try:
+            if smtp_cfg.get("password"):
+                service.start_tls()
+                service.login()
+            service.publish_email(
+                subject=self.subject, sender=sender,
+                recipient=self.recipient, html=html,
+            )
+        finally:
+            service.close()
 
     # ── TheHive ────────────────────────────────────────────────────────────
 

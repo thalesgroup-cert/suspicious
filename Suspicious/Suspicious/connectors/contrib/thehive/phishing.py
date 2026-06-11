@@ -4,7 +4,7 @@ from common.http_client import make_session, get_breaker, RETRY
 from datetime import datetime
 from secrets import token_hex
 import logging
-from score_process.score_utils.thehive.utils import extract_urls, extract_mails, parse_headers
+from .utils import extract_urls, extract_mails, parse_headers
 import os
 from email.header import decode_header, make_header
 import re

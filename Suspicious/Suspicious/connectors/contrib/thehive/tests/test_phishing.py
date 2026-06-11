@@ -1,5 +1,5 @@
 """
-Tests for score_process.score_utils.thehive.phishing
+Tests for connectors.contrib.thehive.phishing
 
 Patches _thehive_request directly — retry/breaker behaviour is tested
 separately in common/tests/test_http_client.py.
@@ -23,8 +23,8 @@ sys.modules.setdefault("pydantic", _pydantic_stub)
 # Stub the utils / models sub-modules so we don't need pydantic at all
 _utils_stub = MagicMock()
 _models_stub = MagicMock()
-sys.modules.setdefault("score_process.score_utils.thehive.utils", _utils_stub)
-sys.modules.setdefault("score_process.score_utils.thehive.models", _models_stub)
+sys.modules.setdefault("connectors.contrib.thehive.utils", _utils_stub)
+sys.modules.setdefault("connectors.contrib.thehive.models", _models_stub)
 
 _FAKE_THEHIVE_CONFIG = {"certificate_path": None, "user": "admin"}
 
@@ -32,7 +32,7 @@ _FAKE_THEHIVE_CONFIG = {"certificate_path": None, "user": "admin"}
 def _patch_thehive_config():
     """Return a context manager that stubs _thehive_config()."""
     return patch(
-        "score_process.score_utils.thehive.phishing._thehive_config",
+        "connectors.contrib.thehive.phishing._thehive_config",
         return_value=_FAKE_THEHIVE_CONFIG,
     )
 
@@ -46,12 +46,12 @@ def _import_phishing():
     for key in list(sys.modules):
         if "phishing" in key and "test" not in key:
             del sys.modules[key]
-    import score_process.score_utils.thehive.phishing as ph
+    import connectors.contrib.thehive.phishing as ph
     return ph
 
 
 # Pre-import once so subsequent test-method imports are cheap
-import score_process.score_utils.thehive.phishing  # noqa: F401 — side-effect import
+import connectors.contrib.thehive.phishing  # noqa: F401 — side-effect import
 
 
 # ---------------------------------------------------------------------------
@@ -62,14 +62,14 @@ class TestCreateNewAlert(unittest.TestCase):
 
     def setUp(self):
         p = patch(
-            "score_process.score_utils.thehive.phishing._thehive_config",
+            "connectors.contrib.thehive.phishing._thehive_config",
             return_value=_FAKE_THEHIVE_CONFIG,
         )
         p.start()
         self.addCleanup(p.stop)
 
     def _call(self, **overrides):
-        from score_process.score_utils.thehive.phishing import create_new_alert
+        from connectors.contrib.thehive.phishing import create_new_alert
         kwargs = dict(
             ticket_id="REF-001",
             title="Test alert",
@@ -88,14 +88,14 @@ class TestCreateNewAlert(unittest.TestCase):
         mock_resp = MagicMock()
         mock_resp.json.return_value = {"_id": "~alert42"}
 
-        with patch("score_process.score_utils.thehive.phishing._thehive_request", return_value=mock_resp):
+        with patch("connectors.contrib.thehive.phishing._thehive_request", return_value=mock_resp):
             result = self._call()
 
         self.assertEqual(result, {"_id": "~alert42"})
 
     def test_returns_none_on_request_exception(self):
         with patch(
-            "score_process.score_utils.thehive.phishing._thehive_request",
+            "connectors.contrib.thehive.phishing._thehive_request",
             side_effect=requests.ConnectionError("down"),
         ):
             result = self._call()
@@ -104,7 +104,7 @@ class TestCreateNewAlert(unittest.TestCase):
 
     def test_returns_none_on_circuit_breaker_open(self):
         with patch(
-            "score_process.score_utils.thehive.phishing._thehive_request",
+            "connectors.contrib.thehive.phishing._thehive_request",
             side_effect=pybreaker.CircuitBreakerError(),
         ):
             result = self._call()
@@ -115,7 +115,7 @@ class TestCreateNewAlert(unittest.TestCase):
         mock_resp = MagicMock()
         mock_resp.json.return_value = {"_id": "~auto"}
 
-        with patch("score_process.score_utils.thehive.phishing._thehive_request", return_value=mock_resp):
+        with patch("connectors.contrib.thehive.phishing._thehive_request", return_value=mock_resp):
             result = self._call(ticket_id=None)
 
         self.assertEqual(result, {"_id": "~auto"})
@@ -125,21 +125,21 @@ class TestGetItemFromId(unittest.TestCase):
 
     def setUp(self):
         p = patch(
-            "score_process.score_utils.thehive.phishing._thehive_config",
+            "connectors.contrib.thehive.phishing._thehive_config",
             return_value=_FAKE_THEHIVE_CONFIG,
         )
         p.start()
         self.addCleanup(p.stop)
 
     def _call(self, item_id="~42"):
-        from score_process.score_utils.thehive.phishing import get_item_from_id
+        from connectors.contrib.thehive.phishing import get_item_from_id
         return get_item_from_id(item_id, "https://hive.local", "key123")
 
     def test_returns_case_type_and_data(self):
         mock_resp = MagicMock()
         mock_resp.json.return_value = {"_id": "~42", "title": "case"}
 
-        with patch("score_process.score_utils.thehive.phishing._thehive_request", return_value=mock_resp):
+        with patch("connectors.contrib.thehive.phishing._thehive_request", return_value=mock_resp):
             item_type, data = self._call()
 
         self.assertEqual(item_type, "case")
@@ -149,7 +149,7 @@ class TestGetItemFromId(unittest.TestCase):
         err = requests.HTTPError()
         err.response = MagicMock(status_code=404)
 
-        with patch("score_process.score_utils.thehive.phishing._thehive_request", side_effect=err):
+        with patch("connectors.contrib.thehive.phishing._thehive_request", side_effect=err):
             item_type, data = self._call()
 
         self.assertIsNone(item_type)
@@ -157,7 +157,7 @@ class TestGetItemFromId(unittest.TestCase):
 
     def test_returns_none_none_on_breaker_open(self):
         with patch(
-            "score_process.score_utils.thehive.phishing._thehive_request",
+            "connectors.contrib.thehive.phishing._thehive_request",
             side_effect=pybreaker.CircuitBreakerError(),
         ):
             item_type, data = self._call()
@@ -170,14 +170,14 @@ class TestAddObservablesToItem(unittest.TestCase):
 
     def setUp(self):
         p = patch(
-            "score_process.score_utils.thehive.phishing._thehive_config",
+            "connectors.contrib.thehive.phishing._thehive_config",
             return_value=_FAKE_THEHIVE_CONFIG,
         )
         p.start()
         self.addCleanup(p.stop)
 
     def _call(self):
-        from score_process.score_utils.thehive.phishing import add_observables_to_item
+        from connectors.contrib.thehive.phishing import add_observables_to_item
         return add_observables_to_item(
             "alert", "~42", [{"dataType": "url", "data": "http://evil.test"}],
             "https://hive.local", "key123",
@@ -185,13 +185,13 @@ class TestAddObservablesToItem(unittest.TestCase):
 
     def test_posts_each_observable(self):
         mock_resp = MagicMock()
-        with patch("score_process.score_utils.thehive.phishing._thehive_request", return_value=mock_resp) as mock_req:
+        with patch("connectors.contrib.thehive.phishing._thehive_request", return_value=mock_resp) as mock_req:
             self._call()
         self.assertEqual(mock_req.call_count, 1)
 
     def test_skips_invalid_item_type(self):
-        from score_process.score_utils.thehive.phishing import add_observables_to_item
-        with patch("score_process.score_utils.thehive.phishing._thehive_request") as mock_req:
+        from connectors.contrib.thehive.phishing import add_observables_to_item
+        with patch("connectors.contrib.thehive.phishing._thehive_request") as mock_req:
             add_observables_to_item("invalid", "~42", [{}], "https://hive.local", "key123")
         mock_req.assert_not_called()
 
@@ -200,14 +200,14 @@ class TestAddAttachmentsToItem(unittest.TestCase):
 
     def setUp(self):
         p = patch(
-            "score_process.score_utils.thehive.phishing._thehive_config",
+            "connectors.contrib.thehive.phishing._thehive_config",
             return_value=_FAKE_THEHIVE_CONFIG,
         )
         p.start()
         self.addCleanup(p.stop)
 
     def test_posts_attachment_successfully(self):
-        from score_process.score_utils.thehive.phishing import add_attachments_to_item
+        from connectors.contrib.thehive.phishing import add_attachments_to_item
         import tempfile
         import os
 
@@ -217,7 +217,7 @@ class TestAddAttachmentsToItem(unittest.TestCase):
 
         try:
             mock_resp = MagicMock()
-            with patch("score_process.score_utils.thehive.phishing._thehive_request", return_value=mock_resp) as mock_req:
+            with patch("connectors.contrib.thehive.phishing._thehive_request", return_value=mock_resp) as mock_req:
                 add_attachments_to_item("alert", "~42", [tmp_path], "https://hive.local", "key123")
             self.assertEqual(mock_req.call_count, 1)
             call_args = mock_req.call_args
@@ -226,7 +226,7 @@ class TestAddAttachmentsToItem(unittest.TestCase):
             os.unlink(tmp_path)
 
     def test_stops_on_circuit_breaker_open(self):
-        from score_process.score_utils.thehive.phishing import add_attachments_to_item
+        from connectors.contrib.thehive.phishing import add_attachments_to_item
         import tempfile
         import os
 
@@ -239,7 +239,7 @@ class TestAddAttachmentsToItem(unittest.TestCase):
 
         try:
             with patch(
-                "score_process.score_utils.thehive.phishing._thehive_request",
+                "connectors.contrib.thehive.phishing._thehive_request",
                 side_effect=pybreaker.CircuitBreakerError(),
             ) as mock_req:
                 add_attachments_to_item("alert", "~42", paths, "https://hive.local", "key123")
@@ -250,8 +250,8 @@ class TestAddAttachmentsToItem(unittest.TestCase):
                 os.unlink(p)
 
     def test_skips_invalid_item_type(self):
-        from score_process.score_utils.thehive.phishing import add_attachments_to_item
-        with patch("score_process.score_utils.thehive.phishing._thehive_request") as mock_req:
+        from connectors.contrib.thehive.phishing import add_attachments_to_item
+        with patch("connectors.contrib.thehive.phishing._thehive_request") as mock_req:
             add_attachments_to_item("invalid", "~42", ["/tmp/x.txt"], "https://hive.local", "key")
         mock_req.assert_not_called()
 
@@ -260,14 +260,14 @@ class TestAddCommentToItem(unittest.TestCase):
 
     def setUp(self):
         p = patch(
-            "score_process.score_utils.thehive.phishing._thehive_config",
+            "connectors.contrib.thehive.phishing._thehive_config",
             return_value=_FAKE_THEHIVE_CONFIG,
         )
         p.start()
         self.addCleanup(p.stop)
 
     def _call(self, **overrides):
-        from score_process.score_utils.thehive.phishing import add_comment_to_item
+        from connectors.contrib.thehive.phishing import add_comment_to_item
         kwargs = dict(
             item_type="alert",
             item_id="~42",
@@ -285,7 +285,7 @@ class TestAddCommentToItem(unittest.TestCase):
             MagicMock(),  # POST new comment
         ]
         with patch(
-            "score_process.score_utils.thehive.phishing._thehive_request",
+            "connectors.contrib.thehive.phishing._thehive_request",
             side_effect=responses,
         ) as mock_req:
             self._call()
@@ -306,9 +306,9 @@ class TestAddCommentToItem(unittest.TestCase):
             MagicMock(),
         ]
         # Patch _thehive_config to return matching user
-        with patch("score_process.score_utils.thehive.phishing._thehive_config", return_value={"user": "suspicious"}):
+        with patch("connectors.contrib.thehive.phishing._thehive_config", return_value={"user": "suspicious"}):
             with patch(
-                "score_process.score_utils.thehive.phishing._thehive_request",
+                "connectors.contrib.thehive.phishing._thehive_request",
                 side_effect=responses,
             ) as mock_req:
                 self._call()
@@ -319,7 +319,7 @@ class TestAddCommentToItem(unittest.TestCase):
 
     def test_circuit_breaker_open_skips_silently(self):
         with patch(
-            "score_process.score_utils.thehive.phishing._thehive_request",
+            "connectors.contrib.thehive.phishing._thehive_request",
             side_effect=pybreaker.CircuitBreakerError(),
         ):
             # Should not raise
@@ -329,7 +329,7 @@ class TestAddCommentToItem(unittest.TestCase):
         # Query fails → fallback POST fires
         fallback_resp = MagicMock()
         with patch(
-            "score_process.score_utils.thehive.phishing._thehive_request",
+            "connectors.contrib.thehive.phishing._thehive_request",
             side_effect=[requests.ConnectionError("query failed"), fallback_resp],
         ) as mock_req:
             self._call()
@@ -341,7 +341,7 @@ class TestAddCommentToItem(unittest.TestCase):
     def test_fallback_post_breaker_open_no_crash(self):
         # Query fails, then breaker open on fallback — must not raise
         with patch(
-            "score_process.score_utils.thehive.phishing._thehive_request",
+            "connectors.contrib.thehive.phishing._thehive_request",
             side_effect=[
                 requests.ConnectionError("query failed"),
                 pybreaker.CircuitBreakerError(),
@@ -350,6 +350,6 @@ class TestAddCommentToItem(unittest.TestCase):
             self._call()  # must not raise
 
     def test_skips_invalid_item_type(self):
-        with patch("score_process.score_utils.thehive.phishing._thehive_request") as mock_req:
+        with patch("connectors.contrib.thehive.phishing._thehive_request") as mock_req:
             self._call(item_type="invalid")
         mock_req.assert_not_called()
