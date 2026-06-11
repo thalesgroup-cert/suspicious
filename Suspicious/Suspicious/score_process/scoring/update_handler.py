@@ -8,7 +8,6 @@ from django.db import transaction
 
 from dashboard.models import UserCasesMonthlyStats
 from mail_feeder.models import MailInfo
-from score_process.score_utils.send_mail.service import MailNotificationService
 
 logger              = logging.getLogger(__name__)
 update_cases_logger = logging.getLogger("tasp.cron.update_ongoing_case_jobs")
@@ -50,11 +49,10 @@ def update_case_results(case, reports, is_malicious, failure):
 
 def save_case_results(case, mail):
     """
-    Persist case and MailInfo, then send the final-verdict email.
+    Persist case and MailInfo.
 
-    The DB transaction is committed BEFORE the email is sent so that:
-      1. A slow SMTP call cannot hold a DB lock.
-      2. A failed email does not roll back a successfully scored case.
+    Reporter notification is handled by SmtpNotifyConnector via the
+    ``case_finalised`` event — it is no longer sent inline here.
     """
     # ── 1. Persist MailInfo ──────────────────────────────────────────────
     try:
@@ -73,19 +71,6 @@ def save_case_results(case, mail):
             update_cases_logger.info("Case %s and MailInfo saved.", case.id)
     except Exception as exc:
         update_cases_logger.error("Failed to save case %s: %s", case.id, exc)
-        return  # Do not attempt email if the save failed
-
-    # ── 3. Send email (best-effort, outside transaction) ─────────────────
-    try:
-        from profiles.models import UserProfile
-        UserProfile.objects.filter(user=case.reporter).first()
-        svc = MailNotificationService.from_settings()
-        svc.send_final(mail_info, case)
-        update_cases_logger.info("Final email sent for case %s.", case.id)
-    except Exception as exc:
-        update_cases_logger.error(
-            "Failed to send final email for case %s: %s", case.id, exc, exc_info=True
-        )
 
 
 def update_kpi_and_user_stats(case):
