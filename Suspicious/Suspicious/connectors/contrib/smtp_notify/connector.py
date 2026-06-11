@@ -6,6 +6,7 @@ reporter notification is expected product behavior. send_final's own
 user_analysis_informed flag keeps duplicate deliveries idempotent."""
 from __future__ import annotations
 
+import logging
 import smtplib
 
 from case_handler.models import Case
@@ -15,7 +16,10 @@ from connectors.base import (
     HealthStatus,
     EVENT_CASE_FINALISED,
 )
+from mail_feeder.models import MailInfo
 from score_process.score_utils.send_mail.service import MailNotificationService
+
+logger = logging.getLogger("connectors.contrib.smtp_notify")
 
 
 class SmtpNotifyConnector(Connector):
@@ -47,10 +51,18 @@ class SmtpNotifyConnector(Connector):
     def on_case_finalised(self, event) -> None:
         if event.status != "Done":
             return
-        case = Case.objects.select_related("fileOrMail", "reporter").get(
-            pk=event.case_id
-        )
+        case = Case.objects.select_related("fileOrMail").get(pk=event.case_id)
         mail = getattr(case.fileOrMail, "mail", None) if case.fileOrMail else None
         if mail is None:
-            return  # IOC-only case — no reporter mail flow
-        MailNotificationService.from_settings().send_final(mail, case)
+            return  # IOC-only / file-only case — no reporter mail flow
+        try:
+            # send_final needs the MailInfo row: it reads .user and flips
+            # .user_analysis_informed for duplicate-delivery idempotency.
+            mail_info = MailInfo.objects.get(mail=mail)
+        except MailInfo.DoesNotExist:
+            logger.warning(
+                "MailInfo missing for mail of case %s — skipping reporter email",
+                event.case_id,
+            )
+            return
+        MailNotificationService.from_settings().send_final(mail_info, case)
