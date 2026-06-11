@@ -10,6 +10,7 @@ from cortex_job.cortex_utils.session_cortex_api import SessionCortexApi
 from cortex_job.models import Analyzer, AnalyzerReport, CaseAnalyzerJob
 from mail_feeder.models import MailBody, MailArchive, MailInfo, MailHeader
 from score_process.scoring.cortex_analyzers.reports import CortexAnalyzerReports
+from connectors.dispatch import emit as emit_connector_event
 
 # ------------------------
 # Logger setup
@@ -1397,6 +1398,8 @@ class CortexJobManager:
                     exc_info=True,
                 )
         case.save()
+        if case.status == "Done":
+            emit_connector_event("case_finalised", case)
 
     def manage_jobs(self, case):
         """
@@ -1439,6 +1442,8 @@ class CortexJobManager:
 
         # Save the updated case object
         case.save()
+        if case.status == "Done":
+            emit_connector_event("case_finalised", case)
 
     def manage_ai_jobs(self, case):
         """

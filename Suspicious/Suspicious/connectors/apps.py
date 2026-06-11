@@ -9,6 +9,7 @@ class ConnectorsConfig(AppConfig):
         from connectors.registry import registry
         registry.discover()
         self._register_beat_schedules()
+        import connectors.signals  # noqa: F401 — registers the receiver
 
     @staticmethod
     def _register_beat_schedules():
