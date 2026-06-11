@@ -27,8 +27,16 @@ def emit(event_name: str, case) -> None:
             return
 
         def _enqueue():
+            # Runs at commit time, outside the try below — guard each enqueue
+            # so an eager-mode Retry (tests) or broker error can't escape
+            # into the committing request/task.
             for name in names:
-                deliver_event.delay(name, event_name, payload)
+                try:
+                    deliver_event.delay(name, event_name, payload)
+                except Exception:  # noqa: BLE001 — fan-out must never raise
+                    logger.exception(
+                        "deliver_event enqueue failed for %s/%s", name, event_name
+                    )
 
         transaction.on_commit(_enqueue)
     except Exception:  # noqa: BLE001 — emission must never break the pipeline
