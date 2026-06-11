@@ -195,7 +195,8 @@ INSTALLED_APPS = [
     "settings.apps.SettingsConfig",
     "url_process.apps.URLConfig",
     "score_process.apps.ScoreConfig",
-    "submission_queue.apps.SubmissionQueueConfig"
+    "submission_queue.apps.SubmissionQueueConfig",
+    "connectors.apps.ConnectorsConfig",
 ]
 
 MIDDLEWARE = [
