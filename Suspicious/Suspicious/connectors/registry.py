@@ -114,6 +114,8 @@ class ConnectorRegistry:
         ]
 
     def instantiate(self, name: str) -> Connector:
+        if name not in self._classes:
+            raise KeyError(f"no connector named {name!r} (registered: {self.names()})")
         from settings.config import get_section
         return self._classes[name](get_section(f"integrations.{name}"))
 

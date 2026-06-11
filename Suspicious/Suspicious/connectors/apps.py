@@ -8,3 +8,22 @@ class ConnectorsConfig(AppConfig):
     def ready(self):
         from connectors.registry import registry
         registry.discover()
+        self._register_beat_schedules()
+
+    @staticmethod
+    def _register_beat_schedules():
+        """Add one beat entry per manifest schedule. Runs in every process
+        that loads Django (web, worker, beat) — only beat consumes it."""
+        from connectors.registry import registry
+        from suspicious.celery import app as celery_app
+
+        entries = {
+            f"connector-{name}-{schedule.name}": {
+                "task": "connectors.tasks.run_connector_sync",
+                "schedule": float(schedule.interval_seconds),
+                "args": [name],
+            }
+            for name, schedule in registry.scheduled()
+        }
+        if entries:
+            celery_app.conf.beat_schedule.update(entries)

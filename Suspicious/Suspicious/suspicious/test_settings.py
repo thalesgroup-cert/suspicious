@@ -15,3 +15,8 @@ from suspicious.settings import *  # noqa: F401,F403
 # Replace the real URL conf with a minimal stub that satisfies Django's
 # system check without importing any heavy service modules.
 ROOT_URLCONF = "suspicious.test_urls"
+
+# Run Celery tasks synchronously in tests so on_commit callbacks can
+# execute deliver_event.delay() without a live broker.
+CELERY_TASK_ALWAYS_EAGER = True
+CELERY_TASK_EAGER_PROPAGATES = True
