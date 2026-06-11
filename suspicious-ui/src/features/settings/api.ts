@@ -174,8 +174,7 @@ export async function getFeederHealth(): Promise<FeederHealth> {
 }
 
 export async function listAnalyzers(): Promise<Analyzer[]> {
-  const res = await api.get(`/settings/analyzers/`);
-  return res.data;
+  return fetchAllPages<Analyzer>(`/settings/analyzers/`);
 }
 
 export async function updateAnalyzerWeight(id: number, weight: number) {

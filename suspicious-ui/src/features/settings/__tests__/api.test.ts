@@ -18,6 +18,7 @@ import { api } from "@/api/client";
 import {
   addItems,
   listItems,
+  listAnalyzers,
   removeItem,
   setFeederStatus,
   getFeederStatus,
@@ -66,6 +67,17 @@ describe("settings api helpers", () => {
     const items = await listItems("domains_deny");
 
     expect(items).toEqual([{ id: "1", value: "evil.example" }]);
+  });
+
+  it("listAnalyzers() pages the paginated /settings/analyzers/", async () => {
+    mockGet.mockResolvedValueOnce({
+      data: { count: 1, next: null, previous: null, results: [{ id: 1, name: "Yara", weight: 0.2 }] },
+    });
+
+    const analyzers = await listAnalyzers();
+
+    expect(mockGet).toHaveBeenCalledWith("/settings/analyzers/?page=1&page_size=1000");
+    expect(analyzers).toEqual([{ id: 1, name: "Yara", weight: 0.2 }]);
   });
 
   it("addItems(section, values) POSTs the values array", async () => {
