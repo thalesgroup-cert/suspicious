@@ -82,11 +82,32 @@ type SectionResponseMap = {
   ciso_users: CisoUser[];
 };
 
+type Paginated<T> = { count: number; next: string | null; previous: string | null; results: T[] };
+
+/**
+ * Fetch every page of a paginated list endpoint and return the flattened array.
+ * The settings UI manages full allow/deny lists with client-side search, so it
+ * needs all rows; the backend now bounds each response (page_size up to 1000),
+ * so this walks the pages. Tolerates a non-paginated (bare array) response too.
+ */
+async function fetchAllPages<T>(path: string): Promise<T[]> {
+  const out: T[] = [];
+  let page = 1;
+  for (;;) {
+    const res = await api.get(`${path}?page=${page}&page_size=1000`);
+    const data = res.data as T[] | Paginated<T>;
+    if (Array.isArray(data)) return data;
+    out.push(...(data.results ?? []));
+    if (!data.next) break;
+    page += 1;
+  }
+  return out;
+}
+
 export async function listItems<T extends keyof SectionResponseMap>(
   section: T
 ): Promise<SectionResponseMap[T]> {
-  const res = await api.get(`/settings/list/${section}/`);
-  return res.data;
+  return fetchAllPages(`/settings/list/${section}/`) as Promise<SectionResponseMap[T]>;
 }
 
 export async function addItems(
