@@ -83,7 +83,6 @@ class CaseEvent:
     """Serializable snapshot of a case at emission time. The payload a
     connector hook receives — connectors needing more must re-fetch the
     Case by id themselves."""
-    schema_version: int
     event: str
     case_id: int
     status: str
@@ -92,12 +91,17 @@ class CaseEvent:
     confidence: float | None
     reporter_email: str
     created_at: str  # ISO-8601
+    schema_version: int = CASE_EVENT_SCHEMA_VERSION
 
     def to_dict(self) -> dict:
         return asdict(self)
 
     @classmethod
     def from_dict(cls, data: dict) -> "CaseEvent":
+        if data.get("schema_version") != CASE_EVENT_SCHEMA_VERSION:
+            raise ValueError(
+                f"unsupported CaseEvent schema_version {data.get('schema_version')!r}"
+            )
         return cls(**data)
 
 
@@ -115,6 +119,9 @@ class Connector(ABC):
         """Cheap connectivity/auth probe. Must not raise — return ok=False."""
 
     # Optional hooks — only called if listed in manifest.events / schedules.
+    # The dispatch engine wraps every hook call; a NotImplementedError from a
+    # connector that subscribed to an event it didn't implement is recorded
+    # as a failed delivery, never propagated to the case pipeline.
     def on_case_created(self, event: CaseEvent) -> None:  # pragma: no cover
         raise NotImplementedError
 

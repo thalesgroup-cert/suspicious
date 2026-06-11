@@ -7,6 +7,7 @@ from connectors.base import (
     ConnectorManifest,
     HealthStatus,
     Schedule,
+    EVENT_CASE_CREATED,
     EVENT_CASE_FINALISED,
 )
 
@@ -41,6 +42,9 @@ class ManifestValidationTest(SimpleTestCase):
         with self.assertRaises(ValueError):
             make_manifest(schedules=(Schedule("sync", 0),)).validate()
 
+    def test_case_created_event_valid(self):
+        make_manifest(events=(EVENT_CASE_CREATED,)).validate()
+
 
 class CaseEventRoundTripTest(SimpleTestCase):
     def test_to_dict_from_dict_round_trip(self):
@@ -52,6 +56,20 @@ class CaseEventRoundTripTest(SimpleTestCase):
         )
         self.assertEqual(CaseEvent.from_dict(event.to_dict()), event)
 
+    def test_from_dict_rejects_unknown_schema_version(self):
+        with self.assertRaises(ValueError):
+            CaseEvent.from_dict({"schema_version": 99, "event": "x", "case_id": 1,
+                                 "status": "", "results": "", "final_score": None,
+                                 "confidence": None, "reporter_email": "",
+                                 "created_at": ""})
+
+    def test_schema_version_defaults_to_current(self):
+        event = CaseEvent(
+            event="case_created", case_id=1, status="", results="",
+            final_score=None, confidence=None, reporter_email="", created_at="",
+        )
+        self.assertEqual(event.schema_version, 1)
+
 
 class ConnectorABCTest(SimpleTestCase):
     def test_subclass_with_health_check_instantiable(self):
@@ -62,3 +80,13 @@ class ConnectorABCTest(SimpleTestCase):
         d = Dummy({"url": "http://x"})
         self.assertEqual(d.config["url"], "http://x")
         self.assertTrue(d.health_check().ok)
+
+    def test_direct_instantiation_rejected(self):
+        with self.assertRaises(TypeError):
+            Connector({})
+
+    def test_subclass_without_health_check_rejected(self):
+        class Bad(Connector):
+            manifest = make_manifest()
+        with self.assertRaises(TypeError):
+            Bad({})
