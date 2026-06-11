@@ -1,0 +1,4 @@
+"""Built-in connectors. Each entry is "module.path:ClassName"; the registry
+imports them lazily and records (instead of raising) load failures."""
+
+BUILTIN_CONNECTOR_PATHS: tuple[str, ...] = ()
