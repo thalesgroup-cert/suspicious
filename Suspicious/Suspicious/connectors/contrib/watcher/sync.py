@@ -12,7 +12,7 @@ from settings.models import (
     WatcherMonitoredDomain,
 )
 
-logger = logging.getLogger("tasp.cron.watcher")
+logger = logging.getLogger("connectors.contrib.watcher")
 
 
 def _watcher_conf() -> dict:
