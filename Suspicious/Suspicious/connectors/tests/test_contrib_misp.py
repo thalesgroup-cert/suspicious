@@ -14,6 +14,13 @@ class MISPConnectorTest(SimpleTestCase):
         secret_keys = [f.key for f in m.config_schema if f.type == "secret"]
         self.assertIn("instances.primary.api_key", secret_keys)
 
+    def test_health_check_unconfigured(self):
+        with mock.patch(
+            "settings.config.get_section", return_value={}
+        ):
+            status = MISPConnector({}).health_check()
+        self.assertFalse(status.ok)
+
     def test_on_case_finalised_delegates_to_service(self):
         connector = MISPConnector({})
         fake_case = mock.Mock()

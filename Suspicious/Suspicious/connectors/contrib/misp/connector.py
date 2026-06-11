@@ -39,7 +39,10 @@ class MISPConnector(Connector):
     )
 
     def health_check(self) -> HealthStatus:
-        primary = self.config.get("instances", {}).get("primary", {})
+        # Read the sub-section directly: the Vault secret overlay is keyed on
+        # "integrations.misp.instances.primary", not on the parent section.
+        from settings.config import get_section
+        primary = get_section("integrations.misp.instances.primary")
         url, key = primary.get("url"), primary.get("api_key")
         if not url or not key:
             return HealthStatus(ok=False, detail="primary url/api_key not configured")
@@ -56,5 +59,7 @@ class MISPConnector(Connector):
             return HealthStatus(ok=False, detail=str(exc))
 
     def on_case_finalised(self, event) -> None:
+        # DoesNotExist (case deleted mid-flight) surfaces as a failed
+        # delivery + retries — intentional, no special-casing.
         case = Case.objects.get(pk=event.case_id)
         MISPService(primary=True).update_misp(case)
