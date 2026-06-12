@@ -16,3 +16,25 @@ class GetS3ClientTest(SimpleTestCase):
         minio_cls.assert_called_once_with(
             endpoint="rustfs:9000", access_key="ak", secret_key="sk", secure=False
         )
+
+
+class GetChromaClientTest(SimpleTestCase):
+    def test_builds_http_client_from_section(self):
+        section = {"host": "chromadb", "port": 8000}
+        with mock.patch("common.clients.get_section", return_value=section), \
+             mock.patch("common.clients.chromadb") as chroma_mod:
+            from common.clients import get_chroma_client
+            get_chroma_client()
+        chroma_mod.HttpClient.assert_called_once()
+        kwargs = chroma_mod.HttpClient.call_args.kwargs
+        self.assertEqual((kwargs["host"], kwargs["port"]), ("chromadb", 8000))
+
+    def test_uses_defaults_when_keys_absent(self):
+        section = {}
+        with mock.patch("common.clients.get_section", return_value=section), \
+             mock.patch("common.clients.chromadb") as chroma_mod:
+            from common.clients import get_chroma_client
+            get_chroma_client()
+        kwargs = chroma_mod.HttpClient.call_args.kwargs
+        self.assertEqual(kwargs["host"], "chromadb")
+        self.assertEqual(kwargs["port"], 8000)

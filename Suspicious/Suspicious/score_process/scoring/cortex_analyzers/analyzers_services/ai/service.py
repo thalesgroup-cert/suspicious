@@ -9,9 +9,8 @@ import logging
 from functools import cached_property
 from typing import Any, Dict, List
 
-import chromadb
 from minio import Minio
-from common.clients import get_s3_client
+from common.clients import get_chroma_client, get_s3_client
 
 from case_handler.models import Case
 from ..base import BaseAnalyzer
@@ -67,21 +66,13 @@ class AnalyzerAI(BaseAnalyzer):
             "verify": bool(cfg.get("certificate_path", True)),
         }
 
-    @cached_property
-    def _chromadb_cfg(self) -> Dict[str, Any]:
-        from settings.config import get_section
-        return get_section("integrations.chromadb")
-
     # ── ChromaDB singleton ────────────────────────────────────────────────
     # One client per AnalyzerAI instance — avoids reconnecting on every call.
 
     @cached_property
     def _chroma_collection(self):
         try:
-            client = chromadb.HttpClient(
-                host=self._chromadb_cfg.get("host", "chromadb"),
-                port=int(self._chromadb_cfg.get("port", 8000)),
-            )
+            client = get_chroma_client()
             return get_suspicious_collection(client)
         except Exception as exc:
             logger.error("ChromaDB init failed: %s", exc)
