@@ -8,11 +8,18 @@ from domain_process.models import Domain
 
 logger = logging.getLogger(__name__)
 
-TLD_CACHE_DIR = Path("/app/Suspicious/domain_process/domain_utils/public")
+# Pinned Public Suffix List shipped with the repo.
+PSL_FILE = Path(__file__).resolve().parent / "public" / "public_suffix_list.dat"
 
+# cache_dir=None keeps tldextract fully read-only: with a cache_dir it must
+# create *.lock files even on cache hits, which raises PermissionError when
+# the code is bind-mounted by another UID (CI) or on a read-only filesystem.
+# The pinned PSL is parsed once per process; the bundled snapshot is the
+# fallback if the file is missing.
 extractor = tldextract.TLDExtract(
-    cache_dir=str(TLD_CACHE_DIR),
-    fallback_to_snapshot=True
+    cache_dir=None,
+    suffix_list_urls=(PSL_FILE.as_uri(),) if PSL_FILE.is_file() else (),
+    fallback_to_snapshot=True,
 )
 
 def normalize_domain(domain: str) -> str | None:
