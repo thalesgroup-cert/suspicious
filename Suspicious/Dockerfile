@@ -52,12 +52,15 @@ RUN uv pip install --system --no-cache -r requirements.txt
 COPY requirements-connectors.txt .
 RUN uv pip install --system --no-cache -r requirements-connectors.txt
 
-# Pre-download NLTK data
+# Pre-download NLTK data. nltk.download() returns False on failure instead
+# of raising, which once produced images missing the stopwords corpus —
+# fail the build instead.
 RUN python - <<EOF
+import sys
 import nltk
-nltk.download("stopwords", download_dir="/usr/local/share/nltk_data")
-nltk.download("punkt", download_dir="/usr/local/share/nltk_data")
-nltk.download("punkt_tab", download_dir="/usr/local/share/nltk_data")
+for package in ("stopwords", "punkt", "punkt_tab"):
+    if not nltk.download(package, download_dir="/usr/local/share/nltk_data"):
+        sys.exit(f"NLTK download failed: {package}")
 EOF
 
 ################
