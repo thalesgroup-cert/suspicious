@@ -2,28 +2,22 @@ import logging
 from pathlib import Path
 
 from thehive4py import TheHiveApi
-from minio import Minio
 from minio.error import S3Error
-import smtplib
-from email.mime.text import MIMEText
-from email.mime.multipart import MIMEMultipart
 from jinja2 import Environment, FileSystemLoader, select_autoescape
 from mail_feeder.models import Mail
 
+from common.clients import get_s3_client
 from .utils import generate_ref, build_mail_attachments_paths
 from score_process.score_utils.send_mail.social_logos import SOCIAL_LOGOS
+from score_process.score_utils.send_mail.send_email_service import SendMailService
 
 logger = logging.getLogger(__name__)
-TEMPLATES_DIR = Path(__file__).parent.parent / "send_mail/templates"
+TEMPLATES_DIR = Path(__file__).parent.parent.parent.parent / "score_process/score_utils/send_mail/templates"
 
 def _thehive_config() -> dict:
     from settings.config import get_section
     return get_section("integrations.thehive")
 
-
-def _s3_config() -> dict:
-    from settings.config import get_section
-    return get_section("storage.s3")
 
 
 def _certificate_path():
@@ -175,15 +169,25 @@ class ChallengeToTheHiveService:
     def send(self) -> None:
         html     = self.template.render(self._context())
         smtp_cfg = self._smtp_cfg()
+        sender   = smtp_cfg.get("username") or smtp_cfg.get("from", "")
 
-        msg = MIMEMultipart("alternative")
-        msg["From"]    = smtp_cfg.get("username") or smtp_cfg.get("from", "")
-        msg["To"]      = self.recipient
-        msg["Subject"] = self.subject
-        msg.attach(MIMEText(html, "html"))
-
-        with smtplib.SMTP(smtp_cfg["server"], smtp_cfg["port"]) as smtp:
-            smtp.send_message(msg)
+        service = SendMailService(
+            host=smtp_cfg["server"],
+            port=smtp_cfg["port"],
+            login=smtp_cfg.get("username", ""),
+            password=smtp_cfg.get("password", ""),
+        )
+        service.connect()
+        try:
+            if smtp_cfg.get("password"):
+                service.start_tls()
+                service.login()
+            service.publish_email(
+                subject=self.subject, sender=sender,
+                recipient=self.recipient, html=html,
+            )
+        finally:
+            service.close()
 
     # ── TheHive ────────────────────────────────────────────────────────────
 
@@ -347,12 +351,7 @@ def create_alert_from_challenge(api_url, api_key, case, mail, challenger,
     )
 
     mail_id = safe(getattr(mail, "mail_id", None), "unknown-mail-id")
-    minio_client = Minio(
-        _s3_config().get("endpoint"),
-        access_key=_s3_config().get("access_key"),
-        secret_key=_s3_config().get("secret_key"),
-        secure=_s3_config().get("secure", False),
-    )
+    minio_client = get_s3_client()
 
     for bucket in minio_client.list_buckets():
         if bucket.name.endswith(f"-{mail_id.split('-')[0]}"):

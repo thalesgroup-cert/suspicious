@@ -10,7 +10,7 @@ from case_handler.models import Case
 from file_process.models import File
 from hash_process.models import Hash
 from mail_feeder.models import Mail, MailArtifact, MailAttachment
-from score_process.score_utils.thehive.challenge import ChallengeToTheHiveService
+from connectors.contrib.thehive.challenge import ChallengeToTheHiveService
 
 
 class ChallengeMailQueryCountTest(TestCase):
@@ -86,7 +86,7 @@ class ChallengeMailQueryCountTest(TestCase):
         }
 
         with patch(
-            "score_process.score_utils.thehive.challenge.create_alert_from_challenge"
+            "connectors.contrib.thehive.challenge.create_alert_from_challenge"
         ):
             original_debug = settings.DEBUG
             settings.DEBUG = True

@@ -1,114 +1,45 @@
 """
-ChromaDB connection, telemetry suppression, and paginated iteration helpers.
+ChromaDB connection and paginated iteration helpers.
 """
 import hashlib
 import logging
-import os
 from typing import Any, Dict, Iterator, List, Optional, Sequence, Tuple
 
+from common.clients import get_chroma_client
 from .metadata import coerce_dict, coerce_list
 
 logger = logging.getLogger(__name__)
 
-DEFAULT_CHROMA_HOST = "chromadb"
-DEFAULT_CHROMA_PORT = 8000
 DEFAULT_CHROMA_COLLECTION_NAME = "suspicious"
 
 CHROMA_PAGE_SIZE = 1000
 CHROMA_FETCH_CHUNK_SIZE = 200
 
 
-def _load_chroma_settings() -> Dict[str, Any]:
+def _load_collection_name() -> str:
     try:
         from settings.config import get_section
-        chromadb_conf = get_section("integrations.chromadb")
-        return {
-            "host": str(chromadb_conf.get("host", DEFAULT_CHROMA_HOST)),
-            "port": int(chromadb_conf.get("port", DEFAULT_CHROMA_PORT)),
-            "collection_name": str(
-                chromadb_conf.get("collection_name", DEFAULT_CHROMA_COLLECTION_NAME)
-            ),
-        }
+        cfg = get_section("integrations.chromadb")
+        return str(cfg.get("collection_name", DEFAULT_CHROMA_COLLECTION_NAME))
     except Exception as exc:
         logger.warning(
-            "Unable to load chromadb settings via accessor, using defaults: %s",
+            "Unable to load chromadb collection_name via accessor, using default: %s",
             exc,
         )
-        return {
-            "host": DEFAULT_CHROMA_HOST,
-            "port": DEFAULT_CHROMA_PORT,
-            "collection_name": DEFAULT_CHROMA_COLLECTION_NAME,
-        }
-
-
-def _disable_chromadb_telemetry() -> None:
-    try:
-        os.environ.setdefault("CHROMADB_TELEMETRY_ENABLED", "false")
-        os.environ.setdefault("ANONYMIZED_TELEMETRY", "false")
-        os.environ.setdefault("CHROMADB_DISABLE_TELEMETRY", "true")
-        os.environ.setdefault("CHROMADB_TELEMETRY", "false")
-    except Exception:
-        pass
-
-    try:
-        from chromadb.telemetry import telemetry as _telemetry  # type: ignore
-
-        if hasattr(_telemetry, "TELEMETRY_ENABLED"):
-            try:
-                _telemetry.TELEMETRY_ENABLED = False  # type: ignore[attr-defined]
-            except Exception:
-                pass
-
-        inst = getattr(_telemetry, "telemetry_instance", None)
-        if inst is not None:
-            for attr in ("capture", "capture_event", "capture_span", "flush"):
-                if hasattr(inst, attr):
-                    setattr(inst, attr, lambda *a, **k: None)
-    except Exception:
-        pass
-
-    try:
-        from chromadb.telemetry import product as _product  # type: ignore
-
-        posthog_mod = getattr(_product, "posthog", None)
-        if posthog_mod is not None:
-            def _noop_capture(*args, **kwargs):
-                return None
-
-            if hasattr(posthog_mod, "capture"):
-                posthog_mod.capture = _noop_capture  # type: ignore[assignment]
-            client_cls = getattr(posthog_mod, "Posthog", None)
-            if client_cls is not None and hasattr(client_cls, "capture"):
-                client_cls.capture = _noop_capture  # type: ignore[assignment]
-    except Exception:
-        pass
+        return DEFAULT_CHROMA_COLLECTION_NAME
 
 
 def get_chroma_collection(collection_name: Optional[str] = None):
-    _cs = _load_chroma_settings()
     if collection_name is None:
-        collection_name = _cs["collection_name"]
+        collection_name = _load_collection_name()
 
     try:
-        import chromadb
-    except Exception as exc:
-        logger.warning("ChromaDB not available in environment: %s", exc)
-        return None
-
-    _disable_chromadb_telemetry()
-
-    try:
-        client = chromadb.HttpClient(
-            host=_cs["host"],
-            port=int(_cs["port"]),
-        )
+        client = get_chroma_client()
         return client.get_collection(name=collection_name)
     except Exception as exc:
         logger.error(
-            "Failed to access ChromaDB collection %s on %s:%s: %s",
+            "Failed to access ChromaDB collection %s: %s",
             collection_name,
-            _cs["host"],
-            _cs["port"],
             exc,
         )
         return None

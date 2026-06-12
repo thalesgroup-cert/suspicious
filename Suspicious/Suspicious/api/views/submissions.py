@@ -165,7 +165,7 @@ class SubmissionDetailsView(RetrieveAPIView):
     lookup_url_kwarg = "submission_id"
 
     def get_queryset(self):
-        return (
+        queryset = (
             Case.objects.select_related(*CASE_DETAIL_SELECT_RELATED)
             .prefetch_related(
                 "fileOrMail__mail__mail_attachments",
@@ -177,6 +177,12 @@ class SubmissionDetailsView(RetrieveAPIView):
                 "fileOrMail__mail__mail_artifacts__artifactIsMailAddress",
             )
         )
+        # Scope to the caller's own submissions unless they hold an elevated
+        # role. A non-owner then gets 404 (not 403), so a case ID's existence
+        # is not leaked. CanAccessSubmission stays as defense-in-depth.
+        if not user_has_submission_elevated_access(self.request.user):
+            queryset = queryset.filter(reporter=self.request.user)
+        return queryset
 
     def get_serializer_class(self):
         if user_has_submission_elevated_access(self.request.user):

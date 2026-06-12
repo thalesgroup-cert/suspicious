@@ -7,11 +7,11 @@ class StatsReadPermission(BasePermission):
 
     Current policy:
     - allow staff/superusers
-    - allow users in CISO or CERT groups
+    - allow users in CISO, CERT, or Admin groups
     - deny everyone else
     """
 
-    allowed_groups = {"CISO", "CERT"}
+    allowed_groups = {"CISO", "CERT", "Admin"}
 
     def has_permission(self, request, view) -> bool:
         user = request.user

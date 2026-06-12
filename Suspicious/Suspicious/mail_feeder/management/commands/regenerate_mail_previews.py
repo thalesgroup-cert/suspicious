@@ -143,13 +143,9 @@ class Command(BaseCommand):
     # ------------------------------------------------------------------
 
     def _get_storage_client(self):
-        from api.views.downloads import load_minio_config
         from api.storage import StorageClient
 
-        cfg = load_minio_config()
-        if not cfg:
-            raise CommandError("Could not load MinIO config via accessor")
-        storage = StorageClient(cfg)
+        storage = StorageClient()
         if not getattr(storage, "client", None):
             raise CommandError("MinIO client initialisation failed")
         return storage

@@ -97,10 +97,18 @@ class TestBreakers(unittest.TestCase):
         from common.http_client import BREAKERS, get_breaker
         self.assertIs(get_breaker("thehive"), BREAKERS["thehive"])
 
-    def test_get_breaker_raises_for_unknown_name(self):
+    def test_get_breaker_creates_unknown_name_on_demand(self):
         from common.http_client import get_breaker
-        with self.assertRaises(KeyError):
-            get_breaker("unknown_integration")
+        b1 = get_breaker("some_new_connector")
+        b2 = get_breaker("some_new_connector")
+        self.assertIs(b1, b2)
+
+    def test_ensure_breaker_is_idempotent(self):
+        from common.http_client import ensure_breaker, BREAKERS
+        b1 = ensure_breaker("another_connector")
+        b2 = ensure_breaker("another_connector")
+        self.assertIs(b1, b2)
+        self.assertIn("another_connector", BREAKERS)
 
 
 class TestRetryDecorator(unittest.TestCase):

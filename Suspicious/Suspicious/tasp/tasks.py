@@ -78,14 +78,6 @@ def remove_old_emails(self):
         raise self.retry(exc=exc, countdown=60 * 2 ** self.request.retries)
 
 
-@shared_task(bind=True, **_RETRY)
-def watcher_sync(self):
-    from tasp.cron.watcher import run_watcher_sync
-    try:
-        run_watcher_sync()
-    except Exception as exc:
-        raise self.retry(exc=exc, countdown=60 * 2 ** self.request.retries)
-
 
 @shared_task(bind=True, **_RETRY)
 def materialise_dashboard_snapshots(self):

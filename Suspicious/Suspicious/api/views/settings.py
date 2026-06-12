@@ -3,6 +3,7 @@ from __future__ import annotations
 
 from rest_framework import generics, status
 from rest_framework.exceptions import ValidationError
+from rest_framework.pagination import PageNumberPagination
 from rest_framework.response import Response
 
 from api.permissions.settings import IsAdminOrCERT
@@ -27,23 +28,37 @@ READ_ONLY_SECTIONS = {
 }
 
 
+class SettingsPagination(PageNumberPagination):
+    """Bounds allow/deny/analyzer list responses. Allow/deny domain lists can
+    grow large; an unbounded scan + response is both a perf and a DoS risk."""
+
+    page_size = 100
+    page_size_query_param = "page_size"
+    max_page_size = 1000
+
+
 class SettingsListView(generics.GenericAPIView):
     """
-    GET  /api/settings/list/<section>/
+    GET  /api/settings/list/<section>/   (paginated: {count, next, previous, results})
     POST /api/settings/list/<section>/
     """
 
     permission_classes = [IsAdminOrCERT]
     serializer_class = SettingsListBulkCreateSerializer
+    pagination_class = SettingsPagination
 
     def get(self, request, section: str, *args, **kwargs):
+        paginator = self.pagination_class()
+
         if section == "ciso_users":
             queryset = CISOProfile.objects.select_related("user").order_by("user__username")
-            serializer = CISOUserSerializer(queryset, many=True)
-            return Response(serializer.data)
+            page = paginator.paginate_queryset(queryset, request, view=self)
+            serializer = CISOUserSerializer(page, many=True)
+            return paginator.get_paginated_response(serializer.data)
 
         data = SettingsListSectionService.list_items(section)
-        return Response(data)
+        page = paginator.paginate_queryset(data, request, view=self)
+        return paginator.get_paginated_response(page)
 
     def post(self, request, section: str, *args, **kwargs):
         if section in READ_ONLY_SECTIONS:
@@ -122,6 +137,7 @@ class AnalyzerSettingsListView(generics.ListAPIView):
     permission_classes = [IsAdminOrCERT]
     serializer_class = AnalyzerSettingsSerializer
     queryset = Analyzer.objects.all().order_by("name")
+    pagination_class = SettingsPagination
 
 
 class AnalyzerSettingsDetailView(generics.UpdateAPIView):

@@ -23,20 +23,6 @@ class StorageUnavailable(APIException):
     default_code = "storage_unavailable"
 
 
-def load_minio_config(path: str = None) -> dict | None:
-    """storage.s3 config via the accessor (endpoint/access_key from DB,
-    secret_key from Vault). `path` kept for signature compatibility, ignored."""
-    from settings.config import get_section
-    try:
-        cfg = get_section("storage.s3")
-    except Exception:
-        logger.warning("Unable to load storage.s3 config via accessor")
-        return None
-    if not isinstance(cfg, dict) or not cfg:
-        return None
-    return cfg
-
-
 def get_request_ip(request) -> str | None:
     forwarded_for = request.META.get("HTTP_X_FORWARDED_FOR")
     if forwarded_for:
@@ -79,11 +65,7 @@ class DownloadCaseArchiveView(APIView):
         return response
 
     def _get_storage_client(self) -> StorageClient:
-        minio_config = load_minio_config()
-        if not minio_config:
-            raise StorageUnavailable("Storage backend not configured")
-
-        storage = StorageClient(minio_config)
+        storage = StorageClient()
         if not getattr(storage, "client", None):
             raise StorageUnavailable("Storage backend unavailable")
 

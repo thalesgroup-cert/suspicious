@@ -195,7 +195,8 @@ INSTALLED_APPS = [
     "settings.apps.SettingsConfig",
     "url_process.apps.URLConfig",
     "score_process.apps.ScoreConfig",
-    "submission_queue.apps.SubmissionQueueConfig"
+    "submission_queue.apps.SubmissionQueueConfig",
+    "connectors.apps.ConnectorsConfig",
 ]
 
 MIDDLEWARE = [
@@ -660,10 +661,6 @@ CELERY_BEAT_SCHEDULE = {
         "task": "tasp.tasks.remove_old_emails",
         "schedule": crontab(hour=0, minute=0),
     },
-    "watcher-sync": {
-        "task": "tasp.tasks.watcher_sync",
-        "schedule": 300.0,
-    },
     "materialise-dashboard-snapshots": {
         "task": "tasp.tasks.materialise_dashboard_snapshots",
         "schedule": crontab(hour=2, minute=0),
@@ -837,7 +834,7 @@ LOGGING = {
             "level":     _trace_level,
             "propagate": False,
         },
-        "tasp.cron.watcher": {
+        "connectors.contrib.watcher": {
             "handlers":  ["watcher_sync"],
             "level":     _trace_level,
             "propagate": False,

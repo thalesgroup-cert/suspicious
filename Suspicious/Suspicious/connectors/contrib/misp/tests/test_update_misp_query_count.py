@@ -13,7 +13,7 @@ from mail_feeder.models import (
     Mail,
     MailArtifact,
 )
-from score_process.misp.service import MISPService
+from connectors.contrib.misp.service import MISPService
 
 
 def _count_selects() -> int:
@@ -60,11 +60,11 @@ class UpdateMispQueryCountTest(TestCase):
         original_debug = settings.DEBUG
         settings.DEBUG = True
         try:
-            with patch("score_process.misp.service.MISPEventManager") as mem_cls, \
-                 patch("score_process.misp.service.MISPClient"), \
-                 patch("score_process.misp.service.build_email_object", return_value=None), \
-                 patch("score_process.misp.service.finalize_misp_object"), \
-                 patch("score_process.misp.service.build_ip_object",
+            with patch("connectors.contrib.misp.service.MISPEventManager") as mem_cls, \
+                 patch("connectors.contrib.misp.service.MISPClient"), \
+                 patch("connectors.contrib.misp.service.build_email_object", return_value=None), \
+                 patch("connectors.contrib.misp.service.finalize_misp_object"), \
+                 patch("connectors.contrib.misp.service.build_ip_object",
                        return_value=MagicMock()), \
                  patch.object(MISPService, "_maybe_push_monthly"):
                 mem_cls.return_value.get_or_create_event.return_value = MagicMock(id=1)

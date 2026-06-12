@@ -12,6 +12,7 @@ from rest_framework.response import Response
 from rest_framework.views import APIView
 
 from api.permissions.settings import IsAdminOrCERT
+from api.permissions.dashboard import StatsReadPermission
 
 from dashboard.models import (
     GroupMonthlyStats,
@@ -119,7 +120,11 @@ class MonthlyCasesSummaryListView(generics.ListAPIView):
 
 
 class MonthlyReporterStatsListView(generics.ListAPIView):
-    permission_classes = [IsAuthenticated]
+    # Per-reporter stats name individual reporters and their case volumes —
+    # colleague-level data. Restricted to elevated roles (CERT/CISO/Admin),
+    # consistent with UserCasesMonthlyStats. Regular users get only the
+    # org-wide aggregate dashboards.
+    permission_classes = [StatsReadPermission]
     queryset = MonthlyReporterStats.objects.all()
     serializer_class = MonthlyReporterStatsSerializer
     filter_backends = [DjangoFilterBackend]

@@ -18,6 +18,7 @@ import { api } from "@/api/client";
 import {
   addItems,
   listItems,
+  listAnalyzers,
   removeItem,
   setFeederStatus,
   getFeederStatus,
@@ -33,15 +34,50 @@ describe("settings api helpers", () => {
     vi.clearAllMocks();
   });
 
-  it("listItems(section) GETs /settings/list/<section>/", async () => {
+  it("listItems(section) pages a paginated /settings/list/<section>/", async () => {
     mockGet.mockResolvedValueOnce({
-      data: [{ id: "1", value: "evil.example" }],
+      data: { count: 1, next: null, previous: null, results: [{ id: "1", value: "evil.example" }] },
     });
 
     const items = await listItems("domains_deny");
 
-    expect(mockGet).toHaveBeenCalledWith("/settings/list/domains_deny/");
+    expect(mockGet).toHaveBeenCalledWith("/settings/list/domains_deny/?page=1&page_size=1000");
     expect(items).toEqual([{ id: "1", value: "evil.example" }]);
+  });
+
+  it("listItems(section) walks every page and flattens the results", async () => {
+    mockGet
+      .mockResolvedValueOnce({
+        data: { count: 2, next: "next-url", previous: null, results: [{ id: "1", value: "a" }] },
+      })
+      .mockResolvedValueOnce({
+        data: { count: 2, next: null, previous: "prev-url", results: [{ id: "2", value: "b" }] },
+      });
+
+    const items = await listItems("domains_deny");
+
+    expect(items).toEqual([{ id: "1", value: "a" }, { id: "2", value: "b" }]);
+    expect(mockGet).toHaveBeenCalledTimes(2);
+    expect(mockGet).toHaveBeenNthCalledWith(2, "/settings/list/domains_deny/?page=2&page_size=1000");
+  });
+
+  it("listItems(section) tolerates a non-paginated bare array", async () => {
+    mockGet.mockResolvedValueOnce({ data: [{ id: "1", value: "evil.example" }] });
+
+    const items = await listItems("domains_deny");
+
+    expect(items).toEqual([{ id: "1", value: "evil.example" }]);
+  });
+
+  it("listAnalyzers() pages the paginated /settings/analyzers/", async () => {
+    mockGet.mockResolvedValueOnce({
+      data: { count: 1, next: null, previous: null, results: [{ id: 1, name: "Yara", weight: 0.2 }] },
+    });
+
+    const analyzers = await listAnalyzers();
+
+    expect(mockGet).toHaveBeenCalledWith("/settings/analyzers/?page=1&page_size=1000");
+    expect(analyzers).toEqual([{ id: 1, name: "Yara", weight: 0.2 }]);
   });
 
   it("addItems(section, values) POSTs the values array", async () => {

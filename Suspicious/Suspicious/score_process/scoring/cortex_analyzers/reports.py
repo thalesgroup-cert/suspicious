@@ -19,7 +19,6 @@ from score_process.scoring.update_handler import (
     save_case_results,
     update_kpi_and_user_stats,
 )
-from score_process.misp.service import MISPService
 from .utils import dump_model
 
 update_cases_logger = logging.getLogger("tasp.cron.update_ongoing_case_jobs")
@@ -107,9 +106,6 @@ class CortexAnalyzerReports:
             # mail may be None for IOC-only cases — save_case_results handles that
             save_case_results(case, mail)
             update_kpi_and_user_stats(case)
-
-            misp_handler = MISPService(primary=True)
-            misp_handler.update_misp(case)
 
             update_cases_logger.info("get_report: case %s completed.", case.id)
 

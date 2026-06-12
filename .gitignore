@@ -55,6 +55,8 @@ suspicious-ui/src/bones/*.bones.json
 suspicious-ui/.playwright
 suspicious-ui/dist
 
+suspicious-ui/public/brand/*.svg
+
 # MkDocs documentation site
 /site/
 .docs-venv/

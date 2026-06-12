@@ -62,7 +62,9 @@ class SeedConfigTest(TestCase):
         self.assertEqual(misp["instances"]["primary"]["url"], "http://m")
 
     def test_sections_seeded_into_their_scope(self):
-        import os, tempfile, pathlib, json as _json
+        import json as _json
+        import pathlib
+        import tempfile
         from suspicious import _config_common as cc
         data = {
             "storage": {"s3": {"endpoint": "e", "secret_key": "SK"}},

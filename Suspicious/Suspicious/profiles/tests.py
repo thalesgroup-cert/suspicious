@@ -2,7 +2,7 @@ from django.test import TestCase
 from unittest.mock import patch, MagicMock
 from django.contrib.auth.models import User
 
-from profiles.models import CISOProfile, UserProfile
+from profiles.models import CISOProfile, Theme, UserProfile
 from profiles.profiles_utils.ciso import process_cisos, generate_message, handle_csv_file, handle_json_file, handle_txt_file
 from profiles.profiles_utils.ldap import Ldap
 
@@ -18,7 +18,7 @@ class UserProfileModelTests(TestCase):
         profile = UserProfile.objects.create(user=user, function="Dev", gbu="IT", country="US", region="NORAM")
         self.assertTrue(profile.wants_acknowledgement)
         self.assertTrue(profile.wants_results)
-        self.assertEqual(profile.theme, "default")
+        self.assertEqual(profile.theme, Theme.LIGHT)
 
 
 class CISOProfileModelTests(TestCase):
@@ -33,7 +33,7 @@ class CISOProfileModelTests(TestCase):
         profile = CISOProfile.objects.create(user=user, function="CISO", gbu="IT", country="US", region="NORAM")
         self.assertTrue(profile.wants_acknowledgement)
         self.assertTrue(profile.wants_results)
-        self.assertEqual(profile.theme, "default")
+        self.assertEqual(profile.theme, Theme.LIGHT)
 
 
 class CISOProcessingTests(TestCase):

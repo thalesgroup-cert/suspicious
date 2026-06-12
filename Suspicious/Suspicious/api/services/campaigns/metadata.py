@@ -11,7 +11,7 @@ from datetime import datetime, timezone as dt_timezone
 from email.utils import parsedate_to_datetime
 from typing import Any, Dict, List, Optional, Tuple
 
-from score_process.score_utils.thehive.utils import (
+from connectors.contrib.thehive.utils import (
     parse_and_decode_defaultdict,
     parse_headers,
 )

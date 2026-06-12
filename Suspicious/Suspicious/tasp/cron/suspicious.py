@@ -1,17 +1,15 @@
 import logging
 from datetime import datetime, timedelta
 
-import chromadb
+from common.clients import get_chroma_client
+from settings.config import get_section
 from .utils import load_config
 from case_handler.models import Case
 
 logger = logging.getLogger("cron.suspicious")
 cleanup_logger = logging.getLogger("tasp.cron.cleanup_phishing")
 
-
-def _chroma_conf() -> dict:
-    from settings.config import get_section
-    return get_section("integrations.chromadb")
+_DEFAULT_CHROMA_COLLECTION_NAME = "suspicious"
 
 
 def check_challengeable():
@@ -31,13 +29,11 @@ def remove_old_suspicious_emails(config_path: str = None, threshold_days: int = 
     load_config(config_path)
     cutoff = datetime.now() - timedelta(days=threshold_days)
 
-    cc = _chroma_conf()
     try:
-        client = chromadb.HttpClient(
-            host=cc.get("host", "chromadb"),
-            port=cc.get("port", 8000),
-        )
-        collection = client.get_collection(name=cc.get("collection_name", "suspicious"))
+        cc = get_section("integrations.chromadb")
+        collection_name = cc.get("collection_name", _DEFAULT_CHROMA_COLLECTION_NAME)
+        client = get_chroma_client()
+        collection = client.get_collection(name=collection_name)
         items = collection.get()
 
         expired_ids = [

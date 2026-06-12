@@ -5,7 +5,7 @@ Shared HTTP client utilities:
   - TimeoutHTTPAdapter  — injects default connect/read timeout
   - make_session()      — returns a Session with the adapter mounted
   - BREAKERS            — per-integration pybreaker.CircuitBreaker registry
-  - get_breaker()       — look up a breaker by integration name
+  - get_breaker()       — look up / create a breaker by integration name
   - RETRY               — tenacity retry decorator
 """
 from __future__ import annotations
@@ -68,14 +68,20 @@ BREAKERS: dict[str, pybreaker.CircuitBreaker] = {
 }
 
 
-def get_breaker(name: str) -> pybreaker.CircuitBreaker:
-    """Return the CircuitBreaker for the named integration.
-
-    Raises KeyError if *name* is not registered in BREAKERS.
-    """
+def ensure_breaker(name: str) -> pybreaker.CircuitBreaker:
+    """Return the breaker for *name*, creating it with default thresholds
+    if absent. Used by the connector registry so dynamically discovered
+    connectors get isolation without editing this module."""
     if name not in BREAKERS:
-        raise KeyError(f"No circuit breaker registered for {name!r}")
+        BREAKERS[name] = pybreaker.CircuitBreaker(
+            fail_max=BREAKER_FAIL_MAX, reset_timeout=BREAKER_RESET_TIMEOUT
+        )
     return BREAKERS[name]
+
+
+def get_breaker(name: str) -> pybreaker.CircuitBreaker:
+    """Return the CircuitBreaker for the named integration (create-on-demand)."""
+    return ensure_breaker(name)
 
 
 def _is_retryable_http_error(exc: BaseException) -> bool:

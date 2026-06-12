@@ -2,7 +2,7 @@ from django.contrib.auth.models import User
 from django.utils import timezone
 
 from dashboard.models import UserCasesMonthlyStats
-from score_process.score_utils.thehive.challenge import ChallengeToTheHiveService
+from connectors.contrib.thehive.challenge import ChallengeToTheHiveService
 
 
 def _load_mail_config() -> dict:

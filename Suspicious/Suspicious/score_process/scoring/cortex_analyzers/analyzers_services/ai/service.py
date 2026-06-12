@@ -9,15 +9,15 @@ import logging
 from functools import cached_property
 from typing import Any, Dict, List
 
-import chromadb
 from minio import Minio
+from common.clients import get_chroma_client, get_s3_client
 
 from case_handler.models import Case
 from ..base import BaseAnalyzer
 from .minio_utils import build_mail_zip_from_minio, fetch_mail_files_from_minio
-from .thehive_utils import add_binary_attachment_to_item
+from connectors.contrib.thehive.attachments import add_binary_attachment_to_item
 
-from score_process.score_utils.thehive.utils import (
+from connectors.contrib.thehive.utils import (
     parse_and_decode_defaultdict,
     get_phishing_campaign,
     get_most_common_subject,
@@ -31,7 +31,7 @@ from score_process.score_utils.chromadb_utils import (
     add_to_suspicious_collection,
     update_suspicious_collection,
 )
-from score_process.score_utils.thehive.phishing import (
+from connectors.contrib.thehive.phishing import (
     PHISHING_CAMPAIGN_TEMPLATE,
     create_new_alert,
     get_item_from_id,
@@ -66,26 +66,13 @@ class AnalyzerAI(BaseAnalyzer):
             "verify": bool(cfg.get("certificate_path", True)),
         }
 
-    @cached_property
-    def _minio_cfg(self) -> Dict[str, Any]:
-        from settings.config import get_section
-        return get_section("storage.s3")
-
-    @cached_property
-    def _chromadb_cfg(self) -> Dict[str, Any]:
-        from settings.config import get_section
-        return get_section("integrations.chromadb")
-
     # ── ChromaDB singleton ────────────────────────────────────────────────
     # One client per AnalyzerAI instance — avoids reconnecting on every call.
 
     @cached_property
     def _chroma_collection(self):
         try:
-            client = chromadb.HttpClient(
-                host=self._chromadb_cfg.get("host", "chromadb"),
-                port=int(self._chromadb_cfg.get("port", 8000)),
-            )
+            client = get_chroma_client()
             return get_suspicious_collection(client)
         except Exception as exc:
             logger.error("ChromaDB init failed: %s", exc)
@@ -94,13 +81,7 @@ class AnalyzerAI(BaseAnalyzer):
     # ── MinIO client factory ──────────────────────────────────────────────
 
     def _make_minio_client(self) -> Minio:
-        cfg = self._minio_cfg
-        return Minio(
-            cfg.get("endpoint", ""),
-            access_key=cfg.get("access_key", ""),
-            secret_key=cfg.get("secret_key", ""),
-            secure=bool(cfg.get("secure", False)),
-        )
+        return get_s3_client()
 
     # ── main entry point ──────────────────────────────────────────────────
 

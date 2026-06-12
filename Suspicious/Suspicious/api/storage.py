@@ -6,8 +6,16 @@ from rest_framework.exceptions import NotFound
 
 
 class StorageClient:
-    def __init__(self, config: dict):
-        self.client = self._init_client(config)
+    def __init__(self, config: dict | None = None):
+        self.client = self._init_client(config) if config else self._default_client()
+
+    @staticmethod
+    def _default_client() -> Optional[Minio]:
+        try:
+            from common.clients import get_s3_client
+            return get_s3_client()
+        except Exception:
+            return None
 
     @staticmethod
     def _init_client(conf: dict) -> Optional[Minio]:

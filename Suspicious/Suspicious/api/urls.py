@@ -57,6 +57,13 @@ from api.views.submissions import (
 from api.views.oidc import OIDCCallbackView, OIDCLoginView
 from api.views.cortex_webhook import CortexWebhookView
 from api.views.config import ServiceConfigView
+from api.views.connectors import (
+    ConnectorConfigView,
+    ConnectorDeliveriesView,
+    ConnectorListView,
+    ConnectorStateView,
+    ConnectorTestView,
+)
 
 urlpatterns = [
     path("schema/", SpectacularAPIView.as_view(), name="schema"),
@@ -140,4 +147,11 @@ urlpatterns = [
 
     # Config authority — services fetch their effective scoped config (TLS-only)
     path("config/<str:scope>/", ServiceConfigView.as_view(), name="service-config"),
+
+    # Connectors (Admin/CERT)
+    path("connectors/", ConnectorListView.as_view(), name="connectors-list"),
+    path("connectors/<str:name>/", ConnectorStateView.as_view(), name="connector-state"),
+    path("connectors/<str:name>/config/", ConnectorConfigView.as_view(), name="connector-config"),
+    path("connectors/<str:name>/test/", ConnectorTestView.as_view(), name="connector-test"),
+    path("connectors/<str:name>/deliveries/", ConnectorDeliveriesView.as_view(), name="connector-deliveries"),
 ]

@@ -20,18 +20,10 @@ logger = logging.getLogger(__name__)
 
 
 def build_storage_client():
-    """Build a MinIO StorageClient from the runtime config accessor.
-
-    Reuses the same loader the downloads view uses so callers work in any
-    deployment without extra wiring. Raises on misconfiguration.
-    """
-    from api.views.downloads import load_minio_config
+    """Build a MinIO StorageClient from the shared ``storage.s3`` runtime config."""
     from api.storage import StorageClient
 
-    cfg = load_minio_config()
-    if not cfg:
-        raise RuntimeError("Could not load MinIO config via accessor")
-    storage = StorageClient(cfg)
+    storage = StorageClient()
     if not getattr(storage, "client", None):
         raise RuntimeError("MinIO client initialisation failed")
     return storage
