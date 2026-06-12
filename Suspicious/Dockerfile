@@ -48,6 +48,10 @@ COPY requirements.txt .
 # Install dependencies directly into system python
 RUN uv pip install --system --no-cache -r requirements.txt
 
+# Third-party connectors (suspicious.connectors entry points)
+COPY requirements-connectors.txt .
+RUN uv pip install --system --no-cache -r requirements-connectors.txt
+
 # Pre-download NLTK data
 RUN python - <<EOF
 import nltk

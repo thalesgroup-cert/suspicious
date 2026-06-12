@@ -119,4 +119,5 @@ nav:
           - score_process: reference/score_process.md
           - tasp tasks: reference/tasp-tasks.md
           - AI Mail Analyzer: reference/aimailanalyzer.md
+  - Building a connector: connectors.md
   - Contributing: contributing.md
