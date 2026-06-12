@@ -11,6 +11,7 @@ from typing import Any, Dict, List
 
 import chromadb
 from minio import Minio
+from common.clients import get_s3_client
 
 from case_handler.models import Case
 from ..base import BaseAnalyzer
@@ -67,11 +68,6 @@ class AnalyzerAI(BaseAnalyzer):
         }
 
     @cached_property
-    def _minio_cfg(self) -> Dict[str, Any]:
-        from settings.config import get_section
-        return get_section("storage.s3")
-
-    @cached_property
     def _chromadb_cfg(self) -> Dict[str, Any]:
         from settings.config import get_section
         return get_section("integrations.chromadb")
@@ -94,13 +90,7 @@ class AnalyzerAI(BaseAnalyzer):
     # ── MinIO client factory ──────────────────────────────────────────────
 
     def _make_minio_client(self) -> Minio:
-        cfg = self._minio_cfg
-        return Minio(
-            cfg.get("endpoint", ""),
-            access_key=cfg.get("access_key", ""),
-            secret_key=cfg.get("secret_key", ""),
-            secure=bool(cfg.get("secure", False)),
-        )
+        return get_s3_client()
 
     # ── main entry point ──────────────────────────────────────────────────
 

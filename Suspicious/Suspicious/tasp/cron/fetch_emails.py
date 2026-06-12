@@ -7,12 +7,12 @@ import shutil
 import logging
 from datetime import datetime, timezone
 from typing import Optional
-from minio import Minio
 from django.core.cache import cache
 from minio.commonconfig import Tags
 
+from minio import Minio
+from common.clients import get_s3_client
 from .utils import safe_execution, load_config, ensure_dir
-from .models import CronConfig
 from mail_feeder.minio_submission.minio import MinioEmailService
 
 logger = logging.getLogger("tasp.cron.fetch_and_process_emails")
@@ -29,14 +29,9 @@ EMAIL_DIR_PATTERN = re.compile(r"^\d{12}-[a-f0-9]+$")
 # MinIO client
 # ---------------------------------------------------------------------------
 
-def _init_minio_client(minio_conf) -> Optional[Minio]:
+def _init_minio_client() -> Optional[Minio]:
     try:
-        return Minio(
-            minio_conf.endpoint,
-            access_key=minio_conf.access_key,
-            secret_key=minio_conf.secret_key,
-            secure=minio_conf.secure,
-        )
+        return get_s3_client()
     except Exception:
         logger.exception("MinIO client initialization failed")
         return None
@@ -188,14 +183,14 @@ def fetch_and_process_emails(config_path: str = CONFIG_PATH) -> None:
     ensure_dir(base_temp)
     logger.info("Starting email fetch job")
     try:
-        _process_minio_buckets(cfg, base_temp)
+        _process_minio_buckets(base_temp)
     except Exception:
         logger.exception("Error in email fetch job")
     logger.info("Email fetch job completed")
 
 
-def _process_minio_buckets(cfg: CronConfig, base_path: str) -> None:
-    client = _init_minio_client(cfg.s3)
+def _process_minio_buckets(base_path: str) -> None:
+    client = _init_minio_client()
     if not client:
         return
 

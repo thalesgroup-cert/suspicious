@@ -2,11 +2,11 @@ import logging
 from pathlib import Path
 
 from thehive4py import TheHiveApi
-from minio import Minio
 from minio.error import S3Error
 from jinja2 import Environment, FileSystemLoader, select_autoescape
 from mail_feeder.models import Mail
 
+from common.clients import get_s3_client
 from .utils import generate_ref, build_mail_attachments_paths
 from score_process.score_utils.send_mail.social_logos import SOCIAL_LOGOS
 from score_process.score_utils.send_mail.send_email_service import SendMailService
@@ -18,10 +18,6 @@ def _thehive_config() -> dict:
     from settings.config import get_section
     return get_section("integrations.thehive")
 
-
-def _s3_config() -> dict:
-    from settings.config import get_section
-    return get_section("storage.s3")
 
 
 def _certificate_path():
@@ -355,12 +351,7 @@ def create_alert_from_challenge(api_url, api_key, case, mail, challenger,
     )
 
     mail_id = safe(getattr(mail, "mail_id", None), "unknown-mail-id")
-    minio_client = Minio(
-        _s3_config().get("endpoint"),
-        access_key=_s3_config().get("access_key"),
-        secret_key=_s3_config().get("secret_key"),
-        secure=_s3_config().get("secure", False),
-    )
+    minio_client = get_s3_client()
 
     for bucket in minio_client.list_buckets():
         if bucket.name.endswith(f"-{mail_id.split('-')[0]}"):

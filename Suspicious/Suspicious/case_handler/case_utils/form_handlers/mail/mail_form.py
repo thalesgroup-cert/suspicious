@@ -31,14 +31,7 @@ class MailFormHandler:
         """
         self.user = user
         self.base_path = Path(base_path)
-        from settings.config import get_section
-        cfg = get_section("storage.s3")
-        self.minio = MinioManager(
-            endpoint=cfg.get("endpoint", "rustfs:9000"),
-            access_key=cfg.get("access_key", "minioadmin"),
-            secret_key=cfg.get("secret_key", "minioadmin"),
-            secure=cfg.get("secure", False),
-        )
+        self.minio = MinioManager()
 
     def handle(self, mail_file):
         """

@@ -79,11 +79,7 @@ class DownloadCaseArchiveView(APIView):
         return response
 
     def _get_storage_client(self) -> StorageClient:
-        minio_config = load_minio_config()
-        if not minio_config:
-            raise StorageUnavailable("Storage backend not configured")
-
-        storage = StorageClient(minio_config)
+        storage = StorageClient()
         if not getattr(storage, "client", None):
             raise StorageUnavailable("Storage backend unavailable")
 

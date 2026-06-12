@@ -5,6 +5,8 @@ from minio import Minio
 from minio.error import S3Error
 from minio.commonconfig import Tags
 
+from common.clients import get_s3_client
+
 logger = logging.getLogger(__name__)
 
 TAG_STATUS_TODO = "To Do"
@@ -17,28 +19,22 @@ class MinioManager:
     bucket lifecycle, file uploads, and presigned URL generation.
     """
 
-    def __init__(self, endpoint: str, access_key: str, secret_key: str, secure: bool = False):
+    def __init__(self):
         """
-        Initialize the MinIO client.
+        Initialize the MinIO client from the shared ``storage.s3`` runtime config.
+        """
+        self.client = self._default_client()
 
-        Args:
-            endpoint (str): MinIO server endpoint (e.g., 'localhost:9000').
-            access_key (str): Access key for authentication.
-            secret_key (str): Secret key for authentication.
-            secure (bool): Whether to use TLS (HTTPS). Default is False.
+    def _default_client(self) -> Optional[Minio]:
         """
-        self.client = self._init_client(endpoint, access_key, secret_key, secure)
-
-    def _init_client(self, endpoint: str, access_key: str, secret_key: str, secure: bool) -> Optional[Minio]:
-        """
-        Create and return a MinIO client instance.
+        Create and return a MinIO client from the shared ``storage.s3`` config.
 
         Returns:
             Minio | None: Initialized client or None on failure.
         """
         try:
-            client = Minio(endpoint, access_key=access_key, secret_key=secret_key, secure=secure)
-            logger.info("MinIO client initialized: %s", endpoint)
+            client = get_s3_client()
+            logger.info("MinIO client initialized via get_s3_client()")
             return client
         except Exception as e:
             logger.critical("Failed to initialize MinIO client: %s", e, exc_info=True)
