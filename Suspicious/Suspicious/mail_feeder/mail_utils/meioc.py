@@ -31,15 +31,23 @@ warnings.simplefilter(action="ignore", category=FutureWarning)
 
 # Precompile the regex pattern for email extraction
 email_regex = re.compile(r"[A-Za-z0-9.!#$%&'*+/=?^_`{|}~-]+@[A-Za-z0-9.-]+\.[A-Za-z]{2,}", re.IGNORECASE)
-TLD_CACHE_DIR = Path("/app/Suspicious/domain_process/domain_utils/public")
+# Pinned Public Suffix List shipped with the repo (kept in domain_process).
+PSL_FILE = (
+    Path(__file__).resolve().parents[2]
+    / "domain_process" / "domain_utils" / "public" / "public_suffix_list.dat"
+)
 HASH_PATTERNS = [
     r'\b[a-f0-9]{32}\b',    # MD5
     r'\b[a-f0-9]{40}\b',    # SHA1
     r'\b[a-f0-9]{64}\b'     # SHA256
 ]
+# cache_dir=None keeps tldextract fully read-only: with a cache_dir it must
+# create *.lock files even on cache hits, which raises PermissionError when
+# the code is bind-mounted by another UID (CI) or on a read-only filesystem.
 tldcache = tldextract.TLDExtract(
-    cache_dir=str(TLD_CACHE_DIR),
-    fallback_to_snapshot=True
+    cache_dir=None,
+    suffix_list_urls=(PSL_FILE.as_uri(),) if PSL_FILE.is_file() else (),
+    fallback_to_snapshot=True,
 )
 fetch_mail_logger = logging.getLogger('tasp.cron.fetch_and_process_emails')
 
@@ -362,10 +370,6 @@ def email_analysis(filename, exclude_private_ip, check_spf, check_dkim, file_out
         # Identify each domain reported in the e-mail body
         try:
             for url in urls_list:
-                tldextract.TLDExtract(
-                    cache_dir=str(TLD_CACHE_DIR),
-                    fallback_to_snapshot=True
-                )
                 analyzed_domain = tldcache(url).registered_domain
                 if analyzed_domain:
                     domains_list.append(analyzed_domain)

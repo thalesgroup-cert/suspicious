@@ -1,5 +1,6 @@
 import { describe, it, expect, vi, beforeEach } from "vitest";
 import { screen, waitFor } from "@testing-library/react";
+import { QueryClient } from "@tanstack/react-query";
 import { renderWithProviders } from "@/test/utils";
 import { fixtureMe, fixtureProfile } from "@/test/fixtures";
 
@@ -61,6 +62,40 @@ describe("ProfilePage - Test Suite", () => {
       ).toBeInTheDocument();
     });
 
+  });
+
+  describe("State across navigation", () => {
+    it("keeps preference toggles checked after unmount/remount with warm query cache", async () => {
+      localStorage.clear();
+      // Realistic client: cache survives unmount (gcTime > 0), like the app default.
+      const queryClient = new QueryClient({
+        defaultOptions: {
+          queries: { retry: false, gcTime: 5 * 60_000, staleTime: 0 },
+          mutations: { retry: false },
+        },
+      });
+
+      const { rerender } = renderWithProviders(<ProfilePage key="first" />, {
+        initialPath: "/profile",
+        queryClient,
+      });
+
+      // Initial mount: toggles hydrate from the fetched profile (both true).
+      await waitFor(() => {
+        const toggles = screen.getAllByRole("switch");
+        expect(toggles).toHaveLength(2);
+        toggles.forEach((t) => expect(t).toBeChecked());
+      });
+
+      // Simulate navigating to another page and back: remount with warm cache.
+      rerender(<ProfilePage key="second" />);
+
+      await waitFor(() => {
+        const toggles = screen.getAllByRole("switch");
+        expect(toggles).toHaveLength(2);
+        toggles.forEach((t) => expect(t).toBeChecked());
+      });
+    });
   });
 
   describe("Management", () => {

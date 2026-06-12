@@ -18,10 +18,10 @@ export function renderWithProviders(
   ui: React.ReactElement,
   {
     initialPath,
+    queryClient = createTestQueryClient(),
     ...options
-  }: { initialPath?: string } & RenderOptions = {}
+  }: { initialPath?: string; queryClient?: QueryClient } & RenderOptions = {}
 ) {
-  const queryClient = createTestQueryClient();
   return render(ui, {
     wrapper: ({ children }) => (
       <QueryClientProvider client={queryClient}>

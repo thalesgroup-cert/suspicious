@@ -541,8 +541,12 @@ export default function ProfilePage() {
 
   // Sync form state from the fetched server profile — adjusted during render
   // when the data reference changes, instead of in an effect.
+  // prev starts as undefined (not profileData): on a remount with a warm query
+  // cache, data is already present on the first render, and seeding prev with
+  // it would skip the sync and leave the toggles at their useState defaults.
   const profileData = profileQuery.data;
-  const [prevProfileData, setPrevProfileData] = React.useState(profileData);
+  const [prevProfileData, setPrevProfileData] =
+    React.useState<UserProfile | undefined>(undefined);
   if (profileData !== prevProfileData) {
     setPrevProfileData(profileData);
     if (profileData) {
