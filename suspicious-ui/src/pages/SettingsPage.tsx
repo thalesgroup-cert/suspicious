@@ -40,6 +40,7 @@ import {
   GroupsOutlined,
   MailOutlined,
   TuneOutlined,
+  HubOutlined,
   ShieldOutlined,
   ContentCopyOutlined,
   LockOutlined,
@@ -75,15 +76,19 @@ import {
   type EditableListSection,
 } from "@/features/settings/api";
 import FeederHealthBadge from "@/shared/components/FeederHealthBadge";
+import { ConnectorsPanel } from "@/features/settings/ConnectorsPanel";
 
 // ---------------------------------------------------------------------------
 // Types
 // ---------------------------------------------------------------------------
 
-type SectionKind = "list" | "toggle" | "scoring" | "ciso_users" | "domain_pair";
+type SectionKind = "list" | "toggle" | "scoring" | "ciso_users" | "domain_pair" | "connectors";
+
+/** Sidebar keys: backend settings sections plus UI-only panels. */
+type SectionKey = SettingsSection | "connectors";
 
 type SectionMeta = {
-  key: SettingsSection;
+  key: SectionKey;
   title: string;
   subtitle: string;
   icon: React.ReactNode;
@@ -1371,6 +1376,8 @@ function SectionContent({ section }: { section: SectionMeta }) {
       return <ScoringPanel />;
     case "ciso_users":
       return <CisoUsersPanel />;
+    case "connectors":
+      return <ConnectorsPanel />;
     default:
       return null;
   }
@@ -1437,6 +1444,13 @@ const SECTIONS: SectionMeta[] = [
     icon: <TuneOutlined />,
     kind: "scoring",
   },
+  {
+    key: "connectors",
+    title: "Connectors",
+    subtitle: "Enable integrations and tune their config.",
+    icon: <HubOutlined />,
+    kind: "connectors",
+  },
 ];
 
 // ---------------------------------------------------------------------------
@@ -1453,7 +1467,7 @@ export default function SettingsPage() {
   const groups = me?.groups ?? [];
   const isAllowed = groups.includes("Admin") || groups.includes("CERT");
 
-  const [active, setActive] = React.useState<SettingsSection>("domains_allow");
+  const [active, setActive] = React.useState<SectionKey>("domains_allow");
   const activeMeta = SECTIONS.find((s) => s.key === active)!;
 
   if (meQuery.isLoading) {
@@ -1634,7 +1648,11 @@ export default function SettingsPage() {
                   size="small"
                   variant="outlined"
                   startIcon={<RefreshOutlined />}
-                  onClick={() => qc.invalidateQueries({ queryKey: ["settings", "list", active] })}
+                  onClick={() =>
+                    qc.invalidateQueries({
+                      queryKey: active === "connectors" ? ["connectors"] : ["settings", "list", active],
+                    })
+                  }
                   sx={{ borderRadius: 2.5, textTransform: "none", fontWeight: 900, flexShrink: 0 }}
                 >
                   Refresh

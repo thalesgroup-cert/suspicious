@@ -3,4 +3,5 @@ export const endpoints = {
   logout: "/auth/logout/",
   me: "/auth/me/",
   dashboardSummary: "/dashboard/summary/",
+  connectors: "/connectors/",
 };
