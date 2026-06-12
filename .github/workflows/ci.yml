@@ -69,6 +69,9 @@ jobs:
           tags: suspicious:ci
           cache-from: type=gha
           cache-to: type=gha,mode=max
+      # Full discovery (no app labels): suspicious.test_settings provides the
+      # eager-Celery config the connectors suite needs and the stub URLConf;
+      # real-settings boot is still exercised by the migration-check job.
       - name: Django test suite
         run: |
           docker run --rm \
@@ -76,9 +79,7 @@ jobs:
             -v "${{ github.workspace }}/Suspicious/settings.ci.json":/app/settings.json:ro \
             -e SUSPICIOUS_CONFIG_PATH=/app/settings.json -w /app/Suspicious \
             suspicious:ci \
-            python manage.py test \
-              api cortex_job tasp score_process case_handler mail_feeder.email_parser suspicious \
-              --settings=suspicious.settings -v2
+            python manage.py test --settings=suspicious.test_settings -v2
 
   feeder-test:
     runs-on: ubuntu-latest

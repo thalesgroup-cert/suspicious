@@ -84,6 +84,11 @@ jobs:
           name: sbom-${{ matrix.name }}
           path: sbom-${{ matrix.name }}.spdx.json
 
+      # Requires the GHCR package to be PUBLIC (attestations on private
+      # packages need GitHub Enterprise and fail with "Failed to persist
+      # attestation: Requires authentication"). New packages default to
+      # private: org admin must flip visibility under
+      # github.com/orgs/thalesgroup-cert/packages → <package> → settings.
       - name: Attest build provenance
         uses: actions/attest-build-provenance@v4
         with:
