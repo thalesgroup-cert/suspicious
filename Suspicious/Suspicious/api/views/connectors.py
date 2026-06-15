@@ -1,8 +1,10 @@
 """Connector management endpoints (Admin/CERT only).
 
-Secret config fields are masked on read and rejected on write — secret
-values are managed through Vault / settings.json like every other secret
-in the platform (see settings/config.py SECRET_FIELDS)."""
+Secret config fields are masked on read; on write they are routed to Vault
+via set_secret and are NEVER persisted to the RuntimeConfig DB row.
+Non-secret fields are written to RuntimeConfig as before."""
+import copy
+import logging
 from dataclasses import asdict
 
 from django.utils import timezone
@@ -22,6 +24,9 @@ from connectors.delivery import get_state
 from connectors.models import ConnectorDelivery
 from connectors.registry import registry
 from settings.config import SECRET_FIELDS, get_section, invalidate_cache
+from suspicious.secrets import SecretStoreUnavailable, set_secret
+
+logger = logging.getLogger("api.connectors")
 
 SECRET_MASK = "********"
 
@@ -113,6 +118,44 @@ def _mask_secrets(section: dict, section_name: str) -> dict:
     return masked
 
 
+def _apply_to_secret_leaves(payload: dict, schema, action) -> dict:
+    """Deep-copy ``payload`` and call ``action(parent_dict, leaf_key)`` on every
+    secret-typed leaf present in it. The schema is the authoritative source of
+    which fields are secret — never SECRET_FIELDS, so connector-defined secrets
+    are handled even if they are absent from that static map."""
+    cleaned = copy.deepcopy(payload)
+    for field in schema:
+        if field.type != "secret":
+            continue
+        parts = field.key.split(".")
+        node = cleaned
+        for part in parts[:-1]:
+            node = node.get(part) if isinstance(node, dict) else None
+            if node is None:
+                break
+        if isinstance(node, dict):
+            action(node, parts[-1])
+    return cleaned
+
+
+def _strip_secret_leaves(payload: dict, schema) -> dict:
+    """Copy of payload with every secret-typed leaf removed, so secrets are
+    never persisted to the RuntimeConfig DB row."""
+    return _apply_to_secret_leaves(
+        payload, schema, lambda node, leaf: node.pop(leaf, None)
+    )
+
+
+def _mask_secret_leaves(payload: dict, schema) -> dict:
+    """Copy of payload with every secret-typed leaf that is present replaced by
+    the mask — used for the response body so cleartext secrets are never echoed."""
+    def mask(node, leaf):
+        if leaf in node:
+            node[leaf] = SECRET_MASK
+
+    return _apply_to_secret_leaves(payload, schema, mask)
+
+
 class ConnectorConfigView(APIView):
     permission_classes = [IsAuthenticated, IsAdminOrCERT]
 
@@ -132,11 +175,17 @@ class ConnectorConfigView(APIView):
         payload = request.data if isinstance(request.data, dict) else {}
 
         errors = {}
+        # (vault_key, value, field_key) — applied only after validation passes.
+        secret_writes = []
         for field in schema:
             value = _dotted_get(payload, field.key)
             if field.type == "secret":
-                if value is not None:
-                    errors[field.key] = "secret fields are managed via Vault/settings.json"
+                # None = field absent; SECRET_MASK = UI echoed the mask back —
+                # both mean "leave the stored secret unchanged".
+                if value not in (None, SECRET_MASK):
+                    secret_writes.append(
+                        (f"integrations.{name}.{field.key}", value, field.key)
+                    )
             elif field.required and value in (None, ""):
                 errors[field.key] = "this field is required"
             elif value is not None and field.type == "int" and not isinstance(value, int):
@@ -146,13 +195,37 @@ class ConnectorConfigView(APIView):
         if errors:
             return Response({"errors": errors}, status=status.HTTP_400_BAD_REQUEST)
 
+        # Secrets are written before the DB row. With multiple secrets, a failure
+        # on a later write leaves earlier ones in Vault while the DB is not
+        # updated; a retry re-writes them idempotently (KV v2), so this is
+        # eventually consistent and intentionally not rolled back.
+        for vault_key, value, field_key in secret_writes:
+            try:
+                set_secret(vault_key, value)
+            except SecretStoreUnavailable:
+                return Response(
+                    {"errors": {field_key: "secret store not configured"}},
+                    status=status.HTTP_409_CONFLICT,
+                )
+            except Exception:  # noqa: BLE001 — surface any Vault write failure as 502
+                # Log full detail server-side (never the value); return a generic
+                # message so internal error text is not echoed to the client.
+                logger.exception("Vault write failed for secret '%s'", vault_key)
+                return Response(
+                    {"errors": {field_key: "secret store write failed"}},
+                    status=status.HTTP_502_BAD_GATEWAY,
+                )
+
         from settings.models import RuntimeConfig
         key = f"integrations.{name}"
+        non_secret = _strip_secret_leaves(payload, schema)
         RuntimeConfig.objects.update_or_create(
-            scope="backend", key=key, defaults={"value": payload}
+            scope="backend", key=key, defaults={"value": non_secret}
         )
         invalidate_cache(key)
-        return Response({"config": _mask_secrets(payload, key)})
+        # Mask from the schema, not SECRET_FIELDS, so no cleartext secret is
+        # ever echoed in the response body.
+        return Response({"config": _mask_secret_leaves(payload, schema)})
 
 
 class ConnectorTestView(APIView):

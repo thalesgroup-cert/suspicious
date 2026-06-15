@@ -13,15 +13,22 @@ from __future__ import annotations
 
 import os
 import sys
+import time
 from typing import Any
 
 from suspicious._config_common import settings_get
 
 _VAULT_MOUNT = "suspicious"
 
+_CACHE_TTL = 60  # seconds; short so UI secret edits propagate across workers
+# key -> (value, expires_at_monotonic)
 _CACHE: dict[str, Any] = {}
 # Boxed singleton so tests can reset it without module reload.
 _client_singleton: list = [None]
+
+
+class SecretStoreUnavailable(RuntimeError):
+    """Raised when a secret write is attempted with no Vault configured."""
 
 
 def _make_client():
@@ -54,14 +61,17 @@ def get_secret(key: str, default: Any = None, *, fail_fast: bool = False) -> Any
     """Resolve a secret by its dotted settings key.
 
     ``fail_fast`` exits the process on any Vault error (boot-critical keys).
+    Cache entries carry a short TTL so a UI-driven Vault write propagates to
+    other worker processes within ``_CACHE_TTL`` seconds.
     """
-    if key in _CACHE:
-        return _CACHE[key]
+    cached = _CACHE.get(key)
+    if cached is not None and cached[1] > time.monotonic():
+        return cached[0]
 
     if not os.environ.get("VAULT_ADDR"):
         # Dev / CI fallback — read the same key out of settings.json.
         value = settings_get(key, default)
-        _CACHE[key] = value
+        _cache_set(key, value)
         return value
 
     try:
@@ -74,7 +84,7 @@ def get_secret(key: str, default: Any = None, *, fail_fast: bool = False) -> Any
             # caller-supplied default, mirroring a settings.json miss. This is
             # what lets optional, unconfigured secrets resolve to "" instead of
             # crashing boot / requests.
-            _CACHE[key] = default
+            _cache_set(key, default)
             return default
         message = (
             f"FATAL: could not read secret '{key}' from Vault at "
@@ -85,5 +95,25 @@ def get_secret(key: str, default: Any = None, *, fail_fast: bool = False) -> Any
             raise SystemExit(1) from exc
         raise RuntimeError(message) from exc
 
-    _CACHE[key] = value
+    _cache_set(key, value)
     return value
+
+
+def _cache_set(key: str, value: Any) -> None:
+    _CACHE[key] = (value, time.monotonic() + _CACHE_TTL)
+
+
+def set_secret(key: str, value: str) -> None:
+    """Write a secret to Vault KV v2 and refresh this process's cache.
+
+    Raises ``SecretStoreUnavailable`` when no Vault is configured —
+    settings.json is read-only config, never a write target.
+    """
+    if not os.environ.get("VAULT_ADDR"):
+        raise SecretStoreUnavailable(
+            "no Vault configured (VAULT_ADDR unset); cannot store secret"
+        )
+    _client().secrets.kv.v2.create_or_update_secret(
+        path=key, secret={"value": value}, mount_point=_VAULT_MOUNT,
+    )
+    _cache_set(key, value)

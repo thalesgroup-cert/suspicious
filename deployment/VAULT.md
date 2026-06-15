@@ -86,6 +86,35 @@ DB. Restarting the stack later requires only re-unsealing Vault (step 3).
 
 ---
 
+## Editing connector secrets from the UI
+
+Admins can set/rotate connector secrets (`integrations.*` — cortex, thehive,
+misp, watcher) from the Settings UI, which writes straight to Vault. The default
+`suspicious-read` AppRole policy is **read-only**, so this is opt-in: widen the
+policy to allow writing the integration secret paths before using the feature.
+
+```hcl
+path "suspicious/data/integrations/*" {
+  capabilities = ["create", "update", "read"]
+}
+```
+
+Add this stanza to the `suspicious-read` policy (`make provision-vault` writes
+the read-only baseline; re-`vault policy write` with the wider rules, or edit the
+policy in place). Behaviour without the widening:
+
+- **`create`/`update` missing** → UI save returns **502 secret store write
+  failed** (Vault rejects the write).
+- **No Vault at all** (`VAULT_ADDR` unset, e.g. local dev) → UI save returns
+  **409 secret store not configured**; set these secrets in `settings.json` as
+  before.
+
+Boot-critical secrets (`app.secret_key`, `database.password`) and non-connector
+sections (s3, ldap, oidc, smtp) are **not** editable from the UI by design —
+they stay Vault/ops-only.
+
+---
+
 ## Dev / CI path
 
 Leave **`VAULT_ADDR` unset**. No Vault and no DB seed are needed:

@@ -72,12 +72,79 @@ class ConnectorsApiTest(APITestCase):
         self.assertEqual(response.json()["config"]["api_key"], "********")
         self.assertEqual(response.json()["config"]["url"], "http://x")
 
-    def test_config_put_rejects_secret_fields(self):
-        response = self.client.put(
-            "/api/connectors/dummy/config/",
-            {"url": "http://x", "api_key": "evil"}, format="json",
+    def test_config_put_writes_secret_to_vault(self):
+        from settings.models import RuntimeConfig
+        with mock.patch("api.views.connectors.set_secret") as set_secret:
+            response = self.client.put(
+                "/api/connectors/dummy/config/",
+                {"url": "http://x", "api_key": "topsecret"}, format="json",
+            )
+        self.assertEqual(response.status_code, 200)
+        set_secret.assert_called_once_with(
+            "integrations.dummy.api_key", "topsecret"
         )
+        row = RuntimeConfig.objects.get(key="integrations.dummy")
+        self.assertNotIn("api_key", row.value)
+        self.assertEqual(row.value["url"], "http://x")
+        # response body must never echo the cleartext secret
+        self.assertEqual(response.json()["config"]["api_key"], "********")
+
+    def test_config_put_writes_nested_secret_to_vault(self):
+        from settings.models import RuntimeConfig
+        with mock.patch("api.views.connectors.set_secret") as set_secret:
+            response = self.client.put(
+                "/api/connectors/dummy/config/",
+                {"url": "http://x", "nested": {"deep": {"token": "s3cr3t"}}},
+                format="json",
+            )
+        self.assertEqual(response.status_code, 200)
+        set_secret.assert_called_once_with(
+            "integrations.dummy.nested.deep.token", "s3cr3t"
+        )
+        row = RuntimeConfig.objects.get(key="integrations.dummy")
+        self.assertNotIn("token", row.value.get("nested", {}).get("deep", {}))
+        self.assertEqual(
+            response.json()["config"]["nested"]["deep"]["token"], "********"
+        )
+
+    def test_config_put_skips_masked_secret(self):
+        with mock.patch("api.views.connectors.set_secret") as set_secret:
+            response = self.client.put(
+                "/api/connectors/dummy/config/",
+                {"url": "http://x", "api_key": "********"}, format="json",
+            )
+        self.assertEqual(response.status_code, 200)
+        set_secret.assert_not_called()
+
+    def test_config_put_secret_store_unavailable_returns_409(self):
+        from suspicious.secrets import SecretStoreUnavailable
+        with mock.patch("api.views.connectors.set_secret",
+                        side_effect=SecretStoreUnavailable("no vault")):
+            response = self.client.put(
+                "/api/connectors/dummy/config/",
+                {"url": "http://x", "api_key": "topsecret"}, format="json",
+            )
+        self.assertEqual(response.status_code, 409)
+        self.assertIn("api_key", response.json()["errors"])
+
+    def test_config_put_secret_write_failure_returns_502(self):
+        with mock.patch("api.views.connectors.set_secret",
+                        side_effect=RuntimeError("permission denied")):
+            response = self.client.put(
+                "/api/connectors/dummy/config/",
+                {"url": "http://x", "api_key": "topsecret"}, format="json",
+            )
+        self.assertEqual(response.status_code, 502)
+        self.assertIn("api_key", response.json()["errors"])
+
+    def test_config_put_no_vault_write_when_validation_fails(self):
+        with mock.patch("api.views.connectors.set_secret") as set_secret:
+            response = self.client.put(
+                "/api/connectors/dummy/config/",
+                {"api_key": "topsecret"}, format="json",
+            )
         self.assertEqual(response.status_code, 400)
+        set_secret.assert_not_called()
 
     def test_config_put_writes_runtimeconfig(self):
         from settings.models import RuntimeConfig
