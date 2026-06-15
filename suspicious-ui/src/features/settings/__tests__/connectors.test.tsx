@@ -12,6 +12,7 @@ vi.mock("../connectors", () => ({
         author: "Thales CERT", docs_url: "", events: ["case_finalised"],
         schedules: [], config_schema: [
           { key: "instances.primary.url", type: "url", required: true, default: null, help: "" },
+          { key: "api_key", type: "secret", required: false, default: null, help: "" },
         ],
         enabled: true, enabled_by_default: false,
         last_health_ok: true, last_health_detail: "ok", last_health_at: null,
@@ -27,6 +28,18 @@ vi.mock("../connectors", () => ({
 }));
 
 describe("ConnectorsPanel", () => {
+  it("renders secret fields as editable password inputs", async () => {
+    const qc = new QueryClient({ defaultOptions: { queries: { retry: false } } });
+    render(
+      <QueryClientProvider client={qc}>
+        <ConnectorsPanel />
+      </QueryClientProvider>,
+    );
+    const input = (await screen.findByLabelText("api_key")) as HTMLInputElement;
+    expect(input).not.toBeDisabled();
+    expect(input.type).toBe("password");
+  });
+
   it("renders discovered connectors with version and toggle", async () => {
     const qc = new QueryClient({ defaultOptions: { queries: { retry: false } } });
     render(

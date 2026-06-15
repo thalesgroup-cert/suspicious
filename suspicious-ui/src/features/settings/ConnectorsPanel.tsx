@@ -57,10 +57,13 @@ function ConfigFieldInput({
       <TextField
         size="small"
         fullWidth
+        type="password"
         label={field.key}
-        value="********"
-        disabled
-        helperText="Managed via Vault / settings.json"
+        value={typeof value === "string" && value !== "********" ? value : ""}
+        placeholder="********"
+        helperText="Leave blank to keep the current secret"
+        autoComplete="new-password"
+        onChange={(e) => onChange(e.target.value)}
       />
     );
   }
@@ -92,6 +95,7 @@ function ConnectorCard({ connector }: { connector: Connector }) {
   const queryClient = useQueryClient();
   const [draft, setDraft] = useState<Record<string, unknown> | null>(null);
   const [testResult, setTestResult] = useState<string | null>(null);
+  const [saveError, setSaveError] = useState<string | null>(null);
 
   const configQuery = useQuery({
     queryKey: ["connector-config", connector.name],
@@ -108,9 +112,18 @@ function ConnectorCard({ connector }: { connector: Connector }) {
       putConnectorConfig(connector.name, config),
     onSuccess: () => {
       setDraft(null);
+      setSaveError(null);
       queryClient.invalidateQueries({
         queryKey: ["connector-config", connector.name],
       });
+    },
+    onError: (err: unknown) => {
+      const e = err as { response?: { data?: { errors?: Record<string, string> } } };
+      const errs = e.response?.data?.errors;
+      setSaveError(
+        errs ? Object.entries(errs).map(([k, v]) => `${k}: ${v}`).join("; ")
+             : "Failed to save configuration.",
+      );
     },
   });
 
@@ -121,7 +134,26 @@ function ConnectorCard({ connector }: { connector: Connector }) {
   });
 
   const config = draft ?? configQuery.data ?? {};
-  const editableFields = connector.config_schema.filter((f) => f.type !== "secret");
+  const secretKeys = connector.config_schema
+    .filter((f) => f.type === "secret")
+    .map((f) => f.key);
+
+  function stripUnchangedSecrets(cfg: Record<string, unknown>) {
+    const out = structuredClone(cfg);
+    for (const key of secretKeys) {
+      const current = dottedGet(out, key);
+      if (current === "" || current === "********" || current == null) {
+        const parts = key.split(".");
+        let node: Record<string, unknown> | undefined = out;
+        for (const part of parts.slice(0, -1)) {
+          node = node?.[part] as Record<string, unknown> | undefined;
+          if (!node) break;
+        }
+        if (node) delete node[parts[parts.length - 1]];
+      }
+    }
+    return out;
+  }
 
   return (
     <Card variant="outlined">
@@ -161,16 +193,14 @@ function ConnectorCard({ connector }: { connector: Connector }) {
           ))}
         </Stack>
         <Stack direction="row" spacing={1} sx={{ mt: 2 }}>
-          {editableFields.length > 0 && (
-            <Button
-              size="small"
-              variant="contained"
-              disabled={!draft || save.isPending}
-              onClick={() => draft && save.mutate(draft)}
-            >
-              Save
-            </Button>
-          )}
+          <Button
+            size="small"
+            variant="contained"
+            disabled={!draft || save.isPending}
+            onClick={() => draft && save.mutate(stripUnchangedSecrets(draft))}
+          >
+            Save
+          </Button>
           <Button size="small" onClick={() => test.mutate()} disabled={test.isPending}>
             Test connection
           </Button>
@@ -182,6 +212,11 @@ function ConnectorCard({ connector }: { connector: Connector }) {
             onClose={() => setTestResult(null)}
           >
             {testResult}
+          </Alert>
+        )}
+        {saveError && (
+          <Alert sx={{ mt: 1 }} severity="error" onClose={() => setSaveError(null)}>
+            {saveError}
           </Alert>
         )}
       </CardContent>
