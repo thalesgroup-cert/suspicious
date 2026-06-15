@@ -104,3 +104,49 @@ class SecretsTestCase(unittest.TestCase):
                 sec.get_secret("authentication.oidc.client_secret", "fallback"),
                 "fallback",
             )
+
+    def test_set_secret_without_vault_raises(self):
+        self._set_env(VAULT_ADDR=None)
+        with self.assertRaises(sec.SecretStoreUnavailable):
+            sec.set_secret("integrations.watcher.api_key", "NEW")
+
+    def test_set_secret_writes_vault_and_updates_cache(self):
+        self._set_env(VAULT_ADDR="http://vault:8200")
+        written = {}
+
+        class FakeKV2:
+            def create_or_update_secret(self, path, secret, mount_point):
+                written["path"] = path
+                written["secret"] = secret
+                written["mount_point"] = mount_point
+
+        class FakeClient:
+            secrets = type("S", (), {"kv": type("K", (), {"v2": FakeKV2()})()})()
+
+        with mock.patch.object(sec, "_client", lambda: FakeClient()):
+            sec.set_secret("integrations.watcher.api_key", "NEW")
+
+        self.assertEqual(written["path"], "integrations.watcher.api_key")
+        self.assertEqual(written["secret"], {"value": "NEW"})
+        self.assertEqual(written["mount_point"], "suspicious")
+        with mock.patch.object(sec, "_read_from_vault",
+                               side_effect=AssertionError("should not read")):
+            self.assertEqual(sec.get_secret("integrations.watcher.api_key"), "NEW")
+
+    def test_cache_entry_expires_after_ttl(self):
+        self._set_env(VAULT_ADDR="http://vault:8200")
+        calls = {"n": 0}
+
+        def fake_read(key):
+            calls["n"] += 1
+            return f"v{calls['n']}"
+
+        with mock.patch.object(sec, "_read_from_vault", fake_read):
+            t = [1000.0]
+            with mock.patch.object(sec.time, "monotonic", lambda: t[0]):
+                self.assertEqual(sec.get_secret("app.secret_key"), "v1")
+                t[0] += 5  # within TTL
+                self.assertEqual(sec.get_secret("app.secret_key"), "v1")
+                t[0] += 60  # past TTL
+                self.assertEqual(sec.get_secret("app.secret_key"), "v2")
+        self.assertEqual(calls["n"], 2)  # exactly two reads: initial + post-expiry
