@@ -32,6 +32,11 @@ bash "${SCRIPTS}/check-secrets.sh" .env
 bash "${SCRIPTS}/check-network.sh"
 ok "Pre-flight passed"
 
+# ── 1b. Unseal Vault (before any container reads secrets from it) ─────────
+step "Unsealing Vault"
+bash "${SCRIPTS}/unseal-vault.sh"
+ok "Vault unseal checked"
+
 # ── 2. Pull images ────────────────────────────────────────────────────────
 step "Pulling latest images"
 $COMPOSE pull suspicious suspicious_ui feeder

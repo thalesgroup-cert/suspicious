@@ -35,7 +35,7 @@ endef
         backup-db restore-db \
         logs status shell db-shell \
         create-certs network clean prune \
-        check-secrets check-updates provision-vault seed-vault-secrets
+        check-secrets check-updates provision-vault seed-vault-secrets unseal
 
 # ---------------------------------------------------------------------------
 # Help
@@ -57,6 +57,7 @@ help:
 	@echo "  install-hooks    Configure git core.hooksPath -> .githooks (commit-msg validator)"
 	@echo "  provision-vault  Enable KV+AppRole in Vault, write role/secret IDs to .env"
 	@echo "  seed-vault-secrets  Write secret env vars into Vault KV (suspicious/<key>)"
+	@echo "  unseal           Unseal Vault from vault/unseal.keys (auto-run by up/deploy)"
 	@echo "  down             Stop and remove containers (data preserved)"
 	@echo "  restart          Restart all running services"
 	@echo "  build            Build local images"
@@ -159,7 +160,14 @@ up: check-secrets
 	@$(SCRIPTS)/replace-tls.sh
 	@echo "Starting services…"
 	@$(COMPOSE) up -d --remove-orphans
+	@$(SCRIPTS)/unseal-vault.sh
 	$(OK) "Services started."
+
+## Unseal the Vault container from vault/unseal.keys (idempotent; no-op if
+## already unsealed or no keys file present). Auto-run by `up` and `deploy`.
+unseal:
+	$(call require_script,$(SCRIPTS)/unseal-vault.sh)
+	@$(SCRIPTS)/unseal-vault.sh
 
 ## Stop all containers (volumes and data preserved)
 down:
