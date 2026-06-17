@@ -11,7 +11,7 @@ Please report potential security issues to the **Thales Product Security
 Incident Response Team (PSIRT)**:
 
 * **Email:** `psirt(at)thalesgroup[.]com`
-* **PGP (recommended for sensitive details):** Thales PSIRT PGP Key
+* **PGP (recommended for sensitive details):** [Thales PSIRT PGP Key](https://pgp.circl.lu/pks/lookup?op=get&search=0xfc3c4520576ec756ae730030536949c48448ae39)
   * **ID:** `0x8448AE39`
   * **Fingerprint:** `FC3C 4520 576E C756 AE73 0030 5369 49C4 8448 AE39`
 
