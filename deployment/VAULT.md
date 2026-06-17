@@ -89,9 +89,9 @@ DB. Restarting the stack later requires only re-unsealing Vault (step 3).
 ## Editing connector secrets from the UI
 
 Admins can set/rotate connector secrets (`integrations.*` — cortex, thehive,
-misp, watcher) from the Settings UI, which writes straight to Vault. The default
-`suspicious-read` AppRole policy is **read-only**, so this is opt-in: widen the
-policy to allow writing the integration secret paths before using the feature.
+misp, watcher) from the Settings UI, which writes straight to Vault.
+`make provision-vault` already grants this — the `suspicious-read` policy it
+writes includes scoped create/update on the integration secret paths:
 
 ```hcl
 path "suspicious/data/integrations/*" {
@@ -99,9 +99,8 @@ path "suspicious/data/integrations/*" {
 }
 ```
 
-Add this stanza to the `suspicious-read` policy (`make provision-vault` writes
-the read-only baseline; re-`vault policy write` with the wider rules, or edit the
-policy in place). Behaviour without the widening:
+Everything else stays read-only. If you tightened the policy by hand and removed
+this stanza, the UI feature stops working as follows:
 
 - **`create`/`update` missing** → UI save returns **502 secret store write
   failed** (Vault rejects the write).
