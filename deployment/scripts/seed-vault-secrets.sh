@@ -1,16 +1,26 @@
 #!/usr/bin/env bash
 # Seed Suspicious secrets into Vault (KV v2 at suspicious/<dotted-key>, field
-# "value"). Requires VAULT_ADDR + VAULT_TOKEN. Secret values come from the
+# "value"). Vault runs as a Docker Compose service, so vault commands execute
+# inside that container. Requires VAULT_TOKEN. Secret values come from the
 # operator's environment (export them before running) — never from a committed
 # file. Unset optional secrets are written empty.
 set -euo pipefail
-: "${VAULT_ADDR:?set VAULT_ADDR}"
 : "${VAULT_TOKEN:?set VAULT_TOKEN (root/admin) for seeding}"
-export VAULT_ADDR VAULT_TOKEN
+export VAULT_TOKEN
+
+cd "$(cd "$(dirname "$0")/.." && pwd)"   # so `docker compose` resolves .env + COMPOSE_FILE
+
+VAULT_SVC="${VAULT_SVC:-vault}"
+# Run the vault CLI inside the running Vault container (no host CLI required).
+vault() {
+  docker compose --env-file .env exec -T \
+    -e VAULT_TOKEN -e VAULT_ADDR=http://127.0.0.1:8200 \
+    "$VAULT_SVC" vault "$@"
+}
 
 put() { vault kv put "suspicious/$1" value="$2" >/dev/null && echo "  wrote suspicious/$1"; }
 
-echo "Seeding secrets into Vault at ${VAULT_ADDR} ..."
+echo "Seeding secrets into Vault ..."
 put app.secret_key                                "${SECRET_KEY:?export SECRET_KEY}"
 put database.password                             "${DB_PASSWORD:?export DB_PASSWORD}"
 put integrations.cortex.api_key                   "${CORTEX_API_KEY:?export CORTEX_API_KEY}"

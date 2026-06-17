@@ -178,14 +178,13 @@ VAULT_PORT=8200
 VAULT_PATH=./vault
 ```
 
-**2. Start the stack, then initialise + unseal Vault:**
+**2. Start the stack, then initialise + unseal Vault.** Vault runs as a Compose service, so run its CLI inside the container:
 
 ```bash
 make up
-export VAULT_ADDR=http://127.0.0.1:8200
-vault operator init        # FIRST BOOT ONLY — record unseal keys + root token SECURELY
-vault operator unseal      # repeat with the threshold number of keys
-export VAULT_TOKEN=<root-token>
+docker compose --env-file .env exec vault vault operator init    # FIRST BOOT ONLY — record unseal keys + root token SECURELY
+docker compose --env-file .env exec vault vault operator unseal   # repeat with the threshold number of keys
+export VAULT_TOKEN=<root-token>                                   # used by make provision-vault / seed-vault-secrets
 ```
 
 **3. Provision KV + AppRole** (writes `VAULT_ROLE_ID` / `VAULT_SECRET_ID` into `.env`):

@@ -49,16 +49,18 @@ boot, so the unseal step is mandatory.
 1. **`make init`** — network, TLS certs, config files (creates `settings.json`
    from the sample if absent).
 2. **`make up`** — start the stack (including the Vault container).
-3. **Initialise + unseal Vault** (first boot only initialises):
+3. **Initialise + unseal Vault** (first boot only initialises). Vault runs as a
+   Compose service, so run its CLI inside the container:
    ```bash
-   vault operator init        # record the unseal keys + root token SECURELY
-   vault operator unseal      # repeat with the threshold number of keys
+   docker compose --env-file .env exec vault vault operator init    # record the unseal keys + root token SECURELY
+   docker compose --env-file .env exec vault vault operator unseal   # repeat with the threshold number of keys
    ```
-   On every subsequent restart Vault comes up sealed — re-run `vault operator
-   unseal` after each `make up`/restart.
-4. **Export the root token** for the provisioning + seeding steps:
+   On every subsequent restart Vault comes up sealed — re-run the `operator
+   unseal` command after each `make up`/restart.
+4. **Export the root token** for the provisioning + seeding steps (the `make`
+   targets run the vault CLI inside the container for you, so only the token is
+   needed on the host):
    ```bash
-   export VAULT_ADDR=http://127.0.0.1:8200
    export VAULT_TOKEN=<root-token>
    ```
 5. **`make provision-vault`** — enables KV v2 + AppRole, writes the
