@@ -159,8 +159,9 @@ up: check-secrets
 	@$(SCRIPTS)/check-network.sh
 	@$(SCRIPTS)/replace-tls.sh
 	@echo "Starting services…"
-	@$(COMPOSE) up -d --remove-orphans
+	@$(COMPOSE) up -d vault --remove-orphans
 	@$(SCRIPTS)/unseal-vault.sh
+	@$(COMPOSE) up -d --remove-orphans
 	$(OK) "Services started."
 
 ## Unseal the Vault container from vault/unseal.keys (idempotent; no-op if
