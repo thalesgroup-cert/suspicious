@@ -37,10 +37,25 @@ step "Unsealing Vault"
 bash "${SCRIPTS}/unseal-vault.sh"
 ok "Vault unseal checked"
 
-# ── 2. Pull images ────────────────────────────────────────────────────────
+# ── 2. Pull images (build from source any the registry doesn't serve) ─────
+# A missing/forbidden registry tag (e.g. a service whose image isn't published)
+# must not abort the deploy: pull each service independently and build from
+# source the ones that fail, so a source-based stack deploys the same way.
 step "Pulling latest images"
-$COMPOSE pull suspicious suspicious_ui feeder
-ok "Images pulled"
+to_build=""
+for svc in suspicious suspicious_ui feeder; do
+  if $COMPOSE pull "$svc"; then
+    ok "pulled $svc"
+  else
+    echo -e "${YELLOW}  pull failed for ${svc} — will build from source${RESET}"
+    to_build="${to_build} ${svc}"
+  fi
+done
+if [ -n "${to_build}" ]; then
+  step "Building from source:${to_build}"
+  $COMPOSE build ${to_build}
+fi
+ok "Images ready"
 
 # ── 3. Migrations (before web restart — forward-compatible required) ──────
 step "Running database migrations"
