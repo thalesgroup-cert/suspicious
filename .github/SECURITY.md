@@ -35,7 +35,7 @@ users can be mitigated before any public disclosure.
 
 By submitting a report, each reporter commits to the following:
 
-* Do not take advantage of the security issue — for example, do not download
+* Do not take advantage of the security issue, for example, do not download
   more data than necessary to demonstrate the vulnerability, and do not
   delete or modify data.
 * Do not disclose the issue until it has been resolved and without Thales's
@@ -108,7 +108,7 @@ Subject to the assumptions above, we consider the following security-relevant:
 * Injection (SQL, command, template, LDAP), unsafe deserialization, and
   stored/reflected XSS in the React UI or Django responses.
 * Leakage of secrets (API keys, passwords, the Django secret key) into logs,
-  API responses, or the UI — including secret values echoed back instead of the
+  API responses, or the UI, including secret values echoed back instead of the
   mask.
 * Sandbox or analyzer escape that yields code execution on the platform itself
   rather than within the intended analyzer isolation.
