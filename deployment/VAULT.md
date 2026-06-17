@@ -136,6 +136,14 @@ AppRole may write. Boot-critical and other secrets still come from
 `make seed-vault-secrets`. Once a secret is in Vault, Vault is the source of
 truth; you can then blank it in `settings.json`.
 
+The **read** path mirrors this: `get_section` resolves each secret leaf from
+Vault first and falls back to the `settings.json` value when Vault is unset or
+has no (non-empty) value for the key. So a connector secret resolves whether it
+lives in Vault, in `settings.json`, or both — even before the boot seed has run.
+Boot-critical secrets (`app.secret_key`, `database.password`) are read via
+`get_secret(fail_fast=True)` directly and do **not** take this fallback, so a
+schema-dummy in `settings.json` can never silently stand in for them.
+
 ---
 
 ## Dev / CI path

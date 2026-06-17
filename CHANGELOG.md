@@ -18,6 +18,11 @@ from the UI and Vault bring-up/unseal automated for operators.
   TTL cache; the connector config endpoint persists secret fields to Vault and
   strips them from the DB row; UI secret fields echo a mask and leave the stored
   value unchanged when resubmitted blank.
+- **Vault → settings.json read fallback for section secrets** — `get_section`
+  now resolves each secret leaf from Vault first and falls back to the
+  `settings.json` value when Vault is unset or has no value for the key (was
+  previously empty when Vault was configured but missing the key). Boot-critical
+  secrets read via `get_secret(fail_fast=True)` are unaffected.
 - **Auto-seed connector secrets from settings.json into Vault on boot** — when
   Vault is configured and reachable, the app copies any
   `integrations.<connector>.<field>` secret present in `settings.json` but
