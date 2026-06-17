@@ -18,6 +18,13 @@ from the UI and Vault bring-up/unseal automated for operators.
   TTL cache; the connector config endpoint persists secret fields to Vault and
   strips them from the DB row; UI secret fields echo a mask and leave the stored
   value unchanged when resubmitted blank.
+- **Auto-seed connector secrets from settings.json into Vault on boot** — when
+  Vault is configured and reachable, the app copies any
+  `integrations.<connector>.<field>` secret present in `settings.json` but
+  missing/empty in Vault into Vault at startup (seed-if-missing; never clobbers
+  UI edits, scoped to the AppRole-writable integration paths). Lets operators
+  set connector secrets in `settings.json` and have them land in Vault
+  automatically.
 - **Automatic Vault unseal** — `scripts/unseal-vault.sh` (idempotent) unseals the
   Vault container from a host-only `deployment/vault/unseal.keys` file; wired into
   `make up` (Vault is staged and unsealed before other services) and `make deploy`,

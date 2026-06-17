@@ -121,6 +121,21 @@ Boot-critical secrets (`app.secret_key`, `database.password`) and non-connector
 sections (s3, ldap, oidc, smtp) are **not** editable from the UI by design —
 they stay Vault/ops-only.
 
+### Auto-seeding connector secrets from settings.json
+
+You can also just set connector secrets in `settings.json` and let the app
+migrate them into Vault on boot. On startup, when Vault is configured and
+reachable, the app copies every `integrations.<connector>.<field>` secret that
+is present in `settings.json` **but missing (or empty) in Vault** into Vault —
+**seed-if-missing**, so a value already in Vault (including one set from the UI)
+is never overwritten. It no-ops when `VAULT_ADDR` is unset or Vault is
+unreachable/sealed.
+
+This is scoped to connector secrets only — the one path the app's read-mostly
+AppRole may write. Boot-critical and other secrets still come from
+`make seed-vault-secrets`. Once a secret is in Vault, Vault is the source of
+truth; you can then blank it in `settings.json`.
+
 ---
 
 ## Dev / CI path
