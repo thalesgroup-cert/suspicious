@@ -40,6 +40,11 @@ from the UI and Vault bring-up/unseal automated for operators.
 
 ### Fixed
 
+- **Install wizard generated an unused secret key** — `install.py` auto-generated
+  a Django secret key into `.env` (which nothing reads) while leaving
+  `settings.json` `app.secret_key` at the committed sample value, so non-Vault
+  installs ran on a publicly known key. The generated key is now written to
+  `app.secret_key`.
 - Vault provisioning and seeding scripts run the `vault` CLI **inside the Vault
   container** instead of requiring a host binary (previously failed with
   `vault: command not found`).
