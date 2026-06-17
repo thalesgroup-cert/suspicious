@@ -178,14 +178,27 @@ VAULT_PORT=8200
 VAULT_PATH=./vault
 ```
 
-**2. Start the stack, then initialise + unseal Vault.** Vault runs as a Compose service, so run its CLI inside the container:
+**2. Start the stack, then initialise Vault.** Vault runs as a Compose service, so run its CLI inside the container:
 
 ```bash
 make up
-docker compose --env-file .env exec vault vault operator init    # FIRST BOOT ONLY — record unseal keys + root token SECURELY
-docker compose --env-file .env exec vault vault operator unseal   # repeat with the threshold number of keys
+docker compose --env-file .env exec vault vault operator init    # FIRST BOOT ONLY — prints unseal keys + root token; record them SECURELY
 export VAULT_TOKEN=<root-token>                                   # used by make provision-vault / seed-vault-secrets
 ```
+
+Save the unseal keys (one per line) to `vault/unseal.keys` so every later boot
+unseals automatically — `make up` and `make deploy` run `make unseal` for you:
+
+```bash
+install -m 600 /dev/null vault/unseal.keys   # then paste one unseal key per line
+make unseal                                  # unseal now (idempotent)
+```
+
+> `vault/unseal.keys` is gitignored and host-only. Storing unseal keys beside
+> Vault weakens the seal (a stolen disk can be unsealed) — fine for this
+> single-host deployment; use Vault auto-unseal (cloud KMS / transit) for
+> production. Without the file, Vault stays sealed and you unseal manually:
+> `docker compose --env-file .env exec vault vault operator unseal`.
 
 **3. Provision KV + AppRole** (writes `VAULT_ROLE_ID` / `VAULT_SECRET_ID` into `.env`):
 

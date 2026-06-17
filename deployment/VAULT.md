@@ -53,10 +53,17 @@ boot, so the unseal step is mandatory.
    Compose service, so run its CLI inside the container:
    ```bash
    docker compose --env-file .env exec vault vault operator init    # record the unseal keys + root token SECURELY
-   docker compose --env-file .env exec vault vault operator unseal   # repeat with the threshold number of keys
    ```
-   On every subsequent restart Vault comes up sealed — re-run the `operator
-   unseal` command after each `make up`/restart.
+   Save the unseal keys (one per line) to `deployment/vault/unseal.keys`
+   (gitignored, `chmod 600`). Vault comes up **sealed** on every boot, but
+   `make up` and `make deploy` run `make unseal`, which reads that file and
+   unseals automatically — no manual step after the first init. To unseal on
+   demand: `make unseal`. Without the keys file, unseal by hand:
+   `docker compose --env-file .env exec vault vault operator unseal`.
+
+   > Security: unseal keys on the host weaken the seal (a stolen disk can be
+   > unsealed). Acceptable for a single-host deployment; use Vault auto-unseal
+   > (cloud KMS / transit Vault) for production.
 4. **Export the root token** for the provisioning + seeding steps (the `make`
    targets run the vault CLI inside the container for you, so only the token is
    needed on the host):

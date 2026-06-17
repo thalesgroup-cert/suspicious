@@ -6,6 +6,8 @@ mainlog
 # Environment
 *.env
 db_suspicious.env
+# Vault unseal keys (host-only secret; never commit)
+deployment/vault/unseal.keys
 *.old
 chromadb
 *.sqlite
