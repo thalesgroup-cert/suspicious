@@ -68,3 +68,23 @@ class GetSectionTest(TestCase):
             section = cfg.get_section("integrations.thehive")
         self.assertEqual(section["url"], "http://json")
         self.assertEqual(section["api_key"], "SECRET")  # secret overlaid from Vault
+
+    def test_secret_falls_back_to_settings_json_on_vault_miss(self):
+        # Vault configured but the key is absent/empty there → resolve from
+        # settings.json rather than returning empty.
+        RuntimeConfig.objects.create(
+            key="integrations.cortex", value={"url": "http://db"}
+        )
+        mapping = {
+            "integrations.cortex.api_key": "JSONKEY",
+            "integrations.cortex.webhook_secret": "JSONHOOK",
+        }
+        with mock.patch.object(cfg, "get_secret", return_value=""), \
+             mock.patch.object(
+                 cfg, "settings_get",
+                 side_effect=lambda key, default=None: mapping.get(key, default),
+             ):
+            section = cfg.get_section("integrations.cortex")
+        self.assertEqual(section["url"], "http://db")
+        self.assertEqual(section["api_key"], "JSONKEY")
+        self.assertEqual(section["webhook_secret"], "JSONHOOK")

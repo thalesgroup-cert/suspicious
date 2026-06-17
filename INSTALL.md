@@ -244,6 +244,45 @@ docker compose exec suspicious python manage.py create_service_token feeder
 docker compose up -d --force-recreate feeder
 ```
 
+### Production secrets with Vault (optional)
+
+The steps above read secrets from `settings.json` (the `VAULT_ADDR`-unset path).
+For production, store them in HashiCorp Vault instead. Full reference and the
+secret map: [deployment/VAULT.md](deployment/VAULT.md).
+
+```bash
+cd deployment
+
+# 1. Enable Vault in deployment/.env
+#    VAULT_ADDR=http://vault:8200
+#    VAULT_PORT=8200
+#    VAULT_PATH=./vault
+
+# 2. Start + initialise Vault (it boots sealed on every restart)
+make up                                                          # stages the vault service and unseals it
+docker compose --env-file .env exec vault vault operator init    # FIRST BOOT ONLY — save unseal keys + root token
+install -m 600 /dev/null vault/unseal.keys                       # paste one unseal key per line (>= threshold)
+make unseal                                                      # idempotent; also auto-run by up/deploy
+
+# 3. Provision the AppRole + policy, then seed the secrets
+export VAULT_TOKEN=<root-token>
+make provision-vault
+export SECRET_KEY=... DB_PASSWORD=... CORTEX_API_KEY=... CORTEX_WEBHOOK_SECRET=... S3_SECRET_KEY=...
+export WATCHER_API_KEY=...        # optional connector secrets
+make seed-vault-secrets
+
+# 4. Apply
+make deploy
+```
+
+- Once `vault/unseal.keys` exists, `make up` and `make deploy` unseal Vault
+  automatically — no manual step after a restart.
+- **Connector** secrets (cortex/thehive/misp/watcher) can also just be set in
+  `settings.json` or edited in the Settings UI: on boot the app seeds any
+  present-but-missing connector secret into Vault, and reads fall back
+  Vault → `settings.json`. Boot-critical secrets (`app.secret_key`,
+  `database.password`) stay Vault/ops-seeded by design.
+
 ---
 
 ## Operations
@@ -259,6 +298,9 @@ Run from `deployment/`.
 | `make seed-config` | Load runtime config into the database |
 | `make createsuperuser` | Create an admin account |
 | `make deploy` | Pull, migrate, seed, restart (production update) |
+| `make unseal` | Unseal Vault from `vault/unseal.keys` (auto-run by up/deploy) |
+| `make provision-vault` | Enable Vault KV + AppRole, write role/secret IDs to `.env` |
+| `make seed-vault-secrets` | Write exported secret env vars into Vault |
 | `make logs` `make logs s=suspicious` | Follow logs (all, or one service) |
 | `make status` | Service health |
 | `make shell` | Shell into the backend container |

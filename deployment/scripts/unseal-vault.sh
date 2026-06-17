@@ -18,9 +18,12 @@ KEYS_FILE="${VAULT_UNSEAL_KEYS_FILE:-$DEPLOY_DIR/vault/unseal.keys}"
 VAULT_SVC="${VAULT_SVC:-vault}"
 
 # Run the vault CLI inside the running Vault container (no host CLI required).
+# stdin is tied to /dev/null: `docker compose exec` would otherwise swallow the
+# caller's stdin — inside the unseal `while read` loop that ate the remaining
+# keys after the first, stalling unseal at 1/3.
 vault() {
   docker compose --env-file .env exec -T \
-    -e VAULT_ADDR=http://127.0.0.1:8200 "$VAULT_SVC" vault "$@"
+    -e VAULT_ADDR=http://127.0.0.1:8200 "$VAULT_SVC" vault "$@" </dev/null
 }
 
 # Echo the seal state: unsealed | sealed | down.
@@ -58,18 +61,38 @@ if [ ! -f "$KEYS_FILE" ]; then
   exit 0
 fi
 
+# Emit one unseal key per line. Tolerates both a bare "<key>" per line and the
+# verbose `vault operator init` layout ("Unseal Key 1: <key>"); strips inline
+# comments and ignores the root-token line.
+read_keys() {
+  sed 's/#.*//' "$KEYS_FILE" | awk '
+    /[Rr]oot [Tt]oken/ { next }            # never treat the root token as a key
+    {
+      line = $0
+      sub(/^.*:[[:space:]]*/, "", line)    # drop a "Label:" prefix if present
+      gsub(/[[:space:]]/, "", line)        # drop all whitespace (incl. CR)
+      if (line != "") print line
+    }
+  '
+}
+
 echo "Unsealing Vault with keys from $KEYS_FILE …"
-while IFS= read -r line; do
-  key="${line%%#*}"                         # strip inline comments
-  key="$(printf '%s' "$key" | tr -d '[:space:]')"
+applied=0
+while IFS= read -r key; do
   [ -z "$key" ] && continue
-  vault operator unseal "$key" >/dev/null || true
+  applied=$((applied + 1))
+  if ! out=$(vault operator unseal "$key" 2>&1); then
+    echo "  key #$applied rejected: ${out##*$'\n'}" >&2
+  fi
   [ "$(seal_state)" = unsealed ] && break
-done < "$KEYS_FILE"
+done < <(read_keys)
 
 if [ "$(seal_state)" = unsealed ]; then
   echo "Vault unsealed."
 else
-  echo "ERROR: Vault still sealed after applying keys from $KEYS_FILE" >&2
+  echo "ERROR: Vault still sealed after applying $applied key(s) from $KEYS_FILE" >&2
+  echo "       Check the file holds enough distinct unseal keys (see Threshold below)," >&2
+  echo "       one key per line. Current status:" >&2
+  vault status 2>&1 | sed 's/^/       /' >&2 || true
   exit 1
 fi

@@ -5,6 +5,65 @@ All notable changes to Suspicious are documented here.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [Unreleased]
+
+Secret management moves to HashiCorp Vault, with connector secrets now editable
+from the UI and Vault bring-up/unseal automated for operators.
+
+### Added
+
+- **Editable connector secrets from the Settings UI** — Admins/CERT can set and
+  rotate `integrations.*` secrets (cortex, thehive, misp, watcher), written
+  straight to Vault. New `set_secret` Vault KV v2 write primitive with a short
+  TTL cache; the connector config endpoint persists secret fields to Vault and
+  strips them from the DB row; UI secret fields echo a mask and leave the stored
+  value unchanged when resubmitted blank.
+- **Vault → settings.json read fallback for section secrets** — `get_section`
+  now resolves each secret leaf from Vault first and falls back to the
+  `settings.json` value when Vault is unset or has no value for the key (was
+  previously empty when Vault was configured but missing the key). Boot-critical
+  secrets read via `get_secret(fail_fast=True)` are unaffected.
+- **Auto-seed connector secrets from settings.json into Vault on boot** — when
+  Vault is configured and reachable, the app copies any
+  `integrations.<connector>.<field>` secret present in `settings.json` but
+  missing/empty in Vault into Vault at startup (seed-if-missing; never clobbers
+  UI edits, scoped to the AppRole-writable integration paths). Lets operators
+  set connector secrets in `settings.json` and have them land in Vault
+  automatically.
+- **Automatic Vault unseal** — `scripts/unseal-vault.sh` (idempotent) unseals the
+  Vault container from a host-only `deployment/vault/unseal.keys` file; wired into
+  `make up` (Vault is staged and unsealed before other services) and `make deploy`,
+  plus a standalone `make unseal`.
+- `make provision-vault` now writes a `suspicious-read` policy that grants scoped
+  `create`/`update` on `suspicious/data/integrations/*`, so UI secret editing
+  works without a manual policy edit.
+
+### Fixed
+
+- **Install wizard generated an unused secret key** — `install.py` auto-generated
+  a Django secret key into `.env` (which nothing reads) while leaving
+  `settings.json` `app.secret_key` at the committed sample value, so non-Vault
+  installs ran on a publicly known key. The generated key is now written to
+  `app.secret_key`.
+- Vault provisioning and seeding scripts run the `vault` CLI **inside the Vault
+  container** instead of requiring a host binary (previously failed with
+  `vault: command not found`).
+- Unseal applied only the first key (stuck at `1/3`) because `docker compose exec`
+  swallowed the loop's stdin; exec stdin is now tied to `/dev/null`. The key
+  parser also tolerates the verbose `vault operator init` layout and reports
+  `vault status` on failure.
+
+### Security
+
+- Added `SECURITY.md`: Thales PSIRT responsible-disclosure contact (email + PGP
+  key) and a threat model scoped to the stack, with explicit in-scope and
+  out-of-scope lists.
+
+### Documentation
+
+- `deployment/VAULT.md` and `deployment/README.md`: copy-paste Vault bring-up
+  runbook, in-container CLI usage, and the auto-unseal workflow.
+
 ## [1.4.0] - 2026-06-05
 
 Adds the web frontend and the documentation site, plus backend changes for Celery

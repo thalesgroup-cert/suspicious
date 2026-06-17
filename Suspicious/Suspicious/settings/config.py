@@ -107,7 +107,13 @@ def get_section(name: str) -> dict:
         base = settings_get(name, {}) or {}
     section = dict(base)  # shallow copy; we only overlay top-level secret leaves
     for field in SECRET_FIELDS.get(name, ()):  # overlay secrets
-        section[field] = get_secret(f"{name}.{field}")
+        key = f"{name}.{field}"
+        # Vault first, then settings.json: get_secret already reads settings.json
+        # when VAULT_ADDR is unset; the `or` extends that to the "Vault configured
+        # but key absent/empty" case, so a value present only in settings.json
+        # still resolves. Boot-critical secrets are read via get_secret(
+        # fail_fast=True) directly and are unaffected.
+        section[field] = get_secret(key) or settings_get(key, "")
     return section
 
 

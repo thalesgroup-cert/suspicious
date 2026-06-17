@@ -265,10 +265,15 @@ def main() -> None:
                 k, _, v = line.partition("=")
                 env[k.strip()] = v.strip()
 
-    # Always auto-generate Django secret key
-    env["SECRET_KEY"] = gen_secret(50)
+    # Always auto-generate a Django secret key. It is persisted to
+    # settings.json -> app.secret_key (read by the app via get_secret); the
+    # .env copy is kept only as the value `make seed-vault-secrets` reads when
+    # provisioning Vault. Without the settings.json write, a non-Vault install
+    # would silently keep the committed sample key.
+    secret_key = gen_secret(50)
+    env["SECRET_KEY"] = secret_key
 
-    settings: dict[str, object] = {}
+    settings: dict[str, object] = {"app.secret_key": secret_key}
 
     section_network(env, )
     section_database(env, settings)
