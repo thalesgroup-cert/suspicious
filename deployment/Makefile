@@ -184,17 +184,30 @@ restart:
 ## Use after `make build` when `make up` would otherwise reuse the old
 ## containers. Pass `s=<service>` to redeploy a single service.
 ##
+## Vault is intentionally NOT force-recreated in the all-services path: a
+## recreated Vault boots sealed, and because the app gates on Vault-backed
+## secrets the dependency-ordered startup would deadlock before anything could
+## unseal it. So we bring Vault up and unseal it first, recreate everything
+## else, then run unseal again as a backstop (covers s=vault and a Vault that
+## was down). db_suspicious_replica is profile-gated and left to its own targets.
+##
 ## Examples:
-##   make redeploy             # all services
+##   make redeploy             # all services (except Vault, kept up + unsealed)
 ##   make redeploy s=suspicious
 redeploy: check-secrets
+	$(call require_script,$(SCRIPTS)/unseal-vault.sh)
 	@if [ -n "$(s)" ]; then \
 		echo "Force-recreating $(s)…"; \
 		$(COMPOSE) up -d --force-recreate --no-deps $(s); \
 	else \
-		echo "Force-recreating all services…"; \
-		$(COMPOSE) up -d --force-recreate --remove-orphans; \
+		echo "Ensuring Vault is up and unsealed first…"; \
+		$(COMPOSE) up -d vault; \
+		$(SCRIPTS)/unseal-vault.sh; \
+		echo "Force-recreating all services except Vault (kept up so it stays unsealed)…"; \
+		$(COMPOSE) up -d --force-recreate --remove-orphans \
+			$$($(COMPOSE) config --services | grep -vxE 'vault|db_suspicious_replica'); \
 	fi
+	@$(SCRIPTS)/unseal-vault.sh
 	$(OK) "Redeploy complete."
 
 ## Build local images
