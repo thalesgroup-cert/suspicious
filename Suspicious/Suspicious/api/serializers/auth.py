@@ -1,8 +1,7 @@
-# api/serializers/auth.py
 from django.contrib.auth import authenticate, get_user_model
 from rest_framework import serializers
 
-from profiles.models import DEFAULT_SEMANTIC_COLORS, CISOProfile, UserProfile
+from profiles.models import CISOProfile, UserProfile, merge_semantic_colors
 
 User = get_user_model()
 
@@ -80,8 +79,7 @@ class AuthenticatedUserSerializer(serializers.ModelSerializer):
         profile = _get_profile_for_user(obj)
         if profile is not None:
             return profile.get_semantic_colors()
-        import copy
-        return copy.deepcopy(DEFAULT_SEMANTIC_COLORS)
+        return merge_semantic_colors(None)
 
     def get_theme(self, obj) -> str:
         """

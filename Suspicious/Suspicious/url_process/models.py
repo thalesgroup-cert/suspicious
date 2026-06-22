@@ -1,6 +1,9 @@
 from django.db import models
 
-class URL(models.Model):
+from common.model_mixins import AllowListableMixin
+
+
+class URL(AllowListableMixin, models.Model):
     id = models.AutoField(primary_key=True)
     ioc_score = models.FloatField(default=5)
     ioc_confidence = models.FloatField(default=0)
@@ -16,12 +19,3 @@ class URL(models.Model):
 
     def __str__(self):
         return str(self.address)
-
-    def update_allow_listed(self):
-        """
-        Mark this URL instance as allow_listed (safe).
-        """
-        self.ioc_score = 0
-        self.ioc_confidence = 100
-        self.ioc_level = "SAFE-ALLOW_LISTED"
-        self.save(update_fields=["ioc_score", "ioc_confidence", "ioc_level"])

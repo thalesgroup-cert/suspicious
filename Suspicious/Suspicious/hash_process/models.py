@@ -1,6 +1,9 @@
 from django.db import models
 
-class Hash(models.Model):
+from common.model_mixins import AllowListableMixin
+
+
+class Hash(AllowListableMixin, models.Model):
     id = models.AutoField(primary_key=True)
     value = models.CharField(max_length=255)
     ioc_score = models.FloatField(default=5)
@@ -13,12 +16,3 @@ class Hash(models.Model):
 
     def __str__(self):
         return self.value
-
-    def update_allow_listed(self):
-        """
-        Mark this Hash instance as allow_listed (safe).
-        """
-        self.ioc_score = 0
-        self.ioc_confidence = 100
-        self.ioc_level = "SAFE-ALLOW_LISTED"
-        self.save(update_fields=["ioc_score", "ioc_confidence", "ioc_level"])
