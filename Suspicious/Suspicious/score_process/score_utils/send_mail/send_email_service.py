@@ -16,6 +16,37 @@ class SendMailService:
         self.__login = login
         self.__password = password
 
+    @classmethod
+    def send_html(
+        cls,
+        smtp: dict,
+        *,
+        sender: str,
+        recipient: str,
+        subject: str,
+        html: str,
+    ) -> None:
+        """Build a service from an ``smtp`` config dict and run the full
+        connect -> (optional) STARTTLS -> login -> publish -> close sequence.
+
+        Shared by every email service's ``_send_action`` so the send dance —
+        and the config-key/default mapping — lives in one place.
+        """
+        service = cls(
+            host=smtp.get("server", ""),
+            port=smtp.get("port", 587),
+            login=smtp.get("username", ""),
+            password=smtp.get("password", ""),
+        )
+        service.connect()
+        if smtp.get("tls"):
+            service.start_tls()
+        service.login()
+        service.publish_email(
+            subject=subject, sender=sender, recipient=recipient, html=html
+        )
+        service.close()
+
     def connect(self) -> None:
         self.__server = smtplib.SMTP(self.__host, self.__port)
 
