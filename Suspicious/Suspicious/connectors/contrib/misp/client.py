@@ -1,4 +1,3 @@
-# misp/client.py
 """
 MISP client wrapper.
 """

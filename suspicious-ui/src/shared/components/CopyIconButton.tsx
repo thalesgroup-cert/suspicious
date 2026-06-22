@@ -1,4 +1,3 @@
-// src/shared/components/CopyIconButton.tsx
 import * as React from "react";
 import { IconButton, Tooltip } from "@mui/material";
 import ContentCopyOutlined from "@mui/icons-material/ContentCopyOutlined";

@@ -1,4 +1,3 @@
-# api/views/settings.py
 from __future__ import annotations
 
 from rest_framework import generics, status

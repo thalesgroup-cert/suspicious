@@ -1,4 +1,3 @@
-// src/styles/ThemeStore.tsx
 import * as React from "react";
 import { CssBaseline, ThemeProvider } from "@mui/material";
 import { themes, type ThemeName, getSeasonalThemeName } from "./themes";

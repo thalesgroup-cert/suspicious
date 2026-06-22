@@ -1,4 +1,3 @@
-# analyzers_services/zscaler.py
 """
 Zscaler URL classification analyzer.
 """

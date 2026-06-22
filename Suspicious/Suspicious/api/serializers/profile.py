@@ -1,4 +1,3 @@
-# profiles/serializers.py
 import re
 from rest_framework import serializers
 from profiles.models import UserProfile, CISOProfile, Theme, DEFAULT_SEMANTIC_COLORS

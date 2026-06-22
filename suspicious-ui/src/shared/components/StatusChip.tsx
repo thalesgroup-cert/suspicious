@@ -1,4 +1,3 @@
-// src/shared/components/StatusChip.tsx
 //
 // Renders a submission status badge whose color comes from the semantic
 // color store (useStatusColors). Switching to the Okabe-Ito colorblind-safe

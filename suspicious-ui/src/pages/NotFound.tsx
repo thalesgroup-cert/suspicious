@@ -1,4 +1,3 @@
-// src/pages/NotFound.tsx
 import * as React from "react";
 import { Box, Button, Stack, Typography } from "@mui/material";
 import { alpha, useTheme } from "@mui/material/styles";

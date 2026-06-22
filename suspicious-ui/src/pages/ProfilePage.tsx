@@ -1,4 +1,3 @@
-// src/pages/ProfilePage.tsx
 import * as React from "react";
 import {
   Alert,

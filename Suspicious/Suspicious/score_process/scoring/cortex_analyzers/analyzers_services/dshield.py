@@ -1,4 +1,3 @@
-# analyzers_services/dshield.py
 """
 DShield analyzer — scores an IP based on DShield count/attacks/threatfeed data.
 """

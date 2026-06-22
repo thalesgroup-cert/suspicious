@@ -1,4 +1,3 @@
-// src/features/profile/api.ts
 //
 // All profile-related API calls. The semantic colors endpoints are new;
 // everything else matches the existing patterns in the app.

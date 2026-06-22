@@ -1,4 +1,3 @@
-# analyzers_services/misp.py
 """
 MISP analyzer — scores based on the number of MISP event matches.
 """

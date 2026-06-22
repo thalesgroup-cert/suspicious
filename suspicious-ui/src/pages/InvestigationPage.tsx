@@ -1,4 +1,3 @@
-// src/pages/InvestigationPage.tsx
 import * as React from "react";
 import {
   Accordion,

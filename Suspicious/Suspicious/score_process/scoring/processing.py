@@ -1,4 +1,3 @@
-# score_process/scoring/processing.py
 """
 Mail, attachment, and IOC scoring pipeline.
 """

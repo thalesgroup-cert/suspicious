@@ -1,4 +1,3 @@
-# misp/models.py
 from pydantic import AnyUrl, BaseModel, Field
 from typing import Any, Dict, Optional
 

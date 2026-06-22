@@ -1,4 +1,3 @@
-# analyzers_services/circl_hashlookup.py
 """
 CIRCL Hash Lookup analyzer — scores a file hash based on its known-hash
 database lookup result.

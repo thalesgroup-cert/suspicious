@@ -1,4 +1,3 @@
-# score_process/scoring/cortex_analyzers/response.py
 """
 Shared scoring helpers used by all analyzer implementations.
 """

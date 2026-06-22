@@ -1,4 +1,3 @@
-# analyzers_services/ai/thehive_utils.py
 """
 TheHive attachment helper extracted from ai/service.py.
 """

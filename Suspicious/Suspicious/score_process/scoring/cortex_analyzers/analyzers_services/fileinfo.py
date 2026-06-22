@@ -1,4 +1,3 @@
-# analyzers_services/fileinfo.py
 """
 FileInfo analyzer — derives the highest-severity level across all
 FileInfo taxonomy entries and extracts file type metadata.

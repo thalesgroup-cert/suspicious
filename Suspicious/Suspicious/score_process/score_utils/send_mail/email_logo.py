@@ -1,4 +1,3 @@
-# mail_service/email_logo.py
 """
 Normalises logo values from settings.json into a dict the Jinja2
 templates can use without any logic inside the template.

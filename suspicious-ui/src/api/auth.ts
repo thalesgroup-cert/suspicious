@@ -1,4 +1,3 @@
-// src/api/auth.ts
 //
 // Semantic color hydration strategy:
 //

@@ -1,4 +1,3 @@
-// src/styles/components/ThemePicker.tsx
 import * as React from "react";
 import {
   Box,

@@ -1,4 +1,3 @@
-# analyzers_services/sfs.py
 """
 StopForumSpam (SFS) analyzer — scores an IP based on SFS reputation data.
 """

@@ -1,4 +1,3 @@
-# score_process/scoring/cortex_analyzers/models.py
 """
 Pydantic models for analyzer results.
 """

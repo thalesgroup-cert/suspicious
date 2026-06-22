@@ -13,7 +13,3 @@ def delete_old_analyzer_reports(days: int = 30) -> None:
         AnalyzerReport.objects.filter(creation_date__lt=cutoff).delete()
     except Exception:
         logger.exception("Failed to delete old analyzer reports")
-
-# placeholder pour suppression de jobs cortex (commentée car asynchrone / volumineuse)
-# def delete_old_cortex_jobs(...):
-#     pass

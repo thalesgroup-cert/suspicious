@@ -1,4 +1,3 @@
-// src/app/router.tsx
 import React, { lazy, Suspense } from "react";
 import { createBrowserRouter } from "react-router-dom";
 import AppLayout from "@/layouts/AppLayout";

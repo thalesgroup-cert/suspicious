@@ -1,4 +1,3 @@
-// src/features/settings/ConnectorsPanel.tsx
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import {
   Alert,

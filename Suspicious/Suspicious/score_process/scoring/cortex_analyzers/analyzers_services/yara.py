@@ -1,4 +1,3 @@
-# analyzers_services/yara.py
 """
 YARA analyzer — scores a file based on the number of YARA rule matches.
 """

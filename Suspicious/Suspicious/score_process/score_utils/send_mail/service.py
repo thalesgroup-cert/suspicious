@@ -1,4 +1,3 @@
-# mail_service/mail_notification_service.py
 import logging
 
 from profiles.models import UserProfile

@@ -1,4 +1,3 @@
-// src/pages/SettingsPage.tsx
 import * as React from "react";
 import {
   Alert,

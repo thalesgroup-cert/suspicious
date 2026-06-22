@@ -1,4 +1,3 @@
-// src/pages/AboutPage.tsx
 import * as React from "react";
 import { env } from "@/lib/runtimeEnv";
 import {

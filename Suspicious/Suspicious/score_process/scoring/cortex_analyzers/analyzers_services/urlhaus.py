@@ -1,4 +1,3 @@
-# analyzers_services/urlhaus.py
 """
 URLhaus analyzer — scores a URL based on the number of URLhaus sightings.
 """

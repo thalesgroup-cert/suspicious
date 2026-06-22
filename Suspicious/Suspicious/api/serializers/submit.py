@@ -1,4 +1,3 @@
-# api/serializers/submit.py
 import ipaddress
 import socket
 import zipfile as _zipfile

@@ -1,5 +1,3 @@
-// src/pages/LoginPage.tsx
-
 import * as React from "react";
 import {
   Alert,

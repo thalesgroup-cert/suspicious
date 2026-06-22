@@ -1,4 +1,3 @@
-// src/layouts/AppLayout.tsx
 import * as React from "react";
 import {
   AppBar,

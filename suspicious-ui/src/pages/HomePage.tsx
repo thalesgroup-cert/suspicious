@@ -1,4 +1,3 @@
-// src/pages/HomePage.tsx
 import * as React from "react";
 import {
   Alert,

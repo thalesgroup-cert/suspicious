@@ -1,4 +1,3 @@
-// src/pages/DashboardPage.tsx
 import * as React from "react";
 import { Alert, Box, Container, Stack } from "@mui/material";
 import { useTheme } from "@mui/material/styles";

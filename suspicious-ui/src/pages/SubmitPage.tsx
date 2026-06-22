@@ -1,4 +1,3 @@
-// src/pages/SubmitPage.tsx
 import * as React from "react";
 import {
   Alert,

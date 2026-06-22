@@ -1,4 +1,3 @@
-# analyzers_services/maxmind.py
 """
 MaxMind GeoIP analyzer — enriches an IP with geographic context.
 """

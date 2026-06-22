@@ -1,4 +1,3 @@
-# analyzers_services/ai/minio_utils.py
 """
 MinIO helpers for the AI analyzer.
 """

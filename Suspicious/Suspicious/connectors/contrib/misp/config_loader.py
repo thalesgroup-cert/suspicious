@@ -1,4 +1,3 @@
-# misp/config_loader.py
 """
 Lazy MISP settings loader — raises at call time, not at import time.
 """

@@ -1,4 +1,3 @@
-# misp/dedup.py
 """
 MISP deduplication helpers — unchanged logic, extracted for clarity.
 """

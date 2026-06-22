@@ -1,4 +1,3 @@
-# api/views/oidc_views.py
 #
 # OIDC Authorization Code flow with:
 #   • PKCE (S256)                    — prevents auth code interception
@@ -58,10 +57,6 @@ except ImportError:
 
 logger = logging.getLogger(__name__)
 User = get_user_model()
-
-# ---------------------------------------------------------------------------
-# Constants
-# ---------------------------------------------------------------------------
 
 _DISCOVERY_CACHE_KEY = "oidc:discovery"
 _DISCOVERY_CACHE_TTL = 3600  # 1 hour — re-fetch if provider rotates keys

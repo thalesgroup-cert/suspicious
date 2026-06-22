@@ -1,4 +1,3 @@
-// src/features/dashboard/components/TopPrefixesPanel.tsx
 import * as React from "react";
 import { api } from "@/api/client";
 import {

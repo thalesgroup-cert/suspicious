@@ -1,4 +1,3 @@
-# analyzers_services/urlscan.py
 """
 Urlscan.io analyzer — scores a URL based on the number of urlscan results.
 """

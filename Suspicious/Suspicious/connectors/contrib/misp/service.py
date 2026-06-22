@@ -1,4 +1,3 @@
-# misp/service.py
 """
 MISP service — orchestrates case and artifact pushing.
 """

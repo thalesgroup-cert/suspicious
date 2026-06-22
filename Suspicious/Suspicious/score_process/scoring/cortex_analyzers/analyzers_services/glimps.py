@@ -1,4 +1,3 @@
-# analyzers_services/glimps.py
 """
 GMalware / GLIMPS analyzer — multi-factor scoring from sandbox output.
 """

@@ -1,4 +1,3 @@
-// src/pages/CampaignsPage.tsx
 import * as React from "react";
 import {
   Alert,
