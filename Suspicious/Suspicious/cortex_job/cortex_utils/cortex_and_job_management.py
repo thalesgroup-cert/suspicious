@@ -482,7 +482,7 @@ class CortexJob:
                 )
         except Exception as e:
             fetch_mail_logger.warning(
-                f"Error creating analyzer '{analyzer.name}': {str(e)}"
+                f"Error creating analyzer '{analyzer.name}': {e!s}"
             )
 
         # Fallback: another worker created the row first — return it.
@@ -992,9 +992,9 @@ class CortexJobManager:
                     )
             except Exception as e:
                 update_cases_logger.error(
-                    f"Error processing artifact {artifact}: {str(e)}"
+                    f"Error processing artifact {artifact}: {e!s}"
                 )
-                logging.error(f"Error processing artifact {artifact}: {str(e)}")
+                logging.error(f"Error processing artifact {artifact}: {e!s}")
 
     def process_ip_artifact(self, artifact):
         if not artifact.artifactIsIp:

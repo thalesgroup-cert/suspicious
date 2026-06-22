@@ -123,7 +123,7 @@ class SecretsTestCase(unittest.TestCase):
         class FakeClient:
             secrets = type("S", (), {"kv": type("K", (), {"v2": FakeKV2()})()})()
 
-        with mock.patch.object(sec, "_client", lambda: FakeClient()):
+        with mock.patch.object(sec, "_client", FakeClient):
             sec.set_secret("integrations.watcher.api_key", "NEW")
 
         self.assertEqual(written["path"], "integrations.watcher.api_key")

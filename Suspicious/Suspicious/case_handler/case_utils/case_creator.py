@@ -70,7 +70,7 @@ class CaseCreator:
             case.save()
             return case
         except Exception as e:
-            fetch_mail_logger.error(f"Error creating case: {str(e)}")
+            fetch_mail_logger.error(f"Error creating case: {e!s}")
             return None
 
     _ARTIFACT_KEY_MAP = {
@@ -115,7 +115,7 @@ class CaseCreator:
                     case.fileOrMail = case_file_or_mail
                     case.save()
             except Exception as e:
-                print(f"Error creating case_file_or_mail: {str(e)}")
+                print(f"Error creating case_file_or_mail: {e!s}")
         elif key == 'ip_instance' or key == 'url_instance' or key == 'hash_instance' and key != 'mail_instance' and key != 'file_instance':
             try:
                 case_has_iocs = self._create_case_has_iocs(key, value, case)
@@ -124,7 +124,7 @@ class CaseCreator:
                     case.nonFileIocs = case_has_iocs
                     case.save()
             except Exception as e:
-                print(f"Error creating case_has_iocs: {str(e)}")
+                print(f"Error creating case_has_iocs: {e!s}")
         else:
             print("Done creating related model...")
 
@@ -211,7 +211,7 @@ class CaseCreator:
                     print("No MonthlyCasesSummary associated with KPI")
 
         except Exception as e:
-            print(f"Error updating KPI stats: {str(e)}")
+            print(f"Error updating KPI stats: {e!s}")
 
     def _update_user_cases_monthly_stats(self, case):
         """
@@ -237,7 +237,7 @@ class CaseCreator:
                 user_cases_monthly_stats.save(update_fields=['allow_listed_cases'])
 
         except Exception as e:
-            print(f"Error updating user cases monthly stats: {str(e)}")
+            print(f"Error updating user cases monthly stats: {e!s}")
 
     def _get_related_model(self, key):
         """

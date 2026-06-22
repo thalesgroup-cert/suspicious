@@ -61,4 +61,4 @@ class SessionCortexApi(Api):
 
     def do_delete(self, endpoint):
         response = self._execute("DELETE", endpoint, headers=self._headers())
-        return True if response is not None else False
+        return response is not None

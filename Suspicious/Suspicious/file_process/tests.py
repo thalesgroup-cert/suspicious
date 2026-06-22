@@ -90,7 +90,7 @@ class FileHandlerProcessingTests(TestCase):
         )
         # Patch hash_file to return the same hash
         with patch.object(FileHandler, 'hash_file', return_value=self.hash.value):
-            f_inst, h_inst = FileHandler.handle_file(file=MagicMock(
+            _f_inst, _h_inst = FileHandler.handle_file(file=MagicMock(
                 name="files/testfile.txt",
                 temporary_file_path=MagicMock(return_value="/tmp/testfile.txt")
             ))

@@ -1,4 +1,3 @@
-# suspicious/settings.py
 #
 # Production-ready settings for the Suspicious platform.
 #
@@ -14,10 +13,6 @@
 # All sensitive values (SECRET_KEY, DB password, OIDC secret, LDAP bind
 # password) must live in settings.json and never be committed to version
 # control.  The file is mounted at runtime by your container orchestrator.
-#
-# ---------------------------------------------------------------------------
-# Imports
-# ---------------------------------------------------------------------------
 
 import json
 import sys
@@ -54,7 +49,7 @@ with open(CONFIG_PATH) as _f:
 # Validate against the SuspiciousConfig schema so missing or malformed
 # required keys (SECRET_KEY, DB credentials, …) fail at boot with a
 # readable error instead of much later at the first call site.
-from suspicious.config_schema import validate_config, ConfigValidationError  # noqa: E402
+from suspicious.config_schema import validate_config, ConfigValidationError
 
 try:
     _config = validate_config(_config, source=CONFIG_PATH)
@@ -91,7 +86,7 @@ FILES_BASE_DIR = Path(__file__).resolve().parent.parent
 # Security
 # ---------------------------------------------------------------------------
 
-from suspicious.secrets import get_secret  # noqa: E402
+from suspicious.secrets import get_secret
 
 SECRET_KEY = get_secret("app.secret_key", fail_fast=True)
 
@@ -134,7 +129,7 @@ if not DEBUG:
 
 # Fail fast on insecure configuration so a misconfigured production deploy
 # refuses to start instead of running silently exposed.
-from django.core.exceptions import ImproperlyConfigured  # noqa: E402
+from django.core.exceptions import ImproperlyConfigured
 
 if SECRET_KEY in ("", "CHANGE_ME"):
     raise ImproperlyConfigured(
@@ -605,7 +600,7 @@ SUBMISSION_ELEVATED_GROUPS = ("CERT", "CISO", "Admin")
 # Celery — broker (redis_broker container) + result backend (MariaDB)
 # ---------------------------------------------------------------------------
 
-from celery.schedules import crontab  # noqa: E402 — intentional mid-file import for BEAT_SCHEDULE
+from celery.schedules import crontab  # intentional mid-file import for BEAT_SCHEDULE
 
 _redis_broker_host = _redis_cfg.get("broker_host", "redis_broker")
 
