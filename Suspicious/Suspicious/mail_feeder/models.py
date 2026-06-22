@@ -53,7 +53,6 @@ class MailHeader(models.Model):
     header_value = models.TextField()
     fuzzy_hash = models.CharField(max_length=64, db_index=True)
     times_sent = models.PositiveIntegerField(default=0)
-    other_values = models.TextField(blank=True)
     creation_date = models.DateTimeField(auto_now_add=True, db_index=True)
     last_update = models.DateTimeField(auto_now=True)
 
@@ -71,7 +70,6 @@ class MailBody(models.Model):
     body_value = models.TextField()
     fuzzy_hash = models.CharField(max_length=64, db_index=True)
     times_sent = models.PositiveIntegerField(default=0)
-    other_values = models.TextField(blank=True)
     creation_date = models.DateTimeField(auto_now_add=True, db_index=True)
     last_update = models.DateTimeField(auto_now=True)
 
