@@ -4,7 +4,6 @@ import {
   Avatar,
   Box,
   Button,
-  Card,
   CardContent,
   CircularProgress,
   Collapse,
@@ -53,127 +52,24 @@ import { useHudModes } from "@/shared/hooks/useHudModes";
 import { useColorStore, useResultColors, useStatusColors } from "@/styles/colorStore";
 import { ColorSettingsPanel } from "@/features/profile/ColorSettingsPanel";
 
+import {
+  CaptionLabel,
+  InnerCard,
+  NavIcon,
+  SoftCard,
+} from "@/features/profile/components/cards";
+import {
+  apiErrorText,
+  initials,
+  readLocalProfile,
+  writeLocalProfile,
+} from "@/features/profile/utils";
+
 // ---------------------------------------------------------------------------
 // Types
 // ---------------------------------------------------------------------------
 
 type Section = "preferences" | "appearance" | "colors";
-
-// ---------------------------------------------------------------------------
-// Local profile persistence (theme + preferences only — colors go to server)
-// ---------------------------------------------------------------------------
-
-const LOCAL_PROFILE_KEY = "suspicious.profile.local";
-
-function readLocalProfile(): Partial<UserProfile> | null {
-  try {
-    const raw = localStorage.getItem(LOCAL_PROFILE_KEY);
-    return raw ? JSON.parse(raw) : null;
-  } catch {
-    return null;
-  }
-}
-
-function writeLocalProfile(patch: Partial<UserProfile>) {
-  try {
-    const next = { ...(readLocalProfile() ?? {}), ...patch };
-    localStorage.setItem(LOCAL_PROFILE_KEY, JSON.stringify(next));
-  } catch { /* ignore */ }
-}
-
-// ---------------------------------------------------------------------------
-// Helpers
-// ---------------------------------------------------------------------------
-
-function initials(first?: string, last?: string) {
-  const f = (first ?? "").trim()[0] ?? "";
-  const l = (last ?? "").trim()[0] ?? "";
-  return (f + l).toUpperCase() || "U";
-}
-
-function apiErrorText(err: unknown) {
-  const e = err as any;
-  const data = e?.response?.data;
-  const msg =
-    e?.message || data?.detail || data?.error ||
-    (typeof data === "string" ? data : null) || "Request failed";
-  const status = e?.response?.status;
-  return status ? `${status}: ${msg}` : String(msg);
-}
-
-// ---------------------------------------------------------------------------
-// SoftCard — exact match to SettingsPage / rest of app
-// ---------------------------------------------------------------------------
-
-function SoftCard(props: React.PropsWithChildren<{ sx?: object }>) {
-  const theme = useTheme();
-  const isDark = theme.palette.mode === "dark";
-  return (
-    <Card
-      sx={{
-        borderRadius: 4,
-        border: `1px solid ${alpha(theme.palette.divider, isDark ? 0.28 : 0.9)}`,
-        background: isDark
-          ? `linear-gradient(180deg, ${alpha("#fff", 0.03)}, ${alpha("#fff", 0.02)})`
-          : `linear-gradient(180deg, ${alpha("#fff", 0.88)}, ${alpha(theme.palette.grey[50], 0.96)})`,
-        boxShadow: isDark
-          ? "0 12px 32px rgba(0,0,0,.28)"
-          : "0 10px 28px rgba(15,23,42,.06)",
-        ...props.sx,
-      }}
-    >
-      {props.children}
-    </Card>
-  );
-}
-
-function InnerCard(props: React.PropsWithChildren<{ sx?: object }>) {
-  const theme = useTheme();
-  const isDark = theme.palette.mode === "dark";
-  return (
-    <Box
-      sx={{
-        borderRadius: 2.5,
-        border: `1px solid ${alpha(theme.palette.divider, isDark ? 0.14 : 0.55)}`,
-        background: isDark
-          ? alpha("#fff", 0.025)
-          : alpha(theme.palette.background.paper, 0.6),
-        ...props.sx,
-      }}
-    >
-      {props.children}
-    </Box>
-  );
-}
-
-function NavIcon({ icon, isDark }: { icon: React.ReactNode; isDark: boolean }) {
-  const theme = useTheme();
-  return (
-    <Box
-      sx={{
-        width: 32, height: 32, borderRadius: 2,
-        display: "grid", placeItems: "center",
-        border: `1px solid ${alpha(theme.palette.divider, isDark ? 0.18 : 0.6)}`,
-        background: "linear-gradient(135deg, rgba(56,189,248,.14), rgba(120,119,198,.12))",
-        flexShrink: 0,
-        "& svg": { fontSize: 17 },
-      }}
-    >
-      {icon}
-    </Box>
-  );
-}
-
-function CaptionLabel({ children }: { children: React.ReactNode }) {
-  return (
-    <Typography
-      variant="caption" color="text.disabled"
-      sx={{ fontWeight: 700, textTransform: "uppercase", letterSpacing: 0.6, fontSize: 10.5, display: "block" }}
-    >
-      {children}
-    </Typography>
-  );
-}
 
 // ---------------------------------------------------------------------------
 // ToggleRow

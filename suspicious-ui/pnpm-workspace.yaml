@@ -1,0 +1,10 @@
+# pnpm 11 reads project settings here (the package.json "pnpm" field is no
+# longer honoured — see https://pnpm.io/settings).
+overrides:
+  # recharts@3.8.1 pulls es-toolkit ^1.39.3, which resolves to 1.47.0 — a
+  # broken release whose "./compat/*" exports map omits the ESM ("import")
+  # condition, so deep imports like es-toolkit/compat/get are CJS-only. That
+  # trips esbuild's CJS interop under Vite/Vitest browser mode
+  # ("require_isUnsafeProperty is not a function"). 1.47.1 restored the ESM
+  # condition; pin to it.
+  es-toolkit: 1.47.1
