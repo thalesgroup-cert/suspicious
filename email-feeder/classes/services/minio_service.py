@@ -15,6 +15,16 @@ import classes.models.configs.internals.minio
 # Object-storage activity -> minio.log + json stdout (see logger_service).
 logger = logging.getLogger("email-feeder.minio")
 
+# MinIO/S3 bucket names are bounded to 63 chars. Normalise once at the entry
+# point so the existence check, creation, and subsequent object puts all use
+# the SAME name — checking the full name but creating a truncated one made
+# long-named buckets fail to be re-detected on the next run.
+_MAX_BUCKET_NAME_LEN = 63
+
+
+def _normalize_bucket_name(bucket_name: str) -> str:
+    return bucket_name[:_MAX_BUCKET_NAME_LEN]
+
 
 class MinioService:
     __minio_client: minio.Minio | None = None
@@ -46,8 +56,6 @@ class MinioService:
     def __make_bucket(self, bucket_name: str) -> None:
         if self.__minio_client is None:
             raise Exception(f"MinIO client not available for bucket '{bucket_name}'.")
-        if len(bucket_name) > 63:
-            bucket_name = bucket_name[:63]
         self.__minio_client.make_bucket(bucket_name)
         logger.info("Created MinIO bucket '%s'", bucket_name)
 
@@ -157,6 +165,9 @@ class MinioService:
             raise Exception(
                 f"Source '{source_dir}' is not a directory or does not exist."
             )
+
+        # Normalise once so existence-check, creation, and object puts agree.
+        bucket_name = _normalize_bucket_name(bucket_name)
 
         bucket_creation_tags = {
             classes.models.mail_tags.MailTag.STATUS.value: classes.models.mail_tags.MailTag.TODO.value

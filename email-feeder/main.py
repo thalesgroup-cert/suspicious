@@ -347,10 +347,12 @@ def main() -> int:
 
     sleep_interval = config.timer_inbox_emails
     if sleep_interval <= 0:
+        default_interval = classes.models.configs.main_config.DEFAULT_SLEEP_INTERVAL
         logger.warning(
-            f"Invalid 'timer-inbox-emails' value ({sleep_interval}). Using default: {config.timer_inbox_emails}s."
+            "Invalid 'timer-inbox-emails' value (%s). Using default: %ss.",
+            sleep_interval, default_interval,
         )
-        sleep_interval = config.timer_inbox_emails
+        sleep_interval = default_interval
 
     _start_health_server()
 

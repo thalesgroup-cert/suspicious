@@ -33,8 +33,6 @@ ANALYSIS_DIR_PREFIX = "analysis_"
 
 
 class Mailbox:
-    fetched_unseen_email_ids: list[str] = []
-
     def __init__(
         self,
         config: classes.models.configs.internals.imap.IMAPConfig,
@@ -65,7 +63,7 @@ class Mailbox:
     def login(self):
         self.__mail_client.login()
 
-    def __exit__(self):
+    def __exit__(self, exc_type, exc_val, exc_tb):
         """Exits the runtime context, calls logout."""
         self.logout()
 

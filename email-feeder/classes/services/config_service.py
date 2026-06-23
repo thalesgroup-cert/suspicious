@@ -51,31 +51,6 @@ def load_config(
             )
         raise e
 
-    # logger.info("Reading config from Vault")
-
-    # vault_addr = os.getenv("VAULT_ADDR", "http://localhost:8200")
-    # vault_token = os.getenv("VAULT_TOKEN", "root")
-    # vault_path = "kv/data/feeder"
-
-    # try:
-    #     response = requests.get(
-    #         f"{vault_addr}/v1/{vault_path}",
-    #         headers={"X-Vault-Token": vault_token},
-    #         timeout=10,
-    #         verify=False,
-    #     )
-
-    #     response.raise_for_status()
-    #     secret_data = response.json()["data"]["data"]
-
-    #     config = secret_data
-
-    #     return config
-
-    # except Exception as e:
-    #     logger.error(f"Error loading config from Vault: {e}")
-    #     raise
-
 
 def _api_to_feeder_json(api: dict, local: dict) -> dict:
     """Translate the backend config-API response (settings.json shape) plus the
