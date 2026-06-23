@@ -171,6 +171,7 @@ class SubmissionDetailsView(RetrieveAPIView):
                 "fileOrMail__mail__mail_attachments",
                 "fileOrMail__mail__mail_artifacts",
                 "fileOrMail__mail__mail_artifacts__artifactIsUrl",
+                "fileOrMail__mail__mail_artifacts__artifactIsUrl__url",
                 "fileOrMail__mail__mail_artifacts__artifactIsIp",
                 "fileOrMail__mail__mail_artifacts__artifactIsHash",
                 "fileOrMail__mail__mail_artifacts__artifactIsDomain",
@@ -223,11 +224,13 @@ class SubmissionDetailsView(RetrieveAPIView):
                 artifact_domain_ids, artifact_mail_address_ids = [], []
 
                 for artifact in mail.mail_artifacts.select_related(
-                    "artifactIsUrl", "artifactIsIp", "artifactIsHash",
+                    "artifactIsUrl", "artifactIsUrl__url", "artifactIsIp", "artifactIsHash",
                     "artifactIsDomain", "artifactIsMailAddress",
                 ):
                     if artifact.artifactIsUrl_id and artifact.artifactIsUrl and artifact.artifactIsUrl.url_id:
                         artifact_url_ids.append(artifact.artifactIsUrl.url_id)
+                        if getattr(artifact.artifactIsUrl.url, "analyzed_url_id", None):
+                            artifact_url_ids.append(artifact.artifactIsUrl.url.analyzed_url_id)
                     if artifact.artifactIsIp_id and artifact.artifactIsIp and artifact.artifactIsIp.ip_id:
                         artifact_ip_ids.append(artifact.artifactIsIp.ip_id)
                     if artifact.artifactIsHash_id and artifact.artifactIsHash and artifact.artifactIsHash.hash_id:
@@ -252,6 +255,8 @@ class SubmissionDetailsView(RetrieveAPIView):
         if obj.nonFileIocs_id and linked_non_file_iocs is not None:
             if linked_non_file_iocs.url_id:
                 filters |= Q(url_id=linked_non_file_iocs.url_id)
+                if getattr(getattr(linked_non_file_iocs, "url", None), "analyzed_url_id", None):
+                    filters |= Q(url_id=linked_non_file_iocs.url.analyzed_url_id)
             if linked_non_file_iocs.ip_id:
                 filters |= Q(ip_id=linked_non_file_iocs.ip_id)
             if linked_non_file_iocs.hash_id:

@@ -98,6 +98,9 @@ def resolve_analyzer_report_target(obj: AnalyzerReport) -> dict:
             "kind": "URL",
             "id": obj.url_id,
             "value": getattr(obj.url, "address", str(obj.url_id)),
+            "analysis_status": getattr(obj.url, "analysis_status", None),
+            "interestingness": getattr(obj.url, "interestingness", None),
+            "canonical_key": getattr(obj.url, "canonical_key", None),
         }
     if obj.domain_id:
         return {
@@ -152,6 +155,9 @@ class AnalyzerReportTargetSerializer(serializers.Serializer):
     kind = serializers.ChoiceField(choices=ANALYZER_TARGET_KIND_CHOICES, read_only=True)
     id = serializers.IntegerField(allow_null=True, read_only=True)
     value = serializers.CharField(allow_null=True, read_only=True)
+    analysis_status = serializers.CharField(allow_null=True, read_only=True)
+    interestingness = serializers.IntegerField(allow_null=True, read_only=True)
+    canonical_key = serializers.CharField(allow_null=True, read_only=True)
 
 
 class SubmissionAnalyzerReportSerializer(serializers.ModelSerializer):
@@ -259,16 +265,58 @@ class SubmissionRowSerializer(BaseSubmissionSerializer):
 class SubmissionDetailsSerializer(SubmissionRowSerializer):
     analyzer_reports = serializers.SerializerMethodField()
     case_infos = serializers.SerializerMethodField()
+    url_artifacts = serializers.SerializerMethodField()
 
     class Meta(SubmissionRowSerializer.Meta):
         fields = SubmissionRowSerializer.Meta.fields + [
             "analyzer_reports",
             "case_infos",
+            "url_artifacts",
         ]
 
     def get_analyzer_reports(self, obj):
         reports = self.context.get("analyzer_reports", [])
         return SubmissionAnalyzerReportSerializer(reports, many=True).data
+
+    def get_url_artifacts(self, obj):
+        """
+        Return ALL distinct URL objects linked to this case, from both:
+          - fileOrMail.mail.mail_artifacts[].artifactIsUrl.url
+          - nonFileIocs.url
+        Each entry carries analysis_status/interestingness/canonical_key so the
+        UI can list skipped URLs and offer an on-demand "Analyze" button.
+        De-duplicated by URL id. Uses only prefetched relations — no extra DB hits.
+        """
+        seen: set = set()
+        result: list = []
+
+        def _append(url_obj):
+            if url_obj is None or url_obj.pk in seen:
+                return
+            seen.add(url_obj.pk)
+            result.append({
+                "id": url_obj.pk,
+                "address": url_obj.address,
+                "analysis_status": url_obj.analysis_status,
+                "interestingness": url_obj.interestingness,
+                "canonical_key": url_obj.canonical_key,
+                "analyzed_url_id": url_obj.analyzed_url_id,
+            })
+
+        linked_file_or_mail = getattr(obj, "fileOrMail", None)
+        if obj.fileOrMail_id and linked_file_or_mail is not None:
+            mail = getattr(linked_file_or_mail, "mail", None)
+            if mail is not None:
+                for artifact in mail.mail_artifacts.all():
+                    artifact_is_url = getattr(artifact, "artifactIsUrl", None)
+                    if artifact_is_url is not None:
+                        _append(getattr(artifact_is_url, "url", None))
+
+        linked_non_file_iocs = getattr(obj, "nonFileIocs", None)
+        if obj.nonFileIocs_id and linked_non_file_iocs is not None:
+            _append(getattr(linked_non_file_iocs, "url", None))
+
+        return result
 
     def get_case_infos(self, obj):
         return {
