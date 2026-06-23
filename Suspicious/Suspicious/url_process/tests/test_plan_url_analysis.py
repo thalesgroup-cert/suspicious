@@ -1,4 +1,5 @@
 """Tests for plan_url_analysis — Task 4 of the URL Analysis Planner."""
+import uuid
 from contextlib import contextmanager
 from datetime import timedelta
 from unittest import mock
@@ -33,7 +34,7 @@ def _mk_report(url, analyzer):
     return AnalyzerReport.objects.create(
         url=url,
         analyzer=analyzer,
-        cortex_job_id="job-test-1",
+        cortex_job_id=f"job-test-{uuid.uuid4().hex[:8]}",
         type="url",
         status="Success",
         level="info",
@@ -99,6 +100,9 @@ class PlanUrlAnalysisTest(TestCase):
         with override_config(max_per_domain=1):
             plan = plan_url_analysis(boring + [redirect])
         self.assertIn(redirect, plan.to_analyze)
+        self.assertEqual(len(plan.to_analyze), 1)
+        for b in boring:
+            self.assertIn(b, plan.skipped)
 
     def test_cross_case_ttl_hit_reuses(self):
         analyzer = _mk_analyzer()
@@ -111,6 +115,9 @@ class PlanUrlAnalysisTest(TestCase):
             plan = plan_url_analysis([fresh])
         self.assertEqual(len(plan.to_reuse), 1)
         self.assertEqual(plan.to_reuse[0][1], prior)
+        fresh.refresh_from_db()
+        self.assertEqual(fresh.analysis_status, URL.AnalysisStatus.REUSED)
+        self.assertEqual(fresh.analyzed_url_id, prior.id)
 
     def test_cross_case_ttl_miss_analyzes(self):
         from cortex_job.models import AnalyzerReport
@@ -133,3 +140,13 @@ class PlanUrlAnalysisTest(TestCase):
         plan = plan_url_analysis([bad])
         # never dropped — ends up analyzed
         self.assertIn(bad, plan.to_analyze)
+        self.assertEqual(len(plan.skipped), 0)
+        self.assertEqual(len(plan.to_reuse), 0)
+
+    def test_multiple_unparseable_urls_not_collapsed(self):
+        a = _mk("http://[::bad::]/")
+        b = _mk("http://[::worse::]/")
+        plan = plan_url_analysis([a, b])
+        self.assertIn(a, plan.to_analyze)
+        self.assertIn(b, plan.to_analyze)
+        self.assertEqual(len(plan.to_reuse), 0)

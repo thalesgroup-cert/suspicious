@@ -238,7 +238,8 @@ def plan_url_analysis(url_instances, *, sender_domain=None) -> URLAnalysisPlan:
             u.save(update_fields=["canonical_key", "interestingness"])
         except Exception:  # noqa: BLE001 — fail-open
             logger.warning("annotate failed for URL id=%s; fail-open", u.pk, exc_info=True)
-        by_key.setdefault(u.canonical_key, []).append(u)
+        group_key = u.canonical_key or f"__unkeyed__:{u.pk}"
+        by_key.setdefault(group_key, []).append(u)
 
     # Step 2: within-case collapse → one representative per canonical key
     representatives = []
