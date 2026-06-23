@@ -65,6 +65,7 @@ import MailPreview from "@/shared/components/MailPreview";
 
 import { SoftCard } from "@/features/submissions/components/cards";
 import { AnalyzerReportCard } from "@/features/submissions/components/AnalyzerReportCard";
+import { UrlGroupList } from "@/features/submissions/components/UrlGroupList";
 import {
   RESULT_OPTIONS,
   STATUS_OPTIONS,
@@ -316,6 +317,7 @@ export default function SubmissionsPage() {
     () => detailsQuery.data?.analyzer_reports ?? [],
     [detailsQuery.data]
   );
+  const urlArtifacts = detailsQuery.data?.url_artifacts ?? [];
   const hasRawDetails = typeof detailsQuery.data?.raw !== "undefined";
 
   // Group reports by artifact so the drawer shows one section per checked item
@@ -1027,6 +1029,16 @@ export default function SubmissionsPage() {
                     </Stack>
                   )}
                 </Box>
+
+                {/* ── URL artifacts — grouped by domain ────────────────────── */}
+                {urlArtifacts.length > 0 && (
+                  <Box sx={{ px: 2.25, pt: 2, pb: 1 }}>
+                    <Typography sx={{ fontSize: 10, fontWeight: 700, textTransform: "uppercase", letterSpacing: "0.08em", color: "text.disabled", mb: 1.25 }}>
+                      URLs · {urlArtifacts.length} artifact{urlArtifacts.length !== 1 ? "s" : ""}
+                    </Typography>
+                    <UrlGroupList submissionId={selectedIdNum} urls={urlArtifacts} />
+                  </Box>
+                )}
               </Stack>
             </Box>
           </Stack>
