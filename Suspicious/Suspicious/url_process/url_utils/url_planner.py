@@ -287,3 +287,21 @@ def plan_url_analysis(url_instances, *, sender_domain=None) -> URLAnalysisPlan:
             plan.skipped.append(o)
 
     return plan
+
+
+def filter_dispatch_intents(intents, *, sender_domain=None):
+    """Given a list of (obj, data_type) dispatch intents, return a possibly-reduced
+    list with redundant URL intents removed per plan_url_analysis. Non-URL intents
+    pass through untouched. Honors the url_analysis.enabled kill-switch and only
+    engages when there is more than one URL intent. Fail-open: any error returns
+    the original intents unchanged so dispatch is never blocked."""
+    url_intents = [(v, t) for (v, t) in intents if t == "url"]
+    if not get_config("url_analysis.enabled", False) or len(url_intents) <= 1:
+        return list(intents)
+    try:
+        plan = plan_url_analysis([v for (v, _t) in url_intents], sender_domain=sender_domain)
+        keep = set(plan.to_analyze)            # URL instances to dispatch
+        return [(v, t) for (v, t) in intents if t != "url" or v in keep]
+    except Exception:
+        logger.warning("URL planner failed; dispatching all URL intents", exc_info=True)
+        return list(intents)

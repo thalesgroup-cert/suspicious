@@ -17,7 +17,7 @@ class DispatchPlannerTest(TestCase):
         case.fileOrMail = mock.Mock(mail_id=99)
         return case
 
-    @mock.patch("case_handler.case_utils.case_handler.get_config")
+    @mock.patch("url_process.url_utils.url_planner.get_config")
     @mock.patch("case_handler.case_utils.case_handler.CortexJob")
     def test_enabled_dispatches_only_survivors(self, CortexJob, get_config):
         get_config.side_effect = lambda k, d=None: {"url_analysis.enabled": True,
@@ -28,7 +28,7 @@ class DispatchPlannerTest(TestCase):
         # collapsed to one canonical group, capped to 1 → exactly one Cortex dispatch
         self.assertEqual(CortexJob.return_value.launch_cortex_jobs.call_count, 1)
 
-    @mock.patch("case_handler.case_utils.case_handler.get_config")
+    @mock.patch("url_process.url_utils.url_planner.get_config")
     @mock.patch("case_handler.case_utils.case_handler.CortexJob")
     def test_disabled_dispatches_all(self, CortexJob, get_config):
         get_config.side_effect = lambda k, d=None: {"url_analysis.enabled": False}.get(k, d)

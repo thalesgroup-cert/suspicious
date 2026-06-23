@@ -116,6 +116,8 @@ class UrlOnDemandAuthTest(APITestCase):
         resp = self.client.post(_url(self.case.pk, self.url.pk))
         self.assertEqual(resp.status_code, 202)
         self.assertEqual(resp.data["status"], "queued")
+        self.url.refresh_from_db()
+        self.assertEqual(self.url.analysis_status, URL.AnalysisStatus.PENDING)
 
     # ------------------------------------------------------------------
     # Fix 3e: mail path — url linked via mail artifact is accessible

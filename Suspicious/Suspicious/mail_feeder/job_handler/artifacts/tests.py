@@ -1,5 +1,7 @@
 from unittest import TestCase
 from unittest.mock import patch, MagicMock
+from unittest import mock
+import django.test
 
 from mail_feeder.job_handler.artifacts.artifacts import ArtifactJobLauncherService
 
@@ -136,3 +138,56 @@ class ArtifactJobLauncherServiceTests(TestCase):
         self.assertEqual(job_ids, [42])
         m_cortex.return_value.launch_cortex_jobs.assert_called_once_with(ip, "ip", case=case)
         self.assertEqual(service.pending_dispatch_intents, [])
+
+
+class ArtifactPlannerIntegrationTest(django.test.TestCase):
+    """Integration test: ArtifactJobLauncherService.dispatch_pending engages
+    the URL planner to reduce redundant Cortex dispatches on mail-origin emails."""
+
+    @mock.patch("mail_feeder.job_handler.artifacts.artifacts.CortexJob")
+    @mock.patch("url_process.url_utils.url_planner.get_config")
+    def test_planner_collapses_same_fqdn_urls(self, mock_get_config, MockCortex):
+        """4 URLs sharing canonical key → planner keeps 1 → Cortex called once."""
+        from url_process.models import URL
+        mock_get_config.side_effect = lambda k, d=None: {
+            "url_analysis.enabled": True,
+            "url_analysis.max_per_domain": 1,
+            "url_analysis.reuse_ttl_days": 7,
+        }.get(k, d)
+        MockCortex.return_value.launch_cortex_jobs.return_value = [1]
+
+        urls = [URL.objects.create(address=f"https://x.com/p?id={i}") for i in range(4)]
+        service = ArtifactJobLauncherService()
+        service.pending_dispatch_intents = [(u, "url") for u in urls]
+
+        case = mock.MagicMock()
+        case.id = 99
+        # No mail on this case (sender_domain=None path)
+        case.fileOrMail = None
+
+        service.dispatch_pending(case)
+
+        # 4 URLs → planner → 1 canonical group capped to 1 → 1 Cortex call
+        self.assertEqual(MockCortex.return_value.launch_cortex_jobs.call_count, 1)
+
+    @mock.patch("mail_feeder.job_handler.artifacts.artifacts.CortexJob")
+    @mock.patch("url_process.url_utils.url_planner.get_config")
+    def test_planner_disabled_dispatches_all(self, mock_get_config, MockCortex):
+        """When url_analysis.enabled=False, all URL intents are dispatched."""
+        from url_process.models import URL
+        mock_get_config.side_effect = lambda k, d=None: {
+            "url_analysis.enabled": False,
+        }.get(k, d)
+        MockCortex.return_value.launch_cortex_jobs.return_value = [1]
+
+        urls = [URL.objects.create(address=f"https://x.com/p?id={i}") for i in range(4)]
+        service = ArtifactJobLauncherService()
+        service.pending_dispatch_intents = [(u, "url") for u in urls]
+
+        case = mock.MagicMock()
+        case.id = 99
+        case.fileOrMail = None
+
+        service.dispatch_pending(case)
+
+        self.assertEqual(MockCortex.return_value.launch_cortex_jobs.call_count, 4)

@@ -19,8 +19,6 @@ from settings.models import (
     WatcherLegitDomain,
 )
 from cortex_job.cortex_utils.cortex_and_job_management import CortexJob
-from settings.config import get_config
-from url_process.url_utils.url_planner import plan_url_analysis
 
 logger = logging.getLogger(__name__)
 
@@ -228,24 +226,11 @@ class CaseHandler:
             self.pending_dispatch_intents = []
             return
 
-        url_intents = [(v, t) for (v, t) in self.pending_dispatch_intents if t == "url"]
-        other_intents = [(v, t) for (v, t) in self.pending_dispatch_intents if t != "url"]
-
-        url_values_to_dispatch = [v for (v, _t) in url_intents]
-        is_mail = bool(
-            getattr(case, "fileOrMail", None) and getattr(case.fileOrMail, "mail_id", None)
-        )
-        if get_config("url_analysis.enabled", False) and is_mail and len(url_intents) > 1:
-            try:
-                plan = plan_url_analysis(url_values_to_dispatch)
-                url_values_to_dispatch = list(plan.to_analyze)
-            except Exception:  # noqa: BLE001 — fail-open: dispatch all URLs
-                logger.exception("URL planner failed for case=%s; dispatching all URLs", case.id)
-                url_values_to_dispatch = [v for (v, _t) in url_intents]
+        from url_process.url_utils.url_planner import filter_dispatch_intents
+        intents = filter_dispatch_intents(self.pending_dispatch_intents, sender_domain=None)
 
         cortex = CortexJob()
-        dispatch_list = other_intents + [(v, "url") for v in url_values_to_dispatch]
-        for value, data_type in dispatch_list:
+        for value, data_type in intents:
             try:
                 cortex.launch_cortex_jobs(value=value, data_type=data_type, case=case)
             except Exception:

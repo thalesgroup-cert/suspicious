@@ -18,6 +18,7 @@ from api.permissions.submissions import CanAccessSubmission
 from api.serializers.submissions import case_url_ids
 from case_handler.models import Case
 from cortex_job.cortex_utils.cortex_and_job_management import CortexJob
+from cortex_job.models import AnalyzerReport
 from url_process.models import URL
 
 logger = logging.getLogger(__name__)
@@ -35,6 +36,11 @@ class SubmissionUrlAnalyzeView(APIView):
             raise Http404
 
         url = get_object_or_404(URL, pk=url_id)
+
+        # Idempotency: skip dispatch if a fresh report already exists
+        if AnalyzerReport.objects.filter(url=url).exists():
+            return Response({"status": "already_analyzed", "url_id": url.id},
+                            status=status.HTTP_200_OK)
 
         if url.analysis_status in (URL.AnalysisStatus.PENDING, URL.AnalysisStatus.ANALYZED):
             return Response({"status": "already_pending", "url_id": url.id},
