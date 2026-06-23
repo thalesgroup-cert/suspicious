@@ -1,4 +1,5 @@
 import json
+import logging
 import os
 import shutil
 import pathlib
@@ -296,7 +297,9 @@ def main() -> int:
 
     acknowledge_bad_mail_service = (
         classes.services.acknowledge_bad_mail_service.AcknowledgeBadMailService(
-            config=config.mail, logger=logger
+            config=config.mail,
+            # Acknowledgement-mail send activity -> smtp.log + json stdout.
+            logger=logging.getLogger("email-feeder.smtp"),
         )
     )
 

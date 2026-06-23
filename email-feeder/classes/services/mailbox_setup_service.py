@@ -8,6 +8,10 @@ def setup_mailboxes(
     config: classes.models.configs.main_config.MainConfig,
     logger: logging.Logger,
 ) -> list[classes.services.mailbox_service.Mailbox]:
+    # IMAP fetch/login/seen activity goes to the dedicated imap domain logger
+    # (-> imap.log + json stdout). The passed-in `logger` (root email-feeder)
+    # is still used for setup-level lifecycle messages.
+    imap_logger = logging.getLogger("email-feeder.imap")
     """
     Connects to mailboxes defined in the configuration file and returns a list of Mailbox objects.
 
@@ -42,7 +46,7 @@ def setup_mailboxes(
 
             mailbox = classes.services.mailbox_service.Mailbox(
                 config=instance_config,
-                logger=logger,
+                logger=imap_logger,
                 tmp_path=config.working_path,
             )
 

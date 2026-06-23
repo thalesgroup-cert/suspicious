@@ -34,7 +34,6 @@ RUN apt-get update && \
         ca-certificates \
         curl \
         libmariadb3 \
-        logrotate \
     && apt-get clean \
     && rm -rf /var/lib/apt/lists/*
 

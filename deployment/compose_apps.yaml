@@ -134,8 +134,9 @@ services:
     environment:
       BACKEND_URL: "${BACKEND_URL:-}"
       FEEDER_API_TOKEN: "${FEEDER_API_TOKEN:-}"
+      LOG_LEVEL: "${LOG_LEVEL:-INFO}"
     volumes:
-      - "${FEEDER_PATH}/application.log:/app/application.log"
+      - "${FEEDER_PATH}/logs:/app/log"
       - "${FEEDER_PATH}/config.json:/app/config.json:ro"
       - "${CA_PATH}/certfile.pem:/etc/private/certfile.pem:ro"
       - "${CA_PATH}/keyfile.pem:/etc/private/keyfile.pem:ro"

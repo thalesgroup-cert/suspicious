@@ -1,3 +1,4 @@
+import logging
 import pathlib
 import typing
 
@@ -9,6 +10,10 @@ import minio.commonconfig
 
 import classes.models.mail_tags
 import classes.models.configs.internals.minio
+
+
+# Object-storage activity -> minio.log + json stdout (see logger_service).
+logger = logging.getLogger("email-feeder.minio")
 
 
 class MinioService:
@@ -26,6 +31,11 @@ class MinioService:
             secret_key=self.__config.secret_key,
             secure=self.__config.secure,
         )
+        logger.info(
+            "MinIO client connected: endpoint=%s secure=%s",
+            self.__config.endpoint,
+            self.__config.secure,
+        )
 
     def __bucket_exists(self, bucket_name: str) -> bool:
         if self.__minio_client is None:
@@ -39,6 +49,7 @@ class MinioService:
         if len(bucket_name) > 63:
             bucket_name = bucket_name[:63]
         self.__minio_client.make_bucket(bucket_name)
+        logger.info("Created MinIO bucket '%s'", bucket_name)
 
     def __assign_bucket_tags(self, bucket_name: str, tags_to_set: dict[str, str]):
         if self.__minio_client is None:
@@ -158,6 +169,7 @@ class MinioService:
                 f"Cannot upload to MinIO bucket '{bucket_name}' as it could not be ensured/created."
             ) from e
 
+        uploaded = 0
         for file_path in source_dir.rglob("*"):
             if not file_path.is_file():
                 continue
@@ -177,11 +189,21 @@ class MinioService:
                     object_name=minio_file_path.as_posix(),
                     default_tags=default_tags,
                 )
+                uploaded += 1
 
             except Exception as e:
+                logger.error(
+                    "Upload failed for '%s' as '%s': %s",
+                    file_path.name, minio_file_path, e,
+                )
                 raise Exception(
                     f"Failed to upload '{file_path.name}' as '{minio_file_path}': {e}",
                 ) from e
+
+        logger.info(
+            "Uploaded %d file(s) from '%s' to bucket '%s'",
+            uploaded, source_dir, bucket_name,
+        )
 
     @property
     def is_connected(self) -> bool:
