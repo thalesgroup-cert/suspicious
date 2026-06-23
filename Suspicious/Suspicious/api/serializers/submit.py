@@ -8,7 +8,12 @@ from rest_framework import serializers
 
 
 DEFAULT_CONTEXT_MAX_LENGTH = 2000
-DEFAULT_OTHER_MAX_LENGTH = 4096
+# An "other" indicator resolves to an IP or a hash; the hash column caps at 255
+# (UploadOtherForm enforces the same). Keep the serializer bound aligned so
+# oversize input is rejected here with a clear field error instead of failing
+# late in form processing.
+DEFAULT_OTHER_MAX_LENGTH = 255
+DEFAULT_URL_MAX_LENGTH = 2048
 DEFAULT_UPLOAD_MAX_BYTES = 25 * 1024 * 1024  # 25 MB
 
 _BLOCKED_NETWORKS = (
@@ -129,7 +134,10 @@ def _check_no_ssrf_ip(url: str) -> None:
 
 
 class SubmitUrlSerializer(OptionalContextMixin, serializers.Serializer):
-    url = serializers.URLField(required=True)
+    url = serializers.URLField(
+        required=True,
+        max_length=getattr(settings, "SUBMIT_URL_MAX_LENGTH", DEFAULT_URL_MAX_LENGTH),
+    )
 
     def validate_url(self, value: str) -> str:
         value = value.strip()
@@ -164,9 +172,30 @@ _ZIP_MAX_UNCOMPRESSED  = 100 * 1024 * 1024   # 100 MB
 _ZIP_MAX_RATIO         = 100                 # uncompressed / compressed
 
 
+def _is_zip_by_magic(uploaded_file) -> bool:
+    """True if the file starts with a ZIP local-file/empty-archive signature.
+
+    Detection is by content, not extension: an attacker can rename a bomb
+    (bomb.zip → bomb.dat) to dodge an extension check, but a downstream
+    analyzer that unpacks by content would still expand it. PK\\x03\\x04 is a
+    normal archive; PK\\x05\\x06 is an empty one.
+    """
+    try:
+        uploaded_file.seek(0)
+        magic = uploaded_file.read(4)
+    except Exception:
+        return False
+    finally:
+        try:
+            uploaded_file.seek(0)
+        except Exception:
+            pass
+    return magic[:4] in (b"PK\x03\x04", b"PK\x05\x06")
+
+
 def _check_zip_bomb(uploaded_file) -> None:
     name = (getattr(uploaded_file, "name", "") or "").lower()
-    if not name.endswith(".zip"):
+    if not name.endswith(".zip") and not _is_zip_by_magic(uploaded_file):
         return
     try:
         uploaded_file.seek(0)
