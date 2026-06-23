@@ -99,10 +99,20 @@ export type SubmissionCaseInfos = {
   category_ai: string | null;
 };
 
+export type UrlArtifact = {
+  id: number;
+  address: string;
+  analysis_status: "pending" | "analyzed" | "reused" | "skipped";
+  interestingness: number;
+  canonical_key: string;
+  analyzed_url_id: number | null;
+};
+
 export type SubmissionDetails = SubmissionRow & {
   analyzer_reports: SubmissionAnalyzerReport[];
   case_infos?: SubmissionCaseInfos;
   raw?: SubmissionRawDetails;
+  url_artifacts?: UrlArtifact[];
 };
 
 export type SubmissionOrdering =
@@ -144,5 +154,17 @@ export async function getSubmissionDetails(id: number): Promise<SubmissionDetail
 
 export async function challengeSubmission(id: number): Promise<{ detail: string }> {
   const res = await api.post(`/submissions/${id}/challenge/`);
+  return res.data;
+}
+
+export type AnalyzeUrlResponse = { status: string; url_id: number };
+
+export async function analyzeUrl(
+  submissionId: number,
+  urlId: number,
+): Promise<AnalyzeUrlResponse> {
+  const res = await api.post<AnalyzeUrlResponse>(
+    `/submissions/${submissionId}/urls/${urlId}/analyze/`,
+  );
   return res.data;
 }
