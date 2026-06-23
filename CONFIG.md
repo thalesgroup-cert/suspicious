@@ -719,7 +719,7 @@ falls back to it on a backend blip; with no cache and no backend it exits
 immediately. As a result, the `storage`, `outgoing-mail`, and `branding`
 blocks have been removed from `email-feeder/config.json` — that file now
 holds only `mail-connectors`, `working-path`, and polling settings
-(see [§3](#3-email-feederconfigurejson--email-ingestion-service)).
+(see [§3](#3-email-feederconfigjson-email-ingestion-service)).
 
 ---
 
@@ -749,7 +749,7 @@ make createsuperuser
 
 The full stack starts: web UI, API, database, email-feeder, Cortex, RustFS,
 Elasticsearch, ChromaDB, Traefik, and Vault. `make seed-config` loads the
-non-secret runtime config into the database (see [Runtime config + secrets](#runtime-config--secrets-db--vault)).
+non-secret runtime config into the database (see [Runtime config + secrets](#runtime-config-secrets-db-vault)).
 See [INSTALL.md](./INSTALL.md) for the step-by-step walkthrough and verification.
 
 ---

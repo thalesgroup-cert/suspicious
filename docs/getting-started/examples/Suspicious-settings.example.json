@@ -2,7 +2,7 @@
     "app": {
         "name": "suspicious",
         "debug": true,
-        "secret_key": "SS765PvR2fRXn82TTdxSWvxyhXe9a1SdFf3EPDo-xgdcJGyO0T4t7_fdX3XWzSlTmU65WhwPGS1yZy9V6W9DNw",
+        "secret_key": "replace-with-vault-or-a-real-64-char-random-key-0123456789abcdef",
         "allowed_hosts": [
             "suspicious",
             "suspicious.meridian.example",
