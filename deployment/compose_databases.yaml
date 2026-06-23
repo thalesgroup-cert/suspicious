@@ -88,8 +88,6 @@ services:
         soft: -1
         hard: -1
     environment:
-      http_proxy:               "${HTTP_PROXY:-}"
-      https_proxy:              "${HTTPS_PROXY:-}"
       no_proxy:                 "localhost"
       discovery.type:           "single-node"
       xpack.security.enabled:   "false"
