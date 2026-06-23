@@ -11,7 +11,13 @@ from __future__ import annotations
 
 import ipaddress
 import logging
+from dataclasses import dataclass, field
+from datetime import timedelta
 from urllib.parse import urlsplit, parse_qs
+
+from django.utils import timezone
+
+from settings.config import get_config
 
 logger = logging.getLogger(__name__)
 
@@ -54,7 +60,6 @@ def canonical_key(url: str) -> str:
 
 
 def _cfg_list(key: str, default: tuple[str, ...]) -> tuple[str, ...]:
-    from settings.config import get_config
     value = get_config(key, None)
     if isinstance(value, (list, tuple)) and value:
         return tuple(str(v).lower() for v in value)
@@ -137,3 +142,147 @@ def score_interestingness(url: str, *, sender_domain: str | None = None) -> int:
     except Exception:  # noqa: BLE001 — scoring must never raise
         logger.warning("score_interestingness failed for %r; defaulting to 0", url, exc_info=True)
         return 0
+
+
+# ---------------------------------------------------------------------------
+# URLAnalysisPlan dataclass + plan_url_analysis entry point
+# ---------------------------------------------------------------------------
+
+@dataclass
+class URLAnalysisPlan:
+    to_analyze: list = field(default_factory=list)
+    to_reuse: list = field(default_factory=list)   # list[tuple[URL, URL]]
+    skipped: list = field(default_factory=list)
+
+
+def _safe_canonical(url) -> str:
+    """Return canonical_key for *url*, defaulting to '' on any error (fail-open)."""
+    try:
+        return canonical_key(url.address or "")
+    except Exception:  # noqa: BLE001
+        logger.warning("canonical_key failed for URL id=%s; fail-open", url.pk, exc_info=True)
+        return ""
+
+
+def _registered_domain_for_url(url) -> str:
+    """Best-effort registered domain for *url*; '' on failure."""
+    try:
+        addr = url.address or ""
+        if "://" not in addr:
+            addr = "http://" + addr
+        return _registered_domain_lower(urlsplit(addr).hostname or "")
+    except Exception:  # noqa: BLE001 — fail-open
+        return ""
+
+
+def _find_reusable_prior(canonical: str, ttl_days: int, exclude_ids: list):
+    """Return the most-recent other URL with the same canonical_key that has
+    a fresh (within TTL) AnalyzerReport, or ``None`` if no such row exists.
+    """
+    if not canonical:
+        return None
+    from url_process.models import URL
+    from cortex_job.models import AnalyzerReport
+
+    cutoff = timezone.now() - timedelta(days=ttl_days)
+    candidate = (
+        URL.objects.filter(
+            canonical_key=canonical,
+            analysis_status__in=[URL.AnalysisStatus.ANALYZED, URL.AnalysisStatus.REUSED],
+        )
+        .exclude(id__in=exclude_ids)
+        .order_by("-last_update")
+        .first()
+    )
+    if candidate is None:
+        return None
+    has_fresh_report = AnalyzerReport.objects.filter(
+        url=candidate, creation_date__gte=cutoff
+    ).exists()
+    return candidate if has_fresh_report else None
+
+
+def plan_url_analysis(url_instances, *, sender_domain=None) -> URLAnalysisPlan:
+    """Decide which URLs in *url_instances* to analyze, reuse, or skip.
+
+    Persists ``canonical_key``, ``interestingness``, ``analysis_status``, and
+    ``analyzed_url`` on each row.  Fail-open per URL: an exception processing
+    one URL must not prevent others from being planned.
+
+    Steps:
+      1. Annotate each URL with canonical_key + interestingness.
+      2. Within-case collapse: URLs with the same canonical_key collapse to
+         one representative; duplicates are marked REUSED → representative.
+      3. Cross-case TTL reuse: if a representative's canonical_key has a
+         recent AnalyzerReport in another row, reuse that row instead of
+         dispatching a new analysis.
+      4. Per-domain cap: keep only the top-N most-interesting URLs per
+         registered domain; remainder are marked SKIPPED.
+    """
+    from url_process.models import URL
+
+    plan = URLAnalysisPlan()
+    if not url_instances:
+        return plan
+
+    max_per_domain = int(get_config("url_analysis.max_per_domain", 5) or 5)
+    ttl_days = int(get_config("url_analysis.reuse_ttl_days", 7) or 7)
+    all_ids = [u.pk for u in url_instances]
+
+    # Step 1: annotate each URL with canonical_key + interestingness
+    by_key: dict[str, list] = {}
+    for u in url_instances:
+        try:
+            u.canonical_key = _safe_canonical(u)
+            u.interestingness = score_interestingness(u.address or "", sender_domain=sender_domain)
+            u.save(update_fields=["canonical_key", "interestingness"])
+        except Exception:  # noqa: BLE001 — fail-open
+            logger.warning("annotate failed for URL id=%s; fail-open", u.pk, exc_info=True)
+        by_key.setdefault(u.canonical_key, []).append(u)
+
+    # Step 2: within-case collapse → one representative per canonical key
+    representatives = []
+    for key, group in by_key.items():
+        # Sort: highest interestingness first; tie-break by longer address
+        group.sort(key=lambda u: (-u.interestingness, len(u.address or "")))
+        rep, dups = group[0], group[1:]
+        representatives.append(rep)
+        for d in dups:
+            d.analysis_status = URL.AnalysisStatus.REUSED
+            d.analyzed_url = rep
+            d.save(update_fields=["analysis_status", "analyzed_url"])
+            plan.to_reuse.append((d, rep))
+
+    # Step 3: cross-case TTL reuse
+    candidates = []
+    for rep in representatives:
+        prior = None
+        try:
+            prior = _find_reusable_prior(rep.canonical_key, ttl_days, all_ids)
+        except Exception:  # noqa: BLE001 — fail-open → analyze
+            logger.warning("TTL lookup failed for URL id=%s; fail-open", rep.pk, exc_info=True)
+        if prior is not None:
+            rep.analysis_status = URL.AnalysisStatus.REUSED
+            rep.analyzed_url = prior
+            rep.save(update_fields=["analysis_status", "analyzed_url"])
+            plan.to_reuse.append((rep, prior))
+        else:
+            candidates.append(rep)
+
+    # Step 4: per-domain cap — keep top-N most-interesting per registered domain
+    by_domain: dict[str, list] = {}
+    for c in candidates:
+        by_domain.setdefault(_registered_domain_for_url(c), []).append(c)
+    for domain, group in by_domain.items():
+        group.sort(key=lambda u: -u.interestingness)
+        keep, overflow = group[:max_per_domain], group[max_per_domain:]
+        for k in keep:
+            k.analysis_status = URL.AnalysisStatus.PENDING
+            k.save(update_fields=["analysis_status"])
+            plan.to_analyze.append(k)
+        for o in overflow:
+            o.analysis_status = URL.AnalysisStatus.SKIPPED
+            o.save(update_fields=["analysis_status"])
+            plan.skipped.append(o)
+
+    return plan
