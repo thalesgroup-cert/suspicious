@@ -262,6 +262,38 @@ class SubmissionRowSerializer(BaseSubmissionSerializer):
         ]
 
 
+def case_url_ids(case) -> set:
+    """
+    Return the set of URL PKs that are linked to *case* via either path:
+      - case.fileOrMail.mail.mail_artifacts[].artifactIsUrl.url
+      - case.nonFileIocs.url
+    Mirrors the traversal in SubmissionDetailsSerializer.get_url_artifacts so
+    the url_analysis view can authorise url_id without duplicating logic.
+    Relies on the same prefetched relations used by the detail view, but also
+    works with plain ORM access (it will just issue extra queries).
+    """
+    ids: set = set()
+
+    linked_file_or_mail = getattr(case, "fileOrMail", None)
+    if case.fileOrMail_id and linked_file_or_mail is not None:
+        mail = getattr(linked_file_or_mail, "mail", None)
+        if mail is not None:
+            for artifact in mail.mail_artifacts.all():
+                artifact_is_url = getattr(artifact, "artifactIsUrl", None)
+                if artifact_is_url is not None:
+                    url_obj = getattr(artifact_is_url, "url", None)
+                    if url_obj is not None:
+                        ids.add(url_obj.pk)
+
+    linked_non_file_iocs = getattr(case, "nonFileIocs", None)
+    if case.nonFileIocs_id and linked_non_file_iocs is not None:
+        url_obj = getattr(linked_non_file_iocs, "url", None)
+        if url_obj is not None:
+            ids.add(url_obj.pk)
+
+    return ids
+
+
 class SubmissionDetailsSerializer(SubmissionRowSerializer):
     analyzer_reports = serializers.SerializerMethodField()
     case_infos = serializers.SerializerMethodField()
