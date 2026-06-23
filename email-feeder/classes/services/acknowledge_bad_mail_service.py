@@ -194,7 +194,17 @@ class AcknowledgeBadMailService:
     @staticmethod
     def __load_template() -> jinja2.Template:
         file_system_template_loader = jinja2.FileSystemLoader(TEMPLATES_DIR)
-        env = jinja2.Environment(loader=file_system_template_loader)
+        # autoescape ON: the template renders attacker-controlled values
+        # (recipient == From-header address) and config-supplied URLs into
+        # HTML/href context. Without escaping this is an HTML-injection sink
+        # in mail emitted from the CERT's own SMTP server.
+        env = jinja2.Environment(
+            loader=file_system_template_loader,
+            autoescape=jinja2.select_autoescape(
+                enabled_extensions=("html", "jinja2", "jinja", "j2"),
+                default_for_string=True,
+            ),
+        )
         return env.get_template("acknowledge_bad_mail.jinja2")
 
     def get_html(self, subject: str, sender: str, recipient: str, infos: str) -> str:

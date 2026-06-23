@@ -62,7 +62,7 @@ class MainConfig(pydantic.BaseModel):
                 },
                 imaps={
                     connector_name: classes.models.configs.internals.imap.IMAPConfig(
-                        **connector
+                        **{**connector, "use_ssl": True}
                     )
                     for connector_name, connector in raw_mail_connectors_imaps.items()
                 },
