@@ -183,5 +183,12 @@
     },
     "domains": [
         "testgroup.com"
-    ]
+    ],
+    "url_analysis": {
+        "enabled": true,
+        "max_per_domain": 5,
+        "reuse_ttl_days": 7,
+        "shortener_domains": ["bit.ly", "tinyurl.com", "t.co", "goo.gl", "ow.ly"],
+        "suspicious_tlds": ["zip", "mov", "xyz", "top", "click"]
+    }
 }
