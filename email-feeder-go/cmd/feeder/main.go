@@ -26,10 +26,10 @@ import (
 )
 
 // smtpSender implements ack.Sender via net/smtp.
+// STARTTLS is always used (smtp.SendMail); implicit TLS is out of scope for now.
 type smtpSender struct {
 	addr string // host:port
 	auth smtp.Auth
-	tls  bool
 }
 
 func newSMTPSender(cfg config.SMTPConfig) *smtpSender {
@@ -38,7 +38,7 @@ func newSMTPSender(cfg config.SMTPConfig) *smtpSender {
 	if cfg.Username != "" {
 		auth = smtp.PlainAuth("", cfg.Username, cfg.Password, cfg.Server)
 	}
-	return &smtpSender{addr: addr, auth: auth, tls: cfg.TLS}
+	return &smtpSender{addr: addr, auth: auth}
 }
 
 func (s *smtpSender) Send(from string, to []string, msg []byte) error {
@@ -211,7 +211,8 @@ func main() {
 	healthMux := http.NewServeMux()
 	healthMux.HandleFunc("/health", func(w http.ResponseWriter, r *http.Request) {
 		snap := mbStatus.snapshot()
-		allUp := true
+		// Zero running mailboxes means the feeder is idle / misconfigured.
+		allUp := len(snap) > 0
 		for _, up := range snap {
 			if !up {
 				allUp = false
@@ -266,8 +267,8 @@ func main() {
 			slog.Info("SIGTERM received — shutting down")
 			cancel()
 			shutCtx, shutCancel := context.WithTimeout(context.Background(), 15*time.Second)
-			defer shutCancel()
 			_ = healthSrv.Shutdown(shutCtx)
+			shutCancel()
 			return
 		}
 	}

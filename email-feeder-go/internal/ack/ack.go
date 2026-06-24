@@ -55,6 +55,9 @@ func (a *Acker) allowed(recipient string) bool {
 }
 
 func (a *Acker) Ack(recipient string) error {
+	// Strip CR/LF to prevent SMTP header injection via a malformed recipient.
+	recipient = strings.NewReplacer("\r", "", "\n", "").Replace(recipient)
+
 	if !a.allowed(recipient) {
 		return nil
 	}

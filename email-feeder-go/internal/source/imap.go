@@ -3,8 +3,10 @@ package source
 import (
 	"context"
 	"crypto/tls"
+	"crypto/x509"
 	"fmt"
 	"log"
+	"os"
 	"time"
 
 	imap "github.com/emersion/go-imap/v2"
@@ -140,9 +142,27 @@ func (s *Source) connectAndPoll(ctx context.Context, mb config.Mailbox, out chan
 	if mb.UseSSL {
 		tlsCfg := &tls.Config{ServerName: mb.Host}
 		if mb.RootCA != "" {
-			// A non-empty RootCA is a PEM file path; load it if present.
-			// (TLS verification will fall back to system roots if loading fails.)
-			log.Printf("source[%s]: note — custom RootCA loading not implemented, using system roots", mb.Name)
+			// Load custom CA certificate from PEM file into a dedicated pool.
+			pem, readErr := os.ReadFile(mb.RootCA)
+			if readErr != nil {
+				log.Printf("source[%s]: cannot read RootCA %q: %v — falling back to system roots", mb.Name, mb.RootCA, readErr)
+			} else {
+				pool := x509.NewCertPool()
+				if !pool.AppendCertsFromPEM(pem) {
+					log.Printf("source[%s]: RootCA %q contained no valid PEM certificates — falling back to system roots", mb.Name, mb.RootCA)
+				} else {
+					tlsCfg.RootCAs = pool
+				}
+			}
+		}
+		if mb.CertFile != "" && mb.KeyFile != "" {
+			// Load mTLS client certificate + private key.
+			cert, certErr := tls.LoadX509KeyPair(mb.CertFile, mb.KeyFile)
+			if certErr != nil {
+				log.Printf("source[%s]: cannot load client cert (%q / %q): %v — proceeding without mTLS", mb.Name, mb.CertFile, mb.KeyFile, certErr)
+			} else {
+				tlsCfg.Certificates = []tls.Certificate{cert}
+			}
 		}
 		opts.TLSConfig = tlsCfg
 		c, err = imapclient.DialTLS(addr, opts)

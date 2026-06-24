@@ -41,18 +41,18 @@ func BuildSubmission(now time.Time, p *Parsed, caps Caps) (*Submission, error) {
 	wrapperKey := id + "/" + contract.SanitizeBucketSegment(localPart) + "-" + contract.SubmissionEMLSuffix
 	sub.Objects = append(sub.Objects, Object{Key: wrapperKey, Body: p.Wrapper})
 
-	var emails, atts []string
+	// Only forwarded emails (.eml attachments where IsEmail is true) get an
+	// inner directory. Non-email attachments are dropped: their content lives
+	// inside the forwarded .eml and will be extracted downstream by the backend.
+	var emails []string
 	for _, a := range p.Attachments {
-		dir := id + "/" + innerDir(ts)
-		if a.IsEmail {
-			key := dir + "/" + contract.SanitizeBucketSegment(strings.TrimSuffix(a.Filename, ".eml")) + ".eml"
-			sub.Objects = append(sub.Objects, Object{Key: key, Body: a.Content})
-			emails = append(emails, key)
-		} else {
-			key := dir + "/attachments/" + contract.SanitizeBucketSegment(a.Filename)
-			sub.Objects = append(sub.Objects, Object{Key: key, Body: a.Content})
-			atts = append(atts, key)
+		if !a.IsEmail {
+			continue
 		}
+		dir := id + "/" + innerDir(ts)
+		key := dir + "/" + contract.SanitizeBucketSegment(strings.TrimSuffix(a.Filename, ".eml")) + ".eml"
+		sub.Objects = append(sub.Objects, Object{Key: key, Body: a.Content})
+		emails = append(emails, key)
 	}
 
 	sub.Status = contract.Status{
@@ -61,7 +61,7 @@ func BuildSubmission(now time.Time, p *Parsed, caps Caps) (*Submission, error) {
 		SubmissionID:    id,
 		ReportedBy:      p.FromAddr,
 		EmailsToAnalyze: emails,
-		Attachments:     atts,
+		Attachments:     []string{},
 	}
 	return sub, nil
 }
