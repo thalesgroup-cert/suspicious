@@ -183,6 +183,10 @@ func main() {
 	}
 
 	// Dispatch loop.
+	// HandleDelivery does NOT consult any in-process dedup: the Source already
+	// called dedup.Mark before emitting the Delivery, so the double-emit guard
+	// lives entirely in the source layer. The cross-restart guard is the
+	// server-side \Seen flag applied by HandleDelivery via d.MarkSeen().
 	go func() {
 		for {
 			select {
@@ -190,21 +194,8 @@ func main() {
 				if !ok {
 					return
 				}
-				raw := d.Raw
-				if dedup.Seen(raw.Mailbox, raw.UID) {
-					continue
-				}
-				handled, dispErr := app.Dispatch(ctx, raw, cfg.Caps, sk, acker, time.Now)
-				if dispErr != nil {
-					slog.Error("dispatch error", "mailbox", raw.Mailbox, "uid", raw.UID, "err", dispErr)
-					continue
-				}
-				if handled {
-					dedup.Mark(raw.Mailbox, raw.UID)
-					// Wire the reliable \Seen path: the closure enqueues a
-					// blocking send to the per-mailbox IMAP goroutine which
-					// applies STORE +FLAGS \Seen on the next drain cycle.
-					d.MarkSeen()
+				if err := app.HandleDelivery(ctx, d, cfg.Caps, sk, acker, time.Now); err != nil {
+					slog.Error("dispatch error", "mailbox", d.Raw.Mailbox, "uid", d.Raw.UID, "err", err)
 				}
 			case <-ctx.Done():
 				return
