@@ -116,7 +116,11 @@ func main() {
 	ctx, cancel := context.WithCancel(context.Background())
 	defer cancel()
 
-	out := make(chan source.RawEmail, 256)
+	// out carries Delivery values: each bundles a RawEmail with a MarkSeen
+	// callback bound to the per-mailbox IMAP goroutine. Calling MarkSeen does
+	// a blocking send to the mailbox-owned mark channel, ensuring no \Seen
+	// flag is ever silently dropped.
+	out := make(chan source.Delivery, 256)
 
 	// cancelFuncs tracks per-mailbox cancel functions for hot-reload.
 	type mbEntry struct {
@@ -141,16 +145,16 @@ func main() {
 				delete(active, mb.Name)
 				mu.Unlock()
 			}()
-			mbOut := make(chan source.RawEmail, 64)
+			mbOut := make(chan source.Delivery, 64)
 			go src.Run(mbCtx, mbOut)
 			for {
 				select {
-				case raw, ok := <-mbOut:
+				case d, ok := <-mbOut:
 					if !ok {
 						return
 					}
 					select {
-					case out <- raw:
+					case out <- d:
 					case <-mbCtx.Done():
 						return
 					}
@@ -159,7 +163,6 @@ func main() {
 				}
 			}
 		}()
-		_ = src // src.MarkSeen is captured by the goroutine via closure over src
 	}
 
 	stopMailbox := func(name string) {
@@ -183,10 +186,11 @@ func main() {
 	go func() {
 		for {
 			select {
-			case raw, ok := <-out:
+			case d, ok := <-out:
 				if !ok {
 					return
 				}
+				raw := d.Raw
 				if dedup.Seen(raw.Mailbox, raw.UID) {
 					continue
 				}
@@ -197,9 +201,10 @@ func main() {
 				}
 				if handled {
 					dedup.Mark(raw.Mailbox, raw.UID)
-					// MarkSeen is per-source; we don't have a direct reference here.
-					// The source's internal dedup prevents redelivery within the window.
-					// Task 9 integration will wire per-source MarkSeen if needed.
+					// Wire the reliable \Seen path: the closure enqueues a
+					// blocking send to the per-mailbox IMAP goroutine which
+					// applies STORE +FLAGS \Seen on the next drain cycle.
+					d.MarkSeen()
 				}
 			case <-ctx.Done():
 				return

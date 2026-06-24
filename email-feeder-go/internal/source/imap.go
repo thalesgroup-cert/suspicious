@@ -22,24 +22,23 @@ type RawEmail struct {
 	Body    []byte
 }
 
+// Delivery pairs a RawEmail with a MarkSeen callback. The callback, when
+// called, enqueues a \Seen flag request to the per-mailbox goroutine that owns
+// the IMAP session for this message. The send is blocking so no mark is ever
+// silently dropped.
+type Delivery struct {
+	Raw      RawEmail
+	MarkSeen func()
+}
+
 // Source connects to one or more IMAP mailboxes and emits new messages as
-// RawEmail values. For each mailbox it tries IDLE if the server advertises
+// Delivery values. For each mailbox it tries IDLE if the server advertises
 // the capability; otherwise it falls back to polling every PollSeconds.
 // Errors cause an exponential-backoff reconnect loop; the caller must drain
 // the out channel to avoid blocking the source goroutines.
 type Source struct {
 	cfg   config.Config
 	dedup *Dedup
-
-	// markCh carries (mailbox, uid) pairs that the controller has confirmed as
-	// processed; the background goroutine forwards them to the IMAP server via
-	// Store \Seen and records them in the dedup set.
-	markCh chan markReq
-}
-
-type markReq struct {
-	mailbox string
-	uid     uint32
 }
 
 // New creates a Source from the given config and an optional external Dedup.
@@ -49,21 +48,8 @@ func New(cfg config.Config, dedup *Dedup) *Source {
 		dedup = NewDedup(10_000)
 	}
 	return &Source{
-		cfg:    cfg,
-		dedup:  dedup,
-		markCh: make(chan markReq, 256),
-	}
-}
-
-// MarkSeen tells the Source that the controller has successfully processed
-// (mailbox, uid) and that the message should be flagged \Seen on the server.
-// It is non-blocking: if the internal channel is full the mark is dropped
-// (the dedup LRU still prevents reprocessing within the window, and the
-// server-side \Seen will be applied on the next reconnect's SEARCH UNSEEN).
-func (s *Source) MarkSeen(mailbox string, uid uint32) {
-	select {
-	case s.markCh <- markReq{mailbox: mailbox, uid: uid}:
-	default:
+		cfg:   cfg,
+		dedup: dedup,
 	}
 }
 
@@ -71,9 +57,9 @@ func (s *Source) MarkSeen(mailbox string, uid uint32) {
 // cancelled. Each goroutine connects to its mailbox, selects INBOX, and
 // enters an IDLE-or-poll loop. On wake it searches for UNSEEN messages,
 // fetches their bodies, records them in the dedup set, and emits them on out.
-// \Seen is applied only after the controller calls MarkSeen. Reconnects use
-// exponential backoff (1 s … 5 min).
-func (s *Source) Run(ctx context.Context, out chan<- RawEmail) {
+// \Seen is applied only after the consumer calls Delivery.MarkSeen.
+// Reconnects use exponential backoff (1 s … 5 min).
+func (s *Source) Run(ctx context.Context, out chan<- Delivery) {
 	for i := range s.cfg.Mailboxes {
 		mb := s.cfg.Mailboxes[i]
 		if !mb.Enable {
@@ -85,15 +71,21 @@ func (s *Source) Run(ctx context.Context, out chan<- RawEmail) {
 }
 
 // runMailbox is the per-mailbox goroutine.
-func (s *Source) runMailbox(ctx context.Context, mb config.Mailbox, out chan<- RawEmail) {
+func (s *Source) runMailbox(ctx context.Context, mb config.Mailbox, out chan<- Delivery) {
 	backoff := time.Second
 	const maxBackoff = 5 * time.Minute
+
+	// Per-mailbox mark channel. The IMAP session goroutine drains this channel
+	// and applies STORE +FLAGS \Seen. Sized generously so that a burst of
+	// handled messages never stalls the consumer; the consumer does a blocking
+	// send so no mark is dropped.
+	markCh := make(chan uint32, 512)
 
 	for {
 		if ctx.Err() != nil {
 			return
 		}
-		err := s.connectAndPoll(ctx, mb, out)
+		err := s.connectAndPoll(ctx, mb, out, markCh)
 		if err != nil && ctx.Err() == nil {
 			log.Printf("source[%s]: %v — reconnecting in %s", mb.Name, err, backoff)
 			select {
@@ -114,7 +106,9 @@ func (s *Source) runMailbox(ctx context.Context, mb config.Mailbox, out chan<- R
 
 // connectAndPoll opens one IMAP session, selects INBOX, and runs the
 // IDLE-or-poll loop until the context is cancelled or an error occurs.
-func (s *Source) connectAndPoll(ctx context.Context, mb config.Mailbox, out chan<- RawEmail) error {
+// markCh is the per-mailbox channel used to receive UIDs that should be
+// flagged \Seen; it is owned by the runMailbox goroutine and drained here.
+func (s *Source) connectAndPoll(ctx context.Context, mb config.Mailbox, out chan<- Delivery, markCh chan uint32) error {
 	addr := fmt.Sprintf("%s:%d", mb.Host, mb.Port)
 
 	// Channel that the unilateral data handler signals on EXISTS updates.
@@ -195,13 +189,10 @@ func (s *Source) connectAndPoll(ctx context.Context, mb config.Mailbox, out chan
 	log.Printf("source[%s]: connected to %s (IDLE=%v poll=%s)", mb.Name, addr, useIdle, pollInterval)
 
 	// Initial fetch on connect.
-	if err := s.fetchUnseen(ctx, c, mb.Name, out); err != nil {
+	if err := s.fetchUnseen(ctx, c, mb, out, markCh); err != nil {
 		return fmt.Errorf("initial fetch on %s: %w", mb.Name, err)
 	}
 
-	// Build a map from mailbox name to the IMAP client so that markHandler can
-	// call Store on the right session. Since we own a single session here we
-	// handle marks inline via a select.
 	for {
 		if ctx.Err() != nil {
 			return nil
@@ -221,10 +212,10 @@ func (s *Source) connectAndPoll(ctx context.Context, mb config.Mailbox, out chan
 		}
 
 		// Apply pending MarkSeen requests for this mailbox.
-		s.drainMarks(c, mb.Name)
+		drainMarks(c, mb.Name, markCh)
 
 		// Fetch all UNSEEN messages.
-		if err := s.fetchUnseen(ctx, c, mb.Name, out); err != nil {
+		if err := s.fetchUnseen(ctx, c, mb, out, markCh); err != nil {
 			return fmt.Errorf("fetch on %s: %w", mb.Name, err)
 		}
 	}
@@ -271,8 +262,11 @@ func (s *Source) idleWait(ctx context.Context, c *imapclient.Client, name string
 }
 
 // fetchUnseen searches for UNSEEN UIDs and fetches their full body, emitting
-// each as a RawEmail on out. UIDs already in the dedup set are skipped.
-func (s *Source) fetchUnseen(ctx context.Context, c *imapclient.Client, mailbox string, out chan<- RawEmail) error {
+// each as a Delivery on out. UIDs already in the dedup set are skipped.
+// The Delivery's MarkSeen closure does a blocking send to markCh so the
+// per-mailbox IMAP goroutine can apply STORE +FLAGS \Seen without any mark
+// being silently dropped.
+func (s *Source) fetchUnseen(ctx context.Context, c *imapclient.Client, mb config.Mailbox, out chan<- Delivery, markCh chan<- uint32) error {
 	if ctx.Err() != nil {
 		return nil
 	}
@@ -293,7 +287,7 @@ func (s *Source) fetchUnseen(ctx context.Context, c *imapclient.Client, mailbox 
 	// Filter already-deduped UIDs.
 	var toFetch []imap.UID
 	for _, uid := range uids {
-		if !s.dedup.Seen(mailbox, uint32(uid)) {
+		if !s.dedup.Seen(mb.Name, uint32(uid)) {
 			toFetch = append(toFetch, uid)
 		}
 	}
@@ -317,7 +311,7 @@ func (s *Source) fetchUnseen(ctx context.Context, c *imapclient.Client, mailbox 
 		}
 		buf, err := msgData.Collect()
 		if err != nil {
-			log.Printf("source[%s]: collect message: %v", mailbox, err)
+			log.Printf("source[%s]: collect message: %v", mb.Name, err)
 			continue
 		}
 		uid := uint32(buf.UID)
@@ -327,15 +321,29 @@ func (s *Source) fetchUnseen(ctx context.Context, c *imapclient.Client, mailbox 
 		}
 		body := buf.FindBodySection(&imap.FetchItemBodySection{})
 		if body == nil {
-			log.Printf("source[%s]: uid %d: empty body section", mailbox, uid)
+			log.Printf("source[%s]: uid %d: empty body section", mb.Name, uid)
 			continue
 		}
 		// Record in dedup before emitting so concurrent goroutines don't
 		// double-emit.
-		s.dedup.Mark(mailbox, uid)
+		s.dedup.Mark(mb.Name, uid)
 
+		// Capture uid for the closure.
+		capturedUID := uid
+		d := Delivery{
+			Raw: RawEmail{Mailbox: mb.Name, UID: uid, Body: body},
+			// MarkSeen does a blocking send to the per-mailbox channel owned by
+			// the runMailbox goroutine. The blocking send guarantees the mark is
+			// never silently dropped: if the channel is full, the consumer pauses
+			// until the IMAP goroutine drains it, which it does on every poll/IDLE
+			// cycle. Capacity 512 means a burst of 512 messages can be enqueued
+			// before any backpressure is felt.
+			MarkSeen: func() {
+				markCh <- capturedUID
+			},
+		}
 		select {
-		case out <- RawEmail{Mailbox: mailbox, UID: uid, Body: body}:
+		case out <- d:
 		case <-ctx.Done():
 			return nil
 		}
@@ -348,26 +356,16 @@ func (s *Source) fetchUnseen(ctx context.Context, c *imapclient.Client, mailbox 
 	return nil
 }
 
-// drainMarks applies all pending MarkSeen requests that target this mailbox
+// drainMarks applies all pending MarkSeen UIDs from the per-mailbox markCh
 // via a server-side STORE +FLAGS \Seen. Errors are logged but do not abort
 // the session; the message will simply remain unread on the server until the
-// next reconnect.
-func (s *Source) drainMarks(c *imapclient.Client, mailbox string) {
+// next reconnect. This function is called with the IMAP client for the mailbox
+// that owns markCh.
+func drainMarks(c *imapclient.Client, mailbox string, markCh <-chan uint32) {
 	for {
 		select {
-		case req := <-s.markCh:
-			if req.mailbox != mailbox {
-				// Put it back — another mailbox goroutine will handle it.
-				// Use a non-blocking send to avoid deadlock if the channel
-				// is temporarily full; the mark will be retried on the next
-				// drain cycle.
-				select {
-				case s.markCh <- req:
-				default:
-				}
-				return
-			}
-			uidSet := imap.UIDSetNum(imap.UID(req.uid))
+		case uid := <-markCh:
+			uidSet := imap.UIDSetNum(imap.UID(uid))
 			store := &imap.StoreFlags{
 				Op:     imap.StoreFlagsAdd,
 				Silent: true,
@@ -375,7 +373,7 @@ func (s *Source) drainMarks(c *imapclient.Client, mailbox string) {
 			}
 			if cmd := c.Store(uidSet, store, nil); cmd != nil {
 				if err := cmd.Close(); err != nil {
-					log.Printf("source[%s]: store \\Seen uid %d: %v", mailbox, req.uid, err)
+					log.Printf("source[%s]: store \\Seen uid %d: %v", mailbox, uid, err)
 				}
 			}
 		default:
