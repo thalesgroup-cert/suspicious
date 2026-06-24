@@ -198,10 +198,15 @@ class Mailbox:
                 continue
 
             try:
-                with open(eml_file_path, "rb") as f_eml:
-                    attached_msg = email.message_from_binary_file(
-                        f_eml, policy=email.policy.default
-                    )
+                if attachment.is_msg:
+                    # Outlook .msg is OLE, not MIME — convert to an EmailMessage
+                    # so the normal .eml pipeline can analyse it.
+                    attached_msg = self._convert_msg_to_email(eml_file_path)
+                else:
+                    with open(eml_file_path, "rb") as f_eml:
+                        attached_msg = email.message_from_binary_file(
+                            f_eml, policy=email.policy.default
+                        )
             except Exception as e:
                 self.__logger.error(
                     f"Failed to process EML attachment "
@@ -235,6 +240,23 @@ class Mailbox:
                 processed_emails.extend(_processed_mails)
 
         return processed_emails
+
+    def _convert_msg_to_email(
+        self, msg_path: pathlib.Path
+    ) -> email.message.EmailMessage:
+        """Convert an Outlook .msg (OLE compound file) into an EmailMessage.
+
+        Outlook desktop "Forward as Attachment" produces a .msg, not a .eml.
+        extract-msg parses the OLE format and yields a standard EmailMessage so
+        the rest of the proven .eml pipeline is unchanged.
+        """
+        import extract_msg
+
+        m = extract_msg.openMsg(str(msg_path))
+        try:
+            return m.asEmailMessage()
+        finally:
+            m.close()
 
     def fetch_unseen_emails_and_process(
         self,
@@ -922,11 +944,18 @@ class Mailbox:
                 file_sha256 = self.get_sha256(file_path)
 
                 # An attachment is itself a mail when it is an embedded
-                # message part OR named .eml — regardless of which produced
-                # the filename. This is what makes a submission "valid".
+                # message part, named .eml, OR an Outlook .msg (Outlook desktop
+                # "Forward as Attachment" produces a .msg). All three make the
+                # submission valid; .msg is converted to .eml downstream.
+                fn_lower = processed_filename.lower()
+                is_msg = (
+                    fn_lower.endswith(".msg")
+                    or content_type in ("application/vnd.ms-outlook", "application/x-msg")
+                )
                 is_email = (
                     content_type == "message/rfc822"
-                    or processed_filename.lower().endswith(".eml")
+                    or fn_lower.endswith(".eml")
+                    or is_msg
                 )
 
                 attachment_details = classes.models.mail_attachment.MailAttachment(
@@ -937,6 +966,7 @@ class Mailbox:
                     file_sha256=file_sha256,
                     parent=source_ref,
                     is_email=is_email,
+                    is_msg=is_msg,
                 )
                 attachments.append(attachment_details)
 

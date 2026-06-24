@@ -10,5 +10,8 @@ class MailAttachment(pydantic.BaseModel):
     file_sha256: str | None
     parent: str
     is_email: bool = False
-    """True when this attachment is itself a mail (message/rfc822 or *.eml) —
-    i.e. the suspicious item the user forwarded for analysis."""
+    """True when this attachment is itself a mail (message/rfc822, *.eml, or an
+    Outlook *.msg) — i.e. the suspicious item the user forwarded for analysis."""
+    is_msg: bool = False
+    """True for an Outlook .msg attachment (OLE, not MIME). It is converted to
+    .eml before the normal email pipeline runs."""

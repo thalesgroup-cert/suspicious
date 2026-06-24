@@ -20,8 +20,6 @@ import logging
 import pathlib
 import tempfile
 
-import pytest
-
 from classes.services.mailbox_service import Mailbox
 
 
@@ -91,7 +89,6 @@ def test_eml_as_octet_stream_by_extension():
     )
 
 
-@pytest.mark.xfail(reason="Outlook .msg detection not yet implemented (production bug)", strict=True)
 def test_outlook_msg_vnd_mime_type():
     # Outlook desktop "Forward as Attachment" -> application/vnd.ms-outlook, *.msg
     assert _detects_attached_email(
@@ -99,7 +96,6 @@ def test_outlook_msg_vnd_mime_type():
     )
 
 
-@pytest.mark.xfail(reason="Outlook .msg detection not yet implemented (production bug)", strict=True)
 def test_outlook_msg_as_octet_stream():
     assert _detects_attached_email(
         _wrap("attachment", "application/octet-stream", "message.msg")
