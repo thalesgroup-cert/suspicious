@@ -9,6 +9,7 @@ from __future__ import annotations
 import io
 import json
 import logging
+import os
 from typing import Iterator
 
 from mail_feeder import submission_contract as sc
@@ -62,3 +63,29 @@ class PrefixSource:
             length=len(raw),
             content_type="application/json",
         )
+
+    def download_submission(self, submission_id: str, dest_root: str) -> str | None:
+        from tasp.cron.utils import _safe_object_name
+
+        prefix = f"{submission_id}/"
+        local_root = os.path.join(dest_root, submission_id)
+        os.makedirs(local_root, exist_ok=True)
+        wrapper_path: str | None = None
+
+        for obj in self._client.list_objects(self._bucket, prefix=prefix, recursive=True):
+            rel = obj.object_name[len(prefix):]
+            if not rel or rel == sc.STATUS_OBJECT_NAME:
+                continue
+            try:
+                safe_rel = _safe_object_name(rel)
+            except ValueError:
+                logger.warning("Unsafe object name %r in %s — skipped",
+                               obj.object_name, submission_id)
+                continue
+            dst = os.path.join(local_root, safe_rel)
+            os.makedirs(os.path.dirname(dst), exist_ok=True)
+            self._client.fget_object(self._bucket, obj.object_name, dst)
+            if obj.object_name.endswith(sc.SUBMISSION_EML_SUFFIX):
+                wrapper_path = dst
+
+        return wrapper_path

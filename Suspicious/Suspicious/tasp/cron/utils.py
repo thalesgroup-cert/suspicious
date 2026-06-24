@@ -1,5 +1,6 @@
 import logging
 import json
+import os
 from pathlib import Path
 
 from common.safe_exec import make_safe_execution
@@ -61,3 +62,15 @@ def load_config(path: str) -> CronConfig:
 def ensure_dir(path: str) -> None:
     from pathlib import Path
     Path(path).mkdir(parents=True, exist_ok=True)
+
+
+def _safe_object_name(raw_name: str) -> str:
+    """
+    Sanitize a MinIO object name before using it as a filesystem path component.
+    Prevents path traversal via crafted object names (e.g. '../../etc/passwd').
+    Raises ValueError if the sanitized name is empty or escapes the prefix.
+    """
+    normalized = os.path.normpath(raw_name.replace("\\", "/")).lstrip("/")
+    if not normalized or normalized.startswith(".."):
+        raise ValueError(f"Unsafe MinIO object name rejected: {raw_name!r}")
+    return normalized

@@ -12,7 +12,7 @@ from minio.commonconfig import Tags
 
 from minio import Minio
 from common.clients import get_s3_client
-from .utils import safe_execution, load_config, ensure_dir
+from .utils import safe_execution, load_config, ensure_dir, _safe_object_name
 from mail_feeder.minio_submission.minio import MinioEmailService
 
 logger = logging.getLogger("tasp.cron.fetch_and_process_emails")
@@ -35,22 +35,6 @@ def _init_minio_client() -> Optional[Minio]:
     except Exception:
         logger.exception("MinIO client initialization failed")
         return None
-
-
-# ---------------------------------------------------------------------------
-# Path safety
-# ---------------------------------------------------------------------------
-
-def _safe_object_name(raw_name: str) -> str:
-    """
-    Sanitize a MinIO object name before using it as a filesystem path component.
-    Prevents path traversal via crafted object names (e.g. '../../etc/passwd').
-    Raises ValueError if the sanitized name is empty or escapes the prefix.
-    """
-    normalized = os.path.normpath(raw_name.replace("\\", "/")).lstrip("/")
-    if not normalized or normalized.startswith(".."):
-        raise ValueError(f"Unsafe MinIO object name rejected: {raw_name!r}")
-    return normalized
 
 
 # ---------------------------------------------------------------------------
