@@ -150,6 +150,21 @@ def _write_manifest(
         logger.warning("Could not write local manifest copy to %s", local_path, exc_info=True)
 
 
+def _handoff_submission(bucket_path: str, submission_path: str, identifier: str, reported_by: str, processor) -> None:
+    """Copy the wrapper into each email dir, archive it, hand to the processor.
+
+    Shared by the legacy bucket path and the new prefix path.
+    """
+    for entry in os.scandir(bucket_path):
+        if not (entry.is_dir() and EMAIL_DIR_PATTERN.match(entry.name)):
+            continue
+        shutil.copy(submission_path, os.path.join(entry.path, "user_submission.eml"))
+        shutil.make_archive(entry.path, "gztar", entry.path)
+        processor.process_emails_from_minio_workdir(
+            entry.path, identifier, reported_by=reported_by,
+        )
+
+
 # ---------------------------------------------------------------------------
 # Main entrypoint
 # ---------------------------------------------------------------------------
@@ -241,22 +256,10 @@ def _process_minio_buckets(base_path: str) -> None:
                     manifest["reported_by"],
                 )
 
-                for entry in os.scandir(bucket_path):
-                    if not (entry.is_dir() and EMAIL_DIR_PATTERN.match(entry.name)):
-                        continue
-
-                    shutil.copy(
-                        submission_path,
-                        os.path.join(entry.path, "user_submission.eml"),
-                    )
-
-                    shutil.make_archive(entry.path, "gztar", entry.path)
-
-                    minio_processor.process_emails_from_minio_workdir(
-                        entry.path,
-                        bucket.name,
-                        reported_by=manifest["reported_by"],
-                    )
+                _handoff_submission(
+                    bucket_path, submission_path, bucket.name,
+                    manifest["reported_by"], minio_processor,
+                )
 
                 try:
                     done_tags = Tags.new_bucket_tags()
