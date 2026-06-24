@@ -1,0 +1,64 @@
+"""Read the portable feeder contract: one bucket, prefix-per-submission.
+
+Lists submission prefixes under a single feeder bucket and drives each
+submission's status via its `_status.json` object — the portable replacement
+for the legacy bucket-per-submission + bucket-tag scheme.
+"""
+from __future__ import annotations
+
+import io
+import json
+import logging
+from typing import Iterator
+
+from mail_feeder import submission_contract as sc
+
+logger = logging.getLogger("tasp.cron.fetch_and_process_emails")
+
+
+class PrefixSource:
+    def __init__(self, client, bucket_name: str):
+        self._client = client
+        self._bucket = bucket_name
+
+    def _status_key(self, submission_id: str) -> str:
+        return f"{submission_id}/{sc.STATUS_OBJECT_NAME}"
+
+    def read_status(self, submission_id: str) -> dict:
+        resp = self._client.get_object(self._bucket, self._status_key(submission_id))
+        try:
+            return sc.parse_status(resp.read())
+        finally:
+            close = getattr(resp, "close", None)
+            release = getattr(resp, "release_conn", None)
+            if callable(close):
+                close()
+            if callable(release):
+                release()
+
+    def iter_pending(self) -> Iterator[str]:
+        # Top-level "directories" = submission prefixes.
+        for obj in self._client.list_objects(self._bucket, recursive=False):
+            name = obj.object_name
+            if not name.endswith("/"):
+                continue
+            submission_id = name.rstrip("/")
+            try:
+                status = self.read_status(submission_id)
+            except Exception:
+                logger.warning("No/invalid _status.json for %s — skipping", submission_id)
+                continue
+            if status.get("status") == sc.STATUS_TODO:
+                yield submission_id
+
+    def set_status(self, submission_id: str, status: str) -> None:
+        manifest = self.read_status(submission_id)
+        manifest["status"] = status
+        raw = json.dumps(manifest, ensure_ascii=False).encode("utf-8")
+        self._client.put_object(
+            bucket_name=self._bucket,
+            object_name=self._status_key(submission_id),
+            data=io.BytesIO(raw),
+            length=len(raw),
+            content_type="application/json",
+        )
