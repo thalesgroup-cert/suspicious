@@ -9,3 +9,6 @@ class MailAttachment(pydantic.BaseModel):
     headers: dict[str, list[typing.Any]]
     file_sha256: str | None
     parent: str
+    is_email: bool = False
+    """True when this attachment is itself a mail (message/rfc822 or *.eml) —
+    i.e. the suspicious item the user forwarded for analysis."""

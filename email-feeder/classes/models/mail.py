@@ -2,6 +2,7 @@ import typing
 import pydantic
 import email.message
 import classes.models.mail_attachment
+import classes.models.mail_tags
 
 
 class SuspiciousMailRequest(pydantic.BaseModel):
@@ -26,4 +27,8 @@ class SuspiciousMailResponse(pydantic.BaseModel):
     original_mail: SuspiciousMailRequest
     id: str
     case_path: str
-    tags: str | None = pydantic.Field(default=None)
+    outcome: classes.models.mail_tags.SubmissionOutcome
+    submission_dir: str
+    """Top-level dir under working_path (the forwarded wrapper). For a VALID
+    submission this whole dir is uploaded to S3; for a bad one it is cleaned up
+    without upload."""

@@ -9,6 +9,8 @@ import time
 from http.server import BaseHTTPRequestHandler, HTTPServer
 
 import classes.models.configs.main_config
+import classes.models.mail
+import classes.models.mail_tags
 import classes.services.config_service
 import classes.services.minio_service
 import classes.services.mailbox_setup_service
@@ -205,6 +207,25 @@ def cleanup_directory(dir_path: pathlib.Path, remove_parent_if_empty: bool = Fal
 # --- Email Processing ---
 
 
+def partition_submissions(
+    email_list: list[classes.models.mail.SuspiciousMailResponse],
+) -> tuple[list[str], list[classes.models.mail.SuspiciousMailResponse]]:
+    """Split fetched submissions into (valid wrapper dirs to upload, bad mails).
+
+    Valid dirs are de-duplicated while preserving order, so a submission whose
+    wrapper carries several inner mails is uploaded exactly once.
+    """
+    outcome = classes.models.mail_tags.SubmissionOutcome
+    invalid_mails = [
+        m for m in email_list if m.outcome == outcome.NO_ATTACHED_MAIL
+    ]
+    valid_dirs: list[str] = []
+    for m in email_list:
+        if m.outcome == outcome.VALID and m.submission_dir not in valid_dirs:
+            valid_dirs.append(m.submission_dir)
+    return valid_dirs, invalid_mails
+
+
 def process_emails_from_mailboxes(
     config: classes.models.configs.main_config.MainConfig,
     acknowledge_bad_mail_service: classes.services.acknowledge_bad_mail_service.AcknowledgeBadMailService,
@@ -237,19 +258,32 @@ def process_emails_from_mailboxes(
                 f"Fetched {len(email_list)} email(s) from {mailbox_identifier}."
             )
             _inc("emails_processed_total", len(email_list))
-            for mail in email_list:
-                case_path = pathlib.Path(mail.case_path)
-                acknowledge_bad_mail_service.process_single_email(
-                    mail=mail, case_path=case_path
-                )
 
-            for case_dir in config.working_path.iterdir():
-                if case_dir.is_dir():
-                    bucket_name = case_dir.name.lower().replace("_", "-")
-                    minio_service.upload_directory(case_dir, bucket_name)
-                    _mark_minio_ok()
-                    cleanup_directory(case_dir, remove_parent_if_empty=False)
-                    logger.info(f"Cleaned up case directory: {case_dir}")
+            valid_dirs, invalid_mails = partition_submissions(email_list)
+
+            # 1) Bad submissions (no attached mail): acknowledge, store nothing.
+            for mail in invalid_mails:
+                acknowledge_bad_mail_service.send_bad_mail_ack(mail)
+
+            # 2) Valid submissions: upload the wrapper dir, then clean it up.
+            for dir_str in valid_dirs:
+                submission_dir = pathlib.Path(dir_str)
+                if not submission_dir.is_dir():
+                    logger.warning(
+                        "Submission dir missing, skipping upload: %s", submission_dir
+                    )
+                    continue
+                bucket_name = submission_dir.name.lower().replace("_", "-")
+                minio_service.upload_directory(submission_dir, bucket_name)
+                _mark_minio_ok()
+                cleanup_directory(submission_dir, remove_parent_if_empty=False)
+                logger.info("Uploaded and cleaned valid submission: %s", submission_dir)
+
+            # 3) Bad submissions: clean up WITHOUT uploading to S3.
+            for mail in invalid_mails:
+                submission_dir = pathlib.Path(mail.submission_dir)
+                if submission_dir.is_dir():
+                    cleanup_directory(submission_dir, remove_parent_if_empty=False)
 
             email_ids = [email.original_mail.id for email in email_list]
             mailbox.mark_emails_as_seen(email_ids=email_ids)

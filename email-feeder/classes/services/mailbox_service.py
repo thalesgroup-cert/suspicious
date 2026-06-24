@@ -22,6 +22,7 @@ import bs4
 import classes.models.mail
 import classes.models.mail_attachment
 import classes.models.mail_exceptions
+import classes.models.mail_tags
 import classes.models.configs.internals.imap
 import classes.services.mail_client_service as mail_client_service
 
@@ -412,17 +413,15 @@ class Mailbox:
             else:
                 self.__logger.debug(f"Attachment '{att.filename}' has no file path.")
 
-        eml_attachments_in_main = [
-            att
-            for att in email_data.attachments
-            if att.filename.lower().endswith(".eml")
+        email_attachments_in_main = [
+            att for att in email_data.attachments if att.is_email
         ]
-        if len(eml_attachments_in_main) > 0:
+        if len(email_attachments_in_main) > 0:
             self.__logger.info(
-                f"Email Ref {source_ref} (ID: {email_id}) has .eml attachments. "
+                f"Email Ref {source_ref} (ID: {email_id}) has attached mail(s). "
                 f"Returning for recursive processing."
             )
-            return (eml_attachments_in_main, processing_root_dir, source_ref)
+            return (email_attachments_in_main, processing_root_dir, source_ref)
 
         analysis_target_dir = pathlib.Path(
             processing_root_dir, f"{ANALYSIS_DIR_PREFIX}0"
@@ -484,7 +483,8 @@ class Mailbox:
             original_mail=email_data,
             id=source_ref,
             case_path=str(analysis_target_dir),
-            tags="to_resend",
+            outcome=classes.models.mail_tags.SubmissionOutcome.NO_ATTACHED_MAIL,
+            submission_dir=str(processing_root_dir),
         )
 
     def process_attachment_email(
@@ -530,6 +530,8 @@ class Mailbox:
             original_mail=email_data,
             id=attached_email_file_ref,
             case_path=str(current_analysis_path),
+            outcome=classes.models.mail_tags.SubmissionOutcome.VALID,
+            submission_dir=str(parent_dir_for_analysis),
         )
 
     def _save_email_files(
@@ -919,6 +921,14 @@ class Mailbox:
                 file_path.write_bytes(attachment_bytes)
                 file_sha256 = self.get_sha256(file_path)
 
+                # An attachment is itself a mail when it is an embedded
+                # message part OR named .eml — regardless of which produced
+                # the filename. This is what makes a submission "valid".
+                is_email = (
+                    content_type == "message/rfc822"
+                    or processed_filename.lower().endswith(".eml")
+                )
+
                 attachment_details = classes.models.mail_attachment.MailAttachment(
                     filename=processed_filename,
                     content=attachment_bytes,
@@ -926,6 +936,7 @@ class Mailbox:
                     file_path=str(file_path),
                     file_sha256=file_sha256,
                     parent=source_ref,
+                    is_email=is_email,
                 )
                 attachments.append(attachment_details)
 
