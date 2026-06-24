@@ -210,7 +210,8 @@ def _process_prefix_submissions(base_path: str, bucket_name: str) -> None:
                 logger.warning("No wrapper in %s — leaving todo", submission_id)
                 source.set_status(submission_id, sc.STATUS_TODO)
                 continue
-            reported_by = _extract_reported_by(wrapper)
+            status = source.read_status(submission_id)
+            reported_by = (status or {}).get("reported_by") or _extract_reported_by(wrapper)
             _handoff_submission(
                 os.path.dirname(wrapper), wrapper, submission_id,
                 reported_by, processor,

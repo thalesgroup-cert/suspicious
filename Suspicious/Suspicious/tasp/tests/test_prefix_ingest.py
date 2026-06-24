@@ -33,6 +33,8 @@ class PrefixIngestTests(unittest.TestCase):
                                return_value=iter(["260326141159-aaa"])), \
              mock.patch.object(PrefixSource, "download_submission") as dl, \
              mock.patch.object(PrefixSource, "set_status") as setst, \
+             mock.patch.object(PrefixSource, "read_status",
+                               return_value={"reported_by": "reporter@example.com"}), \
              mock.patch.object(fe, "_handoff_submission") as handoff, \
              tempfile.TemporaryDirectory() as d:
 
@@ -49,3 +51,4 @@ class PrefixIngestTests(unittest.TestCase):
                 [sc.STATUS_PROCESSING, sc.STATUS_DONE],
             )
             handoff.assert_called_once()
+            self.assertEqual(handoff.call_args.args[3], "reporter@example.com")
