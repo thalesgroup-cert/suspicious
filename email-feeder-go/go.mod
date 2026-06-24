@@ -3,6 +3,7 @@ module github.com/thalesgroup-cert/suspicious/email-feeder-go
 go 1.26
 
 require (
+	github.com/emersion/go-imap/v2 v2.0.0-beta.8
 	github.com/jhillyerd/enmime/v2 v2.4.1
 	github.com/minio/minio-go/v7 v7.2.0
 )
@@ -13,6 +14,8 @@ require (
 	github.com/clipperhouse/displaywidth v0.11.0 // indirect
 	github.com/clipperhouse/uax29/v2 v2.7.0 // indirect
 	github.com/dustin/go-humanize v1.0.1 // indirect
+	github.com/emersion/go-message v0.18.2 // indirect
+	github.com/emersion/go-sasl v0.0.0-20241020182733-b788ff22d5a6 // indirect
 	github.com/fatih/color v1.19.0 // indirect
 	github.com/goccy/go-json v0.10.6 // indirect
 	github.com/gogs/chardet v0.0.0-20211120154057-b7413eaefb8f // indirect
