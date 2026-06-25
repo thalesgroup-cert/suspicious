@@ -50,3 +50,84 @@ class EmailMetadata(pydantic.BaseModel):
     date: str = ""
     headers: dict[str, str] = pydantic.Field(default_factory=dict)
     attachments: list[EmailAttachmentMeta] = pydantic.Field(default_factory=list)
+
+
+def decode_header_value(raw: str | None) -> str:
+    if raw is None:
+        return ""
+    try:
+        return str(make_header(decode_header(raw)))
+    except Exception:
+        return str(raw)
+
+
+def extract_address(header_value: str | None) -> str | None:
+    decoded = decode_header_value(header_value)
+    for _, addr in getaddresses([decoded]):
+        if addr:
+            return addr.lower()
+    return None
+
+
+def extract_text_parts(msg: Message) -> list[str]:
+    parts: list[str] = []
+    for part in msg.walk():
+        if part.get_content_type() in ("text/plain", "text/html"):
+            try:
+                payload = part.get_payload(decode=True)
+            except Exception:
+                continue
+            if payload:
+                parts.append(payload.decode(
+                    part.get_content_charset("utf-8"), errors="replace"))
+    return parts
+
+
+def extract_header_dict(msg: Message) -> dict[str, str]:
+    return {k: decode_header_value(v) for k, v in msg.items()}
+
+
+def extract_attachment_metas(msg: Message) -> list[EmailAttachmentMeta]:
+    metas: list[EmailAttachmentMeta] = []
+    for part in msg.walk():
+        if part.get_content_maintype() == "multipart":
+            continue
+        if "attachment" not in (part.get("Content-Disposition", "") or "").lower():
+            continue
+        raw_name = part.get_filename()
+        if not raw_name:
+            continue
+        try:
+            payload = part.get_payload(decode=True) or b""
+        except Exception:
+            payload = b""
+        metas.append(EmailAttachmentMeta(
+            filename=decode_header_value(raw_name),
+            sha256=hashlib.sha256(payload).hexdigest(),
+            headers={k: decode_header_value(v) for k, v in part.items()},
+        ))
+    return metas
+
+
+def resolve_reporter_and_to(to: str | None, reported_by: str) -> tuple[str, str]:
+    """Shared post-extraction massaging used by both parse_email (fallback)
+    and build_email_data_model (fast path). Returns (to, reporter)."""
+    if not to or to in ("", "Undisclosed recipients:;"):
+        to = "no.recipient@noemail.com"
+    reporter = reported_by if reported_by else to
+    return to, (reporter or to)
+
+
+def build_email_metadata(msg: Message, email_id: str) -> EmailMetadata:
+    return EmailMetadata(
+        id=email_id,
+        from_=extract_address(msg.get("From")),
+        to=extract_address(msg.get("To")),
+        cc=extract_address(msg.get("Cc")),
+        bcc=extract_address(msg.get("Bcc")),
+        reportedSubject=decode_header_value(msg.get("Subject", "")),
+        reportedText=extract_text_parts(msg),
+        date=msg.get("Date", "") or "",
+        headers=extract_header_dict(msg),
+        attachments=extract_attachment_metas(msg),
+    )
