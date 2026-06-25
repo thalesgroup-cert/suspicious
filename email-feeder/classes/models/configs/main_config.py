@@ -54,6 +54,10 @@ class MainConfig(pydantic.BaseModel):
     caps: CapsConfig = pydantic.Field(default_factory=CapsConfig)
     """Attachment size/count caps."""
 
+    imap_idle: bool = pydantic.Field(default=False)
+    """Use IMAP IDLE to wait for new mail (else interval poll). Off by default;
+    the raw-imaplib IDLE path needs live verification before enabling in prod."""
+
     @staticmethod
     def from_json(json_object: dict[str, typing.Any]) -> "MainConfig":
         raw_mail_connectors = json_object.get("mail-connectors")
@@ -114,4 +118,5 @@ class MainConfig(pydantic.BaseModel):
             working_path=working_path,
             timer_inbox_emails=timer_inbox_emails,
             caps=CapsConfig(**json_object.get("caps", {})),
+            imap_idle=bool(json_object.get("imap-idle", False)),
         )

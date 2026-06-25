@@ -311,3 +311,61 @@ class MailClient:
     @property
     def is_logged_in(self) -> bool:
         return self.__imap_client is not None
+
+    def has_idle_capability(self) -> bool:
+        """True when the connected server advertises the IDLE extension."""
+        client = self.__imap_client
+        if client is None:
+            return False
+        try:
+            return "IDLE" in getattr(client, "capabilities", ())
+        except Exception:
+            return False
+
+    def idle_wait(self, timeout: float) -> bool:
+        """Block in IMAP IDLE until new mail arrives or `timeout` elapses.
+
+        Returns True if woken by a mailbox change, False on timeout/error.
+        EXPERIMENTAL: uses raw imaplib internals; needs live (greenmail)
+        verification before enabling in production. Best-effort — any hiccup
+        returns False and always issues DONE so the connection stays usable.
+        """
+        import socket
+
+        client = self.__imap_client
+        if client is None:
+            return False
+        tag = client._new_tag()
+        woke = False
+        try:
+            client.send(b"%s IDLE\r\n" % tag)
+            if not client.readline().startswith(b"+"):
+                return False
+            client.sock.settimeout(timeout)
+            try:
+                while True:
+                    line = client.readline()
+                    if not line:
+                        break
+                    if b"EXISTS" in line or b"RECENT" in line:
+                        woke = True
+                        break
+            except (socket.timeout, OSError):
+                pass
+        except Exception as e:  # noqa: BLE001
+            self.__logger.warning(f"IDLE wait error: {e}")
+        finally:
+            try:
+                client.send(b"DONE\r\n")
+                client.sock.settimeout(5)
+                for _ in range(10):
+                    line = client.readline()
+                    if not line or line.startswith(tag):
+                        break
+            except Exception:
+                pass
+            try:
+                client.sock.settimeout(_IMAP_TIMEOUT)
+            except Exception:
+                pass
+        return woke

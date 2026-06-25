@@ -244,6 +244,28 @@ def choose_sink(config, minio_service):
     return None
 
 
+def _wait_for_next_cycle(config, mailboxes, sleep_interval, logger):
+    """Block until the next poll cycle is due.
+
+    With ``imap_idle`` and exactly one IDLE-capable mailbox, block in IMAP IDLE
+    so newly arrived mail wakes the loop early. The IDLE window is capped at
+    ``sleep_interval`` so the loop still polls periodically and stays responsive
+    to SIGHUP. Anything else (idle disabled, multiple mailboxes, or no IDLE
+    capability) degrades to a plain interval sleep.
+    """
+    if (
+        getattr(config, "imap_idle", False)
+        and len(mailboxes) == 1
+        and mailboxes[0].has_idle_capability()
+    ):
+        logger.info(f"Waiting for new mail (IMAP IDLE, max {sleep_interval}s)...")
+        if mailboxes[0].idle_wait(sleep_interval):
+            logger.info("IDLE: mailbox change signalled — polling now.")
+        return
+    logger.info(f"Sleeping for {sleep_interval}s.")
+    time.sleep(sleep_interval)
+
+
 def upload_valid_submission(sink, minio_service, submission_dir, submission_id, reported_by):
     """Prefix mode -> sink.store; legacy mode -> upload_directory bucket-per-submission."""
     sd = pathlib.Path(submission_dir)
@@ -523,10 +545,8 @@ def main() -> int:
                 sink=sink,
             )
             _set("last_successful_poll", time.time())
-            logger.info(
-                f"Email processing cycle complete. Sleeping for {sleep_interval}s."
-            )
-            time.sleep(sleep_interval)
+            logger.info("Email processing cycle complete.")
+            _wait_for_next_cycle(config, mailboxes, sleep_interval, logger)
     except KeyboardInterrupt:
         logger.info("Keyboard interrupt received. Shutting down application...")
     except Exception as e:

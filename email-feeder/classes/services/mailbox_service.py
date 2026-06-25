@@ -71,6 +71,28 @@ class Mailbox:
     def logout(self):
         return self.__mail_client.logout()
 
+    # --- IMAP IDLE ---
+    def has_idle_capability(self) -> bool:
+        """True when the connected server advertises the IDLE extension."""
+        return self.__mail_client.has_idle_capability()
+
+    def idle_wait(self, timeout: float) -> bool:
+        """Select the monitored mailbox, then block in IMAP IDLE until new mail
+        arrives or `timeout` elapses. Returns True if woken by a change.
+
+        Selecting first is required: the server only pushes EXISTS/RECENT for a
+        SELECTED mailbox, and the poll cycle leaves the connection in an unknown
+        state. Any select failure degrades to False (caller falls back to sleep).
+        """
+        try:
+            self.__mail_client.select(
+                mailbox=self.__config.mailbox_to_monitor, readonly=True
+            )
+        except Exception as e:  # noqa: BLE001
+            self.__logger.warning(f"IDLE select failed; falling back to poll: {e}")
+            return False
+        return self.__mail_client.idle_wait(timeout)
+
     # --- Email Operations ---
     def mark_emails_as_seen(self, email_ids: typing.Sequence[str | bytes]):
         """Marks the specified email IDs (or cached fetched unseen emails) as seen."""

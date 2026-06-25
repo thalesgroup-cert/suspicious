@@ -36,5 +36,6 @@
     }
   },
   "working-path": "/tmp/suspicious",
-  "timer-inbox-emails": 10
+  "timer-inbox-emails": 10,
+  "imap-idle": false
 }
