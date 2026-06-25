@@ -2,6 +2,7 @@ import json
 import logging
 import os
 import shutil
+import signal
 import pathlib
 import sys
 import threading
@@ -56,6 +57,13 @@ _stats: dict = {
     "mailboxes_configured": 0,
 }
 _stats_lock = threading.Lock()
+
+# Set by the SIGHUP handler; the poll loop reloads config on the next cycle.
+_reload_requested = threading.Event()
+
+
+def _sighup_handler(signum, frame):  # noqa: ARG001
+    _reload_requested.set()
 
 
 def _inc(key: str, amount: int = 1) -> None:
@@ -461,9 +469,51 @@ def main() -> int:
 
     _start_health_server()
 
+    # Hot config reload: SIGHUP -> reload connectors + caps + sink on the next
+    # cycle, adding/disabling a mailbox without a restart.
+    try:
+        signal.signal(signal.SIGHUP, _sighup_handler)
+        logger.info("SIGHUP hot-reload enabled.")
+    except (ValueError, OSError) as e:
+        logger.warning("Could not install SIGHUP handler: %s", e)
+
     logger.info(f"Starting email processing loop. Interval: {sleep_interval}s")
     try:
         while True:
+            if _reload_requested.is_set():
+                _reload_requested.clear()
+                logger.info("SIGHUP received — reloading configuration...")
+                try:
+                    if _backend_url and _api_token:
+                        new_config = classes.services.config_service.load_config_from_api(
+                            _backend_url, _api_token, _config_path, _cache_path
+                        )
+                    else:
+                        new_config = classes.services.config_service.load_config(
+                            _config_path, logger
+                        )
+                    if new_config:
+                        to_start, to_stop = (
+                            classes.services.mailbox_setup_service.diff_mailbox_configs(
+                                config, new_config
+                            )
+                        )
+                        mailboxes = classes.services.mailbox_setup_service.apply_mailbox_diff(
+                            mailboxes, to_start, to_stop, new_config.working_path, logger
+                        )
+                        config = new_config
+                        sink = choose_sink(config, minio_service)
+                        _set("mailboxes_configured", len(mailboxes))
+                        logger.info(
+                            "Config reloaded: +%d -%d mailbox(es); %d active.",
+                            len(to_start), len(to_stop), len(mailboxes),
+                        )
+                except Exception as e:
+                    logger.error(
+                        "Config reload failed; keeping current config: %s",
+                        e, exc_info=True,
+                    )
+
             logger.info("Starting new email processing cycle...")
             process_emails_from_mailboxes(
                 config=config,
