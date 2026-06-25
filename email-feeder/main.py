@@ -370,7 +370,7 @@ def process_emails_from_mailboxes(
                 try:
                     upload_valid_submission(
                         sink, minio_service, sd, sd.name,
-                        rep_by_dir[d].original_mail.from_address or "",
+                        rep_by_dir[d].reported_by or "",
                     )
                     _mark_minio_ok()
                     cleanup_directory(sd, remove_parent_if_empty=False)

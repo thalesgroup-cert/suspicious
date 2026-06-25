@@ -32,3 +32,9 @@ class SuspiciousMailResponse(pydantic.BaseModel):
     """Top-level dir under working_path (the forwarded wrapper). For a VALID
     submission this whole dir is uploaded to S3; for a bad one it is cleaned up
     without upload."""
+
+    reported_by: str = ""
+    """Address of the person who submitted the report — the forwarding employee
+    (the wrapper's From), NOT the inner attacker. Drives the contract's
+    `reported_by`, which the backend uses to notify the reporter. Defaults to ""
+    so non-forwarded paths stay valid."""

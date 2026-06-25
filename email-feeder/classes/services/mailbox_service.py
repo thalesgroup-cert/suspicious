@@ -204,7 +204,7 @@ class Mailbox:
             return [processed_email]
 
         processed_emails: list[classes.models.mail.SuspiciousMailResponse] = []
-        eml_attachments, base_tmp_path, main_email_source_ref = processed_email
+        eml_attachments, base_tmp_path, main_email_source_ref, reporter = processed_email
         for attachment in eml_attachments:
             eml_file_path = (
                 pathlib.Path(attachment.file_path)
@@ -240,6 +240,7 @@ class Mailbox:
                     msg=attached_msg,
                     parent_dir_for_analysis=base_tmp_path,
                     source_ref=main_email_source_ref,
+                    reported_by=reporter,
                 )
                 if processed_attached_mail_obj:
                     processed_emails.append(processed_attached_mail_obj)
@@ -383,7 +384,12 @@ class Mailbox:
     def process_inbox_email(
         self, email_id: bytes, source_ref: str
     ) -> (
-        tuple[list[classes.models.mail_attachment.MailAttachment], pathlib.Path, str]
+        tuple[
+            list[classes.models.mail_attachment.MailAttachment],
+            pathlib.Path,
+            str,
+            str,
+        ]
         | classes.models.mail.SuspiciousMailResponse
         | None
     ):
@@ -465,7 +471,12 @@ class Mailbox:
                 f"Email Ref {source_ref} (ID: {email_id}) has attached mail(s). "
                 f"Returning for recursive processing."
             )
-            return (email_attachments_in_main, processing_root_dir, source_ref)
+            # Carry the wrapper sender (the reporting employee) so the inner
+            # submissions are attributed to them, not to the inner attacker.
+            reporter = email_data.from_address or ""
+            return (
+                email_attachments_in_main, processing_root_dir, source_ref, reporter,
+            )
 
         analysis_target_dir = pathlib.Path(
             processing_root_dir, f"{ANALYSIS_DIR_PREFIX}0"
@@ -529,6 +540,8 @@ class Mailbox:
             case_path=str(analysis_target_dir),
             outcome=classes.models.mail_tags.SubmissionOutcome.NO_ATTACHED_MAIL,
             submission_dir=str(processing_root_dir),
+            # No wrapper: the inbox sender is themselves the reporter.
+            reported_by=email_data.from_address or "",
         )
 
     def process_attachment_email(
@@ -537,6 +550,7 @@ class Mailbox:
         msg: email.message.EmailMessage,
         parent_dir_for_analysis: pathlib.Path,
         source_ref: str,
+        reported_by: str = "",
     ):
         attached_email_file_ref = (
             str(source_ref.split("-", maxsplit=1)[0])
@@ -576,6 +590,7 @@ class Mailbox:
             case_path=str(current_analysis_path),
             outcome=classes.models.mail_tags.SubmissionOutcome.VALID,
             submission_dir=str(parent_dir_for_analysis),
+            reported_by=reported_by,
         )
 
     def _save_email_files(
