@@ -38,3 +38,7 @@ class SuspiciousMailResponse(pydantic.BaseModel):
     (the wrapper's From), NOT the inner attacker. Drives the contract's
     `reported_by`, which the backend uses to notify the reporter. Defaults to ""
     so non-forwarded paths stay valid."""
+
+    reporter_note: str = ""
+    """Reporter's note (the wrapper body). Submission-level, shared by every
+    analyzed email under the wrapper. Drives _status.json reporter_note."""

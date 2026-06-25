@@ -204,7 +204,7 @@ class Mailbox:
             return [processed_email]
 
         processed_emails: list[classes.models.mail.SuspiciousMailResponse] = []
-        eml_attachments, base_tmp_path, main_email_source_ref, reporter = processed_email
+        eml_attachments, base_tmp_path, main_email_source_ref, reporter, reporter_note = processed_email
         for attachment in eml_attachments:
             eml_file_path = (
                 pathlib.Path(attachment.file_path)
@@ -241,6 +241,7 @@ class Mailbox:
                     parent_dir_for_analysis=base_tmp_path,
                     source_ref=main_email_source_ref,
                     reported_by=reporter,
+                    reporter_note=reporter_note,
                 )
                 if processed_attached_mail_obj:
                     processed_emails.append(processed_attached_mail_obj)
@@ -389,6 +390,7 @@ class Mailbox:
             pathlib.Path,
             str,
             str,
+            str,
         ]
         | classes.models.mail.SuspiciousMailResponse
         | None
@@ -474,8 +476,10 @@ class Mailbox:
             # Carry the wrapper sender (the reporting employee) so the inner
             # submissions are attributed to them, not to the inner attacker.
             reporter = email_data.from_address or ""
+            reporter_note = email_data.body_text or ""
             return (
-                email_attachments_in_main, processing_root_dir, source_ref, reporter,
+                email_attachments_in_main, processing_root_dir, source_ref,
+                reporter, reporter_note,
             )
 
         analysis_target_dir = pathlib.Path(
@@ -551,6 +555,7 @@ class Mailbox:
         parent_dir_for_analysis: pathlib.Path,
         source_ref: str,
         reported_by: str = "",
+        reporter_note: str = "",
     ):
         attached_email_file_ref = (
             str(source_ref.split("-", maxsplit=1)[0])
@@ -591,6 +596,7 @@ class Mailbox:
             outcome=classes.models.mail_tags.SubmissionOutcome.VALID,
             submission_dir=str(parent_dir_for_analysis),
             reported_by=reported_by,
+            reporter_note=reporter_note,
         )
 
     def _save_email_files(

@@ -57,3 +57,17 @@ def test_response_reported_by_defaults_empty():
             source_ref="260625140959-bbbbbbbbbbbb",
         )
     assert resp.reported_by == ""
+
+
+def test_attachment_email_carries_reporter_note():
+    inner = _inner_attacker_mail()
+    mb = _mb()
+    import pathlib, tempfile
+    with tempfile.TemporaryDirectory() as d:
+        resp = mb.process_attachment_email(
+            email_id=b"1", msg=inner,
+            parent_dir_for_analysis=pathlib.Path(d),
+            source_ref="260625140959-cccccccccccc",
+            reported_by="reporter@corp.com", reporter_note="please analyse",
+        )
+    assert resp.reporter_note == "please analyse"
