@@ -54,9 +54,11 @@ class MainConfig(pydantic.BaseModel):
     caps: CapsConfig = pydantic.Field(default_factory=CapsConfig)
     """Attachment size/count caps."""
 
-    imap_idle: bool = pydantic.Field(default=False)
-    """Use IMAP IDLE to wait for new mail (else interval poll). Off by default;
-    the raw-imaplib IDLE path needs live verification before enabling in prod."""
+    imap_idle: bool = pydantic.Field(default=True)
+    """Use IMAP IDLE to wait for new mail (else interval poll). On by default
+    (live-verified vs GreenMail). Engages only for a single IDLE-capable
+    mailbox; multi-mailbox or non-IDLE servers fall back to interval poll.
+    Set "imap-idle": false to force interval polling everywhere."""
 
     @staticmethod
     def from_json(json_object: dict[str, typing.Any]) -> "MainConfig":
@@ -118,5 +120,5 @@ class MainConfig(pydantic.BaseModel):
             working_path=working_path,
             timer_inbox_emails=timer_inbox_emails,
             caps=CapsConfig(**json_object.get("caps", {})),
-            imap_idle=bool(json_object.get("imap-idle", False)),
+            imap_idle=bool(json_object.get("imap-idle", True)),
         )
