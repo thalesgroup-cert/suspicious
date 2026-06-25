@@ -326,14 +326,22 @@ class MailClient:
         """Block in IMAP IDLE until new mail arrives or `timeout` elapses.
 
         Returns True if woken by a mailbox change, False on timeout/error.
-        EXPERIMENTAL: uses raw imaplib internals; needs live (greenmail)
-        verification before enabling in production. Best-effort — any hiccup
-        returns False and always issues DONE so the connection stays usable.
+        Verified live against GreenMail. Best-effort — any hiccup returns False
+        and always issues DONE so the connection stays usable.
+
+        Readiness is awaited with ``select.select`` rather than a socket
+        timeout: letting ``readline`` raise ``socket.timeout`` mid-read leaves
+        imaplib's buffered reader in an errored state ("cannot read from timed
+        out object"), forcing a reconnect on the very next op. Polling for
+        readability keeps the socket clean across timeouts.
         """
-        import socket
+        import select as _select
 
         client = self.__imap_client
         if client is None:
+            return False
+        sock = getattr(client, "sock", None)
+        if sock is None:
             return False
         tag = client._new_tag()
         woke = False
@@ -341,31 +349,41 @@ class MailClient:
             client.send(b"%s IDLE\r\n" % tag)
             if not client.readline().startswith(b"+"):
                 return False
-            client.sock.settimeout(timeout)
-            try:
-                while True:
-                    line = client.readline()
-                    if not line:
-                        break
-                    if b"EXISTS" in line or b"RECENT" in line:
-                        woke = True
-                        break
-            except (socket.timeout, OSError):
-                pass
+            deadline = time.monotonic() + timeout
+            while True:
+                remaining = deadline - time.monotonic()
+                if remaining <= 0:
+                    break
+                # SSL may hold already-decrypted bytes that select can't see;
+                # read immediately when the TLS buffer is non-empty.
+                pending = getattr(sock, "pending", None)
+                if not (callable(pending) and pending() > 0):
+                    readable, _, _ = _select.select([sock], [], [], remaining)
+                    if not readable:
+                        break  # idle timeout, no server activity
+                line = client.readline()
+                if not line:
+                    break
+                if b"EXISTS" in line or b"RECENT" in line:
+                    woke = True
+                    break
+                # Other untagged responses (EXPUNGE/FETCH/etc.) — keep waiting.
         except Exception as e:  # noqa: BLE001
             self.__logger.warning(f"IDLE wait error: {e}")
         finally:
             try:
                 client.send(b"DONE\r\n")
-                client.sock.settimeout(5)
-                for _ in range(10):
+                drain_deadline = time.monotonic() + 5
+                while True:
+                    remaining = drain_deadline - time.monotonic()
+                    if remaining <= 0:
+                        break
+                    readable, _, _ = _select.select([sock], [], [], remaining)
+                    if not readable:
+                        break
                     line = client.readline()
                     if not line or line.startswith(tag):
                         break
-            except Exception:
-                pass
-            try:
-                client.sock.settimeout(_IMAP_TIMEOUT)
             except Exception:
                 pass
         return woke

@@ -1,6 +1,8 @@
 import logging
-import socket
+import select
 import types
+
+import pytest
 
 import classes.models.configs.internals.imap as imapcfg
 import classes.services.mail_client_service as mail_client_service
@@ -8,6 +10,16 @@ import classes.services.mailbox_service as mailbox_service
 
 
 LOG = logging.getLogger("test-idle")
+
+
+@pytest.fixture(autouse=True)
+def _patch_select(monkeypatch):
+    """idle_wait awaits readability via select.select; a _FakeSock is readable
+    exactly when its backing fake still has lines queued."""
+    def fake_select(rlist, wlist, xlist, timeout=None):
+        ready = [s for s in rlist if getattr(s, "_imap", None) and s._imap._lines]
+        return ready, [], []
+    monkeypatch.setattr(select, "select", fake_select)
 
 
 def _imap_config():
@@ -18,11 +30,11 @@ def _imap_config():
 
 
 class _FakeSock:
-    def __init__(self):
-        self.timeouts = []
+    def __init__(self, imap):
+        self._imap = imap
 
     def settimeout(self, t):
-        self.timeouts.append(t)
+        pass
 
 
 class _FakeImap:
@@ -31,7 +43,7 @@ class _FakeImap:
     def __init__(self, lines, capabilities=("IDLE",), plus=True):
         self._lines = list(lines)
         self.capabilities = capabilities
-        self.sock = _FakeSock()
+        self.sock = _FakeSock(self)
         self.sent = []
         self._plus = plus
         self._tag = 0
@@ -86,14 +98,9 @@ def test_idle_wait_false_when_no_continuation():
 
 
 def test_idle_wait_false_on_timeout():
-    class _TimeoutImap(_FakeImap):
-        def readline(self):
-            if self.sent and self.sent[-1].endswith(b"IDLE\r\n") and not self._lines:
-                # already consumed continuation; simulate blocking timeout
-                raise socket.timeout()
-            return super().readline()
-
-    fake = _TimeoutImap([b"+ idling\r\n"])
+    # Only the continuation line is queued: select reports not-readable once it
+    # is consumed, so the wait times out without corrupting the connection.
+    fake = _FakeImap([b"+ idling\r\n"])
     client = _client_with(fake)
     assert client.idle_wait(timeout=1) is False
     assert any(s == b"DONE\r\n" for s in fake.sent)
