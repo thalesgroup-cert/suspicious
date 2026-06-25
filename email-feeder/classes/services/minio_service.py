@@ -1,3 +1,4 @@
+import io
 import logging
 import pathlib
 import typing
@@ -33,6 +34,23 @@ class MinioService:
         self, config: classes.models.configs.internals.minio.MinioConfig
     ) -> None:
         self.__config = config
+
+    def ensure_bucket(self, bucket_name: str) -> None:
+        """Create the bucket if absent. No tags (prefix mode uses _status.json)."""
+        if self.__minio_client is None:
+            raise Exception(f"MinIO client not available for bucket '{bucket_name}'.")
+        if not self.__minio_client.bucket_exists(bucket_name):
+            self.__minio_client.make_bucket(bucket_name)
+            logger.info("Created MinIO bucket '%s'", bucket_name)
+
+    def upload_bytes(self, bucket_name: str, object_name: str, data: bytes,
+                     content_type: str = "application/octet-stream") -> None:
+        if self.__minio_client is None:
+            raise Exception(f"MinIO client not available for bucket '{bucket_name}'.")
+        self.__minio_client.put_object(
+            bucket_name=bucket_name, object_name=object_name,
+            data=io.BytesIO(data), length=len(data), content_type=content_type,
+        )
 
     def connect(self):
         self.__minio_client = minio.Minio(

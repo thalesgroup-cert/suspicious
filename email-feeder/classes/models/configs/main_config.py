@@ -29,6 +29,12 @@ DEFAULT_CASE_BASE_PATH = pathlib.Path("/app/case")
 DEFAULT_SLEEP_INTERVAL = 10  # seconds
 
 
+class CapsConfig(pydantic.BaseModel):
+    max_attachment_bytes: int = pydantic.Field(default=26214400)  # 25 MiB
+    max_attachments: int = pydantic.Field(default=50)
+    max_total_bytes: int = pydantic.Field(default=52428800)  # 50 MiB
+
+
 class MainConfig(pydantic.BaseModel):
     mail_connectors: MainConfigMailConnectorsConfig
     """All the IMAP connectors configuration."""
@@ -44,6 +50,9 @@ class MainConfig(pydantic.BaseModel):
 
     timer_inbox_emails: int | float = pydantic.Field(default=DEFAULT_SLEEP_INTERVAL)
     """Delay (in seconds) between each mailbox refresh."""
+
+    caps: CapsConfig = pydantic.Field(default_factory=CapsConfig)
+    """Attachment size/count caps."""
 
     @staticmethod
     def from_json(json_object: dict[str, typing.Any]) -> "MainConfig":
@@ -85,6 +94,7 @@ class MainConfig(pydantic.BaseModel):
             access_key=raw_minio["access_key"],
             secret_key=raw_minio["secret_key"],
             secure=raw_minio.get("secure", False),
+            feeder_bucket=raw_minio.get("feeder_bucket", ""),
         )
 
         raw_mail = json_object.get("mail")
@@ -103,4 +113,5 @@ class MainConfig(pydantic.BaseModel):
             mail=mail,
             working_path=working_path,
             timer_inbox_emails=timer_inbox_emails,
+            caps=CapsConfig(**json_object.get("caps", {})),
         )
