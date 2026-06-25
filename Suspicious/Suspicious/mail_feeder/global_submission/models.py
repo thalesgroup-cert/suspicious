@@ -14,3 +14,4 @@ class MailSubmissionData(BaseModel):
     bucket_name: Optional[str]
     user: Optional[str]
     is_submitted: bool
+    reported_by: str = ""
