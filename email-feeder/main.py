@@ -13,6 +13,8 @@ import classes.models.mail
 import classes.models.mail_tags
 import classes.services.config_service
 import classes.services.minio_service
+import classes.services.submission_sink
+import classes.services.caps
 import classes.services.mailbox_setup_service
 import classes.services.mailbox_service
 import classes.services.acknowledge_bad_mail_service
@@ -226,14 +228,36 @@ def partition_submissions(
     return valid_dirs, invalid_mails
 
 
+def choose_sink(config, minio_service):
+    """PrefixSink when a feeder bucket is configured, else None (legacy mode)."""
+    bucket = getattr(config.minio, "feeder_bucket", "") or ""
+    if bucket:
+        return classes.services.submission_sink.PrefixSink(minio_service, bucket)
+    return None
+
+
+def upload_valid_submission(sink, minio_service, submission_dir, submission_id, reported_by):
+    """Prefix mode -> sink.store; legacy mode -> upload_directory bucket-per-submission."""
+    sd = pathlib.Path(submission_dir)
+    if sink is not None:
+        sink.store(sd, submission_id, reported_by)
+    else:
+        bucket_name = sd.name.lower().replace("_", "-")
+        minio_service.upload_directory(sd, bucket_name)
+
+
 def process_emails_from_mailboxes(
     config: classes.models.configs.main_config.MainConfig,
     acknowledge_bad_mail_service: classes.services.acknowledge_bad_mail_service.AcknowledgeBadMailService,
     mailboxes: list[classes.services.mailbox_service.Mailbox],
     minio_service: classes.services.minio_service.MinioService,
+    sink=None,
 ):
     """
     Fetches and processes emails from all enabled mailboxes.
+
+    `sink` is a PrefixSink (portable contract) when a feeder bucket is
+    configured, else None (legacy bucket-per-submission upload).
     """
     if not mailboxes:
         logger.info("No mailboxes provided to process.")
@@ -260,34 +284,74 @@ def process_emails_from_mailboxes(
             _inc("emails_processed_total", len(email_list))
 
             valid_dirs, invalid_mails = partition_submissions(email_list)
+            # One representative response per submission dir (reported_by + attachments).
+            rep_by_dir: dict[str, classes.models.mail.SuspiciousMailResponse] = {}
+            for m in email_list:
+                rep_by_dir.setdefault(m.submission_dir, m)
 
-            # 1) Bad submissions (no attached mail): acknowledge, store nothing.
-            for mail in invalid_mails:
-                acknowledge_bad_mail_service.send_bad_mail_ack(mail)
+            # Mark \Seen ONLY for submissions that reached a terminal state
+            # (uploaded or acked). A failed upload leaves its emails UNSEEN so
+            # the next cycle retries it — no batch reprocess of the successes.
+            handled_ids: list = []
 
-            # 2) Valid submissions: upload the wrapper dir, then clean it up.
-            for dir_str in valid_dirs:
-                submission_dir = pathlib.Path(dir_str)
-                if not submission_dir.is_dir():
-                    logger.warning(
-                        "Submission dir missing, skipping upload: %s", submission_dir
+            def _ids_for(submission_dir: str) -> list:
+                return [m.original_mail.id for m in email_list
+                        if m.submission_dir == submission_dir]
+
+            # Caps gate: oversized valid submissions are acked as bad, not stored.
+            kept_dirs: list[str] = []
+            for d in valid_dirs:
+                rep = rep_by_dir[d]
+                try:
+                    classes.services.caps.check_caps(
+                        rep.original_mail.attachments,
+                        len(rep.original_mail.raw_eml_bytes or b""),
+                        config.caps,
                     )
-                    continue
-                bucket_name = submission_dir.name.lower().replace("_", "-")
-                minio_service.upload_directory(submission_dir, bucket_name)
-                _mark_minio_ok()
-                cleanup_directory(submission_dir, remove_parent_if_empty=False)
-                logger.info("Uploaded and cleaned valid submission: %s", submission_dir)
+                    kept_dirs.append(d)
+                except classes.services.caps.CapsExceeded as ce:
+                    logger.warning("Submission %s exceeds caps (%s); acking as bad.", d, ce)
+                    try:
+                        acknowledge_bad_mail_service.send_bad_mail_ack(rep)
+                        sd = pathlib.Path(d)
+                        if sd.is_dir():
+                            cleanup_directory(sd, remove_parent_if_empty=False)
+                        handled_ids.extend(_ids_for(d))
+                    except Exception as e:
+                        logger.error("Failed handling over-cap submission %s: %s", d, e, exc_info=True)
 
-            # 3) Bad submissions: clean up WITHOUT uploading to S3.
+            # Bad submissions (no attached mail): acknowledge, store nothing.
             for mail in invalid_mails:
-                submission_dir = pathlib.Path(mail.submission_dir)
-                if submission_dir.is_dir():
-                    cleanup_directory(submission_dir, remove_parent_if_empty=False)
+                try:
+                    acknowledge_bad_mail_service.send_bad_mail_ack(mail)
+                    sd = pathlib.Path(mail.submission_dir)
+                    if sd.is_dir():
+                        cleanup_directory(sd, remove_parent_if_empty=False)
+                    handled_ids.append(mail.original_mail.id)
+                except Exception as e:
+                    logger.error("Failed acking bad submission %s: %s", mail.id, e, exc_info=True)
 
-            email_ids = [email.original_mail.id for email in email_list]
-            mailbox.mark_emails_as_seen(email_ids=email_ids)
-            logger.info(f"Marked emails as seen for mailbox: {mailbox_identifier}.")
+            # Valid submissions: upload (prefix or legacy) then clean up, per-submission.
+            for d in kept_dirs:
+                sd = pathlib.Path(d)
+                if not sd.is_dir():
+                    logger.warning("Submission dir missing, skipping upload: %s", sd)
+                    continue
+                try:
+                    upload_valid_submission(
+                        sink, minio_service, sd, sd.name,
+                        rep_by_dir[d].original_mail.from_address or "",
+                    )
+                    _mark_minio_ok()
+                    cleanup_directory(sd, remove_parent_if_empty=False)
+                    handled_ids.extend(_ids_for(d))
+                    logger.info("Uploaded and cleaned valid submission: %s", sd)
+                except Exception as e:
+                    logger.error("Failed uploading submission %s: %s", d, e, exc_info=True)
+
+            if handled_ids:
+                mailbox.mark_emails_as_seen(email_ids=list(dict.fromkeys(handled_ids)))
+                logger.info(f"Marked emails as seen for mailbox: {mailbox_identifier}.")
 
         except Exception as e:
             logger.error(
@@ -348,6 +412,13 @@ def main() -> int:
         logger.critical(f"Failed to initialize MinIO client from config: {e}")
         return 1
 
+    sink = choose_sink(config, minio_service)
+    if sink is not None:
+        logger.info("Using portable prefix contract (feeder bucket '%s').",
+                    config.minio.feeder_bucket)
+    else:
+        logger.info("Using legacy bucket-per-submission mode (no feeder_bucket set).")
+
     try:
         logger.info("Setting up mailboxes...")
         mailboxes = classes.services.mailbox_setup_service.setup_mailboxes(
@@ -399,6 +470,7 @@ def main() -> int:
                 acknowledge_bad_mail_service=acknowledge_bad_mail_service,
                 mailboxes=mailboxes,
                 minio_service=minio_service,
+                sink=sink,
             )
             _set("last_successful_poll", time.time())
             logger.info(
