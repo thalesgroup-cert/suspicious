@@ -5,6 +5,8 @@ import logging
 import pathlib
 
 import classes.models.submission_contract as sc
+import classes.models.email_contract as _ec
+ec_email_metadata_name = _ec.EMAIL_METADATA_OBJECT_NAME
 
 logger = logging.getLogger("email-feeder.minio")
 
@@ -32,6 +34,8 @@ class PrefixSink:
                 continue
             if rel.endswith(sc.SUBMISSION_EML_SUFFIX):
                 continue  # wrapper is not an email-to-analyze
+            if pathlib.PurePosixPath(rel).name == ec_email_metadata_name:  # email.json
+                continue
             if rel.lower().endswith(".eml"):
                 emails.append(object_name)
             else:

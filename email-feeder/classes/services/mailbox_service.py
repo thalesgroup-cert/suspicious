@@ -589,6 +589,15 @@ class Mailbox:
             eml_content=email_data.raw_eml_bytes,
         )
 
+        import json
+        import classes.models.email_contract as ec
+        meta = ec.build_email_metadata(msg, attached_email_file_ref)
+        meta_path = pathlib.Path(current_analysis_path, ec.EMAIL_METADATA_OBJECT_NAME)
+        meta_path.write_text(
+            json.dumps(meta.model_dump(by_alias=True), ensure_ascii=False),
+            encoding="utf-8",
+        )
+
         return classes.models.mail.SuspiciousMailResponse(
             original_mail=email_data,
             id=attached_email_file_ref,
