@@ -82,3 +82,18 @@ def test_model_rejects_wrong_schema_version():
     s["schema"] = 2
     with pytest.raises(pydantic.ValidationError):
         sc.SubmissionStatus.model_validate(s)
+
+
+def test_build_status_carries_reporter_note():
+    s = sc.build_status(
+        submission_id="260625140959-aa", reported_by="u@x",
+        emails_to_analyze=[], attachments=[], reporter_note="please check this",
+    )
+    assert s["reporter_note"] == "please check this"
+    assert sc.SubmissionStatus.model_validate(s).reporter_note == "please check this"
+
+
+def test_build_status_default_reporter_note_empty():
+    s = sc.build_status(submission_id="260625140959-aa", reported_by="u@x",
+                        emails_to_analyze=[], attachments=[])
+    assert s["reporter_note"] == ""

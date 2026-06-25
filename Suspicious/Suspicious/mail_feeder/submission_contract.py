@@ -22,6 +22,8 @@ STATUS_DONE = "done"
 
 CONTRACT_SCHEMA = 1
 
+REPORTER_NOTE_MAX_BYTES = 8192
+
 
 def build_status(
     status: str,
@@ -31,6 +33,7 @@ def build_status(
     emails_to_analyze: list[str],
     attachments: list[str],
     submitted_at: str | None = None,
+    reporter_note: str = "",
 ) -> dict:
     return {
         "schema": CONTRACT_SCHEMA,
@@ -41,6 +44,7 @@ def build_status(
         "attachments": attachments,
         "submitted_at": submitted_at
         or datetime.now(tz=timezone.utc).isoformat(),
+        "reporter_note": reporter_note[:REPORTER_NOTE_MAX_BYTES],
     }
 
 

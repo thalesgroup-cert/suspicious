@@ -30,3 +30,33 @@ class SubmissionContractTests(unittest.TestCase):
     def test_parse_status_rejects_missing_status(self):
         with self.assertRaises(ValueError):
             sc.parse_status(b'{"submission_id": "x"}')
+
+    def test_build_status_carries_reporter_note(self):
+        s = sc.build_status(
+            sc.STATUS_TODO,
+            submission_id="260625140959-aa",
+            reported_by="u@x",
+            emails_to_analyze=[],
+            attachments=[],
+            reporter_note="hi",
+        )
+        self.assertEqual(s["reporter_note"], "hi")
+
+    def test_build_status_default_reporter_note_empty(self):
+        s = sc.build_status(
+            sc.STATUS_TODO,
+            submission_id="260625140959-aa",
+            reported_by="u@x",
+            emails_to_analyze=[],
+            attachments=[],
+        )
+        self.assertEqual(s["reporter_note"], "")
+
+    def test_parse_status_keeps_reporter_note(self):
+        raw = json.dumps({
+            "schema": 1, "status": "todo", "submission_id": "x-1",
+            "reported_by": "u@x", "emails_to_analyze": [], "attachments": [],
+            "submitted_at": "2026-01-01T00:00:00+00:00",
+            "reporter_note": "hi",
+        }).encode()
+        self.assertEqual(sc.parse_status(raw).get("reporter_note"), "hi")

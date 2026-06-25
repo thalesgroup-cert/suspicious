@@ -19,6 +19,8 @@ STATUS_DONE = "done"
 
 CONTRACT_SCHEMA = 1
 
+REPORTER_NOTE_MAX_BYTES = 8192
+
 
 class SubmissionStatus(pydantic.BaseModel):
     """Validated shape of `_status.json`.
@@ -42,6 +44,7 @@ class SubmissionStatus(pydantic.BaseModel):
     emails_to_analyze: list[str]
     attachments: list[str]
     submitted_at: str
+    reporter_note: str = ""
 
     @pydantic.field_validator("submitted_at")
     @classmethod
@@ -61,6 +64,7 @@ def build_status(
     *,
     status: str = STATUS_TODO,
     submitted_at: str | None = None,
+    reporter_note: str = "",
 ) -> dict:
     """Build the validated `_status.json` manifest dict.
 
@@ -74,5 +78,6 @@ def build_status(
         emails_to_analyze=emails_to_analyze,
         attachments=attachments,
         submitted_at=submitted_at or datetime.now(tz=timezone.utc).isoformat(),
+        reporter_note=reporter_note[:REPORTER_NOTE_MAX_BYTES],
     )
     return model.model_dump(by_alias=True)
