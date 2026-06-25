@@ -17,7 +17,7 @@ class PrefixSink:
         self._bucket = bucket_name
 
     def store(self, submission_dir: pathlib.Path, submission_id: str,
-              reported_by: str) -> None:
+              reported_by: str, reporter_note: str = "") -> None:
         self._svc.ensure_bucket(self._bucket)
 
         emails: list[str] = []
@@ -44,6 +44,7 @@ class PrefixSink:
         manifest = sc.build_status(
             submission_id=submission_id, reported_by=reported_by,
             emails_to_analyze=emails, attachments=attachments,
+            reporter_note=reporter_note,
         )
         raw = json.dumps(manifest, ensure_ascii=False).encode("utf-8")
         # _status.json LAST — readers skip prefixes without it.

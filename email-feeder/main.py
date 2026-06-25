@@ -266,11 +266,12 @@ def _wait_for_next_cycle(config, mailboxes, sleep_interval, logger):
     time.sleep(sleep_interval)
 
 
-def upload_valid_submission(sink, minio_service, submission_dir, submission_id, reported_by):
+def upload_valid_submission(sink, minio_service, submission_dir, submission_id,
+                            reported_by, reporter_note=""):
     """Prefix mode -> sink.store; legacy mode -> upload_directory bucket-per-submission."""
     sd = pathlib.Path(submission_dir)
     if sink is not None:
-        sink.store(sd, submission_id, reported_by)
+        sink.store(sd, submission_id, reported_by, reporter_note)
     else:
         bucket_name = sd.name.lower().replace("_", "-")
         minio_service.upload_directory(sd, bucket_name)
@@ -371,6 +372,7 @@ def process_emails_from_mailboxes(
                     upload_valid_submission(
                         sink, minio_service, sd, sd.name,
                         rep_by_dir[d].reported_by or "",
+                        rep_by_dir[d].reporter_note or "",
                     )
                     _mark_minio_ok()
                     cleanup_directory(sd, remove_parent_if_empty=False)

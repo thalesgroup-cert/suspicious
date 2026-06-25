@@ -142,6 +142,7 @@ def test_user_submission_lands_in_bucket_as_prefix_contract():
     assert model.schema_version == sc.CONTRACT_SCHEMA
     assert model.emails_to_analyze, "forwarded .eml should be queued for analysis"
     assert model.reported_by == "reporter@corp.com"
+    assert "Forwarding this suspicious email" in manifest.get("reporter_note", "")
 
     # the queued email object actually exists in the bucket
     for ref in model.emails_to_analyze:
