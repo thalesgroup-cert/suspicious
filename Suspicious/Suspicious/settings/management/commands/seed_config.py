@@ -38,10 +38,15 @@ class Command(BaseCommand):
             if not isinstance(raw, dict):
                 continue
             value = _strip_secrets(section, raw)
+            scope = _scope_for_section(section)
             RuntimeConfig.objects.update_or_create(
-                scope=_scope_for_section(section),
+                scope=scope,
                 key=section,
                 defaults={"value": value},
             )
+            # Purge stale duplicates left under a different scope by an earlier
+            # release that placed this section in another scope group. Without
+            # this, get_config can resolve the stale row (see test_config_dedup).
+            RuntimeConfig.objects.filter(key=section).exclude(scope=scope).delete()
             seeded += 1
         self.stdout.write(self.style.SUCCESS(f"Seeded {seeded} runtime config sections."))
