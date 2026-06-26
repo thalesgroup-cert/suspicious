@@ -152,7 +152,7 @@ def _write_manifest(
         logger.warning("Could not write local manifest copy to %s", local_path, exc_info=True)
 
 
-def _handoff_submission(bucket_path: str, submission_path: str, identifier: str, reported_by: str, processor) -> None:
+def _handoff_submission(bucket_path: str, submission_path: str, identifier: str, reported_by: str, processor, reporter_note: str = "") -> None:
     """Copy the wrapper into each email dir, archive it, hand to the processor.
 
     Shared by the legacy bucket path and the new prefix path.
@@ -164,6 +164,7 @@ def _handoff_submission(bucket_path: str, submission_path: str, identifier: str,
         shutil.make_archive(entry.path, "gztar", entry.path)
         processor.process_emails_from_minio_workdir(
             entry.path, identifier, reported_by=reported_by,
+            reporter_note=reporter_note,
         )
 
 
@@ -212,9 +213,10 @@ def _process_prefix_submissions(base_path: str, bucket_name: str) -> None:
                 continue
             status = source.read_status(submission_id)
             reported_by = (status or {}).get("reported_by") or _extract_reported_by(wrapper)
+            reporter_note = (status or {}).get("reporter_note") or ""
             _handoff_submission(
                 os.path.dirname(wrapper), wrapper, submission_id,
-                reported_by, processor,
+                reported_by, processor, reporter_note=reporter_note,
             )
             source.set_status(submission_id, sc.STATUS_DONE)
         except Exception:

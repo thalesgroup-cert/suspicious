@@ -15,3 +15,4 @@ class MailSubmissionData(BaseModel):
     user: Optional[str]
     is_submitted: bool
     reported_by: str = ""
+    reporter_note: str = ""

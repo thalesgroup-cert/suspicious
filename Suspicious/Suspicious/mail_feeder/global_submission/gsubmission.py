@@ -53,6 +53,7 @@ class GlobalSubmissionService:
                     f"Email instance processing failed for {submission.email_id}"
                 )
                 return None
+            instance.reporterNote = getattr(submission, "reporter_note", "") or ""
             instance.save()
             # Handle post-processing based on submission type
             if submission.is_submitted:

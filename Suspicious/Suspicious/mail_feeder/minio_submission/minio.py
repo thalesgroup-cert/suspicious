@@ -142,6 +142,7 @@ class MinioEmailService:
         workdir: str,
         bucket_name: str,
         reported_by: str = "",
+        reporter_note: str = "",
     ) -> None:
         """
         Process all regular .eml files in a given MinIO work directory.
@@ -175,5 +176,7 @@ class MinioEmailService:
                         user=user.email if user else "",
                         bucket_name=bucket_name,
                         is_submitted=False,
+                        reported_by=reported_by,
+                        reporter_note=reporter_note,
                     )
                 )
