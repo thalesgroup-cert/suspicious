@@ -89,6 +89,11 @@ class S3Config(_Permissive):
     secret_key: Optional[str] = None
     endpoint_url: Optional[str] = None
     bucket_name: Optional[str] = None
+    # When true, the backend builds EmailDataModel straight from the feeder's
+    # per-email email.json (sha256-gated) instead of re-parsing the .eml.
+    # Falls back to parse_email on any mismatch. Enable after e2e parity is
+    # proven in staging. See CONFIG.md "Feeder fast metadata".
+    fast_metadata: bool = False
 
 
 class StorageConfig(_Permissive):

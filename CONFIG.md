@@ -252,7 +252,8 @@ mismatch gives `Access denied for user 'suspicious'`.
         "secret_key": "MINIO_SECRET_KEY",
         "secure": false,
         "auto_create_bucket": true,
-        "media_bucket": "suspicious-media"
+        "media_bucket": "suspicious-media",
+        "fast_metadata": false
     }
 }
 ```
@@ -261,6 +262,24 @@ mismatch gives `Access denied for user 'suspicious'`.
 does **not** require the RustFS service — handy for a minimal dev run. Set
 `"backend": "s3"` to use object storage; then `secret_key` here must match the
 RustFS credentials in `.env` (`MINIO_ROOT_PASSWORD`), and RustFS must be running.
+
+#### Feeder fast metadata
+
+`fast_metadata` (default `false`) controls the email-ingestion fast path. The
+email-feeder always writes a per-email `email.json` (parsed addresses, subject,
+body, headers, attachment sha256) next to each `.eml`. When `fast_metadata` is
+`true`, the backend builds its `EmailDataModel` directly from that JSON —
+sha256-verified against the on-disk attachments — instead of re-opening and
+re-parsing the `.eml`. Any validation error, sha256 mismatch, or missing field
+falls back to `parse_email`, so the worst case equals the legacy behavior.
+
+| Value | Behavior |
+|---|---|
+| `false` (default) | Backend always re-parses the `.eml` (legacy). |
+| `true` | Backend reads `email.json`; falls back to `parse_email` on any mismatch. |
+
+Enable only after end-to-end parity (fast path vs `parse_email` produce
+identical `Mail` rows) is green in staging.
 
 ### 2.7 Integrations
 
