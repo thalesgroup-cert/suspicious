@@ -859,6 +859,58 @@ class Mailbox:
                 headers[key].append(value)
         return headers
 
+    @staticmethod
+    def _rfc822_inner_bytes(part: email.message.Message) -> bytes:
+        """Recover the raw bytes of an email attached as message/rfc822,
+        regardless of its Content-Transfer-Encoding.
+
+        Python's parser nests the sub-message as an EmailMessage only for
+        7bit/8bit parts; with base64/quoted-printable CTE the payload is the
+        encoded string. Decoding it ourselves yields a valid .eml the feeder
+        can re-parse, instead of saving mis-decoded data (null From, base64
+        body) that poisons email.json.
+        """
+        payload = part.get_payload()
+        cte = (part.get("Content-Transfer-Encoding", "") or "").strip().lower()
+
+        # For base64/quoted-printable CTE the parser does NOT decode before
+        # nesting: it parses the *encoded* text as the sub-message, yielding a
+        # bogus EmailMessage (no headers, body = the encoded blob). Decode the
+        # encoded blob ourselves to recover the real inner email.
+        if cte in ("base64", "quoted-printable", "quopri"):
+            if isinstance(payload, list) and payload:
+                encoded = b"".join(
+                    p.as_bytes() if isinstance(p, email.message.Message)
+                    else str(p).encode("utf-8", "replace")
+                    for p in payload
+                )
+            elif isinstance(payload, str):
+                encoded = payload.encode("utf-8", "replace")
+            else:
+                encoded = part.as_bytes()
+            try:
+                if cte == "base64":
+                    import base64 as _b64
+                    return _b64.b64decode(encoded)
+                import quopri
+                return quopri.decodestring(encoded)
+            except Exception:
+                return part.as_bytes()
+
+        # 7bit/8bit/binary: the nested EmailMessage is trustworthy.
+        if isinstance(payload, list) and payload and isinstance(
+            payload[0], email.message.Message
+        ):
+            return payload[0].as_bytes()
+        if isinstance(payload, email.message.Message):
+            return payload.as_bytes()
+        raw = part.get_payload(decode=True)
+        if isinstance(raw, bytes):
+            return raw
+        if isinstance(payload, str):
+            return payload.encode(part.get_content_charset() or "utf-8", "replace")
+        return part.as_bytes()
+
     def extract_attachments(
         self, msg: email.message.EmailMessage, tmp_path: pathlib.Path, source_ref: str
     ) -> list[classes.models.mail_attachment.MailAttachment]:
@@ -931,34 +983,9 @@ class Mailbox:
             try:
                 attachment_bytes: bytes | None = None
                 if content_type == "message/rfc822":
-                    payload_to_write = part.get_payload()
-                    msg_to_write = None
-                    if isinstance(payload_to_write, list) and payload_to_write:
-                        msg_to_write = (
-                            payload_to_write[0]
-                            if isinstance(
-                                payload_to_write[0], email.message.EmailMessage
-                            )
-                            else None
-                        )
-                    elif isinstance(payload_to_write, email.message.EmailMessage):
-                        msg_to_write = payload_to_write
-
-                    if msg_to_write:
-                        attachment_bytes = msg_to_write.as_bytes()
-                    else:
-                        self.__logger.warning(
-                            f"Content of '{processed_filename}' (message/rfc822) not a standard EmailMessage. Saving raw part data."
-                        )
-                        raw_payload = part.get_payload(decode=True)
-                        if isinstance(raw_payload, str):
-                            attachment_bytes = raw_payload.encode(
-                                part.get_content_charset() or "utf-8", "replace"
-                            )
-                        elif isinstance(raw_payload, bytes):
-                            attachment_bytes = raw_payload
-                        else:
-                            attachment_bytes = part.as_bytes()
+                    # Recover the inner email for any CTE (incl. base64), so the
+                    # saved .eml re-parses correctly instead of being mis-decoded.
+                    attachment_bytes = self._rfc822_inner_bytes(part)
 
                 else:
                     payload = part.get_payload(decode=True)
