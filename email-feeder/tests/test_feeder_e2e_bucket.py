@@ -148,6 +148,20 @@ def test_user_submission_lands_in_bucket_as_prefix_contract():
     for ref in model.emails_to_analyze:
         assert ref in objects, f"manifest references missing object {ref}"
 
+    # 5) the feeder wrote a per-email email.json that validates against the
+    # contract — this is what the backend fast-path reads instead of re-parsing.
+    import classes.models.email_contract as ec
+    meta_objs = [
+        o for o in objects
+        if o.rsplit("/", 1)[-1] == ec.EMAIL_METADATA_OBJECT_NAME
+    ]
+    assert meta_objs, f"feeder wrote no {ec.EMAIL_METADATA_OBJECT_NAME}; objects={objects}"
+    for meta_obj in meta_objs:
+        meta_raw = client.get_object(bucket, meta_obj).read()
+        meta = ec.EmailMetadata.model_validate(json.loads(meta_raw))
+        assert meta.schema_version == ec.CONTRACT_SCHEMA
+        assert meta.id, "email.json must carry the email id"
+
     # cleanup
     for o in objects:
         client.remove_object(bucket, o)
