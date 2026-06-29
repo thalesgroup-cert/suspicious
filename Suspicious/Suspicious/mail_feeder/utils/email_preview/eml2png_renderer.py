@@ -268,12 +268,24 @@ class Eml2PngRenderer:
 # ---------------------------------------------------------------------------
 
 def _build_minio_client():
-    """Build a Minio client from Django settings, returning None on failure.
+    """Build the MinIO client used to store previews, or None on failure.
 
-    Reads the same MINIO_STORAGE_* values that django-minio-storage uses,
-    so previews live in the same MinIO instance as every other object the
-    platform stores.
+    Prefer the platform-wide client (`storage.s3` runtime config), so
+    previews live in the same MinIO instance as every other object — the
+    same source the rest of the backend and the preview *fetch* path use.
+    Falls back to legacy django-minio-storage `MINIO_STORAGE_*` settings
+    for older deployments that still configure storage that way.
     """
+    try:
+        from common.clients import get_s3_client
+        client = get_s3_client()
+        if client is not None:
+            return client
+    except Exception:
+        logger.exception(
+            "get_s3_client failed for previews; falling back to MINIO_STORAGE_*"
+        )
+
     endpoint = getattr(settings, "MINIO_STORAGE_ENDPOINT", None)
     access_key = getattr(settings, "MINIO_STORAGE_ACCESS_KEY", None)
     secret_key = getattr(settings, "MINIO_STORAGE_SECRET_KEY", None)

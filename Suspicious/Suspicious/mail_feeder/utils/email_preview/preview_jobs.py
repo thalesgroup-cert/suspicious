@@ -30,16 +30,35 @@ def build_storage_client():
 
 
 def fetch_eml_bytes(storage, bucket_name: str) -> Optional[bytes]:
-    """Stream the previewable .eml from the archive bucket.
+    """Stream the previewable .eml from the archive.
 
-    Buckets typically contain both the reporter wrapper
-    (`user_submission.eml`) and the actual reported message (any other
-    .eml). The preview must always render the reported message, never the
-    wrapper. We pick the first non-wrapper .eml and only fall back to
-    user_submission.eml when nothing else exists (legacy submissions
-    before the split).
+    Resolves both storage layouts. Legacy: bucket-per-submission, where
+    ``bucket_name`` is a real bucket holding the .eml at the root. Portable
+    prefix contract: one shared feeder bucket where the submission id is a
+    *prefix* — MailArchive.bucket_name still carries that id, so when no
+    bucket of that name exists we fall back to the feeder bucket + prefix
+    (otherwise list_objects raises NoSuchBucket and no preview renders).
+
+    The archive holds both the reporter wrapper (`user_submission.eml` /
+    `reporter-submission.eml`) and the reported message (any other .eml).
+    The preview must render the reported message, so we pick the first
+    non-wrapper .eml and only fall back to a wrapper when nothing else
+    exists (legacy submissions before the split).
     """
-    objects = list(storage.client.list_objects(bucket_name, recursive=True))
+    if storage.client.bucket_exists(bucket_name):
+        bucket, prefix = bucket_name, ""
+    else:
+        try:
+            from settings.config import get_section
+            feeder_bucket = (get_section("storage.s3") or {}).get("feeder_bucket", "")
+        except Exception:
+            feeder_bucket = ""
+        if not feeder_bucket:
+            return None
+        bucket = feeder_bucket
+        prefix = bucket_name.rstrip("/") + "/"
+
+    objects = list(storage.client.list_objects(bucket, prefix=prefix, recursive=True))
     eml_keys = [
         getattr(o, "object_name", "") or "" for o in objects
         if (getattr(o, "object_name", "") or "").lower().endswith(".eml")
@@ -47,15 +66,16 @@ def fetch_eml_bytes(storage, bucket_name: str) -> Optional[bytes]:
     if not eml_keys:
         return None
 
+    _WRAPPERS = ("user_submission.eml", "reporter-submission.eml")
     non_wrapper = [
         k for k in eml_keys
-        if not k.lower().endswith("user_submission.eml")
+        if not k.lower().endswith(_WRAPPERS)
     ]
-    eml_key = non_wrapper[0] if non_wrapper else eml_keys[0]
+    eml_key = sorted(non_wrapper)[0] if non_wrapper else sorted(eml_keys)[0]
 
     response = None
     try:
-        response = storage.client.get_object(bucket_name, eml_key)
+        response = storage.client.get_object(bucket, eml_key)
         return response.read()
     finally:
         if response is not None:
