@@ -47,6 +47,11 @@ pybreaker==1.4.1
 # Email Handling
 chardet==7.4.3
 
+# Templating (Jinja2: TheHive challenge + scoring notification emails —
+# connectors/contrib/thehive/challenge.py, score_process/.../send_mail/utils.py.
+# Previously satisfied transitively; pin it as the direct dependency it is.)
+jinja2==3.1.4
+
 # Data Analysis and Machine Learning
 numpy==2.4.4
 validators==0.35.0
