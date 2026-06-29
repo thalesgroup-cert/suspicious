@@ -2,6 +2,9 @@
 # Author : THA-CERT //ECR
 
 import os
+import numpy as np
+import zipfile
+from collections import defaultdict
 import email
 
 from cortexutils.analyzer import Analyzer
@@ -42,16 +45,16 @@ class AIMailClassifier(Analyzer):
         # Load models
         try:
             safe_suspicious_model = ResNetMLP(768, 2).to(device)
-            safe_suspicious_model.load_state_dict(torch.load("/worker/AIMailAnalyzer/models/safe_suspicious_model.pth", weights_only=True))
+            safe_suspicious_model.load_state_dict(torch.load("/worker/AIMailAnalyzer/models/safe_suspicious_30_epochs_model.pth", weights_only=True))
             spam_dangerous_model = ResNetMLP(768, 2).to(device)
-            spam_dangerous_model.load_state_dict(torch.load("/worker/AIMailAnalyzer/models/unwanted_dangerous_model.pth", weights_only=True))
+            spam_dangerous_model.load_state_dict(torch.load("/worker/AIMailAnalyzer/models/spam_dangerous_30_epochs_model.pth", weights_only=True))
 
             safe_model = ResNetMLP(768, 2).to(device)
-            safe_model.load_state_dict(torch.load("/worker/AIMailAnalyzer/models/safe_model.pth", weights_only=True))
+            safe_model.load_state_dict(torch.load("/worker/AIMailAnalyzer/models/safe_30_epochs_model.pth", weights_only=True))
             spam_model = ResNetMLP(768, 2).to(device)
-            spam_model.load_state_dict(torch.load("/worker/AIMailAnalyzer/models/unwanted_model.pth", weights_only=True))
+            spam_model.load_state_dict(torch.load("/worker/AIMailAnalyzer/models/unwanted_30_epochs_model.pth", weights_only=True))
             dangerous_model = ResNetMLP(768, 4).to(device)
-            dangerous_model.load_state_dict(torch.load("/worker/AIMailAnalyzer/models/dangerous_model.pth", weights_only=True))
+            dangerous_model.load_state_dict(torch.load("/worker/AIMailAnalyzer/models/dangerous_30_epochs_model.pth", weights_only=True))
         except Exception as e:
             self.error(f"Error loading models: {e}")
             return
