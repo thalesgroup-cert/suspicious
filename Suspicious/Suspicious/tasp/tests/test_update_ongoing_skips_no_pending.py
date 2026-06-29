@@ -20,9 +20,9 @@ class UpdateOngoingSkipsNoPendingTest(TestCase):
 
     @patch(
         "cortex_job.cortex_utils.cortex_and_job_management."
-        "CortexJobManager.manage_jobs"
+        "CortexJobManager.update_single_job"
     )
-    def test_case_with_no_pending_caj_is_skipped(self, mock_manage):
+    def test_case_with_no_pending_caj_is_skipped(self, mock_update):
         case = Case.objects.create(
             status="On Going", description="", reporter=self.reporter
         )
@@ -34,13 +34,17 @@ class UpdateOngoingSkipsNoPendingTest(TestCase):
             status=CaseAnalyzerJob.STATUS_SUCCESS,
         )
         update_ongoing_case_jobs()
-        mock_manage.assert_not_called()
+        mock_update.assert_not_called()
 
     @patch(
         "cortex_job.cortex_utils.cortex_and_job_management."
-        "CortexJobManager.manage_jobs"
+        "CortexJobManager.finalise_case"
     )
-    def test_case_with_pending_caj_is_processed(self, mock_manage):
+    @patch(
+        "cortex_job.cortex_utils.cortex_and_job_management."
+        "CortexJobManager.update_single_job"
+    )
+    def test_case_with_pending_caj_is_processed(self, mock_update, mock_finalise):
         case = Case.objects.create(
             status="On Going", description="", reporter=self.reporter
         )
@@ -51,15 +55,15 @@ class UpdateOngoingSkipsNoPendingTest(TestCase):
             status=CaseAnalyzerJob.STATUS_INPROGRESS,
         )
         update_ongoing_case_jobs()
-        mock_manage.assert_called_once()
+        mock_update.assert_called_once()
 
     @patch(
         "cortex_job.cortex_utils.cortex_and_job_management."
-        "CortexJobManager.manage_jobs"
+        "CortexJobManager.update_single_job"
     )
-    def test_case_with_no_caj_is_skipped(self, mock_manage):
+    def test_case_with_no_caj_is_skipped(self, mock_update):
         Case.objects.create(
             status="On Going", description="", reporter=self.reporter
         )
         update_ongoing_case_jobs()
-        mock_manage.assert_not_called()
+        mock_update.assert_not_called()

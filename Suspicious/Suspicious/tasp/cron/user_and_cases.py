@@ -14,7 +14,7 @@ log_cases = logging.getLogger("tasp.cron.update_ongoing_case_jobs")
 # STALE_JOB_TIMEOUT auto-fails any zombie reports independently.
 CRON_BATCH_SIZE = 200
 
-# Per-case Redis lock TTL. Long enough to cover one manage_jobs() call,
+# Per-case Redis lock TTL. Long enough to cover one case's ledger sync,
 # short enough that a crashed worker doesn't strand the lock for hours.
 CASE_LOCK_TTL = 120
 
@@ -69,8 +69,22 @@ def update_ongoing_case_jobs() -> None:
             try:
                 with tracer.start_as_current_span("cron.manage_case_jobs") as case_span:
                     case_span.set_attribute("case.id", case.id)
-                    manager.manage_jobs(case)
-                    case.save()
+                    # Mirror the webhook task `process_cortex_job`: sync each
+                    # pending CaseAnalyzerJob ledger row from Cortex, then
+                    # finalise once none remain pending. Using manage_jobs here
+                    # finalised the case but left the ledger stuck InProgress,
+                    # which fail_stale_jobs would later mis-mark as Failed.
+                    pending = (
+                        CaseAnalyzerJob.objects
+                        .filter(case=case, status__in=CaseAnalyzerJob.PENDING_STATUSES)
+                        .select_related("analyzer_report")
+                    )
+                    for caj in pending:
+                        manager.update_single_job(caj)
+                    if not CaseAnalyzerJob.objects.filter(
+                        case=case, status__in=CaseAnalyzerJob.PENDING_STATUSES
+                    ).exists():
+                        manager.finalise_case(case)
             except Exception:
                 log_cases.exception(
                     "Case %s update failed", getattr(case, "id", "<unknown>")

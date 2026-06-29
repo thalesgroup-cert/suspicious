@@ -34,4 +34,4 @@ class HandoffTests(unittest.TestCase):
             self.assertTrue(os.path.exists(
                 os.path.join(email_dir, "user_submission.eml")))
             processor.process_emails_from_minio_workdir.assert_called_once_with(
-                email_dir, "bucket-id", reported_by="u@x")
+                email_dir, "bucket-id", reported_by="u@x", reporter_note="")
