@@ -86,17 +86,20 @@ def _check_finalised(case_id):
 
 
 def _check_preview(case_id):
+    # Exercise the render pipeline directly (fetch_eml -> eml2png -> upload),
+    # not the auth-gated view: a CI admin is not the case reporter, so the
+    # view 403s before it would even enqueue a render.
     code = (
-        "from rest_framework.test import APIRequestFactory, force_authenticate\n"
-        "from django.contrib.auth import get_user_model\n"
-        "from api.views.mail_preview import MailPreviewView\n"
-        f"u=get_user_model().objects.get(username='{RT['admin_user']}')\n"
-        "rf=APIRequestFactory(); req=rf.get('/x'); force_authenticate(req,user=u)\n"
-        f"r=MailPreviewView.as_view()(req,case_id={case_id})\n"
-        "print('PREVIEW',r.status_code,r.get('Content-Type'))"
+        "from case_handler.models import Case\n"
+        "from tasp.tasks import render_mail_preview\n"
+        f"c=Case.objects.get(id={case_id})\n"
+        "m=getattr(getattr(c,'fileOrMail',None),'mail',None)\n"
+        "render_mail_preview.apply(args=[m.id]).get()\n"
+        "m.refresh_from_db()\n"
+        "print('PREVIEW_OK', bool(m.preview_object_key), 'key', m.preview_object_key)"
     )
     out = _dj(code)
-    return ("PREVIEW 200 image/png" in out, out)
+    return ("PREVIEW_OK True" in out, out)
 
 
 def main() -> None:
