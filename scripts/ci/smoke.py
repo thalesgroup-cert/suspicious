@@ -75,10 +75,11 @@ def _check_case():
 def _check_finalised(case_id):
     code = (
         "from case_handler.models import Case\n"
-        "from cortex_job.models import CaseAnalyzerJob as J\n"
+        "from cortex_job.models import CaseAnalyzerJob as J, Analyzer\n"
         f"c=Case.objects.get(id={case_id})\n"
+        f"jobs=list(J.objects.filter(case_id={case_id}).values_list('analyzer__name','status'))\n"
         f"p=J.objects.filter(case_id={case_id},status__in=J.PENDING_STATUSES).count()\n"
-        "print('STATE',c.status,c.results,'pending',p)"
+        "print('STATE',c.status,c.results,'pending',p,'jobs',jobs,'analyzers_registered',Analyzer.objects.count())"
     )
     out = _dj(code)
     return ("STATE Done" in out and "pending 0" in out, out)
