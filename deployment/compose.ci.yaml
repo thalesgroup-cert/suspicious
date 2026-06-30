@@ -46,3 +46,9 @@ services:
   # directly (not through the proxy); nothing depends on traefik.
   traefik:
     profiles: ["disabled"]
+
+  # The smoke chain is backend-only; the React UI is not exercised. Its
+  # Dockerfile also expects an npm lockfile this pnpm repo doesn't ship, so
+  # building it locally fails. Nothing depends on it -> skip in CI.
+  suspicious_ui:
+    profiles: ["disabled"]
