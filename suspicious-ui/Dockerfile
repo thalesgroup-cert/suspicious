@@ -1,13 +1,15 @@
 # build
 FROM node:alpine AS build
 WORKDIR /app
+RUN npm install -g pnpm@11.1.3
 
-# Reproducible install from the committed lockfile (matches CI).
-COPY package.json package-lock.json ./
-RUN npm ci
+# Reproducible install from the committed pnpm lockfile (pnpm version pinned
+# via package.json "packageManager"; workspace file carries dep overrides).
+COPY package.json pnpm-lock.yaml pnpm-workspace.yaml ./
+RUN pnpm install --frozen-lockfile
 
 COPY . .
-RUN npm run build
+RUN pnpm run build
 
 # run
 FROM nginx:alpine
