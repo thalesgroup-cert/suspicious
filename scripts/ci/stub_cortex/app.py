@@ -4,6 +4,7 @@ the backend calls. Logic in route() so it is testable without a socket."""
 from __future__ import annotations
 import json, os, re, threading, time, uuid
 import urllib.request
+import urllib.parse
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 
 BACKEND_URL = os.environ.get("BACKEND_URL", "http://suspicious:9020")
@@ -97,7 +98,9 @@ class Handler(BaseHTTPRequestHandler):
             body = json.loads(raw) if raw else {}
         except json.JSONDecodeError:
             body = {}
-        status, payload = route(method, self.path, body)
+        # cortex4py appends ?sort=&range= query params; strip before routing.
+        path = urllib.parse.urlsplit(self.path).path
+        status, payload = route(method, path, body)
         out = json.dumps(payload).encode()
         self.send_response(status)
         self.send_header("Content-Type", "application/json")
