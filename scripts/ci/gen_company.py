@@ -51,7 +51,11 @@ def generate(seed: int | None, repo_root: pathlib.Path) -> dict:
     db = settings.setdefault("database", {})
     db["password"] = rt["db_pass"]; db["root_password"] = rt["db_root"]
     if isinstance(db.get("replica"), dict):
-        db["replica"]["password"] = rt["db_pass"]
+        # No replica container in CI (profile 'replica'); point replica reads
+        # at the primary so the R6 router's replica_read_apps still resolve.
+        db["replica"].update({"host": "db_suspicious", "port": 3306,
+                              "name": "db_suspicious", "user": "suspicious",
+                              "password": rt["db_pass"]})
     sp.write_text(json.dumps(settings, indent=2))
 
     # Feeder: pin connectors to the in-stack services regardless of the seed
