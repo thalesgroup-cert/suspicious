@@ -21,7 +21,10 @@ python scripts/ci/gen_company.py ${SEED_ARG} >/dev/null
 set -a; . deployment/.env; set +a
 # Isolated external network per run (compose declares it external).
 export NETWORK_NAME="${COMPOSE_PROJECT_NAME}_net"
-COMPOSE="docker compose -f deployment/docker-compose.yml -f deployment/compose.ci.yaml --env-file deployment/.env"
+# Include the override so the private thalesgroup-cert images (suspicious,
+# ui, celery, feeder) build locally instead of pulling from ghcr (CI has no
+# registry auth). compose.ci.yaml is last so its cortex/greenmail wins.
+COMPOSE="docker compose -f deployment/docker-compose.yml -f deployment/docker-compose.override.yml -f deployment/compose.ci.yaml --env-file deployment/.env"
 export COMPOSE
 
 cleanup() {
