@@ -27,11 +27,12 @@ class PrefixSourceTests(unittest.TestCase):
         self.client = mock.Mock()
         self.src = PrefixSource(self.client, "feeder-bucket")
 
-    def test_iter_pending_yields_only_todo(self):
-        # Two submission prefixes at the bucket root.
+    def test_iter_pending_yields_todo_and_processing_not_done(self):
+        # todo + processing (reclaimable) yielded; done excluded.
         self.client.list_objects.return_value = [
             _obj("260326141159-aaa/", is_dir=True),
             _obj("260326141200-bbb/", is_dir=True),
+            _obj("260326141201-ccc/", is_dir=True),
         ]
         statuses = {
             "260326141159-aaa/_status.json": sc.build_status(
@@ -40,6 +41,9 @@ class PrefixSourceTests(unittest.TestCase):
             "260326141200-bbb/_status.json": sc.build_status(
                 sc.STATUS_DONE, submission_id="260326141200-bbb",
                 reported_by="u@x", emails_to_analyze=[], attachments=[]),
+            "260326141201-ccc/_status.json": sc.build_status(
+                sc.STATUS_PROCESSING, submission_id="260326141201-ccc",
+                reported_by="u@x", emails_to_analyze=[], attachments=[]),
         }
 
         def get_object(bucket, name):
@@ -47,7 +51,36 @@ class PrefixSourceTests(unittest.TestCase):
 
         self.client.get_object.side_effect = get_object
 
-        self.assertEqual(list(self.src.iter_pending()), ["260326141159-aaa"])
+        self.assertEqual(
+            list(self.src.iter_pending()),
+            ["260326141159-aaa", "260326141201-ccc"],
+        )
+
+    def test_mark_email_done_appends_and_persists(self):
+        original = sc.build_status(
+            sc.STATUS_PROCESSING, submission_id="260326141159-aaa",
+            reported_by="u@x", emails_to_analyze=["a", "b"], attachments=[])
+        self.client.get_object.return_value = _resp(json.dumps(original).encode())
+
+        self.src.mark_email_done("260326141159-aaa", "260326141159-bbb")
+
+        _, kwargs = self.client.put_object.call_args
+        written = json.loads(kwargs["data"].read())
+        self.assertEqual(written["processed_emails"], ["260326141159-bbb"])
+        # status field untouched by the marker write
+        self.assertEqual(written["status"], "processing")
+
+    def test_mark_email_done_is_idempotent(self):
+        original = sc.build_status(
+            sc.STATUS_PROCESSING, submission_id="260326141159-aaa",
+            reported_by="u@x", emails_to_analyze=[], attachments=[])
+        original["processed_emails"] = ["260326141159-bbb"]
+        self.client.get_object.return_value = _resp(json.dumps(original).encode())
+
+        self.src.mark_email_done("260326141159-aaa", "260326141159-bbb")
+
+        # already present → no write
+        self.client.put_object.assert_not_called()
 
     def test_set_status_overwrites_preserving_fields(self):
         original = sc.build_status(

@@ -52,3 +52,34 @@ class PrefixIngestTests(unittest.TestCase):
             )
             handoff.assert_called_once()
             self.assertEqual(handoff.call_args.args[3], "reporter@example.com")
+            # idempotency wired: no prior progress => empty done set + a marker cb
+            self.assertEqual(handoff.call_args.kwargs["done_emails"], set())
+            self.assertTrue(callable(handoff.call_args.kwargs["on_email_done"]))
+
+    @mock.patch.object(fe, "MinioEmailService")
+    @mock.patch.object(fe, "_init_minio_client")
+    def test_reclaimed_submission_skips_already_processed_emails(self, mock_init, mock_proc_cls):
+        client = mock.Mock()
+        mock_init.return_value = client
+
+        from tasp.cron.prefix_source import PrefixSource
+        with mock.patch.object(PrefixSource, "iter_pending",
+                               return_value=iter(["260326141159-aaa"])), \
+             mock.patch.object(PrefixSource, "download_submission") as dl, \
+             mock.patch.object(PrefixSource, "set_status"), \
+             mock.patch.object(PrefixSource, "read_status",
+                               return_value={"reported_by": "reporter@example.com",
+                                             "processed_emails": ["260326141159-bbb"]}), \
+             mock.patch.object(fe, "_handoff_submission") as handoff, \
+             tempfile.TemporaryDirectory() as d:
+
+            wrapper = os.path.join(d, "260326141159-aaa", "u-submission.eml")
+            os.makedirs(os.path.dirname(wrapper), exist_ok=True)
+            open(wrapper, "wb").close()
+            dl.return_value = wrapper
+
+            fe._process_prefix_submissions(d, "feeder-bucket")
+
+            # the email already done on the crashed run is not re-ingested
+            self.assertEqual(
+                handoff.call_args.kwargs["done_emails"], {"260326141159-bbb"})

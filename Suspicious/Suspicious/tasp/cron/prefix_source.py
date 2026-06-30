@@ -39,6 +39,12 @@ class PrefixSource:
 
     def iter_pending(self) -> Iterator[str]:
         # Top-level "directories" = submission prefixes.
+        # Yield both `todo` and `processing`: a `processing` prefix whose worker
+        # crashed mid-flight would otherwise be stranded forever (reaper). The
+        # caller gates each id behind a per-submission Redis lock, so a prefix
+        # *actively* being processed is skipped there — only abandoned ones
+        # (expired lock) get reclaimed. Idempotency on retry comes from the
+        # `processed_emails` list, so completed emails are not re-ingested.
         for obj in self._client.list_objects(self._bucket, recursive=False):
             name = obj.object_name
             if not name.endswith("/"):
@@ -49,12 +55,10 @@ class PrefixSource:
             except Exception:
                 logger.warning("No/invalid _status.json for %s — skipping", submission_id)
                 continue
-            if status.get("status") == sc.STATUS_TODO:
+            if status.get("status") in (sc.STATUS_TODO, sc.STATUS_PROCESSING):
                 yield submission_id
 
-    def set_status(self, submission_id: str, status: str) -> None:
-        manifest = self.read_status(submission_id)
-        manifest["status"] = status
+    def _put_status(self, submission_id: str, manifest: dict) -> None:
         raw = json.dumps(manifest, ensure_ascii=False).encode("utf-8")
         self._client.put_object(
             bucket_name=self._bucket,
@@ -63,6 +67,22 @@ class PrefixSource:
             length=len(raw),
             content_type="application/json",
         )
+
+    def set_status(self, submission_id: str, status: str) -> None:
+        manifest = self.read_status(submission_id)
+        manifest["status"] = status
+        self._put_status(submission_id, manifest)
+
+    def mark_email_done(self, submission_id: str, email_dir: str) -> None:
+        """Record that one email dir of this submission was fully ingested, so a
+        crash-and-retry of the same submission does not create a duplicate case
+        for it. Durable (lives in the submission's own _status.json)."""
+        manifest = self.read_status(submission_id)
+        done = manifest.get("processed_emails") or []
+        if email_dir not in done:
+            done.append(email_dir)
+            manifest["processed_emails"] = done
+            self._put_status(submission_id, manifest)
 
     def download_submission(self, submission_id: str, dest_root: str) -> str | None:
         from tasp.cron.utils import _safe_object_name
