@@ -27,7 +27,7 @@ def test_seed_is_deterministic():
     with tempfile.TemporaryDirectory() as d:
         root = pathlib.Path(d); _fixture_repo(root)
         a = gen_company.generate(seed=42, repo_root=root)
-        _fixture_repo_reset = json  # noqa
+        # second call reads the already-mutated files; same seed -> same output
         b = gen_company.generate(seed=42, repo_root=root)
         assert a == b
         assert a["domain"].endswith(".example")

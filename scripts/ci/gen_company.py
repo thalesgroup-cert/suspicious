@@ -37,6 +37,7 @@ def generate(seed: int | None, repo_root: pathlib.Path) -> dict:
     settings = json.loads(sp.read_text())
     settings.setdefault("app", {})["secret_key"] = rt["secret_key"]
     s3 = settings.setdefault("storage", {}).setdefault("s3", {})
+    s3["endpoint"] = "rustfs:9000"; s3["secure"] = False
     s3["access_key"] = rt["minio_access"]; s3["secret_key"] = rt["minio_secret"]
     s3["feeder_bucket"] = rt["feeder_bucket"]
     settings["storage"]["backend"] = "local"
@@ -45,22 +46,36 @@ def generate(seed: int | None, repo_root: pathlib.Path) -> dict:
     settings.setdefault("branding", {})["company_name"] = company
     sp.write_text(json.dumps(settings, indent=2))
 
+    # Feeder: pin connectors to the in-stack services regardless of the seed
+    # template (the example ships localhost). One IMAP connector -> greenmail.
     fp = repo_root / "email-feeder/config.json"
     feeder = json.loads(fp.read_text())
-    fs3 = feeder.setdefault("s3", {})
-    fs3["access_key"] = rt["minio_access"]; fs3["secret_key"] = rt["minio_secret"]
-    fs3["feeder_bucket"] = rt["feeder_bucket"]
+    feeder["mail-connectors"] = {"imap": {"ci": {
+        "enable": True, "host": "greenmail", "port": 3143,
+        "login": "suspicious", "password": "suspiciouspass",
+        "mailbox_to_monitor": "INBOX",
+    }}}
+    feeder["s3"] = {
+        "endpoint": "rustfs:9000", "secure": False,
+        "access_key": rt["minio_access"], "secret_key": rt["minio_secret"],
+        "feeder_bucket": rt["feeder_bucket"],
+    }
+    mail = feeder.setdefault("mail", {})
+    mail.update({"server": "greenmail", "port": 3025, "tls": False,
+                 "username": rt["smtp_user"]})
     fp.write_text(json.dumps(feeder, indent=2))
 
+    # rustfs reads MINIO_ROOT_USER/MINIO_ROOT_PASSWORD (compose_databases.yaml);
+    # MINIO_ACCESS_KEY/SECRET_KEY are read by nothing.
     ep = repo_root / "deployment/.env"
     env_lines = [l for l in ep.read_text().splitlines() if not l.startswith((
         "DOMAIN=", "SVC_PREFIX=", "COMPOSE_PROJECT_NAME=", "WEBHOOK_SECRET=",
-        "MINIO_ACCESS_KEY=", "MINIO_SECRET_KEY="))]
+        "MINIO_ROOT_USER=", "MINIO_ROOT_PASSWORD="))]
     env_lines += [
         f"DOMAIN={domain}", f"SVC_PREFIX={rt['svc_prefix']}",
         f"COMPOSE_PROJECT_NAME={rt['project_name']}",
         f"WEBHOOK_SECRET={rt['webhook_secret']}",
-        f"MINIO_ACCESS_KEY={rt['minio_access']}", f"MINIO_SECRET_KEY={rt['minio_secret']}",
+        f"MINIO_ROOT_USER={rt['minio_access']}", f"MINIO_ROOT_PASSWORD={rt['minio_secret']}",
     ]
     ep.write_text("\n".join(env_lines) + "\n")
 

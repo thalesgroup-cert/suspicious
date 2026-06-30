@@ -8,6 +8,9 @@ services:
     build: ../scripts/ci/stub_cortex
     image: stub-cortex:ci          # build + name -> ignore the base Cortex image
     volumes: !override []          # drop the real Cortex host-path mounts
+    depends_on: !reset {}          # stub needs no elasticsearch wait
+    healthcheck:
+      disable: true                # base probes /api/status; stub has no such path
     environment:
       BACKEND_URL: "http://suspicious:9020"
       WEBHOOK_SECRET: "${WEBHOOK_SECRET}"
@@ -20,7 +23,7 @@ services:
         aliases: [stub-cortex]
 
   greenmail:
-    image: greenmail/standalone:latest
+    image: greenmail/standalone:2.1.9
     container_name: ${SVC_PREFIX:-}greenmail
     restart: unless-stopped
     environment:

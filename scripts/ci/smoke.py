@@ -6,6 +6,8 @@ import email.message, json, os, pathlib, smtplib, subprocess, sys, time, uuid
 
 RT = json.loads((pathlib.Path(__file__).parent / ".runtime.json").read_text())
 COMPOSE = os.environ.get("COMPOSE", "").split()
+if not COMPOSE:
+    sys.exit("COMPOSE env var is required (set by bootstrap.sh)")
 
 
 def _dj(code: str) -> str:
