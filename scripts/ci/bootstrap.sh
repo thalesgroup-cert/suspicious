@@ -28,7 +28,12 @@ COMPOSE="docker compose -f deployment/docker-compose.yml -f deployment/docker-co
 export COMPOSE
 
 cleanup() {
+  rc=$?
   $COMPOSE logs --no-color > ci-stack.log 2>&1 || true
+  if [ "$rc" -ne 0 ]; then
+    echo "=== bootstrap failed (rc=$rc); suspicious + celery logs ==="
+    $COMPOSE logs --no-color --tail 60 suspicious suspicious_celery 2>&1 || true
+  fi
   $COMPOSE down -v --remove-orphans || true
   docker network rm "$NETWORK_NAME" >/dev/null 2>&1 || true
   # Restore the config files the generator rewrote (tracked) + drop runtime.

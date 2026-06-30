@@ -30,6 +30,8 @@ def generate(seed: int | None, repo_root: pathlib.Path) -> dict:
         "project_name": f"sus{tag}",
         "feeder_bucket": "suspicious-feeder",
         "smtp_user": f"suspicious@{domain}",
+        "db_pass": tok(24),
+        "db_root": tok(24),
         "ports": {"smtp": 3025, "imap": 3143, "s3": 9000},
     }
 
@@ -44,6 +46,12 @@ def generate(seed: int | None, repo_root: pathlib.Path) -> dict:
     cx = settings.setdefault("integrations", {}).setdefault("cortex", {})
     cx["url"] = "http://stub-cortex:9001"; cx["webhook_secret"] = rt["webhook_secret"]
     settings.setdefault("branding", {})["company_name"] = company
+    # DB creds must match what the mariadb container is initialised with
+    # (MYSQL_PASSWORD in .env), else Django can't auth and /api/health 503s.
+    db = settings.setdefault("database", {})
+    db["password"] = rt["db_pass"]; db["root_password"] = rt["db_root"]
+    if isinstance(db.get("replica"), dict):
+        db["replica"]["password"] = rt["db_pass"]
     sp.write_text(json.dumps(settings, indent=2))
 
     # Feeder: pin connectors to the in-stack services regardless of the seed
@@ -70,12 +78,15 @@ def generate(seed: int | None, repo_root: pathlib.Path) -> dict:
     ep = repo_root / "deployment/.env"
     env_lines = [l for l in ep.read_text().splitlines() if not l.startswith((
         "DOMAIN=", "SVC_PREFIX=", "COMPOSE_PROJECT_NAME=", "WEBHOOK_SECRET=",
-        "MINIO_ROOT_USER=", "MINIO_ROOT_PASSWORD="))]
+        "MINIO_ROOT_USER=", "MINIO_ROOT_PASSWORD=",
+        "MYSQL_PASSWORD=", "MYSQL_ROOT_PASSWORD=", "REPL_PASSWORD="))]
     env_lines += [
         f"DOMAIN={domain}", f"SVC_PREFIX={rt['svc_prefix']}",
         f"COMPOSE_PROJECT_NAME={rt['project_name']}",
         f"WEBHOOK_SECRET={rt['webhook_secret']}",
         f"MINIO_ROOT_USER={rt['minio_access']}", f"MINIO_ROOT_PASSWORD={rt['minio_secret']}",
+        f"MYSQL_PASSWORD={rt['db_pass']}", f"MYSQL_ROOT_PASSWORD={rt['db_root']}",
+        f"REPL_PASSWORD={rt['db_pass']}",
     ]
     ep.write_text("\n".join(env_lines) + "\n")
 
