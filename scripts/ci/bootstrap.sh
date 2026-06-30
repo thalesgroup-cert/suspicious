@@ -45,6 +45,11 @@ trap cleanup EXIT
 
 docker network create "$NETWORK_NAME" >/dev/null 2>&1 || true
 
+# The suspicious/celery containers bind-mount Suspicious/logs -> /app/log and
+# run as uid 1000; a missing host dir gets created root-owned -> the Django
+# file log handler hits PermissionError and gunicorn dies. Pre-create writable.
+mkdir -p Suspicious/logs && chmod 777 Suspicious/logs
+
 $COMPOSE build
 $COMPOSE up -d
 
