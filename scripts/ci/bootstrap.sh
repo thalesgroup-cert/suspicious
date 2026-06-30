@@ -5,6 +5,10 @@ set -euo pipefail
 ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/../.." && pwd)"
 cd "$ROOT"
 
+# Fresh checkouts (CI) have no deployment/.env (it is gitignored); seed it
+# from the tracked example. Existing local .env is left untouched.
+[ -f deployment/.env ] || cp deployment/.env.example deployment/.env
+
 SEED_ARG=""; [ -n "${SEED:-}" ] && SEED_ARG="--seed ${SEED}"
 # shellcheck disable=SC2086
 python scripts/ci/gen_company.py ${SEED_ARG} >/dev/null
