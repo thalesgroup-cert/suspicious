@@ -1,0 +1,45 @@
+# CI override (layered over docker-compose.yml): run the stdlib stub in the
+# `cortex` service slot (keeps `suspicious depends_on cortex` satisfied), add
+# a GreenMail mailbox (prod has none), publish the ports the host smoke driver
+# needs. Used by scripts/ci/bootstrap.sh. Network is the external
+# ${NETWORK_NAME}; bootstrap creates it.
+services:
+  cortex:
+    build: ../scripts/ci/stub_cortex
+    image: stub-cortex:ci          # build + name -> ignore the base Cortex image
+    volumes: !override []          # drop the real Cortex host-path mounts
+    environment:
+      BACKEND_URL: "http://suspicious:9020"
+      WEBHOOK_SECRET: "${WEBHOOK_SECRET}"
+      ANALYZERS_JSON: >-
+        [{"id":"ai","name":"AI_Mail_Analyzer_2_0","dataType":"file","verdict":"safe"},
+         {"id":"fi","name":"FileInfo_8_0","dataType":"file","verdict":"info"},
+         {"id":"hl","name":"CIRCLHashlookup_1_1","dataType":"hash","verdict":"info"}]
+    networks:
+      suspicious_network:
+        aliases: [stub-cortex]
+
+  greenmail:
+    image: greenmail/standalone:latest
+    container_name: ${SVC_PREFIX:-}greenmail
+    restart: unless-stopped
+    environment:
+      GREENMAIL_OPTS: >-
+        -Dgreenmail.setup.test.all
+        -Dgreenmail.users=suspicious:suspiciouspass@${DOMAIN}
+        -Dgreenmail.hostname=0.0.0.0
+        -Dgreenmail.starttls.enable=false
+    ports:
+      - "127.0.0.1:3025:3025"
+      - "127.0.0.1:3143:3143"
+    networks: [suspicious_network]
+
+  # Publish the S3 API so smoke.py can read the feeder bucket from the host.
+  rustfs:
+    ports:
+      - "127.0.0.1:9000:9000"
+
+  # No TLS certs are provisioned in CI and the smoke driver talks to services
+  # directly (not through the proxy); nothing depends on traefik.
+  traefik:
+    profiles: ["disabled"]

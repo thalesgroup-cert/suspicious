@@ -19,7 +19,7 @@ services:
       file: compose_apps.yaml
       service: suspicious
     image: ghcr.io/thalesgroup-cert/suspicious:${SUSPICIOUS_VERSION:?SUSPICIOUS_VERSION is required}
-    container_name: suspicious
+    container_name: ${SVC_PREFIX:-}suspicious
     depends_on:
       db_suspicious:
         condition: service_healthy
@@ -41,7 +41,7 @@ services:
       file: compose_apps.yaml
       service: suspicious_ui
     image: ghcr.io/thalesgroup-cert/suspicious-ui:${SUSPICIOUS_UI_VERSION:-${SUSPICIOUS_VERSION:-latest}}
-    container_name: suspicious_ui
+    container_name: ${SVC_PREFIX:-}suspicious_ui
     depends_on:
       suspicious:
         condition: service_healthy
@@ -55,7 +55,7 @@ services:
       file: compose_apps.yaml
       service: suspicious_celery
     image: ghcr.io/thalesgroup-cert/suspicious:${SUSPICIOUS_VERSION:?SUSPICIOUS_VERSION is required}
-    container_name: suspicious_celery
+    container_name: ${SVC_PREFIX:-}suspicious_celery
     depends_on:
       suspicious:
         condition: service_healthy
@@ -69,7 +69,7 @@ services:
       file: compose_databases.yaml
       service: db_suspicious
     image: mariadb:${DB_SUSPICIOUS_VERSION:?DB_SUSPICIOUS_VERSION is required}
-    container_name: db_suspicious
+    container_name: ${SVC_PREFIX:-}db_suspicious
     healthcheck:
       test: ["CMD", "mariadb-admin", "--user=${MYSQL_USER}", "--password=${MYSQL_PASSWORD}", "status"]
       interval: 5s
@@ -82,7 +82,7 @@ services:
       file: compose_databases.yaml
       service: db_suspicious_replica
     image: mariadb:${DB_SUSPICIOUS_VERSION:?DB_SUSPICIOUS_VERSION is required}
-    container_name: db_suspicious_replica
+    container_name: ${SVC_PREFIX:-}db_suspicious_replica
     healthcheck:
       test: ["CMD", "mariadb-admin", "--user=${MYSQL_USER}", "--password=${MYSQL_PASSWORD}", "status"]
       interval: 5s
@@ -95,7 +95,7 @@ services:
       file: compose_databases.yaml
       service: elasticsearch
     image: elasticsearch:${ELASTICSEARCH_VERSION:?ELASTICSEARCH_VERSION is required}
-    container_name: elasticsearch
+    container_name: ${SVC_PREFIX:-}elasticsearch
     healthcheck:
       test: ["CMD-SHELL", "curl -sf http://localhost:9200/_cluster/health | grep -Eq '\"status\":\"(green|yellow)\"' || exit 1"]
       interval: 20s
@@ -108,7 +108,7 @@ services:
       file: compose_databases.yaml
       service: rustfs
     image: rustfs/rustfs:${RUSTFS_VERSION:?RUSTFS_VERSION is required}
-    container_name: rustfs
+    container_name: ${SVC_PREFIX:-}rustfs
     command: /data --console-address ":9001"
     healthcheck:
       test:
@@ -124,21 +124,21 @@ services:
       file: compose_databases.yaml
       service: chromadb
     image: chromadb/chroma:${CHROMADB_VERSION:?CHROMADB_VERSION is required}
-    container_name: chromadb
+    container_name: ${SVC_PREFIX:-}chromadb
 
   redis_broker:
     extends:
       file: compose_databases.yaml
       service: redis_broker
     image: valkey/valkey:${REDIS_BROKER_VERSION:-9-alpine}
-    container_name: redis_broker
+    container_name: ${SVC_PREFIX:-}redis_broker
 
   redis_cache:
     extends:
       file: compose_databases.yaml
       service: redis_cache
     image: valkey/valkey:${REDIS_CACHE_VERSION:-9-alpine}
-    container_name: redis_cache
+    container_name: ${SVC_PREFIX:-}redis_cache
 
   # ── Analyzers ─────────────────────────────────────────────────────────────
 
@@ -147,7 +147,7 @@ services:
       file: compose_apps.yaml
       service: cortex
     image: thehiveproject/cortex:${CORTEX_VERSION:?CORTEX_VERSION is required}
-    container_name: cortex
+    container_name: ${SVC_PREFIX:-}cortex
     depends_on:
       elasticsearch:
         condition: service_healthy
@@ -165,7 +165,7 @@ services:
       file: compose_apps.yaml
       service: feeder
     image: ghcr.io/thalesgroup-cert/suspicious-feeder:${SUSPICIOUS_FEEDER_VERSION:-${SUSPICIOUS_VERSION:-latest}}
-    container_name: email_feeder
+    container_name: ${SVC_PREFIX:-}email_feeder
     depends_on:
       suspicious:
         condition: service_healthy
@@ -176,14 +176,14 @@ services:
     extends:
       file: compose_apps.yaml
       service: vault
-    container_name: vault
+    container_name: ${SVC_PREFIX:-}vault
 
   # ── Reverse proxy ─────────────────────────────────────────────────────────
 
   traefik:
     init: true
     image: traefik:${TRAEFIK_VERSION:?TRAEFIK_VERSION is required}
-    container_name: traefik
+    container_name: ${SVC_PREFIX:-}traefik
     extends:
       file: compose_reverse_proxy.yaml
       service: traefik
