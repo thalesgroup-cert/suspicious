@@ -25,7 +25,9 @@ export const AVATAR_STYLES = [
   { key: "notionists", label: "Notionists", style: notionists },
 ] as const;
 
-const STYLE_MAP = new Map(AVATAR_STYLES.map((s) => [s.key, s.style]));
+const STYLE_MAP = new Map<string, (typeof AVATAR_STYLES)[number]["style"]>(
+  AVATAR_STYLES.map((s) => [s.key, s.style]),
+);
 
 const cache = new Map<string, string>();
 

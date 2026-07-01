@@ -1,7 +1,6 @@
 import * as React from "react";
 import {
   Alert,
-  Avatar,
   Box,
   Button,
   CardContent,
@@ -51,6 +50,9 @@ import type { ThemeName } from "@/styles/themes";
 import { useHudModes } from "@/shared/hooks/useHudModes";
 import { useColorStore, useResultColors, useStatusColors } from "@/styles/colorStore";
 import { ColorSettingsPanel } from "@/features/profile/ColorSettingsPanel";
+import { AvatarPanel } from "@/features/profile/AvatarPanel";
+import { UserAvatar } from "@/features/profile/components/UserAvatar";
+import { randomSeed } from "@/features/profile/avatar";
 
 import {
   CaptionLabel,
@@ -69,7 +71,7 @@ import {
 // Types
 // ---------------------------------------------------------------------------
 
-type Section = "preferences" | "appearance" | "colors";
+type Section = "preferences" | "appearance" | "colors" | "avatar";
 
 // ---------------------------------------------------------------------------
 // ToggleRow
@@ -433,6 +435,8 @@ export default function ProfilePage() {
   const [pickedTheme,  setPickedTheme]  = React.useState<ThemeName>(
     (readLocalProfile()?.theme as ThemeName) ?? ("light" as ThemeName)
   );
+  const [avatarStyle, setAvatarStyle] = React.useState<string>("");
+  const [avatarSeed,  setAvatarSeed]  = React.useState<string>("");
 
   // Sync form state from the fetched server profile — adjusted during render
   // when the data reference changes, instead of in an effect.
@@ -451,6 +455,8 @@ export default function ProfilePage() {
       setPickedTheme(t);
       setAutoSeasonal(!!profileData.auto_seasonal);
       if (!profileData.auto_seasonal) setThemeName(t);
+      setAvatarStyle(profileData.avatar?.style ?? "");
+      setAvatarSeed(profileData.avatar?.seed ?? "");
     }
   }
 
@@ -522,6 +528,10 @@ export default function ProfilePage() {
     pickedTheme !== ((baseProfile?.theme as ThemeName) ?? pickedTheme) ||
     autoSeasonal !== !!baseProfile?.auto_seasonal;
 
+  const avatarDirty =
+    avatarStyle !== (baseProfile?.avatar?.style ?? "") ||
+    avatarSeed  !== (baseProfile?.avatar?.seed  ?? "");
+
   // ── Save / reset ─────────────────────────────────────────────────────────
 
   function savePreferences() {
@@ -554,6 +564,26 @@ export default function ProfilePage() {
     setPickedTheme(t);
     setAutoSeasonal(!!baseProfile?.auto_seasonal);
   }
+
+  function saveAvatar() {
+    const avatar = avatarStyle && avatarSeed ? { style: avatarStyle, seed: avatarSeed } : {};
+    queryClient.setQueryData<UserProfile>(["profile"], (prev) => ({
+      ...(prev ?? baseProfile as UserProfile),
+      avatar: avatar as UserProfile["avatar"],
+    }));
+    appearanceMutation.mutate({ avatar: avatar as any });
+  }
+
+  function resetAvatar() {
+    setAvatarStyle(baseProfile?.avatar?.style ?? "");
+    setAvatarSeed(baseProfile?.avatar?.seed ?? "");
+  }
+
+  // Seed on style selection when no seed is set yet, so the preview is non-empty.
+  const setStyleWithSeed = (s: string) => {
+    setAvatarStyle(s);
+    if (!avatarSeed) setAvatarSeed(randomSeed());
+  };
 
   // ── Auth guard ────────────────────────────────────────────────────────────
 
@@ -599,9 +629,16 @@ export default function ProfilePage() {
       icon: <AccessibilityNewOutlined />,
       dirty: false, // ColorSettingsPanel manages its own mutation state
     },
+    {
+      key: "avatar" as Section,
+      label: "Avatar",
+      sub: "Your profile picture",
+      icon: <PersonOutlined />,
+      dirty: avatarDirty,
+    },
   ] as const;
 
-  const anyDirty = prefsDirty || themeDirty;
+  const anyDirty = prefsDirty || themeDirty || avatarDirty;
 
   return (
     <Skeleton
@@ -642,15 +679,17 @@ export default function ProfilePage() {
                     : "linear-gradient(135deg, rgba(59,130,246,.5), rgba(124,58,237,.4))",
                   zIndex: 0,
                 }} />
-                <Avatar sx={{
-                  width: 62, height: 62, fontWeight: 950, fontSize: 22,
-                  position: "relative", zIndex: 1,
-                  bgcolor: isDark ? alpha("#fff", 0.07) : alpha(theme.palette.primary.main, 0.08),
-                  color: "text.primary",
-                  border: `2px solid ${isDark ? alpha("#0f172a", 0.9) : alpha("#fff", 0.9)}`,
-                }}>
-                  {initials(me.first_name, me.last_name)}
-                </Avatar>
+                <UserAvatar
+                  avatar={profileData?.avatar}
+                  initials={initials(me.first_name, me.last_name)}
+                  sx={{
+                    width: 62, height: 62, fontWeight: 950, fontSize: 22,
+                    position: "relative", zIndex: 1,
+                    bgcolor: isDark ? alpha("#fff", 0.07) : alpha(theme.palette.primary.main, 0.08),
+                    color: "text.primary",
+                    border: `2px solid ${isDark ? alpha("#0f172a", 0.9) : alpha("#fff", 0.9)}`,
+                  }}
+                />
               </Box>
 
               <Box sx={{ minWidth: 0 }}>
@@ -813,8 +852,21 @@ export default function ProfilePage() {
                 dirty={themeDirty} saving={appearanceMutation.isPending}
                 onSave={saveAppearance} onReset={resetAppearance}
               />
-            ) : (
+            ) : section === "colors" ? (
               <ColorsPanel />
+            ) : (
+              <AvatarPanel
+                style={avatarStyle} seed={avatarSeed}
+                setStyle={setStyleWithSeed} setSeed={setAvatarSeed}
+                firstName={me.first_name} lastName={me.last_name}
+                dirtyBar={
+                  <DirtyBar
+                    dirty={avatarDirty} saving={appearanceMutation.isPending}
+                    onSave={saveAvatar} onReset={resetAvatar}
+                    label="Unsaved avatar changes"
+                  />
+                }
+              />
             )}
           </CardContent>
         </SoftCard>

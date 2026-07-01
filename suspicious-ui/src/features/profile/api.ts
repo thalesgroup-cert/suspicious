@@ -4,6 +4,7 @@
 
 import { api } from "@/api/client";
 import type { ResultColors, StatusColors } from "@/styles/colorStore";
+import type { AvatarConfig } from "@/features/profile/avatar";
 
 // ---------------------------------------------------------------------------
 // Types
@@ -20,6 +21,7 @@ export type UserProfile = {
   wants_results:         boolean;
   theme:                 string;
   auto_seasonal:         boolean;
+  avatar?:               AvatarConfig;
   semantic_colors:       {
     result: ResultColors;
     status: StatusColors;
@@ -31,6 +33,7 @@ export type UserProfile = {
 export type AppearancePayload = {
   theme?:           string;
   auto_seasonal?:   boolean;
+  avatar?:          AvatarConfig;
   semantic_colors?: {
     result?: Partial<ResultColors>;
     status?: Partial<StatusColors>;
