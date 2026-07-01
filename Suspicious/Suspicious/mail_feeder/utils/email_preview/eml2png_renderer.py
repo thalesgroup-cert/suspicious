@@ -134,9 +134,11 @@ class Eml2PngRenderer:
         """Wrap the parsed message in a minimal, safe HTML document.
 
         We escape every header value, prefer the HTML body when present,
-        and fall back to the text/plain body wrapped in <pre>. Remote
-        resources are blocked at imgkit time via --disable-external-links
-        / --no-images flags to keep rendering offline and fast.
+        and fall back to the text/plain body wrapped in <pre>. The body
+        HTML is rendered as-is but rasterised to a PNG with remote images,
+        JavaScript and local-file access all disabled at imgkit time (see
+        _render_html_to_png) — so it cannot phone home, read host files, or
+        execute script. Only remote CSS <link>/@import can still fetch.
         """
         header_rows = []
         for name in _VISIBLE_HEADERS:
