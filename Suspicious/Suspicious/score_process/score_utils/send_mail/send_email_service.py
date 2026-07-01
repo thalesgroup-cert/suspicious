@@ -7,6 +7,19 @@ DEFAULT_MAX_RETRIES = 3
 DEFAULT_BASE_DELAY = 1  # in seconds
 
 
+def _reject_header_crlf(*values: str) -> None:
+    """Guard the raw-smtplib boundary against header/SMTP injection.
+
+    smtplib.sendmail and compat32 MIME do not sanitise embedded newlines the
+    way Django's EmailMessage does, so a CR/LF in an address or subject could
+    inject extra headers or SMTP commands. Reporter addresses are normally
+    already regex-clean; this is defence in depth.
+    """
+    for value in values:
+        if "\r" in value or "\n" in value:
+            raise ValueError("email header value contains a newline (possible injection)")
+
+
 class SendMailService:
     __server: smtplib.SMTP | None = None
 
@@ -63,6 +76,7 @@ class SendMailService:
         recipient: str,
         html: str,
     ) -> str:
+        _reject_header_crlf(str(sender), str(recipient), str(subject))
         msg = email.mime.multipart.MIMEMultipart()
         msg["From"] = sender
         msg["To"] = str(recipient)

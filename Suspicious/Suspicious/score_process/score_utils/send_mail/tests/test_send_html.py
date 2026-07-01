@@ -48,3 +48,14 @@ class SendHtmlTest(SimpleTestCase):
             "server": "smtp.x", "port": 25, "username": "u", "password": "p",
         })
         self.assertEqual(ctor, {"host": "smtp.x", "port": 25, "login": "u", "password": "p"})
+
+    def test_crlf_in_recipient_is_rejected_before_send(self):
+        svc = SendMailService(host="h", port=25, login="l", password="p")
+        svc._SendMailService__server = mock.Mock()
+        with self.assertRaises(ValueError):
+            svc.publish_email(
+                subject="Hi", sender="cert@x",
+                recipient="user@x\r\nBcc: attacker@evil.test",
+                html="<b>hi</b>",
+            )
+        svc._SendMailService__server.sendmail.assert_not_called()

@@ -48,6 +48,28 @@ class BuildEmailDataModelTests(TestCase):
             with self.assertRaises(MetadataIntegrityError):
                 build_email_data_model(meta, "reporter@corp.test", d)
 
+    def test_traversal_filename_cannot_escape_attachments_dir(self):
+        # A crafted email.json with "../" must not read a file outside the
+        # attachments dir. basename() collapses it to a name looked up inside
+        # the dir, where it does not exist -> integrity error, no escape.
+        with tempfile.TemporaryDirectory() as parent:
+            attach_dir = os.path.join(parent, "attachments")
+            os.makedirs(attach_dir)
+            secret = b"OUTSIDE-SECRET"
+            with open(os.path.join(parent, "secret"), "wb") as f:
+                f.write(secret)
+            meta = ec.EmailMetadata.model_validate({
+                "schema": 1, "id": "x-1", "from": "a@b.test", "to": "v@c.test",
+                "reportedSubject": "s", "reportedText": [], "date": "",
+                "headers": {}, "attachments": [{
+                    "filename": "../secret",
+                    "sha256": hashlib.sha256(secret).hexdigest(),
+                    "headers": {},
+                }],
+            })
+            with self.assertRaises(MetadataIntegrityError):
+                build_email_data_model(meta, "reporter@corp.test", attach_dir)
+
     def test_empty_to_defaulted_and_reporter_fallback(self):
         with tempfile.TemporaryDirectory() as d:
             meta = ec.EmailMetadata.model_validate({
