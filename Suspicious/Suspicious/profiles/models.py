@@ -101,6 +101,15 @@ class UserProfile(SemanticColorsMixin, models.Model):
             "Each entry is {main: '#rrggbb'}."
         ),
     )
+    avatar = models.JSONField(
+        default=dict,
+        blank=True,
+        verbose_name=_("Avatar"),
+        help_text=_(
+            "DiceBear avatar config. Structure: {style: '<dicebear-style>', "
+            "seed: '<string>'}. Empty means fall back to initials."
+        ),
+    )
     creation_date = models.DateTimeField(auto_now_add=True)
     last_update = models.DateTimeField(auto_now=True)
     def __str__(self):
@@ -129,6 +138,15 @@ class CISOProfile(SemanticColorsMixin, models.Model):
             "Structure: {result: {safe, suspicious, dangerous, inconclusive}, "
             "status: {done, in_progress, new, failure, challenged, unknown}}. "
             "Each entry is {main: '#rrggbb'}."
+        ),
+    )
+    avatar = models.JSONField(
+        default=dict,
+        blank=True,
+        verbose_name=_("Avatar"),
+        help_text=_(
+            "DiceBear avatar config. Structure: {style: '<dicebear-style>', "
+            "seed: '<string>'}. Empty means fall back to initials."
         ),
     )
     creation_date = models.DateTimeField(auto_now_add=True)
