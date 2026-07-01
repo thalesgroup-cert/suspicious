@@ -71,6 +71,46 @@ class SemanticColorsField(serializers.JSONField):
 
 
 # ---------------------------------------------------------------------------
+# Avatar field
+#
+# Validates DiceBear avatar config: {style, seed} or {} to clear.
+# Kept in sync by hand with suspicious-ui AVATAR_STYLES.
+# ---------------------------------------------------------------------------
+
+ALLOWED_AVATAR_STYLES = {
+    "bottts", "identicon", "initials", "avataaars",
+    "funEmoji", "thumbs", "shapes", "notionists",
+}
+
+
+class AvatarField(serializers.JSONField):
+    """Validates a DiceBear avatar config: {} or {style, seed}."""
+
+    def to_internal_value(self, data):
+        data = super().to_internal_value(data)
+
+        if not isinstance(data, dict):
+            raise serializers.ValidationError("avatar must be an object.")
+
+        if not data:
+            return {}
+
+        style = data.get("style")
+        seed = data.get("seed")
+
+        if style not in ALLOWED_AVATAR_STYLES:
+            raise serializers.ValidationError(
+                f"avatar.style must be one of {sorted(ALLOWED_AVATAR_STYLES)}. Got: {style!r}"
+            )
+        if not isinstance(seed, str) or not (1 <= len(seed) <= 64):
+            raise serializers.ValidationError(
+                "avatar.seed must be a string of length 1..64."
+            )
+
+        return {"style": style, "seed": seed}
+
+
+# ---------------------------------------------------------------------------
 # Profile serializers
 # ---------------------------------------------------------------------------
 
@@ -90,6 +130,7 @@ class UserProfileSerializer(serializers.ModelSerializer):
             "theme",
             "auto_seasonal",
             "semantic_colors",
+            "avatar",
             "creation_date",
             "last_update",
         ]
@@ -127,6 +168,7 @@ class CISOProfileSerializer(serializers.ModelSerializer):
             "theme",
             "auto_seasonal",
             "semantic_colors",
+            "avatar",
             "creation_date",
             "last_update",
         ]
@@ -159,6 +201,7 @@ class AppearanceSerializer(serializers.Serializer):
     )
     auto_seasonal = serializers.BooleanField(required=False)
     semantic_colors = SemanticColorsField(required=False)
+    avatar = AvatarField(required=False)
 
     def update(self, instance, validated_data):
         for attr, value in validated_data.items():
