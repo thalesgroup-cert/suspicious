@@ -26,7 +26,11 @@ class StorageUnavailable(APIException):
 def get_request_ip(request) -> str | None:
     forwarded_for = request.META.get("HTTP_X_FORWARDED_FOR")
     if forwarded_for:
-        return forwarded_for.split(",")[0].strip()
+        # Trust the rightmost hop — the address the nearest trusted proxy
+        # (traefik) actually observed. The leftmost entries are client-supplied
+        # and forgeable, so using [0] let a caller spoof the audit-log source IP.
+        # ponytail: assumes a single trusted proxy; strip N entries if more are added.
+        return forwarded_for.split(",")[-1].strip()
     return request.META.get("REMOTE_ADDR")
 
 

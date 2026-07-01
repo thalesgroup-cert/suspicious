@@ -23,6 +23,7 @@ from __future__ import annotations
 import email
 import io
 import logging
+import re
 from email.message import EmailMessage
 from email.policy import default as email_default_policy
 from html import escape
@@ -45,6 +46,17 @@ _RENDER_WIDTH_PX = 900
 # Headers we surface in the preview. Anything else is dropped so the
 # image stays compact and free of long Received-chains.
 _VISIBLE_HEADERS = ("From", "To", "Cc", "Subject", "Date", "Reply-To")
+
+# Remote stylesheets are the one fetch vector no-images / disable-local-file-access
+# don't close, so a <link>/@import in a phishing body could still beacon the render
+# host. Strip them before rasterising.
+_REMOTE_CSS_RE = re.compile(
+    r"<link\b[^>]*>|@import\b[^;]*;", re.IGNORECASE | re.DOTALL
+)
+
+
+def _strip_remote_css(html: str) -> str:
+    return _REMOTE_CSS_RE.sub("", html)
 
 
 class Eml2PngRenderer:
@@ -222,7 +234,7 @@ class Eml2PngRenderer:
 
         if html_part is not None:
             try:
-                return html_part.get_content()
+                return _strip_remote_css(html_part.get_content())
             except Exception:
                 logger.exception("Failed to decode HTML body; falling back to text/plain")
 
