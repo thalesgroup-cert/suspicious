@@ -224,7 +224,7 @@ export default function SubmitPage() {
       loading={meQuery.isPending || configQuery.isPending}
       animate="shimmer"
     >
-    <Container maxWidth="lg" sx={{ py: { xs: 2.5, md: 3.5 }, pb: 8 }}>
+    <Container data-tour="submit-form" maxWidth="lg" sx={{ py: { xs: 2.5, md: 3.5 }, pb: 8 }}>
       <Stack spacing={2}>
         {/* ---------------------------------------------------------------- */}
         {/* Header + mode selector                                           */}

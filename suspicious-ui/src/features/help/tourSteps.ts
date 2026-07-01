@@ -7,7 +7,7 @@ export const GLOBAL_STEPS: Step[] = [
     title: "Navigation",
     content: "Jump between the main sections of Suspicious from here.",
     placement: "right",
-    disableBeacon: true,
+    skipBeacon: true,
   },
   {
     target: '[data-tour="nav-workspace"]',

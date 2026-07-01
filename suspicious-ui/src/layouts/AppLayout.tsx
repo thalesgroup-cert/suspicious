@@ -32,7 +32,8 @@ import {
   type NavItemConfig,
 } from "@/layouts/nav";
 import { ACCOUNT_NAV, PRIMARY_NAV, SECTIONS, WORKSPACE_NAV } from "@/layouts/navConfig";
-import { LogoutButton, NavItem, NavSection, UserCard } from "@/layouts/components/navComponents";
+import { HelpButton, LogoutButton, NavItem, NavSection, UserCard } from "@/layouts/components/navComponents";
+import { HelpTourProvider } from "@/features/help/HelpTourProvider";
 
 // ---------------------------------------------------------------------------
 // AppLayout
@@ -254,6 +255,7 @@ export default function AppLayout() {
       {/* ── Nav sections ───────────────────────────────────────────────── */}
       <Box
         component="nav"
+        data-tour="nav-primary"
         aria-label="Primary navigation"
         sx={{ flex: 1, overflowY: "auto", overflowX: "hidden", py: 1.5, px: 0.5 }}
       >
@@ -264,12 +266,14 @@ export default function AppLayout() {
             slim={isSlim}
             onNavigate={!isDesktop ? () => setMobileOpen(false) : undefined}
           />
-          <NavSection
-            label="Workspace"
-            items={workspaceItems}
-            slim={isSlim}
-            onNavigate={!isDesktop ? () => setMobileOpen(false) : undefined}
-          />
+          <Box data-tour="nav-workspace">
+            <NavSection
+              label="Workspace"
+              items={workspaceItems}
+              slim={isSlim}
+              onNavigate={!isDesktop ? () => setMobileOpen(false) : undefined}
+            />
+          </Box>
           <NavSection
             label="Account"
             items={accountItems}
@@ -295,13 +299,16 @@ export default function AppLayout() {
         />
       
         <Stack spacing={0.75}>
-          <UserCard
-            slim={isSlim}
-            me={me}
-            isElevated={isElevated}
-            groups={groups}
-            onClick={() => navigate("/profile")}
-          />
+          <Box data-tour="user-card">
+            <UserCard
+              slim={isSlim}
+              me={me}
+              isElevated={isElevated}
+              groups={groups}
+              onClick={() => navigate("/profile")}
+            />
+          </Box>
+          <HelpButton slim={isSlim} />
           <LogoutButton slim={isSlim} onLogout={handleLogout} />
         </Stack>
       </Box>
@@ -313,6 +320,7 @@ export default function AppLayout() {
   // ─────────────────────────────────────────────────────────────────────────
 
   return (
+    <HelpTourProvider>
     <Box sx={{ display: "flex", minHeight: "100vh", background: shellBg }}>
 
       {/* ── Mobile top AppBar ─────────────────────────────────────────── */}
@@ -465,5 +473,6 @@ export default function AppLayout() {
         </Box>
       </Box>
     </Box>
+    </HelpTourProvider>
   );
 }

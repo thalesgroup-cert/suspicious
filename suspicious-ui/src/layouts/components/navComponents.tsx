@@ -10,11 +10,12 @@ import {
   Typography,
 } from "@mui/material";
 import { alpha, useTheme } from "@mui/material/styles";
-import { LogoutOutlined } from "@mui/icons-material";
+import { HelpOutlineOutlined, LogoutOutlined } from "@mui/icons-material";
 import { NavLink } from "react-router-dom";
 
 import type { Me } from "@/api/auth";
 import type { NavItemConfig } from "@/layouts/nav";
+import { useHelpTour } from "@/features/help/useHelpTour";
 
 export function NavItem({
   to,
@@ -298,6 +299,79 @@ export function LogoutButton({ slim, onLogout }: { slim: boolean; onLogout: () =
       <Typography sx={{ fontSize: 13.5, fontWeight: 700, whiteSpace: "nowrap" }}>
         Logout
       </Typography>
+    </ListItemButton>
+  );
+}
+
+export function HelpButton({ slim }: { slim: boolean }) {
+  const theme = useTheme();
+  const isDark = theme.palette.mode === "dark";
+  const { start } = useHelpTour();
+
+  if (slim) {
+    return (
+      <Tooltip title="Help" placement="right" arrow>
+        <Box
+          data-tour="help"
+          onClick={start}
+          role="button"
+          tabIndex={0}
+          aria-label="Help"
+          onKeyDown={(e) => {
+            if (e.key === "Enter" || e.key === " ") { e.preventDefault(); start(); }
+          }}
+          sx={{
+            cursor: "pointer", width: 38, height: 38, borderRadius: 2.5,
+            display: "grid", placeItems: "center", mx: "auto",
+            color: alpha(theme.palette.text.primary, isDark ? 0.7 : 0.75),
+            border: `1px solid ${alpha(theme.palette.divider, isDark ? 0.22 : 0.6)}`,
+            background: isDark ? alpha("#fff", 0.03) : alpha(theme.palette.background.paper, 0.8),
+            transition: theme.transitions.create(["background", "border-color", "color"], { duration: 150 }),
+            "&:hover": {
+              color: theme.palette.primary.main,
+              borderColor: alpha(theme.palette.primary.main, isDark ? 0.28 : 0.22),
+              background: alpha(theme.palette.primary.main, isDark ? 0.12 : 0.09),
+            },
+            "&:focus-visible": { outline: `2px solid ${alpha(theme.palette.primary.main, 0.6)}`, outlineOffset: 2 },
+          }}
+        >
+          <HelpOutlineOutlined sx={{ fontSize: 18 }} />
+        </Box>
+      </Tooltip>
+    );
+  }
+
+  return (
+    <ListItemButton
+      data-tour="help"
+      onClick={start}
+      aria-label="Help"
+      sx={{
+        minHeight: 44, borderRadius: 2.5, px: 1.25, py: 0.75, gap: 1.25,
+        color: alpha(theme.palette.text.primary, isDark ? 0.65 : 0.7),
+        border: `1px solid ${alpha(theme.palette.divider, isDark ? 0.18 : 0.55)}`,
+        background: isDark ? alpha("#fff", 0.025) : alpha(theme.palette.background.paper, 0.7),
+        transition: theme.transitions.create(["background", "border-color", "color"], { duration: 150 }),
+        "& .help-icon": {
+          width: 38, height: 38, borderRadius: 2.5, display: "grid", placeItems: "center", flexShrink: 0,
+          border: `1px solid ${alpha(theme.palette.divider, isDark ? 0.22 : 0.6)}`,
+          background: isDark ? alpha("#fff", 0.03) : alpha(theme.palette.background.paper, 0.8),
+          "& svg": { fontSize: 18 },
+        },
+        "&:hover": {
+          color: theme.palette.primary.main,
+          background: alpha(theme.palette.primary.main, isDark ? 0.09 : 0.07),
+          borderColor: alpha(theme.palette.primary.main, isDark ? 0.22 : 0.2),
+          "& .help-icon": {
+            borderColor: alpha(theme.palette.primary.main, isDark ? 0.28 : 0.22),
+            background: alpha(theme.palette.primary.main, isDark ? 0.12 : 0.09),
+          },
+        },
+        "&:focus-visible": { outline: `2px solid ${alpha(theme.palette.primary.main, 0.6)}`, outlineOffset: 2 },
+      }}
+    >
+      <Box className="help-icon"><HelpOutlineOutlined /></Box>
+      <Typography sx={{ fontSize: 13.5, fontWeight: 700, whiteSpace: "nowrap" }}>Help</Typography>
     </ListItemButton>
   );
 }
