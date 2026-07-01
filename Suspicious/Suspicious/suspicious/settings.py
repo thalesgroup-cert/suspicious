@@ -447,9 +447,19 @@ REST_FRAMEWORK = {
         ["rest_framework.renderers.JSONRenderer"]
         + (["rest_framework.renderers.BrowsableAPIRenderer"] if DEBUG else [])
     ),
+    # Global abuse ceiling. Views with their own throttle_classes (login,
+    # service_config) override these; the cortex webhook + health check opt out
+    # via throttle_classes=[] since they're machine callers, not user traffic.
+    "DEFAULT_THROTTLE_CLASSES": (
+        "rest_framework.throttling.UserRateThrottle",
+        "rest_framework.throttling.AnonRateThrottle",
+    ),
     "DEFAULT_THROTTLE_RATES": {
         "login": "5/min",
         "service_config": "30/min",
+        # Generous enough for the SPA's XHR bursts, low enough to bound scraping.
+        "user": "3000/hour",
+        "anon": "100/hour",
     },
     "DEFAULT_FILTER_BACKENDS": [
         "django_filters.rest_framework.DjangoFilterBackend",
