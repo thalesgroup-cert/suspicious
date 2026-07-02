@@ -1,6 +1,7 @@
 import * as React from "react";
 import {
   Alert,
+  Avatar,
   Box,
   Button,
   CardContent,
@@ -66,13 +67,20 @@ export default function SettingsPage() {
         spacing={1.5}
         sx={{ mb: 2.5, justifyContent: "space-between" }}
       >
-        <Stack spacing={0.3}>
-          <Typography variant="h4" sx={{ fontWeight: 950, letterSpacing: -0.5 }} >
-            Settings
-          </Typography>
-          <Typography color="text.secondary">
-            Manage lists, feeder state and analyzer scoring.
-          </Typography>
+        <Stack spacing={0.4}>
+          <Stack direction="row" spacing={1.25} sx={{ alignItems: "center" }} >
+            <Avatar sx={{ width: 46, height: 46, fontWeight: 950 }}>
+              {(me.username?.[0] ?? "U").toUpperCase()}
+            </Avatar>
+            <Box>
+              <Typography variant="h4" sx={{ fontWeight: 950, letterSpacing: -0.5 }} >
+                Settings
+              </Typography>
+              <Typography color="text.secondary">
+                Manage blocklists, feeder state, and analyzer scoring.
+              </Typography>
+            </Box>
+          </Stack>
         </Stack>
 
         <Tooltip title="Refresh all settings">

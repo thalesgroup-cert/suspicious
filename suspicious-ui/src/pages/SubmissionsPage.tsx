@@ -35,7 +35,6 @@ import {
   SearchOutlined,
   RefreshOutlined,
   OpenInNewOutlined,
-  FilterAltOutlined,
   ExpandMoreOutlined,
   RestartAltOutlined,
 } from "@mui/icons-material";
@@ -395,14 +394,13 @@ export default function SubmissionsPage() {
                 Submissions
               </Typography>
               <Typography color="text.secondary">
-                Review your submitted files, checks, and results in plain language.
+                Track your submissions and their analysis results.
               </Typography>
             </Box>
           </Stack>
 
           <Stack direction="row" spacing={1} sx={{ mt: 1, flexWrap: "wrap" }}>
             <Chip icon={<AssignmentTurnedInOutlined />} label={`${total} shown`} variant="outlined" />
-            <Chip icon={<FilterAltOutlined />} label="Filters available" variant="outlined" />
             {qDebounced ? <Chip label={`Search: ${qDebounced}`} variant="outlined" /> : null}
             {(submissionsQuery.data?.count ?? 0) > rows.length ? (
               <Chip

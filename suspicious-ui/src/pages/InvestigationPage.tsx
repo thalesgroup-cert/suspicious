@@ -35,7 +35,6 @@ import {
   SearchOutlined,
   RefreshOutlined,
   OpenInNewOutlined,
-  FilterAltOutlined,
   ContentCopyOutlined,
   EditOutlined,
   SaveOutlined,
@@ -404,14 +403,13 @@ export default function InvestigationPage() {
                 Investigation
               </Typography>
               <Typography color="text.secondary">
-                All submissions — open an ID to see details.
+                Browse every case and open one to inspect its analysis.
               </Typography>
             </Box>
           </Stack>
 
           <Stack direction="row" spacing={1} sx={{ mt: 1, flexWrap: "wrap" }}>
-            <Chip icon={<AssignmentTurnedInOutlined />} label={`${total} total`} variant="outlined" />
-            <Chip icon={<FilterAltOutlined />} label="Server filters" variant="outlined" />
+            <Chip icon={<AssignmentTurnedInOutlined />} label={`${total} shown`} variant="outlined" />
             {qDebounced ? <Chip label={`Search: ${qDebounced}`} variant="outlined" /> : null}
           </Stack>
         </Stack>
