@@ -1,3 +1,9 @@
+import email
+import email.message
+import email.policy
+import json
+import os
+import tempfile
 import email, email.message, email.policy, hashlib, json, os, tempfile
 from unittest.mock import patch
 from django.test import TestCase
@@ -8,8 +14,10 @@ from mail_feeder.global_submission.fast_metadata import load_email_data
 
 def _write_submission(d):
     inner = email.message.EmailMessage()
-    inner["From"] = "att@evil.test"; inner["To"] = "victim@corp.test"
-    inner["Subject"] = "phish"; inner.set_content("click")
+    inner["From"] = "att@evil.test"
+    inner["To"] = "victim@corp.test"
+    inner["Subject"] = "phish"
+    inner.set_content("click")
     inner.add_attachment(b"PAY", maintype="application", subtype="pdf",
                          filename="p.pdf")
     msg = email.message_from_bytes(inner.as_bytes(), policy=email.policy.default)

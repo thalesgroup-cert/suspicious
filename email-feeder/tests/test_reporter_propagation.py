@@ -62,7 +62,8 @@ def test_response_reported_by_defaults_empty():
 def test_attachment_email_carries_reporter_note():
     inner = _inner_attacker_mail()
     mb = _mb()
-    import pathlib, tempfile
+    import pathlib
+    import tempfile
     with tempfile.TemporaryDirectory() as d:
         resp = mb.process_attachment_email(
             email_id=b"1", msg=inner,

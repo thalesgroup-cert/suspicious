@@ -1,6 +1,5 @@
 from unittest import TestCase
-from unittest.mock import patch, MagicMock, mock_open
-from io import BytesIO
+from unittest.mock import patch, MagicMock
 
 import django.test
 

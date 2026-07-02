@@ -35,7 +35,6 @@ import logging
 import logging.config
 import os
 import pathlib
-import sys
 
 DEFAULT_LOGGER_NAME = "email-feeder"
 DEFAULT_LOG_DIR = "/app/log"
