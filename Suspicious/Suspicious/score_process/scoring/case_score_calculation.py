@@ -1,4 +1,3 @@
-# score_process/scoring/case_score_calculation.py
 """
 Final score calculation and result range classification.
 """

@@ -1,15 +1,9 @@
-# mail_service/modification_service.py
-from pathlib import Path
-from jinja2 import Environment, FileSystemLoader, select_autoescape
-
 from .send_email_service import SendMailService
 from .models import ModificationMailServiceConfigSocial
 from .email_logo import resolve_logo
 from .email_theme import THEME_PALETTES, resolve_semantic_colors
 from .social_logos import SOCIAL_LOGOS
-from .utils import load_email_config
-
-TEMPLATES_DIR = Path(__file__).parent / "templates"
+from .utils import load_email_config, load_email_template
 
 # Maps case.results (internal Django value) to the semantic color key
 _RESULT_TO_COLOR_KEY = {
@@ -86,11 +80,7 @@ class ModificationEmailService:
             **resolve_semantic_colors(profile),
         }
 
-        env = Environment(
-            loader=FileSystemLoader(TEMPLATES_DIR),
-            autoescape=select_autoescape(["html", "xml"]),
-        )
-        self.template = env.get_template("modification_email.jinja2")
+        self.template = load_email_template("modification_email.jinja2")
 
     # ── case helpers ───────────────────────────────────────────────────────
 
@@ -174,22 +164,10 @@ class ModificationEmailService:
 
     def _send_action(self, user: str, user_infos: str, subject: str) -> None:
         html = self.render_html(recipient_name=user_infos, subject=subject)
-
-        smtp = self.config.get("smtp", {})
-        send_mail_service = SendMailService(
-            host=smtp.get("server", ""),
-            port=smtp.get("port", 587),
-            login=smtp.get("username", ""),
-            password=smtp.get("password", ""),
-        )
-        send_mail_service.connect()
-        if smtp.get("tls"):
-            send_mail_service.start_tls()
-        send_mail_service.login()
-        send_mail_service.publish_email(
-            subject=subject,
+        SendMailService.send_html(
+            self.config.get("smtp", {}),
             sender=self.sender,
             recipient=user,
+            subject=subject,
             html=html,
         )
-        send_mail_service.close()

@@ -31,12 +31,12 @@ class MailAttachmentResource(resources.ModelResource):
 class MailBodyResource(resources.ModelResource):
     class Meta:
         model = MailBody
-        fields = ('id', 'body_score', 'body_confidence', 'body_level', 'body_value', 'fuzzy_hash', 'times_sent', 'other_values', 'creation_date', 'last_update')
+        fields = ('id', 'body_score', 'body_confidence', 'body_level', 'body_value', 'fuzzy_hash', 'times_sent', 'creation_date', 'last_update')
 
 class MailHeaderResource(resources.ModelResource):
     class Meta:
         model = MailHeader
-        fields = ('id', 'header_score', 'header_confidence', 'header_level', 'header_value', 'fuzzy_hash', 'times_sent', 'other_values', 'creation_date', 'last_update')
+        fields = ('id', 'header_score', 'header_confidence', 'header_level', 'header_value', 'fuzzy_hash', 'times_sent', 'creation_date', 'last_update')
 
 class MailInfoResource(resources.ModelResource):
     class Meta:

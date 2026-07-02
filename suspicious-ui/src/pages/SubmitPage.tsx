@@ -1,10 +1,8 @@
-// src/pages/SubmitPage.tsx
 import * as React from "react";
 import {
   Alert,
   Box,
   Button,
-  Card,
   CardContent,
   Chip,
   CircularProgress,
@@ -24,7 +22,6 @@ import {
   UploadFileOutlined,
   LinkOutlined,
   FingerprintOutlined,
-  CheckCircleOutlined,
   InfoOutlined,
   InsertDriveFileOutlined,
   PublicOutlined,
@@ -33,360 +30,40 @@ import {
 import { useMutation, useQuery } from "@tanstack/react-query";
 import { Skeleton } from "boneyard-js/react";
 import { useForm } from "react-hook-form";
-import { z } from "zod";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { useDropzone } from "react-dropzone";
 import { useSnackbar } from "notistack";
 import { useNavigate } from "react-router-dom";
 
-import { api } from "@/api/client";
 import { env } from "@/lib/runtimeEnv";
 import { getMe, type Me } from "@/api/auth";
 
-import axios from "axios";
-
-// ---------------------------------------------------------------------------
-// Types
-// ---------------------------------------------------------------------------
-
-type SubmitConfigResponse = {
-  status: "success";
-  data: {
-    suspicious_email: string;
-  };
-};
-
-type SubmitSuccessResponse = {
-  status: "success";
-  accepted: boolean;
-  submission_type: "url" | "other" | "file";
-  result_type: "case" | "mail";
-  case_id: number | string | null;
-  id?: number | string | null;
-  message: string;
-};
-
-type ApiErrorResponse = {
-  status?: "error";
-  code?: string;
-  detail?: string;
-  non_field_errors?: string[];
-} & Record<string, unknown>;
-
-type SubmitMode = "file" | "artifact";
-
-// ---------------------------------------------------------------------------
-// Helpers
-// ---------------------------------------------------------------------------
-
-function extractApiErrorMessage(error: unknown): string {
-  if (!axios.isAxiosError(error)) {
-    return "Request failed.";
-  }
-
-  const data = error.response?.data as ApiErrorResponse | undefined;
-  if (!data) {
-    return error.message || "Request failed.";
-  }
-
-  if (typeof data.detail === "string" && data.detail.trim()) {
-    return data.detail;
-  }
-
-  const fieldMessages = Object.entries(data)
-    .filter(([key]) => key !== "status" && key !== "code" && key !== "detail")
-    .flatMap(([key, value]) => {
-      if (Array.isArray(value)) {
-        return value.map((msg) => `${key}: ${String(msg)}`);
-      }
-      if (typeof value === "string") {
-        return [`${key}: ${value}`];
-      }
-      return [];
-    });
-
-  if (fieldMessages.length > 0) {
-    return fieldMessages.join(" ");
-  }
-
-  return error.message || "Request failed.";
-}
-
-function resolveId(res: SubmitSuccessResponse): string | number | null {
-  return res.case_id ?? res.id ?? null;
-}
-
-function formatBytes(bytes: number) {
-  const units = ["B", "KB", "MB", "GB"];
-  let v = bytes;
-  let i = 0;
-  while (v >= 1024 && i < units.length - 1) {
-    v /= 1024;
-    i++;
-  }
-  return `${v.toFixed(i === 0 ? 0 : 1)} ${units[i]}`;
-}
-
-// ---------------------------------------------------------------------------
-// Artifact classification
-//
-// Determines whether a raw input string should be routed to /submit/url/
-// or /submit/other/.
-//
-// Rules (in priority order):
-//   1. Starts with http:// or https://                                   → url
-//   2. Looks like a bare domain (evil.com, sub.evil.co.uk, evil.com/path) → url
-//   3. Everything else (hash, IP, free-text IOC)                          → ioc
-//
-// The bare-domain branch also normalises the value to "http://<input>"
-// before sending, because Django's URLField requires a scheme.
-// ---------------------------------------------------------------------------
-
-const FULL_URL_RE = /^https?:\/\/.+/i;
-
-/**
- * Matches bare hostnames / domains with an optional path.
- * Does NOT match plain IPs (handled as IOC) or hashes (no dots).
- *
- * Matches:   evil.com  sub.evil.co.uk  evil.com/path?q=1
- * No match:  192.168.1.1  abc123deadbeef  malware
- */
-const BARE_DOMAIN_RE =
-  /^(?:[a-z0-9](?:[a-z0-9-]{0,61}[a-z0-9])?\.)+[a-z]{2,}(\/.*)?$/i;
-
-type ArtifactKind = "url" | "ioc";
-
-function classifyArtifact(raw: string): ArtifactKind {
-  const v = raw.trim();
-  if (FULL_URL_RE.test(v)) return "url";
-  if (BARE_DOMAIN_RE.test(v)) return "url";
-  return "ioc";
-}
-
-/**
- * Ensures the value sent to /submit/url/ always carries a scheme.
- * Django URLField rejects scheme-less strings, so bare domains get http://.
- */
-function normaliseUrl(raw: string): string {
-  const v = raw.trim();
-  return FULL_URL_RE.test(v) ? v : `http://${v}`;
-}
-
-// ---------------------------------------------------------------------------
-// API calls
-// ---------------------------------------------------------------------------
-
-async function submitUrl(input: {
-  url: string;
-  context?: string;
-}): Promise<SubmitSuccessResponse> {
-  const res = await api.post("/submit/url/", input);
-  return res.data;
-}
-
-async function submitIoc(input: {
-  value: string;
-  context?: string;
-}): Promise<SubmitSuccessResponse> {
-  const res = await api.post("/submit/other/", input);
-  return res.data;
-}
-
-async function submitFile(input: {
-  file: File;
-  context?: string;
-}): Promise<SubmitSuccessResponse> {
-  const form = new FormData();
-  form.append("file", input.file);
-  if (input.context) form.append("context", input.context);
-  const res = await api.post("/submit/file/", form);
-  return res.data;
-}
-
-async function getSubmitConfig(): Promise<string> {
-  const res = await api.get<SubmitConfigResponse>("/submit/config/");
-  return res.data.data.suspicious_email;
-}
-
-// ---------------------------------------------------------------------------
-// Validation schemas
-// ---------------------------------------------------------------------------
-
-const artifactSchema = z.object({
-  value: z
-    .string()
-    .trim()
-    .min(1, "URL or indicator is required")
-    .max(4096, "Input is too long"),
-  context: z.string().optional(),
-});
-
-const fileSchema = z.object({
-  context: z.string().optional(),
-});
-
-type ArtifactForm = z.infer<typeof artifactSchema>;
-type FileForm = z.infer<typeof fileSchema>;
-
-// ---------------------------------------------------------------------------
-// Sub-components
-// ---------------------------------------------------------------------------
-
-function SoftCard(props: React.PropsWithChildren<{ sx?: object }>) {
-  const theme = useTheme();
-  const isDark = theme.palette.mode === "dark";
-
-  return (
-    <Card
-      sx={{
-        borderRadius: 4,
-        border: `1px solid ${alpha(theme.palette.divider, isDark ? 0.28 : 0.9)}`,
-        background: isDark
-          ? `linear-gradient(180deg, ${alpha("#fff", 0.03)}, ${alpha("#fff", 0.02)})`
-          : `linear-gradient(180deg, ${alpha("#fff", 0.88)}, ${alpha(
-              theme.palette.grey[50],
-              0.96
-            )})`,
-        boxShadow: isDark
-          ? "0 12px 32px rgba(0,0,0,.28)"
-          : "0 10px 28px rgba(15,23,42,.06)",
-        ...props.sx,
-      }}
-    >
-      {props.children}
-    </Card>
-  );
-}
-
-function ModeSelectorCard(props: {
-  active: boolean;
-  title: string;
-  subtitle: string;
-  icon: React.ReactNode;
-  helper?: string;
-  onClick: () => void;
-}) {
-  const theme = useTheme();
-
-  return (
-    <Box
-      role="button"
-      tabIndex={0}
-      onClick={props.onClick}
-      onKeyDown={(e) => {
-        if (e.key === "Enter" || e.key === " ") {
-          e.preventDefault();
-          props.onClick();
-        }
-      }}
-      sx={{
-        cursor: "pointer",
-        borderRadius: 3,
-        p: 2,
-        border: `1px solid ${
-          props.active
-            ? alpha(theme.palette.primary.main, 0.42)
-            : alpha(theme.palette.divider, 0.9)
-        }`,
-        background: props.active
-          ? alpha(
-              theme.palette.primary.main,
-              theme.palette.mode === "dark" ? 0.1 : 0.06
-            )
-          : "rgba(255,255,255,.02)",
-        transition: "all .16s ease",
-        "&:hover": {
-          borderColor: alpha(theme.palette.primary.main, 0.35),
-          background: alpha(
-            theme.palette.primary.main,
-            theme.palette.mode === "dark" ? 0.08 : 0.045
-          ),
-        },
-      }}
-    >
-      <Stack direction="row" spacing={1.5} sx={{ alignItems: "flex-start" }} >
-        <Box
-          sx={{
-            width: 42,
-            height: 42,
-            borderRadius: 2,
-            display: "grid",
-            placeItems: "center",
-            border: "1px solid rgba(255,255,255,.10)",
-            background:
-              "linear-gradient(135deg, rgba(56,189,248,.14), rgba(120,119,198,.12))",
-            flexShrink: 0,
-          }}
-        >
-          {props.icon}
-        </Box>
-
-        <Box sx={{ minWidth: 0, flex: 1 }}>
-          <Stack
-            direction="row"
-            spacing={1}
-            useFlexGap
-            sx={{ alignItems: "center", flexWrap: "wrap" }}
->
-            <Typography sx={{ fontWeight: 850 }} >{props.title}</Typography>
-
-            {props.helper ? (
-              <Chip
-                size="small"
-                label={props.helper}
-                variant="outlined"
-                sx={{ height: 24, "& .MuiChip-label": { px: 1, fontWeight: 700 } }}
-              />
-            ) : null}
-
-            {props.active ? (
-              <Chip
-                size="small"
-                icon={<CheckCircleOutlined sx={{ fontSize: 16 }} />}
-                label="Selected"
-                variant="outlined"
-                sx={{ height: 24, "& .MuiChip-label": { px: 1, fontWeight: 700 } }}
-              />
-            ) : null}
-          </Stack>
-
-          <Typography variant="body2" color="text.secondary" sx={{ mt: 0.5 }}>
-            {props.subtitle}
-          </Typography>
-        </Box>
-      </Stack>
-    </Box>
-  );
-}
-
-function SectionHeader(props: { title: string; subtitle: string }) {
-  return (
-    <Stack spacing={0.5}>
-      <Typography variant="h5" sx={{ fontWeight: 850, letterSpacing: -0.4 }} >
-        {props.title}
-      </Typography>
-      <Typography color="text.secondary">{props.subtitle}</Typography>
-    </Stack>
-  );
-}
-
-function SidePanel(
-  props: React.PropsWithChildren<{ title: string; icon: React.ReactNode }>
-) {
-  return (
-    <SoftCard>
-      <CardContent sx={{ p: 2.25 }}>
-        <Stack spacing={1.25}>
-          <Stack direction="row" spacing={1} sx={{ alignItems: "center" }} >
-            {props.icon}
-            <Typography sx={{ fontWeight: 850 }} >{props.title}</Typography>
-          </Stack>
-          {props.children}
-        </Stack>
-      </CardContent>
-    </SoftCard>
-  );
-}
+import {
+  getSubmitConfig,
+  submitFile,
+  submitIoc,
+  submitUrl,
+} from "@/features/submit/api";
+import {
+  ModeSelectorCard,
+  SectionHeader,
+  SidePanel,
+  SoftCard,
+} from "@/features/submit/components/cards";
+import {
+  artifactSchema,
+  fileSchema,
+  type ArtifactForm,
+  type FileForm,
+} from "@/features/submit/schema";
+import type { SubmitMode, SubmitSuccessResponse } from "@/features/submit/types";
+import {
+  classifyArtifact,
+  extractApiErrorMessage,
+  formatBytes,
+  normaliseUrl,
+  resolveId,
+} from "@/features/submit/utils";
 
 // ---------------------------------------------------------------------------
 // Page
@@ -547,7 +224,7 @@ export default function SubmitPage() {
       loading={meQuery.isPending || configQuery.isPending}
       animate="shimmer"
     >
-    <Container maxWidth="lg" sx={{ py: { xs: 2.5, md: 3.5 }, pb: 8 }}>
+    <Container data-tour="submit-form" maxWidth="lg" sx={{ py: { xs: 2.5, md: 3.5 }, pb: 8 }}>
       <Stack spacing={2}>
         {/* ---------------------------------------------------------------- */}
         {/* Header + mode selector                                           */}

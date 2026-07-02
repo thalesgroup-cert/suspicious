@@ -1,4 +1,3 @@
-// src/features/dashboard/components/SoftCard.tsx
 import * as React from "react";
 import { Box, Card, CardContent, Divider, Stack, Typography } from "@mui/material";
 import { alpha } from "@mui/material/styles";

@@ -142,6 +142,7 @@ class MinioEmailService:
         workdir: str,
         bucket_name: str,
         reported_by: str = "",
+        reporter_note: str = "",
     ) -> None:
         """
         Process all regular .eml files in a given MinIO work directory.
@@ -167,13 +168,25 @@ class MinioEmailService:
             for filename in eml_files:
                 fetch_mail_logger.debug("Processing MinIO email file %s", filename)
 
-                glo().process_single_email(
-                    MailSubmissionData(
-                        workdir=workdir,
-                        filename=filename,
-                        email_id=email_id,
-                        user=user.email if user else "",
-                        bucket_name=bucket_name,
-                        is_submitted=False,
+                # Isolate each email: a single malformed message (e.g. a missing
+                # From that fails EmailDataModel validation) must not abort the
+                # rest of the batch or the submission — otherwise the cron rolls
+                # the whole submission back to `todo` and retries it forever.
+                try:
+                    glo().process_single_email(
+                        MailSubmissionData(
+                            workdir=workdir,
+                            filename=filename,
+                            email_id=email_id,
+                            user=user.email if user else "",
+                            bucket_name=bucket_name,
+                            is_submitted=False,
+                            reported_by=reported_by,
+                            reporter_note=reporter_note,
+                        )
                     )
-                )
+                except Exception:
+                    fetch_mail_logger.exception(
+                        "Failed to process email %s in %s; skipping", filename, workdir
+                    )
+                    continue

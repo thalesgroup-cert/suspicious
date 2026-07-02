@@ -1,4 +1,3 @@
-# analyzers_services/google_safebrowsing.py
 """
 Google Safe Browsing analyzer — scores a URL based on the number of
 Safe Browsing hits reported by Google.

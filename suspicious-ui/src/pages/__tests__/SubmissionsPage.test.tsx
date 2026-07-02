@@ -13,6 +13,7 @@ vi.mock("@/features/submissions/api", () => ({
   listSubmissions: vi.fn(),
   getSubmissionDetails: vi.fn(),
   challengeSubmission: vi.fn(),
+  analyzeUrl: vi.fn().mockResolvedValue({ status: "queued", url_id: 0 }),
   buildSortOrdering: vi.fn(
     (field: string, dir: string) => `${dir === "asc" ? "" : "-"}${field}`
   ),

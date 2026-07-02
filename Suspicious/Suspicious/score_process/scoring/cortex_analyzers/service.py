@@ -1,4 +1,3 @@
-# analyzers_services/service.py
 """
 Cortex analyzer service — single entry point for running an analyzer
 and returning a normalised AnalyzerResult.

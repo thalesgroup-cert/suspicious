@@ -1,4 +1,3 @@
-// src/shared/components/ResultChip.tsx
 //
 // Renders an analysis result badge whose color comes from the semantic
 // color store (useResultColors). Preset changes in ProfilePage propagate

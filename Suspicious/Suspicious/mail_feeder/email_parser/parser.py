@@ -5,6 +5,7 @@ from email.utils import getaddresses
 from pathlib import Path
 from typing import List, Dict, Optional, Tuple
 
+from mail_feeder import email_contract as ec
 from .utils import decode_email_header, ensure_dir
 from .models import EmailDataModel, AttachmentModel
 
@@ -80,7 +81,7 @@ def extract_email_attachments(
         if not raw_filename:
             continue
 
-        decoded_filename = decode_email_header(raw_filename)
+        decoded_filename = ec.decode_header_value(raw_filename)
         destination = _safe_attachment_destination(save_dir, decoded_filename)
         if destination is None:
             logger.warning(
@@ -100,7 +101,7 @@ def extract_email_attachments(
                 AttachmentModel(
                     filename=safe_filename,
                     content=payload,
-                    headers=dict(part.items()),
+                    headers={k: ec.decode_header_value(v) for k, v in part.items()},
                     parent=email_reference
                 )
             )
@@ -117,7 +118,7 @@ def extract_email_attachments(
 
 def get_header_dict_list(email_message: Message) -> Dict[str, str]:
     return {
-        k: decode_email_header(v)
+        k: ec.decode_header_value(v)
         for k, v in email_message.items()
     }
 
@@ -141,45 +142,25 @@ def parse_email(
         email_reference
     )
 
-    # -------- Email fields --------
+    # -------- Email fields (via shared extractors) --------
 
-    from_addr = decode_and_extract(email_message.get("From"))
-    to_addr = decode_and_extract(email_message.get("To"))
-    cc_addr = decode_and_extract(email_message.get("Cc"))
-    bcc_addr = decode_and_extract(email_message.get("Bcc"))
+    from_addr = ec.extract_address(email_message.get("From"))
+    to_addr = ec.extract_address(email_message.get("To"))
+    cc_addr = ec.extract_address(email_message.get("Cc"))
+    bcc_addr = ec.extract_address(email_message.get("Bcc"))
 
-    subject = decode_email_header(email_message.get("Subject", ""))
+    subject = ec.decode_header_value(email_message.get("Subject", ""))
+    email_text_parts = ec.extract_text_parts(email_message)
+    headers = ec.extract_header_dict(email_message)
 
     logger.debug(f"Parsed From: {from_addr}")
     logger.debug(f"Parsed To: {to_addr}")
     logger.debug(f"Parsed Cc: {cc_addr}")
     logger.debug(f"Parsed Bcc: {bcc_addr}")
 
-    # -------- Reporter logic (critical) --------
+    # -------- Reporter logic (shared contract) --------
 
-    reporter = reported_by if reported_by else to_addr
-    if to_addr == "" or to_addr == "Undisclosed recipients:;"or not to_addr:
-        to_addr = "no.recipient@noemail.com"
-    if not reporter:
-        logger.warning("No valid reporter email found")
-        reporter = to_addr
-
-    # -------- Body extraction --------
-
-    email_text_parts: List[str] = []
-
-    for part in email_message.walk():
-        if part.get_content_type() in ["text/plain", "text/html"]:
-            try:
-                payload = part.get_payload(decode=True)
-                if payload:
-                    text = payload.decode(
-                        part.get_content_charset("utf-8"),
-                        errors="replace"
-                    )
-                    email_text_parts.append(text)
-            except Exception as e:
-                logger.warning(f"Failed to decode email part: {e}")
+    to_addr, reporter = ec.resolve_reporter_and_to(to_addr, reported_by)
 
     # -------- Model creation --------
 
@@ -193,9 +174,9 @@ def parse_email(
             "reportedSubject": subject,
             "reportedText": email_text_parts,
             "date": email_message.get("Date", ""),
-            "headers": get_header_dict_list(email_message),
+            "headers": headers,
             "id": email_reference,
-            "attachments": attachments
+            "attachments": attachments,
         }
     )
 

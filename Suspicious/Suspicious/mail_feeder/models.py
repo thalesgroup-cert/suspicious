@@ -34,8 +34,7 @@ class Mail(models.Model):
     bcc = models.CharField(max_length=255, blank=True)
     mail_id = models.CharField(max_length=255, db_index=True)
     times_sent = models.PositiveIntegerField(default=0)
-    minio_submission_id = models.CharField(max_length=255, db_index=True, blank=True)
-    minio_object_key = models.CharField(max_length=512, blank=True)
+    reporterNote = models.TextField(blank=True, default="")
     creation_date = models.DateTimeField(auto_now_add=True, db_index=True)
     last_update = models.DateTimeField(auto_now=True)
 
@@ -53,7 +52,6 @@ class MailHeader(models.Model):
     header_value = models.TextField()
     fuzzy_hash = models.CharField(max_length=64, db_index=True)
     times_sent = models.PositiveIntegerField(default=0)
-    other_values = models.TextField(blank=True)
     creation_date = models.DateTimeField(auto_now_add=True, db_index=True)
     last_update = models.DateTimeField(auto_now=True)
 
@@ -71,7 +69,6 @@ class MailBody(models.Model):
     body_value = models.TextField()
     fuzzy_hash = models.CharField(max_length=64, db_index=True)
     times_sent = models.PositiveIntegerField(default=0)
-    other_values = models.TextField(blank=True)
     creation_date = models.DateTimeField(auto_now_add=True, db_index=True)
     last_update = models.DateTimeField(auto_now=True)
 

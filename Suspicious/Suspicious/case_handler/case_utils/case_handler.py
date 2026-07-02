@@ -1,5 +1,3 @@
-# case_handler.py
-
 import logging
 from pathlib import Path
 from typing import Any, Optional, Tuple, Dict, Union
@@ -227,8 +225,12 @@ class CaseHandler:
                 )
             self.pending_dispatch_intents = []
             return
+
+        from url_process.url_utils.url_planner import filter_dispatch_intents
+        intents = filter_dispatch_intents(self.pending_dispatch_intents, sender_domain=None)
+
         cortex = CortexJob()
-        for value, data_type in self.pending_dispatch_intents:
+        for value, data_type in intents:
             try:
                 cortex.launch_cortex_jobs(value=value, data_type=data_type, case=case)
             except Exception:

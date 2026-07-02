@@ -59,7 +59,7 @@ def real_email(string):
     # From values is: "Mario Rossi <rossi.mario@big-society.com>" <spoof@example.com>
     result_meioc = None
     try:
-        sender_name, email_address = parseaddr(string)
+        _, email_address = parseaddr(string)
         return email_address.lower() if email_address else None
     except (AttributeError, ValueError, TypeError) as exc:
         fetch_mail_logger.warning("real_email parseaddr failed for %r: %s", string, exc)
@@ -85,7 +85,7 @@ def normalize_headers(raw_email_bytes):
             normalized_lines.append(line)
         else:
             if ": " in line or ":" in line:
-                header, sep, value = line.partition(":")
+                header, _, value = line.partition(":")
                 header = header.strip()
                 normalized_lines.append(f"{header}:{value}")
             else:
@@ -152,7 +152,7 @@ def email_analysis(filename, exclude_private_ip, check_spf, check_dkim, file_out
         fetch_mail_logger.error(f"Failed to parse email from file {filename}: {e}")
         return result_meioc
     if parsed_email:
-        fetch_mail_logger.debug(f"Email parsed successfully: {parsed_email['Subject'] if 'Subject' in parsed_email else 'No Subject'}")
+        fetch_mail_logger.debug(f"Email parsed successfully: {parsed_email.get('Subject', 'No Subject')}")
         #
         # Header analysis
         #
@@ -249,9 +249,6 @@ def email_analysis(filename, exclude_private_ip, check_spf, check_dkim, file_out
                 for line in received:
                     hops = re.findall(r"from\s+(.*?)\s+by(.*?)(?:(?:with|via)(.*?)(?:id|$)|id|$)", line, re.DOTALL | re.X)
                     for hop in hops:
-
-                        #ipv4_address = re.findall(r"\b((25[0-5]|2[0-4][0-9]|1[0-9]{2}|[1-9]?[0-9])\.){3}(25[0-5]|2[0-4][0-9]|1[0-9]{2}|[1-9]?[0-9])\b", hop[0])
-                        
                         ipv4_address = re.findall(r"[0-9]+(?:\.[0-9]+){3}", hop[0], re.DOTALL | re.X)
 
                         # https://gist.github.com/dfee/6ed3a4b05cfe7a6faf40a2102408d5d8

@@ -1,4 +1,3 @@
-# analyzers_services/mailheader.py
 """
 Mail Header analyzer — derives the highest-severity level across all
 MailHeader taxonomy entries.

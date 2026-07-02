@@ -1,4 +1,3 @@
-# analyzers_services/cfapp.py
 """
 CFApp analyzer — pass-through (base class handles all scoring).
 """

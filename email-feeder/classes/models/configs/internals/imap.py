@@ -36,3 +36,8 @@ class IMAPConfig(pydantic.BaseModel):
 
     rootcafile: str | None = pydantic.Field(default=None)
     """The root CA file to use during SSL handshake with the IMAP server. (file path)"""
+
+    use_ssl: bool = pydantic.Field(default=False)
+    """Whether to connect over implicit TLS (IMAPS). Set automatically to True
+    for connectors declared under the 'imaps' section; client cert/key remain
+    optional within the TLS handshake."""

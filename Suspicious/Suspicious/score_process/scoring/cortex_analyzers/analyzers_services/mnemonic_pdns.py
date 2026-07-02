@@ -1,4 +1,3 @@
-# analyzers_services/mnemonic_pdns.py
 """
 Mnemonic passive DNS (PDNS) analyzer.
 """

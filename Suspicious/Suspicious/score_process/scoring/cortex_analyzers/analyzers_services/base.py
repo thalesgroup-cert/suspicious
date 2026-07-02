@@ -1,4 +1,3 @@
-# analyzers_services/base.py
 """
 Base analyzer — shared initialization, whitelist check, and taxonomy/result
 analysis pipeline that all concrete analyzers build on.

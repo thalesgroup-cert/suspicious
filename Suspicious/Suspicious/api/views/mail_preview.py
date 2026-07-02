@@ -92,6 +92,20 @@ class MailPreviewView(APIView):
 
     @staticmethod
     def _minio_client():
+        # Prefer the platform-wide client (storage.s3 runtime config) — the
+        # same source the renderer/upload and the rest of the backend use.
+        # Fall back to legacy django-minio-storage MINIO_STORAGE_* settings.
+        try:
+            from common.clients import get_s3_client
+            client = get_s3_client()
+            if client is not None:
+                return client
+        except Exception:
+            logger.exception(
+                "get_s3_client failed for mail preview view; "
+                "falling back to MINIO_STORAGE_*"
+            )
+
         endpoint = getattr(settings, "MINIO_STORAGE_ENDPOINT", None)
         access_key = getattr(settings, "MINIO_STORAGE_ACCESS_KEY", None)
         secret_key = getattr(settings, "MINIO_STORAGE_SECRET_KEY", None)

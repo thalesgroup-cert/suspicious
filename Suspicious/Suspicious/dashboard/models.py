@@ -2,6 +2,37 @@ from django.conf import settings
 from django.db import models
 
 
+class CaseResultCountsMixin:
+    """Increment per-result and per-category case counters on a stats model.
+
+    Shared by the monthly stats models, which all carry the same
+    ``<result>_cases`` / ``<category>_cases`` integer columns.
+    """
+
+    _DETAILED_CATEGORIES = {
+        "Uncategorized": "uncategorized_cases",
+        "Spam": "spam_cases",
+        "Newsletter": "newsletter_cases",
+        "Classic_phishing": "classic_phishing_cases",
+        "Clone": "clone_cases",
+        "Blackmail": "blackmail_cases",
+        "Whaling": "whaling_cases",
+        "Internal": "internal_cases",
+        "External": "external_cases",
+    }
+
+    def update_case_results(self, case_result):
+        if case_result in {"Safe", "Inconclusive", "Suspicious", "Dangerous", "Failure"}:
+            field = f"{case_result.lower()}_cases"
+            setattr(self, field, getattr(self, field) + 1)
+
+        category_field = self._DETAILED_CATEGORIES.get(case_result)
+        if category_field:
+            setattr(self, category_field, getattr(self, category_field) + 1)
+
+        self.save()
+
+
 class Kpi(models.Model):
     id = models.AutoField(primary_key=True)
     month = models.CharField(max_length=200)
@@ -27,7 +58,7 @@ class Kpi(models.Model):
         return f"{self.month} - {self.year}"
 
 
-class MonthlyCasesSummary(models.Model):
+class MonthlyCasesSummary(CaseResultCountsMixin, models.Model):
     id = models.AutoField(primary_key=True)
 
     suspicious_cases = models.PositiveIntegerField(default=0)
@@ -61,31 +92,6 @@ class MonthlyCasesSummary(models.Model):
     def __str__(self):
         return f"{self.id}"
 
-    def update_case_results(self, case_result):
-        if case_result in {"Safe", "Inconclusive", "Suspicious", "Dangerous", "Failure"}:
-            setattr(
-                self,
-                f"{case_result.lower()}_cases",
-                getattr(self, f"{case_result.lower()}_cases") + 1
-            )
-
-        detailed_map = {
-            "Uncategorized": "uncategorized_cases",
-            "Spam": "spam_cases",
-            "Newsletter": "newsletter_cases",
-            "Classic_phishing": "classic_phishing_cases",
-            "Clone": "clone_cases",
-            "Blackmail": "blackmail_cases",
-            "Whaling": "whaling_cases",
-            "Internal": "internal_cases",
-            "External": "external_cases",
-        }
-
-        if case_result in detailed_map:
-            setattr(self, detailed_map[case_result], getattr(self, detailed_map[case_result]) + 1)
-
-        self.save()
-
 
 class MonthlyReporterStats(models.Model):
     id = models.AutoField(primary_key=True)
@@ -118,7 +124,7 @@ class TotalCasesStats(models.Model):
         return str(self.id)
 
 
-class UserCasesMonthlyStats(models.Model):
+class UserCasesMonthlyStats(CaseResultCountsMixin, models.Model):
     user = models.ForeignKey(settings.AUTH_USER_MODEL, on_delete=models.CASCADE, related_name='user_cases_monthly_stats')
 
     suspicious_cases = models.PositiveIntegerField(default=0)
@@ -154,31 +160,6 @@ class UserCasesMonthlyStats(models.Model):
 
     def __str__(self):
         return f"{self.user.username} - {self.month} - {self.year}"
-
-    def update_case_results(self, case_result):
-        if case_result in {"Safe", "Inconclusive", "Suspicious", "Dangerous", "Failure"}:
-            setattr(
-                self,
-                f"{case_result.lower()}_cases",
-                getattr(self, f"{case_result.lower()}_cases") + 1
-            )
-
-        detailed_map = {
-            "Uncategorized": "uncategorized_cases",
-            "Spam": "spam_cases",
-            "Newsletter": "newsletter_cases",
-            "Classic_phishing": "classic_phishing_cases",
-            "Clone": "clone_cases",
-            "Blackmail": "blackmail_cases",
-            "Whaling": "whaling_cases",
-            "Internal": "internal_cases",
-            "External": "external_cases",
-        }
-
-        if case_result in detailed_map:
-            setattr(self, detailed_map[case_result], getattr(self, detailed_map[case_result]) + 1)
-
-        self.save()
 
 
 class DashboardSnapshot(models.Model):

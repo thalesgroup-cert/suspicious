@@ -1,25 +1,14 @@
 import logging
-from contextlib import contextmanager
 import json
+import os
 from pathlib import Path
+
+from common.safe_exec import make_safe_execution
 from .models import CronConfig
 
 logger = logging.getLogger("cron.utils")
 
-
-@contextmanager
-def safe_execution(context: str):
-    """
-    Contexte uniforme pour logger et remonter les erreurs.
-    Usage:
-        with safe_execution("do something"):
-            ...
-    """
-    try:
-        yield
-    except Exception as exc:
-        logger.exception("[%s] unexpected error: %s", context, exc)
-        raise
+safe_execution = make_safe_execution("cron", logger)
 
 
 def load_config(path: str) -> CronConfig:
@@ -73,3 +62,15 @@ def load_config(path: str) -> CronConfig:
 def ensure_dir(path: str) -> None:
     from pathlib import Path
     Path(path).mkdir(parents=True, exist_ok=True)
+
+
+def _safe_object_name(raw_name: str) -> str:
+    """
+    Sanitize a MinIO object name before using it as a filesystem path component.
+    Prevents path traversal via crafted object names (e.g. '../../etc/passwd').
+    Raises ValueError if the sanitized name is empty or escapes the prefix.
+    """
+    normalized = os.path.normpath(raw_name.replace("\\", "/")).lstrip("/")
+    if not normalized or normalized.startswith(".."):
+        raise ValueError(f"Unsafe MinIO object name rejected: {raw_name!r}")
+    return normalized

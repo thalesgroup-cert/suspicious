@@ -58,28 +58,21 @@ class GlobalSubmissionServiceTests(TestCase):
     @patch("mail_feeder.global_submission.gsubmission.MailInfoService")
     @patch.object(GlobalSubmissionService, "_handle_common_tasks")
     @patch("mail_feeder.global_submission.gsubmission.EmailHandlerService")
-    @patch("mail_feeder.global_submission.gsubmission.parse_email")
-    @patch("mail_feeder.global_submission.gsubmission.email.message_from_binary_file")
-    @patch("builtins.open")
+    @patch("mail_feeder.global_submission.fast_metadata.load_email_data")
     def test_process_single_email_web_submission_success(
         self,
-        mock_open,
-        mock_msg_from_binary,
-        mock_parse_email,
+        mock_load_email_data,
         mock_email_handler_cls,
         mock_common_tasks,
         mock_mail_info
     ):
-        mock_open.return_value = BytesIO(b"raw email")
-
         submission = self._submission(submitted=True)
 
         fake_instance = MagicMock()
         fake_instance.mail_id = "mail-db-id"
         fake_instance.reportedBy = None
 
-        mock_msg_from_binary.return_value = MagicMock()
-        mock_parse_email.return_value = "parsed-mail"
+        mock_load_email_data.return_value = "parsed-mail"
         mock_email_handler_cls.return_value.handle_mail.return_value = fake_instance
 
         result = self.service.process_single_email(submission)
@@ -92,21 +85,16 @@ class GlobalSubmissionServiceTests(TestCase):
     # =========================
     @patch.object(GlobalSubmissionService, "finalize_submission")
     @patch("mail_feeder.global_submission.gsubmission.EmailHandlerService")
-    @patch("mail_feeder.global_submission.gsubmission.parse_email")
-    @patch("mail_feeder.global_submission.gsubmission.email.message_from_binary_file")
-    @patch("builtins.open", new_callable=mock_open, read_data=b"raw email")
+    @patch("mail_feeder.global_submission.fast_metadata.load_email_data")
     def test_process_single_email_handler_failure_returns_none(
         self,
-        mock_open_file,
-        mock_msg_from_file,
-        mock_parse_email,
+        mock_load_email_data,
         mock_email_handler_cls,
         mock_finalize,
     ):
         submission = self._submission(submitted=True)
 
-        mock_msg_from_file.return_value = MagicMock()
-        mock_parse_email.return_value = "parsed-mail"
+        mock_load_email_data.return_value = "parsed-mail"
         mock_email_handler_cls.return_value.handle_mail.return_value = None
 
         result = self.service.process_single_email(submission)
@@ -114,35 +102,27 @@ class GlobalSubmissionServiceTests(TestCase):
         self.assertIsNone(result)
         mock_finalize.assert_not_called()
 
-
     # =========================
     # MinIO submission
     # =========================
     @patch("mail_feeder.global_submission.gsubmission.MailInfoService")
     @patch.object(GlobalSubmissionService, "_handle_instance_for_minio")
     @patch("mail_feeder.global_submission.gsubmission.EmailHandlerService")
-    @patch("mail_feeder.global_submission.gsubmission.parse_email")
-    @patch("mail_feeder.global_submission.gsubmission.email.message_from_binary_file")
-    @patch("builtins.open")
+    @patch("mail_feeder.global_submission.fast_metadata.load_email_data")
     def test_process_single_email_minio_submission_success(
         self,
-        mock_open,
-        mock_msg_from_binary,
-        mock_parse_email,
+        mock_load_email_data,
         mock_email_handler_cls,
         mock_minio_handler,
         mock_mail_info
     ):
-        mock_open.return_value = BytesIO(b"raw email")
-
         submission = self._submission(submitted=False)
 
         fake_instance = MagicMock()
         fake_instance.mail_id = "mail-db-id"
         fake_instance.reportedBy = None
 
-        mock_msg_from_binary.return_value = MagicMock()
-        mock_parse_email.return_value = "parsed-mail"
+        mock_load_email_data.return_value = "parsed-mail"
         mock_email_handler_cls.return_value.handle_mail.return_value = fake_instance
 
         result = self.service.process_single_email(submission)

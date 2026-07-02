@@ -11,6 +11,25 @@ from url_process.url_utils.url_handler import URLHandler
 fetch_mail_logger = logging.getLogger("tasp.cron.fetch_and_process_emails")
 
 
+def _sender_domain_for_case(case) -> str | None:
+    """Extract the registered domain of the sender from a mail-origin case.
+    Returns None if not available (web submit, missing fields, any error)."""
+    try:
+        mail = getattr(getattr(case, "fileOrMail", None), "mail", None)
+        if mail is None:
+            return None
+        mail_from = getattr(mail, "mail_from", None) or ""
+        if "@" not in mail_from:
+            return None
+        host = mail_from.rsplit("@", 1)[1].strip().rstrip(">").strip()
+        if not host:
+            return None
+        from url_process.url_utils.url_planner import _registered_domain_lower
+        return _registered_domain_lower(host) or None
+    except Exception:
+        return None
+
+
 class ArtifactJobLauncherService:
     """
     Service to launch Cortex jobs for various artifact types.
@@ -64,14 +83,16 @@ class ArtifactJobLauncherService:
         return self
 
     def dispatch_pending(self, case) -> list:
-        """
-        Replay queued dispatch intents now that Case exists. Returns the
+        """Replay queued dispatch intents now that Case exists. Returns the
         flat list of Cortex job IDs returned across all dispatches.
         Intents are consumed (cleared) on success.
         """
+        from url_process.url_utils.url_planner import filter_dispatch_intents
         job_ids: list = []
         cortex = CortexJob()
-        for value, data_type in self.pending_dispatch_intents:
+        sender_domain = _sender_domain_for_case(case)
+        intents = filter_dispatch_intents(self.pending_dispatch_intents, sender_domain=sender_domain)
+        for value, data_type in intents:
             try:
                 job_ids.extend(cortex.launch_cortex_jobs(value, data_type, case=case))
             except Exception as e:

@@ -1,4 +1,3 @@
-# misp/objects.py
 """
 MISP object builders.
 """

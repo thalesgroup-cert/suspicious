@@ -1,4 +1,3 @@
-# analyzers_services/ai/service.py
 """
 AI mail analyzer — scores a mail with the AI model and creates/updates
 a TheHive campaign alert when the mail is considered dangerous.
@@ -127,8 +126,8 @@ class AnalyzerAI(BaseAnalyzer):
     def _apply_base_scoring(self, response: Dict[str, Any]) -> Dict[str, Any]:
         if self.summary:
             try:
-                response["score"]      = int(round(float(self.summary.get("malscore",      5))))
-                response["confidence"] = int(round(float(self.summary.get("confidence",    0)) * 10))
+                response["score"]      = round(float(self.summary.get("malscore",      5)))
+                response["confidence"] = round(float(self.summary.get("confidence",    0)) * 10)
                 response["level"]      = str(self.summary.get("classification", "info")).lower()
             except (TypeError, ValueError) as exc:
                 logger.warning("Could not parse AI summary scores: %s", exc)

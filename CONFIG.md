@@ -18,7 +18,7 @@ This document describes every configuration file and environment variable requir
 >
 > | Setting | Rule |
 > |---|---|
-> | `settings.json` `database.password` | must equal `.env` `MYSQL_PASSWORD` (no Vault) — [§2.4](#24-database) |
+> | `settings.json` `database.password` | must equal `.env` `MYSQL_PASSWORD` (no Vault) — [§2.5](#25-database) |
 > | `settings.json` `app.debug` | `true` for plain HTTP on `localhost`; `false` forces HTTPS via Traefik — [§2.1](#21-core-application) |
 > | `settings.json` `app.allowed_hosts` | include `DOMAIN_CORP`, or the Traefik path returns `DisallowedHost` — [§2.1](#21-core-application) |
 > | `.env` `CORTEX_PATH` | absolute path when running Cortex — [§1.7](#17-local-paths) |
@@ -84,7 +84,7 @@ MYSQL_ROOT_PASSWORD="your_db_root_password"
 > 'suspicious'`. To reset for a fresh start (this **erases all data**):
 > `docker compose rm -sf db_suspicious && docker volume rm suspicious_db_suspicious_data`.
 >
-> `MYSQL_PASSWORD` must match `settings.json` → `database.password` (see [§2.4](#24-database)).
+> `MYSQL_PASSWORD` must match `settings.json` → `database.password` (see [§2.5](#25-database)).
 
 ### 1.5 MinIO / RustFS Credentials
 
@@ -197,7 +197,27 @@ Assets accept either a `data:image/...;base64,...` string or an `https://` URL. 
 |-----|-------------|
 | `dual_storage_write` | Write artifacts to both local storage and MinIO simultaneously |
 
-### 2.4 Database
+### 2.4 URL Analysis
+
+```json
+"url_analysis": {
+    "enabled": true,
+    "max_per_domain": 5,
+    "reuse_ttl_days": 7,
+    "shortener_domains": ["bit.ly", "tinyurl.com", "t.co", "goo.gl", "ow.ly"],
+    "suspicious_tlds": ["zip", "mov", "xyz", "top", "click"]
+}
+```
+
+| Key | Type | Default | Description |
+|-----|------|---------|-------------|
+| `enabled` | bool | `true` | Kill-switch for the URL analysis planner. Set `false` to disable URL planning globally without removing configuration. |
+| `max_per_domain` | int | `5` | Maximum number of URLs analyzed per registered domain per case. Lowest-interestingness URLs beyond this cap are marked `SKIPPED`. |
+| `reuse_ttl_days` | int | `7` | Cross-case result reuse window in days. A URL whose canonical key matches a prior URL with a fresh `AnalyzerReport` within this window is marked `REUSED` instead of re-analyzed. |
+| `shortener_domains` | list | `["bit.ly", "tinyurl.com", "t.co", "goo.gl", "ow.ly"]` | Known URL-shortener hostnames. Matching URLs receive a +30 interestingness boost because their final destination is unknown. Overrides the built-in list when non-empty. |
+| `suspicious_tlds` | list | `["zip", "mov", "xyz", "top", "click"]` | TLDs associated with phishing and abuse. URLs on these TLDs receive a +20 interestingness boost. Overrides the built-in list when non-empty. |
+
+### 2.5 Database
 
 ```json
 "database": {
@@ -221,7 +241,7 @@ Assets accept either a `data:image/...;base64,...` string or an `https://` URL. 
 database password from `settings.json` at boot when `VAULT_ADDR` is unset. A
 mismatch gives `Access denied for user 'suspicious'`.
 
-### 2.5 Storage (MinIO / RustFS)
+### 2.6 Storage (MinIO / RustFS)
 
 ```json
 "storage": {
@@ -232,7 +252,8 @@ mismatch gives `Access denied for user 'suspicious'`.
         "secret_key": "MINIO_SECRET_KEY",
         "secure": false,
         "auto_create_bucket": true,
-        "media_bucket": "suspicious-media"
+        "media_bucket": "suspicious-media",
+        "fast_metadata": false
     }
 }
 ```
@@ -242,7 +263,25 @@ does **not** require the RustFS service — handy for a minimal dev run. Set
 `"backend": "s3"` to use object storage; then `secret_key` here must match the
 RustFS credentials in `.env` (`MINIO_ROOT_PASSWORD`), and RustFS must be running.
 
-### 2.6 Integrations
+#### Feeder fast metadata
+
+`fast_metadata` (default `false`) controls the email-ingestion fast path. The
+email-feeder always writes a per-email `email.json` (parsed addresses, subject,
+body, headers, attachment sha256) next to each `.eml`. When `fast_metadata` is
+`true`, the backend builds its `EmailDataModel` directly from that JSON —
+sha256-verified against the on-disk attachments — instead of re-opening and
+re-parsing the `.eml`. Any validation error, sha256 mismatch, or missing field
+falls back to `parse_email`, so the worst case equals the legacy behavior.
+
+| Value | Behavior |
+|---|---|
+| `false` (default) | Backend always re-parses the `.eml` (legacy). |
+| `true` | Backend reads `email.json`; falls back to `parse_email` on any mismatch. |
+
+Enable only after end-to-end parity (fast path vs `parse_email` produce
+identical `Mail` rows) is green in staging.
+
+### 2.7 Integrations
 
 #### Cortex (required for analyzers)
 
@@ -344,7 +383,7 @@ Enable to automatically create cases/alerts in TheHive from Suspicious verdicts.
 
 Allows pushing indicators of compromise to one or more MISP instances.
 
-### 2.7 Authentication
+### 2.8 Authentication
 
 ```json
 "authentication": {
@@ -368,7 +407,7 @@ Configure either OIDC or LDAP (or both).
 
 **LDAP TLS verification.** `verify_ssl` defaults to `true` (`OPT_X_TLS_DEMAND` — full cert + hostname check). Setting it to `false` downgrades to `OPT_X_TLS_NEVER` and exposes bind credentials to any attacker on the network path; the boot logger emits a `WARNING` so the downgrade is visible in `make logs`. Use `false` only in local dev against a self-signed test LDAP, never in production. To support an internal CA, mount the CA bundle into the container and point libldap at it via the system trust store rather than disabling verification.
 
-### 2.8 Company Domains
+### 2.9 Company Domains
 
 ```json
 "domains": ["testgroup.com"]
@@ -376,7 +415,7 @@ Configure either OIDC or LDAP (or both).
 
 Used to identify internal senders, auto-create users, and reduce false positives on domain matching.
 
-### 2.9 Email & Notification
+### 2.10 Email & Notification
 
 Controls SMTP settings, email content, links, social icons, and per-template logos.
 
@@ -440,7 +479,7 @@ Controls SMTP settings, email content, links, social icons, and per-template log
 | `templates.*` | Subject line templates. `{case_id}` and `{result}` are interpolated at send time |
 | `logos.*` | Per-template logos. Accept `data:image/png;base64,...`, `data:image/svg+xml;base64,...`, or `https://` URLs. Outlook-safe rendering is handled automatically |
 
-### 2.10 Observability
+### 2.11 Observability
 
 ```json
 "observability": {
@@ -699,7 +738,7 @@ falls back to it on a backend blip; with no cache and no backend it exits
 immediately. As a result, the `storage`, `outgoing-mail`, and `branding`
 blocks have been removed from `email-feeder/config.json` — that file now
 holds only `mail-connectors`, `working-path`, and polling settings
-(see [§3](#3-email-feederconfigurejson--email-ingestion-service)).
+(see [§3](#3-email-feederconfigjson-email-ingestion-service)).
 
 ---
 
@@ -729,7 +768,7 @@ make createsuperuser
 
 The full stack starts: web UI, API, database, email-feeder, Cortex, RustFS,
 Elasticsearch, ChromaDB, Traefik, and Vault. `make seed-config` loads the
-non-secret runtime config into the database (see [Runtime config + secrets](#runtime-config--secrets-db--vault)).
+non-secret runtime config into the database (see [Runtime config + secrets](#runtime-config-secrets-db-vault)).
 See [INSTALL.md](./INSTALL.md) for the step-by-step walkthrough and verification.
 
 ---

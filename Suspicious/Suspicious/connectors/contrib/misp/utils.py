@@ -1,4 +1,3 @@
-# misp/utils.py
 """
 MISP utility helpers.
 """

@@ -1,5 +1,5 @@
-mkdocs-material==9.5.49
-mkdocstrings[python]==0.27.0
-mkdocs-include-markdown-plugin==7.1.2
+mkdocs-material==9.7.6
+mkdocstrings[python]==1.0.4
+mkdocs-include-markdown-plugin==7.3.0
 mkdocs-render-swagger-plugin==0.1.2
-pymdown-extensions==10.21.3
+pymdown-extensions==11.0

@@ -1,4 +1,3 @@
-# score_process/scoring/cortex_analyzers/analyzers.py
 """
 Analyzer factory — maps analyzer names to implementation classes.
 """

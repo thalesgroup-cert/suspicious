@@ -45,6 +45,7 @@ class HealthView(APIView):
 
     permission_classes = [AllowAny]
     authentication_classes: list = []
+    throttle_classes: list = []  # monitoring polls this frequently — don't throttle
 
     def get(self, request, *args, **kwargs):
         db_ok = _check_db()

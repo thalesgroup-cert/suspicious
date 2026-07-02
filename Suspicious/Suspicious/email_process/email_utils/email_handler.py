@@ -37,7 +37,7 @@ class MailAddressHandler:
 
             return mail_instance
         except Exception as e:
-            fetch_mail_logger.error(f"Error handling mail address: {str(e)}")
+            fetch_mail_logger.error(f"Error handling mail address: {e!s}")
             return None
 
 
@@ -61,7 +61,7 @@ def _create_or_update_domain(domain):
             domain_instance.save()
         return domain_instance
     except Exception as e:
-        fetch_mail_logger.error(f"Error creating or updating domain: {str(e)}")
+        fetch_mail_logger.error(f"Error creating or updating domain: {e!s}")
         return None
 
 
@@ -107,7 +107,7 @@ def get_domain(mail):
             fetch_mail_logger.warning(f"Error: Invalid domain type returned: {domain_type}")
             return None
     except Exception as e:
-        fetch_mail_logger.error(f"Error handling mail address: {str(e)}")
+        fetch_mail_logger.error(f"Error handling mail address: {e!s}")
         return None
 
 def is_valid_email(email):

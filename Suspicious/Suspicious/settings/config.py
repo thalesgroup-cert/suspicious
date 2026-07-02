@@ -82,7 +82,15 @@ def get_config(key: str, default: Any = None) -> Any:
     from settings.models import RuntimeConfig
 
     try:
-        row = RuntimeConfig.objects.filter(key=key).first()
+        # A section that changed scope between releases can leave duplicate rows
+        # under different scopes for the same key. Prefer the canonical-scope row,
+        # then fall back to the newest, so the lookup is deterministic instead of
+        # returning an arbitrary (possibly stale) row via an unordered .first().
+        qs = RuntimeConfig.objects.filter(key=key)
+        row = (
+            qs.filter(scope=_scope_for_section(key)).order_by("-id").first()
+            or qs.order_by("-id").first()
+        )
     except DatabaseError:
         logger.warning("DB unreachable reading runtime config '%s'; using default", key)
         return default

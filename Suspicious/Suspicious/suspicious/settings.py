@@ -1,4 +1,3 @@
-# suspicious/settings.py
 #
 # Production-ready settings for the Suspicious platform.
 #
@@ -14,10 +13,6 @@
 # All sensitive values (SECRET_KEY, DB password, OIDC secret, LDAP bind
 # password) must live in settings.json and never be committed to version
 # control.  The file is mounted at runtime by your container orchestrator.
-#
-# ---------------------------------------------------------------------------
-# Imports
-# ---------------------------------------------------------------------------
 
 import json
 import sys
@@ -54,7 +49,7 @@ with open(CONFIG_PATH) as _f:
 # Validate against the SuspiciousConfig schema so missing or malformed
 # required keys (SECRET_KEY, DB credentials, …) fail at boot with a
 # readable error instead of much later at the first call site.
-from suspicious.config_schema import validate_config, ConfigValidationError  # noqa: E402
+from suspicious.config_schema import validate_config, ConfigValidationError
 
 try:
     _config = validate_config(_config, source=CONFIG_PATH)
@@ -91,7 +86,7 @@ FILES_BASE_DIR = Path(__file__).resolve().parent.parent
 # Security
 # ---------------------------------------------------------------------------
 
-from suspicious.secrets import get_secret  # noqa: E402
+from suspicious.secrets import get_secret
 
 SECRET_KEY = get_secret("app.secret_key", fail_fast=True)
 
@@ -134,7 +129,7 @@ if not DEBUG:
 
 # Fail fast on insecure configuration so a misconfigured production deploy
 # refuses to start instead of running silently exposed.
-from django.core.exceptions import ImproperlyConfigured  # noqa: E402
+from django.core.exceptions import ImproperlyConfigured
 
 if SECRET_KEY in ("", "CHANGE_ME"):
     raise ImproperlyConfigured(
@@ -452,9 +447,19 @@ REST_FRAMEWORK = {
         ["rest_framework.renderers.JSONRenderer"]
         + (["rest_framework.renderers.BrowsableAPIRenderer"] if DEBUG else [])
     ),
+    # Global abuse ceiling. Views with their own throttle_classes (login,
+    # service_config) override these; the cortex webhook + health check opt out
+    # via throttle_classes=[] since they're machine callers, not user traffic.
+    "DEFAULT_THROTTLE_CLASSES": (
+        "rest_framework.throttling.UserRateThrottle",
+        "rest_framework.throttling.AnonRateThrottle",
+    ),
     "DEFAULT_THROTTLE_RATES": {
         "login": "5/min",
         "service_config": "30/min",
+        # Generous enough for the SPA's XHR bursts, low enough to bound scraping.
+        "user": "3000/hour",
+        "anon": "100/hour",
     },
     "DEFAULT_FILTER_BACKENDS": [
         "django_filters.rest_framework.DjangoFilterBackend",
@@ -605,7 +610,7 @@ SUBMISSION_ELEVATED_GROUPS = ("CERT", "CISO", "Admin")
 # Celery — broker (redis_broker container) + result backend (MariaDB)
 # ---------------------------------------------------------------------------
 
-from celery.schedules import crontab  # noqa: E402 — intentional mid-file import for BEAT_SCHEDULE
+from celery.schedules import crontab  # intentional mid-file import for BEAT_SCHEDULE
 
 _redis_broker_host = _redis_cfg.get("broker_host", "redis_broker")
 

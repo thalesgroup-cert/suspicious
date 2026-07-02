@@ -1,4 +1,3 @@
-# analyzers_services/ai/models.py
 """
 Typed models for the AI analyzer pipeline.
 

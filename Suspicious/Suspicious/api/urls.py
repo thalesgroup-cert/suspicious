@@ -64,6 +64,7 @@ from api.views.connectors import (
     ConnectorStateView,
     ConnectorTestView,
 )
+from api.views.url_analysis import SubmissionUrlAnalyzeView
 
 urlpatterns = [
     path("schema/", SpectacularAPIView.as_view(), name="schema"),
@@ -118,6 +119,8 @@ urlpatterns = [
     path("submissions/", SubmissionListView.as_view(), name="submissions-list"),
     path("submissions/<int:submission_id>/", SubmissionDetailsView.as_view(), name="submission-details"),
     path("submissions/<int:submission_id>/challenge/", SubmissionChallengeView.as_view(), name="submission-challenge"),
+    path("submissions/<int:submission_id>/urls/<int:url_id>/analyze/",
+         SubmissionUrlAnalyzeView.as_view(), name="submission-url-analyze"),
 
     # Settings
     path("settings/list/<str:section>/", SettingsListView.as_view(), name="settings-list"),

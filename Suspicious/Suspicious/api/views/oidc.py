@@ -1,4 +1,3 @@
-# api/views/oidc_views.py
 #
 # OIDC Authorization Code flow with:
 #   • PKCE (S256)                    — prevents auth code interception
@@ -58,10 +57,6 @@ except ImportError:
 
 logger = logging.getLogger(__name__)
 User = get_user_model()
-
-# ---------------------------------------------------------------------------
-# Constants
-# ---------------------------------------------------------------------------
 
 _DISCOVERY_CACHE_KEY = "oidc:discovery"
 _DISCOVERY_CACHE_TTL = 3600  # 1 hour — re-fetch if provider rotates keys
@@ -215,7 +210,8 @@ class OIDCCallbackView(APIView):
 
     Validates state → exchanges code (with PKCE verifier) → validates
     id_token signature via JWKS → verifies nonce → gets-or-creates user
-    → issues Knox token → redirects React SPA with token in URL fragment.
+    → issues a Knox token and sets it as an httpOnly cookie, then redirects
+    the SPA to /login?sso=1. The token never appears in the URL or in logs.
     """
     permission_classes = [AllowAny]
 
@@ -379,12 +375,27 @@ def _validate_id_token(
     """
     if _PYJWT_AVAILABLE:
         return _validate_id_token_pyjwt(id_token_raw, discovery, session_nonce)
-    else:
-        logger.warning(
-            "PyJWT not installed — falling back to unverified id_token decode. "
-            "Install PyJWT[cryptography] for production use."
+
+    # PyJWT is a pinned dependency, so this branch should never run in a real
+    # deployment. If it does (e.g. a stripped-down image), the only thing the
+    # fallback can do is decode the token WITHOUT verifying the provider's
+    # signature — i.e. accept a forged id_token. That is acceptable for local
+    # development but must never authenticate a user in production. Fail closed
+    # when DEBUG is off rather than silently downgrading to unverified tokens.
+    if not settings.DEBUG:
+        logger.error(
+            "PyJWT not installed and DEBUG is off — refusing to validate "
+            "OIDC id_token without signature verification. "
+            "Install PyJWT[cryptography]."
         )
-        return _validate_id_token_fallback(id_token_raw, session_nonce)
+        return None
+
+    logger.warning(
+        "PyJWT not installed — falling back to unverified id_token decode. "
+        "DEBUG is on so this is permitted, but install PyJWT[cryptography] "
+        "for any non-development use."
+    )
+    return _validate_id_token_fallback(id_token_raw, session_nonce)
 
 
 def _validate_id_token_pyjwt(

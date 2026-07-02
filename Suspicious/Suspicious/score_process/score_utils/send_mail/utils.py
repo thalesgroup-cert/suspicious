@@ -1,8 +1,24 @@
 import time
 import logging
+from pathlib import Path
 from typing import Callable
 
+from jinja2 import Environment, FileSystemLoader, select_autoescape
+
 logger = logging.getLogger("tasp.cron.update_ongoing_case_jobs")
+
+_TEMPLATES_DIR = Path(__file__).parent / "templates"
+
+
+def load_email_template(template_name: str):
+    """Load a Jinja2 email template from the send_mail templates dir with
+    HTML autoescaping. Shared by every email service so the Environment is
+    configured in one place."""
+    env = Environment(
+        loader=FileSystemLoader(_TEMPLATES_DIR),
+        autoescape=select_autoescape(["html", "xml"]),
+    )
+    return env.get_template(template_name)
 
 
 def build_user_infos(user) -> str:

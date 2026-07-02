@@ -1,4 +1,3 @@
-# mail_service/mail_notification_service.py
 import logging
 
 from profiles.models import UserProfile
@@ -69,6 +68,22 @@ class MailNotificationService:
         if user.email == self.suspicious_email:
             return None
         return user.email
+
+    def _reporter_address(self, mail, user) -> str | None:
+        """Recipient for reporter notifications.
+
+        Prefer the address captured at submission (``Mail.reportedBy``): the
+        resolved ``user`` may be a fallback (e.g. an unknown external reporter
+        mapped to the system user), which would otherwise suppress the email.
+        Never notify the system mailbox itself.
+        """
+        related = getattr(mail, "mail", None)
+        addr = (getattr(related, "reportedBy", "") or "").strip()
+        if not addr:
+            addr = (getattr(user, "email", "") or "").strip() if user else ""
+        if not addr or addr == self.suspicious_email:
+            return None
+        return addr
 
     def _user_allows(self, user, field: str) -> bool:
         profile = UserProfile.objects.filter(user=user).first()
@@ -162,10 +177,13 @@ class MailNotificationService:
             return
 
         user = mail.user
-        if not self._can_notify(user, "wants_results"):
+        recipient = self._reporter_address(mail, user)
+        if not recipient:
+            return
+        if user and not self._user_allows(user, "wants_results"):
+            log_event(logging.INFO, "email_opt_out", user_id=user.id, field="wants_results")
             return
 
-        recipient = user.email
         subject = self.subjects.final.format(case_id=case.id)
         user_infos = build_user_infos(user)
         profile = self._get_profile(user)

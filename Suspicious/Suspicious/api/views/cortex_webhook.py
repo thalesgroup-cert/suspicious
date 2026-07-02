@@ -51,6 +51,7 @@ def _find_cases_for_job(job_id: str) -> list[int]:
 class CortexWebhookView(APIView):
     authentication_classes = []  # Cortex uses a shared secret, not user sessions
     permission_classes = []
+    throttle_classes = []  # machine caller (one POST per analyzer job) — never rate-limit
 
     def post(self, request: Request) -> Response:
         # ── Authenticate ────────────────────────────────────────────────────

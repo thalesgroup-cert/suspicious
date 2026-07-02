@@ -1,4 +1,3 @@
-# score_process/scoring/updating.py
 """
 Score update helpers for case artifacts.
 """
@@ -51,7 +50,7 @@ def update_scores(
         else:
             raw_score = getattr(obj, score_attr)
             try:
-                current_score = int(round(raw_score))
+                current_score = round(raw_score)
             except (TypeError, ValueError):
                 update_cases_logger.error(
                     "Non-numeric score attribute %r=%r on %r — cannot set level.",

@@ -23,6 +23,7 @@ from __future__ import annotations
 import email
 import io
 import logging
+import re
 from email.message import EmailMessage
 from email.policy import default as email_default_policy
 from html import escape
@@ -45,6 +46,17 @@ _RENDER_WIDTH_PX = 900
 # Headers we surface in the preview. Anything else is dropped so the
 # image stays compact and free of long Received-chains.
 _VISIBLE_HEADERS = ("From", "To", "Cc", "Subject", "Date", "Reply-To")
+
+# Remote stylesheets are the one fetch vector no-images / disable-local-file-access
+# don't close, so a <link>/@import in a phishing body could still beacon the render
+# host. Strip them before rasterising.
+_REMOTE_CSS_RE = re.compile(
+    r"<link\b[^>]*>|@import\b[^;]*;", re.IGNORECASE | re.DOTALL
+)
+
+
+def _strip_remote_css(html: str) -> str:
+    return _REMOTE_CSS_RE.sub("", html)
 
 
 class Eml2PngRenderer:
@@ -134,9 +146,11 @@ class Eml2PngRenderer:
         """Wrap the parsed message in a minimal, safe HTML document.
 
         We escape every header value, prefer the HTML body when present,
-        and fall back to the text/plain body wrapped in <pre>. Remote
-        resources are blocked at imgkit time via --disable-external-links
-        / --no-images flags to keep rendering offline and fast.
+        and fall back to the text/plain body wrapped in <pre>. The body
+        HTML is rendered as-is but rasterised to a PNG with remote images,
+        JavaScript and local-file access all disabled at imgkit time (see
+        _render_html_to_png) — so it cannot phone home, read host files, or
+        execute script. Only remote CSS <link>/@import can still fetch.
         """
         header_rows = []
         for name in _VISIBLE_HEADERS:
@@ -220,7 +234,7 @@ class Eml2PngRenderer:
 
         if html_part is not None:
             try:
-                return html_part.get_content()
+                return _strip_remote_css(html_part.get_content())
             except Exception:
                 logger.exception("Failed to decode HTML body; falling back to text/plain")
 
@@ -268,12 +282,24 @@ class Eml2PngRenderer:
 # ---------------------------------------------------------------------------
 
 def _build_minio_client():
-    """Build a Minio client from Django settings, returning None on failure.
+    """Build the MinIO client used to store previews, or None on failure.
 
-    Reads the same MINIO_STORAGE_* values that django-minio-storage uses,
-    so previews live in the same MinIO instance as every other object the
-    platform stores.
+    Prefer the platform-wide client (`storage.s3` runtime config), so
+    previews live in the same MinIO instance as every other object — the
+    same source the rest of the backend and the preview *fetch* path use.
+    Falls back to legacy django-minio-storage `MINIO_STORAGE_*` settings
+    for older deployments that still configure storage that way.
     """
+    try:
+        from common.clients import get_s3_client
+        client = get_s3_client()
+        if client is not None:
+            return client
+    except Exception:
+        logger.exception(
+            "get_s3_client failed for previews; falling back to MINIO_STORAGE_*"
+        )
+
     endpoint = getattr(settings, "MINIO_STORAGE_ENDPOINT", None)
     access_key = getattr(settings, "MINIO_STORAGE_ACCESS_KEY", None)
     secret_key = getattr(settings, "MINIO_STORAGE_SECRET_KEY", None)

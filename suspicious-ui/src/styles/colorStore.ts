@@ -1,4 +1,3 @@
-// src/styles/colorStore.ts
 //
 // Central store for semantic status / result colors.
 //

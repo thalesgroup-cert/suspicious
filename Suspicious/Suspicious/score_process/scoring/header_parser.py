@@ -1,4 +1,3 @@
-# score_process/scoring/parse_email_headers.py
 """
 Email header parsing utilities.
 """

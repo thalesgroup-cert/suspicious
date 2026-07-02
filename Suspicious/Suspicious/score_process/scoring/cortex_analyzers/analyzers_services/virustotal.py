@@ -1,4 +1,3 @@
-# analyzers_services/virustotal.py
 """
 VirusTotal (VT) analyzer — scores a file or URL based on the
 detection ratio across VT engines.

@@ -1,4 +1,3 @@
-// src/shared/hooks/useHudModes.ts
 import * as React from "react";
 
 const KEY_PIXEL = "ui.hud.pixel";

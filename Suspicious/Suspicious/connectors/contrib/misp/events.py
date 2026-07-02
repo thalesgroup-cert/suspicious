@@ -1,4 +1,3 @@
-# misp/events.py
 """
 MISP event manager — get-or-create logic for case and monthly events.
 """

@@ -1,4 +1,3 @@
-# analyzers_services/threatgrid.py
 """
 ThreatGrid / Sandbox analyzer — pass-through (base class handles scoring).
 """

@@ -1,4 +1,3 @@
-// src/shared/components/Badge.tsx
 //
 // Low-level chip component.
 //

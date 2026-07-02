@@ -117,6 +117,7 @@ For the default setup, here is a possible matching `config.json` file :
   },
   "working-path": "/tmp/suspicious",
   "timer-inbox-emails": 10,
+  "imap-idle": true,
   "s3": {
     "endpoint": "rustfs:9000",
     "access_key": "minioadmin",

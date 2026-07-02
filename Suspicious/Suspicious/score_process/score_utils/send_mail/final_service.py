@@ -1,8 +1,4 @@
-# mail_service/final_service.py
 from urllib.parse import urlparse
-from pathlib import Path
-
-from jinja2 import Environment, FileSystemLoader, select_autoescape
 
 from .models import FinalMailServiceConfigSocial
 from .send_email_service import SendMailService
@@ -10,8 +6,7 @@ from .email_theme import THEME_PALETTES, resolve_semantic_colors
 from .email_logo import resolve_logo
 from case_handler.models import CaseChallengeToken
 from .social_logos import SOCIAL_LOGOS
-
-TEMPLATES_DIR = Path(__file__).parent / "templates"
+from .utils import load_email_template
 
 # Maps case.results (internal Django value) to the semantic color key in the
 # email theme context — so the verdict badge always uses the user's own colors.
@@ -98,11 +93,7 @@ class FinalEmailService:
 
     @staticmethod
     def _load_template():
-        env = Environment(
-            loader=FileSystemLoader(TEMPLATES_DIR),
-            autoescape=select_autoescape(["html", "xml"]),
-        )
-        return env.get_template("final_email.jinja2")
+        return load_email_template("final_email.jinja2")
 
     # ── rendering ──────────────────────────────────────────────────────────
 
@@ -250,23 +241,10 @@ class FinalEmailService:
 
     def _send_action(self, user: str, subject: str) -> None:
         html = self.render_html(subject=subject)
-
-        smtp = self.config.get("smtp", {})
-        send_mail_service = SendMailService(
-            host=smtp.get("server", ""),
-            port=smtp.get("port", 587),
-            login=smtp.get("username", ""),
-            password=smtp.get("password", ""),
-        )
-
-        send_mail_service.connect()
-        if smtp.get("tls"):
-            send_mail_service.start_tls()
-        send_mail_service.login()
-        send_mail_service.publish_email(
-            subject=subject,
+        SendMailService.send_html(
+            self.config.get("smtp", {}),
             sender=self.sender,
             recipient=user,
+            subject=subject,
             html=html,
         )
-        send_mail_service.close()

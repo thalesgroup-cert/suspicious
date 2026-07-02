@@ -1,4 +1,3 @@
-// src/features/profile/SemanticChips.tsx
 //
 // Two chip components that read colors from the central colorStore:
 //

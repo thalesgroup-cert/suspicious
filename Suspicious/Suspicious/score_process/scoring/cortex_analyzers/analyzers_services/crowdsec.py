@@ -1,4 +1,3 @@
-# analyzers_services/crowdsec.py
 """
 CrowdSec analyzer — scores an IP based on its CrowdSec threat level.
 """

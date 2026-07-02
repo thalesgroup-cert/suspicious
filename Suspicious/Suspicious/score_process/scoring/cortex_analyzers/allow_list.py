@@ -1,4 +1,3 @@
-# score_process/scoring/cortex_analyzers/allow_list.py
 """
 Allow-list checks for files, filetypes, URLs, and domain IOCs.
 """

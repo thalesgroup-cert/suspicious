@@ -194,7 +194,6 @@ GitHub Actions runs four workflows plus Dependabot under `.github/`.
 | Django API | `ghcr.io/thalesgroup-cert/suspicious` |
 | Frontend | `ghcr.io/thalesgroup-cert/suspicious-ui` |
 | Email feeder | `ghcr.io/thalesgroup-cert/suspicious-feeder` |
-| AIMailAnalyzer | `ghcr.io/thalesgroup-cert/suspicious-aimailanalyzer` |
 
 Deployment is manual via `deployment/Makefile` (`make deploy`); CI never holds
 production credentials.

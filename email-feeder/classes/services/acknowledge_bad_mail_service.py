@@ -7,7 +7,6 @@ import jinja2
 
 import classes.models.configs.internals.mail
 import classes.models.mail
-import classes.models.mail_tags
 import classes.services.send_mail_service
 import classes.services.try_callback_service
 
@@ -194,7 +193,17 @@ class AcknowledgeBadMailService:
     @staticmethod
     def __load_template() -> jinja2.Template:
         file_system_template_loader = jinja2.FileSystemLoader(TEMPLATES_DIR)
-        env = jinja2.Environment(loader=file_system_template_loader)
+        # autoescape ON: the template renders attacker-controlled values
+        # (recipient == From-header address) and config-supplied URLs into
+        # HTML/href context. Without escaping this is an HTML-injection sink
+        # in mail emitted from the CERT's own SMTP server.
+        env = jinja2.Environment(
+            loader=file_system_template_loader,
+            autoescape=jinja2.select_autoescape(
+                enabled_extensions=("html", "jinja2", "jinja", "j2"),
+                default_for_string=True,
+            ),
+        )
         return env.get_template("acknowledge_bad_mail.jinja2")
 
     def get_html(self, subject: str, sender: str, recipient: str, infos: str) -> str:
@@ -275,37 +284,17 @@ class AcknowledgeBadMailService:
         else:
             self.__logger.error("Failed to send bad-submission acknowledgement.")
 
-    def process_single_email(
-        self,
-        mail: classes.models.mail.SuspiciousMailResponse,
-        case_path: pathlib.Path,
+    def send_bad_mail_ack(
+        self, mail: classes.models.mail.SuspiciousMailResponse
     ) -> None:
+        """Acknowledge a submission that carried no attached mail.
+
+        Sends the acknowledge-bad-mail email to the original sender. The caller
+        is responsible for NOT uploading the submission to S3.
+        """
+        sender = mail.original_mail.from_address or "UnknownSender"
         self.__logger.info(
-            "Processing mail ID: %s from sender: %s with case path: %s",
-            mail.id,
-            mail.original_mail.from_address or "UnknownSender",
-            case_path,
+            "Mail %s: no attached mail; sending bad-submission ack to %s",
+            mail.id, sender,
         )
-
-        if not case_path.is_dir():
-            self.__logger.error(
-                "Mail %s: Case path '%s' does not exist or is not a directory. Skipping.",
-                mail.id, case_path,
-            )
-            return
-
-        if mail.tags == classes.models.mail_tags.MailTag.RESEND:
-            self.__logger.info("Mail %s is tagged for resend.", mail.id)
-            self.send_user_acknowledgement_email(
-                mail.original_mail.from_address or "UnknownSender"
-            )
-            self.__logger.info(
-                "Mail %s: Notified %s.",
-                mail.id,
-                mail.original_mail.from_address or "UnknownSender",
-            )
-        else:
-            self.__logger.info(
-                "Mail %s: Standard processing. Uploading case files from '%s'.",
-                mail.id, case_path,
-            )
+        self.send_user_acknowledgement_email(sender)

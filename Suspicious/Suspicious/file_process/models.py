@@ -2,7 +2,11 @@ from django.db import models
 import uuid
 from hash_process.models import Hash
 
-class File(models.Model):
+from common.model_mixins import AllowListableMixin
+
+
+class File(AllowListableMixin, models.Model):
+    allowlist_score_fields = ("file_score", "file_confidence", "file_level")
     id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
     linked_hash = models.ForeignKey(Hash, on_delete=models.CASCADE, related_name='file')
     file_path = models.FileField(upload_to='files/')
@@ -19,15 +23,6 @@ class File(models.Model):
 
     def __str__(self):
         return self.file_path.name
-
-    def update_allow_listed(self):
-        """
-        Mark this File instance as allow_listed (safe).
-        """
-        self.file_score = 0
-        self.file_confidence = 100
-        self.file_level = "SAFE-ALLOW_LISTED"
-        self.save(update_fields=["file_score", "file_confidence", "file_level"])
 
 class HashFromFile(models.Model):
     id = models.AutoField(primary_key=True)

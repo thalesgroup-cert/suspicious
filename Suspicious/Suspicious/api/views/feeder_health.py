@@ -102,11 +102,17 @@ class FeederHealthView(APIView):
         last_poll_int = int(last_poll) if last_poll > 0 else None
         stale_seconds = max(0, now_ts - int(last_poll)) if last_poll > 0 else 0
 
-        # Feeder /health now reports a `status` (ok|degraded) plus per-
-        # subsystem checks (IMAP, MinIO). Surface both through the proxy
-        # so the UI can render finer-grained state without each client
-        # re-implementing the staleness logic.
-        feeder_status = data.get("status") or ("ok" if not last_poll_int else "ok")
+        # Our own staleness view: never polled, or last poll older than
+        # the threshold.
+        poll_is_stale = (
+            last_poll_int is None or stale_seconds > _FEEDER_STALE_THRESHOLD_S
+        )
+
+        # Feeder /health reports a `status` (ok|degraded) plus per-subsystem
+        # checks (IMAP, MinIO). Older feeder builds omit `status`, so derive
+        # it from our staleness view rather than blindly defaulting to "ok" —
+        # otherwise the badge reads "ok" while `stale` is True.
+        feeder_status = data.get("status") or ("degraded" if poll_is_stale else "ok")
         feeder_checks = data.get("checks") or {}
 
         payload.update({
@@ -119,11 +125,7 @@ class FeederHealthView(APIView):
             # poll is too old OR the feeder itself reports degraded —
             # the latter covers the case where IMAP is responding but
             # MinIO uploads have been failing.
-            "stale": (
-                last_poll_int is None
-                or stale_seconds > _FEEDER_STALE_THRESHOLD_S
-                or feeder_status == "degraded"
-            ),
+            "stale": poll_is_stale or feeder_status == "degraded",
             "feeder_status": feeder_status,
             "checks": feeder_checks,
             "error": None,

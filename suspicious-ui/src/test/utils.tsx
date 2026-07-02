@@ -50,8 +50,3 @@ export const mockMe = {
   theme: undefined,
   auto_seasonal: false,
 };
-
-export const mockMeBasic = {
-  ...mockMe,
-  groups: [],
-} as const;

@@ -3,7 +3,6 @@ import email
 import logging
 from typing import Optional
 
-from mail_feeder.email_parser.parser import parse_email
 from mail_feeder.web_submission.models import WebSubmissionConfig
 
 from mail_feeder.case_creator.creator import CaseCreatorService
@@ -31,18 +30,12 @@ class GlobalSubmissionService:
     """
     def process_single_email(self, submission: MailSubmissionData):
         with safe_execution(f"processing email {submission.email_id}"):
-            filepath = os.path.join(submission.workdir, submission.filename)
-
-            with open(filepath, "rb") as f:
-                raw_bytes = f.read()
-
-            msg = email.message_from_bytes(raw_bytes)
-
-            mail_instance = parse_email(
-                msg,
+            from mail_feeder.global_submission.fast_metadata import load_email_data
+            mail_instance = load_email_data(
                 submission.workdir,
+                submission.filename,
                 submission.email_id,
-                submission.user
+                getattr(submission, "reported_by", "") or "",
             )
 
             instance = EmailHandlerService().handle_mail(
@@ -60,6 +53,7 @@ class GlobalSubmissionService:
                     f"Email instance processing failed for {submission.email_id}"
                 )
                 return None
+            instance.reporterNote = getattr(submission, "reporter_note", "") or ""
             instance.save()
             # Handle post-processing based on submission type
             if submission.is_submitted:

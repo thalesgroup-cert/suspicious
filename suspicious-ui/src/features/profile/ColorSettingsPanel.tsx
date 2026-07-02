@@ -1,4 +1,3 @@
-// src/features/profile/ColorSettingsPanel.tsx
 //
 // Appearance settings panel for semantic colors.
 // Reads from colorStore (Zustand), persists to backend via React Query.

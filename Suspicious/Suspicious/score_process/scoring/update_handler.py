@@ -1,4 +1,3 @@
-# score_process/scoring/update_handler.py
 """
 Case result update, persistence, and notification.
 """

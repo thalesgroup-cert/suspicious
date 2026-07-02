@@ -1,3 +1,5 @@
+import copy
+
 from django.conf import settings
 from django.db import models
 from django.utils.translation import gettext_lazy as _
@@ -19,6 +21,25 @@ DEFAULT_SEMANTIC_COLORS = {
         "unknown":     {"main": "#64748B"},
     },
 }
+
+
+def merge_semantic_colors(stored: dict | None) -> dict:
+    """Overlay user-stored result/status colors on top of the defaults."""
+    base = copy.deepcopy(DEFAULT_SEMANTIC_COLORS)
+    stored = stored or {}
+    for group in ("result", "status"):
+        if group in stored and isinstance(stored[group], dict):
+            base[group].update(stored[group])
+    return base
+
+
+class SemanticColorsMixin:
+    """Adds get_semantic_colors() to profile models holding a
+    ``semantic_colors`` JSONField."""
+
+    def get_semantic_colors(self) -> dict:
+        return merge_semantic_colors(self.semantic_colors)
+
 
 class APIKey(models.Model):
     """
@@ -56,7 +77,7 @@ class Theme(models.TextChoices):
     AUTUMN = "autumn", _("Autumn")
     RENEE = "renee", _("Renée")
 
-class UserProfile(models.Model):
+class UserProfile(SemanticColorsMixin, models.Model):
     def default_semantic_colors():
         return DEFAULT_SEMANTIC_COLORS.copy()
     id = models.AutoField(primary_key=True)
@@ -80,21 +101,26 @@ class UserProfile(models.Model):
             "Each entry is {main: '#rrggbb'}."
         ),
     )
+    avatar = models.JSONField(
+        default=dict,
+        blank=True,
+        verbose_name=_("Avatar"),
+        help_text=_(
+            "DiceBear avatar config. Structure: {style: '<dicebear-style>', "
+            "seed: '<string>'}. Empty means fall back to initials."
+        ),
+    )
+    tour_completed = models.BooleanField(
+        default=False,
+        verbose_name=_("Guided tour completed"),
+        help_text=_("True once the user has seen the first-connection guided tour."),
+    )
     creation_date = models.DateTimeField(auto_now_add=True)
     last_update = models.DateTimeField(auto_now=True)
     def __str__(self):
         return self.user.username
-    def get_semantic_colors(self) -> dict:
-        """Same merge logic as UserProfile.get_semantic_colors."""
-        import copy
-        base = copy.deepcopy(DEFAULT_SEMANTIC_COLORS)
-        stored = self.semantic_colors or {}
-        for group in ("result", "status"):
-            if group in stored and isinstance(stored[group], dict):
-                base[group].update(stored[group])
-        return base
 
-class CISOProfile(models.Model):
+class CISOProfile(SemanticColorsMixin, models.Model):
     def default_semantic_colors():
         return DEFAULT_SEMANTIC_COLORS.copy()
     id = models.AutoField(primary_key=True)
@@ -119,16 +145,21 @@ class CISOProfile(models.Model):
             "Each entry is {main: '#rrggbb'}."
         ),
     )
+    avatar = models.JSONField(
+        default=dict,
+        blank=True,
+        verbose_name=_("Avatar"),
+        help_text=_(
+            "DiceBear avatar config. Structure: {style: '<dicebear-style>', "
+            "seed: '<string>'}. Empty means fall back to initials."
+        ),
+    )
+    tour_completed = models.BooleanField(
+        default=False,
+        verbose_name=_("Guided tour completed"),
+        help_text=_("True once the user has seen the first-connection guided tour."),
+    )
     creation_date = models.DateTimeField(auto_now_add=True)
     last_update = models.DateTimeField(auto_now=True)
     def __str__(self):
         return self.user.username
-    def get_semantic_colors(self) -> dict:
-        """Same merge logic as UserProfile.get_semantic_colors."""
-        import copy
-        base = copy.deepcopy(DEFAULT_SEMANTIC_COLORS)
-        stored = self.semantic_colors or {}
-        for group in ("result", "status"):
-            if group in stored and isinstance(stored[group], dict):
-                base[group].update(stored[group])
-        return base

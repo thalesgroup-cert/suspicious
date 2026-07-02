@@ -1,4 +1,3 @@
-# mail_service/email_theme.py
 """
 Maps a UserProfile's theme + semantic_colors to a flat dict of
 email-safe inline CSS values.

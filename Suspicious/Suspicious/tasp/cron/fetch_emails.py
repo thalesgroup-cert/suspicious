@@ -12,8 +12,10 @@ from minio.commonconfig import Tags
 
 from minio import Minio
 from common.clients import get_s3_client
-from .utils import safe_execution, load_config, ensure_dir
+from .utils import safe_execution, load_config, ensure_dir, _safe_object_name
 from mail_feeder.minio_submission.minio import MinioEmailService
+from tasp.cron.prefix_source import PrefixSource
+from mail_feeder import submission_contract as sc
 
 logger = logging.getLogger("tasp.cron.fetch_and_process_emails")
 
@@ -35,22 +37,6 @@ def _init_minio_client() -> Optional[Minio]:
     except Exception:
         logger.exception("MinIO client initialization failed")
         return None
-
-
-# ---------------------------------------------------------------------------
-# Path safety
-# ---------------------------------------------------------------------------
-
-def _safe_object_name(raw_name: str) -> str:
-    """
-    Sanitize a MinIO object name before using it as a filesystem path component.
-    Prevents path traversal via crafted object names (e.g. '../../etc/passwd').
-    Raises ValueError if the sanitized name is empty or escapes the prefix.
-    """
-    normalized = os.path.normpath(raw_name.replace("\\", "/")).lstrip("/")
-    if not normalized or normalized.startswith(".."):
-        raise ValueError(f"Unsafe MinIO object name rejected: {raw_name!r}")
-    return normalized
 
 
 # ---------------------------------------------------------------------------
@@ -166,6 +152,98 @@ def _write_manifest(
         logger.warning("Could not write local manifest copy to %s", local_path, exc_info=True)
 
 
+def _handoff_submission(bucket_path: str, submission_path: str, identifier: str, reported_by: str, processor, reporter_note: str = "", done_emails=frozenset(), on_email_done=None) -> None:
+    """Copy the wrapper into each email dir, archive it, hand to the processor.
+
+    Shared by the legacy bucket path and the new prefix path.
+
+    ``done_emails`` / ``on_email_done`` give the prefix path crash-safe
+    idempotency: an email dir already in ``done_emails`` is skipped, and
+    ``on_email_done(dir_name)`` is called after each successful hand-off so the
+    caller can durably record it. The legacy path passes neither (its
+    whole-bucket Status tag already gates reprocessing).
+    """
+    for entry in os.scandir(bucket_path):
+        if not (entry.is_dir() and EMAIL_DIR_PATTERN.match(entry.name)):
+            continue
+        if entry.name in done_emails:
+            logger.info("Skipping already-ingested email %s/%s", identifier, entry.name)
+            continue
+        shutil.copy(submission_path, os.path.join(entry.path, "user_submission.eml"))
+        shutil.make_archive(entry.path, "gztar", entry.path)
+        processor.process_emails_from_minio_workdir(
+            entry.path, identifier, reported_by=reported_by,
+            reporter_note=reporter_note,
+        )
+        if on_email_done is not None:
+            on_email_done(entry.name)
+
+
+# ---------------------------------------------------------------------------
+# Prefix-based contract helpers (portable feeder contract)
+# ---------------------------------------------------------------------------
+
+def _feeder_bucket_name() -> str:
+    """Return the configured feeder bucket name, or '' if not set / on error."""
+    try:
+        from settings.config import get_section
+        return (get_section("storage.s3") or {}).get("feeder_bucket", "") or ""
+    except Exception:
+        return ""
+
+
+def _process_prefix_submissions(base_path: str, bucket_name: str) -> None:
+    """Process submissions written by the portable prefix contract.
+
+    For each pending prefix in *bucket_name*:
+      1. Acquire a per-submission Redis lock.
+      2. Set status → processing.
+      3. Download all objects under the prefix.
+      4. Hand off to MinioEmailService.
+      5. Set status → done.
+    On any error, rolls back to todo.  Always releases the lock.
+    """
+    client = _init_minio_client()
+    if not client:
+        return
+    source = PrefixSource(client, bucket_name)
+    processor = MinioEmailService()
+
+    for submission_id in source.iter_pending():
+        lock_key = f"lock:feeder_submission:{bucket_name}:{submission_id}"
+        if not cache.add(lock_key, "1", timeout=900):
+            logger.debug("Submission %s already locked, skipping", submission_id)
+            continue
+        work_root = os.path.join(base_path, submission_id)
+        try:
+            source.set_status(submission_id, sc.STATUS_PROCESSING)
+            wrapper = source.download_submission(submission_id, base_path)
+            if not wrapper:
+                logger.warning("No wrapper in %s — leaving todo", submission_id)
+                source.set_status(submission_id, sc.STATUS_TODO)
+                continue
+            status = source.read_status(submission_id)
+            reported_by = (status or {}).get("reported_by") or _extract_reported_by(wrapper)
+            reporter_note = (status or {}).get("reporter_note") or ""
+            done_emails = set((status or {}).get("processed_emails") or [])
+            _handoff_submission(
+                os.path.dirname(wrapper), wrapper, submission_id,
+                reported_by, processor, reporter_note=reporter_note,
+                done_emails=done_emails,
+                on_email_done=lambda d: source.mark_email_done(submission_id, d),
+            )
+            source.set_status(submission_id, sc.STATUS_DONE)
+        except Exception:
+            logger.exception("Error processing prefix submission %s", submission_id)
+            try:
+                source.set_status(submission_id, sc.STATUS_TODO)
+            except Exception:
+                logger.warning("Could not roll back status for %s", submission_id)
+        finally:
+            shutil.rmtree(work_root, ignore_errors=True)
+            cache.delete(lock_key)
+
+
 # ---------------------------------------------------------------------------
 # Main entrypoint
 # ---------------------------------------------------------------------------
@@ -174,16 +252,22 @@ def fetch_and_process_emails(config_path: str = CONFIG_PATH) -> None:
     """
     Main cron entry point.
 
-    Downloads all objects from MinIO buckets tagged Status=To Do, writes a
-    metadata.json manifest, then hands each email subdirectory to
-    MinioEmailService for processing. Tags the bucket as Done on success.
+    Runs both read paths:
+    - Legacy: downloads all objects from MinIO buckets tagged Status=To Do,
+      writes a metadata.json manifest, hands each email subdirectory to
+      MinioEmailService, then tags the bucket as Done.
+    - Portable prefix contract: reads submissions from a single feeder bucket
+      using the prefix-per-submission layout written by the Go feeder.
     """
     cfg = load_config(config_path)
     base_temp = cfg.temp_dir
     ensure_dir(base_temp)
     logger.info("Starting email fetch job")
     try:
-        _process_minio_buckets(base_temp)
+        _process_minio_buckets(base_temp)            # legacy bucket-per-submission
+        feeder_bucket = _feeder_bucket_name()
+        if feeder_bucket:
+            _process_prefix_submissions(base_temp, feeder_bucket)  # portable contract
     except Exception:
         logger.exception("Error in email fetch job")
     logger.info("Email fetch job completed")
@@ -257,22 +341,10 @@ def _process_minio_buckets(base_path: str) -> None:
                     manifest["reported_by"],
                 )
 
-                for entry in os.scandir(bucket_path):
-                    if not (entry.is_dir() and EMAIL_DIR_PATTERN.match(entry.name)):
-                        continue
-
-                    shutil.copy(
-                        submission_path,
-                        os.path.join(entry.path, "user_submission.eml"),
-                    )
-
-                    shutil.make_archive(entry.path, "gztar", entry.path)
-
-                    minio_processor.process_emails_from_minio_workdir(
-                        entry.path,
-                        bucket.name,
-                        reported_by=manifest["reported_by"],
-                    )
+                _handoff_submission(
+                    bucket_path, submission_path, bucket.name,
+                    manifest["reported_by"], minio_processor,
+                )
 
                 try:
                     done_tags = Tags.new_bucket_tags()

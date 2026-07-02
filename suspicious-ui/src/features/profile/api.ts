@@ -1,10 +1,10 @@
-// src/features/profile/api.ts
 //
 // All profile-related API calls. The semantic colors endpoints are new;
 // everything else matches the existing patterns in the app.
 
 import { api } from "@/api/client";
 import type { ResultColors, StatusColors } from "@/styles/colorStore";
+import type { AvatarConfig } from "@/features/profile/avatar";
 
 // ---------------------------------------------------------------------------
 // Types
@@ -21,6 +21,8 @@ export type UserProfile = {
   wants_results:         boolean;
   theme:                 string;
   auto_seasonal:         boolean;
+  avatar?:               AvatarConfig;
+  tour_completed?:       boolean;
   semantic_colors:       {
     result: ResultColors;
     status: StatusColors;
@@ -32,6 +34,7 @@ export type UserProfile = {
 export type AppearancePayload = {
   theme?:           string;
   auto_seasonal?:   boolean;
+  avatar?:          AvatarConfig;
   semantic_colors?: {
     result?: Partial<ResultColors>;
     status?: Partial<StatusColors>;
@@ -41,6 +44,7 @@ export type AppearancePayload = {
 export type PreferencesPayload = {
   wants_acknowledgement?: boolean;
   wants_results?:         boolean;
+  tour_completed?:        boolean;
 };
 
 export type SemanticColorsPayload = {

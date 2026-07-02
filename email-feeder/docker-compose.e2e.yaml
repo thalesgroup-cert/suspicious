@@ -1,0 +1,29 @@
+# Self-contained stack for the end-to-end feeder test
+# (tests/test_feeder_e2e_bucket.py). Unlike docker-compose.dev.yaml this
+# publishes the S3 API port (9000) to the host so the test, running outside
+# Docker, can drive a real submission mail -> real bucket round-trip.
+services:
+  greenmail:
+    image: greenmail/standalone:latest
+    container_name: feeder-e2e-greenmail
+    ports:
+      - "127.0.0.1:3025:3025"   # SMTP (deposit submissions)
+      - "127.0.0.1:3143:3143"   # IMAP  (feeder polls)
+    environment:
+      GREENMAIL_OPTS: >
+        -Dgreenmail.setup.test.all
+        -Dgreenmail.users=imap_user:imap_password@localhost
+        -Dgreenmail.starttls.enable=false
+        -Dgreenmail.hostname=0.0.0.0
+
+  rustfs:
+    image: rustfs/rustfs:latest
+    container_name: feeder-e2e-rustfs
+    command: /data
+    ports:
+      - "127.0.0.1:9000:9000"   # S3 API (real bucket creation + puts)
+    environment:
+      RUSTFS_ACCESS_KEY: minioadmin
+      RUSTFS_SECRET_KEY: minioadmin
+      RUSTFS_VOLUMES: /data
+      RUSTFS_ADDRESS: 0.0.0.0:9000

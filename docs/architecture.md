@@ -40,5 +40,18 @@ and a Celery worker.
    and `fail_stale_jobs` every 600s to auto-fail jobs pending beyond the
    stale-job timeout.
 
+## URL analysis planning
+
+URLs extracted from a reported email are not all dispatched blindly. At
+dispatch time (step 2, mail path only), `plan_url_analysis` collapses equivalent
+URLs by canonical key, reuses recent results across cases within
+`reuse_ttl_days`, and caps analysis per registered domain to the most
+interesting URLs. Every extracted URL is still recorded — capped ones are marked
+`skipped` and stay analyzable on demand via
+`POST /api/submissions/<id>/urls/<url_id>/analyze/`. The planner is fail-open
+(any error → analyze the URL) and kill-switched by `url_analysis.enabled`.
+Direct single-URL submission bypasses it. See
+[Observable Processors](components/backend/observable-processors.md#url-analysis-planner-url_process).
+
 See [Components](components/backend/index.md) for each part in detail, and the
 [API Reference](reference/rest-api.md) for endpoints.

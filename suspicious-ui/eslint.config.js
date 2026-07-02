@@ -77,7 +77,13 @@ export default [
   // theme provider + hooks + constants), so the fast-refresh "component-only
   // file" rule doesn't apply.
   {
-    files: ["src/app/router.tsx", "src/styles/ThemeStore.tsx"],
+    files: [
+      "src/app/router.tsx",
+      "src/styles/ThemeStore.tsx",
+      // SECTIONS holds JSX icons (must be .tsx) and lives beside its
+      // SectionContent router — same "data + component" shape as the routes.
+      "src/features/settings/components/sections.tsx",
+    ],
     rules: {
       "react-refresh/only-export-components": "off",
     },

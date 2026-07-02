@@ -1,4 +1,3 @@
-// src/features/dashboard/components/ThreatDistributionPanel.tsx
 import * as React from "react";
 import { Box, Chip, Stack, Typography } from "@mui/material";
 import { useTheme } from "@mui/material/styles";

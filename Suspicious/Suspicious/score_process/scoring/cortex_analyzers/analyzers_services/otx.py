@@ -1,4 +1,3 @@
-# analyzers_services/otx.py
 """
 OTX (AlienVault OTX) analyzer — scores based on number of OTX Pulses.
 """

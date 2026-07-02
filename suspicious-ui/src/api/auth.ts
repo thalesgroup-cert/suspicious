@@ -1,4 +1,3 @@
-// src/api/auth.ts
 //
 // Semantic color hydration strategy:
 //
@@ -127,9 +126,11 @@ export async function logout(): Promise<void> {
 }
 
 // ---------------------------------------------------------------------------
-// SSO helper — called by LoginPage after setting the token from the fragment.
-// Fires getMe() to both verify the token and hydrate colors in one shot,
-// since the SSO path bypasses the normal login() → getMe() sequence.
+// SSO helper — called by LoginPage on the ?sso=1 redirect. The httpOnly
+// knox_token cookie is already set by the OIDC callback, so there is no token
+// to read from the URL. Fires getMe() to both verify the cookie and hydrate
+// colors in one shot, since the SSO path bypasses the normal
+// login() → getMe() sequence.
 // ---------------------------------------------------------------------------
 
 export async function hydrateColorsAfterSso(): Promise<void> {

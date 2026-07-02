@@ -1,13 +1,9 @@
-# mail_service/acknowledge_service.py
-from pathlib import Path
 from .models import AcknowledgeMailServiceConfigSocial
-from jinja2 import Environment, FileSystemLoader, select_autoescape
 from .send_email_service import SendMailService
 from .email_theme import THEME_PALETTES, resolve_semantic_colors
 from .email_logo import resolve_logo
 from .social_logos import SOCIAL_LOGOS
-
-TEMPLATES_DIR = Path(__file__).parent / "templates"
+from .utils import load_email_template
 
 class AcknowledgementEmailService:
     SUBJECT = "Suspicious – Submission Registered"
@@ -35,11 +31,7 @@ class AcknowledgementEmailService:
 
     @staticmethod
     def _load_template():
-        env = Environment(
-            loader=FileSystemLoader(TEMPLATES_DIR),
-            autoescape=select_autoescape(["html", "xml"]),
-        )
-        return env.get_template("acknowledgement_email.jinja2")
+        return load_email_template("acknowledgement_email.jinja2")
 
     # ── rendering ──────────────────────────────────────────────────────────
 
@@ -76,22 +68,10 @@ class AcknowledgementEmailService:
 
     def _send_action(self, user: str, user_infos: str, subject: str) -> None:
         html = self.render_html(recipient_name=user_infos, subject=subject)
-
-        send_mail_service = SendMailService(
-            host=self.config.get("smtp", {}).get("server", {}),
-            port=self.config.get("smtp", {}).get("port", {}),
-            login=self.config.get("smtp", {}).get("username", {}),
-            password=self.config.get("smtp", {}).get("password", {}),
-        )
-
-        send_mail_service.connect()
-        if self.config.get("smtp", {}).get("tls", {}):
-            send_mail_service.start_tls()
-        send_mail_service.login()
-        send_mail_service.publish_email(
-            subject=subject,
+        SendMailService.send_html(
+            self.config.get("smtp", {}),
             sender=self.sender,
             recipient=user,
+            subject=subject,
             html=html,
         )
-        send_mail_service.close()

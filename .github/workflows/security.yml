@@ -61,7 +61,10 @@ jobs:
           python-version: "3.12"
       - run: pip install pip-audit
       - name: pip-audit ${{ matrix.path }}
-        run: pip-audit -r ${{ matrix.path }}/requirements.txt --strict || true
+        # Gating: a known-vulnerable dependency fails the build. If an advisory
+        # has no fix yet, triage it and add `--ignore-vuln <GHSA/CVE-id>` here
+        # rather than re-muting the whole audit.
+        run: pip-audit -r ${{ matrix.path }}/requirements.txt --strict
 
   npm-audit:
     runs-on: ubuntu-latest

@@ -182,4 +182,4 @@ def update_case_score(case):
         update_cases_logger.info(f"Case with id {case.id} updated with score {case.final_score} and confidence {case.final_confidence}")
 
     except Exception as e:
-        update_cases_logger.error(f"Error occurred while updating case score: {str(e)}")
+        update_cases_logger.error(f"Error occurred while updating case score: {e!s}")

@@ -1,4 +1,3 @@
-// src/styles/themes.ts
 import { createTheme, alpha, type ThemeOptions } from "@mui/material/styles";
 
 // ---------------------------------------------------------------------------
