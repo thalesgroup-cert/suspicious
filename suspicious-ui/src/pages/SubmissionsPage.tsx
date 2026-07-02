@@ -1,7 +1,6 @@
 import * as React from "react";
 import {
   Alert,
-  Avatar,
   Box,
   Button,
   CardContent,
@@ -44,6 +43,8 @@ import { useNavigate, useSearchParams } from "react-router-dom";
 import { alpha } from "@mui/material/styles";
 import { useTheme } from "@mui/material/styles";
 import { getMe, type Me } from "@/api/auth";
+import { getProfile } from "@/features/profile/api";
+import { UserAvatar } from "@/features/profile/components/UserAvatar";
 import {
   challengeSubmission,
   getSubmissionDetails,
@@ -160,6 +161,13 @@ export default function SubmissionsPage() {
   });
 
   const me: Me | undefined = React.useMemo(() => meQuery.data, [meQuery.data]);
+
+  const profileQuery = useQuery({
+    queryKey: ["profile"],
+    queryFn: getProfile,
+    enabled: !!me,
+    retry: false,
+  });
 
   // sort dropdown kept for backwards-compat; column clicks take precedence
   const backendOrdering = backendOrderingFromSort;
@@ -386,9 +394,11 @@ export default function SubmissionsPage() {
       >
         <Stack spacing={0.4}>
           <Stack direction="row" spacing={1.25} sx={{ alignItems: "center" }} >
-            <Avatar sx={{ width: 46, height: 46, fontWeight: 950 }}>
-              {(me.username?.[0] ?? "U").toUpperCase()}
-            </Avatar>
+            <UserAvatar
+              avatar={profileQuery.data?.avatar}
+              initials={(me.username?.[0] ?? "U").toUpperCase()}
+              sx={{ width: 46, height: 46, fontWeight: 950 }}
+            />
             <Box>
               <Typography variant="h4" sx={{ fontWeight: 950, letterSpacing: -0.5 }} >
                 Submissions

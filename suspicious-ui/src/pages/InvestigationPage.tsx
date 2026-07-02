@@ -4,7 +4,6 @@ import {
   AccordionDetails,
   AccordionSummary,
   Alert,
-  Avatar,
   LinearProgress,
   Box,
   Button,
@@ -49,6 +48,8 @@ import { alpha } from "@mui/material/styles";
 import { useTheme } from "@mui/material/styles";
 
 import { getMe, type Me } from "@/api/auth";
+import { getProfile } from "@/features/profile/api";
+import { UserAvatar } from "@/features/profile/components/UserAvatar";
 import {
   getAllInvestigations,
   getInvestigationDetails,
@@ -154,6 +155,13 @@ export default function InvestigationPage() {
 
   const meQuery = useQuery<Me>({ queryKey: ["me"], queryFn: getMe, retry: false });
   const me = meQuery.data;
+
+  const profileQuery = useQuery({
+    queryKey: ["profile"],
+    queryFn: getProfile,
+    enabled: !!me,
+    retry: false,
+  });
 
   const groups = React.useMemo(() => me?.groups ?? [], [me]);
   const isElevated = React.useMemo(
@@ -395,9 +403,11 @@ export default function InvestigationPage() {
       >
         <Stack spacing={0.4}>
           <Stack direction="row" spacing={1.25} sx={{ alignItems: "center" }} >
-            <Avatar sx={{ width: 46, height: 46, fontWeight: 950 }}>
-              {(me.username?.[0] ?? "A").toUpperCase()}
-            </Avatar>
+            <UserAvatar
+              avatar={profileQuery.data?.avatar}
+              initials={(me.username?.[0] ?? "A").toUpperCase()}
+              sx={{ width: 46, height: 46, fontWeight: 950 }}
+            />
             <Box>
               <Typography variant="h4" sx={{ fontWeight: 950, letterSpacing: -0.5 }} >
                 Investigation

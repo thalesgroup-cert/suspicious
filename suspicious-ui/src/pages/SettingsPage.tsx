@@ -1,7 +1,6 @@
 import * as React from "react";
 import {
   Alert,
-  Avatar,
   Box,
   Button,
   CardContent,
@@ -22,6 +21,8 @@ import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { Skeleton } from "boneyard-js/react";
 
 import { getMe, type Me } from "@/api/auth";
+import { getProfile } from "@/features/profile/api";
+import { UserAvatar } from "@/features/profile/components/UserAvatar";
 import { NavIcon, SoftCard } from "@/features/settings/components/cards";
 import { SECTIONS, SectionContent, type SectionKey } from "@/features/settings/components/sections";
 
@@ -32,6 +33,13 @@ export default function SettingsPage() {
 
   const meQuery = useQuery<Me>({ queryKey: ["me"], queryFn: getMe, retry: false });
   const me = meQuery.data;
+
+  const profileQuery = useQuery({
+    queryKey: ["profile"],
+    queryFn: getProfile,
+    enabled: !!me,
+    retry: false,
+  });
   const groups = me?.groups ?? [];
   const isAllowed = groups.includes("Admin") || groups.includes("CERT");
 
@@ -69,9 +77,11 @@ export default function SettingsPage() {
       >
         <Stack spacing={0.4}>
           <Stack direction="row" spacing={1.25} sx={{ alignItems: "center" }} >
-            <Avatar sx={{ width: 46, height: 46, fontWeight: 950 }}>
-              {(me.username?.[0] ?? "U").toUpperCase()}
-            </Avatar>
+            <UserAvatar
+              avatar={profileQuery.data?.avatar}
+              initials={(me.username?.[0] ?? "U").toUpperCase()}
+              sx={{ width: 46, height: 46, fontWeight: 950 }}
+            />
             <Box>
               <Typography variant="h4" sx={{ fontWeight: 950, letterSpacing: -0.5 }} >
                 Settings
