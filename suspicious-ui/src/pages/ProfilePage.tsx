@@ -437,6 +437,8 @@ export default function ProfilePage() {
   );
   const [avatarStyle, setAvatarStyle] = React.useState<string>("");
   const [avatarSeed,  setAvatarSeed]  = React.useState<string>("");
+  const [avatarOptions, setAvatarOptions] =
+    React.useState<Record<string, string[]>>({});
 
   // Sync form state from the fetched server profile — adjusted during render
   // when the data reference changes, instead of in an effect.
@@ -457,6 +459,7 @@ export default function ProfilePage() {
       if (!profileData.auto_seasonal) setThemeName(t);
       setAvatarStyle(profileData.avatar?.style ?? "");
       setAvatarSeed(profileData.avatar?.seed ?? "");
+      setAvatarOptions(profileData.avatar?.options ?? {});
     }
   }
 
@@ -530,7 +533,9 @@ export default function ProfilePage() {
 
   const avatarDirty =
     avatarStyle !== (baseProfile?.avatar?.style ?? "") ||
-    avatarSeed  !== (baseProfile?.avatar?.seed  ?? "");
+    avatarSeed  !== (baseProfile?.avatar?.seed  ?? "") ||
+    JSON.stringify(avatarOptions) !==
+      JSON.stringify(baseProfile?.avatar?.options ?? {});
 
   // ── Save / reset ─────────────────────────────────────────────────────────
 
@@ -566,7 +571,11 @@ export default function ProfilePage() {
   }
 
   function saveAvatar() {
-    const avatar = avatarStyle && avatarSeed ? { style: avatarStyle, seed: avatarSeed } : {};
+    const hasOptions = Object.keys(avatarOptions).length > 0;
+    const avatar =
+      avatarStyle && avatarSeed
+        ? { style: avatarStyle, seed: avatarSeed, ...(hasOptions ? { options: avatarOptions } : {}) }
+        : {};
     queryClient.setQueryData<UserProfile>(["profile"], (prev) => ({
       ...(prev ?? baseProfile as UserProfile),
       avatar: avatar as UserProfile["avatar"],
@@ -577,6 +586,7 @@ export default function ProfilePage() {
   function resetAvatar() {
     setAvatarStyle(baseProfile?.avatar?.style ?? "");
     setAvatarSeed(baseProfile?.avatar?.seed ?? "");
+    setAvatarOptions(baseProfile?.avatar?.options ?? {});
   }
 
   // Seed on style selection when no seed is set yet, so the preview is non-empty.
@@ -858,6 +868,7 @@ export default function ProfilePage() {
               <AvatarPanel
                 style={avatarStyle} seed={avatarSeed}
                 setStyle={setStyleWithSeed} setSeed={setAvatarSeed}
+                options={avatarOptions} setOptions={setAvatarOptions}
                 firstName={me.first_name} lastName={me.last_name}
                 dirtyBar={
                   <DirtyBar
