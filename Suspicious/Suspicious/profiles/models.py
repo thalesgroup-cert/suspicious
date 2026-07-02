@@ -110,6 +110,11 @@ class UserProfile(SemanticColorsMixin, models.Model):
             "seed: '<string>'}. Empty means fall back to initials."
         ),
     )
+    tour_completed = models.BooleanField(
+        default=False,
+        verbose_name=_("Guided tour completed"),
+        help_text=_("True once the user has seen the first-connection guided tour."),
+    )
     creation_date = models.DateTimeField(auto_now_add=True)
     last_update = models.DateTimeField(auto_now=True)
     def __str__(self):
@@ -148,6 +153,11 @@ class CISOProfile(SemanticColorsMixin, models.Model):
             "DiceBear avatar config. Structure: {style: '<dicebear-style>', "
             "seed: '<string>'}. Empty means fall back to initials."
         ),
+    )
+    tour_completed = models.BooleanField(
+        default=False,
+        verbose_name=_("Guided tour completed"),
+        help_text=_("True once the user has seen the first-connection guided tour."),
     )
     creation_date = models.DateTimeField(auto_now_add=True)
     last_update = models.DateTimeField(auto_now=True)

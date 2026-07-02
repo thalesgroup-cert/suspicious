@@ -131,6 +131,7 @@ class UserProfileSerializer(serializers.ModelSerializer):
             "auto_seasonal",
             "semantic_colors",
             "avatar",
+            "tour_completed",
             "creation_date",
             "last_update",
         ]
@@ -169,6 +170,7 @@ class CISOProfileSerializer(serializers.ModelSerializer):
             "auto_seasonal",
             "semantic_colors",
             "avatar",
+            "tour_completed",
             "creation_date",
             "last_update",
         ]
@@ -214,6 +216,7 @@ class PreferencesSerializer(serializers.Serializer):
     """PATCH /profile/preferences/ — notification preferences."""
     wants_acknowledgement = serializers.BooleanField(required=False)
     wants_results         = serializers.BooleanField(required=False)
+    tour_completed        = serializers.BooleanField(required=False)
 
     def update(self, instance, validated_data):
         for attr, value in validated_data.items():
