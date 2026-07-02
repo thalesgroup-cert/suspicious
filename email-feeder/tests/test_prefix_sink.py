@@ -70,7 +70,8 @@ def test_email_json_not_listed_as_email_or_attachment(tmp_path):
 
 def test_store_writes_reporter_note(tmp_path):
     sub = tmp_path / "260625140959-aa"
-    edir = sub / "260625140959-bb"; edir.mkdir(parents=True)
+    edir = sub / "260625140959-bb"
+    edir.mkdir(parents=True)
     (edir / "260625140959-bb.eml").write_bytes(b"From: a@b\n\nx")
     captured = {}
     class FakeSvc:
@@ -78,7 +79,8 @@ def test_store_writes_reporter_note(tmp_path):
         def upload_file(self, **k): pass
         def upload_bytes(self, bucket_name, object_name, data, content_type):
             captured["status"] = data
-    import classes.services.submission_sink as ss, json
+    import classes.services.submission_sink as ss
+    import json
     ss.PrefixSink(FakeSvc(), "bucket").store(
         sub, "260625140959-aa", "u@x", reporter_note="check this please")
     assert json.loads(captured["status"])["reporter_note"] == "check this please"

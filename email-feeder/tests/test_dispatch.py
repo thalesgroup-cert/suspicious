@@ -13,7 +13,6 @@ from unittest import mock
 
 import main
 import classes.models.mail as mail_models
-import classes.models.mail_attachment as mail_attachment
 from classes.models.mail_tags import SubmissionOutcome
 from classes.services.mailbox_service import Mailbox
 

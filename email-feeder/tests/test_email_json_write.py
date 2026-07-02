@@ -1,4 +1,9 @@
-import email.message, email.policy, json, logging, pathlib, tempfile
+import email.message
+import email.policy
+import json
+import logging
+import pathlib
+import tempfile
 import classes.models.email_contract as ec
 from classes.services.mailbox_service import Mailbox
 

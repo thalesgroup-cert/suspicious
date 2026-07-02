@@ -2,7 +2,12 @@
 # REGRESSION GUARD (characterization), not red-green TDD: Tasks 4-5 already
 # enforce fast==fallback parity, so this may pass on first run. Its value is
 # catching future divergence at the integration seam (load_email_data).
-import email, email.message, email.policy, json, os, tempfile
+import email
+import email.message
+import email.policy
+import json
+import os
+import tempfile
 from unittest.mock import patch
 from django.test import TestCase
 
@@ -12,7 +17,8 @@ from mail_feeder.global_submission.fast_metadata import load_email_data
 
 def _build(d):
     inner = email.message.EmailMessage()
-    inner["From"] = "Att <ATT@Evil.TEST>"; inner["To"] = "victim@corp.test"
+    inner["From"] = "Att <ATT@Evil.TEST>"
+    inner["To"] = "victim@corp.test"
     inner["Subject"] = "=?utf-8?q?Cl=C3=ADck?="
     inner["Date"] = "Mon, 1 Jan 2026 00:00:00 +0000"
     inner.set_content("plain http://phish.test")

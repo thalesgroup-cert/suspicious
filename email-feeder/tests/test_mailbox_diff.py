@@ -3,7 +3,6 @@ import pathlib
 import types
 
 import classes.models.configs.internals.imap as imapcfg
-import classes.services.mailbox_setup_service as setup
 from classes.services.mailbox_setup_service import diff_mailbox_configs, apply_mailbox_diff
 
 
