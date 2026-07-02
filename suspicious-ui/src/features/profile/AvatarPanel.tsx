@@ -1,11 +1,18 @@
 import * as React from "react";
-import { Box, Button, Divider, Stack, Typography } from "@mui/material";
+import { Box, Button, Divider, IconButton, Stack, Typography } from "@mui/material";
 import { alpha, useTheme } from "@mui/material/styles";
-import { PersonOutlined, CasinoOutlined } from "@mui/icons-material";
+import {
+  PersonOutlined,
+  CasinoOutlined,
+  ChevronLeft,
+  ChevronRight,
+  RestartAltOutlined,
+} from "@mui/icons-material";
 import { CaptionLabel, InnerCard } from "@/features/profile/components/cards";
 import { UserAvatar } from "@/features/profile/components/UserAvatar";
 import {
   AVATAR_STYLES,
+  getStyleCategories,
   renderAvatarDataUri,
   type AvatarConfig,
 } from "@/features/profile/avatar";
@@ -14,17 +21,21 @@ import { initials as initialsFn } from "@/features/profile/utils";
 // DirtyBar lives in ProfilePage; the panel is controlled and the parent renders it.
 export function AvatarPanel({
   style, seed, setStyle, setSeed,
+  options, setOptions,
   firstName, lastName,
   dirtyBar,
 }: {
   style: string; seed: string;
   setStyle: (s: string) => void; setSeed: (s: string) => void;
+  options: Record<string, string[]>;
+  setOptions: (o: Record<string, string[]>) => void;
   firstName?: string; lastName?: string;
   dirtyBar: React.ReactNode;
 }) {
   const theme = useTheme();
-  const config: AvatarConfig = { style, seed };
+  const config: AvatarConfig = { style, seed, options };
   const inits = initialsFn(firstName, lastName);
+  const categories = getStyleCategories(style);
 
   return (
     <Stack spacing={2.5}>
@@ -93,6 +104,68 @@ export function AvatarPanel({
           })}
         </Box>
       </Stack>
+
+      {/* Categories — one carousel per enum option in the style's schema */}
+      {categories.length > 0 && (
+        <Stack spacing={1}>
+          <CaptionLabel>Customize</CaptionLabel>
+          <Stack spacing={0.5} sx={{ maxHeight: 320, overflowY: "auto", pr: 0.5 }}>
+            {categories.map((cat) => {
+              const current = options[cat.key]?.[0];
+              const idx = current ? cat.values.indexOf(current) : -1;
+              const move = (dir: 1 | -1) => {
+                const base = idx < 0 ? (dir === 1 ? -1 : 0) : idx;
+                const next = (base + dir + cat.values.length) % cat.values.length;
+                setOptions({ ...options, [cat.key]: [cat.values[next]] });
+              };
+              const clear = () => {
+                const rest = { ...options };
+                delete rest[cat.key];
+                setOptions(rest);
+              };
+              return (
+                <Stack
+                  key={cat.key}
+                  direction="row"
+                  spacing={1}
+                  sx={{
+                    alignItems: "center",
+                    px: 1, py: 0.5, borderRadius: 2,
+                    border: `1px solid ${alpha(theme.palette.divider, 0.4)}`,
+                  }}
+                >
+                  <Typography sx={{ flex: 1, minWidth: 0, fontWeight: 800, fontSize: 12.5 }} noWrap>
+                    {cat.label}
+                  </Typography>
+                  <IconButton size="small" aria-label={`${cat.label} previous option`} onClick={() => move(-1)}>
+                    <ChevronLeft fontSize="small" />
+                  </IconButton>
+                  <Typography
+                    sx={{ width: 96, textAlign: "center", fontSize: 11.5,
+                          color: current ? "text.primary" : "text.disabled",
+                          fontWeight: current ? 800 : 600 }}
+                    noWrap
+                  >
+                    {current ?? "Auto"}
+                  </Typography>
+                  <IconButton size="small" aria-label={`${cat.label} next option`} onClick={() => move(1)}>
+                    <ChevronRight fontSize="small" />
+                  </IconButton>
+                  <IconButton
+                    size="small"
+                    aria-label={`${cat.label} use random`}
+                    onClick={clear}
+                    disabled={!current}
+                    sx={{ opacity: current ? 1 : 0.35 }}
+                  >
+                    <RestartAltOutlined fontSize="small" />
+                  </IconButton>
+                </Stack>
+              );
+            })}
+          </Stack>
+        </Stack>
+      )}
     </Stack>
   );
 }
