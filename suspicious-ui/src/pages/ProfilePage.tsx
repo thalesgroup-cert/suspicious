@@ -591,6 +591,7 @@ export default function ProfilePage() {
 
   // Seed on style selection when no seed is set yet, so the preview is non-empty.
   const setStyleWithSeed = (s: string) => {
+    if (s !== avatarStyle) setAvatarOptions({});
     setAvatarStyle(s);
     if (!avatarSeed) setAvatarSeed(randomSeed());
   };

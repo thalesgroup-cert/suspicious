@@ -1,5 +1,6 @@
 import { describe, it, expect, vi, beforeEach } from "vitest";
 import { screen, waitFor } from "@testing-library/react";
+import userEvent from "@testing-library/user-event";
 import { QueryClient } from "@tanstack/react-query";
 import { renderWithProviders } from "@/test/utils";
 import { fixtureMe, fixtureProfile } from "@/test/fixtures";
@@ -105,6 +106,39 @@ describe("ProfilePage - Test Suite", () => {
       });
       await waitFor(() => expect(getProfile).toHaveBeenCalled());
       expect(container.textContent ?? "").not.toBe("");
+    });
+  });
+
+  describe("Avatar section", () => {
+    it("clears pinned options when switching to a different style", async () => {
+      const user = userEvent.setup();
+      renderWithProviders(<ProfilePage />, { initialPath: "/profile" });
+
+      // Nav to Avatar (fixtureProfile has no avatar set, so no style is
+      // selected yet — the style grid is visible but the "Customize"
+      // carousel only appears once a style is picked).
+      await user.click(await screen.findByText("Avatar"));
+      await user.click(await screen.findByAltText("Avataaars"));
+
+      // Pin the "Eyes" category away from its "Auto" default.
+      const eyesNext = await screen.findByLabelText("Eyes next option");
+      await user.click(eyesNext);
+      await waitFor(() => {
+        expect(screen.getByLabelText("Eyes use random")).toBeEnabled();
+      });
+
+      // Switch to a different style — the stale "eyes" option must not
+      // survive (it's not even a valid key for every style, and colliding
+      // key names must not carry a phantom pinned value across styles).
+      await user.click(await screen.findByAltText("Bottts"));
+
+      // Switching back to avataaars proves the option map was actually
+      // reset (not just hidden because bottts lacks an "eyes" category).
+      await user.click(await screen.findByAltText("Avataaars"));
+      await screen.findByLabelText("Eyes next option");
+      await waitFor(() => {
+        expect(screen.getByLabelText("Eyes use random")).toBeDisabled();
+      });
     });
   });
 });

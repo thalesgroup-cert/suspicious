@@ -33,6 +33,7 @@ const STYLE_MAP = new Map<string, (typeof AVATAR_STYLES)[number]["style"]>(
   AVATAR_STYLES.map((s) => [s.key, s.style]),
 );
 
+// ponytail: unbounded render cache, add drop-oldest past N if a long editing session balloons it
 const cache = new Map<string, string>();
 
 export function renderAvatarDataUri(config: AvatarConfig): string {
