@@ -2,6 +2,9 @@
 # Author : THA-CERT //ECR
 
 import os
+import numpy as np
+import zipfile
+from collections import defaultdict
 import email
 
 from cortexutils.analyzer import Analyzer
