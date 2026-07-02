@@ -10,7 +10,11 @@ import {
   notionists,
 } from "@dicebear/collection";
 
-export type AvatarConfig = { style: string; seed: string };
+export type AvatarConfig = {
+  style: string;
+  seed: string;
+  options?: Record<string, string[]>;
+};
 
 // Allowlist — MUST stay in sync with ALLOWED_AVATAR_STYLES in
 // Suspicious/api/serializers/profile.py.
@@ -34,13 +38,54 @@ const cache = new Map<string, string>();
 export function renderAvatarDataUri(config: AvatarConfig): string {
   const style = STYLE_MAP.get(config.style);
   if (!style) return "";
-  const cacheKey = `${config.style}|${config.seed}`;
+  const options = config.options ?? {};
+  const cacheKey = `${config.style}|${config.seed}|${JSON.stringify(options)}`;
   const hit = cache.get(cacheKey);
   if (hit !== undefined) return hit;
   // @dicebear/core v9: toDataUri() is synchronous and returns a string.
-  const uri = createAvatar(style as never, { seed: config.seed }).toDataUri();
+  // DiceBear option values are arrays; a single-element array pins a choice.
+  const uri = createAvatar(style as never, { seed: config.seed, ...options }).toDataUri();
   cache.set(cacheKey, uri);
   return uri;
+}
+
+// A category is any style-schema property that is an enum array of strings
+// (e.g. avataaars `eyes`, `mouth`, enum `*Color`). Numeric `*Probability`
+// props and free-form (non-enum) props are skipped. Schemas are static, so
+// the derived list is memoized per style.
+const categoryCache = new Map<string, { key: string; label: string; values: string[] }[]>();
+
+function prettifyLabel(key: string): string {
+  return key
+    .replace(/([A-Z])/g, " $1")
+    .replace(/^./, (c) => c.toUpperCase())
+    .trim();
+}
+
+export function getStyleCategories(
+  styleKey: string,
+): { key: string; label: string; values: string[] }[] {
+  const hit = categoryCache.get(styleKey);
+  if (hit) return hit;
+  const style = STYLE_MAP.get(styleKey) as unknown as
+    | { schema?: { properties?: Record<string, unknown> } }
+    | undefined;
+  const props = style?.schema?.properties ?? {};
+  const cats: { key: string; label: string; values: string[] }[] = [];
+  for (const [key, raw] of Object.entries(props)) {
+    const p = raw as { type?: string; items?: { enum?: unknown[] } };
+    const en = p?.items?.enum;
+    if (
+      p?.type === "array" &&
+      Array.isArray(en) &&
+      en.length > 0 &&
+      en.every((v) => typeof v === "string")
+    ) {
+      cats.push({ key, label: prettifyLabel(key), values: en as string[] });
+    }
+  }
+  categoryCache.set(styleKey, cats);
+  return cats;
 }
 
 export function randomSeed(): string {
