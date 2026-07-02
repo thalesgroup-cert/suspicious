@@ -1,6 +1,5 @@
 import type { ReactElement } from "react";
 import {
-  Avatar,
   Box,
   Divider,
   List,
@@ -16,6 +15,8 @@ import { NavLink } from "react-router-dom";
 import type { Me } from "@/api/auth";
 import type { NavItemConfig } from "@/layouts/nav";
 import { useHelpTour } from "@/features/help/useHelpTour";
+import { UserAvatar } from "@/features/profile/components/UserAvatar";
+import type { AvatarConfig } from "@/features/profile/avatar";
 
 export function NavItem({
   to,
@@ -379,12 +380,14 @@ export function HelpButton({ slim }: { slim: boolean }) {
 export function UserCard({
   slim,
   me,
+  avatar,
   isElevated,
   groups,
   onClick,
 }: {
   slim: boolean;
   me: Me | undefined;
+  avatar?: AvatarConfig | null;
   isElevated: boolean;
   groups: string[];
   onClick?: () => void;
@@ -424,9 +427,7 @@ export function UserCard({
             }`,
           }}
         >
-          <Typography sx={{ fontWeight: 950, fontSize: 14, color: isElevated ? primary : "text.primary" }}>
-            {initial}
-          </Typography>
+          <UserAvatar avatar={avatar} initials={initial} sx={{ width: 30, height: 30, fontSize: 14, fontWeight: 950, bgcolor: "transparent", color: isElevated ? primary : "text.primary" }} />
         </Box>
       </Tooltip>
     );
@@ -467,7 +468,9 @@ export function UserCard({
             }}
           />
         )}
-        <Avatar
+        <UserAvatar
+          avatar={avatar}
+          initials={initial}
           sx={{
             width: 32,
             height: 32,
@@ -481,9 +484,7 @@ export function UserCard({
             color: isElevated ? primary : "text.primary",
             border: `1.5px solid ${isDark ? alpha("#0f172a", 0.9) : alpha("#fff", 0.9)}`,
           }}
-        >
-          {initial}
-        </Avatar>
+        />
       </Box>
 
       {/* Name + role */}

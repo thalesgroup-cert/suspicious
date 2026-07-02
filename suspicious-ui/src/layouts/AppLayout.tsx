@@ -22,6 +22,7 @@ import {
 import { Outlet, useLocation, useNavigate } from "react-router-dom";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { getMe, logout, type Me } from "@/api/auth";
+import { getProfile } from "@/features/profile/api";
 import { useThemeMode } from "@/styles/ThemeStore";
 
 import {
@@ -55,6 +56,12 @@ export default function AppLayout() {
   });
 
   const me = meQuery.data;
+  const profileQuery = useQuery({
+    queryKey: ["profile"],
+    queryFn: getProfile,
+    enabled: !!me,
+    retry: false,
+  });
   const groups: string[] = (me as any)?.groups ?? [];
   const isElevated = groups.includes("CISO") || groups.includes("CERT") || groups.includes("Admin");
 
@@ -303,6 +310,7 @@ export default function AppLayout() {
             <UserCard
               slim={isSlim}
               me={me}
+              avatar={profileQuery.data?.avatar}
               isElevated={isElevated}
               groups={groups}
               onClick={() => navigate("/profile")}
