@@ -305,8 +305,8 @@ export default function AppLayout() {
           }}
         />
       
-        <Stack spacing={0.75}>
-          <Box data-tour="user-card">
+        <Stack spacing={0.75} sx={{ alignItems: isSlim ? "center" : "stretch" }}>
+          <Box data-tour="user-card" sx={{ width: isSlim ? "auto" : "100%" }}>
             <UserCard
               slim={isSlim}
               me={me}
