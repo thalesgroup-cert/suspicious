@@ -104,22 +104,25 @@ jobs:
         working-directory: suspicious-ui
     steps:
       - uses: actions/checkout@v6
+      - uses: pnpm/action-setup@v4
+        with:
+          version: 11.1.3
       - uses: actions/setup-node@v6
         with:
           node-version: "22"
-          cache: npm
-          cache-dependency-path: suspicious-ui/package-lock.json
-      - run: npm ci
+          cache: pnpm
+          cache-dependency-path: suspicious-ui/pnpm-lock.yaml
+      - run: pnpm install --frozen-lockfile
       - name: Lint
-        run: npm run lint
+        run: pnpm run lint
       - name: Type-check
-        run: npx tsc -b
+        run: pnpm exec tsc -b
       - name: Install Chromium for vitest browser mode
-        run: npx playwright install --with-deps chromium
+        run: pnpm exec playwright install --with-deps chromium
       - name: Unit tests (browser mode)
-        run: npx vitest --run
+        run: pnpm exec vitest --run
       - name: Production build
-        run: npm run build
+        run: pnpm run build
 
   docker-build:
     runs-on: ubuntu-latest

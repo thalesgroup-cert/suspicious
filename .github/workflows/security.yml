@@ -73,10 +73,13 @@ jobs:
         working-directory: suspicious-ui
     steps:
       - uses: actions/checkout@v6
+      - uses: pnpm/action-setup@v4
+        with:
+          version: 11.1.3
       - uses: actions/setup-node@v6
         with:
           node-version: "22"
-          cache: npm
-          cache-dependency-path: suspicious-ui/package-lock.json
-      - run: npm ci
-      - run: npm audit --audit-level=high
+          cache: pnpm
+          cache-dependency-path: suspicious-ui/pnpm-lock.yaml
+      - run: pnpm install --frozen-lockfile
+      - run: pnpm audit --audit-level=high
