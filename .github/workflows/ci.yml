@@ -90,10 +90,12 @@ jobs:
           python-version: "3.12"
       - name: Install feeder deps
         working-directory: email-feeder
-        run: pip install -r requirements.txt
-      - name: unittest
+        run: pip install -r requirements-dev.txt
+      - name: pytest
         working-directory: email-feeder
-        run: python -m unittest discover -s tests -v
+        # pytest runs BOTH the unittest.TestCase files and the pytest-style
+        # tests; `unittest discover` silently skips the latter.
+        run: python -m pytest tests -v
 
   frontend:
     runs-on: ubuntu-latest
