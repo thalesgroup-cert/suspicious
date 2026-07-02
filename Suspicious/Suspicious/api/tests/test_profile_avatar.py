@@ -46,3 +46,64 @@ class AvatarAppearanceTests(APITestCase):
         resp = self.client.patch(self.url, {"avatar": {}}, format="json")
         self.assertEqual(resp.status_code, 200, resp.content)
         self.assertEqual(resp.data["avatar"], {})
+
+    def test_valid_options_saves_and_roundtrips(self):
+        resp = self.client.patch(
+            self.url,
+            {"avatar": {"style": "avataaars", "seed": "abc123",
+                        "options": {"eyes": ["happy"]}}},
+            format="json",
+        )
+        self.assertEqual(resp.status_code, 200, resp.content)
+        self.assertEqual(
+            resp.data["avatar"],
+            {"style": "avataaars", "seed": "abc123", "options": {"eyes": ["happy"]}},
+        )
+        get = self.client.get("/api/profile/")
+        self.assertEqual(get.data["avatar"]["options"], {"eyes": ["happy"]})
+
+    def test_string_option_value_is_normalised_to_list(self):
+        resp = self.client.patch(
+            self.url,
+            {"avatar": {"style": "avataaars", "seed": "abc123",
+                        "options": {"eyes": "happy"}}},
+            format="json",
+        )
+        self.assertEqual(resp.status_code, 200, resp.content)
+        self.assertEqual(resp.data["avatar"]["options"], {"eyes": ["happy"]})
+
+    def test_too_many_option_keys_rejected(self):
+        opts = {f"k{i}": ["v"] for i in range(21)}
+        resp = self.client.patch(
+            self.url,
+            {"avatar": {"style": "avataaars", "seed": "abc123", "options": opts}},
+            format="json",
+        )
+        self.assertEqual(resp.status_code, 400)
+
+    def test_oversized_option_value_rejected(self):
+        resp = self.client.patch(
+            self.url,
+            {"avatar": {"style": "avataaars", "seed": "abc123",
+                        "options": {"eyes": ["z" * 65]}}},
+            format="json",
+        )
+        self.assertEqual(resp.status_code, 400)
+
+    def test_non_string_option_value_rejected(self):
+        resp = self.client.patch(
+            self.url,
+            {"avatar": {"style": "avataaars", "seed": "abc123",
+                        "options": {"eyes": [42]}}},
+            format="json",
+        )
+        self.assertEqual(resp.status_code, 400)
+
+    def test_empty_options_are_dropped(self):
+        resp = self.client.patch(
+            self.url,
+            {"avatar": {"style": "avataaars", "seed": "abc123", "options": {}}},
+            format="json",
+        )
+        self.assertEqual(resp.status_code, 200, resp.content)
+        self.assertEqual(resp.data["avatar"], {"style": "avataaars", "seed": "abc123"})
