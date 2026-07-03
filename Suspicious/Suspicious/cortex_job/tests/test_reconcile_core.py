@@ -36,3 +36,9 @@ class ReconcileCoreTest(TestCase):
         self.case.refresh_from_db()
         self.assertEqual(self.case.lifecycle_state, LifecycleState.FINALIZED)
         mock_finalise.assert_called_once()
+
+    @patch("cortex_job.cortex_utils.reconciliation.emit_connector_event")
+    @patch("cortex_job.cortex_utils.reconciliation.finalise")
+    def test_finalisation_emits_case_finalised_event(self, mock_finalise, mock_emit):
+        reconcile_case_core(self.case)   # zero jobs -> finalises
+        mock_emit.assert_called_once_with("case_finalised", self.case)

@@ -1,6 +1,7 @@
 # cortex_job/cortex_utils/reconciliation.py
 import logging
 
+from connectors.dispatch import emit as emit_connector_event
 from cortex_job.cortex_utils.cortex_and_job_management import CortexJobManager
 from score_process.scoring.cortex_analyzers.reports import CortexAnalyzerReports
 
@@ -76,3 +77,4 @@ def reconcile_case_core(case) -> None:
         transition(case, LifecycleState.SCORING)
     finalise(case)
     transition(case, LifecycleState.FINALIZED)
+    emit_connector_event("case_finalised", case)
