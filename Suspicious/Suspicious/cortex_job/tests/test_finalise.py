@@ -3,23 +3,28 @@ from unittest.mock import patch
 from django.contrib.auth import get_user_model
 from django.test import TestCase
 from case_handler.models import Case
+from cortex_job.cortex_utils.aggregate import CaseAggregate
 from cortex_job.cortex_utils.reconciliation import finalise, _describe
 
 
+def _agg(total=0, success=0, failure=0, deleted=0, in_progress=0, waiting=0):
+    return CaseAggregate(total=total, success=success, failure=failure,
+                         deleted=deleted, in_progress=in_progress, waiting=waiting)
+
+
 class DescribeTest(TestCase):
-    def _totals(self, **b):
-        keys = ("reports", "success", "inprogress", "failure", "waiting", "deleted")
-        t = {k: set() for k in keys}
-        for name, ids in b.items():
-            t[name] = set(ids)
-        return {"total": t}
+    def test_no_scored_reports_mentions_no_analyzer(self):
+        self.assertIn("analyzer", _describe(_agg()).lower())
 
-    def test_zero_reports_description_mentions_no_analyzer(self):
-        self.assertIn("analyzer", _describe(self._totals()).lower())
+    def test_all_success(self):
+        self.assertIn("success", _describe(_agg(total=1, success=1)).lower())
 
-    def test_all_success_description(self):
-        d = _describe(self._totals(reports=["r1"], success=["r1"]))
-        self.assertIn("success", d.lower())
+    def test_all_failure(self):
+        self.assertIn("failed", _describe(_agg(total=1, failure=1)).lower())
+
+    def test_partial(self):
+        d = _describe(_agg(total=3, success=2, failure=1))
+        self.assertIn("2/3", d)
 
 
 class FinaliseTest(TestCase):
@@ -28,14 +33,8 @@ class FinaliseTest(TestCase):
         self.case = Case.objects.create(description="", reporter=user)
 
     @patch("cortex_job.cortex_utils.reconciliation.CortexAnalyzerReports.get_report")
-    @patch("cortex_job.cortex_utils.reconciliation.CortexJobManager.get_results")
-    def test_finalise_runs_scoring_and_sets_description(self, mock_results, mock_report):
-        mock_results.return_value = None
-        # get_results populates mgr.results; emulate empty buckets
-        def _populate(case):
-            return None
-        mock_results.side_effect = _populate
-        finalise(self.case)
+    def test_finalise_runs_scoring_and_sets_description(self, mock_report):
+        finalise(self.case)   # real aggregate_case on a bare case -> all zeros
         mock_report.assert_called_once_with(self.case)
         self.assertTrue(self.case.description)
 
