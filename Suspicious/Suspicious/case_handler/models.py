@@ -70,6 +70,7 @@ class Case(models.Model):
         verbose_name="Lifecycle State",
     )
     finalized_at = models.DateTimeField(null=True, blank=True, verbose_name="Finalized At")
+    dispatched_at = models.DateTimeField(null=True, blank=True, verbose_name="Dispatched At")
 
     class Meta:
         ordering = ['-creation_date']

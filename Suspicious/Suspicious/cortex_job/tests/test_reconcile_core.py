@@ -14,6 +14,9 @@ class ReconcileCoreTest(TestCase):
 
     @patch("cortex_job.cortex_utils.reconciliation.finalise")
     def test_zero_jobs_finalises(self, mock_finalise):
+        from django.utils import timezone
+        self.case.dispatched_at = timezone.now()
+        self.case.save(update_fields=["dispatched_at"])
         reconcile_case_core(self.case)
         self.case.refresh_from_db()
         self.assertEqual(self.case.lifecycle_state, LifecycleState.FINALIZED)
@@ -29,9 +32,11 @@ class ReconcileCoreTest(TestCase):
 
     @patch("cortex_job.cortex_utils.reconciliation.finalise")
     def test_reentry_from_scoring_state(self, mock_finalise):
+        from django.utils import timezone
         from case_handler.lifecycle import LifecycleState
         self.case.lifecycle_state = LifecycleState.SCORING
-        self.case.save(update_fields=["lifecycle_state"])
+        self.case.dispatched_at = timezone.now()
+        self.case.save(update_fields=["lifecycle_state", "dispatched_at"])
         reconcile_case_core(self.case)  # must not raise IllegalTransition
         self.case.refresh_from_db()
         self.assertEqual(self.case.lifecycle_state, LifecycleState.FINALIZED)
@@ -40,5 +45,30 @@ class ReconcileCoreTest(TestCase):
     @patch("cortex_job.cortex_utils.reconciliation.emit_connector_event")
     @patch("cortex_job.cortex_utils.reconciliation.finalise")
     def test_finalisation_emits_case_finalised_event(self, mock_finalise, mock_emit):
+        from django.utils import timezone
+        self.case.dispatched_at = timezone.now()
+        self.case.save(update_fields=["dispatched_at"])
         reconcile_case_core(self.case)   # zero jobs -> finalises
         mock_emit.assert_called_once_with("case_finalised", self.case)
+
+    @patch("cortex_job.cortex_utils.reconciliation.finalise")
+    def test_young_undispatched_case_is_not_finalised(self, mock_finalise):
+        # Fresh CREATED case, no dispatched_at, no jobs -> reconcile must NOT
+        # finalise (dispatch may still be in flight).
+        from case_handler.lifecycle import LifecycleState
+        reconcile_case_core(self.case)
+        self.case.refresh_from_db()
+        self.assertEqual(self.case.lifecycle_state, LifecycleState.CREATED)
+        mock_finalise.assert_not_called()
+
+    @patch("cortex_job.cortex_utils.reconciliation.finalise")
+    def test_dispatched_zero_job_case_is_finalised(self, mock_finalise):
+        # dispatched_at set (dispatch finished, zero analyzers) -> finalise now.
+        from django.utils import timezone
+        from case_handler.lifecycle import LifecycleState
+        self.case.dispatched_at = timezone.now()
+        self.case.save(update_fields=["dispatched_at"])
+        reconcile_case_core(self.case)
+        self.case.refresh_from_db()
+        self.assertEqual(self.case.lifecycle_state, LifecycleState.FINALIZED)
+        mock_finalise.assert_called_once()

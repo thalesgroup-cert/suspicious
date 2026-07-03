@@ -242,6 +242,15 @@ class CaseHandler:
                 )
         self.pending_dispatch_intents = []
 
+        # Stamp dispatch completion BEFORE enqueuing reconcile: this closes
+        # the create/dispatch race where a cron/webhook-triggered reconcile
+        # runs mid-dispatch, sees zero/partial CaseAnalyzerJob rows, and
+        # finalises the case before dispatch has written the real jobs.
+        # reconcile_case_core gates finalisation on this field being set.
+        from django.utils import timezone
+        case.dispatched_at = timezone.now()
+        case.save(update_fields=["dispatched_at"])
+
         # Enqueue unconditionally after dispatch: reconcile_case inspects the
         # CaseAnalyzerJob ledger itself and decides ANALYZING (jobs pending)
         # vs immediate finalise (zero jobs — no analyzer was applicable, so

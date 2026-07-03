@@ -1,5 +1,8 @@
 # cortex_job/cortex_utils/reconciliation.py
 import logging
+from datetime import timedelta
+
+from django.utils import timezone
 
 from connectors.dispatch import emit as emit_connector_event
 from cortex_job.cortex_utils.cortex_and_job_management import CortexJobManager
@@ -49,6 +52,8 @@ from cortex_job.models import CaseAnalyzerJob
 
 _TERMINAL = {LifecycleState.FINALIZED, LifecycleState.CONTESTED}
 
+RECONCILE_DISPATCH_GRACE = timedelta(seconds=120)
+
 
 def reconcile_case_core(case) -> None:
     """Advance one case. Caller MUST hold the per-case lock."""
@@ -71,6 +76,16 @@ def reconcile_case_core(case) -> None:
     if still_pending:
         if case.lifecycle_state == LifecycleState.CREATED:
             transition(case, LifecycleState.ANALYZING)
+        return
+
+    # Guard against racing an in-flight dispatch: a case whose dispatch has
+    # not confirmed completion (dispatched_at is None) and that is still young
+    # may just be mid-dispatch (jobs not written yet). Don't finalise it — a
+    # later reconcile (after dispatched_at is stamped, or once it is old enough
+    # to be a genuine legacy orphan) will. This keeps the dispatch-triggered
+    # reconcile finalising zero-analyzer cases promptly (dispatched_at is set
+    # by then) while stopping the cron/webhook from finalising prematurely.
+    if case.dispatched_at is None and case.creation_date > timezone.now() - RECONCILE_DISPATCH_GRACE:
         return
 
     if case.lifecycle_state != LifecycleState.SCORING:
