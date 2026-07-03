@@ -193,60 +193,6 @@ def sweep_missing_mail_previews(self, limit: int = 200):
         raise self.retry(exc=exc, countdown=60 * 2 ** self.request.retries)
 
 
-def _case_has_pending_jobs(case_id: int) -> bool:
-    """Return True if any CaseAnalyzerJob for this case is still pending."""
-    from cortex_job.models import CaseAnalyzerJob
-    return CaseAnalyzerJob.objects.filter(
-        case_id=case_id, status__in=CaseAnalyzerJob.PENDING_STATUSES
-    ).exists()
-
-
-@shared_task(bind=True, **_RETRY)
-def process_cortex_job(self, case_id: int, job_id: str):
-    """Sync one (case, cortex_job) pair after the webhook fires.
-
-    Acquires a per-case Redis lock to serialise with the cron poll
-    `update_ongoing_cases` and other concurrent webhook tasks on the
-    same case. Idempotent: the status precheck drops re-deliveries of an
-    already-finalised job.
-
-    When this update transitions the case's last pending CAJ to a
-    non-pending state, `finalise_case` is invoked to compute the final
-    description, status, and CortexAnalyzerReports.get_report.
-    """
-    from django.core.cache import cache
-    from cortex_job.models import CaseAnalyzerJob
-    from cortex_job.cortex_utils.cortex_and_job_management import CortexJobManager
-
-    lock_key = f"case_update_lock:{case_id}"
-    if not cache.add(lock_key, 1, timeout=CASE_LOCK_TTL):
-        return  # Cron or another webhook task is currently updating this case
-    try:
-        try:
-            caj = CaseAnalyzerJob.objects.select_related(
-                "case", "analyzer_report"
-            ).get(case_id=case_id, cortex_job_id=job_id)
-        except CaseAnalyzerJob.DoesNotExist:
-            logger.warning(
-                "CaseAnalyzerJob missing (case=%s job=%s)", case_id, job_id
-            )
-            return
-
-        if caj.status not in CaseAnalyzerJob.PENDING_STATUSES:
-            # Already updated by a prior webhook delivery or by the cron.
-            return
-
-        manager = CortexJobManager()
-        manager.update_single_job(caj)
-
-        if not _case_has_pending_jobs(caj.case_id):
-            manager.finalise_case(caj.case)
-    except Exception as exc:
-        raise self.retry(exc=exc, countdown=30 * 2 ** self.request.retries)
-    finally:
-        cache.delete(lock_key)
-
-
 @shared_task(bind=True)
 def reconcile_case(self, case_id: int):
     """Single finalise entrypoint: sync ledger + advance the state machine."""

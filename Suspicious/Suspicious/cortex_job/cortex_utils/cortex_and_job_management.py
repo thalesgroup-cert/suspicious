@@ -9,8 +9,6 @@ from common.http_client import get_breaker, RETRY
 from cortex_job.cortex_utils.session_cortex_api import SessionCortexApi
 from cortex_job.models import Analyzer, AnalyzerReport, CaseAnalyzerJob
 from mail_feeder.models import MailBody, MailArchive, MailInfo, MailHeader
-from score_process.scoring.cortex_analyzers.reports import CortexAnalyzerReports
-from connectors.dispatch import emit as emit_connector_event
 
 # ------------------------
 # Logger setup
@@ -1277,88 +1275,6 @@ class CortexJobManager:
             "deleted": total_deleted,
         }
 
-    def generate_description(self, case):
-        """
-        Generates a user-friendly description for the case based on the current job execution results.
-
-        Args:
-            case (Case): The case object to update.
-
-        Returns:
-            None
-        """
-        total_reports = self.results["total"]["reports"]
-        success = self.results["total"]["success"]
-        failure = self.results["total"]["failure"]
-        waiting = self.results["total"]["waiting"]
-        ongoing = self.results["total"]["inprogress"]
-        deleted = self.results["total"]["deleted"]
-
-        total_job = len(total_reports)
-        success_count = len(success)
-        failure_count = len(failure)
-        waiting_count = len(waiting)
-        ongoing_count = len(ongoing)
-        deleted_count = len(deleted)
-
-        update_cases_logger.info(
-            f"Total jobs: {total_job}, Success: {success_count}, Failure: {failure_count}, "
-            f"Waiting: {waiting_count}, Ongoing: {ongoing_count}, Deleted: {deleted_count}"
-        )
-
-        adjusted_total = total_job - deleted_count if total_job else 0
-        success_ratio = success_count / adjusted_total if adjusted_total else 0
-        failure_ratio = failure_count / adjusted_total if adjusted_total else 0
-
-        # A case is finished once no analyzer report is still pending
-        # (in-progress or waiting). This is trivially true when the case
-        # dispatched zero analyzers — such a case has nothing to wait for, so
-        # it finalises immediately instead of hanging in "On Going" forever.
-        finished = ongoing_count == 0 and waiting_count == 0
-
-        if finished:
-            case.status = "Done"
-            if total_job == 0:
-                case.description = (
-                    "No analyzer was applicable to this submission, so it could "
-                    "not be analysed. Check that the relevant Cortex analyzers "
-                    "are enabled."
-                )
-            elif failure_count == 0:
-                case.description = "All analyzers completed successfully. You can now view the full results."
-            elif success_count == 0:
-                case.description = "All analyzers failed to run. Please check the configuration and retry."
-            elif success_ratio > 0.6:
-                case.description = (
-                    f"Most analyzers ({success_count}/{adjusted_total}) succeeded. "
-                    "Consider rerunning remaining analyzers for a complete analysis."
-                )
-            elif failure_ratio > 0.6:
-                case.description = (
-                    f"Most analyzers ({failure_count}/{adjusted_total}) failed. "
-                    "This case is marked as done, but please check for potential issues with the analyzers or network."
-                )
-            else:  # roughly 40%-60% success
-                case.description = (
-                    f"About half of the analyzers succeeded ({success_count}/{adjusted_total}). "
-                    "Some results are available, consider rerunning others for a more complete analysis."
-                )
-        else:
-            case.status = "On Going"
-            if ongoing_count > 0:
-                case.description = (
-                    f"{ongoing_count} out of {total_job} analyzers are still running. "
-                    "Results will be updated once finished."
-                )
-            else:
-                completed = success_count + failure_count
-                case.description = (
-                    f"{completed} out of {total_job} analyzers have finished. "
-                    "Some analyzers may still be processing."
-                )
-
-        case.save()
-
     def update_single_job(self, caj) -> None:
         """Sync a single CaseAnalyzerJob + its AnalyzerReport from Cortex.
 
@@ -1379,79 +1295,6 @@ class CortexJobManager:
             if new_status not in CaseAnalyzerJob.PENDING_STATUSES:
                 caj.completed_at = timezone.now()
             caj.save(update_fields=["status", "completed_at"])
-
-    def finalise_case(self, case) -> None:
-        """Compute final description + status + trigger CortexAnalyzerReports.
-
-        Called once when the case's CaseAnalyzerJob pending-count drops to 0.
-        Mirrors the tail end of manage_jobs but without the per-case bulk
-        aggregation step that manage_jobs performs.
-
-        CortexAnalyzerReports.get_report is safe to call multiple times for
-        most of its work (create_and_save_report overwrites scoring fields,
-        update_case_results / save_case_results overwrite case fields).
-        HOWEVER: update_kpi_and_user_stats increments total_cases counters
-        unconditionally — calling get_report twice will double-count KPI stats.
-        This is a pre-existing bug (out of scope for Task 5); duplicate webhook
-        deliveries should be deduplicated by the caller (Task 6/7).
-        """
-        self.get_results(case)
-        self.generate_description(case)
-        if case.status == "Done":
-            try:
-                CortexAnalyzerReports.get_report(case)
-            except Exception as e:
-                update_cases_logger.error(
-                    "Error fetching final report for case %s: %s", case.id, e,
-                    exc_info=True,
-                )
-        case.save()
-        if case.status == "Done":
-            emit_connector_event("case_finalised", case)
-
-    def manage_jobs(self, case):
-        """
-        Manage and update Cortex jobs for a given case, with user-friendly results and descriptions.
-
-        Steps:
-        1. Fetch results for the case (files, mail, IOCs, attachments, artifacts).
-        2. Generate a user-friendly description and update case status.
-        3. Retrieve final report if the case is complete.
-
-        Args:
-            case (Case): The case to process.
-
-        Returns:
-            None
-        """
-        if not case:
-            raise ValueError("Case is required.")
-
-        # Fetch and process all relevant results for this case
-        results = self.get_results(case)
-
-        # If no results were generated, exit early
-        if not results or not results.get("total"):
-            update_cases_logger.info(f"No results found for case {case.id}")
-            return
-
-        # Generate a user-friendly description and update status
-        self.generate_description(case)
-
-        # If all jobs are done, fetch the final report
-        if case.status == "Done":
-            try:
-                CortexAnalyzerReports.get_report(case)
-            except Exception as e:
-                update_cases_logger.error(
-                    f"Error fetching final report for case {case.id}: {e}",
-                    exc_info=True,
-                )
-
-        # Save the updated case object
-        case.save()
-        if case.status == "Done":
-            emit_connector_event("case_finalised", case)
 
     def manage_ai_jobs(self, case):
         """
