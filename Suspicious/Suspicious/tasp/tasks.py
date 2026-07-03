@@ -204,5 +204,9 @@ def reconcile_case(self, case_id: int):
         if case is None:
             return
         reconcile_case_core(case)
+    except Exception:
+        # Isolate per-case failures so one bad case never aborts the caller
+        # (cron batch / webhook). The cron re-enqueues it next tick.
+        logger.exception("reconcile_case failed for case %s", case_id)
     finally:
         cache.delete(lock_key)
