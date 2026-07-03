@@ -20,6 +20,17 @@ def update_case_results(case, reports, is_malicious, failure):
     from score_process.scoring.case_score_calculation import calculate_result_ranges
 
     try:
+        # No analyzer produced a report (e.g. no enabled analyzer matched the
+        # observable). There is no signal to score, so the honest verdict is
+        # Failure — never leave the fail-dangerous default "Suspicious".
+        if not reports:
+            case.results = "Failure"
+            case.analysis_done = 0
+            update_cases_logger.warning(
+                "Case %s finalised with no analyzer reports — marking Failure.", case.id
+            )
+            return
+
         update_cases_logger.info("Deriving case results from final score %s.", case.final_score)
         case.results      = calculate_result_ranges(case.final_score)
         case.analysis_done = max(0, len(reports) - failure)

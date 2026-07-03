@@ -1310,12 +1310,21 @@ class CortexJobManager:
         success_ratio = success_count / adjusted_total if adjusted_total else 0
         failure_ratio = failure_count / adjusted_total if adjusted_total else 0
 
-        all_done = bool(total_reports) and total_reports == (success | failure | deleted)
-        all_finished = all_done and (ongoing_count == 0 and waiting_count == 0)
+        # A case is finished once no analyzer report is still pending
+        # (in-progress or waiting). This is trivially true when the case
+        # dispatched zero analyzers — such a case has nothing to wait for, so
+        # it finalises immediately instead of hanging in "On Going" forever.
+        finished = ongoing_count == 0 and waiting_count == 0
 
-        if all_finished:
+        if finished:
             case.status = "Done"
-            if failure_count == 0:
+            if total_job == 0:
+                case.description = (
+                    "No analyzer was applicable to this submission, so it could "
+                    "not be analysed. Check that the relevant Cortex analyzers "
+                    "are enabled."
+                )
+            elif failure_count == 0:
                 case.description = "All analyzers completed successfully. You can now view the full results."
             elif success_count == 0:
                 case.description = "All analyzers failed to run. Please check the configuration and retry."

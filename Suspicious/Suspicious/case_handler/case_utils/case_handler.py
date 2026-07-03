@@ -241,3 +241,21 @@ class CaseHandler:
                     value,
                 )
         self.pending_dispatch_intents = []
+
+        # A submission whose observable matched no enabled analyzer produces
+        # zero CaseAnalyzerJob rows. Every finalise path (webhook, cron,
+        # stale-job sweep) is keyed on a CaseAnalyzerJob, so nothing would ever
+        # finalise such a case — it would hang in "On Going" forever. Finalise
+        # it here instead. Cheap: no reports means no Cortex/network calls.
+        from cortex_job.models import CaseAnalyzerJob
+        if not CaseAnalyzerJob.objects.filter(case=case).exists():
+            try:
+                from cortex_job.cortex_utils.cortex_and_job_management import (
+                    CortexJobManager,
+                )
+                CortexJobManager().finalise_case(case)
+            except Exception:
+                logger.exception(
+                    "Failed to finalise zero-analyzer case %s",
+                    getattr(case, "id", None),
+                )
