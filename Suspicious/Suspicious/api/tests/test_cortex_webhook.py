@@ -42,7 +42,7 @@ class CortexWebhookTest(TestCase):
             analyzer_report=self.ar,
         )
 
-    @patch("tasp.tasks.process_cortex_job.delay")
+    @patch("tasp.tasks.reconcile_case.delay")
     def test_authenticated_webhook_dispatches_per_case(self, mock_delay):
         resp = self.client.post(
             "/api/cortex/webhook/",
@@ -51,9 +51,9 @@ class CortexWebhookTest(TestCase):
             format="json",
         )
         self.assertEqual(resp.status_code, 202)
-        mock_delay.assert_called_once_with(self.case.id, "job-1")
+        mock_delay.assert_called_once_with(self.case.id)
 
-    @patch("tasp.tasks.process_cortex_job.delay")
+    @patch("tasp.tasks.reconcile_case.delay")
     def test_unauth_returns_401(self, mock_delay):
         resp = self.client.post(
             "/api/cortex/webhook/",
@@ -64,7 +64,7 @@ class CortexWebhookTest(TestCase):
         self.assertEqual(resp.status_code, 401)
         mock_delay.assert_not_called()
 
-    @patch("tasp.tasks.process_cortex_job.delay")
+    @patch("tasp.tasks.reconcile_case.delay")
     def test_dedup_drops_duplicate_jobid(self, mock_delay):
         for _ in range(2):
             self.client.post(
@@ -75,7 +75,7 @@ class CortexWebhookTest(TestCase):
             )
         self.assertEqual(mock_delay.call_count, 1)
 
-    @patch("tasp.tasks.process_cortex_job.delay")
+    @patch("tasp.tasks.reconcile_case.delay")
     def test_no_pending_caj_skips_dispatch(self, mock_delay):
         self.caj.status = CaseAnalyzerJob.STATUS_SUCCESS
         self.caj.save(update_fields=["status"])
@@ -88,7 +88,7 @@ class CortexWebhookTest(TestCase):
         self.assertEqual(resp.status_code, 202)
         mock_delay.assert_not_called()
 
-    @patch("tasp.tasks.process_cortex_job.delay")
+    @patch("tasp.tasks.reconcile_case.delay")
     def test_missing_authorization_header_returns_401(self, mock_delay):
         resp = self.client.post(
             "/api/cortex/webhook/",
@@ -98,7 +98,7 @@ class CortexWebhookTest(TestCase):
         self.assertEqual(resp.status_code, 401)
         mock_delay.assert_not_called()
 
-    @patch("tasp.tasks.process_cortex_job.delay")
+    @patch("tasp.tasks.reconcile_case.delay")
     def test_missing_jobid_returns_400(self, mock_delay):
         resp = self.client.post(
             "/api/cortex/webhook/",
@@ -110,7 +110,7 @@ class CortexWebhookTest(TestCase):
         mock_delay.assert_not_called()
 
     @override_settings(CORTEX_WEBHOOK_SECRET="")
-    @patch("tasp.tasks.process_cortex_job.delay")
+    @patch("tasp.tasks.reconcile_case.delay")
     def test_unconfigured_secret_returns_503(self, mock_delay):
         resp = self.client.post(
             "/api/cortex/webhook/",

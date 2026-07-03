@@ -1,5 +1,6 @@
 from django.utils import timezone
 
+from case_handler.lifecycle import LifecycleState
 from case_handler.models import (
     Case,
     CaseArtifact,
@@ -58,6 +59,8 @@ class CaseCreator:
                 case.final_score = 0
                 case.final_confidence = 100
                 case.status = "Done"
+                case.lifecycle_state = LifecycleState.FINALIZED
+                case.finalized_at = timezone.now()
                 break
 
             if value:

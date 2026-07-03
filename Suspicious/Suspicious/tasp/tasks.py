@@ -9,6 +9,12 @@ logger = get_task_logger(__name__)
 
 _RETRY = dict(max_retries=3, acks_late=True)
 
+# Per-case Redis lock TTL for the `case_update_lock:<id>` key. Long enough to
+# cover one case's ledger sync, short enough that a crashed worker doesn't
+# strand the lock for hours. Canonical home for this value — other modules
+# that need it (e.g. the cron fallback) import it from here.
+CASE_LOCK_TTL = 120
+
 
 @shared_task(bind=True, **_RETRY)
 def fetch_emails(self):
@@ -30,9 +36,9 @@ def sync_cortex(self):
 
 @shared_task(bind=True, **_RETRY)
 def update_ongoing_cases(self):
-    from tasp.cron.user_and_cases import update_ongoing_case_jobs
+    from tasp.cron.user_and_cases import update_ongoing_cases as _update_ongoing_cases
     try:
-        update_ongoing_case_jobs()
+        _update_ongoing_cases()
     except Exception as exc:
         raise self.retry(exc=exc, countdown=60 * 2 ** self.request.retries)
 
@@ -200,7 +206,7 @@ def process_cortex_job(self, case_id: int, job_id: str):
     """Sync one (case, cortex_job) pair after the webhook fires.
 
     Acquires a per-case Redis lock to serialise with the cron poll
-    `update_ongoing_case_jobs` and other concurrent webhook tasks on the
+    `update_ongoing_cases` and other concurrent webhook tasks on the
     same case. Idempotent: the status precheck drops re-deliveries of an
     already-finalised job.
 
@@ -213,7 +219,7 @@ def process_cortex_job(self, case_id: int, job_id: str):
     from cortex_job.cortex_utils.cortex_and_job_management import CortexJobManager
 
     lock_key = f"case_update_lock:{case_id}"
-    if not cache.add(lock_key, 1, timeout=120):
+    if not cache.add(lock_key, 1, timeout=CASE_LOCK_TTL):
         return  # Cron or another webhook task is currently updating this case
     try:
         try:
@@ -245,7 +251,7 @@ def process_cortex_job(self, case_id: int, job_id: str):
 def reconcile_case(self, case_id: int):
     """Single finalise entrypoint: sync ledger + advance the state machine."""
     lock_key = f"case_update_lock:{case_id}"
-    if not cache.add(lock_key, 1, timeout=120):
+    if not cache.add(lock_key, 1, timeout=CASE_LOCK_TTL):
         return  # another worker/webhook owns this case; cron will re-pick it
     try:
         case = Case.objects.filter(id=case_id).first()
