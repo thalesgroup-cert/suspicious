@@ -4,7 +4,9 @@ import email.policy
 import json
 import os
 import tempfile
-import email, email.message, email.policy, hashlib, json, os, tempfile
+import email
+import email.message
+import email.policy
 from unittest.mock import patch
 from django.test import TestCase
 
