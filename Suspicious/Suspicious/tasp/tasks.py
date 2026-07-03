@@ -1,5 +1,9 @@
 from celery import shared_task
 from celery.utils.log import get_task_logger
+from django.core.cache import cache
+
+from case_handler.models import Case
+from cortex_job.cortex_utils.reconciliation import reconcile_case_core
 
 logger = get_task_logger(__name__)
 
@@ -233,5 +237,20 @@ def process_cortex_job(self, case_id: int, job_id: str):
             manager.finalise_case(caj.case)
     except Exception as exc:
         raise self.retry(exc=exc, countdown=30 * 2 ** self.request.retries)
+    finally:
+        cache.delete(lock_key)
+
+
+@shared_task(bind=True)
+def reconcile_case(self, case_id: int):
+    """Single finalise entrypoint: sync ledger + advance the state machine."""
+    lock_key = f"case_update_lock:{case_id}"
+    if not cache.add(lock_key, 1, timeout=120):
+        return  # another worker/webhook owns this case; cron will re-pick it
+    try:
+        case = Case.objects.filter(id=case_id).first()
+        if case is None:
+            return
+        reconcile_case_core(case)
     finally:
         cache.delete(lock_key)
