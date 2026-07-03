@@ -17,12 +17,9 @@ venv/
 .coverage
 htmlcov/
 
-# Local DB / secrets (mounted at runtime, never baked into the image)
-*.sqlite
-*.sqlite3
-*.env
-settings.json
+# Secrets (mounted at runtime, never baked into the image)
 config.json
+*.env
 
 # Logs / OS cruft
 *.log
