@@ -38,3 +38,18 @@ class FinaliseTest(TestCase):
         finalise(self.case)
         mock_report.assert_called_once_with(self.case)
         self.assertTrue(self.case.description)
+
+
+class FinalisePersistenceTest(TestCase):
+    def test_finalise_persists_failure_verdict_for_mailless_case(self):
+        # A case with no mail and no analyzer reports must persist the Failure
+        # verdict (regression: save_case_results early-returns for mail=None, so
+        # finalise must do a full save or the verdict is lost).
+        from django.contrib.auth import get_user_model
+        from case_handler.models import Case
+        from cortex_job.cortex_utils.reconciliation import finalise
+        user = get_user_model().objects.create_user(username="fin_persist_u", password="x")
+        case = Case.objects.create(description="", reporter=user, results="Suspicious")
+        finalise(case)
+        case.refresh_from_db()
+        self.assertEqual(case.results, "Failure")

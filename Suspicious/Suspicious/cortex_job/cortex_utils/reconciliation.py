@@ -41,7 +41,7 @@ def finalise(case) -> None:
     # the Failure verdict via update_case_results (empty-reports branch).
     CortexAnalyzerReports.get_report(case)
     case.description = _describe(mgr.results)
-    case.save(update_fields=["description"])
+    case.save()
 
 
 from case_handler.lifecycle import LifecycleState, transition
