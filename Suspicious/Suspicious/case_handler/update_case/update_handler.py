@@ -49,7 +49,6 @@ def handle_attachment(id, level, case_id):
         obj_confidence = obj.file_confidence
         obj_level = obj.file_level
 
-        # Get the linked hash information directly from the updated file object
         linked_hash = file.linked_hash
         hash_obj_score = linked_hash.ioc_score
         hash_obj_confidence = linked_hash.ioc_confidence

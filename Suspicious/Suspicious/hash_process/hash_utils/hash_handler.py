@@ -24,7 +24,6 @@ class HashHandler:
         h = h.strip().lower()  # Normalize input
         hash_info = self.hashid.identifyHash(h)
         try:
-            # Return the first detected hash type from the generator
             return next(hash_info).name
         except StopIteration:
             # No hash type was identified by hashid; try SSDEEP next

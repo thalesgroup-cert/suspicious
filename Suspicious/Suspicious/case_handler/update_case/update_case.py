@@ -118,7 +118,6 @@ def update_case_score(case):
             # Calculate scores if there are attachments or artifacts
             attachments, artifacts = get_attachments_and_artifacts(case)
 
-            # Check if there are any attachments and artifacts to calculate
             if attachments:
                 attachment_scores, attachment_confidences = calculate_attachment_scores(attachments)
                 total_scores.extend(attachment_scores)
@@ -152,7 +151,6 @@ def update_case_score(case):
             total_confidences.append(non_file_ioc_confidence)
             update_cases_logger.info(f"Non-file IoC score: {non_file_ioc_score}, confidence: {non_file_ioc_confidence}")
 
-        # Check if there are any scores to calculate
         if total_scores:
             avg_score = sum(total_scores) / len(total_scores)
             avg_confidence = sum(total_confidences) / len(total_confidences) if total_confidences else 0

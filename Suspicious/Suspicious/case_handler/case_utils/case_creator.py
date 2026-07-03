@@ -270,7 +270,6 @@ class CaseCreator:
             'mail_instance': 'fileOrMail'
         }
 
-        # Check if the key exists in the dictionary
         if key not in related_fields:
             raise ValueError(f"Invalid key: {key}. Valid keys are {', '.join(related_fields.keys())}.")
 

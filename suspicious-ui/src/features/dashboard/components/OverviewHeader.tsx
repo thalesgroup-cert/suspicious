@@ -40,7 +40,6 @@ export default function OverviewHeader(props: {
   onRefresh: () => void;
   refreshing: boolean;
 
-  // ✅ new
   trendWindow: number;
   onTrendWindowChange: (n: number) => void;
 }) {

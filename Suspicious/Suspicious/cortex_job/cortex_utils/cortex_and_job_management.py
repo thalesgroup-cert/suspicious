@@ -1217,7 +1217,6 @@ class CortexJobManager:
                 # Mark report as seen
                 self.results[data_type]["reports"].add(report_id)
 
-                # Get the job result
                 status = self.get_cortex_jobs_results(report, data_type)
                 if status and status.lower() in {
                     "success",
