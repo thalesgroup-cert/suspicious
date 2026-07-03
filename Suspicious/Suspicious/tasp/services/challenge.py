@@ -29,9 +29,17 @@ class CaseChallengeService:
             raise ValueError("Case already challenged")
 
     def mark_challenged(self):
+        from case_handler.lifecycle import LifecycleState, transition
+
         self.case.is_challenged = True
-        self.case.status = "Challenged"
-        self.case.save(update_fields=["is_challenged", "status"])
+        self.case.save(update_fields=["is_challenged"])
+        # Keep lifecycle_state authoritative: route through the state machine
+        # so status stays derived from it (FINALIZED -> CONTESTED).
+        if self.case.lifecycle_state == LifecycleState.FINALIZED:
+            transition(self.case, LifecycleState.CONTESTED)
+        else:
+            self.case.status = "Challenged"
+            self.case.save(update_fields=["status"])
 
     def update_user_stats(self):
         _update_case_challenge_stats(self.case.reporter)

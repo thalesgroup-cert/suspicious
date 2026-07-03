@@ -314,8 +314,16 @@ class SubmissionChallengeView(APIView):
         if not obj.is_challengeable:
             raise ValidationError({"detail": "Submission cannot be challenged."})
 
+        from case_handler.lifecycle import LifecycleState, transition
+
         obj.is_challenged = True
-        obj.status = "Challenged"
-        obj.save(update_fields=["is_challenged", "status", "last_update"])
+        obj.save(update_fields=["is_challenged", "last_update"])
+        # Keep lifecycle_state authoritative (FINALIZED -> CONTESTED); status is
+        # derived from it via the state machine.
+        if obj.lifecycle_state == LifecycleState.FINALIZED:
+            transition(obj, LifecycleState.CONTESTED)
+        else:
+            obj.status = "Challenged"
+            obj.save(update_fields=["status"])
 
         return Response({"detail": "Challenge submitted."}, status=status.HTTP_200_OK)
