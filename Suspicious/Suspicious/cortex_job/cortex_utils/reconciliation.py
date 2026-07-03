@@ -41,3 +41,37 @@ def finalise(case) -> None:
     CortexAnalyzerReports.get_report(case)
     case.description = _describe(mgr.results)
     case.save(update_fields=["description"])
+
+
+from case_handler.lifecycle import LifecycleState, transition
+from cortex_job.models import CaseAnalyzerJob
+
+_TERMINAL = {LifecycleState.FINALIZED, LifecycleState.CONTESTED}
+
+
+def reconcile_case_core(case) -> None:
+    """Advance one case. Caller MUST hold the per-case lock."""
+    if case.lifecycle_state in _TERMINAL:
+        return
+
+    mgr = CortexJobManager()
+    pending = list(
+        CaseAnalyzerJob.objects
+        .filter(case=case, status__in=CaseAnalyzerJob.PENDING_STATUSES)
+        .select_related("analyzer_report")
+    )
+    for caj in pending:
+        mgr.update_single_job(caj)
+
+    still_pending = CaseAnalyzerJob.objects.filter(
+        case=case, status__in=CaseAnalyzerJob.PENDING_STATUSES
+    ).exists()
+
+    if still_pending:
+        if case.lifecycle_state == LifecycleState.CREATED:
+            transition(case, LifecycleState.ANALYZING)
+        return
+
+    transition(case, LifecycleState.SCORING)
+    finalise(case)
+    transition(case, LifecycleState.FINALIZED)
