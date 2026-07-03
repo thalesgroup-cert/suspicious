@@ -12,6 +12,7 @@ from hash_process.models import Hash
 from mail_feeder.models import Mail
 from django.utils.translation import gettext_lazy as _
 from django.utils import timezone
+from case_handler.lifecycle import LifecycleState
 import datetime
 
 
@@ -63,6 +64,12 @@ class Case(models.Model):
     creation_date = models.DateTimeField(auto_now_add=True, db_index=True)
     last_update = models.DateTimeField(auto_now=True)
     last_update_by = models.ForeignKey(settings.AUTH_USER_MODEL, on_delete=models.CASCADE, related_name='cases_last_update_by', null=True, blank=True, db_index=True)
+    lifecycle_state = models.CharField(
+        max_length=20, choices=LifecycleState.choices,
+        default=LifecycleState.CREATED, db_index=True,
+        verbose_name="Lifecycle State",
+    )
+    finalized_at = models.DateTimeField(null=True, blank=True, verbose_name="Finalized At")
 
     class Meta:
         ordering = ['-creation_date']
