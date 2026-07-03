@@ -72,6 +72,7 @@ def reconcile_case_core(case) -> None:
             transition(case, LifecycleState.ANALYZING)
         return
 
-    transition(case, LifecycleState.SCORING)
+    if case.lifecycle_state != LifecycleState.SCORING:
+        transition(case, LifecycleState.SCORING)
     finalise(case)
     transition(case, LifecycleState.FINALIZED)

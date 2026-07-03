@@ -26,3 +26,13 @@ class ReconcileCoreTest(TestCase):
         self.case.save(update_fields=["lifecycle_state"])
         reconcile_case_core(self.case)
         mock_finalise.assert_not_called()
+
+    @patch("cortex_job.cortex_utils.reconciliation.finalise")
+    def test_reentry_from_scoring_state(self, mock_finalise):
+        from case_handler.lifecycle import LifecycleState
+        self.case.lifecycle_state = LifecycleState.SCORING
+        self.case.save(update_fields=["lifecycle_state"])
+        reconcile_case_core(self.case)  # must not raise IllegalTransition
+        self.case.refresh_from_db()
+        self.assertEqual(self.case.lifecycle_state, LifecycleState.FINALIZED)
+        mock_finalise.assert_called_once()
