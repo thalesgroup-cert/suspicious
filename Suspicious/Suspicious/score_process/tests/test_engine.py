@@ -1,8 +1,7 @@
 from django.test import SimpleTestCase
 from case_handler.models import Result
 from score_process.scoring.engine import (
-    Signal, AiSignal, CaseVerdict, band, score_case,
-    CONF_FLOOR, NEUTRAL,
+    Signal, AiSignal, band, score_case, CONF_FLOOR,
 )
 
 
