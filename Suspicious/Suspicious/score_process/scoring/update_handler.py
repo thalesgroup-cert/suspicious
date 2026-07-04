@@ -12,51 +12,6 @@ logger              = logging.getLogger(__name__)
 update_cases_logger = logging.getLogger("tasp.cron.update_ongoing_case_jobs")
 
 
-def update_case_results(case, reports, is_malicious, failure):
-    """
-    Derive and set case.results and case.analysis_done from scoring outputs.
-    Does NOT call case.save() — the caller is responsible for persistence.
-    """
-    from score_process.scoring.case_score_calculation import calculate_result_ranges
-
-    try:
-        # No analyzer produced a report (e.g. no enabled analyzer matched the
-        # observable). There is no signal to score, so the honest verdict is
-        # Failure — never leave the fail-dangerous default "Suspicious".
-        if not reports:
-            case.results = "Failure"
-            case.analysis_done = 0
-            update_cases_logger.warning(
-                "Case %s finalised with no analyzer reports — marking Failure.", case.id
-            )
-            return
-
-        update_cases_logger.info("Deriving case results from final score %s.", case.final_score)
-        case.results      = calculate_result_ranges(case.final_score)
-        case.analysis_done = max(0, len(reports) - failure)
-
-        # Override to Dangerous when at least one third of analyzers — and at
-        # least one — flagged malicious. The `max(1, …)` floor prevents
-        # `len(reports) // 3 == 0` from short-circuiting the comparison and
-        # forcing every case (including 0-report and 0-malicious ones) into
-        # Dangerous.
-        threshold = max(1, len(reports) // 3)
-        if is_malicious >= threshold:
-            update_cases_logger.info(
-                "Malicious report count (%s) >= threshold (%s) — forcing Dangerous.",
-                is_malicious, threshold,
-            )
-            case.results = "Dangerous"
-
-        if case.analysis_done == 0 and case.results != "Dangerous":
-            update_cases_logger.warning(
-                "Case %s: no analysis completed and result is not Dangerous.", case.id
-            )
-
-    except Exception as exc:
-        update_cases_logger.error("Failed to update case results for %s: %s", case.id, exc)
-
-
 def save_case_results(case, mail):
     """
     Persist case and MailInfo.

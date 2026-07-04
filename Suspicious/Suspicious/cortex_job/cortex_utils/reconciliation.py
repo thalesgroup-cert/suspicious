@@ -32,7 +32,7 @@ def finalise(case) -> None:
     """
     agg = aggregate_case(case)
     # Verdict + KPI + connector side-effects. For zero reports this resolves to
-    # the Failure verdict via update_case_results (empty-reports branch).
+    # the Failure verdict via score_case (no scored signals → Result.FAILURE).
     CortexAnalyzerReports.get_report(case)
     case.description = _describe(agg)
     case.save()
