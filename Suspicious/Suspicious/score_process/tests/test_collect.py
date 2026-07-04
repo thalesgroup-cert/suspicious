@@ -39,6 +39,8 @@ class CollectSignalsTest(TestCase):
         self.assertTrue(all(isinstance(s, Signal) for s in signals))
         self.assertEqual(len(signals), 1)
         self.assertTrue(signals[0].is_malicious)     # score 10 ≥ 8
+        self.assertLessEqual(signals[0].confidence, 100)  # confidence normalized to 0-100
+        self.assertEqual(signals[0].confidence, 100)  # fixture's malicious report → conf 100
         self.assertFalse(deny_listed)
 
     def test_no_iocs_yields_no_signals(self):

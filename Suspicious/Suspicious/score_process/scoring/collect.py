@@ -26,8 +26,10 @@ def _signals_from(scores, confidences, offset, source):
     vote."""
     out = []
     for score, conf in zip(scores[offset:], confidences[offset:]):
+        # ponytail: normalize confidence from 0-1000 (compute_weighted_scores *10) to 0-100.
+        normalized_confidence = min(round(conf / 10), 100)
         out.append(Signal(
-            source=source, score=score, confidence=conf,
+            source=source, score=score, confidence=normalized_confidence,
             is_malicious=score >= MALICIOUS_SCORE_THRESHOLD, is_failure=False,
         ))
     return out
@@ -65,7 +67,8 @@ def collect_signals(case):
 
     ai = None
     if getattr(case, "confidence_ai", 0):
-        ai = AiSignal(score=case.score_ai or 0, confidence=case.confidence_ai or 0)
+        # ponytail: clamp AI confidence defensively to 0-100 boundary.
+        ai = AiSignal(score=case.score_ai or 0, confidence=min(case.confidence_ai or 0, 100))
 
     deny_listed = _compute_deny_listed(case)
     return signals, ai, deny_listed
