@@ -304,6 +304,8 @@ class SubmissionDetailsSerializer(SubmissionRowSerializer):
             "analyzer_reports",
             "case_infos",
             "url_artifacts",
+            "challenge_proposed_result",
+            "challenge_reason",
         ]
 
     def get_analyzer_reports(self, obj):
