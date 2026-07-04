@@ -47,7 +47,7 @@ class CaseCreator:
             description=description or casestr,
             creation_date=timezone.now(),
             analysis_done=False,
-            results="Suspicious",
+            results="Inconclusive",
             status="On Going",
             reporter=self.user
         )

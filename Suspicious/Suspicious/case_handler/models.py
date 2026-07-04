@@ -47,7 +47,7 @@ class Case(models.Model):
     reporter = models.ForeignKey(settings.AUTH_USER_MODEL, on_delete=models.CASCADE, related_name='cases', db_index=True)
     analysis_done = models.PositiveIntegerField(default=0)
     status = models.CharField(max_length=20, choices=Status.choices, default=Status.TODO, verbose_name='Status', db_index=True)
-    results = models.CharField(max_length=20, choices=Result.choices, default=Result.SUSPICIOUS, verbose_name='Results', db_index=True)
+    results = models.CharField(max_length=20, choices=Result.choices, default=Result.INCONCLUSIVE, verbose_name='Results', db_index=True)
     final_score = models.FloatField(default=0)
     final_confidence = models.FloatField(default=0)
     score = models.FloatField(default=0)
