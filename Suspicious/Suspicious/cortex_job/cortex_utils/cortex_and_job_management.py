@@ -801,12 +801,6 @@ class CortexJobManager:
         Args:
             case (Case): The case to manage.
         """
-        if case.status != "Done":
-            update_cases_logger.info(
-                "Case status is not 'Done'. Skipping AI job management."
-            )
-            return
-
         # Validate presence of mail
         try:
             eml = getattr(case.fileOrMail, "mail", None)
