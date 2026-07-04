@@ -17,5 +17,7 @@ class ApplyVerdictTest(TestCase):
         self.assertEqual(case.results, Result.DANGEROUS)
         self.assertEqual(case.final_score, 9)
         self.assertEqual(case.final_confidence, 90)
+        self.assertEqual(case.score, 9)           # legacy mirror of final_score
+        self.assertEqual(case.confidence, 90)     # legacy mirror of final_confidence
         self.assertEqual(case.analysis_done, 4)
         self.assertTrue(case.kpi_counted)     # SP2 idempotent KPI ran once
