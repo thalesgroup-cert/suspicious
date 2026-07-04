@@ -79,3 +79,12 @@ class ScoreCaseTest(SimpleTestCase):
     def test_safe_case(self):
         v = score_case([sig(1, 90), sig(2, 90)])
         self.assertEqual(v.result, Result.SAFE)
+
+    def test_final_score_and_result_agree_on_non_integer_mean(self):
+        # base_score = 4.4 → rounds to 4 (Safe band); result must not read Suspicious
+        # sig(4, 60) qualifies for worst (conf >= 50); sig(5, 40) doesn't
+        # worst = 4; wmean = (4*60+5*40)/100 = 4.4; base = max(4, 4.4) = 4.4
+        # rounds to 4 → SAFE band
+        v = score_case([sig(4, 60), sig(5, 40)])
+        self.assertEqual(v.final_score, 4)
+        self.assertEqual(v.result, Result.SAFE)

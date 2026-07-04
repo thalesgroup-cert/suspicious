@@ -58,6 +58,9 @@ def score_case(signals, ai=None, deny_listed=False) -> CaseVerdict:
     else:
         final_score, final_conf = base_score, base_conf
 
+    # Round score once, before verdict checks — ensures final_score and result agree
+    final_score = min(round(final_score), 10)
+
     n_malicious = sum(1 for s in scored if s.is_malicious)
     n_scored = len(scored)
 
@@ -65,13 +68,13 @@ def score_case(signals, ai=None, deny_listed=False) -> CaseVerdict:
         result, final_score = Result.DANGEROUS, 10
     elif n_malicious >= max(1, n_scored // 3):
         result = Result.DANGEROUS
-    elif round(final_score) == NEUTRAL or final_conf < CONF_FLOOR:
+    elif final_score == NEUTRAL or final_conf < CONF_FLOOR:
         result = Result.INCONCLUSIVE
     else:
         result = band(final_score)
 
     return CaseVerdict(
-        final_score=min(round(final_score), 10),
+        final_score=final_score,
         final_confidence=min(round(final_conf), 100),
         result=result,
         n_malicious=n_malicious,
