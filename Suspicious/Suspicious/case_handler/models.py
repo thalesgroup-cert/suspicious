@@ -71,6 +71,7 @@ class Case(models.Model):
     )
     finalized_at = models.DateTimeField(null=True, blank=True, verbose_name="Finalized At")
     dispatched_at = models.DateTimeField(null=True, blank=True, verbose_name="Dispatched At")
+    kpi_counted = models.BooleanField(default=False, verbose_name="KPI Counted")
 
     class Meta:
         ordering = ['-creation_date']

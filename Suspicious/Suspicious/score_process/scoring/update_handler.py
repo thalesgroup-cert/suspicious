@@ -84,28 +84,43 @@ def save_case_results(case, mail):
 
 
 def update_kpi_and_user_stats(case):
-    """Update KPI counters and per-user monthly stats for the given case."""
+    """Update KPI counters and per-user monthly stats — exactly once per case.
+
+    A row-level lock on the Case plus the ``kpi_counted`` flag make this a
+    no-op on any re-finalisation (cron fallback, challenge→resolve), so a case
+    can never be double-counted.
+    """
+    from case_handler.models import Case
     try:
-        from tasp.cron.kpi import sync_monthly_kpi
-        kpi = sync_monthly_kpi()
+        with transaction.atomic():
+            locked = Case.objects.select_for_update().get(pk=case.pk)
+            if locked.kpi_counted:
+                return
 
-        kpi.monthly_cases_summary.update_case_results(case.results)
-        kpi.monthly_cases_summary.update_case_results(case.category_ai)
-        kpi.monthly_cases_summary.save()
+            from tasp.cron.kpi import sync_monthly_kpi
+            kpi = sync_monthly_kpi()
 
-        kpi.total_cases_stats.total_cases += 1
-        kpi.total_cases_stats.save()
+            kpi.monthly_cases_summary.update_case_results(case.results)
+            kpi.monthly_cases_summary.update_case_results(case.category_ai)
+            kpi.monthly_cases_summary.save()
 
-        stats = UserCasesMonthlyStats.objects.filter(
-            user=case.reporter, month=kpi.month, year=kpi.year
-        ).first()
-        if not stats:
-            stats = UserCasesMonthlyStats(user=case.reporter, month=kpi.month, year=kpi.year)
+            kpi.total_cases_stats.total_cases += 1
+            kpi.total_cases_stats.save()
 
-        stats.update_case_results(case.results)
-        stats.update_case_results(case.category_ai)
-        stats.total_cases += 1
-        stats.save()
+            stats = UserCasesMonthlyStats.objects.filter(
+                user=case.reporter, month=kpi.month, year=kpi.year
+            ).first()
+            if not stats:
+                stats = UserCasesMonthlyStats(user=case.reporter, month=kpi.month, year=kpi.year)
+
+            stats.update_case_results(case.results)
+            stats.update_case_results(case.category_ai)
+            stats.total_cases += 1
+            stats.save()
+
+            locked.kpi_counted = True
+            locked.save(update_fields=["kpi_counted"])
+            case.kpi_counted = True
 
     except Exception as exc:
         update_cases_logger.error("Failed to update KPI/user stats: %s", exc)
