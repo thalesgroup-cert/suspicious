@@ -26,6 +26,8 @@ import {
   TableRow,
   TableSortLabel,
   TextField,
+  ToggleButton,
+  ToggleButtonGroup,
   Tooltip,
   Typography,
 } from "@mui/material";
@@ -151,6 +153,8 @@ export default function SubmissionsPage() {
   const [openDrawer, setOpenDrawer] = React.useState(false);
   const [selectedId, setSelectedId] = React.useState<number | string | null>(null);
   const [challengeId, setChallengeId] = React.useState<number | null>(null);
+  const [proposedResult, setProposedResult] = React.useState<"Safe" | "Dangerous" | null>(null);
+  const [challengeReason, setChallengeReason] = React.useState("");
   const [expandedAnalyzerIds, setExpandedAnalyzerIds] = React.useState<Record<number, boolean>>({});
   const [expandedGroups, setExpandedGroups] = React.useState<Record<string, boolean>>({});
 
@@ -209,8 +213,9 @@ export default function SubmissionsPage() {
   });
 
   const challengeMutation = useMutation({
-    mutationFn: async (id: number) => challengeSubmission(id),
-    onMutate: async (id) => {
+    mutationFn: async (vars: { id: number; proposed_result: "Safe" | "Dangerous"; reason: string }) =>
+      challengeSubmission(vars.id, { proposed_result: vars.proposed_result, reason: vars.reason }),
+    onMutate: async (vars) => {
       await qc.cancelQueries({ queryKey: ["submissions"] });
       const prevEntries = qc.getQueriesData<PaginatedSubmissionsResponse>({ queryKey: ["submissions"] });
       prevEntries.forEach(([key, prev]) => {
@@ -218,20 +223,24 @@ export default function SubmissionsPage() {
         qc.setQueryData<PaginatedSubmissionsResponse>(key, {
           ...prev,
           results: prev.results.map((r) =>
-            r.id === id ? { ...r, is_challenged: true, is_challengeable: false } : r
+            r.id === vars.id ? { ...r, is_challenged: true, is_challengeable: false } : r
           ),
         });
       });
       return { prevEntries };
     },
-    onError: (_err, _id, ctx) => {
+    onError: (_err, _vars, ctx) => {
       ctx?.prevEntries?.forEach(([key, data]) => { qc.setQueryData(key, data); });
     },
     onSettled: () => {
       qc.invalidateQueries({ queryKey: ["submissions"] });
       qc.invalidateQueries({ queryKey: ["submissionDetails"] });
     },
-    onSuccess: () => setChallengeId(null),
+    onSuccess: () => {
+      setChallengeId(null);
+      setProposedResult(null);
+      setChallengeReason("");
+    },
   });
 
   // Sync from deep-link URL params (?q, ?open) on first render and whenever
@@ -1058,7 +1067,11 @@ export default function SubmissionsPage() {
       {/* ------------------------------------------------------------------ */}
       <Dialog
         open={challengeId !== null}
-        onClose={() => setChallengeId(null)}
+        onClose={() => {
+          setChallengeId(null);
+          setProposedResult(null);
+          setChallengeReason("");
+        }}
         maxWidth="xs"
         fullWidth
         slotProps={{ paper: { sx: { borderRadius: DIALOG_RADIUS } } }}
@@ -1068,18 +1081,50 @@ export default function SubmissionsPage() {
           <Typography color="text.secondary">
             Submit a challenge request for submission #{challengeId}.
           </Typography>
+          <Typography variant="subtitle2" sx={{ mt: 2, mb: 1 }}>
+            What should the verdict be?
+          </Typography>
+          <ToggleButtonGroup
+            value={proposedResult}
+            exclusive
+            onChange={(_, v) => v && setProposedResult(v)}
+            size="small"
+          >
+            <ToggleButton value="Safe">Safe</ToggleButton>
+            <ToggleButton value="Dangerous">Dangerous</ToggleButton>
+          </ToggleButtonGroup>
+          <TextField
+            label="Why? (optional)"
+            value={challengeReason}
+            onChange={(e) => setChallengeReason(e.target.value)}
+            multiline
+            minRows={2}
+            fullWidth
+            sx={{ mt: 2 }}
+          />
           {challengeMutation.isError ? (
             <Alert severity="error" sx={{ mt: 2 }}>Failed to challenge.</Alert>
           ) : null}
         </DialogContent>
         <DialogActions>
-          <Button onClick={() => setChallengeId(null)} sx={{ borderRadius: 2 }}>
+          <Button
+            onClick={() => {
+              setChallengeId(null);
+              setProposedResult(null);
+              setChallengeReason("");
+            }}
+            sx={{ borderRadius: 2 }}
+          >
             Cancel
           </Button>
           <Button
             variant="contained"
-            disabled={challengeMutation.isPending || challengeId === null}
-            onClick={() => { if (challengeId) challengeMutation.mutate(challengeId); }}
+            disabled={challengeMutation.isPending || challengeId === null || proposedResult === null}
+            onClick={() => {
+              if (challengeId && proposedResult) {
+                challengeMutation.mutate({ id: challengeId, proposed_result: proposedResult, reason: challengeReason });
+              }
+            }}
             sx={{ textTransform: "none", fontWeight: 950, borderRadius: 2 }}
           >
             {challengeMutation.isPending ? "Sending…" : "Confirm"}
