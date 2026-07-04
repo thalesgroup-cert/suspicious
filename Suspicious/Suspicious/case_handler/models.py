@@ -39,6 +39,11 @@ class Result(models.TextChoices):
     DANGEROUS = 'Dangerous', _('Dangerous')
 
 
+class ProposedVerdict(models.TextChoices):
+    SAFE = "Safe", _("Safe")
+    DANGEROUS = "Dangerous", _("Dangerous")
+
+
 class Case(models.Model):
     """
     Main incident investigation case, storing scores, analyst decisions and AI predictions.
@@ -72,6 +77,13 @@ class Case(models.Model):
     finalized_at = models.DateTimeField(null=True, blank=True, verbose_name="Finalized At")
     dispatched_at = models.DateTimeField(null=True, blank=True, verbose_name="Dispatched At")
     kpi_counted = models.BooleanField(default=False, verbose_name="KPI Counted")
+    challenge_proposed_result = models.CharField(
+        max_length=20, choices=ProposedVerdict.choices, blank=True, default="",
+        verbose_name="Challenge Proposed Result",
+    )
+    challenge_reason = models.TextField(
+        blank=True, default="", verbose_name="Challenge Reason",
+    )
 
     class Meta:
         ordering = ['-creation_date']
