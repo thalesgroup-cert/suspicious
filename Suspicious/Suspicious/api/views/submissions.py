@@ -1,3 +1,5 @@
+import logging
+
 from django.db.models import Q
 from drf_spectacular.utils import OpenApiExample, OpenApiParameter, extend_schema
 from rest_framework import status
@@ -13,6 +15,7 @@ from api.permissions.submissions import (
     CanChallengeSubmission,
     user_has_submission_elevated_access,
 )
+from api.serializers.challenge import SubmissionChallengeSerializer
 from api.serializers.submissions import (
     AdminSubmissionDetailsSerializer,
     SubmissionDetailsSerializer,
@@ -20,6 +23,9 @@ from api.serializers.submissions import (
 )
 from case_handler.models import Case
 from cortex_job.models import AnalyzerReport
+from tasp.services.challenge import notify_and_record_challenge
+
+logger = logging.getLogger(__name__)
 
 
 CASE_LIST_SELECT_RELATED = (
@@ -309,6 +315,9 @@ class SubmissionChallengeView(APIView):
     def post(self, request, submission_id: int):
         obj = self.get_object(submission_id)
 
+        serializer = SubmissionChallengeSerializer(data=request.data)
+        serializer.is_valid(raise_exception=True)
+
         if obj.is_challenged:
             raise ValidationError({"detail": "Submission already challenged."})
         if not obj.is_challengeable:
@@ -317,7 +326,11 @@ class SubmissionChallengeView(APIView):
         from case_handler.lifecycle import LifecycleState, transition
 
         obj.is_challenged = True
-        obj.save(update_fields=["is_challenged", "last_update"])
+        obj.challenge_proposed_result = serializer.validated_data["proposed_result"]
+        obj.challenge_reason = serializer.validated_data.get("reason", "")
+        obj.save(update_fields=[
+            "is_challenged", "challenge_proposed_result", "challenge_reason", "last_update",
+        ])
         # Keep lifecycle_state authoritative (FINALIZED -> CONTESTED); status is
         # derived from it via the state machine.
         if obj.lifecycle_state == LifecycleState.FINALIZED:
@@ -325,5 +338,10 @@ class SubmissionChallengeView(APIView):
         else:
             obj.status = "Challenged"
             obj.save(update_fields=["status"])
+
+        try:
+            notify_and_record_challenge(obj, logger)
+        except Exception:
+            logger.exception("Challenge notify failed for case %s", obj.id)
 
         return Response({"detail": "Challenge submitted."}, status=status.HTTP_200_OK)
