@@ -7,6 +7,10 @@ rebuilt per-AnalyzerReport from the CaseAnalyzerJob ledger (a coarser
 granularity than live collect_signals, which aggregates per artifact) — good
 enough to compare verdict bands, which is the point. Safe↔Dangerous flips get
 eyeballed by the operator, not trusted blindly.
+
+Deliberately approximate: score_case is called without the AI-override or
+deny-list inputs, so the reported drift omits those two paths. It is an
+operator sanity tool, not an exhaustive drift oracle.
 """
 from collections import Counter
 

@@ -48,3 +48,15 @@ class CollectSignalsTest(TestCase):
         signals, ai, deny_listed = collect_signals(case)
         self.assertEqual(signals, [])
         self.assertFalse(deny_listed)
+
+    def test_ai_confidence_normalized_by_ten_not_clamped(self):
+        # manage_ai_jobs stores confidence_ai = analyzer.confidence * 10 (0-1000);
+        # collect must /10 back to 0-100, NOT clamp — else a mid-confidence AI
+        # verdict saturates to 100 and defeats the CONF_FLOOR gate.
+        case = Case.objects.create(
+            description="", reporter=self.user, score_ai=7, confidence_ai=400,
+        )
+        _, ai, _ = collect_signals(case)
+        self.assertIsNotNone(ai)
+        self.assertEqual(ai.confidence, 40)   # 400/10, not clamped to 100
+        self.assertEqual(ai.score, 7)

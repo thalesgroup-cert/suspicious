@@ -57,6 +57,14 @@ class ScoreCaseTest(SimpleTestCase):
         self.assertEqual(v.result, Result.DANGEROUS)
         self.assertEqual(v.final_score, 10)
 
+    def test_deny_list_wins_over_empty_signals(self):
+        # a known-bad domain whose analyzers all failed must still read Dangerous
+        # (deny-list is checked before the empty→Failure early return)
+        v = score_case([sig(0, 0, fail=True)], deny_listed=True)
+        self.assertEqual(v.result, Result.DANGEROUS)
+        self.assertEqual(v.final_score, 10)
+        self.assertEqual(v.final_confidence, 100)
+
     def test_malicious_vote_forces_dangerous(self):
         # 2 malicious of 3 ≥ max(1, 3//3=1) → Dangerous even if mean is modest
         signals = [sig(6, 90, mal=True), sig(6, 90, mal=True), sig(1, 90)]

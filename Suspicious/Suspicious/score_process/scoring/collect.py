@@ -23,7 +23,8 @@ logger = logging.getLogger("tasp.cron.update_ongoing_case_jobs")
 def _signals_from(scores, confidences, offset, source):
     """Turn the new (score, confidence) pairs appended since `offset` into
     Signals. is_malicious is the per-artifact equivalent of the old per-report
-    vote."""
+    vote — score-only by design, so the malicious-vote override in score_case
+    can fire on a high-score artifact regardless of its confidence."""
     out = []
     for score, conf in zip(scores[offset:], confidences[offset:]):
         # ponytail: normalize confidence from 0-1000 (compute_weighted_scores *10) to 0-100.
@@ -66,9 +67,12 @@ def collect_signals(case):
     signals += [Signal("failed", 0, 0, False, True) for _ in range(failures)]
 
     ai = None
-    if getattr(case, "confidence_ai", 0):
-        # ponytail: clamp AI confidence defensively to 0-100 boundary.
-        ai = AiSignal(score=case.score_ai or 0, confidence=min(case.confidence_ai or 0, 100))
+    if case.confidence_ai:
+        # manage_ai_jobs stores confidence_ai = analyzer.confidence * 10 (0-1000),
+        # the same *10 inflation as compute_weighted_scores — undo it with /10 so
+        # the AI signal is on the same 0-100 scale as artifact signals (otherwise
+        # any AI confidence >= 10% saturates to 100 and defeats the CONF_FLOOR gate).
+        ai = AiSignal(score=case.score_ai or 0, confidence=min(round((case.confidence_ai or 0) / 10), 100))
 
     deny_listed = _compute_deny_listed(case)
     return signals, ai, deny_listed

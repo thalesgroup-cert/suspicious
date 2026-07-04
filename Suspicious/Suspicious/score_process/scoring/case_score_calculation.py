@@ -92,16 +92,6 @@ def get_score_level(score: int) -> str:
     )
 
 
-def calculate_result_ranges(final_score: float) -> str:
-    return _find_category_in_enum_range(
-        score=final_score,
-        enum_class=ResultRange,
-        category_type_name="result range",
-        capitalize_result=True,
-        logger=update_cases_logger,
-    )
-
-
 # ── Domain deny-list helpers ──────────────────────────────────────────────────
 
 def get_deny_listed_domains_set() -> Set[str]:

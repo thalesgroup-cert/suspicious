@@ -44,6 +44,16 @@ def band(score: float) -> str:
 
 def score_case(signals, ai=None, deny_listed=False) -> CaseVerdict:
     scored = [s for s in signals if not s.is_failure]
+    n_malicious = sum(1 for s in scored if s.is_malicious)
+    n_scored = len(scored)
+
+    # Deny-list is a hard, analyzer-independent signal: it wins even when no
+    # analyzer produced a usable report (a known-bad domain whose analyzers all
+    # failed must still read Dangerous, not Failure). Confidence is pinned to 100
+    # because the verdict comes from a curated list, not from scoring.
+    if deny_listed:
+        return CaseVerdict(10, 100, Result.DANGEROUS, n_malicious, n_scored)
+
     if not scored:
         return CaseVerdict(NEUTRAL, 0, Result.FAILURE, 0, 0)
 
@@ -61,12 +71,7 @@ def score_case(signals, ai=None, deny_listed=False) -> CaseVerdict:
     # Round score once, before verdict checks — ensures final_score and result agree
     final_score = min(round(final_score), 10)
 
-    n_malicious = sum(1 for s in scored if s.is_malicious)
-    n_scored = len(scored)
-
-    if deny_listed:
-        result, final_score = Result.DANGEROUS, 10
-    elif n_malicious >= max(1, n_scored // 3):
+    if n_malicious >= max(1, n_scored // 3):
         result = Result.DANGEROUS
     elif final_score == NEUTRAL or final_conf < CONF_FLOOR:
         result = Result.INCONCLUSIVE
