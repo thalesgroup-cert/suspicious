@@ -12,8 +12,16 @@ from score_process.scoring.cortex_analyzers.reports import CortexAnalyzerReports
 logger = logging.getLogger("tasp.cron.update_ongoing_case_jobs")
 
 
-def _describe(agg: CaseAggregate) -> str:
+def _describe(agg: CaseAggregate, analysis_done: int = 0) -> str:
     if agg.scored == 0:
+        # No CaseAnalyzerJob rows for this case. This is either a genuinely
+        # unanalysable submission OR a deduplicated artifact whose result was
+        # reused from a prior identical submission (no new job dispatched, so
+        # no ledger row) — the latter still produces a scored verdict, which
+        # analysis_done reflects. Don't claim "no analyzer applicable" then.
+        if analysis_done > 0:
+            return ("Analysis complete using results reused from a prior "
+                    "identical submission.")
         return ("No analyzer was applicable to this submission, so it could "
                 "not be analysed. Check that the relevant Cortex analyzers "
                 "are enabled.")
@@ -33,8 +41,9 @@ def finalise(case) -> None:
     agg = aggregate_case(case)
     # Verdict + KPI + connector side-effects. For zero reports this resolves to
     # the Failure verdict via score_case (no scored signals → Result.FAILURE).
+    # get_report writes case.analysis_done (= verdict.n_scored) on this instance.
     CortexAnalyzerReports.get_report(case)
-    case.description = _describe(agg)
+    case.description = _describe(agg, case.analysis_done)
     case.save()
 
 

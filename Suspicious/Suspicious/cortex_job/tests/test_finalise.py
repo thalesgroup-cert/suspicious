@@ -16,6 +16,14 @@ class DescribeTest(TestCase):
     def test_no_scored_reports_mentions_no_analyzer(self):
         self.assertIn("analyzer", _describe(_agg()).lower())
 
+    def test_empty_ledger_but_reused_report_not_called_inapplicable(self):
+        # Deduped IOC: no CaseAnalyzerJob rows (agg.scored==0) but scoring
+        # reused a prior report (analysis_done>0). Must NOT say the submission
+        # could not be analysed — the verdict came from a reused result.
+        d = _describe(_agg(), analysis_done=1)
+        self.assertIn("reused", d.lower())
+        self.assertNotIn("no analyzer was applicable", d.lower())
+
     def test_all_success(self):
         self.assertIn("success", _describe(_agg(total=1, success=1)).lower())
 

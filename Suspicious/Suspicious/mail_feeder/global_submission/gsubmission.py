@@ -185,3 +185,13 @@ class GlobalSubmissionService:
                     "Failed to launch Cortex AI job (case=%s)",
                     getattr(case, "id", None),
                 )
+
+        # Stamp dispatch completion + enqueue reconcile, matching the API
+        # submission path (case_handler.dispatch_pending). Closes the
+        # create/dispatch race for feeder cases and triggers prompt
+        # finalisation instead of waiting on the 300s cron fallback.
+        from django.utils import timezone
+        case.dispatched_at = timezone.now()
+        case.save(update_fields=["dispatched_at"])
+        from tasp.tasks import reconcile_case
+        reconcile_case.delay(case.id)

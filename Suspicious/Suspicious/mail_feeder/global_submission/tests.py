@@ -195,12 +195,14 @@ class GlobalSubmissionUtilsTests(TestCase):
 class HandleCommonTasksOrderingTest(django.test.TestCase):
     """Verify dispatch happens strictly after Case creation."""
 
+    @patch("tasp.tasks.reconcile_case")
     @patch("mail_feeder.global_submission.gsubmission.CortexJob")
     @patch("mail_feeder.global_submission.gsubmission.CaseCreatorService")
     @patch("mail_feeder.global_submission.gsubmission.UserCreationService")
     @patch("mail_feeder.global_submission.gsubmission.Handlers")
     def test_create_case_runs_before_dispatch_pending(
-        self, mock_handlers_cls, mock_user_cls, mock_case_cls, mock_cortex_cls
+        self, mock_handlers_cls, mock_user_cls, mock_case_cls, mock_cortex_cls,
+        mock_reconcile,
     ):
         from django.contrib.auth import get_user_model
         User = get_user_model()
@@ -234,3 +236,8 @@ class HandleCommonTasksOrderingTest(django.test.TestCase):
         self.assertEqual(order_log[0], "create_case")
         self.assertIn("artifact_dispatch", order_log[1:])
         self.assertIn("attachment_dispatch", order_log[1:])
+        # Feeder path must stamp dispatch completion + enqueue reconcile,
+        # matching the API path — otherwise the case waits on the 300s cron.
+        self.assertIsNotNone(fake_case.dispatched_at)
+        fake_case.save.assert_any_call(update_fields=["dispatched_at"])
+        mock_reconcile.delay.assert_called_once_with(42)
