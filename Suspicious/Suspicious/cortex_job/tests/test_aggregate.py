@@ -3,7 +3,7 @@ from django.contrib.auth import get_user_model
 from django.test import TestCase
 from case_handler.models import Case
 from cortex_job.models import Analyzer, AnalyzerReport, CaseAnalyzerJob
-from cortex_job.cortex_utils.aggregate import CaseAggregate, aggregate_case
+from cortex_job.cortex_utils.aggregate import aggregate_case
 
 
 class CaseAggregateTest(TestCase):
