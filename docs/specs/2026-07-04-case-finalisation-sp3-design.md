@@ -88,10 +88,13 @@ MALICIOUS_SCORE_THRESHOLD = 8
 @dataclass(frozen=True)
 class Signal:
     source: str          # "file", "mail_header", "url", … (diagnostic only)
-    score: float         # 0–10
-    confidence: float    # 0–100 (normalized)
-    weight: float        # Analyzer.weight
-    level: str           # analyzer level ("malicious", "info", …)
+    score: float         # 0–10 (already weight-aggregated WITHIN the artifact
+                         #        by compute_weighted_scores, which consumes
+                         #        Analyzer.weight — kept)
+    confidence: float    # 0–100 (normalized). Doubles as the CROSS-artifact
+                         #        weight: high-confidence signals pull the mean.
+    is_malicious: bool   # set at collect time: level in {malicious,dangerous}
+                         #        or score >= MALICIOUS_SCORE_THRESHOLD
     is_failure: bool
 
 
@@ -110,10 +113,6 @@ class CaseVerdict:
     n_scored: int
 
 
-def _is_malicious(s: Signal) -> bool:
-    return s.level in ("malicious", "dangerous") or s.score >= MALICIOUS_SCORE_THRESHOLD
-
-
 def band(score: float) -> str:
     if score <= 4:  return Result.SAFE
     if score <= 7:  return Result.SUSPICIOUS
@@ -126,12 +125,12 @@ def score_case(signals, ai=None, deny_listed=False) -> CaseVerdict:
         # Nothing ran / everything failed — SP1 invariant: honest Failure.
         return CaseVerdict(NEUTRAL, 0, Result.FAILURE, 0, 0)
 
-    total_w   = sum(s.weight for s in scored) or 1
+    conf_sum  = sum(s.confidence for s in scored) or 1
     confident = [s.score for s in scored if s.confidence >= CONF_FLOOR]
     worst     = max(confident, default=0)
-    wmean     = sum(s.score * s.weight for s in scored) / total_w
+    wmean     = sum(s.score * s.confidence for s in scored) / conf_sum  # confidence-weighted
     base_score = max(worst, wmean)
-    base_conf  = sum(s.confidence * s.weight for s in scored) / total_w
+    base_conf  = max(s.confidence for s in scored)     # case is as confident as its strongest signal
 
     # AI: replace-on-higher-confidence (kept behaviour).
     if ai is not None and ai.confidence > base_conf:
@@ -139,7 +138,7 @@ def score_case(signals, ai=None, deny_listed=False) -> CaseVerdict:
     else:
         final_score, final_conf = base_score, base_conf
 
-    n_malicious = sum(1 for s in scored if _is_malicious(s))
+    n_malicious = sum(1 for s in scored if s.is_malicious)   # per-artifact vote
     n_scored    = len(scored)
 
     # Overrides, strongest first.
