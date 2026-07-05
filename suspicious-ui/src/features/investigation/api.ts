@@ -106,6 +106,8 @@ export type InvestigationDetails = {
   raw?: unknown;
   analyzer_reports: InvestigationAnalyzerReport[];
   case_infos?: InvestigationCaseInfos;
+  challenge_proposed_result?: "Safe" | "Dangerous" | "";
+  challenge_reason?: string;
   [key: string]: unknown;
 };
 
