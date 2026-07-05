@@ -73,7 +73,6 @@ class MISPEventManager:
                 self._misp.update_event(event_obj)
                 return event_obj
 
-            # Create a new event
             event                 = MISPEvent()
             event.info            = event_name
             event.date            = datetime.now().strftime("%Y-%m-%d")

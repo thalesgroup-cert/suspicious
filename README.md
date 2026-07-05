@@ -178,14 +178,16 @@ Bug reports and ideas are welcome in [issues](https://github.com/thalesgroup-cer
 
 ## CI/CD
 
-GitHub Actions runs four workflows plus Dependabot under `.github/`.
+GitHub Actions runs six workflows plus Dependabot under `.github/`.
 
 | Workflow | Trigger | Runs |
 |----------|---------|------|
 | `ci.yml` | PRs and pushes to `main`/`test` | commit-lint, `ruff`, migration-drift check, Django tests, feeder tests, frontend (eslint + tsc + vitest + build), image builds |
+| `e2e-deploy.yml` | PRs, pushes to `main`/`feature/frontweb` | full-stack deploy smoke test against a stubbed Cortex |
+| `docs.yml` | PRs and pushes to `main` | builds the MkDocs site and deploys it to GitHub Pages |
 | `release.yml` | pushes to `main`/`test`, `v*` tags | builds and pushes images to GHCR with SBOM and provenance |
 | `codeql.yml` | PRs, pushes to `main`, weekly | CodeQL for Python and JS/TS |
-| `security.yml` | PRs, weekly | Trivy, gitleaks, `pip-audit`, `npm audit` |
+| `security.yml` | PRs, weekly | Trivy, gitleaks, `pip-audit`, `pnpm audit` |
 
 ### Published images (GHCR)
 

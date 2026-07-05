@@ -34,8 +34,11 @@ cp .env.example .env
 ### 1.1 Application Versions
 
 ```env
-SUSPICIOUS_VERSION=test          # or a pinned tag; `latest` tracks main
-DB_SUSPICIOUS_VERSION=12
+SUSPICIOUS_VERSION=latest        # `latest` tracks main; pin a tag for prod
+# UI + feeder default to SUSPICIOUS_VERSION when unset; pin independently if needed.
+SUSPICIOUS_UI_VERSION=
+SUSPICIOUS_FEEDER_VERSION=
+DB_SUSPICIOUS_VERSION=11.4
 RUSTFS_VERSION=1.0.0-alpha.90
 CORTEX_VERSION=4.0.0-1
 ELASTICSEARCH_VERSION=8.19.7
@@ -53,7 +56,7 @@ REDIS_CACHE_VERSION=9-alpine
 ```env
 SUSPICIOUS_PORT=9020
 SUSPICIOUS_UI_PORT=9021
-RUSTFS_PORT=35000        # RustFS console — local access only
+MINIO_PORT=35000         # MinIO / RustFS console — local access only
 CORTEX_PORT=9001
 ```
 

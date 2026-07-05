@@ -157,7 +157,6 @@ class Mailbox:
         # Search for unseen emails. Consider using UID SEARCH for UIDs if preferred over sequence numbers.
         _, response = self.__mail_client.search(charset, *criteria)
 
-        # Check if there is no new email, or if it's whitespace-only
         if len(response) > 0 and len(response[0].strip()) > 0:
             # email_ids are space-separated bytes string of message numbers
             encoded_email_ids: list[bytes] = response[0].split()

@@ -1,0 +1,26 @@
+# VCS
+.git
+.gitignore
+
+# Docker
+Dockerfile
+.dockerignore
+
+# Python caches / virtualenvs
+__pycache__/
+*.py[cod]
+.venv/
+venv/
+.pytest_cache/
+.ruff_cache/
+.mypy_cache/
+.coverage
+htmlcov/
+
+# Secrets (mounted at runtime, never baked into the image)
+config.json
+*.env
+
+# Logs / OS cruft
+*.log
+.DS_Store

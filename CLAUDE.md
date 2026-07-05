@@ -56,7 +56,7 @@ python manage.py createsuperuser
 | `suspicious` | Django REST API (Gunicorn, port 9020) |
 | `suspicious_celery` | Celery beat + worker (background jobs, cortex sync, case finalisation) |
 | `suspicious_ui` | React/Vite frontend (Nginx, port 9021) |
-| `db_suspicious` | MariaDB 12 (primary read/write; opt-in replica via R6 router) |
+| `db_suspicious` | MariaDB 11.4 (primary read/write; opt-in replica via R6 router) |
 | `redis_broker` / `redis_cache` | Valkey 9 — Celery broker + Django cache (per-case lock, webhook jobId dedup) |
 | `elasticsearch` | Search and indexing |
 | `rustfs` | MinIO-compatible S3 object storage (artifacts/attachments) |

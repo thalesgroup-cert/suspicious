@@ -29,9 +29,17 @@ class CaseChallengeService:
             raise ValueError("Case already challenged")
 
     def mark_challenged(self):
+        from case_handler.lifecycle import LifecycleState, transition
+
         self.case.is_challenged = True
-        self.case.status = "Challenged"
-        self.case.save(update_fields=["is_challenged", "status"])
+        self.case.save(update_fields=["is_challenged"])
+        # Keep lifecycle_state authoritative: route through the state machine
+        # so status stays derived from it (FINALIZED -> CONTESTED).
+        if self.case.lifecycle_state == LifecycleState.FINALIZED:
+            transition(self.case, LifecycleState.CONTESTED)
+        else:
+            self.case.status = "Challenged"
+            self.case.save(update_fields=["status"])
 
     def update_user_stats(self):
         _update_case_challenge_stats(self.case.reporter)
@@ -39,6 +47,12 @@ class CaseChallengeService:
     def notify(self):
         send_to_thehive = _load_thehive_config().get("enabled", False)
         mail_header = f"Case ID {self.case.id} challenged by {self.case.reporter.username}"
+        proposed = getattr(self.case, "challenge_proposed_result", "")
+        if proposed:
+            mail_header += f" — reporter says it should be {proposed}"
+            reason = getattr(self.case, "challenge_reason", "")
+            if reason:
+                mail_header += f" (reason: {reason})"
         self.logger.info(
             "Notifying about challenge for case ID %s. Send to TheHive: %s",
             self.case.id,
@@ -58,6 +72,15 @@ def run_case_challenge(case, logger) -> None:
     service = CaseChallengeService(case, logger)
     service.validate()
     service.mark_challenged()
+    service.update_user_stats()
+    service.notify()
+
+
+def notify_and_record_challenge(case, logger) -> None:
+    """Stats + CERT/TheHive notification for an already-marked challenge.
+    Unlike run_case_challenge, does NOT validate/mark — the caller (in-app
+    view) has already marked the case, including the proposed verdict."""
+    service = CaseChallengeService(case, logger)
     service.update_user_stats()
     service.notify()
 

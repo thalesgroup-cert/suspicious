@@ -245,7 +245,6 @@ class AnalyzerAI(BaseAnalyzer):
             item_type, item = get_item_from_id(alert_id, hive_url, hive_key)
             return alert_id, item_type, item
 
-        # Create a new alert
         item = create_new_alert(
             None,
             PHISHING_CAMPAIGN_TEMPLATE["title"](get_most_common_subject(campaign)),

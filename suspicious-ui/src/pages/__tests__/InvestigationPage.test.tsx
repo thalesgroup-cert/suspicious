@@ -47,6 +47,14 @@ const mockListResponse = {
   results: [mockRow],
 };
 
+const mockDetailsChallenged = {
+  ...mockRow,
+  challenge_proposed_result: "Dangerous",
+  challenge_reason: "phish",
+  analyzer_reports: [],
+  case_infos: {},
+};
+
 const mockDetails = {
   ...mockRow,
   analyzer_reports: [
@@ -165,6 +173,49 @@ describe("InvestigationPage", () => {
       // PhishingURLAnalyzer name should appear in the drawer
       expect(screen.getByText(/PhishingURLAnalyzer/i)).toBeInTheDocument();
     });
+  });
+
+  it("shows the reporter's proposed verdict and reason for a challenged case", async () => {
+    const user = userEvent.setup();
+    mockGetDetails.mockResolvedValue(mockDetailsChallenged as never);
+    renderInvestigation();
+
+    await waitFor(() =>
+      expect(
+        screen.getByText(/phish\.evil\.com|reporter@corp/i)
+      ).toBeInTheDocument()
+    );
+
+    const row = screen.getByText(/phish\.evil\.com|reporter@corp/i).closest("tr") ??
+                screen.getByText(/phish\.evil\.com|reporter@corp/i);
+    await user.click(row);
+
+    await waitFor(() => {
+      expect(screen.getByText(/reporter's challenge/i)).toBeInTheDocument();
+      expect(screen.getByText("Dangerous")).toBeInTheDocument();
+      expect(screen.getByText(/reason: phish/i)).toBeInTheDocument();
+    });
+  });
+
+  it("does not show a challenge panel when the case has no proposed verdict", async () => {
+    const user = userEvent.setup();
+    renderInvestigation();
+
+    await waitFor(() =>
+      expect(
+        screen.getByText(/phish\.evil\.com|reporter@corp/i)
+      ).toBeInTheDocument()
+    );
+
+    const row = screen.getByText(/phish\.evil\.com|reporter@corp/i).closest("tr") ??
+                screen.getByText(/phish\.evil\.com|reporter@corp/i);
+    await user.click(row);
+
+    await waitFor(() => {
+      expect(screen.getByText(/PhishingURLAnalyzer/i)).toBeInTheDocument();
+    });
+
+    expect(screen.queryByText(/reporter's challenge/i)).not.toBeInTheDocument();
   });
 
   it("redirects non-elevated users away from the page", async () => {

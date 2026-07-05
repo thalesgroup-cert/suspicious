@@ -941,6 +941,23 @@ export default function InvestigationPage() {
                   </Stack>
                 </Box>
 
+                {/* ── Reporter's challenge (proposed verdict) ───────────────────── */}
+                {detailsQuery.data?.challenge_proposed_result ? (
+                  <Box sx={{ px: 2.25, py: 2 }}>
+                    <Typography sx={{ fontSize: 10, fontWeight: 700, textTransform: "uppercase", letterSpacing: "0.08em", color: "text.disabled", mb: 0.75 }}>
+                      Reporter's challenge
+                    </Typography>
+                    <Typography sx={{ fontWeight: 700, fontSize: 13.5 }}>
+                      Proposed verdict: <strong>{detailsQuery.data.challenge_proposed_result}</strong>
+                    </Typography>
+                    {detailsQuery.data.challenge_reason ? (
+                      <Typography variant="body2" color="text.secondary" sx={{ mt: 0.5 }}>
+                        Reason: {detailsQuery.data.challenge_reason}
+                      </Typography>
+                    ) : null}
+                  </Box>
+                ) : null}
+
                 {/* ── Global verdict override ───────────────────────────────────── */}
                 <Box sx={{ px: 2.25, py: 2 }}>
                   <Stack direction="row" sx={{ mb: 1, alignItems: "center", justifyContent: "space-between" }}>

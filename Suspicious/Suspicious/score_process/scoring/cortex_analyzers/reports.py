@@ -7,24 +7,9 @@ from django.db.models import Max
 
 from .service import CortexAnalyzerService
 from cortex_job.models import AnalyzerReport
-from score_process.scoring.processing import (
-    process_file_ioc,
-    process_mail,
-    process_ioc,
-)
-from score_process.scoring.case_score_calculation import calculate_final_scores
-from score_process.scoring.update_handler import (
-    update_case_results,
-    save_case_results,
-    update_kpi_and_user_stats,
-)
 from .utils import dump_model
 
 update_cases_logger = logging.getLogger("tasp.cron.update_ongoing_case_jobs")
-
-# Threshold above which a report is counted as "malicious" for the
-# update_case_results majority-vote check.
-MALICIOUS_SCORE_THRESHOLD = 8
 
 
 class CortexAnalyzerReports:
@@ -35,82 +20,39 @@ class CortexAnalyzerReports:
     @staticmethod
     def get_report(case) -> None:
         """
-        Score a case end-to-end: run analyzers, compute final scores,
-        persist results, send notification email, update KPIs.
+        Score a case end-to-end: collect signals (which also persists
+        analyzer reports), compute the verdict, and apply it (persist,
+        notify, KPI).
         """
         from cortex_job.cortex_utils.cortex_and_job_management import CortexJobManager
+        from score_process.scoring.collect import collect_signals
+        from score_process.scoring.engine import score_case
+        from score_process.scoring.apply import apply_verdict
 
         if not case:
             update_cases_logger.warning("get_report called with no case.")
             return
 
-        cortex_job_manager = CortexJobManager()
-        reports:           list = []
-        total_scores:      list = []
-        total_confidences: list = []
-        is_malicious:      int  = 0
-        failure:           int  = 0
-        mail               = None
-
         try:
-            if case.fileOrMail:
-                file = getattr(case.fileOrMail, "file", None)
-                if file:
-                    update_cases_logger.info("get_report: processing file for case %s.", case.id)
-                    failure += process_file_ioc(
-                        file, reports, total_scores, total_confidences,
-                        is_malicious, case.id,
-                    )
+            mail = getattr(case.fileOrMail, "mail", None) if case.fileOrMail else None
+            if mail:
+                # Must run before collect_signals: populates case.score_ai /
+                # case.confidence_ai, which collect_signals reads to build AiSignal.
+                CortexJobManager().manage_ai_jobs(case)
 
-                mail = getattr(case.fileOrMail, "mail", None)
-                if mail:
-                    update_cases_logger.info(
-                        "get_report: processing mail (subject=%r) for case %s.",
-                        getattr(mail, "subject", ""), case.id,
-                    )
-                    failure += process_mail(
-                        mail, reports, total_scores, total_confidences,
-                        is_malicious, case.id,
-                    )
-                    cortex_job_manager.manage_ai_jobs(case)
+            signals, ai, deny_listed = collect_signals(case)
+            verdict = score_case(signals, ai, deny_listed)
+            apply_verdict(case, verdict)
 
-            if case.nonFileIocs:
-                ioc_data = case.nonFileIocs.get_iocs()
-                for ioc_type in ("url", "ip", "hash", "domain"):
-                    ioc = ioc_data.get(ioc_type)
-                    if ioc:
-                        update_cases_logger.info(
-                            "get_report: processing %s IOC for case %s.", ioc_type, case.id
-                        )
-                        failure += process_ioc(
-                            ioc, ioc_type, reports, total_scores, total_confidences,
-                            is_malicious,
-                        )
-
-            # Count malicious reports for the majority-vote override in
-            # update_case_results.  A report is "malicious" when the analyzer
-            # assigned level=malicious or a score at or above the threshold.
-            is_malicious = sum(
-                1 for r in reports
-                if getattr(r, "level", "") in ("malicious", "dangerous")
-                or getattr(r, "score", 0) >= MALICIOUS_SCORE_THRESHOLD
-            )
             update_cases_logger.info(
-                "get_report: case %s — %d/%d reports malicious.",
-                case.id, is_malicious, len(reports),
+                "get_report: case %s → %s (score=%s conf=%s, %d/%d malicious).",
+                case.id, verdict.result, verdict.final_score,
+                verdict.final_confidence, verdict.n_malicious, verdict.n_scored,
             )
-
-            calculate_final_scores(total_scores, total_confidences, case)
-            update_case_results(case, reports, is_malicious, failure)
-            # mail may be None for IOC-only cases — save_case_results handles that
-            save_case_results(case, mail)
-            update_kpi_and_user_stats(case)
-
-            update_cases_logger.info("get_report: case %s completed.", case.id)
 
         except Exception as exc:
             update_cases_logger.error(
-                "get_report: error processing case %s: %s", case.id, exc, exc_info=True
+                "get_report: error scoring case %s: %s", case.id, exc, exc_info=True
             )
 
     # ── report processing helpers ─────────────────────────────────────────

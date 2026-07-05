@@ -1,7 +1,6 @@
 import email
 import email.message
 import email.policy
-import os
 import tempfile
 from django.test import TestCase
 

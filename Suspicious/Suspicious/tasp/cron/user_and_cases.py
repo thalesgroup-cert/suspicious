@@ -1,11 +1,9 @@
 import logging
 from django.contrib.auth.models import User
-from django.core.cache import cache
-from django.db.models import Exists, OuterRef
+from case_handler.lifecycle import LifecycleState
 from case_handler.models import Case
-from cortex_job.cortex_utils.cortex_and_job_management import CortexJobManager
-from cortex_job.models import CaseAnalyzerJob
 from profiles.profiles_utils.ldap import Ldap
+from tasp.tasks import reconcile_case
 
 logger = logging.getLogger("tasp.cron.users_cases")
 log_cases = logging.getLogger("tasp.cron.update_ongoing_case_jobs")
@@ -13,10 +11,6 @@ log_cases = logging.getLogger("tasp.cron.update_ongoing_case_jobs")
 # Bound work per cron tick. Cases beyond this batch wait for the next tick;
 # STALE_JOB_TIMEOUT auto-fails any zombie reports independently.
 CRON_BATCH_SIZE = 200
-
-# Per-case Redis lock TTL. Long enough to cover one case's ledger sync,
-# short enough that a crashed worker doesn't strand the lock for hours.
-CASE_LOCK_TTL = 120
 
 
 def sync_user_profiles() -> None:
@@ -33,61 +27,25 @@ def sync_user_profiles() -> None:
             logger.exception("Failed to sync user %s", user.pk)
 
 
-def update_ongoing_case_jobs() -> None:
-    """Update of ongoing case jobs.
+def update_ongoing_cases() -> None:
+    """Fallback sweep: enqueue `reconcile_case` for every non-terminal case.
 
-    Bounded scan: at most CRON_BATCH_SIZE oldest cases per tick. Per-case
-    Redis lock (`case_update_lock:<id>`) prevents racing with the webhook
-    task `process_cortex_job` on the same case.
+    Bounded scan: at most CRON_BATCH_SIZE oldest cases per tick. Covers
+    cases whose webhook delivery was missed/delayed *and* jobless cases
+    (zero CaseAnalyzerJob rows) that no per-job trigger would ever revisit.
+    No lock is taken here — `reconcile_case` owns the per-case
+    `case_update_lock:<id>` lock, so a case already being processed by the
+    webhook task is simply skipped there and re-picked up next tick.
     """
-    from opentelemetry import trace
-
-    tracer = trace.get_tracer(__name__)
-    pending_jobs = CaseAnalyzerJob.objects.filter(
-        case_id=OuterRef("pk"),
-        status__in=CaseAnalyzerJob.PENDING_STATUSES,
-    )
-    cases = list(
+    _TERMINAL = (LifecycleState.FINALIZED, LifecycleState.CONTESTED)
+    case_ids = list(
         Case.objects
-        .filter(status="On Going")
-        .annotate(has_pending=Exists(pending_jobs))
-        .filter(has_pending=True)
-        .order_by("creation_date")[:CRON_BATCH_SIZE]
+        .exclude(lifecycle_state__in=_TERMINAL)
+        .order_by("creation_date")
+        .values_list("id", flat=True)[:CRON_BATCH_SIZE]
     )
-    if not cases:
+    if not case_ids:
         log_cases.info("No ongoing cases found.")
         return
-
-    with tracer.start_as_current_span("cron.update_ongoing_case_jobs") as span:
-        span.set_attribute("cases.count", len(cases))
-        manager = CortexJobManager()
-        for case in cases:
-            lock_key = f"case_update_lock:{case.id}"
-            if not cache.add(lock_key, 1, timeout=CASE_LOCK_TTL):
-                # Webhook task or another worker is already updating this case.
-                continue
-            try:
-                with tracer.start_as_current_span("cron.manage_case_jobs") as case_span:
-                    case_span.set_attribute("case.id", case.id)
-                    # Mirror the webhook task `process_cortex_job`: sync each
-                    # pending CaseAnalyzerJob ledger row from Cortex, then
-                    # finalise once none remain pending. Using manage_jobs here
-                    # finalised the case but left the ledger stuck InProgress,
-                    # which fail_stale_jobs would later mis-mark as Failed.
-                    pending = (
-                        CaseAnalyzerJob.objects
-                        .filter(case=case, status__in=CaseAnalyzerJob.PENDING_STATUSES)
-                        .select_related("analyzer_report")
-                    )
-                    for caj in pending:
-                        manager.update_single_job(caj)
-                    if not CaseAnalyzerJob.objects.filter(
-                        case=case, status__in=CaseAnalyzerJob.PENDING_STATUSES
-                    ).exists():
-                        manager.finalise_case(case)
-            except Exception:
-                log_cases.exception(
-                    "Case %s update failed", getattr(case, "id", "<unknown>")
-                )
-            finally:
-                cache.delete(lock_key)
+    for cid in case_ids:
+        reconcile_case.delay(cid)

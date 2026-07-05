@@ -12,6 +12,7 @@ from hash_process.models import Hash
 from mail_feeder.models import Mail
 from django.utils.translation import gettext_lazy as _
 from django.utils import timezone
+from case_handler.lifecycle import LifecycleState
 import datetime
 
 
@@ -38,6 +39,11 @@ class Result(models.TextChoices):
     DANGEROUS = 'Dangerous', _('Dangerous')
 
 
+class ProposedVerdict(models.TextChoices):
+    SAFE = "Safe", _("Safe")
+    DANGEROUS = "Dangerous", _("Dangerous")
+
+
 class Case(models.Model):
     """
     Main incident investigation case, storing scores, analyst decisions and AI predictions.
@@ -46,7 +52,7 @@ class Case(models.Model):
     reporter = models.ForeignKey(settings.AUTH_USER_MODEL, on_delete=models.CASCADE, related_name='cases', db_index=True)
     analysis_done = models.PositiveIntegerField(default=0)
     status = models.CharField(max_length=20, choices=Status.choices, default=Status.TODO, verbose_name='Status', db_index=True)
-    results = models.CharField(max_length=20, choices=Result.choices, default=Result.SUSPICIOUS, verbose_name='Results', db_index=True)
+    results = models.CharField(max_length=20, choices=Result.choices, default=Result.INCONCLUSIVE, verbose_name='Results', db_index=True)
     final_score = models.FloatField(default=0)
     final_confidence = models.FloatField(default=0)
     score = models.FloatField(default=0)
@@ -63,6 +69,21 @@ class Case(models.Model):
     creation_date = models.DateTimeField(auto_now_add=True, db_index=True)
     last_update = models.DateTimeField(auto_now=True)
     last_update_by = models.ForeignKey(settings.AUTH_USER_MODEL, on_delete=models.CASCADE, related_name='cases_last_update_by', null=True, blank=True, db_index=True)
+    lifecycle_state = models.CharField(
+        max_length=20, choices=LifecycleState.choices,
+        default=LifecycleState.CREATED, db_index=True,
+        verbose_name="Lifecycle State",
+    )
+    finalized_at = models.DateTimeField(null=True, blank=True, verbose_name="Finalized At")
+    dispatched_at = models.DateTimeField(null=True, blank=True, verbose_name="Dispatched At")
+    kpi_counted = models.BooleanField(default=False, verbose_name="KPI Counted")
+    challenge_proposed_result = models.CharField(
+        max_length=20, choices=ProposedVerdict.choices, blank=True, default="",
+        verbose_name="Challenge Proposed Result",
+    )
+    challenge_reason = models.TextField(
+        blank=True, default="", verbose_name="Challenge Reason",
+    )
 
     class Meta:
         ordering = ['-creation_date']

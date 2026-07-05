@@ -2,8 +2,8 @@
 
 Cortex calls this endpoint when a job finishes (Success or Failure).
 We look up which cases own the job via the CaseAnalyzerJob ledger
-(written atomically at dispatch time) and dispatch a targeted per-(case, job)
-Celery task instead of waiting for the 60-second cron poll.
+(written atomically at dispatch time) and dispatch `reconcile_case` for each
+owning case instead of waiting for the cron poll fallback.
 
 Authentication: Bearer <CORTEX_WEBHOOK_SECRET> in the Authorization header,
 compared via hmac.compare_digest to defeat timing oracles.
@@ -89,9 +89,9 @@ class CortexWebhookView(APIView):
                 status=status.HTTP_202_ACCEPTED,
             )
 
-        from tasp.tasks import process_cortex_job
+        from tasp.tasks import reconcile_case
         for case_id in case_ids:
-            process_cortex_job.delay(case_id, job_id)
+            reconcile_case.delay(case_id)
             logger.info(
                 "Queued cortex update for case=%s job=%s", case_id, job_id
             )

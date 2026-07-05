@@ -94,8 +94,6 @@ class DomainHandlerTests(TestCase):
         self.assertGreater(existing.last_update, old_time)
         mock_normalize.assert_called_once()
 
-    # 🧩 Fixture-like test for complex normalization logic
-    # You can adjust rules here for more edge cases
     @patch("domain_process.domain_utils.domain_handler.normalize_domain")
     def test_handle_complex_normalization_rules(self, mock_normalize):
         # Suppose a rule that strips uppercase and special chars

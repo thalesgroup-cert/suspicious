@@ -152,8 +152,11 @@ export async function getSubmissionDetails(id: number): Promise<SubmissionDetail
   return res.data;
 }
 
-export async function challengeSubmission(id: number): Promise<{ detail: string }> {
-  const res = await api.post(`/submissions/${id}/challenge/`);
+export async function challengeSubmission(
+  id: number,
+  body: { proposed_result: "Safe" | "Dangerous"; reason?: string },
+): Promise<{ detail: string }> {
+  const res = await api.post(`/submissions/${id}/challenge/`, body);
   return res.data;
 }
 

@@ -1,5 +1,6 @@
 from django.utils import timezone
 
+from case_handler.lifecycle import LifecycleState
 from case_handler.models import (
     Case,
     CaseArtifact,
@@ -46,7 +47,7 @@ class CaseCreator:
             description=description or casestr,
             creation_date=timezone.now(),
             analysis_done=False,
-            results="Suspicious",
+            results="Inconclusive",
             status="On Going",
             reporter=self.user
         )
@@ -58,6 +59,8 @@ class CaseCreator:
                 case.final_score = 0
                 case.final_confidence = 100
                 case.status = "Done"
+                case.lifecycle_state = LifecycleState.FINALIZED
+                case.finalized_at = timezone.now()
                 break
 
             if value:
@@ -270,7 +273,6 @@ class CaseCreator:
             'mail_instance': 'fileOrMail'
         }
 
-        # Check if the key exists in the dictionary
         if key not in related_fields:
             raise ValueError(f"Invalid key: {key}. Valid keys are {', '.join(related_fields.keys())}.")
 

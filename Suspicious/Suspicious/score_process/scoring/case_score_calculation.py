@@ -3,12 +3,9 @@ Final score calculation and result range classification.
 """
 import logging
 from enum import Enum
-from typing import TYPE_CHECKING, List, Optional, Set, Type, Union
+from typing import Optional, Set, Type, Union
 from urllib.parse import urlparse
 from email.utils import parseaddr
-
-if TYPE_CHECKING:
-    from case_handler.models import Case
 
 from settings.models import CampaignDomainAllowList, DenyListDomain, WatcherMonitoredDomain
 from domain_process.models import Domain
@@ -21,17 +18,6 @@ ARTIFACT_DENY_LIST_CONFIDENCE = 100
 IOC_DENY_LIST_SCORE           = 10
 IOC_DENY_LIST_CONFIDENCE      = 100
 IOC_DENY_LIST_LEVEL           = "critical"
-DEFAULT_SCORE                 = 5
-DEFAULT_CONFIDENCE            = 0
-DENY_LIST_SCORE               = 10
-DENY_LIST_CONFIDENCE          = 100
-MAX_FINAL_SCORE               = 10
-MAX_FINAL_CONFIDENCE          = 100
-HIGH_SCORE_THRESHOLD          = 8
-MAIL_HEADER_HIGH_THRESHOLD    = 8
-HIGH_SCORE_COUNT_THRESHOLD_1  = 3
-HIGH_SCORE_COUNT_THRESHOLD_2  = 2
-ADJUSTED_SCORE_FLOOR          = 7
 
 # ── Loggers ───────────────────────────────────────────────────────────────────
 update_cases_logger = logging.getLogger("tasp.cron.update_ongoing_case_jobs")
@@ -102,16 +88,6 @@ def get_score_level(score: int) -> str:
         enum_class=ScoreLevel,
         category_type_name="score level",
         capitalize_result=False,
-        logger=update_cases_logger,
-    )
-
-
-def calculate_result_ranges(final_score: float) -> str:
-    return _find_category_in_enum_range(
-        score=final_score,
-        enum_class=ResultRange,
-        category_type_name="result range",
-        capitalize_result=True,
         logger=update_cases_logger,
     )
 
@@ -279,91 +255,3 @@ def _check_mail_artifacts_for_deny_list(
     return found_any
 
 
-# ── Final score calculation ───────────────────────────────────────────────────
-
-def _calculate_and_set_final_scores(
-    case: "Case",
-    total_scores: List[float],
-    total_confidences: List[float],
-    _logger: logging.Logger,
-    mail_header_score: Optional[float] = None,
-) -> None:
-    if not total_scores:
-        _logger.info("No scores available — defaulting to %s/%s.", DEFAULT_SCORE, DEFAULT_CONFIDENCE)
-        case.final_score      = DEFAULT_SCORE
-        case.final_confidence = DEFAULT_CONFIDENCE
-        return
-
-    avg_score      = sum(total_scores)      / len(total_scores)
-    avg_confidence = sum(total_confidences) / len(total_confidences) if total_confidences else DEFAULT_CONFIDENCE
-
-    _logger.info("Average score=%s confidence=%s.", avg_score, avg_confidence)
-
-    if mail_header_score is not None:
-        high_score_count = sum(1 for s in total_scores if s >= HIGH_SCORE_THRESHOLD)
-        adjust = (
-            (mail_header_score >  MAIL_HEADER_HIGH_THRESHOLD and high_score_count >= HIGH_SCORE_COUNT_THRESHOLD_1)
-            or
-            (mail_header_score <= MAIL_HEADER_HIGH_THRESHOLD and high_score_count >= HIGH_SCORE_COUNT_THRESHOLD_2)
-        )
-        if adjust:
-            _logger.info("Raising score floor to %s.", ADJUSTED_SCORE_FLOOR)
-            avg_score = max(avg_score, ADJUSTED_SCORE_FLOOR)
-
-    case.score      = min(round(avg_score),      MAX_FINAL_SCORE)
-    case.confidence = min(round(avg_confidence), MAX_FINAL_CONFIDENCE)
-    _logger.info("Processed score=%s confidence=%s.", case.score, case.confidence)
-
-    # Use AI scores when they carry higher confidence
-    if case.confidence_ai > case.confidence:
-        _logger.info("AI confidence (%s) > human confidence (%s) — using AI scores.", case.confidence_ai, case.confidence)
-        case.final_score      = case.score_ai
-        case.final_confidence = case.confidence_ai
-    else:
-        case.final_score      = case.score
-        case.final_confidence = case.confidence
-
-    _logger.info("Final score=%s confidence=%s.", case.final_score, case.final_confidence)
-
-    # Persist — this was previously missing; values were computed in memory only.
-    case.save(update_fields=["score", "confidence", "final_score", "final_confidence"])
-
-
-def calculate_final_scores(
-    total_scores: List[float],
-    total_confidences: List[float],
-    case: "Case",
-) -> None:
-    _logger = update_cases_logger
-    _logger.info("Calculating final scores — scores=%s confidences=%s.", total_scores, total_confidences)
-
-    deny_listed_domains_set = get_deny_listed_domains_set()
-
-    try:
-        deny_listed        = False
-        mail_header_score  = None
-
-        if case.fileOrMail and case.fileOrMail.mail:
-            mail = case.fileOrMail.mail
-            mail_header_score = getattr(getattr(mail, "mail_header", None), "header_score", None)
-
-            if _check_mail_artifacts_for_deny_list(mail, deny_listed_domains_set, _logger):
-                case.final_score      = DENY_LIST_SCORE
-                case.final_confidence = DENY_LIST_CONFIDENCE
-                deny_listed = True
-
-        if not deny_listed and case.nonFileIocs and getattr(case.nonFileIocs, "url", None):
-            url_address = case.nonFileIocs.url.address
-            _logger.info("Checking non-file IOC URL: %s", url_address)
-            if _is_address_deny_listed(url_address, deny_listed_domains_set, _logger):
-                case.final_score      = DENY_LIST_SCORE
-                case.final_confidence = DENY_LIST_CONFIDENCE
-                deny_listed = True
-
-        if not deny_listed:
-            _calculate_and_set_final_scores(
-                case, total_scores, total_confidences, _logger, mail_header_score
-            )
-
-    except Exception as exc:
-        _logger.exception("Error calculating final scores: %s", exc)

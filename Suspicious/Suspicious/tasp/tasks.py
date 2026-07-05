@@ -1,9 +1,19 @@
 from celery import shared_task
 from celery.utils.log import get_task_logger
+from django.core.cache import cache
+
+from case_handler.models import Case
+from cortex_job.cortex_utils.reconciliation import reconcile_case_core
 
 logger = get_task_logger(__name__)
 
 _RETRY = dict(max_retries=3, acks_late=True)
+
+# Per-case Redis lock TTL for the `case_update_lock:<id>` key. Long enough to
+# cover one case's ledger sync, short enough that a crashed worker doesn't
+# strand the lock for hours. Canonical home for this value — other modules
+# that need it (e.g. the cron fallback) import it from here.
+CASE_LOCK_TTL = 120
 
 
 @shared_task(bind=True, **_RETRY)
@@ -26,9 +36,9 @@ def sync_cortex(self):
 
 @shared_task(bind=True, **_RETRY)
 def update_ongoing_cases(self):
-    from tasp.cron.user_and_cases import update_ongoing_case_jobs
+    from tasp.cron.user_and_cases import update_ongoing_cases as _update_ongoing_cases
     try:
-        update_ongoing_case_jobs()
+        _update_ongoing_cases()
     except Exception as exc:
         raise self.retry(exc=exc, countdown=60 * 2 ** self.request.retries)
 
@@ -183,55 +193,20 @@ def sweep_missing_mail_previews(self, limit: int = 200):
         raise self.retry(exc=exc, countdown=60 * 2 ** self.request.retries)
 
 
-def _case_has_pending_jobs(case_id: int) -> bool:
-    """Return True if any CaseAnalyzerJob for this case is still pending."""
-    from cortex_job.models import CaseAnalyzerJob
-    return CaseAnalyzerJob.objects.filter(
-        case_id=case_id, status__in=CaseAnalyzerJob.PENDING_STATUSES
-    ).exists()
-
-
-@shared_task(bind=True, **_RETRY)
-def process_cortex_job(self, case_id: int, job_id: str):
-    """Sync one (case, cortex_job) pair after the webhook fires.
-
-    Acquires a per-case Redis lock to serialise with the cron poll
-    `update_ongoing_case_jobs` and other concurrent webhook tasks on the
-    same case. Idempotent: the status precheck drops re-deliveries of an
-    already-finalised job.
-
-    When this update transitions the case's last pending CAJ to a
-    non-pending state, `finalise_case` is invoked to compute the final
-    description, status, and CortexAnalyzerReports.get_report.
-    """
-    from django.core.cache import cache
-    from cortex_job.models import CaseAnalyzerJob
-    from cortex_job.cortex_utils.cortex_and_job_management import CortexJobManager
-
+@shared_task(bind=True)
+def reconcile_case(self, case_id: int):
+    """Single finalise entrypoint: sync ledger + advance the state machine."""
     lock_key = f"case_update_lock:{case_id}"
-    if not cache.add(lock_key, 1, timeout=120):
-        return  # Cron or another webhook task is currently updating this case
+    if not cache.add(lock_key, 1, timeout=CASE_LOCK_TTL):
+        return  # another worker/webhook owns this case; cron will re-pick it
     try:
-        try:
-            caj = CaseAnalyzerJob.objects.select_related(
-                "case", "analyzer_report"
-            ).get(case_id=case_id, cortex_job_id=job_id)
-        except CaseAnalyzerJob.DoesNotExist:
-            logger.warning(
-                "CaseAnalyzerJob missing (case=%s job=%s)", case_id, job_id
-            )
+        case = Case.objects.filter(id=case_id).first()
+        if case is None:
             return
-
-        if caj.status not in CaseAnalyzerJob.PENDING_STATUSES:
-            # Already updated by a prior webhook delivery or by the cron.
-            return
-
-        manager = CortexJobManager()
-        manager.update_single_job(caj)
-
-        if not _case_has_pending_jobs(caj.case_id):
-            manager.finalise_case(caj.case)
-    except Exception as exc:
-        raise self.retry(exc=exc, countdown=30 * 2 ** self.request.retries)
+        reconcile_case_core(case)
+    except Exception:
+        # Isolate per-case failures so one bad case never aborts the caller
+        # (cron batch / webhook). The cron re-enqueues it next tick.
+        logger.exception("reconcile_case failed for case %s", case_id)
     finally:
         cache.delete(lock_key)

@@ -1,5 +1,6 @@
 import { describe, it, expect, vi, beforeEach } from "vitest";
 import { screen, waitFor } from "@testing-library/react";
+import userEvent from "@testing-library/user-event";
 import { renderWithProviders } from "@/test/utils";
 import { fixtureMe, fixtureSubmissionsList } from "@/test/fixtures";
 
@@ -21,7 +22,7 @@ vi.mock("@/features/submissions/api", () => ({
 
 
 import { getMe } from "@/api/auth";
-import { listSubmissions } from "@/features/submissions/api";
+import { listSubmissions, challengeSubmission } from "@/features/submissions/api";
 import SubmissionsPage from "../SubmissionsPage";
 
 describe("SubmissionsPage - Test Suite", () => {
@@ -65,6 +66,41 @@ describe("SubmissionsPage - Test Suite", () => {
       vi.mocked(listSubmissions).mockClear();
       renderWithProviders(<SubmissionsPage />, { initialPath: "/submissions" });
       await waitFor(() => expect(listSubmissions).toHaveBeenCalled());
+    });
+  });
+
+  describe("Challenge dialog", () => {
+    it("requires a proposed verdict and submits it with the reason", async () => {
+      const user = userEvent.setup();
+      vi.mocked(listSubmissions).mockResolvedValue({
+        ...fixtureSubmissionsList,
+        results: [
+          { ...fixtureSubmissionsList.results[0], is_challengeable: true },
+          fixtureSubmissionsList.results[1],
+        ],
+      } as never);
+      vi.mocked(challengeSubmission).mockResolvedValue({ detail: "ok" });
+
+      renderWithProviders(<SubmissionsPage />, { initialPath: "/submissions" });
+
+      const challengeButton = await screen.findByRole("button", { name: /challenge/i });
+      await user.click(challengeButton);
+
+      const confirmButton = await screen.findByRole("button", { name: /confirm/i });
+      expect(confirmButton).toBeDisabled();
+
+      const dangerousToggle = await screen.findByRole("button", { name: /dangerous/i });
+      await user.click(dangerousToggle);
+
+      expect(confirmButton).not.toBeDisabled();
+      await user.click(confirmButton);
+
+      await waitFor(() =>
+        expect(challengeSubmission).toHaveBeenCalledWith(
+          101,
+          { proposed_result: "Dangerous", reason: "" },
+        )
+      );
     });
   });
 });
