@@ -1079,7 +1079,7 @@ export default function SubmissionsPage() {
         <DialogTitle>Challenge submission</DialogTitle>
         <DialogContent>
           <Typography color="text.secondary">
-            Submit a challenge request for submission #{challengeId}.
+            Tell us what you think the verdict should be for submission #{challengeId}.
           </Typography>
           <Typography variant="subtitle2" sx={{ mt: 2, mb: 1 }}>
             What should the verdict be?

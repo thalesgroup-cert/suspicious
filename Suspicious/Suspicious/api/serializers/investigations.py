@@ -263,7 +263,10 @@ class InvestigationDetailsSerializer(InvestigationRowSerializer):
     raw = serializers.SerializerMethodField()
 
     class Meta(InvestigationRowSerializer.Meta):
-        fields = InvestigationRowSerializer.Meta.fields + ["analyzer_reports", "case_infos", "raw"]
+        fields = InvestigationRowSerializer.Meta.fields + [
+            "analyzer_reports", "case_infos", "raw",
+            "challenge_proposed_result", "challenge_reason",
+        ]
 
     def get_analyzer_reports(self, obj: Case) -> list[dict[str, Any]]:
         queryset = self.context.get("analyzer_reports_qs")
