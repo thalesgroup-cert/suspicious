@@ -194,7 +194,7 @@ class CaseHandler:
         if self.other_form.is_valid():
             description = self.other_form.cleaned_data.get("context") or description
         try:
-            case = CaseCreator(self.request.user).create_case(description=description, **ctx)
+            case = CaseCreator(self.request.user).create_case(description=description, reporter_context=description, **ctx)
             logger.info("Case created: %s", case)
             return case
         except Exception:

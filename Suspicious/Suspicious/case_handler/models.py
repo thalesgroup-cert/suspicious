@@ -84,6 +84,9 @@ class Case(models.Model):
     challenge_reason = models.TextField(
         blank=True, default="", verbose_name="Challenge Reason",
     )
+    reporter_context = models.TextField(
+        blank=True, default="", verbose_name="Reporter Context",
+    )
 
     class Meta:
         ordering = ['-creation_date']
