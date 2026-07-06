@@ -237,13 +237,26 @@ else
     echo "→ Certificates already present"
 fi
 
-echo "Creating keystore for Cortex..."
+echo "Creating Cortex JVM truststore (keystore.jks) from root CA..."
 KEYSTORE="$CA_PATH/keystore.jks"
-if [ ! -f "$KEYSTORE" ]; then
-    touch "$KEYSTORE"
-    echo "→ Keystore created at $KEYSTORE"
+# Cortex's JVM (JAVA_OPTS -Djavax.net.ssl.trustStore) needs a REAL JKS holding
+# the root CA. The old code just `touch`ed an empty file, so the truststore
+# load failed at boot ("KeyStoreException: Short read of DER length"). Build it
+# with keytool. `-s` (non-empty) rather than `-f` so an existing 0-byte
+# keystore from an older init is healed on re-run.
+if [ "${FORCE_KEYSTORE:-0}" = "1" ] || [ ! -s "$KEYSTORE" ]; then
+    rm -f "$KEYSTORE"
+    if ! keytool -importcert -noprompt -alias rootca \
+            -file "$ROOTCAFILE" -keystore "$KEYSTORE" \
+            -storepass changeit -storetype JKS; then
+        echo "ERROR: keytool failed to build $KEYSTORE from $ROOTCAFILE" >&2
+        exit 1
+    fi
+    # Never leave a silently-empty keystore behind (the historical failure).
+    [ -s "$KEYSTORE" ] || { echo "ERROR: $KEYSTORE is empty after keytool" >&2; exit 1; }
+    echo "→ Keystore built: $KEYSTORE"
 else
-    echo "→ Keystore already exists at $KEYSTORE"
+    echo "→ Keystore already present: $KEYSTORE"
 fi
 
 # -------------------------------------------------
