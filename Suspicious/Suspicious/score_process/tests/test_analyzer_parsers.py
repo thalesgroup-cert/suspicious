@@ -114,6 +114,23 @@ class DefaultParserTests(SimpleTestCase):
         self.assertEqual(r.level, "malicious")
         self.assertEqual((r.score, r.confidence), (10, 100))
 
+    def test_safe_only_taxonomy_scores_safe(self):
+        # Regression: a lone `safe` taxonomy (e.g. GoogleSafebrowsing "0 match")
+        # must yield safe/0, not be floored to the info default.
+        summary = {"taxonomies": [
+            {"level": "safe", "value": "0 match", "predicate": "Safebrowsing"},
+        ]}
+        r = self._mk().parse(summary, None)
+        self.assertEqual(r.level, "safe")
+        self.assertEqual((r.score, r.confidence), (0, 100))
+
+    def test_safe_and_info_taxonomy_takes_info(self):
+        summary = {"taxonomies": [
+            {"level": "safe", "value": "a", "predicate": "p1"},
+            {"level": "info", "value": "b", "predicate": "p2"},
+        ]}
+        self.assertEqual(self._mk().parse(summary, None).level, "info")
+
 
 class AiMailParserTests(SimpleTestCase):
     def _mk(self):

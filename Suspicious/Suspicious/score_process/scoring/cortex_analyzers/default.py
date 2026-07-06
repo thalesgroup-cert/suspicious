@@ -28,15 +28,21 @@ class DefaultTaxonomyParser(AnalyzerParser):
         level, category, details, score, confidence = "info", [], {}, 5, 50
 
         if isinstance(summary, dict) and summary.get("taxonomies"):
+            # Take the highest-severity taxonomy level, seeded from the first
+            # taxonomy (not the "info" default) so a genuinely `safe` verdict —
+            # e.g. GoogleSafebrowsing "0 match" — is honoured instead of being
+            # floored to info.
+            tax_level = None
             for tax in summary["taxonomies"]:
                 lvl = str(tax.get("level", "info")).lower()
-                if SEVERITY_ORDER.get(lvl, 0) > SEVERITY_ORDER.get(level, 0):
-                    level = lvl
+                if tax_level is None or SEVERITY_ORDER.get(lvl, 1) > SEVERITY_ORDER.get(tax_level, 1):
+                    tax_level = lvl
                 val = tax.get("value")
                 if val and val not in category:
                     category.append(val)
                 if tax.get("predicate"):
                     details[tax["predicate"]] = val
+            level = tax_level or "info"
             score, confidence = get_level_score_confidence(level)
 
         if isinstance(full, dict) and isinstance(full.get("results"), list):
