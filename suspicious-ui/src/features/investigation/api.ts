@@ -108,6 +108,8 @@ export type InvestigationDetails = {
   case_infos?: InvestigationCaseInfos;
   challenge_proposed_result?: "Safe" | "Dangerous" | "";
   challenge_reason?: string;
+  reporter_context?: string;
+  reporter_note?: string;
   [key: string]: unknown;
 };
 
