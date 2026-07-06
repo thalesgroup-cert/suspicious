@@ -156,3 +156,27 @@ class RegistryTests(SimpleTestCase):
     def test_unknown_falls_back_to_default(self):
         a = SimpleNamespace(name="GoogleDNS_resolve_1_0_0", analyzer_cortex_id="gdns")
         self.assertIs(self.reg.resolve(a), DefaultTaxonomyParser)
+
+
+from unittest.mock import MagicMock
+from score_process.scoring.cortex_analyzers.reports import CortexAnalyzerReports
+
+class ReportsRewireTests(SimpleTestCase):
+    def _report(self, summary, full, status="Success"):
+        r = MagicMock()
+        r.report_summary, r.report_full, r.status, r.type = summary, full, status, "hash"
+        r.analyzer.name = "CIRCLHashlookup_1_1"
+        r.analyzer.analyzer_cortex_id = "circl"
+        return r
+
+    def test_pending_report_not_saved(self):
+        r = self._report({"ongoing": "analysis"}, {"ongoing": "analysis"})
+        CortexAnalyzerReports.create_and_save_report(r, "abc123", case_id=1)
+        r.save.assert_not_called()
+
+    def test_success_report_saved_with_scores(self):
+        r = self._report({"taxonomies": [{"level": "info", "value": "TXT",
+                                          "predicate": "Filetype"}]}, {})
+        CortexAnalyzerReports.create_and_save_report(r, "abc123", case_id=1)
+        r.save.assert_called_once()
+        self.assertEqual(r.level, "info")
