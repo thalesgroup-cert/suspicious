@@ -261,11 +261,13 @@ class InvestigationDetailsSerializer(InvestigationRowSerializer):
     analyzer_reports = serializers.SerializerMethodField()
     case_infos = serializers.SerializerMethodField()
     raw = serializers.SerializerMethodField()
+    reporter_note = serializers.SerializerMethodField()
 
     class Meta(InvestigationRowSerializer.Meta):
         fields = InvestigationRowSerializer.Meta.fields + [
             "analyzer_reports", "case_infos", "raw",
             "challenge_proposed_result", "challenge_reason",
+            "reporter_context", "reporter_note",
         ]
 
     def get_analyzer_reports(self, obj: Case) -> list[dict[str, Any]]:
@@ -284,6 +286,11 @@ class InvestigationDetailsSerializer(InvestigationRowSerializer):
             "classification_ai": normalize_result_to_api(obj.results_ai),
             "category_ai": obj.category_ai,
         }
+
+    def get_reporter_note(self, obj: Case) -> str:
+        fom = getattr(obj, "fileOrMail", None)
+        mail = getattr(fom, "mail", None) if fom else None
+        return getattr(mail, "reporterNote", "") or ""
 
     def get_raw(self, obj: Case) -> dict[str, Any]:
         analyzer_reports_qs = self.context.get("analyzer_reports_qs", AnalyzerReport.objects.none())
