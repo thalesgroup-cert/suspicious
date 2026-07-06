@@ -68,11 +68,13 @@ def collect_signals(case):
 
     ai = None
     if case.confidence_ai:
-        # manage_ai_jobs stores confidence_ai = analyzer.confidence * 10 (0-1000),
-        # the same *10 inflation as compute_weighted_scores — undo it with /10 so
-        # the AI signal is on the same 0-100 scale as artifact signals (otherwise
-        # any AI confidence >= 10% saturates to 100 and defeats the CONF_FLOOR gate).
-        ai = AiSignal(score=case.score_ai or 0, confidence=min(round((case.confidence_ai or 0) / 10), 100))
+        # confidence_ai is already 0-100: manage_ai_jobs stores
+        # analyzer.confidence * 10 where the AI analyzer's confidence is 0-10, so
+        # a 100% AI verdict is confidence_ai=100. Do NOT divide by 10 — that would
+        # sink a confident AI below CONF_FLOOR and stop it ever winning the
+        # replace-on-higher-confidence override (case #275: 100% spam -> ignored,
+        # case read Inconclusive). Clamp defensively to 100.
+        ai = AiSignal(score=case.score_ai or 0, confidence=min(round(case.confidence_ai or 0), 100))
 
     deny_listed = _compute_deny_listed(case)
     return signals, ai, deny_listed

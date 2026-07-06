@@ -83,6 +83,16 @@ class ScoreCaseTest(SimpleTestCase):
         self.assertEqual(v.final_score, 2)
         self.assertEqual(v.result, Result.SAFE)
 
+    def test_confident_ai_beats_neutral_base(self):
+        # Regression (case #275): 23 analyzers net a neutral base (score 5,
+        # conf 85), AI is 100%-confident spam (score 6). With confidence_ai on
+        # the correct 0-100 scale, AI 100 > base 85 → AI wins, verdict Suspicious
+        # instead of the neutral Inconclusive.
+        base = [sig(5, 85), sig(5, 80)]
+        v = score_case(base, ai=AiSignal(score=6, confidence=100))
+        self.assertEqual(v.final_score, 6)
+        self.assertEqual(v.result, Result.SUSPICIOUS)
+
     def test_safe_case(self):
         v = score_case([sig(1, 90), sig(2, 90)])
         self.assertEqual(v.result, Result.SAFE)
