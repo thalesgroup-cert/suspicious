@@ -83,3 +83,33 @@ class BaseParserTests(SimpleTestCase):
         m_allow.return_value = AllowListResult()
         r = self._mk().run({"taxonomies": [{"level": "malicious"}]}, {})
         self.assertEqual(r.level, "malicious")
+
+
+from score_process.scoring.cortex_analyzers.default import (
+    DefaultTaxonomyParser, get_level_score_confidence,
+)
+
+class DefaultParserTests(SimpleTestCase):
+    def _mk(self, data="x", data_type="file"):
+        return DefaultTaxonomyParser(analyzer_name="FileInfo_8_0", data=data,
+                                     data_type=data_type)
+
+    def test_level_score_confidence(self):
+        self.assertEqual(get_level_score_confidence("malicious"), (10, 100))
+        self.assertEqual(get_level_score_confidence("safe"), (0, 100))
+        self.assertEqual(get_level_score_confidence("nonsense"), (0, 0))
+
+    def test_fileinfo_fixture_parses_info(self):
+        f = load_fixture("fileinfo")
+        r = self._mk().parse(f["summary"], f["full"])
+        self.assertEqual(r.level, "info")
+        self.assertIn("TXT", r.category)
+
+    def test_taxonomy_raises_to_highest_severity(self):
+        summary = {"taxonomies": [
+            {"level": "info", "value": "a", "predicate": "p1"},
+            {"level": "malicious", "value": "b", "predicate": "p2"},
+        ]}
+        r = self._mk().parse(summary, None)
+        self.assertEqual(r.level, "malicious")
+        self.assertEqual((r.score, r.confidence), (10, 100))
