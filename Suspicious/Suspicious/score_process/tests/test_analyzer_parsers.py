@@ -16,3 +16,24 @@ class ResultModuleTests(SimpleTestCase):
 
     def test_allow_list_defaults_none(self):
         self.assertIsNone(AllowListResult().DomainAllowList)
+
+
+import json
+from pathlib import Path
+
+FIXTURES = Path(__file__).parent / "fixtures" / "cortex"
+
+def load_fixture(name: str) -> dict:
+    return json.loads((FIXTURES / f"{name}.json").read_text())
+
+class FixtureCorpusTests(SimpleTestCase):
+    def test_ai_mail_fixture_has_classification(self):
+        f = load_fixture("ai_mail")
+        self.assertIn("classification", f["summary"])
+        self.assertIn("malscore", f["summary"])
+
+    def test_fileinfo_fixture_has_taxonomies(self):
+        self.assertIn("taxonomies", load_fixture("fileinfo")["summary"])
+
+    def test_pending_fixture_is_ongoing(self):
+        self.assertEqual(load_fixture("pending")["summary"], {"ongoing": "analysis"})
