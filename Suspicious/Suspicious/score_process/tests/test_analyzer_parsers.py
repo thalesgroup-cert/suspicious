@@ -135,3 +135,24 @@ class AiMailParserTests(SimpleTestCase):
         names = self._mk().manifest.cortex_names
         self.assertIn("AI_Mail_Analyzer", names)
         self.assertIn("AI_Mail_Analyzer_2_0", names)
+
+
+from types import SimpleNamespace
+from score_process.scoring.cortex_analyzers.registry import AnalyzerParserRegistry
+from score_process.scoring.cortex_analyzers.contrib.ai_mail import AiMailParser
+
+class RegistryTests(SimpleTestCase):
+    def setUp(self):
+        self.reg = AnalyzerParserRegistry(); self.reg.discover()
+
+    def test_resolve_by_name(self):
+        a = SimpleNamespace(name="AI_Mail_Analyzer_2_0", analyzer_cortex_id="zzz")
+        self.assertIs(self.reg.resolve(a), AiMailParser)
+
+    def test_resolve_by_cortex_id(self):
+        a = SimpleNamespace(name="whatever", analyzer_cortex_id="AI_Mail_Analyzer")
+        self.assertIs(self.reg.resolve(a), AiMailParser)
+
+    def test_unknown_falls_back_to_default(self):
+        a = SimpleNamespace(name="GoogleDNS_resolve_1_0_0", analyzer_cortex_id="gdns")
+        self.assertIs(self.reg.resolve(a), DefaultTaxonomyParser)
