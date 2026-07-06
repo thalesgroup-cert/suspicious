@@ -193,7 +193,10 @@ class ArtifactJobLauncherService:
         """
         Checks if a domain is allow-listed. Updates its and optionally related object's IOC attributes if it is.
         """
-        if domain_obj and AllowListDomain.objects.filter(domain=domain_obj).exists() and WatcherLegitDomain.objects.filter(domain=domain_obj).exists():
+        if domain_obj and (
+            AllowListDomain.objects.filter(domain=domain_obj).exists()
+            or WatcherLegitDomain.objects.filter(domain=domain_obj).exists()
+        ):
             fetch_mail_logger.info(f"Domain {domain_obj} is allow-listed")
             domain_obj.ioc_score = 0
             domain_obj.ioc_confidence = 100
