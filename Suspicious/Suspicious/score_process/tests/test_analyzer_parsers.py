@@ -113,3 +113,25 @@ class DefaultParserTests(SimpleTestCase):
         r = self._mk().parse(summary, None)
         self.assertEqual(r.level, "malicious")
         self.assertEqual((r.score, r.confidence), (10, 100))
+
+
+class AiMailParserTests(SimpleTestCase):
+    def _mk(self):
+        from score_process.scoring.cortex_analyzers.contrib.ai_mail import AiMailParser
+        return AiMailParser(analyzer_name="AI_Mail_Analyzer_2_0", data="mail.eml",
+                            data_type="file", case_id=1)
+
+    @patch("score_process.scoring.cortex_analyzers.contrib.ai_mail.AiMailParser._run_campaign")
+    def test_safe_mail_score_mapping(self, m_campaign):
+        f = load_fixture("ai_mail")   # classification SAFE, malscore 1.52, confidence 0.848
+        r = self._mk().parse(f["summary"], f["full"])
+        self.assertEqual(r.level, "safe")
+        self.assertEqual(r.score, 2)          # round(1.52)
+        self.assertEqual(r.confidence, 85)    # round(0.848 * 100)
+        m_campaign.assert_called_once()       # side-effects invoked but stubbed
+
+    @patch("score_process.scoring.cortex_analyzers.contrib.ai_mail.AiMailParser._run_campaign")
+    def test_manifest_matches_versioned_and_bare(self, _m):
+        names = self._mk().manifest.cortex_names
+        self.assertIn("AI_Mail_Analyzer", names)
+        self.assertIn("AI_Mail_Analyzer_2_0", names)
