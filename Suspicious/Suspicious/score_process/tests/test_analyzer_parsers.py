@@ -37,3 +37,49 @@ class FixtureCorpusTests(SimpleTestCase):
 
     def test_pending_fixture_is_ongoing(self):
         self.assertEqual(load_fixture("pending")["summary"], {"ongoing": "analysis"})
+
+
+from unittest.mock import patch
+from score_process.scoring.cortex_analyzers.base import (
+    AnalyzerParser, AnalyzerManifest, is_pending,
+)
+
+
+class _StubParser(AnalyzerParser):
+    manifest = AnalyzerManifest(name="stub", cortex_names=("Stub_1_0",))
+    def parse(self, summary, full):
+        return AnalyzerResult(analyzer_name=self.analyzer_name, data=self.data,
+                              score=9, confidence=90, category="c", level="malicious",
+                              details={})
+
+class BaseParserTests(SimpleTestCase):
+    def _mk(self, **kw):
+        kw.setdefault("analyzer_name", "Stub_1_0"); kw.setdefault("data", "x")
+        kw.setdefault("data_type", "url")
+        return _StubParser(**kw)
+
+    def test_is_pending_ongoing(self):
+        self.assertTrue(is_pending({"ongoing": "analysis"}, {"ongoing": "analysis"}))
+
+    def test_is_pending_empty(self):
+        self.assertTrue(is_pending(None, None))
+
+    def test_is_pending_status(self):
+        self.assertTrue(is_pending({"taxonomies": []}, {}, status="InProgress"))
+
+    def test_run_returns_pending_for_ongoing(self):
+        self.assertIs(self._mk().run({"ongoing": "analysis"}, {"ongoing": "analysis"}), PENDING)
+
+    @patch("score_process.scoring.cortex_analyzers.base.check_allow_list")
+    def test_run_allow_list_short_circuits_safe(self, m_allow):
+        from score_process.scoring.cortex_analyzers.result import AllowListResult
+        m_allow.return_value = AllowListResult(DomainAllowList="Safe DW triggered")
+        r = self._mk(data_type="domain").run({"taxonomies": []}, {})
+        self.assertEqual((r.score, r.confidence, r.level), (0, 100, "safe"))
+
+    @patch("score_process.scoring.cortex_analyzers.base.check_allow_list")
+    def test_run_calls_parse_when_clean(self, m_allow):
+        from score_process.scoring.cortex_analyzers.result import AllowListResult
+        m_allow.return_value = AllowListResult()
+        r = self._mk().run({"taxonomies": [{"level": "malicious"}]}, {})
+        self.assertEqual(r.level, "malicious")
