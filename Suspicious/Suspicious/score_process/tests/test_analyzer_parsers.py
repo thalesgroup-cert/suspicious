@@ -274,6 +274,12 @@ class UrlscanSearchParserTests(SimpleTestCase):
         self.assertEqual(r.details["urlscan_total"], 2)
         self.assertIn("http://x/a", r.details["urlscan_results"])
 
+    def test_null_total_falls_back_to_result_count(self):
+        p = UrlscanSearchParser(analyzer_name="Urlscan_io_Search_0_1_1", data="http://x", data_type="url")
+        full = {"indicator": {"results": [{"page": {"url": "http://x/a"}}], "total": None}}
+        r = p.parse({"taxonomies": [{"level": "info"}]}, full)
+        self.assertEqual(r.details["urlscan_total"], 1)
+
 
 from score_process.scoring.cortex_analyzers.contrib.misp import MispParser
 
@@ -299,6 +305,14 @@ class MispParserTests(SimpleTestCase):
         full = {"results": [{"result": [{"id": "9", "info": "medium", "threat_level_id": "2"}]}]}
         r = p.parse({"taxonomies": [{"level": "info"}]}, full)
         self.assertEqual(r.level, "suspicious")
+
+    def test_scalar_results_do_not_crash(self):
+        # Malformed payload (results/result not a list) must degrade to the
+        # taxonomy, not raise — a raise would silently drop a real MISP hit.
+        p = MispParser(analyzer_name="MISP_2_1", data="x", data_type="hash")
+        self.assertEqual(p.parse({"taxonomies": [{"level": "info"}]}, {"results": 5}).level, "info")
+        self.assertEqual(
+            p.parse({"taxonomies": [{"level": "info"}]}, {"results": [{"result": 5}]}).level, "info")
 
 
 from score_process.scoring.cortex_analyzers.contrib.circl_hashlookup import CirclHashlookupParser

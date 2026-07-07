@@ -15,9 +15,12 @@ def _events(full: Any) -> list:
     if not isinstance(full, dict):
         return []
     out = []
-    for block in full.get("results", []) or []:
+    results = full.get("results")
+    for block in results if isinstance(results, list) else []:
         if isinstance(block, dict):
-            out.extend(e for e in (block.get("result") or []) if isinstance(e, dict))
+            events = block.get("result")
+            if isinstance(events, list):
+                out.extend(e for e in events if isinstance(e, dict))
     return out
 
 

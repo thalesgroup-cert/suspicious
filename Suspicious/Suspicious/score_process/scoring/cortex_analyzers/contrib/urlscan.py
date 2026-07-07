@@ -19,8 +19,11 @@ class UrlscanSearchParser(AnalyzerParser):
         ).parse(summary, full)
 
         indicator = full.get("indicator", {}) if isinstance(full, dict) else {}
-        results = indicator.get("results", []) if isinstance(indicator, dict) else []
-        total = indicator.get("total", len(results)) if isinstance(indicator, dict) else 0
+        raw_results = indicator.get("results") if isinstance(indicator, dict) else None
+        results = raw_results if isinstance(raw_results, list) else []
+        total = indicator.get("total") if isinstance(indicator, dict) else None
+        if not isinstance(total, int):
+            total = len(results)
         urls = [r.get("page", {}).get("url") for r in results
                 if isinstance(r, dict) and isinstance(r.get("page"), dict)][:5]
 
