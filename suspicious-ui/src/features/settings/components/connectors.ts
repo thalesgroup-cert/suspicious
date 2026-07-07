@@ -15,11 +15,13 @@ export type Connector = {
   description: string;
   author: string;
   docs_url: string;
+  category: string;
   events: string[];
   schedules: { name: string; interval_seconds: number }[];
   config_schema: ConfigField[];
   enabled: boolean;
   enabled_by_default: boolean;
+  status: "connected" | "partial" | "disabled";
   last_health_ok: boolean | null;
   last_health_detail: string;
   last_health_at: string | null;

@@ -9,12 +9,13 @@ vi.mock("../connectors", () => ({
     connectors: [
       {
         name: "misp", version: "1.0.0", description: "Push to MISP",
-        author: "Thales CERT", docs_url: "", events: ["case_finalised"],
+        author: "Thales CERT", docs_url: "", category: "Threat Intelligence",
+        events: ["case_finalised"],
         schedules: [], config_schema: [
           { key: "instances.primary.url", type: "url", required: true, default: null, help: "" },
           { key: "api_key", type: "secret", required: false, default: null, help: "" },
         ],
-        enabled: true, enabled_by_default: false,
+        enabled: true, enabled_by_default: false, status: "connected",
         last_health_ok: true, last_health_detail: "ok", last_health_at: null,
       },
     ],
@@ -50,5 +51,33 @@ describe("ConnectorsPanel", () => {
     await waitFor(() => expect(screen.getByText("misp")).toBeInTheDocument());
     expect(screen.getByText(/1\.0\.0/)).toBeInTheDocument();
     expect(screen.getByRole("switch")).toBeChecked();
+  });
+
+  it("shows a KPI row with the connected count", async () => {
+    const qc = new QueryClient({ defaultOptions: { queries: { retry: false } } });
+    render(
+      <QueryClientProvider client={qc}>
+        <ConnectorsPanel />
+      </QueryClientProvider>,
+    );
+    // "Incomplete"/"Disabled" are KPI-tile-only labels (the mock's one
+    // connector is status "connected", so no status chip renders either of
+    // these) — unambiguous proof the KPI row rendered.
+    await waitFor(() => expect(screen.getByText("Incomplete")).toBeInTheDocument());
+    expect(screen.getByText("Disabled")).toBeInTheDocument();
+    // "Connected" appears twice by design: the KPI tile label and the
+    // connector's status chip.
+    expect(screen.getAllByText("Connected")).toHaveLength(2);
+    expect(screen.getAllByText("1").length).toBeGreaterThan(0);
+  });
+
+  it("groups the connector card under its category heading", async () => {
+    const qc = new QueryClient({ defaultOptions: { queries: { retry: false } } });
+    render(
+      <QueryClientProvider client={qc}>
+        <ConnectorsPanel />
+      </QueryClientProvider>,
+    );
+    await waitFor(() => expect(screen.getByText("Threat Intelligence")).toBeInTheDocument());
   });
 });
