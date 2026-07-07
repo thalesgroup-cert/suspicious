@@ -273,3 +273,29 @@ class UrlscanSearchParserTests(SimpleTestCase):
         self.assertEqual(r.level, "info")  # detail-only, no escalation
         self.assertEqual(r.details["urlscan_total"], 2)
         self.assertIn("http://x/a", r.details["urlscan_results"])
+
+
+from score_process.scoring.cortex_analyzers.contrib.misp import MispParser
+
+class MispParserTests(SimpleTestCase):
+    def _run(self, fixture):
+        f = load_fixture(fixture)
+        p = MispParser(analyzer_name="MISP_2_1", data="abc", data_type="hash")
+        return p.parse(f["summary"], f["full"])
+
+    def test_no_events_uses_taxonomy(self):
+        r = self._run("misp")
+        self.assertEqual(r.level, "info")
+
+    def test_high_threat_event_is_malicious(self):
+        r = self._run("misp_hit")
+        self.assertEqual(r.level, "malicious")
+        self.assertEqual(r.score, 10)
+        self.assertIn("Phishing campaign X", r.category)
+
+    def test_threat_level_mapping(self):
+        # threat_level_id 2 -> suspicious
+        p = MispParser(analyzer_name="MISP_2_1", data="x", data_type="hash")
+        full = {"results": [{"result": [{"id": "9", "info": "medium", "threat_level_id": "2"}]}]}
+        r = p.parse({"taxonomies": [{"level": "info"}]}, full)
+        self.assertEqual(r.level, "suspicious")
