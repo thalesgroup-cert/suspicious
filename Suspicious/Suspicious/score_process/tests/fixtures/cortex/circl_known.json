@@ -1,0 +1,4 @@
+{
+  "summary": {"taxonomies": [{"level": "safe", "namespace": "CIRCLHashlookup", "predicate": "Result", "value": "known"}]},
+  "full": {"FileName": "kernel32.dll", "source": "NSRL", "SHA-256": "abc"}
+}

@@ -299,3 +299,27 @@ class MispParserTests(SimpleTestCase):
         full = {"results": [{"result": [{"id": "9", "info": "medium", "threat_level_id": "2"}]}]}
         r = p.parse({"taxonomies": [{"level": "info"}]}, full)
         self.assertEqual(r.level, "suspicious")
+
+
+from score_process.scoring.cortex_analyzers.contrib.circl_hashlookup import CirclHashlookupParser
+
+class CirclHashlookupParserTests(SimpleTestCase):
+    def _run(self, fixture):
+        f = load_fixture(fixture)
+        p = CirclHashlookupParser(analyzer_name="CIRCLHashlookup_1_1", data="abc", data_type="hash")
+        return p.parse(f["summary"], f["full"])
+
+    def test_unknown_is_info(self):
+        r = self._run("circl")
+        self.assertEqual(r.level, "info")
+
+    def test_known_good_is_safe(self):
+        r = self._run("circl_known")
+        self.assertEqual(r.level, "safe")
+        self.assertEqual(r.confidence, 100)
+        self.assertIn("kernel32.dll", r.category)
+
+    def test_known_malicious(self):
+        r = self._run("circl_malicious")
+        self.assertEqual(r.level, "malicious")
+        self.assertEqual(r.score, 10)

@@ -1,0 +1,4 @@
+{
+  "summary": {"taxonomies": [{"level": "info", "namespace": "CIRCLHashlookup", "predicate": "Result", "value": "unkown"}]},
+  "full": {"message": "Non existing SHA-256", "query": "3d99590ceb630d3aa9"}
+}
