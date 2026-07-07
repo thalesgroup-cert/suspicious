@@ -199,3 +199,25 @@ class ReportsRewireTests(SimpleTestCase):
         CortexAnalyzerReports.create_and_save_report(r, "abc123", case_id=1)
         r.save.assert_called_once()
         self.assertEqual(r.level, "info")
+
+
+from score_process.scoring.cortex_analyzers.contrib.zscaler import ZscalerParser
+
+class ZscalerParserTests(SimpleTestCase):
+    def _run(self, fixture):
+        f = load_fixture(fixture)
+        p = ZscalerParser(analyzer_name="Zscaler_1_0", data="http://x", data_type="url")
+        return p.parse(f["summary"], f["full"])
+
+    def test_benign_is_info(self):
+        r = self._run("zscaler")
+        self.assertEqual(r.level, "info")
+        self.assertEqual(r.score, 5)
+        self.assertIn("CORPORATE_MARKETING", r.category)
+
+    def test_security_alert_is_malicious(self):
+        r = self._run("zscaler_alert")
+        self.assertEqual(r.level, "malicious")
+        self.assertEqual(r.score, 10)
+        self.assertEqual(r.confidence, 100)
+        self.assertIn("PHISHING", r.category)
