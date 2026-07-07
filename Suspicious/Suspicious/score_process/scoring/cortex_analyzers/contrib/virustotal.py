@@ -16,9 +16,11 @@ def _stats(full: Any) -> Optional[dict]:
     if isinstance(res, dict):
         attrs = res.get("data", {})
         if isinstance(attrs, dict):
-            stats = attrs.get("attributes", {}).get("last_analysis_stats")
-            if isinstance(stats, dict):
-                return stats
+            inner = attrs.get("attributes")
+            if isinstance(inner, dict):
+                stats = inner.get("last_analysis_stats")
+                if isinstance(stats, dict):
+                    return stats
         if isinstance(res.get("last_analysis_stats"), dict):
             return res["last_analysis_stats"]
     return None

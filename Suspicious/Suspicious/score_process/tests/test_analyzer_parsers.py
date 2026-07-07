@@ -247,3 +247,9 @@ class VirusTotalParserTests(SimpleTestCase):
         p = VirusTotalGetReportParser(analyzer_name="VirusTotal_GetReport_3_1", data="x", data_type="hash")
         r = p.parse({"taxonomies": [{"level": "suspicious", "value": "VT"}]}, {"message": "no report"})
         self.assertEqual(r.level, "suspicious")
+
+    def test_non_dict_attributes_falls_back(self):
+        p = VirusTotalGetReportParser(analyzer_name="VirusTotal_GetReport_3_1", data="x", data_type="hash")
+        r = p.parse({"taxonomies": [{"level": "info", "value": "VT"}]},
+                    {"results": {"data": {"attributes": None}}})
+        self.assertEqual(r.level, "info")  # no crash; delegated to taxonomy
