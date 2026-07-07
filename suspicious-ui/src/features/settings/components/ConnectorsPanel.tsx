@@ -12,7 +12,17 @@ import {
   TextField,
   Typography,
 } from "@mui/material";
+import BlockOutlined from "@mui/icons-material/BlockOutlined";
+import CheckCircleOutlined from "@mui/icons-material/CheckCircleOutlined";
+import EmailOutlined from "@mui/icons-material/EmailOutlined";
+import ExtensionOutlined from "@mui/icons-material/ExtensionOutlined";
+import HubOutlined from "@mui/icons-material/HubOutlined";
+import ShareOutlined from "@mui/icons-material/ShareOutlined";
+import VisibilityOutlined from "@mui/icons-material/VisibilityOutlined";
+import WarningAmberOutlined from "@mui/icons-material/WarningAmberOutlined";
+import type { SvgIconProps } from "@mui/material";
 import { useState } from "react";
+import type { ComponentType } from "react";
 
 import {
   type ConfigField,
@@ -23,6 +33,24 @@ import {
   setConnectorEnabled,
   testConnector,
 } from "./connectors";
+
+type IconType = ComponentType<SvgIconProps>;
+
+const CONNECTOR_ICONS: Record<string, IconType> = {
+  thehive: HubOutlined,
+  misp: ShareOutlined,
+  watcher: VisibilityOutlined,
+  smtp_notify: EmailOutlined,
+};
+
+const STATUS_CHIP: Record<
+  Connector["status"],
+  { label: string; color: "success" | "warning" | "default" }
+> = {
+  connected: { label: "Connected", color: "success" },
+  partial: { label: "Incomplete", color: "warning" },
+  disabled: { label: "Disabled", color: "default" },
+};
 
 function dottedGet(obj: Record<string, unknown>, key: string): unknown {
   return key.split(".").reduce<unknown>(
@@ -90,6 +118,32 @@ function ConfigFieldInput({
   );
 }
 
+function KpiTile({
+  label,
+  value,
+  icon: Icon,
+  color,
+}: {
+  label: string;
+  value: number;
+  icon: IconType;
+  color: "success.main" | "warning.main" | "text.secondary";
+}) {
+  return (
+    <Card variant="outlined" sx={{ flex: 1, minWidth: 140 }}>
+      <CardContent sx={{ display: "flex", alignItems: "center", gap: 1.5 }}>
+        <Icon sx={{ color, fontSize: 32 }} />
+        <Box>
+          <Typography variant="caption" color="text.secondary" sx={{ textTransform: "uppercase" }}>
+            {label}
+          </Typography>
+          <Typography variant="h6">{value}</Typography>
+        </Box>
+      </CardContent>
+    </Card>
+  );
+}
+
 function ConnectorCard({ connector }: { connector: Connector }) {
   const queryClient = useQueryClient();
   const [draft, setDraft] = useState<Record<string, unknown> | null>(null);
@@ -115,6 +169,7 @@ function ConnectorCard({ connector }: { connector: Connector }) {
       queryClient.invalidateQueries({
         queryKey: ["connector-config", connector.name],
       });
+      queryClient.invalidateQueries({ queryKey: ["connectors"] });
     },
     onError: (err: unknown) => {
       const e = err as { response?: { data?: { errors?: Record<string, string> } } };
@@ -154,12 +209,17 @@ function ConnectorCard({ connector }: { connector: Connector }) {
     return out;
   }
 
+  const Icon = CONNECTOR_ICONS[connector.name] ?? ExtensionOutlined;
+  const statusChip = STATUS_CHIP[connector.status];
+
   return (
     <Card variant="outlined">
       <CardContent>
         <Stack direction="row" spacing={1} sx={{ alignItems: "center" }}>
+          <Icon fontSize="small" color="action" />
           <Typography variant="h6">{connector.name}</Typography>
           <Chip size="small" label={connector.version} variant="outlined" />
+          <Chip size="small" color={statusChip.color} label={statusChip.label} />
           {connector.last_health_ok !== null && (
             <Chip
               size="small"
@@ -232,15 +292,49 @@ export function ConnectorsPanel() {
   if (isLoading) return <CircularProgress size={24} />;
   if (error) return <Alert severity="error">Failed to load connectors.</Alert>;
 
+  const connectors = data?.connectors ?? [];
+  const kpi = {
+    connected: connectors.filter((c) => c.status === "connected").length,
+    partial: connectors.filter((c) => c.status === "partial").length,
+    disabled: connectors.filter((c) => c.status === "disabled").length,
+  };
+
+  const byCategory = new Map<string, Connector[]>();
+  for (const c of connectors) {
+    const key = c.category || "Other";
+    byCategory.set(key, [...(byCategory.get(key) ?? []), c]);
+  }
+  const categories = [...byCategory.keys()].sort((a, b) => a.localeCompare(b));
+
   return (
     <Stack spacing={2}>
+      <Stack direction="row" spacing={2} sx={{ flexWrap: "wrap" }}>
+        <KpiTile label="Connected" value={kpi.connected} icon={CheckCircleOutlined} color="success.main" />
+        <KpiTile label="Incomplete" value={kpi.partial} icon={WarningAmberOutlined} color="warning.main" />
+        <KpiTile label="Disabled" value={kpi.disabled} icon={BlockOutlined} color="text.secondary" />
+      </Stack>
+
       {Object.entries(data?.load_errors ?? {}).map(([name, message]) => (
         <Alert key={name} severity="warning">
           Connector {name} failed to load: {message}
         </Alert>
       ))}
-      {data?.connectors.map((connector) => (
-        <ConnectorCard key={connector.name} connector={connector} />
+
+      {categories.map((category) => (
+        <Box key={category}>
+          <Typography
+            variant="overline"
+            color="text.secondary"
+            sx={{ display: "block", mb: 1, letterSpacing: "0.08em" }}
+          >
+            {category}
+          </Typography>
+          <Stack spacing={2}>
+            {(byCategory.get(category) ?? []).map((connector) => (
+              <ConnectorCard key={connector.name} connector={connector} />
+            ))}
+          </Stack>
+        </Box>
       ))}
     </Stack>
   );

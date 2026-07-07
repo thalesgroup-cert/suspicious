@@ -107,7 +107,16 @@ services:
     environment:
       http_proxy:  "${HTTP_PROXY:-}"
       https_proxy: "${HTTPS_PROXY:-}"
-      no_proxy:    "${NO_PROXY:-}"
+      # Cortex bundles a fabric8 Kubernetes client (eagerly constructed even
+      # though jobs run via docker.sock) that REJECTS `*` wildcards in NO_PROXY
+      # and refuses to boot. Two sources leak a corporate wildcard in here: the
+      # host's ${NO_PROXY}, AND Docker's own proxy injection from
+      # ~/.docker/config.json (which sets the UPPERCASE NO_PROXY on every
+      # container). Override BOTH cases with a dedicated wildcard-free list;
+      # deployments needing a corp-internal bypass set CORTEX_NO_PROXY with
+      # dot-form entries (`.corp.example`), never `*`.
+      no_proxy:    "${CORTEX_NO_PROXY:-localhost,127.0.0.1,cortex,elasticsearch,rustfs,chromadb,vault,suspicious}"
+      NO_PROXY:    "${CORTEX_NO_PROXY:-localhost,127.0.0.1,cortex,elasticsearch,rustfs,chromadb,vault,suspicious}"
       JAVA_OPTS:   "-Djavax.net.ssl.trustStore=/etc/cortex/keystore.jks"
       job_directory: "${CORTEX_PATH}/jobs"
     volumes:

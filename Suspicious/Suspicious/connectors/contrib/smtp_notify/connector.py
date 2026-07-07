@@ -27,6 +27,7 @@ class SmtpNotifyConnector(Connector):
         name="smtp_notify",
         version="1.0.0",
         author="Thales CERT",
+        category="Notifications",
         description="Email the reporter their case verdict. Uses the shared "
                     "email.smtp / email.content config sections.",
         config_schema=(),  # intentionally empty: shared sections, not per-connector

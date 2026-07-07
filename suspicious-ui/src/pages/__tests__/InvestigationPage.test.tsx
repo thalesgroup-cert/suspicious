@@ -218,6 +218,75 @@ describe("InvestigationPage", () => {
     expect(screen.queryByText(/reporter's challenge/i)).not.toBeInTheDocument();
   });
 
+  it("shows the reporter's note in the context panel when present", async () => {
+    const user = userEvent.setup();
+    mockGetDetails.mockResolvedValue({
+      ...mockDetails,
+      reporter_note: "forwarded phishing",
+      reporter_context: "please check this url",
+    } as never);
+    renderInvestigation();
+
+    await waitFor(() =>
+      expect(
+        screen.getByText(/phish\.evil\.com|reporter@corp/i)
+      ).toBeInTheDocument()
+    );
+
+    const row = screen.getByText(/phish\.evil\.com|reporter@corp/i).closest("tr") ??
+                screen.getByText(/phish\.evil\.com|reporter@corp/i);
+    await user.click(row);
+
+    await waitFor(() => {
+      expect(screen.getByText(/reporter's context/i)).toBeInTheDocument();
+      expect(screen.getByText("forwarded phishing")).toBeInTheDocument();
+    });
+  });
+
+  it("shows the reporter's context when there is no note", async () => {
+    const user = userEvent.setup();
+    mockGetDetails.mockResolvedValue({
+      ...mockDetails,
+      reporter_context: "please check this url",
+    } as never);
+    renderInvestigation();
+
+    await waitFor(() =>
+      expect(
+        screen.getByText(/phish\.evil\.com|reporter@corp/i)
+      ).toBeInTheDocument()
+    );
+
+    const row = screen.getByText(/phish\.evil\.com|reporter@corp/i).closest("tr") ??
+                screen.getByText(/phish\.evil\.com|reporter@corp/i);
+    await user.click(row);
+
+    await waitFor(() => {
+      expect(screen.getByText("please check this url")).toBeInTheDocument();
+    });
+  });
+
+  it("does not show a reporter's context panel when neither field is present", async () => {
+    const user = userEvent.setup();
+    renderInvestigation();
+
+    await waitFor(() =>
+      expect(
+        screen.getByText(/phish\.evil\.com|reporter@corp/i)
+      ).toBeInTheDocument()
+    );
+
+    const row = screen.getByText(/phish\.evil\.com|reporter@corp/i).closest("tr") ??
+                screen.getByText(/phish\.evil\.com|reporter@corp/i);
+    await user.click(row);
+
+    await waitFor(() => {
+      expect(screen.getByText(/PhishingURLAnalyzer/i)).toBeInTheDocument();
+    });
+
+    expect(screen.queryByText(/reporter's context/i)).not.toBeInTheDocument();
+  });
+
   it("redirects non-elevated users away from the page", async () => {
     // Render without elevated groups — the component should show nothing / redirect
     mockGetMe.mockResolvedValue({ ...mockMe, groups: [] } as never);

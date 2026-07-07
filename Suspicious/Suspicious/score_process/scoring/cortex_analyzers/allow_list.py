@@ -11,7 +11,7 @@ from settings.models import (
     WatcherLegitDomain,
 )
 from .utils import extract_domain
-from .models import AllowListResult
+from .result import AllowListResult
 
 logger = logging.getLogger("tasp.cron.update_ongoing_case_jobs")
 

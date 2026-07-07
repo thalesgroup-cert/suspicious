@@ -23,6 +23,7 @@ class MISPConnector(Connector):
         name="misp",
         version="1.0.0",
         author="Thales CERT",
+        category="Threat Intelligence",
         description="Push finalised cases (mail object, artifacts, IOCs) to MISP; "
                     "Suspicious/Dangerous verdicts also feed the secondary monthly event.",
         config_schema=(

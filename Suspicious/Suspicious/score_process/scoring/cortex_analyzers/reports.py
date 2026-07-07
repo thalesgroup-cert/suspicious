@@ -5,7 +5,6 @@ import logging
 
 from django.db.models import Max
 
-from .service import CortexAnalyzerService
 from cortex_job.models import AnalyzerReport
 from .utils import dump_model
 
@@ -90,21 +89,33 @@ class CortexAnalyzerReports:
 
     @staticmethod
     def create_and_save_report(report, artifact_value, case_id):
-        """Run the analyzer for a successful job and write scoring fields."""
+        """Run the resolved parser for a finished job and write scoring fields.
+
+        PENDING (job not finished) → leave the row untouched for the next poll.
+        Only update the four scoring columns — prevents overwriting foreign keys
+        or timestamps another process may have changed. AnalyzerReport has no
+        `details` column; raw payload is already in report_full / report_summary.
+        """
+        from .registry import registry
+        from .result import PENDING
         try:
             update_cases_logger.info(
                 "Creating result for artifact=%r analyzer=%s.",
                 artifact_value, report.analyzer.name,
             )
 
-            result = CortexAnalyzerService.create_report(
-                summary=report.report_summary,
-                full=report.report_full,
+            parser_cls = registry.resolve(report.analyzer)
+            parser = parser_cls(
                 analyzer_name=report.analyzer.name,
                 data=artifact_value,
                 data_type=report.type,
                 case_id=case_id,
             )
+            result = parser.run(report.report_summary, report.report_full, report.status)
+            if result is PENDING:
+                update_cases_logger.info(
+                    "Report %s still pending — not scoring.", getattr(report, "id", "?"))
+                return
 
             result_dict = dump_model(result)
             category = result_dict.get("category", "Unknown")
@@ -115,11 +126,6 @@ class CortexAnalyzerReports:
             report.confidence = result_dict.get("confidence", 0)
             report.category   = category
             report.level      = result_dict.get("level",    "info")
-
-            # Only update the four scoring columns — prevents overwriting
-            # foreign keys or timestamps that another process may have changed.
-            # AnalyzerReport has no `details` column; raw payload is already in
-            # report_full / report_summary / report_taxonomy from initial save.
             report.save(update_fields=["score", "confidence", "category", "level"])
 
         except Exception as exc:

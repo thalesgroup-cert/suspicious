@@ -958,6 +958,18 @@ export default function InvestigationPage() {
                   </Box>
                 ) : null}
 
+                {/* ── Reporter's context / note ─────────────────────────────────── */}
+                {(detailsQuery.data?.reporter_note || detailsQuery.data?.reporter_context) ? (
+                  <Box sx={{ px: 2.25, py: 2 }}>
+                    <Typography sx={{ fontSize: 10, fontWeight: 700, textTransform: "uppercase", letterSpacing: "0.08em", color: "text.disabled", mb: 0.75 }}>
+                      Reporter's context
+                    </Typography>
+                    <Typography variant="body2" color="text.secondary" sx={{ whiteSpace: "pre-wrap" }}>
+                      {detailsQuery.data.reporter_note || detailsQuery.data.reporter_context}
+                    </Typography>
+                  </Box>
+                ) : null}
+
                 {/* ── Global verdict override ───────────────────────────────────── */}
                 <Box sx={{ px: 2.25, py: 2 }}>
                   <Stack direction="row" sx={{ mb: 1, alignItems: "center", justifyContent: "space-between" }}>

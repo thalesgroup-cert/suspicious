@@ -3,7 +3,6 @@ Shared utility functions for the Cortex analyzer layer.
 """
 from __future__ import annotations
 
-import re
 from typing import Any, Optional
 from urllib.parse import urlparse
 
@@ -12,25 +11,6 @@ from domain_process.domain_utils.domain_handler import DomainHandler
 # Module-level singleton — DomainHandler may load config or open DB
 # connections; creating one per call is wasteful.
 _domain_handler = DomainHandler()
-
-# Matches Cortex version suffixes like _4_0, _1_4, _10_0 at end of string
-_VERSION_SUFFIX_RE = re.compile(r"_\d+_\d+$")
-
-
-def normalize_analyzer_name(name: str) -> str:
-    """
-    Convert a Cortex analyzer name to the lowercase key used in REGISTRY.
-
-    Examples
-    --------
-    "MailHeader_4_0"       → "mailheader"
-    "VirustotalQuery_2_0"  → "virustotalquery"
-    "AI_Mail_Analyzer_1_4" → "ai"
-    "Yara_Boosted_3_2"     → "yara"
-    "MailHeader_10_0"      → "mailheader"   (two-digit version)
-    """
-    stripped = _VERSION_SUFFIX_RE.sub("", name)
-    return stripped.split("_")[0].lower()
 
 
 def extract_domain(value: str) -> Optional[str]:

@@ -53,6 +53,7 @@ class ConnectorManifest:
     description: str = ""
     author: str = ""
     docs_url: str = ""
+    category: str = ""
     config_schema: tuple[ConfigField, ...] = ()
     events: tuple[str, ...] = ()
     schedules: tuple[Schedule, ...] = ()

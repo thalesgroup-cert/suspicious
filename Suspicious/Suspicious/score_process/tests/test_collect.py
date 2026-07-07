@@ -49,14 +49,22 @@ class CollectSignalsTest(TestCase):
         self.assertEqual(signals, [])
         self.assertFalse(deny_listed)
 
-    def test_ai_confidence_normalized_by_ten_not_clamped(self):
-        # manage_ai_jobs stores confidence_ai = analyzer.confidence * 10 (0-1000);
-        # collect must /10 back to 0-100, NOT clamp — else a mid-confidence AI
-        # verdict saturates to 100 and defeats the CONF_FLOOR gate.
+    def test_ai_confidence_is_already_0_100(self):
+        # manage_ai_jobs stores confidence_ai = analyzer.confidence * 10 where the
+        # AI analyzer confidence is 0-10, so confidence_ai is already 0-100. A
+        # 100% AI (confidence_ai=100) must stay 100 — NOT be divided to 10, which
+        # would sink it below CONF_FLOOR and make the AI verdict never win.
         case = Case.objects.create(
-            description="", reporter=self.user, score_ai=7, confidence_ai=400,
+            description="", reporter=self.user, score_ai=6, confidence_ai=100,
         )
         _, ai, _ = collect_signals(case)
         self.assertIsNotNone(ai)
-        self.assertEqual(ai.confidence, 40)   # 400/10, not clamped to 100
-        self.assertEqual(ai.score, 7)
+        self.assertEqual(ai.confidence, 100)   # a 100% AI stays 100
+        self.assertEqual(ai.score, 6)
+
+    def test_ai_confidence_clamped_to_100(self):
+        case = Case.objects.create(
+            description="", reporter=self.user, score_ai=6, confidence_ai=150,
+        )
+        _, ai, _ = collect_signals(case)
+        self.assertEqual(ai.confidence, 100)   # defensively clamped

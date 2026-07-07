@@ -194,7 +194,11 @@ class CaseHandler:
         if self.other_form.is_valid():
             description = self.other_form.cleaned_data.get("context") or description
         try:
-            case = CaseCreator(self.request.user).create_case(description=description, **ctx)
+            # reporter_context is web-form-only by design: it captures the
+            # submitter's `context` here before finalise overwrites description.
+            # Email submissions surface the reporter's message via
+            # Mail.reporterNote instead, so the feeder paths don't set it.
+            case = CaseCreator(self.request.user).create_case(description=description, reporter_context=description, **ctx)
             logger.info("Case created: %s", case)
             return case
         except Exception:
