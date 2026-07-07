@@ -253,3 +253,23 @@ class VirusTotalParserTests(SimpleTestCase):
         r = p.parse({"taxonomies": [{"level": "info", "value": "VT"}]},
                     {"results": {"data": {"attributes": None}}})
         self.assertEqual(r.level, "info")  # no crash; delegated to taxonomy
+
+
+from score_process.scoring.cortex_analyzers.contrib.urlscan import UrlscanSearchParser
+
+class UrlscanSearchParserTests(SimpleTestCase):
+    def _run(self, fixture):
+        f = load_fixture(fixture)
+        p = UrlscanSearchParser(analyzer_name="Urlscan_io_Search_0_1_1", data="http://x", data_type="url")
+        return p.parse(f["summary"], f["full"])
+
+    def test_no_results_keeps_taxonomy_level(self):
+        r = self._run("urlscan")
+        self.assertEqual(r.level, "info")
+        self.assertEqual(r.details["urlscan_total"], 0)
+
+    def test_hits_enrich_detail_but_do_not_escalate(self):
+        r = self._run("urlscan_hits")
+        self.assertEqual(r.level, "info")  # detail-only, no escalation
+        self.assertEqual(r.details["urlscan_total"], 2)
+        self.assertIn("http://x/a", r.details["urlscan_results"])
