@@ -54,7 +54,8 @@ class _StubParser(AnalyzerParser):
 
 class BaseParserTests(SimpleTestCase):
     def _mk(self, **kw):
-        kw.setdefault("analyzer_name", "Stub_1_0"); kw.setdefault("data", "x")
+        kw.setdefault("analyzer_name", "Stub_1_0")
+        kw.setdefault("data", "x")
         kw.setdefault("data_type", "url")
         return _StubParser(**kw)
 
@@ -160,7 +161,8 @@ from score_process.scoring.cortex_analyzers.contrib.ai_mail import AiMailParser
 
 class RegistryTests(SimpleTestCase):
     def setUp(self):
-        self.reg = AnalyzerParserRegistry(); self.reg.discover()
+        self.reg = AnalyzerParserRegistry()
+        self.reg.discover()
 
     def test_resolve_by_name(self):
         a = SimpleNamespace(name="AI_Mail_Analyzer_2_0", analyzer_cortex_id="zzz")

@@ -14,11 +14,16 @@ SEVERITY_ORDER = {"safe": 0, "info": 1, "suspicious": 2, "malicious": 3, "danger
 
 def get_level_score_confidence(level: str) -> tuple[int, int]:
     match level:
-        case "malicious" | "dangerous": return 10, 100
-        case "suspicious":              return 7, 70
-        case "info":                    return 5, 50
-        case "safe":                    return 0, 100
-        case _:                         return 0, 0
+        case "malicious" | "dangerous":
+            return 10, 100
+        case "suspicious":
+            return 7, 70
+        case "info":
+            return 5, 50
+        case "safe":
+            return 0, 100
+        case _:
+            return 0, 0
 
 
 class DefaultTaxonomyParser(AnalyzerParser):
