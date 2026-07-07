@@ -323,3 +323,25 @@ class CirclHashlookupParserTests(SimpleTestCase):
         r = self._run("circl_malicious")
         self.assertEqual(r.level, "malicious")
         self.assertEqual(r.score, 10)
+
+
+class BespokeParserResolutionTests(SimpleTestCase):
+    def test_registry_resolves_all_bespoke_parsers(self):
+        reg = AnalyzerParserRegistry()
+        reg.discover()
+        self.assertFalse(reg.errors, f"parser import errors: {reg.errors}")
+
+        class _A:
+            def __init__(self, name):
+                self.name = name
+                self.analyzer_cortex_id = None
+
+        cases = {
+            "Zscaler_1_3": "ZscalerParser",
+            "VirusTotal_GetReport_3_1": "VirusTotalGetReportParser",
+            "Urlscan_io_Search_0_1_1": "UrlscanSearchParser",
+            "MISP_2_1": "MispParser",
+            "CIRCLHashlookup_1_1": "CirclHashlookupParser",
+        }
+        for cortex_name, cls_name in cases.items():
+            self.assertEqual(reg.resolve(_A(cortex_name)).__name__, cls_name)
