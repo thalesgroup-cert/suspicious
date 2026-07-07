@@ -20,6 +20,7 @@ class TheHiveConnector(Connector):
         name="thehive",
         version="1.0.0",
         author="Thales CERT",
+        category="Incident Response",
         description="TheHive alerts for challenged cases and phishing campaigns.",
         config_schema=(
             ConfigField("url", "url", required=True),

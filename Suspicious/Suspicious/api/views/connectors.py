@@ -38,21 +38,37 @@ def _connector_or_none(name: str):
         return None
 
 
+def _compute_status(config_schema, enabled: bool, section: dict) -> str:
+    """Disabled/partial/connected — mirrors Watcher's own connector status
+    logic. No 'disconnected' state: Watcher's badge config defines one but
+    its _compute_status never returns it."""
+    if not enabled:
+        return "disabled"
+    required = [f for f in config_schema if f.required]
+    if not required:
+        return "connected"
+    filled = [f for f in required if _dotted_get(section, f.key)]
+    return "connected" if len(filled) == len(required) else "partial"
+
+
 def _serialize_connector(name: str) -> dict:
     cls = registry.get(name)
     manifest = cls.manifest
     state = get_state(name)
+    section = get_section(f"integrations.{name}")
     return {
         "name": manifest.name,
         "version": manifest.version,
         "description": manifest.description,
         "author": manifest.author,
         "docs_url": manifest.docs_url,
+        "category": manifest.category,
         "events": list(manifest.events),
         "schedules": [asdict(s) for s in manifest.schedules],
         "config_schema": [asdict(f) for f in manifest.config_schema],
         "enabled": state.enabled,
         "enabled_by_default": manifest.enabled_by_default,
+        "status": _compute_status(manifest.config_schema, state.enabled, section),
         "last_health_ok": state.last_health_ok,
         "last_health_detail": state.last_health_detail,
         "last_health_at": state.last_health_at,

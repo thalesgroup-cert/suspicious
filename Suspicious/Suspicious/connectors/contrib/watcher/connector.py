@@ -15,6 +15,7 @@ class WatcherConnector(Connector):
         name="watcher",
         version="1.0.0",
         author="Thales CERT",
+        category="Threat Intelligence",
         description="Sync monitored and legitimate domains from Watcher every 5 minutes.",
         config_schema=(
             ConfigField("url", "url", required=True),
