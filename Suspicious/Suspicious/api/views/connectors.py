@@ -24,7 +24,8 @@ from connectors.delivery import get_state
 from connectors.models import ConnectorDelivery
 from connectors.registry import registry
 from settings.config import SECRET_FIELDS, get_section, invalidate_cache
-from suspicious.secrets import SecretStoreUnavailable, set_secret
+from suspicious._config_common import settings_get
+from suspicious.secrets import SecretStoreUnavailable, get_secret, set_secret
 
 logger = logging.getLogger("api.connectors")
 
@@ -38,7 +39,20 @@ def _connector_or_none(name: str):
         return None
 
 
-def _compute_status(config_schema, enabled: bool, section: dict) -> str:
+def _required_field_filled(name: str, field, section: dict) -> bool:
+    if field.type == "secret":
+        # get_section() only overlays secrets registered at the section's own
+        # top level (SECRET_FIELDS[name]) — a nested secret like misp's
+        # "instances.primary.api_key" lives under the deeper section
+        # "integrations.misp.instances.primary" and never reaches `section`.
+        # Resolve it directly at any nesting depth instead, mirroring the
+        # same get_secret-then-settings_get fallback get_section itself uses.
+        key = f"integrations.{name}.{field.key}"
+        return bool(get_secret(key) or settings_get(key, ""))
+    return bool(_dotted_get(section, field.key))
+
+
+def _compute_status(name: str, config_schema, enabled: bool, section: dict) -> str:
     """Disabled/partial/connected — mirrors Watcher's own connector status
     logic. No 'disconnected' state: Watcher's badge config defines one but
     its _compute_status never returns it."""
@@ -47,7 +61,7 @@ def _compute_status(config_schema, enabled: bool, section: dict) -> str:
     required = [f for f in config_schema if f.required]
     if not required:
         return "connected"
-    filled = [f for f in required if _dotted_get(section, f.key)]
+    filled = [f for f in required if _required_field_filled(name, f, section)]
     return "connected" if len(filled) == len(required) else "partial"
 
 
@@ -68,7 +82,7 @@ def _serialize_connector(name: str) -> dict:
         "config_schema": [asdict(f) for f in manifest.config_schema],
         "enabled": state.enabled,
         "enabled_by_default": manifest.enabled_by_default,
-        "status": _compute_status(manifest.config_schema, state.enabled, section),
+        "status": _compute_status(name, manifest.config_schema, state.enabled, section),
         "last_health_ok": state.last_health_ok,
         "last_health_detail": state.last_health_detail,
         "last_health_at": state.last_health_at,
