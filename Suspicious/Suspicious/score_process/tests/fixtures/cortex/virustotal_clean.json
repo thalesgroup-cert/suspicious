@@ -1,0 +1,4 @@
+{
+  "summary": {"taxonomies": [{"level": "safe", "namespace": "VT", "predicate": "GetReport", "value": "0/70"}]},
+  "full": {"results": {"data": {"attributes": {"last_analysis_stats": {"malicious": 0, "suspicious": 0, "harmless": 68, "undetected": 2}}}}}
+}

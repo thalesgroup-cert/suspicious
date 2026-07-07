@@ -221,3 +221,29 @@ class ZscalerParserTests(SimpleTestCase):
         self.assertEqual(r.score, 10)
         self.assertEqual(r.confidence, 100)
         self.assertIn("PHISHING", r.category)
+
+
+from score_process.scoring.cortex_analyzers.contrib.virustotal import VirusTotalGetReportParser
+
+class VirusTotalParserTests(SimpleTestCase):
+    def _run(self, fixture):
+        f = load_fixture(fixture)
+        p = VirusTotalGetReportParser(analyzer_name="VirusTotal_GetReport_3_1", data="abc123", data_type="hash")
+        return p.parse(f["summary"], f["full"])
+
+    def test_clean_is_safe(self):
+        r = self._run("virustotal_clean")
+        self.assertEqual(r.level, "safe")
+        self.assertEqual(r.score, 0)
+        self.assertIn("0/", " ".join(r.category) if isinstance(r.category, list) else r.category)
+
+    def test_malicious_stats(self):
+        r = self._run("virustotal_malicious")
+        self.assertEqual(r.level, "malicious")
+        self.assertEqual(r.score, 10)
+        self.assertEqual(r.details["last_analysis_stats"]["malicious"], 5)
+
+    def test_no_stats_falls_back_to_taxonomy(self):
+        p = VirusTotalGetReportParser(analyzer_name="VirusTotal_GetReport_3_1", data="x", data_type="hash")
+        r = p.parse({"taxonomies": [{"level": "suspicious", "value": "VT"}]}, {"message": "no report"})
+        self.assertEqual(r.level, "suspicious")
