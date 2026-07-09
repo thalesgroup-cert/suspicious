@@ -254,6 +254,8 @@ class AiMailParser(AnalyzerParser):
     ) -> None:
         try:
             case     = Case.objects.get(id=case_id)
+            case.thehive_alert_id = alert_id
+            case.save(update_fields=["thehive_alert_id"])
             mail_id  = str(case.fileOrMail.mail.mail_id)
             reporter = case.reporter.username
 
