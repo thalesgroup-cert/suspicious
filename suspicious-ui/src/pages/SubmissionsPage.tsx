@@ -68,6 +68,8 @@ import MailPreview from "@/shared/components/MailPreview";
 import { SoftCard } from "@/features/submissions/components/cards";
 import { AnalyzerReportCard } from "@/features/submissions/components/AnalyzerReportCard";
 import { UrlGroupList } from "@/features/submissions/components/UrlGroupList";
+import { CommentThread } from "@/features/comments/CommentThread";
+import { addCaseComment, getCaseComments } from "@/features/comments/api";
 import {
   RESULT_OPTIONS,
   STATUS_OPTIONS,
@@ -240,6 +242,20 @@ export default function SubmissionsPage() {
       setChallengeId(null);
       setProposedResult(null);
       setChallengeReason("");
+    },
+  });
+
+  const commentsQuery = useQuery({
+    queryKey: ["caseComments", selectedIdNum],
+    queryFn: () => getCaseComments(selectedIdNum),
+    enabled: !!me && hasNumericSelectedId && openDrawer,
+    retry: false,
+  });
+
+  const addCommentMutation = useMutation({
+    mutationFn: (body: string) => addCaseComment(selectedIdNum, body),
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: ["caseComments", selectedIdNum] });
     },
   });
 
@@ -928,6 +944,15 @@ export default function SubmissionsPage() {
                     {selectedRow.artifact || "—"}
                   </Typography>
                 </Box>
+
+                {/* ── Your comments ───────────────────────────────────────────── */}
+                <CommentThread
+                  title="Your comments"
+                  comments={commentsQuery.data ?? []}
+                  isLoading={commentsQuery.isLoading}
+                  onAdd={(body) => addCommentMutation.mutate(body)}
+                  isAdding={addCommentMutation.isPending}
+                />
 
                 {/* ── Email preview (only when the case is a mail) ─────────────── */}
                 {selectedRow.mail_preview_url ? (

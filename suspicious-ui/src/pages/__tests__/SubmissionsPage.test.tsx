@@ -20,9 +20,17 @@ vi.mock("@/features/submissions/api", () => ({
   ),
 }));
 
+vi.mock("@/features/comments/api", () => ({
+  getCaseComments: vi.fn().mockResolvedValue([]),
+  addCaseComment: vi.fn().mockResolvedValue({
+    id: 1, author_email: "me@example.com", body: "checking on this", is_internal: false, created_at: "2026-07-09T10:00:00Z",
+  }),
+}));
+
 
 import { getMe } from "@/api/auth";
 import { listSubmissions, challengeSubmission } from "@/features/submissions/api";
+import { addCaseComment, getCaseComments } from "@/features/comments/api";
 import SubmissionsPage from "../SubmissionsPage";
 
 describe("SubmissionsPage - Test Suite", () => {
@@ -100,6 +108,24 @@ describe("SubmissionsPage - Test Suite", () => {
           101,
           { proposed_result: "Dangerous", reason: "" },
         )
+      );
+    });
+  });
+
+  describe("Comments", () => {
+    it("adds a comment from the submissions drawer", async () => {
+      const user = userEvent.setup();
+      renderWithProviders(<SubmissionsPage />, { initialPath: "/submissions" });
+
+      await screen.findByText(/phish@example\.com/i, {}, { timeout: 5000 });
+      await user.click(screen.getByText(/phish@example\.com/i));
+
+      const textarea = await screen.findByPlaceholderText("Add a comment…");
+      await user.type(textarea, "checking on this");
+      await user.click(screen.getByRole("button", { name: "Add" }));
+
+      await waitFor(() =>
+        expect(addCaseComment).toHaveBeenCalledWith(101, "checking on this")
       );
     });
   });
