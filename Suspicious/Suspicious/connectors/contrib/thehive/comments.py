@@ -24,5 +24,5 @@ def sync_case_comment_to_thehive(case, comment) -> None:
     config = _thehive_config()
     add_comment_to_item(
         "alert", case.thehive_alert_id, {"message": message},
-        config.get("url", ""), config.get("api_key", ""),
+        config.get("url", ""), config.get("api_key", ""), always_append=True,
     )

@@ -52,7 +52,7 @@ class SyncCaseCommentToTheHiveTest(TestCase):
 
         mock_comment.assert_called_once_with(
             "alert", "~alert-2", {"message": "**sync_u@example.com**: please check"},
-            "https://stub", "key",
+            "https://stub", "key", always_append=True,
         )
 
     def test_syncs_internal_comment_with_marker(self):
@@ -67,5 +67,5 @@ class SyncCaseCommentToTheHiveTest(TestCase):
 
         mock_comment.assert_called_once_with(
             "alert", "~alert-3", {"message": "**sync_u@example.com** (internal): looks clean"},
-            "https://stub", "key",
+            "https://stub", "key", always_append=True,
         )

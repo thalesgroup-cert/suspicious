@@ -214,7 +214,7 @@ class ChallengeToTheHiveService:
             )
             add_comment_to_item(
                 "alert", case.thehive_alert_id, {"message": message},
-                THE_HIVE_URL, THE_HIVE_KEY,
+                THE_HIVE_URL, THE_HIVE_KEY, always_append=True,
             )
             return
 

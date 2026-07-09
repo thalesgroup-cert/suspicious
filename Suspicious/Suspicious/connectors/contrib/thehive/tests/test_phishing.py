@@ -278,6 +278,16 @@ class TestAddCommentToItem(unittest.TestCase):
         kwargs.update(overrides)
         return add_comment_to_item(**kwargs)
 
+    def test_always_append_skips_query_and_always_posts(self):
+        with patch(
+            "connectors.contrib.thehive.phishing._thehive_request",
+        ) as mock_req:
+            self._call(always_append=True)
+        self.assertEqual(mock_req.call_count, 1)
+        only_call = mock_req.call_args_list[0]
+        self.assertEqual(only_call[0][0], "POST")
+        self.assertEqual(only_call[0][1], "https://hive.local/api/v1/alert/~42/comment")
+
     def test_posts_new_comment_when_no_existing(self):
         # Query returns empty list → POST new comment
         responses = [

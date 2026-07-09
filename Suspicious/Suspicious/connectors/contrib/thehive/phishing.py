@@ -273,7 +273,7 @@ def add_attachments_to_item(item_type, item_id, attachment_paths, thehive_url, a
             update_cases_logger.error(f"Error opening attachment {file_path}: {e}")
 
 
-def add_comment_to_item(item_type, item_id, comment, thehive_url, api_key):
+def add_comment_to_item(item_type, item_id, comment, thehive_url, api_key, *, always_append: bool = False):
     if item_type not in ("alert", "case"):
         update_cases_logger.error(f"add_comment_to_item: invalid item_type {item_type!r}, skipping")
         return
@@ -297,6 +297,15 @@ def add_comment_to_item(item_type, item_id, comment, thehive_url, api_key):
             {"_name": "page", "from": 0, "to": 1},
         ]
     }
+
+    if always_append:
+        try:
+            _thehive_request("POST", url_add_comment, headers=headers, json=comment, verify=_certificate_path())
+        except pybreaker.CircuitBreakerError as e:
+            update_cases_logger.warning("[breaker:thehive] open — add_comment_to_item skipped: %s", e)
+        except requests.exceptions.RequestException as e:
+            update_cases_logger.error(f"Error adding comment to {item_type} {item_id}: {e}")
+        return
 
     try:
         response = _thehive_request(

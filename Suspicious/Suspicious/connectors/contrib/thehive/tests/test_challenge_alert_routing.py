@@ -42,6 +42,7 @@ class ChallengeAlertRoutingTest(TestCase):
         self.assertEqual(args[1], "~alert-999")
         self.assertIn("Safe", args[2]["message"])
         self.assertIn("looks like spam", args[2]["message"])
+        self.assertTrue(kwargs.get("always_append"))
         mock_new_alert.assert_not_called()
         mock_new_alert_nomail.assert_not_called()
 
