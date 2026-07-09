@@ -118,7 +118,7 @@ class AiMailParser(AnalyzerParser):
         return {
             "url": cfg.get("url", ""),
             "key": cfg.get("api_key", ""),
-            "verify": bool(cfg.get("certificate_path", True)),
+            "verify": cfg.get("certificate_path") or True,
         }
 
     # ── ChromaDB singleton — one client per parser instance ───────────────

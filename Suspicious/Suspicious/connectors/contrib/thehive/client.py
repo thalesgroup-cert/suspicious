@@ -27,7 +27,7 @@ class TheHiveService:
         self.api = TheHiveApi(
             url=config.url,
             apikey=config.api_key,
-            verify=config.certificate_path,
+            verify=config.certificate_path or True,
         )
 
     # ---------- factory ----------
