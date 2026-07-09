@@ -991,7 +991,7 @@ export default function InvestigationPage() {
                   title="Comments"
                   comments={commentsQuery.data ?? []}
                   isLoading={commentsQuery.isLoading}
-                  onAdd={(body) => addCommentMutation.mutate(body)}
+                  onAdd={(body) => addCommentMutation.mutateAsync(body)}
                   isAdding={addCommentMutation.isPending}
                 />
 

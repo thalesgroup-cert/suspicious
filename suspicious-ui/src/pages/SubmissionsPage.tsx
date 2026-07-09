@@ -950,7 +950,7 @@ export default function SubmissionsPage() {
                   title="Your comments"
                   comments={commentsQuery.data ?? []}
                   isLoading={commentsQuery.isLoading}
-                  onAdd={(body) => addCommentMutation.mutate(body)}
+                  onAdd={(body) => addCommentMutation.mutateAsync(body)}
                   isAdding={addCommentMutation.isPending}
                 />
 

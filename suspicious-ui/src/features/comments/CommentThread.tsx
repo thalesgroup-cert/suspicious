@@ -12,18 +12,24 @@ export type CommentThreadProps = {
   title: string;
   comments: CaseComment[];
   isLoading: boolean;
-  onAdd: (body: string) => void;
+  onAdd: (body: string) => Promise<unknown>;
   isAdding: boolean;
 };
 
 export function CommentThread({ title, comments, isLoading, onAdd, isAdding }: CommentThreadProps) {
   const [draft, setDraft] = React.useState("");
+  const [error, setError] = React.useState(false);
 
-  const handleAdd = () => {
+  const handleAdd = async () => {
     const trimmed = draft.trim();
     if (!trimmed) return;
-    onAdd(trimmed);
-    setDraft("");
+    try {
+      await onAdd(trimmed);
+      setDraft("");
+      setError(false);
+    } catch {
+      setError(true);
+    }
   };
 
   return (
@@ -50,6 +56,12 @@ export function CommentThread({ title, comments, isLoading, onAdd, isAdding }: C
         )}
       </Stack>
 
+      {error ? (
+        <Typography variant="caption" color="error" sx={{ display: "block", mb: 0.75 }}>
+          Failed to add comment — try again.
+        </Typography>
+      ) : null}
+
       <Stack direction="row" spacing={1}>
         <TextField
           size="small"
@@ -58,7 +70,10 @@ export function CommentThread({ title, comments, isLoading, onAdd, isAdding }: C
           minRows={2}
           placeholder="Add a comment…"
           value={draft}
-          onChange={(e) => setDraft(e.target.value)}
+          onChange={(e) => {
+            setDraft(e.target.value);
+            setError(false);
+          }}
         />
         <Button
           variant="contained"

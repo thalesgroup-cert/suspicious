@@ -1,5 +1,5 @@
 import { describe, expect, it, vi } from "vitest";
-import { screen, fireEvent } from "@testing-library/react";
+import { screen, fireEvent, waitFor } from "@testing-library/react";
 import { renderWithProviders } from "@/test/utils";
 import { CommentThread } from "../CommentThread";
 import type { CaseComment } from "../api";
@@ -24,7 +24,7 @@ describe("CommentThread", () => {
     expect(screen.getByText("No comments yet.")).toBeInTheDocument();
   });
 
-  it("calls onAdd with trimmed body and clears the draft", () => {
+  it("calls onAdd with trimmed body and clears the draft", async () => {
     const onAdd = vi.fn();
     renderWithProviders(
       <CommentThread title="Your comments" comments={[]} isLoading={false} onAdd={onAdd} isAdding={false} />
@@ -33,7 +33,7 @@ describe("CommentThread", () => {
     fireEvent.change(textarea, { target: { value: "  new comment  " } });
     fireEvent.click(screen.getByRole("button", { name: "Add" }));
     expect(onAdd).toHaveBeenCalledWith("new comment");
-    expect((textarea as HTMLTextAreaElement).value).toBe("");
+    await waitFor(() => expect((textarea as HTMLTextAreaElement).value).toBe(""));
   });
 
   it("disables Add when the draft is blank", () => {
@@ -41,5 +41,18 @@ describe("CommentThread", () => {
       <CommentThread title="Your comments" comments={[]} isLoading={false} onAdd={vi.fn()} isAdding={false} />
     );
     expect(screen.getByRole("button", { name: "Add" })).toBeDisabled();
+  });
+
+  it("keeps the draft and shows an error when onAdd fails", async () => {
+    const onAdd = vi.fn().mockRejectedValue(new Error("network"));
+    renderWithProviders(
+      <CommentThread title="Your comments" comments={[]} isLoading={false} onAdd={onAdd} isAdding={false} />
+    );
+    const textarea = screen.getByPlaceholderText("Add a comment…");
+    fireEvent.change(textarea, { target: { value: "typed comment" } });
+    fireEvent.click(screen.getByRole("button", { name: "Add" }));
+
+    expect(await screen.findByText("Failed to add comment — try again.")).toBeInTheDocument();
+    expect((textarea as HTMLTextAreaElement).value).toBe("typed comment");
   });
 });

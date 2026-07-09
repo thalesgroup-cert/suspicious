@@ -22,7 +22,7 @@ class CaseCommentListCreateView(APIView):
 
     def get(self, request, case_id: int):
         case = self.get_case(request, case_id)
-        comments = case.comments.all()
+        comments = case.comments.select_related("author")
         if not user_has_submission_elevated_access(request.user):
             comments = comments.filter(is_internal=False)
         serializer = CaseCommentSerializer(comments, many=True)
