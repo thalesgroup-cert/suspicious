@@ -295,7 +295,9 @@ def create_alert_from_challenge_without_mail(api_url, api_key, case, file, ioc, 
         f"|Value|Description|\n|---|---|\n"
         f"|Case Score|{getattr(case, 'score', 'N/A')}|\n"
         f"|Case Confidence|{getattr(case, 'confidence', 'N/A')}|\n"
-        f"|Results|{getattr(case, 'results', 'N/A')}|"
+        f"|Results|{getattr(case, 'results', 'N/A')}|\n"
+        f"|Proposed Verdict|{getattr(case, 'challenge_proposed_result', None) or 'N/A'}|\n\n"
+        f"## Challenge Reason:\n{getattr(case, 'challenge_reason', None) or 'No reason provided.'}"
     )
 
     return api.alert.create(alert={
@@ -331,7 +333,8 @@ def create_alert_from_challenge(api_url, api_key, case, mail, challenger,
         f"|AI Suggestion|{safe(getattr(case, 'category_ai', None))} / {safe(getattr(case, 'results_ai', None))} "
         f"(Score: {_safe_round(getattr(case, 'score_ai', None))}, "
         f"Confidence: {_safe_round(getattr(case, 'confidence_ai', None))})|\n"
-        f"|Results|{safe(getattr(case, 'results', None))}|"
+        f"|Results|{safe(getattr(case, 'results', None))}|\n"
+        f"|Proposed Verdict|{safe(getattr(case, 'challenge_proposed_result', None))}|"
     )
 
     artifacts_section = "\n".join(
@@ -346,6 +349,7 @@ def create_alert_from_challenge(api_url, api_key, case, mail, challenger,
         f"# {safe(challenger.get('firstname'))} {safe(challenger.get('lastname'))} "
         f"({safe(challenger.get('email'))}) has challenged the result of case #{safe(case.id)}.\n\n"
         f"{summary_table}\n\n"
+        f"## Challenge Reason:\n{safe(getattr(case, 'challenge_reason', None), 'No reason provided.')}\n\n"
         f"## Extracted Artifacts:\n{artifacts_section}\n\n"
         f"## Attachments:\n{attachments_section}"
     )
