@@ -1,3 +1,5 @@
+from unittest.mock import patch
+
 from django.contrib.auth import get_user_model
 from django.contrib.auth.models import Group
 from django.test import TestCase
@@ -80,3 +82,26 @@ class CaseCommentsViewTest(TestCase):
         resp = self.client.post(self.url, {"body": "hi", "is_internal": True}, format="json")
         self.assertEqual(resp.status_code, 201)
         self.assertFalse(resp.data["is_internal"])
+
+    def test_posting_a_comment_triggers_thehive_sync(self):
+        self.case.thehive_alert_id = "~alert-42"
+        self.case.save(update_fields=["thehive_alert_id"])
+        self.client.force_authenticate(self.reporter)
+
+        with patch("api.views.comments.sync_case_comment_to_thehive") as mock_sync:
+            resp = self.client.post(self.url, {"body": "please check"}, format="json")
+
+        self.assertEqual(resp.status_code, 201)
+        mock_sync.assert_called_once()
+        args, kwargs = mock_sync.call_args
+        self.assertEqual(args[0].id, self.case.id)
+        self.assertEqual(args[1].body, "please check")
+
+    def test_posting_a_comment_without_alert_id_does_not_error(self):
+        self.client.force_authenticate(self.reporter)
+
+        with patch("api.views.comments.sync_case_comment_to_thehive") as mock_sync:
+            resp = self.client.post(self.url, {"body": "no alert here"}, format="json")
+
+        self.assertEqual(resp.status_code, 201)
+        mock_sync.assert_called_once()

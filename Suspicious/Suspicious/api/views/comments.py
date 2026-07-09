@@ -9,6 +9,7 @@ from rest_framework.views import APIView
 from api.permissions.submissions import user_has_submission_elevated_access
 from api.serializers.comments import CaseCommentSerializer
 from case_handler.models import Case
+from connectors.contrib.thehive.comments import sync_case_comment_to_thehive
 
 
 class CaseCommentListCreateView(APIView):
@@ -34,4 +35,5 @@ class CaseCommentListCreateView(APIView):
         serializer.is_valid(raise_exception=True)
         is_internal = user_has_submission_elevated_access(request.user)
         comment = serializer.save(case=case, author=request.user, is_internal=is_internal)
+        sync_case_comment_to_thehive(case, comment)
         return Response(CaseCommentSerializer(comment).data, status=status.HTTP_201_CREATED)
