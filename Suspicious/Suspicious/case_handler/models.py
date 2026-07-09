@@ -163,6 +163,26 @@ class CaseChallengeToken(models.Model):
         self.save(update_fields=["used_at"])
 
 
+class CaseComment(models.Model):
+    case = models.ForeignKey(
+        Case,
+        on_delete=models.CASCADE,
+        related_name="comments",
+        db_index=True,
+    )
+    author = models.ForeignKey(
+        settings.AUTH_USER_MODEL,
+        on_delete=models.CASCADE,
+        related_name="case_comments",
+    )
+    body = models.TextField()
+    is_internal = models.BooleanField(default=False, verbose_name="Internal (analyst-only)")
+    created_at = models.DateTimeField(auto_now_add=True, db_index=True)
+
+    class Meta:
+        ordering = ["-created_at"]
+
+
 class CaseHasFileOrMail(models.Model):
     """
     Association model for cases linked to either a file or an email (one-to-one per instance).
