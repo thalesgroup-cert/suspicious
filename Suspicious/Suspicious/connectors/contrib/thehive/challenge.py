@@ -2,11 +2,11 @@ import logging
 from pathlib import Path
 
 from thehive4py import TheHiveApi
-from minio.error import S3Error
 from jinja2 import Environment, FileSystemLoader, select_autoescape
 from mail_feeder.models import Mail
 
 from common.clients import get_s3_client
+from score_process.scoring.cortex_analyzers.contrib.ai_minio_utils import fetch_mail_files_from_minio
 from .phishing import add_comment_to_item
 from .utils import generate_ref, build_mail_attachments_paths
 from score_process.score_utils.send_mail.social_logos import SOCIAL_LOGOS
@@ -332,7 +332,6 @@ def create_alert_from_challenge(api_url, api_key, case, mail, challenger,
                                 artifact_summary=None, attachments_summary=None):
     api       = TheHiveApi(url=api_url, apikey=api_key, verify=_certificate_path())
     ticket_id = generate_ref()
-    eml       = ""
 
     def safe(v, default="N/A"):
         return v if v not in (None, "") else default
@@ -372,15 +371,7 @@ def create_alert_from_challenge(api_url, api_key, case, mail, challenger,
     mail_id = safe(getattr(mail, "mail_id", None), "unknown-mail-id")
     minio_client = get_s3_client()
 
-    for bucket in minio_client.list_buckets():
-        if bucket.name.endswith(f"-{mail_id.split('-')[0]}"):
-            try:
-                for obj in minio_client.list_objects(bucket.name, prefix=mail_id, recursive=False):
-                    if obj.object_name.startswith(mail_id):
-                        data = minio_client.get_object(bucket.name, f"{mail_id}/{mail_id}.eml")
-                        eml  = data.read().decode("utf-8")
-            except S3Error as e:
-                logger.error(f"Error listing objects in bucket {bucket.name}: {e}")
+    _headers, eml, _txt, _html = fetch_mail_files_from_minio(minio_client, mail_id)
 
     tmp_path = build_mail_attachments_paths(eml, ticket_id)
 
