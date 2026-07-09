@@ -8,6 +8,7 @@ from api.views.campaigns import (
     CampaignPcaView,
 )
 from api.views.challenge import CaseChallengeTokenView
+from api.views.comments import CaseCommentListCreateView
 from api.views.dashboard import (
     DashboardSummaryView,
     MonthlyCasesSummaryAggregateView,
@@ -97,6 +98,7 @@ urlpatterns = [
     # Legacy query-string form (?token=) — kept so challenge links already
     # delivered before this change still resolve until they expire.
     path("cases/<int:case_id>/challenge/", CaseChallengeTokenView.as_view(), name="case-challenge-legacy"),
+    path("cases/<int:case_id>/comments/", CaseCommentListCreateView.as_view(), name="case-comments"),
 
     # Dashboard summary
     path("dashboard/summary/", DashboardSummaryView.as_view(), name="dashboard-summary"),
