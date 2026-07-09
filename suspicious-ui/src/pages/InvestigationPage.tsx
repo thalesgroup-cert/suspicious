@@ -69,6 +69,8 @@ import MailPreview from "@/shared/components/MailPreview";
 
 import { SoftCard } from "@/features/investigation/components/cards";
 import { InvestigationAnalyzerReportCard } from "@/features/investigation/components/InvestigationAnalyzerReportCard";
+import { CommentThread } from "@/features/comments/CommentThread";
+import { addCaseComment, getCaseComments } from "@/features/comments/api";
 import {
   fmtDate,
   groupReportsByArtifact,
@@ -235,6 +237,20 @@ export default function InvestigationPage() {
         qc.invalidateQueries({ queryKey: ["investigationDetails"] }),
         qc.invalidateQueries({ queryKey: ["investigation"] }),
       ]);
+    },
+  });
+
+  const commentsQuery = useQuery({
+    queryKey: ["caseComments", selectedIdNum],
+    queryFn: () => getCaseComments(selectedIdNum),
+    enabled: !!me && isElevated && hasNumericSelectedId && openDrawer,
+    retry: false,
+  });
+
+  const addCommentMutation = useMutation({
+    mutationFn: (body: string) => addCaseComment(selectedIdNum, body),
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: ["caseComments", selectedIdNum] });
     },
   });
 
@@ -969,6 +985,15 @@ export default function InvestigationPage() {
                     </Typography>
                   </Box>
                 ) : null}
+
+                {/* ── Comments (reporter's own + analyst notes) ─────────────────── */}
+                <CommentThread
+                  title="Comments"
+                  comments={commentsQuery.data ?? []}
+                  isLoading={commentsQuery.isLoading}
+                  onAdd={(body) => addCommentMutation.mutate(body)}
+                  isAdding={addCommentMutation.isPending}
+                />
 
                 {/* ── Global verdict override ───────────────────────────────────── */}
                 <Box sx={{ px: 2.25, py: 2 }}>

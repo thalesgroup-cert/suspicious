@@ -22,6 +22,11 @@ vi.mock("@/features/investigation/api", () => ({
   buildSortOrdering: vi.fn((field: string, dir: string) => `${dir === "asc" ? "" : "-"}${field}`),
 }));
 
+vi.mock("@/features/comments/api", () => ({
+  getCaseComments: vi.fn(),
+  addCaseComment: vi.fn(),
+}));
+
 // ---------------------------------------------------------------------------
 // Test data
 // ---------------------------------------------------------------------------
@@ -93,10 +98,13 @@ import {
   getInvestigationDetails,
 } from "@/features/investigation/api";
 import InvestigationPage from "@/pages/InvestigationPage";
+import { getCaseComments, addCaseComment } from "@/features/comments/api";
 
 const mockGetMe = vi.mocked(getMe);
 const mockGetAll = vi.mocked(getAllInvestigations);
 const mockGetDetails = vi.mocked(getInvestigationDetails);
+const mockGetComments = vi.mocked(getCaseComments);
+const mockAddComment = vi.mocked(addCaseComment);
 
 function renderInvestigation() {
   return renderWithProviders(<InvestigationPage />, { initialPath: "/investigation" });
@@ -112,6 +120,12 @@ describe("InvestigationPage", () => {
     mockGetMe.mockResolvedValue({ ...mockMe, groups: ["CERT"] } as never);
     mockGetAll.mockResolvedValue(mockListResponse as never);
     mockGetDetails.mockResolvedValue(mockDetails as never);
+    mockGetComments.mockResolvedValue([
+      { id: 1, author_email: "reporter@corp.test", body: "please check", is_internal: false, created_at: "2026-07-09T10:00:00Z" },
+    ]);
+    mockAddComment.mockResolvedValue({
+      id: 2, author_email: "analyst@corp.test", body: "looks clean", is_internal: true, created_at: "2026-07-09T11:00:00Z",
+    });
   });
 
   it("renders the investigations table", async () => {
@@ -297,5 +311,32 @@ describe("InvestigationPage", () => {
     await waitFor(() => {
       expect(mockGetAll).not.toHaveBeenCalled();
     });
+  });
+
+  it("shows the comment thread and posts an analyst note", async () => {
+    const user = userEvent.setup();
+    renderInvestigation();
+
+    await waitFor(() =>
+      expect(
+        screen.getByText(/phish\.evil\.com|reporter@corp/i)
+      ).toBeInTheDocument()
+    );
+
+    const row = screen.getByText(/phish\.evil\.com|reporter@corp/i).closest("tr") ??
+                screen.getByText(/phish\.evil\.com|reporter@corp/i);
+    await user.click(row);
+
+    await waitFor(() => {
+      expect(screen.getByText("please check")).toBeInTheDocument();
+    });
+
+    const textarea = screen.getByPlaceholderText("Add a comment…");
+    await user.type(textarea, "looks clean");
+    await user.click(screen.getByRole("button", { name: "Add" }));
+
+    await waitFor(() =>
+      expect(mockAddComment).toHaveBeenCalledWith(7, "looks clean")
+    );
   });
 });
