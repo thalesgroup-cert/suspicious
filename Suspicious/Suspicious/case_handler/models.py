@@ -87,6 +87,9 @@ class Case(models.Model):
     reporter_context = models.TextField(
         blank=True, default="", verbose_name="Reporter Context",
     )
+    thehive_alert_id = models.CharField(
+        max_length=64, blank=True, default="", verbose_name="TheHive Alert ID",
+    )
 
     class Meta:
         ordering = ['-creation_date']
