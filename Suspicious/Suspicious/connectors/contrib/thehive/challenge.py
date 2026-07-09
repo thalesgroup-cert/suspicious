@@ -7,6 +7,7 @@ from jinja2 import Environment, FileSystemLoader, select_autoescape
 from mail_feeder.models import Mail
 
 from common.clients import get_s3_client
+from .phishing import add_comment_to_item
 from .utils import generate_ref, build_mail_attachments_paths
 from score_process.score_utils.send_mail.social_logos import SOCIAL_LOGOS
 from score_process.score_utils.send_mail.send_email_service import SendMailService
@@ -203,6 +204,20 @@ class ChallengeToTheHiveService:
         }
 
         case = self.case
+
+        if case.thehive_alert_id:
+            message = (
+                f"**{challenger['firstname']} {challenger['lastname']}** "
+                f"({challenger['email']}) has challenged the result of case #{case.id}.\n\n"
+                f"Proposed verdict: **{case.challenge_proposed_result or 'N/A'}**\n"
+                f"Reason: {case.challenge_reason or 'No reason provided.'}"
+            )
+            add_comment_to_item(
+                "alert", case.thehive_alert_id, {"message": message},
+                THE_HIVE_URL, THE_HIVE_KEY,
+            )
+            return
+
         mail = getattr(getattr(case, "fileOrMail", None), "mail", None)
 
         if not mail:
