@@ -14,7 +14,6 @@ from case_handler.case_utils.form_handlers.mail.minio import MinioManager
 
 logger = logging.getLogger(__name__)
 
-# Default application paths and settings
 DEFAULT_CASE_BASE_PATH = Path("/app/case")
 
 

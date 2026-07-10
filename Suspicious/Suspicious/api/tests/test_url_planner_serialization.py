@@ -212,7 +212,6 @@ class UrlArtifactsDeduplicationTest(TestCase):
 
     def test_deduplication_across_paths(self):
         mail = _build_mail_with_url(self.url)
-        # Create case with both fileOrMail and nonFileIocs pointing at the same URL.
         case = Case.objects.create(reporter=self.reporter, description="dup case")
         file_or_mail = CaseHasFileOrMail.objects.create(case=case, mail=mail)
         iocs = CaseHasNonFileIocs.objects.create(case=case, url=self.url)

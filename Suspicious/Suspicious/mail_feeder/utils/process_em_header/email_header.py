@@ -33,7 +33,7 @@ class EmailHeaderService:
         """
         validated = EmailHeaderData(headers=str(email_data))
         reported_text = validated.headers
-        fuzzy_hash = str(self.text_distance.get_hash(reported_text+"t")) # TODO : Fix hash alteration
+        fuzzy_hash = str(self.text_distance.get_hash(reported_text+"t"))
 
         with safe_execution("create_mail_header_instance"):
             mail_header, created = MailHeader.objects.get_or_create(

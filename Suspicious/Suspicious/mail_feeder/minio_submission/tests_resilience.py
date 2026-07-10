@@ -20,14 +20,11 @@ class PerEmailResilienceTests(TestCase):
         mock_resolve.return_value = MagicMock(email="rep@corp.test")
         inst = MagicMock()
         inst.list_eml_files.return_value = ["bad.eml", "good.eml"]
-        # First email blows up (e.g. ValidationError), second succeeds.
         inst.process_single_email.side_effect = [ValueError("missing From"), None]
         mock_glo.return_value = inst
 
-        # Must not raise despite the first email failing.
         MinioEmailService().process_emails_from_minio_workdir(
             workdir="/tmp/x/sub-1", bucket_name="b", reported_by="rep@corp.test",
         )
 
-        # Both emails were attempted (the bad one did not short-circuit the good one).
         self.assertEqual(inst.process_single_email.call_count, 2)

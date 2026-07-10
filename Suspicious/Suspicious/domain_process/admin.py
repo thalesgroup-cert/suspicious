@@ -4,7 +4,6 @@ from import_export.admin import ImportExportModelAdmin
 from domain_process.models import Domain, DomainInIocs
 
 
-# Resources
 class DomainResource(resources.ModelResource):
     class Meta:
         model = Domain
@@ -23,7 +22,6 @@ class DomainInIocsResource(resources.ModelResource):
         export_order = fields
 
 
-# Admin classes
 @admin.register(Domain)
 class DomainAdmin(ImportExportModelAdmin):
     resource_class = DomainResource
@@ -41,7 +39,6 @@ class DomainInIocsAdmin(ImportExportModelAdmin):
     search_fields = ('domain__value', 'url__address', 'mail_address__address')
     ordering = ('-creation_date',)
 
-    # Custom display methods for linked fields
     def get_linked_url(self, obj):
         return obj.url.address if obj.url else "-"
     get_linked_url.short_description = "Linked URL"

@@ -4,8 +4,7 @@ from dataclasses import dataclass
 
 from case_handler.models import Result
 
-CONF_FLOOR = 50                 # below this a signal can't drive `worst`; a
-                                # case below this is Inconclusive. Pinned in Task 6.
+CONF_FLOOR = 50
 NEUTRAL = 5
 MALICIOUS_SCORE_THRESHOLD = 8
 
@@ -13,16 +12,16 @@ MALICIOUS_SCORE_THRESHOLD = 8
 @dataclass(frozen=True)
 class Signal:
     source: str
-    score: float          # 0–10, already weight-aggregated within the artifact
-    confidence: float     # 0–100; doubles as the cross-artifact mean weight
+    score: float
+    confidence: float
     is_malicious: bool
     is_failure: bool
 
 
 @dataclass(frozen=True)
 class AiSignal:
-    score: float          # 0–10
-    confidence: float     # 0–100
+    score: float
+    confidence: float
 
 
 @dataclass(frozen=True)
@@ -47,10 +46,6 @@ def score_case(signals, ai=None, deny_listed=False) -> CaseVerdict:
     n_malicious = sum(1 for s in scored if s.is_malicious)
     n_scored = len(scored)
 
-    # Deny-list is a hard, analyzer-independent signal: it wins even when no
-    # analyzer produced a usable report (a known-bad domain whose analyzers all
-    # failed must still read Dangerous, not Failure). Confidence is pinned to 100
-    # because the verdict comes from a curated list, not from scoring.
     if deny_listed:
         return CaseVerdict(10, 100, Result.DANGEROUS, n_malicious, n_scored)
 
@@ -68,7 +63,6 @@ def score_case(signals, ai=None, deny_listed=False) -> CaseVerdict:
     else:
         final_score, final_conf = base_score, base_conf
 
-    # Round score once, before verdict checks — ensures final_score and result agree
     final_score = min(round(final_score), 10)
 
     if n_malicious >= max(1, n_scored // 3):

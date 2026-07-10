@@ -8,8 +8,6 @@ from tasp.tasks import reconcile_case
 logger = logging.getLogger("tasp.cron.users_cases")
 log_cases = logging.getLogger("tasp.cron.update_ongoing_case_jobs")
 
-# Bound work per cron tick. Cases beyond this batch wait for the next tick;
-# STALE_JOB_TIMEOUT auto-fails any zombie reports independently.
 CRON_BATCH_SIZE = 200
 
 

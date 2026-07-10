@@ -18,7 +18,6 @@ from tasp.tasks import render_mail_preview, sweep_missing_mail_previews
 
 class RenderMailPreviewTaskTest(TestCase):
     def test_missing_mail_is_a_noop(self):
-        # Must not raise / retry when the mail row is gone.
         result = render_mail_preview.apply(args=[999_999]).get()
         self.assertIsNone(result)
 
@@ -35,9 +34,9 @@ class SweepMissingMailPreviewsTest(TestCase):
     @patch("tasp.tasks.render_mail_preview.delay")
     def test_enqueues_only_fetchable_rows_missing_a_preview(self, delay):
         fetchable = self._mail(key="", bucket="case-bucket")
-        self._mail(key="", bucket=None)               # no archive -> skip
-        self._mail(key="", bucket="")                 # empty bucket -> skip
-        self._mail(key="9.png", bucket="case-bucket")  # already has preview -> skip
+        self._mail(key="", bucket=None)
+        self._mail(key="", bucket="")
+        self._mail(key="9.png", bucket="case-bucket")
 
         sweep_missing_mail_previews.apply(args=[]).get()
 

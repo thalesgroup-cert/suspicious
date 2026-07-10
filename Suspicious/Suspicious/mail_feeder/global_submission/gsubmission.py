@@ -55,7 +55,6 @@ class GlobalSubmissionService:
                 return None
             instance.reporterNote = getattr(submission, "reporter_note", "") or ""
             instance.save()
-            # Handle post-processing based on submission type
             if submission.is_submitted:
                 fetch_mail_logger.debug(f"Finalizing web submission for email: {submission.email_id}")
                 self.finalize_submission(instance, WebSubmissionConfig(user_email=submission.user, workdir=submission.workdir))
@@ -151,7 +150,6 @@ class GlobalSubmissionService:
         body_intents = handlers.handle_mail_body(instance, email_id)
 
         fetch_mail_logger.debug(f"Creating case for email: {email_id}")
-        # Create case BEFORE Cortex dispatch so CaseAnalyzerJob rows have a valid FK.
         case = CaseCreatorService().create_case(CaseInputData(
             instance=instance,
             user=user,
@@ -163,7 +161,6 @@ class GlobalSubmissionService:
             fetch_mail_logger.error("Case creation failed for email %s; skipping dispatch", email_id)
             return
 
-        # Replay all queued dispatch intents with the new case.
         artifact_service.dispatch_pending(case)
         for service in attachment_result.services:
             service.dispatch_pending(case)
@@ -186,10 +183,6 @@ class GlobalSubmissionService:
                     getattr(case, "id", None),
                 )
 
-        # Stamp dispatch completion + enqueue reconcile, matching the API
-        # submission path (case_handler.dispatch_pending). Closes the
-        # create/dispatch race for feeder cases and triggers prompt
-        # finalisation instead of waiting on the 300s cron fallback.
         from django.utils import timezone
         case.dispatched_at = timezone.now()
         case.save(update_fields=["dispatched_at"])

@@ -100,7 +100,6 @@ class MailInfoServiceTests(TestCase):
         mock_notify.from_settings.side_effect = Exception("SMTP down")
         mail_info = MagicMock()
 
-        # must NOT raise
         self.service._acknowledge_user(mail_info)
 
     @patch("mail_feeder.email_info.email_info.MailInfo")

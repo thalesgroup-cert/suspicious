@@ -49,9 +49,6 @@ class BuildEmailDataModelTests(TestCase):
                 build_email_data_model(meta, "reporter@corp.test", d)
 
     def test_traversal_filename_cannot_escape_attachments_dir(self):
-        # A crafted email.json with "../" must not read a file outside the
-        # attachments dir. basename() collapses it to a name looked up inside
-        # the dir, where it does not exist -> integrity error, no escape.
         with tempfile.TemporaryDirectory() as parent:
             attach_dir = os.path.join(parent, "attachments")
             os.makedirs(attach_dir)

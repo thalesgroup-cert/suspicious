@@ -77,7 +77,6 @@ def get_domain(mail):
     """
     try:
 
-        # First check if it's a valid email
         email_type = DomainHandler().validate_email(mail.address)
         if email_type == "Mail":
             domain = mail.address.split("@")[1]
@@ -87,12 +86,10 @@ def get_domain(mail):
                 fetch_mail_logger.warning(f"Error: Extracted domain is empty from mail: {mail}")
                 return None
 
-        # If not a valid email, check if it's a domain or URL
         domain_type = DomainHandler().validate_domain(mail)
         if domain_type == "Domain":
             return mail.address
         elif domain_type == "Url":
-            # Extract the domain from the URL
             if "@" in mail:
                 domain = mail.address.split("@")[1].split("/")[0]
                 if domain:
@@ -112,7 +109,6 @@ def get_domain(mail):
 
 def is_valid_email(email):
     try:
-        # Valide l'adresse email et retourne sa forme normalisée
         valid = validate_email(email, check_deliverability=False)
         return True, valid.email.lower()
     except EmailNotValidError as e:

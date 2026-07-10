@@ -1,4 +1,3 @@
-# Suspicious/Suspicious/mail_feeder/global_submission/tests_reporter_note.py
 from django.test import TestCase
 from mail_feeder.global_submission.models import MailSubmissionData
 

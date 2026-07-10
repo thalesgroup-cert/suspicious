@@ -205,7 +205,6 @@ class RuntimeConfig(models.Model):
 
     def save(self, *args, **kwargs):
         super().save(*args, **kwargs)
-        # Invalidate the accessor cache so admin edits propagate immediately.
         from settings.config import invalidate_cache
         invalidate_cache(self.key)
 

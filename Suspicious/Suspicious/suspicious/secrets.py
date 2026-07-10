@@ -20,10 +20,8 @@ from suspicious._config_common import settings_get
 
 _VAULT_MOUNT = "suspicious"
 
-_CACHE_TTL = 60  # seconds; short so UI secret edits propagate across workers
-# key -> (value, expires_at_monotonic)
+_CACHE_TTL = 60
 _CACHE: dict[str, Any] = {}
-# Boxed singleton so tests can reset it without module reload.
 _client_singleton: list = [None]
 
 
@@ -69,7 +67,6 @@ def get_secret(key: str, default: Any = None, *, fail_fast: bool = False) -> Any
         return cached[0]
 
     if not os.environ.get("VAULT_ADDR"):
-        # Dev / CI fallback — read the same key out of settings.json.
         value = settings_get(key, default)
         _cache_set(key, value)
         return value
@@ -80,10 +77,6 @@ def get_secret(key: str, default: Any = None, *, fail_fast: bool = False) -> Any
         import hvac
 
         if isinstance(exc, hvac.exceptions.InvalidPath):
-            # Key absent in Vault (404) — not an error. Fall through to the
-            # caller-supplied default, mirroring a settings.json miss. This is
-            # what lets optional, unconfigured secrets resolve to "" instead of
-            # crashing boot / requests.
             _cache_set(key, default)
             return default
         message = (

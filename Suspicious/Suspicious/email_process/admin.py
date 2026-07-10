@@ -4,7 +4,6 @@ from import_export.admin import ImportExportModelAdmin
 from email_process.models import MailAddress
 
 
-# Resource class
 class MailAddressResource(resources.ModelResource):
     class Meta:
         model = MailAddress
@@ -12,7 +11,6 @@ class MailAddressResource(resources.ModelResource):
         export_order = fields
 
 
-# Admin class
 @admin.register(MailAddress)
 class MailAddressAdmin(ImportExportModelAdmin):
     resource_class = MailAddressResource

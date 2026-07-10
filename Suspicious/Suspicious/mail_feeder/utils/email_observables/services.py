@@ -47,15 +47,12 @@ class EmailObservablesService:
             self.logger.error(f"email_analysis failed: {e}")
             iocextract = {}
 
-        # Extract basic observables
         self._extract_basic_observables(iocextract, artifacts)
 
-        # Clean up temporary file if msg
         if mail.get("mailFormat") == "msg":
             os.remove(filepath)
             filepath = os.path.join(FILE_TEMP_PATH, filename, f"{filename}.msg")
 
-        # Process attachments
         attachment_id = 0
         attachment_id = add_file_attachment(files, processed_files, artifacts, filepath, attachment_id, ["reported email"])
         attachment_id = self._process_related_attachments(workdir, mail, attachment_id, artifacts, files, processed_files)
@@ -77,24 +74,19 @@ class EmailObservablesService:
 
     def _extract_basic_observables(self, iocextract: Dict[str, Any], artifacts: list) -> None:
         
-        # URLs
         for _, url in (iocextract.get("urls") or {}).items():
             if not url.startswith("mailto"):
                 add_artifact(artifacts, "url", url)
 
-        # Domains
         for _, domain in (iocextract.get("domains") or {}).items():
             add_artifact(artifacts, "domain", domain)
 
-        # IPs
         for ip in (iocextract.get("body_ip") or []):
             add_artifact(artifacts, "ip", str(ip), ["Body"])
 
-        # Emails
         for email in (iocextract.get("body_email") or []):
             add_artifact(artifacts, "mail", str(email), ["Body"])
 
-        # Hashes
         for hash_val in (iocextract.get("body_hash") or []):
             add_artifact(artifacts, "hash", str(hash_val), ["Body"])
 

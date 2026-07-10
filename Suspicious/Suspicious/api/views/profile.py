@@ -13,10 +13,6 @@ from api.serializers.profile import (
 
 
 # ---------------------------------------------------------------------------
-# Helper — resolve the correct profile model for the requesting user.
-#
-# CISOProfile takes priority: users with a CISO profile get CISO
-# serialization (which includes the scope field).
 # ---------------------------------------------------------------------------
 
 def _get_profile(user):
@@ -53,8 +49,6 @@ class ProfileView(APIView):
 
 
 # ---------------------------------------------------------------------------
-# PATCH /api/profile/appearance/
-# Updates: theme, auto_seasonal, semantic_colors (any combination).
 # ---------------------------------------------------------------------------
 
 class AppearanceView(APIView):
@@ -66,13 +60,10 @@ class AppearanceView(APIView):
         serializer.is_valid(raise_exception=True)
         serializer.update(profile, serializer.validated_data)
 
-        # Return the full profile so the frontend can update its cache.
         return Response(ProfileSerializerClass(profile).data)
 
 
 # ---------------------------------------------------------------------------
-# PATCH /api/profile/preferences/
-# Updates: wants_acknowledgement, wants_results.
 # ---------------------------------------------------------------------------
 
 class PreferencesView(APIView):
@@ -88,18 +79,6 @@ class PreferencesView(APIView):
 
 
 # ---------------------------------------------------------------------------
-# GET / PATCH /api/profile/colors/
-#
-# Dedicated endpoint for semantic color sync.
-#
-# GET  — returns just the semantic_colors blob (merged with defaults).
-# PATCH — accepts a full or partial semantic_colors object, validates,
-#         persists, and returns the merged result.
-#
-# The frontend calls this on:
-#   1. Preset switch in ColorSettingsPanel
-#   2. Individual swatch change (debounced 800ms)
-#   3. ProfilePage "Save appearance" button
 # ---------------------------------------------------------------------------
 
 class SemanticColorsView(APIView):
@@ -118,15 +97,12 @@ class SemanticColorsView(APIView):
         return Response(
             {
                 "semantic_colors": profile.get_semantic_colors(),
-                # Echo the full profile so a single roundtrip is enough.
                 "profile": ProfileSerializerClass(profile).data,
             }
         )
 
 
 # ---------------------------------------------------------------------------
-# POST /api/profile/colors/reset/
-# Resets semantic_colors to DEFAULT_SEMANTIC_COLORS.
 # ---------------------------------------------------------------------------
 
 class ResetSemanticColorsView(APIView):

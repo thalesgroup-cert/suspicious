@@ -7,7 +7,7 @@ from url_process.models import URL
 
 class DispatchPlannerTest(TestCase):
     def _handler_with_url_intents(self, urls):
-        h = CaseHandler.__new__(CaseHandler)            # bypass __init__
+        h = CaseHandler.__new__(CaseHandler)
         h.pending_dispatch_intents = [(u, "url") for u in urls]
         return h
 
@@ -25,7 +25,6 @@ class DispatchPlannerTest(TestCase):
         urls = [URL.objects.create(address=f"https://x.com/p?id={i}") for i in range(4)]
         h = self._handler_with_url_intents(urls)
         h.dispatch_pending(self._fake_mail_case())
-        # collapsed to one canonical group, capped to 1 → exactly one Cortex dispatch
         self.assertEqual(CortexJob.return_value.launch_cortex_jobs.call_count, 1)
 
     @mock.patch("url_process.url_utils.url_planner.get_config")

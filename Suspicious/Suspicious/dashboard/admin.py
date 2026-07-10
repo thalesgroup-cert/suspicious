@@ -11,7 +11,6 @@ from .models import (
 )
 
 
-# Resources
 class KpiResource(resources.ModelResource):
     class Meta:
         model = Kpi
@@ -63,7 +62,6 @@ class UserCasesMonthlyStatsResource(resources.ModelResource):
         export_order = fields
 
 
-# Admin classes
 @admin.register(Kpi)
 class KpiAdmin(ImportExportModelAdmin):
     resource_class = KpiResource

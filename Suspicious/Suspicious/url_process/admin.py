@@ -5,7 +5,6 @@ from import_export.admin import ImportExportModelAdmin
 from .models import URL
 
 
-# Resource for URL model
 class URLResource(resources.ModelResource):
     class Meta:
         model = URL
@@ -19,7 +18,6 @@ class URLResource(resources.ModelResource):
         )
 
 
-# Admin configuration for URL model
 @admin.register(URL)
 class URLAdmin(ImportExportModelAdmin):
     resource_class = URLResource
@@ -28,7 +26,6 @@ class URLAdmin(ImportExportModelAdmin):
     search_fields = ('address', 'ioc_score', 'ioc_confidence', 'ioc_level')
     ordering = ('creation_date',)
 
-    # Custom actions
     def increment_times_sent(self, request, queryset):
         rows_updated = queryset.update(times_sent=models.F('times_sent') + 1)
         self.message_user(request, f"{rows_updated} URL(s) updated with incremented 'times_sent'.")

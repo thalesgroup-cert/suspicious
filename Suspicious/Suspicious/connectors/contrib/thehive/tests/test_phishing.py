@@ -16,11 +16,9 @@ import requests
 # Stub out heavy / unavailable dependencies before any import of phishing.py
 # ---------------------------------------------------------------------------
 
-# Stub pydantic (not installed in test environment)
 _pydantic_stub = MagicMock()
 sys.modules.setdefault("pydantic", _pydantic_stub)
 
-# Stub the utils / models sub-modules so we don't need pydantic at all
 _utils_stub = MagicMock()
 _models_stub = MagicMock()
 sys.modules.setdefault("connectors.contrib.thehive.utils", _utils_stub)
@@ -42,7 +40,6 @@ def _patch_thehive_config():
 # ---------------------------------------------------------------------------
 
 def _import_phishing():
-    # Remove cached module so a clean import occurs
     for key in list(sys.modules):
         if "phishing" in key and "test" not in key:
             del sys.modules[key]
@@ -50,7 +47,6 @@ def _import_phishing():
     return ph
 
 
-# Pre-import once so subsequent test-method imports are cheap
 import connectors.contrib.thehive.phishing  # noqa: F401 — side-effect import
 
 
@@ -230,7 +226,6 @@ class TestAddAttachmentsToItem(unittest.TestCase):
         import tempfile
         import os
 
-        # Create two temp files — only one POST should be attempted before breaker stops loop
         paths = []
         for _ in range(2):
             with tempfile.NamedTemporaryFile(delete=False, suffix=".txt") as f:
@@ -243,7 +238,6 @@ class TestAddAttachmentsToItem(unittest.TestCase):
                 side_effect=pybreaker.CircuitBreakerError(),
             ) as mock_req:
                 add_attachments_to_item("alert", "~42", paths, "https://hive.local", "key123")
-            # Loop should exit after first breaker-open — only 1 attempt
             self.assertEqual(mock_req.call_count, 1)
         finally:
             for p in paths:
@@ -289,10 +283,9 @@ class TestAddCommentToItem(unittest.TestCase):
         self.assertEqual(only_call[0][1], "https://hive.local/api/v1/alert/~42/comment")
 
     def test_posts_new_comment_when_no_existing(self):
-        # Query returns empty list → POST new comment
         responses = [
-            MagicMock(**{"json.return_value": []}),  # query response
-            MagicMock(),  # POST new comment
+            MagicMock(**{"json.return_value": []}),
+            MagicMock(),
         ]
         with patch(
             "connectors.contrib.thehive.phishing._thehive_request",
@@ -300,7 +293,6 @@ class TestAddCommentToItem(unittest.TestCase):
         ) as mock_req:
             self._call()
         self.assertEqual(mock_req.call_count, 2)
-        # Second call should be POST to add_comment URL
         second_call = mock_req.call_args_list[1]
         self.assertEqual(second_call[0][0], "POST")
 
@@ -308,14 +300,13 @@ class TestAddCommentToItem(unittest.TestCase):
         import time
         existing = {
             "_id": "comment1",
-            "createdAt": int(time.time() * 1000) - 1000,  # 1 second ago — recent
-            "createdBy": "suspicious",  # match thehive_config user
+            "createdAt": int(time.time() * 1000) - 1000,
+            "createdBy": "suspicious",
         }
         responses = [
             MagicMock(**{"json.return_value": [existing]}),
             MagicMock(),
         ]
-        # Patch _thehive_config to return matching user
         with patch("connectors.contrib.thehive.phishing._thehive_config", return_value={"user": "suspicious"}):
             with patch(
                 "connectors.contrib.thehive.phishing._thehive_request",
@@ -323,7 +314,6 @@ class TestAddCommentToItem(unittest.TestCase):
             ) as mock_req:
                 self._call()
         self.assertEqual(mock_req.call_count, 2)
-        # Second call should be PATCH
         second_call = mock_req.call_args_list[1]
         self.assertEqual(second_call[0][0], "PATCH")
 
@@ -332,11 +322,9 @@ class TestAddCommentToItem(unittest.TestCase):
             "connectors.contrib.thehive.phishing._thehive_request",
             side_effect=pybreaker.CircuitBreakerError(),
         ):
-            # Should not raise
             self._call()
 
     def test_request_exception_triggers_fallback_post(self):
-        # Query fails → fallback POST fires
         fallback_resp = MagicMock()
         with patch(
             "connectors.contrib.thehive.phishing._thehive_request",
@@ -344,12 +332,10 @@ class TestAddCommentToItem(unittest.TestCase):
         ) as mock_req:
             self._call()
         self.assertEqual(mock_req.call_count, 2)
-        # Second call must be POST
         second_call = mock_req.call_args_list[1]
         self.assertEqual(second_call[0][0], "POST")
 
     def test_fallback_post_breaker_open_no_crash(self):
-        # Query fails, then breaker open on fallback — must not raise
         with patch(
             "connectors.contrib.thehive.phishing._thehive_request",
             side_effect=[
@@ -357,7 +343,7 @@ class TestAddCommentToItem(unittest.TestCase):
                 pybreaker.CircuitBreakerError(),
             ],
         ):
-            self._call()  # must not raise
+            self._call()
 
     def test_skips_invalid_item_type(self):
         with patch("connectors.contrib.thehive.phishing._thehive_request") as mock_req:

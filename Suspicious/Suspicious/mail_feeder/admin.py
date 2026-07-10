@@ -6,7 +6,6 @@ from .models import (
     ArtifactIsDomain, ArtifactIsHash, ArtifactIsIp, ArtifactIsMailAddress, ArtifactIsUrl,MailArchive
 )
 
-# Resources for models
 class MailResource(resources.ModelResource):
     class Meta:
         model = Mail
@@ -69,7 +68,6 @@ class ArtifactIsUrlResource(resources.ModelResource):
         fields = ('id', 'url', 'artifact', 'associated_mails', 'times_sent', 'creation_date', 'last_update')
 
 
-# Admin classes
 @admin.register(Mail)
 class MailAdmin(ImportExportModelAdmin):
     resource_class = MailResource
@@ -103,7 +101,6 @@ class MailAdmin(ImportExportModelAdmin):
             link, obj.preview_object_key,
         )
 
-# Admin classes
 @admin.register(MailArchive)
 class MailArchiveAdmin(ImportExportModelAdmin):
     resource_class = MailResource

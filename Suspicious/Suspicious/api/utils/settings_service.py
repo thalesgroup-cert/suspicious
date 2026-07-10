@@ -27,13 +27,6 @@ User = get_user_model()
 # Return type for all bulk create handlers
 # ---------------------------------------------------------------------------
 
-# Every bulk_create_handler must return this shape so the view can give
-# the frontend precise, actionable feedback for each category:
-#
-#   created           — values successfully added (new entries)
-#   duplicates        — values already present in this editable list (skipped)
-#   watcher_conflicts — values already managed by Watcher sync (skipped,
-#                       user does not need to add them manually)
 CreateResult = dict[str, list[str]]
 
 _EMPTY_RESULT: CreateResult = {
@@ -178,8 +171,6 @@ def _bulk_create_domain_links(
     ]
     through_model.objects.bulk_create(new_entries, ignore_conflicts=True)
 
-    # Fetch the IDs of everything we just created (ignore_conflicts means
-    # some may have been skipped by a race; capture only what landed).
     created_ids = list(
         through_model.objects.filter(domain__value__in=to_create_values)
         .values_list("id", flat=True)
@@ -215,7 +206,6 @@ def _bulk_create_hash_links(values: list[str], user: User) -> CreateResult:
     if not to_create_values:
         return _make_result(created=[], duplicates=duplicates, watcher_conflicts=[])
 
-    # Get-or-create Hash objects
     hash_map = {h.value: h for h in Hash.objects.filter(value__in=to_create_values)}
     missing = [v for v in to_create_values if v not in hash_map]
     if missing:

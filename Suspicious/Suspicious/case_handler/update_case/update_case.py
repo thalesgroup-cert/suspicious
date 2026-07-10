@@ -64,7 +64,6 @@ def update_ioc_level_and_cases(obj, obj_type, level):
         obj.file_level = level_upper
         obj.save()
 
-        # If the file has a linked hash, update it simultaneously
         if hasattr(obj, 'linked_hash') and obj.linked_hash:
             linked_hash = obj.linked_hash
             linked_hash.ioc_score = ioc_score
@@ -90,7 +89,6 @@ def update_ioc_level_and_cases(obj, obj_type, level):
         obj.ioc_level = level_upper
         obj.save()
 
-    # Ensure cases linked to this object are updated
     update_linked_cases(obj, obj_type)
     
     return obj
@@ -110,12 +108,10 @@ def update_case_score(case):
     try:
         update_cases_logger.info("Updating case score.")
 
-        # Initialize lists for scores and confidences
         total_scores = []
         total_confidences = []
 
         if case.fileOrMail:
-            # Calculate scores if there are attachments or artifacts
             attachments, artifacts = get_attachments_and_artifacts(case)
 
             if attachments:
@@ -128,7 +124,6 @@ def update_case_score(case):
                 total_scores.extend(artifact_scores)
                 total_confidences.extend(artifact_confidences)
 
-            # Calculate body and header scores only if there's an associated mail
             if case.fileOrMail.mail:
                 body_score, body_confidence = calculate_body_score(case)
                 header_score, header_confidence = calculate_header_score(case)
@@ -137,14 +132,12 @@ def update_case_score(case):
                 total_scores.extend([header_score])
                 total_confidences.extend([header_confidence])
 
-            # Calculate file score only if there is an associated file
             if case.fileOrMail.file:
                 file_score, file_confidence = calculate_file_score(case)
                 update_cases_logger.info(f"File score: {file_score}, confidence: {file_confidence}")
                 total_scores.append(file_score)
                 total_confidences.append(file_confidence)
 
-        # Handle non-file IoCs if they exist
         if case.nonFileIocs:
             non_file_ioc_score, non_file_ioc_confidence = calculate_non_file_ioc_scores(case)
             total_scores.append(non_file_ioc_score)
@@ -157,7 +150,6 @@ def update_case_score(case):
 
             update_cases_logger.info(f"Average score: {avg_score}, Average confidence: {avg_confidence}")
 
-            # Adjust based on logic from `calculate_final_scores`
             high_scores_count = sum(1 for score in total_scores if score >= 9)
             mail_header_score = header_score if case.fileOrMail and case.fileOrMail.mail else 0
             if (mail_header_score > 9 and high_scores_count >= 2) or (mail_header_score <= 9 and high_scores_count >= 1):
@@ -168,12 +160,10 @@ def update_case_score(case):
             case.final_confidence = min(round(avg_confidence), 100)
             update_cases_logger.info(f"Final confidence: {case.final_confidence}")
         else:
-            # Default to 0 if there are no scores
             update_cases_logger.info("No scores available, defaulting to 0.")
             case.final_score = 0
             case.final_confidence = 0
 
-        # Update the results based on the final score
         case.results = calculate_result_ranges(case.final_score)
         case.save()
 

@@ -26,5 +26,4 @@ class AllowListResult(BaseModel):
     FiletypeAllowList: Optional[str] = None
 
 
-# Sentinel: analyzer job not finished — the report must NOT be scored.
 PENDING = object()

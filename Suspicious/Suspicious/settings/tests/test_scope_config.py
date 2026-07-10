@@ -38,8 +38,6 @@ class GetScopeConfigTest(TestCase):
         self.assertEqual(result["branding"]["x"], 1)
 
     def test_email_subsections_coexist_under_one_email_dict(self):
-        # All email.* sections must merge into the same "email" dict rather
-        # than overwrite one another.
         RuntimeConfig.objects.create(scope="shared", key="email.smtp",
                                      value={"host": "h"})
         RuntimeConfig.objects.create(scope="shared", key="email.content",
@@ -54,7 +52,7 @@ class GetScopeConfigTest(TestCase):
             result = cfg.get_scope_config("feeder")
         email = result["email"]
         self.assertEqual(email["smtp"]["host"], "h")
-        self.assertEqual(email["smtp"]["password"], "S")  # secret overlaid
+        self.assertEqual(email["smtp"]["password"], "S")
         self.assertEqual(email["content"]["subject"], "s")
         self.assertEqual(email["links"]["portal"], "p")
         self.assertEqual(email["socials"]["x"], "@acme")

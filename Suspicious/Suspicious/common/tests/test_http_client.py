@@ -126,7 +126,7 @@ class TestRetryDecorator(unittest.TestCase):
                 raise requests.ConnectionError("down")
             return "ok"
 
-        with patch("tenacity.nap.time.sleep"):  # suppress actual sleep
+        with patch("tenacity.nap.time.sleep"):
             result = flaky()
 
         self.assertEqual(result, "ok")
@@ -164,7 +164,7 @@ class TestRetryDecorator(unittest.TestCase):
             with self.assertRaises(requests.HTTPError):
                 client_error()
 
-        self.assertEqual(call_count, 1)  # no retry on 4xx
+        self.assertEqual(call_count, 1)
 
     def test_retries_on_5xx_and_succeeds(self):
         from common.http_client import RETRY

@@ -27,9 +27,6 @@ def emit(event_name: str, case) -> None:
             return
 
         def _enqueue():
-            # Runs at commit time, outside the try below — guard each enqueue
-            # so an eager-mode Retry (tests) or broker error can't escape
-            # into the committing request/task.
             for name in names:
                 try:
                     deliver_event.delay(name, event_name, payload)

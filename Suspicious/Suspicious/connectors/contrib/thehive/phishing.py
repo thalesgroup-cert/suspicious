@@ -218,7 +218,6 @@ def get_item_from_id(item_id, thehive_url, api_key):
             update_cases_logger.warning("[breaker:thehive] open — get_item_from_id skipped: %s", e)
             return None, None
         except requests.exceptions.HTTPError:
-            # Non-200 (e.g. 404 — item is not this type); try next type
             continue
         except requests.exceptions.RequestException as e:
             update_cases_logger.error(f"Error retrieving {item_type} with ID {item_id}: {e}")
@@ -332,7 +331,6 @@ def add_comment_to_item(item_type, item_id, comment, thehive_url, api_key, *, al
         update_cases_logger.warning("[breaker:thehive] open — add_comment_to_item skipped: %s", e)
     except requests.exceptions.RequestException as e:
         update_cases_logger.error(f"Error querying comments for {item_type} {item_id}: {e}")
-        # Fallback: attempt to post a new comment directly
         try:
             _thehive_request("POST", url_add_comment, headers=headers, json=comment, verify=_certificate_path())
         except pybreaker.CircuitBreakerError as e2:

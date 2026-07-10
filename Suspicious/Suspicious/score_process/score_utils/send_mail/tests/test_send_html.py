@@ -39,7 +39,6 @@ class SendHtmlTest(SimpleTestCase):
         self.assertEqual(order, ["connect", "login", "publish", "close"])
 
     def test_missing_config_uses_sane_defaults(self):
-        # Regression: the old acknowledge copy defaulted port/host to {}.
         _, _, ctor = self._run({})
         self.assertEqual(ctor, {"host": "", "port": 587, "login": "", "password": ""})
 

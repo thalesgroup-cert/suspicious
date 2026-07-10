@@ -1,12 +1,7 @@
 from knox.auth import TokenAuthentication
 
-# Cookie name used for the httpOnly Knox session token.
-# Must match the name used in LoginView, LogoutView, and OIDCCallbackView.
 KNOX_COOKIE_NAME = "knox_token"
 
-# Non-httpOnly indicator cookie.  JS can read this to know whether a session
-# exists without making a network round-trip.  It carries no secret — the
-# actual authentication is the httpOnly knox_token cookie.
 SESSION_INDICATOR_COOKIE = "session_active"
 
 
@@ -27,6 +22,4 @@ class KnoxCookieAuthentication(TokenAuthentication):
         token = request.COOKIES.get(KNOX_COOKIE_NAME)
         if not token:
             return None
-        # Knox's authenticate_credentials expects bytes (it calls .decode("utf-8")
-        # internally because it normally receives the raw Authorization header value).
         return self.authenticate_credentials(token.encode("utf-8"))

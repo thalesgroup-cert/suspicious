@@ -45,8 +45,6 @@ class MailPreviewView(APIView):
         bucket = getattr(mail, "preview_bucket", "") or ""
         key = getattr(mail, "preview_object_key", "") or ""
         if not bucket or not key:
-            # Never rendered (or pointer cleared): kick off a background
-            # render so a later request can serve it. 404 for now.
             enqueue_preview_render(mail.pk)
             raise NotFound("No preview available")
 
@@ -61,8 +59,6 @@ class MailPreviewView(APIView):
                 "MinIO get_object failed: case_id=%s bucket=%s key=%s err=%s",
                 case.pk, bucket, key, exc,
             )
-            # Pointer exists but the object is gone — re-render in the
-            # background (deduped) and 404 so the client retries.
             enqueue_preview_render(mail.pk)
             raise NotFound("Preview unavailable") from exc
 
@@ -92,9 +88,6 @@ class MailPreviewView(APIView):
 
     @staticmethod
     def _minio_client():
-        # Prefer the platform-wide client (storage.s3 runtime config) — the
-        # same source the renderer/upload and the rest of the backend use.
-        # Fall back to legacy django-minio-storage MINIO_STORAGE_* settings.
         try:
             from common.clients import get_s3_client
             client = get_s3_client()

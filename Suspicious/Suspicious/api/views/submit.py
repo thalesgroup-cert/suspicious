@@ -34,7 +34,7 @@ def _build_submission_response(
         "submission_type": submission_type,
         "result_type": result_type,
         "case_id": case_id,
-        "id": case_id,  # compatibility with current frontend
+        "id": case_id,
         "message": message,
     }
     return Response(payload, status=http_status)
@@ -95,8 +95,6 @@ class BaseSubmitView(APIView):
                 result_type="case",
             )
 
-        # Submission was accepted but matched the allow-list — no case is
-        # expected. Return 200 so the frontend doesn't treat it as an error.
         if results.get("allow_listed"):
             return _build_submission_response(
                 message="Submission accepted (allowlisted — no case created).",
@@ -223,7 +221,6 @@ class SubmitFileView(BaseSubmitView):
                 result_type="mail",
             )
 
-        # Allow-listed files: accepted but no case or mail produced.
         if results.get("allow_listed"):
             return _build_submission_response(
                 message="Submission accepted (allowlisted — no case created).",

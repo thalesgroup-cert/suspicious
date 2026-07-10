@@ -91,7 +91,7 @@ def process_reports(analyzers_reports, mail_part, part_type, is_malicious):
 # ── Mail processing ───────────────────────────────────────────────────────────
 
 def process_mail(mail, reports, total_scores, total_confidences, is_malicious, case_id):
-    from mail_feeder.models import Mail  # local import: avoid app-loading cycle
+    from mail_feeder.models import Mail
     mail = Mail.objects.prefetch_related(*_PROCESS_MAIL_PREFETCH).get(pk=mail.pk)
     total_failures = 0
     update_cases_logger.info("Starting mail processing.")
@@ -167,7 +167,6 @@ def _process_mail_part(
             setattr(mail_part, confidence_field, confidence)
 
             update_mail_part_with_scores(mail_part, part_type, is_malicious)
-            # Only write the fields we changed
             mail_part.save(update_fields=["times_sent", score_field, confidence_field])
             log_func("process_%s: saved successfully.", part_type)
 

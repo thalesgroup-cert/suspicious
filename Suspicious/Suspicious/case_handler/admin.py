@@ -10,7 +10,6 @@ from case_handler.models import (
 )
 
 
-# Resources
 class CaseResource(resources.ModelResource):
     class Meta:
         model = Case
@@ -49,7 +48,6 @@ class CaseArtifactResource(resources.ModelResource):
         )
 
 
-# Admin classes
 @admin.register(Case)
 class CaseAdmin(ImportExportModelAdmin):
     resource_class = CaseResource

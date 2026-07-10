@@ -1,18 +1,3 @@
-#
-# Production-ready settings for the Suspicious platform.
-#
-# Configuration is loaded from /app/settings.json, which is split into
-# top-level sections:
-#
-#   suspicious  — app-level config (host, secret key, OIDC, storage, …)
-#   database    — MySQL connection parameters
-#   ldap        — optional LDAP / Active Directory auth
-#   minio       — optional MinIO object storage
-#   cortex      — Cortex analyzer host
-#
-# All sensitive values (SECRET_KEY, DB password, OIDC secret, LDAP bind
-# password) must live in settings.json and never be committed to version
-# control.  The file is mounted at runtime by your container orchestrator.
 
 import json
 import sys
@@ -22,8 +7,6 @@ from pathlib import Path
 from urllib.parse import urlparse
 import logging
 
-# Silence SyntaxWarnings from third-party packages we cannot patch
-# (pyspf, simhash use bare-string regexes in docstrings/code).
 warnings.filterwarnings("ignore", category=SyntaxWarning, module=r"spf$")
 warnings.filterwarnings("ignore", category=SyntaxWarning, module=r"simhash(\..*)?$")
 
@@ -34,10 +17,6 @@ warnings.filterwarnings("ignore", category=SyntaxWarning, module=r"simhash(\..*)
 import os as _os
 CONFIG_PATH = _os.environ.get("SUSPICIOUS_CONFIG_PATH", "/app/settings.json")
 
-# Detect non-production execution contexts: test runner, migration helpers,
-# or any context where /app/log does not exist (e.g. local dev checkouts).
-# Used below to substitute NullHandlers for file-based log handlers and
-# SQLite for MySQL so no external services are needed.
 _is_test = (
     "test" in sys.argv
     or not _os.path.isdir("/app/log")
@@ -46,9 +25,6 @@ _is_test = (
 with open(CONFIG_PATH) as _f:
     _config = json.load(_f)
 
-# Validate against the SuspiciousConfig schema so missing or malformed
-# required keys (SECRET_KEY, DB credentials, …) fail at boot with a
-# readable error instead of much later at the first call site.
 from suspicious.config_schema import validate_config, ConfigValidationError
 
 try:
@@ -77,9 +53,7 @@ _otel    = _observ.get("opentelemetry", {})
 # Base directories
 # ---------------------------------------------------------------------------
 
-# BASE_DIR  → repository root  (settings.py is 3 levels deep: suspicious/settings.py)
 BASE_DIR       = Path(__file__).resolve().parent.parent.parent
-# FILES_BASE_DIR → project root (one level up from suspicious/)
 FILES_BASE_DIR = Path(__file__).resolve().parent.parent
 
 # ---------------------------------------------------------------------------
@@ -91,44 +65,33 @@ from suspicious.secrets import get_secret
 SECRET_KEY = get_secret("app.secret_key", fail_fast=True)
 
 _debug_raw = _app.get("debug", False)
-# Opt-in only: unknown/typo values fall back to False (prod-safe).
 DEBUG = str(_debug_raw).strip().lower() in {"true", "1", "yes", "on"}
 
 ALLOWED_HOSTS = _app.get("allowed_hosts", ["localhost"]) + [
     "127.0.0.1",
     "localhost",
 ]
-# Add the Cortex host if provided (needed for internal callbacks)
 _cortex_url = _cortex.get("url", "")
 if _cortex_url:
     _cortex_hostname = urlparse(_cortex_url).hostname
     if _cortex_hostname:
         ALLOWED_HOSTS.append(_cortex_hostname)
 
-# Shared secret for the Cortex → Suspicious job-completion webhook.
-# Set in settings.json under integrations.cortex.webhook_secret.
-# If absent, the webhook endpoint rejects all requests.
 CORTEX_WEBHOOK_SECRET: str = get_secret("integrations.cortex.webhook_secret", "")
 
-# CSRF — at least one trusted origin is required for POST requests in
-# Django 4.x.  Must be a full scheme+host (e.g. https://suspicious.corp).
 CSRF_TRUSTED_ORIGINS = _app.get("csrf_trusted_origins", ["https://localhost"])
 
-# Reverse-proxy headers — the proxy must set these explicitly.
 SECURE_PROXY_SSL_HEADER = ("HTTP_X_FORWARDED_PROTO", "https")
 USE_X_FORWARDED_HOST   = True
 
-# Enforce HTTPS in production (no-op when DEBUG is True).
 if not DEBUG:
     SECURE_SSL_REDIRECT            = True
-    SECURE_HSTS_SECONDS            = 31_536_000  # 1 year
+    SECURE_HSTS_SECONDS            = 31_536_000
     SECURE_HSTS_INCLUDE_SUBDOMAINS = True
     SECURE_HSTS_PRELOAD            = True
     SESSION_COOKIE_SECURE          = True
     CSRF_COOKIE_SECURE             = True
 
-# Fail fast on insecure configuration so a misconfigured production deploy
-# refuses to start instead of running silently exposed.
 from django.core.exceptions import ImproperlyConfigured
 
 if SECRET_KEY in ("", "CHANGE_ME"):
@@ -154,7 +117,6 @@ if not DEBUG:
 # ---------------------------------------------------------------------------
 
 INSTALLED_APPS = [
-    # Django built-ins
     "django.contrib.admin",
     "django.contrib.admindocs",
     "django.contrib.auth",
@@ -164,7 +126,6 @@ INSTALLED_APPS = [
     "django.contrib.staticfiles",
     "django.contrib.sites",
 
-    # Third-party
     "rest_framework",
     "drf_spectacular",
     "knox",
@@ -173,7 +134,6 @@ INSTALLED_APPS = [
     "import_export",
     "fontawesomefree",
 
-    # Internal apps
     "suspicious.apps.SuspiciousConfig",
     "api.apps.ApiConfig",
     "tasp.apps.TaspConfig",
@@ -236,8 +196,6 @@ TEMPLATES = [
 # ---------------------------------------------------------------------------
 
 if _is_test:
-    # Use SQLite in-memory for the test suite / migration generation —
-    # no MySQL required outside Docker.
     DATABASES = {
         "default": {
             "ENGINE": "django.db.backends.sqlite3",
@@ -257,19 +215,14 @@ else:
         }
     }
     _db_opts = _db.get("options", {})
-    # Optional SSL
     if _db_opts.get("ssl"):
         DATABASES["default"]["OPTIONS"]["ssl"] = {"ca": "/cert.pem"}
 
-    # Optional connection pooling / persistence
     if _db_opts.get("connection_pooling"):
-        DATABASES["default"]["CONN_MAX_AGE"] = None       # persistent
+        DATABASES["default"]["CONN_MAX_AGE"] = None
     elif _db_opts.get("persistent_connections"):
-        DATABASES["default"]["CONN_MAX_AGE"] = 600        # 10 min pool
+        DATABASES["default"]["CONN_MAX_AGE"] = 600
 
-    # Optional read-replica — opt-in via settings.json `database.replica`.
-    # When present, reads from apps listed in REPLICA_READ_APPS route to
-    # this alias; writes always stay on "default". See suspicious.db_router.
     _db_replica = _db.get("replica") or {}
     if _db_replica:
         DATABASES["replica"] = {
@@ -312,33 +265,21 @@ else:
     }
 
 # ---------------------------------------------------------------------------
-# Sessions — Redis cache backend (eliminates per-request DB session lookup)
-#
-# The OIDC callback view stores state/nonce in the session between the
-# login redirect and the provider callback, so the session backend must
-# be functional even for unauthenticated requests.
 # ---------------------------------------------------------------------------
 
 SESSION_ENGINE               = "django.contrib.sessions.backends.cache"
 SESSION_CACHE_ALIAS          = "default"
 SESSION_EXPIRE_AT_BROWSER_CLOSE = True
-SESSION_COOKIE_HTTPONLY      = True     # prevent JS access
-SESSION_COOKIE_SAMESITE      = "Lax"   # CSRF protection; Strict breaks OIDC redirects
+SESSION_COOKIE_HTTPONLY      = True
+SESSION_COOKIE_SAMESITE      = "Lax"
 
 # ---------------------------------------------------------------------------
-# Authentication backends
-#
-# Order matters: LDAP is tried first; if the user isn't found there,
-# Django's model backend is used (covers superusers and OIDC-created users).
 # ---------------------------------------------------------------------------
 
 AUTHENTICATION_BACKENDS = []
 
 _ldap_uri = _ldap_cfg.get("server_uri")
 if _ldap_uri:
-    # Only wire up LDAP when a server is actually configured.
-    # This avoids ImportError / connection errors on setups that use
-    # pure OIDC or local accounts only.
     try:
         import ldap
         from django_auth_ldap.config import LDAPSearch
@@ -356,31 +297,15 @@ if _ldap_uri:
             "last_name":  "sn",
             "email":      "mail",
         }
-        # Keep the local user record in sync with the directory on every
-        # login (name/email changes propagate automatically).
         AUTH_LDAP_ALWAYS_UPDATE_USER = True
 
-        # Cache LDAP group memberships for 1 hour so repeated requests
-        # don't re-query the directory on every login attempt.
         AUTH_LDAP_CACHE_TIMEOUT = 3600
  
-        # Reuse the LDAP connection across requests instead of opening a
-        # new TCP connection for every authentication call.
-        # This is the most impactful setting for latency — without it,
-        # each LDAP auth pays a full TCP handshake + bind RTT.
         AUTH_LDAP_CONNECTION_OPTIONS = {
-            ldap.OPT_NETWORK_TIMEOUT: 5,    # fail fast if LDAP is unreachable
-            ldap.OPT_TIMEOUT:         10,   # total operation timeout
+            ldap.OPT_NETWORK_TIMEOUT: 5,
+            ldap.OPT_TIMEOUT:         10,
         }
 
-        # LDAP TLS verification — default-secure. Audit S3:
-        # historically `verify_ssl` defaulted to "False", silently
-        # downgrading to OPT_X_TLS_NEVER and exposing the bind
-        # credentials to anyone on the path. We now default to
-        # OPT_X_TLS_DEMAND (full cert + hostname check) and require an
-        # explicit opt-out via `verify_ssl: false` in settings.json.
-        # The opt-out path emits a startup WARNING so the regression
-        # is visible in `make logs`.
         _verify_ssl = str(_ldap_cfg.get("verify_ssl", "True")).lower()
         if _verify_ssl in ("false", "0", "no"):
             logging.getLogger("suspicious.boot").warning(
@@ -399,21 +324,11 @@ if _ldap_uri:
 
         AUTHENTICATION_BACKENDS.append("django_auth_ldap.backend.LDAPBackend")
     except ImportError:
-        pass  # python-ldap not installed — skip silently
+        pass
 
 AUTHENTICATION_BACKENDS.append("django.contrib.auth.backends.ModelBackend")
 
 # ---------------------------------------------------------------------------
-# OIDC (custom Authorization Code flow — see api/views/oidc.py)
-#
-# These settings are consumed by OIDCLoginView and OIDCCallbackView.
-# allauth / mozilla-django-oidc are NOT used; the OIDC flow is
-# implemented directly so Knox tokens are issued at the callback.
-#
-# OIDC_REDIRECT_URI is optional: if absent, the callback view derives it
-# from the request using build_absolute_uri("/oidc/callback/"), which
-# works correctly when SECURE_PROXY_SSL_HEADER and USE_X_FORWARDED_HOST
-# are set.
 # ---------------------------------------------------------------------------
 
 OIDC_SERVER_URL    = _oidc.get("server_url", "")
@@ -422,8 +337,6 @@ OIDC_CLIENT_SECRET = get_secret("authentication.oidc.client_secret", "")
 OIDC_SCOPES        = _oidc.get("scopes", "openid email profile")
 OIDC_REDIRECT_URI  = _oidc.get("redirect_uri", "")
 
-# Note: SOCIALACCOUNT_PROVIDERS (allauth) is removed — allauth is not in
-# INSTALLED_APPS and the custom OIDC views do not use it.
 
 # ---------------------------------------------------------------------------
 # Django REST Framework
@@ -431,25 +344,16 @@ OIDC_REDIRECT_URI  = _oidc.get("redirect_uri", "")
 
 REST_FRAMEWORK = {
     "DEFAULT_AUTHENTICATION_CLASSES": (
-        # Cookie auth first — used by the browser SPA (httpOnly cookie, XSS-safe).
-        # Falls through when the cookie is absent so API clients can still
-        # authenticate via Authorization: Token <token>.
         "api.authentication.KnoxCookieAuthentication",
         "knox.auth.TokenAuthentication",
     ),
     "DEFAULT_PERMISSION_CLASSES": (
         "rest_framework.permissions.IsAuthenticated",
     ),
-    # JSON only in production. The Browsable API renderer ships interactive
-    # HTML forms + schema introspection — handy in dev, needless attack/info
-    # surface in prod — so it's only added when DEBUG is on.
     "DEFAULT_RENDERER_CLASSES": (
         ["rest_framework.renderers.JSONRenderer"]
         + (["rest_framework.renderers.BrowsableAPIRenderer"] if DEBUG else [])
     ),
-    # Global abuse ceiling. Views with their own throttle_classes (login,
-    # service_config) override these; the cortex webhook + health check opt out
-    # via throttle_classes=[] since they're machine callers, not user traffic.
     "DEFAULT_THROTTLE_CLASSES": (
         "rest_framework.throttling.UserRateThrottle",
         "rest_framework.throttling.AnonRateThrottle",
@@ -457,7 +361,6 @@ REST_FRAMEWORK = {
     "DEFAULT_THROTTLE_RATES": {
         "login": "5/min",
         "service_config": "30/min",
-        # Generous enough for the SPA's XHR bursts, low enough to bound scraping.
         "user": "3000/hour",
         "anon": "100/hour",
     },
@@ -482,7 +385,6 @@ OTEL_EXPORTER_OTLP_ENDPOINT  = _otel.get("otlp_endpoint", "http://tempo:4318")
 REST_KNOX = {
     "SECURE_HASH_ALGORITHM": "hashlib.sha3_512",
     "TOKEN_TTL": timedelta(hours=10),
-    # Rotate tokens: if a request arrives within TOKEN_TTL/2, extend it.
     "AUTO_REFRESH": False,
 }
 
@@ -509,12 +411,6 @@ SPECTACULAR_SETTINGS = {
 }
 
 # ---------------------------------------------------------------------------
-# Storage backend
-#
-# Three modes, set via suspicious.storage_backend in settings.json:
-#   local  — standard Django FileSystemStorage (default)
-#   minio  — MinIO object storage via django-minio-storage
-#   dual   — write to both MinIO and local (useful during migrations)
 # ---------------------------------------------------------------------------
 
 _storage_backend = _storage.get("backend", "local").lower()
@@ -523,9 +419,6 @@ _DUAL_WRITE = str(_features.get("dual_storage_write", "0")).strip().lower() in {
 }
 
 if _storage_backend in {"s3", "dual"}:
-    # Read by suspicious.storage_backends.MinioMediaStorage. We use the
-    # project's own minio==7.2.20 client (via that backend) rather than
-    # django-minio-storage, which caps minio<7.2.19.
     MINIO_STORAGE_ENDPOINT      = _minio.get("endpoint",   "rustfs:9000")
     MINIO_STORAGE_ACCESS_KEY    = _minio["access_key"]
     MINIO_STORAGE_SECRET_KEY    = get_secret("storage.s3.secret_key", _minio.get("secret_key", ""))
@@ -545,10 +438,6 @@ else:
 # Static and media files
 # ---------------------------------------------------------------------------
 
-# Django 5.1+ removed DEFAULT_FILE_STORAGE / STATICFILES_STORAGE in favour
-# of the STORAGES dict. "default" is the FileField backend selected above;
-# "staticfiles" keeps Django's default (WhiteNoise serves static via its
-# middleware regardless).
 STORAGES = {
     "default": {"BACKEND": _default_file_backend},
     "staticfiles": {"BACKEND": "django.contrib.staticfiles.storage.StaticFilesStorage"},
@@ -568,11 +457,11 @@ FILE_UPLOAD_HANDLERS = [
     "django.core.files.uploadhandler.TemporaryFileUploadHandler",
 ]
 
-MAX_UPLOAD_SIZE = 5 * 1024 * 1024  # 5 MB — enforced at the serializer level
+MAX_UPLOAD_SIZE = 5 * 1024 * 1024
 
-DATA_UPLOAD_MAX_MEMORY_SIZE = MAX_UPLOAD_SIZE  # cap in-memory multipart parsing
-FILE_UPLOAD_MAX_MEMORY_SIZE = 0               # always spool uploads to disk
-SUBMIT_FILE_MAX_BYTES       = MAX_UPLOAD_SIZE  # serializer-level guard; keep in sync
+DATA_UPLOAD_MAX_MEMORY_SIZE = MAX_UPLOAD_SIZE
+FILE_UPLOAD_MAX_MEMORY_SIZE = 0
+SUBMIT_FILE_MAX_BYTES       = MAX_UPLOAD_SIZE
 
 # ---------------------------------------------------------------------------
 # Password validation
@@ -602,15 +491,13 @@ USE_TZ        = True
 # Submission groups
 # ---------------------------------------------------------------------------
 
-# Groups whose members receive elevated permissions in the API
-# (access to CISO/CERT-only routes).
 SUBMISSION_ELEVATED_GROUPS = ("CERT", "CISO", "Admin")
 
 # ---------------------------------------------------------------------------
 # Celery — broker (redis_broker container) + result backend (MariaDB)
 # ---------------------------------------------------------------------------
 
-from celery.schedules import crontab  # intentional mid-file import for BEAT_SCHEDULE
+from celery.schedules import crontab
 
 _redis_broker_host = _redis_cfg.get("broker_host", "redis_broker")
 
@@ -678,9 +565,6 @@ CELERY_BEAT_SCHEDULE = {
 
 _trace_level = getattr(logging, _app.get("log_level", "INFO").upper(), logging.INFO)
 
-# Build file-based log handlers.  During test runs there is no /app/log
-# directory, so replace every RotatingFileHandler with a NullHandler to
-# avoid FileNotFoundError / PermissionError on startup.
 if _is_test:
     _file_handlers: dict = {
         name: {"class": "logging.NullHandler"}
@@ -759,14 +643,10 @@ LOGGING = {
     "disable_existing_loggers": False,
 
     "formatters": {
-        # Structured JSON — consumed by log aggregators (ELK, Loki, etc.).
-        # Fields: level, time, logger, message, plus any extra= keys passed
-        # at the call site (e.g. user_id, case_id on audit events).
         "json": {
             "()": "pythonjsonlogger.jsonlogger.JsonFormatter",
             "format": "%(levelname)s %(asctime)s %(name)s %(message)s %(trace_id)s %(span_id)s",
         },
-        # Plain-text fallback kept for local development / docker logs tailing.
         "verbose": {
             "format": "%(levelname)s %(asctime)s | %(name)s | %(message)s",
         },
@@ -792,14 +672,12 @@ LOGGING = {
     },
 
     "loggers": {
-        # Django internals — only errors to console (avoid noise)
         "django": {
             "handlers": ["console"],
             "level":    "ERROR",
             "propagate": False,
         },
 
-        # Main application
         "tasp": {
             "handlers": ["app_file", "json_console"],
             "level":     _trace_level,
@@ -811,14 +689,12 @@ LOGGING = {
             "propagate": False,
         },
 
-        # OIDC views — useful to see callback errors in the main log
         "api.views.oidc_views": {
             "handlers":  ["app_file", "console"],
             "level":     _trace_level,
             "propagate": False,
         },
 
-        # Cron sub-loggers
         "tasp.cron.fetch_and_process_emails": {
             "handlers":  ["fetch_mail"],
             "level":     _trace_level,
@@ -845,14 +721,12 @@ LOGGING = {
             "propagate": False,
         },
 
-        # LDAP debug (can be very verbose — consider raising to WARNING)
         "django_auth_ldap": {
             "handlers":  ["json_console"],
             "level":     _trace_level,
             "propagate": False,
         },
 
-        # Audit trail for certificate downloads
         "audit.cert_download": {
             "handlers":  ["audit"],
             "level":     _trace_level,

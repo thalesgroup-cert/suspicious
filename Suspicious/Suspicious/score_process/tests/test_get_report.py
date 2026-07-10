@@ -17,9 +17,6 @@ from score_process.scoring.cortex_analyzers.reports import CortexAnalyzerReports
 class GetReportIntegrationTest(TestCase):
     def test_malicious_ioc_case_scores_dangerous_end_to_end(self):
         user = get_user_model().objects.create_user(username="gr_u", password="x")
-        # Same fixture shape as test_collect: the report's score/confidence are
-        # re-derived from the taxonomy level by the analyzer pipeline, so a
-        # "malicious" taxonomy is what yields score=10/conf=100 downstream.
         ip = IP.objects.create(address="203.0.113.8")
         analyzer = Analyzer.objects.create(name="Abuse", analyzer_cortex_id="Abuse", weight=1)
         AnalyzerReport.objects.create(
@@ -36,8 +33,7 @@ class GetReportIntegrationTest(TestCase):
         CortexAnalyzerReports.get_report(case)
 
         case.refresh_from_db()
-        # One malicious IOC → malicious-vote override (1 >= max(1, 1//3)) → Dangerous.
         self.assertEqual(case.results, Result.DANGEROUS)
         self.assertEqual(case.final_score, 10)
         self.assertGreaterEqual(case.analysis_done, 1)
-        self.assertTrue(case.kpi_counted)   # apply_verdict ran through to KPI
+        self.assertTrue(case.kpi_counted)

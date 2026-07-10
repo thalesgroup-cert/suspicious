@@ -38,13 +38,6 @@ class PrefixSource:
                 release()
 
     def iter_pending(self) -> Iterator[str]:
-        # Top-level "directories" = submission prefixes.
-        # Yield both `todo` and `processing`: a `processing` prefix whose worker
-        # crashed mid-flight would otherwise be stranded forever (reaper). The
-        # caller gates each id behind a per-submission Redis lock, so a prefix
-        # *actively* being processed is skipped there — only abandoned ones
-        # (expired lock) get reclaimed. Idempotency on retry comes from the
-        # `processed_emails` list, so completed emails are not re-ingested.
         for obj in self._client.list_objects(self._bucket, recursive=False):
             name = obj.object_name
             if not name.endswith("/"):

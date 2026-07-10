@@ -1,4 +1,3 @@
-# cortex_job/cortex_utils/aggregate.py
 from dataclasses import dataclass
 
 from django.db.models import Count

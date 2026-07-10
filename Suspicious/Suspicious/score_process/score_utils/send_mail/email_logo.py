@@ -79,10 +79,8 @@ _DATA_PREFIXES: dict[str, str] = {
     "data:image/webp;base64,":    "image/webp",
 }
 
-# SVG magic bytes in base64 (covers <?xml …>, <svg…>, and BOM variants)
 _SVG_B64_MAGIC = ("PHN2Zy", "Cjxzdmc", "77u/PHN2Z")
 
-# Default output width for the Outlook PNG raster (px)
 _OUTLOOK_PNG_WIDTH = 260
 
 
@@ -244,8 +242,6 @@ def resolve_logo(raw: str | None, outlook_png_width: int = _OUTLOOK_PNG_WIDTH) -
             else "image/jpeg" if lower.endswith((".jpg", ".jpeg"))
             else ""
         )
-        # Remote SVG URLs: we cannot fetch and convert at render time —
-        # outlook_src is left as "" so the text wordmark fallback is used.
         return {
             "src":         raw,
             "mime":        mime,
@@ -262,7 +258,6 @@ def resolve_logo(raw: str | None, outlook_png_width: int = _OUTLOOK_PNG_WIDTH) -
     if mime:
         src         = "data:%s;base64,%s" % (mime, b64)
         is_svg      = mime == "image/svg+xml"
-        # For a raw base64 SVG the prefix is "" — pass the raw b64 directly
         outlook_src = _svg_bytes_to_png_data_uri(
             _extract_svg_bytes(b64, "") or b"", outlook_png_width
         ) if is_svg else ""
@@ -276,7 +271,6 @@ def resolve_logo(raw: str | None, outlook_png_width: int = _OUTLOOK_PNG_WIDTH) -
             "outlook_src": outlook_src,
         }
 
-    # Unknown — pass through as-is, no Outlook conversion
     return {
         "src":         raw,
         "mime":        "",

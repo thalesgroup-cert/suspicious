@@ -189,7 +189,6 @@ class GetCortexJobsResultsScoringTests(TestCase):
         self.assertEqual(self.report.level, "info")
 
     def test_stale_inprogress_report_auto_failed(self):
-        # Force creation_date older than the stale-job threshold.
         AnalyzerReport.objects.filter(pk=self.report.pk).update(
             creation_date=timezone.now() - timedelta(days=5)
         )

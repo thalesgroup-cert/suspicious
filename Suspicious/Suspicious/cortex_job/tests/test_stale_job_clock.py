@@ -33,7 +33,6 @@ class StaleJobClockTest(TestCase):
             confidence=0, score=0,
             report_summary={}, report_taxonomy={}, report_full={},
         )
-        # auto_now_add fields need explicit update to backdate
         AnalyzerReport.objects.filter(pk=report.pk).update(
             creation_date=report_created_at
         )
@@ -58,9 +57,7 @@ class StaleJobClockTest(TestCase):
         )
 
         now = timezone.now()
-        # CAJ submitted well past the stale threshold
         caj_created = now - timedelta(seconds=STALE_JOB_TIMEOUT_SECONDS + 60)
-        # Report row rewritten recently — by itself this is NOT stale
         report_created = now - timedelta(seconds=10)
 
         report = self._make_report_and_caj("job-r6", caj_created, report_created)
@@ -82,7 +79,6 @@ class StaleJobClockTest(TestCase):
 
         now = timezone.now()
         caj_created = now - timedelta(seconds=10)
-        # Report row creation_date stamped older than the threshold
         report_created = now - timedelta(seconds=STALE_JOB_TIMEOUT_SECONDS + 60)
 
         report = self._make_report_and_caj("job-r6b", caj_created, report_created)

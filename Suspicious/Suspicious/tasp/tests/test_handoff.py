@@ -4,7 +4,6 @@ import tempfile
 import unittest
 from unittest import mock
 
-# Mock out the problematic dependency chain before importing fetch_emails
 sys.modules["cortex4py"] = mock.MagicMock()
 sys.modules["cortex4py.api"] = mock.MagicMock()
 sys.modules["cortex4py.controllers"] = mock.MagicMock()
@@ -25,7 +24,6 @@ class HandoffTests(unittest.TestCase):
             os.makedirs(email_dir)
             with open(os.path.join(email_dir, "ref.eml"), "wb") as f:
                 f.write(b"inner")
-            # A non-matching dir must be ignored.
             os.makedirs(os.path.join(d, "analysis_0"))
 
             processor = mock.Mock()
@@ -41,8 +39,8 @@ class HandoffTests(unittest.TestCase):
             wrapper = os.path.join(d, "u-submission.eml")
             with open(wrapper, "wb") as f:
                 f.write(b"From: u@x\r\n\r\nbody")
-            done_dir = os.path.join(d, "260326141159-abc")   # already ingested
-            todo_dir = os.path.join(d, "260326141200-def")   # fresh
+            done_dir = os.path.join(d, "260326141159-abc")
+            todo_dir = os.path.join(d, "260326141200-def")
             for p in (done_dir, todo_dir):
                 os.makedirs(p)
                 with open(os.path.join(p, "ref.eml"), "wb") as f:
@@ -56,7 +54,6 @@ class HandoffTests(unittest.TestCase):
                 on_email_done=marked.append,
             )
 
-            # only the fresh dir is processed and marked; the done dir is skipped
             processor.process_emails_from_minio_workdir.assert_called_once_with(
                 todo_dir, "bucket-id", reported_by="u@x", reporter_note="")
             self.assertFalse(os.path.exists(

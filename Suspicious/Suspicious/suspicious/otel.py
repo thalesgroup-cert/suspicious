@@ -8,9 +8,6 @@ import logging
 
 logger = logging.getLogger(__name__)
 
-# Hoist `trace` to module scope so tests can patch suspicious.otel.trace
-# directly. Falls back to None when opentelemetry is not installed; the
-# filter handles that branch.
 try:
     from opentelemetry import trace
 except ImportError:  # pragma: no cover — import-time only

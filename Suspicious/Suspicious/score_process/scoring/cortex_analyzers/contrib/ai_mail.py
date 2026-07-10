@@ -53,13 +53,13 @@ class AiMailParser(AnalyzerParser):
     )
 
     def parse(self, summary: Any, full: Any) -> AnalyzerResult:
-        self.summary, self.full = summary, full          # helpers read these
+        self.summary, self.full = summary, full
         score, confidence, level, details = 5, 0, "info", {}
 
         if isinstance(summary, dict):
             try:
                 score = round(float(summary.get("malscore", 5)))
-                confidence = round(float(summary.get("confidence", 0)) * 100)  # 0-1 → 0-100
+                confidence = round(float(summary.get("confidence", 0)) * 100)
                 level = str(summary.get("classification", "info")).lower()
             except (TypeError, ValueError) as exc:
                 logger.warning("[ai_mail] score parse failed: %s", exc)
@@ -75,7 +75,7 @@ class AiMailParser(AnalyzerParser):
             score=score, confidence=confidence, category=[level],
             level=level, details=details,
         )
-        self._run_campaign(result)   # best-effort side-effects, never raises
+        self._run_campaign(result)
         return result
 
     def _run_campaign(self, result: AnalyzerResult) -> None:
@@ -184,9 +184,6 @@ class AiMailParser(AnalyzerParser):
             )
             item_type = "alert"
 
-        # Collect all case IDs in the campaign plus the current one.
-        # metadatas is a list-of-lists from ChromaDB — flatten it to get
-        # individual metadata dicts.
         meta_dicts: List[Dict] = [
             m for sublist in (similar.get("metadatas") or []) for m in sublist
         ]
@@ -198,7 +195,6 @@ class AiMailParser(AnalyzerParser):
                 pass
         all_case_ids = list(dict.fromkeys(campaign_case_ids + [self.case_id]))
 
-        # Create Minio client ONCE before the loop
         minio_client = self._make_minio_client()
 
         for case_id in all_case_ids:

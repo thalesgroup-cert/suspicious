@@ -117,8 +117,6 @@ class Command(BaseCommand):
             )
             return "ok"
 
-        # Delegate to the shared helper that also backs the Celery tasks,
-        # so the command and the worker render previews identically.
         outcome = regenerate_mail_preview(
             mail,
             fetch_eml=lambda a: fetch_eml_bytes(storage, a.bucket_name),
@@ -138,8 +136,6 @@ class Command(BaseCommand):
         return outcome
 
     # ------------------------------------------------------------------
-    # MinIO helpers — reuse the same loader the downloads view uses so
-    # the command works in any deployment without extra wiring.
     # ------------------------------------------------------------------
 
     def _get_storage_client(self):

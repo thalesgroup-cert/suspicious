@@ -28,8 +28,6 @@ def load_email_data(workdir: str, filename: str, email_id: str, reported_by: str
         try:
             with open(meta_path, "rb") as f:
                 meta = ec.EmailMetadata.model_validate(json.loads(f.read()))
-            # Feeder stores attachments under <email-dir>/attachments/ and the
-            # backend download preserves that layout.
             return build_email_data_model(
                 meta, reported_by, os.path.join(workdir, "attachments"))
         except (MetadataIntegrityError, Exception) as e:

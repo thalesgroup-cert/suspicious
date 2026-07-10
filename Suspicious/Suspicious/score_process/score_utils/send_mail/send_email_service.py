@@ -4,7 +4,7 @@ import smtplib
 
 
 DEFAULT_MAX_RETRIES = 3
-DEFAULT_BASE_DELAY = 1  # in seconds
+DEFAULT_BASE_DELAY = 1
 
 
 def _reject_header_crlf(*values: str) -> None:
@@ -82,7 +82,6 @@ class SendMailService:
         msg["To"] = str(recipient)
         msg["Subject"] = str(subject)
 
-        # Attach the HTML content to the email
         msg.attach(email.mime.text.MIMEText(html, "html"))
 
         return msg.as_string()

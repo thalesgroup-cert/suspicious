@@ -28,7 +28,6 @@ class AttachmentService:
         for file_obj in batch.files.values():
             self._process_single_attachment(file_obj, mail_instance)
 
-        # Persist final mail state after processing all attachments
         mail_instance.save()
         self.logger.debug("All attachments processed and mail instance saved.")
 
@@ -40,7 +39,6 @@ class AttachmentService:
             filename = file_obj.name
             self.logger.debug(f"Processing attachment: {filename}")
 
-            # FileHandler is assumed to return (FileModel, created: bool)
             att, _ = FileHandler.handle_file(file=None, mail=filename)
             if att is None:
                 self.logger.warning(f"FileHandler returned None for {filename}")

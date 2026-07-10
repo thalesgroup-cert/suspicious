@@ -59,8 +59,6 @@ class EmailParserTests(TestCase):
         self.assertEqual(data.reportedBy, "override@example.com")
 
     def test_missing_sender_fails_validation(self):
-        # from_addr is a required field; a mail with no extractable sender
-        # must be rejected by EmailDataModel.
         msg = self._build_basic_email()
         del msg["From"]
 
@@ -143,7 +141,6 @@ class EmailParserTests(TestCase):
             with tempfile.TemporaryDirectory() as tmpdir:
                 attachments = extract_email_attachments(msg, tmpdir, "ref-abs")
 
-                # Original file untouched, write landed inside save_dir.
                 with open(target, encoding="utf-8") as f:
                     self.assertEqual(f.read(), "ORIGINAL")
                 self.assertEqual(len(attachments), 1)

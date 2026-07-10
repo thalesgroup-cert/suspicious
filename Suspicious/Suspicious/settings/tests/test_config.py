@@ -28,19 +28,19 @@ class GetConfigTest(TestCase):
         RuntimeConfig.objects.create(key="k", value="v1")
         self.assertEqual(cfg.get_config("k"), "v1")
         RuntimeConfig.objects.filter(key="k").update(value="v2")
-        self.assertEqual(cfg.get_config("k"), "v1")  # still cached
+        self.assertEqual(cfg.get_config("k"), "v1")
 
     def test_invalidate_on_save(self):
         rc = RuntimeConfig.objects.create(key="k", value="v1")
         self.assertEqual(cfg.get_config("k"), "v1")
         rc.value = "v2"
-        rc.save()  # save() calls invalidate_cache
+        rc.save()
         self.assertEqual(cfg.get_config("k"), "v2")
 
     def test_falsy_db_value_survives_cache(self):
         RuntimeConfig.objects.create(key="flag", value=False)
-        self.assertIs(cfg.get_config("flag"), False)   # DB hit fills cache
-        self.assertIs(cfg.get_config("flag"), False)   # must come from cache
+        self.assertIs(cfg.get_config("flag"), False)
+        self.assertIs(cfg.get_config("flag"), False)
 
 
 class GetSectionTest(TestCase):
@@ -67,11 +67,9 @@ class GetSectionTest(TestCase):
         ), mock.patch.object(cfg, "get_secret", return_value="SECRET"):
             section = cfg.get_section("integrations.thehive")
         self.assertEqual(section["url"], "http://json")
-        self.assertEqual(section["api_key"], "SECRET")  # secret overlaid from Vault
+        self.assertEqual(section["api_key"], "SECRET")
 
     def test_secret_falls_back_to_settings_json_on_vault_miss(self):
-        # Vault configured but the key is absent/empty there → resolve from
-        # settings.json rather than returning empty.
         RuntimeConfig.objects.create(
             key="integrations.cortex", value={"url": "http://db"}
         )

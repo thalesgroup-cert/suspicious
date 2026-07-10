@@ -10,14 +10,7 @@ from file_process.models import File
 class Mail(models.Model):
     subject = models.CharField(max_length=255, db_index=True)
     reportedBy = models.CharField(max_length=255, db_index=True)
-    # Explicit MinIO location for the rendered .eml -> PNG preview. Stored
-    # as (bucket, key) rather than a Django ImageField so the admin and
-    # API never depend on storage-backend URL guessing (DualStorage used
-    # to leak `/media/mail_previews/...` for missing blobs). MailPreviewView
-    # streams directly from MinIO using these two values.
     preview_bucket = models.CharField(max_length=255, blank=True)
-    # Indexed: the sweeper scans `preview_object_key=""` to find rows
-    # still missing a rendered preview.
     preview_object_key = models.CharField(max_length=512, blank=True, db_index=True)
     mail_header = models.ForeignKey(
         'MailHeader', on_delete=models.CASCADE, related_name='mails',

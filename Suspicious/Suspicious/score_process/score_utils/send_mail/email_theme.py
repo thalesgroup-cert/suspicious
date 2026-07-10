@@ -24,28 +24,11 @@ from typing import Any
 
 
 # ---------------------------------------------------------------------------
-# Palette definitions — sourced 1-to-1 from themes.ts
-#
-# Key mapping
-#   bg          palette.background.default
-#   surface     palette.background.paper
-#   header_bg   darkest tone (paper for dark themes; near-black for light)
-#   header_text palette.text.primary  (contrast on header_bg)
-#   accent      palette.primary.main
-#   accent_text legible colour on top of accent
-#   body_text   palette.text.primary
-#   muted       palette.text.secondary (~70 % opacity of text.primary)
-#   border      MuiCard/MuiPaper border colour (composited to opaque hex)
-#   link        primary or secondary used for inline links
-#   cta_bg      palette.primary.main
-#   cta_text    legible on cta_bg
 # ---------------------------------------------------------------------------
 
 THEME_PALETTES: dict[str, dict[str, str]] = {
 
     # ── 1. MIDNIGHT ───────────────────────────────────────────────────────
-    # bg:#03050D  paper:#080D1A  primary:#4D8FFF  text:#E6ECF8
-    # MuiPaper border: alpha(#4D8FFF, 0.12) composited on #03050D → #0D1E3A
     "midnight": {
         "bg":          "#03050D",
         "surface":     "#080D1A",
@@ -63,8 +46,6 @@ THEME_PALETTES: dict[str, dict[str, str]] = {
     },
 
     # ── 2. GRAPHITE ───────────────────────────────────────────────────────
-    # bg:#0A0C10  paper:#10141C  primary:#4FB3FF  text:#E8EDF4
-    # MuiPaper border: rgba(229,231,235,.10) on #0A0C10 → #1C2028
     "graphite": {
         "bg":          "#0A0C10",
         "surface":     "#10141C",
@@ -82,8 +63,6 @@ THEME_PALETTES: dict[str, dict[str, str]] = {
     },
 
     # ── 3. SLATE ──────────────────────────────────────────────────────────
-    # bg:#08101E  paper:#0E1830  primary:#5D9EFF  text:#DDE8F8
-    # No explicit paper border override; using alpha(#5D9EFF,0.12) → #142040
     "slate": {
         "bg":          "#08101E",
         "surface":     "#0E1830",
@@ -101,8 +80,6 @@ THEME_PALETTES: dict[str, dict[str, str]] = {
     },
 
     # ── 4. LIGHT ──────────────────────────────────────────────────────────
-    # bg:#F4F5F7  paper:#FFFFFF  primary:#1B5FFF  text:#0B1220
-    # MuiCard: shadow only, no border — using alpha(#0B1220,0.08) → #DDE2EA
     "light": {
         "bg":          "#F4F5F7",
         "surface":     "#FFFFFF",
@@ -120,8 +97,6 @@ THEME_PALETTES: dict[str, dict[str, str]] = {
     },
 
     # ── 5. PAPER ──────────────────────────────────────────────────────────
-    # bg:#F0EDE7  paper:#FDFBF8  primary:#0F4CFF  text:#111827
-    # MuiCard border: alpha(#111827,0.10) on cream → #E0DAD0
     "paper": {
         "bg":          "#F0EDE7",
         "surface":     "#FDFBF8",
@@ -139,8 +114,6 @@ THEME_PALETTES: dict[str, dict[str, str]] = {
     },
 
     # ── 6. HIGH CONTRAST ─────────────────────────────────────────────────
-    # bg:#000000  paper:#080808  primary:#FFFFFF  text:#FFFFFF
-    # MuiPaper/Card border: 2px solid rgba(255,255,255,.88) → #E0E0E0 approx
     "high_contrast": {
         "bg":          "#000000",
         "surface":     "#080808",
@@ -158,8 +131,6 @@ THEME_PALETTES: dict[str, dict[str, str]] = {
     },
 
     # ── 7. SUNRISE ────────────────────────────────────────────────────────
-    # bg:#FFF5F0  paper:#FFFFFF  primary:#F03D2F  secondary:#FF8C00  text:#1A1A2E
-    # Contained button: gradient primary→secondary — use primary for email
     "sunrise": {
         "bg":          "#FFF5F0",
         "surface":     "#FFFFFF",
@@ -177,8 +148,6 @@ THEME_PALETTES: dict[str, dict[str, str]] = {
     },
 
     # ── 8. VALENTINE ─────────────────────────────────────────────────────
-    # bg:#FFF0F4  paper:#FFFFFF  primary:#C2185B  secondary:#E91E8C  text:#1A0814
-    # MuiCard border: alpha(#C2185B,0.12) on white → #FCCDD8
     "valentine": {
         "bg":          "#FFF0F4",
         "surface":     "#FFFFFF",
@@ -196,8 +165,6 @@ THEME_PALETTES: dict[str, dict[str, str]] = {
     },
 
     # ── 9. CYBER ─────────────────────────────────────────────────────────
-    # bg:#020408  paper:#06090F  primary:#00E5FF  secondary:#FF00CC  text:#E8F4FF
-    # MuiPaper border: alpha(#00E5FF,0.18) on #020408 → #002933
     "cyber": {
         "bg":          "#020408",
         "surface":     "#06090F",
@@ -215,8 +182,6 @@ THEME_PALETTES: dict[str, dict[str, str]] = {
     },
 
     # ── 10. THE ONE ───────────────────────────────────────────────────────
-    # bg:#060606  paper:#0D0D0D  primary:#C9A84C  secondary:#E8D5A3  text:#F0ECD8
-    # MuiPaper border: alpha(#C9A84C,0.16) on #060606 → #201A0A
     "the_one": {
         "bg":          "#060606",
         "surface":     "#0D0D0D",
@@ -234,9 +199,6 @@ THEME_PALETTES: dict[str, dict[str, str]] = {
     },
 
     # ── 11. METAL ─────────────────────────────────────────────────────────
-    # bg:#06080C  paper:#0A0F15  primary:#E1061B  secondary:#EDEDED  text:#EDEDED
-    # MuiPaper border: alpha(#EDEDED,0.10) on #06080C → #1A1D22
-    # Link uses info colour #37D6C7 — more legible on dark than red
     "metal": {
         "bg":          "#06080C",
         "surface":     "#0A0F15",
@@ -254,8 +216,6 @@ THEME_PALETTES: dict[str, dict[str, str]] = {
     },
 
     # ── 12. WINTER ────────────────────────────────────────────────────────
-    # bg:#04080F  paper:#08122A  primary:#7DD3FC  secondary:#A5B4FC  text:#E8F2FF
-    # MuiPaper border: alpha(#7DD3FC,0.14) on #04080F → #0C1C36
     "winter": {
         "bg":          "#04080F",
         "surface":     "#08122A",
@@ -273,8 +233,6 @@ THEME_PALETTES: dict[str, dict[str, str]] = {
     },
 
     # ── 13. SPRING ────────────────────────────────────────────────────────
-    # bg:#F2FFF5  paper:#FFFFFF  primary:#15803D  secondary:#5B21B6  text:#0B1A10
-    # No explicit card border; alpha(#15803D,0.14) on white → #C6EED4
     "spring": {
         "bg":          "#F2FFF5",
         "surface":     "#FFFFFF",
@@ -292,8 +250,6 @@ THEME_PALETTES: dict[str, dict[str, str]] = {
     },
 
     # ── 14. SUMMER ────────────────────────────────────────────────────────
-    # bg:#FFFBEA  paper:#FFFFFF  primary:#D97706  secondary:#DC2626  text:#1A1000
-    # alpha(#D97706,0.14) on white → #FDECC4
     "summer": {
         "bg":          "#FFFBEA",
         "surface":     "#FFFFFF",
@@ -311,8 +267,6 @@ THEME_PALETTES: dict[str, dict[str, str]] = {
     },
 
     # ── 15. AUTUMN ────────────────────────────────────────────────────────
-    # bg:#0C0805  paper:#170D09  primary:#F97316  secondary:#EAB308  text:#F5EDE0
-    # MuiPaper border: alpha(#F97316,0.14) on #0C0805 → #211008
     "autumn": {
         "bg":          "#0C0805",
         "surface":     "#170D09",
@@ -330,9 +284,6 @@ THEME_PALETTES: dict[str, dict[str, str]] = {
     },
 
     # ── 16. FUTURE ────────────────────────────────────────────────────────
-    # bg:#0D0905  paper:#160E08  primary:#E8720C  secondary:#4A90D9  text:#E8DED0
-    # MuiCard border: alpha(#E8720C,0.20) on #0D0905 → #2A1A0C
-    # Top rule gradient amber→blue; links use Brigade blue #4A90D9
     "future": {
         "bg":          "#2A1A0C",
         "surface":     "#160E08",
@@ -350,8 +301,6 @@ THEME_PALETTES: dict[str, dict[str, str]] = {
     },
 
     # ── 17. RENÉE ─────────────────────────────────────────────────────────
-    # bg:#F1E8DC  paper:#FBF6EE  primary:#9B2FA8  accent bloom:#C667D4  text:#2A1B10
-    # Light atelier theme: orchid ink primary, gold/walnut accents.
     "renee": {
         "bg":          "#F1E8DC",
         "surface":     "#FBF6EE",
@@ -369,7 +318,6 @@ THEME_PALETTES: dict[str, dict[str, str]] = {
     },
 }
 
-# Fall back to graphite when the theme value is missing or unrecognised
 _DEFAULT_PALETTE = THEME_PALETTES["graphite"]
 
 

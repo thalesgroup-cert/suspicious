@@ -27,7 +27,7 @@ class AnalyzerParserRegistry:
                 cls = getattr(import_module(module_path), attr)
                 for key in cls.manifest.cortex_names:
                     self._by_key[key] = cls
-            except Exception as exc:  # isolate a bad builtin
+            except Exception as exc:
                 self._errors[path] = str(exc)
                 logger.exception("Failed to load analyzer parser %s", path)
 

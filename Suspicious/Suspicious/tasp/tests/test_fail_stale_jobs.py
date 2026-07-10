@@ -28,7 +28,6 @@ class FailStaleJobsTest(TestCase):
             analyzer=self.analyzer,
             status=CaseAnalyzerJob.STATUS_INPROGRESS,
         )
-        # Force created_at into the past (auto_now_add prevents direct assignment)
         CaseAnalyzerJob.objects.filter(pk=old_caj.pk).update(
             created_at=timezone.now() - timedelta(days=2),
         )

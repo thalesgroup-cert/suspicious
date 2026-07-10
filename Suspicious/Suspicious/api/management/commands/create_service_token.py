@@ -35,6 +35,5 @@ class Command(BaseCommand):
         )
         group, _ = Group.objects.get_or_create(name=scope)
         user.groups.add(group)
-        # Service token: no expiry (rotate by re-running this command).
         _, token = AuthToken.objects.create(user, expiry=None)
         self.stdout.write(token)

@@ -27,8 +27,8 @@ def is_pending(summary: Any, full: Any, status: Optional[str] = None) -> bool:
 @dataclass(frozen=True)
 class AnalyzerManifest:
     name: str
-    cortex_names: tuple[str, ...]        # matched vs Analyzer.name AND .analyzer_cortex_id
-    data_types: tuple[str, ...] = ()     # informational
+    cortex_names: tuple[str, ...]
+    data_types: tuple[str, ...] = ()
 
 
 class AnalyzerParser(ABC):

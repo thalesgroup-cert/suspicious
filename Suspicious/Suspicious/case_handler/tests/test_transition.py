@@ -26,4 +26,4 @@ class TransitionTest(TestCase):
 
     def test_illegal_transition_raises(self):
         with self.assertRaises(IllegalTransition):
-            transition(self.case, LifecycleState.CONTESTED)  # CREATED->CONTESTED illegal
+            transition(self.case, LifecycleState.CONTESTED)

@@ -8,8 +8,6 @@ from urllib.parse import urlparse
 
 from domain_process.domain_utils.domain_handler import DomainHandler
 
-# Module-level singleton — DomainHandler may load config or open DB
-# connections; creating one per call is wasteful.
 _domain_handler = DomainHandler()
 
 
@@ -40,7 +38,6 @@ def dump_model(model: Any) -> dict:
         return model
     if hasattr(model, "model_dump"):
         return model.model_dump(exclude_none=True)
-    # Pydantic v1 fallback — kept for transitional codebases
     if hasattr(model, "dict"):
         return model.dict(exclude_none=True)
     raise TypeError("Cannot serialise %r to dict." % type(model))

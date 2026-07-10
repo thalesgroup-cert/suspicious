@@ -34,8 +34,6 @@ class SessionCortexApiTest(TestCase):
 
         args, kwargs = api._session.request.call_args
         self.assertEqual(args[0], "GET")
-        # cortex4py's Api builds base_url as "{url}/api/" — endpoints
-        # in controllers are passed without a leading slash.
         self.assertEqual(args[1], "http://cortex.invalid:9001/api/status")
         self.assertIn("Authorization", kwargs["headers"])
         self.assertTrue(kwargs["headers"]["Authorization"].startswith("Bearer "))

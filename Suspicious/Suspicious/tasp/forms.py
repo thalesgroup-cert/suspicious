@@ -4,9 +4,6 @@ class UploadFileForm(forms.Form):
     file = forms.FileField()
 
 class UploadURLForm(forms.Form):
-    # URL model stores `address` as a TextField, so 255 was an artificial cap
-    # that rejected legitimate long URLs. 2048 matches the serializer bound and
-    # the de-facto browser URL limit.
     url = forms.URLField(max_length=2048)
 
 class UploadOtherForm(forms.Form):

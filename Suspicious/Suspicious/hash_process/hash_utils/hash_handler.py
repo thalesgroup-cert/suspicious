@@ -8,10 +8,8 @@ logger = logging.getLogger(__name__)
 
 class HashHandler:
     def __init__(self):
-        self.hashid = HashID()  # Hash detection engine
-        # Compile a regex for SSDEEP hashes (fuzzy hashing)
+        self.hashid = HashID()
         self.ssdeep_regex = re.compile(r'^\d+:[A-Za-z0-9/+]+:[A-Za-z0-9/+]+$')
-        # Define what an "empty" SSDEEP hash looks like
         self.empty_ssdeep = "0:"  
 
     def validate_hash(self, h: str) -> str | None:
@@ -21,12 +19,11 @@ class HashHandler:
         :param h: The hash value.
         :return: The hash type (e.g., 'MD5', 'SHA-256', 'SSDEEP') or None if invalid.
         """
-        h = h.strip().lower()  # Normalize input
+        h = h.strip().lower()
         hash_info = self.hashid.identifyHash(h)
         try:
             return next(hash_info).name
         except StopIteration:
-            # No hash type was identified by hashid; try SSDEEP next
             pass
 
         if self.ssdeep_regex.match(h) and h != self.empty_ssdeep:
@@ -42,7 +39,7 @@ class HashHandler:
         :return: The Hash instance if created/updated successfully, otherwise None.
         """
         try:
-            hash_value = hash_value.strip()  # Remove leading and trailing spaces
+            hash_value = hash_value.strip()
             hash_type = HashHandler().validate_hash(hash_value)
 
             if hash_type:
@@ -73,7 +70,6 @@ class HashHandler:
                     value=hash_value, defaults={"hashtype": hash_type}
                 )
                 if not created:
-                    # Safely increment the times_sent counter using an F expression
                     hash_instance.times_sent = F('times_sent') + 1
                     hash_instance.save()
                 return hash_instance

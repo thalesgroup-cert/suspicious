@@ -33,7 +33,6 @@ class ProcessEmailService:
         tmp_path = Path(tmp_dir)
         tmp_path.mkdir(parents=True, exist_ok=True)
 
-        # 1. write initial .eml
         temp_eml = tmp_path / f"{submitter}-submission.eml"
         try:
             temp_eml.write_bytes(msg.as_bytes())
@@ -41,11 +40,9 @@ class ProcessEmailService:
             logger.error("Failed to write initial EML: %s", e)
             return None
 
-        # 2. parse email content
         parser = EmailParser(tmp_path, source_ref)
         data = parser.parse(msg)
 
-        # 3. rename eml to final reference
         final_eml = tmp_path / f"{source_ref}.eml"
         try:
             temp_eml.rename(final_eml)
@@ -53,7 +50,6 @@ class ProcessEmailService:
             logger.error("Failed to rename EML file: %s", e)
             return None
 
-        # 4. move attachments directory if exists
         attach_dir = tmp_path / "attachments"
         if not attach_dir.exists():
             attach_dir.mkdir()
@@ -62,7 +58,6 @@ class ProcessEmailService:
             attach_dir.unlink()
             attach_dir.mkdir()
 
-        # 5. save email components
         saver = EmailSaver(tmp_path)
         saver.save(
             ref=source_ref,
@@ -72,5 +67,4 @@ class ProcessEmailService:
             headers=data.get("headers_parsed")
         )
 
-        # 6. Return structured data
         return { **data, "source_ref": source_ref, "tmp_dir": str(tmp_path) }

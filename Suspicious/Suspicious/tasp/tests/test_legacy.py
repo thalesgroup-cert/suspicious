@@ -45,7 +45,6 @@ class TestRequeueFailedAction(unittest.TestCase):
         sys.modules["django_celery_results.models"] = MagicMock(TaskResult=task_result_cls)
         sys.modules["django_celery_results.admin"] = MagicMock(TaskResultAdmin=base_admin_cls)
 
-        # Clear cached module
         sys.modules.pop("tasp.admin", None)
         from tasp.admin import TaskResultAdmin
 
@@ -55,7 +54,6 @@ class TestRequeueFailedAction(unittest.TestCase):
         qs = self._make_queryset(["FAILURE", "SUCCESS", "FAILURE"])
         admin_instance.requeue_failed(MagicMock(), qs)
 
-        # send_task called twice (two FAILURE rows), not three
         self.assertEqual(celery_stub.current_app.send_task.call_count, 2)
         admin_instance.message_user.assert_called_once()
         msg = admin_instance.message_user.call_args[0][1]

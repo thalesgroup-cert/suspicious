@@ -25,8 +25,6 @@ from rest_framework.views import APIView
 
 logger = logging.getLogger(__name__)
 
-# How long to remember a processed jobId. Cortex retries within minutes;
-# 1 hour is comfortably above the upper bound of legitimate retry windows.
 _WEBHOOK_DEDUP_TTL = 3600
 
 
@@ -49,9 +47,9 @@ def _find_cases_for_job(job_id: str) -> list[int]:
 
 
 class CortexWebhookView(APIView):
-    authentication_classes = []  # Cortex uses a shared secret, not user sessions
+    authentication_classes = []
     permission_classes = []
-    throttle_classes = []  # machine caller (one POST per analyzer job) — never rate-limit
+    throttle_classes = []
 
     def post(self, request: Request) -> Response:
         # ── Authenticate ────────────────────────────────────────────────────

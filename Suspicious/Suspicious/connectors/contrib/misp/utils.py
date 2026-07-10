@@ -15,7 +15,6 @@ DETECTION_TAGS: dict[str, str] = {
     "Dangerous":    "level::DANGEROUS",
 }
 
-# Verdict strings that warrant pushing to the secondary monthly event
 SECONDARY_MISP_LEVELS = {"Suspicious", "Dangerous"}
 
 

@@ -10,7 +10,7 @@ class KpiIdempotentTest(TestCase):
         user = get_user_model().objects.create_user(username="kpi_u", password="x")
         case = Case.objects.create(description="", reporter=user, results="Safe")
         update_kpi_and_user_stats(case)
-        update_kpi_and_user_stats(case)  # second call must be a no-op
+        update_kpi_and_user_stats(case)
         case.refresh_from_db()
         self.assertTrue(case.kpi_counted)
         from tasp.cron.kpi import sync_monthly_kpi

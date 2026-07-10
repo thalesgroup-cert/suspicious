@@ -22,7 +22,6 @@ from cortex_job.cortex_utils.cortex_and_job_management import CortexJob
 
 logger = logging.getLogger(__name__)
 
-# Tagging constants
 TAG_STATUS_TODO = "To Do_User"
 TAG_KEY_STATUS = "Status"
 TAG_RESEND = "to_resend"
@@ -194,10 +193,6 @@ class CaseHandler:
         if self.other_form.is_valid():
             description = self.other_form.cleaned_data.get("context") or description
         try:
-            # reporter_context is web-form-only by design: it captures the
-            # submitter's `context` here before finalise overwrites description.
-            # Email submissions surface the reporter's message via
-            # Mail.reporterNote instead, so the feeder paths don't set it.
             case = CaseCreator(self.request.user).create_case(description=description, reporter_context=description, **ctx)
             logger.info("Case created: %s", case)
             return case
@@ -246,19 +241,9 @@ class CaseHandler:
                 )
         self.pending_dispatch_intents = []
 
-        # Stamp dispatch completion BEFORE enqueuing reconcile: this closes
-        # the create/dispatch race where a cron/webhook-triggered reconcile
-        # runs mid-dispatch, sees zero/partial CaseAnalyzerJob rows, and
-        # finalises the case before dispatch has written the real jobs.
-        # reconcile_case_core gates finalisation on this field being set.
         from django.utils import timezone
         case.dispatched_at = timezone.now()
         case.save(update_fields=["dispatched_at"])
 
-        # Enqueue unconditionally after dispatch: reconcile_case inspects the
-        # CaseAnalyzerJob ledger itself and decides ANALYZING (jobs pending)
-        # vs immediate finalise (zero jobs — no analyzer was applicable, so
-        # nothing would otherwise revisit this case and it would hang in
-        # "On Going" forever).
         from tasp.tasks import reconcile_case
         reconcile_case.delay(case.id)

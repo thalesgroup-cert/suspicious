@@ -35,8 +35,6 @@ class CortexAnalyzerReports:
         try:
             mail = getattr(case.fileOrMail, "mail", None) if case.fileOrMail else None
             if mail:
-                # Must run before collect_signals: populates case.score_ai /
-                # case.confidence_ai, which collect_signals reads to build AiSignal.
                 CortexJobManager().manage_ai_jobs(case)
 
             signals, ai, deny_listed = collect_signals(case)
@@ -168,7 +166,7 @@ class CortexAnalyzerReports:
             "domain":      "domain",
             "mail_body":   "mail_body",
             "mail_header": "mail_header",
-            "mailaddress": "mail",      # AnalyzerReport FK is named "mail"
+            "mailaddress": "mail",
         }
 
         field_name = FIELD_MAP.get(artifact_type)
@@ -178,7 +176,6 @@ class CortexAnalyzerReports:
             )
             return AnalyzerReport.objects.none()
 
-        # Keep the subquery in SQL — avoids loading all IDs into Python.
         latest_id_subquery = (
             AnalyzerReport.objects
             .filter(**{field_name: artifact})

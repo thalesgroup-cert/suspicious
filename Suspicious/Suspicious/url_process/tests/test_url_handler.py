@@ -65,17 +65,14 @@ class URLHandlerTests(TestCase):
         MockDomain,
         MockDomainInIocs,
     ):
-        # Domain validated as a URL type
         mock_domain_handler = MockDomainHandler.return_value
         mock_domain_handler.validate_domain.side_effect = ["Url", "Domain"]
 
-        # Domain model behavior
         MockDomain.objects.get_or_create.return_value = (
             MagicMock(),
             True,
         )
 
-        # DomainInIocs
         mock_di_instance = MagicMock()
         MockDomainInIocs.objects.get_or_create.return_value = (mock_di_instance, True)
 
@@ -84,11 +81,9 @@ class URLHandlerTests(TestCase):
         url_str = "http://example.com/path"
         url_instance, domain_instance = handler.handle_url(url_str)
 
-        # URL object created
         self.assertIsNotNone(url_instance)
         self.assertEqual(url_instance.address, url_str)
 
-        # Domain extracted
         self.assertIsNotNone(domain_instance)
 
         MockDomainInIocs.objects.get_or_create.assert_called_once()
@@ -102,10 +97,8 @@ class URLHandlerTests(TestCase):
         MockDomain,
         MockDomainInIocs,
     ):
-        # First part: create initial URL
         existing_url = URL.objects.create(address="http://example.com")
 
-        # Mock domain validation
         mock_domain_handler = MockDomainHandler.return_value
         mock_domain_handler.validate_domain.side_effect = ["Url", "Domain"]
 
@@ -116,11 +109,10 @@ class URLHandlerTests(TestCase):
         handler.handle_url("http://example.com")
 
         existing_url.refresh_from_db()
-        self.assertEqual(existing_url.times_sent, 1)  # incremented
+        self.assertEqual(existing_url.times_sent, 1)
 
     @patch("url_process.url_utils.url_handler.DomainHandler")
     def test_get_domain_extracts_and_normalizes(self, MockDomainHandler):
-        # validate_domain returns Domain to mark it valid
         MockDomainHandler.return_value.validate_domain.return_value = "Domain"
 
         domain = URLHandler.get_domain("http://www.Example.com/path")

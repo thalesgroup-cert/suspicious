@@ -115,7 +115,7 @@ class DualStorageTest(TestCase):
 
     def test_open_falls_back_to_secondary(self):
         ds = self._dual(dual_write=False)
-        ds.secondary.save("legacy.txt", ContentFile(b"old"))  # only on local
+        ds.secondary.save("legacy.txt", ContentFile(b"old"))
         self.assertTrue(ds.exists("legacy.txt"))
         self.assertEqual(ds.open("legacy.txt").read(), b"old")
 

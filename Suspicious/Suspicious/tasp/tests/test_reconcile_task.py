@@ -35,8 +35,6 @@ class ReconcileTaskTest(TestCase):
     @patch("tasp.tasks.reconcile_case_core", side_effect=RuntimeError("boom"))
     def test_core_failure_is_swallowed_and_lock_released(self, mock_core):
         lock_key = f"case_update_lock:{self.case.id}"
-        # Must not raise (per-case isolation) ...
         reconcile_case.run(self.case.id)
-        # ... and the lock must be released even on failure.
         self.assertTrue(cache.add(lock_key, 1, timeout=120))
         cache.delete(lock_key)

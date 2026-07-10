@@ -30,7 +30,7 @@ class SmtpNotifyConnector(Connector):
         category="Notifications",
         description="Email the reporter their case verdict. Uses the shared "
                     "email.smtp / email.content config sections.",
-        config_schema=(),  # intentionally empty: shared sections, not per-connector
+        config_schema=(),
         events=(EVENT_CASE_FINALISED,),
         enabled_by_default=True,
     )
@@ -38,7 +38,6 @@ class SmtpNotifyConnector(Connector):
     def health_check(self) -> HealthStatus:
         from settings.config import get_section
         smtp = get_section("email.smtp")
-        # Settings use "server" as the SMTP host field name (see settings.ci.json).
         host, port = smtp.get("server"), int(smtp.get("port", 25) or 25)
         if not host:
             return HealthStatus(ok=False, detail="email.smtp.server not configured")
@@ -55,10 +54,8 @@ class SmtpNotifyConnector(Connector):
         case = Case.objects.select_related("fileOrMail").get(pk=event.case_id)
         mail = getattr(case.fileOrMail, "mail", None) if case.fileOrMail else None
         if mail is None:
-            return  # IOC-only / file-only case — no reporter mail flow
+            return
         try:
-            # send_final needs the MailInfo row: it reads .user and flips
-            # .user_analysis_informed for duplicate-delivery idempotency.
             mail_info = MailInfo.objects.get(mail=mail)
         except MailInfo.DoesNotExist:
             logger.warning(

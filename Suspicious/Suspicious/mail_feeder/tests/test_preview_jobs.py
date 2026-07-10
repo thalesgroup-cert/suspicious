@@ -118,7 +118,7 @@ class EnqueuePreviewRenderTest(TestCase):
     @patch("tasp.tasks.render_mail_preview.delay")
     def test_enqueues_once_within_dedup_window(self, delay):
         self.assertTrue(enqueue_preview_render(5))
-        self.assertFalse(enqueue_preview_render(5))  # still in flight -> skipped
+        self.assertFalse(enqueue_preview_render(5))
         delay.assert_called_once_with(5)
 
     @patch("tasp.tasks.render_mail_preview.delay")
@@ -130,6 +130,6 @@ class EnqueuePreviewRenderTest(TestCase):
     @patch("tasp.tasks.render_mail_preview.delay")
     def test_window_expiry_allows_reenqueue(self, delay):
         self.assertTrue(enqueue_preview_render(9))
-        cache.clear()  # emulate the dedup key expiring
+        cache.clear()
         self.assertTrue(enqueue_preview_render(9))
         self.assertEqual(delay.call_count, 2)

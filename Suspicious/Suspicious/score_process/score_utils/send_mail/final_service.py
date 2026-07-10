@@ -8,19 +8,16 @@ from case_handler.models import CaseChallengeToken
 from .social_logos import SOCIAL_LOGOS
 from .utils import load_email_template
 
-# Maps case.results (internal Django value) to the semantic color key in the
-# email theme context — so the verdict badge always uses the user's own colors.
 _RESULT_TO_COLOR_KEY = {
     "Dangerous":    "color_dangerous",
     "Suspicious":   "color_suspicious",
     "Safe":         "color_safe",
     "Inconclusive": "color_inconclusive",
-    "Unchallenged": "color_inconclusive",  # closest semantic match
+    "Unchallenged": "color_inconclusive",
     "AllowListed":  "color_safe",
     "Failure":      "color_failure",
 }
 
-# Human-readable label shown in the email subject line of the verdict badge
 _RESULT_LABEL = {
     "Dangerous":    "Dangerous",
     "Suspicious":   "Suspicious",
@@ -31,7 +28,6 @@ _RESULT_LABEL = {
     "Failure":      "Analysis failed",
 }
 
-# One-line guidance sentence per result
 _RESULT_GUIDANCE = {
     "Dangerous": (
         "Do not open any files or click any links associated with this item. "
@@ -71,7 +67,7 @@ class FinalEmailService:
         sender: str,
         recipient,
         recipient_name: str,
-        profile=None,           # UserProfile — drives theme + semantic colors
+        profile=None,
     ) -> None:
         self.case          = case
         self.sender        = str(sender)
@@ -79,8 +75,6 @@ class FinalEmailService:
         self.recipient_name = recipient_name
         self.config        = self._load_config()
         self.template      = self._load_template()
-        # Verdict mails always use the light palette, regardless of the
-        # recipient's UI theme. Semantic colors still follow the profile.
         self.theme_ctx     = {
             **THEME_PALETTES["light"],
             **resolve_semantic_colors(profile),
@@ -198,13 +192,7 @@ class FinalEmailService:
         raw_result = getattr(self.case, "results", None) or "Failure"
 
         return {
-            # The internal result string e.g. "Dangerous", "Safe"
             "result":       raw_result,
-            # The CSS variable name in the theme context that holds this
-            # result's color — e.g. "color_dangerous", "color_safe"
-            # Template uses: style="color:{{ case.result_color_var | theme_color }}"
-            # We just pass the name; template does: {{ theme_color_for(case.result) }}
-            # Simpler: pass the resolved hex directly so template stays logic-free.
             "result_color": self.theme_ctx.get(
                 _RESULT_TO_COLOR_KEY.get(raw_result, "color_inconclusive"),
                 "#94A3B8",
@@ -214,12 +202,10 @@ class FinalEmailService:
                 raw_result,
                 "Please review the case details on the portal."
             ),
-            # AI fields — shown as reference chips
             "result_ai":        getattr(self.case, "results_ai",  None),
             "category_ai":      getattr(self.case, "category_ai", None),
             "score":            getattr(self.case, "final_score",      None),
             "confidence":       getattr(self.case, "final_confidence", None),
-            # Challenge URL — empty string if not available
             "challenge_url":    self._challenge_url(),
         }
 

@@ -72,11 +72,6 @@ class SettingsListView(generics.GenericAPIView):
             user=request.user,
         )
 
-        # result = {
-        #   "created": [id, ...],
-        #   "duplicates": ["val", ...],
-        #   "watcher_conflicts": ["val", ...],
-        # }
         return Response(result, status=status.HTTP_201_CREATED)
 
 

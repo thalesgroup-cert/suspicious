@@ -34,13 +34,9 @@ def check_allow_list(data: str, data_type: str) -> AllowListResult:
                     result.FiletypeAllowList = "Safe FTW triggered"
 
         elif data_type in ("url", "domain"):
-            # For URLs, extract the hostname first; for domain IOCs use as-is.
             domain = extract_domain(data) if data_type == "url" else data
 
             if domain:
-                # Either table matching is sufficient to flag as safe —
-                # the two lists serve different purposes (explicit allow-list
-                # vs watcher-validated legitimate domain).
                 if AllowListDomain.objects.filter(domain__value=domain).exists():
                     result.DomainAllowList = "Safe DW triggered"
 

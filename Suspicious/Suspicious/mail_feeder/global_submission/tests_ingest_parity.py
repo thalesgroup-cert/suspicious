@@ -1,7 +1,3 @@
-# Suspicious/Suspicious/mail_feeder/global_submission/tests_ingest_parity.py
-# REGRESSION GUARD (characterization), not red-green TDD: Tasks 4-5 already
-# enforce fast==fallback parity, so this may pass on first run. Its value is
-# catching future divergence at the integration seam (load_email_data).
 import email
 import email.message
 import email.policy
@@ -34,16 +30,13 @@ class IngestParityTests(TestCase):
     def test_fast_and_fallback_produce_identical_model(self):
         with tempfile.TemporaryDirectory() as d:
             inner = _build(d)
-            # fallback (flag off)
             with patch("mail_feeder.global_submission.fast_metadata."
                        "fast_metadata_enabled", return_value=False):
                 fb = load_email_data(d, "mail.eml", "260625140959-aa", "rep@corp.test")
-            # write email.json + attachment + run fast (flag on)
             msg = email.message_from_bytes(inner.as_bytes(), policy=email.policy.default)
             meta = ec.build_email_metadata(msg, "260625140959-aa")
             with open(os.path.join(d, ec.EMAIL_METADATA_OBJECT_NAME), "w") as f:
                 f.write(json.dumps(meta.model_dump(by_alias=True)))
-            # place the attachment under attachments/ for the fast-path mapper
             os.makedirs(os.path.join(d, "attachments"), exist_ok=True)
             with open(os.path.join(d, "attachments", "inv.pdf"), "wb") as f:
                 f.write(b"PAYLOAD")

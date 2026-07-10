@@ -73,7 +73,7 @@ class DispatchTest(TestCase):
         with self.captureOnCommitCallbacks(execute=True):
             emit(EVENT_CASE_FINALISED, case)
         state = ConnectorState.objects.get(name="dummy")
-        self.assertFalse(state.enabled)  # dummy manifest default = disabled
+        self.assertFalse(state.enabled)
 
     def test_hook_failure_writes_failed_row_and_never_raises(self):
         ConnectorState.objects.create(name="dummy", enabled=True)
@@ -111,7 +111,6 @@ class DispatchTest(TestCase):
         from common.http_client import BREAKERS
         from connectors import delivery as delivery_mod
 
-        # snapshot previous breaker value so cleanup restores it
         prev_breaker = BREAKERS.get("dummy")
         BREAKERS["dummy"] = pybreaker.CircuitBreaker(fail_max=1, reset_timeout=600)
         def _restore():
@@ -124,7 +123,7 @@ class DispatchTest(TestCase):
         try:
             BREAKERS["dummy"].call(lambda: (_ for _ in ()).throw(RuntimeError("x")))
         except Exception:
-            pass  # breaker now open
+            pass
         delivery_mod.deliver_now(
             "dummy", EVENT_CASE_FINALISED, make_payload(case), attempt=1,
         )

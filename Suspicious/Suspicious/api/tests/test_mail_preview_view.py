@@ -22,7 +22,6 @@ class MailPreviewClientTest(TestCase):
 
     @patch("common.clients.get_s3_client", return_value=None)
     def test_falls_back_to_none_when_unconfigured(self, _mock_get):
-        # No storage.s3 client and no legacy MINIO_STORAGE_* settings.
         with self.settings(
             MINIO_STORAGE_ENDPOINT=None,
             MINIO_STORAGE_ACCESS_KEY=None,

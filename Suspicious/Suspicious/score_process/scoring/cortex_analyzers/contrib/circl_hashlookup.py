@@ -23,7 +23,7 @@ class CirclHashlookupParser(AnalyzerParser):
         elif "non existing" in message or not full or (not filename and not full.get("source")):
             level = "info"
             category = ["Unknown hash"]
-        else:  # present in a known-good corpus (e.g. NSRL)
+        else:
             level = "safe"
             category = [filename or "Known good"]
 

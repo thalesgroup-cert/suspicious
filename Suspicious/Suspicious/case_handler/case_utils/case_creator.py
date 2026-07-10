@@ -173,7 +173,6 @@ class CaseCreator:
         """
         case_has_iocs = None
 
-        # Use a dictionary to map keys to attributes instead of multiple if-else statements
         file_or_mail_keys = {'mail_instance': 'mail', 'file_instance': 'file'}
         non_file_iocs_keys = {'ip_instance': 'ip', 'url_instance': 'url', 'hash_instance': 'hash'}
 
@@ -186,7 +185,6 @@ class CaseCreator:
                 **{non_file_iocs_keys[key]: value, 'case': case}
             )
 
-        # Add error handling for invalid keys
         else:
             raise ValueError(f"Invalid key: {key}. Expected one of {list(file_or_mail_keys.keys()) + list(non_file_iocs_keys.keys())}")
 
@@ -206,7 +204,6 @@ class CaseCreator:
             from tasp.cron.kpi import sync_monthly_kpi
             kpi = sync_monthly_kpi()
 
-            # Only update the stats if the case results are "SAFE-ALLOW_LISTED"
             if case.results == "SAFE-ALLOW_LISTED":
                 if kpi.monthly_cases_summary:
                     kpi.monthly_cases_summary.allow_listed_cases += 1
@@ -235,7 +232,6 @@ class CaseCreator:
             if not user_cases_monthly_stats:
                 user_cases_monthly_stats = UserCasesMonthlyStats(user=self.user, month=kpi.month, year=kpi.year)
 
-            # Only update the stats if the case results are "SAFE-ALLOW_LISTED"
             if case.results == "SAFE-ALLOW_LISTED":
                 user_cases_monthly_stats.allow_listed_cases = F('allow_listed_cases') + 1
                 user_cases_monthly_stats.save(update_fields=['allow_listed_cases'])

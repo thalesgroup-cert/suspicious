@@ -11,8 +11,6 @@ import os
 from functools import lru_cache
 from typing import Any
 
-# Canonical env var. The legacy names SUSPICIOUS_SETTINGS_PATH / CONFIG_PATH
-# are collapsed into this one (see the per-site swaps).
 CONFIG_PATH = os.environ.get("SUSPICIOUS_CONFIG_PATH", "/app/settings.json")
 
 @lru_cache(maxsize=1)

@@ -33,10 +33,6 @@ class DefaultTaxonomyParser(AnalyzerParser):
         level, category, details, score, confidence = "info", [], {}, 5, 50
 
         if isinstance(summary, dict) and summary.get("taxonomies"):
-            # Take the highest-severity taxonomy level, seeded from the first
-            # taxonomy (not the "info" default) so a genuinely `safe` verdict —
-            # e.g. GoogleSafebrowsing "0 match" — is honoured instead of being
-            # floored to info.
             tax_level = None
             for tax in summary["taxonomies"]:
                 lvl = str(tax.get("level", "info")).lower()

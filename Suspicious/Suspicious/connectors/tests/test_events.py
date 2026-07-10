@@ -23,4 +23,4 @@ class BuildCaseEventTest(TestCase):
         self.assertEqual(event.results, "Dangerous")
         self.assertEqual(event.final_score, 9.0)
         self.assertEqual(event.reporter_email, "rep@example.com")
-        self.assertTrue(event.created_at)  # ISO timestamp
+        self.assertTrue(event.created_at)

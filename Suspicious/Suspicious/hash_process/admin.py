@@ -4,7 +4,6 @@ from import_export.admin import ImportExportModelAdmin
 from hash_process.models import Hash
 
 
-# Resource class
 class HashResource(resources.ModelResource):
     class Meta:
         model = Hash
@@ -15,7 +14,6 @@ class HashResource(resources.ModelResource):
         export_order = fields
 
 
-# Admin class
 @admin.register(Hash)
 class HashAdmin(ImportExportModelAdmin):
     resource_class = HashResource
