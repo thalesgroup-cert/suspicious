@@ -52,16 +52,23 @@ services:
     networks:
       - suspicious_network
 
-  minio:
+  rustfs:
     restart: always
+    expose:
+      - "9000"
     ports:
-      - "127.0.0.1:${MINIO_PORT_1}:9000"
-      - "127.0.0.1:${MINIO_PORT_2}:9001"
+      - "127.0.0.1:${MINIO_PORT:-35000}:9001"
     environment:
-      MINIO_ROOT_USER: ${MINIO_ROOT_USER}
-      MINIO_ROOT_PASSWORD: ${MINIO_ROOT_PASSWORD}
+      RUSTFS_ACCESS_KEY: ${MINIO_ROOT_USER}
+      RUSTFS_SECRET_KEY: ${MINIO_ROOT_PASSWORD}
+      RUSTFS_VOLUMES: /data
+      RUSTFS_ADDRESS: 0.0.0.0:9000
+      RUSTFS_CONSOLE_ENABLE: "true"
+      RUSTFS_CONSOLE_ADDRESS: 0.0.0.0:9001
     volumes:
       - ${MINIO_PATH}:/data
+    security_opt:
+      - no-new-privileges:true
     networks:
       - suspicious_network
 

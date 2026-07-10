@@ -2,6 +2,7 @@ import csv
 import json
 import os
 import ldap
+import ldap.filter
 from django.contrib.auth.models import User
 from profiles.models import CISOProfile
 from profiles.profiles_utils.ldap import Ldap
@@ -142,10 +143,13 @@ def search_ldap_server(ldap_server, ciso):
         list: A list of search results matching the given CISO.
     """
     try:
+        # ciso comes from an admin-uploaded CSV/JSON/TXT list, but escape it
+        # anyway — same LDAP-filter-injection primitive as profiles_utils/ldap.py.
+        safe_ciso = ldap.filter.escape_filter_chars(ciso)
         search_results = ldap_server.search_s(
             ldap_config.get("auth_ldap_base_dn"),
             ldap.SCOPE_SUBTREE,
-            f"(&(mail={ciso})(Tpresent=true)(!(ou=admin))(!(TpreferredFirstName=Test)))",
+            f"(&(mail={safe_ciso})(Tpresent=true)(!(ou=admin))(!(TpreferredFirstName=Test)))",
             ["mail", "title", "businessCategory", "c"],
         )
         return search_results
