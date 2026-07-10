@@ -34,8 +34,7 @@ _RESULT_LABEL = {
 # One-line guidance sentence per result
 _RESULT_GUIDANCE = {
     "Dangerous": (
-        "Do not open any files or click any links associated with this item. "
-        "Contact your security team immediately if you have already interacted with it."
+        "Contact your cybersecurity representative if you already interacted with it."
     ),
     "Suspicious": (
         "Exercise caution. Avoid interacting with any files or links until "

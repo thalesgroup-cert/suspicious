@@ -37,7 +37,7 @@ _RESULT_GUIDANCE = {
     ),
     "Safe": (
         "The item has been assessed as safe. You may proceed, but remain vigilant — "
-        "no automated analysis is conclusive on its own."
+        "no analysis is entirely conclusive."
     ),
     "Inconclusive": (
         "The revised analysis could not reach a definitive conclusion. "
