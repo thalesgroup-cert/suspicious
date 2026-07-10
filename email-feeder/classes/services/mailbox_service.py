@@ -604,6 +604,24 @@ class Mailbox:
 
         return raw
 
+    def _unwrap_signed(self, msg: email.message.EmailMessage) -> email.message.EmailMessage:
+        """
+        If the message is multipart/signed, return the first part (the actual content).
+        The second part is the detached signature and can be ignored.
+        For all other content types, return the message unchanged.
+        """
+        if msg.get_content_type() == "multipart/signed":
+            payload = msg.get_payload()
+            if isinstance(payload, list) and len(payload) >= 1:
+                inner = payload[0]
+                if isinstance(inner, email.message.EmailMessage):
+                    self.__logger.debug(
+                        "Unwrapping multipart/signed envelope; "
+                        f"inner content-type: {inner.get_content_type()}"
+                    )
+                    return inner
+        return msg
+
     def extract_body(self, msg: email.message.EmailMessage) -> tuple[str, str]:
         """
         Extrait le corps plain-text et HTML.
@@ -611,6 +629,7 @@ class Mailbox:
         - Si encodé en bytes, détecte et décode avec chardet.
         - En cas d'email chiffré, retourne un placeholder.
         """
+        msg = self._unwrap_signed(msg)
         part_plain = msg.get_body(preferencelist=("plain"))
         part_html = msg.get_body(preferencelist=("html"))
 
@@ -762,7 +781,7 @@ class Mailbox:
         self, msg: email.message.EmailMessage, tmp_path: pathlib.Path, source_ref: str
     ) -> list[classes.models.mail_attachment.MailAttachment]:
         attachments: list[classes.models.mail_attachment.MailAttachment] = []
-
+        msg = self._unwrap_signed(msg)
         attachments_output_dir = pathlib.Path(tmp_path, "attachments")
         try:
             attachments_output_dir.mkdir(parents=True, exist_ok=True)
