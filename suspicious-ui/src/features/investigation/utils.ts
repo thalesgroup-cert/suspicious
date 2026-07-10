@@ -1,6 +1,5 @@
 import type { InvestigationDetails } from "@/features/investigation/api";
 
-// Shared score/confidence/label/grouping helpers live in one place.
 export {
   clamp,
   normalizeScore,

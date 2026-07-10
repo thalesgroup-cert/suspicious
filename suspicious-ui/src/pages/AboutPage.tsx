@@ -56,7 +56,6 @@ export default function AboutPage() {
       <Stack spacing={4}>
 
         {/* ──────────────────────────────────────────────────────────────── */}
-        {/* 1. HERO                                                          */}
         {/* ──────────────────────────────────────────────────────────────── */}
         <SoftCard
           sx={{
@@ -72,7 +71,6 @@ export default function AboutPage() {
         >
           <Box sx={{ p: { xs: 2.5, md: 3.5 } }}>
             <Stack spacing={2.5}>
-              {/* Identity row */}
               <Stack direction={{ xs: "column", sm: "row" }} spacing={2} sx={{ alignItems: { sm: "center" } }} >
                 <Stack direction="row" spacing={1.75} sx={{ flex: 1, minWidth: 0, alignItems: "center" }}>
                   <IconBadge icon={<InfoOutlined />} size={52} />
@@ -87,7 +85,6 @@ export default function AboutPage() {
                 </Stack>
               </Stack>
 
-              {/* Artifact type pills */}
               <Stack direction="row" spacing={0.75} useFlexGap sx={{ flexWrap: "wrap" }} >
                 <InfoPill icon={<EmailOutlined fontSize="small" />} label="Mail" />
                 <InfoPill icon={<InsertDriveFileOutlined fontSize="small" />} label="Files" />
@@ -99,7 +96,6 @@ export default function AboutPage() {
 
               <Divider sx={{ opacity: isDark ? 0.18 : 0.45 }} />
 
-              {/* Report address */}
               <Alert severity="info" sx={{ borderRadius: 3 }}>
                 Forward suspicious emails to{" "}
                 <Box component="span" sx={{ fontWeight: 900, userSelect: "all" }}>
@@ -111,7 +107,6 @@ export default function AboutPage() {
         </SoftCard>
 
         {/* ──────────────────────────────────────────────────────────────── */}
-        {/* 2. CLASSIFICATION — moved up, first thing after hero            */}
         {/* ──────────────────────────────────────────────────────────────── */}
         <Box>
           <SectionHeader
@@ -172,7 +167,6 @@ export default function AboutPage() {
         </Box>
 
         {/* ──────────────────────────────────────────────────────────────── */}
-        {/* 3. HOW IT WORKS                                                  */}
         {/* ──────────────────────────────────────────────────────────────── */}
         <Box>
           <SectionHeader
@@ -207,7 +201,6 @@ export default function AboutPage() {
         </Box>
 
         {/* ──────────────────────────────────────────────────────────────── */}
-        {/* 4. KEY TOPICS                                                    */}
         {/* ──────────────────────────────────────────────────────────────── */}
         <Box>
           <SectionHeader
@@ -278,7 +271,6 @@ export default function AboutPage() {
         </Box>
 
         {/* ──────────────────────────────────────────────────────────────── */}
-        {/* 5. DETAILS — accordions                                          */}
         {/* ──────────────────────────────────────────────────────────────── */}
         <Box>
           <SectionHeader
@@ -367,7 +359,6 @@ export default function AboutPage() {
         </Box>
 
         {/* ──────────────────────────────────────────────────────────────── */}
-        {/* Footer note                                                      */}
         {/* ──────────────────────────────────────────────────────────────── */}
         <InnerCard sx={{ px: 2.5, py: 1.75 }}>
           <Typography variant="body2" color="text.secondary" sx={{ fontSize: 12.5 }}>

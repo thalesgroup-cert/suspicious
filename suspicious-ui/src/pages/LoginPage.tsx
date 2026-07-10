@@ -73,7 +73,6 @@ export default function LoginPage() {
   const reduce = useReducedMotion();
   const isDesktop = useMediaQuery(theme.breakpoints.up("md"));
 
-  // Auth state
   const [username, setUsername]         = React.useState("");
   const [password, setPassword]         = React.useState("");
   const [showPassword, setShowPassword] = React.useState(false);
@@ -83,10 +82,8 @@ export default function LoginPage() {
     () => new URLSearchParams(window.location.search).get("sso") === "1"
   );
 
-  // UI state — password panel collapsed by default (SSO-first)
   const [passwordMode, setPasswordMode] = React.useState(false);
 
-  // Caps Lock detection
   const [capsLock, setCapsLock] = React.useState(false);
   const onPasswordKey = (e: React.KeyboardEvent<HTMLInputElement>) => {
     if (typeof e.getModifierState === "function") {
@@ -94,21 +91,17 @@ export default function LoginPage() {
     }
   };
 
-  // Existing session
   const { data: me, isLoading: meLoading } = useQuery({
     queryKey: ["me"],
     queryFn: getMe,
     retry: false,
   });
 
-  // SSO callback handler (preserved)
   React.useEffect(() => {
     const searchParams = new URLSearchParams(window.location.search);
 
     const ssoError = searchParams.get("sso_error");
     if (ssoError) {
-      // The error itself is seeded into state via initialSsoError(); here we
-      // only clean the URL.
       window.history.replaceState({}, "", "/login");
       return;
     }
@@ -116,7 +109,6 @@ export default function LoginPage() {
     const isSsoCallback = searchParams.get("sso") === "1";
     if (!isSsoCallback) return;
 
-    // ssoLoading is seeded true from the URL via the lazy initializer above.
     window.history.replaceState({}, "", "/login");
     hydrateColorsAfterSso().finally(() => {
       navigate("/", { replace: true });
@@ -145,8 +137,6 @@ export default function LoginPage() {
       const upstream =
         err?.response?.data?.detail ||
         err?.response?.data?.non_field_errors?.[0];
-      // Keep account-state messages verbatim; generic-ize credential errors
-      // to avoid user enumeration leaks.
       setError(
         upstream && /disabled|locked|inactive/i.test(upstream)
           ? upstream
@@ -157,7 +147,6 @@ export default function LoginPage() {
     }
   }
 
-  // Motion variants
   const stagger: Variants = {
     hidden: { opacity: 0 },
     visible: {
@@ -260,7 +249,6 @@ export default function LoginPage() {
           py: { xs: 2, md: 4 },
         }}
       >
-        {/* Left rail */}
         {isDesktop && (
           <MotionBox
             variants={stagger}
@@ -341,7 +329,6 @@ export default function LoginPage() {
           </MotionBox>
         )}
 
-        {/* Right rail — sign-in card */}
         <MotionBox
           variants={stagger}
           initial="hidden"
@@ -377,7 +364,6 @@ export default function LoginPage() {
               },
             }}
           >
-            {/* Header */}
             <Stack spacing={0.75} sx={{ mb: 3 }}>
               <Typography
                 id={headingId}
@@ -402,7 +388,6 @@ export default function LoginPage() {
               </Typography>
             </Stack>
 
-            {/* Error */}
             <Box
               id={errorId}
               role={error ? "alert" : undefined}
@@ -438,7 +423,6 @@ export default function LoginPage() {
               </AnimatePresence>
             </Box>
 
-            {/* Primary action: SSO */}
             <MotionBox
               whileHover={reduce ? undefined : { y: -1 }}
               whileTap={reduce ? undefined : { y: 0, scale: 0.995 }}
@@ -503,7 +487,6 @@ export default function LoginPage() {
               Same login you use for other {COMPANY_NAME} apps.
             </Typography>
 
-            {/* Divider */}
             <Box
               role="separator"
               aria-orientation="horizontal"
@@ -544,7 +527,6 @@ export default function LoginPage() {
               />
             </Box>
 
-            {/* Password disclosure */}
             <AnimatePresence initial={false} mode="wait">
               {!passwordMode ? (
                 <MotionBox
@@ -771,7 +753,6 @@ export default function LoginPage() {
             </AnimatePresence>
           </MotionBox>
 
-          {/* Below-card support row */}
           <MotionBox
             variants={item}
             sx={{

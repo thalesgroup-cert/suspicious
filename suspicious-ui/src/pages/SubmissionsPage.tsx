@@ -101,14 +101,12 @@ export default function SubmissionsPage() {
   const [sortField, setSortField] = React.useState<"created_at" | "id" | "status" | "result" | "artifact" | "type">("created_at");
   const [sortDir,   setSortDir]   = React.useState<"asc" | "desc">("desc");
 
-  // Derived backend ordering — maps sortField/sortDir to SubmissionOrdering
   const backendOrderingFromSort = React.useMemo((): import("@/features/submissions/api").SubmissionOrdering => {
     const prefix = sortDir === "desc" ? "-" : "";
     if (sortField === "created_at") return `${prefix}created_at` as any;
     if (sortField === "id")         return `${prefix}id` as any;
     if (sortField === "status")     return `${prefix}status` as any;
     if (sortField === "result")     return `${prefix}result` as any;
-    // artifact/type have no backend ordering — fall back to date
     return "-created_at";
   }, [sortField, sortDir]);
 
@@ -175,7 +173,6 @@ export default function SubmissionsPage() {
     retry: false,
   });
 
-  // sort dropdown kept for backwards-compat; column clicks take precedence
   const backendOrdering = backendOrderingFromSort;
 
   const submissionsQuery = useQuery<PaginatedSubmissionsResponse>({
@@ -184,10 +181,6 @@ export default function SubmissionsPage() {
       listSubmissions({ mine: true, ordering: backendOrdering, page: 1, page_size: 100, search: qDebounced || undefined }),
     enabled: !!me,
     retry: false,
-    // placeholderData keeps isFetching:true until the real response lands,
-    // so the empty-state message never fires prematurely.
-    // initialData would mark the query as "successful" immediately with []
-    // and show "No submissions match your filters." before the fetch completes.
     placeholderData: { count: 0, next: null, previous: null, results: [] },
     refetchInterval: (query) => {
       const rows = (query.state.data as PaginatedSubmissionsResponse | undefined)?.results ?? [];
@@ -259,8 +252,6 @@ export default function SubmissionsPage() {
     },
   });
 
-  // Sync from deep-link URL params (?q, ?open) on first render and whenever
-  // they change — adjusted during render instead of in an effect.
   const urlSyncKey = `${searchParams.get("q") ?? ""}|${searchParams.get("open") ?? ""}`;
   const [prevUrlSyncKey, setPrevUrlSyncKey] = React.useState<string | null>(null);
   if (urlSyncKey !== prevUrlSyncKey) {
@@ -277,7 +268,6 @@ export default function SubmissionsPage() {
     }
   }
 
-  // Reset to first page when any filter/sort changes.
   const filterKey = [qDebounced, status, type, result, from, to, sort, sortField, sortDir, pageSize].join("|");
   const [prevFilterKey, setPrevFilterKey] = React.useState(filterKey);
   if (filterKey !== prevFilterKey) {
@@ -285,7 +275,6 @@ export default function SubmissionsPage() {
     setPage(0);
   }
 
-  // Collapse expansion when the drawer closes.
   const [prevOpenDrawer, setPrevOpenDrawer] = React.useState(openDrawer);
   if (openDrawer !== prevOpenDrawer) {
     setPrevOpenDrawer(openDrawer);
@@ -295,7 +284,6 @@ export default function SubmissionsPage() {
     }
   }
 
-  // Collapse expansion when the selected item changes.
   const [prevSelectedId, setPrevSelectedId] = React.useState(selectedId);
   if (selectedId !== prevSelectedId) {
     setPrevSelectedId(selectedId);
@@ -303,8 +291,6 @@ export default function SubmissionsPage() {
     setExpandedGroups({});
   }
 
-  // Collapse analyzer rows when a fresh set of reports arrives. Keyed on the
-  // query's update timestamp (stable across renders, unlike the data array ref).
   const reportsKey = detailsQuery.dataUpdatedAt;
   const [prevReportsKey, setPrevReportsKey] = React.useState(reportsKey);
   if (reportsKey !== prevReportsKey) {
@@ -316,7 +302,6 @@ export default function SubmissionsPage() {
     () => submissionsQuery.data?.results ?? [],
     [submissionsQuery.data]
   );
-  // Client-side sort for artifact/type fields (not supported by backend ordering)
   const clientSorted = React.useMemo(() => {
     if (sortField !== "artifact" && sortField !== "type") return rows;
     return [...rows].sort((a, b) => {
@@ -340,7 +325,6 @@ export default function SubmissionsPage() {
   const selectedRow = selectedId ? rows.find((r) => String(r.id) === String(selectedId)) : undefined;
 
   // ── Derived values and callbacks ────────────────────────────────────────
-  // Must be declared BEFORE any early returns to satisfy Rules of Hooks.
 
   const BADGE_W = 132;
   const DIALOG_RADIUS = 2;
@@ -352,7 +336,6 @@ export default function SubmissionsPage() {
   const urlArtifacts = detailsQuery.data?.url_artifacts ?? [];
   const hasRawDetails = typeof detailsQuery.data?.raw !== "undefined";
 
-  // Group reports by artifact so the drawer shows one section per checked item
   const reportGroups = React.useMemo(
     () => groupReportsByArtifact(analyzerReports),
     [analyzerReports]
@@ -372,7 +355,6 @@ export default function SubmissionsPage() {
     );
   }, [analyzerReports]);
 
-  // Theme-aware values used in the drawer and inline cards
   const drawerCardBorder = isDark ? "rgba(255,255,255,.08)" : alpha(theme.palette.divider, 0.6);
   const drawerCardBg = isDark ? "rgba(255,255,255,.025)" : alpha(theme.palette.background.paper, 0.7);
   const refreshBtnBorder = isDark
@@ -381,8 +363,6 @@ export default function SubmissionsPage() {
 
   // ── Early returns (AFTER all hooks) ─────────────────────────────────────
 
-  // With placeholderData, isLoading is always false. Use isFetching + no real
-  // data yet to detect the true initial load so we show a spinner, not empty state.
   const submissionsLoading =
     submissionsQuery.isFetching && submissionsQuery.data?.results.length === 0;
 
@@ -410,7 +390,6 @@ export default function SubmissionsPage() {
     >
     <Box sx={{ p: { xs: 2, md: 3 } }}>
       {/* ------------------------------------------------------------------ */}
-      {/* Page header                                                         */}
       {/* ------------------------------------------------------------------ */}
       <Stack
         direction={{ xs: "column", md: "row" }}
@@ -467,7 +446,6 @@ export default function SubmissionsPage() {
       </Stack>
 
       {/* ------------------------------------------------------------------ */}
-      {/* Filter bar                                                          */}
       {/* ------------------------------------------------------------------ */}
       <SoftCard sx={{ mb: 2 }}>
         <CardContent sx={{ p: { xs: 2.25, md: 3 } }}>
@@ -639,7 +617,6 @@ export default function SubmissionsPage() {
       </SoftCard>
 
       {/* ------------------------------------------------------------------ */}
-      {/* Results table                                                       */}
       {/* ------------------------------------------------------------------ */}
       <SoftCard>
         <CardContent sx={{ p: 0 }}>
@@ -716,7 +693,6 @@ export default function SubmissionsPage() {
                           }
                         }}
                       >
-                        {/* ID */}
                         <TableCell>
                           <Stack direction="row" spacing={0.5} sx={{ alignItems: "center" }} >
                             <Button
@@ -735,17 +711,14 @@ export default function SubmissionsPage() {
                           </Stack>
                         </TableCell>
 
-                        {/* Result — most critical, shown immediately after ID */}
                         <TableCell>
                           <ResultChip result={r.result} minWidth={BADGE_W} />
                         </TableCell>
 
-                        {/* Status — compact */}
                         <TableCell>
                           <StatusChip status={r.status} minWidth={96} />
                         </TableCell>
 
-                        {/* Artifact (with email preview thumbnail when available) */}
                         <TableCell title={r.artifact}>
                           <Stack direction="row" spacing={1.25} sx={{ alignItems: "center" }}>
                             {r.mail_preview_url ? (
@@ -773,10 +746,8 @@ export default function SubmissionsPage() {
                           </Stack>
                         </TableCell>
 
-                        {/* Date */}
                         <TableCell sx={{ whiteSpace: "nowrap" }}>{fmtDate(r.created_at)}</TableCell>
 
-                        {/* Type — compact chip */}
                         <TableCell>
                           <Chip
                             label={r.type}
@@ -814,7 +785,6 @@ export default function SubmissionsPage() {
       </SoftCard>
 
       {/* ------------------------------------------------------------------ */}
-      {/* Detail drawer                                                       */}
       {/* ------------------------------------------------------------------ */}
       <Drawer
         anchor="right"
@@ -843,7 +813,6 @@ export default function SubmissionsPage() {
           </Box>
         ) : (
           <Stack sx={{ height: "100%" }}>
-            {/* Drawer header — result-focused */}
             <Box
               sx={(theme) => ({
                 px: 2.25,
@@ -868,7 +837,6 @@ export default function SubmissionsPage() {
                 </Button>
               </Stack>
 
-              {/* Verdict + status chips — the key info at a glance */}
               <Stack direction="row" spacing={1} sx={{ mt: 1.5, flexWrap: "wrap" }}>
                 <ResultChip result={selectedRow.result} minWidth={BADGE_W} />
                 <StatusChip status={selectedRow.status} minWidth={96} />
@@ -879,7 +847,6 @@ export default function SubmissionsPage() {
               </Stack>
             </Box>
 
-            {/* Drawer body — redesigned */}
             <Box sx={{ flex: 1, overflowY: "auto" }}>
 
               {/* ── Summary strip ──────────────────────────────────────────────── */}
@@ -1011,7 +978,6 @@ export default function SubmissionsPage() {
                               overflow: "hidden",
                             }}
                           >
-                            {/* Group header */}
                             <Box
                               role="button" tabIndex={0}
                               onClick={() => setExpandedGroups((prev) => ({ ...prev, [group.key]: !prev[group.key] }))}
@@ -1050,7 +1016,6 @@ export default function SubmissionsPage() {
                               }} />
                             </Box>
 
-                            {/* Reports inside the group */}
                             {isGroupOpen ? (
                               <Box sx={{ p: 1.25 }}>
                                 <Stack spacing={0.9}>
@@ -1088,7 +1053,6 @@ export default function SubmissionsPage() {
       </Drawer>
 
       {/* ------------------------------------------------------------------ */}
-      {/* Challenge dialog                                                    */}
       {/* ------------------------------------------------------------------ */}
       <Dialog
         open={challengeId !== null}

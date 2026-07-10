@@ -2,7 +2,6 @@ import * as React from "react";
 import { Box, Card, Chip, Stack, Typography } from "@mui/material";
 import { alpha, useTheme } from "@mui/material/styles";
 
-// SoftCard — exactly mirrors the rest of the app.
 export function SoftCard(props: React.PropsWithChildren<{ sx?: object }>) {
   const theme = useTheme();
   const isDark = theme.palette.mode === "dark";
@@ -27,7 +26,6 @@ export function SoftCard(props: React.PropsWithChildren<{ sx?: object }>) {
   );
 }
 
-// Tighter inner card — same as SettingsPage / ProfilePage.
 export function InnerCard(props: React.PropsWithChildren<{ sx?: object }>) {
   const theme = useTheme();
   const isDark = theme.palette.mode === "dark";

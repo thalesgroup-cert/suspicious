@@ -1,7 +1,6 @@
 import { Box, Typography } from "@mui/material";
 import type { ThemeCapabilities } from "@/styles/ThemeStore";
 
-// ThemeGreeting — lore-aware sub-headline, only rendered for themed variants.
 export function ThemeGreeting({ caps, name }: { caps: ThemeCapabilities; name: string }) {
   const codename = name.toUpperCase().replace(/\s+/g, "_");
 

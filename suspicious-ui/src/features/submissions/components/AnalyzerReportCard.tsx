@@ -48,8 +48,6 @@ export function AnalyzerReportCard({
   const readableSummary = prettySummary(report.report_summary);
   const plainSummary = summarizeForReading(report);
 
-  // In light mode, tone down the semi-transparent backgrounds so they don't
-  // look washed out on white.
   const cardBg = isDark
     ? `linear-gradient(180deg, ${risk.softBg} 0%, rgba(255,255,255,.03) 100%)`
     : `linear-gradient(180deg, ${risk.softBg} 0%, ${alpha("#fff", 0.9)} 100%)`;

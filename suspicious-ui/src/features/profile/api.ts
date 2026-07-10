@@ -1,6 +1,3 @@
-//
-// All profile-related API calls. The semantic colors endpoints are new;
-// everything else matches the existing patterns in the app.
 
 import { api } from "@/api/client";
 import type { ResultColors, StatusColors } from "@/styles/colorStore";
@@ -16,7 +13,7 @@ export type UserProfile = {
   gbu:                  string;
   country:              string;
   region:               string;
-  scope?:               string;          // CISOProfile only
+  scope?:               string;
   wants_acknowledgement: boolean;
   wants_results:         boolean;
   theme:                 string;
@@ -64,9 +61,6 @@ export async function getProfile(): Promise<UserProfile> {
 }
 
 // ---------------------------------------------------------------------------
-// PATCH /api/profile/appearance/
-// Updates theme, auto_seasonal, and/or semantic_colors in one request.
-// Used by the "Save appearance" button in ProfilePage.
 // ---------------------------------------------------------------------------
 
 export async function updateAppearance(
@@ -94,14 +88,6 @@ export async function updatePreferences(
 }
 
 // ---------------------------------------------------------------------------
-// PATCH /api/profile/colors/
-//
-// Dedicated endpoint for syncing only semantic colors.
-// Called by ColorSettingsPanel:
-//   • On preset switch → sends the full preset palette immediately.
-//   • On individual swatch change → debounced 800ms to avoid flooding.
-//
-// Returns { semantic_colors, profile } — the store hydrates from `profile`.
 // ---------------------------------------------------------------------------
 
 export async function updateSemanticColors(
@@ -115,8 +101,6 @@ export async function updateSemanticColors(
 }
 
 // ---------------------------------------------------------------------------
-// POST /api/profile/colors/reset/
-// Resets to DEFAULT_SEMANTIC_COLORS on the server.
 // ---------------------------------------------------------------------------
 
 export async function resetSemanticColors(): Promise<{

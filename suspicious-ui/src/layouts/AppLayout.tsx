@@ -71,7 +71,6 @@ export default function AppLayout() {
   const { capabilities } = useThemeMode();
   const { effects } = capabilities;
 
-  // Logo Avatar gets a per-theme ambient animation
   const logoClass = React.useMemo(() => {
     if (effects.hasHeatEffect)     return "sun-orb";
     if (effects.hasSeasonalLights) return "christmas-lights";
@@ -81,10 +80,8 @@ export default function AppLayout() {
     return undefined;
   }, [effects]);
 
-  // Brand label gets a glitch flicker on Future theme
   const brandClass = effects.hasPortalEffect ? "temporal-glitch" : undefined;
 
-  // Sidebar Paper picks up a neon / solar rim glow
   const sidebarGlow = React.useMemo(() => {
     if (effects.hasNeonEffect)
       return `4px 0 40px rgba(0,0,0,.6), 0 0 28px rgba(0,229,255,.07), inset -1px 0 0 rgba(0,229,255,.18)`;
@@ -95,34 +92,28 @@ export default function AppLayout() {
     return undefined;
   }, [effects]);
 
-  // Pin state persists across page reloads via localStorage
   const [pinned, setPinned] = React.useState<boolean>(() => {
     try { return localStorage.getItem("suspicious.sidebar.pinned") === "1"; }
     catch { return false; }
   });
 
-  // Write pin state whenever it changes
   React.useEffect(() => {
     try { localStorage.setItem("suspicious.sidebar.pinned", pinned ? "1" : "0"); }
     catch { /* localStorage blocked in this env */ }
   }, [pinned]);
 
-  // Close mobile drawer on navigation — adjusted during render via prev-value
-  // compare instead of an effect.
   const [prevPathname, setPrevPathname] = React.useState(location.pathname);
   if (location.pathname !== prevPathname) {
     setPrevPathname(location.pathname);
     setMobileOpen(false);
   }
 
-  // Clear hover state when leaving the desktop breakpoint.
   const [prevIsDesktop, setPrevIsDesktop] = React.useState(isDesktop);
   if (isDesktop !== prevIsDesktop) {
     setPrevIsDesktop(isDesktop);
     if (!isDesktop) setHovered(false);
   }
 
-  // Filtered nav items
   const primaryItems   = React.useMemo(() => filterItems(PRIMARY_NAV,   isElevated), [isElevated]);
   const workspaceItems = React.useMemo(() => filterItems(WORKSPACE_NAV, isElevated), [isElevated]);
   const accountItems   = React.useMemo(() => filterItems(ACCOUNT_NAV,   isElevated), [isElevated]);
@@ -145,7 +136,6 @@ export default function AppLayout() {
   }
 
   // ── Sidebar background — fully theme-aware ──────────────────────────────
-  // Match SoftCard: subtle primary tint + same gradient/border system as app cards
   const sidebarBg = isDark
     ? `linear-gradient(180deg, ${alpha("#fff", 0.04)} 0%, ${alpha("#fff", 0.02)} 100%)`
     : `linear-gradient(180deg, ${alpha("#fff", 0.92)} 0%, ${alpha(theme.palette.grey[50], 0.97)} 100%)`;
@@ -158,7 +148,6 @@ export default function AppLayout() {
        ${theme.palette.background.default}`;
 
   // ── Sidebar border ───────────────────────────────────────────────────────
-  // SoftCard's divider system: 0.28 dark / 0.9 light
   const sidebarBorder = `1px solid ${alpha(theme.palette.divider, isDark ? 0.28 : 0.9)}`;
 
   // ─────────────────────────────────────────────────────────────────────────
@@ -187,7 +176,6 @@ export default function AppLayout() {
           minHeight: 68,
         }}
       >
-        {/* Brand */}
         <Stack direction="row" spacing={isSlim ? 0 : 1.25} sx={{ alignItems: "center" }} >
           <Avatar
             variant="rounded"
@@ -222,7 +210,6 @@ export default function AppLayout() {
           )}
         </Stack>
 
-        {/* Pin button — only in wide mode on desktop */}
         {!isSlim && isDesktop && (
           <Tooltip title={pinned ? "Unpin sidebar" : "Pin sidebar"} placement="right">
             <IconButton
@@ -377,7 +364,6 @@ export default function AppLayout() {
               {pageTitle}
             </Typography>
 
-            {/* Right spacer to balance the hamburger */}
             <Box sx={{ width: 36 }} />
           </Stack>
         </Toolbar>
@@ -398,7 +384,6 @@ export default function AppLayout() {
           }),
         }}
       >
-        {/* Mobile: temporary drawer */}
         {!isDesktop ? (
           <Drawer
             variant="temporary"
@@ -422,7 +407,6 @@ export default function AppLayout() {
             {drawerContent}
           </Drawer>
         ) : (
-          /* Desktop: permanent drawer with animated width */
           <Drawer
             variant="permanent"
             open
@@ -461,7 +445,6 @@ export default function AppLayout() {
           }),
         }}
       >
-        {/* Spacer for mobile AppBar */}
         <Box sx={{ height: { xs: 60, md: 0 } }} />
 
         <Box

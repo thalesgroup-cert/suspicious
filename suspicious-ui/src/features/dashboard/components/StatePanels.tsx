@@ -1,4 +1,3 @@
-// file: src/features/dashboard/components/StatePanels.tsx
 import * as React from "react";
 import { Box, Button, Container, Skeleton, Stack, Typography } from "@mui/material";
 import { RefreshOutlined } from "@mui/icons-material";

@@ -48,7 +48,6 @@ export default function MailPreview({
   const [attempt, setAttempt] = useState(0);
   const timerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
-  // Clear any pending retry timer on unmount.
   useEffect(
     () => () => {
       if (timerRef.current) clearTimeout(timerRef.current);
@@ -73,8 +72,6 @@ export default function MailPreview({
     }
   };
 
-  // Cache-bust on retry so the browser (and the 60s response cache) re-fetch
-  // rather than serving the prior 404.
   const src = attempt > 0 ? `${url}${url.includes("?") ? "&" : "?"}r=${attempt}` : url;
 
   return (

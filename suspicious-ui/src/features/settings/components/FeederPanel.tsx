@@ -8,7 +8,6 @@ import { getFeederStatus, setFeederStatus } from "@/features/settings/api";
 import FeederHealthBadge from "@/shared/components/FeederHealthBadge";
 import { InnerCard } from "@/features/settings/components/cards";
 
-// FeederPanel — enhanced toggle with status indicator
 export function FeederPanel() {
   const qc = useQueryClient();
   const { enqueueSnackbar } = useSnackbar();
@@ -39,7 +38,6 @@ export function FeederPanel() {
   return (
     <Stack spacing={2}>
       <InnerCard sx={{ p: 0, overflow: "hidden" }}>
-        {/* Status bar accent */}
         <Box
           sx={{
             height: 4,
@@ -83,9 +81,7 @@ export function FeederPanel() {
           </Stack>
 
           <Stack direction="row" spacing={1.5} sx={{ alignItems: "center", flexWrap: "wrap" }} >
-            {/* Live runtime status — polled from feeder /health */}
             <FeederHealthBadge />
-            {/* Operator-controlled toggle (Django settings) */}
             <Chip
               size="small"
               label={pending ? "…" : enabled ? "Running" : "Stopped"}

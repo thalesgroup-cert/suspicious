@@ -154,7 +154,6 @@ export function NavSection({
   return (
     <Box component="section">
       {slim ? (
-        // slim: small divider with no label
         <Divider sx={{ mx: 1.5, mb: 1, opacity: isDark ? 0.15 : 0.35 }} />
       ) : (
         <Typography
@@ -194,8 +193,6 @@ export function LogoutButton({ slim, onLogout }: { slim: boolean; onLogout: () =
   const theme = useTheme();
   const isDark = theme.palette.mode === "dark";
 
-  // Slim variant: render as a 38×38 centered tile, EXACTLY mirroring
-  // UserCard's slim shape so the two stack with perfect vertical centerline.
   if (slim) {
     return (
       <Tooltip title="Logout" placement="right" arrow>
@@ -244,7 +241,6 @@ export function LogoutButton({ slim, onLogout }: { slim: boolean; onLogout: () =
     );
   }
 
-  // Wide variant: full-row button with icon + label (unchanged behavior)
   return (
     <ListItemButton
       onClick={onLogout}
@@ -455,7 +451,6 @@ export function UserCard({
         gap: 1.25,
       }}
     >
-      {/* Avatar with elevation ring */}
       <Box sx={{ position: "relative", flexShrink: 0 }}>
         {isElevated && (
           <Box
@@ -487,7 +482,6 @@ export function UserCard({
         />
       </Box>
 
-      {/* Name + role */}
       <Box sx={{ flex: 1, minWidth: 0 }}>
         <Typography
           sx={{

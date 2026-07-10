@@ -60,13 +60,8 @@ describe("ConnectorsPanel", () => {
         <ConnectorsPanel />
       </QueryClientProvider>,
     );
-    // "Incomplete"/"Disabled" are KPI-tile-only labels (the mock's one
-    // connector is status "connected", so no status chip renders either of
-    // these) — unambiguous proof the KPI row rendered.
     await waitFor(() => expect(screen.getByText("Incomplete")).toBeInTheDocument());
     expect(screen.getByText("Disabled")).toBeInTheDocument();
-    // "Connected" appears twice by design: the KPI tile label and the
-    // connector's status chip.
     expect(screen.getAllByText("Connected")).toHaveLength(2);
     expect(screen.getAllByText("1").length).toBeGreaterThan(0);
   });

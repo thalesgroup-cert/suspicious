@@ -36,7 +36,6 @@ describe("ThemeStore", () => {
       </AppThemeProvider>
     );
 
-    // Disable auto-seasonal so the resolved theme matches the manual pick.
     await userEvent.click(screen.getByText("auto-off"));
     await userEvent.click(screen.getByText("cyber"));
 
@@ -57,14 +56,10 @@ describe("ThemeStore", () => {
 
     expect(screen.getByTestId("theme")).toHaveTextContent("graphite");
 
-    // Invalid theme — calls into setThemeName via the public API would
-    // be blocked by the type system, but the runtime guard still applies.
     act(() => {
       hydrateThemeFromServer("nonexistent-theme", false);
     });
 
-    // Resolved theme stayed on graphite because isValidThemeName() rejected
-    // the unknown name; only the auto-seasonal flag was overwritten.
     expect(screen.getByTestId("theme")).toHaveTextContent("graphite");
     expect(localStorage.getItem(STORAGE_KEY)).toBe("graphite");
   });
@@ -76,7 +71,6 @@ describe("ThemeStore", () => {
       </AppThemeProvider>
     );
 
-    // Hydrate as if /auth/me/ returned a user with theme=valentine, auto=false.
     act(() => {
       hydrateThemeFromServer("valentine", false);
     });

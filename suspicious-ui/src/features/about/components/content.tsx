@@ -45,7 +45,6 @@ export function SeverityCard(props: {
 
   return (
     <SoftCard sx={{ height: "100%" }}>
-      {/* Top accent line */}
       <Box
         sx={{
           height: 3,
@@ -56,7 +55,6 @@ export function SeverityCard(props: {
 
       <Box sx={{ p: 2.25 }}>
         <Stack spacing={1.75}>
-          {/* Header */}
           <Stack direction="row" spacing={1.25} sx={{ alignItems: "center" }} >
             <IconBadge icon={cfg.icon} size={40} color={tone} />
             <Box>
@@ -71,7 +69,6 @@ export function SeverityCard(props: {
 
           <Divider sx={{ opacity: isDark ? 0.14 : 0.45 }} />
 
-          {/* Bullets */}
           <Stack spacing={0.6}>
             {props.bullets.map((bullet) => (
               <Stack key={bullet} direction="row" spacing={0.75} sx={{ alignItems: "center" }} >
@@ -110,7 +107,6 @@ export function StepCard(props: {
     <SoftCard sx={{ height: "100%", position: "relative", overflow: "visible" }}>
       <Box sx={{ p: 2.5 }}>
         <Stack spacing={1.25}>
-          {/* Step number badge */}
           <Stack direction="row" spacing={1.5} sx={{ alignItems: "center" }} >
             <Box
               sx={{

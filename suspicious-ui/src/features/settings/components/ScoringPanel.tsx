@@ -22,7 +22,6 @@ import { useSnackbar } from "notistack";
 import { listAnalyzers, updateAnalyzerWeight, type Analyzer } from "@/features/settings/api";
 import { InnerCard } from "@/features/settings/components/cards";
 
-// ScoringPanel — sliders with live preview, dirty tracking, bulk save
 export function ScoringPanel() {
   const qc = useQueryClient();
   const { enqueueSnackbar } = useSnackbar();
@@ -44,8 +43,6 @@ export function ScoringPanel() {
 
   const [drafts, setDrafts] = React.useState<Record<number, number>>({});
 
-  // Seed weight drafts from fetched analyzers — adjusted during render when the
-  // data reference changes, instead of in an effect.
   const analyzersData = analyzersQuery.data;
   const [prevAnalyzersData, setPrevAnalyzersData] = React.useState(analyzersData);
   if (analyzersData !== prevAnalyzersData) {
@@ -83,7 +80,6 @@ export function ScoringPanel() {
 
   return (
     <Stack spacing={2}>
-      {/* Bulk action bar */}
       {dirtyIds.length > 0 ? (
         <InnerCard
           sx={{
@@ -124,14 +120,12 @@ export function ScoringPanel() {
         </InnerCard>
       ) : null}
 
-      {/* Analyzer cards */}
       <Stack spacing={1.25}>
         {analyzers.map((a) => {
           const draft = drafts[a.id] ?? a.weight;
           const isDirty = Number(draft.toFixed(1)) !== Number(a.weight.toFixed(1));
           const savingThis = updateMutation.isPending && updateMutation.variables?.id === a.id;
 
-          // Weight color
           const weightColor =
             draft >= 0.7 ? "#22C55E"
             : draft >= 0.4 ? "#F59E0B"
@@ -168,7 +162,6 @@ export function ScoringPanel() {
                     </Typography>
                   </Box>
 
-                  {/* Weight badge */}
                   <Box
                     sx={{
                       px: 1.25,
@@ -190,7 +183,6 @@ export function ScoringPanel() {
                   </Box>
                 </Stack>
 
-                {/* Slider + progress */}
                 <Stack spacing={0.75}>
                   <LinearProgress
                     variant="determinate"

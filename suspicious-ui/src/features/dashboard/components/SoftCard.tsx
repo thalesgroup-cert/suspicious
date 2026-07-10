@@ -5,9 +5,6 @@ import { useTheme } from "@mui/material/styles";
 import { useThemeMode } from "@/styles/ThemeStore";
 
 // ---------------------------------------------------------------------------
-// SoftCard — theme-aware card shell shared across all dashboard panels.
-// Replaces every local GlassCard copy (KpiTrendPanels, ThreatDistributionPanel,
-// TopPrefixesPanel, KpiGrid). Single source of truth.
 // ---------------------------------------------------------------------------
 
 export type SoftCardProps = React.PropsWithChildren<{
@@ -36,7 +33,6 @@ export function SoftCard({
   const { capabilities } = useThemeMode();
   const { effects } = capabilities;
 
-  // Metal theme: periodic ! badge on hover
   const isMetal = effects.hasAlertStates;
   const [hovered, setHovered] = React.useState(false);
   const [showExcl, setShowExcl] = React.useState(false);
@@ -58,7 +54,6 @@ export function SoftCard({
       }, delay);
     }
     schedule();
-    // Reset on cleanup (hover end / unmount) rather than synchronously in the body.
     return () => {
       clearTimeout(timerRef.current);
       setShowExcl(false);
@@ -95,7 +90,6 @@ export function SoftCard({
           ...contentSx,
         }}
       >
-        {/* Card header */}
         <Stack
           direction="row"
           sx={{ mb: 1, flexShrink: 0, alignItems: "center", justifyContent: "space-between" }}
@@ -143,7 +137,6 @@ export function SoftCard({
 
         <Divider sx={{ opacity: 0.25, mb: 1.5, flexShrink: 0 }} />
 
-        {/* Card body */}
         {fillHeight ? (
           <Box sx={{ flex: 1, minHeight: 0, display: "flex", flexDirection: "column" }}>
             {children}

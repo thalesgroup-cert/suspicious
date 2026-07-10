@@ -41,7 +41,6 @@ function parseMulti(input: string) {
   return input.split(/[\n,; ]+/g).map((s) => s.trim()).filter(Boolean);
 }
 
-// ListItemRow — individual item with copy + delete
 function ListItemRow({
   item,
   selected,
@@ -79,7 +78,6 @@ function ListItemRow({
         transition: "all .14s ease",
       }}
     >
-      {/* Selection checkbox */}
       <IconButton
         size="small"
         onClick={onToggleSelect}
@@ -147,7 +145,6 @@ function ListItemRow({
   );
 }
 
-// AddBar — textarea + submit (supports multi-line paste)
 function AddBar({
   onAdd,
   placeholder,
@@ -207,7 +204,6 @@ function AddBar({
   );
 }
 
-// BulkToolbar
 function BulkToolbar({
   total,
   selected,
@@ -275,7 +271,6 @@ function BulkToolbar({
   );
 }
 
-// EditableListPanel — full-featured list manager
 export function EditableListPanel({
   section,
   placeholder,
@@ -398,14 +393,12 @@ export function EditableListPanel({
 
   return (
     <Stack spacing={2}>
-      {/* Add bar */}
       <AddBar
         placeholder={placeholder}
         onAdd={(values) => addMutation.mutate(values)}
         loading={addMutation.isPending}
       />
 
-      {/* Toolbar row */}
       <Stack direction="row" spacing={1} sx={{ alignItems: "center", flexWrap: "wrap" }} >
         <Button
           size="small"
@@ -450,7 +443,6 @@ export function EditableListPanel({
         />
       </Stack>
 
-      {/* Search collapse */}
       <Collapse in={showFilter}>
         <TextField
           size="small"
@@ -471,7 +463,6 @@ export function EditableListPanel({
         />
       </Collapse>
 
-      {/* List */}
       {listQuery.isLoading ? (
         <Box sx={{ py: 4, display: "grid", placeItems: "center" }}>
           <CircularProgress size={24} />
@@ -480,7 +471,6 @@ export function EditableListPanel({
         <Alert severity="error">Failed to load list.</Alert>
       ) : (
         <Stack spacing={1}>
-          {/* Bulk toolbar — only when items exist */}
           {filtered.length > 0 ? (
             <BulkToolbar
               total={filtered.length}
@@ -492,7 +482,6 @@ export function EditableListPanel({
             />
           ) : null}
 
-          {/* Item list */}
           {filtered.length === 0 ? (
             <EmptyList message={filter ? `No items matching "${filter}"` : "No items yet."} />
           ) : (
@@ -502,7 +491,6 @@ export function EditableListPanel({
                 maxHeight: 400,
                 overflowY: "auto",
                 pr: 0.5,
-                // thin scrollbar
                 "&::-webkit-scrollbar": { width: 4 },
                 "&::-webkit-scrollbar-thumb": {
                   borderRadius: 999,

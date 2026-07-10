@@ -197,8 +197,6 @@ function PreferencesPanel({
   wantsResults: boolean; setWantsResults: (v: boolean) => void;
   dirty: boolean; saving: boolean; onSave: () => void; onReset: () => void;
 }) {
-  // Use semantic store colors so notification toggles follow the user's
-  // colorblind-safe preset — inconclusive blue for "info/ack", done green for "results".
   const resultColors = useResultColors();
   const statusColors  = useStatusColors();
 
@@ -222,7 +220,6 @@ function PreferencesPanel({
 
       <Divider sx={{ opacity: 0.25 }} />
 
-      {/* Save bar — top */}
       <DirtyBar dirty={dirty} saving={saving} onSave={onSave} onReset={onReset} label="Unsaved preference changes" />
 
       <Stack spacing={1}>
@@ -269,7 +266,6 @@ function AppearancePanel({
   const theme = useTheme();
   const isDark = theme.palette.mode === "dark";
 
-  // Pull semantic colors so accent chips follow the user's preset.
   const statusColors = useStatusColors();
 
   return (
@@ -292,13 +288,11 @@ function AppearancePanel({
 
       <Divider sx={{ opacity: 0.25 }} />
 
-      {/* Save bar — top */}
       <DirtyBar
         dirty={dirty} saving={saving} onSave={onSave} onReset={onReset}
         label="Unsaved appearance changes — save to persist across sessions"
       />
 
-      {/* Active theme status */}
       <InnerCard sx={{ px: 2, py: 1.25 }}>
         <Stack direction="row" spacing={1} sx={{ alignItems: "center", flexWrap: "wrap" }} >
           <Typography variant="caption" color="text.secondary" sx={{ fontWeight: 700 }}>Active theme:</Typography>
@@ -341,7 +335,6 @@ function AppearancePanel({
         </Stack>
       </InnerCard>
 
-      {/* Seasonal */}
       <Stack spacing={1}>
         <CaptionLabel>Automatic</CaptionLabel>
         <ToggleRow
@@ -358,13 +351,11 @@ function AppearancePanel({
         ) : null}
       </Stack>
 
-      {/* Theme picker */}
       <Stack spacing={1}>
         <CaptionLabel>Manual theme</CaptionLabel>
         <ThemePicker value={pickedTheme} onChange={setPickedTheme} />
       </Stack>
 
-      {/* Bottom save bar */}
       <DirtyBar dirty={dirty} saving={saving} onSave={onSave} onReset={onReset} label="Unsaved appearance changes" />
 
       {!dirty ? (
@@ -378,8 +369,6 @@ function AppearancePanel({
 }
 
 // ---------------------------------------------------------------------------
-// ColorsPanel — wraps ColorSettingsPanel (no extra state needed here,
-// ColorSettingsPanel owns its own mutations via useColorStore)
 // ---------------------------------------------------------------------------
 
 function ColorsPanel() {
@@ -399,9 +388,8 @@ export default function ProfilePage() {
   const { themeName, setThemeName, autoSeasonal, setAutoSeasonal } = useThemeMode();
   const { pixel, setPixel, alert, setAlert } = useHudModes();
 
-  // Color store — hydrated from server profile on load
   const hydrateFromProfile = useColorStore((s) => s.hydrateFromProfile);
-  const pageStatusColors   = useStatusColors();   // for hero "All saved" chip
+  const pageStatusColors   = useStatusColors();
 
   const [section, setSection] = React.useState<Section>("preferences");
 
@@ -418,10 +406,6 @@ export default function ProfilePage() {
   });
 
   // ── Hydrate color store from server profile ──────────────────────────────
-  // Primary hydration: auth.ts → hydrateColorsFromServer() fires on getMe()
-  //   and login(), so colors are set before this page even mounts.
-  // Secondary hydration (here): re-syncs when the full profile query resolves,
-  //   which catches color changes saved from another device or tab.
   React.useEffect(() => {
     const p = profileQuery.data;
     if (!p?.semantic_colors) return;
@@ -440,11 +424,6 @@ export default function ProfilePage() {
   const [avatarOptions, setAvatarOptions] =
     React.useState<Record<string, string[]>>({});
 
-  // Sync form state from the fetched server profile — adjusted during render
-  // when the data reference changes, instead of in an effect.
-  // prev starts as undefined (not profileData): on a remount with a warm query
-  // cache, data is already present on the first render, and seeding prev with
-  // it would skip the sync and leave the toggles at their useState defaults.
   const profileData = profileQuery.data;
   const [prevProfileData, setPrevProfileData] =
     React.useState<UserProfile | undefined>(undefined);
@@ -463,7 +442,6 @@ export default function ProfilePage() {
     }
   }
 
-  // One-time hydration of local form state from localStorage (render-time).
   const [localHydrated, setLocalHydrated] = React.useState(false);
   if (!localHydrated) {
     setLocalHydrated(true);
@@ -475,8 +453,6 @@ export default function ProfilePage() {
     }
   }
 
-  // Side effects from the stored theme (theme store + query cache) must run in
-  // an effect, not during render.
   React.useEffect(() => {
     const lp = readLocalProfile();
     if (lp?.theme) {
@@ -490,7 +466,6 @@ export default function ProfilePage() {
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
-  // Live theme preview
   React.useEffect(() => {
     if (!pickedTheme || autoSeasonal) return;
     setThemeName(pickedTheme);
@@ -589,7 +564,6 @@ export default function ProfilePage() {
     setAvatarOptions(baseProfile?.avatar?.options ?? {});
   }
 
-  // Seed on style selection when no seed is set yet, so the preview is non-empty.
   const setStyleWithSeed = (s: string) => {
     if (s !== avatarStyle) setAvatarOptions({});
     setAvatarStyle(s);
@@ -617,7 +591,6 @@ export default function ProfilePage() {
   const scope      = (me as any)?.ciso_scope;
   const displayName = [me.first_name, me.last_name].filter(Boolean).join(" ") || me.username;
 
-  // Nav items — drives both sidebar and dirty-dot logic
   const NAV = [
     {
       key: "preferences" as Section,
@@ -679,9 +652,7 @@ export default function ProfilePage() {
             spacing={2.5}
             sx={{ alignItems: { md: "center" }, justifyContent: "space-between" }}
 >
-            {/* Identity */}
             <Stack direction="row" spacing={2.25} sx={{ minWidth: 0, alignItems: "center" }}>
-              {/* Avatar with gradient ring */}
               <Box sx={{ position: "relative", flexShrink: 0 }}>
                 <Box sx={{
                   position: "absolute", inset: -2, borderRadius: "50%",
@@ -727,7 +698,6 @@ export default function ProfilePage() {
               </Box>
             </Stack>
 
-            {/* Account info + global save status */}
             <Stack spacing={0.4} sx={{ flexShrink: 0, alignItems: { xs: "flex-start", md: "flex-end" } }}>
               <Typography variant="caption" color="text.disabled"
                 sx={{ fontWeight: 700, textTransform: "uppercase", letterSpacing: 0.5, fontSize: 10 }}>
@@ -772,7 +742,6 @@ export default function ProfilePage() {
         {/* ── Sidebar nav ───────────────────────────────────────────────── */}
         <SoftCard sx={{ position: { md: "sticky" }, top: { md: 16 }, overflow: "hidden" }}>
           <CardContent sx={{ p: 1.5 }}>
-            {/* Identity mini */}
             <Stack direction="row" spacing={1.25} sx={{ px: 1, py: 1, mb: 0.5, alignItems: "center" }}>
               <Box sx={{
                 width: 42, height: 42, borderRadius: 3, display: "grid", placeItems: "center",

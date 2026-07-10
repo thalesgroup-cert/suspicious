@@ -3,13 +3,11 @@ import { screen, waitFor } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { renderWithProviders } from "@/test/utils";
 
-// Mock the library: capture the controls.start spy, render nothing for Tour.
 const start = vi.fn();
 vi.mock("react-joyride", () => ({
   useJoyride: () => ({ controls: { start }, on: () => () => {}, state: {}, Tour: null }),
 }));
 
-// Mock the profile API that backs the "seen once" flag.
 const getProfile = vi.fn();
 const updatePreferences = vi.fn().mockResolvedValue({});
 vi.mock("@/features/profile/api", () => ({
@@ -51,7 +49,7 @@ describe("HelpTourProvider", () => {
   });
 
   it("exposes start() through context for manual launch", async () => {
-    getProfile.mockResolvedValue({ tour_completed: true }); // suppress auto-run
+    getProfile.mockResolvedValue({ tour_completed: true });
     renderWithProviders(
       <HelpTourProvider><Consumer /></HelpTourProvider>
     );

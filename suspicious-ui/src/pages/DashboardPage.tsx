@@ -67,19 +67,13 @@ const DASHBOARD_PANEL_KEYS = {
 const DASHBOARD_BREAKPOINTS = { lg: 1200, md: 900, sm: 600, xs: 0 };
 const DASHBOARD_COLS = { lg: 12, md: 12, sm: 6, xs: 1 };
 
-// Row height unit in px. All h values below are in these units.
-// rowHeight=32 → h:6 = 192px (KPI row), h:14 = 448px (bottom row — tall enough for all legend items)
 const ROW_HEIGHT = 32;
 
-// Bottom row height — tall enough to show the full threat legend without scrolling.
-// At 32px/unit: 14 units = 448px. Increase if needed.
 const BOTTOM_H = 14;
 const BOTTOM_MIN_H = 10;
 
 type ResponsiveLayouts = Partial<Record<string, Layout>>;
 
-// Layouts: KPI row is full-width, bottom row splits Top Prefixes (8 cols) and
-// Threat Distribution (4 cols) at the SAME height so they align perfectly.
 const DEFAULT_DASHBOARD_LAYOUTS: ResponsiveLayouts = {
   lg: [
     { i: DASHBOARD_PANEL_KEYS.KPI_TRENDS,          x: 0,  y: 0,          w: 12, h: 6,       minW: 6,  minH: 4 },
@@ -147,7 +141,6 @@ const DashboardPanelShell = React.memo(function DashboardPanelShell({
         display: "flex",
         flexDirection: "column",
         overflow: "hidden",
-        // Make the resize handle visible via a global override scoped to this panel
         "& .react-resizable-handle": {
           opacity: 0,
           transition: "opacity .18s ease",
@@ -157,7 +150,6 @@ const DashboardPanelShell = React.memo(function DashboardPanelShell({
         },
       }}
     >
-      {/* Drag handle bar — visible on hover */}
       <DragHandle />
 
       <Box sx={{ flex: 1, minHeight: 0, overflow: "hidden" }}>
@@ -167,7 +159,6 @@ const DashboardPanelShell = React.memo(function DashboardPanelShell({
   );
 });
 
-// Visible drag handle strip at the top of every panel
 function DragHandle() {
   const theme = useTheme();
   const isDark = theme.palette.mode === "dark";
@@ -192,7 +183,6 @@ function DragHandle() {
         background: isDark
           ? alpha("#fff", 0.04)
           : alpha(theme.palette.grey[400], 0.1),
-        // Show on parent hover — handled by sibling selector in DashboardPanelShell
         ".dashboard-draggable-panel:hover &": {
           opacity: 1,
         },
@@ -204,7 +194,6 @@ function DragHandle() {
         },
       }}
     >
-      {/* 6-dot grip */}
       <DragDots isDark={isDark} dividerColor={theme.palette.divider} />
     </Box>
   );
@@ -256,7 +245,6 @@ function GridStyles() {
     ? "1px solid rgba(255,255,255,.12)"
     : `1px solid ${alpha(theme.palette.divider, 0.7)}`;
 
-  // Drag placeholder color follows theme
   const placeholderBg = effects.hasNeonEffect
     ? "rgba(0,229,255,.1)"
     : effects.hasSolarEffect
@@ -378,8 +366,6 @@ export default function DashboardPage() {
     loadLayoutsFromStorage(storageKey)
   );
 
-  // Reload persisted layouts when the storage key (user) changes — adjusted
-  // during render rather than in an effect.
   const [prevStorageKey, setPrevStorageKey] = React.useState(storageKey);
   if (storageKey !== prevStorageKey) {
     setPrevStorageKey(storageKey);
@@ -497,7 +483,6 @@ export default function DashboardPage() {
       animate="shimmer"
     >
     <Box>
-      {/* Inject grid CSS overrides — theme-aware, re-renders on theme switch */}
       <GridStyles />
 
       <OverviewHeader
@@ -529,7 +514,6 @@ export default function DashboardPage() {
         ) : null}
 
         <Box sx={{ opacity: isEmpty ? 0.5 : 1, pointerEvents: isEmpty ? "none" : "auto" }}>
-          {/* Section header */}
           <Stack
             direction="row"
             sx={{ mb: 1, alignItems: "center", justifyContent: "space-between" }}
@@ -576,7 +560,6 @@ export default function DashboardPage() {
             draggableHandle=".dashboard-panel-drag-handle"
             onLayoutChange={handleLayoutsChange}
           >
-            {/* KPI Trends */}
             <Box
               key={DASHBOARD_PANEL_KEYS.KPI_TRENDS}
               className="dashboard-draggable-panel"
@@ -591,7 +574,6 @@ export default function DashboardPage() {
               </DashboardPanelShell>
             </Box>
 
-            {/* Top Prefixes */}
             <Box
               key={DASHBOARD_PANEL_KEYS.TOP_PREFIXES}
               className="dashboard-draggable-panel"
@@ -602,7 +584,6 @@ export default function DashboardPage() {
               </DashboardPanelShell>
             </Box>
 
-            {/* Threat Distribution */}
             <Box
               key={DASHBOARD_PANEL_KEYS.THREAT_DISTRIBUTION}
               className="dashboard-draggable-panel"

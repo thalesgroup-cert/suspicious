@@ -133,7 +133,6 @@ export function InvestigationAnalyzerReportCard({
       {expanded ? (
         <CardContent sx={{ p: 2 }}>
           <Stack spacing={2}>
-            {/* What this means */}
             <Box
               sx={{
                 p: 1.5,
@@ -150,7 +149,6 @@ export function InvestigationAnalyzerReportCard({
               </Typography>
             </Box>
 
-            {/* Score + confidence bars */}
             <Stack spacing={1.25}>
               <Box>
                 <Stack direction="row" sx={{ mb: 0.5, justifyContent: "space-between" }}>
@@ -183,7 +181,6 @@ export function InvestigationAnalyzerReportCard({
               </Box>
             </Stack>
 
-            {/* Details grid */}
             <Box
               sx={{
                 display: "grid",
@@ -216,7 +213,6 @@ export function InvestigationAnalyzerReportCard({
               </Typography>
             </Box>
 
-            {/* Technical details accordion */}
             <Accordion
               disableGutters
               sx={{

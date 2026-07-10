@@ -30,7 +30,6 @@ function renderLogin(initialPath = "/login") {
   return renderWithProviders(<LoginPage />, { initialPath });
 }
 
-// The username/password form is disclosed behind a button; SSO is shown first.
 async function revealPasswordForm(user: ReturnType<typeof userEvent.setup>) {
   const disclose = await screen.findByRole("button", {
     name: /sign in with username and password/i,
@@ -48,7 +47,6 @@ async function revealPasswordForm(user: ReturnType<typeof userEvent.setup>) {
 describe("LoginPage", () => {
   beforeEach(() => {
     vi.clearAllMocks();
-    // Default: unauthenticated
     mockGetMe.mockRejectedValue(new Error("401 Unauthorized"));
   });
 
@@ -87,7 +85,6 @@ describe("LoginPage", () => {
   it("calls login() with entered credentials on submit", async () => {
     const user = userEvent.setup();
     mockLogin.mockResolvedValue({ expiry: "2099-01-01T00:00:00Z" } as never);
-    // After login success, getMe returns the user for color hydration
     mockGetMe
       .mockRejectedValueOnce(new Error("401"))
       .mockResolvedValue(mockMe as never);
@@ -119,7 +116,6 @@ describe("LoginPage", () => {
     await user.type(screen.getByLabelText(/^password/i), "wrong");
     await user.click(screen.getByRole("button", { name: "Sign in" }));
 
-    // LoginPage surfaces a generic credential-failure message, not the raw API detail.
     await waitFor(() =>
       expect(screen.getByText(/check your credentials/i)).toBeInTheDocument()
     );
@@ -129,7 +125,6 @@ describe("LoginPage", () => {
     mockGetMe.mockResolvedValue(mockMe as never);
     renderLogin();
 
-    // MemoryRouter renders navigate — the login form should not appear
     await waitFor(() =>
       expect(screen.queryByLabelText(/username/i)).not.toBeInTheDocument()
     );

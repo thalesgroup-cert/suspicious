@@ -97,8 +97,6 @@ export default function FeederHealthBadge({
           ) : null}
           <Row k="Processed" v={health.emails_processed_total.toString()} />
           <Row k="Errors" v={health.errors_total.toString()} />
-          {/* Per-subsystem readiness (IMAP, MinIO). Only shown when the */}
-          {/* feeder is online and reported a checks block.              */}
           {health.online && health.checks?.imap ? (
             <Row
               k="IMAP"

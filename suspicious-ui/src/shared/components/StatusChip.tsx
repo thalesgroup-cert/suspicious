@@ -1,10 +1,3 @@
-//
-// Renders a submission status badge whose color comes from the semantic
-// color store (useStatusColors). Switching to the Okabe-Ito colorblind-safe
-// preset in ProfilePage updates these chips everywhere immediately.
-//
-// Color + icon dual encoding: every status has a distinct icon so color
-// is never the sole differentiator — accessible by design.
 
 import * as React from "react";
 import {
@@ -19,7 +12,6 @@ import { useStatusColors } from "@/styles/colorStore";
 import { Badge } from "@/shared/components/Badge";
 import type { StatusKey } from "@/styles/colorStore";
 
-// SubmissionStatus values as they arrive from the API
 export type SubmissionStatus =
   | "NEW"
   | "IN_PROGRESS"
@@ -29,10 +21,6 @@ export type SubmissionStatus =
   | "CHALLENGED"
   | "UNKNOWN";
 
-// Maps each API status to:
-//   storeKey — the StatusKey used to look up the hex color
-//   label    — display text
-//   icon     — distinct icon (color is never the sole indicator)
 const STATUS_META: Record<
   SubmissionStatus | "UNKNOWN",
   { storeKey: StatusKey; label: string; icon: React.ReactNode }
@@ -58,7 +46,7 @@ const STATUS_META: Record<
     icon:     <ErrorOutlineOutlined fontSize="small" />,
   },
   REJECTED: {
-    storeKey: "failure",       // rejected = processing failed
+    storeKey: "failure",
     label:    "REJECTED",
     icon:     <ReportProblemOutlined fontSize="small" />,
   },

@@ -1,15 +1,3 @@
-//
-// Low-level chip component.
-//
-// Accepts either:
-//   color  — a raw hex string from the semantic color store (preferred)
-//   muiColor — a MUI palette name for cases where a semantic hex isn't
-//              available (e.g. "default" fallback chips)
-//
-// When `color` (hex) is provided it takes full precedence and drives
-// background, border, and text contrast automatically.
-// When only `muiColor` is provided the MUI Chip color prop is used
-// as before — so existing callers that pass muiColor still work.
 
 import * as React from "react";
 import { Chip } from "@mui/material";
@@ -34,7 +22,7 @@ export function Badge({ label, color, muiColor = "default", icon, minWidth = 128
   if (color) {
     const bg     = alpha(color, isDark ? 0.14 : 0.1);
     const border = alpha(color, isDark ? 0.35 : 0.45);
-    const text   = color; // use the main color as text in tinted mode
+    const text   = color;
 
     return (
       <Chip
@@ -49,7 +37,6 @@ export function Badge({ label, color, muiColor = "default", icon, minWidth = 128
           bgcolor:     bg,
           borderColor: border,
           color:       text,
-          // Icon inherits color from the chip via currentColor
           "& .MuiChip-icon": { color: "inherit" },
           "& .MuiChip-label": { width: "100%", textAlign: "center" },
         }}

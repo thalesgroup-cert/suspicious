@@ -1,13 +1,3 @@
-//
-// Appearance settings panel for semantic colors.
-// Reads from colorStore (Zustand), persists to backend via React Query.
-//
-// Sync strategy:
-//   • Preset switch       → immediate PATCH /api/profile/colors/
-//   • Swatch drag/pick    → optimistic local update + debounced PATCH (800ms)
-//   • "Reset" button      → POST /api/profile/colors/reset/
-//   • On mount            → hydrateFromProfile() called by ProfilePage
-//                           after ["profile"] query resolves
 
 import * as React from "react";
 import {
@@ -286,7 +276,6 @@ export function ColorSettingsPanel() {
   return (
     <Stack spacing={2.5}>
 
-      {/* Header */}
       <Stack direction="row" spacing={1.5} sx={{ alignItems: "center" }} >
         <Box sx={{ width: 46, height: 46, borderRadius: 3, display: "grid", placeItems: "center", background: "linear-gradient(135deg, rgba(56,189,248,.14), rgba(120,119,198,.12))", border: "1px solid rgba(56,189,248,.2)", "& svg": { fontSize: 22 } }}>
           <AccessibilityNewOutlined />
@@ -311,7 +300,6 @@ export function ColorSettingsPanel() {
 
       <Divider sx={{ opacity: 0.25 }} />
 
-      {/* Accessibility banner */}
       <InnerCard sx={{ px: 2, py: 1.25, borderColor: alpha("#56B4E9", isDark ? 0.3 : 0.4), background: alpha("#56B4E9", isDark ? 0.06 : 0.04) }}>
         <Typography variant="body2" color="text.secondary" sx={{ fontSize: 12.5, lineHeight: 1.6 }}>
           <Box component="span" sx={{ fontWeight: 800, color: "#56B4E9" }}>Colorblind-safe</Box>{" "}
@@ -320,7 +308,6 @@ export function ColorSettingsPanel() {
         </Typography>
       </InnerCard>
 
-      {/* Presets */}
       <Stack spacing={1}>
         <CaptionLabel>Preset</CaptionLabel>
         <Stack direction={{ xs: "column", sm: "row" }} spacing={1}>
@@ -331,10 +318,8 @@ export function ColorSettingsPanel() {
         </Stack>
       </Stack>
 
-      {/* Preview */}
       <LivePreview />
 
-      {/* Color pickers */}
       <ColorGroup
         title="Analysis result colors"
         keys={["safe", "suspicious", "dangerous", "inconclusive"] as ResultKey[]}
@@ -349,7 +334,6 @@ export function ColorSettingsPanel() {
         onChange={handleStatusColor} saving={isSaving}
       />
 
-      {/* Reset */}
       <Stack direction="row" sx={{ justifyContent: "flex-end" }} >
         <Button size="small" startIcon={<RestoreOutlined />} disabled={isSaving} onClick={handleReset}
           sx={{ textTransform: "none", fontWeight: 800, borderRadius: 2, color: "text.secondary" }}>

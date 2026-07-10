@@ -229,7 +229,6 @@ export default function CampaignsPage() {
     })
     .filter(Boolean) as { name: string; startIdx: number; endIdx: number }[];
 
-  // Chart axis tick color adapts to theme
   const tickStyle = { fontSize: 11, fill: theme.palette.text.secondary };
   const gridOpacity = isDark ? 0.25 : 0.4;
   const cursorFill = isDark
@@ -246,7 +245,6 @@ export default function CampaignsPage() {
       <GridStyles />
 
       {/* ---------------------------------------------------------------- */}
-      {/* Page header                                                       */}
       {/* ---------------------------------------------------------------- */}
       <Stack
         direction={{ xs: "column", md: "row" }}
@@ -307,7 +305,6 @@ export default function CampaignsPage() {
       </Stack>
 
       {/* ---------------------------------------------------------------- */}
-      {/* Draggable / resizable grid                                        */}
       {/* ---------------------------------------------------------------- */}
       <ResponsiveGridLayout
         className="campaigns-layout"
@@ -386,7 +383,6 @@ export default function CampaignsPage() {
               }
               fillHeight
             >
-              {/* Label toggles */}
               <Stack
                 direction="row"
                 spacing={0.75}
@@ -607,7 +603,6 @@ export default function CampaignsPage() {
                 </ResponsiveContainer>
               </Box>
 
-              {/* Campaign band chips */}
               {campaignBands.length ? (
                 <Stack
                   direction="row"

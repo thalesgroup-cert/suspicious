@@ -2,7 +2,6 @@ import * as React from "react";
 import { Box } from "@mui/material";
 import { alpha, useTheme } from "@mui/material/styles";
 
-// Drag handle + panel shell (mirrors DashboardPage)
 
 function DragDots({ dotColor }: { dotColor: string }) {
   return (
@@ -95,7 +94,6 @@ export const PanelShell = React.memo(function PanelShell({
   );
 });
 
-// Global CSS overrides for grid (mirrors DashboardPage.GridStyles)
 export function GridStyles() {
   const theme = useTheme();
   const isDark = theme.palette.mode === "dark";

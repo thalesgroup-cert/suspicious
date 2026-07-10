@@ -132,7 +132,6 @@ describe("InvestigationPage", () => {
     renderInvestigation();
 
     await waitFor(() => {
-      // Row artifact or reporter email should appear
       expect(
         screen.getByText(/phish\.evil\.com|reporter@corp/i)
       ).toBeInTheDocument();
@@ -142,7 +141,6 @@ describe("InvestigationPage", () => {
   it("shows correct result chip for a suspicious case", async () => {
     renderInvestigation();
 
-    // The uppercase chip label "SUSPICIOUS" disambiguates from prose text.
     await waitFor(() => {
       expect(screen.getByText("SUSPICIOUS")).toBeInTheDocument();
     });
@@ -158,13 +156,11 @@ describe("InvestigationPage", () => {
       ).toBeInTheDocument();
     });
 
-    // Click the investigation row
     const row = screen.getByText(/phish\.evil\.com|reporter@corp/i).closest("tr") ??
                  screen.getByText(/phish\.evil\.com|reporter@corp/i);
     await user.click(row);
 
     await waitFor(() => {
-      // The details query should be triggered and the analyzer name should render
       expect(mockGetDetails).toHaveBeenCalledWith(7);
     });
   });
@@ -184,7 +180,6 @@ describe("InvestigationPage", () => {
     await user.click(row);
 
     await waitFor(() => {
-      // PhishingURLAnalyzer name should appear in the drawer
       expect(screen.getByText(/PhishingURLAnalyzer/i)).toBeInTheDocument();
     });
   });
@@ -302,12 +297,10 @@ describe("InvestigationPage", () => {
   });
 
   it("redirects non-elevated users away from the page", async () => {
-    // Render without elevated groups — the component should show nothing / redirect
     mockGetMe.mockResolvedValue({ ...mockMe, groups: [] } as never);
 
     renderInvestigation();
 
-    // The investigations table should never appear
     await waitFor(() => {
       expect(mockGetAll).not.toHaveBeenCalled();
     });

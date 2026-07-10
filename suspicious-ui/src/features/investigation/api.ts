@@ -119,8 +119,8 @@ export type InvestigationListParams = {
   search?: string;
   status?: InvestigationStatus | "ALL";
   type?: InvestigationType | "ALL";
-  result?: InvestigationResult | "ALL";   // added for backend result filter
-  ordering?: string;                        // raw ordering string (from column header clicks)
+  result?: InvestigationResult | "ALL";
+  ordering?: string;
   from?: string;
   to?: string;
   sort?: InvestigationSort;
@@ -305,7 +305,6 @@ function mapSort(sort: InvestigationListParams["sort"]): string {
   }
 }
 
-// Called directly by sortable column headers with field + direction
 export function buildSortOrdering(
   field: "creation_date" | "id" | "status" | "result",
   dir: "asc" | "desc"

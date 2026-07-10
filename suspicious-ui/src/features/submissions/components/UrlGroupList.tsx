@@ -53,9 +53,7 @@ export function UrlGroupList({ submissionId, urls }: UrlGroupListProps) {
   const theme = useTheme();
   const isDark = theme.palette.mode === "dark";
 
-  // Track which url ids have an in-flight analyze request
   const [busyIds, setBusyIds] = useState<Set<number>>(new Set());
-  // Optimistically flip status to "pending" after triggering analyze
   const [optimisticStatus, setOptimisticStatus] = useState<
     Map<number, UrlArtifact["analysis_status"]>
   >(new Map());
@@ -74,7 +72,6 @@ export function UrlGroupList({ submissionId, urls }: UrlGroupListProps) {
     }
   };
 
-  // Group by registered domain, preserving insertion order
   const groups = new Map<string, UrlArtifact[]>();
   for (const u of urls) {
     const domain = registeredDomain(u.address);
@@ -88,18 +85,15 @@ export function UrlGroupList({ submissionId, urls }: UrlGroupListProps) {
     <Box>
       <Stack spacing={1}>
         {[...groups.entries()].map(([domain, items]) => {
-          // Resolve each item with its optimistic status
           const resolved = items.map((u) => ({
             ...u,
             analysis_status: optimisticStatus.get(u.id) ?? u.analysis_status,
           }));
 
-          // Sort by interestingness desc
           const sorted = [...resolved].sort(
             (a, b) => b.interestingness - a.interestingness,
           );
 
-          // Count by status
           const counts = resolved.reduce<Record<string, number>>((acc, u) => {
             acc[u.analysis_status] = (acc[u.analysis_status] ?? 0) + 1;
             return acc;
@@ -158,7 +152,6 @@ export function UrlGroupList({ submissionId, urls }: UrlGroupListProps) {
                   >
                     {items.length} URL{items.length !== 1 ? "s" : ""}
                   </Typography>
-                  {/* Status breakdown chips */}
                   {(
                     [
                       ["analyzed", counts.analyzed],
@@ -209,7 +202,6 @@ export function UrlGroupList({ submissionId, urls }: UrlGroupListProps) {
                           border: `1px solid ${alpha(theme.palette.divider, isDark ? 0.1 : 0.3)}`,
                         }}
                       >
-                        {/* Status chip */}
                         <Chip
                           label={effectiveStatus}
                           size="small"
@@ -224,7 +216,6 @@ export function UrlGroupList({ submissionId, urls }: UrlGroupListProps) {
                           }}
                         />
 
-                        {/* URL text */}
                         <Tooltip title={u.address} placement="top-start">
                           <Typography
                             variant="body2"
@@ -241,10 +232,8 @@ export function UrlGroupList({ submissionId, urls }: UrlGroupListProps) {
                           </Typography>
                         </Tooltip>
 
-                        {/* Copy URL to clipboard */}
                         <CopyIconButton text={u.address} title="Copy URL" />
 
-                        {/* Analyze button — only on skipped rows */}
                         {effectiveStatus === "skipped" && (
                           <Button
                             size="small"

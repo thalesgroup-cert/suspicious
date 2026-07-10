@@ -51,7 +51,7 @@ describe("avatar helper", () => {
       seed: "abc123",
       options: { eyes: ["happy"] },
     });
-    expect(withOpt).toBe(withOptAgain); // deterministic
+    expect(withOpt).toBe(withOptAgain);
     expect(withOpt).not.toBe(base); // pinning a category changes the render
   });
 
@@ -67,7 +67,6 @@ describe("avatar helper", () => {
     expect(cats.length).toBeGreaterThan(0);
     expect(keys).toContain("eyes");
     expect(keys).toContain("mouth");
-    // every category has a non-empty list of string values and a label
     for (const c of cats) {
       expect(c.values.length).toBeGreaterThan(0);
       expect(typeof c.label).toBe("string");

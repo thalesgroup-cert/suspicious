@@ -2,7 +2,6 @@ import * as React from "react";
 import { Card } from "@mui/material";
 import { alpha, useTheme } from "@mui/material/styles";
 
-// Theme-aware container card shared across feature surfaces.
 export function SoftCard(props: React.PropsWithChildren<{ sx?: object }>) {
   const theme = useTheme();
   const isDark = theme.palette.mode === "dark";

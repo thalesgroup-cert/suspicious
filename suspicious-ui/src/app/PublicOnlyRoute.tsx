@@ -19,8 +19,6 @@ export default function PublicOnlyRoute({ children }: Props) {
     queryKey: ["me"],
     queryFn: getMe,
     retry: false,
-    // Skip the network round-trip when there's no session indicator — avoids
-    // a 401 log entry and a loading spinner on every visit to /login.
     enabled: maybeLoggedIn,
   });
 

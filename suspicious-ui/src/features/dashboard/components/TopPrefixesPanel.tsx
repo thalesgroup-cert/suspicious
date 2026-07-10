@@ -27,8 +27,6 @@ import { useResultColors, useStatusColors } from "@/styles/colorStore";
 
 type TopPrefixesType = "user" | "group";
 
-// CATEGORY_CONFIG is built dynamically from the color store (see component)
-// so it respects the user's preset (Standard / Colorblind-safe / Monochrome).
 type CategoryKey = "safe" | "suspicious" | "dangerous" | "failure" | "inconclusive";
 
 type CategoryConfig = {
@@ -68,8 +66,6 @@ function compactLabel(text: string, max = 14) {
   return text.length > max ? `${text.slice(0, max - 1)}…` : text;
 }
 
-// Rank badge visual config — gold/silver/bronze trophy aesthetics,
-// not semantic status colors (intentionally stays hardcoded).
 function getRankBadge(rank: number) {
   if (rank === 0) {
     return {
@@ -136,10 +132,6 @@ export default function TopPrefixesPanel({
   const theme = useTheme();
   const isDark = theme.palette.mode === "dark";
 
-  // Build category config from the semantic color store so stacked bar
-  // segments and legend dots respect the user's colorblind-safe preset.
-  // "Failure" maps to statusColors.failure (processing error, not an
-  // analysis result) — the other four map to resultColors.
   const resultColors = useResultColors();
   const statusColors  = useStatusColors();
 
@@ -197,7 +189,6 @@ export default function TopPrefixesPanel({
     ? "1px solid rgba(255,255,255,0.10)"
     : `1px solid ${alpha(theme.palette.divider, 0.45)}`;
 
-  // #1 rank chip uses theme primary (not a semantic result color)
   const chipBgTop  = isDark
     ? alpha(theme.palette.primary.main, 0.16)
     : alpha(theme.palette.primary.main, 0.12);
@@ -268,7 +259,6 @@ export default function TopPrefixesPanel({
                     background: index === 0 ? rowBgTop : rowBgRest,
                   }}
                 >
-                  {/* Row header: rank badge + prefix label + total chip */}
                   <Stack
                     direction="row"
                     spacing={2}
@@ -323,7 +313,6 @@ export default function TopPrefixesPanel({
                     />
                   </Stack>
 
-                  {/* Stacked bar — segment colors from the color store */}
                   <Box
                     sx={{
                       height: 16,
@@ -356,7 +345,6 @@ export default function TopPrefixesPanel({
                     })}
                   </Box>
 
-                  {/* Legend */}
                   <Stack
                     direction="row"
                     spacing={1.5}

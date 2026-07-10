@@ -227,7 +227,6 @@ export default function SubmitPage() {
     <Container data-tour="submit-form" maxWidth="lg" sx={{ py: { xs: 2.5, md: 3.5 }, pb: 8 }}>
       <Stack spacing={2}>
         {/* ---------------------------------------------------------------- */}
-        {/* Header + mode selector                                           */}
         {/* ---------------------------------------------------------------- */}
         <SoftCard>
           <CardContent sx={{ p: { xs: 2.25, md: 3 } }}>
@@ -273,7 +272,6 @@ export default function SubmitPage() {
         </SoftCard>
 
         {/* ---------------------------------------------------------------- */}
-        {/* Main content + sidebar                                           */}
         {/* ---------------------------------------------------------------- */}
         <Box
           sx={{
@@ -283,11 +281,9 @@ export default function SubmitPage() {
             alignItems: "start",
           }}
         >
-          {/* Main form */}
           <SoftCard>
             <CardContent sx={{ p: { xs: 2.25, md: 3 } }}>
               {/* ---------------------------------------------------------- */}
-              {/* FILE mode                                                   */}
               {/* ---------------------------------------------------------- */}
               {mode === "file" ? (
                 <Stack spacing={2.5}>
@@ -435,7 +431,6 @@ export default function SubmitPage() {
               ) : null}
 
               {/* ---------------------------------------------------------- */}
-              {/* ARTIFACT mode — URL / domain / IOC unified                  */}
               {/* ---------------------------------------------------------- */}
               {mode === "artifact" ? (
                 <Stack spacing={2.5}>
@@ -506,7 +501,6 @@ export default function SubmitPage() {
             </CardContent>
           </SoftCard>
 
-          {/* Sidebar */}
           <Stack spacing={2}>
             <SidePanel title="Guidance" icon={<InfoOutlined fontSize="small" />}>
               <Typography variant="body2" color="text.secondary">
@@ -588,7 +582,6 @@ export default function SubmitPage() {
       </Stack>
 
       {/* ------------------------------------------------------------------ */}
-      {/* Loading overlay                                                     */}
       {/* ------------------------------------------------------------------ */}
       <Dialog open={loadingOpen} onClose={() => {}} maxWidth="xs" fullWidth>
         <DialogContent sx={{ py: 4 }}>

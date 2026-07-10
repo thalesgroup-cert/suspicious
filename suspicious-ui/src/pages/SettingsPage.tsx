@@ -69,7 +69,6 @@ export default function SettingsPage() {
       animate="shimmer"
     >
     <Box sx={{ p: { xs: 1.5, md: 2.5 } }}>
-      {/* Page header */}
       <Stack
         direction={{ xs: "column", md: "row" }}
         spacing={1.5}
@@ -109,11 +108,9 @@ export default function SettingsPage() {
       </Stack>
 
       <Grid container spacing={2} sx={{ alignItems: "flex-start" }} >
-        {/* Sidebar nav */}
         <Grid size={{ xs: 12, md: 3.5, lg: 3 }}>
           <SoftCard sx={{ overflow: "hidden", position: { md: "sticky" }, top: { md: 16 } }}>
             <CardContent sx={{ p: 1.5 }}>
-              {/* Console identity */}
               <Stack direction="row" spacing={1.25} sx={{ px: 1, py: 1, mb: 0.5, alignItems: "center" }}>
                 <Box
                   sx={{
@@ -137,7 +134,6 @@ export default function SettingsPage() {
 
               <Divider sx={{ opacity: isDark ? 0.18 : 0.45, my: 1 }} />
 
-              {/* Section list */}
               <List dense disablePadding>
                 {SECTIONS.map((s) => {
                   const isActive = active === s.key;
@@ -187,11 +183,9 @@ export default function SettingsPage() {
           </SoftCard>
         </Grid>
 
-        {/* Main content panel */}
         <Grid size={{ xs: 12, md: 8.5, lg: 9 }}>
           <SoftCard>
             <CardContent sx={{ p: { xs: 2, md: 3 } }}>
-              {/* Section header */}
               <Stack
                 direction={{ xs: "column", sm: "row" }}
                 spacing={1.25}
@@ -240,7 +234,6 @@ export default function SettingsPage() {
 
               <Divider sx={{ opacity: isDark ? 0.18 : 0.45, mb: 2.5 }} />
 
-              {/* Section body */}
               <SectionContent section={activeMeta} />
             </CardContent>
           </SoftCard>

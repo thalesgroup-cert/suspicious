@@ -1,6 +1,5 @@
 import type { Step } from "react-joyride";
 
-// Steps whose targets are always mounted (desktop sidebar). Shown first, every page.
 export const GLOBAL_STEPS: Step[] = [
   {
     target: '[data-tour="nav-primary"]',
@@ -29,7 +28,6 @@ export const GLOBAL_STEPS: Step[] = [
   },
 ];
 
-// Keyed by route prefix; matched longest-prefix-first against location.pathname.
 export const PAGE_STEPS: Record<string, Step[]> = {
   "/submit": [
     {

@@ -77,14 +77,12 @@ export function PcaTooltip({
         backdropFilter: "blur(6px)",
       }}
     >
-      {/* Verdict label */}
       <Typography
         sx={{ fontSize: 12, fontWeight: 800, color: "text.primary", mb: 0.5 }}
       >
         {point.label || "UNKNOWN"}
       </Typography>
 
-      {/* Mail subject — primary context line */}
       {point.mail_subject ? (
         <Typography
           sx={{
@@ -103,14 +101,12 @@ export function PcaTooltip({
         </Typography>
       ) : null}
 
-      {/* Case ID */}
       {point.suspicious_case_id ? (
         <Typography sx={{ fontSize: 11, color: "text.secondary", mb: 0.5 }}>
           Case #{point.suspicious_case_id}
         </Typography>
       ) : null}
 
-      {/* Campaign source refs */}
       {refs.length ? (
         <Typography
           sx={{

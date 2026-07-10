@@ -13,8 +13,6 @@ describe("env", () => {
   });
 
   it("ignores an empty runtime value and falls through to build-time", () => {
-    // Stub the build-time value so the test doesn't depend on an untracked
-    // .env; an empty runtime override must be skipped so the build value wins.
     vi.stubEnv("VITE_API_BASE", "/api");
     window.__ENV__ = { VITE_API_BASE: "" };
     expect(env("VITE_API_BASE")).toBe("/api");

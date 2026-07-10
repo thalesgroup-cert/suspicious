@@ -54,18 +54,6 @@ export function formatBytes(bytes: number) {
 }
 
 // ---------------------------------------------------------------------------
-// Artifact classification
-//
-// Determines whether a raw input string should be routed to /submit/url/
-// or /submit/other/.
-//
-// Rules (in priority order):
-//   1. Starts with http:// or https://                                   → url
-//   2. Looks like a bare domain (evil.com, sub.evil.co.uk, evil.com/path) → url
-//   3. Everything else (hash, IP, free-text IOC)                          → ioc
-//
-// The bare-domain branch also normalises the value to "http://<input>"
-// before sending, because Django's URLField requires a scheme.
 // ---------------------------------------------------------------------------
 
 export const FULL_URL_RE = /^https?:\/\/.+/i;

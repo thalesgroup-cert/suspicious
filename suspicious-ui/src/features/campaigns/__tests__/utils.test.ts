@@ -77,7 +77,6 @@ describe("computeCampaignRects", () => {
     ]);
     expect(rects).toHaveLength(1);
     expect(rects[0].name).toBe("c1");
-    // span 2 -> pad = max(0.2, 2*0.1) = 0.2
     expect(rects[0].x1).toBeCloseTo(-0.2);
     expect(rects[0].x2).toBeCloseTo(2.2);
     expect(rects[0].y1).toBeCloseTo(-0.2);

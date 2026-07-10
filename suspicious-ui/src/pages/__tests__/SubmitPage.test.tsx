@@ -15,7 +15,6 @@ vi.mock("@/api/auth", () => ({
   hydrateAppearanceFromMe: vi.fn(),
 }));
 
-// api.post / api.get used for submissions and config
 vi.mock("@/api/client", () => ({
   api: {
     get: vi.fn(),
@@ -47,14 +46,12 @@ describe("SubmitPage", () => {
   beforeEach(() => {
     vi.clearAllMocks();
     mockGetMe.mockResolvedValue(mockMe as never);
-    // getSubmitConfig response (returns suspicious_email or a config object)
     mockApiGet.mockResolvedValue({ data: "suspicious@corp.test" } as never);
   });
 
   it("renders both submission modes", async () => {
     renderSubmit();
 
-    // File mode is the default; both mode cards are present.
     expect(
       await screen.findByText("Drag and drop or click to browse")
     ).toBeInTheDocument();
@@ -75,7 +72,6 @@ describe("SubmitPage", () => {
 
     await user.click(await screen.findByText("URL, Domain or Indicator"));
 
-    // The artifact value field (label "URL, domain or indicator") appears.
     expect(
       await screen.findByLabelText(/url, domain or indicator/i)
     ).toBeInTheDocument();

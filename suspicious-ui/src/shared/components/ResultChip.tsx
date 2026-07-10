@@ -1,10 +1,3 @@
-//
-// Renders an analysis result badge whose color comes from the semantic
-// color store (useResultColors). Preset changes in ProfilePage propagate
-// here automatically via Zustand reactivity.
-//
-// Dual encoding: every result also carries a distinct icon so the badge
-// remains accessible when color perception is limited.
 
 import * as React from "react";
 import {
@@ -19,11 +12,6 @@ import { useResultColors, useStatusColors } from "@/styles/colorStore";
 import { Badge } from "@/shared/components/Badge";
 import type { ResultKey, StatusKey } from "@/styles/colorStore";
 
-// Each API result maps to:
-//   group    — "result" | "status" (which store to read from)
-//   storeKey — the key within that group
-//   label    — display text
-//   icon     — distinct icon
 type ResultMeta = {
   group:    "result" | "status";
   storeKey: ResultKey | StatusKey;
@@ -52,7 +40,7 @@ const RESULT_META: Record<string, ResultMeta> = {
   },
   UNWANTED: {
     group:    "result",
-    storeKey: "suspicious",   // unwanted = suspicious severity
+    storeKey: "suspicious",
     label:    "UNWANTED",
     icon:     <WarningAmberOutlined fontSize="small" />,
   },
@@ -70,13 +58,13 @@ const RESULT_META: Record<string, ResultMeta> = {
   },
   MALICIOUS: {
     group:    "result",
-    storeKey: "dangerous",    // malicious = dangerous tier
+    storeKey: "dangerous",
     label:    "MALICIOUS",
     icon:     <GppBadOutlined fontSize="small" />,
   },
   FAILURE: {
     group:    "status",
-    storeKey: "failure",      // processing failure, not an analysis result
+    storeKey: "failure",
     label:    "FAILURE",
     icon:     <ErrorOutlined fontSize="small" />,
   },

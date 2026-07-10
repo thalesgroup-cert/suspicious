@@ -24,18 +24,14 @@ export default function ProtectedRoute({ children, requireGroups }: Props) {
     retry: false,
   });
 
-  // Show a full-page loader while we resolve auth — never flash null.
   if (isLoading) {
     return <PageLoader />;
   }
 
-  // Not authenticated → go to login, preserving the intended destination
-  // so we can redirect back after a successful login if desired.
   if (isError || !me) {
     return <Navigate to="/login" replace state={{ from: location.pathname }} />;
   }
 
-  // Role gate — redirect to home if the user lacks the required group.
   if (requireGroups && requireGroups.length > 0) {
     const groups: string[] = (me as any)?.groups ?? [];
     const hasAccess = requireGroups.some((g) => groups.includes(g));

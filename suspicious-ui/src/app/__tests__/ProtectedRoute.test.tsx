@@ -43,7 +43,6 @@ describe("ProtectedRoute", () => {
   });
 
   it("renders the loader while /me is in flight", async () => {
-    // Never-resolving promise keeps the query in isLoading.
     mockGetMe.mockImplementation(() => new Promise(() => {}));
 
     renderWithProviders(<ProtectedTree />, { initialPath: "/secret" });

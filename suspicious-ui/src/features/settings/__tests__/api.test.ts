@@ -1,9 +1,5 @@
 import { describe, it, expect, vi, beforeEach } from "vitest";
 
-// Mock the axios wrapper so we never touch the network. Tests assert
-// that each settings helper hits the right URL with the right body —
-// the layer guarded by the audit's M1 "Settings: toggle change persists,
-// blacklist add/remove" requirement.
 
 vi.mock("@/api/client", () => ({
   api: {

@@ -6,9 +6,6 @@ import PublicOnlyRoute from "@/app/PublicOnlyRoute";
 import PageLoader from "@/styles/components/PageLoader";
 
 // ---------------------------------------------------------------------------
-// Route-level lazy chunks.
-// Each import() becomes a separate JS chunk — loaded only when the user
-// navigates to that route for the first time.
 // ---------------------------------------------------------------------------
 
 const LoginPage        = lazy(() => import("@/pages/LoginPage"));
@@ -23,11 +20,9 @@ const InvestigationPage = lazy(() => import("@/pages/InvestigationPage"));
 const AboutPage        = lazy(() => import("@/pages/AboutPage"));
 const NotFound         = lazy(() => import("@/pages/NotFound"));
 
-// Groups that unlock elevated routes.
 const ELEVATED = ["Admin", "CISO", "CERT"];
 const ADMIN    = ["Admin", "CERT"];
 
-// Thin wrapper — keeps route definitions readable without repeating Suspense.
 const fallback = <PageLoader />;
 function S({ children }: { children: React.ReactElement }) {
   return <Suspense fallback={fallback}>{children}</Suspense>;

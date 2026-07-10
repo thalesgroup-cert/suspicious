@@ -18,7 +18,6 @@ import {
 } from "@/features/profile/avatar";
 import { initials as initialsFn } from "@/features/profile/utils";
 
-// DirtyBar lives in ProfilePage; the panel is controlled and the parent renders it.
 export function AvatarPanel({
   style, seed, setStyle, setSeed,
   options, setOptions,
@@ -59,7 +58,6 @@ export function AvatarPanel({
 
       {dirtyBar}
 
-      {/* Live preview + randomize */}
       <InnerCard sx={{ px: 2, py: 2, display: "flex", alignItems: "center", gap: 2 }}>
         <UserAvatar avatar={config} initials={inits} sx={{ width: 72, height: 72, fontSize: 26, fontWeight: 950 }} />
         <Box sx={{ flex: 1, minWidth: 0 }}>
@@ -75,7 +73,6 @@ export function AvatarPanel({
         </Button>
       </InnerCard>
 
-      {/* Style grid */}
       <Stack spacing={1}>
         <CaptionLabel>Style</CaptionLabel>
         <Box sx={{ display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(84px, 1fr))", gap: 1 }}>
@@ -105,7 +102,6 @@ export function AvatarPanel({
         </Box>
       </Stack>
 
-      {/* Categories — one carousel per enum option in the style's schema */}
       {categories.length > 0 && (
         <Stack spacing={1}>
           <CaptionLabel>Customize</CaptionLabel>

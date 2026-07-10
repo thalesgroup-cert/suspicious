@@ -1,20 +1,3 @@
-//
-// Semantic color hydration strategy:
-//
-//   The backend now embeds semantic_colors directly in GET /auth/me/
-//   (via MeResponseSerializer → AuthenticatedUserSerializer).
-//
-//   This eliminates the previous second roundtrip to /profile/colors/
-//   that was fired on every page load. Colors are now available in the
-//   very first authenticated response — before any page component mounts.
-//
-//   Flow:
-//     1. login() sets the token, React Query invalidates ["me"]
-//     2. ProtectedRoute mounts → useQuery(["me"]) → getMe()
-//     3. getMe() receives Me response with semantic_colors embedded
-//     4. hydrateColorsFromMe() pushes them into the Zustand colorStore
-//     5. Every dashboard panel, chip, and indicator already has the
-//        correct user-configured colors by the time they render
 
 import { api } from "@/api/client";
 import { endpoints } from "@/api/endpoints";
@@ -34,22 +17,15 @@ export type Me = {
   last_name?: string;
   groups: string[];
   ciso_scope?: string;
-  // Embedded by MeResponseSerializer. Optional so the type stays compatible
-  // with pre-migration backends that don't yet return these fields.
   semantic_colors?: {
     result: ResultColors;
     status: StatusColors;
   };
-  // Theme preference — embedded alongside colors so a single getMe()
-  // call gives us everything needed to render the correct appearance.
   theme?: string;
   auto_seasonal?: boolean;
 };
 
 export type LoginResponse = {
-  // token is still present in the response body for API clients that use the
-  // Authorization header — the browser SPA ignores it and relies on the
-  // httpOnly cookie set by the server.
   token?: string;
   expiry: string | null;
   user: {
@@ -63,9 +39,6 @@ export type LoginResponse = {
 };
 
 // ---------------------------------------------------------------------------
-// Appearance hydration — called with every successful getMe() response.
-// Applies both the color preset and the theme/seasonal preference so the
-// correct appearance is active before any page component renders.
 // ---------------------------------------------------------------------------
 
 function hydrateAppearanceFromMe(me: Me): void {
@@ -80,9 +53,6 @@ function hydrateAppearanceFromMe(me: Me): void {
   }
 
   // ── Theme + auto_seasonal ─────────────────────────────────────────────────
-  // Only hydrate if the server actually returned these fields.
-  // Pre-migration backends that don't include them are silently skipped —
-  // the localStorage value (or OS preference) continues to be used.
   try {
     if (me.theme || me.auto_seasonal !== undefined) {
       hydrateThemeFromServer(
@@ -108,9 +78,6 @@ export async function login(
     password,
   });
 
-  // The server sets the httpOnly knox_token cookie in the response — nothing
-  // to store here. Colors are hydrated on the subsequent getMe() call which
-  // React Query fires automatically via the ["me"] query on mount.
 
   return res.data;
 }
@@ -126,11 +93,6 @@ export async function logout(): Promise<void> {
 }
 
 // ---------------------------------------------------------------------------
-// SSO helper — called by LoginPage on the ?sso=1 redirect. The httpOnly
-// knox_token cookie is already set by the OIDC callback, so there is no token
-// to read from the URL. Fires getMe() to both verify the cookie and hydrate
-// colors in one shot, since the SSO path bypasses the normal
-// login() → getMe() sequence.
 // ---------------------------------------------------------------------------
 
 export async function hydrateColorsAfterSso(): Promise<void> {
@@ -145,8 +107,6 @@ export async function hydrateColorsAfterSso(): Promise<void> {
 export async function getMe(): Promise<Me> {
   const res = await api.get<Me>(endpoints.me);
 
-  // Hydrate both colors and theme from the embedded appearance fields.
-  // Runs on: initial page load, hard refresh, SSO callback, tab focus re-auth.
   hydrateAppearanceFromMe(res.data);
 
   return res.data;

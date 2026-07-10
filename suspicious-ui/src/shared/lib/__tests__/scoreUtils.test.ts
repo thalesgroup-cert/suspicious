@@ -84,7 +84,6 @@ describe("groupReportsByArtifact (generic)", () => {
     ];
     const groups = groupReportsByArtifact(reports);
     expect(groups.map((g) => g.key)).toEqual(["URL::a.com", "FILE::x"]);
-    // Element type is preserved (T = the input object), so `.id` is accessible.
     expect(groups[0].reports[0].id).toBe(1);
     expect(groups[0].reports).toHaveLength(2);
   });

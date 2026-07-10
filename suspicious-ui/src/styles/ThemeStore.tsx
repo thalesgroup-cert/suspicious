@@ -7,24 +7,12 @@ import { themes, type ThemeName, getSeasonalThemeName } from "./themes";
 // ---------------------------------------------------------------------------
 
 const STORAGE_KEY      = "suspicious.theme";
-const STORAGE_KEY_AUTO = "suspicious.theme.auto"; // "1" | "0"
+const STORAGE_KEY_AUTO = "suspicious.theme.auto";
 const DEFAULT_THEME: ThemeName = "light";
 
-// Custom event dispatched by hydrateThemeFromServer() so AppThemeProvider
-// can react immediately without a page reload.
 const THEME_HYDRATE_EVENT = "suspicious:theme-hydrate";
 
 // ---------------------------------------------------------------------------
-// Theme capabilities
-//
-// Each theme may define utility CSS classes, CSS custom properties, and named
-// visual effects beyond the standard MUI palette. This record documents them
-// so consuming components can apply them without hardcoding theme names.
-//
-// Usage:
-//   const { capabilities } = useThemeMode();
-//   <div className={capabilities.utilityClasses.includes("fennec") ? "fennec" : ""} />
-//   if (capabilities.effects.hasGlitchEffect) { ... }
 // ---------------------------------------------------------------------------
 
 /** Named feature flags — each describes a visual capability a theme provides. */
@@ -123,8 +111,6 @@ export const THEME_CAPABILITIES: Record<ThemeName, ThemeCapabilities> = {
     effects:        {},
   },
 
-  // Grouped under "Classic" in ThemePicker, but a light theme — kept here with
-  // the other light base themes.
   renee: {
     label:       "Renée",
     description: "Where orchid rests, life becomes memory.",
@@ -242,10 +228,10 @@ export const THEME_CAPABILITIES: Record<ThemeName, ThemeCapabilities> = {
     isDark: true,
     utilityClasses: ["cardboard-box", "stealth-camo", "hud-alertable"],
     cssVars: [
-      "--mgs-codec-snake",   // Codec frequency: 140.85
-      "--mgs-codec-otacon",  // Codec frequency: 141.12
-      "--mgs-alert",         // #E1061B — ALERT siren red
-      "--mgs-caution",       // #F2C94C — CAUTION amber
+      "--mgs-codec-snake",
+      "--mgs-codec-otacon",
+      "--mgs-alert",
+      "--mgs-caution",
       "--mgs-codec",         // #37D6C7 — Codec screen teal
     ],
     effects: {
@@ -261,26 +247,26 @@ export const THEME_CAPABILITIES: Record<ThemeName, ThemeCapabilities> = {
     lore:        "«Here's what's gonna happen...» — Le Visiteur du Futur (web series 2009–2012, film 2022). ",
     isDark: true,
     utilityClasses: [
-      "temporal-arrive",  // element enters as if stepping out of a portal
-      "portal-flash",     // radial blue burst pseudo-element
-      "contaminated",     // irradiated green pulsing border
-      "brigade-scan",     // cold blue scan sweep + animated shimmer
-      "temporal-glitch",  // periodic timeline-corruption glitch
-      "visitor-briefing", // scrawled note styled like the Visitor's field notes
+      "temporal-arrive",
+      "portal-flash",
+      "contaminated",
+      "brigade-scan",
+      "temporal-glitch",
+      "visitor-briefing",
       "fennec",           // ambient amber heartbeat — Fennec approves
     ],
     cssVars: [
-      "--visitor-coat",    // #E8720C — Visitor's amber coat
-      "--visitor-fennec",  // #F5A623 — Fennec ear-tips & paw pads
-      "--visitor-ash",     // #E8DED0 — ash bone text
-      "--brigade-blue",    // #4A90D9 — Brigade armour & portal flash
-      "--brigade-ghost",   // #8FA8C0 — Brigade ghost / smoke secondary
-      "--brigade-alert",   // #C42B0A — Brigade alert siren
-      "--future-char",     // #0D0905 — burnt char floor of 2555 Paris
-      "--future-timber",   // #160E08 — scorched timber walls
-      "--future-copper",   // #C87941 — copper wiring / relic tech
-      "--future-green",    // #5CB85C — contamination / irradiation glow
-      "--bracelet-on",     // #E8720C — bracelet active
+      "--visitor-coat",
+      "--visitor-fennec",
+      "--visitor-ash",
+      "--brigade-blue",
+      "--brigade-ghost",
+      "--brigade-alert",
+      "--future-char",
+      "--future-timber",
+      "--future-copper",
+      "--future-green",
+      "--bracelet-on",
       "--bracelet-full",   // #F5A623 — bracelet fully charged
     ],
     effects: {
@@ -319,18 +305,6 @@ export function useThemeMode() {
 }
 
 // ---------------------------------------------------------------------------
-// Out-of-React hydration
-//
-// Called by auth.ts → getMe() immediately after a successful /auth/me/
-// response. Cannot use React hooks (we're outside the component tree) so
-// we write directly to localStorage and fire a custom DOM event that
-// AppThemeProvider listens for — same approach as BroadcastChannel for
-// multi-tab sync, but simpler.
-//
-// Priority:
-//   1. Server value (always wins — reflects the user's saved preference)
-//   2. localStorage (offline / pre-login fallback)
-//   3. OS preference (absolute default for new users)
 // ---------------------------------------------------------------------------
 
 export function hydrateThemeFromServer(theme: string, autoSeasonal: boolean): void {
@@ -340,7 +314,6 @@ export function hydrateThemeFromServer(theme: string, autoSeasonal: boolean): vo
     }
     localStorage.setItem(STORAGE_KEY_AUTO, autoSeasonal ? "1" : "0");
 
-    // Notify AppThemeProvider to re-read and update its React state.
     window.dispatchEvent(
       new CustomEvent(THEME_HYDRATE_EVENT, {
         detail: { theme, autoSeasonal },
@@ -417,10 +390,6 @@ export function AppThemeProvider({ children }: { children: React.ReactNode }) {
   }, []);
 
   // ── Auth-time hydration via custom event ─────────────────────────────────
-  //
-  // When getMe() resolves (login, page load, tab focus), hydrateThemeFromServer()
-  // fires THEME_HYDRATE_EVENT. We listen here and update React state so the
-  // theme switches immediately without requiring a visit to ProfilePage.
 
   React.useEffect(() => {
     function onHydrate(e: Event) {
@@ -437,13 +406,9 @@ export function AppThemeProvider({ children }: { children: React.ReactNode }) {
 
     window.addEventListener(THEME_HYDRATE_EVENT, onHydrate);
     return () => window.removeEventListener(THEME_HYDRATE_EVENT, onHydrate);
-  }, []); // stable — no deps, listener identity doesn't matter
+  }, []);
 
   // ── Seasonal resolution ───────────────────────────────────────────────────
-  //
-  // When autoSeasonal is on, the resolved theme is the current seasonal
-  // theme. The manual preference is still stored under STORAGE_KEY so it
-  // survives when the user turns seasonal off.
 
   const resolvedThemeName: ThemeName = React.useMemo(() => {
     if (!autoSeasonal) return themeName;

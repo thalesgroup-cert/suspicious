@@ -49,7 +49,6 @@ const noiseSVG = (opacity = 0.06) => {
   return `url("data:image/svg+xml,${svg}")`;
 };
 
-// Horizontal scanlines tinted with a colour (for dystopian / CRT feels)
 const tintedScanlines = (hex: string, a = 0.04, step = 3) =>
   `repeating-linear-gradient(0deg, ${alpha(hex, a)}, ${alpha(hex, a)} 1px, transparent 1px, transparent ${step}px)`;
 
@@ -349,7 +348,6 @@ export function getSeasonalThemeName(date = new Date()): ThemeName {
 export const themes: Record<ThemeName, ReturnType<typeof createTheme>> = {
 
   // ── 1. MIDNIGHT — dark ───────────────────────────────────────────────
-  // Near-black background with blue corner glows and blurred glass surfaces.
   midnight: mkDark({
     bg: "#03050D",
     paper: "#070C1A",
@@ -534,7 +532,6 @@ export const themes: Record<ThemeName, ReturnType<typeof createTheme>> = {
   }),
 
   // ── 2. GRAPHITE — dark ───────────────────────────────────────────────
-  // Flat matte charcoal surfaces, steel-blue accent, left-stripe cards.
   graphite: mkDark({
     bg: "#0A0C10",
     paper: "#0F1318",
@@ -586,7 +583,6 @@ export const themes: Record<ThemeName, ReturnType<typeof createTheme>> = {
             backgroundImage: "none",
             backgroundColor: "#0F1318",
             border: "1px solid rgba(229,231,235,.09)",
-            // Left accent stripe — field report classification bar
             borderLeft: `3px solid ${alpha("#4FB3FF", 0.38)}`,
             boxShadow: `0 2px 12px rgba(10,12,16,.55)`,
           },
@@ -674,7 +670,6 @@ export const themes: Record<ThemeName, ReturnType<typeof createTheme>> = {
           root: { borderColor: "rgba(229,231,235,.08)" },
         },
       },
-      // Matte progress — sharp ends, no glow (military precision)
       MuiLinearProgress: {
         styleOverrides: {
           root: { borderRadius: 2, backgroundColor: alpha("#4FB3FF", 0.14), height: 4 },
@@ -692,7 +687,6 @@ export const themes: Record<ThemeName, ReturnType<typeof createTheme>> = {
           track: { backgroundColor: alpha("#E8EDF4", 0.16), opacity: 1 },
         },
       },
-      // Sharp indicator — no soft rounding here
       MuiTabs: {
         styleOverrides: {
           indicator: { backgroundColor: "#4FB3FF", height: 2, borderRadius: 0 },
@@ -711,7 +705,6 @@ export const themes: Record<ThemeName, ReturnType<typeof createTheme>> = {
   }),
 
   // ── 3. SLATE — dark ──────────────────────────────────────────────────
-  // Blueprint look: graph-paper grid, monospace, registration-mark cards.
   slate: mkDark({
     bg: "#07101D",
     paper: "#0C1828",
@@ -770,12 +763,10 @@ export const themes: Record<ThemeName, ReturnType<typeof createTheme>> = {
           root: {
             backgroundColor: "#0A1522",
             border: `1px solid ${alpha("#5D9EFF", 0.18)}`,
-            // Top accent bar — blueprint title block underline
             boxShadow: `
               0 2px 20px rgba(7,16,29,.55),
               inset 0 2px 0 ${alpha("#5D9EFF", 0.22)}
             `,
-            // Corner registration marks via outline trick
             outline: `1px solid ${alpha("#5D9EFF", 0.07)}`,
             outlineOffset: 3,
           },
@@ -925,7 +916,6 @@ export const themes: Record<ThemeName, ReturnType<typeof createTheme>> = {
   }),
 
   // ── 4. LIGHT — light ─────────────────────────────────────────────────
-  // White surfaces, three-level shadow depth, blue accent, no textures.
   light: mkLight({
     bg: "#F3F4F6",
     paper: "#FFFFFF",
@@ -960,7 +950,6 @@ export const themes: Record<ThemeName, ReturnType<typeof createTheme>> = {
           },
         },
       },
-      // Level 1 — surfaces, sidebars, panels
       MuiPaper: {
         styleOverrides: {
           root: {
@@ -970,7 +959,6 @@ export const themes: Record<ThemeName, ReturnType<typeof createTheme>> = {
           },
         },
       },
-      // Level 2 — content cards, clearly elevated
       MuiCard: {
         styleOverrides: {
           root: {
@@ -1100,7 +1088,6 @@ export const themes: Record<ThemeName, ReturnType<typeof createTheme>> = {
           indicator: { backgroundColor: "#1B5FFF", borderRadius: 2, height: 2 },
         },
       },
-      // Level 3 — floating (menu, tooltip)
       MuiMenu: {
         styleOverrides: {
           paper: {
@@ -1124,7 +1111,6 @@ export const themes: Record<ThemeName, ReturnType<typeof createTheme>> = {
   }),
 
   // ── 5. PAPER — light ─────────────────────────────────────────────────
-  // Warm paper surfaces with grain/noise, stacked-paper shadows, serif type.
   paper: mkLight({
     bg: "#EDE8DF",
     paper: "#FAF7F2",
@@ -1153,7 +1139,6 @@ export const themes: Record<ThemeName, ReturnType<typeof createTheme>> = {
         styleOverrides: {
           body: {
             backgroundColor: "#EDE8DF",
-            // Paper grain + edge vignette — like aged document paper
             backgroundImage: `
               ${noiseSVG(0.16)},
               radial-gradient(ellipse 120% 80% at 50% 50%, transparent 58%, rgba(120,85,40,.07) 100%)
@@ -1188,7 +1173,6 @@ export const themes: Record<ThemeName, ReturnType<typeof createTheme>> = {
       MuiCard: {
         styleOverrides: {
           root: {
-            // White card on cream desk — grain + stacked paper shadow
             backgroundImage: `linear-gradient(180deg, rgba(255,255,255,.65), rgba(255,255,255,.9)), ${noiseSVG(0.1)}`,
             backgroundBlendMode: "normal, multiply",
             backgroundColor: "#FAF7F2",
@@ -1284,7 +1268,6 @@ export const themes: Record<ThemeName, ReturnType<typeof createTheme>> = {
       },
       MuiTableCell: {
         styleOverrides: {
-          // Italic serif ledger headers — not uppercase, not mono
           head: {
             fontFamily: serifStack,
             fontSize: 12.5,
@@ -1339,7 +1322,6 @@ export const themes: Record<ThemeName, ReturnType<typeof createTheme>> = {
       },
       MuiTooltip: {
         styleOverrides: {
-          // Marginalia note — dark ink, italic serif
           tooltip: {
             fontFamily: serifStack,
             fontSize: 12,
@@ -1364,9 +1346,6 @@ export const themes: Record<ThemeName, ReturnType<typeof createTheme>> = {
   }),
 
   // ── 17. RENÉE — light ────────────────────────────────────────────────
-  // Cream background with walnut wood-grain and gold-leaf card edges.
-  // Orchid primary: ink #9B2FA8 for text/buttons, bloom #C667D4 for fills/glow.
-  // Gold and walnut accents; red reserved for errors.
   renee: mkLight({
     bg: "#F1E8DC",
     paper: "#FBF6EE",
@@ -1377,8 +1356,6 @@ export const themes: Record<ThemeName, ReturnType<typeof createTheme>> = {
     warning: "#B5730A",
     error: "#B23A2E",
     text: "#2A1B10",
-    // Serif display headings only; body/button intentionally inherit sansStack
-    // for legibility contrast (editorial atelier feel).
     typography: {
       h1: { fontFamily: serifStack, fontWeight: 800, letterSpacing: -0.5 },
       h2: { fontFamily: serifStack, fontWeight: 800, letterSpacing: -0.3 },
@@ -1562,8 +1539,6 @@ export const themes: Record<ThemeName, ReturnType<typeof createTheme>> = {
   }),
 
   // ── 6. HIGH CONTRAST — dark, WCAG AAA ────────────────────────────────
-  // Black/white + yellow (#FFD600) primary (14.7:1 on black), sharp corners,
-  // 2px borders, strong focus rings.
   high_contrast: mkDark({
     bg: "#000000",
     paper: "#0A0A0A",
@@ -1594,14 +1569,12 @@ export const themes: Record<ThemeName, ReturnType<typeof createTheme>> = {
             backgroundColor: "#000000",
             backgroundImage: "none",
           },
-          // 3px yellow focus ring — unmissable for keyboard nav and low vision
           "*:focus-visible": {
             outline: "3px solid #FFD600 !important",
             outlineOffset: "2px !important",
           },
           "*, *::before, *::after": { outlineColor: "#FFD600 !important" },
           "::selection": { backgroundColor: "#FFD600", color: "#000000" },
-          // Windows High Contrast Mode passthrough
           "@media (forced-colors: active)": {
             "*": { forcedColorAdjust: "auto" },
           },
@@ -1633,7 +1606,6 @@ export const themes: Record<ThemeName, ReturnType<typeof createTheme>> = {
             backgroundImage: "none",
             backgroundColor: "#0A0A0A",
             border: "2px solid rgba(255,255,255,.85)",
-            // Yellow top tab — filing label for the card
             borderTop: "3px solid #FFD600",
             boxShadow: "none",
           },
@@ -1850,7 +1822,6 @@ export const themes: Record<ThemeName, ReturnType<typeof createTheme>> = {
   }),
 
   // ── 7. SUNRISE — light ───────────────────────────────────────────────
-  // Warm coral/amber/gold gradients, glass cards, fully rounded controls.
   sunrise: mkLight({
     bg: "#FFF0E8",
     paper: "#FFFFFF",
@@ -1900,7 +1871,6 @@ export const themes: Record<ThemeName, ReturnType<typeof createTheme>> = {
           },
         },
       },
-      // Warm glass — sunlight through a beach-house window
       MuiPaper: {
         styleOverrides: {
           root: {
@@ -2081,7 +2051,6 @@ export const themes: Record<ThemeName, ReturnType<typeof createTheme>> = {
   }),
 
   // ── 8. VALENTINE — dark ──────────────────────────────────────────────
-  // Crimson-to-magenta gradients, glass cards, dark corners.
   valentine: mkLight({
     bg: "#FBF0F4",
     paper: "#FFFFFF",
@@ -2097,7 +2066,6 @@ export const themes: Record<ThemeName, ReturnType<typeof createTheme>> = {
         styleOverrides: {
           body: {
             backgroundColor: "#FBF0F4",
-            // Rose bloom at center, shadow creeping in from corners — the battlefield edge
             backgroundImage: `
               radial-gradient(ellipse 900px 600px at 18% -5%, rgba(194,24,91,.22), transparent 55%),
               radial-gradient(ellipse 700px 500px at 88% 12%, rgba(233,30,140,.18), transparent 50%),
@@ -2121,7 +2089,6 @@ export const themes: Record<ThemeName, ReturnType<typeof createTheme>> = {
           },
         },
       },
-      // Crystal glass — petal-thin surfaces
       MuiPaper: {
         styleOverrides: {
           root: {
@@ -2135,13 +2102,11 @@ export const themes: Record<ThemeName, ReturnType<typeof createTheme>> = {
       MuiCard: {
         styleOverrides: {
           root: {
-            // Crystal surface with rose bloom at the top
             backgroundImage: `linear-gradient(180deg, ${alpha("#E91E8C", 0.05)} 0%, rgba(255,255,255,.0) 30%)`,
             backgroundColor: "rgba(255,255,255,.93)",
             backdropFilter: "blur(18px)",
             border: `1px solid ${alpha("#C2185B", 0.14)}`,
             borderRadius: 20,
-            // Rose-petal shadow — warm crimson, not cold grey
             boxShadow: `
               0 2px 8px ${alpha("#8B0030", 0.1)},
               0 8px 24px ${alpha("#8B0030", 0.1)},
@@ -2306,7 +2271,6 @@ export const themes: Record<ThemeName, ReturnType<typeof createTheme>> = {
   }),
 
   // ── 9. CYBER — dark ──────────────────────────────────────────────────
-  // Black background, cyan + magenta neon, CRT scanlines, monospace, glow.
   cyber: mkDark({
     bg: "#020408",
     paper: "#040810",
@@ -2354,7 +2318,6 @@ export const themes: Record<ThemeName, ReturnType<typeof createTheme>> = {
             "&::-webkit-scrollbar-track": { backgroundColor: "#020408" },
             "::selection": { backgroundColor: alpha("#00E5FF", 0.35), color: "#000000" },
           },
-          // Neon text-shadow on headings — phosphor glow
           "h1, h2, h3": {
             textShadow: `0 0 20px ${alpha("#00E5FF", 0.55)}, 0 0 40px ${alpha("#00E5FF", 0.2)}`,
           },
@@ -2374,13 +2337,11 @@ export const themes: Record<ThemeName, ReturnType<typeof createTheme>> = {
           },
         },
       },
-      // Dark terminal pane — scanlines inside, dual neon border
       MuiPaper: {
         styleOverrides: {
           root: {
             backgroundImage: "none",
             backgroundColor: alpha("#020408", 0.88),
-            // Dual neon split: cyan top-left, magenta bottom-right
             border: `1px solid ${alpha("#00E5FF", 0.22)}`,
             boxShadow: `
               0 0 0 1px ${alpha("#FF00CC", 0.1)},
@@ -2397,7 +2358,6 @@ export const themes: Record<ThemeName, ReturnType<typeof createTheme>> = {
               pointerEvents: "none",
               zIndex: 0,
             },
-            // Top neon scan line — like CRT electron beam
             "&::after": {
               content: '""',
               position: "absolute",
@@ -2632,11 +2592,6 @@ export const themes: Record<ThemeName, ReturnType<typeof createTheme>> = {
   }),
 
   // ── 10. THE ONE — Escanor, Lion's Sin of Pride, noon sun absolute ─────
-  // "Who decided that?" — At noon, for one minute, he is The One.
-  // Molten gold blazing out of obsidian void. Solar radiance at its peak.
-  // Not luxury for luxury's sake — this is the pinnacle because nothing
-  // less is acceptable. Every surface, every shadow, every glow: maximum.
-  // Signature: blazing solar backdrop + liquid gold gradients + crown shimmer.
   the_one: mkDark({
     bg: "#060606",
     paper: "#0C0C0C",
@@ -2662,7 +2617,6 @@ export const themes: Record<ThemeName, ReturnType<typeof createTheme>> = {
         styleOverrides: {
           body: {
             backgroundColor: "#060606",
-            // The noon sun blazing from directly above — Escanor's solar corona
             backgroundImage: `
               radial-gradient(ellipse 700px 500px at 50% -8%, rgba(235,200,80,.24), transparent 52%),
               radial-gradient(ellipse 1400px 400px at 50% -4%, rgba(201,168,76,.12), transparent 58%),
@@ -2685,11 +2639,9 @@ export const themes: Record<ThemeName, ReturnType<typeof createTheme>> = {
             "&::-webkit-scrollbar-track": { backgroundColor: "transparent" },
             "::selection": { backgroundColor: alpha("#C9A84C", 0.38), color: "#060606" },
           },
-          // Heading glow — the pride of The One
           "h1, h2": {
             textShadow: `0 0 30px ${alpha("#C9A84C", 0.4)}, 0 0 60px ${alpha("#C9A84C", 0.15)}`,
           },
-          // Solar radiance animation — Escanor's power building
           "@keyframes solarRadiance": {
             "0%, 100%": { boxShadow: `0 0 20px ${alpha("#C9A84C", 0.18)}, inset 0 0 25px ${alpha("#C9A84C", 0.04)}` },
             "50%":       { boxShadow: `0 0 45px ${alpha("#C9A84C", 0.32)}, inset 0 0 40px ${alpha("#C9A84C", 0.08)}` },
@@ -2700,7 +2652,6 @@ export const themes: Record<ThemeName, ReturnType<typeof createTheme>> = {
           },
         },
       },
-      // Obsidian surface — absorbs everything, reflects gold
       MuiPaper: {
         styleOverrides: {
           root: {
@@ -2715,7 +2666,6 @@ export const themes: Record<ThemeName, ReturnType<typeof createTheme>> = {
           },
         },
       },
-      // The throne — every card is a seat of power
       MuiCard: {
         styleOverrides: {
           root: {
@@ -2731,7 +2681,6 @@ export const themes: Record<ThemeName, ReturnType<typeof createTheme>> = {
             position: "relative",
             overflow: "hidden",
             transition: "box-shadow 250ms ease, transform 250ms ease",
-            // Crown shimmer — gold light across the top
             "&::after": {
               content: '""',
               position: "absolute",
@@ -2752,7 +2701,6 @@ export const themes: Record<ThemeName, ReturnType<typeof createTheme>> = {
           },
         },
       },
-      // Liquid gold buttons — the absolute
       MuiButton: {
         styleOverrides: {
           outlined: {
@@ -2902,7 +2850,6 @@ export const themes: Record<ThemeName, ReturnType<typeof createTheme>> = {
           root: { borderBottom: `1px solid ${alpha("#C9A84C", 0.15)}` },
         },
       },
-      // Royal decree — dark velvet with gold seal
       MuiTooltip: {
         styleOverrides: {
           tooltip: {
@@ -2921,13 +2868,6 @@ export const themes: Record<ThemeName, ReturnType<typeof createTheme>> = {
   }),
 
   // ── 11. METAL — Metal Gear Solid, Hideo Kojima ────────────────────────
-  //
-  //  "Kept you waiting, huh?"
-  //
-  //  FOXHOUND tactical HUD. Codec frequency 140.85 MHz. Red ALERT /
-  //  yellow CAUTION system. Scanlines on every surface. Stealth camo.
-  //  Cardboard box. Radar sweep. Nanomachines, son. Shadow Moses.
-  //
   metal: createTheme({
     ...base,
     shape: { borderRadius: 4 },
@@ -2947,11 +2887,11 @@ export const themes: Record<ThemeName, ReturnType<typeof createTheme>> = {
     palette: {
       mode: "dark",
       background: { default: "#06080C", paper: "#0A0F15" },
-      primary:   { main: "#E1061B" },   // ALERT — red
-      secondary: { main: "#EDEDED" },   // HUD white
-      info:      { main: "#37D6C7" },   // CODEC teal — 140.85 MHz
-      success:   { main: "#2DE39A" },   // MISSION COMPLETE
-      warning:   { main: "#F2C94C" },   // CAUTION — yellow
+      primary:   { main: "#E1061B" },
+      secondary: { main: "#EDEDED" },
+      info:      { main: "#37D6C7" },
+      success:   { main: "#2DE39A" },
+      warning:   { main: "#F2C94C" },
       error:     { main: "#E1061B" },
       text: { primary: "#EDEDED", secondary: alpha("#EDEDED", 0.7) },
     },
@@ -2995,19 +2935,16 @@ export const themes: Record<ThemeName, ReturnType<typeof createTheme>> = {
             "0%, 100%": { boxShadow: "none" },
             "50%": { boxShadow: `0 0 0 1px ${alpha("#F2C94C", 0.35)}, 0 0 20px ${alpha("#F2C94C", 0.12)}` },
           },
-          // The "!" moment
           "@keyframes exclamation": {
             "0%":   { transform: "scaleY(0)", opacity: 0 },
             "60%":  { transform: "scaleY(1.15)", opacity: 1 },
             "100%": { transform: "scaleY(1)",    opacity: 1 },
           },
-          // Codec static interference
           "@keyframes codecStatic": {
             "0%, 100%": { opacity: 1 },
             "93%": { opacity: 0.7 }, "94%": { opacity: 1 },
             "96%": { opacity: 0.85 }, "97%": { opacity: 1 },
           },
-          // Radar sweep
           "@keyframes radarSweep": {
             "0%": { transform: "rotate(0deg)" },
             "100%": { transform: "rotate(360deg)" },
@@ -3081,7 +3018,6 @@ export const themes: Record<ThemeName, ReturnType<typeof createTheme>> = {
               mixBlendMode: "overlay",
               zIndex: 0,
             },
-            // Codec top indicator — teal channel active
             "&::after": {
               content: '""',
               position: "absolute",
@@ -3333,19 +3269,14 @@ export const themes: Record<ThemeName, ReturnType<typeof createTheme>> = {
 
   // ── 12–15. SEASONAL ──────────────────────────────────────────────────
 
-  // WINTER — Christmas Eve: Santa, chimney, cookies, tree ──────────────
-  // Midnight outside, fireplace inside. The cold frost on the window
-  // against the warm amber glow of the hearth. Gold ornaments, Christmas
-  // red, tree green, snow white. Cozy surfaces lit from below by the fire.
-  // Signature: fireplace-glow backdrop + frost-crystal borders + Christmas animations.
   winter: mkDark({
     bg: "#05091A",
     paper: "#0B1230",
-    primary: "#F5C030",      // gold star on the tree
-    secondary: "#CC2828",    // Santa red
-    info: "#7DD3FC",         // frost blue
-    success: "#22A84A",      // Christmas tree green
-    warning: "#F5A623",      // amber candlelight
+    primary: "#F5C030",
+    secondary: "#CC2828",
+    info: "#7DD3FC",
+    success: "#22A84A",
+    warning: "#F5A623",
     error: "#FF4040",
     text: "#EEF4FF",
     components: {
@@ -3375,18 +3306,15 @@ export const themes: Record<ThemeName, ReturnType<typeof createTheme>> = {
             "::selection": { backgroundColor: alpha("#F5C030", 0.35), color: "#05091A" },
           },
           // ── Christmas animations ─────────────────────────────────────
-          // Star twinkling on top of the tree
           "@keyframes twinkle": {
             "0%, 100%": { opacity: 1, transform: "scale(1)" },
             "50%":      { opacity: 0.45, transform: "scale(0.88)" },
           },
-          // Fireplace flicker — warm light pulsing
           "@keyframes fireplaceFlicker": {
             "0%, 100%": { boxShadow: `inset 0 -2px 0 ${alpha("#F5C030", 0.08)}` },
             "33%":      { boxShadow: `inset 0 -2px 0 ${alpha("#F5A623", 0.14)}` },
             "66%":      { boxShadow: `inset 0 -2px 0 ${alpha("#CC2828", 0.08)}` },
           },
-          // Christmas lights cycling through the four colours
           "@keyframes christmasLights": {
             "0%":   { boxShadow: `0 0 7px 1px rgba(245,192,48,.9)`  },
             "25%":  { boxShadow: `0 0 7px 1px rgba(204,40,40,.9)`   },
@@ -3394,14 +3322,12 @@ export const themes: Record<ThemeName, ReturnType<typeof createTheme>> = {
             "75%":  { boxShadow: `0 0 7px 1px rgba(125,211,252,.9)` },
             "100%": { boxShadow: `0 0 7px 1px rgba(245,192,48,.9)`  },
           },
-          // Snowfall — use on small absolute elements
           "@keyframes snowfall": {
             "0%":   { transform: "translateY(-20px) rotate(0deg)",    opacity: 0 },
             "10%":  { opacity: 1 },
             "90%":  { opacity: 0.8 },
             "100%": { transform: "translateY(100vh) rotate(720deg)", opacity: 0 },
           },
-          // Utility classes
           ".christmas-lights": {
             animation: "christmasLights 2s ease-in-out infinite",
           },
@@ -3410,7 +3336,6 @@ export const themes: Record<ThemeName, ReturnType<typeof createTheme>> = {
           },
         },
       },
-      // Frost-crystal surface — cold border, warm bottom glow
       MuiPaper: {
         styleOverrides: {
           root: {
@@ -3425,7 +3350,6 @@ export const themes: Record<ThemeName, ReturnType<typeof createTheme>> = {
           },
         },
       },
-      // Cozy card — frost top, fireplace warmth at the bottom
       MuiCard: {
         styleOverrides: {
           root: {
@@ -3508,7 +3432,6 @@ export const themes: Record<ThemeName, ReturnType<typeof createTheme>> = {
           notchedOutline: { borderColor: alpha("#7DD3FC", 0.22) },
         },
       },
-      // Ornament chips — small decorations on the tree
       MuiChip: {
         styleOverrides: {
           root: {
@@ -3544,7 +3467,6 @@ export const themes: Record<ThemeName, ReturnType<typeof createTheme>> = {
           root: { borderColor: alpha("#7DD3FC", 0.14) },
         },
       },
-      // Garland progress — gold bar with warm glow
       MuiLinearProgress: {
         styleOverrides: {
           root: { borderRadius: 999, backgroundColor: alpha("#F5C030", 0.14), height: 5 },
@@ -3555,7 +3477,6 @@ export const themes: Record<ThemeName, ReturnType<typeof createTheme>> = {
           },
         },
       },
-      // Christmas light switch — gold when on
       MuiSwitch: {
         styleOverrides: {
           switchBase: {
@@ -3582,7 +3503,6 @@ export const themes: Record<ThemeName, ReturnType<typeof createTheme>> = {
           },
         },
       },
-      // Eggnog tooltip — warm and creamy
       MuiTooltip: {
         styleOverrides: {
           tooltip: {
@@ -3599,11 +3519,6 @@ export const themes: Record<ThemeName, ReturnType<typeof createTheme>> = {
     },
   }),
 
-  // SPRING — botanical, morning dew, blossoms, meadow at 8 AM ──────────
-  // Sunlight filtering through new leaves. Cherry blossoms drifting.
-  // Wildflower purple in the distance. Dew still on everything.
-  // Organic, rounded, alive. The world waking up after winter.
-  // Signature: dot-grid nature journal + dewy glass cards + botanical gradients.
   spring: mkLight({
     bg: "#F0FDF4",
     paper: "#FFFFFF",
@@ -3652,18 +3567,15 @@ export const themes: Record<ThemeName, ReturnType<typeof createTheme>> = {
             "::selection": { backgroundColor: alpha("#15803D", 0.2), color: "#0B1A10" },
           },
           // ── Spring animations ────────────────────────────────────────
-          // Bloom — element opens like a flower
           "@keyframes bloom": {
             "0%":   { transform: "scale(0.85)", opacity: 0 },
             "70%":  { transform: "scale(1.03)" },
             "100%": { transform: "scale(1)",    opacity: 1 },
           },
-          // Dew pulse — morning dew shimmer
           "@keyframes dewPulse": {
             "0%, 100%": { boxShadow: `0 2px 12px ${alpha("#15803D", 0.1)}` },
             "50%":      { boxShadow: `0 4px 20px ${alpha("#15803D", 0.18)}` },
           },
-          // Petal drift — for decorative elements
           "@keyframes petalDrift": {
             "0%":   { transform: "translateY(-10px) rotate(-8deg)", opacity: 0 },
             "10%":  { opacity: 0.9 },
@@ -3674,7 +3586,6 @@ export const themes: Record<ThemeName, ReturnType<typeof createTheme>> = {
           ".dew-pulse": { animation: "dewPulse 3s ease-in-out infinite" },
         },
       },
-      // Morning glass — dewy, fresh, slightly translucent
       MuiPaper: {
         styleOverrides: {
           root: {
@@ -3689,7 +3600,6 @@ export const themes: Record<ThemeName, ReturnType<typeof createTheme>> = {
       MuiCard: {
         styleOverrides: {
           root: {
-            // Sunlight-through-leaves: subtle green at top, white body
             backgroundImage: `linear-gradient(180deg, ${alpha("#15803D", 0.04)} 0%, transparent 30%)`,
             backgroundColor: "rgba(255,255,255,.96)",
             backdropFilter: "blur(6px)",
@@ -3779,7 +3689,6 @@ export const themes: Record<ThemeName, ReturnType<typeof createTheme>> = {
           notchedOutline: { borderColor: alpha("#15803D", 0.18) },
         },
       },
-      // Botanical tags — wildflower variety
       MuiChip: {
         styleOverrides: {
           root: {
@@ -3824,7 +3733,6 @@ export const themes: Record<ThemeName, ReturnType<typeof createTheme>> = {
           },
         },
       },
-      // Fresh growth bar
       MuiLinearProgress: {
         styleOverrides: {
           root: { borderRadius: 999, backgroundColor: alpha("#15803D", 0.12), height: 5 },
@@ -3873,7 +3781,6 @@ export const themes: Record<ThemeName, ReturnType<typeof createTheme>> = {
     },
   }),
 
-  // SUMMER — blazing sun, heat shimmer, Miami bleach, amber & coral
   summer: mkLight({
     bg: "#FFFBEA",
     paper: "#FFFFFF",
@@ -3903,13 +3810,9 @@ export const themes: Record<ThemeName, ReturnType<typeof createTheme>> = {
           body: {
             backgroundColor: "#FFFBEA",
             backgroundImage: [
-              // blazing sun corona top-right
               `radial-gradient(ellipse 700px 700px at 92% -8%, rgba(217,119,6,.22), transparent 60%)`,
-              // amber heat wash left
               `radial-gradient(ellipse 900px 500px at 5% 20%, rgba(251,191,36,.14), transparent 60%)`,
-              // coral heat bloom center
               `radial-gradient(ellipse 600px 300px at 50% 110%, rgba(220,38,38,.08), transparent 55%)`,
-              // bleached horizon
               `linear-gradient(180deg, rgba(255,255,255,0) 0%, rgba(255,251,235,.6) 100%)`,
             ].join(","),
             scrollbarWidth: "thin",
@@ -3923,7 +3826,6 @@ export const themes: Record<ThemeName, ReturnType<typeof createTheme>> = {
             },
             "::selection": { backgroundColor: alpha("#D97706", 0.35), color: "#1A1000" },
           },
-          // Utility: heat-haze shimmer overlay on any element
           ".heat-shimmer": {
             position: "relative",
             "&::after": {
@@ -3937,7 +3839,6 @@ export const themes: Record<ThemeName, ReturnType<typeof createTheme>> = {
               pointerEvents: "none",
             },
           },
-          // Utility: pulsing sun orb class
           ".sun-orb": {
             animation: "sunPulse 4s ease-in-out infinite",
           },
@@ -3948,7 +3849,6 @@ export const themes: Record<ThemeName, ReturnType<typeof createTheme>> = {
           root: {
             border: `1px solid ${alpha("#D97706", 0.13)}`,
             backgroundImage: "none",
-            // top golden accent bar
             "&::before": {
               content: '""',
               position: "absolute",
@@ -4098,7 +3998,6 @@ export const themes: Record<ThemeName, ReturnType<typeof createTheme>> = {
     },
   }),
 
-  // AUTUMN — dying embers, fallen leaves, woodsmoke, deep terracotta dusk
   autumn: mkDark({
     bg: "#0C0805",
     paper: "#170D09",
@@ -4129,13 +4028,9 @@ export const themes: Record<ThemeName, ReturnType<typeof createTheme>> = {
           body: {
             backgroundColor: "#0C0805",
             backgroundImage: [
-              // ember bloom — upper left
               `radial-gradient(ellipse 1000px 700px at 10% -5%, rgba(249,115,22,.22), transparent 55%)`,
-              // golden canopy — upper right
               `radial-gradient(ellipse 800px 500px at 90% 10%, rgba(234,179,8,.15), transparent 55%)`,
-              // deep soot glow — lower center
               `radial-gradient(ellipse 900px 400px at 50% 100%, rgba(180,53,8,.18), transparent 60%)`,
-              // woodsmoke noise
               noiseSVG(0.09),
             ].join(","),
             scrollbarWidth: "thin",
@@ -4149,11 +4044,9 @@ export const themes: Record<ThemeName, ReturnType<typeof createTheme>> = {
             },
             "::selection": { backgroundColor: alpha("#F97316", 0.4), color: "#F5EDE0" },
           },
-          // Utility: hearth-flicker animation
           ".hearth-glow": {
             animation: "hearthGlow 3s ease-in-out infinite",
           },
-          // Utility: swaying leaf
           ".leaf-sway": {
             animation: "leafSway 4s ease-in-out infinite",
           },
@@ -4165,7 +4058,6 @@ export const themes: Record<ThemeName, ReturnType<typeof createTheme>> = {
             border: `1px solid ${alpha("#F97316", 0.16)}`,
             backgroundImage: "none",
             background: `linear-gradient(160deg, #1C100A 0%, #170D09 100%)`,
-            // warm amber top bar
             "&::before": {
               content: '""',
               position: "absolute",
@@ -4317,31 +4209,18 @@ export const themes: Record<ThemeName, ReturnType<typeof createTheme>> = {
 
 
   // ── 16. FUTURE ────────────────────────────────
-  //
-  // «Here's what's gonna happen... A new Theme !»
-  // LE VISITEUR DU FUTUR — a homage to François Descraques' web series & film
-  //   Colour lore:
-  //     #E8720C  — Visitor's coat, scorched amber, Fennec's fur
-  //     #F5A623  — Fennec ear-tips & paw pads, small warm hope
-  //     #4A90D9  — Brigade armour, temporal-portal flash, cold authority
-  //     #5CB85C  — contamination glow, irradiated zones, mission-survived green
-  //     #C42B0A  — Brigade alert siren, ember deep-fire, error state
-  //     #0D0905  — burnt char — the floor of 2555 Paris
-  //     #160E08  — scorched timber — walls still standing
   // ─────────────────────────────────────────────────────────────────────────
   future: createTheme({
     ...base,
-    shape: { borderRadius: 6 }, // slightly rounded — survival tech, not sterile Brigade
+    shape: { borderRadius: 6 },
     typography: {
       fontFamily: sansStack,
       fontSize: 13,
-      // Headings: stencil mono — Brigade field documents & Visitor's hand-coded notes
       h1: { fontFamily: monoStack, fontWeight: 900, letterSpacing: -0.4, fontSize: 28 },
       h2: { fontFamily: monoStack, fontWeight: 900, letterSpacing: -0.3, fontSize: 22 },
       h3: { fontFamily: monoStack, fontWeight: 850, letterSpacing: -0.2, fontSize: 18 },
       h4: { fontFamily: monoStack, fontWeight: 800, fontSize: 16 },
       h5: { fontFamily: monoStack, fontWeight: 750, fontSize: 14 },
-      // Body: sans — human survivors don't write in monospace
       body1: { fontFamily: sansStack, fontSize: 13, lineHeight: 1.6 },
       body2: { fontFamily: sansStack, fontSize: 12.5, lineHeight: 1.55 },
       caption: { fontFamily: sansStack, fontSize: 12, lineHeight: 1.35 },
@@ -4356,17 +4235,17 @@ export const themes: Record<ThemeName, ReturnType<typeof createTheme>> = {
     palette: {
       mode: "dark",
       background: {
-        default: "#0D0905", // burnt char — the floor of 2555 Paris
+        default: "#0D0905",
         paper:   "#160E08", // scorched timber — walls still standing
       },
-      primary:   { main: "#E8720C" }, // scorched amber — Visitor's coat, Fennec's fur
-      secondary: { main: "#4A90D9" }, // Brigade steel blue — their armour, portal flash
-      info:      { main: "#5CB85C" }, // irradiated green — contamination glow
-      success:   { main: "#5CB85C" }, // same: green = mission survived
-      warning:   { main: "#F5A623" }, // Fennec amber — ear tips, paw pads, small hope
-      error:     { main: "#C42B0A" }, // ember red — Brigade alert, deep fire
+      primary:   { main: "#E8720C" },
+      secondary: { main: "#4A90D9" },
+      info:      { main: "#5CB85C" },
+      success:   { main: "#5CB85C" },
+      warning:   { main: "#F5A623" },
+      error:     { main: "#C42B0A" },
       text: {
-        primary:   "#E8DED0",               // ash bone — warm rubble dust
+        primary:   "#E8DED0",
         secondary: alpha("#8FA8C0", 0.9),   // Brigade ghost — cold grey-blue smoke
       },
     },
@@ -4378,20 +4257,16 @@ export const themes: Record<ThemeName, ReturnType<typeof createTheme>> = {
         styleOverrides: {
           // ── CSS lore tokens ────────────────────────────────────────────
           ":root": {
-            // Visitor palette
             "--visitor-coat":    "#E8720C",
             "--visitor-fennec":  "#F5A623",
             "--visitor-ash":     "#E8DED0",
-            // Brigade palette
             "--brigade-blue":    "#4A90D9",
             "--brigade-ghost":   "#8FA8C0",
             "--brigade-alert":   "#C42B0A",
-            // Environment
             "--future-char":     "#0D0905",
             "--future-timber":   "#160E08",
             "--future-copper":   "#C87941",
             "--future-green":    "#5CB85C",
-            // Bracelet charge states
             "--bracelet-off":    alpha("#E8720C", 0.15),
             "--bracelet-on":     "#E8720C",
             "--bracelet-full":   "#F5A623",
@@ -4405,15 +4280,10 @@ export const themes: Record<ThemeName, ReturnType<typeof createTheme>> = {
           body: {
             backgroundColor: "#0D0905",
             backgroundImage: [
-              // Visitor's amber bloom — upper right, his coat catching light
               `radial-gradient(ellipse 1100px 700px at 82% -6%, ${alpha("#E8720C", 0.22)}, transparent 55%)`,
-              // Brigade blue — upper left, their searchlights sweeping ruins
               `radial-gradient(ellipse 900px 600px at 4% 8%, ${alpha("#4A90D9", 0.16)}, transparent 50%)`,
-              // Ember below — the fires still burn in 2555
               `radial-gradient(ellipse 700px 400px at 50% 102%, ${alpha("#C42B0A", 0.12)}, transparent 52%)`,
-              // Contamination pocket — irradiated corner
               `radial-gradient(ellipse 400px 300px at 95% 90%, ${alpha("#5CB85C", 0.06)}, transparent 55%)`,
-              // Woodsmoke noise — rubble dust, ash, broken concrete
               noiseSVG(0.13),
             ].join(","),
             scrollbarWidth: "thin",
@@ -4431,26 +4301,22 @@ export const themes: Record<ThemeName, ReturnType<typeof createTheme>> = {
 
           // ── Keyframes ──────────────────────────────────────────────────
 
-          // The moment the Visitor steps out of the temporal portal
           "@keyframes temporalArrive": {
             "0%":   { opacity: 0, transform: "scale(0.96) translateY(8px)", filter: "blur(4px) sepia(0.6)" },
             "55%":  { opacity: 1, filter: "blur(0) sepia(0)" },
             "100%": { opacity: 1, transform: "scale(1) translateY(0)", filter: "none" },
           },
 
-          // Fennec heartbeat — warm amber glow on primary interactive elements
           "@keyframes fennecPulse": {
             "0%, 100%": { boxShadow: `0 0 8px ${alpha("#E8720C", 0.2)}` },
             "50%":      { boxShadow: `0 0 22px ${alpha("#E8720C", 0.52)}, 0 0 44px ${alpha("#F5A623", 0.18)}` },
           },
 
-          // Brigade sweep — cold blue scan line / radar ping
           "@keyframes brigadeSweep": {
             "0%, 100%": { boxShadow: `0 0 6px ${alpha("#4A90D9", 0.15)}` },
             "50%":      { boxShadow: `0 0 20px ${alpha("#4A90D9", 0.42)}, 0 0 40px ${alpha("#4A90D9", 0.15)}` },
           },
 
-          // Portal flash — the blue-white burst of temporal displacement
           "@keyframes portalFlash": {
             "0%":   { opacity: 0, transform: "scale(0.6)", filter: "blur(6px) brightness(3)" },
             "15%":  { opacity: 1, transform: "scale(1.04)", filter: "blur(1px) brightness(2.5)" },
@@ -4458,7 +4324,6 @@ export const themes: Record<ThemeName, ReturnType<typeof createTheme>> = {
             "100%": { opacity: 0, transform: "scale(1.1)", filter: "blur(4px) brightness(0.8)" },
           },
 
-          // Temporal glitch — the bracelet misfiring, timeline corrupting
           "@keyframes temporalGlitch": {
             "0%, 90%, 100%": { transform: "translate(0,0)", filter: "none", opacity: 1 },
             "92%": { transform: "translate(-2px, 0)",  filter: `hue-rotate(40deg)  saturate(2)`, opacity: 0.9 },
@@ -4466,13 +4331,11 @@ export const themes: Record<ThemeName, ReturnType<typeof createTheme>> = {
             "96%": { transform: "translate(0, -1px)", filter: "none", opacity: 1 },
           },
 
-          // Contamination pulse — irradiated zones, green sickness
           "@keyframes contaminationPulse": {
             "0%, 100%": { boxShadow: `0 0 8px ${alpha("#5CB85C", 0.2)}, inset 0 0 4px ${alpha("#5CB85C", 0.05)}` },
             "50%":      { boxShadow: `0 0 20px ${alpha("#5CB85C", 0.45)}, inset 0 0 10px ${alpha("#5CB85C", 0.12)}` },
           },
 
-          // Bracelet charge — the temporal bracelet powering up
           "@keyframes braceletCharge": {
             "0%":   { backgroundPosition: "-200% 0", opacity: 0.5 },
             "50%":  { opacity: 1 },
@@ -4481,12 +4344,10 @@ export const themes: Record<ThemeName, ReturnType<typeof createTheme>> = {
 
           // ── Utility classes ────────────────────────────────────────────
 
-          // .temporal-arrive — animate an element in as if arriving through a portal
           ".temporal-arrive": {
             animation: "temporalArrive 0.65s cubic-bezier(0.22,1,0.36,1) both",
           },
 
-          // .portal-flash — the moment of temporal displacement
           ".portal-flash": {
             position: "relative",
             "&::before": {
@@ -4501,14 +4362,12 @@ export const themes: Record<ThemeName, ReturnType<typeof createTheme>> = {
             },
           },
 
-          // .contaminated — irradiated element, green pulsing border
           ".contaminated": {
             border: `1px solid ${alpha("#5CB85C", 0.45)} !important`,
             animation: "contaminationPulse 2.5s ease-in-out infinite",
             color: "#80D880 !important",
           },
 
-          // .brigade-scan — element under Brigade surveillance, cold blue sweep
           ".brigade-scan": {
             border: `1px solid ${alpha("#4A90D9", 0.4)} !important`,
             animation: "brigadeSweep 2s ease-in-out infinite",
@@ -4525,13 +4384,10 @@ export const themes: Record<ThemeName, ReturnType<typeof createTheme>> = {
             },
           },
 
-          // .temporal-glitch — bracelet misfire, timeline instability
           ".temporal-glitch": {
             animation: "temporalGlitch 4s ease-in-out infinite",
           },
 
-          // .visitor-briefing — styled like the Visitor's scrawled notes
-          // on scorched paper, amber ink on char background
           ".visitor-briefing": {
             fontFamily: monoStack,
             fontSize: "12px !important",
@@ -4554,7 +4410,6 @@ export const themes: Record<ThemeName, ReturnType<typeof createTheme>> = {
             },
           },
 
-          // .fennec — warm amber glow, Fennec is nearby and approves
           ".fennec": {
             animation: "fennecPulse 3.5s ease-in-out infinite",
           },
@@ -4569,7 +4424,6 @@ export const themes: Record<ThemeName, ReturnType<typeof createTheme>> = {
             borderRadius: 10,
             backgroundColor: "#160E08",
             border: `1px solid ${alpha("#E8720C", 0.18)}`,
-            // Warm amber inner glow at the top — like light from a fire below
             boxShadow: `inset 0 1px 0 ${alpha("#E8720C", 0.1)}`,
           },
           elevation1: {
@@ -4605,7 +4459,6 @@ export const themes: Record<ThemeName, ReturnType<typeof createTheme>> = {
                 inset 0 -1px 0 ${alpha("#4A90D9", 0.1)}
               `,
             },
-            // Visitor coat gradient — firelight streaming across the top
             "&::after": {
               content: '""',
               position: "absolute",
@@ -4619,8 +4472,6 @@ export const themes: Record<ThemeName, ReturnType<typeof createTheme>> = {
       },
 
       // ── Dividers — ash line between worlds ─────────────────────────────
-      // The gradient runs amber (Visitor) → blue (Brigade): the divide
-      // between the two forces that define 2555 Paris.
       MuiDivider: {
         styleOverrides: {
           root: {
@@ -4772,20 +4623,17 @@ export const themes: Record<ThemeName, ReturnType<typeof createTheme>> = {
             transition: "all 150ms ease",
             "&:hover": { backgroundColor: alpha("#E8720C", 0.18) },
           },
-          // Filled: active hazard zone — Fennec amber
           filled: {
             backgroundColor: "#E8720C",
             color: "#0D0905",
             border: "none",
           },
-          // colorSecondary chip: Brigade clearance tag — steel blue
           colorSecondary: {
             backgroundColor: alpha("#4A90D9", 0.12),
             border: `1px solid ${alpha("#4A90D9", 0.3)}`,
             color: "#8FC4E8",
             "&:hover": { backgroundColor: alpha("#4A90D9", 0.2) },
           },
-          // colorSuccess / colorInfo: contamination badge — irradiated green
           colorSuccess: {
             backgroundColor: alpha("#5CB85C", 0.1),
             border: `1px solid ${alpha("#5CB85C", 0.3)}`,
@@ -4800,8 +4648,6 @@ export const themes: Record<ThemeName, ReturnType<typeof createTheme>> = {
       },
 
       // ── Tabs — timeline selector ────────────────────────────────────────
-      // Left tabs: Visitor's amber. The gradient crossing to Brigade blue
-      // represents the two timelines in tension.
       MuiTabs: {
         styleOverrides: {
           root: {
@@ -4936,7 +4782,6 @@ export const themes: Record<ThemeName, ReturnType<typeof createTheme>> = {
             backgroundImage: `linear-gradient(90deg, #E8720C, #F5A623)`,
             border: "none",
           },
-          // Fennec paw — warm amber thumb
           thumb: {
             backgroundColor: "#F5A623",
             border: `2px solid ${alpha("#E8720C", 0.6)}`,
@@ -4949,7 +4794,6 @@ export const themes: Record<ThemeName, ReturnType<typeof createTheme>> = {
       },
 
       // ── Switch — Fennec ear toggle ──────────────────────────────────────
-      // The little fox twitches an ear when she hears the Brigade coming.
       MuiSwitch: {
         styleOverrides: {
           switchBase: {
@@ -4979,8 +4823,6 @@ export const themes: Record<ThemeName, ReturnType<typeof createTheme>> = {
       },
 
       // ── Linear progress — bracelet charge indicator ─────────────────────
-      // When the bar is half full, Fennec amber bleeds in from the right —
-      // hope alongside the fire.
       MuiLinearProgress: {
         styleOverrides: {
           root: {

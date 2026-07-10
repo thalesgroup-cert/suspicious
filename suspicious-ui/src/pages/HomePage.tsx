@@ -151,11 +151,10 @@ export default function HomePage() {
   const resultColors = useResultColors();
   const statusColors  = useStatusColors();
 
-  // Entrance / ambient class applied to every DashboardCard.
   const cardClass = React.useMemo(() => {
     const { effects } = capabilities;
-    if (effects.hasPortalEffect)   return "temporal-arrive"; // Le Visiteur — portal step-in
-    if (effects.hasAlertStates)    return "hud-alertable";   // MGS — cards respond to alert state
+    if (effects.hasPortalEffect)   return "temporal-arrive";
+    if (effects.hasAlertStates)    return "hud-alertable";
     return undefined;
   }, [capabilities]);
 
@@ -207,9 +206,6 @@ export default function HomePage() {
     },
   });
 
-  // Body alert/caution data-attributes. Declared before any early return so
-  // hook order stays stable across renders; reads query data directly and
-  // self-guards when it is absent.
   React.useEffect(() => {
     const home = homeQuery.data;
     const dangerous = home?.danger_counts?.dangerous ?? 0;
@@ -283,9 +279,6 @@ export default function HomePage() {
 
   const recent = recentQuery.data ?? [];
 
-  // Scope-pulse derived values. donutTotal = the user's personal submission
-  // total this month (sum of their danger_counts). For a CISO the meaningful
-  // numerator is the scope volume; for everyone else it is their own.
   const orgCount = everyoneCount;
   const myCount = donutTotal;
   const shareNumerator = isCiso ? scopeCount : myCount;
@@ -305,7 +298,6 @@ export default function HomePage() {
       <Box sx={{ maxWidth: 1280, mx: "auto" }}>
 
         {/* ---------------------------------------------------------------- */}
-        {/* Page header                                                      */}
         {/* ---------------------------------------------------------------- */}
         <Stack
           direction={{ xs: "column", md: "row" }}
@@ -321,7 +313,6 @@ export default function HomePage() {
             </Box>
           </Stack>
 
-          {/* Live email_feeder runtime status — Admin / CERT only */}
           {(groups.includes("Admin") || groups.includes("CERT")) ? (
             <FeederHealthBadge />
           ) : null}
@@ -336,7 +327,6 @@ export default function HomePage() {
         <Grid container spacing={2}>
 
           {/* -------------------------------------------------------------- */}
-          {/* Threat distribution                                             */}
           {/* -------------------------------------------------------------- */}
           <Grid size={{ xs: 12, md: 7 }}>
             <DashboardCard
@@ -526,7 +516,6 @@ export default function HomePage() {
           </Grid>
 
           {/* -------------------------------------------------------------- */}
-          {/* Scope health (CISO) / Your monthly share (everyone else)        */}
           {/* -------------------------------------------------------------- */}
           <Grid size={{ xs: 12, md: 5 }}>
             <DashboardCard
@@ -578,7 +567,6 @@ export default function HomePage() {
                   </Typography>
                 )}
 
-                {/* Proportion bar — scope (or personal) volume vs the org. */}
                 <Box>
                   <Box
                     sx={{
@@ -615,8 +603,6 @@ export default function HomePage() {
                 </Box>
               </Stack>
 
-              {/* Scope verdict strip — CISO only. Uses scope_danger_counts,
-                  which is distinct from the personal donut on the left card. */}
               {showScopeVerdicts ? (
                 <>
                   <Divider sx={{ opacity: 0.25, my: 1.5 }} />
@@ -705,7 +691,6 @@ export default function HomePage() {
           </Grid>
 
           {/* -------------------------------------------------------------- */}
-          {/* Recent submissions                                              */}
           {/* -------------------------------------------------------------- */}
           <Grid size={{ xs: 12 }}>
             <DashboardCard
@@ -768,7 +753,6 @@ export default function HomePage() {
                       letterSpacing: "0.1em",
                     }}
                   >
-                    // NO TARGETS ACQUIRED — AREA CLEAR
                   </Box>
                 ) : (
                   <Box sx={{ px: { xs: 1.5, md: 2 }, pb: 2 }}>
@@ -875,7 +859,6 @@ export default function HomePage() {
         </Grid>
 
         {/* ---------------------------------------------------------------- */}
-        {/* CISO scope modal                                                 */}
         {/* ---------------------------------------------------------------- */}
         <Dialog open={showScopeModal} maxWidth="sm" fullWidth>
           <DialogTitle>Select your management scope</DialogTitle>

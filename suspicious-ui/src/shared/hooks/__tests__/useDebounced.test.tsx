@@ -22,7 +22,6 @@ describe("useDebounced", () => {
     });
 
     rerender({ value: "b" });
-    // Still the old value before the timer fires.
     expect(result.current).toBe("a");
 
     act(() => {
@@ -45,7 +44,6 @@ describe("useDebounced", () => {
     act(() => {
       vi.advanceTimersByTime(150);
     });
-    // A second change restarts the countdown — "b" must never surface.
     rerender({ value: "c" });
     act(() => {
       vi.advanceTimersByTime(150);

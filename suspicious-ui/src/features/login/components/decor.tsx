@@ -71,7 +71,6 @@ export function Background() {
         />
       ))}
 
-      {/* Grain */}
       <Box
         sx={{
           position: "absolute",
@@ -84,7 +83,6 @@ export function Background() {
         }}
       />
 
-      {/* Vignette */}
       <Box
         sx={{
           position: "absolute",

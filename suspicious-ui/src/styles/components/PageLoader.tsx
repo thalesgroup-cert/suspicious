@@ -1,5 +1,3 @@
-// Suspense fallback for route chunks + ProtectedRoute auth resolution —
-// fires before per-page boneyard skeletons mount.
 
 import * as React from "react";
 import { Box, Container, Skeleton, Stack, useTheme } from "@mui/material";

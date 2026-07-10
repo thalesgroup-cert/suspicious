@@ -85,14 +85,9 @@ export default function ThreatDistributionPanel(props: { dangerCounts: DangerCou
   const { capabilities } = useThemeMode();
   const { effects } = capabilities;
 
-  // Read from the user's semantic color store so this panel respects
-  // colorblind-safe presets and custom color choices from ProfilePage.
   const resultColors = useResultColors();
   const statusColors  = useStatusColors();
 
-  // Map the DangerLabel keys to their semantic color store equivalents.
-  // "Failure" maps to status.failure (not a result) — it's a processing
-  // failure, not an analysis outcome, so it reads from statusColors.
   const dangerColors: Record<DangerLabel, string> = React.useMemo(() => ({
     Safe:         resultColors.safe.main,
     Suspicious:   resultColors.suspicious.main,
@@ -108,9 +103,7 @@ export default function ThreatDistributionPanel(props: { dangerCounts: DangerCou
   const total = React.useMemo(() => sum(donut.map((d) => d.value)), [donut]);
   const danger = props.dangerCounts;
 
-  // donut stroke adapts to theme
   const donutStroke = isDark ? "rgba(255,255,255,.10)" : alpha(theme.palette.divider, 0.35);
-  // legend dot border adapts to theme
   const dotBorder = isDark ? "rgba(255,255,255,.18)" : alpha(theme.palette.divider, 0.5);
 
   return (

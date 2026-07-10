@@ -29,7 +29,6 @@ export default function NotFound({ standalone = false }: Props) {
         px: 3,
         py: standalone ? 0 : 8, alignItems: "center" }}
     >
-      {/* Icon badge */}
       <Box
         sx={{
           width: 80,
@@ -45,7 +44,6 @@ export default function NotFound({ standalone = false }: Props) {
         <SearchOffOutlined sx={{ fontSize: 38, color: p, opacity: 0.85 }} />
       </Box>
 
-      {/* Headline */}
       <Stack spacing={0.75}>
         <Typography
           variant="h3"
@@ -86,7 +84,6 @@ export default function NotFound({ standalone = false }: Props) {
         </Typography>
       </Stack>
 
-      {/* Actions */}
       <Stack direction={{ xs: "column", sm: "row" }} spacing={1.25}>
         <Button
           variant="contained"
@@ -134,7 +131,6 @@ export default function NotFound({ standalone = false }: Props) {
     </Stack>
   );
 
-  // Standalone mode: full-screen centred layout with ambient background
   if (standalone) {
     return (
       <Box
@@ -148,7 +144,6 @@ export default function NotFound({ standalone = false }: Props) {
           overflow: "hidden",
         }}
       >
-        {/* Ambient orbs */}
         <Box
           aria-hidden
           sx={{
@@ -167,6 +162,5 @@ export default function NotFound({ standalone = false }: Props) {
     );
   }
 
-  // Inline mode: renders inside AppLayout, no outer wrapper needed
   return content;
 }

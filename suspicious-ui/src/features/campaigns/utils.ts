@@ -25,8 +25,6 @@ export const BREAKPOINTS = { lg: 1200, md: 900, sm: 600, xs: 0 };
 export const COLS = { lg: 12, md: 12, sm: 6, xs: 1 };
 export const ROW_HEIGHT = 32;
 
-// Layout: classification (left, tall) + PCA (right, tall) on top row,
-// volume (full width) on bottom row.
 export const DEFAULT_LAYOUTS: Partial<Record<string, Layout>> = {
   lg: [
     { i: PANEL_KEYS.CLASSIFICATION, x: 0, y: 0, w: 4, h: 14, minW: 3, minH: 8 },

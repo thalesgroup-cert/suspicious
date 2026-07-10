@@ -1,4 +1,3 @@
-// file: src/features/dashboard/components/OverviewHeader.tsx
 import * as React from "react";
 import {
   Box,
@@ -54,7 +53,6 @@ export default function OverviewHeader(props: {
   const { capabilities } = useThemeMode();
   const { effects } = capabilities;
 
-  // Sticky bar border glow for themed sidebars
   const barGlow = React.useMemo(() => {
     if (effects.hasNeonEffect)
       return "0 1px 0 rgba(0,229,255,.25), 0 4px 24px rgba(0,229,255,.06)";
@@ -184,7 +182,6 @@ export default function OverviewHeader(props: {
                       </FormControl>
                     ) : null}
 
-                    {/* ✅ new */}
                     <FormControl fullWidth size="small">
                       <InputLabel id="trend-label">Trend window</InputLabel>
                       <Select

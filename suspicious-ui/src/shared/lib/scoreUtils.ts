@@ -1,5 +1,3 @@
-// Shared score/confidence/label helpers used by the analysis surfaces
-// (submissions + investigation). Pure functions — no React, no feature types.
 
 /** Minimal shape these helpers read off an analyzer report. */
 export type ReportLike = {
@@ -169,8 +167,6 @@ export function kindLabel(kind: string) {
 }
 
 // ---------------------------------------------------------------------------
-// Group analyzer reports by artifact (target.kind + target.value).
-// Generic so the caller keeps its own report type on the grouped reports.
 // ---------------------------------------------------------------------------
 
 export type ReportGroup<T = ReportLike> = {

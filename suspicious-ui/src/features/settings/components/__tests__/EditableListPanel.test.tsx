@@ -67,7 +67,6 @@ describe("EditableListPanel", () => {
     );
     await screen.findByText("evil.com");
 
-    // The Add button is disabled until there is input.
     expect(screen.getByRole("button", { name: /^add$/i })).toBeDisabled();
     expect(mockAdd).not.toHaveBeenCalled();
   });

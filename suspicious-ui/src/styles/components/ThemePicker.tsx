@@ -103,7 +103,6 @@ function Swatch({ name, selected }: { name: ThemeName; selected: boolean }) {
   const textSec   = p.text.secondary;
   const isDark    = p.mode === "dark";
 
-  // Border between the two halves
   const splitBorder = isDark
     ? `1px solid ${alpha("#fff", 0.07)}`
     : `1px solid ${alpha("#000", 0.06)}`;
@@ -134,11 +133,9 @@ function Swatch({ name, selected }: { name: ThemeName; selected: boolean }) {
           gap: "4px",
         }}
       >
-        {/* Fake nav dots */}
         {[alpha(textPri, 0.18), primary, secondary].map((c, i) => (
           <Box key={i} sx={{ width: 6, height: 6, borderRadius: 99, bgcolor: c }} />
         ))}
-        {/* Faint scan-line hint for dark themes that use it */}
         {isDark && (
           <Box
             sx={{
@@ -167,7 +164,6 @@ function Swatch({ name, selected }: { name: ThemeName; selected: boolean }) {
           pb: "6px",
         }}
       >
-        {/* Primary glow dot */}
         <Box
           sx={{
             width: 11,
@@ -177,7 +173,6 @@ function Swatch({ name, selected }: { name: ThemeName; selected: boolean }) {
             boxShadow: `0 0 8px ${alpha(primary, isDark ? 0.7 : 0.45)}`,
           }}
         />
-        {/* Info/secondary dot */}
         <Box
           sx={{
             width: 7,
@@ -200,7 +195,6 @@ function Swatch({ name, selected }: { name: ThemeName; selected: boolean }) {
           gap: "3px",
         }}
       >
-        {/* Primary bar */}
         <Box
           sx={{
             flex: 1,
@@ -210,7 +204,6 @@ function Swatch({ name, selected }: { name: ThemeName; selected: boolean }) {
             boxShadow: `0 0 6px ${alpha(primary, isDark ? 0.5 : 0.3)}`,
           }}
         />
-        {/* Faint text line */}
         <Box sx={{ width: "28%", height: 3, borderRadius: 99, bgcolor: alpha(textSec, 0.3) }} />
       </Box>
 
@@ -337,10 +330,8 @@ function ThemeCard({
         },
       }}
     >
-      {/* Swatch */}
       <Swatch name={name} selected={selected} />
 
-      {/* Card body */}
       <Box
         sx={{
           px: 1.5,
@@ -407,7 +398,6 @@ function ThemeCard({
           {meta?.description ?? "Theme preset."}
         </Typography>
 
-        {/* Mini palette strip — real colors from the theme */}
         <Stack component="div" direction="row" spacing={0.4} sx={{ mt: 1 }}>
           {[
             t.palette.primary.main,

@@ -1,16 +1,3 @@
-//
-// Central store for semantic status / result colors.
-//
-// Persistence strategy:
-//   1. Zustand persist writes to localStorage immediately (offline-first).
-//   2. When the user is authenticated, changes are also synced to the
-//      backend at PATCH /api/profile/colors/ so they survive across
-//      devices and browser clears.
-//   3. On app boot, ProfilePage already fetches the full profile via
-//      React Query ["profile"]. The store subscribes to that data and
-//      hydrates itself — so the backend value always wins on first load.
-//
-// See: src/features/profile/api.ts  for the API call implementations.
 
 import { create } from "zustand";
 import { persist } from "zustand/middleware";
@@ -68,22 +55,19 @@ export const PRESET_DEFAULT: { result: ResultColors; status: StatusColors } = {
   },
 };
 
-// Okabe-Ito (2008) — universally distinguishable across all colorblindness types.
-// Mapping: safe → bluish-green, suspicious → orange, dangerous → vermilion,
-//          inconclusive → sky-blue. Blue+orange are the safest pair.
 export const PRESET_COLORBLIND: { result: ResultColors; status: StatusColors } = {
   result: {
-    safe:         { main: "#009E73" }, // bluish-green
-    suspicious:   { main: "#E69F00" }, // orange
-    dangerous:    { main: "#D55E00" }, // vermilion
+    safe:         { main: "#009E73" },
+    suspicious:   { main: "#E69F00" },
+    dangerous:    { main: "#D55E00" },
     inconclusive: { main: "#56B4E9" }, // sky-blue
   },
   status: {
     done:        { main: "#009E73" },
-    in_progress: { main: "#0072B2" }, // blue
-    new:         { main: "#56B4E9" }, // sky-blue
-    failure:     { main: "#D55E00" }, // vermilion
-    challenged:  { main: "#CC79A7" }, // reddish-purple
+    in_progress: { main: "#0072B2" },
+    new:         { main: "#56B4E9" },
+    failure:     { main: "#D55E00" },
+    challenged:  { main: "#CC79A7" },
     unknown:     { main: "#888888" },
   },
 };
@@ -139,14 +123,11 @@ type ColorStore = {
   status: StatusColors;
   preset: PresetName;
 
-  // Mutators
   setResultColor: (key: ResultKey, hex: string) => void;
   setStatusColor: (key: StatusKey, hex: string) => void;
   applyPreset:    (name: Exclude<PresetName, "custom">) => void;
   reset:          () => void;
 
-  // Called by ProfilePage after fetching the backend profile so the server
-  // value always takes precedence over the localStorage snapshot on boot.
   hydrateFromProfile: (colors: { result: ResultColors; status: StatusColors }) => void;
 };
 
@@ -185,7 +166,6 @@ export const useColorStore = create<ColorStore>()(
 
       hydrateFromProfile: (colors) =>
         set((s) => {
-          // Only hydrate if the incoming data looks structurally valid.
           if (!colors?.result || !colors?.status) return s;
           return {
             result: { ...PRESET_DEFAULT.result, ...colors.result },
@@ -198,7 +178,6 @@ export const useColorStore = create<ColorStore>()(
     {
       name: "suspicious.semantic-colors",
       version: 1,
-      // Migrate v0 → v1: ensure both groups exist.
       migrate: (persisted: any, version) => {
         if (version === 0) {
           return {

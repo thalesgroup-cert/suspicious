@@ -20,7 +20,6 @@ describe("fmtDate", () => {
   });
 
   it("formats a valid ISO date", () => {
-    // Locale-dependent formatting, but a real date must not be the em-dash.
     expect(fmtDate("2026-06-22T10:00:00Z")).not.toBe("—");
   });
 });

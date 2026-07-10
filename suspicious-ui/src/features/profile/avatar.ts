@@ -16,8 +16,6 @@ export type AvatarConfig = {
   options?: Record<string, string[]>;
 };
 
-// Allowlist — MUST stay in sync with ALLOWED_AVATAR_STYLES in
-// Suspicious/api/serializers/profile.py.
 export const AVATAR_STYLES = [
   { key: "bottts", label: "Bottts", style: bottts },
   { key: "identicon", label: "Identicon", style: identicon },
@@ -33,7 +31,6 @@ const STYLE_MAP = new Map<string, (typeof AVATAR_STYLES)[number]["style"]>(
   AVATAR_STYLES.map((s) => [s.key, s.style]),
 );
 
-// ponytail: unbounded render cache, add drop-oldest past N if a long editing session balloons it
 const cache = new Map<string, string>();
 
 export function renderAvatarDataUri(config: AvatarConfig): string {
@@ -43,17 +40,11 @@ export function renderAvatarDataUri(config: AvatarConfig): string {
   const cacheKey = `${config.style}|${config.seed}|${JSON.stringify(options)}`;
   const hit = cache.get(cacheKey);
   if (hit !== undefined) return hit;
-  // @dicebear/core v9: toDataUri() is synchronous and returns a string.
-  // DiceBear option values are arrays; a single-element array pins a choice.
   const uri = createAvatar(style as never, { seed: config.seed, ...options }).toDataUri();
   cache.set(cacheKey, uri);
   return uri;
 }
 
-// A category is any style-schema property that is an enum array of strings
-// (e.g. avataaars `eyes`, `mouth`, enum `*Color`). Numeric `*Probability`
-// props and free-form (non-enum) props are skipped. Schemas are static, so
-// the derived list is memoized per style.
 const categoryCache = new Map<string, { key: string; label: string; values: string[] }[]>();
 
 function prettifyLabel(key: string): string {

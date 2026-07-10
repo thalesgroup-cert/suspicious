@@ -1,12 +1,3 @@
-// Runtime environment access.
-//
-// The production image is built once (in CI) with no .env, so build-time
-// VITE_* values are absent. Instead the container's entrypoint writes
-// `window.__ENV__` into /env-config.js at startup from the container's
-// environment variables. One image, configured per deployment.
-//
-// In dev (`vite dev`) window.__ENV__ is the empty placeholder, so we fall
-// through to import.meta.env, which the dev server populates from .env.
 
 declare global {
   interface Window {

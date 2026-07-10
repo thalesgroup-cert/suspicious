@@ -5,7 +5,6 @@ import { alpha, useTheme } from "@mui/material/styles";
 import { useThemeMode } from "@/styles/ThemeStore";
 import { SoftCard } from "@/features/home/components/SoftCard";
 
-// DashboardCard — renders inside SoftCard, drops its own border/bg.
 export function DashboardCard(
   props: React.PropsWithChildren<{
     title: string;
@@ -45,7 +44,6 @@ export function DashboardCard(
     }
 
     schedule();
-    // Reset on cleanup (hover end / unmount) rather than synchronously in the body.
     return () => {
       clearTimeout(timerRef.current);
       setShowExcl(false);

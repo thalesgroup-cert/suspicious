@@ -5,7 +5,6 @@ import type {
   SubmissionType,
 } from "@/features/submissions/api";
 
-// Shared score/confidence/label/grouping helpers live in one place.
 export {
   clamp,
   normalizeScore,

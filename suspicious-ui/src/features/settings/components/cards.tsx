@@ -5,7 +5,6 @@ import { SearchOutlined } from "@mui/icons-material";
 
 export { SoftCard } from "@/shared/components/SoftCard";
 
-// A tighter inner card for list items / sub-panels.
 export function InnerCard(props: React.PropsWithChildren<{ sx?: object; hover?: boolean }>) {
   const theme = useTheme();
   const isDark = theme.palette.mode === "dark";

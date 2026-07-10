@@ -1,11 +1,3 @@
-//
-// Two chip components that read colors from the central colorStore:
-//
-//   <ResultChip value="dangerous" />
-//   <StatusChip  value="in_progress" />
-//
-// Both chips combine color AND an icon/pattern so meaning is never
-// conveyed by color alone — key for colorblind accessibility.
 
 import * as React from "react";
 import { Box, Chip, Tooltip } from "@mui/material";
@@ -34,8 +26,6 @@ import {
 } from "@/styles/colorStore";
 
 // ---------------------------------------------------------------------------
-// Icon maps — dual-encoding: color + icon shape
-// Never rely on color alone. Each status has a distinct icon.
 // ---------------------------------------------------------------------------
 
 const RESULT_ICONS: Record<ResultKey, React.ReactElement> = {

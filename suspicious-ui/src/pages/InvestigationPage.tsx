@@ -103,7 +103,6 @@ export default function InvestigationPage() {
   const [sortField, setSortField] = React.useState<"creation_date" | "id" | "status" | "result">("creation_date");
   const [sortDir,   setSortDir]   = React.useState<"asc" | "desc">("desc");
 
-  // Derived sort value for backwards-compat with the sort dropdown and API
   const sort = React.useMemo((): "date_desc" | "date_asc" | "id_desc" | "id_asc" => {
     if (sortField === "creation_date") return sortDir === "desc" ? "date_desc" : "date_asc";
     if (sortField === "id") return sortDir === "desc" ? "id_desc" : "id_asc";
@@ -171,8 +170,6 @@ export default function InvestigationPage() {
     [groups]
   );
 
-  // For status/result sort fields (not covered by the dropdown "sort" presets),
-  // pass the raw ordering string so the backend gets e.g. "-result".
   const investigationListParams = React.useMemo(() => {
     const needsRawOrdering = sortField === "status" || sortField === "result";
     return {
@@ -184,7 +181,7 @@ export default function InvestigationPage() {
       result,
       from,
       to,
-      sort: needsRawOrdering ? "date_desc" : sort, // fallback for mapSort
+      sort: needsRawOrdering ? "date_desc" : sort,
       ordering: needsRawOrdering
         ? buildSortOrdering(sortField, sortDir)
         : undefined,
@@ -254,8 +251,6 @@ export default function InvestigationPage() {
     },
   });
 
-  // Deep-link URL sync (?q, ?open) — adjusted during render, runs on mount
-  // and whenever the params change.
   const urlSyncKey = `${searchParams.get("q") ?? ""}|${searchParams.get("open") ?? ""}`;
   const [prevUrlSyncKey, setPrevUrlSyncKey] = React.useState<string | null>(null);
   if (urlSyncKey !== prevUrlSyncKey) {
@@ -269,23 +264,16 @@ export default function InvestigationPage() {
     }
   }
 
-  // Reset to first page when any filter/sort changes.
   const filterKey = [qDebounced, status, type, result, from, to, sort, pageSize].join("|");
   const [prevFilterKey, setPrevFilterKey] = React.useState(filterKey);
   if (filterKey !== prevFilterKey) { setPrevFilterKey(filterKey); setPage(0); }
 
-  // Collapse expansion when the drawer closes.
   const [prevOpenDrawer, setPrevOpenDrawer] = React.useState(openDrawer);
   if (openDrawer !== prevOpenDrawer) {
     setPrevOpenDrawer(openDrawer);
     if (!openDrawer) { setExpandedAnalyzerIds({}); setExpandedGroups({}); }
   }
 
-  // Collapse expansion + leave edit mode when the selected item changes.
-  // Keyed on selectedId (number | null), which is stable across renders.
-  // NB: never key a render-phase compare on selectedIdNum — it is NaN when
-  // nothing is selected, and NaN !== NaN makes the compare re-fire every
-  // render → "Too many re-renders".
   const [prevSelectedId, setPrevSelectedId] = React.useState(selectedId);
   if (selectedId !== prevSelectedId) {
     setPrevSelectedId(selectedId);
@@ -294,19 +282,15 @@ export default function InvestigationPage() {
     setEditMode(false);
   }
 
-  // Collapse analyzer rows when a fresh set of reports arrives. Keyed on the
-  // query's update timestamp (stable across renders, unlike the data array ref).
   const reportsKey = detailsQuery.dataUpdatedAt;
   const [prevReportsKey, setPrevReportsKey] = React.useState(reportsKey);
   if (reportsKey !== prevReportsKey) { setPrevReportsKey(reportsKey); setExpandedAnalyzerIds({}); }
 
-  // Clear the edit mutation on case change (reset() is a side effect, not setState).
   React.useEffect(() => {
     editMutation.reset();
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [selectedId]);
 
-  // Seed the edit form from fetched details (unless actively editing).
   const editSeedKey = `${openDrawer}|${detailsQuery.dataUpdatedAt}|${editMode}`;
   const [prevEditSeedKey, setPrevEditSeedKey] = React.useState<string | null>(null);
   if (editSeedKey !== prevEditSeedKey) {
@@ -364,7 +348,6 @@ export default function InvestigationPage() {
     try { await navigator.clipboard.writeText(email); } catch { /* ignore */ }
   }
 
-  // Auth / access guards
   if (meQuery.isLoading) {
     return <Box sx={{ minHeight: "60vh", display: "grid", placeItems: "center" }}><CircularProgress /></Box>;
   }
@@ -395,7 +378,6 @@ export default function InvestigationPage() {
   const confValid = Number.isFinite(confNum) && confNum >= 0 && confNum <= 100;
   const canSave = scoreValid && confValid && !!editClassification && !editMutation.isPending;
 
-  // Theme-aware values for drawer inline cards
   const drawerCardBorder = isDark ? "rgba(255,255,255,.08)" : alpha(theme.palette.divider, 0.6);
   const drawerCardBg = isDark ? "rgba(255,255,255,.025)" : alpha(theme.palette.background.paper, 0.7);
   const refreshBtnBorder = isDark
@@ -410,7 +392,6 @@ export default function InvestigationPage() {
     >
     <Box sx={{ p: { xs: 2, md: 3 } }}>
       {/* ------------------------------------------------------------------ */}
-      {/* Page header                                                         */}
       {/* ------------------------------------------------------------------ */}
       <Stack
         direction={{ xs: "column", md: "row" }}
@@ -460,7 +441,6 @@ export default function InvestigationPage() {
       </Stack>
 
       {/* ------------------------------------------------------------------ */}
-      {/* Filter bar                                                          */}
       {/* ------------------------------------------------------------------ */}
       <SoftCard sx={{ mb: 2 }}>
         <CardContent sx={{ p: { xs: 2.25, md: 3 } }}>
@@ -634,7 +614,6 @@ export default function InvestigationPage() {
       </SoftCard>
 
       {/* ------------------------------------------------------------------ */}
-      {/* Results table                                                       */}
       {/* ------------------------------------------------------------------ */}
       <SoftCard>
         <CardContent sx={{ p: 0 }}>
@@ -699,7 +678,6 @@ export default function InvestigationPage() {
                         }
                       }}
                     >
-                      {/* ID */}
                       <TableCell>
                         <Stack direction="row" spacing={0.5} sx={{ alignItems: "center" }} >
                           <Button
@@ -714,17 +692,14 @@ export default function InvestigationPage() {
                         </Stack>
                       </TableCell>
 
-                      {/* Result — most critical, shown first */}
                       <TableCell>
                         <ResultChip result={r.result} minWidth={BADGE_W} />
                       </TableCell>
 
-                      {/* Status — compact, auto-sized */}
                       <TableCell>
                         <StatusChip status={r.status as any} minWidth={96} />
                       </TableCell>
 
-                      {/* Artifact */}
                       <TableCell title={r.info}>
                         <Tooltip title={r.info || ""} arrow placement="top">
                           <Typography
@@ -741,10 +716,8 @@ export default function InvestigationPage() {
                         </Tooltip>
                       </TableCell>
 
-                      {/* Date */}
                       <TableCell sx={{ whiteSpace: "nowrap" }}>{fmtDate(r.created_at)}</TableCell>
 
-                      {/* Type — compact chip */}
                       <TableCell>
                         <Chip
                           label={r.type}
@@ -754,7 +727,6 @@ export default function InvestigationPage() {
                         />
                       </TableCell>
 
-                      {/* User mail */}
                       <TableCell onClick={(e) => e.stopPropagation()}>
                         <Stack direction="row" spacing={0.5} sx={{ alignItems: "center" }} >
                           <Typography variant="body2" sx={{ fontWeight: 700 }}>
@@ -779,7 +751,6 @@ export default function InvestigationPage() {
       </SoftCard>
 
       {/* ------------------------------------------------------------------ */}
-      {/* Detail drawer                                                       */}
       {/* ------------------------------------------------------------------ */}
       <Drawer
         anchor="right"
@@ -807,7 +778,6 @@ export default function InvestigationPage() {
           <Box sx={{ p: 2 }}><Alert severity="info">Select a row.</Alert></Box>
         ) : (
           <Stack sx={{ height: "100%" }}>
-            {/* Drawer header */}
             <Box
               sx={(theme) => ({
                 px: 2.25,
@@ -896,7 +866,6 @@ export default function InvestigationPage() {
               </Stack>
             </Box>
 
-            {/* Drawer body — redesigned */}
             <Box sx={{ flex: 1, overflowY: "auto" }}>
 
               {/* ── Summary strip ──────────────────────────────────────────────── */}
@@ -1040,13 +1009,11 @@ export default function InvestigationPage() {
                     <Alert severity="warning" sx={{ py: 0.5 }}>Could not load details.</Alert>
                   ) : !editMode ? (
                     <Stack spacing={1.25}>
-                      {/* Human override */}
                       <Stack direction="row" spacing={1} sx={{ alignItems: "center", flexWrap: "wrap" }} >
                         <ResultChip result={String(currentClassification ?? "UNKNOWN")} minWidth={BADGE_W} />
                         <Chip size="small" label={`Score ${currentScore ?? "—"}/10`} variant="outlined" sx={{ fontWeight: 800 }} />
                         <Chip size="small" label={`Confidence ${currentConfidence ?? "—"}%`} variant="outlined" sx={{ fontWeight: 800 }} />
                       </Stack>
-                      {/* AI reference row */}
                       <Stack direction="row" spacing={0.75} sx={{ opacity: 0.65, flexWrap: "wrap" }}>
                         <Typography variant="caption" color="text.secondary" sx={{ fontWeight: 700, mr: 0.25 }}>AI:</Typography>
                         {[
@@ -1152,7 +1119,6 @@ export default function InvestigationPage() {
                               overflow: "hidden",
                             }}
                           >
-                            {/* Group header — clickable to collapse */}
                             <Box
                               role="button" tabIndex={0}
                               onClick={() => setExpandedGroups((prev) => ({ ...prev, [group.key]: !prev[group.key] }))}
@@ -1189,7 +1155,6 @@ export default function InvestigationPage() {
                               }} />
                             </Box>
 
-                            {/* Reports inside the group */}
                             {isGroupOpen ? (
                               <Box sx={{ p: 1.25 }}>
                                 <Stack spacing={0.9}>

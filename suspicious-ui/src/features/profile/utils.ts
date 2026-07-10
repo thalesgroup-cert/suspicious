@@ -1,6 +1,5 @@
 import type { UserProfile } from "@/features/profile/api";
 
-// Local profile persistence (theme + preferences only — colors go to server).
 export const LOCAL_PROFILE_KEY = "suspicious.profile.local";
 
 export function readLocalProfile(): Partial<UserProfile> | null {

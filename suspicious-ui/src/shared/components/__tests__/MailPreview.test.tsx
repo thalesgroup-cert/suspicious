@@ -53,18 +53,15 @@ describe("MailPreview", () => {
       />
     );
 
-    // First failure schedules a retry — not "No preview" yet.
     fireEvent.error(screen.getByRole("img"));
     expect(screen.queryByText(/^No preview$/i)).toBeNull();
 
-    // After the delay the <img> remounts with a cache-busting query param.
     act(() => {
       vi.advanceTimersByTime(1000);
     });
     const retried = screen.getByRole("img") as HTMLImageElement;
     expect(retried.src).toContain("r=1");
 
-    // The retry also fails — retries exhausted, fall back to "No preview".
     fireEvent.error(retried);
     expect(screen.getByText(/^No preview$/i)).toBeInTheDocument();
   });

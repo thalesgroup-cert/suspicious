@@ -27,7 +27,6 @@ describe("getPageTitle", () => {
   });
 
   it("does not prefix-match the root route", () => {
-    // "/" must not swallow every path; an unknown path falls back.
     expect(getPageTitle("/unknown", items)).toBe("Workspace");
   });
 

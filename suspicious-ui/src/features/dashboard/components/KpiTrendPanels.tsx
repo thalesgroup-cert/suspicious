@@ -55,11 +55,6 @@ function lastTwoNumbers(values: Array<number | null>) {
 function TrendIcon(props: { values: Array<number | null> }) {
   const theme = useTheme();
 
-  // Use done (positive) and failure (negative) from the status color store
-  // so trend arrows respect the user's colorblind-safe preset.
-  // With Okabe-Ito: ↑ becomes #009E73 (bluish-green), ↓ becomes #D55E00
-  // (vermilion) — both distinguishable by protanopia and deuteranopia users,
-  // unlike the default red/green pair.
   const statusColors = useStatusColors();
 
   const { prev, last } = React.useMemo(

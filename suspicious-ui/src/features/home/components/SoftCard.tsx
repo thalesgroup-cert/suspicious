@@ -2,7 +2,6 @@ import * as React from "react";
 import { Card } from "@mui/material";
 import { alpha, useTheme } from "@mui/material/styles";
 
-// Shared card shell — mirrors SubmitPage's SoftCard exactly.
 export function SoftCard(props: React.PropsWithChildren<{
   sx?: object;
   className?: string;

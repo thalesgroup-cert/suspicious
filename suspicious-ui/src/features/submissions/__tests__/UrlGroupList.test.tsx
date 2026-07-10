@@ -35,13 +35,11 @@ describe("UrlGroupList", () => {
   it("renders the registered domain as a group header", () => {
     render(<UrlGroupList submissionId={5} urls={urls} />);
     const headings = screen.getAllByText(/example\.com/);
-    // The domain header Typography element has exactly "example.com" as text content
     expect(headings.some((el) => el.textContent === "example.com")).toBe(true);
   });
 
   it("shows an Analyze button only on the skipped row", () => {
     render(<UrlGroupList submissionId={5} urls={urls} />);
-    // Accordion is expanded by default so items are visible
     const buttons = screen.getAllByRole("button", { name: /^analyze$/i });
     expect(buttons).toHaveLength(1);
   });
@@ -54,7 +52,6 @@ describe("UrlGroupList", () => {
     await user.click(screen.getByRole("button", { name: /^analyze$/i }));
 
     await waitFor(() => {
-      // analyzeUrl POSTs to /submissions/{submissionId}/urls/{urlId}/analyze/
       expect(api.post).toHaveBeenCalledWith("/submissions/5/urls/2/analyze/");
     });
   });

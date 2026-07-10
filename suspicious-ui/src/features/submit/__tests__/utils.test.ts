@@ -57,7 +57,6 @@ describe("resolveId", () => {
 });
 
 describe("extractApiErrorMessage", () => {
-  // axios.isAxiosError only checks the isAxiosError flag on an object.
   const axiosErr = (over: Record<string, unknown>) =>
     ({ isAxiosError: true, message: "boom", ...over });
 
