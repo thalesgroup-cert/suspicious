@@ -1,6 +1,7 @@
 from django.test import TestCase
 from unittest.mock import patch, MagicMock
 from django.contrib.auth.models import User
+import ldap as ldap_module
 
 from profiles.models import CISOProfile, UserProfile
 from profiles.profiles_utils.ciso import process_cisos, generate_message, handle_csv_file, handle_json_file, handle_txt_file
@@ -118,3 +119,51 @@ class LDAPUtilityTests(TestCase):
         server = ldap_obj.initialize_ldap()
         self.assertEqual(server, mock_server)
         mock_server.simple_bind_s.assert_called_once()
+
+    @patch("profiles.profiles_utils.ldap.ldap.initialize")
+    @patch("profiles.profiles_utils.ldap.ldap.set_option")
+    @patch("profiles.profiles_utils.ldap.ldap_config", {})
+    def test_initialize_ldap_defaults_to_tls_demand(self, mock_set_option, mock_initialize):
+        # verify_ssl unset (or true) must default to cert verification ON —
+        # regression test for the hardcoded OPT_X_TLS_NEVER bypass.
+        Ldap().initialize_ldap()
+        mock_set_option.assert_called_once_with(
+            ldap_module.OPT_X_TLS_REQUIRE_CERT, ldap_module.OPT_X_TLS_DEMAND
+        )
+
+    @patch("profiles.profiles_utils.ldap.ldap.initialize")
+    @patch("profiles.profiles_utils.ldap.ldap.set_option")
+    @patch("profiles.profiles_utils.ldap.ldap_config", {"auth_ldap_verify_ssl": "false"})
+    def test_initialize_ldap_verify_ssl_false_disables_tls(self, mock_set_option, mock_initialize):
+        # Explicit opt-out is still honoured — only the default flipped.
+        Ldap().initialize_ldap()
+        mock_set_option.assert_called_once_with(
+            ldap_module.OPT_X_TLS_REQUIRE_CERT, ldap_module.OPT_X_TLS_NEVER
+        )
+
+    def test_get_search_results_escapes_filter_chars(self):
+        # A username containing LDAP filter metacharacters must not be able
+        # to widen or restructure the search filter — regression test for
+        # the unescaped-filter-injection bug.
+        mock_server = MagicMock()
+        mock_server.search_s.return_value = []
+        instance = MagicMock(username="x)(mail=*")
+
+        Ldap.get_search_results(instance, mock_server)
+
+        used_filter = mock_server.search_s.call_args[0][2]
+        self.assertNotIn(")(mail=*)", used_filter)
+        self.assertIn(r"\28mail=\2a", used_filter)
+
+    def test_add_user_to_group_blocks_reserved_rbac_names(self):
+        # businessCategory/title values from the directory must never be
+        # able to join a group that also carries real RBAC meaning —
+        # regression test for the LDAP-attribute-to-privilege-escalation bug.
+        user = User.objects.create_user(username="sam.whitfield")
+        Ldap.add_user_to_group(user, "Admin")
+        self.assertEqual(user.groups.filter(name="Admin").count(), 0)
+
+    def test_add_user_to_group_allows_non_reserved_names(self):
+        user = User.objects.create_user(username="jordan.kim")
+        Ldap.add_user_to_group(user, "Marketing")
+        self.assertTrue(user.groups.filter(name="Marketing").exists())
