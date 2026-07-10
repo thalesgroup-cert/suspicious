@@ -12,7 +12,7 @@ from common.http_client import make_session, get_breaker, RETRY
 
 logger = logging.getLogger("tasp.cron.update_ongoing_case_jobs")
 
-_ATTACHMENT_TIMEOUT = 60  # seconds — overrides adapter default (attachments can be large)
+_ATTACHMENT_TIMEOUT = 60
 
 _session         = make_session()
 _thehive_breaker = get_breaker("thehive")

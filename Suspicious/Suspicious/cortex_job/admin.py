@@ -5,7 +5,6 @@ from import_export.admin import ImportExportModelAdmin
 from cortex_job.models import Analyzer, AnalyzerReport
 
 
-# Resources
 class AnalyzerResource(resources.ModelResource):
     class Meta:
         model = Analyzer
@@ -28,7 +27,6 @@ class AnalyzerReportResource(resources.ModelResource):
         export_order = fields
 
 
-# Admin classes
 @admin.register(Analyzer)
 class AnalyzerAdmin(ImportExportModelAdmin):
     resource_class = AnalyzerResource

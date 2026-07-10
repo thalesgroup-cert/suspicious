@@ -65,8 +65,6 @@ def update_scores(
                     "Score %s on %r out of range for level calculation: %s",
                     current_score, obj, exc,
                 )
-                # Proceed to save with whatever level was previously set.
-                # Callers can inspect the return value if they need to react.
             else:
                 setattr(obj, level_attr, calculated_level)
                 update_cases_logger.debug(
@@ -120,10 +118,8 @@ class MailPartType(Enum):
             cls.BODY:   ("body_level",   "body_score",   "body_confidence"),
             cls.HEADER: ("header_level", "header_score", "header_confidence"),
         }
-        # Accept enum member directly
         if isinstance(part_type, cls):
             return _map.get(part_type)
-        # Accept string value — look up the matching enum member
         try:
             member = next(m for m in cls if m.value == part_type)
             return _map.get(member)

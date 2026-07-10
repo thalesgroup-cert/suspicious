@@ -1,4 +1,3 @@
-# score_process/tests/test_analyzer_parsers.py
 from django.test import SimpleTestCase
 from score_process.scoring.cortex_analyzers.result import (
     AnalyzerResult, AllowListResult, PENDING,
@@ -116,8 +115,6 @@ class DefaultParserTests(SimpleTestCase):
         self.assertEqual((r.score, r.confidence), (10, 100))
 
     def test_safe_only_taxonomy_scores_safe(self):
-        # Regression: a lone `safe` taxonomy (e.g. GoogleSafebrowsing "0 match")
-        # must yield safe/0, not be floored to the info default.
         summary = {"taxonomies": [
             {"level": "safe", "value": "0 match", "predicate": "Safebrowsing"},
         ]}
@@ -141,12 +138,12 @@ class AiMailParserTests(SimpleTestCase):
 
     @patch("score_process.scoring.cortex_analyzers.contrib.ai_mail.AiMailParser._run_campaign")
     def test_safe_mail_score_mapping(self, m_campaign):
-        f = load_fixture("ai_mail")   # classification SAFE, malscore 1.52, confidence 0.848
+        f = load_fixture("ai_mail")
         r = self._mk().parse(f["summary"], f["full"])
         self.assertEqual(r.level, "safe")
-        self.assertEqual(r.score, 2)          # round(1.52)
-        self.assertEqual(r.confidence, 85)    # round(0.848 * 100)
-        m_campaign.assert_called_once()       # side-effects invoked but stubbed
+        self.assertEqual(r.score, 2)
+        self.assertEqual(r.confidence, 85)
+        m_campaign.assert_called_once()
 
     @patch("score_process.scoring.cortex_analyzers.contrib.ai_mail.AiMailParser._run_campaign")
     def test_manifest_matches_versioned_and_bare(self, _m):
@@ -252,7 +249,7 @@ class VirusTotalParserTests(SimpleTestCase):
         p = VirusTotalGetReportParser(analyzer_name="VirusTotal_GetReport_3_1", data="x", data_type="hash")
         r = p.parse({"taxonomies": [{"level": "info", "value": "VT"}]},
                     {"results": {"data": {"attributes": None}}})
-        self.assertEqual(r.level, "info")  # no crash; delegated to taxonomy
+        self.assertEqual(r.level, "info")
 
 
 from score_process.scoring.cortex_analyzers.contrib.urlscan import UrlscanSearchParser
@@ -270,7 +267,7 @@ class UrlscanSearchParserTests(SimpleTestCase):
 
     def test_hits_enrich_detail_but_do_not_escalate(self):
         r = self._run("urlscan_hits")
-        self.assertEqual(r.level, "info")  # detail-only, no escalation
+        self.assertEqual(r.level, "info")
         self.assertEqual(r.details["urlscan_total"], 2)
         self.assertIn("http://x/a", r.details["urlscan_results"])
 
@@ -300,15 +297,12 @@ class MispParserTests(SimpleTestCase):
         self.assertIn("Phishing campaign X", r.category)
 
     def test_threat_level_mapping(self):
-        # threat_level_id 2 -> suspicious
         p = MispParser(analyzer_name="MISP_2_1", data="x", data_type="hash")
         full = {"results": [{"result": [{"id": "9", "info": "medium", "threat_level_id": "2"}]}]}
         r = p.parse({"taxonomies": [{"level": "info"}]}, full)
         self.assertEqual(r.level, "suspicious")
 
     def test_scalar_results_do_not_crash(self):
-        # Malformed payload (results/result not a list) must degrade to the
-        # taxonomy, not raise — a raise would silently drop a real MISP hit.
         p = MispParser(analyzer_name="MISP_2_1", data="x", data_type="hash")
         self.assertEqual(p.parse({"taxonomies": [{"level": "info"}]}, {"results": 5}).level, "info")
         self.assertEqual(

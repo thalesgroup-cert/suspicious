@@ -1,0 +1,93 @@
+# Meridian Group — dev/test directory seed for profiles/profiles_utils/ldap.py
+# Loaded via `ldapadd` against the running openldap dev container (see deploy
+# notes) rather than through the image's bootstrap-ldif volume, which chowns/
+# sed's/rm's those paths in place and collides with bind mounts.
+# Standard schema only (inetOrgPerson + extensibleObject) — title/businessCategory/c
+# are all standard RFC4519 attributes, no custom schema needed.
+#
+# sam.whitfield deliberately carries businessCategory: Admin — this is the
+# attacker/misconfiguration scenario finding #4 fixed: without the reserved-group
+# guard in Ldap.add_user_to_group, syncing this entry would silently add Sam to
+# the real Django "Admin" RBAC group.
+
+dn: ou=people,dc=meridian,dc=example
+objectClass: organizationalUnit
+ou: people
+
+dn: uid=elena.voss,ou=people,dc=meridian,dc=example
+objectClass: inetOrgPerson
+objectClass: extensibleObject
+uid: elena.voss
+cn: Elena Voss
+sn: Voss
+givenName: Elena
+mail: elena.voss@meridian.example
+title: CERT Team Lead
+businessCategory: CERT
+c: FR
+userPassword: MeridianDev!2026
+
+dn: uid=adaeze.okafor,ou=people,dc=meridian,dc=example
+objectClass: inetOrgPerson
+objectClass: extensibleObject
+uid: adaeze.okafor
+cn: Adaeze Okafor
+sn: Okafor
+givenName: Adaeze
+mail: adaeze.okafor@meridian.example
+title: Chief Information Security Officer
+businessCategory: Security
+c: ZA
+userPassword: MeridianDev!2026
+
+dn: uid=jordan.kim,ou=people,dc=meridian,dc=example
+objectClass: inetOrgPerson
+objectClass: extensibleObject
+uid: jordan.kim
+cn: Jordan Kim
+sn: Kim
+givenName: Jordan
+mail: jordan.kim@meridian.example
+title: Marketing Specialist
+businessCategory: Marketing
+c: US
+userPassword: MeridianDev!2026
+
+dn: uid=camila.reyes,ou=people,dc=meridian,dc=example
+objectClass: inetOrgPerson
+objectClass: extensibleObject
+uid: camila.reyes
+cn: Camila Reyes
+sn: Reyes
+givenName: Camila
+mail: camila.reyes@meridian.example
+title: Finance Analyst
+businessCategory: Finance
+c: BR
+userPassword: MeridianDev!2026
+
+dn: uid=haruto.sato,ou=people,dc=meridian,dc=example
+objectClass: inetOrgPerson
+objectClass: extensibleObject
+uid: haruto.sato
+cn: Haruto Sato
+sn: Sato
+givenName: Haruto
+mail: haruto.sato@meridian.example
+title: Sales Manager
+businessCategory: Sales
+c: JP
+userPassword: MeridianDev!2026
+
+dn: uid=sam.whitfield,ou=people,dc=meridian,dc=example
+objectClass: inetOrgPerson
+objectClass: extensibleObject
+uid: sam.whitfield
+cn: Sam Whitfield
+sn: Whitfield
+givenName: Sam
+mail: sam.whitfield@meridian.example
+title: IT Operations Engineer
+businessCategory: Admin
+c: GB
+userPassword: MeridianDev!2026

@@ -114,11 +114,9 @@ class ArtifactJobLauncherServiceTests(TestCase):
         )
 
         service = self.service.process_artifacts([artifact])
-        # dispatch_pending should not raise even when launch_cortex_jobs fails
         case = MagicMock()
         job_ids = service.dispatch_pending(case)
         self.assertEqual(job_ids, [])
-        # intents cleared after dispatch attempt
         self.assertEqual(service.pending_dispatch_intents, [])
 
     @patch("mail_feeder.job_handler.artifacts.artifacts.CortexJob")
@@ -162,12 +160,10 @@ class ArtifactPlannerIntegrationTest(django.test.TestCase):
 
         case = mock.MagicMock()
         case.id = 99
-        # No mail on this case (sender_domain=None path)
         case.fileOrMail = None
 
         service.dispatch_pending(case)
 
-        # 4 URLs → planner → 1 canonical group capped to 1 → 1 Cortex call
         self.assertEqual(MockCortex.return_value.launch_cortex_jobs.call_count, 1)
 
     @mock.patch("mail_feeder.job_handler.artifacts.artifacts.CortexJob")

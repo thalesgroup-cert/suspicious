@@ -8,7 +8,7 @@ from score_process.scoring.update_handler import (
 def apply_verdict(case, verdict) -> None:
     case.final_score = verdict.final_score
     case.final_confidence = verdict.final_confidence
-    case.score = verdict.final_score          # legacy mirror
+    case.score = verdict.final_score
     case.confidence = verdict.final_confidence
     case.results = verdict.result
     case.analysis_done = verdict.n_scored
@@ -18,5 +18,5 @@ def apply_verdict(case, verdict) -> None:
     ])
 
     mail = getattr(case.fileOrMail, "mail", None) if case.fileOrMail else None
-    save_case_results(case, mail)             # MailInfo flags (mail-less safe)
-    update_kpi_and_user_stats(case)           # idempotent (SP2)
+    save_case_results(case, mail)
+    update_kpi_and_user_stats(case)

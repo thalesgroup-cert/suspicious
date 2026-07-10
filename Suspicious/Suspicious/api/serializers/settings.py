@@ -67,7 +67,6 @@ class AnalyzerWeightUpdateSerializer(serializers.Serializer):
     )
 
     def validate_weight(self, value: Decimal) -> Decimal:
-        # Preserve frontend behavior: slider uses 0.1 increments.
         return value.quantize(Decimal("0.1"))
 
 

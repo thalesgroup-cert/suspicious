@@ -23,7 +23,7 @@ class DummyConnector(Connector):
         schedules=(Schedule("sync", 120),),
     )
 
-    calls: list = []  # class-level call recorder for assertions
+    calls: list = []
 
     def health_check(self) -> HealthStatus:
         return HealthStatus(ok=True, detail="dummy ok")

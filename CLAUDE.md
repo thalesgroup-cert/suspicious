@@ -114,6 +114,107 @@ Sentence Transformers model (`paraphrase-multilingual-mpnet-base-v2`) for embedd
 | `email-feeder/config.json` | IMAP connectors, MinIO endpoint, SMTP, polling interval |
 | `deployment/Makefile` | All operational tasks |
 
+## Full E2E Dev Deployment — `/deploy-full-e2e`
+
+Trigger phrase for this section: "deploy full e2e", "redo the full deploy", "stand up the full stack", `/deploy-full-e2e`. Follow it step by step instead of re-deriving the process — every step below encodes a gotcha that cost real time to find the first time. This builds a *local, dev-only* full stack (all 13 services, real Cortex, no Vault/Traefik — plain HTTP on `localhost:9020`) seeded with a fictional company ("Meridian Group") and a handful of named personas, suitable for exercising the whole submit → analyze → finalize → notify pipeline end to end.
+
+Assumes: Docker + Compose v2 working, outbound internet, a user in the `docker` group. No JDK/keytool needed on the host — worked around below. No sudo needed.
+
+### 1. Config files (all four are git-ignored — create fresh each time)
+
+Base them on `docs/getting-started/examples/*.example` (already a coherent "Meridian Group" example set) and layer in:
+- `deployment/.env` — copy `deployment/.env.example`, fill in the `DOMAIN_CORP`/passwords from the docs example, and set `CORTEX_PATH` to an **absolute** path (e.g. `$(pwd)/cortex` under `deployment/`) — a relative path fails Cortex's mount with "mount path must be absolute".
+- `Suspicious/settings.json` — copy `docs/getting-started/examples/Suspicious-settings.example.json`. Keep `app.debug: true` (plain HTTP, no Traefik). `database.password` **must equal** `.env`'s `MYSQL_PASSWORD`.
+- `email-feeder/config.json` — copy `docs/getting-started/examples/email-feeder-config.example.json`.
+- `suspicious-ui/.env` — copy `docs/getting-started/examples/suspicious-ui-env.example` verbatim.
+
+### 2. `make init` and the keytool gap
+
+Run `cd deployment && bash scripts/init.sh` (or `make init`). It downloads Cortex's `application.conf` + analyzer/responder catalogs (needs internet) and generates TLS certs — but will fail at the JVM truststore step if `keytool` (JDK) isn't on the host. Don't install a JDK — build the keystore in a throwaway container instead, then re-run init.sh so it sees the keystore already present and continues past it:
+```bash
+cd deployment/certificates
+docker run --rm -v "$(pwd):/certs" eclipse-temurin:17-jre keytool \
+  -importcert -noprompt -alias rootca -file /certs/rootcafile.pem \
+  -keystore /certs/keystore.jks -storepass changeit -storetype JKS
+cd .. && bash scripts/init.sh   # now completes: downloads Cortex catalogs too
+```
+
+### 3. Optional dev SMTP + LDAP
+
+`deployment/docker-compose.override.yml` already carries `greenmail` (SMTP :3025 / IMAP :3143, same image `email-feeder/docker-compose.e2e.yaml` uses for its e2e test) and `openldap` (`osixia/openldap`) as of this session — auto-loaded, no extra `-f` flags. If they're gone, re-add them. Two non-obvious traps already worked around there:
+- **SMTP AUTH is required.** `email.smtp.password` in `settings.json` can't be empty or greenmail disconnects the login. Use the same password as the IMAP user(s) in `GREENMAIL_OPTS`.
+- **openldap seed data must NOT go through the image's own bootstrap-ldif volume.** That entrypoint chown/sed/rm's paths under `/container/service/slapd/assets/config/bootstrap/ldif/` in place, which fails ("Device or resource busy") against any bind mount at that exact path. Seed with `ldapadd` after the container is healthy instead:
+  ```bash
+  docker cp docker/openldap/custom/50-meridian.ldif openldap:/tmp/seed.ldif
+  docker compose exec openldap ldapadd -x -D "cn=admin,dc=meridian,dc=example" \
+    -w "$LDAP_ADMIN_PASSWORD" -f /tmp/seed.ldif
+  ```
+  See `CONFIG.md` § 2.8 for why `profiles/profiles_utils/ldap.py`'s own search silently returns zero results against a plain-schema test directory like this one (hardcoded `Tpresent`/`TpreferredFirstName` attribute filter, not a standard schema).
+
+### 4. Build and bring up
+
+```bash
+cd deployment
+docker network create --driver bridge --subnet 172.20.0.0/16 \
+  --gateway 172.20.0.1 --ip-range 172.20.0.0/24 suspicious_net   # or `make network`
+docker compose --env-file .env build suspicious suspicious_ui feeder
+docker compose --env-file .env up -d db_suspicious redis_cache redis_broker rustfs chromadb greenmail openldap
+```
+**Gotcha:** if `Suspicious/logs/` or `email-feeder/logs/` don't exist yet, Docker auto-creates them as `root:root` on first bind mount, and the container's non-root app user then can't write its log file (`PermissionError`). Fix before running anything that writes logs:
+```bash
+rmdir Suspicious/logs 2>/dev/null; mkdir Suspicious/logs   # now owned by your host user = uid 1000 = container's app user
+```
+
+### 5. Migrate, seed, create users
+
+```bash
+docker compose --env-file .env run --rm --no-deps suspicious python manage.py migrate --no-input
+docker compose --env-file .env run --rm --no-deps suspicious python manage.py seed_config
+docker compose --env-file .env run --rm --no-deps \
+  -e DJANGO_SUPERUSER_USERNAME=elena.voss@meridian.example \
+  -e DJANGO_SUPERUSER_PASSWORD='MeridianDev!2026' \
+  -e DJANGO_SUPERUSER_EMAIL=elena.voss@meridian.example \
+  suspicious python manage.py createsuperuser --noinput
+```
+For the rest of the "Meridian Group" cast — spread across NORAM/LATAM/APAC/EMEA to exercise the `REGION_DICT` logic, one deliberately carrying an LDAP `businessCategory: Admin` to test the reserved-RBAC-group guard in `profiles/profiles_utils/ldap.py` — pipe this into `docker compose --env-file .env exec -T suspicious python manage.py shell -c "$(cat script.py)"`:
+```python
+from django.contrib.auth.models import User, Group
+PERSONAS = [
+    ("adaeze.okafor@meridian.example", "Adaeze", "Okafor", ["CISO"]),
+    ("jordan.kim@meridian.example", "Jordan", "Kim", []),        # Marketing, US / NORAM
+    ("camila.reyes@meridian.example", "Camila", "Reyes", []),    # Finance, BR / LATAM
+    ("haruto.sato@meridian.example", "Haruto", "Sato", []),      # Sales, JP / APAC
+    ("sam.whitfield@meridian.example", "Sam", "Whitfield", []),  # IT, GB / EMEA
+]
+for username, first, last, groups in PERSONAS:
+    user, created = User.objects.get_or_create(
+        username=username,
+        defaults={"email": username, "first_name": first, "last_name": last, "is_active": True},
+    )
+    if created:
+        user.set_password("MeridianDev!2026")
+        user.save()
+    for gname in groups:
+        g, _ = Group.objects.get_or_create(name=gname)
+        user.groups.add(g)
+```
+
+```bash
+docker compose --env-file .env up -d suspicious suspicious_celery suspicious_ui feeder
+```
+`cortex` and `elasticsearch` come up automatically as dependencies of `suspicious`. Confirm everything: `docker compose --env-file .env ps` (all healthy) and `curl --noproxy '*' http://localhost:9020/api/health/` → `{"status": "ok", "checks": {"db": true, "redis": true, "cortex": true}, ...}`.
+
+### 6. Edited a config file after containers are already running?
+
+**Recreate, don't just wait.** `docker compose up -d --force-recreate --no-deps suspicious suspicious_celery` — a plain bind-mounted-file edit (most editors write-temp + rename, replacing the inode) can leave a running container looking at the old file even though it's mounted "live". If a config change doesn't seem to take effect, this is why.
+
+### 7. Verify
+
+```bash
+docker compose --env-file .env run --rm --no-deps suspicious python manage.py test   # 525 tests as of this session
+```
+For a real pipeline smoke test: build a multipart email with a `message/rfc822` attachment (the phishing sample) using Python's `email` module, `smtplib.SMTP('127.0.0.1', 3025).send_message(...)` it to `suspicious@meridian.example`, wait ~10–20s for `email_feeder`'s IMAP poll, then check `Case.objects.all()` via `manage.py shell` — a case should appear and finalize automatically.
+
 ## Conventions
 
 - Commit messages follow **Conventional Commits** (`feat:`, `fix:`, `chore:`, etc.) — see `CONTRIBUTING.md`.

@@ -150,8 +150,6 @@ class CaseChallengeToken(models.Model):
             return ""
         if base.endswith("/api"):
             base = base[:-4]
-        # Token in the path, not the query string — keeps it out of the
-        # query-string fields that proxies/APM tools log separately.
         return f"{base}/api/cases/{case_id}/challenge/{token}/"
 
     @staticmethod
@@ -298,10 +296,6 @@ class CaseArtifact(models.Model):
 
     class Meta:
         ordering = ['-creation_date']
-        # NOTE: MariaDB does not support partial unique constraints
-        # (Django raises models.W036 when conditions are present), so
-        # uniqueness is enforced at the application layer via the
-        # get_or_create call in CaseCreator instead.
 
     def __str__(self):
         artifact_id = (

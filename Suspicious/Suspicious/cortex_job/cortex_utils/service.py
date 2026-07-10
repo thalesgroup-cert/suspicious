@@ -20,7 +20,6 @@ class CortexJob:
         self.proxies = config.proxies or {"http": "", "https": ""}
         self.api = None
 
-        # Initialize Cortex API connection
         try:
             self.api = Api(self.api_url, self.api_key, proxies=self.proxies)
         except Exception as e:
@@ -38,7 +37,6 @@ class CortexJob:
         """
         analyzers = self.get_analyzers_by_type(data.data_type)
 
-        # Run analyzers and collect job IDs
         job_ids = []
         for analyzer in analyzers:
             try:

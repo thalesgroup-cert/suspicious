@@ -11,8 +11,6 @@ class ConnectorsConfig(AppConfig):
         self._register_beat_schedules()
         import connectors.signals  # noqa: F401 — registers the receiver
 
-        # Best-of-both-worlds: let operators set connector secrets in
-        # settings.json and migrate them into Vault on boot (seed-if-missing).
         from connectors.bootstrap import seed_connector_secrets_from_settings
         seed_connector_secrets_from_settings()
 

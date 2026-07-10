@@ -43,7 +43,6 @@ def handle_attachment(id, level, case_id):
     """
     file = File.objects.filter(linked_hash__value=id).first()
     if file:
-        # Update the file and its linked hash (handled within update_ioc_level_and_cases)
         obj = update_ioc_level_and_cases(file, "file", level)
         obj_score = obj.file_score
         obj_confidence = obj.file_confidence
@@ -122,7 +121,7 @@ def handle_mail(ioc_id: int, mail_type: str, level: int, case_id: int) -> JsonRe
 
     model_name = f"Mail{mail_type.capitalize()}"
     try:
-        mail_model = apps.get_model("mail_feeder", model_name)  # <-- adapter "your_app_name"
+        mail_model = apps.get_model("mail_feeder", model_name)
     except LookupError:
         update_cases_logger.debug(f"Model {model_name} not found in app 'your_app_name'")
         return JsonResponse({"success": False, "error": "Mail model not found"}, status=500)
@@ -143,7 +142,7 @@ def handle_mail(ioc_id: int, mail_type: str, level: int, case_id: int) -> JsonRe
             mail_object.body_confidence,
             mail_object.body_level,
         )
-    else:  # header
+    else:
         obj_score, obj_confidence, obj_level = (
             mail_object.header_score,
             mail_object.header_confidence,

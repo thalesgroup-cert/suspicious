@@ -151,7 +151,7 @@ def score_interestingness(url: str, *, sender_domain: str | None = None) -> int:
 @dataclass
 class URLAnalysisPlan:
     to_analyze: list = field(default_factory=list)
-    to_reuse: list = field(default_factory=list)   # list[tuple[URL, URL]]
+    to_reuse: list = field(default_factory=list)
     skipped: list = field(default_factory=list)
 
 
@@ -229,7 +229,6 @@ def plan_url_analysis(url_instances, *, sender_domain=None) -> URLAnalysisPlan:
     ttl_days = int(get_config("url_analysis.reuse_ttl_days", 7) or 7)
     all_ids = [u.pk for u in url_instances]
 
-    # Step 1: annotate each URL with canonical_key + interestingness
     by_key: dict[str, list] = {}
     for u in url_instances:
         try:
@@ -241,10 +240,8 @@ def plan_url_analysis(url_instances, *, sender_domain=None) -> URLAnalysisPlan:
         group_key = u.canonical_key or f"__unkeyed__:{u.pk}"
         by_key.setdefault(group_key, []).append(u)
 
-    # Step 2: within-case collapse → one representative per canonical key
     representatives = []
     for key, group in by_key.items():
-        # Sort: highest interestingness first; tie-break by longer address
         group.sort(key=lambda u: (-u.interestingness, len(u.address or "")))
         rep, dups = group[0], group[1:]
         representatives.append(rep)
@@ -254,7 +251,6 @@ def plan_url_analysis(url_instances, *, sender_domain=None) -> URLAnalysisPlan:
             d.save(update_fields=["analysis_status", "analyzed_url"])
             plan.to_reuse.append((d, rep))
 
-    # Step 3: cross-case TTL reuse
     candidates = []
     for rep in representatives:
         prior = None
@@ -270,7 +266,6 @@ def plan_url_analysis(url_instances, *, sender_domain=None) -> URLAnalysisPlan:
         else:
             candidates.append(rep)
 
-    # Step 4: per-domain cap — keep top-N most-interesting per registered domain
     by_domain: dict[str, list] = {}
     for c in candidates:
         by_domain.setdefault(_registered_domain_for_url(c), []).append(c)
@@ -300,7 +295,7 @@ def filter_dispatch_intents(intents, *, sender_domain=None):
         return list(intents)
     try:
         plan = plan_url_analysis([v for (v, _t) in url_intents], sender_domain=sender_domain)
-        keep = set(plan.to_analyze)            # URL instances to dispatch
+        keep = set(plan.to_analyze)
         return [(v, t) for (v, t) in intents if t != "url" or v in keep]
     except Exception:
         logger.warning("URL planner failed; dispatching all URL intents", exc_info=True)

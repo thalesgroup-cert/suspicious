@@ -12,6 +12,7 @@ from url_process.models import URL
 from hash_process.models import Hash
 from domain_process.models import Domain
 from score_process.scoring.header_parser import parse_email_headers
+from .dedup import has_object
 
 logger = logging.getLogger(__name__)
 
@@ -75,7 +76,7 @@ def build_hash_object(
             "[MISPHandler] Unsupported hash type %r for case %s — skipping.",
             hash_type, case_number,
         )
-        return None   # explicit None, not bare return
+        return None
 
     obj = MISPObject("file")
     obj.add_attribute(hash_type, type=hash_type, value=hash_obj.value)
@@ -99,5 +100,20 @@ def finalize_misp_object(
     event_id: str,
     misp_object: MISPObject,
 ) -> None:
-    """Add misp_object to the event identified by event_id."""
+    """Add misp_object to the event identified by event_id, skipping it if an
+    equivalent object is already there (repeated pushes for the same case —
+    e.g. delivery retries — would otherwise duplicate objects in the shared
+    MISP event, since add_object itself has no dedup)."""
+    unique_value = next(
+        (a.value for a in misp_object.Attribute if a.object_relation != "comment"),
+        None,
+    )
+    if unique_value is not None:
+        event_data = misp_instance.get_event(event_id)
+        if has_object(event_data.get("Event", {}), misp_object.name, unique_value):
+            logger.debug(
+                "[MISPHandler] Skipping duplicate %s object (%s) in event %s.",
+                misp_object.name, unique_value, event_id,
+            )
+            return
     misp_instance.add_object(event_id, misp_object)

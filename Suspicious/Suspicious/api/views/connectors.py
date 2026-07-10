@@ -41,12 +41,6 @@ def _connector_or_none(name: str):
 
 def _required_field_filled(name: str, field, section: dict) -> bool:
     if field.type == "secret":
-        # get_section() only overlays secrets registered at the section's own
-        # top level (SECRET_FIELDS[name]) — a nested secret like misp's
-        # "instances.primary.api_key" lives under the deeper section
-        # "integrations.misp.instances.primary" and never reaches `section`.
-        # Resolve it directly at any nesting depth instead, mirroring the
-        # same get_secret-then-settings_get fallback get_section itself uses.
         key = f"integrations.{name}.{field.key}"
         return bool(get_secret(key) or settings_get(key, ""))
     return bool(_dotted_get(section, field.key))
@@ -205,13 +199,10 @@ class ConnectorConfigView(APIView):
         payload = request.data if isinstance(request.data, dict) else {}
 
         errors = {}
-        # (vault_key, value, field_key) — applied only after validation passes.
         secret_writes = []
         for field in schema:
             value = _dotted_get(payload, field.key)
             if field.type == "secret":
-                # None = field absent; SECRET_MASK = UI echoed the mask back —
-                # both mean "leave the stored secret unchanged".
                 if value not in (None, SECRET_MASK):
                     secret_writes.append(
                         (f"integrations.{name}.{field.key}", value, field.key)
@@ -225,10 +216,6 @@ class ConnectorConfigView(APIView):
         if errors:
             return Response({"errors": errors}, status=status.HTTP_400_BAD_REQUEST)
 
-        # Secrets are written before the DB row. With multiple secrets, a failure
-        # on a later write leaves earlier ones in Vault while the DB is not
-        # updated; a retry re-writes them idempotently (KV v2), so this is
-        # eventually consistent and intentionally not rolled back.
         for vault_key, value, field_key in secret_writes:
             try:
                 set_secret(vault_key, value)
@@ -238,8 +225,6 @@ class ConnectorConfigView(APIView):
                     status=status.HTTP_409_CONFLICT,
                 )
             except Exception:  # noqa: BLE001 — surface any Vault write failure as 502
-                # Log full detail server-side (never the value); return a generic
-                # message so internal error text is not echoed to the client.
                 logger.exception("Vault write failed for secret '%s'", vault_key)
                 return Response(
                     {"errors": {field_key: "secret store write failed"}},
@@ -253,8 +238,6 @@ class ConnectorConfigView(APIView):
             scope="backend", key=key, defaults={"value": non_secret}
         )
         invalidate_cache(key)
-        # Mask from the schema, not SECRET_FIELDS, so no cleartext secret is
-        # ever echoed in the response body.
         return Response({"config": _mask_secret_leaves(payload, schema)})
 
 

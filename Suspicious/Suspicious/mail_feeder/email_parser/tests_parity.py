@@ -28,8 +28,6 @@ class ParityTests(TestCase):
         msg = _fixture()
         with tempfile.TemporaryDirectory() as d:
             fallback = parse_email(msg, d, "260625140959-aa", "reporter@corp.test")
-            # fast path: metadata derived from the same msg, attachments on disk
-            # are exactly what parse_email just wrote into d.
             meta = ec.build_email_metadata(msg, "260625140959-aa")
             fast = build_email_data_model(meta, "reporter@corp.test", d)
 

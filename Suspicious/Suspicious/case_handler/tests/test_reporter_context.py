@@ -30,5 +30,5 @@ class ReporterContextTest(TestCase):
         ):
             finalise(case)
         case.refresh_from_db()
-        self.assertEqual(case.reporter_context, "keep me")   # untouched
-        self.assertNotEqual(case.description, "original")     # finalise rewrote it
+        self.assertEqual(case.reporter_context, "keep me")
+        self.assertNotEqual(case.description, "original")

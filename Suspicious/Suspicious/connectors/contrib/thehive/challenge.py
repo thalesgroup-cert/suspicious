@@ -2,7 +2,7 @@ import logging
 from pathlib import Path
 
 from thehive4py import TheHiveApi
-from jinja2 import Environment, FileSystemLoader, select_autoescape
+from jinja2 import Environment, FileSystemLoader
 from mail_feeder.models import Mail
 
 from common.clients import get_s3_client
@@ -74,7 +74,7 @@ class ChallengeToTheHiveService:
 
         self.template = Environment(
             loader=FileSystemLoader(TEMPLATES_DIR),
-            autoescape=select_autoescape(["html"]),
+            autoescape=True,
         ).get_template("challenge_email.jinja2")
 
     # ── config helpers ─────────────────────────────────────────────────────

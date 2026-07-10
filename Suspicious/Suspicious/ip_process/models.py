@@ -2,7 +2,7 @@ from django.db import models
 
 class IP(models.Model):
     id = models.AutoField(primary_key=True)
-    address = models.CharField(max_length=45)  # 45 = max IPv6 textual length
+    address = models.CharField(max_length=45)
     ioc_score = models.FloatField(default=5)
     ioc_confidence = models.FloatField(default=0)
     ioc_level = models.CharField(max_length=20, default='info')

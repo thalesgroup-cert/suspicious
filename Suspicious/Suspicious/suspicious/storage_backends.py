@@ -186,6 +186,4 @@ class DualStorage(Storage):
         return self.secondary.url(name)
 
     def get_available_name(self, name, max_length=None):
-        # Object storage overwrites in place; keep the deterministic name
-        # so primary and secondary stay addressable by the same key.
         return posixpath.normpath(name).lstrip("/")

@@ -34,7 +34,6 @@ class RegistryTest(SimpleTestCase):
         self.registry.register(DummyConnector)
         self.assertIn("integrations.dummy", SCOPE_SECTIONS["backend"])
         self.assertIn("api_key", SECRET_FIELDS["integrations.dummy"])
-        # dotted secret key lands in the nested section
         self.assertIn("token", SECRET_FIELDS["integrations.dummy.nested.deep"])
 
     def test_register_creates_breaker(self):

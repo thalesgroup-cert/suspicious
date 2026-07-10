@@ -18,7 +18,6 @@ class BackfillMigrationTest(TransactionTestCase):
     def test_backfill_applies_on_empty_db(self):
         executor = self._executor()
         executor.migrate([("cortex_job", "0010_backfill_caseanalyzerjob")])
-        # No rows expected when no Cases exist.
         new_state = executor.loader.project_state(
             [("cortex_job", "0010_backfill_caseanalyzerjob")]
         )
@@ -28,7 +27,6 @@ class BackfillMigrationTest(TransactionTestCase):
     def test_backfill_is_idempotent(self):
         executor = self._executor()
         executor.migrate([("cortex_job", "0010_backfill_caseanalyzerjob")])
-        # Re-applying should not raise nor add rows.
         executor.loader.build_graph()
         executor.migrate([("cortex_job", "0010_backfill_caseanalyzerjob")])
         new_state = executor.loader.project_state(

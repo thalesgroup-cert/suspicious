@@ -12,7 +12,7 @@ class InvestigationReporterContextTest(TestCase):
         )
         data = InvestigationDetailsSerializer(case).data
         self.assertEqual(data["reporter_context"], "please check this URL")
-        self.assertEqual(data["reporter_note"], "")   # not a mail case
+        self.assertEqual(data["reporter_note"], "")
 
     def test_reporter_note_from_mail(self):
         from mail_feeder.models import Mail

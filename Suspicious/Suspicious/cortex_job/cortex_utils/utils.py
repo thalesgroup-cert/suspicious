@@ -1,7 +1,6 @@
 import logging
 from models import CortexJobConfig
 
-# Logger setup
 fetch_mail_logger = logging.getLogger("tasp.cron.fetch_and_process_emails")
 
 def load_config(config_path: str = None) -> CortexJobConfig:
@@ -10,9 +9,6 @@ def load_config(config_path: str = None) -> CortexJobConfig:
     from settings.config import get_section
     try:
         cortex = get_section("integrations.cortex")
-        # Build kwargs explicitly: CortexJobConfig only declares url, api_key,
-        # proxies — passing extra keys from get_section would cause a Pydantic
-        # validation error if extra='forbid' is ever set.
         return CortexJobConfig(
             url=cortex.get("url", ""),
             api_key=cortex.get("api_key", ""),

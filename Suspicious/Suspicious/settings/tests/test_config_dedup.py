@@ -19,12 +19,10 @@ class ConfigDedupLookupTests(TestCase):
         RuntimeConfig.objects.all().delete()
 
     def test_get_config_prefers_canonical_scope_over_stale_duplicate(self):
-        # Stale row under the OLD scope (inserted first → naive .first() picks it).
         RuntimeConfig.objects.create(
             scope="backend", key="storage.s3",
             value={"endpoint": "x", "media_bucket": "m"},
         )
-        # Current row under the canonical scope (shared) carries feeder_bucket.
         RuntimeConfig.objects.create(
             scope="shared", key="storage.s3",
             value={"endpoint": "x", "media_bucket": "m", "feeder_bucket": "suspicious-feeder"},
@@ -40,7 +38,6 @@ class SeedConfigPurgeTests(TestCase):
         RuntimeConfig.objects.all().delete()
 
     def test_seed_purges_stale_scope_duplicates(self):
-        # Pre-existing stale duplicate under the wrong scope.
         RuntimeConfig.objects.create(
             scope="backend", key="storage.s3", value={"endpoint": "stale"},
         )

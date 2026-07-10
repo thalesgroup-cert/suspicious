@@ -11,7 +11,6 @@ class NotifyAndRecordTest(TestCase):
     @patch("tasp.services.challenge.CaseChallengeService.update_user_stats")
     def test_runs_stats_and_notify_without_validate(self, m_stats, m_notify):
         user = get_user_model().objects.create_user(username="ncs", password="x")
-        # Already-challenged case must NOT raise (no validate() here).
         case = Case.objects.create(
             description="", reporter=user, is_challenged=True,
             challenge_proposed_result="Safe",
@@ -32,7 +31,6 @@ class NotifyHeaderTest(TestCase):
             challenge_proposed_result="Dangerous", challenge_reason="looks like phishing",
         )
         CaseChallengeService(case, logging.getLogger("t")).notify()
-        # mail_header is the 3rd positional arg to ChallengeToTheHiveService.
         header = m_thehive.call_args[0][2]
         self.assertIn("Dangerous", header)
         self.assertIn("looks like phishing", header)

@@ -56,7 +56,7 @@ class SmtpNotifyConnectorTest(SimpleTestCase):
     def test_skips_file_only_case(self):
         connector = SmtpNotifyConnector({})
         fake_case = mock.Mock()
-        fake_case.fileOrMail = mock.Mock(spec=[])  # no .mail attribute
+        fake_case.fileOrMail = mock.Mock(spec=[])
         with mock.patch(
             "connectors.contrib.smtp_notify.connector.Case"
         ) as case_model, mock.patch(

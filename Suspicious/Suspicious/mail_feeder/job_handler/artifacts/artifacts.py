@@ -145,7 +145,7 @@ class ArtifactJobLauncherService:
                 fetch_mail_logger.warning(f"Invalid URL: {url_obj.address}")
                 return
 
-            from domain_process.models import Domain  # lazy import
+            from domain_process.models import Domain
             domain_instance = Domain.objects.filter(value=domain_str).first()
 
             if not self._is_domain_allow_listed(domain_instance, url_obj) and not self._is_domain_deny_listed(domain_instance, url_obj):

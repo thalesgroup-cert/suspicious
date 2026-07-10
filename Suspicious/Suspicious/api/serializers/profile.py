@@ -19,16 +19,6 @@ def _validate_hex(value: str, field_path: str) -> str:
 
 
 # ---------------------------------------------------------------------------
-# Semantic color field
-#
-# Validates the full nested structure:
-#   {
-#     result: { safe, suspicious, dangerous, inconclusive },
-#     status: { done, in_progress, new, failure, challenged, unknown },
-#   }
-#
-# Any missing keys are filled from DEFAULT_SEMANTIC_COLORS so partial
-# updates are safe. Extra keys are silently dropped.
 # ---------------------------------------------------------------------------
 
 RESULT_KEYS = {"safe", "suspicious", "dangerous", "inconclusive"}
@@ -71,10 +61,6 @@ class SemanticColorsField(serializers.JSONField):
 
 
 # ---------------------------------------------------------------------------
-# Avatar field
-#
-# Validates DiceBear avatar config: {style, seed} or {} to clear.
-# Kept in sync by hand with suspicious-ui AVATAR_STYLES.
 # ---------------------------------------------------------------------------
 
 ALLOWED_AVATAR_STYLES = {
@@ -207,7 +193,6 @@ class UserProfileSerializer(serializers.ModelSerializer):
 
     def to_representation(self, instance):
         rep = super().to_representation(instance)
-        # Always return the merged (complete) color structure, not the raw stored value.
         rep["semantic_colors"] = instance.get_semantic_colors()
         return rep
 
@@ -251,9 +236,6 @@ class CISOProfileSerializer(serializers.ModelSerializer):
 
 
 # ---------------------------------------------------------------------------
-# Partial-update serializers
-# Used by dedicated PATCH endpoints so clients don't have to send the
-# full profile every time they change a single field.
 # ---------------------------------------------------------------------------
 
 class AppearanceSerializer(serializers.Serializer):

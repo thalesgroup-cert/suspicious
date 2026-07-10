@@ -16,12 +16,10 @@ class BacktestTest(TestCase):
         out = StringIO()
         call_command("backtest_scoring", stdout=out)
         case.refresh_from_db()
-        self.assertEqual(case.results, "Suspicious")   # unchanged — read-only
-        self.assertIn("old", out.getvalue().lower())    # header printed
+        self.assertEqual(case.results, "Suspicious")
+        self.assertIn("old", out.getvalue().lower())
 
     def test_reports_drift(self):
-        # A case stored as "Safe" whose ledger report is malicious must show up
-        # as a Safe -> Dangerous transition, proving the drift table is real.
         user = get_user_model().objects.create_user(username="bt_d", password="x")
         case = Case.objects.create(description="", reporter=user, results="Safe")
         ip = IP.objects.create(address="203.0.113.9")
@@ -41,4 +39,4 @@ class BacktestTest(TestCase):
         self.assertIn("Safe -> Dangerous", text)
         self.assertIn("CHANGED", text)
         case.refresh_from_db()
-        self.assertEqual(case.results, "Safe")   # still read-only
+        self.assertEqual(case.results, "Safe")

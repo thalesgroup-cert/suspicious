@@ -27,7 +27,6 @@ class PrefixSourceTests(unittest.TestCase):
         self.src = PrefixSource(self.client, "feeder-bucket")
 
     def test_iter_pending_yields_todo_and_processing_not_done(self):
-        # todo + processing (reclaimable) yielded; done excluded.
         self.client.list_objects.return_value = [
             _obj("260326141159-aaa/", is_dir=True),
             _obj("260326141200-bbb/", is_dir=True),
@@ -66,7 +65,6 @@ class PrefixSourceTests(unittest.TestCase):
         _, kwargs = self.client.put_object.call_args
         written = json.loads(kwargs["data"].read())
         self.assertEqual(written["processed_emails"], ["260326141159-bbb"])
-        # status field untouched by the marker write
         self.assertEqual(written["status"], "processing")
 
     def test_mark_email_done_is_idempotent(self):
@@ -78,7 +76,6 @@ class PrefixSourceTests(unittest.TestCase):
 
         self.src.mark_email_done("260326141159-aaa", "260326141159-bbb")
 
-        # already present → no write
         self.client.put_object.assert_not_called()
 
     def test_set_status_overwrites_preserving_fields(self):

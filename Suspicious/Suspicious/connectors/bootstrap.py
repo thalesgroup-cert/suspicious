@@ -28,7 +28,7 @@ def seed_connector_secrets_from_settings() -> None:
     raises — safe to call from ``AppConfig.ready()``.
     """
     if not os.environ.get("VAULT_ADDR"):
-        return  # dev/CI: settings.json is already the source of truth
+        return
 
     try:
         from connectors.registry import registry
@@ -43,9 +43,9 @@ def seed_connector_secrets_from_settings() -> None:
                 key = f"integrations.{name}.{field.key}"
                 value = settings_get(key, "")
                 if not value:
-                    continue  # nothing to seed from settings.json
+                    continue
                 if sec.get_secret(key, ""):
-                    continue  # Vault already has a real value — never clobber
+                    continue
                 sec.set_secret(key, value)
                 seeded += 1
                 logger.info(

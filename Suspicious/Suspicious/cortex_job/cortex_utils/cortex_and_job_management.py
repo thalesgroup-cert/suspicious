@@ -31,11 +31,6 @@ def _get_cortex_config() -> dict:
         return {}
 
 
-# Backwards-compatible lazy module attributes. Consumers do
-# `from ...cortex_and_job_management import API_URL / API_KEY /
-# STALE_JOB_TIMEOUT_SECONDS`. PEP 562 __getattr__ resolves them on first
-# access via the runtime accessor, so importing this module never triggers
-# a DB/Vault read at import time.
 def __getattr__(name):
     if name in ("API_URL", "API_KEY", "STALE_JOB_TIMEOUT_SECONDS"):
         cc = _get_cortex_config()
@@ -78,12 +73,10 @@ class CortexJob:
         self.api_url = api_url or cortex_config.get("url", "https://cortex.example.com")
         self.api_key = api_key or cortex_config.get("api_key", "your_api_key_here")
 
-        # Ensure proxies is a dict; default to empty no-proxy configuration
         self.proxies = (
             proxies if isinstance(proxies, dict) else {"http": "", "https": ""}
         )
 
-        # Initialize Cortex API connection
         try:
             self.api = SessionCortexApi(self.api_url, self.api_key, proxies=self.proxies)
         except Exception as e:
@@ -122,7 +115,6 @@ class CortexJob:
                 elif data_type == "file":
                     analyzers = CortexJob.get_file_analyzers(api_launchjob, value)
 
-                    # Exclude analyzers for `.eml` files
                     if getattr(
                         value, "file_path", None
                     ) and value.file_path.name.endswith(".eml"):
@@ -182,9 +174,8 @@ class CortexJob:
             str or None: The job ID of the launched Cortex AI job, or None if launch failed.
         """
         if data_type != "file":
-            return None  # Currently, only 'file' type is supported
+            return None
 
-        # Validate that the value has an archive with a tmp_path
         archive = getattr(value, "archive", None)
         if not archive or not hasattr(archive, "tmp_path"):
             fetch_mail_logger.warning(
@@ -192,21 +183,18 @@ class CortexJob:
             )
             return None
 
-        # Only run AI analyzer if not a .eml file
         if archive.tmp_path.endswith(".eml"):
             fetch_mail_logger.info("Skipping AI analyzer for .eml file")
             return None
 
         try:
             cortex_config = _get_cortex_config()
-            # Get AI analyzer by name from config
             ai_analyzer_name = (cortex_config.get("analyzers", {}).get("ai", {}))
             analyzer = self.api.analyzers.get_by_name(ai_analyzer_name)
             if not analyzer:
                 fetch_mail_logger.warning(f"AI analyzer '{ai_analyzer_name}' not found")
                 return None
 
-            # Run analyzer using CortexJob.run
             report = CortexJob.run(self.api, analyzer, archive, "file", case)
             return getattr(report, "id", None)
         except Exception as e:
@@ -260,7 +248,6 @@ class CortexJob:
         analyzers = []
 
         for analyzer_name in analyzer_names:
-            # Skip Yara analyzer for .eml files
             if analyzer_name == (cortex_config.get("analyzers", {}).get("yara", {})) and file.file_path.name.endswith(".eml"):
                 continue
 
@@ -299,7 +286,6 @@ class CortexJob:
             return []
 
         cortex_config = _get_cortex_config()
-        # Analyzers to exclude (safely handle missing keys in config)
         analyzers_to_remove = set(
             filter(
                 None,
@@ -311,7 +297,6 @@ class CortexJob:
             )
         )
 
-        # Filter out excluded analyzers
         filtered_analyzers = [
             analyzer
             for analyzer in analyzers
@@ -384,12 +369,6 @@ class CortexJob:
                 report_taxonomy={"ongoing": "analysis"},
             )
 
-            # set_analyzer_report_data saves analyzer_report internally
-            # (see set_analyzer_report_data body). Let any exception
-            # propagate so the outer transaction.atomic rolls back the
-            # report row alongside the CaseAnalyzerJob that we are about
-            # to create. The previous try/except here silently swallowed
-            # save errors and is removed.
             CortexJob.set_analyzer_report_data(analyzer_report, data, data_type)
 
             CaseAnalyzerJob.objects.create(
@@ -436,7 +415,7 @@ class CortexJob:
             data_value = data.value
 
         elif data_type == "mail_body":
-            data_value = data  # Pass the object or string itself
+            data_value = data
 
         elif data_type == "mail_header":
             if not hasattr(data, "header_value"):
@@ -468,9 +447,6 @@ class CortexJob:
         except Analyzer.DoesNotExist:
             pass
 
-        # Wrap create in a nested savepoint so an IntegrityError from a concurrent
-        # dispatch race does not poison the surrounding transaction.atomic block
-        # (run_analyzer wraps this call in atomic).
         try:
             with transaction.atomic():
                 return Analyzer.objects.create(
@@ -483,7 +459,6 @@ class CortexJob:
                 f"Error creating analyzer '{analyzer.name}': {e!s}"
             )
 
-        # Fallback: another worker created the row first — return it.
         return Analyzer.objects.filter(name=analyzer.name).first()
 
     @staticmethod
@@ -522,20 +497,20 @@ class CortexJob:
         else:
             raise ValueError(f"Unsupported data type: {data_type}")
 
-        # Save properly
         if analyzer_report.pk:
             analyzer_report.save(update_fields=[data_type])
         else:
             analyzer_report.save()
 
 class CortexJobManager:
-    _job_cache = {}  # Cache for Cortex jobs to avoid repeated API calls
-    _report_cache = {}  # Cache for Cortex reports to avoid repeated API calls
+    _job_cache = {}
+    _report_cache = {}
 
     def __init__(self):
         self.case = None
+        CortexJobManager._job_cache.clear()
+        CortexJobManager._report_cache.clear()
 
-        # API configuration
         _cc = _get_cortex_config()
         self.api_urls = _cc.get("url", "https://cortex.example.com")
         self.api_keys = _cc.get("api_key", "your_api_key_here")
@@ -591,7 +566,6 @@ class CortexJobManager:
 
         job_id = report_instance.cortex_job_id
 
-        # Fetch job using cache
         job = cls._job_cache.get(job_id)
         if job is None:
             job = cls.get_job_from_api(job_id)
@@ -607,7 +581,6 @@ class CortexJobManager:
             job.dataType == data_type
             or (data_type == "mail_body" and job.dataType == "file")
         ):
-            # Fetch report using cache
             report = cls._report_cache.get(job_id)
             if report is None:
                 report = cls.get_report_from_api(job_id)
@@ -625,8 +598,6 @@ class CortexJobManager:
                         f"Error updating report {job_id}: {e}", exc_info=True
                     )
 
-            # Score immediately on success so the UI does not wait for the
-            # case to flip to Done. create_and_save_report is idempotent.
             if job.status == "Success":
                 try:
                     from score_process.scoring.cortex_analyzers.reports import (
@@ -641,9 +612,6 @@ class CortexJobManager:
                         f"Error scoring report {job_id}: {e}", exc_info=True
                     )
 
-        # Age anchored to CaseAnalyzerJob.created_at (dispatch time), not
-        # AnalyzerReport.creation_date — that can drift on Deleted/resurrected
-        # rewrites or queue lag.
         if report_instance.status in {"Waiting", "InProgress"}:
             submitted_at = (
                 CaseAnalyzerJob.objects
@@ -735,12 +703,10 @@ class CortexJobManager:
 
         updated_fields = []
 
-        # Update status
         if report_instance.status != job.status:
             report_instance.status = job.status
             updated_fields.append("status")
 
-        # Update report fields if job succeeded
         if job.status == "Success" and isinstance(report, dict):
             summary = report.get("summary")
             if summary and summary != getattr(report_instance, "report_summary", None):
@@ -801,7 +767,6 @@ class CortexJobManager:
         Args:
             case (Case): The case to manage.
         """
-        # Validate presence of mail
         try:
             eml = getattr(case.fileOrMail, "mail", None)
             if not eml or not getattr(eml, "mail_id", None):
@@ -813,7 +778,6 @@ class CortexJobManager:
             )
             return
 
-        # Get mail archive
         try:
             mail_archive = MailArchive.objects.filter(mail=eml).first()
             if not mail_archive:
@@ -827,7 +791,6 @@ class CortexJobManager:
 
         update_cases_logger.info("Processing archive file: %s", mail_archive)
 
-        # Get AI analyzer report
         try:
             cortex_config = _get_cortex_config()
             analyzer = AnalyzerReport.objects.get(
@@ -845,7 +808,6 @@ class CortexJobManager:
             update_cases_logger.error("Error retrieving analyzer report: %s", e)
             return
 
-        # Update case with AI analysis
         try:
             case.score_ai = analyzer.score
             case.confidence_ai = analyzer.confidence * 10
@@ -861,7 +823,6 @@ class CortexJobManager:
                 case.category_ai,
             )
 
-            # Update associated MailInfo
             mail_info = MailInfo.objects.get(mail=eml)
             self.update_mail_models(mail_info, case.category_ai, case.results_ai)
 
@@ -884,15 +845,12 @@ class CortexJobManager:
         try:
             mail_info.is_analyzed = True
 
-            # Normalize strings to lowercase for safe comparison
             classification_lower = (classification or "").strip().lower()
             sub_class_lower = (sub_classification or "").strip().lower()
 
-            # Set phishing flag
             if classification_lower in {"classic_phishing", "whaling", "clone"}:
                 mail_info.is_phishing = True
 
-            # Set dangerous flag
             if sub_class_lower == "dangerous":
                 mail_info.is_dangerous = True
 
@@ -923,7 +881,6 @@ class CortexJobManager:
         if not report_full:
             return default_message
 
-        # Ensure report_full is a dictionary
         if isinstance(report_full, str):
             try:
                 report_full = json.loads(report_full)

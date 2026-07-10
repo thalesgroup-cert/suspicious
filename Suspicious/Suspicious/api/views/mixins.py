@@ -19,7 +19,6 @@ class MonthYearQueryMixin:
         raw_month = self.request.query_params.get("month")
         raw_year = self.request.query_params.get("year")
 
-        # Defaults
         if not raw_month and self.DEFAULT_TO_NOW:
             month = now.month
         else:
@@ -30,7 +29,6 @@ class MonthYearQueryMixin:
         else:
             year = self._parse_year(raw_year)
 
-        # Normalized strings (for CharField compatibility)
         month_str = f"{int(month):02d}"
         year_str = str(int(year))
 

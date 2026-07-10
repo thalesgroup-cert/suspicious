@@ -238,22 +238,9 @@ class InvestigationAccessMixin:
 
         if search:
             # ── ID search ────────────────────────────────────────────────────
-            # pk is an integer field — icontains on an integer raises FieldError
-            # on MySQL/MariaDB. Use exact match only when the search term is
-            # purely numeric.
             id_q = Q(pk=int(search)) if search.strip().isdigit() else Q()
 
             # ── Text search across all meaningful string fields ───────────────
-            #
-            # Each nonFileIocs FK traversal goes one level deeper to the actual
-            # string column on the related model:
-            #   nonFileIocs__url__address     (not nonFileIocs__url)
-            #   nonFileIocs__ip__address      (not nonFileIocs__ip)
-            #   nonFileIocs__hash__value      (not nonFileIocs__hash)
-            #
-            # Doing icontains directly on a ForeignKey column (which is an
-            # integer in the DB) raises:
-            #   FieldError: Unsupported lookup 'icontains' for ForeignKey
             text_q = (
                 Q(description__icontains=search)
                 | Q(reporter__email__icontains=search)
@@ -429,8 +416,6 @@ class InvestigationGlobalEditView(InvestigationAccessMixin, APIView):
             ]
         )
 
-        # Send modification email to the reporter.
-        # Best-effort — a failure must not prevent the 200 response.
         try:
             MailNotificationService.from_settings().send_review_email(obj)
         except Exception as exc:

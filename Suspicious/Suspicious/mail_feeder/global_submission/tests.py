@@ -171,7 +171,6 @@ class GlobalSubmissionServiceTests(TestCase):
     def test_list_eml_files(self, m_listdir):
         m_listdir.return_value = ["a.eml", "b.eml", "x.txt", "pref_1.eml"]
 
-        # list_eml_files excludes files that START WITH the prefix
         result = self.service.list_eml_files("/tmp", prefix="pref")
 
         self.assertEqual(result, ["a.eml", "b.eml"])
@@ -208,7 +207,6 @@ class HandleCommonTasksOrderingTest(django.test.TestCase):
         User = get_user_model()
         real_user = User.objects.create_user(username="ordering_test_user", password="x")
 
-        # Setup: Handlers() returns the mock helper shape
         handlers_mock = _make_handlers_mock(mock_handlers_cls)
         mock_user_cls.return_value.get_or_create_user.return_value = real_user
 
@@ -222,7 +220,6 @@ class HandleCommonTasksOrderingTest(django.test.TestCase):
         artifact_svc = handlers_mock.handle_artifacts.return_value
         artifact_svc.dispatch_pending.side_effect = lambda case: order_log.append("artifact_dispatch")
 
-        # Add one attachment service
         att_svc = MagicMock()
         att_svc.dispatch_pending.side_effect = lambda case: order_log.append("attachment_dispatch")
         handlers_mock.handle_attachments.return_value.services = [att_svc]
@@ -236,8 +233,6 @@ class HandleCommonTasksOrderingTest(django.test.TestCase):
         self.assertEqual(order_log[0], "create_case")
         self.assertIn("artifact_dispatch", order_log[1:])
         self.assertIn("attachment_dispatch", order_log[1:])
-        # Feeder path must stamp dispatch completion + enqueue reconcile,
-        # matching the API path — otherwise the case waits on the 300s cron.
         self.assertIsNotNone(fake_case.dispatched_at)
         fake_case.save.assert_any_call(update_fields=["dispatched_at"])
         mock_reconcile.delay.assert_called_once_with(42)

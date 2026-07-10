@@ -9,10 +9,6 @@ logger = get_task_logger(__name__)
 
 _RETRY = dict(max_retries=3, acks_late=True)
 
-# Per-case Redis lock TTL for the `case_update_lock:<id>` key. Long enough to
-# cover one case's ledger sync, short enough that a crashed worker doesn't
-# strand the lock for hours. Canonical home for this value — other modules
-# that need it (e.g. the cron fallback) import it from here.
 CASE_LOCK_TTL = 120
 
 
@@ -113,15 +109,18 @@ def fail_stale_jobs(self):
         STALE_JOB_TIMEOUT_SECONDS,
     )
 
-    cutoff = timezone.now() - timedelta(seconds=STALE_JOB_TIMEOUT_SECONDS)
-    n = CaseAnalyzerJob.objects.filter(
-        status__in=CaseAnalyzerJob.PENDING_STATUSES,
-        created_at__lt=cutoff,
-    ).update(status=CaseAnalyzerJob.STATUS_FAILURE, completed_at=timezone.now())
-    if n:
-        logger.warning(
-            "fail_stale_jobs: marked %d CaseAnalyzerJob rows as Failure", n
-        )
+    try:
+        cutoff = timezone.now() - timedelta(seconds=STALE_JOB_TIMEOUT_SECONDS)
+        n = CaseAnalyzerJob.objects.filter(
+            status__in=CaseAnalyzerJob.PENDING_STATUSES,
+            created_at__lt=cutoff,
+        ).update(status=CaseAnalyzerJob.STATUS_FAILURE, completed_at=timezone.now())
+        if n:
+            logger.warning(
+                "fail_stale_jobs: marked %d CaseAnalyzerJob rows as Failure", n
+            )
+    except Exception as exc:
+        raise self.retry(exc=exc, countdown=60 * 2 ** self.request.retries)
 
 
 @shared_task(bind=True, **_RETRY)
@@ -198,15 +197,13 @@ def reconcile_case(self, case_id: int):
     """Single finalise entrypoint: sync ledger + advance the state machine."""
     lock_key = f"case_update_lock:{case_id}"
     if not cache.add(lock_key, 1, timeout=CASE_LOCK_TTL):
-        return  # another worker/webhook owns this case; cron will re-pick it
+        return
     try:
         case = Case.objects.filter(id=case_id).first()
         if case is None:
             return
         reconcile_case_core(case)
     except Exception:
-        # Isolate per-case failures so one bad case never aborts the caller
-        # (cron batch / webhook). The cron re-enqueues it next tick.
         logger.exception("reconcile_case failed for case %s", case_id)
     finally:
         cache.delete(lock_key)

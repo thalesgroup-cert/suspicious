@@ -37,7 +37,6 @@ class VirusTotalGetReportParser(AnalyzerParser):
             positives = full["results"].get("positives")
 
         if stats is None and positives is None:
-            # No engine data — honour the taxonomy.
             return DefaultTaxonomyParser(
                 analyzer_name=self.analyzer_name, data=self.data,
                 data_type=self.type, case_id=self.case_id,
@@ -48,7 +47,7 @@ class VirusTotalGetReportParser(AnalyzerParser):
             suspicious = int(stats.get("suspicious", 0) or 0)
             total = sum(int(v or 0) for v in stats.values())
             details = {"last_analysis_stats": stats}
-        else:  # legacy
+        else:
             malicious, suspicious = int(positives or 0), 0
             total = int(full["results"].get("total", 0) or 0)
             details = {"positives": malicious, "total": total}

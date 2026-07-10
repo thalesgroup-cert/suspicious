@@ -25,7 +25,6 @@ class MakeSafeExecutionTest(SimpleTestCase):
         self.assertIn("[web_submission]", message)
         self.assertIn("creating case", message)
         self.assertIn("boom", message)
-        # exc_info attached so the traceback is logged
         self.assertIsNotNone(captured.records[0].exc_info)
 
     def test_defaults_logger_to_prefix_named_logger(self):

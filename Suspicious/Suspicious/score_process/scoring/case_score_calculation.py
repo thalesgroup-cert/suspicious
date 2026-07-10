@@ -25,15 +25,6 @@ logger              = logging.getLogger(__name__)
 
 
 # ── Score / result enums ──────────────────────────────────────────────────────
-#
-#  ScoreLevel   — used for individual analyzer outputs (ioc_level etc.)
-#  ResultRange  — used for the case-level verdict (Safe / Suspicious / Dangerous)
-#
-#  Boundaries are INCLUSIVE and cover [0..10] without gaps or overlaps:
-#
-#  Score   0  1  2  3  4 | 5 | 6  7 | 8  9  10
-#  Level  ──── SAFE ─────   I  ─SUS─  ─MALICIOUS─
-#  Result ──── SAFE ─────   ───SUSP───  ─DANGEROUS─
 
 class ScoreLevel(Enum):
     SAFE      = (0, 4)

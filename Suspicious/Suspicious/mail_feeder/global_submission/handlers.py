@@ -16,7 +16,7 @@ fetch_mail_logger = logging.getLogger("tasp.cron.fetch_and_process_emails")
 @dataclass
 class AttachmentDispatchResult:
     services: List[AttachmentJobLauncherService] = field(default_factory=list)
-    ai_archive: Optional[Any] = None  # mail_archive instance for AI dispatch
+    ai_archive: Optional[Any] = None
 
 
 class Handlers:
@@ -49,7 +49,6 @@ class Handlers:
                     service, _ = attachment_handler.process_attachment(att.file)
                     result.services.append(service)
         fetch_mail_logger.debug(f"Completed processing attachments for mail ID: {instance.mail_id}")
-        # Process archive
         if mail_zip:
             fetch_mail_logger.debug(f"Processing mail archive for mail ID: {instance.mail_id}")
             mail_archive = MailArchive.objects.filter(mail=instance).first()

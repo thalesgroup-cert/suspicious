@@ -19,11 +19,10 @@ from suspicious.secrets import get_secret
 logger = logging.getLogger("settings.config")
 
 _CACHE_PREFIX = "runtimeconfig:"
-_CACHE_TTL = 60  # seconds; short so admin edits propagate without restart
+_CACHE_TTL = 60
 _SENTINEL_MISS = "__miss__"
 _CACHE_NOT_SET = object()
 
-# Leaf field names that are secrets (overlaid from Vault), keyed by section.
 SECRET_FIELDS: dict[str, tuple[str, ...]] = {
     "app": ("secret_key",),
     "database": ("password",),
@@ -38,8 +37,6 @@ SECRET_FIELDS: dict[str, tuple[str, ...]] = {
     "email.smtp": ("password",),
 }
 
-# Which config sections belong to which scope. A scope's effective sections
-# are its own plus everything in "shared". Drives seed_config and the config API.
 SCOPE_SECTIONS: dict[str, list[str]] = {
     "shared": [
         "storage.s3", "email.smtp", "email.content", "email.links",
@@ -51,7 +48,7 @@ SCOPE_SECTIONS: dict[str, list[str]] = {
         "integrations.misp.instances.secondary", "integrations.watcher",
         "integrations.chromadb", "authentication.ldap",
     ],
-    "feeder": [],  # phase 1: feeder consumes only "shared"
+    "feeder": [],
 }
 
 
@@ -63,9 +60,6 @@ def _scope_for_section(section: str) -> str:
 
 
 def invalidate_cache(key: str) -> None:
-    # Best-effort: a cache backend outage must not break a RuntimeConfig
-    # save / admin edit / seed_config run. The stale entry expires within the
-    # short TTL anyway. Mirrors get_config's graceful DB-down degradation.
     try:
         cache.delete(_CACHE_PREFIX + key)
     except Exception:  # noqa: BLE001 — cache is non-critical for a write
@@ -82,10 +76,6 @@ def get_config(key: str, default: Any = None) -> Any:
     from settings.models import RuntimeConfig
 
     try:
-        # A section that changed scope between releases can leave duplicate rows
-        # under different scopes for the same key. Prefer the canonical-scope row,
-        # then fall back to the newest, so the lookup is deterministic instead of
-        # returning an arbitrary (possibly stale) row via an unordered .first().
         qs = RuntimeConfig.objects.filter(key=key)
         row = (
             qs.filter(scope=_scope_for_section(key)).order_by("-id").first()
@@ -113,14 +103,9 @@ def get_section(name: str) -> dict:
     base = get_config(name, default=None)
     if not isinstance(base, dict):
         base = settings_get(name, {}) or {}
-    section = dict(base)  # shallow copy; we only overlay top-level secret leaves
-    for field in SECRET_FIELDS.get(name, ()):  # overlay secrets
+    section = dict(base)
+    for field in SECRET_FIELDS.get(name, ()):
         key = f"{name}.{field}"
-        # Vault first, then settings.json: get_secret already reads settings.json
-        # when VAULT_ADDR is unset; the `or` extends that to the "Vault configured
-        # but key absent/empty" case, so a value present only in settings.json
-        # still resolves. Boot-critical secrets are read via get_secret(
-        # fail_fast=True) directly and are unaffected.
         section[field] = get_secret(key) or settings_get(key, "")
     return section
 

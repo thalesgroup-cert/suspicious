@@ -30,8 +30,8 @@ class MISPEventManager:
     """
 
     def __init__(self, client: MISPClient) -> None:
-        self.client = client          # MISPClient wrapper
-        self._misp  = client.misp     # ExpandedPyMISP instance — direct access
+        self.client = client
+        self._misp  = client.misp
 
     # ── Internal helpers ──────────────────────────────────────────────────
 
@@ -63,10 +63,8 @@ class MISPEventManager:
             if event_id:
                 logger.info("Found existing MISP event %s for %r.", event_id, event_name)
                 event_data = self._misp.get_event(event_id)
-                # add_case_number_attribute is a module-level function
                 add_case_number_attribute(self._misp, event_data["Event"]["id"], case.id)
                 event_obj = MISPEvent().load(event_data["Event"])
-                # get_detection_level_tag is a module-level function
                 tag = get_detection_level_tag(case.results or "")
                 if tag:
                     event_obj.add_tag(tag)
@@ -100,7 +98,6 @@ class MISPEventManager:
     def get_or_create_monthly_event(self) -> Optional[MISPEvent]:
         event_name  = current_month_event_name()
         event_date  = first_day_of_month()
-        # Load lazily — not from a module-level global
         tags_config = load_misp_settings().tags or {}
 
         try:
@@ -108,16 +105,13 @@ class MISPEventManager:
 
             if event_id:
                 logger.info("Found existing monthly MISP event %s for %r.", event_id, event_name)
-                # pythonify=True returns a MISPEvent object
                 event = self._misp.get_event(event_id, pythonify=True)
                 if event:
-                    # parse_tags is a module-level function, not self.parse_tags
                     for tag in parse_tags(tags_config):
                         event.add_tag(tag["name"])
                     return self._misp.update_event(event, pythonify=True)
                 return None
 
-            # Create a new monthly event
             event                 = MISPEvent()
             event.info            = event_name
             event.date            = event_date

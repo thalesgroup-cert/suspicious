@@ -86,7 +86,6 @@ class ConnectorsApiTest(APITestCase):
         row = RuntimeConfig.objects.get(key="integrations.dummy")
         self.assertNotIn("api_key", row.value)
         self.assertEqual(row.value["url"], "http://x")
-        # response body must never echo the cleartext secret
         self.assertEqual(response.json()["config"]["api_key"], "********")
 
     def test_config_put_writes_nested_secret_to_vault(self):
@@ -159,7 +158,7 @@ class ConnectorsApiTest(APITestCase):
         response = self.client.put(
             "/api/connectors/dummy/config/", {}, format="json",
         )
-        self.assertEqual(response.status_code, 400)  # url required
+        self.assertEqual(response.status_code, 400)
 
     def test_test_endpoint_runs_health_check(self):
         ConnectorState.objects.create(name="dummy", enabled=True)

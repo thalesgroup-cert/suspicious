@@ -104,7 +104,6 @@ def get_case_info_value(obj: Case) -> str:
         if non_file_iocs.ip_id and non_file_iocs.ip:
             return getattr(non_file_iocs.ip, "address", "") or obj.description or ""
         if non_file_iocs.hash_id and non_file_iocs.hash:
-            # Hash model has field `value` (CharField) — confirmed from models
             return (
                 getattr(non_file_iocs.hash, "value", "")
                 or obj.description
@@ -128,8 +127,6 @@ class InvestigationListQuerySerializer(serializers.Serializer):
         required=False,
         default="ALL",
     )
-    # Dedicated result filter — allows filtering to DANGEROUS-only, SAFE-only, etc.
-    # without having to guess the right freetext search term.
     result = serializers.ChoiceField(
         choices=("ALL",) + INVESTIGATION_RESULT_CHOICES,
         required=False,

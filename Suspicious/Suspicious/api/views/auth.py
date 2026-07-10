@@ -24,7 +24,6 @@ def _set_auth_cookies(response, token: str, max_age: int, secure: bool) -> None:
         max_age=max_age,
         path="/",
     )
-    # The indicator has the same lifetime so both expire together.
     response.set_cookie(
         SESSION_INDICATOR_COOKIE,
         "1",

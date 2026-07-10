@@ -17,7 +17,6 @@ class CaseHandlerDispatchPendingTest(TestCase):
         )
         request = RequestFactory().post("/api/submit")
         request.user = self.reporter
-        # Forms are not used by dispatch_pending; pass MagicMocks.
         self.handler = CaseHandler(request, MagicMock(), MagicMock(), MagicMock())
         self.handler.pending_dispatch_intents = [
             ("artifact-1", "ip"),
@@ -61,5 +60,4 @@ class CaseHandlerDispatchPendingTest(TestCase):
         mock_cortex = mock_cortex_cls.return_value
         self.handler.dispatch_pending(self.case)
         self.handler.dispatch_pending(self.case)
-        # First call dispatches 2 intents; second call sees empty list.
         self.assertEqual(mock_cortex.launch_cortex_jobs.call_count, 2)

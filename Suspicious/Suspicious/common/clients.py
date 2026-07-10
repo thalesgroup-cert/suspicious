@@ -12,9 +12,6 @@ from minio import Minio
 
 from settings.config import get_section
 
-# chromadb is imported lazily inside get_chroma_client() so that importing
-# this module never triggers the heavy chromadb package load.  The module-level
-# name is exposed so tests can patch "common.clients.chromadb" cleanly.
 try:
     import chromadb  # type: ignore
 except ImportError:  # pragma: no cover

@@ -40,18 +40,15 @@ class ReporterRecipientTests(TestCase):
 
     @patch("score_process.score_utils.send_mail.service.FinalEmailService")
     def test_final_goes_to_reportedby_when_user_is_system_fallback(self, FinalSvc):
-        # reporter resolved to the system user, but the real reporter is alice
         mi = self._mail_info(resolved_email=SYS, reported_by="alice@meridian.example")
         case = MagicMock(id=7, results="Safe")
         self._svc().send_final(mi, case)
-        # email was sent (not skipped) to the real reporter address
         self.assertTrue(FinalSvc.called, "send_final must not skip a real reporter")
         kwargs = FinalSvc.call_args.kwargs
         self.assertEqual(kwargs.get("recipient"), "alice@meridian.example")
 
     @patch("score_process.score_utils.send_mail.service.FinalEmailService")
     def test_final_skipped_when_reporter_is_the_system_mailbox(self, FinalSvc):
-        # genuinely self-reported (reportedBy == system) → don't email ourselves
         mi = self._mail_info(resolved_email=SYS, reported_by=SYS)
         self._svc().send_final(mi, MagicMock(id=8, results="Safe"))
         self.assertFalse(FinalSvc.called)

@@ -13,7 +13,7 @@ def _minimal_valid() -> dict:
     return {
         "app": {
             "secret_key": (
-                "k" * 64  # passes length + non-placeholder checks
+                "k" * 64
             ),
         },
         "database": {
@@ -29,7 +29,6 @@ class ValidateConfigTests(unittest.TestCase):
         cfg = validate_config(_minimal_valid())
         self.assertEqual(cfg["app"]["secret_key"], "k" * 64)
         self.assertEqual(cfg["database"]["name"], "db_suspicious")
-        # Defaults filled in
         self.assertEqual(cfg["redis"]["cache_host"], "redis_cache")
         self.assertEqual(cfg["observability"]["opentelemetry"]["enabled"], False)
 

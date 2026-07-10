@@ -24,7 +24,6 @@ class EmailDataModel(BaseModel):
     id: str
     attachments: List[AttachmentModel]
 
-    # Nettoyage automatique des valeurs vides
     @field_validator("to", "cc", "bcc", mode="before")
     @classmethod
     def empty_to_none(cls, v):

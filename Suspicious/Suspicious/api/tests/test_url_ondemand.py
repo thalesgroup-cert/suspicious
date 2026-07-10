@@ -101,7 +101,6 @@ class UrlOnDemandAuthTest(APITestCase):
         case2 = _build_case_with_non_file_ioc(self.owner, url2)
 
         self.client.force_authenticate(self.owner)
-        # url1 (self.url) belongs to case1 (self.case), not case2
         resp = self.client.post(_url(case2.pk, self.url.pk))
         self.assertEqual(resp.status_code, 404)
 

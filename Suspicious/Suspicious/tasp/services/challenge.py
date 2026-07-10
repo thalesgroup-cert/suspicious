@@ -33,8 +33,6 @@ class CaseChallengeService:
 
         self.case.is_challenged = True
         self.case.save(update_fields=["is_challenged"])
-        # Keep lifecycle_state authoritative: route through the state machine
-        # so status stays derived from it (FINALIZED -> CONTESTED).
         if self.case.lifecycle_state == LifecycleState.FINALIZED:
             transition(self.case, LifecycleState.CONTESTED)
         else:

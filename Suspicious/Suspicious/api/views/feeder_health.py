@@ -35,17 +35,10 @@ from api.permissions.settings import IsAdminOrCERT
 logger = logging.getLogger(__name__)
 
 
-# Internal Docker DNS — both containers are on suspicious_network and
-# the feeder healthcheck binds 9091.
 _FEEDER_HEALTH_URL = "http://email_feeder:9091/health"
 
-# Hard ceiling so a hanging feeder cannot wedge the Django thread.
 _FEEDER_HEALTH_TIMEOUT_S = 3.0
 
-# Anything older than this is considered "stale" — the feeder may be
-# alive (responding to /health) but is no longer polling mailboxes.
-# Polling cadence is the IMAP-side `polling_interval` (default 60 s),
-# so 5 min is comfortably above legitimate gaps.
 _FEEDER_STALE_THRESHOLD_S = 5 * 60
 
 
@@ -96,22 +89,13 @@ class FeederHealthView(APIView):
         except (TypeError, ValueError):
             last_poll = 0.0
 
-        # last_successful_poll == 0 means the feeder has not polled
-        # anything yet since the container started — keep it as null
-        # in the API so the UI doesn't print "1970-01-01".
         last_poll_int = int(last_poll) if last_poll > 0 else None
         stale_seconds = max(0, now_ts - int(last_poll)) if last_poll > 0 else 0
 
-        # Our own staleness view: never polled, or last poll older than
-        # the threshold.
         poll_is_stale = (
             last_poll_int is None or stale_seconds > _FEEDER_STALE_THRESHOLD_S
         )
 
-        # Feeder /health reports a `status` (ok|degraded) plus per-subsystem
-        # checks (IMAP, MinIO). Older feeder builds omit `status`, so derive
-        # it from our staleness view rather than blindly defaulting to "ok" —
-        # otherwise the badge reads "ok" while `stale` is True.
         feeder_status = data.get("status") or ("degraded" if poll_is_stale else "ok")
         feeder_checks = data.get("checks") or {}
 
@@ -121,10 +105,6 @@ class FeederHealthView(APIView):
             "emails_processed_total": int(data.get("emails_processed_total", 0)),
             "errors_total": int(data.get("errors_total", 0)),
             "stale_seconds": stale_seconds,
-            # `stale` becomes True if either the proxy thinks the last
-            # poll is too old OR the feeder itself reports degraded —
-            # the latter covers the case where IMAP is responding but
-            # MinIO uploads have been failing.
             "stale": poll_is_stale or feeder_status == "degraded",
             "feeder_status": feeder_status,
             "checks": feeder_checks,

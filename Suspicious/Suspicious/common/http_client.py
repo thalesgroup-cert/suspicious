@@ -13,8 +13,8 @@ from __future__ import annotations
 import requests
 from requests.adapters import HTTPAdapter
 
-DEFAULT_CONNECT_TIMEOUT: int = 5   # seconds
-DEFAULT_READ_TIMEOUT: int    = 30  # seconds
+DEFAULT_CONNECT_TIMEOUT: int = 5
+DEFAULT_READ_TIMEOUT: int    = 30
 
 
 class TimeoutHTTPAdapter(HTTPAdapter):
@@ -58,7 +58,7 @@ from tenacity import (
 )
 
 BREAKER_FAIL_MAX: int      = 5
-BREAKER_RESET_TIMEOUT: int = 60  # seconds
+BREAKER_RESET_TIMEOUT: int = 60
 
 BREAKERS: dict[str, pybreaker.CircuitBreaker] = {
     "cortex":     pybreaker.CircuitBreaker(fail_max=BREAKER_FAIL_MAX, reset_timeout=BREAKER_RESET_TIMEOUT),
@@ -93,10 +93,6 @@ def _is_retryable_http_error(exc: BaseException) -> bool:
     )
 
 
-#: Retry decorator for outbound integration calls.
-#: Retries on ConnectionError, Timeout, and HTTP 5xx.
-#: Does NOT retry on HTTP 4xx or CircuitBreakerError.
-#: After 3 attempts the original exception is re-raised (reraise=True).
 RETRY = tenacity.retry(
     retry=(
         retry_if_exception_type((requests.ConnectionError, requests.Timeout))

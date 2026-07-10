@@ -221,13 +221,9 @@ class SubmissionQueue(models.Model):
     class Meta:
         ordering = ["created_at"]
         indexes = [
-            # Claim query: status + retry_after
             models.Index(fields=["status", "retry_after"]),
-            # Watchdog query: stuck PROCESSING items
             models.Index(fields=["status", "locked_at"]),
-            # Ingest dedup check
             models.Index(fields=["submission_id"]),
-            # Link MinIO → Mail
             models.Index(fields=["mail_id"]),
         ]
         verbose_name = "Submission queue item"
@@ -296,7 +292,7 @@ class SubmissionQueue(models.Model):
         Use for unrecoverable errors (corrupt .eml, schema mismatch, etc.).
         """
         self.status = SubmissionStatus.FAILED
-        self.error_detail = reason[:4000]  # guard against runaway tracebacks
+        self.error_detail = reason[:4000]
         self.worker_id = ""
         self.locked_at = None
         self.save(

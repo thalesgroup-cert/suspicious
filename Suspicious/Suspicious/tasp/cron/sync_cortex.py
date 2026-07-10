@@ -32,8 +32,6 @@ def sync_cortex_analyzers(config_path: str = CONFIG_PATH) -> None:
 
     api = Api(str(cfg.cortex.url), cfg.cortex.api_key)
 
-    # cortex4py makes bare requests.get/post calls — no session to mount adapters on.
-    # Timeout protection comes from the RETRY decorator and circuit breaker.
     try:
         remote_analyzers = _fetch_all_analyzers(api)
     except pybreaker.CircuitBreakerError as exc:

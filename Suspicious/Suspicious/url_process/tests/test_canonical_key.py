@@ -45,7 +45,6 @@ class CanonicalKeyTests(TestCase):
         )
 
     def test_missing_scheme_defaults_to_http(self):
-        # bare host already normalised upstream, but be defensive
         self.assertEqual(
             canonical_key("x.com/p"),
             canonical_key("http://x.com/p")

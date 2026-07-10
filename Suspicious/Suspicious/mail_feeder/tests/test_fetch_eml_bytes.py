@@ -38,7 +38,7 @@ class _Resp:
 class _Client:
     def __init__(self, buckets, objects):
         self._buckets = set(buckets)
-        self._objects = objects  # {bucket: [names]}
+        self._objects = objects
         self.got = None
 
     def bucket_exists(self, b):
@@ -65,19 +65,18 @@ class FetchEmlBytesTest(TestCase):
         )
         data = fetch_eml_bytes(_Storage(client), "case-bucket")
         self.assertEqual(data, b"EMLBYTES")
-        # Reads the reported message, not the wrapper, from the real bucket.
         self.assertEqual(client.got, ("case-bucket", "msg.eml"))
 
     @patch("settings.config.get_section", return_value={"feeder_bucket": "suspicious-feeder"})
     def test_prefix_contract_falls_back_to_feeder_bucket(self, _gs):
         client = _Client(
-            buckets={"suspicious-feeder"},  # NOT 'sub-1'
+            buckets={"suspicious-feeder"},
             objects={
                 "suspicious-feeder": [
                     "sub-1/260-aaa/260-aaa.eml",
                     "sub-1/reporter-submission.eml",
                     "sub-1/attachments/x.eml",
-                    "sub-2/other.eml",  # different submission, must be ignored
+                    "sub-2/other.eml",
                 ]
             },
         )
@@ -86,7 +85,6 @@ class FetchEmlBytesTest(TestCase):
         bucket, key = client.got
         self.assertEqual(bucket, "suspicious-feeder")
         self.assertTrue(key.startswith("sub-1/"), key)
-        # Never the wrapper, never another submission.
         self.assertNotIn("reporter-submission.eml", key)
         self.assertFalse(key.startswith("sub-2/"), key)
 

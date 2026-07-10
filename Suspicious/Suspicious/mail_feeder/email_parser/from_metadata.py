@@ -19,9 +19,6 @@ def build_email_data_model(
 ) -> EmailDataModel:
     attachments = []
     for att in meta.attachments:
-        # basename() so a crafted email.json with "../" in the filename can't
-        # read outside the attachments dir. The feeder stores files under
-        # sanitised bare names, so a legit name is unaffected.
         path = os.path.join(attachments_dir, os.path.basename(att.filename))
         if not os.path.isfile(path):
             raise MetadataIntegrityError(f"missing attachment file: {att.filename}")

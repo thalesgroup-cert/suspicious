@@ -31,13 +31,11 @@ class SubmissionUrlAnalyzeView(APIView):
         case = get_object_or_404(Case, pk=submission_id)
         self.check_object_permissions(request, case)
 
-        # Fix 1: Bind url_id to the submission — prevents horizontal IDOR.
         if url_id not in case_url_ids(case):
             raise Http404
 
         url = get_object_or_404(URL, pk=url_id)
 
-        # Idempotency: skip dispatch if a fresh report already exists
         if AnalyzerReport.objects.filter(url=url).exists():
             return Response({"status": "already_analyzed", "url_id": url.id},
                             status=status.HTTP_200_OK)
@@ -46,7 +44,6 @@ class SubmissionUrlAnalyzeView(APIView):
             return Response({"status": "already_pending", "url_id": url.id},
                             status=status.HTTP_200_OK)
 
-        # Fix 2: Capture prior state before mutating so we can roll back on failure.
         prior_status = url.analysis_status
         prior_analyzed_url_id = url.analyzed_url_id
 
@@ -59,7 +56,6 @@ class SubmissionUrlAnalyzeView(APIView):
         except Exception:
             logger.exception("On-demand URL analysis dispatch failed (url=%s case=%s)",
                              url.id, case.id)
-            # Restore prior state so subsequent calls are not stuck in PENDING.
             url.analysis_status = prior_status
             url.analyzed_url_id = prior_analyzed_url_id
             url.save(update_fields=["analysis_status", "analyzed_url"])

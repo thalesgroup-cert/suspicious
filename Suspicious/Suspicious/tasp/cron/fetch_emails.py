@@ -82,11 +82,8 @@ def _collect_manifest_fields(
     for dirpath, _, filenames in os.walk(bucket_path):
         for filename in filenames:
             full = os.path.join(dirpath, filename)
-            # Object key = path relative to the bucket root, using forward slashes
             rel = os.path.relpath(full, bucket_path).replace(os.sep, "/")
 
-            # Skip the wrapper submission email — it is the reporter vehicle,
-            # not an email to be analysed.
             if filename.endswith(SUBMISSION_EML_SUFFIX):
                 continue
             elif filename.endswith(".eml"):
@@ -119,7 +116,6 @@ def _write_manifest(
     """
     raw = json.dumps(manifest, indent=2, ensure_ascii=False).encode("utf-8")
 
-    # Write to MinIO
     try:
         client.put_object(
             bucket_name=bucket_name,
@@ -142,8 +138,6 @@ def _write_manifest(
             exc_info=True,
         )
 
-    # Write local copy alongside downloaded objects so MinioEmailService
-    # can load it from the filesystem without re-fetching from MinIO.
     local_path = os.path.join(bucket_path, MANIFEST_OBJECT_NAME)
     try:
         with open(local_path, "wb") as f:
@@ -264,10 +258,10 @@ def fetch_and_process_emails(config_path: str = CONFIG_PATH) -> None:
     ensure_dir(base_temp)
     logger.info("Starting email fetch job")
     try:
-        _process_minio_buckets(base_temp)            # legacy bucket-per-submission
+        _process_minio_buckets(base_temp)
         feeder_bucket = _feeder_bucket_name()
         if feeder_bucket:
-            _process_prefix_submissions(base_temp, feeder_bucket)  # portable contract
+            _process_prefix_submissions(base_temp, feeder_bucket)
     except Exception:
         logger.exception("Error in email fetch job")
     logger.info("Email fetch job completed")

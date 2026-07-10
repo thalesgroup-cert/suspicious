@@ -40,7 +40,6 @@ def load_config(path: str) -> CronConfig:
             ),
         }
 
-        # Cortex: read via accessor (DB runtime config + Vault secrets overlay).
         try:
             from settings.config import get_section
             cortex_raw = get_section("integrations.cortex")

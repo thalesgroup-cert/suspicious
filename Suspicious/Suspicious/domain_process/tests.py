@@ -96,7 +96,6 @@ class DomainHandlerTests(TestCase):
 
     @patch("domain_process.domain_utils.domain_handler.normalize_domain")
     def test_handle_complex_normalization_rules(self, mock_normalize):
-        # Suppose a rule that strips uppercase and special chars
         mock_normalize.side_effect = lambda d: d.lower().replace("!", "")
         handler = DomainHandler()
 
@@ -117,12 +116,10 @@ class DomainHandlerExceptionTests(TestCase):
 
     @patch("domain_process.domain_utils.domain_handler.normalize_domain")
     def test_normalize_exception_is_caught_and_returns_none(self, mock_normalize):
-        # Make normalize_domain raise Exception
         mock_normalize.side_effect = Exception("unexpected error")
 
         handler = DomainHandler()
         result = handler.handle_domain("badinput")
 
-        # Because handler catches any exception inside handle_domain
         self.assertIsNone(result)
 

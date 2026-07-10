@@ -35,8 +35,6 @@ from rest_framework.views import APIView
 logger = logging.getLogger(__name__)
 
 
-# Network probe against Cortex must be short — we never want a slow
-# Cortex to drag a single healthcheck above the compose `timeout`.
 _CORTEX_PROBE_TIMEOUT_S = 2.0
 
 
@@ -45,7 +43,7 @@ class HealthView(APIView):
 
     permission_classes = [AllowAny]
     authentication_classes: list = []
-    throttle_classes: list = []  # monitoring polls this frequently — don't throttle
+    throttle_classes: list = []
 
     def get(self, request, *args, **kwargs):
         db_ok = _check_db()
@@ -62,9 +60,6 @@ class HealthView(APIView):
             "checks": {
                 "db": db_ok,
                 "redis": redis_ok,
-                # Cortex is informational; surfaced but never flips the HTTP
-                # status. Tenacity + the circuit breaker absorb transient
-                # Cortex outages without taking the API down.
                 "cortex": cortex_ok,
             },
             "failed": critical_failed,
@@ -84,7 +79,6 @@ def _check_db() -> bool:
 
 def _check_redis() -> bool:
     try:
-        # Independent ping key so we never clobber real cache entries.
         cache.set("health:probe", "pong", timeout=5)
         return cache.get("health:probe") == "pong"
     except Exception:
@@ -101,7 +95,6 @@ def _check_cortex() -> bool | None:
 
     url = (API_URL or "").rstrip("/")
     if not url or url == "https://cortex.example.com":
-        # Default placeholder from settings.py when no Cortex is configured.
         return None
 
     try:
@@ -112,6 +105,4 @@ def _check_cortex() -> bool | None:
         )
     except requests.RequestException:
         return False
-    # 200/401/403 all mean "Cortex process is up and serving HTTP"; we
-    # don't authenticate this probe so any < 500 counts as reachable.
     return resp.status_code < 500

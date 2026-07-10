@@ -88,9 +88,6 @@ class SecretsTestCase(unittest.TestCase):
                 sec.get_secret("app.secret_key", fail_fast=True)
 
     def test_missing_vault_key_returns_default(self):
-        # A key absent in Vault (KV v2 404 -> hvac InvalidPath) must fall through
-        # to the caller default, not raise — so optional, unconfigured secrets
-        # resolve to "" instead of crashing boot/requests.
         import hvac
 
         self._set_env(VAULT_ADDR="http://vault:8200")
@@ -145,8 +142,8 @@ class SecretsTestCase(unittest.TestCase):
             t = [1000.0]
             with mock.patch.object(sec.time, "monotonic", lambda: t[0]):
                 self.assertEqual(sec.get_secret("app.secret_key"), "v1")
-                t[0] += 5  # within TTL
+                t[0] += 5
                 self.assertEqual(sec.get_secret("app.secret_key"), "v1")
-                t[0] += 60  # past TTL
+                t[0] += 60
                 self.assertEqual(sec.get_secret("app.secret_key"), "v2")
-        self.assertEqual(calls["n"], 2)  # exactly two reads: initial + post-expiry
+        self.assertEqual(calls["n"], 2)

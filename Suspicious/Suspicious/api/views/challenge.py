@@ -24,7 +24,6 @@ class CaseChallengeTokenView(APIView):
 
     def get(self, request, case_id: int, token: str | None = None):
         if token is None:
-            # Legacy ?token= form.
             query_serializer = CaseChallengeTokenQuerySerializer(data=request.query_params)
             query_serializer.is_valid(raise_exception=True)
             token = query_serializer.validated_data["token"]

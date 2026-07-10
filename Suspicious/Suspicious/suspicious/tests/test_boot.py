@@ -19,4 +19,4 @@ def test_settings_import_without_vault_uses_json(monkeypatch):
     monkeypatch.delenv("VAULT_ADDR", raising=False)
     sys.modules.pop("suspicious.settings", None)
     mod = importlib.import_module("suspicious.settings")
-    assert mod.SECRET_KEY  # resolved from settings.json
+    assert mod.SECRET_KEY

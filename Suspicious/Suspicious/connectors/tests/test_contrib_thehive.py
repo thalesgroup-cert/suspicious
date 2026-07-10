@@ -10,7 +10,7 @@ class TheHiveConnectorTest(SimpleTestCase):
         m = TheHiveConnector.manifest
         m.validate()
         self.assertEqual(m.name, "thehive")
-        self.assertEqual(m.events, ())  # invoked via challenge/campaign flows
+        self.assertEqual(m.events, ())
 
     def test_health_check_unconfigured(self):
         status = TheHiveConnector({}).health_check()

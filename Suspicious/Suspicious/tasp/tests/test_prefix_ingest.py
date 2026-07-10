@@ -4,7 +4,6 @@ import tempfile
 import unittest
 from unittest import mock
 
-# Stub out the dependency chain that requires native libs not available in test env.
 for _mod in [
     "cortex4py",
     "cortex4py.api",
@@ -27,7 +26,6 @@ class PrefixIngestTests(unittest.TestCase):
         client = mock.Mock()
         mock_init.return_value = client
 
-        # iter_pending sees one todo prefix.
         from tasp.cron.prefix_source import PrefixSource
         with mock.patch.object(PrefixSource, "iter_pending",
                                return_value=iter(["260326141159-aaa"])), \
@@ -45,14 +43,12 @@ class PrefixIngestTests(unittest.TestCase):
 
             fe._process_prefix_submissions(d, "feeder-bucket")
 
-            # processing then done
             self.assertEqual(
                 [c.args[1] for c in setst.call_args_list],
                 [sc.STATUS_PROCESSING, sc.STATUS_DONE],
             )
             handoff.assert_called_once()
             self.assertEqual(handoff.call_args.args[3], "reporter@example.com")
-            # idempotency wired: no prior progress => empty done set + a marker cb
             self.assertEqual(handoff.call_args.kwargs["done_emails"], set())
             self.assertTrue(callable(handoff.call_args.kwargs["on_email_done"]))
 
@@ -80,6 +76,5 @@ class PrefixIngestTests(unittest.TestCase):
 
             fe._process_prefix_submissions(d, "feeder-bucket")
 
-            # the email already done on the crashed run is not re-ingested
             self.assertEqual(
                 handoff.call_args.kwargs["done_emails"], {"260326141159-bbb"})

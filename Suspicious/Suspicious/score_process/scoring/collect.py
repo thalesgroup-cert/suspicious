@@ -1,4 +1,3 @@
-# score_process/scoring/collect.py
 """Read the DB and build the typed inputs the pure engine consumes.
 
 Reuses the existing per-artifact processing (which still persists analyzer
@@ -27,7 +26,6 @@ def _signals_from(scores, confidences, offset, source):
     can fire on a high-score artifact regardless of its confidence."""
     out = []
     for score, conf in zip(scores[offset:], confidences[offset:]):
-        # ponytail: normalize confidence from 0-1000 (compute_weighted_scores *10) to 0-100.
         normalized_confidence = min(round(conf / 10), 100)
         out.append(Signal(
             source=source, score=score, confidence=normalized_confidence,
@@ -63,17 +61,10 @@ def collect_signals(case):
                 failures += process_ioc(ioc, ioc_type, reports, scores, confidences, 0)
                 signals += _signals_from(scores, confidences, off, ioc_type)
 
-    # Emit a failure Signal per failed artifact so all-failed cases → Failure.
     signals += [Signal("failed", 0, 0, False, True) for _ in range(failures)]
 
     ai = None
     if case.confidence_ai:
-        # confidence_ai is already 0-100: manage_ai_jobs stores
-        # analyzer.confidence * 10 where the AI analyzer's confidence is 0-10, so
-        # a 100% AI verdict is confidence_ai=100. Do NOT divide by 10 — that would
-        # sink a confident AI below CONF_FLOOR and stop it ever winning the
-        # replace-on-higher-confidence override (case #275: 100% spam -> ignored,
-        # case read Inconclusive). Clamp defensively to 100.
         ai = AiSignal(score=case.score_ai or 0, confidence=min(round(case.confidence_ai or 0), 100))
 
     deny_listed = _compute_deny_listed(case)

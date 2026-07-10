@@ -28,7 +28,5 @@ class ManageAiJobsStatusGuardTest(TestCase):
         with self.assertLogs(logger_name, level="INFO") as cm:
             CortexJobManager().manage_ai_jobs(case)
         msgs = "\n".join(cm.output)
-        # Reached the archive lookup (past status + mail checks) — proves the
-        # stale status guard is gone.
         self.assertIn("No archive file found", msgs)
         self.assertNotIn("Skipping AI job management", msgs)

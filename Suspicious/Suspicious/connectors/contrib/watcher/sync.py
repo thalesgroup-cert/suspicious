@@ -114,7 +114,6 @@ def extract_domain_value(value: str) -> str:
     if not value:
         return ""
 
-    # Refang defanged indicators (e.g. "example[.]com", "hxxp://...", "[:]")
     refanged = (
         value.replace("[.]", ".")
         .replace("(.)", ".")

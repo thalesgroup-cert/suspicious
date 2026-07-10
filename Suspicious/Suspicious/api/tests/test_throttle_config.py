@@ -17,7 +17,5 @@ class ThrottleConfigTests(SimpleTestCase):
         self.assertEqual(AnonRateThrottle().get_rate(), "100/hour")
 
     def test_machine_endpoints_exempt_from_throttling(self):
-        # A throttled cortex webhook would drop analyzer callbacks and stall
-        # the pipeline; a throttled health check would break monitoring.
         self.assertEqual(CortexWebhookView.throttle_classes, [])
         self.assertEqual(HealthView.throttle_classes, [])

@@ -5,7 +5,6 @@ from .email_theme import THEME_PALETTES, resolve_semantic_colors
 from .social_logos import SOCIAL_LOGOS
 from .utils import load_email_config, load_email_template
 
-# Maps case.results (internal Django value) to the semantic color key
 _RESULT_TO_COLOR_KEY = {
     "Dangerous":    "color_dangerous",
     "Suspicious":   "color_suspicious",
@@ -64,7 +63,7 @@ class ModificationEmailService:
         recipient: str,
         recipient_name: str,
         case,
-        profile=None,           # UserProfile — drives theme + semantic colors
+        profile=None,
     ):
         self.config = load_email_config()
 
@@ -73,8 +72,6 @@ class ModificationEmailService:
         self.recipient     = str(recipient)
         self.recipient_name = recipient_name
         self.case          = case
-        # Modification mails always use the light palette, regardless of the
-        # recipient's UI theme. Semantic colors still follow the profile.
         self.theme_ctx     = {
             **THEME_PALETTES["light"],
             **resolve_semantic_colors(profile),
@@ -100,7 +97,6 @@ class ModificationEmailService:
         cert_url   = self.config.get("links", {}).get("security_contact", "")
         cert_msg   = self.config.get("links", {}).get("security_text", "contact us")
 
-        # Dangerous gets an extra contact CTA — plain text, no | safe needed
         contact_cta = (
             f"If you have already interacted with this item, "
             f"contact {cert_msg} at {cert_url} immediately."
@@ -131,7 +127,6 @@ class ModificationEmailService:
         content = self.config.get("content", {})
 
         return self.template.render(
-            # Content
             subject=subject,
             recipient_name=recipient_name,
             company_name=content.get("team_name"),
@@ -154,9 +149,7 @@ class ModificationEmailService:
                 for social in self.config.get("socials", {})
                 if SOCIAL_LOGOS.get("svgs", {}).get(social) or SOCIAL_LOGOS.get("pngs", {}).get(social)
             ],
-            # Case context — all plain strings, no raw HTML
             case=self._build_case_context(),
-            # Theme palette + semantic colors
             **self.theme_ctx,
         )
 

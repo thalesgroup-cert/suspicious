@@ -10,8 +10,6 @@ class _Req:
 
 class GetRequestIpTests(SimpleTestCase):
     def test_uses_rightmost_forwarded_for_not_client_supplied(self):
-        # Leftmost is client-forgeable; the real client as seen by the trusted
-        # proxy is the rightmost hop.
         req = _Req({"HTTP_X_FORWARDED_FOR": "9.9.9.9, 10.0.0.1, 203.0.113.7"})
         self.assertEqual(get_request_ip(req), "203.0.113.7")
 

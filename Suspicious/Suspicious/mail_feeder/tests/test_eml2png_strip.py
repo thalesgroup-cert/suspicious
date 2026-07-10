@@ -14,7 +14,6 @@ class StripRemoteCssTests(SimpleTestCase):
         self.assertNotIn("evil.test", out)
         self.assertNotIn("<link", out)
         self.assertNotIn("@import", out)
-        # legit inline content survives
         self.assertIn("<p>hi</p>", out)
         self.assertIn("color:red", out)
 

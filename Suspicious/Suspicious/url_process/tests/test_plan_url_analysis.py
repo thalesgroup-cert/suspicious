@@ -70,7 +70,6 @@ class PlanUrlAnalysisTest(TestCase):
         a = _mk("https://x.com/p?id=1")
         b = _mk("https://x.com/p?id=2")
         plan = plan_url_analysis([a, b])
-        # one representative analyzed, the other reused → it
         self.assertEqual(len(plan.to_analyze), 1)
         self.assertEqual(len(plan.to_reuse), 1)
         reused_row, rep = plan.to_reuse[0]
@@ -94,7 +93,6 @@ class PlanUrlAnalysisTest(TestCase):
             self.assertEqual(s.analysis_status, URL.AnalysisStatus.SKIPPED)
 
     def test_payload_in_query_survives_cap(self):
-        # 3 boring + 1 open-redirect; cap=1 must keep the redirect one
         boring = [_mk(f"https://x.com/a{i}") for i in range(3)]
         redirect = _mk("https://x.com/go?redirect=http://evil.com")
         with override_config(max_per_domain=1):
@@ -126,7 +124,6 @@ class PlanUrlAnalysisTest(TestCase):
         old.canonical_key = "https://x.com/p?id"
         old.save(update_fields=["canonical_key"])
         report = _mk_report(old, analyzer)
-        # Back-date the report beyond the TTL window
         AnalyzerReport.objects.filter(pk=report.pk).update(
             creation_date=timezone.now() - timedelta(days=30)
         )
@@ -138,7 +135,6 @@ class PlanUrlAnalysisTest(TestCase):
     def test_fail_open_on_bad_url(self):
         bad = _mk("http://[::bad::]/")
         plan = plan_url_analysis([bad])
-        # never dropped — ends up analyzed
         self.assertIn(bad, plan.to_analyze)
         self.assertEqual(len(plan.skipped), 0)
         self.assertEqual(len(plan.to_reuse), 0)

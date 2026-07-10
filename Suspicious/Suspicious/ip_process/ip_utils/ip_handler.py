@@ -35,10 +35,9 @@ class IPHandler:
                 return f"Link-local {ip_type}"
             elif ip_obj.is_multicast:
                 return f"Multicast {ip_type}"
-            # Fallback in case none of the above conditions match
             return f"Unknown {ip_type}"
         except ValueError:
-            return None  # The provided string is not a valid IP address
+            return None
 
     def handle_ip(self, ip: str):
         """
@@ -52,11 +51,9 @@ class IPHandler:
             ip = ip.strip()
             ip_type = IPHandler().validate_ip(ip)
 
-            # Only process public IPs.
             if ip_type and ip_type.startswith("Public"):
                 ip_instance, created = IP.objects.get_or_create(address=ip)
                 if not created:
-                    # Increment the counter in a race-condition-safe way
                     ip_instance.times_sent = F('times_sent') + 1
                 ip_instance.save()
                 return ip_instance

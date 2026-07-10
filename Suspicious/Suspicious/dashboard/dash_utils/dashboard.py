@@ -16,7 +16,6 @@ def update_monthly_reporter_stats(kpi, current_month: int, current_year: int) ->
         date_joined__year=current_year
     ).count()
 
-    # Calculate unique reporters for current month
     total_reporters_count = Case.objects.filter(
         creation_date__month=current_month,
         creation_date__year=current_year
@@ -51,7 +50,6 @@ def update_group_monthly_stats(current_month: int, current_year: int) -> None:
             year=str(current_year),
         )
 
-        # Reset all counters before recomputing
         group_stat.total_cases = base_qs.count()
         group_stat.suspicious_cases = 0
         group_stat.inconclusive_cases = 0
@@ -71,7 +69,6 @@ def update_group_monthly_stats(current_month: int, current_year: int) -> None:
         group_stat.internal_cases = 0
         group_stat.external_cases = 0
 
-        # Count by results
         result_counts = (
             base_qs.values('results')
             .annotate(count=Count('results'))
@@ -85,10 +82,8 @@ def update_group_monthly_stats(current_month: int, current_year: int) -> None:
             if hasattr(group_stat, field_name):
                 setattr(group_stat, field_name, entry['count'])
 
-        # Count challenged cases
         group_stat.challenged_cases = base_qs.filter(is_challenged=True).count()
 
-        # Count by category_ai
         category_counts = (
             base_qs.values('category_ai')
             .annotate(count=Count('category_ai'))
@@ -113,7 +108,6 @@ def update_monthly_cases_summary(kpi, current_month: int, current_year: int) -> 
 
     summary = kpi.monthly_cases_summary
 
-    # Reset all counters before recomputing to avoid stale data from previous runs
     for field in MonthlyCasesSummary._meta.get_fields():
         if hasattr(field, 'default') and field.name.endswith('_cases'):
             setattr(summary, field.name, 0)

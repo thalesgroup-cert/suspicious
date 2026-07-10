@@ -30,9 +30,6 @@ from .utils import SECONDARY_MISP_LEVELS
 logger = logging.getLogger("tasp.cron.update_ongoing_case_jobs")
 
 
-# Deep FK chain accessed in _build_artifact_object per mail_artifact row.
-# Re-fetching the Mail with this prefetch turns N+1 forward-FK lookups
-# into a fixed number of batched queries.
 _UPDATE_MISP_PREFETCH = (
     "mail_artifacts__artifactIsIp__ip",
     "mail_artifacts__artifactIsUrl__url",
@@ -58,7 +55,6 @@ class MISPService:
                 logger.error("Could not get/create MISP event for case %s.", case.id)
                 return
 
-            # Create the secondary handler ONCE per case, not per artifact
             if case.results in SECONDARY_MISP_LEVELS:
                 secondary_client = MISPClient(config=load_misp_settings().security)
                 secondary_mem    = MISPEventManager(secondary_client)
@@ -72,7 +68,6 @@ class MISPService:
                 )
                 obj  = build_email_object(mail, case.id, case.results)
                 if obj:
-                    # Correct signature: (misp_instance, event_id, obj)
                     finalize_misp_object(self.client.misp, event.id, obj)
                     self._maybe_push_monthly(
                         obj, case.id, case.results, secondary_mem, secondary_client
@@ -106,6 +101,7 @@ class MISPService:
 
         except Exception as exc:
             logger.error("Error updating MISP for case %s: %s", case.id, exc, exc_info=True)
+            raise
 
     # ── Artifact routing ──────────────────────────────────────────────────
 
@@ -124,7 +120,6 @@ class MISPService:
             obj = self._build_artifact_object(artifact, case_number, detection_level, ioc_type)
             if not obj:
                 return
-            # Correct signature: (misp_instance, event_id, obj)
             finalize_misp_object(self.client.misp, event_id, obj)
             self._maybe_push_monthly(
                 obj, case_number, detection_level, secondary_mem, secondary_client
@@ -142,7 +137,6 @@ class MISPService:
         detection_level: str,
         ioc_type: Optional[str],
     ) -> Optional[MISPObject]:
-        # Named IOC (from nonFileIocs)
         if ioc_type:
             if ioc_type == "url" and isinstance(artifact, URL):
                 return build_url_object(artifact, case_number, detection_level)
@@ -158,7 +152,6 @@ class MISPService:
             )
             return None
 
-        # Mail artifact (from mail_artifacts)
         artifact_type = (getattr(artifact, "artifact_type", None) or "").lower()
         if artifact_type == "url" and getattr(artifact, "artifactIsUrl", None):
             return build_url_object(artifact.artifactIsUrl.url, case_number, detection_level)
@@ -185,8 +178,27 @@ class MISPService:
         secondary_mem:    Optional[MISPEventManager] = None,
         secondary_client: Optional[MISPClient]       = None,
     ) -> None:
-        # Placeholder — attachment builder not yet implemented
-        pass
+        file_obj = getattr(attachment, "file", None)
+        hash_obj = getattr(file_obj, "linked_hash", None)
+        if hash_obj is None:
+            logger.warning(
+                "[MISPHandler] Attachment %s on case %s has no linked hash — skipping.",
+                getattr(attachment, "id", attachment), case_number,
+            )
+            return
+        try:
+            obj = build_hash_object(hash_obj, case_number, detection_level)
+            if not obj:
+                return
+            finalize_misp_object(self.client.misp, event_id, obj)
+            self._maybe_push_monthly(
+                obj, case_number, detection_level, secondary_mem, secondary_client
+            )
+        except Exception as exc:
+            logger.error(
+                "[MISPHandler] Error adding attachment to event %s: %s",
+                event_id, exc, exc_info=True,
+            )
 
     # ── Monthly event push ────────────────────────────────────────────────
 
@@ -199,7 +211,6 @@ class MISPService:
         client:          Optional[MISPClient],
     ) -> None:
         """Push a copy of misp_object to the secondary monthly event when warranted."""
-        # Use capitalised comparison — case.results is "Suspicious"/"Dangerous", not uppercase
         if detection_level not in SECONDARY_MISP_LEVELS or not mem or not client:
             return
         try:
@@ -207,8 +218,6 @@ class MISPService:
             if not monthly_event:
                 return
 
-            # get_or_create_monthly_event uses pythonify=True — result is a
-            # MISPEvent object, so use .id attribute, not ['Event']['id'] dict access
             monthly_id = getattr(monthly_event, "id", None)
             if not monthly_id:
                 logger.warning(
@@ -224,7 +233,6 @@ class MISPService:
                         attr.object_relation, type=attr_type, value=attr.value
                     )
 
-            # Correct call: module-level finalize_misp_object with client.misp
             finalize_misp_object(client.misp, str(monthly_id), new_obj)
 
         except Exception as exc:

@@ -91,7 +91,7 @@ class CaseEvent:
     final_score: float | None
     confidence: float | None
     reporter_email: str
-    created_at: str  # ISO-8601
+    created_at: str
     schema_version: int = CASE_EVENT_SCHEMA_VERSION
 
     def to_dict(self) -> dict:
@@ -119,10 +119,6 @@ class Connector(ABC):
     def health_check(self) -> HealthStatus:
         """Cheap connectivity/auth probe. Must not raise — return ok=False."""
 
-    # Optional hooks — only called if listed in manifest.events / schedules.
-    # The dispatch engine wraps every hook call; a NotImplementedError from a
-    # connector that subscribed to an event it didn't implement is recorded
-    # as a failed delivery, never propagated to the case pipeline.
     def on_case_created(self, event: CaseEvent) -> None:  # pragma: no cover
         raise NotImplementedError
 

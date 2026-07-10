@@ -1,4 +1,3 @@
-# cortex_job/tests/test_aggregate.py
 from django.contrib.auth import get_user_model
 from django.test import TestCase
 from case_handler.models import Case
@@ -41,8 +40,8 @@ class CaseAggregateTest(TestCase):
         self.assertEqual(agg.in_progress, 1)
         self.assertEqual(agg.waiting, 1)
         self.assertEqual(agg.deleted, 1)
-        self.assertEqual(agg.pending, 2)      # in_progress + waiting
-        self.assertEqual(agg.scored, 5)       # total - deleted
+        self.assertEqual(agg.pending, 2)
+        self.assertEqual(agg.scored, 5)
 
     def test_zero_jobs(self):
         agg = aggregate_case(self.case)

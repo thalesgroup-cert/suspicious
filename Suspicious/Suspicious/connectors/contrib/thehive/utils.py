@@ -144,24 +144,19 @@ def extract_urls(text):
 
     candidates = []
 
-    # HTML href/src attributes (double or single quotes)
     attr_pattern = re.compile(r"\b(?:href|src)\s*=\s*(['\"])\s*(https?://[^'\"\s>]+)\1", re.IGNORECASE)
     for _quote, url in attr_pattern.findall(text):
         candidates.append(url)
 
-    # Markdown links [text](url)
     md_link_pattern = re.compile(r"\[[^\]]+\]\(\s*(https?://[^) \t]+)\s*\)")
     candidates.extend(md_link_pattern.findall(text))
 
-    # Angle bracket autolinks <url>
     angle_pattern = re.compile(r"<(https?://[^>\s]+)>")
     candidates.extend(angle_pattern.findall(text))
 
-    # Plain URLs (avoid trailing punctuation / closing delimiters)
     plain_pattern = re.compile(r"(https?://[^\s<>'\"]+)")
     candidates.extend(plain_pattern.findall(text))
 
-    # Normalise, strip trailing punctuation, HTML-unescape, de-duplicate, keep order
     urls = []
     seen = set()
     for raw in candidates:
@@ -185,36 +180,29 @@ def parse_headers(headers_str: str):
 
     for line in headers_str.splitlines():
         if not line.strip():
-            continue  # skip empty lines
+            continue
 
         if ":" in line and not line.startswith(" "):  
-            # flush previous header
             if current_key is not None:
                 headers[current_key].append(" ".join(current_value_lines).strip())
             
-            # start new header
             key, value = line.split(":", 1)
             current_key = key.strip()
             current_value_lines = [value.strip()]
         else:
-            # continuation of previous header (folded header)
             if current_key:
                 current_value_lines.append(line.strip())
 
-    # flush the last header
     if current_key is not None:
         headers[current_key].append(" ".join(current_value_lines).strip())
 
     return headers
 
 def parse_and_decode_defaultdict(s):
-    # Extract dict portion
     dict_str = s[s.find("{"):s.rfind("}")+1]
 
-    # Convert string to dict
     raw_dict = ast.literal_eval(dict_str)
 
-    # Decode MIME headers in list values
     decoded_dict = {}
     for key, values in raw_dict.items():
         decoded_list = []
@@ -223,7 +211,7 @@ def parse_and_decode_defaultdict(s):
                 try:
                     decoded_val = decode_mime_header(val)
                 except Exception:
-                    decoded_val = val  # Fallback
+                    decoded_val = val
             else:
                 decoded_val = val
             decoded_list.append(decoded_val)
@@ -301,7 +289,6 @@ def extract_sender_domain_from_headers(mail_headers):
         update_cases_logger.debug(f"Extracting sender domain from headers: {type(mail_headers)}")
         
         if isinstance(mail_headers, dict):
-            # Look for 'From' field in headers (case insensitive)
             from_field = None
             for key in ['From', 'from', 'FROM']:
                 if key in mail_headers:
@@ -311,32 +298,26 @@ def extract_sender_domain_from_headers(mail_headers):
             update_cases_logger.debug(f"From field found: {from_field} (type: {type(from_field)})")
             
             if from_field:
-                # Handle case where from_field is a list (take first element)
                 if isinstance(from_field, list) and len(from_field) > 0:
                     from_field = from_field[0]
                 
-                # Ensure from_field is a string
                 if not isinstance(from_field, str):
                     from_field = str(from_field)
                 
-                # Skip if it's None or empty string after conversion
                 if not from_field or from_field.lower() in ['none', '']:
                     update_cases_logger.debug("From field is None or empty after conversion")
                     return None
                 
                 update_cases_logger.debug(f"Processing from_field as string: {from_field}")
                 
-                # Extract email address from "Name <email@domain.com>" format
                 email_match = re.search(r'<([^>]+)>', from_field)
                 if email_match:
                     email = email_match.group(1)
                 else:
-                    # If no angle brackets, assume the whole field is the email
                     email = from_field.strip()
                 
                 update_cases_logger.debug(f"Extracted email: {email}")
                 
-                # Extract domain from email
                 if '@' in email:
                     domain = email.split('@')[1].strip()
                     domain = domain.lower()
@@ -359,11 +340,8 @@ def is_domain_in_campaign_allow_list(domain):
             update_cases_logger.debug("No domain provided for whitelist check")
             return False
         
-        # Import here to avoid circular imports
         from settings.models import CampaignDomainAllowList
 
-        # Check if domain exists in CampaignDomainAllowList
-        # The domain field is a ForeignKey to Domain model, so we need to query by domain__value
         is_whitelisted = CampaignDomainAllowList.objects.filter(domain__value__exact=domain).exists()
         update_cases_logger.info(f"Domain '{domain}' allow list check: {is_whitelisted}")
         return is_whitelisted

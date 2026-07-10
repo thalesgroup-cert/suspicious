@@ -1,35 +1,3 @@
-#
-# OIDC Authorization Code flow with:
-#   • PKCE (S256)                    — prevents auth code interception
-#   • Full JWT signature validation  — verifies id_token against provider JWKS
-#   • HTTP Basic auth at token endpoint — spec-compliant client authentication
-#   • State + nonce binding          — prevents CSRF and replay attacks
-#   • Knox token issuance            — integrates with the DRF token auth system
-#
-# Two endpoints:
-#
-#   GET /api/oidc/login/
-#     Generates state, nonce, and PKCE pair; stores them in the session;
-#     redirects the browser to the provider's authorization endpoint.
-#
-#   GET /api/oidc/callback/
-#     Verifies state, exchanges the code (with code_verifier), validates the
-#     id_token signature and nonce via PyJWT + JWKS, gets or creates the
-#     local Django user, issues a Knox token, and redirects the React SPA
-#     to /login?sso=1#token=<knox>&expiry=<iso>.
-#     The token is in the URL fragment — it never appears in server access logs.
-#
-# Required Django settings (populated from settings.json):
-#   OIDC_SERVER_URL      — IdP base URL, e.g. "https://sso.corp.example"
-#   OIDC_CLIENT_ID       — registered client ID
-#   OIDC_CLIENT_SECRET   — registered client secret
-#   OIDC_SCOPES          — space-separated scopes (default: "openid email profile")
-#
-# Optional:
-#   OIDC_REDIRECT_URI    — explicit callback URL override (auto-derived if absent)
-#
-# Dependencies:
-#   pip install PyJWT[cryptography] requests
 
 import base64
 import hashlib
@@ -59,7 +27,7 @@ logger = logging.getLogger(__name__)
 User = get_user_model()
 
 _DISCOVERY_CACHE_KEY = "oidc:discovery"
-_DISCOVERY_CACHE_TTL = 3600  # 1 hour — re-fetch if provider rotates keys
+_DISCOVERY_CACHE_TTL = 3600
 
 
 # ---------------------------------------------------------------------------
@@ -139,9 +107,6 @@ def _redirect_uri(request) -> str:
     override = getattr(settings, "OIDC_REDIRECT_URI", None)
     if override:
         return override
-    # Auto-derive from the request so it works behind any hostname.
-    # SECURE_PROXY_SSL_HEADER and USE_X_FORWARDED_HOST must be set
-    # in settings.py for this to produce an https:// URL behind Traefik.
     return request.build_absolute_uri("/api/oidc/callback/")
 
 
@@ -173,7 +138,6 @@ class OIDCLoginView(APIView):
         nonce = get_random_string(32)
         pkce  = _generate_pkce_pair()
 
-        # Bind all three to the session — callback verifies each one.
         request.session["oidc_state"]         = state
         request.session["oidc_nonce"]         = nonce
         request.session["oidc_code_verifier"] = pkce["code_verifier"]
@@ -188,7 +152,6 @@ class OIDCLoginView(APIView):
             "scope":                 scopes,
             "state":                 state,
             "nonce":                 nonce,
-            # PKCE — prevents authorization code interception attacks
             "code_challenge":        pkce["code_challenge"],
             "code_challenge_method": "S256",
         }
@@ -238,7 +201,6 @@ class OIDCCallbackView(APIView):
             return redirect(_frontend_error("state_mismatch"))
 
         if not code_verifier:
-            # Session expired between login and callback
             logger.warning("OIDC code_verifier missing from session")
             return redirect(_frontend_error("state_mismatch"))
 
@@ -249,12 +211,6 @@ class OIDCCallbackView(APIView):
             return redirect(_frontend_error("provider_unavailable"))
 
         # ── Token exchange ───────────────────────────────────────────────
-        #
-        # Send code_verifier (PKCE) so the provider can verify it matches
-        # the challenge sent in step 1.
-        # Use HTTP Basic auth (client_id:client_secret) rather than putting
-        # the secret in the request body — more spec-compliant and avoids
-        # the secret appearing in server-side request logs.
         try:
             token_resp = requests.post(
                 discovery["token_endpoint"],
@@ -282,20 +238,11 @@ class OIDCCallbackView(APIView):
             return redirect(_frontend_error("token_exchange_failed"))
 
         # ── ID token validation ───────────────────────────────────────────
-        #
-        # Full signature verification via the provider's JWKS endpoint.
-        # PyJWT fetches and caches the signing keys automatically.
-        # Falls back to basic base64 decode if PyJWT is not installed —
-        # install PyJWT[cryptography] in production.
         claims = _validate_id_token(id_token_raw, discovery, session_nonce)
         if claims is None:
             return redirect(_frontend_error("token_validation_failed"))
 
         # ── Userinfo (optional — claims may already have what we need) ────
-        #
-        # Fetch userinfo if email was not in the id_token claims directly.
-        # Most providers include email in the id_token when the openid +
-        # email scopes are requested, making this roundtrip unnecessary.
         email = claims.get("email")
         if not email and access_token:
             try:
@@ -306,7 +253,6 @@ class OIDCCallbackView(APIView):
                 )
                 userinfo_resp.raise_for_status()
                 userinfo = userinfo_resp.json()
-                # Merge — id_token claims take precedence
                 email = userinfo.get("email", "")
                 claims.setdefault("given_name",  userinfo.get("given_name",  ""))
                 claims.setdefault("family_name", userinfo.get("family_name", ""))
@@ -340,9 +286,6 @@ class OIDCCallbackView(APIView):
             user.username, email,
         )
 
-        # Set the Knox token as an httpOnly cookie and redirect the browser
-        # to the SPA login page with ?sso=1 to trigger color hydration.
-        # The token never appears in URLs or server logs.
         ttl = settings.REST_KNOX.get("TOKEN_TTL")
         max_age = int(ttl.total_seconds()) if ttl else 36_000
 
@@ -376,12 +319,6 @@ def _validate_id_token(
     if _PYJWT_AVAILABLE:
         return _validate_id_token_pyjwt(id_token_raw, discovery, session_nonce)
 
-    # PyJWT is a pinned dependency, so this branch should never run in a real
-    # deployment. If it does (e.g. a stripped-down image), the only thing the
-    # fallback can do is decode the token WITHOUT verifying the provider's
-    # signature — i.e. accept a forged id_token. That is acceptable for local
-    # development but must never authenticate a user in production. Fail closed
-    # when DEBUG is off rather than silently downgrading to unverified tokens.
     if not settings.DEBUG:
         logger.error(
             "PyJWT not installed and DEBUG is off — refusing to validate "
@@ -418,14 +355,12 @@ def _validate_id_token_pyjwt(
             algorithms=algorithms,
             audience=settings.OIDC_CLIENT_ID,
             issuer=discovery["issuer"],
-            # leeway tolerates up to 10s clock skew between IdP and server
             leeway=10,
         )
     except Exception as exc:
         logger.error("OIDC id_token validation failed: %s", exc, exc_info=True)
         return None
 
-    # Nonce — replay protection
     if session_nonce and claims.get("nonce") != session_nonce:
         logger.warning("OIDC nonce mismatch")
         return None
@@ -502,7 +437,6 @@ def _get_or_create_user(claims: dict, email: str) -> "User":
     )
 
     if not created:
-        # Sync name fields — only write if something actually changed
         update_fields = []
         if first_name and user.first_name != first_name:
             user.first_name = first_name

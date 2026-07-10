@@ -7,7 +7,6 @@ from ..base import AnalyzerParser, AnalyzerManifest
 from ..result import AnalyzerResult
 from ..default import get_level_score_confidence, DefaultTaxonomyParser
 
-# MISP threat_level_id → our level. 1=High, 2=Medium, 3=Low, 4=Undefined.
 THREAT_LEVEL = {1: "malicious", 2: "suspicious", 3: "suspicious", 4: "info"}
 
 
@@ -36,7 +35,6 @@ class MispParser(AnalyzerParser):
                 data_type=self.type, case_id=self.case_id,
             ).parse(summary, full)
 
-        # Most severe = lowest threat_level_id (1 is highest threat).
         ids = []
         for e in events:
             try:

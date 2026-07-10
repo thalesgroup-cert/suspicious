@@ -86,7 +86,6 @@ def _resolve_user(
     The path-convention fallback exists only for buckets that predate
     metadata.json. Remove it once all feeder-produced buckets write manifests.
     """
-    # Fast path: manifest provided a full email address
     if reported_by:
         user = _get_user_by_email(reported_by)
         if user:
@@ -99,7 +98,6 @@ def _resolve_user(
             reported_by,
         )
 
-    # Slow path: extract username from workdir path convention
     username: Optional[str] = None
     for part in workdir.split(os.sep):
         if "-submission-" in part:
@@ -168,10 +166,6 @@ class MinioEmailService:
             for filename in eml_files:
                 fetch_mail_logger.debug("Processing MinIO email file %s", filename)
 
-                # Isolate each email: a single malformed message (e.g. a missing
-                # From that fails EmailDataModel validation) must not abort the
-                # rest of the batch or the submission — otherwise the cron rolls
-                # the whole submission back to `todo` and retries it forever.
                 try:
                     glo().process_single_email(
                         MailSubmissionData(

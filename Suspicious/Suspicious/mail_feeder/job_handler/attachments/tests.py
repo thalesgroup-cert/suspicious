@@ -33,7 +33,6 @@ class AttachmentDispatchPendingTest(TestCase):
         mock_cortex.launch_cortex_jobs.assert_any_call(self.file, "file", case=self.case)
         mock_cortex.launch_cortex_jobs.assert_any_call(self.hash, "hash", case=self.case)
         self.assertEqual(self.service.pending_dispatch_intents, [])
-        # Each call returns [1, 2] → result is [1, 2, 1, 2]
         self.assertEqual(sorted(result), [1, 1, 2, 2])
 
     @patch("mail_feeder.job_handler.attachments.attachments.CortexJob")

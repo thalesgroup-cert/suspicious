@@ -34,22 +34,13 @@ from django.conf import settings
 
 logger = logging.getLogger(__name__)
 
-# Default bucket name for rendered previews. Configurable via
-# settings.MAIL_PREVIEW_BUCKET; falls back to this constant.
 _DEFAULT_PREVIEW_BUCKET = "mail-previews"
 
 
-# Pixel-perfect width matches the eml-thumbnail use case in
-# SubmissionsPage; investigation page scales up with CSS object-fit.
 _RENDER_WIDTH_PX = 900
 
-# Headers we surface in the preview. Anything else is dropped so the
-# image stays compact and free of long Received-chains.
 _VISIBLE_HEADERS = ("From", "To", "Cc", "Subject", "Date", "Reply-To")
 
-# Remote stylesheets are the one fetch vector no-images / disable-local-file-access
-# don't close, so a <link>/@import in a phishing body could still beacon the render
-# host. Strip them before rasterising.
 _REMOTE_CSS_RE = re.compile(
     r"<link\b[^>]*>|@import\b[^;]*;", re.IGNORECASE | re.DOTALL
 )
@@ -63,9 +54,6 @@ class Eml2PngRenderer:
     """Render an .eml file to a PNG preview via stdlib email + imgkit."""
 
     def __init__(self) -> None:
-        # Imported lazily so the module still loads when wkhtmltopdf is
-        # missing (e.g. unit tests outside the Docker image). Failures
-        # surface in render_eml_path_to_png_bytes with a clear log line.
         try:
             import imgkit  # noqa: F401  (probed for availability)
             self._imgkit_available = True
@@ -254,17 +242,11 @@ class Eml2PngRenderer:
     def _render_html_to_png(self, html: str) -> Optional[bytes]:
         import imgkit
 
-        # Flags supported by wkhtmltoimage 0.12.6. The wkhtmltopdf-only
-        # options (--disable-external-links etc.) are intentionally
-        # absent — they make wkhtmltoimage exit 1.
         options = {
             "format": "png",
             "encoding": "utf-8",
             "width": str(_RENDER_WIDTH_PX),
             "quiet": "",
-            # Block remote fetches + local-FS reads + script execution.
-            # Previews must be deterministic and must not phone home to
-            # attacker-controlled hosts.
             "no-images": "",
             "disable-javascript": "",
             "disable-local-file-access": "",
@@ -325,8 +307,6 @@ def _ensure_bucket(client, bucket: str) -> None:
         if not client.bucket_exists(bucket):
             client.make_bucket(bucket)
     except Exception:
-        # bucket_exists / make_bucket can race on concurrent creates;
-        # tolerate the race and let put_object surface a real failure.
         logger.warning(
             "ensure_bucket(%s) failed (continuing — put_object will retry)",
             bucket, exc_info=True,

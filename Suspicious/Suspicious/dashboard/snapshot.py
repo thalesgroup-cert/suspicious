@@ -16,7 +16,7 @@ from dashboard.models import (
 )
 
 _TOP_PREFIXES_LIMIT = 10
-_SNAPSHOT_MAX_AGE_SECONDS = 86_400  # 24 h
+_SNAPSHOT_MAX_AGE_SECONDS = 86_400
 
 
 def build_dashboard_payload(*, month: int, year: int, scope: str) -> dict:

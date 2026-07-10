@@ -41,7 +41,7 @@ def _signals_for(case):
         if report.status != "Success":
             continue
         score = report.score or 0
-        conf = min(report.confidence or 0, 100)   # AnalyzerReport.confidence is 0–100
+        conf = min(report.confidence or 0, 100)
         is_mal = (report.level or "").lower() in ("malicious", "dangerous") \
             or score >= MALICIOUS_SCORE_THRESHOLD
         signals.append(Signal("report", score, conf, is_mal, False))

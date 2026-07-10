@@ -4,7 +4,6 @@ from import_export.admin import ImportExportModelAdmin
 from ip_process.models import IP
 
 
-# Resource class for import/export
 class IPResource(resources.ModelResource):
     class Meta:
         model = IP
@@ -15,7 +14,6 @@ class IPResource(resources.ModelResource):
         export_order = fields
 
 
-# Admin class
 @admin.register(IP)
 class IPAdmin(ImportExportModelAdmin):
     resource_class = IPResource

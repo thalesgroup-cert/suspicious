@@ -5,7 +5,7 @@ from typing import Any, Dict, Optional
 class MISPConfig(BaseModel):
     url:         AnyUrl
     key:         str
-    ssl_verify:  bool = False   # read from config, not hardcoded in client
+    ssl_verify:  bool = True
 
 
 class MISPSettings(BaseModel):

@@ -25,8 +25,6 @@ def _write_submission(d):
     msg = email.message_from_bytes(inner.as_bytes(), policy=email.policy.default)
     with open(os.path.join(d, "mail.eml"), "wb") as f:
         f.write(inner.as_bytes())
-    # Attachments live under <email-dir>/attachments/ — the layout the feeder
-    # writes and build_email_data_model reads.
     os.makedirs(os.path.join(d, "attachments"), exist_ok=True)
     with open(os.path.join(d, "attachments", "p.pdf"), "wb") as f:
         f.write(b"PAY")

@@ -89,6 +89,43 @@ curl --noproxy '*' http://localhost:9020/api/health/
 
 ---
 
+## Local dev mail + LDAP (optional)
+
+Two services in `deployment/docker-compose.override.yml` (auto-loaded, no extra
+flags needed) stand in for infrastructure most contributors don't have handy:
+
+- **`greenmail`** — a disposable SMTP+IMAP server (the same image
+  `email-feeder/docker-compose.e2e.yaml` uses for its own e2e test). Point
+  `Suspicious/settings.json` → `email.smtp` and `email-feeder/config.json` →
+  `mail`/`mail-connectors.imap` at it (`server: greenmail`, port `3025` SMTP /
+  `3143` IMAP) to submit and receive real mail locally without a corporate
+  relay. **SMTP AUTH is required** — greenmail rejects an empty
+  `email.smtp.password`; use the same credentials as the IMAP user(s) you
+  define in `GREENMAIL_IMAP_USER`/`GREENMAIL_IMAP_PASSWORD`. IMAP requires a
+  named account per mailbox you want to read (`-Dgreenmail.users=user:pw@domain,...`
+  in the service's `GREENMAIL_OPTS`) — an unlisted recipient still accepts SMTP
+  delivery but has no IMAP account to read it back from.
+- **`openldap`** (`osixia/openldap`) — a disposable LDAP directory for
+  exercising `authentication.ldap` and `profiles/profiles_utils/ldap.py`. Seed
+  it with `ldapadd` **after** the container is healthy, not through the
+  image's own bootstrap-ldif volume — that entrypoint chown/sed/rm's paths
+  under `/container/service/slapd/assets/config/bootstrap/ldif/` in place,
+  which fails with "Device or resource busy" against any bind-mounted file or
+  directory at that exact path:
+  ```bash
+  docker cp docker/openldap/custom/50-meridian.ldif openldap:/tmp/seed.ldif
+  docker compose exec openldap ldapadd -x -D "cn=admin,dc=meridian,dc=example" \
+    -w "$LDAP_ADMIN_PASSWORD" -f /tmp/seed.ldif
+  ```
+  See [CONFIG.md § 2.8](CONFIG.md#28-authentication) for a caveat on testing
+  `profiles/profiles_utils/ldap.py`'s search against a plain-schema directory
+  like this one.
+
+Both are dev-only — omit them (or delete the `greenmail`/`openldap` blocks from
+the override file) for a production deploy.
+
+---
+
 ## Configuration
 
 Three files hold all configuration. They are git-ignored — create them from the

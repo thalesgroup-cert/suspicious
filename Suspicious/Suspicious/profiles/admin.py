@@ -44,16 +44,13 @@ class APIKeyForm(forms.ModelForm):
         self.request = kwargs.pop("request", None)
         super().__init__(*args, **kwargs)
 
-        # Default expiration
         if not self.instance.pk:
             self.fields["expiration"].initial = 30
 
-        # Editing existing key → lock fields
         if self.instance.pk:
             self.fields["user"].widget = forms.HiddenInput()
             self.fields["expiration"].widget = forms.HiddenInput()
 
-        # Non-superusers can only create keys for themselves
         if self.request and not self.request.user.is_superuser:
             self.fields["user"].queryset = User.objects.filter(id=self.request.user.id)
             self.fields["user"].initial = self.request.user
@@ -198,7 +195,6 @@ class APIKeyAdmin(admin.ModelAdmin):
     key_details.short_description = "Key details"
 
 
-# Auto-cleanup Knox token when APIKey is deleted
 @receiver(post_delete, sender=APIKey)
 def delete_authtoken_on_apikey_delete(sender, instance, **kwargs):
     auth_token_id = getattr(instance, "auth_token_id", None)
@@ -247,7 +243,6 @@ class UserProfileAdmin(ImportExportModelAdmin):
     ordering = ("-creation_date",)
     actions = ("enable_acknowledgement", "disable_acknowledgement")
 
-    # Actions
 
     def enable_acknowledgement(self, request, queryset):
         updated = queryset.update(wants_acknowledgement=True)

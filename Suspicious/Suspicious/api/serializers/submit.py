@@ -8,16 +8,12 @@ from rest_framework import serializers
 
 
 DEFAULT_CONTEXT_MAX_LENGTH = 2000
-# An "other" indicator resolves to an IP or a hash; the hash column caps at 255
-# (UploadOtherForm enforces the same). Keep the serializer bound aligned so
-# oversize input is rejected here with a clear field error instead of failing
-# late in form processing.
 DEFAULT_OTHER_MAX_LENGTH = 255
 DEFAULT_URL_MAX_LENGTH = 2048
-DEFAULT_UPLOAD_MAX_BYTES = 25 * 1024 * 1024  # 25 MB
+DEFAULT_UPLOAD_MAX_BYTES = 25 * 1024 * 1024
 
 _BLOCKED_NETWORKS = (
-    ipaddress.ip_network("100.64.0.0/10"),   # RFC 6598 CGNAT
+    ipaddress.ip_network("100.64.0.0/10"),
 )
 
 
@@ -67,18 +63,18 @@ def _looks_like_numeric_host(host: str) -> bool:
     h = host.strip(".")
     if not h:
         return False
-    if h.isdigit():                       # packed decimal (e.g. 2130706433)
+    if h.isdigit():
         return True
-    if h.lower().startswith("0x"):        # packed hex (e.g. 0x7f000001)
+    if h.lower().startswith("0x"):
         return True
     parts = h.split(".")
     if len(parts) <= 4:
         for p in parts:
             if not p:
                 return True
-            if p.lower().startswith("0x"):               # hex octet
+            if p.lower().startswith("0x"):
                 return True
-            if p.startswith("0") and p != "0" and p.isdigit():  # octal octet
+            if p.startswith("0") and p != "0" and p.isdigit():
                 return True
     return False
 
@@ -100,11 +96,10 @@ def _check_no_ssrf_ip(url: str) -> None:
 
     Raises ValueError when a blocked target is detected.
     """
-    hostname = urlparse(url).hostname  # strips [] from IPv6 literals; None-safe
+    hostname = urlparse(url).hostname
     if not hostname:
         return
 
-    # 1. Literal IP address?
     try:
         addr = ipaddress.ip_address(hostname)
     except ValueError:
@@ -114,15 +109,13 @@ def _check_no_ssrf_ip(url: str) -> None:
             raise ValueError("URL targets a private or reserved address.")
         return
 
-    # 2. Ambiguous numeric encodings that aren't valid literals but resolve to IPv4.
     if _looks_like_numeric_host(hostname):
         raise ValueError("URL host is an ambiguous numeric address.")
 
-    # 3. Resolve the domain and check every address it maps to (DNS rebinding).
     try:
         infos = socket.getaddrinfo(hostname, None)
     except socket.gaierror:
-        return  # unresolvable now — any later fetch fails closed anyway
+        return
     for info in infos:
         ip = info[4][0]
         try:
@@ -141,9 +134,6 @@ class SubmitUrlSerializer(OptionalContextMixin, serializers.Serializer):
 
     def validate_url(self, value: str) -> str:
         value = value.strip()
-        # Normalise bare domains that arrive without a scheme.
-        # The frontend already prepends http:// for bare domains, but this
-        # acts as a safety net in case the value slips through uncorrected.
         if value and not value.startswith(("http://", "https://")):
             value = f"http://{value}"
         try:
@@ -168,8 +158,8 @@ class SubmitOtherSerializer(OptionalContextMixin, serializers.Serializer):
 
 
 _ZIP_MAX_ENTRIES       = 1_000
-_ZIP_MAX_UNCOMPRESSED  = 100 * 1024 * 1024   # 100 MB
-_ZIP_MAX_RATIO         = 100                 # uncompressed / compressed
+_ZIP_MAX_UNCOMPRESSED  = 100 * 1024 * 1024
+_ZIP_MAX_RATIO         = 100
 
 
 def _is_zip_by_magic(uploaded_file) -> bool:
