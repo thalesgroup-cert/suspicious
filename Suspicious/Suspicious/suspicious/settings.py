@@ -276,7 +276,7 @@ INSTALLED_APPS = [
 SUSPICIOUS_STORAGE_BACKEND = suspicious_config.get("storage_backend", "local").lower()
 
 # MinIO (django-minio-storage) settings (env first, then settings.json)
-MINIO_STORAGE_ENDPOINT = minio_config.get("endpoint", "minio:9000")
+MINIO_STORAGE_ENDPOINT = minio_config.get("endpoint", "rustfs:9000")
 MINIO_STORAGE_ACCESS_KEY = minio_config.get("access_key", "")
 MINIO_STORAGE_SECRET_KEY = minio_config.get("secret_key", "")
 MINIO_STORAGE_USE_HTTPS = str(minio_config.get("secure", "0")).lower() in {"1", "true", "yes", "on"}

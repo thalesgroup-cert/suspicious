@@ -28,7 +28,7 @@ cp .env.example .env
 ```env
 SUSPICIOUS_VERSION=latest
 DB_SUSPICIOUS_VERSION=12
-MINIO_VERSION=RELEASE.2025-04-22T22-12-26Z
+RUSTFS_VERSION=1.0.0-alpha.89
 CORTEX_VERSION=4.0
 ELASTICSEARCH_VERSION=8.19.7
 TRAEFIK_VERSION=v3.5
@@ -41,8 +41,7 @@ Update only when you know compatibility. Mismatched versions can break services.
 ```env
 SUSPICIOUS_PORT=9020
 DB_SUSPICIOUS_PORT=3306
-MINIO_PORT_1=35001
-MINIO_PORT_2=35002
+MINIO_PORT=35000
 CORTEX_PORT=9001
 ELASTICSEARCH_PORT=9200
 ```
@@ -308,7 +307,7 @@ Set `"enable": false"` for unused connectors.
 
 ```json
 "minio": {
-  "endpoint": "minio:9000",
+  "endpoint": "rustfs:9000",
   "access_key": "minioadmin",
   "secret_key": "minioadmin",
   "secure": false
