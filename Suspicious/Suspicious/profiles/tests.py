@@ -163,6 +163,14 @@ class LDAPUtilityTests(TestCase):
         Ldap.add_user_to_group(user, "Admin")
         self.assertEqual(user.groups.filter(name="Admin").count(), 0)
 
+    def test_add_user_to_group_blocks_champions(self):
+        # "Champions" is treated as elevated (alongside Admin/CERT) by
+        # tasp/views.py's is_admin_or_cert()/TaspService and
+        # tasp/templatetags/utils.py on this branch — must be reserved too.
+        user = User.objects.create_user(username="pat.reyes")
+        Ldap.add_user_to_group(user, "Champions")
+        self.assertEqual(user.groups.filter(name="Champions").count(), 0)
+
     def test_add_user_to_group_allows_non_reserved_names(self):
         user = User.objects.create_user(username="jordan.kim")
         Ldap.add_user_to_group(user, "Marketing")
