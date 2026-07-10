@@ -1,10 +1,17 @@
+import logging
+
 try:
     import ldap
+    import ldap.filter
 except ImportError:
     ldap = None  # type: ignore[assignment]
 from django.contrib.auth.models import Group
 from profiles.models import CISOProfile, UserProfile
 from django.contrib.auth import get_user_model
+
+logger = logging.getLogger("profiles.ldap")
+
+RESERVED_GROUP_NAMES = {"Admin", "CERT", "CISO"}
 
 
 def _ldap_config() -> dict:
@@ -31,8 +38,8 @@ REGION_DICT = {
 
 
 class Ldap:
-    
-    
+
+
     def initialize_ldap(self):
         """
         Initializes and returns an LDAP server connection.
@@ -49,15 +56,24 @@ class Ldap:
         """
         ldap_config = _ldap_config()
         try:
-            ldap.set_option(ldap.OPT_X_TLS_REQUIRE_CERT, ldap.OPT_X_TLS_NEVER)
+            verify_ssl = str(ldap_config.get("verify_ssl", "True")).lower()
+            if verify_ssl in ("false", "0", "no"):
+                logger.warning(
+                    "LDAP TLS verification disabled via settings.json "
+                    "(authentication.ldap.verify_ssl=false). Bind credentials "
+                    "are exposed to MITM."
+                )
+                ldap.set_option(ldap.OPT_X_TLS_REQUIRE_CERT, ldap.OPT_X_TLS_NEVER)
+            else:
+                ldap.set_option(ldap.OPT_X_TLS_REQUIRE_CERT, ldap.OPT_X_TLS_DEMAND)
             ldap_server = ldap.initialize(ldap_config.get("server_uri", "ldap://localhost"))
             ldap_server.simple_bind_s(ldap_config.get("bind_dn", "cn=admin,dc=example,dc=com"),
                                     ldap_config.get("bind_password", "password"))
             return ldap_server
         except ldap.LDAPError as e:
-            print(f"Error while binding to the LDAP server: {e}")
+            logger.error(f"Error while binding to the LDAP server: {e}")
             raise
-    
+
     @staticmethod
     def get_search_results(instance, ldap_server):
         """
@@ -71,13 +87,12 @@ class Ldap:
             search_results: The search results from the LDAP server.
         """
         try:
-            print('searching user')
+            safe_username = ldap.filter.escape_filter_chars(instance.username)
             search_results = ldap_server.search_s(_ldap_config().get("base_dn"), ldap.SCOPE_SUBTREE,
-                                                  f'(&(mail={instance.username})(Tpresent=true)(!(ou=admin))(!(TpreferredFirstName=Test)))',
+                                                  f'(&(mail={safe_username})(Tpresent=true)(!(ou=admin))(!(TpreferredFirstName=Test)))',
                                                   ['mail', 'title', 'businessCategory', 'c'])
-            print(search_results)
         except Exception as e:
-            print(e)
+            logger.error(f"LDAP search failed for user {instance.username!r}: {e}")
             search_results = None
         return search_results
 
@@ -99,15 +114,13 @@ class Ldap:
                 for title in CISO:
                     if title in search_results[0][1]['title'][0].decode('utf-8'):
                         ciso_found = True
-                        print('CISO found')
                         break
                 if ciso_found:
                     Ldap.create_ciso_profile(instance, search_results)
                 else:
-                    print('Not a CISO')
                     Ldap.create_user_profile(instance, search_results)
             except Exception as e:
-                print(e)
+                logger.error(f"Failed to process LDAP search results for user {instance.username!r}: {e}")
 
     @staticmethod
     def create_ciso_profile(instance, search_results):
@@ -183,8 +196,11 @@ class Ldap:
 
     @staticmethod
     def add_user_to_group(user, group_name):
-        try:
-            group, _ = Group.objects.get_or_create(name=group_name)
-        except Group.DoesNotExist:
-            group = Group.objects.create(name=group_name)
+        if group_name in RESERVED_GROUP_NAMES:
+            logger.warning(
+                "Refusing to add user %r to LDAP-derived group %r: name collides "
+                "with a reserved RBAC group.", user.username, group_name,
+            )
+            return
+        group, _ = Group.objects.get_or_create(name=group_name)
         user.groups.add(group)

@@ -3,7 +3,7 @@ import logging
 from pathlib import Path
 from typing import Callable
 
-from jinja2 import Environment, FileSystemLoader, select_autoescape
+from jinja2 import Environment, FileSystemLoader
 
 logger = logging.getLogger("tasp.cron.update_ongoing_case_jobs")
 
@@ -16,7 +16,7 @@ def load_email_template(template_name: str):
     configured in one place."""
     env = Environment(
         loader=FileSystemLoader(_TEMPLATES_DIR),
-        autoescape=select_autoescape(["html", "xml"]),
+        autoescape=True,
     )
     return env.get_template(template_name)
 

@@ -31,11 +31,15 @@ import traceback
 VECTORIZER_PATH = (
     "/worker/AIMailAnalyzer/vectorizers/paraphrase-multilingual-mpnet-base-v2"
 )
-SAFE_SUSPICIOUS_MODEL = (
-    "/worker/AIMailAnalyzer/models/safe_suspicious_model.pth"
-)
-UNWANTED_DANGEROUS_MODEL = (
-    "/worker/AIMailAnalyzer/models/unwanted_dangerous_model.pth"
+# Must match the five files ai_mail_classifier.py actually loads — this probe
+# previously checked two differently-named legacy files, so it could pass
+# while the real models were broken (or fail while they were fine).
+MODEL_PATHS = (
+    "/worker/AIMailAnalyzer/models/safe_suspicious_30_epochs_model.pth",
+    "/worker/AIMailAnalyzer/models/spam_dangerous_30_epochs_model.pth",
+    "/worker/AIMailAnalyzer/models/safe_30_epochs_model.pth",
+    "/worker/AIMailAnalyzer/models/unwanted_30_epochs_model.pth",
+    "/worker/AIMailAnalyzer/models/dangerous_30_epochs_model.pth",
 )
 
 
@@ -59,7 +63,7 @@ def main() -> int:
 
     try:
         device = torch.device("cpu")
-        for path in (SAFE_SUSPICIOUS_MODEL, UNWANTED_DANGEROUS_MODEL):
+        for path in MODEL_PATHS:
             model = ResNetMLP(768, 2).to(device)
             model.load_state_dict(torch.load(path, weights_only=True))
     except Exception as exc:

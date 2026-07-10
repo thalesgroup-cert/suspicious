@@ -10,7 +10,6 @@ class LifecycleState(models.TextChoices):
     CONTESTED = "CONTESTED", "Contested"
 
 
-# lifecycle_state -> analyst-facing Case.status display value
 STATUS_MAP = {
     LifecycleState.CREATED:   "On Going",
     LifecycleState.ANALYZING: "On Going",
@@ -26,7 +25,7 @@ class IllegalTransition(Exception):
 
 LEGAL_TRANSITIONS = {
     LifecycleState.CREATED:   {LifecycleState.ANALYZING, LifecycleState.SCORING,
-                               LifecycleState.FINALIZED},   # FINALIZED = allow-listed shortcut
+                               LifecycleState.FINALIZED},
     LifecycleState.ANALYZING: {LifecycleState.SCORING},
     LifecycleState.SCORING:   {LifecycleState.FINALIZED},
     LifecycleState.FINALIZED: {LifecycleState.CONTESTED},
@@ -38,10 +37,21 @@ def transition(case, to_state: str) -> None:
     current = case.lifecycle_state
     if to_state not in LEGAL_TRANSITIONS.get(current, set()):
         raise IllegalTransition(f"{current} -> {to_state} (case {case.id})")
+
+    values = {"lifecycle_state": to_state, "status": STATUS_MAP[to_state]}
+    finalized_at = case.finalized_at
+    if to_state == LifecycleState.FINALIZED and finalized_at is None:
+        finalized_at = timezone.now()
+        values["finalized_at"] = finalized_at
+
+    updated = type(case).objects.filter(id=case.id, lifecycle_state=current).update(**values)
+    if not updated:
+        raise IllegalTransition(
+            f"{current} -> {to_state} (case {case.id}): lifecycle_state changed "
+            "concurrently, aborting this transition"
+        )
+
     case.lifecycle_state = to_state
-    case.status = STATUS_MAP[to_state]
-    fields = ["lifecycle_state", "status"]
-    if to_state == LifecycleState.FINALIZED and case.finalized_at is None:
-        case.finalized_at = timezone.now()
-        fields.append("finalized_at")
-    case.save(update_fields=fields)
+    case.status = values["status"]
+    if "finalized_at" in values:
+        case.finalized_at = finalized_at

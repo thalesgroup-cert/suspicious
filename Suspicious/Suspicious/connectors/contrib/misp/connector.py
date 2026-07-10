@@ -30,18 +30,16 @@ class MISPConnector(Connector):
             ConfigField("instances.primary.url", "url", required=True,
                         help="Primary MISP instance URL"),
             ConfigField("instances.primary.api_key", "secret", required=True),
-            ConfigField("instances.primary.ssl_verify", "bool", default=False),
+            ConfigField("instances.primary.ssl_verify", "bool", default=True),
             ConfigField("instances.secondary.url", "url",
                         help="Secondary (security) MISP for monthly campaign events"),
             ConfigField("instances.secondary.api_key", "secret"),
-            ConfigField("instances.secondary.ssl_verify", "bool", default=False),
+            ConfigField("instances.secondary.ssl_verify", "bool", default=True),
         ),
         events=(EVENT_CASE_FINALISED,),
     )
 
     def health_check(self) -> HealthStatus:
-        # Read the sub-section directly: the Vault secret overlay is keyed on
-        # "integrations.misp.instances.primary", not on the parent section.
         from settings.config import get_section
         primary = get_section("integrations.misp.instances.primary")
         url, key = primary.get("url"), primary.get("api_key")
@@ -52,7 +50,7 @@ class MISPConnector(Connector):
                 f"{url.rstrip('/')}/servers/getVersion",
                 headers={"Authorization": key, "Accept": "application/json"},
                 timeout=10,
-                verify=bool(primary.get("ssl_verify", False)),
+                verify=bool(primary.get("ssl_verify", True)),
             )
             response.raise_for_status()
             return HealthStatus(ok=True, detail=f"MISP {response.json().get('version', '?')}")
@@ -60,7 +58,5 @@ class MISPConnector(Connector):
             return HealthStatus(ok=False, detail=str(exc))
 
     def on_case_finalised(self, event) -> None:
-        # DoesNotExist (case deleted mid-flight) surfaces as a failed
-        # delivery + retries — intentional, no special-casing.
         case = Case.objects.get(pk=event.case_id)
         MISPService(primary=True).update_misp(case)

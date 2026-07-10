@@ -40,7 +40,7 @@ from api.views.filters import (
 )
 from api.views.mixins import MonthYearQueryMixin
 
-DASHBOARD_CACHE_TTL = 120  # 2 minutes — matches KPI sync cadence
+DASHBOARD_CACHE_TTL = 120
 TOP_PREFIXES_CACHE_TTL = 120
 
 
@@ -94,7 +94,9 @@ class DashboardSummaryView(APIView):
         snap = get_snapshot(month, year)
         if snap is not None:
             payload = {**snap, "scope": scope}
-            return Response(DashboardSummaryResponseSerializer(instance=payload).data)
+            return Response(
+                DashboardSummaryResponseSerializer(instance=self._scrub(payload)).data
+            )
 
         cache_key = f"dashboard:summary:{year}:{month}:{scope}"
         payload = cache.get(cache_key)
@@ -102,12 +104,17 @@ class DashboardSummaryView(APIView):
             payload = build_dashboard_payload(month=month, year=year, scope=scope)
             cache.set(cache_key, payload, DASHBOARD_CACHE_TTL)
 
-        return Response(DashboardSummaryResponseSerializer(instance=payload).data)
+        return Response(DashboardSummaryResponseSerializer(instance=self._scrub(payload)).data)
 
     def _resolve_scope(self, requested_scope: str) -> str:
         if not self.request.user.groups.filter(name="CISO").exists():
             return "ALL"
         return requested_scope
+
+    def _scrub(self, payload: dict) -> dict:
+        if StatsReadPermission().has_permission(self.request, self):
+            return payload
+        return {**payload, "top_prefixes": []}
 
 
 class MonthlyCasesSummaryListView(generics.ListAPIView):
@@ -120,10 +127,6 @@ class MonthlyCasesSummaryListView(generics.ListAPIView):
 
 
 class MonthlyReporterStatsListView(generics.ListAPIView):
-    # Per-reporter stats name individual reporters and their case volumes —
-    # colleague-level data. Restricted to elevated roles (CERT/CISO/Admin),
-    # consistent with UserCasesMonthlyStats. Regular users get only the
-    # org-wide aggregate dashboards.
     permission_classes = [StatsReadPermission]
     queryset = MonthlyReporterStats.objects.all()
     serializer_class = MonthlyReporterStatsSerializer
@@ -287,7 +290,7 @@ class UserCasesMonthlyStatsAggregateView(MonthYearQueryMixin, APIView):
 
 
 class TopPrefixesView(APIView):
-    permission_classes = [IsAuthenticated]
+    permission_classes = [StatsReadPermission]
 
     DEFAULT_LIMIT = 10
     MAX_LIMIT = 50
@@ -340,9 +343,6 @@ class TopPrefixesView(APIView):
         username_expr = Lower(Coalesce(F("user__username"), Value("")))
         at_pos = StrIndex(username_expr, Value("@"))
 
-        # Guard Substr length: at_pos may be 0 when no '@' is present.
-        # The When() branch only fires when '@' exists, but we still wrap
-        # the length in a Case to be safe across DB backends.
         qs = qs.annotate(
             prefix=Case(
                 When(

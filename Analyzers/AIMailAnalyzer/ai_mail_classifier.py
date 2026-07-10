@@ -57,9 +57,13 @@ class AIMailClassifier(Analyzer):
             return
 
         # Untar file
-        mail_analysis.untar_file(self.filepath, './tmp/')
+        if not mail_analysis.untar_file(self.filepath, './tmp/'):
+            self.error(f"Error extracting archive: {self.filepath}")
+            return
 
         # Get mail content and headers
+        mail_body = None
+        mail_headers = None
         for file in os.listdir('./tmp/'):
             if file.endswith('.txt'):
                 with open('./tmp/' + file, 'r') as f:
@@ -68,6 +72,10 @@ class AIMailClassifier(Analyzer):
                 with open('./tmp/' + file, 'r') as f:
                     msg = email.message_from_file(f)
                     mail_headers = mail_analysis.get_header_dict_list(msg)
+
+        if mail_body is None or mail_headers is None:
+            self.error(f"Archive {self.filepath} is missing the expected .txt/.headers member")
+            return
 
         # Get mail embedding
         email_embedding = vectorizer.encode([mail_body], show_progress_bar=False)

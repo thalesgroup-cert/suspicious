@@ -1,6 +1,7 @@
 from django.test import TestCase
 from unittest.mock import patch, MagicMock
 from django.contrib.auth.models import User
+import ldap as ldap_module
 
 from profiles.models import CISOProfile, Theme, UserProfile
 from profiles.profiles_utils.ciso import process_cisos, generate_message, handle_csv_file, handle_json_file, handle_txt_file
@@ -45,11 +46,9 @@ class CISOProcessingTests(TestCase):
     @patch("profiles.profiles_utils.ciso.search_ldap_server")
     @patch("profiles.profiles_utils.ciso.Ldap")
     def test_process_cisos_creates_ciso_profile(self, mock_ldap_class, mock_search, mock_create):
-        # Mock LDAP server
         mock_ldap_instance = MagicMock()
         mock_ldap_class.return_value.initialize_ldap.return_value = mock_ldap_instance
 
-        # Mock LDAP search results with bytes
         mock_search.return_value = [
             (None, {
                 "title": [b"CISO"],
@@ -58,7 +57,6 @@ class CISOProcessingTests(TestCase):
             })
         ]
 
-        # Mock CISOProfile creation
         mock_create.return_value = MagicMock(spec=CISOProfile)
 
         good, error = process_cisos(["alice"])
@@ -67,7 +65,6 @@ class CISOProcessingTests(TestCase):
 
     @patch("profiles.profiles_utils.ciso.Ldap")
     def test_process_cisos_user_does_not_exist(self, MockLdap):
-        # Mock LDAP initialization
         mock_ldap = MockLdap.return_value
         mock_ldap.initialize_ldap.return_value = MagicMock()
 
@@ -118,3 +115,43 @@ class LDAPUtilityTests(TestCase):
         server = ldap_obj.initialize_ldap()
         self.assertEqual(server, mock_server)
         mock_server.simple_bind_s.assert_called_once()
+
+    @patch("profiles.profiles_utils.ldap.ldap.initialize")
+    @patch("profiles.profiles_utils.ldap.ldap.set_option")
+    @patch("profiles.profiles_utils.ldap._ldap_config", return_value={})
+    def test_initialize_ldap_defaults_to_tls_demand(self, mock_config, mock_set_option, mock_initialize):
+        Ldap().initialize_ldap()
+        mock_set_option.assert_called_once_with(
+            ldap_module.OPT_X_TLS_REQUIRE_CERT, ldap_module.OPT_X_TLS_DEMAND
+        )
+
+    @patch("profiles.profiles_utils.ldap.ldap.initialize")
+    @patch("profiles.profiles_utils.ldap.ldap.set_option")
+    @patch("profiles.profiles_utils.ldap._ldap_config", return_value={"verify_ssl": "false"})
+    def test_initialize_ldap_verify_ssl_false_disables_tls(self, mock_config, mock_set_option, mock_initialize):
+        Ldap().initialize_ldap()
+        mock_set_option.assert_called_once_with(
+            ldap_module.OPT_X_TLS_REQUIRE_CERT, ldap_module.OPT_X_TLS_NEVER
+        )
+
+    @patch("profiles.profiles_utils.ldap._ldap_config", return_value={"base_dn": "dc=meridian,dc=example"})
+    def test_get_search_results_escapes_filter_chars(self, mock_config):
+        mock_server = MagicMock()
+        mock_server.search_s.return_value = []
+        instance = MagicMock(username="x)(mail=*")
+
+        Ldap.get_search_results(instance, mock_server)
+
+        used_filter = mock_server.search_s.call_args[0][2]
+        self.assertNotIn(")(mail=*)", used_filter)
+        self.assertIn(r"\28mail=\2a", used_filter)
+
+    def test_add_user_to_group_blocks_reserved_rbac_names(self):
+        user = User.objects.create_user(username="sam.whitfield")
+        Ldap.add_user_to_group(user, "Admin")
+        self.assertEqual(user.groups.filter(name="Admin").count(), 0)
+
+    def test_add_user_to_group_allows_non_reserved_names(self):
+        user = User.objects.create_user(username="jordan.kim")
+        Ldap.add_user_to_group(user, "Marketing")
+        self.assertTrue(user.groups.filter(name="Marketing").exists())

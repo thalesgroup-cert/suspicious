@@ -127,7 +127,7 @@ class MailNotificationService:
                 recipient=recipient,
                 recipient_name=user_infos,
                 case=case,
-                profile=profile,        # ← theme context
+                profile=profile,
             )._send_action(
                 user=recipient,
                 user_infos=user_infos,
@@ -156,7 +156,7 @@ class MailNotificationService:
 
         def action():
             AcknowledgementEmailService(
-                profile=profile,        # ← theme context
+                profile=profile,
             )._send_action(
                 user=recipient,
                 user_infos=user_infos,
@@ -194,7 +194,7 @@ class MailNotificationService:
                 sender=self.suspicious_email,
                 recipient=recipient,
                 recipient_name=user_infos,
-                profile=profile,        # ← theme context
+                profile=profile,
             )._send_action(user=recipient, subject=subject)
 
         if self._send_with_retry(
@@ -205,3 +205,8 @@ class MailNotificationService:
         ):
             mail.user_analysis_informed = True
             mail.save(update_fields=["user_analysis_informed"])
+        else:
+            raise RuntimeError(
+                f"Failed to send final-result email for case {case.id} "
+                f"after {self.retry_cfg.max_retries} attempts"
+            )

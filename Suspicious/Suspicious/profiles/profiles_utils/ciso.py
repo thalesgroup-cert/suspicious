@@ -1,6 +1,7 @@
 import csv
 import json
 import ldap
+import ldap.filter
 from django.contrib.auth.models import User
 from profiles.models import CISOProfile
 from profiles.profiles_utils.ldap import Ldap
@@ -141,13 +142,14 @@ def search_ldap_server(ldap_server, ciso):
     """
     ldap_config = _ldap_config()
     try:
+        safe_ciso = ldap.filter.escape_filter_chars(ciso)
         search_results = ldap_server.search_s(
             ldap_config.get("base_dn"),
             ldap.SCOPE_SUBTREE,
-            f"(&(mail={ciso})(Tpresent=true)(!(ou=admin))(!(TpreferredFirstName=Test)))",
+            f"(&(mail={safe_ciso})(Tpresent=true)(!(ou=admin))(!(TpreferredFirstName=Test)))",
             ["mail", "title", "businessCategory", "c"],
         )
         return search_results
     except Exception as e:
-        print(e)
+        logger.error(f"LDAP search failed for CISO {ciso!r}: {e}")
         return None

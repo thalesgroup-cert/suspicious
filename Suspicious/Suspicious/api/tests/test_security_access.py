@@ -43,7 +43,6 @@ class SubmissionAccessTests(TestCase):
         self.assertEqual(resp.status_code, 200)
 
     def test_reporter_cannot_read_other_reporters_submission(self):
-        # 404 (not 403): a non-owner must not even learn the case ID exists.
         self.client.force_authenticate(self.reporter_b)
         resp = self.client.get(
             reverse("submission-details", kwargs={"submission_id": self.case_a.id})
@@ -140,11 +139,55 @@ class MonthlyReporterStatsAccessTests(TestCase):
         self.assertEqual(resp.status_code, 200)
 
     def test_aggregate_dashboards_stay_open_to_regular_users(self):
-        # Org-wide aggregates remain accessible to all authenticated users.
         self.client.force_authenticate(self.reporter)
         for name in ("monthly-cases-list", "total-cases-list"):
             resp = self.client.get(reverse(name))
             self.assertEqual(resp.status_code, 200, f"{name} should stay open")
+
+
+class TopPrefixesAccessTests(TestCase):
+    """Per-user/group case-count ranking is the same colleague-level data as
+    MonthlyReporterStats — regular reporters must not be able to enumerate it."""
+
+    def setUp(self):
+        self.client = APIClient()
+        self.reporter = _make_user("prefixes_reporter")
+        self.cert = _make_user("prefixes_cert", groups=["CERT"])
+
+    def test_regular_user_forbidden(self):
+        self.client.force_authenticate(self.reporter)
+        resp = self.client.get(reverse("top-prefixes"), {"type": "user"})
+        self.assertEqual(resp.status_code, 403)
+
+    def test_cert_user_allowed(self):
+        self.client.force_authenticate(self.cert)
+        resp = self.client.get(reverse("top-prefixes"), {"type": "user"})
+        self.assertEqual(resp.status_code, 200)
+
+
+class DashboardSummaryTopPrefixesScrubTests(TestCase):
+    """DashboardSummaryView embeds top_prefixes in every response — it must be
+    scrubbed for non-elevated users even though the endpoint itself stays open
+    (regular users still get the org-wide KPI aggregates)."""
+
+    def setUp(self):
+        self.client = APIClient()
+        self.reporter = _make_user("summary_reporter")
+        self.cert = _make_user("summary_cert", groups=["CERT"])
+
+    def _get(self):
+        return self.client.get(reverse("dashboard-summary"), {"month": 5, "year": 2026})
+
+    def test_regular_user_gets_empty_top_prefixes(self):
+        self.client.force_authenticate(self.reporter)
+        resp = self._get()
+        self.assertEqual(resp.status_code, 200)
+        self.assertEqual(resp.data["top_prefixes"], [])
+
+    def test_elevated_user_request_succeeds(self):
+        self.client.force_authenticate(self.cert)
+        resp = self._get()
+        self.assertEqual(resp.status_code, 200)
 
 
 class CampaignAccessTests(TestCase):
@@ -162,8 +205,6 @@ class CampaignAccessTests(TestCase):
             self.assertEqual(resp.status_code, 403, f"{name} must be forbidden for a reporter")
 
     def test_elevated_user_passes_permission_gate(self):
-        # Permission must pass for CERT (status is not 403). The view body may
-        # then need ChromaDB; we assert only that the authz gate let it through.
         self.client.force_authenticate(self.cert)
         resp = self.client.get(reverse("campaign-classification-counts"))
         self.assertNotEqual(resp.status_code, 403)
