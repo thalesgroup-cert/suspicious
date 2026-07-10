@@ -88,7 +88,7 @@
     },
     "minio": {
         "access_key": "the minio access key",
-        "endpoint": "minio:9000",
+        "endpoint": "rustfs:9000",
         "secret_key": "the minio secret key",
         "secure": false,
         "minio_auto_create_bucket": true

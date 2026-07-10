@@ -71,13 +71,13 @@ services:
       retries: 30
       start_period: 60s
 
-  minio:
+  rustfs:
     extends:
       file: compose_databases.yaml
-      service: minio
-    image: minio/minio:${MINIO_VERSION}
-    command: server /data --console-address ":9001"
-    container_name: minio
+      service: rustfs
+    image: rustfs/rustfs:${RUSTFS_VERSION}
+    command: /data --console-address ":9001"
+    container_name: rustfs
 
 
   feeder:
@@ -88,7 +88,7 @@ services:
       context: ${FEEDER_PATH}/
       dockerfile: Dockerfile
       args:
-        - NO_PROXY=localhost,minio
+        - NO_PROXY=localhost,rustfs
         - HTTP_PROXY=${HTTP_PROXY}
         - HTTPS_PROXY=${HTTPS_PROXY}
     container_name: email_feeder
