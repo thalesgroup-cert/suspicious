@@ -35,7 +35,7 @@ django-import-export==4.4.0
 
 # Request Handling
 requests==2.33.0
-PyJWT==2.9.0
+PyJWT==2.13.0
 minio==7.2.20
 zipstream==1.1.4
 
