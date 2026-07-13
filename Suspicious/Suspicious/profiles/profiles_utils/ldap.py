@@ -11,7 +11,7 @@ from django.contrib.auth import get_user_model
 
 logger = logging.getLogger("profiles.ldap")
 
-RESERVED_GROUP_NAMES = {"Admin", "CERT", "CISO"}
+RESERVED_GROUP_NAMES = {"Admin", "CERT", "CISO", "Champions"}
 
 
 def _ldap_config() -> dict:

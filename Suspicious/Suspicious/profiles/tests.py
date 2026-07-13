@@ -151,6 +151,11 @@ class LDAPUtilityTests(TestCase):
         Ldap.add_user_to_group(user, "Admin")
         self.assertEqual(user.groups.filter(name="Admin").count(), 0)
 
+    def test_add_user_to_group_blocks_champions(self):
+        user = User.objects.create_user(username="haruto.sato")
+        Ldap.add_user_to_group(user, "Champions")
+        self.assertEqual(user.groups.filter(name="Champions").count(), 0)
+
     def test_add_user_to_group_allows_non_reserved_names(self):
         user = User.objects.create_user(username="jordan.kim")
         Ldap.add_user_to_group(user, "Marketing")
