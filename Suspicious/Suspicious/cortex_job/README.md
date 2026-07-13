@@ -165,4 +165,4 @@ Roll forward with `make migrate`. Rollback strategy: revert the deployed image; 
 
 ## 📄 License
 
-AGPL-3.0 (same as the parent project).
+Apache-2.0 (same as the parent project).

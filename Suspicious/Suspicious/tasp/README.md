@@ -99,4 +99,4 @@ The legacy `tasp/tests.py` (now exposed as `tasp.tests.test_celery_wrappers` onc
 
 ## 📄 License
 
-AGPL-3.0 (same as the parent project).
+Apache-2.0 (same as the parent project).

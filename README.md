@@ -202,8 +202,7 @@ production credentials.
 
 ## License
 
-Released under the **GNU Affero General Public License v3 (AGPL-3.0)**. See
-[`LICENSE`](LICENSE).
+Released under the **Apache License, Version 2.0**. See [`LICENSE`](LICENSE).
 
 ## Contact
 
