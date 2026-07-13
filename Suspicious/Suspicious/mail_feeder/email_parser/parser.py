@@ -1,12 +1,11 @@
 import os
 import logging
 from email.message import Message
-from email.utils import getaddresses
 from pathlib import Path
 from typing import List, Dict, Optional, Tuple
 
 from mail_feeder import email_contract as ec
-from .utils import decode_email_header, ensure_dir
+from .utils import ensure_dir
 from .models import EmailDataModel, AttachmentModel
 
 logger = logging.getLogger("tasp.cron.fetch_and_process_emails")
@@ -34,27 +33,6 @@ def _safe_attachment_destination(
         return None
 
     return destination, safe_filename
-
-
-# -------------------------
-# Helpers
-# -------------------------
-
-def extract_first_email(header_value: str) -> Optional[str]:
-    if not header_value:
-        return None
-
-    addresses = getaddresses([header_value])
-    for _, email in addresses:
-        if email:
-            return email.lower()
-
-    return None
-
-
-def decode_and_extract(header: Optional[str]) -> Optional[str]:
-    decoded = decode_email_header(header or "")
-    return extract_first_email(decoded)
 
 
 # -------------------------

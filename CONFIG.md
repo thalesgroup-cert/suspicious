@@ -40,7 +40,7 @@ SUSPICIOUS_UI_VERSION=
 SUSPICIOUS_FEEDER_VERSION=
 DB_SUSPICIOUS_VERSION=11.4
 RUSTFS_VERSION=1.0.0-alpha.90
-CORTEX_VERSION=4.0.0-1
+CORTEX_VERSION=4.1.0-1
 ELASTICSEARCH_VERSION=8.19.7
 TRAEFIK_VERSION=v3.3.4
 CHROMADB_VERSION=0.6.3
@@ -597,10 +597,10 @@ deactivate a connector without removing it.
 
 ```json
 "s3": {
-    "endpoint":   "rustfs:9000",
-    "access_key": "minioadmin",
-    "secret_key": "minioadmin",
-    "secure":     false
+  "endpoint": "rustfs:9000",
+  "access_key": "minioadmin",
+  "secret_key": "minioadmin",
+  "secure": false
 }
 ```
 

@@ -11,13 +11,20 @@ from django.contrib.auth import get_user_model
 
 logger = logging.getLogger("profiles.ldap")
 
-RESERVED_GROUP_NAMES = {"Admin", "CERT", "CISO", "Champions"}
-
 
 def _ldap_config() -> dict:
     from settings.config import get_section
     return get_section("authentication.ldap")
 
+
+# Django auth group names that also carry real RBAC meaning (api/permissions,
+# SUBMISSION_ELEVATED_GROUPS, and — on this branch specifically —
+# tasp/views.py's is_admin_or_cert()/TaspService and
+# tasp/templatetags/utils.py, which all treat "Champions" as elevated
+# alongside Admin/CERT). LDAP-derived attribute values (title/
+# businessCategory) must never be allowed to silently join one of these —
+# see add_user_to_group.
+RESERVED_GROUP_NAMES = {"Admin", "CERT", "CISO", "Champions"}
 
 CISO = {
     "CISO",
@@ -56,6 +63,11 @@ class Ldap:
         """
         ldap_config = _ldap_config()
         try:
+            # verify_ssl defaults to secure (OPT_X_TLS_DEMAND); explicit
+            # opt-out only. Previously this unconditionally set
+            # OPT_X_TLS_NEVER, disabling certificate verification on every
+            # bind regardless of config and exposing bind credentials to
+            # MITM on the network path.
             verify_ssl = str(ldap_config.get("verify_ssl", "True")).lower()
             if verify_ssl in ("false", "0", "no"):
                 logger.warning(
@@ -87,6 +99,9 @@ class Ldap:
             search_results: The search results from the LDAP server.
         """
         try:
+            # instance.username can be attacker/IdP-controlled (e.g. OIDC
+            # preferred_username); escape it so LDAP metacharacters can't
+            # widen or restructure the search filter.
             safe_username = ldap.filter.escape_filter_chars(instance.username)
             search_results = ldap_server.search_s(_ldap_config().get("base_dn"), ldap.SCOPE_SUBTREE,
                                                   f'(&(mail={safe_username})(Tpresent=true)(!(ou=admin))(!(TpreferredFirstName=Test)))',

@@ -142,6 +142,8 @@ def search_ldap_server(ldap_server, ciso):
     """
     ldap_config = _ldap_config()
     try:
+        # ciso comes from an admin-uploaded CSV/JSON/TXT list, but escape it
+        # anyway — same LDAP-filter-injection primitive as profiles_utils/ldap.py.
         safe_ciso = ldap.filter.escape_filter_chars(ciso)
         search_results = ldap_server.search_s(
             ldap_config.get("base_dn"),

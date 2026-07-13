@@ -141,6 +141,7 @@ class EmailParserTests(TestCase):
             with tempfile.TemporaryDirectory() as tmpdir:
                 attachments = extract_email_attachments(msg, tmpdir, "ref-abs")
 
+                # Original file untouched, write landed inside save_dir.
                 with open(target, encoding="utf-8") as f:
                     self.assertEqual(f.read(), "ORIGINAL")
                 self.assertEqual(len(attachments), 1)
