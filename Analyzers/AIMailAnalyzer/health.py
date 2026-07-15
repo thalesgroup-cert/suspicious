@@ -24,23 +24,17 @@ Use cases:
 
 from __future__ import annotations
 
+import os
 import sys
 import traceback
 
 
+from mail_analysis import MODEL_SPECS
+
 VECTORIZER_PATH = (
     "/worker/AIMailAnalyzer/vectorizers/paraphrase-multilingual-mpnet-base-v2"
 )
-# Must match the five files ai_mail_classifier.py actually loads — this probe
-# previously checked two differently-named legacy files, so it could pass
-# while the real models were broken (or fail while they were fine).
-MODEL_PATHS = (
-    "/worker/AIMailAnalyzer/models/safe_suspicious_30_epochs_model.pth",
-    "/worker/AIMailAnalyzer/models/spam_dangerous_30_epochs_model.pth",
-    "/worker/AIMailAnalyzer/models/safe_30_epochs_model.pth",
-    "/worker/AIMailAnalyzer/models/unwanted_30_epochs_model.pth",
-    "/worker/AIMailAnalyzer/models/dangerous_30_epochs_model.pth",
-)
+MODEL_DIR = "/worker/AIMailAnalyzer/models"
 
 
 def main() -> int:
@@ -63,8 +57,9 @@ def main() -> int:
 
     try:
         device = torch.device("cpu")
-        for path in MODEL_PATHS:
-            model = ResNetMLP(768, 2).to(device)
+        for spec in MODEL_SPECS:
+            path = os.path.join(MODEL_DIR, spec.filename)
+            model = ResNetMLP(768, spec.output_dim).to(device)
             model.load_state_dict(torch.load(path, weights_only=True))
     except Exception as exc:
         print(f"model_load_error: {exc}", file=sys.stderr)

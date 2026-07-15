@@ -5,8 +5,11 @@
 # pull official base image
 FROM python:3.10-slim
 
-ENV http_proxy="http://10.10.10.10:8080"
-ENV https_proxy="http://10.10.10.10:8080"
+# Build-time proxy only (not baked into the running container's env like the
+# old ENV did — that routed every runtime outbound call through a proxy IP
+# that only exists on one network).
+ARG HTTP_PROXY
+ARG HTTPS_PROXY
 
 RUN apt-get update -y && \
     apt-get upgrade -y && \
