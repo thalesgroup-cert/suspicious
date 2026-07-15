@@ -2,6 +2,7 @@ import base64
 import logging
 from urllib.parse import urlparse, urlunparse, parse_qs
 from typing import Optional, Tuple
+from pydantic import ValidationError
 from .models import URLDecodeResult
 
 logger = logging.getLogger(__name__)
@@ -24,7 +25,22 @@ def decode_base64_from_tid_param(url: str) -> Optional[str]:
     return None
 
 
+def _as_valid_url(candidate: Optional[str]) -> Optional[str]:
+    """Returns candidate if it validates as an HttpUrl, else None."""
+    if not candidate:
+        return None
+    try:
+        URLDecodeResult(prime_url=candidate)
+        return candidate
+    except ValidationError as e:
+        # The extractor occasionally emits malformed/merged URL strings (e.g. two
+        # links joined by a space) that fail HttpUrl validation. Drop just that
+        # field instead of failing the whole artifact.
+        logger.error(f"Malformed URL '{candidate}': {e}")
+        return None
+
+
 def extract_url_info(url: str) -> URLDecodeResult:
-    prime = get_prime_url(url)
-    decoded = decode_base64_from_tid_param(url)
+    prime = _as_valid_url(get_prime_url(url))
+    decoded = _as_valid_url(decode_base64_from_tid_param(url))
     return URLDecodeResult(prime_url=prime, decoded_url=decoded)
