@@ -34,24 +34,29 @@ class AIMailClassifier(Analyzer):
 
         # Initialize vectorizer
         try:
-            vectorizer = SentenceTransformer('/worker/AIMailAnalyzer/vectorizers/paraphrase-multilingual-mpnet-base-v2')
+            vectorizer = SentenceTransformer(
+                '/worker/AIMailAnalyzer/vectorizers/paraphrase-multilingual-mpnet-base-v2',
+                device=str(device),
+            )
         except Exception as e:
             self.error(f"Error loading vectorizer: {e}")
             return
         
-        # Load models
+        # Load models (MODEL_SPECS is the single source of truth for output
+        # dims, shared with health.py's load probe)
         try:
-            safe_suspicious_model = ResNetMLP(768, 2).to(device)
-            safe_suspicious_model.load_state_dict(torch.load("/worker/AIMailAnalyzer/models/safe_suspicious_30_epochs_model.pth", weights_only=True))
-            spam_dangerous_model = ResNetMLP(768, 2).to(device)
-            spam_dangerous_model.load_state_dict(torch.load("/worker/AIMailAnalyzer/models/spam_dangerous_30_epochs_model.pth", weights_only=True))
+            models_by_file = {}
+            for spec in mail_analysis.MODEL_SPECS:
+                model = ResNetMLP(768, spec.output_dim).to(device)
+                path = f"/worker/AIMailAnalyzer/models/{spec.filename}"
+                model.load_state_dict(torch.load(path, weights_only=True))
+                models_by_file[spec.filename] = model
 
-            safe_model = ResNetMLP(768, 2).to(device)
-            safe_model.load_state_dict(torch.load("/worker/AIMailAnalyzer/models/safe_30_epochs_model.pth", weights_only=True))
-            spam_model = ResNetMLP(768, 2).to(device)
-            spam_model.load_state_dict(torch.load("/worker/AIMailAnalyzer/models/unwanted_30_epochs_model.pth", weights_only=True))
-            dangerous_model = ResNetMLP(768, 4).to(device)
-            dangerous_model.load_state_dict(torch.load("/worker/AIMailAnalyzer/models/dangerous_30_epochs_model.pth", weights_only=True))
+            safe_suspicious_model = models_by_file["safe_suspicious_30_epochs_model.pth"]
+            spam_dangerous_model = models_by_file["spam_dangerous_30_epochs_model.pth"]
+            safe_model = models_by_file["safe_30_epochs_model.pth"]
+            spam_model = models_by_file["unwanted_30_epochs_model.pth"]
+            dangerous_model = models_by_file["dangerous_30_epochs_model.pth"]
         except Exception as e:
             self.error(f"Error loading models: {e}")
             return
@@ -66,10 +71,10 @@ class AIMailClassifier(Analyzer):
         mail_headers = None
         for file in os.listdir('./tmp/'):
             if file.endswith('.txt'):
-                with open('./tmp/' + file, 'r') as f:
+                with open('./tmp/' + file, 'r', encoding='utf-8', errors='replace') as f:
                     mail_body = f.read()
             if file.endswith('.headers'):
-                with open('./tmp/' + file, 'r') as f:
+                with open('./tmp/' + file, 'r', encoding='utf-8', errors='replace') as f:
                     msg = email.message_from_file(f)
                     mail_headers = mail_analysis.get_header_dict_list(msg)
 

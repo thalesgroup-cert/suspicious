@@ -1,7 +1,7 @@
 from enum import Enum
 import os
+from typing import NamedTuple
 import numpy as np
-import torch
 from collections import defaultdict
 import tarfile
 
@@ -15,19 +15,33 @@ class SubClassificationName(Enum):
     EXTERNAL = 1
     SPAM = 2
     NEWSLETTER = 3
-    # CLASSIC_PHISHING = 4
-    # SPEAR = 5
-    # WHALING = 6
-    # CLONE = 7
-    # BLACKMAIL = 8
-    # COMPROMISED = 9
-    # HIJACKING = 10
-    # OTHER = 11
+    # ponytail: dangerous_model has 4 output neurons, so only 4 phishing
+    # subtypes are reachable. Add OTHER_PHISHING back only once that model
+    # is retrained with a 5th output class.
     CLASSIC_PHISHING = 4
     CLONE = 5
     BLACKMAIL = 6
     WHALING = 7
-    OTHER_PHISHING = 8
+
+
+class ModelSpec(NamedTuple):
+    filename: str
+    output_dim: int
+    group: str  # "main" (safe/suspicious vs spam/dangerous) or "sub" (phishing subtype)
+
+
+# Single source of truth for every .pth file this analyzer loads, consumed by
+# both ai_mail_classifier.py (real inference) and health.py (load-only probe).
+# These previously drifted independently: health.py hardcoded output_dim=2
+# for all five files, but dangerous_30_epochs_model.pth actually has 4 —
+# load_state_dict raised a shape-mismatch there every time.
+MODEL_SPECS = (
+    ModelSpec("safe_suspicious_30_epochs_model.pth", 2, "main"),
+    ModelSpec("spam_dangerous_30_epochs_model.pth", 2, "main"),
+    ModelSpec("safe_30_epochs_model.pth", 2, "sub"),
+    ModelSpec("unwanted_30_epochs_model.pth", 2, "sub"),
+    ModelSpec("dangerous_30_epochs_model.pth", 4, "sub"),
+)
 
 # Limits for safe extraction. The archive holds an email's parsed parts
 # (body .txt, .headers) — kilobytes in practice — so these caps are generous
@@ -97,6 +111,7 @@ def get_header_dict_list(msg):
     return headers
 
 def getMainClassificationProbabilities(device, safe_suspicious_model, spam_dangerous_model, email_embedding):
+    import torch
     email_tensor = torch.tensor(email_embedding, dtype=torch.float32).to(device)
 
     # Get safe/suspicious probabilities
@@ -146,6 +161,7 @@ def getMainClassificationInfo(global_probabilities):
     return result
 
 def getSubClassificationProbabilities(device, models, email_embedding, main_classification_probabilities):
+    import torch
     email_tensor = torch.tensor(email_embedding, dtype=torch.float32).to(device)
 
     global_sub_probabilities = []
