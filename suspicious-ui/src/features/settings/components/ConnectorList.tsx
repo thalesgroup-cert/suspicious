@@ -9,29 +9,17 @@ import {
   Switch,
   Typography,
 } from "@mui/material";
-import EmailOutlined from "@mui/icons-material/EmailOutlined";
-import ExtensionOutlined from "@mui/icons-material/ExtensionOutlined";
-import HubOutlined from "@mui/icons-material/HubOutlined";
-import ShareOutlined from "@mui/icons-material/ShareOutlined";
-import VisibilityOutlined from "@mui/icons-material/VisibilityOutlined";
 import { alpha, useTheme } from "@mui/material/styles";
 import { useSnackbar } from "notistack";
-import type { SvgIconProps } from "@mui/material";
-import type { ComponentType } from "react";
 
 import { useResultColors } from "@/styles/colorStore";
 import { EmptyList, NavIcon } from "@/features/settings/components/cards";
+import {
+  CONNECTOR_ICONS,
+  DEFAULT_CONNECTOR_ICON,
+} from "@/features/settings/components/connectorIcons";
 import { getConnectorStatusColor } from "@/features/settings/components/connectorColors";
 import { setConnectorEnabled, type Connector } from "@/features/settings/components/connectors";
-
-type IconType = ComponentType<SvgIconProps>;
-
-const CONNECTOR_ICONS: Record<string, IconType> = {
-  thehive: HubOutlined,
-  misp: ShareOutlined,
-  watcher: VisibilityOutlined,
-  smtp_notify: EmailOutlined,
-};
 
 export function ConnectorList({
   connectors,
@@ -104,7 +92,7 @@ export function ConnectorList({
           <List dense disablePadding>
             {(byCategory.get(category) ?? []).map((connector) => {
               const isSelected = selected === connector.name;
-              const Icon = CONNECTOR_ICONS[connector.name] ?? ExtensionOutlined;
+              const Icon = CONNECTOR_ICONS[connector.name] ?? DEFAULT_CONNECTOR_ICON;
               const dotColor = getConnectorStatusColor(connector.status, resultColors);
               return (
                 <ListItemButton
@@ -146,6 +134,7 @@ export function ConnectorList({
                   <Switch
                     size="small"
                     checked={connector.enabled}
+                    disabled={toggle.isPending}
                     onChange={(e) => {
                       e.stopPropagation();
                       toggle.mutate({ name: connector.name, enabled: e.target.checked });

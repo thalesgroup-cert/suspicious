@@ -74,6 +74,14 @@ describe("ConnectorDetail", () => {
     expect(screen.queryByText("No deliveries yet.")).not.toBeInTheDocument();
   });
 
+  it("shows error alert when config query fails, without rendering stale fields", async () => {
+    const { getConnectorConfig } = await import("../connectors");
+    vi.mocked(getConnectorConfig).mockRejectedValueOnce(new Error("network error"));
+    renderWithProviders(<ConnectorDetail connector={CONNECTOR} />);
+    expect(await screen.findByText("Failed to load configuration.")).toBeInTheDocument();
+    expect(screen.queryByLabelText("api_key")).not.toBeInTheDocument();
+  });
+
   it("shows a back button only when onBack is provided", () => {
     renderWithProviders(<ConnectorDetail connector={CONNECTOR} onBack={vi.fn()} />);
     expect(screen.getByLabelText("Back to connector list")).toBeInTheDocument();

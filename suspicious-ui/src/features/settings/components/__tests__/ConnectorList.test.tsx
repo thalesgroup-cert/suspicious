@@ -74,4 +74,20 @@ describe("ConnectorList", () => {
     renderList({ loadErrors: { watcher: "timeout" } });
     expect(screen.getByText(/Connector watcher failed to load: timeout/)).toBeInTheDocument();
   });
+
+  it("disables the toggle switch while the enable/disable mutation is in flight", async () => {
+    const { setConnectorEnabled } = await import("../connectors");
+    let resolveMutation!: (value: Connector) => void;
+    vi.mocked(setConnectorEnabled).mockReturnValueOnce(
+      new Promise((resolve) => {
+        resolveMutation = resolve;
+      }),
+    );
+    renderList();
+    const toggle = screen.getByRole("switch", { name: "Enable misp" });
+    await userEvent.click(toggle);
+    await waitFor(() => expect(toggle).toBeDisabled());
+    resolveMutation({ ...CONNECTOR, enabled: false });
+    await waitFor(() => expect(toggle).not.toBeDisabled());
+  });
 });

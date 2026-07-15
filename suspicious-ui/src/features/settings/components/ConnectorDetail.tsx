@@ -12,13 +12,6 @@ import {
 } from "@mui/material";
 import { useTheme } from "@mui/material/styles";
 import ArrowBackOutlined from "@mui/icons-material/ArrowBackOutlined";
-import EmailOutlined from "@mui/icons-material/EmailOutlined";
-import ExtensionOutlined from "@mui/icons-material/ExtensionOutlined";
-import HubOutlined from "@mui/icons-material/HubOutlined";
-import ShareOutlined from "@mui/icons-material/ShareOutlined";
-import VisibilityOutlined from "@mui/icons-material/VisibilityOutlined";
-import type { SvgIconProps } from "@mui/material";
-import type { ComponentType } from "react";
 
 import { Badge } from "@/shared/components/Badge";
 import { useResultColors } from "@/styles/colorStore";
@@ -34,21 +27,16 @@ import {
   getDeliveryStatusColor,
 } from "@/features/settings/components/connectorColors";
 import {
+  CONNECTOR_ICONS,
+  DEFAULT_CONNECTOR_ICON,
+} from "@/features/settings/components/connectorIcons";
+import {
   type Connector,
   getConnectorConfig,
   listDeliveries,
   putConnectorConfig,
   testConnector,
 } from "@/features/settings/components/connectors";
-
-type IconType = ComponentType<SvgIconProps>;
-
-const CONNECTOR_ICONS: Record<string, IconType> = {
-  thehive: HubOutlined,
-  misp: ShareOutlined,
-  watcher: VisibilityOutlined,
-  smtp_notify: EmailOutlined,
-};
 
 const STATUS_LABEL: Record<Connector["status"], string> = {
   connected: "Connected",
@@ -111,7 +99,7 @@ export function ConnectorDetail({
     .filter((f) => f.type === "secret")
     .map((f) => f.key);
 
-  const Icon = CONNECTOR_ICONS[connector.name] ?? ExtensionOutlined;
+  const Icon = CONNECTOR_ICONS[connector.name] ?? DEFAULT_CONNECTOR_ICON;
   const deliveries = deliveriesQuery.data ?? [];
 
   return (
@@ -149,34 +137,44 @@ export function ConnectorDetail({
       <Typography variant="overline" color="text.secondary" sx={{ display: "block", mb: 1 }}>
         Configuration
       </Typography>
-      <Stack spacing={1.5} sx={{ mb: 2 }}>
-        {connector.config_schema.map((field) => (
-          <ConfigFieldInput
-            key={field.key}
-            field={field}
-            value={dottedGet(config, field.key)}
-            onChange={(value) => {
-              const next = structuredClone(config);
-              dottedSet(next, field.key, value);
-              setDraft(next);
-            }}
-          />
-        ))}
-      </Stack>
+      {configQuery.isError && (
+        <Alert severity="error" sx={{ mb: 2 }}>
+          Failed to load configuration.
+        </Alert>
+      )}
+      {configQuery.isLoading && <CircularProgress size={18} sx={{ mb: 2, display: "block" }} />}
+      {!configQuery.isLoading && !configQuery.isError && (
+        <>
+          <Stack spacing={1.5} sx={{ mb: 2 }}>
+            {connector.config_schema.map((field) => (
+              <ConfigFieldInput
+                key={field.key}
+                field={field}
+                value={dottedGet(config, field.key)}
+                onChange={(value) => {
+                  const next = structuredClone(config);
+                  dottedSet(next, field.key, value);
+                  setDraft(next);
+                }}
+              />
+            ))}
+          </Stack>
 
-      <Stack direction="row" spacing={1} sx={{ mb: 2 }}>
-        <Button
-          size="small"
-          variant="contained"
-          disabled={!draft || save.isPending}
-          onClick={() => draft && save.mutate(stripUnchangedSecrets(draft, secretKeys))}
-        >
-          Save
-        </Button>
-        <Button size="small" onClick={() => test.mutate()} disabled={test.isPending}>
-          Test connection
-        </Button>
-      </Stack>
+          <Stack direction="row" spacing={1} sx={{ mb: 2 }}>
+            <Button
+              size="small"
+              variant="contained"
+              disabled={!draft || save.isPending}
+              onClick={() => draft && save.mutate(stripUnchangedSecrets(draft, secretKeys))}
+            >
+              Save
+            </Button>
+            <Button size="small" onClick={() => test.mutate()} disabled={test.isPending}>
+              Test connection
+            </Button>
+          </Stack>
+        </>
+      )}
 
       {testResult && (
         <Alert
