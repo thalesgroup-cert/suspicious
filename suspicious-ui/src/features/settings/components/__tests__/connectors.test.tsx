@@ -71,7 +71,13 @@ describe("ConnectorsPanel", () => {
   it("does not render KPI count tiles", async () => {
     renderWithProviders(<ConnectorsPanel />);
     await waitFor(() => expect(screen.getByText("misp")).toBeInTheDocument());
-    expect(screen.queryByText("Connected")).not.toBeInTheDocument();
+    // Don't assert "Connected" is absent — on desktop the auto-selected
+    // connector's own ConnectorDetail status Badge legitimately renders
+    // that word (this fixture's connector has status: "connected"). The
+    // fixture has exactly one connector and it's connected, so "Incomplete"
+    // and "Disabled" (which a real KPI tile would render regardless of
+    // count) should never appear anywhere — that's what actually confirms
+    // the KPI tiles are gone.
     expect(screen.queryByText("Incomplete")).not.toBeInTheDocument();
     expect(screen.queryByText("Disabled")).not.toBeInTheDocument();
   });
