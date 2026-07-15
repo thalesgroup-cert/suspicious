@@ -1,5 +1,6 @@
 import { screen, waitFor } from "@testing-library/react";
-import { describe, expect, it, vi } from "vitest";
+import { beforeEach, describe, expect, it, vi } from "vitest";
+import { page } from "@vitest/browser/context";
 
 import { renderWithProviders } from "@/test/utils";
 import { ConnectorsPanel } from "../ConnectorsPanel";
@@ -38,10 +39,20 @@ vi.mock("../connectors", () => ({
 }));
 
 describe("ConnectorsPanel", () => {
+  // This project's Vitest browser-mode default viewport is mobile-sized
+  // (~414px wide), below MUI's md breakpoint — these tests exercise the
+  // desktop two-pane path, so force a desktop viewport before each render.
+  beforeEach(async () => {
+    await page.viewport(1280, 800);
+  });
+
   it("renders discovered connectors in the list with version and toggle", async () => {
     renderWithProviders(<ConnectorsPanel />);
     await waitFor(() => expect(screen.getByText("misp")).toBeInTheDocument());
-    expect(screen.getByText(/1\.0\.0/)).toBeInTheDocument();
+    // Version chip lives in ConnectorDetail, which mounts only after the
+    // auto-select effect fires — an extra render pass after "misp" is
+    // already visible in the list, so this needs an async find, not getBy.
+    expect(await screen.findByText(/1\.0\.0/)).toBeInTheDocument();
     expect(screen.getByRole("switch", { name: "Enable misp" })).toBeChecked();
   });
 
