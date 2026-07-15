@@ -41,7 +41,7 @@ def band(score: float) -> str:
     return Result.DANGEROUS
 
 
-def score_case(signals, ai=None, deny_listed=False) -> CaseVerdict:
+def score_case(signals, ai=None, deny_listed=False, ai_missing=False) -> CaseVerdict:
     scored = [s for s in signals if not s.is_failure]
     n_malicious = sum(1 for s in scored if s.is_malicious)
     n_scored = len(scored)
@@ -67,6 +67,8 @@ def score_case(signals, ai=None, deny_listed=False) -> CaseVerdict:
 
     if n_malicious >= max(1, n_scored // 3):
         result = Result.DANGEROUS
+    elif ai_missing:
+        result = Result.INCONCLUSIVE
     elif final_score == NEUTRAL or final_conf < CONF_FLOOR:
         result = Result.INCONCLUSIVE
     else:

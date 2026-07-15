@@ -15,6 +15,7 @@ from score_process.scoring.case_score_calculation import (
     _check_mail_artifacts_for_deny_list,
     _is_address_deny_listed,
 )
+from case_handler.models import Result
 
 logger = logging.getLogger("tasp.cron.update_ongoing_case_jobs")
 
@@ -62,13 +63,14 @@ def collect_signals(case):
                 signals += _signals_from(scores, confidences, off, ioc_type)
 
     signals += [Signal("failed", 0, 0, False, True) for _ in range(failures)]
+    ai_missing = (case.results_ai == Result.INCONCLUSIVE)
 
     ai = None
-    if case.confidence_ai:
+    if case.confidence_ai and not ai_missing:
         ai = AiSignal(score=case.score_ai or 0, confidence=min(round(case.confidence_ai or 0), 100))
 
     deny_listed = _compute_deny_listed(case)
-    return signals, ai, deny_listed
+    return signals, ai, deny_listed, ai_missing
 
 
 def _compute_deny_listed(case) -> bool:

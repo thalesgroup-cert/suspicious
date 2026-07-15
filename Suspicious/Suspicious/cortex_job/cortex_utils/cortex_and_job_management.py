@@ -9,6 +9,7 @@ from common.http_client import get_breaker, RETRY
 from cortex_job.cortex_utils.session_cortex_api import SessionCortexApi
 from cortex_job.models import Analyzer, AnalyzerReport, CaseAnalyzerJob
 from mail_feeder.models import MailBody, MailArchive, MailInfo, MailHeader
+from case_handler.models import Result
 
 # ------------------------
 # Logger setup
@@ -797,12 +798,36 @@ class CortexJobManager:
                 analyzer__name=(cortex_config.get("analyzers", {}).get("ai", {})),
                 file=mail_archive.archive,
             )
+            if analyzer is None:
+                raise AnalyzerReport.DoesNotExist
+
+            if analyzer.status == "Failure":
+                update_cases_logger.info(
+                    "AI Mail Analyzer report is Failure for case %s — marked Inconclusive.",
+                    case.id,
+                )
+                case.results_ai = Result.INCONCLUSIVE
+                case.save(update_fields=["results_ai"])
+                return
             update_cases_logger.info("AI Mail Analyzer report found: %s", analyzer)
         except AnalyzerReport.DoesNotExist:
             update_cases_logger.info(
                 "No AI Mail Analyzer report found for archive file: %s",
                 mail_archive.archive,
             )
+            last_job = (
+                CaseAnalyzerJob.objects
+                .filter(case=case, analyzer__name=analyzer.analyzer.name)
+                .order_by("-created_at")
+                .first()
+            )
+            if last_job is None or last_job.status == CaseAnalyzerJob.STATUS_FAILURE:
+                case.results_ai = Result.INCONCLUSIVE
+                case.save(update_fields=["results_ai"])
+                update_cases_logger.info(
+                    "AI Mail Analyzer unavailable for case %s — marked Inconclusive.",
+                    case.id,
+                )
             return
         except Exception as e:
             update_cases_logger.error("Error retrieving analyzer report: %s", e)
