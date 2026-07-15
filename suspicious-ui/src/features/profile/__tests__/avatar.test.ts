@@ -4,6 +4,7 @@ import {
   renderAvatarDataUri,
   randomSeed,
   getStyleCategories,
+  randomPaletteValue,
 } from "@/features/profile/avatar";
 
 describe("avatar helper", () => {
@@ -80,5 +81,46 @@ describe("avatar helper", () => {
 
   it("returns [] for an unknown style", () => {
     expect(getStyleCategories("nope")).toEqual([]);
+  });
+
+  it("marks enum categories with kind 'enum'", () => {
+    const cats = getStyleCategories("avataaars");
+    const eyes = cats.find((c) => c.key === "eyes");
+    expect(eyes?.kind).toBe("enum");
+  });
+
+  it("extracts color categories with their curated hex palette", () => {
+    const cats = getStyleCategories("avataaars");
+    const skin = cats.find((c) => c.key === "skinColor");
+    expect(skin?.kind).toBe("color");
+    expect(skin?.values.length).toBeGreaterThan(0);
+    for (const hex of skin?.values ?? []) {
+      expect(hex).toMatch(/^[a-fA-F0-9]{6}$/);
+    }
+  });
+
+  it("includes backgroundColor as a color category on styles that support it", () => {
+    const cats = getStyleCategories("avataaars");
+    const bg = cats.find((c) => c.key === "backgroundColor");
+    expect(bg?.kind).toBe("color");
+    expect(bg?.values.length).toBeGreaterThan(0);
+  });
+
+  it("returns no color categories for a style with none (notionists)", () => {
+    const cats = getStyleCategories("notionists");
+    expect(cats.some((c) => c.kind === "color")).toBe(false);
+    expect(cats.length).toBeGreaterThan(0); // still has enum categories
+  });
+
+  it("randomPaletteValue returns a value drawn from that category's palette", () => {
+    const skin = getStyleCategories("avataaars").find((c) => c.key === "skinColor")!;
+    const value = randomPaletteValue("avataaars", "skinColor");
+    expect(value).toBeDefined();
+    expect(skin.values).toContain(value);
+  });
+
+  it("randomPaletteValue returns undefined for an unknown style or category", () => {
+    expect(randomPaletteValue("nope", "skinColor")).toBeUndefined();
+    expect(randomPaletteValue("avataaars", "nope")).toBeUndefined();
   });
 });

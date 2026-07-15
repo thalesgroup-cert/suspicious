@@ -45,7 +45,14 @@ export function renderAvatarDataUri(config: AvatarConfig): string {
   return uri;
 }
 
-const categoryCache = new Map<string, { key: string; label: string; values: string[] }[]>();
+export type StyleCategory = {
+  key: string;
+  label: string;
+  kind: "enum" | "color";
+  values: string[];
+};
+
+const categoryCache = new Map<string, StyleCategory[]>();
 
 function prettifyLabel(key: string): string {
   return key
@@ -54,30 +61,43 @@ function prettifyLabel(key: string): string {
     .trim();
 }
 
-export function getStyleCategories(
-  styleKey: string,
-): { key: string; label: string; values: string[] }[] {
+export function getStyleCategories(styleKey: string): StyleCategory[] {
   const hit = categoryCache.get(styleKey);
   if (hit) return hit;
   const style = STYLE_MAP.get(styleKey) as unknown as
     | { schema?: { properties?: Record<string, unknown> } }
     | undefined;
   const props = style?.schema?.properties ?? {};
-  const cats: { key: string; label: string; values: string[] }[] = [];
+  const cats: StyleCategory[] = [];
   for (const [key, raw] of Object.entries(props)) {
-    const p = raw as { type?: string; items?: { enum?: unknown[] } };
-    const en = p?.items?.enum;
-    if (
-      p?.type === "array" &&
-      Array.isArray(en) &&
-      en.length > 0 &&
-      en.every((v) => typeof v === "string")
-    ) {
-      cats.push({ key, label: prettifyLabel(key), values: en as string[] });
+    const p = raw as {
+      type?: string;
+      items?: { enum?: unknown[]; pattern?: string };
+      default?: unknown[];
+    };
+    if (p?.type !== "array") continue;
+    if (p.items?.pattern) {
+      const palette = Array.isArray(p.default)
+        ? p.default.filter((v): v is string => typeof v === "string")
+        : [];
+      if (palette.length > 0) {
+        cats.push({ key, label: prettifyLabel(key), kind: "color", values: palette });
+      }
+      continue;
+    }
+    const en = p.items?.enum;
+    if (Array.isArray(en) && en.length > 0 && en.every((v) => typeof v === "string")) {
+      cats.push({ key, label: prettifyLabel(key), kind: "enum", values: en as string[] });
     }
   }
   categoryCache.set(styleKey, cats);
   return cats;
+}
+
+export function randomPaletteValue(styleKey: string, categoryKey: string): string | undefined {
+  const cat = getStyleCategories(styleKey).find((c) => c.key === categoryKey);
+  if (!cat || cat.values.length === 0) return undefined;
+  return cat.values[Math.floor(Math.random() * cat.values.length)];
 }
 
 export function randomSeed(): string {
