@@ -50,6 +50,7 @@ export function EnumField({
         {open ? <ExpandLessOutlined fontSize="small" /> : <ExpandMoreOutlined fontSize="small" />}
       </Stack>
       <Collapse in={open} unmountOnExit>
+        {open && (
         <Box sx={{ display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(52px, 1fr))", gap: 0.75, pt: 0.5 }}>
           <Box
             role="button"
@@ -116,6 +117,7 @@ export function EnumField({
             );
           })}
         </Box>
+        )}
       </Collapse>
     </Stack>
   );

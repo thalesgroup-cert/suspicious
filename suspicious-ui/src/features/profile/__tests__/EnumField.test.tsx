@@ -18,6 +18,14 @@ describe("EnumField", () => {
     expect(screen.getByLabelText("Eyes options")).toHaveTextContent("Auto");
   });
 
+  it("does not call renderThumb for any value while collapsed", () => {
+    const renderThumbSpy = vi.fn(renderThumb);
+    render(
+      <EnumField label="Eyes" values={VALUES} onChange={vi.fn()} onReset={vi.fn()} renderThumb={renderThumbSpy} />,
+    );
+    expect(renderThumbSpy).not.toHaveBeenCalled();
+  });
+
   it("expands on click and shows a tile per value plus Auto", async () => {
     render(
       <EnumField label="Eyes" values={VALUES} onChange={vi.fn()} onReset={vi.fn()} renderThumb={renderThumb} />,
