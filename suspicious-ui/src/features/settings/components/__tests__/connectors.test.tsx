@@ -1,22 +1,31 @@
-import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
-import { render, screen, waitFor } from "@testing-library/react";
+import { screen, waitFor } from "@testing-library/react";
 import { describe, expect, it, vi } from "vitest";
 
+import { renderWithProviders } from "@/test/utils";
 import { ConnectorsPanel } from "../ConnectorsPanel";
 
 vi.mock("../connectors", () => ({
   listConnectors: vi.fn().mockResolvedValue({
     connectors: [
       {
-        name: "misp", version: "1.0.0", description: "Push to MISP",
-        author: "Thales CERT", docs_url: "", category: "Threat Intelligence",
+        name: "misp",
+        version: "1.0.0",
+        description: "Push to MISP",
+        author: "Thales CERT",
+        docs_url: "",
+        category: "Threat Intelligence",
         events: ["case_finalised"],
-        schedules: [], config_schema: [
+        schedules: [],
+        config_schema: [
           { key: "instances.primary.url", type: "url", required: true, default: null, help: "" },
           { key: "api_key", type: "secret", required: false, default: null, help: "" },
         ],
-        enabled: true, enabled_by_default: false, status: "connected",
-        last_health_ok: true, last_health_detail: "ok", last_health_at: null,
+        enabled: true,
+        enabled_by_default: false,
+        status: "connected",
+        last_health_ok: true,
+        last_health_detail: "ok",
+        last_health_at: null,
       },
     ],
     load_errors: {},
@@ -29,50 +38,30 @@ vi.mock("../connectors", () => ({
 }));
 
 describe("ConnectorsPanel", () => {
-  it("renders secret fields as editable password inputs", async () => {
-    const qc = new QueryClient({ defaultOptions: { queries: { retry: false } } });
-    render(
-      <QueryClientProvider client={qc}>
-        <ConnectorsPanel />
-      </QueryClientProvider>,
-    );
+  it("renders discovered connectors in the list with version and toggle", async () => {
+    renderWithProviders(<ConnectorsPanel />);
+    await waitFor(() => expect(screen.getByText("misp")).toBeInTheDocument());
+    expect(screen.getByText(/1\.0\.0/)).toBeInTheDocument();
+    expect(screen.getByRole("switch", { name: "Enable misp" })).toBeChecked();
+  });
+
+  it("groups the connector under its category heading", async () => {
+    renderWithProviders(<ConnectorsPanel />);
+    await waitFor(() => expect(screen.getByText("Threat Intelligence")).toBeInTheDocument());
+  });
+
+  it("auto-selects the first connector on desktop and shows its editable fields", async () => {
+    renderWithProviders(<ConnectorsPanel />);
     const input = (await screen.findByLabelText("api_key")) as HTMLInputElement;
     expect(input).not.toBeDisabled();
     expect(input.type).toBe("password");
   });
 
-  it("renders discovered connectors with version and toggle", async () => {
-    const qc = new QueryClient({ defaultOptions: { queries: { retry: false } } });
-    render(
-      <QueryClientProvider client={qc}>
-        <ConnectorsPanel />
-      </QueryClientProvider>,
-    );
+  it("does not render KPI count tiles", async () => {
+    renderWithProviders(<ConnectorsPanel />);
     await waitFor(() => expect(screen.getByText("misp")).toBeInTheDocument());
-    expect(screen.getByText(/1\.0\.0/)).toBeInTheDocument();
-    expect(screen.getByRole("switch")).toBeChecked();
-  });
-
-  it("shows a KPI row with the connected count", async () => {
-    const qc = new QueryClient({ defaultOptions: { queries: { retry: false } } });
-    render(
-      <QueryClientProvider client={qc}>
-        <ConnectorsPanel />
-      </QueryClientProvider>,
-    );
-    await waitFor(() => expect(screen.getByText("Incomplete")).toBeInTheDocument());
-    expect(screen.getByText("Disabled")).toBeInTheDocument();
-    expect(screen.getAllByText("Connected")).toHaveLength(2);
-    expect(screen.getAllByText("1").length).toBeGreaterThan(0);
-  });
-
-  it("groups the connector card under its category heading", async () => {
-    const qc = new QueryClient({ defaultOptions: { queries: { retry: false } } });
-    render(
-      <QueryClientProvider client={qc}>
-        <ConnectorsPanel />
-      </QueryClientProvider>,
-    );
-    await waitFor(() => expect(screen.getByText("Threat Intelligence")).toBeInTheDocument());
+    expect(screen.queryByText("Connected")).not.toBeInTheDocument();
+    expect(screen.queryByText("Incomplete")).not.toBeInTheDocument();
+    expect(screen.queryByText("Disabled")).not.toBeInTheDocument();
   });
 });
