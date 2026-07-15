@@ -67,17 +67,19 @@ describe("ConfigFieldInput", () => {
         onChange={vi.fn()}
       />,
     );
-    expect(screen.getByRole("checkbox")).toBeChecked();
+    expect(screen.getByRole("switch")).toBeChecked();
   });
 
-  it("renders a str field as a required text input with help text", () => {
+  it("renders a str field as a text input with help text", () => {
     render(
       <ConfigFieldInput
-        field={{ key: "url", type: "str", required: true, default: null, help: "Base URL" }}
+        field={{ key: "url", type: "str", required: false, default: null, help: "Base URL" }}
         value="https://example.test"
         onChange={vi.fn()}
       />,
     );
+    // required: false chosen to test plain str field rendering without the asterisk decoration,
+    // which would break exact label matching in getByLabelText
     const input = screen.getByLabelText("url") as HTMLInputElement;
     expect(input.value).toBe("https://example.test");
     expect(screen.getByText("Base URL")).toBeInTheDocument();

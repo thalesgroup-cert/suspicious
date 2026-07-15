@@ -19,7 +19,7 @@ deployment/vault/unseal.keys
 *.key
 *.pem
 *.jks
-
+.pnpm-store
 # ===== Python =====
 __pycache__/
 *.py[cod]
