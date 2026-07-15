@@ -19,6 +19,7 @@ deployment/vault/unseal.keys
 *.key
 *.pem
 *.jks
+*.srl
 .pnpm-store
 # ===== Python =====
 __pycache__/
