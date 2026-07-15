@@ -196,8 +196,13 @@ export function ConnectorDetail({
       <Typography variant="overline" color="text.secondary" sx={{ display: "block", mb: 1 }}>
         Recent deliveries
       </Typography>
+      {deliveriesQuery.isError && (
+        <Alert severity="error" sx={{ mb: 1 }}>
+          Failed to load recent deliveries.
+        </Alert>
+      )}
       {deliveriesQuery.isLoading && <CircularProgress size={18} />}
-      {!deliveriesQuery.isLoading && deliveries.length === 0 && (
+      {!deliveriesQuery.isLoading && !deliveriesQuery.isError && deliveries.length === 0 && (
         <Typography variant="body2" color="text.disabled">
           No deliveries yet.
         </Typography>

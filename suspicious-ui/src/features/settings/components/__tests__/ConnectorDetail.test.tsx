@@ -66,6 +66,14 @@ describe("ConnectorDetail", () => {
     expect(await screen.findByText("No deliveries yet.")).toBeInTheDocument();
   });
 
+  it("shows error alert when deliveries query fails", async () => {
+    const { listDeliveries } = await import("../connectors");
+    vi.mocked(listDeliveries).mockRejectedValueOnce(new Error("network error"));
+    renderWithProviders(<ConnectorDetail connector={CONNECTOR} />);
+    expect(await screen.findByText("Failed to load recent deliveries.")).toBeInTheDocument();
+    expect(screen.queryByText("No deliveries yet.")).not.toBeInTheDocument();
+  });
+
   it("shows a back button only when onBack is provided", () => {
     renderWithProviders(<ConnectorDetail connector={CONNECTOR} onBack={vi.fn()} />);
     expect(screen.getByLabelText("Back to connector list")).toBeInTheDocument();
