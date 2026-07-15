@@ -12,8 +12,11 @@ export function UserAvatar({
   initials: string;
   sx?: SxProps<Theme>;
 } & Record<string, unknown>) {
+  const effectiveSeed = avatar?.style === "initials" ? initials : avatar?.seed;
   const src =
-    avatar?.style && avatar?.seed ? renderAvatarDataUri(avatar) : "";
+    avatar?.style && effectiveSeed
+      ? renderAvatarDataUri({ ...avatar, seed: effectiveSeed })
+      : "";
 
   if (src) {
     return <Avatar src={src} alt={initials} sx={sx} {...rest} />;

@@ -128,5 +128,17 @@ describe("ProfilePage - Test Suite", () => {
         expect(screen.getByLabelText("Eyes use random")).toBeDisabled();
       });
     });
+
+    it("locks the seed to the real initials when switching to the Initials style", async () => {
+      const user = userEvent.setup();
+      renderWithProviders(<ProfilePage />, { initialPath: "/profile" });
+
+      await user.click(await screen.findByText("Avatar"));
+      await user.click(await screen.findByAltText("Initials"));
+
+      await waitFor(() => {
+        expect(screen.getByText(/always your initials/i)).toBeInTheDocument();
+      });
+    });
   });
 });

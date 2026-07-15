@@ -18,4 +18,13 @@ describe("UserAvatar", () => {
     render(<UserAvatar avatar={{ style: "", seed: "" }} initials="CD" />);
     expect(screen.getByText("CD")).toBeInTheDocument();
   });
+
+  it("renders real initials for the initials style even if a stale random seed is stored", () => {
+    render(<UserAvatar avatar={{ style: "initials", seed: "zz9k2x" }} initials="JD" />);
+    const img = screen.getByRole("img");
+    const src = img.getAttribute("src")!;
+    const svg = decodeURIComponent(src.replace("data:image/svg+xml;utf8,", ""));
+    expect(svg).toContain(">JD<");
+    expect(svg).not.toContain("zz9k2x");
+  });
 });

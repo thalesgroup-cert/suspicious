@@ -567,8 +567,19 @@ export default function ProfilePage() {
   const setStyleWithSeed = (s: string) => {
     if (s !== avatarStyle) setAvatarOptions({});
     setAvatarStyle(s);
-    if (!avatarSeed) setAvatarSeed(randomSeed());
+    if (s === "initials") {
+      setAvatarSeed(me ? initials(me.first_name, me.last_name) : "");
+    } else if (!avatarSeed) {
+      setAvatarSeed(randomSeed());
+    }
   };
+
+  React.useEffect(() => {
+    if (avatarStyle !== "initials" || !me) return;
+    const expected = initials(me.first_name, me.last_name);
+    setAvatarSeed((prev) => (prev === expected ? prev : expected));
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [avatarStyle, me?.first_name, me?.last_name]);
 
   // ── Auth guard ────────────────────────────────────────────────────────────
 
