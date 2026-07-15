@@ -45,7 +45,10 @@ export function ColorField({
               aria-pressed={selected}
               onClick={() => onChange(hex)}
               onKeyDown={(e) => {
-                if (e.key === "Enter" || e.key === " ") onChange(hex);
+                if (e.key === "Enter" || e.key === " ") {
+                  e.preventDefault();
+                  onChange(hex);
+                }
               }}
               sx={{
                 width: 26,
