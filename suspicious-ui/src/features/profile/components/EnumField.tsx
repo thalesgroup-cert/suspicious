@@ -20,6 +20,7 @@ export function EnumField({
 }) {
   const theme = useTheme();
   const [open, setOpen] = React.useState(false);
+  const [renderGrid, setRenderGrid] = React.useState(false);
   const toggle = () => setOpen((o) => !o);
 
   return (
@@ -49,8 +50,13 @@ export function EnumField({
         </Typography>
         {open ? <ExpandLessOutlined fontSize="small" /> : <ExpandMoreOutlined fontSize="small" />}
       </Stack>
-      <Collapse in={open} unmountOnExit>
-        {open && (
+      <Collapse
+        in={open}
+        unmountOnExit
+        onEnter={() => setRenderGrid(true)}
+        onExited={() => setRenderGrid(false)}
+      >
+        {renderGrid && (
         <Box sx={{ display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(52px, 1fr))", gap: 0.75, pt: 0.5 }}>
           <Box
             role="button"
