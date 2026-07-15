@@ -76,6 +76,7 @@ docs/superpowers
 .claude/
 .codegraph
 .superpowers
+.worktrees
 .vscode
 .idea
 .DS_Store
