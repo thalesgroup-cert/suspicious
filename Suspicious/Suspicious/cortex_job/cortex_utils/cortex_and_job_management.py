@@ -9,7 +9,7 @@ from common.http_client import get_breaker, RETRY
 from cortex_job.cortex_utils.session_cortex_api import SessionCortexApi
 from cortex_job.models import Analyzer, AnalyzerReport, CaseAnalyzerJob
 from mail_feeder.models import MailBody, MailArchive, MailInfo, MailHeader
-from case_handler.models import Result
+from case_handler.models import Case, Result
 
 # ------------------------
 # Logger setup
@@ -915,6 +915,7 @@ class CortexJobManager:
 
         subclass = report_full.get("sub_classification")
         if subclass:
-            return str(subclass).capitalize()
+            max_length = Case._meta.get_field("category_ai").max_length
+            return str(subclass).capitalize()[:max_length]
 
         return default_message

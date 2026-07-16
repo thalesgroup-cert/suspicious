@@ -4,6 +4,7 @@ requests.get/post with no socket timeout.
 """
 from __future__ import annotations
 
+import requests
 from cortex4py.api import Api
 
 from common.http_client import make_session
@@ -34,6 +35,14 @@ class SessionCortexApi(Api):
             )
             response.raise_for_status()
             return response
+        except requests.HTTPError as exc:
+            if exc.response is not None and exc.response.status_code >= 500:
+                # Let common.http_client.RETRY see and retry the original
+                # HTTPError for 5xx — cortex4py's __recover() below rewraps
+                # it into InvalidInputError, which isn't a requests.HTTPError
+                # subclass and would defeat RETRY's 5xx retry predicate.
+                raise
+            self._Api__recover(exc)
         except Exception as exc:
             self._Api__recover(exc)
 
