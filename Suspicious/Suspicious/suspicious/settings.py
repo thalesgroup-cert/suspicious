@@ -565,6 +565,63 @@ CELERY_BEAT_SCHEDULE = {
 
 _trace_level = getattr(logging, _app.get("log_level", "INFO").upper(), logging.INFO)
 
+APP_LOGGERS = [
+    "api", "case_handler", "cortex_job", "score_process", "connectors",
+    "mail_feeder", "email_process", "url_process", "ip_process",
+    "hash_process", "file_process", "domain_process", "dashboard",
+    "settings", "profiles", "tasp", "suspicious",
+]
+assert len(APP_LOGGERS) == len(set(APP_LOGGERS)), "duplicate name in APP_LOGGERS"
+
+
+def _app_logger(name: str) -> tuple[dict, dict]:
+    """Build the (handler, logger) pair for one Django app's dedicated log
+    file. Plain per-app log? Add the name to APP_LOGGERS above. Need a
+    different handler/rotation/name mapping (a cross-cutting pipeline
+    logger)? Write it by hand below, unchanged — don't force it through
+    this generator."""
+    handler = (
+        {"class": "logging.NullHandler"}
+        if _is_test
+        else {
+            "class": "logging.handlers.RotatingFileHandler",
+            "filename": f"/app/log/{name}.log",
+            "maxBytes": 5 * 1024 * 1024,
+            "backupCount": 3,
+            "formatter": "json",
+            "filters": ["trace_id"],
+            "level": _trace_level,
+        }
+    )
+    logger = {
+        "handlers": [f"{name}_file", "json_console"],
+        "level": _trace_level,
+        "propagate": False,
+    }
+    return handler, logger
+
+
+_app_handlers: dict = {}
+_app_loggers: dict = {}
+for _app_name in APP_LOGGERS:
+    _handler, _logger = _app_logger(_app_name)
+    _app_handlers[f"{_app_name}_file"] = _handler
+    _app_loggers[_app_name] = _logger
+
+_unclassified_handler = (
+    {"class": "logging.NullHandler"}
+    if _is_test
+    else {
+        "class": "logging.handlers.RotatingFileHandler",
+        "filename": "/app/log/unclassified.log",
+        "maxBytes": 5 * 1024 * 1024,
+        "backupCount": 3,
+        "formatter": "json",
+        "filters": ["trace_id"],
+        "level": _trace_level,
+    }
+)
+
 if _is_test:
     _file_handlers: dict = {
         name: {"class": "logging.NullHandler"}
@@ -669,23 +726,16 @@ LOGGING = {
             "filters": ["trace_id"],
         },
         **_file_handlers,
+        **_app_handlers,
+        "unclassified_file": _unclassified_handler,
     },
 
     "loggers": {
+        **_app_loggers,
+
         "django": {
             "handlers": ["console"],
             "level":    "ERROR",
-            "propagate": False,
-        },
-
-        "tasp": {
-            "handlers": ["app_file", "json_console"],
-            "level":     _trace_level,
-            "propagate": False,
-        },
-        "case_handler": {
-            "handlers":  ["app_file", "json_console"],
-            "level":     _trace_level,
             "propagate": False,
         },
 
