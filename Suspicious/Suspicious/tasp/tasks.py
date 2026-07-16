@@ -192,6 +192,49 @@ def sweep_missing_mail_previews(self, limit: int = 200):
         raise self.retry(exc=exc, countdown=60 * 2 ** self.request.retries)
 
 
+@shared_task(bind=True, **_RETRY)
+def dispatch_case_analysis(self, case_id: int, intents: list):
+    """Launch Cortex analyzers for a just-submitted case in the background.
+
+    Moved off the request/response path: the synchronous Cortex round-trips
+    (analyzer lookup + run_by_name per matched analyzer) used to run inline
+    in the submit view, so users waited on Cortex for every submission.
+    `intents` is a JSON-safe list of (app_label.model, pk, data_type) triples
+    (model instances aren't JSON-serializable, so callers resolve+serialize
+    them before enqueueing); we re-fetch the objects here.
+    """
+    from django.apps import apps
+    from django.utils import timezone
+    from cortex_job.cortex_utils.cortex_and_job_management import CortexJob
+    from url_process.url_utils.url_planner import filter_dispatch_intents
+
+    case = Case.objects.filter(id=case_id).first()
+    if case is None:
+        logger.warning("dispatch_case_analysis: case %s no longer exists", case_id)
+        return
+
+    resolved = []
+    for label, pk, data_type in intents:
+        try:
+            resolved.append((apps.get_model(label).objects.get(pk=pk), data_type))
+        except Exception:
+            logger.exception("dispatch_case_analysis: failed to resolve %s pk=%s", label, pk)
+
+    filtered = filter_dispatch_intents(resolved, sender_domain=None)
+    cortex = CortexJob()
+    for value, data_type in filtered:
+        try:
+            cortex.launch_cortex_jobs(value=value, data_type=data_type, case=case)
+        except Exception:
+            logger.exception(
+                "Failed to launch Cortex jobs (case=%s data_type=%s)", case_id, data_type
+            )
+
+    case.dispatched_at = timezone.now()
+    case.save(update_fields=["dispatched_at"])
+    reconcile_case.delay(case_id)
+
+
 @shared_task(bind=True)
 def reconcile_case(self, case_id: int):
     """Single finalise entrypoint: sync ledger + advance the state machine."""

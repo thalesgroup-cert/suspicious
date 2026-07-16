@@ -18,7 +18,6 @@ from settings.models import (
     AllowListFiletype,
     WatcherLegitDomain,
 )
-from cortex_job.cortex_utils.cortex_and_job_management import CortexJob
 
 logger = logging.getLogger(__name__)
 
@@ -215,7 +214,9 @@ class CaseHandler:
             self._launch_analysis(hash_inst, None, "hash")
 
     def dispatch_pending(self, case) -> None:
-        """Replay queued dispatch intents now that Case exists."""
+        """Queue analyzer dispatch for the case; runs async (see
+        tasp.tasks.dispatch_case_analysis) so the submit request returns as
+        soon as the Case exists instead of blocking on Cortex round-trips."""
         if case is None:
             if self.pending_dispatch_intents:
                 logger.warning(
@@ -225,25 +226,12 @@ class CaseHandler:
             self.pending_dispatch_intents = []
             return
 
-        from url_process.url_utils.url_planner import filter_dispatch_intents
-        intents = filter_dispatch_intents(self.pending_dispatch_intents, sender_domain=None)
-
-        cortex = CortexJob()
-        for value, data_type in intents:
-            try:
-                cortex.launch_cortex_jobs(value=value, data_type=data_type, case=case)
-            except Exception:
-                logger.exception(
-                    "Failed to launch Cortex jobs (case=%s data_type=%s value=%r)",
-                    getattr(case, "id", None),
-                    data_type,
-                    value,
-                )
+        intents = [
+            (f"{value._meta.app_label}.{value._meta.model_name}", value.pk, data_type)
+            for value, data_type in self.pending_dispatch_intents
+        ]
         self.pending_dispatch_intents = []
 
-        from django.utils import timezone
-        case.dispatched_at = timezone.now()
-        case.save(update_fields=["dispatched_at"])
-
-        from tasp.tasks import reconcile_case
-        reconcile_case.delay(case.id)
+        from django.db import transaction
+        from tasp.tasks import dispatch_case_analysis
+        transaction.on_commit(lambda: dispatch_case_analysis.delay(case.id, intents))

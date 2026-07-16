@@ -4,6 +4,8 @@ from django.test import RequestFactory, TestCase
 
 from case_handler.case_utils.case_handler import CaseHandler
 from case_handler.models import Case
+from ip_process.models import IP
+from url_process.models import URL
 
 
 class CaseHandlerDispatchPendingTest(TestCase):
@@ -15,49 +17,49 @@ class CaseHandlerDispatchPendingTest(TestCase):
         self.case = Case.objects.create(
             status="On Going", description="", reporter=self.reporter
         )
+        self.ip = IP.objects.create(address="203.0.113.5")
+        self.url = URL.objects.create(address="http://example.test/phish")
         request = RequestFactory().post("/api/submit")
         request.user = self.reporter
         self.handler = CaseHandler(request, MagicMock(), MagicMock(), MagicMock())
         self.handler.pending_dispatch_intents = [
-            ("artifact-1", "ip"),
-            ("artifact-2", "url"),
+            (self.ip, "ip"),
+            (self.url, "url"),
         ]
 
-    @patch("case_handler.case_utils.case_handler.CortexJob")
-    def test_dispatches_each_intent_with_case(self, mock_cortex_cls):
-        mock_cortex = mock_cortex_cls.return_value
-        self.handler.dispatch_pending(self.case)
+    @patch("tasp.tasks.dispatch_case_analysis.delay")
+    def test_queues_async_dispatch_with_serialized_intents(self, mock_delay):
+        with self.captureOnCommitCallbacks(execute=True):
+            self.handler.dispatch_pending(self.case)
 
-        self.assertEqual(mock_cortex.launch_cortex_jobs.call_count, 2)
-        mock_cortex.launch_cortex_jobs.assert_any_call(
-            value="artifact-1", data_type="ip", case=self.case
-        )
-        mock_cortex.launch_cortex_jobs.assert_any_call(
-            value="artifact-2", data_type="url", case=self.case
-        )
+        expected_intents = [
+            (f"{self.ip._meta.app_label}.{self.ip._meta.model_name}", self.ip.pk, "ip"),
+            (f"{self.url._meta.app_label}.{self.url._meta.model_name}", self.url.pk, "url"),
+        ]
+        mock_delay.assert_called_once_with(self.case.id, expected_intents)
         self.assertEqual(self.handler.pending_dispatch_intents, [])
 
-    @patch("case_handler.case_utils.case_handler.CortexJob")
-    def test_none_case_drops_intents_with_warning(self, mock_cortex_cls):
+    @patch("tasp.tasks.dispatch_case_analysis.delay")
+    def test_none_case_drops_intents_with_warning(self, mock_delay):
         with self.assertLogs("case_handler.case_utils.case_handler", level="WARNING") as cm:
             self.handler.dispatch_pending(None)
 
-        mock_cortex_cls.return_value.launch_cortex_jobs.assert_not_called()
+        mock_delay.assert_not_called()
         self.assertEqual(self.handler.pending_dispatch_intents, [])
         self.assertTrue(any("Dropping 2 pending" in m for m in cm.output))
 
-    @patch("case_handler.case_utils.case_handler.CortexJob")
-    def test_per_intent_failure_does_not_block_others(self, mock_cortex_cls):
-        mock_cortex = mock_cortex_cls.return_value
-        mock_cortex.launch_cortex_jobs.side_effect = [Exception("boom"), None]
+    @patch("tasp.tasks.dispatch_case_analysis.delay")
+    def test_second_call_is_noop(self, mock_delay):
+        with self.captureOnCommitCallbacks(execute=True):
+            self.handler.dispatch_pending(self.case)
         self.handler.dispatch_pending(self.case)
 
-        self.assertEqual(mock_cortex.launch_cortex_jobs.call_count, 2)
-        self.assertEqual(self.handler.pending_dispatch_intents, [])
+        mock_delay.assert_called_once()
 
-    @patch("case_handler.case_utils.case_handler.CortexJob")
-    def test_second_call_is_noop(self, mock_cortex_cls):
-        mock_cortex = mock_cortex_cls.return_value
+    @patch("tasp.tasks.dispatch_case_analysis.delay")
+    def test_not_queued_without_transaction_commit(self, mock_delay):
+        # dispatch_pending schedules via transaction.on_commit; outside of a
+        # commit (e.g. the surrounding test transaction rolling back) the
+        # task must never fire.
         self.handler.dispatch_pending(self.case)
-        self.handler.dispatch_pending(self.case)
-        self.assertEqual(mock_cortex.launch_cortex_jobs.call_count, 2)
+        mock_delay.assert_not_called()
