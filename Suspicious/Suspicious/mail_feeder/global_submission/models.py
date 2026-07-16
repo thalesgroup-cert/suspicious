@@ -11,8 +11,8 @@ class MailSubmissionData(BaseModel):
     workdir: str
     filename: str
     email_id: str
-    bucket_name: Optional[str]
-    user: Optional[str]
+    bucket_name: Optional[str] = None
+    user: Optional[str] = None
     is_submitted: bool
     reported_by: str = ""
     reporter_note: str = ""

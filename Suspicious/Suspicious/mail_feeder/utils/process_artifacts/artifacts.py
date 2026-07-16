@@ -34,6 +34,10 @@ class ArtifactService:
             'url': self._handle_url,
             'ip': self._handle_ip,
             'hash': self._handle_hash,
+            # File artifacts are recorded by add_file_attachment() for every
+            # attachment/reported email, but the actual attachment record is
+            # created separately via AttachmentService.handle_attachments().
+            'file': self._handle_file,
         }
 
         for artifact in artifacts:
@@ -47,6 +51,9 @@ class ArtifactService:
                 logger.error(f"Error processing {artifact.dataType}: {e}")
 
     # --- Core handlers ---
+    def _handle_file(self, data_value: str, mail_instance):
+        logger.debug(f"File artifact {data_value} handled via AttachmentService, skipping.")
+
     def _handle_mail(self, data_value: str, mail_instance):
         data_value = data_value.lower()
         if "email=" in data_value:
@@ -121,7 +128,7 @@ class ArtifactService:
     def _process_url(self, url: str, mail_instance):
         handler = URLHandler()
         artifact = handler.handle_url(url)
-        if not artifact:
+        if not artifact[0]:
             logger.error(f"URL handler failed for {url}")
             return
 

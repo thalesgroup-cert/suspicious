@@ -12,8 +12,8 @@ class ArtifactModel(BaseModel):
 
 
 class URLDecodeResult(BaseModel):
-    prime_url: Optional[HttpUrl]
-    decoded_url: Optional[HttpUrl]
+    prime_url: Optional[HttpUrl] = None
+    decoded_url: Optional[HttpUrl] = None
 
 
 class ConfigModel(BaseModel):

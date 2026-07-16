@@ -67,7 +67,11 @@ class SendMailService:
         self.__server.starttls()
 
     def login(self) -> None:
-        self.__server.login(user=self.__login, password=self.__password)
+        # Skip auth entirely when no credentials are configured (e.g. an
+        # internal relay that doesn't require it) — calling login() with
+        # empty creds would raise instead of sending anonymously.
+        if self.__login and self.__password:
+            self.__server.login(user=self.__login, password=self.__password)
 
     def __create_mail(
         self,
