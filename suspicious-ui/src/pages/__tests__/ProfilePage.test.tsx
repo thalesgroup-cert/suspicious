@@ -22,6 +22,7 @@ vi.mock("@/features/profile/api", () => ({
 
 import { getMe } from "@/api/auth";
 import { getProfile, updatePreferences } from "@/features/profile/api";
+import { getStyleCategories } from "@/features/profile/avatar";
 import ProfilePage from "../ProfilePage";
 
 describe("ProfilePage - Test Suite", () => {
@@ -114,18 +115,18 @@ describe("ProfilePage - Test Suite", () => {
       await user.click(await screen.findByText("Avatar"));
       await user.click(await screen.findByAltText("Avataaars"));
 
-      const eyesNext = await screen.findByLabelText("Eyes next option");
-      await user.click(eyesNext);
+      const eyes = getStyleCategories("avataaars").find((c) => c.key === "eyes")!;
+      await user.click(await screen.findByLabelText("Eyes options"));
+      await user.click(await screen.findByLabelText(`Eyes ${eyes.values[0]}`));
       await waitFor(() => {
-        expect(screen.getByLabelText("Eyes use random")).toBeEnabled();
+        expect(screen.getByLabelText("Eyes options")).toHaveTextContent(eyes.values[0]);
       });
 
       await user.click(await screen.findByAltText("Bottts"));
-
       await user.click(await screen.findByAltText("Avataaars"));
-      await screen.findByLabelText("Eyes next option");
+
       await waitFor(() => {
-        expect(screen.getByLabelText("Eyes use random")).toBeDisabled();
+        expect(screen.getByLabelText("Eyes options")).toHaveTextContent("Auto");
       });
     });
 
