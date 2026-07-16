@@ -1,11 +1,7 @@
 import { render, screen } from "@testing-library/react";
 import { describe, expect, it, vi } from "vitest";
-import {
-  ConfigFieldInput,
-  dottedGet,
-  dottedSet,
-  stripUnchangedSecrets,
-} from "../configFieldHelpers";
+import { ConfigFieldInput } from "../configFieldHelpers";
+import { dottedGet, dottedSet, stripUnchangedSecrets } from "../configHelpers";
 
 describe("dottedGet / dottedSet", () => {
   it("reads a nested value by dotted key", () => {

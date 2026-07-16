@@ -16,12 +16,12 @@ import ArrowBackOutlined from "@mui/icons-material/ArrowBackOutlined";
 import { Badge } from "@/shared/components/Badge";
 import { useResultColors } from "@/styles/colorStore";
 import { InnerCard, NavIcon } from "@/features/settings/components/cards";
+import { ConfigFieldInput } from "@/features/settings/components/configFieldHelpers";
 import {
-  ConfigFieldInput,
   dottedGet,
   dottedSet,
   stripUnchangedSecrets,
-} from "@/features/settings/components/configFieldHelpers";
+} from "@/features/settings/components/configHelpers";
 import {
   getConnectorStatusColor,
   getDeliveryStatusColor,

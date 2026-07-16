@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { Alert, CircularProgress, Grid, useMediaQuery } from "@mui/material";
 import { useTheme } from "@mui/material/styles";
@@ -17,7 +17,7 @@ export function ConnectorsPanel() {
     queryFn: listConnectors,
   });
 
-  const connectors = data?.connectors ?? [];
+  const connectors = useMemo(() => data?.connectors ?? [], [data]);
   const [selected, setSelected] = useState<string | null>(null);
 
   useEffect(() => {
