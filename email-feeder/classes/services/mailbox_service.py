@@ -754,7 +754,15 @@ class Mailbox:
     def _sanitize_filename(
         self, filename: str, id_num: int, default_base: str = "attachment"
     ) -> str:
-        """Sanitizes a filename to be safe for file systems and limits its length."""
+        """Sanitizes a filename to be safe for file systems and limits its length.
+
+        Truncates by UTF-8 byte length, not character count: the sanitizer keeps
+        accented characters (they match \\w), so a 200-*character* French title
+        can already be 250+ bytes - over most filesystems' 255-byte NAME_MAX
+        before MinIO's own ".{etag}.part.minio" download suffix (~44 bytes) is
+        even appended. Cap well below 255 to leave room for that and any other
+        suffix appended later in the pipeline.
+        """
         if not filename.strip():
             filename = f"{default_base}_{id_num}"
 
@@ -765,8 +773,9 @@ class Mailbox:
             sanitized = f"{default_base}_{id_num}"
 
         name_part, ext_part = os.path.splitext(sanitized)
-        max_name_len = 200 - len(ext_part)
-        return name_part[:max_name_len] + ext_part
+        max_name_bytes = 150 - len(ext_part.encode("utf-8"))
+        truncated_name = name_part.encode("utf-8")[:max_name_bytes].decode("utf-8", "ignore")
+        return truncated_name + ext_part
 
     def get_header_dict_list(self, msg: email.message.EmailMessage):
         headers: dict[str, list[typing.Any]] = {}
