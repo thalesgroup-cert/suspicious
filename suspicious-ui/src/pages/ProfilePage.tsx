@@ -156,7 +156,8 @@ function DirtyBar({
   return (
     <Collapse in={dirty}>
       <InnerCard sx={{
-        px: 2, py: 1.25, display: "flex", alignItems: "center", gap: 1.5,
+        px: 2, py: 1.25, display: "flex", flexWrap: "wrap", alignItems: "center",
+        rowGap: 1, columnGap: 1.5,
         borderColor: alpha(theme.palette.warning.main, 0.4),
         background: alpha(theme.palette.warning.main, isDark ? 0.06 : 0.04),
       }}>
@@ -165,21 +166,23 @@ function DirtyBar({
           bgcolor: theme.palette.warning.main,
           boxShadow: `0 0 8px ${alpha(theme.palette.warning.main, 0.6)}`,
         }} />
-        <Typography variant="body2" sx={{ flex: 1, color: "text.secondary", fontWeight: 700 }}>{label}</Typography>
-        {onReset ? (
-          <Button size="small" startIcon={<RestoreOutlined />} onClick={onReset}
-            sx={{ textTransform: "none", fontWeight: 800, borderRadius: 2 }}>
-            Reset
+        <Typography variant="body2" sx={{ flex: "1 1 auto", minWidth: "140px", color: "text.secondary", fontWeight: 700 }}>{label}</Typography>
+        <Stack direction="row" spacing={1} sx={{ ml: "auto", flexShrink: 0 }}>
+          {onReset ? (
+            <Button size="small" startIcon={<RestoreOutlined />} onClick={onReset}
+              sx={{ textTransform: "none", fontWeight: 800, borderRadius: 2 }}>
+              Reset
+            </Button>
+          ) : null}
+          <Button
+            size="small" variant="contained"
+            startIcon={saving ? <CircularProgress size={13} color="inherit" /> : <SaveOutlined />}
+            disabled={saving} onClick={onSave}
+            sx={{ textTransform: "none", fontWeight: 900, borderRadius: 2 }}
+          >
+            {saving ? "Saving…" : "Save changes"}
           </Button>
-        ) : null}
-        <Button
-          size="small" variant="contained"
-          startIcon={saving ? <CircularProgress size={13} color="inherit" /> : <SaveOutlined />}
-          disabled={saving} onClick={onSave}
-          sx={{ textTransform: "none", fontWeight: 900, borderRadius: 2 }}
-        >
-          {saving ? "Saving…" : "Save changes"}
-        </Button>
+        </Stack>
       </InnerCard>
     </Collapse>
   );
