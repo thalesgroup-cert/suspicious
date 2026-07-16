@@ -56,6 +56,16 @@ def _safe_round(value, default=0):
         return default
 
 
+def _save_thehive_alert_id(case, alert: dict | None) -> None:
+    """Persist the newly created alert's id so later challenges/comments on
+    the same case land on the existing alert instead of creating a new one."""
+    alert_id = (alert or {}).get("_id")
+    if not alert_id:
+        return
+    case.thehive_alert_id = alert_id
+    case.save(update_fields=["thehive_alert_id"])
+
+
 class ChallengeToTheHiveService:
 
     def __init__(self, case, recipient: str, subject: str) -> None:
@@ -231,12 +241,13 @@ class ChallengeToTheHiveService:
         if fileormail:
             file = fileormail.file
             if file:
-                create_alert_from_challenge_without_mail(
+                alert = create_alert_from_challenge_without_mail(
                     api_url=api_url, api_key=api_key,
                     case=case, file=file,
                     ioc=file.linked_hash.value, datatype="hash",
                     challenger=challenger,
                 )
+                _save_thehive_alert_id(case, alert)
             return
 
         nonfileiocs = case.nonFileIocs
@@ -248,12 +259,13 @@ class ChallengeToTheHiveService:
             if ioc_obj:
                 ioc_value = getattr(ioc_obj, "address" if ioc_attr != "hash" else "value", None)
                 if ioc_value:
-                    create_alert_from_challenge_without_mail(
+                    alert = create_alert_from_challenge_without_mail(
                         api_url=api_url, api_key=api_key,
                         case=case, file=None,
                         ioc=ioc_value, datatype=datatype,
                         challenger=challenger,
                     )
+                    _save_thehive_alert_id(case, alert)
 
     def _send_thehive_with_mail(self, api_url, api_key, case, mail, challenger) -> None:
         artifact_type_map = {
@@ -281,13 +293,14 @@ class ChallengeToTheHiveService:
         ]
 
         try:
-            create_alert_from_challenge(
+            alert = create_alert_from_challenge(
                 api_url=api_url, api_key=api_key,
                 case=case, mail=mail,
                 challenger=challenger,
                 artifact_summary=artifact_summary,
                 attachments_summary=attachments_summary,
             )
+            _save_thehive_alert_id(case, alert)
         except Exception as e:
             logger.error(f"Failed to create TheHive alert for case #{_safe(case.id)}: {e}")
 

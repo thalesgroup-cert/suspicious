@@ -86,7 +86,8 @@ class ChallengeMailQueryCountTest(TestCase):
         }
 
         with patch(
-            "connectors.contrib.thehive.challenge.create_alert_from_challenge"
+            "connectors.contrib.thehive.challenge.create_alert_from_challenge",
+            return_value={"_id": "~stub-alert"},
         ):
             original_debug = settings.DEBUG
             settings.DEBUG = True

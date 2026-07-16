@@ -3,8 +3,9 @@ from unittest.mock import patch
 from django.contrib.auth import get_user_model
 from django.test import TestCase
 
-from case_handler.models import Case
+from case_handler.models import Case, CaseHasNonFileIocs
 from connectors.contrib.thehive.challenge import ChallengeToTheHiveService
+from url_process.models import URL
 
 
 class ChallengeAlertRoutingTest(TestCase):
@@ -56,3 +57,25 @@ class ChallengeAlertRoutingTest(TestCase):
 
         mock_comment.assert_not_called()
         mock_no_mail.assert_called_once()
+
+    def test_new_alert_id_is_saved_on_case(self):
+        """Regression: creating a new alert must persist its id onto the case
+        so a follow-up challenge/comment lands on the same alert instead of
+        creating another one — previously thehive_alert_id stayed empty forever."""
+        url = URL.objects.create(address="http://evil.example")
+        case = Case.objects.create(description="", reporter=self.user)
+        CaseHasNonFileIocs.objects.create(case=case, url=url)
+        case.nonFileIocs = CaseHasNonFileIocs.objects.get(case=case)
+        service = self._service_for(case)
+
+        with patch("connectors.contrib.thehive.challenge.add_comment_to_item") as mock_comment, \
+             patch(
+                 "connectors.contrib.thehive.challenge.create_alert_from_challenge_without_mail",
+                 return_value={"_id": "~new-alert-123"},
+             ) as mock_new_alert_nomail:
+            service.send_to_thehive()
+
+        mock_comment.assert_not_called()
+        mock_new_alert_nomail.assert_called_once()
+        case.refresh_from_db()
+        self.assertEqual(case.thehive_alert_id, "~new-alert-123")
