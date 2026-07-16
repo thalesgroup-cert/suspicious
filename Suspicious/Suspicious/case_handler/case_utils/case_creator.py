@@ -12,7 +12,6 @@ import logging
 from dashboard.models import UserCasesMonthlyStats
 from django.db.models import F
 
-fetch_mail_logger = logging.getLogger("tasp.cron.fetch_and_process_emails")
 logger = logging.getLogger(__name__)
 
 
@@ -54,7 +53,7 @@ class CaseCreator:
         )
 
         for key, value in kwargs.items():
-            fetch_mail_logger.debug(f"Processing key: {key}, value: {getattr(value, 'id', 'None')}")
+            logger.debug(f"Processing key: {key}, value: {getattr(value, 'id', 'None')}")
             if key == 'allow_listed' and value:
                 case.results = "SAFE-ALLOW_LISTED"
                 case.final_score = 0
@@ -74,7 +73,7 @@ class CaseCreator:
             case.save()
             return case
         except Exception as e:
-            fetch_mail_logger.error(f"Error creating case: {e!s}")
+            logger.error(f"Error creating case: {e!s}")
             return None
 
     _ARTIFACT_KEY_MAP = {
