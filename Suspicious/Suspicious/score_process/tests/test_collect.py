@@ -26,7 +26,7 @@ class CollectSignalsTest(TestCase):
         case.nonFileIocs = iocs
         case.save()
 
-        signals, ai, deny_listed = collect_signals(case)
+        signals, ai, deny_listed, ai_missing = collect_signals(case)
 
         self.assertTrue(all(isinstance(s, Signal) for s in signals))
         self.assertEqual(len(signals), 1)
@@ -37,7 +37,7 @@ class CollectSignalsTest(TestCase):
 
     def test_no_iocs_yields_no_signals(self):
         case = Case.objects.create(description="", reporter=self.user)
-        signals, ai, deny_listed = collect_signals(case)
+        signals, ai, deny_listed, ai_missing = collect_signals(case)
         self.assertEqual(signals, [])
         self.assertFalse(deny_listed)
 
@@ -45,7 +45,7 @@ class CollectSignalsTest(TestCase):
         case = Case.objects.create(
             description="", reporter=self.user, score_ai=6, confidence_ai=100,
         )
-        _, ai, _ = collect_signals(case)
+        _, ai, _, _ = collect_signals(case)
         self.assertIsNotNone(ai)
         self.assertEqual(ai.confidence, 100)
         self.assertEqual(ai.score, 6)
@@ -54,5 +54,5 @@ class CollectSignalsTest(TestCase):
         case = Case.objects.create(
             description="", reporter=self.user, score_ai=6, confidence_ai=150,
         )
-        _, ai, _ = collect_signals(case)
+        _, ai, _, _ = collect_signals(case)
         self.assertEqual(ai.confidence, 100)
