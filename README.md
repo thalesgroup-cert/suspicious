@@ -6,6 +6,9 @@
 </p>
 
 <p align="center">
+    <a href="https://github.com/thalesgroup-cert/suspicious/actions/workflows/ci.yml">
+        <img src="https://img.shields.io/github/actions/workflow/status/thalesgroup-cert/suspicious/ci.yml?branch=main&style=for-the-badge&logo=github&label=CI" alt="CI">
+    </a>
     <a href="https://github.com/thalesgroup-cert/suspicious/graphs/contributors">
         <img src="https://img.shields.io/github/contributors/thalesgroup-cert/suspicious?style=for-the-badge" alt="Contributors">
     </a>

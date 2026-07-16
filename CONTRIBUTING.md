@@ -64,13 +64,23 @@ allowed through.
      * `docs:` for documentation changes
      * `refactor:` for code improvements without changing behavior
 
-4. **Push your branch**:
+4. **Run tests and lint before pushing**:
+
+   ```bash
+   # Backend
+   cd Suspicious && python manage.py test
+
+   # Frontend
+   cd suspicious-ui && pnpm lint && pnpm test
+   ```
+
+5. **Push your branch**:
 
    ```bash
    git push origin feature/<short_feature_name>
    ```
 
-5. **Open a Pull Request (PR)** from your fork on GitHub:
+6. **Open a Pull Request (PR)** from your fork on GitHub:
 
    * Navigate to your repository
    * Click **Contribute > Open Pull Request**

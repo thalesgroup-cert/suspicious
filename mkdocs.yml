@@ -33,6 +33,8 @@ theme:
 
 exclude_docs: |
   superpowers/
+  plans/
+  specs/
 
 validation:
   links:
