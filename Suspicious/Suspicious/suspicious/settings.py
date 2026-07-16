@@ -783,4 +783,9 @@ LOGGING = {
             "propagate": False,
         },
     },
+
+    "root": {
+        "handlers": ["unclassified_file", "json_console"],
+        "level": _trace_level,
+    },
 }
