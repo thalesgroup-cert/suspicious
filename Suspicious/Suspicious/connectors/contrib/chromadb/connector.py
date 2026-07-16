@@ -31,12 +31,14 @@ def _run_with_timeout(fn: Callable[[], T], timeout: float) -> T:
     Celery workers recycle periodically, and the alternative (blocking
     forever) is strictly worse.
     """
-    with ThreadPoolExecutor(max_workers=1) as pool:
-        future = pool.submit(fn)
-        try:
-            return future.result(timeout=timeout)
-        except FutureTimeoutError:
-            raise TimeoutError(f"ChromaDB call did not complete within {timeout}s") from None
+    pool = ThreadPoolExecutor(max_workers=1)
+    future = pool.submit(fn)
+    try:
+        return future.result(timeout=timeout)
+    except FutureTimeoutError:
+        raise TimeoutError(f"ChromaDB call did not complete within {timeout}s") from None
+    finally:
+        pool.shutdown(wait=False)
 
 
 class ChromaDBConnector(Connector):

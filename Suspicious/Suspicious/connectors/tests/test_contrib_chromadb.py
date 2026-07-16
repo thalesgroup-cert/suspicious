@@ -20,6 +20,18 @@ class RunWithTimeoutTest(SimpleTestCase):
         with self.assertRaises(TimeoutError):
             _run_with_timeout(slow, timeout=0.05)
 
+    def test_returns_promptly_on_timeout_without_waiting_for_the_slow_call(self):
+        started = time.time()
+        with self.assertRaises(TimeoutError):
+            _run_with_timeout(lambda: time.sleep(2), timeout=0.2)
+        elapsed = time.time() - started
+        self.assertLess(
+            elapsed, 1.0,
+            f"expected to return within ~0.2s of the timeout, took {elapsed:.3f}s "
+            "— _run_with_timeout is blocking on the abandoned thread instead of "
+            "returning promptly",
+        )
+
 
 class _FakeCollection:
     def __init__(self, ids, metadatas):
