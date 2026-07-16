@@ -625,20 +625,11 @@ _unclassified_handler = (
 if _is_test:
     _file_handlers: dict = {
         name: {"class": "logging.NullHandler"}
-        for name in ("app_file", "fetch_mail", "update_cases",
+        for name in ("fetch_mail", "update_cases",
                      "fetch_analyzer", "cleanup", "watcher_sync", "audit")
     }
 else:
     _file_handlers = {
-        "app_file": {
-            "class":     "logging.handlers.RotatingFileHandler",
-            "filename":  "/app/log/suspicious.log",
-            "maxBytes":  10 * 1024 * 1024,
-            "backupCount": 5,
-            "formatter": "json",
-            "filters":   ["trace_id"],
-            "level":     _trace_level,
-        },
         "fetch_mail": {
             "class":     "logging.handlers.RotatingFileHandler",
             "filename":  "/app/log/fetched_mail.log",
@@ -740,7 +731,7 @@ LOGGING = {
         },
 
         "api.views.oidc_views": {
-            "handlers":  ["app_file", "console"],
+            "handlers":  ["suspicious_file", "console"],
             "level":     _trace_level,
             "propagate": False,
         },
@@ -786,6 +777,6 @@ LOGGING = {
 
     "root": {
         "handlers": ["unclassified_file", "json_console"],
-        "level": _trace_level,
+        "level": "WARNING",
     },
 }
