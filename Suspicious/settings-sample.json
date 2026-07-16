@@ -98,6 +98,7 @@
         "server" : "the smtp serve to allow the app to send mails",
         "port" : 25,
         "username" : "SUSPICIOUS",
+        "password" : "the smtp account password",
         "footer" : "Limited Distribution",
         "group" : "Your Cybersecurity Team Name",
         "suspicious_web" : "https://suspicious.test/submissions/",
