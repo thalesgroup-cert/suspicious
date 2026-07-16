@@ -6,7 +6,7 @@ from pathlib import Path
 from common.safe_exec import make_safe_execution
 from .models import CronConfig
 
-logger = logging.getLogger("cron.utils")
+logger = logging.getLogger("tasp.cron.utils")
 
 safe_execution = make_safe_execution("cron", logger)
 

@@ -1,7 +1,7 @@
 from pydantic import BaseModel, conint
 import logging
 
-logger = logging.getLogger("kpi_updating")
+logger = logging.getLogger(__name__)
 
 class Period(BaseModel):
     month: conint(ge=1, le=12)

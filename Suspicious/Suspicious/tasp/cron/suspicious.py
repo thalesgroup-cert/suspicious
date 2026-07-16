@@ -6,7 +6,7 @@ from settings.config import get_section
 from .utils import load_config
 from case_handler.models import Case
 
-logger = logging.getLogger("cron.suspicious")
+logger = logging.getLogger("tasp.cron.suspicious")
 cleanup_logger = logging.getLogger("tasp.cron.cleanup_phishing")
 
 _DEFAULT_CHROMA_COLLECTION_NAME = "suspicious"

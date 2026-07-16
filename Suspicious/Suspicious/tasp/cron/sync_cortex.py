@@ -9,7 +9,7 @@ from cortex_job.models import Analyzer
 import pybreaker
 from common.http_client import get_breaker, RETRY
 
-logger = logging.getLogger("cron.sync_cortex")
+logger = logging.getLogger("tasp.cron.sync_cortex")
 log_analyzers = logging.getLogger("tasp.cron.fetch_analyzer")
 import os as _os_cfg
 CONFIG_PATH = _os_cfg.environ.get("SUSPICIOUS_CONFIG_PATH", "/app/settings.json")
