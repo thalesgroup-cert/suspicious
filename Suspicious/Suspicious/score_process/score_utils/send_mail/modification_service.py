@@ -138,7 +138,11 @@ class ModificationEmailService:
         )
 
         send_mail_service = SendMailService(
-            host=self.config["server"], port=self.config["port"]
+            host=self.config["server"],
+            port=self.config["port"],
+            use_tls=self.config.get("tls", False),
+            username=self.config.get("username"),
+            password=self.config.get("password"),
         )
 
         send_mail_service.connect()

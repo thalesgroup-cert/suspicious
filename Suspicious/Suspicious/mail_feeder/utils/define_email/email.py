@@ -1,5 +1,4 @@
 import logging
-from email.utils import parseaddr
 from django.core.exceptions import ValidationError
 from mail_feeder.models import Mail
 
@@ -25,12 +24,11 @@ class EmailService:
             try:
                 validated = EmailDataModel(**email_data)
                 subject = decode_subject(validated.reportedSubject)
-                _, addr = parseaddr(validated.reportedBy)
-                decoded_subject = subject or f"Suspicious Mail by {addr or 'Unknown Sender'}"
+                decoded_subject = subject or f"Suspicious Mail by {validated.reportedBy}"
 
                 mail = Mail(
                     subject=decoded_subject,
-                    reportedBy=addr,
+                    reportedBy=validated.reportedBy,
                     date=parse_email_date(validated.date),
                     mail_from=validated.mail_from or "",
                     to=validated.to,
