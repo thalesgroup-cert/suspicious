@@ -835,7 +835,7 @@ class CortexJobManager:
 
         try:
             case.score_ai = analyzer.score
-            case.confidence_ai = analyzer.confidence * 10
+            case.confidence_ai = analyzer.confidence
             case.category_ai = self.get_sub_class(analyzer)
             case.results_ai = analyzer.level.capitalize()
             case.save()
