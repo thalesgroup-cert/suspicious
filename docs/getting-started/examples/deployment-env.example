@@ -1,0 +1,110 @@
+# .env — Suspicious platform (Meridian Group dev instance)
+# Generated for local development. NEVER commit this file.
+# Production: pin image digests, use strong rotated secrets, prefer Vault.
+
+# =============================================================================
+# IMAGE VERSIONS
+# =============================================================================
+SUSPICIOUS_VERSION=test
+SUSPICIOUS_UI_VERSION=
+SUSPICIOUS_FEEDER_VERSION=
+DB_SUSPICIOUS_VERSION=12
+RUSTFS_VERSION=1.0.0-alpha.90
+CORTEX_VERSION=4.0.0-1
+ELASTICSEARCH_VERSION=8.19.7
+TRAEFIK_VERSION=v3.3.4
+CHROMADB_VERSION=0.6.3
+REDIS_BROKER_VERSION=9-alpine
+REDIS_CACHE_VERSION=9-alpine
+
+# =============================================================================
+# DOMAIN & NETWORK
+# =============================================================================
+DOMAIN_CORP=suspicious.meridian.example
+NETWORK_NAME=suspicious_net
+NETWORK_SUBNET=172.20.0.0/16
+NETWORK_GATEWAY=172.20.0.1
+NETWORK_IP_RANGE=172.20.0.0/24
+
+# =============================================================================
+# EXPOSED PORTS  (bound to 127.0.0.1)
+# =============================================================================
+SUSPICIOUS_PORT=9020
+SUSPICIOUS_UI_PORT=9021
+MINIO_PORT=35000
+CORTEX_PORT=9001
+ELASTICSEARCH_PORT=9200
+
+# =============================================================================
+# DATABASE
+# NOTE (dev, no Vault): Suspicious/settings.json database.password MUST equal
+# MYSQL_PASSWORD below — the backend reads it from settings.json when VAULT_ADDR
+# is unset.
+# =============================================================================
+MYSQL_DATABASE=db_suspicious
+MYSQL_USER=suspicious
+MYSQL_PASSWORD=meridian_dev_db_pw
+MYSQL_ROOT_PASSWORD=meridian_dev_root_pw
+
+REPL_USER=replicator
+REPL_PASSWORD=meridian_dev_repl_pw
+
+INNODB_BUFFER_POOL_SIZE=512M
+INNODB_IO_CAPACITY=1000
+INNODB_IO_CAPACITY_MAX=2000
+INNODB_LOG_FILE_SIZE=200M
+INNODB_READ_IO_THREADS=4
+INNODB_WRITE_IO_THREADS=4
+INNODB_CHANGE_BUFFERING=none
+INNODB_STATS_PERSISTENT=ON
+
+# =============================================================================
+# ELASTICSEARCH  (only needed for the full/Cortex stack)
+# =============================================================================
+ES_JAVA_OPTS="-Xms1g -Xmx1g"
+
+# =============================================================================
+# MINIO / RustFS  (only needed when storage.backend = s3)
+# =============================================================================
+MINIO_ROOT_USER=minio
+MINIO_ROOT_PASSWORD=meridian_dev_minio_pw
+
+# =============================================================================
+# HASHICORP VAULT  (leave unset for dev → secrets read from settings.json)
+# =============================================================================
+# VAULT_ADDR=http://vault:8200
+# VAULT_ROLE_ID=
+# VAULT_SECRET_ID=
+# VAULT_PORT=8200
+# VAULT_PATH=./vault
+
+# =============================================================================
+# APPLICATION PATHS  (relative to deployment/)
+# =============================================================================
+ROOT_PATH=../
+SUSPICIOUS_PATH=../Suspicious
+SUSPICIOUS_UI_PATH=../suspicious-ui
+FEEDER_PATH=../email-feeder
+DOCKER_PATH=../docker
+YARA_PATH=../yara-rules
+MISP_PATH=../misp
+# Cortex needs an ABSOLUTE path: it mounts analyzer job dirs into sibling
+# containers via the Docker socket, so the host and in-container paths must be
+# identical. A relative path yields "mount path must be absolute".
+CORTEX_PATH=/opt/suspicious/cortex
+AIANALYZER_PATH=../Analyzers/AIMailAnalyzer
+CA_PATH=./certificates
+TRAEFIK_PATH=../traefik
+
+# =============================================================================
+# CONTAINER NAMES
+# =============================================================================
+DB_CONTAINER=db_suspicious
+WEB_CONTAINER=suspicious
+
+# =============================================================================
+# PROXIES
+# =============================================================================
+HTTP_PROXY=
+HTTPS_PROXY=
+NO_PROXY=localhost,127.0.0.1,db_suspicious,db_suspicious_replica,redis_cache,redis_broker,rustfs,chromadb,cortex,elasticsearch,suspicious,suspicious_ui,vault,traefik

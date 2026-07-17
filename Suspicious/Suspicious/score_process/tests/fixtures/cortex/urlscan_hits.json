@@ -1,0 +1,4 @@
+{
+  "summary": {"taxonomies": [{"level": "info", "namespace": "urlscan.io", "predicate": "Search", "value": "2 results"}]},
+  "full": {"type": "url", "query": "http://x", "service": "search", "indicator": {"results": [{"page": {"url": "http://x/a"}}, {"page": {"url": "http://x/b"}}], "total": 2, "has_more": false}}
+}

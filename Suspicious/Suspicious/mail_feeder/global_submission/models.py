@@ -1,5 +1,5 @@
 from pydantic import BaseModel, Field
-from typing import List, Optional, Union
+from typing import List, Optional
 
 
 class ArtifactResult(BaseModel):
@@ -14,3 +14,5 @@ class MailSubmissionData(BaseModel):
     bucket_name: Optional[str] = None
     user: Optional[str] = None
     is_submitted: bool
+    reported_by: str = ""
+    reporter_note: str = ""

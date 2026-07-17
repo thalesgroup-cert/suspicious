@@ -18,3 +18,7 @@ class MinioConfig(pydantic.BaseModel):
 
     secure: bool = pydantic.Field(default=False)
     """Whether to secure the communication."""
+
+    feeder_bucket: str = pydantic.Field(default="")
+    """Single bucket for the portable prefix contract. Empty => legacy
+    bucket-per-submission mode."""

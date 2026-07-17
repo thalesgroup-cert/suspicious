@@ -1,5 +1,7 @@
 from unittest import TestCase
 from unittest.mock import patch, MagicMock
+from unittest import mock
+import django.test
 
 from mail_feeder.job_handler.artifacts.artifacts import ArtifactJobLauncherService
 
@@ -16,24 +18,20 @@ class ArtifactJobLauncherServiceTests(TestCase):
             setattr(art, k, v)
         return art
 
-    @patch("mail_feeder.job_handler.artifacts.artifacts.CortexJob")
-    def test_process_ip_artifact_launches_job(self, m_cortex):
-        m_cortex.return_value.launch_cortex_jobs.return_value = [1]
-
+    def test_process_ip_artifact_queues_intent(self):
         ip = MagicMock(address="1.1.1.1")
         artifact = self._artifact(
             "IP",
             artifactIsIp=MagicMock(ip=ip)
         )
 
-        result = self.service.process_artifacts([artifact])
+        service = self.service.process_artifacts([artifact])
 
-        self.assertEqual(result, [1])
-        m_cortex.return_value.launch_cortex_jobs.assert_called_once_with(ip, "ip")
+        self.assertIs(service, self.service)
+        self.assertEqual(service.pending_dispatch_intents, [(ip, "ip")])
 
     @patch("mail_feeder.job_handler.artifacts.artifacts.AllowListFile")
-    @patch("mail_feeder.job_handler.artifacts.artifacts.CortexJob")
-    def test_hash_allow_listed_skips_cortex(self, m_cortex, m_allow):
+    def test_hash_allow_listed_skips_cortex(self, m_allow):
         m_allow.objects.filter.return_value.exists.return_value = True
 
         hash_obj = MagicMock()
@@ -42,20 +40,20 @@ class ArtifactJobLauncherServiceTests(TestCase):
             artifactIsHash=MagicMock(hash=hash_obj)
         )
 
-        result = self.service.process_artifacts([artifact])
+        service = self.service.process_artifacts([artifact])
 
-        self.assertEqual(result, [])
-        m_cortex.assert_not_called()
+        self.assertEqual(service.pending_dispatch_intents, [])
         self.assertEqual(hash_obj.ioc_level, "SAFE-ALLOW_LISTED")
 
+    @patch("mail_feeder.job_handler.artifacts.artifacts.WatcherLegitDomain")
     @patch("mail_feeder.job_handler.artifacts.artifacts.URLHandler")
     @patch("mail_feeder.job_handler.artifacts.artifacts.AllowListDomain")
-    @patch("mail_feeder.job_handler.artifacts.artifacts.CortexJob")
     def test_url_domain_allow_listed_skips_job(
-        self, m_cortex, m_allow, m_urlhandler
+        self, m_allow, m_urlhandler, m_watcher
     ):
         m_urlhandler.return_value.get_domain.return_value = "example.com"
         m_allow.objects.filter.return_value.exists.return_value = True
+        m_watcher.objects.filter.return_value.exists.return_value = True
 
         url = MagicMock(address="http://example.com")
         artifact = self._artifact(
@@ -65,14 +63,19 @@ class ArtifactJobLauncherServiceTests(TestCase):
 
         with patch("domain_process.models.Domain") as m_domain:
             m_domain.objects.filter.return_value.first.return_value = MagicMock()
-            result = self.service.process_artifacts([artifact])
+            service = self.service.process_artifacts([artifact])
 
-        self.assertEqual(result, [])
-        m_cortex.assert_not_called()
+        self.assertEqual(service.pending_dispatch_intents, [])
 
-    @patch("mail_feeder.job_handler.artifacts.artifacts.CortexJob")
-    def test_domain_not_allow_listed_launches_job(self, m_cortex):
-        m_cortex.return_value.launch_cortex_jobs.return_value = [42]
+    @patch("mail_feeder.job_handler.artifacts.artifacts.WatcherMonitoredDomain")
+    @patch("mail_feeder.job_handler.artifacts.artifacts.DenyListDomain")
+    @patch("mail_feeder.job_handler.artifacts.artifacts.WatcherLegitDomain")
+    @patch("mail_feeder.job_handler.artifacts.artifacts.AllowListDomain")
+    def test_domain_not_allow_listed_queues_intent(self, m_allow, m_watcher, m_deny, m_monitored):
+        m_allow.objects.filter.return_value.exists.return_value = False
+        m_watcher.objects.filter.return_value.exists.return_value = False
+        m_deny.objects.filter.return_value.exists.return_value = False
+        m_monitored.objects.filter.return_value.exists.return_value = False
 
         domain = MagicMock()
         artifact = self._artifact(
@@ -80,14 +83,9 @@ class ArtifactJobLauncherServiceTests(TestCase):
             artifactIsDomain=MagicMock(domain=domain)
         )
 
-        with patch(
-            "mail_feeder.job_handler.artifacts.artifacts.AllowListDomain.objects.filter"
-        ) as m_filter:
-            m_filter.return_value.exists.return_value = False
-            result = self.service.process_artifacts([artifact])
+        service = self.service.process_artifacts([artifact])
 
-        self.assertEqual(result, [42])
-        m_cortex.return_value.launch_cortex_jobs.assert_called_once_with(domain, "domain")
+        self.assertEqual(service.pending_dispatch_intents, [(domain, "domain")])
 
     def test_mail_internal_address_is_skipped(self):
         mail = MagicMock(is_internal=True, address="a@local")
@@ -96,17 +94,17 @@ class ArtifactJobLauncherServiceTests(TestCase):
             artifactIsMailAddress=MagicMock(mail_address=mail)
         )
 
-        result = self.service.process_artifacts([artifact])
+        service = self.service.process_artifacts([artifact])
 
-        self.assertEqual(result, [])
+        self.assertEqual(service.pending_dispatch_intents, [])
 
     def test_invalid_artifact_type_is_ignored(self):
         artifact = MagicMock(artifact_type=None)
-        result = self.service.process_artifacts([artifact])
-        self.assertEqual(result, [])
+        service = self.service.process_artifacts([artifact])
+        self.assertEqual(service.pending_dispatch_intents, [])
 
     @patch("mail_feeder.job_handler.artifacts.artifacts.CortexJob")
-    def test_cortex_exception_is_caught(self, m_cortex):
+    def test_dispatch_pending_exception_is_caught(self, m_cortex):
         m_cortex.return_value.launch_cortex_jobs.side_effect = Exception("boom")
 
         ip = MagicMock(address="8.8.8.8")
@@ -115,5 +113,77 @@ class ArtifactJobLauncherServiceTests(TestCase):
             artifactIsIp=MagicMock(ip=ip)
         )
 
-        result = self.service.process_artifacts([artifact])
-        self.assertEqual(result, [])
+        service = self.service.process_artifacts([artifact])
+        case = MagicMock()
+        job_ids = service.dispatch_pending(case)
+        self.assertEqual(job_ids, [])
+        self.assertEqual(service.pending_dispatch_intents, [])
+
+    @patch("mail_feeder.job_handler.artifacts.artifacts.CortexJob")
+    def test_dispatch_pending_calls_launch_cortex_jobs(self, m_cortex):
+        m_cortex.return_value.launch_cortex_jobs.return_value = [42]
+
+        ip = MagicMock(address="1.2.3.4")
+        artifact = self._artifact(
+            "IP",
+            artifactIsIp=MagicMock(ip=ip)
+        )
+
+        service = self.service.process_artifacts([artifact])
+        case = MagicMock()
+        job_ids = service.dispatch_pending(case)
+
+        self.assertEqual(job_ids, [42])
+        m_cortex.return_value.launch_cortex_jobs.assert_called_once_with(ip, "ip", case=case)
+        self.assertEqual(service.pending_dispatch_intents, [])
+
+
+class ArtifactPlannerIntegrationTest(django.test.TestCase):
+    """Integration test: ArtifactJobLauncherService.dispatch_pending engages
+    the URL planner to reduce redundant Cortex dispatches on mail-origin emails."""
+
+    @mock.patch("mail_feeder.job_handler.artifacts.artifacts.CortexJob")
+    @mock.patch("url_process.url_utils.url_planner.get_config")
+    def test_planner_collapses_same_fqdn_urls(self, mock_get_config, MockCortex):
+        """4 URLs sharing canonical key → planner keeps 1 → Cortex called once."""
+        from url_process.models import URL
+        mock_get_config.side_effect = lambda k, d=None: {
+            "url_analysis.enabled": True,
+            "url_analysis.max_per_domain": 1,
+            "url_analysis.reuse_ttl_days": 7,
+        }.get(k, d)
+        MockCortex.return_value.launch_cortex_jobs.return_value = [1]
+
+        urls = [URL.objects.create(address=f"https://x.com/p?id={i}") for i in range(4)]
+        service = ArtifactJobLauncherService()
+        service.pending_dispatch_intents = [(u, "url") for u in urls]
+
+        case = mock.MagicMock()
+        case.id = 99
+        case.fileOrMail = None
+
+        service.dispatch_pending(case)
+
+        self.assertEqual(MockCortex.return_value.launch_cortex_jobs.call_count, 1)
+
+    @mock.patch("mail_feeder.job_handler.artifacts.artifacts.CortexJob")
+    @mock.patch("url_process.url_utils.url_planner.get_config")
+    def test_planner_disabled_dispatches_all(self, mock_get_config, MockCortex):
+        """When url_analysis.enabled=False, all URL intents are dispatched."""
+        from url_process.models import URL
+        mock_get_config.side_effect = lambda k, d=None: {
+            "url_analysis.enabled": False,
+        }.get(k, d)
+        MockCortex.return_value.launch_cortex_jobs.return_value = [1]
+
+        urls = [URL.objects.create(address=f"https://x.com/p?id={i}") for i in range(4)]
+        service = ArtifactJobLauncherService()
+        service.pending_dispatch_intents = [(u, "url") for u in urls]
+
+        case = mock.MagicMock()
+        case.id = 99
+        case.fileOrMail = None
+
+        service.dispatch_pending(case)
+
+        self.assertEqual(MockCortex.return_value.launch_cortex_jobs.call_count, 4)

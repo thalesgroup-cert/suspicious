@@ -29,17 +29,14 @@ def convert_msg_to_eml(msg_path: str, eml_path: str = None) -> str:
     email_msg['Subject'] = msg_subject
     email_msg.set_content(msg_body)
 
-    # Ajouter les pièces jointes si présentes
     for att in msg.attachments:
         filename = att.longFilename or att.shortFilename or "attachment"
         email_msg.add_attachment(att.data, maintype='application', subtype='octet-stream', filename=filename)
 
-    # Chemin de sortie
     if eml_path is None:
         base = os.path.splitext(msg_path)[0]
         eml_path = f"{base}.eml"
 
-    # Sauvegarde du fichier .eml
     with open(eml_path, 'wb') as f:
         f.write(email_msg.as_bytes())
 

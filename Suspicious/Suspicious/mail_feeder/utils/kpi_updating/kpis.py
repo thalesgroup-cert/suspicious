@@ -1,6 +1,6 @@
 import logging
 from django.db import transaction
-from dashboard.models import Kpi, MonthlyReporterStats, UserCasesMonthlyStats
+from dashboard.models import MonthlyReporterStats, UserCasesMonthlyStats
 from .utils import Period, safe_get_or_create
 
 logger = logging.getLogger("tasp.cron.fetch_and_process_emails")

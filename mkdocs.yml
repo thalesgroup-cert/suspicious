@@ -1,0 +1,125 @@
+site_name: Suspicious
+site_description: AI-powered phishing & threat-analysis platform
+site_url: https://thalesgroup-cert.github.io/suspicious/
+repo_url: https://github.com/thalesgroup-cert/suspicious
+repo_name: thalesgroup-cert/suspicious
+edit_uri: edit/main/docs/
+
+theme:
+  name: material
+  logo: assets/suspicious-logo.png
+  favicon: assets/suspicious-logo.png
+  features:
+    - navigation.sections
+    - navigation.tabs
+    - navigation.top
+    - navigation.indexes
+    - search.suggest
+    - content.code.copy
+    - content.tabs.link
+  palette:
+    - media: "(prefers-color-scheme: light)"
+      scheme: default
+      primary: indigo
+      toggle:
+        icon: material/brightness-7
+        name: Switch to dark mode
+    - media: "(prefers-color-scheme: dark)"
+      scheme: slate
+      primary: indigo
+      toggle:
+        icon: material/brightness-4
+        name: Switch to light mode
+
+exclude_docs: |
+  superpowers/
+  plans/
+  specs/
+
+validation:
+  links:
+    absolute_links: ignore
+    unrecognized_links: ignore
+    not_found: ignore
+
+plugins:
+  - search
+  - include-markdown
+  - render_swagger
+  - mkdocstrings:
+      handlers:
+        python:
+          paths:
+            - Suspicious/Suspicious
+            - Suspicious/Suspicious/score_process/scoring
+            - Analyzers/AIMailAnalyzer
+          options:
+            show_root_heading: true
+            show_source: false
+            show_if_no_docstring: true
+            members_order: source
+            docstring_section_style: table
+            filters:
+              - "!^_"
+
+markdown_extensions:
+  - admonition
+  - tables
+  - pymdownx.details
+  - pymdownx.superfences
+  - pymdownx.highlight
+  - pymdownx.tabbed:
+      alternate_style: true
+  - toc:
+      permalink: true
+
+nav:
+  - Home: index.md
+  - Getting Started:
+      - Quick Start: getting-started/quick-start.md
+      - Installation: getting-started/installation.md
+      - Configuration: getting-started/configuration.md
+  - User Guide:
+      - Submitting: user-guide/submitting.md
+      - Investigations: user-guide/investigations.md
+      - Campaigns: user-guide/campaigns.md
+      - Alerts: user-guide/alerts.md
+      - Dashboard: user-guide/dashboard.md
+      - Profile & Settings: user-guide/profile.md
+  - Architecture: architecture.md
+  - Components:
+      - Backend (Django):
+          - Overview: components/backend/index.md
+          - api: components/backend/api.md
+          - case_handler: components/backend/case_handler.md
+          - cortex_job: components/backend/cortex_job.md
+          - score_process: components/backend/score_process.md
+          - email_process: components/backend/email_process.md
+          - Observable Processors: components/backend/observable-processors.md
+          - dashboard: components/backend/dashboard.md
+          - mail_feeder: components/backend/mail_feeder.md
+          - submission_queue: components/backend/submission_queue.md
+          - tasp: components/backend/tasp.md
+          - settings: components/backend/settings.md
+          - profiles: components/backend/profiles.md
+      - Frontend (React UI): components/frontend.md
+      - Email Feeder: components/email-feeder.md
+      - AI / ML Analyzers: components/analyzers.md
+      - Cortex + YARA: components/cortex-yara.md
+      - Deployment / Infra: components/deployment.md
+  - Operations:
+      - Deploy & Rollback: operations/deploy.md
+      - Backups: operations/backups.md
+      - Monitoring: operations/monitoring.md
+      - Integrations: operations/integrations.md
+  - API Reference:
+      - REST API: reference/rest-api.md
+      - Python Code:
+          - Overview: reference/index.md
+          - cortex_job models: reference/cortex_job-models.md
+          - case_handler models: reference/case_handler-models.md
+          - score_process: reference/score_process.md
+          - tasp tasks: reference/tasp-tasks.md
+          - AI Mail Analyzer: reference/aimailanalyzer.md
+  - Building a connector: connectors.md
+  - Contributing: contributing.md

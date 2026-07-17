@@ -1,12 +1,12 @@
 # 🧳 Profile Module
 
-This module is part of a Django-based application that provides functionality to manage and update profiles. It includes standard Django components (models, views, urls) and custom utilities for profile creation, handling, and scoring.
+This module is a Django app that manages and updates profiles. It includes standard Django components (models, views, urls) and custom utilities for profile creation, handling, and scoring.
 
 ---
 
 ## 📦 Overview
 
-The `profile` app is designed to:
+The `profile` app:
 - Manage cases through Django models and views
 - Provide APIs for CRUD operations on cases
 - Offer utility scripts to handle and automate profile creation and updating

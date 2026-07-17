@@ -37,36 +37,5 @@
   },
   "working-path": "/tmp/suspicious",
   "timer-inbox-emails": 10,
-  "minio": {
-    "endpoint": "localhost:9000",
-    "access_key": "minioadmin",
-    "secret_key": "minioadmin",
-    "secure": false
-  },
-  "mail": {
-    "server": "localhost",
-    "port": 3025,
-    "username": "SUSPICIOUS",
-    "footer": "Limited Distribution",
-    "group": "Your Cybersecurity Team Name",
-    "suspicious_web": "https://suspicious.test/submissions/",
-    "company_name": "test.com",
-    "company_url": "https://www.test.com/en",
-    "socials": {
-      "facebook": "https://fr-fr.facebook.com/test",
-      "twitter": "https://x.com/test",
-      "instagram": "https://www.instagram.com/test",
-      "linkedin": "https://www.linkedin.com/company/test",
-      "youtube": "https://www.youtube.com/test"
-    },
-    "glossary": "https://glossary_to_cyber terms",
-    "inquiry": "mailto:inquryemail@yourcompany.com",
-    "inquiry_text": "inquryemail@yourcompany.com",
-    "security": "mailto:yoursecuritymail@yourcompany.com",
-    "security_msg": "yoursecuritymail@yourcompany.com",
-    "logos": {
-      "company": "data:image/png;base64,Base64 text of your company logo",
-      "acknowledge-badmail": "data:image/png;base64,The Base 64 image for the bad acknowledge mail"
-    }
-  }
+  "imap-idle": true
 }

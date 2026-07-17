@@ -1,5 +1,5 @@
-import json
 import logging
+import os
 import shutil
 from email import policy
 from email.parser import BytesParser
@@ -13,13 +13,8 @@ from case_handler.case_utils.form_handlers.mail.email_processing.service import 
 from case_handler.case_utils.form_handlers.mail.email_processing.utils import generate_object_reference
 from case_handler.case_utils.form_handlers.mail.minio import MinioManager
 
-CONFIG_PATH = "/app/settings.json"
-with open(CONFIG_PATH) as config_file:
-    config = json.load(config_file)
-
 logger = logging.getLogger(__name__)
 
-# Default application paths and settings
 DEFAULT_CASE_BASE_PATH = Path("/app/case")
 
 
@@ -36,13 +31,7 @@ class MailFormHandler:
         """
         self.user = user
         self.base_path = Path(base_path)
-        cfg = config.get("minio", {})
-        self.minio = MinioManager(
-            endpoint=cfg.get("endpoint", "localhost:9000"),
-            access_key=cfg.get("access_key", "minioadmin"),
-            secret_key=cfg.get("secret_key", "minioadmin"),
-            secure=cfg.get("secure", False),
-        )
+        self.minio = MinioManager()
 
     def handle(self, mail_file):
         """
@@ -59,7 +48,12 @@ class MailFormHandler:
         Returns:
             instance from WebSubmissionService or None on failure.
         """
-        user_prefix = self.user.username.split('@')[0]
+        # os.path.basename strips any separator a username could carry — Django's
+        # default validator already forbids "/", but this is the barrier CodeQL's
+        # path-injection query recognizes, and it's what actually stops every
+        # downstream directory built from user_prefix (bucket, local_dir, tmp_dir)
+        # from being flagged as tainted.
+        user_prefix = os.path.basename(self.user.username.split('@')[0])
         mail_id = generate_object_reference()
         bucket = f"{user_prefix}-submission-{mail_id.split('-',1)[0]}"
         ext = Path(mail_file.name).suffix.lower()

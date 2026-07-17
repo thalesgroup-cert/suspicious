@@ -13,6 +13,7 @@ MAILBOX_LOGGER_NAME = "email-feeder.mailbox"
 ATTACHMENTS_DIR_NAME = "attachments"
 ANALYSIS_DIR_PREFIX = "analysis_"
 USER_SUBMISSION_PREFIX = "user_submission_"
+_IMAP_TIMEOUT = 30  # seconds — bound socket connect + SSL handshake
 
 
 class MailClient:
@@ -25,7 +26,13 @@ class MailClient:
     ):
         self.__instance_config = config
 
-        self.__use_ssl = (
+        # TLS is driven by the connector type ('imaps' → use_ssl), NOT by the
+        # presence of a client certificate. Tying it to cert presence silently
+        # downgraded password-auth imaps connectors to plaintext IMAP, leaking
+        # the mailbox password on the wire. Client cert/key are an optional
+        # extra *inside* the TLS handshake (mutual TLS).
+        self.__use_ssl = self.__instance_config.use_ssl
+        self.__use_client_cert = (
             self.__instance_config.certfile is not None
             and self.__instance_config.keyfile is not None
         )
@@ -60,10 +67,22 @@ class MailClient:
                 time.sleep(backoff)
                 backoff *= 2
 
-    def _safe_op(self, func, *args, **kwargs):
-        """Execute IMAP operation and reconnect transparently on broken pipe."""
+    def _safe_op(self, method_name: str, *args, **kwargs):
+        """Execute an IMAP operation by name and reconnect transparently on a
+        broken pipe.
+
+        The method is resolved against ``self.__imap_client`` at call time —
+        both before and after a reconnect — so the retry runs against the
+        freshly reconnected client. Passing a pre-bound method instead would
+        retry against the dead client and always fail.
+        """
+        client = self.__imap_client
+        if client is None:
+            raise classes.models.mail_exceptions.MailboxConnectionError(
+                "The IMAP client is not connected"
+            )
         try:
-            return func(*args, **kwargs)
+            return getattr(client, method_name)(*args, **kwargs)
 
         except (BrokenPipeError,
                 imaplib.IMAP4.abort,
@@ -71,8 +90,13 @@ class MailClient:
             self.__logger.warning(f"IMAP error detected: {e} — reconnecting")
             self._reconnect()
 
-            # Retry the operation ONCE after reconnection
-            return func(*args, **kwargs)
+            if self.__imap_client is None:
+                raise classes.models.mail_exceptions.MailboxConnectionError(
+                    "IMAP client unavailable after reconnect"
+                )
+
+            # Retry the operation ONCE against the reconnected client.
+            return getattr(self.__imap_client, method_name)(*args, **kwargs)
 
 
     def login(self):
@@ -108,7 +132,9 @@ class MailClient:
     def __imap_login(self):
         """Handles non-SSL IMAP login."""
         self.__imap_client = imaplib.IMAP4(
-            self.__instance_config.host, self.__instance_config.port
+            self.__instance_config.host,
+            self.__instance_config.port,
+            timeout=_IMAP_TIMEOUT,
         )
         self.__imap_client.login(
             user=self.__instance_config.login, password=self.__instance_config.password
@@ -116,30 +142,32 @@ class MailClient:
 
     def __imaps_login(self):
         """Handles SSL IMAP login."""
-        ssl_context = None
+        if not self.__use_ssl:
+            raise Exception("Trying to use SSL on a non-SSL connector.")
 
-        if (not self.__use_ssl):
-            raise Exception(
-                "Trying to use SSL although no certfile / keyfile were provided."
-            )
-
-        ssl_context=ssl.create_default_context(ssl.Purpose.SERVER_AUTH, cafile=self.__instance_config.rootcafile)
-        try:
-            ssl_context.load_cert_chain(
-                self.__instance_config.certfile, self.__instance_config.keyfile
-            )
-        except ssl.SSLError as e:
-            self.__logger.error(
-                f"SSL Error loading cert / key for {self.__instance_config.login}: {e}"
-            )
-            raise classes.models.mail_exceptions.MailboxConnectionError(
-                f"SSL cert / key error: {e}"
-            ) from e
+        ssl_context = ssl.create_default_context(
+            ssl.Purpose.SERVER_AUTH, cafile=self.__instance_config.rootcafile
+        )
+        # Client certificate is optional: only load a cert chain when both a
+        # certfile and keyfile are configured (mutual-TLS deployments).
+        if self.__use_client_cert:
+            try:
+                ssl_context.load_cert_chain(
+                    self.__instance_config.certfile, self.__instance_config.keyfile
+                )
+            except ssl.SSLError as e:
+                self.__logger.error(
+                    f"SSL Error loading cert / key for {self.__instance_config.login}: {e}"
+                )
+                raise classes.models.mail_exceptions.MailboxConnectionError(
+                    f"SSL cert / key error: {e}"
+                ) from e
 
         self.__imap_client = imaplib.IMAP4_SSL(
             self.__instance_config.host,
             self.__instance_config.port,
             ssl_context=ssl_context,
+            timeout=_IMAP_TIMEOUT,
         )
         self.__imap_client.login(
             user=self.__instance_config.login, password=self.__instance_config.password
@@ -176,7 +204,7 @@ class MailClient:
             )
 
         return self._safe_op(
-            self.__imap_client.store,
+            "store",
             email_id,
             "+FLAGS",
             flags
@@ -223,7 +251,7 @@ class MailClient:
             )
 
         response_status, response = self._safe_op(
-            self.__imap_client.select,
+            "select",
             mailbox,
             readonly=readonly
         )
@@ -243,7 +271,7 @@ class MailClient:
             )
 
         response_status, response = self._safe_op(
-            self.__imap_client.search,
+            "search",
             charset, *criteria
         )
 
@@ -260,7 +288,7 @@ class MailClient:
             )
 
         response_status, response = self._safe_op(
-            self.__imap_client.fetch,
+            "fetch",
             email_id.decode("utf-8"),
             message_parts
         )
@@ -283,3 +311,79 @@ class MailClient:
     @property
     def is_logged_in(self) -> bool:
         return self.__imap_client is not None
+
+    def has_idle_capability(self) -> bool:
+        """True when the connected server advertises the IDLE extension."""
+        client = self.__imap_client
+        if client is None:
+            return False
+        try:
+            return "IDLE" in getattr(client, "capabilities", ())
+        except Exception:
+            return False
+
+    def idle_wait(self, timeout: float) -> bool:
+        """Block in IMAP IDLE until new mail arrives or `timeout` elapses.
+
+        Returns True if woken by a mailbox change, False on timeout/error.
+        Verified live against GreenMail. Best-effort — any hiccup returns False
+        and always issues DONE so the connection stays usable.
+
+        Readiness is awaited with ``select.select`` rather than a socket
+        timeout: letting ``readline`` raise ``socket.timeout`` mid-read leaves
+        imaplib's buffered reader in an errored state ("cannot read from timed
+        out object"), forcing a reconnect on the very next op. Polling for
+        readability keeps the socket clean across timeouts.
+        """
+        import select as _select
+
+        client = self.__imap_client
+        if client is None:
+            return False
+        sock = getattr(client, "sock", None)
+        if sock is None:
+            return False
+        tag = client._new_tag()
+        woke = False
+        try:
+            client.send(b"%s IDLE\r\n" % tag)
+            if not client.readline().startswith(b"+"):
+                return False
+            deadline = time.monotonic() + timeout
+            while True:
+                remaining = deadline - time.monotonic()
+                if remaining <= 0:
+                    break
+                # SSL may hold already-decrypted bytes that select can't see;
+                # read immediately when the TLS buffer is non-empty.
+                pending = getattr(sock, "pending", None)
+                if not (callable(pending) and pending() > 0):
+                    readable, _, _ = _select.select([sock], [], [], remaining)
+                    if not readable:
+                        break  # idle timeout, no server activity
+                line = client.readline()
+                if not line:
+                    break
+                if b"EXISTS" in line or b"RECENT" in line:
+                    woke = True
+                    break
+                # Other untagged responses (EXPUNGE/FETCH/etc.) — keep waiting.
+        except Exception as e:  # noqa: BLE001
+            self.__logger.warning(f"IDLE wait error: {e}")
+        finally:
+            try:
+                client.send(b"DONE\r\n")
+                drain_deadline = time.monotonic() + 5
+                while True:
+                    remaining = drain_deadline - time.monotonic()
+                    if remaining <= 0:
+                        break
+                    readable, _, _ = _select.select([sock], [], [], remaining)
+                    if not readable:
+                        break
+                    line = client.readline()
+                    if not line or line.startswith(tag):
+                        break
+            except Exception:
+                pass
+        return woke

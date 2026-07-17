@@ -2,7 +2,7 @@ import os
 import re
 import logging
 from typing import List, Set, Dict, BinaryIO
-from .models import Artifact, ObservablesResult
+from .models import Artifact
 
 logger = logging.getLogger("tasp.cron.fetch_and_process_emails")
 def add_artifact(artifacts: List[Artifact], data_type: str, data: str, tags: List[str] | None = None) -> None:

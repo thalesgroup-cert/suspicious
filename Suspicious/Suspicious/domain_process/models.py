@@ -1,7 +1,6 @@
 from django.db import models
 from url_process.models import URL
 from email_process.models import MailAddress
-from django.utils.translation import gettext_lazy as _
 
 class Domain(models.Model):
     id = models.AutoField(primary_key=True)

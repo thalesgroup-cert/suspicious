@@ -1,12 +1,12 @@
 # 🧳 Mail Feeder Module
 
-This module is part of a Django-based application that provides functionality to manage and update mail instance. It includes standard Django components (models, views, urls) and custom utilities for mail creation, handling, and scoring.
+This module is a Django app that manages and updates mail instance. It includes standard Django components (models, views, urls) and custom utilities for mail creation, handling, and scoring.
 
 ---
 
 ## 📦 Overview
 
-The `mail_feeder` app is designed to:
+The `mail_feeder` app:
 - Manage cases through Django models and views
 - Provide APIs for CRUD operations on cases
 - Offer utility scripts to handle and automate mail creation and updating

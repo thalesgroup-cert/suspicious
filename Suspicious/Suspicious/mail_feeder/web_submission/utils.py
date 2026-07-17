@@ -1,16 +1,7 @@
-import os
 import logging
-from contextlib import contextmanager
+
+from common.safe_exec import make_safe_execution
 
 logger = logging.getLogger("tasp.cron.fetch_and_process_emails")
 
-@contextmanager
-def safe_execution(context: str):
-    """
-    Context manager for standardized exception logging.
-    """
-    try:
-        yield
-    except Exception as e:
-        logger.error(f"[web_submission] Error during {context}: {e}", exc_info=True)
-        raise
+safe_execution = make_safe_execution("web_submission", logger)

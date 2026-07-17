@@ -43,13 +43,11 @@ def handle_attachment(id, level, case_id):
     """
     file = File.objects.filter(linked_hash__value=id).first()
     if file:
-        # Update the file and its linked hash (handled within update_ioc_level_and_cases)
         obj = update_ioc_level_and_cases(file, "file", level)
         obj_score = obj.file_score
         obj_confidence = obj.file_confidence
         obj_level = obj.file_level
 
-        # Get the linked hash information directly from the updated file object
         linked_hash = file.linked_hash
         hash_obj_score = linked_hash.ioc_score
         hash_obj_confidence = linked_hash.ioc_confidence
@@ -58,11 +56,11 @@ def handle_attachment(id, level, case_id):
         case = Case.objects.get(id=case_id)
         case_infos = {
             "id": case.id,
-            "score": case.finalScore,
-            "confidence": case.finalConfidence,
+            "score": case.final_score,
+            "confidence": case.final_confidence,
             "results": case.results,
         }
-        update_cases_logger.info(f"Case updated with id {case.id}, score {case.finalScore}, confidence {case.finalConfidence}, and results {case.results}")
+        update_cases_logger.info(f"Case updated with id {case.id}, score {case.final_score}, confidence {case.final_confidence}, and results {case.results}")
         return JsonResponse({'success': True, 'score': obj_score, 'confidence': obj_confidence, 'level': obj_level, 'hash_score': hash_obj_score, 'hash_confidence': hash_obj_confidence, 'hash_level': hash_obj_level, 'case_infos': case_infos})
     else:
         update_cases_logger.error(f"File with linked hash {id} not found")
@@ -95,7 +93,7 @@ def handle_artifact(id, level, case_id):
     artifact = get_artifact_by_id(id)
     artifact_type = artifact.__class__.__name__.lower() if artifact else None
     if artifact:
-        print(f"Artifact with id {artifact.id} found")
+        update_cases_logger.debug(f"Artifact with id {artifact.id} found")
         update_ioc_level_and_cases(artifact, artifact_type, level)
         obj_score = artifact.ioc_score
         obj_confidence = artifact.ioc_confidence
@@ -104,14 +102,14 @@ def handle_artifact(id, level, case_id):
         case = Case.objects.get(id=case_id)
         case_infos = {
             "id": case.id,
-            "score": case.finalScore,
-            "confidence": case.finalConfidence,
+            "score": case.final_score,
+            "confidence": case.final_confidence,
             "results": case.results,
         }
-        print(f"Case updated with id {case.id}, score {case.finalScore}, confidence {case.finalConfidence}, and results {case.results}")
+        update_cases_logger.debug(f"Case updated with id {case.id}, score {case.final_score}, confidence {case.final_confidence}, and results {case.results}")
         return JsonResponse({'success': True, 'score': obj_score, 'confidence': obj_confidence, 'level': obj_level, 'case_infos': case_infos})
     else:
-        print(f"Artifact with id {id} not found")
+        update_cases_logger.debug(f"Artifact with id {id} not found")
         return JsonResponse({'success': False, 'error': 'Artifact does not exist'})
 
 def handle_mail(ioc_id: int, mail_type: str, level: int, case_id: int) -> JsonResponse:
@@ -123,19 +121,19 @@ def handle_mail(ioc_id: int, mail_type: str, level: int, case_id: int) -> JsonRe
 
     model_name = f"Mail{mail_type.capitalize()}"
     try:
-        mail_model = apps.get_model("mail_feeder", model_name)  # <-- adapter "your_app_name"
+        mail_model = apps.get_model("mail_feeder", model_name)
     except LookupError:
-        print(f"Model {model_name} not found in app 'your_app_name'")
+        update_cases_logger.debug(f"Model {model_name} not found in app 'your_app_name'")
         return JsonResponse({"success": False, "error": "Mail model not found"}, status=500)
 
     mail_object = mail_model.objects.filter(fuzzy_hash=ioc_id).first()
     if not mail_object:
-        print(f"Mail {mail_type} with id {ioc_id} not found")
+        update_cases_logger.debug(f"Mail {mail_type} with id {ioc_id} not found")
         return JsonResponse(
             {"success": False, "error": f"Mail {mail_type} does not exist"}, status=404
         )
 
-    print(f"Mail {mail_type} {mail_object.id} found")
+    update_cases_logger.debug(f"Mail {mail_type} {mail_object.id} found")
     update_ioc_level_and_cases(mail_object, mail_type, level)
 
     if mail_type == "body":
@@ -144,7 +142,7 @@ def handle_mail(ioc_id: int, mail_type: str, level: int, case_id: int) -> JsonRe
             mail_object.body_confidence,
             mail_object.body_level,
         )
-    else:  # header
+    else:
         obj_score, obj_confidence, obj_level = (
             mail_object.header_score,
             mail_object.header_confidence,
@@ -154,18 +152,18 @@ def handle_mail(ioc_id: int, mail_type: str, level: int, case_id: int) -> JsonRe
     try:
         case = Case.objects.get(id=case_id)
     except Case.DoesNotExist:
-        print(f"Case {case_id} not found")
+        update_cases_logger.debug(f"Case {case_id} not found")
         return JsonResponse({"success": False, "error": "Case does not exist"}, status=404)
 
     case_infos = {
         "id": case.id,
-        "score": case.finalScore,
-        "confidence": case.finalConfidence,
+        "score": case.final_score,
+        "confidence": case.final_confidence,
         "results": case.results,
     }
 
-    print(
-        f"Case {case.id} updated (score={case.finalScore}, confidence={case.finalConfidence})"
+    update_cases_logger.debug(
+        f"Case {case.id} updated (score={case.final_score}, confidence={case.final_confidence})"
     )
 
     return JsonResponse(
@@ -198,13 +196,13 @@ def handle_file(id, level, case_id):
     """
     file = File.objects.filter(linked_hash__value=id).first()
     if file:
-        print(f"File with id {file.id} found")
+        update_cases_logger.debug(f"File with id {file.id} found")
         obj = update_ioc_level_and_cases(file, "file", level)
         obj_score = obj.file_score
         obj_confidence = obj.file_confidence
         obj_level = obj.file_level
 
-        print(f"Updating linked hash with id {file.linked_hash.id}")
+        update_cases_logger.debug(f"Updating linked hash with id {file.linked_hash.id}")
 
         hash_obj = update_ioc_level_and_cases(file.linked_hash, "hash", level)
         hash_obj_score = hash_obj.ioc_score
@@ -214,14 +212,14 @@ def handle_file(id, level, case_id):
         case = Case.objects.get(id=case_id)
         case_infos = {
             "id": case.id,
-            "score": case.finalScore,
-            "confidence": case.finalConfidence,
+            "score": case.final_score,
+            "confidence": case.final_confidence,
             "results": case.results,
         }
-        print(f"Case updated with id {case.id}, score {case.finalScore}, confidence {case.finalConfidence}, and results {case.results}")
+        update_cases_logger.debug(f"Case updated with id {case.id}, score {case.final_score}, confidence {case.final_confidence}, and results {case.results}")
         return JsonResponse({'success': True, 'score': obj_score, 'confidence': obj_confidence, 'level': obj_level, 'hash_score': hash_obj_score, 'hash_confidence': hash_obj_confidence, 'hash_level': hash_obj_level, 'case_infos': case_infos})
     else:
-        print(f"File with linked hash {id} not found")
+        update_cases_logger.debug(f"File with linked hash {id} not found")
         return JsonResponse({'success': False, 'error': 'File does not exist'})
 
 def handle_ioc(id, ioc_type, level, case_id):
@@ -255,7 +253,7 @@ def handle_ioc(id, ioc_type, level, case_id):
     elif ioc_type == 'hash':
         obj = Hash.objects.filter(value=id).first()
     if obj:
-        print(f"{ioc_type} with id {obj.id} found")
+        update_cases_logger.debug(f"{ioc_type} with id {obj.id} found")
         obj = update_ioc_level_and_cases(obj, ioc_type, level)
         obj_score = obj.ioc_score
         obj_confidence = obj.ioc_confidence
@@ -264,14 +262,14 @@ def handle_ioc(id, ioc_type, level, case_id):
         case = Case.objects.get(id=case_id)
         case_infos = {
             "id": case.id,
-            "score": case.finalScore,
-            "confidence": case.finalConfidence,
+            "score": case.final_score,
+            "confidence": case.final_confidence,
             "results": case.results,
         }
-        print(f"Case updated with id {case.id}, score {case.finalScore}, confidence {case.finalConfidence}, and results {case.results}")
+        update_cases_logger.debug(f"Case updated with id {case.id}, score {case.final_score}, confidence {case.final_confidence}, and results {case.results}")
         return JsonResponse({'success': True, 'score': obj_score, 'confidence': obj_confidence, 'level': obj_level, 'case_infos': case_infos})
     else:
-        print(f"{ioc_type} with id {id} not found")
+        update_cases_logger.debug(f"{ioc_type} with id {id} not found")
         return JsonResponse({'success': False, 'error': f'{ioc_type.capitalize()} does not exist'})
     
 def get_artifact_by_id(id):
@@ -288,22 +286,22 @@ def get_artifact_by_id(id):
         IP or Hash or URL or None: The artifact object if found, otherwise None.
     """
     try:
-        print(f"Trying to get artifact with id {id} as IP")
+        update_cases_logger.debug(f"Trying to get artifact with id {id} as IP")
         return IP.objects.get(address=id)
     except IP.DoesNotExist:
-        print(f"Artifact with id {id} not found as IP")
+        update_cases_logger.debug(f"Artifact with id {id} not found as IP")
 
     try:
-        print(f"Trying to get artifact with id {id} as URL")
+        update_cases_logger.debug(f"Trying to get artifact with id {id} as URL")
         return Hash.objects.get(value=id)
     except Hash.DoesNotExist:
-        print(f"Artifact with id {id} not found as Hash")
+        update_cases_logger.debug(f"Artifact with id {id} not found as Hash")
 
     try:
-        print(f"Trying to get artifact with id {id} as Hash")
+        update_cases_logger.debug(f"Trying to get artifact with id {id} as Hash")
         return URL.objects.get(id=id)
     except URL.DoesNotExist:
-        print(f"Artifact with id {id} not found as URL")
+        update_cases_logger.debug(f"Artifact with id {id} not found as URL")
 
-    print(f"Artifact with id {id} not found")
+    update_cases_logger.debug(f"Artifact with id {id} not found")
     return None

@@ -1,5 +1,5 @@
 from pydantic import BaseModel, EmailStr, Field, validator
-from typing import List, Optional
+from typing import List
 
 
 class ConfigModel(BaseModel):

@@ -1,6 +1,5 @@
-from pydantic import BaseModel, Field, HttpUrl
-from typing import Optional, List, Union
-from datetime import datetime
+from pydantic import BaseModel
+from typing import Optional, Union
 
 
 class MailBody(BaseModel):
@@ -32,7 +31,7 @@ class AnalyzerReport(BaseModel):
 
 class CortexJobData(BaseModel):
     data_type: str
-    value: Union[str, dict, None]  # Could be file, URL, etc.
+    value: Union[str, dict, None]
     data_value: str
 
 

@@ -1,4 +1,4 @@
-# email_processing/parser.py
+import os
 import re
 import logging
 import mimetypes
@@ -6,7 +6,7 @@ from pathlib import Path
 from typing import Optional, Tuple, List, Dict
 from email.message import EmailMessage
 from email.parser import HeaderParser
-from email.utils import parseaddr
+from email.utils import parseaddr, getaddresses
 import chardet
 from bs4 import BeautifulSoup
 from dateutil import parser as dt_parser, tz
@@ -42,12 +42,10 @@ class EmailParser:
             "attachments": self._extract_attachments(msg),
         }
 
-        # Body
         plain, html = self._extract_body(msg)
         data["body_text"] = self._clean_body(plain)
         data["body_html"] = html
 
-        # Headers parsing
         data["headers_parsed"] = self._extract_headers(msg)
 
         data["raw_eml_bytes"] = msg.as_bytes()
@@ -56,7 +54,7 @@ class EmailParser:
     def _process_recipients(self, raw: Optional[str]) -> List[str]:
         if not raw:
             return []
-        return [addr for _, addr in EmailMessage().get_all("To", [])]  # import fix: uses email.utils
+        return [addr for _, addr in getaddresses([raw])]
 
     def _process_subject(self, raw: Optional[str]) -> Optional[str]:
         if raw is None:
@@ -100,7 +98,7 @@ class EmailParser:
                 enc = chardet.detect(raw)["encoding"] or "utf-8"
                 try:
                     return raw.decode(enc)
-                except:
+                except Exception:
                     return raw.decode("utf-8", errors="replace")
             return raw
 
@@ -154,7 +152,11 @@ class EmailParser:
                 ext = mimetypes.guess_extension(ctype) or ".bin"
                 name = sanitize_filename(f"attachment_{i}", i) + ext
 
-            path = self.attachments_dir / name
+            # sanitize_filename already strips separators, but os.path.basename
+            # is the barrier CodeQL's path-injection query recognizes as a
+            # sanitizer, and it's a genuine no-op-if-already-safe guard against
+            # any future change to sanitize_filename reintroducing one.
+            path = self.attachments_dir / os.path.basename(f"{i}_{name}")
             payload = part.get_payload(decode=True)
             if payload is None:
                 payload = part.as_bytes()

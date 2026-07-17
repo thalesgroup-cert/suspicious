@@ -1,4 +1,4 @@
-#!/usr/bin/env sh
+#!/usr/bin/env bash
 set -eu
 
 echo "============================================"
@@ -25,6 +25,11 @@ if ! command -v curl >/dev/null 2>&1; then
     echo "ERROR: Missing required binary: curl"
 fi
 
+# Check keytool
+if ! command -v keytool >/dev/null 2>&1; then
+    echo "ERROR: Missing required binary: keytool (part of JDK)"
+fi
+
 echo "→ OK"
 
 # -------------------------------------------------
@@ -43,6 +48,17 @@ else
     echo "→ .env present"
 fi
 
+if [ ! -f "../suspicious-ui/.env" ]; then
+    if [ -f "../suspicious-ui/.env.example" ]; then
+        cp ../suspicious-ui/.env.example ../suspicious-ui/.env
+        echo "→ UI .env created from .env.example"
+    else
+        echo "ERROR: Missing both UI .env and .env.example"
+    fi
+else
+    echo "→ UI .env present"
+fi
+
 # Load environment variables
 set -a
 . ./.env
@@ -54,15 +70,11 @@ set +a
 echo "[3/11] Checking directory structure..."
 
 DIRS=(
-    "${ELASTIC_PATH}"
-    "${ELASTIC_PATH}/logs"
-    "${DB_SUSPICIOUS_PATH}"
-    "${MINIO_PATH}"
     "${CA_PATH}"
     "${CORTEX_PATH}"
-    "${CORTEX_PATH}/jobs"
     "${CORTEX_PATH}/Cortex-Analyzers-Public/analyzers"
     "${CORTEX_PATH}/Cortex-Analyzers-Public/responders"
+    "${CORTEX_PATH}/jobs"
     "${AIANALYZER_PATH}"
     "${YARA_PATH}"
 )
@@ -73,6 +85,9 @@ for dir in "${DIRS[@]}"; do
         echo "→ Directory exists: $dir (permissions: $perms)"
     else
         echo "→ Directory missing: $dir"
+        echo "Creating directory: $dir"
+        mkdir -p "$dir"
+        echo "→ Directory created: $dir"
     fi
 done
 
@@ -107,6 +122,14 @@ else
     echo "→ Email Feeder config.json present"
 fi
 
+# Email Feeder pplication.log
+FEEDER_LOG="${FEEDER_PATH}/application.log"
+if [ ! -f "$FEEDER_LOG" ]; then
+    touch "$FEEDER_LOG"
+fi
+perm_flog=$(stat -c '%a' "$FEEDER_LOG")
+echo "→ Email Feeder log created: $FEEDER_LOG (permissions: $perm_flog)"
+
 # Traefik TLS file
 TLS_FILE="${TRAEFIK_PATH}/dynamic/tls.yaml"
 if [ -f "$TLS_FILE" ]; then
@@ -122,17 +145,17 @@ else
     echo "→ tls.yaml not present in Traefik dynamic path"
 fi
 
-# -------------------------------------------------
-# 5. Elasticsearch gc.log
-# -------------------------------------------------
-echo "[5/11] Checking Elasticsearch gc.log..."
-GC_LOG="${ELASTIC_PATH}/logs/gc.log"
-if [ ! -f "$GC_LOG" ]; then
-    touch "$GC_LOG"
-fi
-perm_log=$(stat -c '%a' "$GC_LOG")
-echo "→ Garbage Collector Log exists: $GC_LOG (permissions: $perm_log)"
-echo "→ gc.log OK"
+# # -------------------------------------------------
+# # 5. Elasticsearch gc.log
+# # -------------------------------------------------
+# echo "[5/11] Checking Elasticsearch gc.log..."
+# GC_LOG="${ELASTIC_PATH}/logs/gc.log"
+# if [ ! -f "$GC_LOG" ]; then
+#     touch "$GC_LOG"
+# fi
+# perm_log=$(stat -c '%a' "$GC_LOG")
+# echo "→ Garbage Collector Log exists: $GC_LOG (permissions: $perm_log)"
+# echo "→ gc.log OK"
 
 # -------------------------------------------------
 # 6. Cortex application.conf
@@ -149,6 +172,11 @@ if [ ! -f "$CORTEX_CONF" ]; then
     }
 else
     echo "→ application.conf exists — not overwritten"
+fi
+
+# Replace 127.0.0.1:9200 with elasticsearch:9200 in application.conf
+if grep -q "127.0.0.1:9200" "$CORTEX_CONF"; then
+    sed -i 's/127.0.0.1:9200/elasticsearch:9200/g' "$CORTEX_CONF"
 fi
 
 [ ! -f "$CORTEX_LOG" ] && touch "$CORTEX_LOG"
@@ -207,6 +235,28 @@ if [ ! -f "$CERTFILE" ] || [ ! -f "$KEYFILE" ] || [ ! -f "$ROOTCAFILE" ]; then
     echo "→ Certificates generated in $CA_PATH"
 else
     echo "→ Certificates already present"
+fi
+
+echo "Creating Cortex JVM truststore (keystore.jks) from root CA..."
+KEYSTORE="$CA_PATH/keystore.jks"
+# Cortex's JVM (JAVA_OPTS -Djavax.net.ssl.trustStore) needs a REAL JKS holding
+# the root CA. The old code just `touch`ed an empty file, so the truststore
+# load failed at boot ("KeyStoreException: Short read of DER length"). Build it
+# with keytool. `-s` (non-empty) rather than `-f` so an existing 0-byte
+# keystore from an older init is healed on re-run.
+if [ "${FORCE_KEYSTORE:-0}" = "1" ] || [ ! -s "$KEYSTORE" ]; then
+    rm -f "$KEYSTORE"
+    if ! keytool -importcert -noprompt -alias rootca \
+            -file "$ROOTCAFILE" -keystore "$KEYSTORE" \
+            -storepass changeit -storetype JKS; then
+        echo "ERROR: keytool failed to build $KEYSTORE from $ROOTCAFILE" >&2
+        exit 1
+    fi
+    # Never leave a silently-empty keystore behind (the historical failure).
+    [ -s "$KEYSTORE" ] || { echo "ERROR: $KEYSTORE is empty after keytool" >&2; exit 1; }
+    echo "→ Keystore built: $KEYSTORE"
+else
+    echo "→ Keystore already present: $KEYSTORE"
 fi
 
 # -------------------------------------------------

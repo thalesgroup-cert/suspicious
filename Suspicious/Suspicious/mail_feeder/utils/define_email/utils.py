@@ -1,20 +1,12 @@
 import logging
 import email.header
 from datetime import datetime as dt
-from contextlib import contextmanager
+
+from common.safe_exec import make_safe_execution
 
 logger = logging.getLogger("tasp.cron.fetch_and_process_emails")
 
-@contextmanager
-def safe_execution(context: str):
-    """
-    Context manager for consistent error logging.
-    """
-    try:
-        yield
-    except Exception as e:
-        logger.error(f"[define_email] Error during {context}: {e}", exc_info=True)
-        raise
+safe_execution = make_safe_execution("define_email", logger)
 
 
 def decode_subject(subject: str) -> str:

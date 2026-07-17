@@ -58,7 +58,7 @@ class CaseCreatorService:
         """
         case_creator = CaseCreator(user_instance)
         with safe_execution("creating case"):
-            case = case_creator.create_case(**case_dict)
+            case = case_creator.create_case(description="", **case_dict)
             fetch_mail_logger.debug(f"Created case: {getattr(case, 'id', 'None')}")
             if case and case.fileOrMail:
                 fetch_mail_logger.debug(f"Linking mail to case: {getattr(case, 'id', 'None')}")

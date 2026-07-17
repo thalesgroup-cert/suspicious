@@ -1,0 +1,4 @@
+{
+  "summary": {"taxonomies": [{"level": "malicious", "namespace": "MISP", "predicate": "Search", "value": "1 event"}]},
+  "full": {"results": [{"url": "https://cert-misp.corp.thales", "name": "Thales CERT MISP", "result": [{"id": "42", "info": "Phishing campaign X", "threat_level_id": "1"}]}]}
+}

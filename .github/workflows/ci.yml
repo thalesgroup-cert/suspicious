@@ -1,0 +1,158 @@
+name: CI
+
+on:
+  pull_request:
+    branches: [main]
+  push:
+    branches: [main, test]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  commit-lint:
+    if: github.event_name == 'pull_request'
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v6
+        with:
+          fetch-depth: 0
+      - uses: wagoid/commitlint-github-action@v6
+        with:
+          # This only became a blocking PR gate the moment a PR first
+          # targeted `main` (pull_request here is scoped to branches: [main]
+          # — test/feature branches were never gated by it pre-merge). A
+          # long-lived integration branch's full history predates that, so
+          # only lint the tip commit going forward rather than demanding
+          # retroactive Conventional Commits compliance from every commit
+          # already merged into test.
+          commitDepth: 1
+
+  backend-lint:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v6
+      - uses: actions/setup-python@v6
+        with:
+          python-version: "3.12"
+      - run: pip install ruff
+      - name: ruff check
+        run: ruff check Suspicious/ email-feeder/ Analyzers/
+
+  migration-check:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v6
+      - uses: docker/setup-buildx-action@v4
+      - name: Build backend image
+        uses: docker/build-push-action@v7
+        with:
+          context: ./Suspicious
+          load: true
+          tags: suspicious:ci
+          cache-from: type=gha
+          cache-to: type=gha,mode=max
+      - name: makemigrations --check
+        run: |
+          docker run --rm \
+            -v "${{ github.workspace }}/Suspicious/settings.ci.json":/app/settings.json:ro \
+            -e SUSPICIOUS_CONFIG_PATH=/app/settings.json -w /app/Suspicious \
+            suspicious:ci \
+            python manage.py makemigrations --check --dry-run --settings=suspicious.settings
+
+  backend-test:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v6
+      - uses: docker/setup-buildx-action@v4
+      - name: Build backend image
+        uses: docker/build-push-action@v7
+        with:
+          context: ./Suspicious
+          load: true
+          tags: suspicious:ci
+          cache-from: type=gha
+          cache-to: type=gha,mode=max
+      # Full discovery (no app labels): suspicious.test_settings provides the
+      # eager-Celery config the connectors suite needs and the stub URLConf;
+      # real-settings boot is still exercised by the migration-check job.
+      - name: Django test suite
+        run: |
+          docker run --rm \
+            -v "${{ github.workspace }}/Suspicious/Suspicious":/app/Suspicious \
+            -v "${{ github.workspace }}/Suspicious/settings.ci.json":/app/settings.json:ro \
+            -e SUSPICIOUS_CONFIG_PATH=/app/settings.json -w /app/Suspicious \
+            suspicious:ci \
+            python manage.py test --settings=suspicious.test_settings -v2
+
+  feeder-test:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v6
+      - uses: actions/setup-python@v6
+        with:
+          python-version: "3.12"
+      - name: Install feeder deps
+        working-directory: email-feeder
+        run: pip install -r requirements-dev.txt
+      - name: pytest
+        working-directory: email-feeder
+        # pytest runs BOTH the unittest.TestCase files and the pytest-style
+        # tests; `unittest discover` silently skips the latter.
+        run: python -m pytest tests -v
+
+  frontend:
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: suspicious-ui
+    steps:
+      - uses: actions/checkout@v6
+      - uses: pnpm/action-setup@v6
+        with:
+          version: 11.1.3
+      - uses: actions/setup-node@v6
+        with:
+          node-version: "22"
+          cache: pnpm
+          cache-dependency-path: suspicious-ui/pnpm-lock.yaml
+      - run: pnpm install --frozen-lockfile
+      - name: Lint
+        run: pnpm run lint
+      - name: Type-check
+        run: pnpm exec tsc -b
+      - name: Install Chromium for vitest browser mode
+        run: pnpm exec playwright install --with-deps chromium
+      - name: Unit tests (browser mode)
+        run: pnpm exec vitest --run
+      - name: Production build
+        run: pnpm run build
+
+  docker-build:
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - name: suspicious
+            context: ./Suspicious
+          - name: suspicious-ui
+            context: ./suspicious-ui
+          - name: suspicious-feeder
+            context: ./email-feeder
+    steps:
+      - uses: actions/checkout@v6
+      - uses: docker/setup-buildx-action@v4
+      - name: Build ${{ matrix.name }} (no push)
+        uses: docker/build-push-action@v7
+        with:
+          context: ${{ matrix.context }}
+          push: false
+          tags: ${{ matrix.name }}:ci
+          cache-from: type=gha,scope=${{ matrix.name }}
+          cache-to: type=gha,mode=max,scope=${{ matrix.name }}

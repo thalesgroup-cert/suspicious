@@ -7,10 +7,10 @@ from .models import (
     MonthlyReporterStats,
     TotalCasesStats,
     UserCasesMonthlyStats,
+    GroupMonthlyStats,
 )
 
 
-# Resources
 class KpiResource(resources.ModelResource):
     class Meta:
         model = Kpi
@@ -34,6 +34,15 @@ class MonthlyReporterStatsResource(resources.ModelResource):
         fields = ('id', 'new_reporters', 'total_reporters', 'creation_date', 'last_update')
         export_order = fields
 
+class GroupMonthlyStatsResource(resources.ModelResource):
+    class Meta:
+        model = GroupMonthlyStats
+        fields = (
+            'id', 'group_name', 'month', 'year', 'total_cases', 'suspicious_cases', 'inconclusive_cases',
+            'failure_cases', 'dangerous_cases', 'safe_cases', 'challenged_cases', 'allow_listed_cases',
+            'creation_date', 'last_update',
+        )
+        export_order = fields
 
 class TotalCasesStatsResource(resources.ModelResource):
     class Meta:
@@ -53,7 +62,6 @@ class UserCasesMonthlyStatsResource(resources.ModelResource):
         export_order = fields
 
 
-# Admin classes
 @admin.register(Kpi)
 class KpiAdmin(ImportExportModelAdmin):
     resource_class = KpiResource
@@ -71,6 +79,13 @@ class MonthlyCasesSummaryAdmin(ImportExportModelAdmin):
     search_fields = ('id',)
     ordering = ('-creation_date',)
 
+@admin.register(GroupMonthlyStats)
+class GroupMonthlyStatsAdmin(ImportExportModelAdmin):
+    resource_class = GroupMonthlyStatsResource
+    list_display = ('id', 'group_name', 'month', 'year', 'total_cases', 'suspicious_cases', 'inconclusive_cases', 'dangerous_cases', 'safe_cases', 'creation_date')
+    list_filter = ('group_name', 'month', 'year', 'creation_date')
+    search_fields = ('group_name', 'month', 'year')
+    ordering = ('-creation_date',)
 
 @admin.register(MonthlyReporterStats)
 class MonthlyReporterStatsAdmin(ImportExportModelAdmin):
@@ -95,5 +110,6 @@ class UserCasesMonthlyStatsAdmin(ImportExportModelAdmin):
     resource_class = UserCasesMonthlyStatsResource
     list_display = ('id', 'user', 'month', 'year', 'total_cases', 'creation_date', 'last_update')
     list_filter = ('month', 'year', 'creation_date')
+    list_select_related = ('user',)
     search_fields = ('user__username', 'month', 'year')
     ordering = ('-creation_date',)

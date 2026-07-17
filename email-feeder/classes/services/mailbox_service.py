@@ -22,6 +22,7 @@ import bs4
 import classes.models.mail
 import classes.models.mail_attachment
 import classes.models.mail_exceptions
+import classes.models.mail_tags
 import classes.models.configs.internals.imap
 import classes.services.mail_client_service as mail_client_service
 
@@ -33,8 +34,6 @@ ANALYSIS_DIR_PREFIX = "analysis_"
 
 
 class Mailbox:
-    fetched_unseen_email_ids: list[str] = []
-
     def __init__(
         self,
         config: classes.models.configs.internals.imap.IMAPConfig,
@@ -65,12 +64,34 @@ class Mailbox:
     def login(self):
         self.__mail_client.login()
 
-    def __exit__(self):
+    def __exit__(self, exc_type, exc_val, exc_tb):
         """Exits the runtime context, calls logout."""
         self.logout()
 
     def logout(self):
         return self.__mail_client.logout()
+
+    # --- IMAP IDLE ---
+    def has_idle_capability(self) -> bool:
+        """True when the connected server advertises the IDLE extension."""
+        return self.__mail_client.has_idle_capability()
+
+    def idle_wait(self, timeout: float) -> bool:
+        """Select the monitored mailbox, then block in IMAP IDLE until new mail
+        arrives or `timeout` elapses. Returns True if woken by a change.
+
+        Selecting first is required: the server only pushes EXISTS/RECENT for a
+        SELECTED mailbox, and the poll cycle leaves the connection in an unknown
+        state. Any select failure degrades to False (caller falls back to sleep).
+        """
+        try:
+            self.__mail_client.select(
+                mailbox=self.__config.mailbox_to_monitor, readonly=True
+            )
+        except Exception as e:  # noqa: BLE001
+            self.__logger.warning(f"IDLE select failed; falling back to poll: {e}")
+            return False
+        return self.__mail_client.idle_wait(timeout)
 
     # --- Email Operations ---
     def mark_emails_as_seen(self, email_ids: typing.Sequence[str | bytes]):
@@ -136,7 +157,6 @@ class Mailbox:
         # Search for unseen emails. Consider using UID SEARCH for UIDs if preferred over sequence numbers.
         _, response = self.__mail_client.search(charset, *criteria)
 
-        # Check if there is no new email, or if it's whitespace-only
         if len(response) > 0 and len(response[0].strip()) > 0:
             # email_ids are space-separated bytes string of message numbers
             encoded_email_ids: list[bytes] = response[0].split()
@@ -183,7 +203,7 @@ class Mailbox:
             return [processed_email]
 
         processed_emails: list[classes.models.mail.SuspiciousMailResponse] = []
-        eml_attachments, base_tmp_path, main_email_source_ref = processed_email
+        eml_attachments, base_tmp_path, main_email_source_ref, reporter, reporter_note = processed_email
         for attachment in eml_attachments:
             eml_file_path = (
                 pathlib.Path(attachment.file_path)
@@ -199,10 +219,15 @@ class Mailbox:
                 continue
 
             try:
-                with open(eml_file_path, "rb") as f_eml:
-                    attached_msg = email.message_from_binary_file(
-                        f_eml, policy=email.policy.default
-                    )
+                if attachment.is_msg:
+                    # Outlook .msg is OLE, not MIME — convert to an EmailMessage
+                    # so the normal .eml pipeline can analyse it.
+                    attached_msg = self._convert_msg_to_email(eml_file_path)
+                else:
+                    with open(eml_file_path, "rb") as f_eml:
+                        attached_msg = email.message_from_binary_file(
+                            f_eml, policy=email.policy.default
+                        )
             except Exception as e:
                 self.__logger.error(
                     f"Failed to process EML attachment "
@@ -214,6 +239,8 @@ class Mailbox:
                     msg=attached_msg,
                     parent_dir_for_analysis=base_tmp_path,
                     source_ref=main_email_source_ref,
+                    reported_by=reporter,
+                    reporter_note=reporter_note,
                 )
                 if processed_attached_mail_obj:
                     processed_emails.append(processed_attached_mail_obj)
@@ -236,6 +263,23 @@ class Mailbox:
                 processed_emails.extend(_processed_mails)
 
         return processed_emails
+
+    def _convert_msg_to_email(
+        self, msg_path: pathlib.Path
+    ) -> email.message.EmailMessage:
+        """Convert an Outlook .msg (OLE compound file) into an EmailMessage.
+
+        Outlook desktop "Forward as Attachment" produces a .msg, not a .eml.
+        extract-msg parses the OLE format and yields a standard EmailMessage so
+        the rest of the proven .eml pipeline is unchanged.
+        """
+        import extract_msg
+
+        m = extract_msg.openMsg(str(msg_path))
+        try:
+            return m.asEmailMessage()
+        finally:
+            m.close()
 
     def fetch_unseen_emails_and_process(
         self,
@@ -340,7 +384,13 @@ class Mailbox:
     def process_inbox_email(
         self, email_id: bytes, source_ref: str
     ) -> (
-        tuple[list[classes.models.mail_attachment.MailAttachment], pathlib.Path, str]
+        tuple[
+            list[classes.models.mail_attachment.MailAttachment],
+            pathlib.Path,
+            str,
+            str,
+            str,
+        ]
         | classes.models.mail.SuspiciousMailResponse
         | None
     ):
@@ -365,10 +415,18 @@ class Mailbox:
 
         from_decoded = self._decode_header_str(from_header_raw)
         email_from = email.utils.parseaddr(from_decoded)[1]
-        folder_name = f"{email_from.split('@')[0]}-submission"
+        # Sanitise the local-part before composing a filesystem path —
+        # crafted From headers like `<"../x"@a.b>` would otherwise traverse.
+        safe_local = self._sanitize_filename(
+            email_from.split("@")[0], 0, default_base="submitter"
+        )
+        folder_name = f"{safe_local}-submission"
+        safe_ref = self._sanitize_filename(
+            source_ref.split("-", maxsplit=1)[0], 0, default_base="ref"
+        )
 
         processing_root_dir = pathlib.Path(
-            self.__tmp_path, folder_name + f"-{source_ref.split('-', maxsplit=1)[0]}"
+            self.__tmp_path, f"{folder_name}-{safe_ref}"
         )
         try:
             processing_root_dir.mkdir(parents=True, exist_ok=True)
@@ -406,17 +464,22 @@ class Mailbox:
             else:
                 self.__logger.debug(f"Attachment '{att.filename}' has no file path.")
 
-        eml_attachments_in_main = [
-            att
-            for att in email_data.attachments
-            if att.filename.lower().endswith(".eml")
+        email_attachments_in_main = [
+            att for att in email_data.attachments if att.is_email
         ]
-        if len(eml_attachments_in_main) > 0:
+        if len(email_attachments_in_main) > 0:
             self.__logger.info(
-                f"Email Ref {source_ref} (ID: {email_id}) has .eml attachments. "
+                f"Email Ref {source_ref} (ID: {email_id}) has attached mail(s). "
                 f"Returning for recursive processing."
             )
-            return (eml_attachments_in_main, processing_root_dir, source_ref)
+            # Carry the wrapper sender (the reporting employee) so the inner
+            # submissions are attributed to them, not to the inner attacker.
+            reporter = email_data.from_address or ""
+            reporter_note = email_data.body_text or ""
+            return (
+                email_attachments_in_main, processing_root_dir, source_ref,
+                reporter, reporter_note,
+            )
 
         analysis_target_dir = pathlib.Path(
             processing_root_dir, f"{ANALYSIS_DIR_PREFIX}0"
@@ -478,7 +541,10 @@ class Mailbox:
             original_mail=email_data,
             id=source_ref,
             case_path=str(analysis_target_dir),
-            tags="to_resend",
+            outcome=classes.models.mail_tags.SubmissionOutcome.NO_ATTACHED_MAIL,
+            submission_dir=str(processing_root_dir),
+            # No wrapper: the inbox sender is themselves the reporter.
+            reported_by=email_data.from_address or "",
         )
 
     def process_attachment_email(
@@ -487,6 +553,8 @@ class Mailbox:
         msg: email.message.EmailMessage,
         parent_dir_for_analysis: pathlib.Path,
         source_ref: str,
+        reported_by: str = "",
+        reporter_note: str = "",
     ):
         attached_email_file_ref = (
             str(source_ref.split("-", maxsplit=1)[0])
@@ -520,10 +588,23 @@ class Mailbox:
             eml_content=email_data.raw_eml_bytes,
         )
 
+        import json
+        import classes.models.email_contract as ec
+        meta = ec.build_email_metadata(msg, attached_email_file_ref)
+        meta_path = pathlib.Path(current_analysis_path, ec.EMAIL_METADATA_OBJECT_NAME)
+        meta_path.write_text(
+            json.dumps(meta.model_dump(by_alias=True), ensure_ascii=False),
+            encoding="utf-8",
+        )
+
         return classes.models.mail.SuspiciousMailResponse(
             original_mail=email_data,
             id=attached_email_file_ref,
             case_path=str(current_analysis_path),
+            outcome=classes.models.mail_tags.SubmissionOutcome.VALID,
+            submission_dir=str(parent_dir_for_analysis),
+            reported_by=reported_by,
+            reporter_note=reporter_note,
         )
 
     def _save_email_files(
@@ -786,6 +867,58 @@ class Mailbox:
                 headers[key].append(value)
         return headers
 
+    @staticmethod
+    def _rfc822_inner_bytes(part: email.message.Message) -> bytes:
+        """Recover the raw bytes of an email attached as message/rfc822,
+        regardless of its Content-Transfer-Encoding.
+
+        Python's parser nests the sub-message as an EmailMessage only for
+        7bit/8bit parts; with base64/quoted-printable CTE the payload is the
+        encoded string. Decoding it ourselves yields a valid .eml the feeder
+        can re-parse, instead of saving mis-decoded data (null From, base64
+        body) that poisons email.json.
+        """
+        payload = part.get_payload()
+        cte = (part.get("Content-Transfer-Encoding", "") or "").strip().lower()
+
+        # For base64/quoted-printable CTE the parser does NOT decode before
+        # nesting: it parses the *encoded* text as the sub-message, yielding a
+        # bogus EmailMessage (no headers, body = the encoded blob). Decode the
+        # encoded blob ourselves to recover the real inner email.
+        if cte in ("base64", "quoted-printable", "quopri"):
+            if isinstance(payload, list) and payload:
+                encoded = b"".join(
+                    p.as_bytes() if isinstance(p, email.message.Message)
+                    else str(p).encode("utf-8", "replace")
+                    for p in payload
+                )
+            elif isinstance(payload, str):
+                encoded = payload.encode("utf-8", "replace")
+            else:
+                encoded = part.as_bytes()
+            try:
+                if cte == "base64":
+                    import base64 as _b64
+                    return _b64.b64decode(encoded)
+                import quopri
+                return quopri.decodestring(encoded)
+            except Exception:
+                return part.as_bytes()
+
+        # 7bit/8bit/binary: the nested EmailMessage is trustworthy.
+        if isinstance(payload, list) and payload and isinstance(
+            payload[0], email.message.Message
+        ):
+            return payload[0].as_bytes()
+        if isinstance(payload, email.message.Message):
+            return payload.as_bytes()
+        raw = part.get_payload(decode=True)
+        if isinstance(raw, bytes):
+            return raw
+        if isinstance(payload, str):
+            return payload.encode(part.get_content_charset() or "utf-8", "replace")
+        return part.as_bytes()
+
     def extract_attachments(
         self, msg: email.message.EmailMessage, tmp_path: pathlib.Path, source_ref: str
     ) -> list[classes.models.mail_attachment.MailAttachment]:
@@ -858,34 +991,9 @@ class Mailbox:
             try:
                 attachment_bytes: bytes | None = None
                 if content_type == "message/rfc822":
-                    payload_to_write = part.get_payload()
-                    msg_to_write = None
-                    if isinstance(payload_to_write, list) and payload_to_write:
-                        msg_to_write = (
-                            payload_to_write[0]
-                            if isinstance(
-                                payload_to_write[0], email.message.EmailMessage
-                            )
-                            else None
-                        )
-                    elif isinstance(payload_to_write, email.message.EmailMessage):
-                        msg_to_write = payload_to_write
-
-                    if msg_to_write:
-                        attachment_bytes = msg_to_write.as_bytes()
-                    else:
-                        self.__logger.warning(
-                            f"Content of '{processed_filename}' (message/rfc822) not a standard EmailMessage. Saving raw part data."
-                        )
-                        raw_payload = part.get_payload(decode=True)
-                        if isinstance(raw_payload, str):
-                            attachment_bytes = raw_payload.encode(
-                                part.get_content_charset() or "utf-8", "replace"
-                            )
-                        elif isinstance(raw_payload, bytes):
-                            attachment_bytes = raw_payload
-                        else:
-                            attachment_bytes = part.as_bytes()
+                    # Recover the inner email for any CTE (incl. base64), so the
+                    # saved .eml re-parses correctly instead of being mis-decoded.
+                    attachment_bytes = self._rfc822_inner_bytes(part)
 
                 else:
                     payload = part.get_payload(decode=True)
@@ -922,6 +1030,21 @@ class Mailbox:
                 file_path.write_bytes(attachment_bytes)
                 file_sha256 = self.get_sha256(file_path)
 
+                # An attachment is itself a mail when it is an embedded
+                # message part, named .eml, OR an Outlook .msg (Outlook desktop
+                # "Forward as Attachment" produces a .msg). All three make the
+                # submission valid; .msg is converted to .eml downstream.
+                fn_lower = processed_filename.lower()
+                is_msg = (
+                    fn_lower.endswith(".msg")
+                    or content_type in ("application/vnd.ms-outlook", "application/x-msg")
+                )
+                is_email = (
+                    content_type == "message/rfc822"
+                    or fn_lower.endswith(".eml")
+                    or is_msg
+                )
+
                 attachment_details = classes.models.mail_attachment.MailAttachment(
                     filename=processed_filename,
                     content=attachment_bytes,
@@ -929,6 +1052,8 @@ class Mailbox:
                     file_path=str(file_path),
                     file_sha256=file_sha256,
                     parent=source_ref,
+                    is_email=is_email,
+                    is_msg=is_msg,
                 )
                 attachments.append(attachment_details)
 

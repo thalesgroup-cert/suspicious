@@ -3,7 +3,7 @@ from unittest.mock import patch, MagicMock
 from django.contrib.auth.models import User
 import ldap as ldap_module
 
-from profiles.models import CISOProfile, UserProfile
+from profiles.models import CISOProfile, Theme, UserProfile
 from profiles.profiles_utils.ciso import process_cisos, generate_message, handle_csv_file, handle_json_file, handle_txt_file
 from profiles.profiles_utils.ldap import Ldap
 
@@ -19,7 +19,7 @@ class UserProfileModelTests(TestCase):
         profile = UserProfile.objects.create(user=user, function="Dev", gbu="IT", country="US", region="NORAM")
         self.assertTrue(profile.wants_acknowledgement)
         self.assertTrue(profile.wants_results)
-        self.assertEqual(profile.theme, "default")
+        self.assertEqual(profile.theme, Theme.LIGHT)
 
 
 class CISOProfileModelTests(TestCase):
@@ -34,7 +34,7 @@ class CISOProfileModelTests(TestCase):
         profile = CISOProfile.objects.create(user=user, function="CISO", gbu="IT", country="US", region="NORAM")
         self.assertTrue(profile.wants_acknowledgement)
         self.assertTrue(profile.wants_results)
-        self.assertEqual(profile.theme, "default")
+        self.assertEqual(profile.theme, Theme.LIGHT)
 
 
 class CISOProcessingTests(TestCase):
@@ -46,11 +46,9 @@ class CISOProcessingTests(TestCase):
     @patch("profiles.profiles_utils.ciso.search_ldap_server")
     @patch("profiles.profiles_utils.ciso.Ldap")
     def test_process_cisos_creates_ciso_profile(self, mock_ldap_class, mock_search, mock_create):
-        # Mock LDAP server
         mock_ldap_instance = MagicMock()
         mock_ldap_class.return_value.initialize_ldap.return_value = mock_ldap_instance
 
-        # Mock LDAP search results with bytes
         mock_search.return_value = [
             (None, {
                 "title": [b"CISO"],
@@ -59,7 +57,6 @@ class CISOProcessingTests(TestCase):
             })
         ]
 
-        # Mock CISOProfile creation
         mock_create.return_value = MagicMock(spec=CISOProfile)
 
         good, error = process_cisos(["alice"])
@@ -68,7 +65,6 @@ class CISOProcessingTests(TestCase):
 
     @patch("profiles.profiles_utils.ciso.Ldap")
     def test_process_cisos_user_does_not_exist(self, MockLdap):
-        # Mock LDAP initialization
         mock_ldap = MockLdap.return_value
         mock_ldap.initialize_ldap.return_value = MagicMock()
 
@@ -90,14 +86,14 @@ class CISOProcessingTests(TestCase):
         self.assertEqual(result[0]["ciso"], "alice")
 
     def test_handle_json_file(self):
-        import io, json
+        import io
+        import json
         data = json.dumps([{"ciso": "alice"}, {"ciso": "bob"}]).encode("utf-8")
         file = io.BytesIO(data)
         result = handle_json_file(file)
         self.assertEqual(result, ["alice", "bob"])
 
     def test_handle_txt_file(self):
-        import io
         file = [b"alice\n", b"bob\n"]
         result = handle_txt_file(file)
         self.assertEqual(result, ["alice", "bob"])
@@ -122,8 +118,8 @@ class LDAPUtilityTests(TestCase):
 
     @patch("profiles.profiles_utils.ldap.ldap.initialize")
     @patch("profiles.profiles_utils.ldap.ldap.set_option")
-    @patch("profiles.profiles_utils.ldap.ldap_config", {})
-    def test_initialize_ldap_defaults_to_tls_demand(self, mock_set_option, mock_initialize):
+    @patch("profiles.profiles_utils.ldap._ldap_config", return_value={})
+    def test_initialize_ldap_defaults_to_tls_demand(self, mock_config, mock_set_option, mock_initialize):
         # verify_ssl unset (or true) must default to cert verification ON —
         # regression test for the hardcoded OPT_X_TLS_NEVER bypass.
         Ldap().initialize_ldap()
@@ -133,15 +129,16 @@ class LDAPUtilityTests(TestCase):
 
     @patch("profiles.profiles_utils.ldap.ldap.initialize")
     @patch("profiles.profiles_utils.ldap.ldap.set_option")
-    @patch("profiles.profiles_utils.ldap.ldap_config", {"auth_ldap_verify_ssl": "false"})
-    def test_initialize_ldap_verify_ssl_false_disables_tls(self, mock_set_option, mock_initialize):
+    @patch("profiles.profiles_utils.ldap._ldap_config", return_value={"verify_ssl": "false"})
+    def test_initialize_ldap_verify_ssl_false_disables_tls(self, mock_config, mock_set_option, mock_initialize):
         # Explicit opt-out is still honoured — only the default flipped.
         Ldap().initialize_ldap()
         mock_set_option.assert_called_once_with(
             ldap_module.OPT_X_TLS_REQUIRE_CERT, ldap_module.OPT_X_TLS_NEVER
         )
 
-    def test_get_search_results_escapes_filter_chars(self):
+    @patch("profiles.profiles_utils.ldap._ldap_config", return_value={"base_dn": "dc=meridian,dc=example"})
+    def test_get_search_results_escapes_filter_chars(self, mock_config):
         # A username containing LDAP filter metacharacters must not be able
         # to widen or restructure the search filter — regression test for
         # the unescaped-filter-injection bug.

@@ -1,5 +1,5 @@
 log:
-  level: DEBUG
+  level: INFO
   filePath: "/var/log/traefik/traefik.log"
 
 accessLog:
@@ -14,8 +14,7 @@ entryPoints:
         options: default
 
 api:
-  dashboard: true
-  insecure: true
+  dashboard: false
 
 providers:
   file:

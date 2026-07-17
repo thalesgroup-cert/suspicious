@@ -4,7 +4,6 @@ from import_export.admin import ImportExportModelAdmin
 from file_process.models import File, HashFromFile
 
 
-# Resource classes
 class FileResource(resources.ModelResource):
     class Meta:
         model = File
@@ -23,7 +22,6 @@ class HashFromFileResource(resources.ModelResource):
         export_order = fields
 
 
-# Admin classes
 @admin.register(File)
 class FileAdmin(ImportExportModelAdmin):
     resource_class = FileResource

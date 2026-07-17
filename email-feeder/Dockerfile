@@ -3,7 +3,7 @@
 #   DOCKERFILE – EMAIL FEEDER SERVICE           #
 #                                               #
 #################################################
-FROM python AS runtime
+FROM python:3.12-slim AS runtime
 
 # -------------------------
 # Build-time arguments
@@ -34,7 +34,6 @@ RUN apt-get update && \
         ca-certificates \
         curl \
         libmariadb3 \
-        logrotate \
     && apt-get clean \
     && rm -rf /var/lib/apt/lists/*
 
@@ -56,6 +55,22 @@ COPY requirements.txt .
 RUN uv pip install --system --no-cache -r requirements.txt
 
 # -------------------------
+# Non-root runtime user
+# -------------------------
+# Service consumes attacker-controlled IMAP/SMTP content; never run as root.
+# UID/GID match the Suspicious app pattern; override via build args if needed.
+ARG APP_UID=1000
+ARG APP_GID=1000
+RUN groupadd --system --gid ${APP_GID} feeder \
+    && useradd --system --uid ${APP_UID} --gid ${APP_GID} \
+        --home /app --shell /usr/sbin/nologin feeder
+
+# -------------------------
 # Copy application source
 # -------------------------
 COPY . .
+
+# Ensure runtime user owns app dir (logs, working_path, MinIO temp dirs).
+RUN chown -R feeder:feeder /app
+
+USER feeder

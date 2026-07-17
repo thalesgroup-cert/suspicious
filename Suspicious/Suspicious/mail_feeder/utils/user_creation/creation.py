@@ -3,22 +3,24 @@ from datetime import date
 from django.contrib.auth.models import User
 from django.core.exceptions import ObjectDoesNotExist
 from .models import UsernameModel
-from .utils import load_config, initialize_email_validator, create_ldap_user
+from .utils import initialize_email_validator, create_ldap_user
 from mail_feeder.utils.kpi_updating.kpis import (
     KpiService
 )
+from settings.models import WatcherLegitDomain
 
 
-CONFIG_PATH = "/app/settings.json"
-CONFIG = load_config(CONFIG_PATH)
-COMPANY_DOMAINS = CONFIG.get("company_domains", [])
-SUSPICIOUS_EMAIL = CONFIG.get("suspicious", {}).get("email")
+def _suspicious_email() -> str:
+    from settings.config import get_section
+    return get_section("branding").get("contact_email")
+
 
 fetch_mail_logger = logging.getLogger("tasp.cron.fetch_and_process_emails")
 
 
 class UserCreationService:
     def __init__(self):
+        COMPANY_DOMAINS = WatcherLegitDomain.objects.select_related('domain').values_list('domain__value', flat=True)
         self.email_validator = initialize_email_validator(COMPANY_DOMAINS)
 
     def get_or_create_user(self, username: str) -> User:
@@ -50,26 +52,21 @@ class UserCreationService:
         return user
 
     def create_user(self, username: str) -> User:
-        try:
-            User.objects.get(username=username)
+        user, created = User.objects.get_or_create(username=username)
+        if created:
+            user.set_unusable_password()
+            user.full_clean()
+            user.save()
+            fetch_mail_logger.info(f"User created: {username}")
+        else:
             fetch_mail_logger.warning(f"User {username} already exists.")
-            return None
-        except User.DoesNotExist:
-            try:
-                user = User.objects.create_user(username=username, password=None)
-                user.set_unusable_password()
-                user.full_clean()
-                user.save()
-                fetch_mail_logger.info(f"User created: {username}")
-                return user
-            except Exception as e:
-                fetch_mail_logger.error(f"Error creating user {username}: {e}")
-                return None
+        return user
 
     def create_default_user(self) -> User:
-        user, created = User.objects.get_or_create(username=SUSPICIOUS_EMAIL)
+        suspicious_email = _suspicious_email()
+        user, created = User.objects.get_or_create(username=suspicious_email)
         if created:
             user.set_unusable_password()
             user.save()
-            fetch_mail_logger.info(f"Default suspicious user created: {SUSPICIOUS_EMAIL}")
+            fetch_mail_logger.info(f"Default suspicious user created: {suspicious_email}")
         return user

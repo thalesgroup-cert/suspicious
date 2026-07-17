@@ -1,11 +1,4 @@
 #!/usr/bin/env python3
-# This file is part of Meioc.
-#
-# Meioc was made with ♥ by Andrea Draghetti
-#
-# This file may be licensed under the terms of of the
-# GNU General Public License Version 3 (the ``GPL'').
-#
 import os
             
 import re
@@ -13,7 +6,6 @@ from urllib.parse import urlparse
 import spf
 import json
 import dkim
-import email
 import hashlib
 import warnings
 import argparse
@@ -30,31 +22,30 @@ from email import message_from_bytes
 encodings.aliases.aliases["cp_850"] = "cp850"
 warnings.simplefilter(action="ignore", category=FutureWarning)
 
-# Precompile the regex pattern for email extraction
 email_regex = re.compile(r"[A-Za-z0-9.!#$%&'*+/=?^_`{|}~-]+@[A-Za-z0-9.-]+\.[A-Za-z]{2,}", re.IGNORECASE)
-TLD_CACHE_DIR = Path("/app/Suspicious/domain_process/domain_utils/public")
+PSL_FILE = (
+    Path(__file__).resolve().parents[2]
+    / "domain_process" / "domain_utils" / "public" / "public_suffix_list.dat"
+)
 HASH_PATTERNS = [
-    r'\b[a-f0-9]{32}\b',    # MD5
-    r'\b[a-f0-9]{40}\b',    # SHA1
-    r'\b[a-f0-9]{64}\b'     # SHA256
+    r'\b[a-f0-9]{32}\b',
+    r'\b[a-f0-9]{40}\b',
+    r'\b[a-f0-9]{64}\b'
 ]
 tldcache = tldextract.TLDExtract(
-    cache_dir=str(TLD_CACHE_DIR),
-    fallback_to_snapshot=True
+    cache_dir=None,
+    suffix_list_urls=(PSL_FILE.as_uri(),) if PSL_FILE.is_file() else (),
+    fallback_to_snapshot=True,
 )
 fetch_mail_logger = logging.getLogger('tasp.cron.fetch_and_process_emails')
 
 def real_email(string):
-    # A sender obfuscation technique involves entering two e-mails. Only the last one is the real one. Example:
-    #
-    # Sender Name: Mario Rossi <rossi.mario@big-society.com>
-    # Sender Mail: spoof@example.com
-    # From values is: "Mario Rossi <rossi.mario@big-society.com>" <spoof@example.com>
     result_meioc = None
     try:
-        sender_name, email_address = parseaddr(string)
+        _, email_address = parseaddr(string)
         return email_address.lower() if email_address else None
-    except:
+    except (AttributeError, ValueError, TypeError) as exc:
+        fetch_mail_logger.warning("real_email parseaddr failed for %r: %s", string, exc)
         return result_meioc
 
 def normalize_headers(raw_email_bytes):
@@ -77,7 +68,7 @@ def normalize_headers(raw_email_bytes):
             normalized_lines.append(line)
         else:
             if ": " in line or ":" in line:
-                header, sep, value = line.partition(":")
+                header, _, value = line.partition(":")
                 header = header.strip()
                 normalized_lines.append(f"{header}:{value}")
             else:
@@ -126,12 +117,10 @@ def email_analysis(filename, exclude_private_ip, check_spf, check_dkim, file_out
     }
 
     fetch_mail_logger.debug(f"Processing email file: {filename}")
-    # Open E-mail
     with open(filename, "rb") as email_file:
         raw_email_content = email_file.read()
 
     fetch_mail_logger.debug(f"Raw email content read from file: {filename}")
-    # Parsing E-mail
     try:
         if raw_email_content:
             raw_email_content_normalized = normalize_headers(raw_email_content)
@@ -144,10 +133,7 @@ def email_analysis(filename, exclude_private_ip, check_spf, check_dkim, file_out
         fetch_mail_logger.error(f"Failed to parse email from file {filename}: {e}")
         return result_meioc
     if parsed_email:
-        fetch_mail_logger.debug(f"Email parsed successfully: {parsed_email['Subject'] if 'Subject' in parsed_email else 'No Subject'}")
-        #
-        # Header analysis
-        #
+        fetch_mail_logger.debug(f"Email parsed successfully: {parsed_email.get('Subject', 'No Subject')}")
         try:
             if parsed_email["Date"]:
                 result_meioc["date"] = parsed_email["Date"]
@@ -173,7 +159,6 @@ def email_analysis(filename, exclude_private_ip, check_spf, check_dkim, file_out
             if parsed_email["To"]:
                 mail_to = email_regex.findall(parsed_email["To"])
                 if mail_to:
-                    # Convert to lower, remove possible duplicates, and create a numbered dictionary
                     mail_to = {i: x.lower() for i, x in enumerate(set(mail_to))}
                     result_meioc["to"] = mail_to
 
@@ -189,7 +174,6 @@ def email_analysis(filename, exclude_private_ip, check_spf, check_dkim, file_out
                         mail_cc_list.append(mail_cc)
 
                 if mail_cc_list:
-                    # Convert to lower, remove possible duplicates, and create a numbered dictionary
                     mail_cc_list = {i: x.lower() for i, x in enumerate(set(mail_cc_list))}
                     result_meioc["cc"] = mail_cc_list
 
@@ -205,7 +189,6 @@ def email_analysis(filename, exclude_private_ip, check_spf, check_dkim, file_out
                 mail_envelopeto = email_regex.findall(parsed_email["Envelope-to"])
 
                 if mail_envelopeto:
-                    # Convert to lower, remove possible duplicates, and create a numbered dictionary
                     mail_envelopeto = {i: x.lower() for i, x in enumerate(set(mail_envelopeto))}
                     result_meioc["envelope-to"] = mail_envelopeto
 
@@ -225,28 +208,20 @@ def email_analysis(filename, exclude_private_ip, check_spf, check_dkim, file_out
                 result_meioc["x-mailer"] = parsed_email["X-Mailer"]
 
             if parsed_email["X-Originating-IP"]:
-                # Usually the IP is in square brackets, I remove them if present.
                 mail_xorigip = parsed_email["X-Originating-IP"].replace("[", "").replace("]", "")
                 result_meioc["x-originating-ip"] = mail_xorigip
 
             if parsed_email["Subject"]:
                 result_meioc["subject"] = parsed_email["Subject"]
-            #
-            # Identify each relay
-            #
             fetch_mail_logger.debug("Identifying relays in email headers")
             received = parsed_email.get_all("Received")
             if received:
                 received.reverse()
                 for line in received:
-                    hops = re.findall("from\s+(.*?)\s+by(.*?)(?:(?:with|via)(.*?)(?:id|$)|id|$)", line, re.DOTALL | re.X)
+                    hops = re.findall(r"from\s+(.*?)\s+by(.*?)(?:(?:with|via)(.*?)(?:id|$)|id|$)", line, re.DOTALL | re.X)
                     for hop in hops:
-
-                        #ipv4_address = re.findall(r"\b((25[0-5]|2[0-4][0-9]|1[0-9]{2}|[1-9]?[0-9])\.){3}(25[0-5]|2[0-4][0-9]|1[0-9]{2}|[1-9]?[0-9])\b", hop[0])
-                        
                         ipv4_address = re.findall(r"[0-9]+(?:\.[0-9]+){3}", hop[0], re.DOTALL | re.X)
 
-                        # https://gist.github.com/dfee/6ed3a4b05cfe7a6faf40a2102408d5d8
                         ipv6_address = re.findall(
                             r"(?:(?:(?:(?:[0-9a-fA-F]){1,4}):){1,4}:[^\s:](?:(?:(?:25[0-5]|(?:2[0-4]|1{0,1}[0-9]){0,1}[0-9]).){3,3}(?:25[0-5]|(?:2[0-4]|1{0,1}[0-9]){0,1}[0-9])))|(?:::(?:ffff(?::0{1,4}){0,1}:){0,1}[^\s:](?:(?:(?:25[0-5]|(?:2[0-4]|1{0,1}[0-9]){0,1}[0-9]).){3,3}(?:25[0-5]|(?:2[0-4]|1{0,1}[0-9]){0,1}[0-9])))|(?:fe80:(?::(?:(?:[0-9a-fA-F]){1,4})){0,4}%[0-9a-zA-Z]{1,})|(?::(?:(?::(?:(?:[0-9a-fA-F]){1,4})){1,7}|:))|(?:(?:(?:[0-9a-fA-F]){1,4}):(?:(?::(?:(?:[0-9a-fA-F]){1,4})){1,6}))|(?:(?:(?:(?:[0-9a-fA-F]){1,4}):){1,2}(?::(?:(?:[0-9a-fA-F]){1,4})){1,5})|(?:(?:(?:(?:[0-9a-fA-F]){1,4}):){1,3}(?::(?:(?:[0-9a-fA-F]){1,4})){1,4})|(?:(?:(?:(?:[0-9a-fA-F]){1,4}):){1,4}(?::(?:(?:[0-9a-fA-F]){1,4})){1,3})|(?:(?:(?:(?:[0-9a-fA-F]){1,4}):){1,5}(?::(?:(?:[0-9a-fA-F]){1,4})){1,2})|(?:(?:(?:(?:[0-9a-fA-F]){1,4}):){1,6}:(?:(?:[0-9a-fA-F]){1,4}))|(?:(?:(?:(?:[0-9a-fA-F]){1,4}):){1,7}:)|(?:(?:(?:(?:[0-9a-fA-F]){1,4}):){7,7}(?:(?:[0-9a-fA-F]){1,4}))",
                             hop[0], re.DOTALL | re.X)
@@ -281,9 +256,6 @@ def email_analysis(filename, exclude_private_ip, check_spf, check_dkim, file_out
             fetch_mail_logger.error(f"Error processing email headers: {e}")
             return result_meioc
         fetch_mail_logger.debug("Header analysis completed successfully")
-        #
-        # Body analysis
-        #
         try:
             fetch_mail_logger.debug("Extracting URLs, IPs, emails, and hashes from email body")
 
@@ -296,8 +268,6 @@ def email_analysis(filename, exclude_private_ip, check_spf, check_dkim, file_out
                 text = payload.decode('utf-8', errors='ignore')
 
                 if part.get_content_type() == "text/plain":
-                    # Regex is based on what Diego Perini shared:
-                    # https://gist.github.com/dperini/729294
                     candidates.extend(re.findall(r'(?:https?://|www\.)[^\s<>"]+', text))
                     body_IP.extend(re.findall(r"[0-9]+(?:\.[0-9]+){3}", str(part.get_payload()), re.DOTALL | re.X))
 
@@ -307,9 +277,7 @@ def email_analysis(filename, exclude_private_ip, check_spf, check_dkim, file_out
                     for pattern in HASH_PATTERNS:
                         body_Hash.extend(re.findall(pattern, part.get_content(), re.IGNORECASE))
 
-                # Extracts each URL identified in the e-mail in text/html format
                 if part.get_content_type() == "text/html":
-                    # The try/except is necessary, if the body of the e-mail contains an incorrect or unencoded HTML code the script freeezes.
                     try:
                         soup = BeautifulSoup(text, 'html.parser')
                         for a in soup.find_all('a', href=True):
@@ -320,10 +288,9 @@ def email_analysis(filename, exclude_private_ip, check_spf, check_dkim, file_out
                             re.IGNORECASE))
                         for pattern in HASH_PATTERNS:
                             body_Hash.extend(re.findall(pattern, part.get_content(), re.IGNORECASE))
-                    except:
-                        pass
+                    except (TypeError, ValueError, UnicodeDecodeError, LookupError) as exc:
+                        fetch_mail_logger.warning("Body IOC extraction skipped (%s)", exc)
 
-                # Extracts information from each file attached to the e-mail
                 if part.get_filename():
                     if part.get_payload(decode=True):
                         filename = part.get_filename()
@@ -336,16 +303,14 @@ def email_analysis(filename, exclude_private_ip, check_spf, check_dkim, file_out
 
             seen = set()
             for url in candidates:
-                url = url.rstrip('.,;:')  # trim trailing punctuation
+                url = url.rstrip('.,;:')
                 lower = url.lower()
                 if lower.startswith('mailto:') or lower.startswith('ftp:'):
-                    continue  # skip mailto/ftp
-                # Ensure scheme for parsing
+                    continue
                 if not lower.startswith(('http://','https://')):
                     url = 'http://' + url
                 parsed = urlparse(url)
                 host = parsed.hostname or ''
-                # Skip IP-only hosts
                 if host.replace('.', '').isdigit() or ':' in host:
                     continue
                 clean = parsed.geturl()
@@ -358,21 +323,14 @@ def email_analysis(filename, exclude_private_ip, check_spf, check_dkim, file_out
         
         fetch_mail_logger.debug("Body analysis completed successfully")
         
-        #
-        # Identify each domain reported in the e-mail body
         try:
             for url in urls_list:
-                tldextract.TLDExtract(
-                    cache_dir=str(TLD_CACHE_DIR),
-                    fallback_to_snapshot=True
-                )
                 analyzed_domain = tldcache(url).registered_domain
                 if analyzed_domain:
                     domains_list.append(analyzed_domain)
         except Exception as e:
             fetch_mail_logger.error(f"Error processing email domains: {e}")
             return result_meioc
-        # Remove Duplicate from List
         urls_list = list(set(urls_list))
         domains_list = list(set(domains_list))
 
@@ -391,9 +349,6 @@ def email_analysis(filename, exclude_private_ip, check_spf, check_dkim, file_out
             result_meioc["body_email"] = body_email
             
         fetch_mail_logger.debug("Email analysis completed successfully")
-        #
-        # Verify the SPF record if requested
-        #
         fetch_mail_logger.debug("Checking SPF records if requested")
         if check_spf:
             try:
@@ -405,8 +360,11 @@ def email_analysis(filename, exclude_private_ip, check_spf, check_dkim, file_out
                         try:
                             domain_from = mail_from.split("@")[1]
                             result_spf = spf.check2(ip, mail_from,domain_from)[0]
-                        except:
-                            pass
+                        except (IndexError, AttributeError, TypeError, ValueError) as exc:
+                            fetch_mail_logger.warning(
+                                "SPF check skipped for ip=%s mail_from=%r: %s",
+                                ip, mail_from, exc,
+                            )
 
                         if result_spf == "pass":
                             test_spf = True
@@ -418,9 +376,6 @@ def email_analysis(filename, exclude_private_ip, check_spf, check_dkim, file_out
                 fetch_mail_logger.error(f"Error checking SPF record: {e}")
                 result_meioc["spf"] = None
         fetch_mail_logger.debug("SPF record check completed")
-        #
-        # Verify the DKIM record if requested
-        #
         fetch_mail_logger.debug("Checking DKIM records if requested")
         if check_dkim:
             test_dkim = False
@@ -445,9 +400,9 @@ def email_analysis(filename, exclude_private_ip, check_spf, check_dkim, file_out
                 fetch_mail_logger.debug("Returning JSON result")
                 result = json.dumps(result_meioc, indent=4)
                 return result
-            except:
-                result = None
-                return result
+            except (TypeError, ValueError) as exc:
+                fetch_mail_logger.error("meioc result JSON serialise failed: %s", exc)
+                return None
             
 
 

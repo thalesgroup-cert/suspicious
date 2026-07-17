@@ -1,0 +1,27 @@
+# VCS
+.git
+.gitignore
+
+# Docker
+Dockerfile
+.dockerignore
+
+# Python caches / virtualenvs
+__pycache__/
+*.py[cod]
+.venv/
+venv/
+.pytest_cache/
+.ruff_cache/
+.mypy_cache/
+
+# Large ML weights — fetched at build/runtime, never sent in build context
+models/
+vectorizers/paraphrase-multilingual-mpnet-base-v2/model.safetensors
+vectorizers/paraphrase-multilingual-mpnet-base-v2/config.json
+vectorizers/paraphrase-multilingual-mpnet-base-v2/1_Pooling/
+
+# Secrets / logs / OS cruft
+*.env
+*.log
+.DS_Store

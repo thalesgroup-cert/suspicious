@@ -7,7 +7,7 @@
 #################################################
 #               BUILD ARGS                      #
 #################################################
-ARG PYTHON_VERSION=3.11.14
+ARG PYTHON_VERSION=3.12.13
 ARG DEBIAN_SUITE=bookworm
 ARG HTTP_PROXY
 ARG HTTPS_PROXY
@@ -48,12 +48,19 @@ COPY requirements.txt .
 # Install dependencies directly into system python
 RUN uv pip install --system --no-cache -r requirements.txt
 
-# Pre-download NLTK data
+# Third-party connectors (suspicious.connectors entry points)
+COPY requirements-connectors.txt .
+RUN uv pip install --system --no-cache -r requirements-connectors.txt
+
+# Pre-download NLTK data. nltk.download() returns False on failure instead
+# of raising, which once produced images missing the stopwords corpus —
+# fail the build instead.
 RUN python - <<EOF
+import sys
 import nltk
-nltk.download("stopwords", download_dir="/usr/local/share/nltk_data")
-nltk.download("punkt", download_dir="/usr/local/share/nltk_data")
-nltk.download("punkt_tab", download_dir="/usr/local/share/nltk_data")
+for package in ("stopwords", "punkt", "punkt_tab"):
+    if not nltk.download(package, download_dir="/usr/local/share/nltk_data"):
+        sys.exit(f"NLTK download failed: {package}")
 EOF
 
 ################
@@ -92,7 +99,14 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
         wkhtmltopdf \
         libmariadb3 \
         libmagic1 \
+        libcairo2 \
+        libpango-1.0-0 \
+        libgdk-pixbuf-2.0-0 \
+        libffi8 \
+        shared-mime-info \
+        fonts-dejavu-core \
         cron \
+        celery \
     && rm -rf /var/lib/apt/lists/* \
     && mkdir -p /var/log \
     && touch /var/log/cron.log
@@ -103,9 +117,27 @@ COPY --from=builder /usr/local /usr/local
 # Copy NLTK data
 COPY --from=builder /usr/local/share/nltk_data /usr/local/share/nltk_data
 
+# Create non-root runtime user (S7).
+# UID/GID 1000 matches the typical host developer account so bind-mounted
+# settings.json / logs / certificates remain readable. Override via build
+# args if your host uses a different UID range.
+ARG APP_UID=1000
+ARG APP_GID=1000
+RUN groupadd --system --gid ${APP_GID} suspicious \
+    && useradd --system --uid ${APP_UID} --gid ${APP_GID} \
+        --home /app --shell /usr/sbin/nologin suspicious
+
 # Copy application code
 COPY . .
 
+# Logs directory must be writable by the runtime user; settings.json is
+# bind-mounted read-only at /app/settings.json so its host permissions
+# (chmod 600 expected) govern access.
+RUN mkdir -p /app/log \
+    && chown -R suspicious:suspicious /app /var/log/cron.log
+
 WORKDIR /app/Suspicious
+
+USER suspicious
 
 EXPOSE 9020

@@ -1,0 +1,4 @@
+{
+  "summary": {"taxonomies": [{"level": "info", "namespace": "MISP", "predicate": "Search", "value": "0 events"}]},
+  "full": {"results": [{"url": "https://cert-misp.corp.thales", "name": "Thales CERT MISP", "result": []}]}
+}

@@ -1,9 +1,8 @@
 from django.db import models
-from django.utils.translation import gettext_lazy as _
 
 class IP(models.Model):
     id = models.AutoField(primary_key=True)
-    address = models.CharField(max_length=15)
+    address = models.CharField(max_length=45)
     ioc_score = models.FloatField(default=5)
     ioc_confidence = models.FloatField(default=0)
     ioc_level = models.CharField(max_length=20, default='info')

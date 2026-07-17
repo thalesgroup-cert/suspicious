@@ -1,0 +1,4 @@
+{
+  "summary": {"taxonomies": [{"level": "malicious", "namespace": "CIRCLHashlookup", "predicate": "Result", "value": "known"}]},
+  "full": {"KnownMalicious": "blocklist.de", "FileName": "invoice.exe", "SHA-256": "def"}
+}

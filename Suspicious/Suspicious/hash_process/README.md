@@ -1,12 +1,12 @@
 # 🧳 Hash Process Module
 
-This module is part of a Django-based application that provides functionality to manage the hashs that are submitted to suspicious either via mail or simple submission. It includes standard Django components (models, views, urls) and custom utilities for hash handling.
+This module is a Django app that manages the hashs that are submitted to suspicious either via mail or simple submission. It includes standard Django components (models, views, urls) and custom utilities for hash handling.
 
 ---
 
 ## 📦 Overview
 
-The `hash_process` app is designed to:
+The `hash_process` app:
 
 - Manage hashs through Django models and views
 - Provide APIs for CRUD operations on hashs

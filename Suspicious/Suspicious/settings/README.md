@@ -1,12 +1,12 @@
 # 🧳 settings Process Module
 
-This module is part of a Django-based application that provides functionality to manage the settingss that are submitted to suspicious either via mail or simple submission. It includes standard Django components (models, views, urls) and custom utilities for settings handling.
+This module is a Django app that manages the settingss that are submitted to suspicious either via mail or simple submission. It includes standard Django components (models, views, urls) and custom utilities for settings handling.
 
 ---
 
 ## 📦 Overview
 
-The `settings` app is designed to:
+The `settings` app:
 
 - Manage settingss through Django models and views
 - Provide APIs for CRUD operations on settingss
@@ -27,10 +27,6 @@ settings/
 ├── views.py
 ├── migrations/
 │   └── *.py
-├── settings_utils/
-│   ├── domain.py
-│   ├── feeder_email.py
-│   └── filetype.py
 ```
 
 ---

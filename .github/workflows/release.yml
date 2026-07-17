@@ -1,0 +1,97 @@
+name: Release
+
+on:
+  push:
+    branches: [main, test]
+    tags: ["v*"]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: release-${{ github.ref }}
+  cancel-in-progress: false
+
+jobs:
+  build-push:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      packages: write
+      id-token: write
+      attestations: write
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - name: suspicious
+            context: ./Suspicious
+            image: ghcr.io/thalesgroup-cert/suspicious
+          - name: suspicious-ui
+            context: ./suspicious-ui
+            image: ghcr.io/thalesgroup-cert/suspicious-ui
+          - name: suspicious-feeder
+            context: ./email-feeder
+            image: ghcr.io/thalesgroup-cert/suspicious-feeder
+    steps:
+      - uses: actions/checkout@v6
+
+      - uses: docker/setup-qemu-action@v4
+      - uses: docker/setup-buildx-action@v4
+
+      - name: Log in to GHCR
+        uses: docker/login-action@v4
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Docker metadata
+        id: meta
+        uses: docker/metadata-action@v6
+        with:
+          images: ${{ matrix.image }}
+          tags: |
+            type=raw,value=latest,enable={{is_default_branch}}
+            type=sha,prefix=sha-,enable={{is_default_branch}}
+            type=raw,value=test,enable=${{ github.ref == 'refs/heads/test' }}
+            type=semver,pattern={{version}}
+            type=semver,pattern={{major}}.{{minor}}
+            type=semver,pattern={{major}}
+
+      - name: Build and push
+        id: build
+        uses: docker/build-push-action@v7
+        with:
+          context: ${{ matrix.context }}
+          push: true
+          tags: ${{ steps.meta.outputs.tags }}
+          labels: ${{ steps.meta.outputs.labels }}
+          cache-from: type=gha,scope=${{ matrix.name }}
+          cache-to: type=gha,mode=max,scope=${{ matrix.name }}
+
+      - name: Generate SBOM (syft)
+        uses: anchore/sbom-action@v0
+        with:
+          image: ${{ matrix.image }}@${{ steps.build.outputs.digest }}
+          format: spdx-json
+          output-file: sbom-${{ matrix.name }}.spdx.json
+
+      - name: Upload SBOM artifact
+        uses: actions/upload-artifact@v7
+        with:
+          name: sbom-${{ matrix.name }}
+          path: sbom-${{ matrix.name }}.spdx.json
+
+      # Requires the GHCR package to be PUBLIC (attestations on private
+      # packages need GitHub Enterprise and fail with "Failed to persist
+      # attestation: Requires authentication"). New packages default to
+      # private: org admin must flip visibility under
+      # github.com/orgs/thalesgroup-cert/packages → <package> → settings.
+      - name: Attest build provenance
+        uses: actions/attest-build-provenance@v4
+        with:
+          subject-name: ${{ matrix.image }}
+          subject-digest: ${{ steps.build.outputs.digest }}
+          push-to-registry: true

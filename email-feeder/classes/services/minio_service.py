@@ -1,3 +1,5 @@
+import io
+import logging
 import pathlib
 import typing
 
@@ -11,6 +13,20 @@ import classes.models.mail_tags
 import classes.models.configs.internals.minio
 
 
+# Object-storage activity -> minio.log + json stdout (see logger_service).
+logger = logging.getLogger("email-feeder.minio")
+
+# MinIO/S3 bucket names are bounded to 63 chars. Normalise once at the entry
+# point so the existence check, creation, and subsequent object puts all use
+# the SAME name — checking the full name but creating a truncated one made
+# long-named buckets fail to be re-detected on the next run.
+_MAX_BUCKET_NAME_LEN = 63
+
+
+def _normalize_bucket_name(bucket_name: str) -> str:
+    return bucket_name[:_MAX_BUCKET_NAME_LEN]
+
+
 class MinioService:
     __minio_client: minio.Minio | None = None
 
@@ -19,12 +35,34 @@ class MinioService:
     ) -> None:
         self.__config = config
 
+    def ensure_bucket(self, bucket_name: str) -> None:
+        """Create the bucket if absent. No tags (prefix mode uses _status.json)."""
+        if self.__minio_client is None:
+            raise Exception(f"MinIO client not available for bucket '{bucket_name}'.")
+        if not self.__minio_client.bucket_exists(bucket_name):
+            self.__minio_client.make_bucket(bucket_name)
+            logger.info("Created MinIO bucket '%s'", bucket_name)
+
+    def upload_bytes(self, bucket_name: str, object_name: str, data: bytes,
+                     content_type: str = "application/octet-stream") -> None:
+        if self.__minio_client is None:
+            raise Exception(f"MinIO client not available for bucket '{bucket_name}'.")
+        self.__minio_client.put_object(
+            bucket_name=bucket_name, object_name=object_name,
+            data=io.BytesIO(data), length=len(data), content_type=content_type,
+        )
+
     def connect(self):
         self.__minio_client = minio.Minio(
             self.__config.endpoint,
             access_key=self.__config.access_key,
             secret_key=self.__config.secret_key,
             secure=self.__config.secure,
+        )
+        logger.info(
+            "MinIO client connected: endpoint=%s secure=%s",
+            self.__config.endpoint,
+            self.__config.secure,
         )
 
     def __bucket_exists(self, bucket_name: str) -> bool:
@@ -37,6 +75,7 @@ class MinioService:
         if self.__minio_client is None:
             raise Exception(f"MinIO client not available for bucket '{bucket_name}'.")
         self.__minio_client.make_bucket(bucket_name)
+        logger.info("Created MinIO bucket '%s'", bucket_name)
 
     def __assign_bucket_tags(self, bucket_name: str, tags_to_set: dict[str, str]):
         if self.__minio_client is None:
@@ -145,10 +184,8 @@ class MinioService:
                 f"Source '{source_dir}' is not a directory or does not exist."
             )
 
-        # Truncate before first use: bucket_exists() enforces the 63-char S3 limit
-        # too, so truncating only in __make_bucket left it out of sync with the name
-        # actually checked/uploaded to.
-        bucket_name = bucket_name[:63]
+        # Normalise once so existence-check, creation, and object puts agree.
+        bucket_name = _normalize_bucket_name(bucket_name)
 
         bucket_creation_tags = {
             classes.models.mail_tags.MailTag.STATUS.value: classes.models.mail_tags.MailTag.TODO.value
@@ -161,6 +198,7 @@ class MinioService:
                 f"Cannot upload to MinIO bucket '{bucket_name}' as it could not be ensured/created."
             ) from e
 
+        uploaded = 0
         for file_path in source_dir.rglob("*"):
             if not file_path.is_file():
                 continue
@@ -180,11 +218,21 @@ class MinioService:
                     object_name=minio_file_path.as_posix(),
                     default_tags=default_tags,
                 )
+                uploaded += 1
 
             except Exception as e:
+                logger.error(
+                    "Upload failed for '%s' as '%s': %s",
+                    file_path.name, minio_file_path, e,
+                )
                 raise Exception(
                     f"Failed to upload '{file_path.name}' as '{minio_file_path}': {e}",
                 ) from e
+
+        logger.info(
+            "Uploaded %d file(s) from '%s' to bucket '%s'",
+            uploaded, source_dir, bucket_name,
+        )
 
     @property
     def is_connected(self) -> bool:
