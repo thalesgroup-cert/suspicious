@@ -23,10 +23,11 @@ jobs:
     steps:
       - uses: actions/checkout@v6
       - name: Trivy filesystem scan
-        # v0.28.0's composite step pins a now-nonexistent aquasecurity/setup-trivy
-        # tag (v0.2.1) and fails before it ever scans; v0.30.0 runs its own
-        # entrypoint.sh with no nested action reference to break.
-        uses: aquasecurity/trivy-action@v0.30.0
+        # v0.28.0 and v0.30.0 both pin a now-nonexistent aquasecurity/setup-trivy
+        # tag (v0.2.1, v0.2.2) and fail before ever scanning; v0.36.0 pins that
+        # nested action by commit SHA (equivalent to the real tag v0.2.6), so
+        # it isn't exposed to the same float-tag drift.
+        uses: aquasecurity/trivy-action@v0.36.0
         with:
           scan-type: fs
           scan-ref: .
@@ -67,7 +68,23 @@ jobs:
         # Gating: a known-vulnerable dependency fails the build. If an advisory
         # has no fix yet, triage it and add `--ignore-vuln <GHSA/CVE-id>` here
         # rather than re-muting the whole audit.
-        run: pip-audit -r ${{ matrix.path }}/requirements.txt --strict
+        #
+        # Suspicious-only, no fix released yet for either:
+        #  - GHSA-f4j7-r4q5-qw2c (chromadb pre-auth RCE via trust_remote_code
+        #    on the collections API): we only use chromadb as an HttpClient
+        #    (common.clients.get_chroma_client — get_collection/get/delete),
+        #    never the vulnerable server code path or trust_remote_code.
+        #  - CVE-2026-12243 (nltk path traversal via nltk.data.load/find):
+        #    our only call site is nltk.download() in Dockerfile with a
+        #    hardcoded package tuple, not the vulnerable load()/find() API.
+        run: |
+          if [ "${{ matrix.path }}" = "Suspicious" ]; then
+            pip-audit -r Suspicious/requirements.txt --strict \
+              --ignore-vuln GHSA-f4j7-r4q5-qw2c \
+              --ignore-vuln CVE-2026-12243
+          else
+            pip-audit -r ${{ matrix.path }}/requirements.txt --strict
+          fi
 
   npm-audit:
     runs-on: ubuntu-latest
