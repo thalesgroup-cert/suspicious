@@ -1,6 +1,7 @@
 from django.test import SimpleTestCase
 
 from connectors.base import EVENT_CASE_FINALISED
+from connectors.contrib.chromadb.connector import ChromaDBConnector
 from connectors.registry import ConnectorRegistry
 from connectors.tests.dummy import DummyConnector
 
@@ -44,3 +45,16 @@ class RegistryTest(SimpleTestCase):
     def test_load_failure_recorded_not_raised(self):
         self.registry._load("connectors.no_such_module:Nope", builtin=True)
         self.assertIn("connectors.no_such_module:Nope", self.registry.errors)
+
+    def test_chromadb_connector_registers_with_daily_schedule(self):
+        self.registry.register(ChromaDBConnector)
+        self.assertIs(self.registry.get("chromadb"), ChromaDBConnector)
+        [(name, sched)] = self.registry.scheduled()
+        self.assertEqual((name, sched.name, sched.interval_seconds), ("chromadb", "cleanup", 86400))
+
+    def test_chromadb_is_a_registered_builtin(self):
+        from connectors.contrib import BUILTIN_CONNECTOR_PATHS
+        self.assertIn(
+            "connectors.contrib.chromadb.connector:ChromaDBConnector",
+            BUILTIN_CONNECTOR_PATHS,
+        )
