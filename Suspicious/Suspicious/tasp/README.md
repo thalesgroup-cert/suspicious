@@ -54,7 +54,6 @@ tasp/
 | `check-challengeable` | `tasp.tasks.check_challengeable` | daily 00:00 | Refresh the daily "challengeable" flag |
 | `sync-monthly-kpi` | `tasp.tasks.sync_monthly_kpi` | every 300 s | Roll the monthly KPI snapshots |
 | `delete-old-reports` | `tasp.tasks.delete_old_reports` | monthly day 1 | GC ageing `AnalyzerReport` rows |
-| `remove-old-emails` | `tasp.tasks.remove_old_emails` | daily 00:00 | Purge stale `.eml` files from the working dir |
 | `materialise-dashboard-snapshots` | `tasp.tasks.materialise_dashboard_snapshots` | daily 02:00 | Materialise the dashboard summary tables |
 
 All wrappers use `@shared_task(bind=True, max_retries=3, acks_late=True)` with exponential-backoff retry on unexpected exception (60 s base for slow tasks, 30 s for the per-job Cortex update).
