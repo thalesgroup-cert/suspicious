@@ -1,5 +1,5 @@
 beautifulsoup4==4.11.1
-requests==2.33.1
+requests==2.34.2
 python-dateutil==2.9.0.post0
 minio==7.2.20
 chardet==7.4.3
