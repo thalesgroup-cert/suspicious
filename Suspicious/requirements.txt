@@ -5,7 +5,7 @@ django-mysql==4.19.0
 mysqlclient==2.2.8
 python-ldap==3.4.7
 djangorestframework==3.17.1
-django-rest-knox==5.0.4
+django-rest-knox==5.1.0
 django-filter==26.1
 drf-spectacular==0.29.0
 gunicorn==25.3.0
