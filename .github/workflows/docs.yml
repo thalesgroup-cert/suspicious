@@ -43,6 +43,7 @@ jobs:
       - name: Generate OpenAPI schema
         run: |
           mkdir -p docs/reference
+          chmod 777 docs/reference
           docker run --rm \
             -v "${{ github.workspace }}/Suspicious/Suspicious":/app/Suspicious \
             -v "${{ github.workspace }}/Suspicious/settings.ci.json":/app/settings.json:ro \

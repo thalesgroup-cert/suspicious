@@ -18,3 +18,5 @@ python-json-logger==4.1.0
 opentelemetry-sdk==1.27.0
 opentelemetry-exporter-otlp-proto-http==1.27.0
 opentelemetry-instrumentation-requests==0.48b0
+# Transitive via the otel exporter above; PYSEC-2026-1805 needs >=5.29.6
+protobuf>=5.29.6

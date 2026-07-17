@@ -70,7 +70,7 @@ chromadb==1.5.8
 python-json-logger==4.1.0  # v4.x changed the API; pin to v3 until we migrate
 
 # Image rendering (cairosvg: SVG→PNG for Outlook email previews)
-pillow==12.2.0
+pillow==12.3.0
 cairosvg==2.9.0
 
 # Task Queue
@@ -86,3 +86,5 @@ opentelemetry-instrumentation-django==0.48b0
 opentelemetry-instrumentation-requests==0.48b0
 opentelemetry-instrumentation-celery==0.48b0
 opentelemetry-exporter-otlp-proto-http==1.27.0
+# Transitive via the otel exporter above; PYSEC-2026-1805 needs >=5.29.6
+protobuf>=5.29.6
