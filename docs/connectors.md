@@ -6,10 +6,13 @@ built-in TheHive, MISP, Watcher and SMTP-notify integrations are
 themselves connectors (`connectors/contrib/`), and third-party packages
 plug in through the same contract without touching Suspicious code.
 
-**Starting your own:** [`examples/suspicious-connector-template/`](https://github.com/thalesgroup-cert/suspicious/tree/main/examples/suspicious-connector-template)
+**Starting your own:** [`Suspicious/Suspicious/connectors/contrib/template/`](https://github.com/thalesgroup-cert/suspicious/tree/main/Suspicious/Suspicious/connectors/contrib/template)
 is a complete, working package skeleton (manifest, both hooks, `sync()`,
-packaging, and tests) — copy it out and rename rather than starting from
-the snippet below.
+packaging, and tests) — copy it out of the tree and rename rather than
+starting from the snippet below. It's a standalone pip package (its own
+`pyproject.toml`), not a builtin — it isn't listed in
+`connectors.contrib.BUILTIN_CONNECTOR_PATHS` and never gets discovered
+from in-place.
 
 ## Overview
 
