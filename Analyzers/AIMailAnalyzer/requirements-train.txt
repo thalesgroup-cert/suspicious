@@ -6,7 +6,7 @@
 # Usage: pip install -r requirements.txt -r requirements-train.txt
 -r requirements.txt
 
-pandas>=2.2
+pandas>=3.0.3
 scikit-learn>=1.5
 imbalanced-learn>=0.13
 matplotlib>=3.9
