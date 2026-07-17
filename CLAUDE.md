@@ -141,12 +141,13 @@ cd .. && bash scripts/init.sh   # now completes: downloads Cortex catalogs too
 
 ### 3. Optional dev SMTP + LDAP
 
-`deployment/docker-compose.override.yml` already carries `greenmail` (SMTP :3025 / IMAP :3143, same image `email-feeder/docker-compose.e2e.yaml` uses for its e2e test) and `openldap` (`osixia/openldap`) as of this session — auto-loaded, no extra `-f` flags. If they're gone, re-add them. Two non-obvious traps already worked around there:
+`deployment/docker-compose.dev-extras.yml` carries `greenmail` (SMTP :3025 / IMAP :3143, same image `email-feeder/docker-compose.e2e.yaml` uses for its e2e test) and `openldap` (`osixia/openldap`) as of this session — **opt-in only**, pass `-f docker-compose.dev-extras.yml` explicitly (it is deliberately not `docker-compose.override.yml`, which *is* auto-loaded, so a plain `make up`/`docker compose up` never starts these). If the file's gone, re-add it. Two non-obvious traps already worked around there:
 - **SMTP AUTH is required.** `email.smtp.password` in `settings.json` can't be empty or greenmail disconnects the login. Use the same password as the IMAP user(s) in `GREENMAIL_OPTS`.
 - **openldap seed data must NOT go through the image's own bootstrap-ldif volume.** That entrypoint chown/sed/rm's paths under `/container/service/slapd/assets/config/bootstrap/ldif/` in place, which fails ("Device or resource busy") against any bind mount at that exact path. Seed with `ldapadd` after the container is healthy instead:
   ```bash
   docker cp docker/openldap/custom/50-meridian.ldif openldap:/tmp/seed.ldif
-  docker compose exec openldap ldapadd -x -D "cn=admin,dc=meridian,dc=example" \
+  docker compose -f docker-compose.yml -f docker-compose.dev-extras.yml \
+    exec openldap ldapadd -x -D "cn=admin,dc=meridian,dc=example" \
     -w "$LDAP_ADMIN_PASSWORD" -f /tmp/seed.ldif
   ```
   See `CONFIG.md` § 2.8 for why `profiles/profiles_utils/ldap.py`'s own search silently returns zero results against a plain-schema test directory like this one (hardcoded `Tpresent`/`TpreferredFirstName` attribute filter, not a standard schema).
@@ -158,7 +159,9 @@ cd deployment
 docker network create --driver bridge --subnet 172.20.0.0/16 \
   --gateway 172.20.0.1 --ip-range 172.20.0.0/24 suspicious_net   # or `make network`
 docker compose --env-file .env build suspicious suspicious_ui feeder
-docker compose --env-file .env up -d db_suspicious redis_cache redis_broker rustfs chromadb greenmail openldap
+docker compose --env-file .env up -d db_suspicious redis_cache redis_broker rustfs chromadb
+docker compose --env-file .env -f docker-compose.yml -f docker-compose.dev-extras.yml \
+  up -d greenmail openldap
 ```
 **Gotcha:** if `Suspicious/logs/` or `email-feeder/logs/` don't exist yet, Docker auto-creates them as `root:root` on first bind mount, and the container's non-root app user then can't write its log file (`PermissionError`). Fix before running anything that writes logs:
 ```bash
