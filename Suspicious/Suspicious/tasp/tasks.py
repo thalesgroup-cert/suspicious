@@ -76,16 +76,6 @@ def delete_old_reports(self):
 
 
 @shared_task(bind=True, **_RETRY)
-def remove_old_emails(self):
-    from tasp.cron.suspicious import remove_old_suspicious_emails
-    try:
-        remove_old_suspicious_emails()
-    except Exception as exc:
-        raise self.retry(exc=exc, countdown=60 * 2 ** self.request.retries)
-
-
-
-@shared_task(bind=True, **_RETRY)
 def materialise_dashboard_snapshots(self):
     from tasp.cron.dashboard_snapshot import materialise_dashboard_snapshots as _run
     try:
