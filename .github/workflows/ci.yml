@@ -29,9 +29,8 @@ jobs:
         with:
           ref: ${{ github.event.pull_request.head.sha }}
           fetch-depth: 2
-      - run: npx --yes -p @commitlint/cli -p @commitlint/config-conventional \
-          commitlint --from HEAD~1 --to HEAD \
-          --config .github/commitlint.config.js
+      - run: |
+          npx --yes -p @commitlint/cli -p @commitlint/config-conventional commitlint --from HEAD~1 --to HEAD --config .github/commitlint.config.js
 
   backend-lint:
     runs-on: ubuntu-latest
