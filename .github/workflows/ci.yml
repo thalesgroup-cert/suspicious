@@ -19,19 +19,19 @@ jobs:
     if: github.event_name == 'pull_request'
     runs-on: ubuntu-latest
     steps:
+      # wagoid/commitlint-github-action's commitDepth doesn't reliably mean
+      # "the tip commit" in a pull_request context — observed linting the
+      # *oldest* new commit on a multi-commit PR instead (see PR #14). Check
+      # out the PR's real head commit explicitly and run commitlint directly
+      # over HEAD~1..HEAD so there's no ambiguity about which commit or which
+      # ref (merge-preview vs. head) is being examined.
       - uses: actions/checkout@v6
         with:
-          fetch-depth: 0
-      - uses: wagoid/commitlint-github-action@v6
-        with:
-          # This only became a blocking PR gate the moment a PR first
-          # targeted `main` (pull_request here is scoped to branches: [main]
-          # — test/feature branches were never gated by it pre-merge). A
-          # long-lived integration branch's full history predates that, so
-          # only lint the tip commit going forward rather than demanding
-          # retroactive Conventional Commits compliance from every commit
-          # already merged into test.
-          commitDepth: 1
+          ref: ${{ github.event.pull_request.head.sha }}
+          fetch-depth: 2
+      - run: npx --yes -p @commitlint/cli -p @commitlint/config-conventional \
+          commitlint --from HEAD~1 --to HEAD \
+          --config .github/commitlint.config.js
 
   backend-lint:
     runs-on: ubuntu-latest
