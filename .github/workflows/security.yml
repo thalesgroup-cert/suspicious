@@ -69,19 +69,15 @@ jobs:
         # has no fix yet, triage it and add `--ignore-vuln <GHSA/CVE-id>` here
         # rather than re-muting the whole audit.
         #
-        # Suspicious-only, no fix released yet for either:
-        #  - GHSA-f4j7-r4q5-qw2c (chromadb pre-auth RCE via trust_remote_code
-        #    on the collections API): we only use chromadb as an HttpClient
-        #    (common.clients.get_chroma_client — get_collection/get/delete),
-        #    never the vulnerable server code path or trust_remote_code.
-        #  - CVE-2026-12243 (nltk path traversal via nltk.data.load/find):
-        #    our only call site is nltk.download() in Dockerfile with a
-        #    hardcoded package tuple, not the vulnerable load()/find() API.
+        # Suspicious-only: GHSA-f4j7-r4q5-qw2c (chromadb pre-auth RCE via
+        # trust_remote_code on the collections API) has no fix released yet.
+        # We only use chromadb as an HttpClient (common.clients.get_chroma_
+        # client — get_collection/get/delete), never the vulnerable server
+        # code path or trust_remote_code.
         run: |
           if [ "${{ matrix.path }}" = "Suspicious" ]; then
             pip-audit -r Suspicious/requirements.txt --strict \
-              --ignore-vuln GHSA-f4j7-r4q5-qw2c \
-              --ignore-vuln CVE-2026-12243
+              --ignore-vuln GHSA-f4j7-r4q5-qw2c
           else
             pip-audit -r ${{ matrix.path }}/requirements.txt --strict
           fi
