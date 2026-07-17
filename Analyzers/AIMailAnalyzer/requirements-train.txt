@@ -8,7 +8,7 @@
 
 pandas>=2.2
 scikit-learn>=1.5
-imbalanced-learn>=0.13
+imbalanced-learn>=0.14.2
 matplotlib>=3.9
 seaborn>=0.13
 tqdm>=4.66
