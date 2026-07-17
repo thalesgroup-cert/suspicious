@@ -139,6 +139,11 @@ class SubmitUrlSerializer(OptionalContextMixin, serializers.Serializer):
         try:
             _check_no_ssrf_ip(value)
         except ValueError as exc:
+            # codeql[py/stack-trace-exposure]: _check_no_ssrf_ip only ever
+            # raises one of three fixed, deliberately user-facing literals
+            # (e.g. "URL targets a private or reserved address.") — never an
+            # interpolated internal detail — so surfacing str(exc) here is
+            # the intended SSRF-rejection UX, not a leak.
             raise serializers.ValidationError(str(exc)) from exc
         return value
 

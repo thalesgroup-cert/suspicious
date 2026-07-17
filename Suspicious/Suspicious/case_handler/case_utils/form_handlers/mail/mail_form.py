@@ -1,4 +1,5 @@
 import logging
+import os
 import shutil
 from email import policy
 from email.parser import BytesParser
@@ -47,7 +48,12 @@ class MailFormHandler:
         Returns:
             instance from WebSubmissionService or None on failure.
         """
-        user_prefix = self.user.username.split('@')[0]
+        # os.path.basename strips any separator a username could carry — Django's
+        # default validator already forbids "/", but this is the barrier CodeQL's
+        # path-injection query recognizes, and it's what actually stops every
+        # downstream directory built from user_prefix (bucket, local_dir, tmp_dir)
+        # from being flagged as tainted.
+        user_prefix = os.path.basename(self.user.username.split('@')[0])
         mail_id = generate_object_reference()
         bucket = f"{user_prefix}-submission-{mail_id.split('-',1)[0]}"
         ext = Path(mail_file.name).suffix.lower()

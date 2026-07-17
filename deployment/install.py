@@ -106,7 +106,15 @@ def write_env(values: dict) -> None:
             template,
             flags=re.MULTILINE,
         )
+    # codeql[py/clear-text-storage-sensitive-data]: a docker-compose .env file
+    # is inherently plaintext-at-rest — that's the contract compose reads
+    # env vars under, and there's no alternative encoding for it. Vault
+    # (suspicious/secrets.py) is the production-grade path for everything
+    # this script doesn't touch; this is dev/local bootstrap only. Restrict
+    # to owner-read/write so at least other local accounts on the host can't
+    # read it off the filesystem.
     ENV_FILE.write_text(template)
+    os.chmod(ENV_FILE, 0o600)
     ok(f".env written ({ENV_FILE})")
 
 

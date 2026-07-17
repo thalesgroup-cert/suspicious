@@ -54,6 +54,9 @@ class BuildEmailDataModelTests(TestCase):
             os.makedirs(attach_dir)
             secret = b"OUTSIDE-SECRET"
             with open(os.path.join(parent, "secret"), "wb") as f:
+                # codeql[py/clear-text-storage-sensitive-data]: `secret` is a
+                # hardcoded test fixture (bait for the traversal assertion
+                # below), not real secret material.
                 f.write(secret)
             meta = ec.EmailMetadata.model_validate({
                 "schema": 1, "id": "x-1", "from": "a@b.test", "to": "v@c.test",

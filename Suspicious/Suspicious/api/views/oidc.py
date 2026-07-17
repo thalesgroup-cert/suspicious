@@ -183,6 +183,11 @@ class OIDCCallbackView(APIView):
         if "error" in request.GET:
             error = request.GET.get("error", "unknown")
             logger.warning("OIDC provider returned error: %s", error)
+            # codeql[py/url-redirection]: _frontend_url always prepends the
+            # admin-configured CSRF_TRUSTED_ORIGINS[0] + a hardcoded "/login"
+            # path — `error` only ever reaches the percent-encoded
+            # `sso_error` query VALUE, never the scheme/host/path, so there's
+            # no attacker-controlled redirect target here.
             return redirect(_frontend_error(error))
 
         code  = request.GET.get("code")

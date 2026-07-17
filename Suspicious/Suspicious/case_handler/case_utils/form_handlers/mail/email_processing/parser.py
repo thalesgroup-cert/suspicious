@@ -1,3 +1,4 @@
+import os
 import re
 import logging
 import mimetypes
@@ -151,7 +152,11 @@ class EmailParser:
                 ext = mimetypes.guess_extension(ctype) or ".bin"
                 name = sanitize_filename(f"attachment_{i}", i) + ext
 
-            path = self.attachments_dir / f"{i}_{name}"
+            # sanitize_filename already strips separators, but os.path.basename
+            # is the barrier CodeQL's path-injection query recognizes as a
+            # sanitizer, and it's a genuine no-op-if-already-safe guard against
+            # any future change to sanitize_filename reintroducing one.
+            path = self.attachments_dir / os.path.basename(f"{i}_{name}")
             payload = part.get_payload(decode=True)
             if payload is None:
                 payload = part.as_bytes()

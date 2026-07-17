@@ -224,8 +224,15 @@ class ConnectorConfigView(APIView):
                     {"errors": {field_key: "secret store not configured"}},
                     status=status.HTTP_409_CONFLICT,
                 )
-            except Exception:  # noqa: BLE001 — surface any Vault write failure as 502
-                logger.exception("Vault write failed for secret '%s'", vault_key)
+            except Exception as exc:  # noqa: BLE001 — surface any Vault write failure as 502
+                # Not logger.exception(): the traceback/exception message can
+                # echo back the failed HTTP request (hvac wraps requests
+                # errors, which sometimes embed the request body) — and that
+                # body is exactly the secret `value` this loop is writing.
+                # Log the exception's type only, never its string form.
+                logger.error(
+                    "Vault write failed for secret '%s' (%s)", vault_key, type(exc).__name__
+                )
                 return Response(
                     {"errors": {field_key: "secret store write failed"}},
                     status=status.HTTP_502_BAD_GATEWAY,

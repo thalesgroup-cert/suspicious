@@ -84,6 +84,10 @@ def get_secret(key: str, default: Any = None, *, fail_fast: bool = False) -> Any
             f"{os.environ.get('VAULT_ADDR')}: {exc}"
         )
         if fail_fast:
+            # codeql[py/clear-text-logging-sensitive-data]: this is the READ
+            # failure branch — _read_from_vault raised before ever returning a
+            # value, so `message` can only contain the secret's dotted *name*
+            # (`key`) and the Vault client's error, never a resolved value.
             sys.stderr.write(f"\n{message}\n\n")
             raise SystemExit(1) from exc
         raise RuntimeError(message) from exc
