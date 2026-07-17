@@ -19,7 +19,7 @@ jobs:
         run: ./scripts/ci/bootstrap.sh
       - name: Upload stack logs
         if: failure()
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v7
         with:
           name: ci-stack-log
           path: ci-stack.log
