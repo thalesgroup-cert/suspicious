@@ -3,7 +3,7 @@
 #########
 
 # pull official base image
-FROM python:3.10-slim
+FROM python:3.14-slim
 
 # Build-time proxy only (not baked into the running container's env like the
 # old ENV did — that routed every runtime outbound call through a proxy IP
