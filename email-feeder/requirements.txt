@@ -15,8 +15,8 @@ python-json-logger==4.1.0
 # Observability — OTel SDK + auto-instrumentation for outbound HTTP.
 # Mirror of the versions pinned in Suspicious/requirements.txt so
 # trace IDs stay consistent across services. Closes audit O5.
-opentelemetry-sdk==1.27.0
-opentelemetry-exporter-otlp-proto-http==1.27.0
-opentelemetry-instrumentation-requests==0.48b0
-# Transitive via the otel exporter above; PYSEC-2026-1805 needs >=5.29.6
-protobuf>=5.29.6
+# 1.28.0+ needed: opentelemetry-proto pins protobuf<5 below that, which
+# conflicts with the >=5.29.6 fix for PYSEC-2026-1805.
+opentelemetry-sdk==1.28.0
+opentelemetry-exporter-otlp-proto-http==1.28.0
+opentelemetry-instrumentation-requests==0.49b0
