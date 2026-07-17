@@ -83,8 +83,8 @@ hvac==2.3.0
 # Observability
 # 1.28.0+ needed: opentelemetry-proto pins protobuf<5 below that, which
 # conflicts with the >=5.29.6 fix for PYSEC-2026-1805.
-opentelemetry-sdk==1.28.0
-opentelemetry-instrumentation-django==0.49b0
-opentelemetry-instrumentation-requests==0.49b0
-opentelemetry-instrumentation-celery==0.49b0
+opentelemetry-sdk==1.44.0
+opentelemetry-instrumentation-django==0.65b0
+opentelemetry-instrumentation-requests==0.65b0
+opentelemetry-instrumentation-celery==0.65b0
 opentelemetry-exporter-otlp-proto-http==1.44.0

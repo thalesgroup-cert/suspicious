@@ -1,4 +1,4 @@
-beautifulsoup4==4.15.0
+beautifulsoup4==4.13.5
 requests==2.34.2
 python-dateutil==2.9.0.post0
 minio==7.2.20
@@ -19,4 +19,4 @@ python-json-logger==4.1.0
 # conflicts with the >=5.29.6 fix for PYSEC-2026-1805.
 opentelemetry-sdk==1.44.0
 opentelemetry-exporter-otlp-proto-http==1.44.0
-opentelemetry-instrumentation-requests==0.49b0
+opentelemetry-instrumentation-requests==0.65b0
