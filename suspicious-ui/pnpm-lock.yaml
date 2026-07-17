@@ -30,10 +30,10 @@ importers:
         version: 5.2.2(react-hook-form@7.76.0(react@19.2.6))
       '@mui/icons-material':
         specifier: 9.0.1
-        version: 9.0.1(@mui/material@9.0.1(@emotion/react@11.14.0(@types/react@19.2.14)(react@19.2.6))(@emotion/styled@11.14.1(@emotion/react@11.14.0(@types/react@19.2.14)(react@19.2.6))(@types/react@19.2.14)(react@19.2.6))(@types/react@19.2.14)(react-dom@19.2.6(react@19.2.6))(react@19.2.6))(@types/react@19.2.14)(react@19.2.6)
+        version: 9.0.1(@mui/material@9.0.1(@emotion/react@11.14.0(@types/react@19.2.14)(react@19.2.6))(@emotion/styled@11.14.1(@emotion/react@11.14.0(@types/react@19.2.14)(react@19.2.6))(@types/react@19.2.14)(react@19.2.6))(@types/react@19.2.14)(react-dom@19.2.7(react@19.2.6))(react@19.2.6))(@types/react@19.2.14)(react@19.2.6)
       '@mui/material':
         specifier: 9.0.1
-        version: 9.0.1(@emotion/react@11.14.0(@types/react@19.2.14)(react@19.2.6))(@emotion/styled@11.14.1(@emotion/react@11.14.0(@types/react@19.2.14)(react@19.2.6))(@types/react@19.2.14)(react@19.2.6))(@types/react@19.2.14)(react-dom@19.2.6(react@19.2.6))(react@19.2.6)
+        version: 9.0.1(@emotion/react@11.14.0(@types/react@19.2.14)(react@19.2.6))(@emotion/styled@11.14.1(@emotion/react@11.14.0(@types/react@19.2.14)(react@19.2.6))(@types/react@19.2.14)(react@19.2.6))(@types/react@19.2.14)(react-dom@19.2.7(react@19.2.6))(react@19.2.6)
       '@tanstack/react-query':
         specifier: 5.100.11
         version: 5.100.11(react@19.2.6)
@@ -42,37 +42,37 @@ importers:
         version: 1.18.1
       framer-motion:
         specifier: 12.39.0
-        version: 12.39.0(@emotion/is-prop-valid@1.4.0)(react-dom@19.2.6(react@19.2.6))(react@19.2.6)
+        version: 12.39.0(@emotion/is-prop-valid@1.4.0)(react-dom@19.2.7(react@19.2.6))(react@19.2.6)
       notistack:
         specifier: 3.0.2
-        version: 3.0.2(react-dom@19.2.6(react@19.2.6))(react@19.2.6)
+        version: 3.0.2(react-dom@19.2.7(react@19.2.6))(react@19.2.6)
       react:
         specifier: 19.2.6
         version: 19.2.6
       react-dom:
-        specifier: 19.2.6
-        version: 19.2.6(react@19.2.6)
+        specifier: 19.2.7
+        version: 19.2.7(react@19.2.6)
       react-dropzone:
         specifier: 15.0.0
         version: 15.0.0(react@19.2.6)
       react-grid-layout:
         specifier: 2.2.3
-        version: 2.2.3(react-dom@19.2.6(react@19.2.6))(react@19.2.6)
+        version: 2.2.3(react-dom@19.2.7(react@19.2.6))(react@19.2.6)
       react-hook-form:
         specifier: 7.76.0
         version: 7.76.0(react@19.2.6)
       react-joyride:
         specifier: ^3.1.0
-        version: 3.1.0(@types/react@19.2.14)(react-dom@19.2.6(react@19.2.6))(react@19.2.6)
+        version: 3.1.0(@types/react@19.2.14)(react-dom@19.2.7(react@19.2.6))(react@19.2.6)
       react-resizable:
         specifier: 3.2.0
-        version: 3.2.0(react-dom@19.2.6(react@19.2.6))(react@19.2.6)
+        version: 3.2.0(react-dom@19.2.7(react@19.2.6))(react@19.2.6)
       react-router-dom:
         specifier: 7.15.1
-        version: 7.15.1(react-dom@19.2.6(react@19.2.6))(react@19.2.6)
+        version: 7.15.1(react-dom@19.2.7(react@19.2.6))(react@19.2.6)
       recharts:
         specifier: 3.8.1
-        version: 3.8.1(@types/react@19.2.14)(react-dom@19.2.6(react@19.2.6))(react-is@19.2.7)(react@19.2.6)(redux@5.0.1)
+        version: 3.8.1(@types/react@19.2.14)(react-dom@19.2.7(react@19.2.6))(react-is@19.2.7)(react@19.2.6)(redux@5.0.1)
       zod:
         specifier: 4.4.3
         version: 4.4.3
@@ -91,7 +91,7 @@ importers:
         version: 6.9.1
       '@testing-library/react':
         specifier: 16.3.2
-        version: 16.3.2(@testing-library/dom@10.4.1)(@types/react-dom@19.2.3(@types/react@19.2.14))(@types/react@19.2.14)(react-dom@19.2.6(react@19.2.6))(react@19.2.6)
+        version: 16.3.2(@testing-library/dom@10.4.1)(@types/react-dom@19.2.3(@types/react@19.2.14))(@types/react@19.2.14)(react-dom@19.2.7(react@19.2.6))(react@19.2.6)
       '@testing-library/user-event':
         specifier: 14.6.1
         version: 14.6.1(@testing-library/dom@10.4.1)
@@ -1939,10 +1939,10 @@ packages:
     resolution: {integrity: sha512-vYt7UD1U9Wg6138shLtLOvdAu+8DsC/ilFtEVHcH+wydcSpNE20AfSOduf6MkRFahL5FY7X1oU7nKVZFtfq8Fg==}
     engines: {node: '>=6'}
 
-  react-dom@19.2.6:
-    resolution: {integrity: sha512-0prMI+hvBbPjsWnxDLxlCGyM8PN6UuWjEUCYmZhO67xIV9Xasa/r/vDnq+Xyq4Lo27g8QSbO5YzARu0D1Sps3g==}
+  react-dom@19.2.7:
+    resolution: {integrity: sha512-t0BRVXvbiE/o20Hfw669rLbMCDWtYZLvmJigy2f0MxsXF+71pxhR3xOkspmsO8h3ZlNzyibAmtCa3l4lYKk6gQ==}
     peerDependencies:
-      react: ^19.2.6
+      react: ^19.2.7
 
   react-draggable@4.6.0:
     resolution: {integrity: sha512-g4vqY53xhmPrBnZvGP+1YQV0eYnB3o0VLzoi6q2IpwnQrxIZ34tYRKpVtsWIXPg4D/pvLn+oYCW5gOK2cWIrgA==}
@@ -2875,11 +2875,11 @@ snapshots:
       '@floating-ui/core': 1.7.5
       '@floating-ui/utils': 0.2.11
 
-  '@floating-ui/react-dom@2.1.8(react-dom@19.2.6(react@19.2.6))(react@19.2.6)':
+  '@floating-ui/react-dom@2.1.8(react-dom@19.2.7(react@19.2.6))(react@19.2.6)':
     dependencies:
       '@floating-ui/dom': 1.7.6
       react: 19.2.6
-      react-dom: 19.2.6(react@19.2.6)
+      react-dom: 19.2.7(react@19.2.6)
 
   '@floating-ui/utils@0.2.11': {}
 
@@ -2936,15 +2936,15 @@ snapshots:
 
   '@mui/core-downloads-tracker@9.1.1': {}
 
-  '@mui/icons-material@9.0.1(@mui/material@9.0.1(@emotion/react@11.14.0(@types/react@19.2.14)(react@19.2.6))(@emotion/styled@11.14.1(@emotion/react@11.14.0(@types/react@19.2.14)(react@19.2.6))(@types/react@19.2.14)(react@19.2.6))(@types/react@19.2.14)(react-dom@19.2.6(react@19.2.6))(react@19.2.6))(@types/react@19.2.14)(react@19.2.6)':
+  '@mui/icons-material@9.0.1(@mui/material@9.0.1(@emotion/react@11.14.0(@types/react@19.2.14)(react@19.2.6))(@emotion/styled@11.14.1(@emotion/react@11.14.0(@types/react@19.2.14)(react@19.2.6))(@types/react@19.2.14)(react@19.2.6))(@types/react@19.2.14)(react-dom@19.2.7(react@19.2.6))(react@19.2.6))(@types/react@19.2.14)(react@19.2.6)':
     dependencies:
       '@babel/runtime': 7.29.7
-      '@mui/material': 9.0.1(@emotion/react@11.14.0(@types/react@19.2.14)(react@19.2.6))(@emotion/styled@11.14.1(@emotion/react@11.14.0(@types/react@19.2.14)(react@19.2.6))(@types/react@19.2.14)(react@19.2.6))(@types/react@19.2.14)(react-dom@19.2.6(react@19.2.6))(react@19.2.6)
+      '@mui/material': 9.0.1(@emotion/react@11.14.0(@types/react@19.2.14)(react@19.2.6))(@emotion/styled@11.14.1(@emotion/react@11.14.0(@types/react@19.2.14)(react@19.2.6))(@types/react@19.2.14)(react@19.2.6))(@types/react@19.2.14)(react-dom@19.2.7(react@19.2.6))(react@19.2.6)
       react: 19.2.6
     optionalDependencies:
       '@types/react': 19.2.14
 
-  '@mui/material@9.0.1(@emotion/react@11.14.0(@types/react@19.2.14)(react@19.2.6))(@emotion/styled@11.14.1(@emotion/react@11.14.0(@types/react@19.2.14)(react@19.2.6))(@types/react@19.2.14)(react@19.2.6))(@types/react@19.2.14)(react-dom@19.2.6(react@19.2.6))(react@19.2.6)':
+  '@mui/material@9.0.1(@emotion/react@11.14.0(@types/react@19.2.14)(react@19.2.6))(@emotion/styled@11.14.1(@emotion/react@11.14.0(@types/react@19.2.14)(react@19.2.6))(@types/react@19.2.14)(react@19.2.6))(@types/react@19.2.14)(react-dom@19.2.7(react@19.2.6))(react@19.2.6)':
     dependencies:
       '@babel/runtime': 7.29.7
       '@mui/core-downloads-tracker': 9.1.1
@@ -2957,9 +2957,9 @@ snapshots:
       csstype: 3.2.3
       prop-types: 15.8.1
       react: 19.2.6
-      react-dom: 19.2.6(react@19.2.6)
+      react-dom: 19.2.7(react@19.2.6)
       react-is: 19.2.7
-      react-transition-group: 4.4.5(react-dom@19.2.6(react@19.2.6))(react@19.2.6)
+      react-transition-group: 4.4.5(react-dom@19.2.7(react@19.2.6))(react@19.2.6)
     optionalDependencies:
       '@emotion/react': 11.14.0(@types/react@19.2.14)(react@19.2.6)
       '@emotion/styled': 11.14.1(@emotion/react@11.14.0(@types/react@19.2.14)(react@19.2.6))(@types/react@19.2.14)(react@19.2.6)
@@ -3132,12 +3132,12 @@ snapshots:
       picocolors: 1.1.1
       redent: 3.0.0
 
-  '@testing-library/react@16.3.2(@testing-library/dom@10.4.1)(@types/react-dom@19.2.3(@types/react@19.2.14))(@types/react@19.2.14)(react-dom@19.2.6(react@19.2.6))(react@19.2.6)':
+  '@testing-library/react@16.3.2(@testing-library/dom@10.4.1)(@types/react-dom@19.2.3(@types/react@19.2.14))(@types/react@19.2.14)(react-dom@19.2.7(react@19.2.6))(react@19.2.6)':
     dependencies:
       '@babel/runtime': 7.29.7
       '@testing-library/dom': 10.4.1
       react: 19.2.6
-      react-dom: 19.2.6(react@19.2.6)
+      react-dom: 19.2.7(react@19.2.6)
     optionalDependencies:
       '@types/react': 19.2.14
       '@types/react-dom': 19.2.3(@types/react@19.2.14)
@@ -3744,7 +3744,7 @@ snapshots:
       hasown: 2.0.4
       mime-types: 2.1.35
 
-  framer-motion@12.39.0(@emotion/is-prop-valid@1.4.0)(react-dom@19.2.6(react@19.2.6))(react@19.2.6):
+  framer-motion@12.39.0(@emotion/is-prop-valid@1.4.0)(react-dom@19.2.7(react@19.2.6))(react@19.2.6):
     dependencies:
       motion-dom: 12.40.0
       motion-utils: 12.39.0
@@ -3752,7 +3752,7 @@ snapshots:
     optionalDependencies:
       '@emotion/is-prop-valid': 1.4.0
       react: 19.2.6
-      react-dom: 19.2.6(react@19.2.6)
+      react-dom: 19.2.7(react@19.2.6)
 
   fsevents@2.3.2:
     optional: true
@@ -4016,13 +4016,13 @@ snapshots:
 
   node-releases@2.0.47: {}
 
-  notistack@3.0.2(react-dom@19.2.6(react@19.2.6))(react@19.2.6):
+  notistack@3.0.2(react-dom@19.2.7(react@19.2.6))(react@19.2.6):
     dependencies:
       clsx: 1.2.1
       csstype: 3.2.3
       goober: 2.1.19(csstype@3.2.3)
       react: 19.2.6
-      react-dom: 19.2.6(react@19.2.6)
+      react-dom: 19.2.7(react@19.2.6)
 
   object-assign@4.1.1: {}
 
@@ -4108,17 +4108,17 @@ snapshots:
 
   punycode@2.3.1: {}
 
-  react-dom@19.2.6(react@19.2.6):
+  react-dom@19.2.7(react@19.2.6):
     dependencies:
       react: 19.2.6
       scheduler: 0.27.0
 
-  react-draggable@4.6.0(react-dom@19.2.6(react@19.2.6))(react@19.2.6):
+  react-draggable@4.6.0(react-dom@19.2.7(react@19.2.6))(react@19.2.6):
     dependencies:
       clsx: 2.1.1
       prop-types: 15.8.1
       react: 19.2.6
-      react-dom: 19.2.6(react@19.2.6)
+      react-dom: 19.2.7(react@19.2.6)
 
   react-dropzone@15.0.0(react@19.2.6):
     dependencies:
@@ -4127,15 +4127,15 @@ snapshots:
       prop-types: 15.8.1
       react: 19.2.6
 
-  react-grid-layout@2.2.3(react-dom@19.2.6(react@19.2.6))(react@19.2.6):
+  react-grid-layout@2.2.3(react-dom@19.2.7(react@19.2.6))(react@19.2.6):
     dependencies:
       clsx: 2.1.1
       fast-equals: 4.0.3
       prop-types: 15.8.1
       react: 19.2.6
-      react-dom: 19.2.6(react@19.2.6)
-      react-draggable: 4.6.0(react-dom@19.2.6(react@19.2.6))(react@19.2.6)
-      react-resizable: 3.2.0(react-dom@19.2.6(react@19.2.6))(react@19.2.6)
+      react-dom: 19.2.7(react@19.2.6)
+      react-draggable: 4.6.0(react-dom@19.2.7(react@19.2.6))(react@19.2.6)
+      react-resizable: 3.2.0(react-dom@19.2.7(react@19.2.6))(react@19.2.6)
       resize-observer-polyfill: 1.5.1
 
   react-hook-form@7.76.0(react@19.2.6):
@@ -4153,16 +4153,16 @@ snapshots:
 
   react-is@19.2.7: {}
 
-  react-joyride@3.1.0(@types/react@19.2.14)(react-dom@19.2.6(react@19.2.6))(react@19.2.6):
+  react-joyride@3.1.0(@types/react@19.2.14)(react-dom@19.2.7(react@19.2.6))(react@19.2.6):
     dependencies:
       '@fastify/deepmerge': 3.2.1
-      '@floating-ui/react-dom': 2.1.8(react-dom@19.2.6(react@19.2.6))(react@19.2.6)
+      '@floating-ui/react-dom': 2.1.8(react-dom@19.2.7(react@19.2.6))(react@19.2.6)
       '@gilbarbara/deep-equal': 0.4.1
       '@gilbarbara/hooks': 0.11.0(react@19.2.6)
       '@gilbarbara/types': 0.2.2
       is-lite: 2.0.0
       react: 19.2.6
-      react-dom: 19.2.6(react@19.2.6)
+      react-dom: 19.2.7(react@19.2.6)
       react-innertext: 1.1.5(@types/react@19.2.14)(react@19.2.6)
       scroll: 3.0.1
       scrollparent: 2.1.0
@@ -4179,39 +4179,39 @@ snapshots:
       '@types/react': 19.2.14
       redux: 5.0.1
 
-  react-resizable@3.2.0(react-dom@19.2.6(react@19.2.6))(react@19.2.6):
+  react-resizable@3.2.0(react-dom@19.2.7(react@19.2.6))(react@19.2.6):
     dependencies:
       prop-types: 15.8.1
       react: 19.2.6
-      react-dom: 19.2.6(react@19.2.6)
-      react-draggable: 4.6.0(react-dom@19.2.6(react@19.2.6))(react@19.2.6)
+      react-dom: 19.2.7(react@19.2.6)
+      react-draggable: 4.6.0(react-dom@19.2.7(react@19.2.6))(react@19.2.6)
 
-  react-router-dom@7.15.1(react-dom@19.2.6(react@19.2.6))(react@19.2.6):
+  react-router-dom@7.15.1(react-dom@19.2.7(react@19.2.6))(react@19.2.6):
     dependencies:
       react: 19.2.6
-      react-dom: 19.2.6(react@19.2.6)
-      react-router: 7.15.1(react-dom@19.2.6(react@19.2.6))(react@19.2.6)
+      react-dom: 19.2.7(react@19.2.6)
+      react-router: 7.15.1(react-dom@19.2.7(react@19.2.6))(react@19.2.6)
 
-  react-router@7.15.1(react-dom@19.2.6(react@19.2.6))(react@19.2.6):
+  react-router@7.15.1(react-dom@19.2.7(react@19.2.6))(react@19.2.6):
     dependencies:
       cookie: 1.1.1
       react: 19.2.6
       set-cookie-parser: 2.7.2
     optionalDependencies:
-      react-dom: 19.2.6(react@19.2.6)
+      react-dom: 19.2.7(react@19.2.6)
 
-  react-transition-group@4.4.5(react-dom@19.2.6(react@19.2.6))(react@19.2.6):
+  react-transition-group@4.4.5(react-dom@19.2.7(react@19.2.6))(react@19.2.6):
     dependencies:
       '@babel/runtime': 7.29.7
       dom-helpers: 5.2.1
       loose-envify: 1.4.0
       prop-types: 15.8.1
       react: 19.2.6
-      react-dom: 19.2.6(react@19.2.6)
+      react-dom: 19.2.7(react@19.2.6)
 
   react@19.2.6: {}
 
-  recharts@3.8.1(@types/react@19.2.14)(react-dom@19.2.6(react@19.2.6))(react-is@19.2.7)(react@19.2.6)(redux@5.0.1):
+  recharts@3.8.1(@types/react@19.2.14)(react-dom@19.2.7(react@19.2.6))(react-is@19.2.7)(react@19.2.6)(redux@5.0.1):
     dependencies:
       '@reduxjs/toolkit': 2.12.0(react-redux@9.3.0(@types/react@19.2.14)(react@19.2.6)(redux@5.0.1))(react@19.2.6)
       clsx: 2.1.1
@@ -4220,7 +4220,7 @@ snapshots:
       eventemitter3: 5.0.4
       immer: 10.2.0
       react: 19.2.6
-      react-dom: 19.2.6(react@19.2.6)
+      react-dom: 19.2.7(react@19.2.6)
       react-is: 19.2.7
       react-redux: 9.3.0(@types/react@19.2.14)(react@19.2.6)(redux@5.0.1)
       reselect: 5.1.1
