@@ -91,8 +91,9 @@ curl --noproxy '*' http://localhost:9020/api/health/
 
 ## Local dev mail + LDAP (optional)
 
-Two services in `deployment/docker-compose.override.yml` (auto-loaded, no extra
-flags needed) stand in for infrastructure most contributors don't have handy:
+Two services in `deployment/docker-compose.dev-extras.yml` — **opt-in only**,
+pass `-f docker-compose.yml -f docker-compose.dev-extras.yml` explicitly — stand
+in for infrastructure most contributors don't have handy:
 
 - **`greenmail`** — a disposable SMTP+IMAP server (the same image
   `email-feeder/docker-compose.e2e.yaml` uses for its own e2e test). Point
@@ -114,15 +115,16 @@ flags needed) stand in for infrastructure most contributors don't have handy:
   directory at that exact path:
   ```bash
   docker cp docker/openldap/custom/50-meridian.ldif openldap:/tmp/seed.ldif
-  docker compose exec openldap ldapadd -x -D "cn=admin,dc=meridian,dc=example" \
+  docker compose -f docker-compose.yml -f docker-compose.dev-extras.yml \
+    exec openldap ldapadd -x -D "cn=admin,dc=meridian,dc=example" \
     -w "$LDAP_ADMIN_PASSWORD" -f /tmp/seed.ldif
   ```
   See [CONFIG.md § 2.8](CONFIG.md#28-authentication) for a caveat on testing
   `profiles/profiles_utils/ldap.py`'s search against a plain-schema directory
   like this one.
 
-Both are dev-only — omit them (or delete the `greenmail`/`openldap` blocks from
-the override file) for a production deploy.
+Both are dev-only and never start unless you pass `-f docker-compose.dev-extras.yml`
+explicitly — nothing to omit for a production deploy.
 
 ---
 

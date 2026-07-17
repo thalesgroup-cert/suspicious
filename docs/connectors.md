@@ -6,6 +6,11 @@ built-in TheHive, MISP, Watcher and SMTP-notify integrations are
 themselves connectors (`connectors/contrib/`), and third-party packages
 plug in through the same contract without touching Suspicious code.
 
+**Starting your own:** [`examples/suspicious-connector-template/`](https://github.com/thalesgroup-cert/suspicious/tree/main/examples/suspicious-connector-template)
+is a complete, working package skeleton (manifest, both hooks, `sync()`,
+packaging, and tests) — copy it out and rename rather than starting from
+the snippet below.
+
 ## Overview
 
 A connector is a Python class deriving from `connectors.base.Connector`

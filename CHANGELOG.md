@@ -7,11 +7,61 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
-Secret management moves to HashiCorp Vault, with connector secrets now editable
-from the UI and Vault bring-up/unseal automated for operators.
+A connector framework rewrite (pluggable contrib connectors, lifecycle events, a
+delivery ledger), a rebuilt scoring engine, a Cortex job/webhook re-architecture
+around a `CaseAnalyzerJob` ledger, a redesigned settings UI, and secret
+management moving to HashiCorp Vault.
 
 ### Added
 
+#### Connectors
+- **Contrib connector architecture** — TheHive, MISP, Watcher, and SMTP
+  notification migrated off bespoke integration code onto a common `Connector`
+  base with a registry, `ConnectorState`/`ConnectorDelivery` models, and
+  Celery fan-out dispatch. `case_created`/`case_finalised` lifecycle events
+  replace direct calls into each integration.
+- **`ChromaDBConnector`** registered as a builtin — nightly cleanup of expired
+  similarity-collection items, wrapped in a background-thread timeout so a
+  hung ChromaDB server can't block a Celery worker until the global task
+  timeout fires; retires the old ad-hoc cleanup task and beat entry.
+- Connector management API and UI: list/toggle/configure/test/deliveries
+  endpoints, a category + computed status field, and third-party packaging
+  hooks with authoring docs for external connectors.
+- Case comments sync to TheHive threads, with challenge reason and proposed
+  verdict surfaced in the alert.
+
+#### Scoring
+- **Rewritten scoring engine** — a pure `score_case` function over typed
+  `Signal`/`CaseVerdict` inputs, with `apply_verdict` as the sole writer of a
+  case's scoring fields and a read-only `backtest_scoring` drift command for
+  validating engine changes against historical cases.
+- **Per-analyzer parser registry** (`AnalyzerParserRegistry`, resolved by name
+  or Cortex analyzer id) — dedicated parsers for CirclHashlookup, MISP,
+  Urlscan, VirusTotal, Zscaler, the default taxonomy shape, and the AI mail
+  classifier (ported onto the same `AnalyzerParser` base, confidence 0-100).
+
+#### Cortex job orchestration
+- **`CaseAnalyzerJob` ledger** — an indexed junction table mapping
+  `case_id ↔ cortex_job_id`, backfilled from existing `AnalyzerReport` rows.
+  The webhook now does a single indexed lookup instead of a broader query, and
+  each report is scored immediately on a Cortex success rather than waiting
+  for the next sweep.
+- Per-job `process_cortex_job` Celery task with a per-case Redis lock; Cortex
+  dispatch deferred until after case creation so a slow/failed dispatch can't
+  block case creation itself; the cron path slimmed to a fallback role plus a
+  stale-job rescue task anchored to `CaseAnalyzerJob.created_at`.
+
+#### Frontend
+- Connectors panel rebuilt as a two-pane master/detail layout with a
+  recent-deliveries history view; Avatar panel rebuilt as a two-column "Split
+  Studio" layout.
+- New shared components: collapsible `EnumField` thumbnail grid, `ColorField`
+  swatch + hex picker, `MailPreview`, `ResultChip`, `StatusChip`, `SoftCard`.
+- Settings scoping (`RuntimeConfig`, `get_scope_config`, scope-aware
+  `seed_config`) and a `create_service_token` command for scoped
+  config-authority access, feeding the feeder's own config authority.
+
+#### Secrets (Vault)
 - **Editable connector secrets from the Settings UI** — Admins/CERT can set and
   rotate `integrations.*` secrets (cortex, thehive, misp, watcher), written
   straight to Vault. New `set_secret` Vault KV v2 write primitive with a short
@@ -38,8 +88,43 @@ from the UI and Vault bring-up/unseal automated for operators.
   `create`/`update` on `suspicious/data/integrations/*`, so UI secret editing
   works without a manual policy edit.
 
+#### CI/CD
+- CI consolidated onto a single matrix workflow (ruff, Django suite, feeder
+  pytest, UI lint/typecheck/vitest-browser/build, docker build matrix) and a
+  release workflow that builds, pushes, generates an SBOM, and attests build
+  provenance. A full-stack `e2e-deploy` smoke gate boots the real stack
+  (Cortex stubbed) and drives one email through feeder → S3 → backend → case →
+  ledger → finalise → preview, asserting every hop.
+- New `security.yml`: Trivy filesystem scan, gitleaks, and `pip-audit`/
+  `pnpm audit` across all four Python/JS dependency sets, gating any PR into
+  `main`.
+- MkDocs documentation site deploy workflow.
+
+### Changed
+- Old `docker-image-latest`/`docker-image-tags`/`docker-image-test` workflows
+  retired in favor of the CI/release matrix above.
+- `docker-compose.override.yml`'s dev-only `greenmail`/`openldap` stubs moved
+  to an opt-in `docker-compose.dev-extras.yml` — a plain `make up` no longer
+  starts them; pass `-f docker-compose.dev-extras.yml` explicitly.
+- Per-app log files with corrected logger nesting and a root-logger safety
+  net; web-submission case creation no longer logs into the fetch-mail log.
+
 ### Fixed
 
+- **Cortex analyzer launch dispatches asynchronously** from the submit path,
+  so a slow Cortex doesn't hold up the request that creates the case.
+- **Cortex 5xx responses now retry correctly**, and `category_ai` is bounded
+  to its column width instead of erroring on overflow.
+- **SMTP send now authenticates** — Microsoft 365 was rejecting outbound mail
+  as anonymous relay.
+- **Attachment filenames truncated by bytes instead of characters**, which
+  was silently breaking object-storage fetch for multi-byte filenames.
+- AI mail analyzer confidence was being scaled twice (once in the parser, once
+  in scoring), and MISP/Urlscan/VirusTotal parsers now guard against
+  non-list/non-dict scalar payloads instead of raising.
+- `thehive_alert_id` now persists after a challenge alert is created; TheHive
+  attachment upload fixed (wrong endpoint, fragile `.eml` fetch); thread
+  comments post as `always_append` instead of a lossy dedup-merge.
 - **Install wizard generated an unused secret key** — `install.py` auto-generated
   a Django secret key into `.env` (which nothing reads) while leaving
   `settings.json` `app.secret_key` at the committed sample value, so non-Vault
@@ -58,11 +143,22 @@ from the UI and Vault bring-up/unseal automated for operators.
 - Added `SECURITY.md`: Thales PSIRT responsible-disclosure contact (email + PGP
   key) and a threat model scoped to the stack, with explicit in-scope and
   out-of-scope lists.
+- First CodeQL run against this body of work triaged: hardened attachment/
+  submission path handling (`os.path.basename` at both taint roots), stopped
+  logging a Vault write failure's exception string (could echo back the
+  secret value on certain HTTP client errors), and `chmod 0600` on the
+  installer-generated `.env`. One accepted, documented exception: a
+  pre-auth ChromaDB RCE with no upstream fix yet, verified unreachable since
+  this app only uses ChromaDB as an `HttpClient`.
+- Dependency bumps closing known CVEs: `pillow`, `django`, `jinja2`, `nltk`,
+  the `opentelemetry` stack (needed to unblock a `protobuf` fix), and on the
+  UI side `vite`, `undici`, `form-data`.
 
 ### Documentation
 
 - `deployment/VAULT.md` and `deployment/README.md`: copy-paste Vault bring-up
   runbook, in-container CLI usage, and the auto-unseal workflow.
+- Third-party connector authoring docs for the new contrib architecture.
 
 ## [1.4.0] - 2026-06-05
 
