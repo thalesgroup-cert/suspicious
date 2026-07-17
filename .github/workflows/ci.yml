@@ -23,6 +23,15 @@ jobs:
         with:
           fetch-depth: 0
       - uses: wagoid/commitlint-github-action@v6
+        with:
+          # This only became a blocking PR gate the moment a PR first
+          # targeted `main` (pull_request here is scoped to branches: [main]
+          # — test/feature branches were never gated by it pre-merge). A
+          # long-lived integration branch's full history predates that, so
+          # only lint the tip commit going forward rather than demanding
+          # retroactive Conventional Commits compliance from every commit
+          # already merged into test.
+          commitDepth: 1
 
   backend-lint:
     runs-on: ubuntu-latest
