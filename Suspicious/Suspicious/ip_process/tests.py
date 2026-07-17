@@ -18,6 +18,12 @@ class IPModelTests(TestCase):
         self.assertEqual(obj.ioc_level, "info")
         self.assertEqual(obj.times_sent, 0)
 
+    def test_ipv6_address_not_truncated(self):
+        ipv6 = "2001:0db8:85a3:0000:0000:8a2e:0370:7334"
+        obj = IP.objects.create(address=ipv6)
+        obj.refresh_from_db()
+        self.assertEqual(obj.address, ipv6)
+
 
 class IPHandlerValidationTests(TestCase):
 

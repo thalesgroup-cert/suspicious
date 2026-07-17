@@ -1,17 +1,21 @@
-import os
-import ldap
-import ldap.filter
+import logging
+
+try:
+    import ldap
+    import ldap.filter
+except ImportError:
+    ldap = None  # type: ignore[assignment]
 from django.contrib.auth.models import Group
 from profiles.models import CISOProfile, UserProfile
 from django.contrib.auth import get_user_model
-import json
-from pathlib import Path
 
-CONFIG_PATH = "/app/settings.json"
-with open(CONFIG_PATH) as config_file:
-    config = json.load(config_file)
+logger = logging.getLogger("profiles.ldap")
 
-ldap_config = config.get('ldap', {})
+
+def _ldap_config() -> dict:
+    from settings.config import get_section
+    return get_section("authentication.ldap")
+
 
 # Django auth group names that also carry real RBAC meaning (api/permissions,
 # SUBMISSION_ELEVATED_GROUPS, and — on this branch specifically —
@@ -41,8 +45,8 @@ REGION_DICT = {
 
 
 class Ldap:
-    
-    
+
+
     def initialize_ldap(self):
         """
         Initializes and returns an LDAP server connection.
@@ -57,25 +61,31 @@ class Ldap:
             LDAPError: If there is an error while binding to the LDAP server.
 
         """
+        ldap_config = _ldap_config()
         try:
             # verify_ssl defaults to secure (OPT_X_TLS_DEMAND); explicit
             # opt-out only. Previously this unconditionally set
             # OPT_X_TLS_NEVER, disabling certificate verification on every
             # bind regardless of config and exposing bind credentials to
             # MITM on the network path.
-            verify_ssl = str(ldap_config.get("auth_ldap_verify_ssl", "True")).lower()
+            verify_ssl = str(ldap_config.get("verify_ssl", "True")).lower()
             if verify_ssl in ("false", "0", "no"):
+                logger.warning(
+                    "LDAP TLS verification disabled via settings.json "
+                    "(authentication.ldap.verify_ssl=false). Bind credentials "
+                    "are exposed to MITM."
+                )
                 ldap.set_option(ldap.OPT_X_TLS_REQUIRE_CERT, ldap.OPT_X_TLS_NEVER)
             else:
                 ldap.set_option(ldap.OPT_X_TLS_REQUIRE_CERT, ldap.OPT_X_TLS_DEMAND)
-            ldap_server = ldap.initialize(ldap_config.get("auth_ldap_server_uri", "ldap://localhost"))
-            ldap_server.simple_bind_s(ldap_config.get("auth_ldap_bind_dn", "cn=admin,dc=example,dc=com"),
-                                    ldap_config.get("auth_ldap_bind_password", "password"))
+            ldap_server = ldap.initialize(ldap_config.get("server_uri", "ldap://localhost"))
+            ldap_server.simple_bind_s(ldap_config.get("bind_dn", "cn=admin,dc=example,dc=com"),
+                                    ldap_config.get("bind_password", "password"))
             return ldap_server
         except ldap.LDAPError as e:
-            print(f"Error while binding to the LDAP server: {e}")
+            logger.error(f"Error while binding to the LDAP server: {e}")
             raise
-    
+
     @staticmethod
     def get_search_results(instance, ldap_server):
         """
@@ -89,17 +99,15 @@ class Ldap:
             search_results: The search results from the LDAP server.
         """
         try:
-            print('searching user')
             # instance.username can be attacker/IdP-controlled (e.g. OIDC
             # preferred_username); escape it so LDAP metacharacters can't
             # widen or restructure the search filter.
             safe_username = ldap.filter.escape_filter_chars(instance.username)
-            search_results = ldap_server.search_s(ldap_config.get("auth_ldap_base_dn"), ldap.SCOPE_SUBTREE,
+            search_results = ldap_server.search_s(_ldap_config().get("base_dn"), ldap.SCOPE_SUBTREE,
                                                   f'(&(mail={safe_username})(Tpresent=true)(!(ou=admin))(!(TpreferredFirstName=Test)))',
                                                   ['mail', 'title', 'businessCategory', 'c'])
-            print(search_results)
         except Exception as e:
-            print(e)
+            logger.error(f"LDAP search failed for user {instance.username!r}: {e}")
             search_results = None
         return search_results
 
@@ -121,15 +129,13 @@ class Ldap:
                 for title in CISO:
                     if title in search_results[0][1]['title'][0].decode('utf-8'):
                         ciso_found = True
-                        print('CISO found')
                         break
                 if ciso_found:
                     Ldap.create_ciso_profile(instance, search_results)
                 else:
-                    print('Not a CISO')
                     Ldap.create_user_profile(instance, search_results)
             except Exception as e:
-                print(e)
+                logger.error(f"Failed to process LDAP search results for user {instance.username!r}: {e}")
 
     @staticmethod
     def create_ciso_profile(instance, search_results):
@@ -205,16 +211,11 @@ class Ldap:
 
     @staticmethod
     def add_user_to_group(user, group_name):
-        # LDAP directory attributes (title/businessCategory/country/region)
-        # must never be allowed to grant membership in a group that also
-        # carries RBAC meaning — otherwise a directory value of e.g. "Admin"
-        # silently grants real app privileges on the next sync.
         if group_name in RESERVED_GROUP_NAMES:
-            print(f"Refusing to add user {user.username!r} to LDAP-derived "
-                  f"group {group_name!r}: name collides with a reserved RBAC group.")
+            logger.warning(
+                "Refusing to add user %r to LDAP-derived group %r: name collides "
+                "with a reserved RBAC group.", user.username, group_name,
+            )
             return
-        try:
-            group, _ = Group.objects.get_or_create(name=group_name)
-        except Group.DoesNotExist:
-            group = Group.objects.create(name=group_name)
+        group, _ = Group.objects.get_or_create(name=group_name)
         user.groups.add(group)

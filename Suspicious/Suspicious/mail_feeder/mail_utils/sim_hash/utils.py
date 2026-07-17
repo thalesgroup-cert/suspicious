@@ -1,9 +1,7 @@
 import re
-from functools import lru_cache
 from nltk.tokenize import word_tokenize
 from nltk.corpus import stopwords
 from simhash import Simhash
-from .models import TextInputModel
 
 
 class TextProcessor:
@@ -49,15 +47,3 @@ class TextProcessor:
         Generates an integer Simhash value from the input text.
         """
         return self.hash_text(text).value
-
-    @lru_cache(maxsize=128)
-    def calculate_distance(self, hash1: Simhash | int, hash2: Simhash | int) -> int:
-        """
-        Computes the Hamming distance between two Simhashes.
-        Accepts either Simhash objects or integer values.
-        """
-        if isinstance(hash1, int):
-            hash1 = Simhash(hash1)
-        if isinstance(hash2, int):
-            hash2 = Simhash(hash2)
-        return hash1.distance(hash2)

@@ -15,7 +15,7 @@ class CortexConfig(BaseModel):
 
 
 class CronConfig(BaseModel):
-    minio: MinioConfig
+    s3: MinioConfig
     cortex: Optional[CortexConfig] = None
     temp_dir: str = Field(default="/tmp/emailAnalysis/")
     suspicious_path: Optional[str] = Field(default="/app/Suspicious/chromadb")

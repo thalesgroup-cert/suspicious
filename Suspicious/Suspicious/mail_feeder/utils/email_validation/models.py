@@ -1,5 +1,5 @@
 from pydantic import BaseModel, EmailStr
-from typing import List, Optional, Tuple, Union
+from typing import List, Optional
 
 class ConfigModel(BaseModel):
     company_domains: List[str]

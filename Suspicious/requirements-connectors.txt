@@ -1,0 +1,5 @@
+# Third-party Suspicious connectors (pip requirements, one per line).
+# Packages listed here are installed into the backend image at build time
+# and discovered at startup via the "suspicious.connectors" entry-point
+# group. Example:
+#   suspicious-slack-connector==1.2.0

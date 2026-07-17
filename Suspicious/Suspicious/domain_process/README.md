@@ -1,12 +1,12 @@
 # 🧳 Domain Process Module
 
-This module is part of a Django-based application that provides functionality to manage the domains that are submitted to suspicious either via mail or simple submission. It includes standard Django components (models, views, urls) and custom utilities for domain handling.
+This module is a Django app that manages the domains that are submitted to suspicious either via mail or simple submission. It includes standard Django components (models, views, urls) and custom utilities for domain handling.
 
 ---
 
 ## 📦 Overview
 
-The `domain_process` app is designed to:
+The `domain_process` app:
 
 - Manage Domains through Django models and views
 - Provide APIs for CRUD operations on domains

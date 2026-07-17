@@ -1,75 +1,191 @@
+# compose_apps.yaml
+#
+# Base service definitions for application containers.
+# Extended (not run directly) by docker-compose.yml.
+#
+# Changes from previous version
+# ──────────────────────────────
+# - feeder: healthcheck added (was missing — make status showed unknown)
+# - suspicious_cron: replaced by suspicious_celery (Celery worker + Beat scheduler)
+# - Both use `test: ["CMD-SHELL", ...]` to keep the check inline
+
 services:
+
+  # ── suspicious (Gunicorn WSGI) ─────────────────────────────────────────
+
   suspicious:
     init: true
-    ports:
-      - "127.0.0.1:${SUSPICIOUS_PORT}:9020"
     restart: always
-    volumes:
-      - "${SUSPICIOUS_PATH}/logs:/app/log"
-      - "/var/run/docker.sock:/var/run/docker.sock"
-      - "${SUSPICIOUS_PATH}/settings.json:/app/settings.json"
-      # AI Vector Database
-      - "${SUSPICIOUS_PATH}/chromadb:/app/Suspicious/chromadb"
     command: >
-      /bin/bash -c "
-      python3 manage.py crontab show &&
-      python3 manage.py crontab add &&
-      python3 manage.py crontab show &&
-      service cron start &&
-      python3 manage.py runserver 0.0.0.0:9020 --insecure"
-    env_file:
-      - ".env"
-    environment:
-      no_proxy: "${NO_PROXY},cortex,db_suspicious,feeder"
-    networks:
-      - suspicious_network
-
-  cortex:
-    init: true
+      gunicorn suspicious.wsgi:application
+        --config /app/gunicorn.conf.py
     ports:
-      - "127.0.0.1:${CORTEX_PORT}:9001"
-    restart: unless-stopped
-    environment:
-      http_proxy: "${HTTP_PROXY}"
-      https_proxy: "${HTTPS_PROXY}"
-      no_proxy: "${NO_PROXY}"
-      JAVA_OPTS: "-Djavax.net.ssl.trustStore=/etc/cortex/keystore.jks"
-      job_directory: "${CORTEX_PATH}/jobs"
+      - "127.0.0.1:${SUSPICIOUS_PORT:-9020}:9020"
     volumes:
-      # Certificates
-      - "${CA_PATH}/keystore.jks:/etc/cortex/keystore.jks:ro"
-      # Cortex config
-      - "${CORTEX_PATH}/jobs:${CORTEX_PATH}/jobs:rw"
-      - "${CORTEX_PATH}/application.conf:/etc/cortex/application.conf:ro"
-      - "${CORTEX_PATH}/application-cortex.log:/var/log/cortex/application.log:rw"
-      # Docker configuration
-      - "/var/run/docker.sock:/var/run/docker.sock"
-      - "${DOCKER_PATH}/config.json:/home/cortex/.docker/config.json:ro"
-      # Neurons Local
-      - "${CORTEX_PATH}/Cortex-Analyzers/:/opt/Cortex-Analyzers/:ro"
-      # AIMailAnalyzer Neurons
-      - "${AIANALYZER_PATH}/analyzers.json:/opt/Cortex-Analyzers-AI/analyzers/analyzers.json"
-      # Docker Neurons
-      - "${CORTEX_PATH}/Cortex-Analyzers-Public/analyzers/analyzers.json:/opt/Cortex-Analyzers-Public/analyzers/analyzers.json"
-      - "${CORTEX_PATH}/Cortex-Analyzers-Public/responders/responders.json:/opt/Cortex-Analyzers-Public/responders/responders.json"
-      # Yara rules
-      - "${YARA_PATH}/rules/:/opt/Yara/rules"
-    networks:
-      - suspicious_network
-
-  feeder:
-    command: >
-      /bin/bash -c "python3 main.py"
-    volumes:
-      - "${FEEDER_PATH}/application.log:/app/application.log"
       - "${CA_PATH}/certfile.pem:/etc/private/certfile.pem:ro"
       - "${CA_PATH}/keyfile.pem:/etc/private/keyfile.pem:ro"
       - "${CA_PATH}/rootcafile.pem:/etc/private/rootcafile.pem:ro"
+      - "${SUSPICIOUS_PATH}/logs:/app/log"
+      - "${SUSPICIOUS_PATH}/settings.json:/app/settings.json:ro"
+      - "${SUSPICIOUS_PATH}/gunicorn.conf.py:/app/gunicorn.conf.py:ro"
+    env_file:
+      - ".env"
+    environment:
+      no_proxy: "${NO_PROXY:-},cortex,db_suspicious,rustfs,chromadb,vault"
+      VAULT_ADDR: "${VAULT_ADDR:-}"
+      VAULT_ROLE_ID: "${VAULT_ROLE_ID:-}"
+      VAULT_SECRET_ID: "${VAULT_SECRET_ID:-}"
+      SUSPICIOUS_CONFIG_PATH: "/app/settings.json"
+    healthcheck:
+      # Closes audit O7 / R9. /api/health/ pings DB + Redis; Cortex is
+      # informational (the app degrades gracefully via tenacity + the
+      # circuit breaker, we do not want a Cortex flap to restart Django).
+      test: ["CMD-SHELL", "curl -sf http://localhost:9020/api/health/ || exit 1"]
+      interval: 60s
+      timeout: 10s
+      retries: 3
+      start_period: 30s
     networks:
       - suspicious_network
 
+  # ── suspicious_celery (Celery worker + Beat) ──────────────────────────
+
+  suspicious_celery:
+    init: true
+    restart: always
+    command: celery -A suspicious worker --beat --loglevel=info
+    volumes:
+      - "${CA_PATH}/certfile.pem:/etc/private/certfile.pem:ro"
+      - "${CA_PATH}/keyfile.pem:/etc/private/keyfile.pem:ro"
+      - "${CA_PATH}/rootcafile.pem:/etc/private/rootcafile.pem:ro"
+      - "${SUSPICIOUS_PATH}/logs:/app/log"
+      - "${SUSPICIOUS_PATH}/settings.json:/app/settings.json:ro"
+    env_file:
+      - ".env"
+    environment:
+      no_proxy: "${NO_PROXY:-},cortex,db_suspicious,rustfs,chromadb,redis_broker,redis_cache,vault"
+      VAULT_ADDR: "${VAULT_ADDR:-}"
+      VAULT_ROLE_ID: "${VAULT_ROLE_ID:-}"
+      VAULT_SECRET_ID: "${VAULT_SECRET_ID:-}"
+      SUSPICIOUS_CONFIG_PATH: "/app/settings.json"
+    healthcheck:
+      test: ["CMD-SHELL", "celery -A suspicious inspect ping -d celery@$$HOSTNAME || exit 1"]
+      interval: 60s
+      timeout: 10s
+      retries: 3
+      start_period: 30s
+    networks:
+      - suspicious_network
+
+  # ── suspicious_ui (Nginx SPA) ──────────────────────────────────────────
+
+  suspicious_ui:
+    init: true
+    restart: unless-stopped
+    ports:
+      - "127.0.0.1:${SUSPICIOUS_UI_PORT:-9021}:80"
+    environment:
+      no_proxy: "${NO_PROXY:-},suspicious"
+    # Runtime SPA config. The container entrypoint reads these VITE_* env
+    # vars at startup and writes them into window.__ENV__ (no rebuild needed).
+    # They come from suspicious-ui/.env; missing file is tolerated (defaults
+    # apply). Copy suspicious-ui/.env.example -> suspicious-ui/.env to set them.
+    env_file:
+      - path: ../suspicious-ui/.env
+        required: false
+    networks:
+      - suspicious_network
+      - reverse_network
+
+  # ── cortex ─────────────────────────────────────────────────────────────
+
+  cortex:
+    init: true
+    restart: unless-stopped
+    ports:
+      - "127.0.0.1:${CORTEX_PORT:-9001}:9001"
+    environment:
+      http_proxy:  "${HTTP_PROXY:-}"
+      https_proxy: "${HTTPS_PROXY:-}"
+      # Cortex bundles a fabric8 Kubernetes client (eagerly constructed even
+      # though jobs run via docker.sock) that REJECTS `*` wildcards in NO_PROXY
+      # and refuses to boot. Two sources leak a corporate wildcard in here: the
+      # host's ${NO_PROXY}, AND Docker's own proxy injection from
+      # ~/.docker/config.json (which sets the UPPERCASE NO_PROXY on every
+      # container). Override BOTH cases with a dedicated wildcard-free list;
+      # deployments needing a corp-internal bypass set CORTEX_NO_PROXY with
+      # dot-form entries (`.corp.example`), never `*`.
+      no_proxy:    "${CORTEX_NO_PROXY:-localhost,127.0.0.1,cortex,elasticsearch,rustfs,chromadb,vault,suspicious}"
+      NO_PROXY:    "${CORTEX_NO_PROXY:-localhost,127.0.0.1,cortex,elasticsearch,rustfs,chromadb,vault,suspicious}"
+      JAVA_OPTS:   "-Djavax.net.ssl.trustStore=/etc/cortex/keystore.jks"
+      job_directory: "${CORTEX_PATH}/jobs"
+    volumes:
+      - "${CA_PATH}/keystore.jks:/etc/cortex/keystore.jks:ro"
+      - "${CORTEX_PATH}/jobs:${CORTEX_PATH}/jobs:Z"
+      - "${CORTEX_PATH}/application.conf:/etc/cortex/application.conf:ro"
+      - "${CORTEX_PATH}/application-cortex.log:/var/log/cortex/application.log:rw"
+      - "/var/run/docker.sock:/var/run/docker.sock:ro"
+      - "${DOCKER_PATH}/config.json:/home/cortex/.docker/config.json:ro"
+      - "${CORTEX_PATH}/Cortex-Analyzers/:/opt/Cortex-Analyzers/:ro"
+      - "${AIANALYZER_PATH}/analyzers.json:/opt/Cortex-Analyzers-AI/analyzers/analyzers.json:ro"
+      - "${CORTEX_PATH}/Cortex-Analyzers-Public/analyzers/analyzers.json:/opt/Cortex-Analyzers-Public/analyzers/analyzers.json:ro"
+      - "${CORTEX_PATH}/Cortex-Analyzers-Public/responders/responders.json:/opt/Cortex-Analyzers-Public/responders/responders.json:ro"
+      - "${YARA_PATH}/rules/:/opt/Yara/rules:ro"
+    networks:
+      - suspicious_network
+
+  # ── feeder (Python — email-feeder/) ──────────────────────────────────────
+
+  feeder:
+    init: true
+    restart: unless-stopped
+    command: python3 main.py
+    environment:
+      BACKEND_URL: "${BACKEND_URL:-}"
+      FEEDER_API_TOKEN: "${FEEDER_API_TOKEN:-}"
+      LOG_LEVEL: "${LOG_LEVEL:-INFO}"
+    volumes:
+      - "${FEEDER_PATH}/logs:/app/log"
+      - "${FEEDER_PATH}/config.json:/app/config.json:ro"
+      - "${CA_PATH}/certfile.pem:/etc/private/certfile.pem:ro"
+      - "${CA_PATH}/keyfile.pem:/etc/private/keyfile.pem:ro"
+      - "${CA_PATH}/rootcafile.pem:/etc/private/rootcafile.pem:ro"
+    healthcheck:
+      test: ["CMD-SHELL", "curl -sf http://localhost:9091/health || exit 1"]
+      interval: 60s
+      timeout: 10s
+      retries: 3
+      start_period: 90s
+    networks:
+      - suspicious_network
+
+  # ── vault (HashiCorp Vault — secrets) ──────────────────────────────────
+
+  vault:
+    image: hashicorp/vault:1.18
+    init: true
+    restart: always
+    cap_add:
+      - IPC_LOCK
+    ports:
+      - "127.0.0.1:${VAULT_PORT:-8200}:8200"
+    environment:
+      VAULT_ADDR: "http://0.0.0.0:8200"
+    volumes:
+      - "${VAULT_PATH:-./vault}/config.hcl:/vault/config/config.hcl:ro"
+      - "${VAULT_PATH:-./vault}/data:/vault/file"
+    command: ["vault", "server", "-config=/vault/config/config.hcl"]
+    healthcheck:
+      test: ["CMD-SHELL", "vault status -address=http://127.0.0.1:8200 >/dev/null 2>&1 || [ $$? -eq 2 ]"]
+      interval: 30s
+      timeout: 5s
+      retries: 5
+      start_period: 10s
+    networks:
+      - suspicious_network
 
 networks:
   suspicious_network:
     external: true
     name: ${NETWORK_NAME}
+  reverse_network:

@@ -20,19 +20,22 @@ class SuspiciousConfig(BaseModel):
 class AcknowledgeMailServiceConfigSocial(BaseModel):
     name: str
     url: str
-    logo: str
+    logo_svg: Optional[str] = None
+    logo_png: Optional[str] = None
 
 
 class FinalMailServiceConfigSocial(BaseModel):
     name: str
     url: str
-    logo: str
+    logo_svg: Optional[str] = None
+    logo_png: Optional[str] = None
 
 
 class ModificationMailServiceConfigSocial(BaseModel):
     name: str
     url: str
-    logo: str
+    logo_svg: Optional[str] = None
+    logo_png: Optional[str] = None
 
 @dataclass(frozen=True)
 class EmailSubjectsConfig:

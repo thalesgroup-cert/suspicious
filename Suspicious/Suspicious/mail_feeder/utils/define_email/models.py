@@ -1,7 +1,6 @@
 import re
 from email.utils import parseaddr
 from pydantic import BaseModel, EmailStr, Field, validator
-from datetime import datetime
 from typing import Optional
 
 # Fallback for headers that aren't RFC 5322 "Name <addr>" (parseaddr needs the

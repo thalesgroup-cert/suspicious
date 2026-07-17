@@ -1,0 +1,63 @@
+{
+  "mail-connectors": {
+    "imap": {
+      "imap-dev": {
+        "enable": false,
+        "host": "localhost",
+        "port": 3143,
+        "login": "suspicious@meridian.example",
+        "password": "imap_password",
+        "mailbox_to_monitor": "INBOX"
+      }
+    },
+    "imaps": {
+      "imaps-prod": {
+        "enable": false,
+        "host": "mail.meridian.example",
+        "port": 993,
+        "login": "suspicious@meridian.example",
+        "password": "imap_password",
+        "certfile": "/path/to/certfile.pem",
+        "keyfile": "/path/to/keyfile.pem",
+        "rootcafile": "/path/to/rootcafile.pem",
+        "mailbox_to_monitor": "INBOX"
+      }
+    }
+  },
+  "working-path": "/tmp/suspicious",
+  "timer-inbox-emails": 10,
+  "s3": {
+    "endpoint": "rustfs:9000",
+    "access_key": "minio",
+    "secret_key": "meridian_dev_minio_pw",
+    "secure": false
+  },
+  "mail": {
+    "tls": true,
+    "server": "smtp.meridian.example",
+    "port": 25,
+    "password": "",
+    "username": "suspicious@meridian.example",
+    "footer": "Meridian Group — Internal Use",
+    "group": "Meridian CERT",
+    "suspicious_web": "https://suspicious.meridian.example/submissions/",
+    "company_name": "meridian.example",
+    "company_url": "https://www.meridian.example",
+    "socials": {
+      "facebook": "",
+      "twitter": "",
+      "instagram": "",
+      "linkedin": "https://www.linkedin.com/company/meridian-group",
+      "youtube": ""
+    },
+    "glossary": "https://intranet.meridian.example/glossary",
+    "inquiry": "mailto:cert@meridian.example",
+    "inquiry_text": "cert@meridian.example",
+    "security": "mailto:cert@meridian.example",
+    "security_msg": "cert@meridian.example",
+    "logos": {
+      "company": "",
+      "acknowledge-badmail": ""
+    }
+  }
+}

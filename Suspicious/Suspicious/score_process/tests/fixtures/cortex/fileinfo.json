@@ -1,0 +1,57 @@
+{
+  "summary": {
+    "taxonomies": [
+      {
+        "level": "info",
+        "namespace": "FileInfo",
+        "predicate": "Filetype",
+        "value": "TXT"
+      }
+    ]
+  },
+  "full": {
+    "results": [
+      {
+        "submodule_name": "Basic properties",
+        "results": [
+          {
+            "submodule_section_header": "Hashes",
+            "submodule_section_content": {
+              "md5": "a567515be52f262c31ecd64712d3c3e0",
+              "sha1": "33b1250f8441e0046b4abb2e4fa8a1d6c062ef19",
+              "sha256": "c515a12953a26a16e617ae9af11a71da610b8c19e9d64ec3dc6d631be6d6da9f",
+              "ssdeep": "6:pTMRRFRp9SlbCM10Q8KMW0YksAWjMXm3X2QKeto5zIGEDjNPtv:BMRvRp9g/eQu3XmnH/GzaNF"
+            }
+          },
+          {
+            "submodule_section_header": "Exif Info",
+            "submodule_section_content": {
+              "ExifTool:ExifToolVersion": 13.25
+            }
+          },
+          {
+            "submodule_section_header": "File information",
+            "submodule_section_content": {
+              "Magic literal": "us-ascii",
+              "MimeType": "message/rfc822; charset=us-ascii",
+              "Filetype": "TXT",
+              "Filesize": 261
+            }
+          }
+        ],
+        "summary": {
+          "taxonomies": [
+            {
+              "level": "info",
+              "namespace": "FileInfo",
+              "predicate": "Filetype",
+              "value": "TXT"
+            }
+          ]
+        }
+      }
+    ]
+  },
+  "status": "Success",
+  "type": "file"
+}

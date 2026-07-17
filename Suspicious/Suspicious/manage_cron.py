@@ -4,18 +4,14 @@ import logging
 import argparse
 import docker
 
-# Set up Django environment
 os.environ.setdefault('DJANGO_SETTINGS_MODULE', 'suspicious.settings')
 django.setup()
 
-# Import models
 from settings.models import EmailFeederState
 
-# Configure logging
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
 
-# Docker client
 docker_client = docker.from_env()
 DOCKER_CONTAINER_NAME = "email_feeder"
 
@@ -81,7 +77,6 @@ def manage_feeder_state(state=None):
                 logger.error('Invalid argument. Use "on" or "off".')
             return
 
-        # Fallback: use database state
         db_state = EmailFeederState.objects.first()
         if db_state and db_state.is_running:
             enable_email_feeder()
@@ -101,8 +96,6 @@ if __name__ == "__main__":
     )
     args = parser.parse_args()
 
-    # Manage feeder based on input
     manage_feeder_state(args.state)
 
-    # Show current container status
     show_feeder_status()

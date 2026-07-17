@@ -1,100 +1,77 @@
-import re
+"""
+Email header parsing utilities.
+"""
 import ast
-from email.parser import Parser
 import logging
+import re
+from email.parser import Parser
 
-# Initialize the logger
-update_cases_logger = logging.getLogger('tasp.cron.update_ongoing_case_jobs')
+update_cases_logger = logging.getLogger("tasp.cron.update_ongoing_case_jobs")
 
-def extract_email_address(header_value):
-    """
-    Extract email address from a header field in the format 'Name <email@example.com>'.
-    If no angle brackets are found, return the entire value.
-    """
+
+def extract_email_address(header_value: str) -> str:
     match = re.search(r'<([^>]+)>', header_value)
-    if match:
-        return match.group(1)  # Extract the email part inside the angle brackets
-    return header_value  # Return the full value if no brackets found
+    return match.group(1) if match else header_value
 
-def extract_display_name(header_value):
-    """
-    Extract display name from a header field in the format 'Name <email@example.com>'.
-    If no angle brackets are found, return None.
-    """
+
+def extract_display_name(header_value: str):
     match = re.search(r'^(.*)<[^>]+>', header_value)
-    if match:
-        return match.group(1).strip()  # Extract the display name before the angle brackets
-    return None  # Return None if no display name is found
+    return match.group(1).strip() if match else None
 
-def parse_email_headers(header_value):
+
+def parse_email_headers(header_value) -> dict:
     """
-    Parse email headers from different formats (list of tuples, string, or dictionary) into a dictionary
-    with case-insensitive keys, ensuring all required fields are returned.
-
-    Args:
-        header_value (Union[str, list, dict]): The raw headers.
-
-    Returns:
-        dict: A dictionary containing all parsed header key-value pairs, keys are lowercase.
+    Parse email headers from list-of-tuples, string, or dict into a flat
+    lowercase-key dict with required fields extracted.
     """
-    update_cases_logger.debug(f"Starting to parse email headers: {header_value}")
-    print(f"DEBUG: Starting to parse email headers: {header_value}")
+    update_cases_logger.debug("Parsing email headers: %r", header_value)
 
-    parsed_headers = {}
+    parsed_headers: dict = {}
 
-    # If the headers are a list of tuples, convert to dictionary
     if isinstance(header_value, list):
         for key, value in header_value:
             key_lower = key.lower()
             if key_lower in parsed_headers:
-                if isinstance(parsed_headers[key_lower], list):
-                    parsed_headers[key_lower].append(value)
-                else:
-                    parsed_headers[key_lower] = [parsed_headers[key_lower], value]
+                existing = parsed_headers[key_lower]
+                parsed_headers[key_lower] = (
+                    existing + [value] if isinstance(existing, list) else [existing, value]
+                )
             else:
                 parsed_headers[key_lower] = value
 
-    # If the headers are a string, parse them using ast.literal_eval or treat as raw headers
     elif isinstance(header_value, str):
         try:
-            evaluated_headers = ast.literal_eval(header_value)
-            if isinstance(evaluated_headers, dict):
-                parsed_headers = {k.lower(): v for k, v in evaluated_headers.items()}
-                update_cases_logger.debug(f"Parsed headers from string evaluated as dictionary: {parsed_headers}")
-                print(f"DEBUG: Parsed headers from string evaluated as dictionary: {parsed_headers}")
+            evaluated = ast.literal_eval(header_value)
+            if isinstance(evaluated, dict):
+                parsed_headers = {k.lower(): v for k, v in evaluated.items()}
+                update_cases_logger.debug("Parsed headers from evaluated string: %r", parsed_headers)
             else:
-                update_cases_logger.warning(f"Evaluated string is not a dictionary: {evaluated_headers}")
-        except (SyntaxError, ValueError) as e:
-            update_cases_logger.warning(f"Failed to evaluate string as dictionary: {str(e)}. Treating it as raw headers.")
-            parser = Parser()
-            raw_headers = parser.parsestr(header_value)
-            parsed_headers = {k.lower(): v for k, v in raw_headers.items()}
-            update_cases_logger.debug(f"Parsed headers from raw string: {parsed_headers}")
-            print(f"DEBUG: Parsed headers from raw string: {parsed_headers}")
+                update_cases_logger.warning("Evaluated string is not a dict: %r", evaluated)
+        except (SyntaxError, ValueError) as exc:
+            update_cases_logger.warning(
+                "Could not evaluate header string: %s — falling back to raw parser.", exc
+            )
+            raw = Parser().parsestr(header_value)
+            parsed_headers = {k.lower(): v for k, v in raw.items()}
+            update_cases_logger.debug("Parsed headers from raw string: %r", parsed_headers)
 
-    # If it's already a dictionary, just use the dictionary as is, normalize keys
     elif isinstance(header_value, dict):
         parsed_headers = {k.lower(): v for k, v in header_value.items()}
-        update_cases_logger.debug(f"Parsed headers from dictionary: {parsed_headers}")
 
     else:
-        raise ValueError(f"Unsupported header format: {type(header_value)}")
+        raise ValueError("Unsupported header format: %s" % type(header_value))
 
-    # Now extract the required fields, using None if not found
-    parsed_result = {
-        'from': extract_email_address(parsed_headers.get('from', '')),
-        'from_display_name': extract_display_name(parsed_headers.get('from', '')),
-        'to': extract_email_address(parsed_headers.get('to', '')),
-        'to_display_name': extract_display_name(parsed_headers.get('to', '')),
-        'cc': extract_email_address(parsed_headers.get('cc', '')),
-        'subject': parsed_headers.get('subject'),
-        'reply_to': extract_email_address(parsed_headers.get('reply-to', '')),
-        'return_path': parsed_headers.get('return-path'),
-        'user_agent': parsed_headers.get('user-agent'),
-        'send_date': parsed_headers.get('date')
+    result = {
+        "from":              extract_email_address(parsed_headers.get("from", "")),
+        "from_display_name": extract_display_name(parsed_headers.get("from", "")),
+        "to":                extract_email_address(parsed_headers.get("to", "")),
+        "to_display_name":   extract_display_name(parsed_headers.get("to", "")),
+        "cc":                extract_email_address(parsed_headers.get("cc", "")),
+        "subject":           parsed_headers.get("subject"),
+        "reply_to":          extract_email_address(parsed_headers.get("reply-to", "")),
+        "return_path":       parsed_headers.get("return-path"),
+        "user_agent":        parsed_headers.get("user-agent"),
+        "send_date":         parsed_headers.get("date"),
     }
-
-    update_cases_logger.debug(f"Finished parsing headers: {parsed_result}")
-    print(f"DEBUG: Finished parsing headers: {parsed_result}")
-
-    return parsed_result
+    update_cases_logger.debug("Parsed result: %r", result)
+    return result

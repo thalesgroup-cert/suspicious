@@ -14,7 +14,7 @@ def calculate_attachment_scores(attachments):
     confidences = []
 
     if not attachments:
-        return scores, confidences  # Return empty lists if there are no attachments
+        return scores, confidences
 
     for attachment in attachments:
         file_score = attachment.file.file_score
@@ -22,15 +22,12 @@ def calculate_attachment_scores(attachments):
         ioc_score = attachment.file.linked_hash.ioc_score
         ioc_confidence = attachment.file.linked_hash.ioc_confidence
 
-        # Average the file score and IOC score for this attachment
         avg_score = (file_score + ioc_score) / 2
         avg_confidence = (file_confidence + ioc_confidence) / 2
 
-        # Add to lists of scores and confidences
         scores.append(avg_score)
         confidences.append(avg_confidence)
 
-    # Return lists of scores and confidences
     return scores, confidences
 
 
@@ -47,7 +44,7 @@ def calculate_artifact_scores(artifacts):
     confidences = []
 
     if not artifacts:
-        return scores, confidences  # Return empty lists if there are no artifacts
+        return scores, confidences
 
     for artifact in artifacts:
         if artifact.artifact_type == 'IP':
@@ -60,11 +57,9 @@ def calculate_artifact_scores(artifacts):
             score = artifact.artifactIsHash.hash.ioc_score
             confidence = artifact.artifactIsHash.hash.ioc_confidence
 
-        # Add to lists of scores and confidences
         scores.append(score)
         confidences.append(confidence)
 
-    # Return lists of scores and confidences
     return scores, confidences
 
 def calculate_body_score(case):
@@ -186,10 +181,8 @@ def calculate_result_ranges(final_score):
         (8, 10): "Dangerous",
     }
 
-    # Default result for unknown scores or unexpected values
     default_result = "Failure"
 
-    # Find the matching range for the final score
     for range_key in result_ranges:
         start, end = range_key
         if start <= final_score <= end:

@@ -1,6 +1,9 @@
 from django.test import TestCase
 from unittest.mock import patch, MagicMock
 
+from domain_process.models import Domain
+from settings.models import WatcherLegitDomain
+
 from email_process.models import MailAddress
 from email_process.email_utils.email_handler import (
     MailAddressHandler,
@@ -65,18 +68,22 @@ class EmailValidationTests(TestCase):
 
 
 class CompanyEmailTests(TestCase):
+    """is_valid_company_email checks the domain against WatcherLegitDomain."""
 
-    @patch("email_process.email_utils.email_handler.company_config", ["example.com"])
+    def setUp(self):
+        domain = Domain.objects.create(value="example.com")
+        WatcherLegitDomain.objects.create(domain=domain)
+
     @patch("email_process.email_utils.email_handler.validate_email")
     def test_is_valid_company_email_true(self, mock_validate):
         mock_validate.return_value = MagicMock(email="alice@example.com")
         self.assertTrue(is_valid_company_email("alice@example.com"))
 
-    @patch("email_process.email_utils.email_handler.company_config", ["example.com"])
-    def test_is_valid_company_email_false(self):
+    @patch("email_process.email_utils.email_handler.validate_email")
+    def test_is_valid_company_email_false(self, mock_validate):
+        mock_validate.return_value = MagicMock(email="bob@other.com")
         self.assertFalse(is_valid_company_email("bob@other.com"))
 
-    @patch("email_process.email_utils.email_handler.company_config", ["example.com"])
     def test_is_valid_company_email_invalid(self):
         self.assertFalse(is_valid_company_email("not-an-email"))
 

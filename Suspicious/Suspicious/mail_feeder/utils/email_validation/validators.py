@@ -4,7 +4,6 @@ from .models import EmailValidationResult, ConfigModel
 
 class EmailValidatorService:
     def __init__(self, config: ConfigModel):
-        # Normalize to lowercase domains internally
         self.company_domains = {d.strip().lower() for d in config.company_domains}
 
     def validate_email_syntax(self, email: str) -> EmailValidationResult:
@@ -22,12 +21,10 @@ class EmailValidatorService:
         """
         Validate email syntax and ensure its domain belongs to configured company domains.
         """
-        # First validate syntax
         result = self.validate_email_syntax(email)
         if not result.is_valid:
             return result
 
-        # At this point result.normalized is non-None
         normalized = result.normalized  # type: ignore
         domain = normalized.split("@")[1].lower()
         if domain in self.company_domains:

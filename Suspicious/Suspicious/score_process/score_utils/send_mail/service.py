@@ -1,6 +1,4 @@
-import json
 import logging
-from pathlib import Path
 
 from profiles.models import UserProfile
 
@@ -14,12 +12,14 @@ from .utils import log_event, build_user_infos, send_with_retry
 
 logger = logging.getLogger("tasp.cron.update_ongoing_case_jobs")
 
-CONFIG_PATH = "/app/settings.json"
-
 
 class MailNotificationService:
     """
     Service responsible for user-facing email notifications.
+
+    Each send method resolves the recipient's UserProfile so the
+    individual email services can theme the message according to the
+    user's chosen theme and semantic colors.
     """
 
     def __init__(
@@ -32,20 +32,19 @@ class MailNotificationService:
         self.retry_cfg = retry_cfg
         self.subjects = subjects
 
-    # ---------- factory ----------
+    # ── factory ────────────────────────────────────────────────────────────
 
     @classmethod
-    def from_settings(cls, path: str = CONFIG_PATH) -> "MailNotificationService":
-        with open(path) as f:
-            raw = json.load(f)
-
-        suspicious_cfg = SuspiciousConfig(**raw.get("suspicious", {}))
+    def from_settings(cls, path: str = None) -> "MailNotificationService":
+        from settings.config import get_section
+        branding = get_section("branding")
+        email_section = get_section("email")
+        suspicious_cfg = SuspiciousConfig(email=branding.get("contact_email", ""))
         retry_cfg = RetryConfig()
-        subjects = EmailSubjectsConfig(**raw.get("email_subjects", {}))
-
+        subjects = EmailSubjectsConfig(**email_section.get("templates", {}))
         return cls(suspicious_cfg, retry_cfg, subjects)
 
-    # ---------- helpers ----------
+    # ── helpers ────────────────────────────────────────────────────────────
 
     def _send_with_retry(self, action, *, email_type: str, **context) -> bool:
         success = send_with_retry(
@@ -53,7 +52,6 @@ class MailNotificationService:
             self.retry_cfg.max_retries,
             self.retry_cfg.base_delay,
         )
-
         log_event(
             logging.INFO if success else logging.ERROR,
             "email_send",
@@ -62,7 +60,6 @@ class MailNotificationService:
             retries=self.retry_cfg.max_retries,
             **context,
         )
-
         return success
 
     def _get_recipient(self, user) -> str | None:
@@ -72,6 +69,22 @@ class MailNotificationService:
             return None
         return user.email
 
+    def _reporter_address(self, mail, user) -> str | None:
+        """Recipient for reporter notifications.
+
+        Prefer the address captured at submission (``Mail.reportedBy``): the
+        resolved ``user`` may be a fallback (e.g. an unknown external reporter
+        mapped to the system user), which would otherwise suppress the email.
+        Never notify the system mailbox itself.
+        """
+        related = getattr(mail, "mail", None)
+        addr = (getattr(related, "reportedBy", "") or "").strip()
+        if not addr:
+            addr = (getattr(user, "email", "") or "").strip() if user else ""
+        if not addr or addr == self.suspicious_email:
+            return None
+        return addr
+
     def _user_allows(self, user, field: str) -> bool:
         profile = UserProfile.objects.filter(user=user).first()
         return getattr(profile, field, True) if profile else True
@@ -80,16 +93,22 @@ class MailNotificationService:
         if not self._get_recipient(user):
             return False
         if opt_field and not self._user_allows(user, opt_field):
-            log_event(
-                logging.INFO,
-                "email_opt_out",
-                user_id=user.id,
-                field=opt_field,
-            )
+            log_event(logging.INFO, "email_opt_out", user_id=user.id, field=opt_field)
             return False
         return True
 
-    # ---------- public API ----------
+    def _get_profile(self, user) -> "UserProfile | None":
+        """
+        Return the UserProfile for a user, or None if not found.
+        The profile carries .theme and .semantic_colors which are
+        forwarded to the email service so the message is rendered
+        in the user's chosen visual style.
+        """
+        if not user:
+            return None
+        return UserProfile.objects.filter(user=user).first()
+
+    # ── public API ─────────────────────────────────────────────────────────
 
     def send_review_email(self, case) -> None:
         user = case.reporter
@@ -97,11 +116,9 @@ class MailNotificationService:
             return
 
         recipient = user.email
-        subject = self.subjects.review.format(
-            case_id=case.id,
-            result=case.results,
-        )
+        subject = self.subjects.review.format(case_id=case.id, result=case.results)
         user_infos = build_user_infos(user)
+        profile = self._get_profile(user)
 
         def action():
             ModificationEmailService(
@@ -110,6 +127,7 @@ class MailNotificationService:
                 recipient=recipient,
                 recipient_name=user_infos,
                 case=case,
+                profile=profile,
             )._send_action(
                 user=recipient,
                 user_infos=user_infos,
@@ -134,9 +152,12 @@ class MailNotificationService:
         recipient = user.email
         subject = self.subjects.acknowledgement
         user_infos = build_user_infos(user)
+        profile = self._get_profile(user)
 
         def action():
-            AcknowledgementEmailService()._send_action(
+            AcknowledgementEmailService(
+                profile=profile,
+            )._send_action(
                 user=recipient,
                 user_infos=user_infos,
                 subject=subject,
@@ -156,12 +177,16 @@ class MailNotificationService:
             return
 
         user = mail.user
-        if not self._can_notify(user, "wants_results"):
+        recipient = self._reporter_address(mail, user)
+        if not recipient:
+            return
+        if user and not self._user_allows(user, "wants_results"):
+            log_event(logging.INFO, "email_opt_out", user_id=user.id, field="wants_results")
             return
 
-        recipient = user.email
         subject = self.subjects.final.format(case_id=case.id)
         user_infos = build_user_infos(user)
+        profile = self._get_profile(user)
 
         def action():
             FinalEmailService(
@@ -169,6 +194,7 @@ class MailNotificationService:
                 sender=self.suspicious_email,
                 recipient=recipient,
                 recipient_name=user_infos,
+                profile=profile,
             )._send_action(user=recipient, subject=subject)
 
         if self._send_with_retry(
@@ -179,3 +205,8 @@ class MailNotificationService:
         ):
             mail.user_analysis_informed = True
             mail.save(update_fields=["user_analysis_informed"])
+        else:
+            raise RuntimeError(
+                f"Failed to send final-result email for case {case.id} "
+                f"after {self.retry_cfg.max_retries} attempts"
+            )

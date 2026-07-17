@@ -2,9 +2,10 @@ import os
 import logging
 from email.message import Message
 from pathlib import Path
-from typing import List, Dict, Any, Optional, Tuple
+from typing import List, Dict, Optional, Tuple
 
-from .utils import decode_email_header, ensure_dir
+from mail_feeder import email_contract as ec
+from .utils import ensure_dir
 from .models import EmailDataModel, AttachmentModel
 
 logger = logging.getLogger("tasp.cron.fetch_and_process_emails")
@@ -34,19 +35,22 @@ def _safe_attachment_destination(
     return destination, safe_filename
 
 
+# -------------------------
+# Attachments
+# -------------------------
+
 def extract_email_attachments(
     email_message: Message,
     save_dir: str,
     email_reference: str
 ) -> List[AttachmentModel]:
-    """
-    Extract attachments from an email message and save them to disk.
-    """
+
     attachments: List[AttachmentModel] = []
 
     for part in email_message.walk():
         if part.get_content_maintype() == "multipart":
             continue
+
         content_disposition = part.get("Content-Disposition", "")
         if "attachment" not in content_disposition.lower():
             continue
@@ -55,7 +59,7 @@ def extract_email_attachments(
         if not raw_filename:
             continue
 
-        decoded_filename = decode_email_header(raw_filename)
+        decoded_filename = ec.decode_header_value(raw_filename)
         destination = _safe_attachment_destination(save_dir, decoded_filename)
         if destination is None:
             logger.warning(
@@ -75,58 +79,72 @@ def extract_email_attachments(
                 AttachmentModel(
                     filename=safe_filename,
                     content=payload,
-                    headers=dict(part.items()),
+                    headers={k: ec.decode_header_value(v) for k, v in part.items()},
                     parent=email_reference
                 )
             )
+
         except Exception as e:
             logger.error(f"Failed to save attachment {safe_filename}: {e}")
 
     return attachments
 
 
-def get_header_dict_list(email_message: Message) -> Dict[str, str]:
-    """
-    Convert email headers into a dictionary.
-    """
-    return {k: decode_email_header(v) for k, v in email_message.items()}
+# -------------------------
+# Headers
+# -------------------------
 
+def get_header_dict_list(email_message: Message) -> Dict[str, str]:
+    return {
+        k: ec.decode_header_value(v)
+        for k, v in email_message.items()
+    }
+
+
+# -------------------------
+# Main parser
+# -------------------------
 
 def parse_email(
     email_message: Message,
     working_dir: str,
     email_reference: str,
-    reported_by: Optional[str] = None
+    reported_by: Optional[str]
 ) -> EmailDataModel:
-    """
-    Parse an email message and return structured data including headers, text, attachments, and metadata.
-    """
+
     ensure_dir(working_dir)
-    attachments = extract_email_attachments(email_message, working_dir, email_reference)
 
-    from_addr = decode_email_header(email_message.get("From", ""))
-    logger.debug(f"Decoded From address: {from_addr}")
-    to_addr = decode_email_header(email_message.get("To", ""))
-    logger.debug(f"Decoded To address: {to_addr}")
-    cc_addr = decode_email_header(email_message.get("Cc", ""))
-    logger.debug(f"Decoded Cc address: {cc_addr}")
-    bcc_addr = decode_email_header(email_message.get("Bcc", ""))
-    logger.debug(f"Decoded Bcc address: {bcc_addr}")
-    subject = decode_email_header(email_message.get("Subject", ""))
-    logger.debug(f"Decoded Subject: {subject}")
-    reporter = reported_by or to_addr
-    logger.debug(f"Using reporter: {reporter}")
+    attachments = extract_email_attachments(
+        email_message,
+        working_dir,
+        email_reference
+    )
 
-    email_text_parts = [
-        part.get_payload(decode=True).decode(part.get_content_charset("utf-8"), errors="replace")
-        for part in email_message.walk()
-        if part.get_content_type() in ["text/plain", "text/html"]
-    ]
+    # -------- Email fields (via shared extractors) --------
+
+    from_addr = ec.extract_address(email_message.get("From"))
+    to_addr = ec.extract_address(email_message.get("To"))
+    cc_addr = ec.extract_address(email_message.get("Cc"))
+    bcc_addr = ec.extract_address(email_message.get("Bcc"))
+
+    subject = ec.decode_header_value(email_message.get("Subject", ""))
+    email_text_parts = ec.extract_text_parts(email_message)
+    headers = ec.extract_header_dict(email_message)
+
+    logger.debug(f"Parsed From: {from_addr}")
+    logger.debug(f"Parsed To: {to_addr}")
+    logger.debug(f"Parsed Cc: {cc_addr}")
+    logger.debug(f"Parsed Bcc: {bcc_addr}")
+
+    # -------- Reporter logic (shared contract) --------
+
+    to_addr, reporter = ec.resolve_reporter_and_to(to_addr, reported_by)
+
+    # -------- Model creation --------
 
     email_data = EmailDataModel(
         reportedBy=reporter,
         **{
-            "mail_from": from_addr,
             "from": from_addr,
             "to": to_addr,
             "cc": cc_addr,
@@ -134,11 +152,12 @@ def parse_email(
             "reportedSubject": subject,
             "reportedText": email_text_parts,
             "date": email_message.get("Date", ""),
-            "headers": get_header_dict_list(email_message),
+            "headers": headers,
             "id": email_reference,
-            "attachments": attachments
+            "attachments": attachments,
         }
     )
 
-    logger.debug(f"Processed email '{subject}' with reference {email_reference}")
+    logger.debug(f"Processed email '{subject}' ({email_reference})")
+
     return email_data

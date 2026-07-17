@@ -1,0 +1,4 @@
+{
+  "summary": {"taxonomies": [{"level": "info", "namespace": "Zscaler", "predicate": "Classification", "value": "MISCELLANEOUS_OR_UNKNOWN"}]},
+  "full": {"url": "login-update.example", "urlClassifications": ["MISCELLANEOUS_OR_UNKNOWN"], "urlClassificationsWithSecurityAlert": ["PHISHING"]}
+}

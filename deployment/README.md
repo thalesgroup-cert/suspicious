@@ -145,6 +145,93 @@ make create-certs
 
 ---
 
+## Secrets & Vault
+
+### Principles
+
+Configuration is split into three tiers — knowing which tier owns a value tells you where to set it:
+
+| Tier | Holds | Source of truth |
+|------|-------|-----------------|
+| **Bootstrap** | Ports, image versions, Vault AppRole IDs, DB/MinIO bootstrap creds | `deployment/.env` |
+| **Secrets** | API keys, passwords, Django secret key | HashiCorp Vault (KV v2 at `suspicious/<dotted-key>`) |
+| **Runtime config** | Non-secret app settings (branding, integration URLs, …) | Database, seeded from `settings.json` |
+
+Key rules:
+
+* **`settings.json` is the dev/CI fallback, read-only at runtime.** Leave `VAULT_ADDR` unset and secrets are read straight from `settings.json` — no Vault needed for tests or local dev.
+* **`VAULT_ADDR` set ⇒ Vault is the secret store.** Real secrets are read from Vault and overlaid onto `settings.json` paths at boot.
+* **Editing connector secrets from the Settings UI requires Vault.** Admins can set/rotate `integrations.*` secrets (cortex, thehive, misp, watcher) in the UI; the write goes straight to Vault. With no Vault the UI save returns **409 secret store not configured** — set those secrets in `settings.json` instead.
+* The AppRole policy written by `make provision-vault` already allows the UI to write integration secrets; everything else stays read-only.
+
+Full secret map and details: [`VAULT.md`](VAULT.md).
+
+### Bring up Vault (copy-paste)
+
+Run from `deployment/`. Vault uses file storage and starts **sealed** on every boot — re-run the unseal step after each restart.
+
+**1. Enable Vault in `.env`** (uncomment / add):
+
+```bash
+VAULT_ADDR=http://vault:8200
+VAULT_PORT=8200
+VAULT_PATH=./vault
+```
+
+**2. Start the stack, then initialise Vault.** Vault runs as a Compose service, so run its CLI inside the container:
+
+```bash
+make up
+docker compose --env-file .env exec vault vault operator init    # FIRST BOOT ONLY — prints unseal keys + root token; record them SECURELY
+export VAULT_TOKEN=<root-token>                                   # used by make provision-vault / seed-vault-secrets
+```
+
+Save the unseal keys (one per line) to `vault/unseal.keys` so every later boot
+unseals automatically — `make up` and `make deploy` run `make unseal` for you:
+
+```bash
+install -m 600 /dev/null vault/unseal.keys   # then paste one unseal key per line
+make unseal                                  # unseal now (idempotent)
+```
+
+> `vault/unseal.keys` is gitignored and host-only. Storing unseal keys beside
+> Vault weakens the seal (a stolen disk can be unsealed) — fine for this
+> single-host deployment; use Vault auto-unseal (cloud KMS / transit) for
+> production. Without the file, Vault stays sealed and you unseal manually:
+> `docker compose --env-file .env exec vault vault operator unseal`.
+
+**3. Provision KV + AppRole** (writes `VAULT_ROLE_ID` / `VAULT_SECRET_ID` into `.env`):
+
+```bash
+make provision-vault
+```
+
+**4. Seed the secrets** (values come from your environment only — never a committed file):
+
+```bash
+export SECRET_KEY=...            # required
+export DB_PASSWORD=...           # required
+export CORTEX_API_KEY=...        # required
+export CORTEX_WEBHOOK_SECRET=... # required
+export S3_SECRET_KEY=...         # required
+# optional — export only those you use:
+export WATCHER_API_KEY=... THEHIVE_API_KEY=... MISP_PRIMARY_API_KEY=... \
+       MISP_SECONDARY_API_KEY=... LDAP_BIND_PASSWORD=... OIDC_CLIENT_SECRET=... SMTP_PASSWORD=...
+make seed-vault-secrets
+```
+
+**5. Migrate + seed runtime config, then restart:**
+
+```bash
+make deploy
+```
+
+The app now reads secrets from Vault and runtime config from the DB. Later restarts only need the unseal step (2).
+
+> **Rotation:** update the value in Vault (`vault kv put suspicious/<dotted-key> value=...`), then restart the app containers so they re-read it at boot.
+
+---
+
 ## Security Notes
 
 * `.env` **must never be committed** — it contains secrets.
@@ -165,6 +252,8 @@ make create-certs
 | Start services        | `make up`           |
 | Stop services         | `make down`         |
 | Deploy updates        | `make deploy`       |
+| Provision Vault       | `make provision-vault` |
+| Seed Vault secrets    | `make seed-vault-secrets` |
 | Run migrations        | `make migrate`      |
 | Backup database       | `make backup`       |
 | Create superuser      | `make superuser`    |

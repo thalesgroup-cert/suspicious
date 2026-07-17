@@ -1,0 +1,27 @@
+[project]
+# CUSTOMIZE: rename the package (and the src/suspicious_connector_template/
+# directory, and the entry-point target below) to match what you're building.
+name = "suspicious-connector-template"
+version = "0.1.0"
+description = "Template for a third-party Suspicious connector."
+requires-python = ">=3.12"
+dependencies = [
+    "requests",
+]
+
+[project.optional-dependencies]
+dev = ["pytest"]
+
+[build-system]
+requires = ["setuptools>=68"]
+build-backend = "setuptools.build_meta"
+
+[tool.setuptools.packages.find]
+where = ["src"]
+
+# This is the part that actually matters: it's how Suspicious's connector
+# registry finds your class at startup (connectors/registry.py, "suspicious.
+# connectors" entry-point group). The key ("template" here) has no effect —
+# ConnectorManifest.name is what's used everywhere else.
+[project.entry-points."suspicious.connectors"]
+template = "suspicious_connector_template:TemplateConnector"

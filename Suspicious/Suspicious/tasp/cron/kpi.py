@@ -3,7 +3,7 @@ from dashboard.models import Kpi
 from dashboard.dash_utils.dashboard import update_all_kpi_stats
 import logging
 
-logger = logging.getLogger("cron.kpi")
+logger = logging.getLogger("tasp.cron.kpi")
 
 
 def sync_monthly_kpi() -> Kpi:

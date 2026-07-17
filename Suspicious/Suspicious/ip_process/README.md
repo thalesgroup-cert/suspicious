@@ -1,12 +1,12 @@
 # 🧳 Ip Process Module
 
-This module is part of a Django-based application that provides functionality to manage the ips that are submitted to suspicious either via mail or simple submission. It includes standard Django components (models, views, urls) and custom utilities for ip handling.
+This module is a Django app that manages the ips that are submitted to suspicious either via mail or simple submission. It includes standard Django components (models, views, urls) and custom utilities for ip handling.
 
 ---
 
 ## 📦 Overview
 
-The `ip_process` app is designed to:
+The `ip_process` app:
 
 - Manage ips through Django models and views
 - Provide APIs for CRUD operations on ips

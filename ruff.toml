@@ -1,0 +1,16 @@
+# Ruff configuration. Lints Suspicious/, email-feeder/, Analyzers/.
+target-version = "py312"
+line-length = 120
+
+extend-exclude = [
+    "**/migrations/**",
+    "*.ipynb",
+]
+
+[lint]
+# Default select (E, F, W subset). Ignore the intentional "config loaded after
+# logger" import-ordering pattern used across cron/service modules.
+ignore = [
+    "E402",  # module-level import not at top — deliberate: CONFIG_PATH blocks
+             # are intentionally placed after logger setup in several modules.
+]

@@ -1,0 +1,23 @@
+# VCS
+.git
+.gitignore
+
+# Docker
+Dockerfile
+.dockerignore
+docker-compose.yml
+
+# Node / build output
+node_modules
+dist
+.pnpm-store/
+.playwright/
+tsconfig.tsbuildinfo
+
+# Secrets / local env (baked config comes from window.__ENV__ at runtime)
+*.env
+
+# Test / coverage / OS cruft
+coverage/
+*.log
+.DS_Store

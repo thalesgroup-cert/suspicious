@@ -25,6 +25,20 @@ Switch to a feature branch:
 git checkout -b feature/<short_feature_name>
 ```
 
+Wire the repo's git hooks (Conventional Commits validator):
+
+```bash
+git config core.hooksPath .githooks
+# or, from deployment/:
+make install-hooks
+```
+
+The `commit-msg` hook rejects any subject that does not match
+`<type>(scope)?!?: <subject>` (max 72 chars). Allowed types: `feat`,
+`fix`, `chore`, `docs`, `refactor`, `perf`, `test`, `ci`, `build`,
+`style`, `revert`. Merge / revert / fixup / squash auto-subjects are
+allowed through.
+
 ---
 
 ## Contribution Workflow
@@ -50,13 +64,23 @@ git checkout -b feature/<short_feature_name>
      * `docs:` for documentation changes
      * `refactor:` for code improvements without changing behavior
 
-4. **Push your branch**:
+4. **Run tests and lint before pushing**:
+
+   ```bash
+   # Backend
+   cd Suspicious && python manage.py test
+
+   # Frontend
+   cd suspicious-ui && pnpm lint && pnpm test
+   ```
+
+5. **Push your branch**:
 
    ```bash
    git push origin feature/<short_feature_name>
    ```
 
-5. **Open a Pull Request (PR)** from your fork on GitHub:
+6. **Open a Pull Request (PR)** from your fork on GitHub:
 
    * Navigate to your repository
    * Click **Contribute > Open Pull Request**

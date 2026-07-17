@@ -4,7 +4,9 @@
 load_env_file() {
     if [ -f "$1" ]; then
         echo "Loading environment variables from $1..."
-        export $(grep -v '^#' "$1" | xargs)
+        set -o allexport
+        source "$1"
+        set +o allexport
     else
         echo "Error: Environment file $1 does not exist."
         exit 1

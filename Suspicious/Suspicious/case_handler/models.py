@@ -12,10 +12,9 @@ from hash_process.models import Hash
 from mail_feeder.models import Mail
 from django.utils.translation import gettext_lazy as _
 from django.utils import timezone
+from case_handler.lifecycle import LifecycleState
 import datetime
-from datetime import timedelta
 
-import hashlib
 
 class Status(models.TextChoices):
     """
@@ -40,6 +39,11 @@ class Result(models.TextChoices):
     DANGEROUS = 'Dangerous', _('Dangerous')
 
 
+class ProposedVerdict(models.TextChoices):
+    SAFE = "Safe", _("Safe")
+    DANGEROUS = "Dangerous", _("Dangerous")
+
+
 class Case(models.Model):
     """
     Main incident investigation case, storing scores, analyst decisions and AI predictions.
@@ -48,30 +52,47 @@ class Case(models.Model):
     reporter = models.ForeignKey(settings.AUTH_USER_MODEL, on_delete=models.CASCADE, related_name='cases', db_index=True)
     analysis_done = models.PositiveIntegerField(default=0)
     status = models.CharField(max_length=20, choices=Status.choices, default=Status.TODO, verbose_name='Status', db_index=True)
-    results = models.CharField(max_length=20, choices=Result.choices, default=Result.SUSPICIOUS, verbose_name='Results', db_index=True)
-    finalScore = models.FloatField(default=0, db_index=True)
-    finalConfidence = models.FloatField(default=0, db_index=True)
-    score = models.FloatField(default=0, db_index=True)
-    confidence = models.FloatField(default=0, db_index=True)
-    resultsAI = models.CharField(max_length=20, default="Suspicious", verbose_name='ResultsAI', db_index=True)
-    scoreAI = models.FloatField(default=0, db_index=True)
-    confidenceAI = models.FloatField(default=0, db_index=True)
-    categoryAI = models.CharField(max_length=20, default='Uncategorized', verbose_name='Category AI', db_index=True)
+    results = models.CharField(max_length=20, choices=Result.choices, default=Result.INCONCLUSIVE, verbose_name='Results', db_index=True)
+    final_score = models.FloatField(default=0)
+    final_confidence = models.FloatField(default=0)
+    score = models.FloatField(default=0)
+    confidence = models.FloatField(default=0)
+    results_ai = models.CharField(max_length=20, default="Suspicious", verbose_name='ResultsAI')
+    score_ai = models.FloatField(default=0)
+    confidence_ai = models.FloatField(default=0)
+    category_ai = models.CharField(max_length=20, default='Uncategorized', verbose_name='Category AI', db_index=True)
     fileOrMail = models.ForeignKey('CaseHasFileOrMail', on_delete=models.CASCADE, related_name='cases', null=True, blank=True, db_index=True)
     nonFileIocs = models.ForeignKey('CaseHasNonFileIocs', on_delete=models.CASCADE, related_name='cases', null=True, blank=True, db_index=True)
     is_challenged = models.BooleanField(default=False)
     is_challengeable = models.BooleanField(default=True)
-    challenged_result = models.CharField(max_length=20, choices=Result.choices, default=Result.UNCHALLENGED, verbose_name='Challenged Result', db_index=True)
+    challenged_result = models.CharField(max_length=20, choices=Result.choices, default=Result.UNCHALLENGED, verbose_name='Challenged Result')
     creation_date = models.DateTimeField(auto_now_add=True, db_index=True)
     last_update = models.DateTimeField(auto_now=True)
     last_update_by = models.ForeignKey(settings.AUTH_USER_MODEL, on_delete=models.CASCADE, related_name='cases_last_update_by', null=True, blank=True, db_index=True)
+    lifecycle_state = models.CharField(
+        max_length=20, choices=LifecycleState.choices,
+        default=LifecycleState.CREATED, db_index=True,
+        verbose_name="Lifecycle State",
+    )
+    finalized_at = models.DateTimeField(null=True, blank=True, verbose_name="Finalized At")
+    dispatched_at = models.DateTimeField(null=True, blank=True, verbose_name="Dispatched At")
+    kpi_counted = models.BooleanField(default=False, verbose_name="KPI Counted")
+    challenge_proposed_result = models.CharField(
+        max_length=20, choices=ProposedVerdict.choices, blank=True, default="",
+        verbose_name="Challenge Proposed Result",
+    )
+    challenge_reason = models.TextField(
+        blank=True, default="", verbose_name="Challenge Reason",
+    )
+    reporter_context = models.TextField(
+        blank=True, default="", verbose_name="Reporter Context",
+    )
+    thehive_alert_id = models.CharField(
+        max_length=64, blank=True, default="", verbose_name="TheHive Alert ID",
+    )
 
     class Meta:
         ordering = ['-creation_date']
-        indexes = [
-            models.Index(fields=['status']),
-            models.Index(fields=['results']),
-        ]
 
     def __str__(self):
         """
@@ -129,7 +150,7 @@ class CaseChallengeToken(models.Model):
             return ""
         if base.endswith("/api"):
             base = base[:-4]
-        return f"{base}/api/cases/{case_id}/challenge?token={token}"
+        return f"{base}/api/cases/{case_id}/challenge/{token}/"
 
     @staticmethod
     def normalize_api_base(submissions_url: str) -> str:
@@ -141,6 +162,26 @@ class CaseChallengeToken(models.Model):
     def mark_used(self) -> None:
         self.used_at = timezone.now()
         self.save(update_fields=["used_at"])
+
+
+class CaseComment(models.Model):
+    case = models.ForeignKey(
+        Case,
+        on_delete=models.CASCADE,
+        related_name="comments",
+        db_index=True,
+    )
+    author = models.ForeignKey(
+        settings.AUTH_USER_MODEL,
+        on_delete=models.CASCADE,
+        related_name="case_comments",
+    )
+    body = models.TextField()
+    is_internal = models.BooleanField(default=False, verbose_name="Internal (analyst-only)")
+    created_at = models.DateTimeField(auto_now_add=True, db_index=True)
+
+    class Meta:
+        ordering = ["-created_at"]
 
 
 class CaseHasFileOrMail(models.Model):
@@ -208,12 +249,48 @@ class CaseHasNonFileIocs(models.Model):
         return f"Case #{self.case_id} - " + ", ".join(parts)
 
 
-class FileInCases(models.Model):
+class CaseArtifact(models.Model):
     """
-    Many-to-many association between files and cases.
+    Per-(case, artifact) link replacing the old FileInCases / HashInCases /
+    UrlInCases / IpInCases / MailInCases models. Exactly one of file, hash,
+    url, ip, mail is populated per row; artifact_type matches the populated
+    FK.
     """
-    file = models.ForeignKey(File, on_delete=models.CASCADE, related_name='file_cases', db_index=True)
-    case = models.ManyToManyField('Case', related_name='file_cases', blank=True)
+
+    class ArtifactType(models.TextChoices):
+        FILE = 'file', 'File'
+        HASH = 'hash', 'Hash'
+        URL = 'url', 'URL'
+        IP = 'ip', 'IP'
+        MAIL = 'mail', 'Mail'
+
+    case = models.ForeignKey(
+        'Case', on_delete=models.CASCADE,
+        related_name='case_artifacts', db_index=True,
+    )
+    artifact_type = models.CharField(
+        max_length=10, choices=ArtifactType.choices, db_index=True,
+    )
+    file = models.ForeignKey(
+        File, on_delete=models.CASCADE, related_name='case_artifacts',
+        null=True, blank=True, db_index=True,
+    )
+    hash = models.ForeignKey(
+        Hash, on_delete=models.CASCADE, related_name='case_artifacts',
+        null=True, blank=True, db_index=True,
+    )
+    url = models.ForeignKey(
+        URL, on_delete=models.CASCADE, related_name='case_artifacts',
+        null=True, blank=True, db_index=True,
+    )
+    ip = models.ForeignKey(
+        IP, on_delete=models.CASCADE, related_name='case_artifacts',
+        null=True, blank=True, db_index=True,
+    )
+    mail = models.ForeignKey(
+        Mail, on_delete=models.CASCADE, related_name='case_artifacts',
+        null=True, blank=True, db_index=True,
+    )
     creation_date = models.DateTimeField(auto_now_add=True, db_index=True)
     last_update = models.DateTimeField(auto_now=True)
 
@@ -221,68 +298,8 @@ class FileInCases(models.Model):
         ordering = ['-creation_date']
 
     def __str__(self):
-        return f"File ID: {self.file_id}"
-
-
-class HashInCases(models.Model):
-    """
-    Many-to-many association between hashes and cases.
-    """
-    hash = models.ForeignKey(Hash, on_delete=models.CASCADE, related_name='hash_cases', db_index=True)
-    case = models.ManyToManyField('Case', related_name='hash_cases', blank=True)
-    creation_date = models.DateTimeField(auto_now_add=True, db_index=True)
-    last_update = models.DateTimeField(auto_now=True)
-
-    class Meta:
-        ordering = ['-creation_date']
-
-    def __str__(self):
-        return f"Hash ID: {self.hash_id}"
-
-
-class UrlInCases(models.Model):
-    """
-    Many-to-many association between URLs and cases.
-    """
-    url = models.ForeignKey(URL, on_delete=models.CASCADE, related_name='url_cases', db_index=True)
-    case = models.ManyToManyField('Case', related_name='url_cases', blank=True)
-    creation_date = models.DateTimeField(auto_now_add=True, db_index=True)
-    last_update = models.DateTimeField(auto_now=True)
-
-    class Meta:
-        ordering = ['-creation_date']
-
-    def __str__(self):
-        return f"URL ID: {self.url_id}"
-
-
-class IpInCases(models.Model):
-    """
-    Many-to-many association between IPs and cases.
-    """
-    ip = models.ForeignKey(IP, on_delete=models.CASCADE, related_name='ip_cases', db_index=True)
-    case = models.ManyToManyField('Case', related_name='ip_cases', blank=True)
-    creation_date = models.DateTimeField(auto_now_add=True, db_index=True)
-    last_update = models.DateTimeField(auto_now=True)
-
-    class Meta:
-        ordering = ['-creation_date']
-
-    def __str__(self):
-        return f"IP ID: {self.ip_id}"
-
-
-class MailInCases(models.Model):
-    """
-    Many-to-many association between mails and cases.
-    """
-    associated_mail = models.ForeignKey(Mail, on_delete=models.CASCADE, related_name='cases_associated_with_mail', db_index=True)
-    associated_cases = models.ManyToManyField('Case', related_name='mail_cases', blank=True)
-    creation_date = models.DateTimeField(auto_now_add=True, db_index=True)
-    last_update = models.DateTimeField(auto_now=True)
-
-    class Meta:
-        ordering = ['-creation_date']
-
-    def __str__(self):
-        return f"Mail ID: {self.associated_mail_id}"
+        artifact_id = (
+            self.file_id or self.hash_id or self.url_id
+            or self.ip_id or self.mail_id or 'orphan'
+        )
+        return f"Case #{self.case_id} - {self.artifact_type}: {artifact_id}"

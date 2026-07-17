@@ -1,0 +1,101 @@
+name: Security
+
+on:
+  pull_request:
+    branches: [main]
+  schedule:
+    - cron: "0 21 * * 5"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: security-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  trivy-fs:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      security-events: write
+    steps:
+      - uses: actions/checkout@v6
+      - name: Trivy filesystem scan
+        # v0.28.0 and v0.30.0 both pin a now-nonexistent aquasecurity/setup-trivy
+        # tag (v0.2.1, v0.2.2) and fail before ever scanning; v0.36.0 pins that
+        # nested action by commit SHA (equivalent to the real tag v0.2.6), so
+        # it isn't exposed to the same float-tag drift.
+        uses: aquasecurity/trivy-action@v0.36.0
+        with:
+          scan-type: fs
+          scan-ref: .
+          format: sarif
+          output: trivy-fs.sarif
+          severity: CRITICAL,HIGH
+          ignore-unfixed: true
+      - name: Upload SARIF
+        if: always()
+        uses: github/codeql-action/upload-sarif@v4
+        with:
+          sarif_file: trivy-fs.sarif
+          category: trivy-fs
+
+  gitleaks:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v6
+        with:
+          fetch-depth: 0
+      - uses: gitleaks/gitleaks-action@v3
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+  pip-audit:
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        path: [Suspicious, email-feeder, Analyzers/AIMailAnalyzer]
+    steps:
+      - uses: actions/checkout@v6
+      - uses: actions/setup-python@v6
+        with:
+          python-version: "3.12"
+      - run: pip install pip-audit
+      - name: pip-audit ${{ matrix.path }}
+        # Gating: a known-vulnerable dependency fails the build. If an advisory
+        # has no fix yet, triage it and add `--ignore-vuln <GHSA/CVE-id>` here
+        # rather than re-muting the whole audit.
+        #
+        # Suspicious-only: GHSA-f4j7-r4q5-qw2c (chromadb pre-auth RCE via
+        # trust_remote_code on the collections API) has no fix released yet.
+        # We only use chromadb as an HttpClient (common.clients.get_chroma_
+        # client — get_collection/get/delete), never the vulnerable server
+        # code path or trust_remote_code.
+        run: |
+          if [ "${{ matrix.path }}" = "Suspicious" ]; then
+            pip-audit -r Suspicious/requirements.txt --strict \
+              --ignore-vuln GHSA-f4j7-r4q5-qw2c
+          else
+            pip-audit -r ${{ matrix.path }}/requirements.txt --strict
+          fi
+
+  npm-audit:
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: suspicious-ui
+    steps:
+      - uses: actions/checkout@v6
+      - uses: pnpm/action-setup@v6
+        with:
+          version: 11.1.3
+      - uses: actions/setup-node@v6
+        with:
+          node-version: "22"
+          cache: pnpm
+          cache-dependency-path: suspicious-ui/pnpm-lock.yaml
+      - run: pnpm install --frozen-lockfile
+      - run: pnpm audit --audit-level=high

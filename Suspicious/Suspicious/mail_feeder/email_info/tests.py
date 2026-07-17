@@ -89,23 +89,22 @@ class MailInfoServiceTests(TestCase):
         instance.save.assert_called_once()
         self.assertEqual(result, instance)
 
-    @patch("mail_feeder.email_info.email_info.user_acknowledge")
-    def test_acknowledge_user_success(self, mock_ack):
+    @patch("mail_feeder.email_info.email_info.MailNotificationService")
+    def test_acknowledge_user_success(self, mock_notify):
         mail_info = MagicMock()
         self.service._acknowledge_user(mail_info)
-        mock_ack.assert_called_once_with(mail_info)
+        mock_notify.from_settings.return_value.send_acknowledgement.assert_called_once_with(mail_info)
 
-    @patch("mail_feeder.email_info.email_info.user_acknowledge")
-    def test_acknowledge_user_failure_is_swallowed(self, mock_ack):
-        mock_ack.side_effect = Exception("SMTP down")
+    @patch("mail_feeder.email_info.email_info.MailNotificationService")
+    def test_acknowledge_user_failure_is_swallowed(self, mock_notify):
+        mock_notify.from_settings.side_effect = Exception("SMTP down")
         mail_info = MagicMock()
 
-        # must NOT raise
         self.service._acknowledge_user(mail_info)
 
     @patch("mail_feeder.email_info.email_info.MailInfo")
-    @patch("mail_feeder.email_info.email_info.user_acknowledge")
-    def test_create_mail_info_happy_path(self, mock_ack, mock_mailinfo):
+    @patch("mail_feeder.email_info.email_info.MailNotificationService")
+    def test_create_mail_info_happy_path(self, mock_notify, mock_mailinfo):
         instance = MagicMock()
         mock_mailinfo.return_value = instance
 
@@ -113,4 +112,4 @@ class MailInfoServiceTests(TestCase):
 
         self.user_creator.get_or_create_user.assert_called_once()
         instance.save.assert_called_once()
-        mock_ack.assert_called_once()
+        mock_notify.from_settings.return_value.send_acknowledgement.assert_called_once_with(instance)

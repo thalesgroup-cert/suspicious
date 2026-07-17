@@ -1,0 +1,335 @@
+import { describe, it, expect, vi, beforeEach } from "vitest";
+import { screen, waitFor, within } from "@testing-library/react";
+import userEvent from "@testing-library/user-event";
+import { renderWithProviders, mockMe } from "@/test/utils";
+
+// ---------------------------------------------------------------------------
+// Module mocks
+// ---------------------------------------------------------------------------
+
+vi.mock("@/api/auth", () => ({
+  getMe: vi.fn(),
+  login: vi.fn(),
+  logout: vi.fn(),
+  hydrateColorsAfterSso: vi.fn(),
+  hydrateAppearanceFromMe: vi.fn(),
+}));
+
+vi.mock("@/features/investigation/api", () => ({
+  getAllInvestigations: vi.fn(),
+  getInvestigationDetails: vi.fn(),
+  editGlobalCase: vi.fn(),
+  buildSortOrdering: vi.fn((field: string, dir: string) => `${dir === "asc" ? "" : "-"}${field}`),
+}));
+
+vi.mock("@/features/comments/api", () => ({
+  getCaseComments: vi.fn(),
+  addCaseComment: vi.fn(),
+}));
+
+// ---------------------------------------------------------------------------
+// Test data
+// ---------------------------------------------------------------------------
+
+const mockRow = {
+  id: 7,
+  reporter_email: "reporter@corp.test",
+  status: "DONE",
+  info: "Suspicious email with credential harvesting link",
+  artifact: "http://phish.evil.com/login",
+  created_at: "2026-04-01T10:00:00Z",
+  tests_done: 3,
+  type: "URL",
+  result: "Suspicious",
+  is_challengeable: false,
+  is_challenged: false,
+};
+
+const mockListResponse = {
+  count: 1,
+  next: null,
+  previous: null,
+  results: [mockRow],
+};
+
+const mockDetailsChallenged = {
+  ...mockRow,
+  challenge_proposed_result: "Dangerous",
+  challenge_reason: "phish",
+  analyzer_reports: [],
+  case_infos: {},
+};
+
+const mockDetails = {
+  ...mockRow,
+  analyzer_reports: [
+    {
+      id: 1,
+      cortex_job_id: "cj-001",
+      type: "url",
+      status: "SUCCESS",
+      analyzer_name: "PhishingURLAnalyzer",
+      analyzer_id: "PhishingURLAnalyzer_1_0",
+      level: "malicious",
+      confidence: 0.95,
+      score: 0.95,
+      category: "Phishing",
+      categories: ["Phishing"],
+      report_summary: {},
+      report_taxonomy: {},
+      report_full: {},
+      target: null,
+    },
+  ],
+  case_infos: {
+    score: 0.95,
+    confidence: 0.95,
+    classification: "Phishing",
+  },
+};
+
+// ---------------------------------------------------------------------------
+// Helpers
+// ---------------------------------------------------------------------------
+
+import { getMe } from "@/api/auth";
+import {
+  getAllInvestigations,
+  getInvestigationDetails,
+} from "@/features/investigation/api";
+import InvestigationPage from "@/pages/InvestigationPage";
+import { getCaseComments, addCaseComment } from "@/features/comments/api";
+
+const mockGetMe = vi.mocked(getMe);
+const mockGetAll = vi.mocked(getAllInvestigations);
+const mockGetDetails = vi.mocked(getInvestigationDetails);
+const mockGetComments = vi.mocked(getCaseComments);
+const mockAddComment = vi.mocked(addCaseComment);
+
+function renderInvestigation() {
+  return renderWithProviders(<InvestigationPage />, { initialPath: "/investigation" });
+}
+
+// ---------------------------------------------------------------------------
+// Tests
+// ---------------------------------------------------------------------------
+
+describe("InvestigationPage", () => {
+  beforeEach(() => {
+    vi.clearAllMocks();
+    mockGetMe.mockResolvedValue({ ...mockMe, groups: ["CERT"] } as never);
+    mockGetAll.mockResolvedValue(mockListResponse as never);
+    mockGetDetails.mockResolvedValue(mockDetails as never);
+    mockGetComments.mockResolvedValue([
+      { id: 1, author_email: "reporter@corp.test", body: "please check", is_internal: false, created_at: "2026-07-09T10:00:00Z" },
+    ]);
+    mockAddComment.mockResolvedValue({
+      id: 2, author_email: "analyst@corp.test", body: "looks clean", is_internal: true, created_at: "2026-07-09T11:00:00Z",
+    });
+  });
+
+  it("renders the investigations table", async () => {
+    renderInvestigation();
+
+    await waitFor(() => {
+      expect(
+        screen.getByText(/phish\.evil\.com|reporter@corp/i)
+      ).toBeInTheDocument();
+    });
+  });
+
+  it("shows correct result chip for a suspicious case", async () => {
+    renderInvestigation();
+
+    await waitFor(() => {
+      expect(screen.getByText("SUSPICIOUS")).toBeInTheDocument();
+    });
+  });
+
+  it("opens the detail drawer when a row is clicked", async () => {
+    const user = userEvent.setup();
+    renderInvestigation();
+
+    await waitFor(() => {
+      expect(
+        screen.getByText(/phish\.evil\.com|reporter@corp/i)
+      ).toBeInTheDocument();
+    });
+
+    const row = screen.getByText(/phish\.evil\.com|reporter@corp/i).closest("tr") ??
+                 screen.getByText(/phish\.evil\.com|reporter@corp/i);
+    await user.click(row);
+
+    await waitFor(() => {
+      expect(mockGetDetails).toHaveBeenCalledWith(7);
+    });
+  });
+
+  it("shows detail content once drawer data loads", async () => {
+    const user = userEvent.setup();
+    renderInvestigation();
+
+    await waitFor(() =>
+      expect(
+        screen.getByText(/phish\.evil\.com|reporter@corp/i)
+      ).toBeInTheDocument()
+    );
+
+    const row = screen.getByText(/phish\.evil\.com|reporter@corp/i).closest("tr") ??
+                screen.getByText(/phish\.evil\.com|reporter@corp/i);
+    await user.click(row);
+
+    await waitFor(() => {
+      expect(screen.getByText(/PhishingURLAnalyzer/i)).toBeInTheDocument();
+    });
+  });
+
+  it("shows the reporter's proposed verdict and reason for a challenged case", async () => {
+    const user = userEvent.setup();
+    mockGetDetails.mockResolvedValue(mockDetailsChallenged as never);
+    renderInvestigation();
+
+    await waitFor(() =>
+      expect(
+        screen.getByText(/phish\.evil\.com|reporter@corp/i)
+      ).toBeInTheDocument()
+    );
+
+    const row = screen.getByText(/phish\.evil\.com|reporter@corp/i).closest("tr") ??
+                screen.getByText(/phish\.evil\.com|reporter@corp/i);
+    await user.click(row);
+
+    await waitFor(() => {
+      expect(screen.getByText(/reporter's challenge/i)).toBeInTheDocument();
+      expect(screen.getByText("Dangerous")).toBeInTheDocument();
+      expect(screen.getByText(/reason: phish/i)).toBeInTheDocument();
+    });
+  });
+
+  it("does not show a challenge panel when the case has no proposed verdict", async () => {
+    const user = userEvent.setup();
+    renderInvestigation();
+
+    await waitFor(() =>
+      expect(
+        screen.getByText(/phish\.evil\.com|reporter@corp/i)
+      ).toBeInTheDocument()
+    );
+
+    const row = screen.getByText(/phish\.evil\.com|reporter@corp/i).closest("tr") ??
+                screen.getByText(/phish\.evil\.com|reporter@corp/i);
+    await user.click(row);
+
+    await waitFor(() => {
+      expect(screen.getByText(/PhishingURLAnalyzer/i)).toBeInTheDocument();
+    });
+
+    expect(screen.queryByText(/reporter's challenge/i)).not.toBeInTheDocument();
+  });
+
+  it("shows the reporter's note in the context panel when present", async () => {
+    const user = userEvent.setup();
+    mockGetDetails.mockResolvedValue({
+      ...mockDetails,
+      reporter_note: "forwarded phishing",
+      reporter_context: "please check this url",
+    } as never);
+    renderInvestigation();
+
+    await waitFor(() =>
+      expect(
+        screen.getByText(/phish\.evil\.com|reporter@corp/i)
+      ).toBeInTheDocument()
+    );
+
+    const row = screen.getByText(/phish\.evil\.com|reporter@corp/i).closest("tr") ??
+                screen.getByText(/phish\.evil\.com|reporter@corp/i);
+    await user.click(row);
+
+    await waitFor(() => {
+      expect(screen.getByText(/reporter's context/i)).toBeInTheDocument();
+      expect(screen.getByText("forwarded phishing")).toBeInTheDocument();
+    });
+  });
+
+  it("shows the reporter's context when there is no note", async () => {
+    const user = userEvent.setup();
+    mockGetDetails.mockResolvedValue({
+      ...mockDetails,
+      reporter_context: "please check this url",
+    } as never);
+    renderInvestigation();
+
+    await waitFor(() =>
+      expect(
+        screen.getByText(/phish\.evil\.com|reporter@corp/i)
+      ).toBeInTheDocument()
+    );
+
+    const row = screen.getByText(/phish\.evil\.com|reporter@corp/i).closest("tr") ??
+                screen.getByText(/phish\.evil\.com|reporter@corp/i);
+    await user.click(row);
+
+    await waitFor(() => {
+      expect(screen.getByText("please check this url")).toBeInTheDocument();
+    });
+  });
+
+  it("does not show a reporter's context panel when neither field is present", async () => {
+    const user = userEvent.setup();
+    renderInvestigation();
+
+    await waitFor(() =>
+      expect(
+        screen.getByText(/phish\.evil\.com|reporter@corp/i)
+      ).toBeInTheDocument()
+    );
+
+    const row = screen.getByText(/phish\.evil\.com|reporter@corp/i).closest("tr") ??
+                screen.getByText(/phish\.evil\.com|reporter@corp/i);
+    await user.click(row);
+
+    await waitFor(() => {
+      expect(screen.getByText(/PhishingURLAnalyzer/i)).toBeInTheDocument();
+    });
+
+    expect(screen.queryByText(/reporter's context/i)).not.toBeInTheDocument();
+  });
+
+  it("redirects non-elevated users away from the page", async () => {
+    mockGetMe.mockResolvedValue({ ...mockMe, groups: [] } as never);
+
+    renderInvestigation();
+
+    await waitFor(() => {
+      expect(mockGetAll).not.toHaveBeenCalled();
+    });
+  });
+
+  it("shows the comment thread and posts an analyst note", async () => {
+    const user = userEvent.setup();
+    renderInvestigation();
+
+    await waitFor(() =>
+      expect(
+        screen.getByText(/phish\.evil\.com|reporter@corp/i)
+      ).toBeInTheDocument()
+    );
+
+    const row = screen.getByText(/phish\.evil\.com|reporter@corp/i).closest("tr") ??
+                screen.getByText(/phish\.evil\.com|reporter@corp/i);
+    await user.click(row);
+
+    await waitFor(() => {
+      expect(screen.getByText("please check")).toBeInTheDocument();
+    });
+
+    const textarea = screen.getByPlaceholderText("Add a comment…");
+    await user.type(textarea, "looks clean");
+    await user.click(screen.getByRole("button", { name: "Add" }));
+
+    await waitFor(() =>
+      expect(mockAddComment).toHaveBeenCalledWith(7, "looks clean")
+    );
+  });
+});

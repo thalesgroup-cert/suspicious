@@ -4,23 +4,18 @@ from import_export.admin import ImportExportModelAdmin
 
 from case_handler.models import (
     Case,
+    CaseArtifact,
     CaseHasFileOrMail,
     CaseHasNonFileIocs,
-    IpInCases,
-    UrlInCases,
-    HashInCases,
-    MailInCases,
-    FileInCases,
 )
 
 
-# Resources
 class CaseResource(resources.ModelResource):
     class Meta:
         model = Case
         fields = (
             'id', 'description', 'reporter__username', 'analysis_done',
-            'status', 'results', 'finalScore', 'finalConfidence',
+            'status', 'results', 'final_score', 'final_confidence',
             'is_challenged', 'challenged_result', 'creation_date', 'last_update',
         )
         export_order = fields
@@ -42,42 +37,23 @@ class CaseHasNonFileIocsResource(resources.ModelResource):
         )
 
 
-class IpInCasesResource(resources.ModelResource):
+class CaseArtifactResource(resources.ModelResource):
     class Meta:
-        model = IpInCases
-        fields = ('id', 'ip__address', 'creation_date', 'last_update')
+        model = CaseArtifact
+        fields = (
+            'id', 'case__id', 'artifact_type',
+            'file__file_path', 'hash__value', 'url__address',
+            'ip__address', 'mail__subject',
+            'creation_date', 'last_update',
+        )
 
 
-class UrlInCasesResource(resources.ModelResource):
-    class Meta:
-        model = UrlInCases
-        fields = ('id', 'url__address', 'creation_date', 'last_update')
-
-
-class HashInCasesResource(resources.ModelResource):
-    class Meta:
-        model = HashInCases
-        fields = ('id', 'hash__value', 'creation_date', 'last_update')
-
-
-class MailInCasesResource(resources.ModelResource):
-    class Meta:
-        model = MailInCases
-        fields = ('id', 'associated_mail__subject', 'creation_date', 'last_update')
-
-
-class FileInCasesResource(resources.ModelResource):
-    class Meta:
-        model = FileInCases
-        fields = ('id', 'file__file_path', 'creation_date', 'last_update')
-
-
-# Admin classes
 @admin.register(Case)
 class CaseAdmin(ImportExportModelAdmin):
     resource_class = CaseResource
     list_display = ('id', 'description', 'reporter', 'status', 'results', 'is_challenged', 'creation_date')
     list_filter = ('status', 'results', 'is_challenged', 'creation_date')
+    list_select_related = ('reporter',)
     search_fields = ('id', 'description', 'reporter__username')
     ordering = ('-creation_date',)
 
@@ -86,6 +62,7 @@ class CaseAdmin(ImportExportModelAdmin):
 class CaseHasFileOrMailAdmin(ImportExportModelAdmin):
     resource_class = CaseHasFileOrMailResource
     list_display = ('id', 'case', 'file', 'mail', 'creation_date')
+    list_select_related = ('case', 'file', 'mail')
     search_fields = ('case__id', 'file__file_path', 'mail__subject')
     ordering = ('-creation_date',)
 
@@ -94,45 +71,23 @@ class CaseHasFileOrMailAdmin(ImportExportModelAdmin):
 class CaseHasNonFileIocsAdmin(ImportExportModelAdmin):
     resource_class = CaseHasNonFileIocsResource
     list_display = ('id', 'case', 'url', 'ip', 'hash', 'creation_date')
+    list_select_related = ('case', 'url', 'ip', 'hash')
     search_fields = ('case__id', 'url__address', 'ip__address', 'hash__value')
     ordering = ('-creation_date',)
 
 
-@admin.register(IpInCases)
-class IpInCasesAdmin(ImportExportModelAdmin):
-    resource_class = IpInCasesResource
-    list_display = ('id', 'ip', 'creation_date')
-    search_fields = ('ip__address',)
-    ordering = ('-creation_date',)
-
-
-@admin.register(UrlInCases)
-class UrlInCasesAdmin(ImportExportModelAdmin):
-    resource_class = UrlInCasesResource
-    list_display = ('id', 'url', 'creation_date')
-    search_fields = ('url__address',)
-    ordering = ('-creation_date',)
-
-
-@admin.register(HashInCases)
-class HashInCasesAdmin(ImportExportModelAdmin):
-    resource_class = HashInCasesResource
-    list_display = ('id', 'hash', 'creation_date')
-    search_fields = ('hash__value',)
-    ordering = ('-creation_date',)
-
-
-@admin.register(MailInCases)
-class MailInCasesAdmin(ImportExportModelAdmin):
-    resource_class = MailInCasesResource
-    list_display = ('id', 'associated_mail', 'creation_date')
-    search_fields = ('associated_mail__subject',)
-    ordering = ('-creation_date',)
-
-
-@admin.register(FileInCases)
-class FileInCasesAdmin(ImportExportModelAdmin):
-    resource_class = FileInCasesResource
-    list_display = ('id', 'file', 'creation_date')
-    search_fields = ('file__file_path',)
+@admin.register(CaseArtifact)
+class CaseArtifactAdmin(ImportExportModelAdmin):
+    resource_class = CaseArtifactResource
+    list_display = (
+        'id', 'case', 'artifact_type',
+        'file', 'hash', 'url', 'ip', 'mail',
+        'creation_date',
+    )
+    list_filter = ('artifact_type', 'creation_date')
+    list_select_related = ('case', 'file', 'hash', 'url', 'ip', 'mail')
+    search_fields = (
+        'case__id', 'file__file_path', 'hash__value',
+        'url__address', 'ip__address', 'mail__subject',
+    )
     ordering = ('-creation_date',)

@@ -1,83 +1,115 @@
+# docker-compose.yml
+#
+# Main composition file.  Override with docker-compose.override.yml for
+# local dev (build instead of image, debug ports, etc.).
+#
+# Usage:
+#   docker compose up -d
+#   docker compose up -d suspicious suspicious_ui   # rolling restart
+#   make deploy                                      # see Makefile
+
 name: suspicious
+
 services:
+
+  # ── Application ──────────────────────────────────────────────────────────
+
   suspicious:
     extends:
       file: compose_apps.yaml
       service: suspicious
-    # build:
-    #   context: ${SUSPICIOUS_PATH}/
-    #   dockerfile: Dockerfile
-    #   args:
-    #     - HTTP_PROXY=${HTTP_PROXY}
-    #     - HTTPS_PROXY=${HTTPS_PROXY}
-    container_name: suspicious
-    image: ghcr.io/thalesgroup-cert/suspicious:latest
+    image: ghcr.io/thalesgroup-cert/suspicious:${SUSPICIOUS_VERSION:?SUSPICIOUS_VERSION is required}
+    container_name: ${SVC_PREFIX:-}suspicious
     depends_on:
       db_suspicious:
         condition: service_healthy
       cortex:
+        condition: service_started   # R2: decoupled — circuit breaker handles unavailability at call time
+      chromadb:
+        condition: service_started
+      redis_cache:
         condition: service_healthy
     healthcheck:
-      test: ["CMD-SHELL", "curl -s -o /dev/null -w '%{http_code}' http://localhost:9020/admin/login/| grep -q 200 || exit 1"]
+      test: ["CMD-SHELL", "curl -sf http://localhost:9020/admin/login/?next=/admin/ -o /dev/null || exit 1"]
       interval: 30s
-      timeout: 30s
-      retries: 15
+      timeout: 10s
+      retries: 10
       start_period: 60s
-    labels:
-      - "traefik.enable=true"
-      - "traefik.http.routers.suspicious.rule=Host(`${DOMAIN_CORP}`)"
-      - "traefik.http.routers.suspicious.entrypoints=websecure"
-      - "traefik.http.routers.suspicious.tls=true"
+
+  suspicious_ui:
+    extends:
+      file: compose_apps.yaml
+      service: suspicious_ui
+    image: ghcr.io/thalesgroup-cert/suspicious-ui:${SUSPICIOUS_UI_VERSION:-${SUSPICIOUS_VERSION:-latest}}
+    container_name: ${SVC_PREFIX:-}suspicious_ui
+    depends_on:
+      suspicious:
+        condition: service_healthy
+    # Routing handled by the file provider (traefik/dynamic/tls.yaml).
+    # Do NOT add traefik labels here — the file provider already defines
+    # the suspicious-ui router and adding a competing @docker router
+    # caused /docs requests to bypass the swagger-csp middleware.
+
+  suspicious_celery:
+    extends:
+      file: compose_apps.yaml
+      service: suspicious_celery
+    image: ghcr.io/thalesgroup-cert/suspicious:${SUSPICIOUS_VERSION:?SUSPICIOUS_VERSION is required}
+    container_name: ${SVC_PREFIX:-}suspicious_celery
+    depends_on:
+      suspicious:
+        condition: service_healthy
+      redis_broker:
+        condition: service_healthy
+
+  # ── Data stores ───────────────────────────────────────────────────────────
 
   db_suspicious:
     extends:
       file: compose_databases.yaml
       service: db_suspicious
-    image: mariadb:${DB_SUSPICIOUS_VERSION}
-    container_name: db_suspicious
+    image: mariadb:${DB_SUSPICIOUS_VERSION:?DB_SUSPICIOUS_VERSION is required}
+    container_name: ${SVC_PREFIX:-}db_suspicious
     healthcheck:
-      test: mariadb-admin --user=${MYSQL_USER} --password=${MYSQL_PASSWORD} status
-      interval: 2s
-      timeout: 1s
-      retries: 10
+      test: ["CMD", "mariadb-admin", "--user=${MYSQL_USER}", "--password=${MYSQL_PASSWORD}", "status"]
+      interval: 5s
+      timeout: 3s
+      retries: 20
       start_period: 30s
 
-  cortex:
+  db_suspicious_replica:
     extends:
-      file: compose_apps.yaml
-      service: cortex
-    image: thehiveproject/cortex:${CORTEX_VERSION}
-    container_name: cortex
-    depends_on:
-      elasticsearch:
-        condition: service_healthy
+      file: compose_databases.yaml
+      service: db_suspicious_replica
+    image: mariadb:${DB_SUSPICIOUS_VERSION:?DB_SUSPICIOUS_VERSION is required}
+    container_name: ${SVC_PREFIX:-}db_suspicious_replica
     healthcheck:
-      test: ["CMD-SHELL", "curl -s -o /dev/null -w '%{http_code}' http://localhost:9001/api/status | grep -q 200 || exit 1"]
-      interval: 30s
-      timeout: 30s
-      retries: 10
-      start_period: 60s
+      test: ["CMD", "mariadb-admin", "--user=${MYSQL_USER}", "--password=${MYSQL_PASSWORD}", "status"]
+      interval: 5s
+      timeout: 3s
+      retries: 20
+      start_period: 30s
 
   elasticsearch:
     extends:
       file: compose_databases.yaml
       service: elasticsearch
-    image: elasticsearch:${ELASTICSEARCH_VERSION}
-    container_name: elasticsearch
+    image: elasticsearch:${ELASTICSEARCH_VERSION:?ELASTICSEARCH_VERSION is required}
+    container_name: ${SVC_PREFIX:-}elasticsearch
     healthcheck:
-      test: ["CMD-SHELL", "curl -k --silent --fail localhost:9200/_cluster/health | grep -Eq '\"status\":\"green\"|\"status\":\"yellow\"' || exit 1"]
+      test: ["CMD-SHELL", "curl -sf http://localhost:9200/_cluster/health | grep -Eq '\"status\":\"(green|yellow)\"' || exit 1"]
       interval: 20s
-      timeout: 60s
+      timeout: 10s
       retries: 30
       start_period: 60s
 
-  rustfs:
+  rustfs:                          # renamed from minio
     extends:
       file: compose_databases.yaml
       service: rustfs
     image: rustfs/rustfs:${RUSTFS_VERSION:?RUSTFS_VERSION is required}
+    container_name: ${SVC_PREFIX:-}rustfs
     command: /data --console-address ":9001"
-    container_name: rustfs
     healthcheck:
       test:
         - "CMD-SHELL"
@@ -87,44 +119,109 @@ services:
       retries: 5
       start_period: 30s
 
+  chromadb:
+    extends:
+      file: compose_databases.yaml
+      service: chromadb
+    image: chromadb/chroma:${CHROMADB_VERSION:?CHROMADB_VERSION is required}
+    container_name: ${SVC_PREFIX:-}chromadb
+
+  redis_broker:
+    extends:
+      file: compose_databases.yaml
+      service: redis_broker
+    image: valkey/valkey:${REDIS_BROKER_VERSION:-9-alpine}
+    container_name: ${SVC_PREFIX:-}redis_broker
+
+  redis_cache:
+    extends:
+      file: compose_databases.yaml
+      service: redis_cache
+    image: valkey/valkey:${REDIS_CACHE_VERSION:-9-alpine}
+    container_name: ${SVC_PREFIX:-}redis_cache
+
+  # ── Analyzers ─────────────────────────────────────────────────────────────
+
+  cortex:
+    extends:
+      file: compose_apps.yaml
+      service: cortex
+    image: thehiveproject/cortex:${CORTEX_VERSION:?CORTEX_VERSION is required}
+    container_name: ${SVC_PREFIX:-}cortex
+    depends_on:
+      elasticsearch:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD-SHELL", "curl -s -o /dev/null -w '%{http_code}' http://localhost:9001/api/status | grep -q 200 || exit 1"]
+      interval: 30s
+      timeout: 10s
+      retries: 10
+      start_period: 60s
+
+  # ── Email feeder ──────────────────────────────────────────────────────────
 
   feeder:
     extends:
       file: compose_apps.yaml
       service: feeder
-    build:
-      context: ${FEEDER_PATH}/
-      dockerfile: Dockerfile
-      args:
-        - NO_PROXY=localhost,rustfs
-        - HTTP_PROXY=${HTTP_PROXY}
-        - HTTPS_PROXY=${HTTPS_PROXY}
-    container_name: email_feeder
+    image: ghcr.io/thalesgroup-cert/suspicious-feeder:${SUSPICIOUS_FEEDER_VERSION:-${SUSPICIOUS_VERSION:-latest}}
+    container_name: ${SVC_PREFIX:-}email_feeder
     depends_on:
-      - suspicious
+      suspicious:
+        condition: service_healthy
+
+  # ── Secrets ───────────────────────────────────────────────────────────────
+
+  vault:
+    extends:
+      file: compose_apps.yaml
+      service: vault
+    container_name: ${SVC_PREFIX:-}vault
+
+  # ── Reverse proxy ─────────────────────────────────────────────────────────
 
   traefik:
     init: true
-    image: traefik:${TRAEFIK_VERSION}
-    container_name: traefik
+    image: traefik:${TRAEFIK_VERSION:?TRAEFIK_VERSION is required}
+    container_name: ${SVC_PREFIX:-}traefik
     extends:
       file: compose_reverse_proxy.yaml
       service: traefik
     command:
-      # Providers
       - "--providers.docker=true"
       - "--providers.docker.exposedbydefault=false"
       - "--providers.docker.network=${NETWORK_NAME}"
-      # API & Dashboard
+      - "--providers.file.directory=/dynamic"
+      - "--providers.file.watch=true"
+      - "--entrypoints.web.address=:80"
+      - "--entrypoints.web.http.redirections.entryPoint.to=websecure"
+      - "--entrypoints.web.http.redirections.entryPoint.scheme=https"
+      - "--entrypoints.websecure.address=:443"
       - "--api.dashboard=true"
-      - "--api.insecure=true"
-      # Observability
+      - "--api.insecure=false"
       - "--log.level=INFO"
       - "--accesslog=true"
-      - "--metrics.prometheus=true"
+      - "--accesslog.filepath=/var/log/traefik/access.log"
+
+# ── Volumes ───────────────────────────────────────────────────────────────
+# Declared once here; referenced by extends in the sub-files.
+
+volumes:
+  db_suspicious_data:
+    driver: local
+  elasticsearch_data:
+    driver: local
+  elasticsearch_logs:
+    driver: local
+  rustfs_data:
+    driver: local
+  chromadb_data:
+    driver: local
+
+# ── Networks ──────────────────────────────────────────────────────────────
 
 networks:
   suspicious_network:
     external: true
     name: ${NETWORK_NAME}
-
+  reverse_network:

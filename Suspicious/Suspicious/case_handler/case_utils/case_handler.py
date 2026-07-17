@@ -1,9 +1,6 @@
-# case_handler.py
-
 import logging
-import json
 from pathlib import Path
-from typing import Optional, Tuple, Dict, Union
+from typing import Any, Optional, Tuple, Dict, Union
 
 from cortex_job.models import AnalyzerReport
 from case_handler.case_utils.case_creator import CaseCreator
@@ -19,16 +16,11 @@ from settings.models import (
     AllowListDomain,
     AllowListFile,
     AllowListFiletype,
+    WatcherLegitDomain,
 )
-from cortex_job.cortex_utils.cortex_and_job_management import CortexJob
 
 logger = logging.getLogger(__name__)
 
-CONFIG_PATH = "/app/settings.json"
-with open(CONFIG_PATH) as config_file:
-    config = json.load(config_file)
-
-# Tagging constants
 TAG_STATUS_TODO = "To Do_User"
 TAG_KEY_STATUS = "Status"
 TAG_RESEND = "to_resend"
@@ -56,6 +48,7 @@ class CaseHandler:
         self.url_form = url_form
         self.other_form = other_form
         self.base_case_path = Path(base_case_path)
+        self.pending_dispatch_intents: list[tuple[Any, str]] = []
 
     def validate_forms(self) -> Dict[str, Optional[object]]:
         """
@@ -131,7 +124,7 @@ class CaseHandler:
         try:
             url_inst, domain = URLHandler().handle_url(url)
             if url_inst and domain:
-                if not AllowListDomain.objects.filter(domain=domain).exists():
+                if not AllowListDomain.objects.filter(domain=domain).exists() and not WatcherLegitDomain.objects.filter(domain=domain).exists():
                     self._launch_analysis(url_inst, None, data_type="url")
                     return url_inst, False
                 url_inst.update_allow_listed()
@@ -191,26 +184,54 @@ class CaseHandler:
             allow_listed=allow_listed,
         )
         logger.debug("Creating case with: %s", ctx)
+        description = ""
+        if self.file_form.is_valid():
+            description = self.file_form.cleaned_data.get("context") or description
+        if self.url_form.is_valid():
+            description = self.url_form.cleaned_data.get("context") or description
+        if self.other_form.is_valid():
+            description = self.other_form.cleaned_data.get("context") or description
         try:
-            case = CaseCreator(self.request.user).create_case(**ctx)
+            case = CaseCreator(self.request.user).create_case(description=description, reporter_context=description, **ctx)
             logger.info("Case created: %s", case)
             return case
         except Exception:
             logger.exception("Failed to create case")
             return None
 
-    def _launch_analysis(self, instance, hash_inst, data_type: str) -> list:
+    def _launch_analysis(self, instance, hash_inst, data_type: str) -> None:
         """
-        Launch Cortex analysis and update AnalyzerReport accordingly.
-        """ 
-        existing = AnalyzerReport.objects.filter(**{data_type: instance}).values_list("id", flat=True)
-        if existing:
-            return list(existing)
+        Queue a Cortex dispatch intent for (instance, data_type). Actual dispatch
+        happens after the Case is created via `dispatch_pending(case)`.
 
-        ids = CortexJob().launch_cortex_jobs(value=instance, data_type=data_type)
-
+        Skips queueing when an existing AnalyzerReport already covers this
+        artifact (preserves prior idempotency behaviour).
+        """
+        if AnalyzerReport.objects.filter(**{data_type: instance}).exists():
+            return
+        self.pending_dispatch_intents.append((instance, data_type))
         if data_type == "file" and hash_inst:
             self._launch_analysis(hash_inst, None, "hash")
 
-        AnalyzerReport.objects.filter(cortex_job_id__in=ids).update(**{data_type: instance})
-        return list(ids)
+    def dispatch_pending(self, case) -> None:
+        """Queue analyzer dispatch for the case; runs async (see
+        tasp.tasks.dispatch_case_analysis) so the submit request returns as
+        soon as the Case exists instead of blocking on Cortex round-trips."""
+        if case is None:
+            if self.pending_dispatch_intents:
+                logger.warning(
+                    "Dropping %d pending Cortex dispatch intents because no Case was created",
+                    len(self.pending_dispatch_intents),
+                )
+            self.pending_dispatch_intents = []
+            return
+
+        intents = [
+            (f"{value._meta.app_label}.{value._meta.model_name}", value.pk, data_type)
+            for value, data_type in self.pending_dispatch_intents
+        ]
+        self.pending_dispatch_intents = []
+
+        from django.db import transaction
+        from tasp.tasks import dispatch_case_analysis
+        transaction.on_commit(lambda: dispatch_case_analysis.delay(case.id, intents))

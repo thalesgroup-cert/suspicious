@@ -32,7 +32,7 @@ class UserCasesMonthlyStatsTest(TestCase):
         self.stats.update_case_results('Failure')
         self.assertEqual(self.stats.failure_cases, 3)
 
-        self.stats.update_case_results('InvalidCase')  # Invalid case should not update any counts
+        self.stats.update_case_results('InvalidCase')
         self.assertEqual(self.stats.safe_cases, 11)
         self.assertEqual(self.stats.suspicious_cases, 6)
         self.assertEqual(self.stats.failure_cases, 3)

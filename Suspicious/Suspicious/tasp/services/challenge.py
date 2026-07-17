@@ -1,31 +1,22 @@
-import json
-import os
-from functools import lru_cache
-
 from django.contrib.auth.models import User
 from django.utils import timezone
 
 from dashboard.models import UserCasesMonthlyStats
-from score_process.score_utils.thehive.challenge import ChallengeToTheHiveService
+from connectors.contrib.thehive.challenge import ChallengeToTheHiveService
 
 
-CONFIG_PATH = os.environ.get("SUSPICIOUS_SETTINGS_PATH", "/app/settings.json")
-
-
-@lru_cache(maxsize=1)
 def _load_mail_config() -> dict:
-    with open(CONFIG_PATH) as config_file:
-        return json.load(config_file).get("mail", {})
+    from settings.config import get_section
+    return get_section("email")
 
 
-@lru_cache(maxsize=1)
 def _load_thehive_config() -> dict:
-    with open(CONFIG_PATH) as config_file:
-        return json.load(config_file).get("thehive", {})
+    from settings.config import get_section
+    return get_section("integrations.thehive")
 
 
 def get_submissions_url() -> str:
-    return _load_mail_config().get("submissions", "/submissions/")
+    return _load_mail_config().get("links", {}).get("submissions", "/submissions/")
 
 
 class CaseChallengeService:
@@ -38,9 +29,15 @@ class CaseChallengeService:
             raise ValueError("Case already challenged")
 
     def mark_challenged(self):
+        from case_handler.lifecycle import LifecycleState, transition
+
         self.case.is_challenged = True
-        self.case.status = "Challenged"
-        self.case.save(update_fields=["is_challenged", "status"])
+        self.case.save(update_fields=["is_challenged"])
+        if self.case.lifecycle_state == LifecycleState.FINALIZED:
+            transition(self.case, LifecycleState.CONTESTED)
+        else:
+            self.case.status = "Challenged"
+            self.case.save(update_fields=["status"])
 
     def update_user_stats(self):
         _update_case_challenge_stats(self.case.reporter)
@@ -48,6 +45,12 @@ class CaseChallengeService:
     def notify(self):
         send_to_thehive = _load_thehive_config().get("enabled", False)
         mail_header = f"Case ID {self.case.id} challenged by {self.case.reporter.username}"
+        proposed = getattr(self.case, "challenge_proposed_result", "")
+        if proposed:
+            mail_header += f" — reporter says it should be {proposed}"
+            reason = getattr(self.case, "challenge_reason", "")
+            if reason:
+                mail_header += f" (reason: {reason})"
         self.logger.info(
             "Notifying about challenge for case ID %s. Send to TheHive: %s",
             self.case.id,
@@ -67,6 +70,15 @@ def run_case_challenge(case, logger) -> None:
     service = CaseChallengeService(case, logger)
     service.validate()
     service.mark_challenged()
+    service.update_user_stats()
+    service.notify()
+
+
+def notify_and_record_challenge(case, logger) -> None:
+    """Stats + CERT/TheHive notification for an already-marked challenge.
+    Unlike run_case_challenge, does NOT validate/mark — the caller (in-app
+    view) has already marked the case, including the proposed verdict."""
+    service = CaseChallengeService(case, logger)
     service.update_user_stats()
     service.notify()
 

@@ -1,0 +1,4 @@
+{
+  "summary": {"taxonomies": [{"level": "info", "namespace": "urlscan.io", "predicate": "Search", "value": "0 result"}]},
+  "full": {"type": "hash", "query": "5952b2bd807f", "service": "get", "indicator": {"results": [], "total": 0, "took": 273, "has_more": false}}
+}

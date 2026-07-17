@@ -1,133 +1,194 @@
 {
-    "suspicious": {
-        "allowed_host": "suspicious",
-        "csrf_trusted_origins": "https://suspicious.test",
-        "django_debug": "False",
-        "django_secret_key": "django-insecure-test",
-        "trace_level": "INFO",
-        "email": "suspicious@test.com",
-        "company": "Test",
-        "tz": "Europe/Paris",
-        "pattern": "pattern to match your company mail addresses",
+    "app": {
+        "name": "suspicious",
+        "debug": false,
+        "secret_key": "replace-with-vault-or-a-real-64-char-random-key-0123456789abcdef",
+        "allowed_hosts": [
+            "suspicious"
+        ],
+        "csrf_trusted_origins": [
+            "https://suspicious.test"
+        ],
+        "timezone": "Europe/Paris",
+        "log_level": "INFO"
+    },
+    "branding": {
+        "company_name": "Test",
+        "contact_email": "suspicious@test.com",
         "footer": "Your Group",
-        "link" : "link to your intranet",
-        "ico" : "data:image/png;base64,Base64 text of your company logo",
-        "logo": "data:image/png;base64,Base64 text of your company logo",
-        "banner": "data:image/png;base64,Base64 text of your company logo",
-        "sign": "data:image/png;base64,Base64 text of your company logo",
-        "oidc_server_url": "oicd-server",
-        "oidc_client_id": "oicd-client-id",
-        "oidc_client_secret": "oidc_client_secret",
-        "storage_backend": "minio",
-        "minio_media_bucket": "suspicious-media",
-        "storage_dual_write" : "False"
-    },
-    "thehive": {
-        "enabled": false,
-        "url": "https://thehive",
-        "api_key": "superpassword",
-        "the_hive_verify_ssl" : false,
-        "the_hive_custom_field" : "",
-        "the_hive_email_sender" : "",
-        "the_hive_tags" : "",
-        "certificate_path" : "/app/cert.pem",
-        "user": "exemple@user.com"
-    },
-    "cortex": {
-        "url": "http://cortex:9001",
-        "api_key": "your cortex api key",
-        "header_analyzer" : "MailHeader_4_0",
-        "ai_analyzer" : "AI_Mail_Analyzer_1_4",
-        "sandbox_analyzer" : "ThreatGridOnPrem_1_0",
-        "yara_analyzer" : "Yara_Boosted_3_2",
-        "file_info_analyzer" : "FileInfo_8_0"
-    },
-    "company_domains": [
-        "testgroup.com"
-    ],
-    "database": {
-        "mysql_database": "db_suspicious",
-        "mysql_host": "db_suspicious",
-        "mysql_password": "password",
-        "mysql_port": 3306,
-        "mysql_root_password": "strongpassword",
-        "mysql_user": "suspicious",
-        "db_use_ssl": "NO",
-        "db_use_connection_pooling": "NO",
-        "db_use_persistent_connections": "NO"
-    },
-    "ldap": {
-        "auth_ldap_base_dn": "ou=People,o=group",
-        "auth_ldap_bind_dn": "ou=Applications,ou=Gresources,o=Group",
-        "auth_ldap_bind_password": "test",
-        "auth_ldap_filter": "(&(mail=%(user)s)(Tpresent=true)(!(ou=admin))(!(TpreferredFirstName=Test)))",
-        "auth_ldap_server_uri": "ldaps://ldap",
-        "auth_ldap_verify_ssl": "False"
-    },
-    "misp" : {
-        "tags" : {
-            "tlp" : "clear",
-            "pap" : "clear",
-            "test" : {
-                "distribution" : "customers"
-            },
-            "other" : "MalSpam,Phishing"
-        },
-        "suspicious" : {
-            "url": "http://misp:80",
-            "key": "your misp api key",
-            "ssl_verify": "False",
-            "ssl_ca_certs": "/etc/ssl/certs/ca-certificates.crt"
-        },
-        "security" : {
-            "url": "https://secondary-misp",
-            "key": "your second misp api key",
-            "ssl_verify": "False",
-            "ssl_ca_certs": "/etc/ssl/certs/ca-certificates.crt"
+        "intranet_link": "https://intranet.local",
+        "assets": {
+            "logo": "BASE64_LOGO",
+            "icon": "BASE64_ICON",
+            "banner": "BASE64_BANNER",
+            "signature": "BASE64_SIGNATURE"
         }
     },
-    "minio": {
-        "access_key": "the minio access key",
-        "endpoint": "rustfs:9000",
-        "secret_key": "the minio secret key",
-        "secure": false,
-        "minio_auto_create_bucket": true
+    "features": {
+        "dual_storage_write": false
     },
-    "mail": {
-        "tls": true,
-        "server" : "the smtp serve to allow the app to send mails",
-        "port" : 25,
-        "username" : "SUSPICIOUS",
-        "password" : "the smtp account password",
-        "footer" : "Limited Distribution",
-        "group" : "Your Cybersecurity Team Name",
-        "suspicious_web" : "https://suspicious.test/submissions/",
-        "global" : "test.com",
-        "global_url" : "https://www.test.com/en",
-        "socials" : {
+    "database": {
+        "engine": "mysql",
+        "host": "db_suspicious",
+        "port": 3306,
+        "name": "db_suspicious",
+        "user": "suspicious",
+        "password": "vault-managed-or-set-here",
+        "root_password": "strongpassword",
+        "options": {
+            "ssl": false,
+            "connection_pooling": false,
+            "persistent_connections": false
+        },
+        "replica": {
+            "host": "db_suspicious_replica",
+            "port": 3306,
+            "user": "suspicious",
+            "password": "password",
+            "name": "db_suspicious"
+        },
+        "replica_read_apps": ["dashboard", "case_handler"]
+    },
+    "storage": {
+        "backend": "local",
+        "s3": {
+            "endpoint": "rustfs:9000",
+            "access_key": "MINIO_ACCESS_KEY",
+            "secret_key": "",
+            "secure": false,
+            "auto_create_bucket": true,
+            "media_bucket": "suspicious-media"
+        }
+    },
+    "integrations": {
+        "cortex": {
+            "url": "http://cortex:9001",
+            "api_key": "",
+            "analyzers": {
+                "header": "MailHeader_4_0",
+                "ai": "AI_Mail_Analyzer_1_4",
+                "sandbox": "ThreatGridOnPrem_1_0",
+                "yara": "Yara_Boosted_3_2",
+                "file_info": "FileInfo_8_0"
+            },
+            "webhook_secret": ""
+        },
+        "chromadb": {
+            "url": "http://chromadb:8000",
+            "host": "chromadb",
+            "port": 8000,
+            "collection_name": "suspicious_mails",
+            "ssl_verify": false
+        },
+        "thehive": {
+            "enabled": false,
+            "url": "https://thehive",
+            "api_key": "",
+            "verify_ssl" : false,
+            "custom_field" : "",
+            "email_sender" : "",
+            "tags" : "",
+            "certificate_path" : "/app/cert.pem",
+            "user": "exemple@user.com"
+        },
+        "watcher": {
+            "enabled": false,
+            "url": "https://watcher",
+            "api_key": "",
+            "timeout": 10,
+            "verify_ssl": false
+        },
+        "misp": {
+            "default_tags": {
+                "tlp": "clear",
+                "pap": "clear",
+                "categories": [
+                    "MalSpam",
+                    "Phishing"
+                ]
+            },
+            "instances": {
+                "primary": {
+                    "url": "http://misp",
+                    "api_key": "",
+                    "ssl_verify": false,
+                    "ssl_ca_certs": "/etc/ssl/certs/ca-certificates.crt"
+                },
+                "secondary": {
+                    "url": "https://secondary-misp",
+                    "api_key": "",
+                    "ssl_verify": false,
+                    "ssl_ca_certs": "/etc/ssl/certs/ca-certificates.crt"
+                }
+            }
+        }
+    },
+    "authentication": {
+        "oidc": {
+            "server_url": "https://oidc-server",
+            "client_id": "client-id",
+            "client_secret": ""
+        },
+        "ldap": {
+            "server_uri": "ldaps://ldap",
+            "bind_dn": "ou=Applications,ou=Gresources,o=Group",
+            "bind_password": "",
+            "base_dn": "ou=People,o=group",
+            "filter": "(&(mail=%(user)s)(Tpresent=true)(!(ou=admin)))",
+            "verify_ssl": false
+        }
+    },
+    "email": {
+        "api_base": "https://suspicious.test/api/",
+        "smtp": {
+            "server": "smtp.server.local",
+            "port": 25,
+            "username": "smtp_user",
+            "password": "",
+            "tls": true
+        },
+        "content": {
+            "footer": "Limited Distribution",
+            "team_name": "Your Cybersecurity Team",
+            "global_domain": "test.com",
+            "website": "https://www.test.com/en"
+        },
+        "links": {
+            "submissions": "https://suspicious.test/submissions",
+            "security_contact": "mailto:security@test.com",
+            "security_text": "security@test.com",
+            "inquiry": "mailto:inquiry@test.com",
+            "inquiry_text": "inquiry@test.com",
+            "glossary": "https://glossary.local"
+        },
+        "socials": {
             "facebook" : "https://fr-fr.facebook.com/test",
             "twitter" : "https://x.com/test",
             "instagram" : "https://www.instagram.com/test",
             "linkedin" : "https://www.linkedin.com/company/test",
             "youtube" : "https://www.youtube.com/test"
         },
-        "glossary" : "https://glossary_to_cyber terms",
-        "inquiry" : "mailto:inquryemail@yourcompany.com",
-        "inquiry_text" : "inquryemail@yourcompany.com",
-        "submissions" : "https://suspicious.corp.test/submissions/",
-        "security" : "mailto:yoursecuritymail@yourcompany.com",
-        "security_msg" : "yoursecuritymail@yourcompany.com",
+        "templates": {
+            "acknowledgement": "Suspicious – Submission Registered",
+            "review": "Your submission n°{case_id} has been reviewed as: {result}",
+            "final": "SUSPICIOUS EMAIL ANALYSIS - Your analysis [{case_id}] is completed"
+        },
         "logos" : {
-            "company" : "data:image/png;base64,Base64 text of your company logo",
-            "acknowledge" : "data:image/png;base64,The Base 64 image for the acknowledge mail",
-            "final" : "data:image/png;base64,The Base 64 image for the final mail",
-            "challenge" : "data:image/png;base64,The Base 64 image for the challenge mail",
-            "modif" : "data:image/png;base64,The Base 64 image for the modif mail"
+            "company" : "BASE64_LOGO",
+            "acknowledge" : "BASE64_LOGO",
+            "final" : "BASE64_LOGO",
+            "challenge" : "BASE64_LOGO",
+            "modif" : "BASE64_LOGO"
         }
     },
-    "email_subjects": {
-        "acknowledgement": "Suspicious – Submission Registered",
-        "review": "Your submission n°{case_id} has been reviewed as: {result}",
-        "final": "SUSPICIOUS EMAIL ANALYSIS - Your analysis [{case_id}] is completed"
+    "domains": [
+        "testgroup.com"
+    ],
+    "url_analysis": {
+        "enabled": true,
+        "max_per_domain": 5,
+        "reuse_ttl_days": 7,
+        "shortener_domains": ["bit.ly", "tinyurl.com", "t.co", "goo.gl", "ow.ly"],
+        "suspicious_tlds": ["zip", "mov", "xyz", "top", "click"]
     }
 }

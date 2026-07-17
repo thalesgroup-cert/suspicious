@@ -10,6 +10,9 @@ import pydantic
 
 
 class MailConfig(pydantic.BaseModel):
+    tls: bool
+    """The server Protocol"""
+
     server: str
     """The SMTP server host."""
 
@@ -18,6 +21,9 @@ class MailConfig(pydantic.BaseModel):
 
     username: str = "SUSPICIOUS"
     """The name of the user sending the response email."""
+
+    password: str
+    """The password of the user sending the response email."""
 
     footer: str = "Limited Distribution"
     """The email footer."""

@@ -1,17 +1,174 @@
-import time
+import json
+import logging
+import os
 import shutil
+import signal
 import pathlib
 import sys
+import threading
+import time
+from http.server import BaseHTTPRequestHandler, HTTPServer
 
 import classes.models.configs.main_config
+import classes.models.mail
+import classes.models.mail_tags
 import classes.services.config_service
 import classes.services.minio_service
+import classes.services.submission_sink
+import classes.services.caps
 import classes.services.mailbox_setup_service
 import classes.services.mailbox_service
 import classes.services.acknowledge_bad_mail_service
 import classes.services.logger_service
+import classes.services.otel_service
 
 logger = classes.services.logger_service.setup_logging()
+
+# Best-effort OTel init — exporter target read from OTEL_EXPORTER_OTLP_ENDPOINT
+# (defaults to http://tempo:4318 in the compose network). Failures inside
+# configure() are swallowed: the feeder must boot even if Tempo is down.
+classes.services.otel_service.configure(
+    service_name="email-feeder",
+    enabled=os.environ.get("OTEL_ENABLED", "true").lower() != "false",
+)
+
+# ---------------------------------------------------------------------------
+# Health / metrics state — written by the poll loop, read by the HTTP server
+# ---------------------------------------------------------------------------
+
+_HEALTH_PORT = 9091
+
+# Anything older than this is "stale" — the dependency was reachable at
+# some point but has not been touched recently. Keep above the legitimate
+# IMAP polling cadence (default 60 s) so a single missed cycle does not
+# flip a healthy feeder to degraded.
+_HEALTH_STALE_THRESHOLD_S = 5 * 60
+
+_stats: dict = {
+    "last_successful_poll": 0.0,   # Unix timestamp; 0 = never polled
+    "emails_processed_total": 0,
+    "errors_total": 0,
+    # name → last unix ts a fetch_unseen_emails_and_process() succeeded.
+    # Populated by process_emails_from_mailboxes; consumed by /health.
+    "mailbox_last_ok": {},
+    # Last unix ts a MinIO upload succeeded.
+    "minio_last_ok": 0.0,
+    # How many connectors are configured at boot (target).
+    "mailboxes_configured": 0,
+}
+_stats_lock = threading.Lock()
+
+# Set by the SIGHUP handler; the poll loop reloads config on the next cycle.
+_reload_requested = threading.Event()
+
+
+def _sighup_handler(signum, frame):  # noqa: ARG001
+    _reload_requested.set()
+
+
+def _inc(key: str, amount: int = 1) -> None:
+    with _stats_lock:
+        _stats[key] += amount
+
+
+def _set(key: str, value) -> None:
+    with _stats_lock:
+        _stats[key] = value
+
+
+def _mark_mailbox_ok(name: str) -> None:
+    """Record that this mailbox last responded successfully at now()."""
+    with _stats_lock:
+        _stats["mailbox_last_ok"][name] = time.time()
+
+
+def _mark_minio_ok() -> None:
+    """Record that a MinIO operation just succeeded."""
+    with _stats_lock:
+        _stats["minio_last_ok"] = time.time()
+
+
+def _build_health_payload() -> dict:
+    """Snapshot stats + derive subsystem readiness for /health.
+
+    Connectivity is tracked passively: every successful fetch /
+    upload writes a timestamp; /health compares against
+    _HEALTH_STALE_THRESHOLD_S. This keeps the endpoint O(1), avoids
+    contending with the poll loop, and never opens a side-effect
+    connection to IMAP or MinIO from the HTTP thread.
+    """
+    now = time.time()
+    with _stats_lock:
+        snap = dict(_stats)
+        mailbox_last_ok = dict(snap["mailbox_last_ok"])
+
+    def _stale(ts: float) -> bool:
+        return ts <= 0.0 or (now - ts) > _HEALTH_STALE_THRESHOLD_S
+
+    imap_ok_count = sum(1 for ts in mailbox_last_ok.values() if not _stale(ts))
+    imap_overall = (
+        snap["mailboxes_configured"] > 0
+        and imap_ok_count == snap["mailboxes_configured"]
+    )
+    minio_overall = not _stale(snap["minio_last_ok"])
+
+    status = "ok" if (imap_overall and minio_overall) else "degraded"
+
+    return {
+        "status": status,
+        "last_successful_poll": snap["last_successful_poll"] or None,
+        "emails_processed_total": snap["emails_processed_total"],
+        "errors_total": snap["errors_total"],
+        "checks": {
+            "imap": {
+                "ok": imap_overall,
+                "configured": snap["mailboxes_configured"],
+                "healthy": imap_ok_count,
+                "last_ok": {
+                    name: int(ts) for name, ts in mailbox_last_ok.items()
+                },
+            },
+            "minio": {
+                "ok": minio_overall,
+                "last_ok": int(snap["minio_last_ok"]) or None,
+            },
+        },
+        "stale_threshold_seconds": _HEALTH_STALE_THRESHOLD_S,
+        "checked_at": int(now),
+    }
+
+
+class _HealthHandler(BaseHTTPRequestHandler):
+    def do_GET(self):
+        if self.path != "/health":
+            self.send_response(404)
+            self.end_headers()
+            return
+
+        body = json.dumps(_build_health_payload(), indent=2).encode()
+        # Always 200 once the feeder process is alive — the Docker
+        # healthcheck only needs to know the process is responsive.
+        # Degradation is surfaced in the JSON `status` field so the
+        # Django proxy + UI badge can render an amber state without
+        # triggering a container restart.
+        self._respond(200, "application/json", body)
+
+    def _respond(self, code: int, content_type: str, body: bytes) -> None:
+        self.send_response(code)
+        self.send_header("Content-Type", content_type)
+        self.send_header("Content-Length", str(len(body)))
+        self.end_headers()
+        self.wfile.write(body)
+
+    def log_message(self, fmt, *args):  # suppress per-request access logs
+        pass
+
+
+def _start_health_server() -> None:
+    server = HTTPServer(("", _HEALTH_PORT), _HealthHandler)
+    thread = threading.Thread(target=server.serve_forever, daemon=True, name="health-server")
+    thread.start()
+    logger.info("Health server listening on :%d (/health)", _HEALTH_PORT)
 
 
 # --- Helper Functions ---
@@ -60,14 +217,78 @@ def cleanup_directory(dir_path: pathlib.Path, remove_parent_if_empty: bool = Fal
 # --- Email Processing ---
 
 
+def partition_submissions(
+    email_list: list[classes.models.mail.SuspiciousMailResponse],
+) -> tuple[list[str], list[classes.models.mail.SuspiciousMailResponse]]:
+    """Split fetched submissions into (valid wrapper dirs to upload, bad mails).
+
+    Valid dirs are de-duplicated while preserving order, so a submission whose
+    wrapper carries several inner mails is uploaded exactly once.
+    """
+    outcome = classes.models.mail_tags.SubmissionOutcome
+    invalid_mails = [
+        m for m in email_list if m.outcome == outcome.NO_ATTACHED_MAIL
+    ]
+    valid_dirs: list[str] = []
+    for m in email_list:
+        if m.outcome == outcome.VALID and m.submission_dir not in valid_dirs:
+            valid_dirs.append(m.submission_dir)
+    return valid_dirs, invalid_mails
+
+
+def choose_sink(config, minio_service):
+    """PrefixSink when a feeder bucket is configured, else None (legacy mode)."""
+    bucket = getattr(config.minio, "feeder_bucket", "") or ""
+    if bucket:
+        return classes.services.submission_sink.PrefixSink(minio_service, bucket)
+    return None
+
+
+def _wait_for_next_cycle(config, mailboxes, sleep_interval, logger):
+    """Block until the next poll cycle is due.
+
+    With ``imap_idle`` and exactly one IDLE-capable mailbox, block in IMAP IDLE
+    so newly arrived mail wakes the loop early. The IDLE window is capped at
+    ``sleep_interval`` so the loop still polls periodically and stays responsive
+    to SIGHUP. Anything else (idle disabled, multiple mailboxes, or no IDLE
+    capability) degrades to a plain interval sleep.
+    """
+    if (
+        getattr(config, "imap_idle", False)
+        and len(mailboxes) == 1
+        and mailboxes[0].has_idle_capability()
+    ):
+        logger.info(f"Waiting for new mail (IMAP IDLE, max {sleep_interval}s)...")
+        if mailboxes[0].idle_wait(sleep_interval):
+            logger.info("IDLE: mailbox change signalled — polling now.")
+        return
+    logger.info(f"Sleeping for {sleep_interval}s.")
+    time.sleep(sleep_interval)
+
+
+def upload_valid_submission(sink, minio_service, submission_dir, submission_id,
+                            reported_by, reporter_note=""):
+    """Prefix mode -> sink.store; legacy mode -> upload_directory bucket-per-submission."""
+    sd = pathlib.Path(submission_dir)
+    if sink is not None:
+        sink.store(sd, submission_id, reported_by, reporter_note)
+    else:
+        bucket_name = sd.name.lower().replace("_", "-")
+        minio_service.upload_directory(sd, bucket_name)
+
+
 def process_emails_from_mailboxes(
     config: classes.models.configs.main_config.MainConfig,
     acknowledge_bad_mail_service: classes.services.acknowledge_bad_mail_service.AcknowledgeBadMailService,
     mailboxes: list[classes.services.mailbox_service.Mailbox],
     minio_service: classes.services.minio_service.MinioService,
+    sink=None,
 ):
     """
     Fetches and processes emails from all enabled mailboxes.
+
+    `sink` is a PrefixSink (portable contract) when a feeder bucket is
+    configured, else None (legacy bucket-per-submission upload).
     """
     if not mailboxes:
         logger.info("No mailboxes provided to process.")
@@ -79,6 +300,9 @@ def process_emails_from_mailboxes(
         try:
             email_list = mailbox.fetch_unseen_emails_and_process()
 
+            # IMAP responded — record liveness even when no new mail.
+            _mark_mailbox_ok(mailbox_identifier)
+
             if not email_list:
                 logger.info(
                     f"No new emails to process in mailbox: {mailbox_identifier}"
@@ -88,28 +312,85 @@ def process_emails_from_mailboxes(
             logger.info(
                 f"Fetched {len(email_list)} email(s) from {mailbox_identifier}."
             )
-            for mail in email_list:
-                case_path = pathlib.Path(mail.case_path)
-                acknowledge_bad_mail_service.process_single_email(
-                    mail=mail, case_path=case_path
-                )
+            _inc("emails_processed_total", len(email_list))
 
-            for case_dir in config.working_path.iterdir():
-                if case_dir.is_dir():
-                    bucket_name = case_dir.name.lower().replace("_", "-")
-                    minio_service.upload_directory(case_dir, bucket_name)
-                    cleanup_directory(case_dir, remove_parent_if_empty=False)
-                    logger.info(f"Cleaned up case directory: {case_dir}")
+            valid_dirs, invalid_mails = partition_submissions(email_list)
+            # One representative response per submission dir (reported_by + attachments).
+            rep_by_dir: dict[str, classes.models.mail.SuspiciousMailResponse] = {}
+            for m in email_list:
+                rep_by_dir.setdefault(m.submission_dir, m)
 
-            email_ids = [email.original_mail.id for email in email_list]
-            mailbox.mark_emails_as_seen(email_ids=email_ids)
-            logger.info(f"Marked emails as seen for mailbox: {mailbox_identifier}.")
+            # Mark \Seen ONLY for submissions that reached a terminal state
+            # (uploaded or acked). A failed upload leaves its emails UNSEEN so
+            # the next cycle retries it — no batch reprocess of the successes.
+            handled_ids: list = []
+
+            def _ids_for(submission_dir: str) -> list:
+                return [m.original_mail.id for m in email_list
+                        if m.submission_dir == submission_dir]
+
+            # Caps gate: oversized valid submissions are acked as bad, not stored.
+            kept_dirs: list[str] = []
+            for d in valid_dirs:
+                rep = rep_by_dir[d]
+                try:
+                    classes.services.caps.check_caps(
+                        rep.original_mail.attachments,
+                        len(rep.original_mail.raw_eml_bytes or b""),
+                        config.caps,
+                    )
+                    kept_dirs.append(d)
+                except classes.services.caps.CapsExceeded as ce:
+                    logger.warning("Submission %s exceeds caps (%s); acking as bad.", d, ce)
+                    try:
+                        acknowledge_bad_mail_service.send_bad_mail_ack(rep)
+                        sd = pathlib.Path(d)
+                        if sd.is_dir():
+                            cleanup_directory(sd, remove_parent_if_empty=False)
+                        handled_ids.extend(_ids_for(d))
+                    except Exception as e:
+                        logger.error("Failed handling over-cap submission %s: %s", d, e, exc_info=True)
+
+            # Bad submissions (no attached mail): acknowledge, store nothing.
+            for mail in invalid_mails:
+                try:
+                    acknowledge_bad_mail_service.send_bad_mail_ack(mail)
+                    sd = pathlib.Path(mail.submission_dir)
+                    if sd.is_dir():
+                        cleanup_directory(sd, remove_parent_if_empty=False)
+                    handled_ids.append(mail.original_mail.id)
+                except Exception as e:
+                    logger.error("Failed acking bad submission %s: %s", mail.id, e, exc_info=True)
+
+            # Valid submissions: upload (prefix or legacy) then clean up, per-submission.
+            for d in kept_dirs:
+                sd = pathlib.Path(d)
+                if not sd.is_dir():
+                    logger.warning("Submission dir missing, skipping upload: %s", sd)
+                    continue
+                try:
+                    upload_valid_submission(
+                        sink, minio_service, sd, sd.name,
+                        rep_by_dir[d].reported_by or "",
+                        rep_by_dir[d].reporter_note or "",
+                    )
+                    _mark_minio_ok()
+                    cleanup_directory(sd, remove_parent_if_empty=False)
+                    handled_ids.extend(_ids_for(d))
+                    logger.info("Uploaded and cleaned valid submission: %s", sd)
+                except Exception as e:
+                    logger.error("Failed uploading submission %s: %s", d, e, exc_info=True)
+
+            if handled_ids:
+                mailbox.mark_emails_as_seen(email_ids=list(dict.fromkeys(handled_ids)))
+                logger.info(f"Marked emails as seen for mailbox: {mailbox_identifier}.")
 
         except Exception as e:
             logger.error(
                 f"Error processing mailbox {mailbox_identifier}: {e}",
                 exc_info=True,
             )
+            _inc("errors_total")
         logger.info(f"Finished processing cycle for mailbox: {mailbox_identifier}.")
 
 
@@ -123,9 +404,17 @@ def main() -> int:
     logger.info("Application starting...")
 
     try:
-        config = classes.services.config_service.load_config(
-            config_path=pathlib.Path("config.json"), logger=logger
-        )
+        _backend_url = os.environ.get("BACKEND_URL")
+        _api_token = os.environ.get("FEEDER_API_TOKEN")
+        _config_path = pathlib.Path(os.environ.get("FEEDER_CONFIG_PATH", "config.json"))
+        _cache_path = _config_path.parent / ".config-cache.json"
+
+        if _backend_url and _api_token:
+            config = classes.services.config_service.load_config_from_api(
+                _backend_url, _api_token, _config_path, _cache_path
+            )
+        else:
+            config = classes.services.config_service.load_config(_config_path, logger)
         if not config:
             logger.critical("Configuration could not be loaded. Exiting.")
             return 1
@@ -138,7 +427,9 @@ def main() -> int:
 
     acknowledge_bad_mail_service = (
         classes.services.acknowledge_bad_mail_service.AcknowledgeBadMailService(
-            config=config.mail, logger=logger
+            config=config.mail,
+            # Acknowledgement-mail send activity -> smtp.log + json stdout.
+            logger=logging.getLogger("email-feeder.smtp"),
         )
     )
 
@@ -146,9 +437,19 @@ def main() -> int:
     try:
         minio_service.connect()
         logger.info("MinIO client initialized from config.")
+        # Initial MinIO connect counts as a fresh liveness signal — the
+        # /health endpoint will surface this until the next upload.
+        _mark_minio_ok()
     except Exception as e:
         logger.critical(f"Failed to initialize MinIO client from config: {e}")
         return 1
+
+    sink = choose_sink(config, minio_service)
+    if sink is not None:
+        logger.info("Using portable prefix contract (feeder bucket '%s').",
+                    config.minio.feeder_bucket)
+    else:
+        logger.info("Using legacy bucket-per-submission mode (no feeder_bucket set).")
 
     try:
         logger.info("Setting up mailboxes...")
@@ -162,6 +463,12 @@ def main() -> int:
             )
             return 1
         logger.info(f"Successfully connected to {len(mailboxes)} mailboxes.")
+        _set("mailboxes_configured", len(mailboxes))
+        # Mailboxes successfully connected at setup time — seed the
+        # per-mailbox liveness map so /health does not report stale
+        # before the first poll cycle completes.
+        for mailbox in mailboxes:
+            _mark_mailbox_ok(mailbox.config.login or mailbox.config.host)
     except Exception as e:
         logger.critical(f"Failed to setup mailboxes: {e}", exc_info=True)
         return 1
@@ -177,25 +484,71 @@ def main() -> int:
 
     sleep_interval = config.timer_inbox_emails
     if sleep_interval <= 0:
+        default_interval = classes.models.configs.main_config.DEFAULT_SLEEP_INTERVAL
         logger.warning(
-            f"Invalid 'timer-inbox-emails' value ({sleep_interval}). Using default: {config.timer_inbox_emails}s."
+            "Invalid 'timer-inbox-emails' value (%s). Using default: %ss.",
+            sleep_interval, default_interval,
         )
-        sleep_interval = config.timer_inbox_emails
+        sleep_interval = default_interval
+
+    _start_health_server()
+
+    # Hot config reload: SIGHUP -> reload connectors + caps + sink on the next
+    # cycle, adding/disabling a mailbox without a restart.
+    try:
+        signal.signal(signal.SIGHUP, _sighup_handler)
+        logger.info("SIGHUP hot-reload enabled.")
+    except (ValueError, OSError) as e:
+        logger.warning("Could not install SIGHUP handler: %s", e)
 
     logger.info(f"Starting email processing loop. Interval: {sleep_interval}s")
     try:
         while True:
+            if _reload_requested.is_set():
+                _reload_requested.clear()
+                logger.info("SIGHUP received — reloading configuration...")
+                try:
+                    if _backend_url and _api_token:
+                        new_config = classes.services.config_service.load_config_from_api(
+                            _backend_url, _api_token, _config_path, _cache_path
+                        )
+                    else:
+                        new_config = classes.services.config_service.load_config(
+                            _config_path, logger
+                        )
+                    if new_config:
+                        to_start, to_stop = (
+                            classes.services.mailbox_setup_service.diff_mailbox_configs(
+                                config, new_config
+                            )
+                        )
+                        mailboxes = classes.services.mailbox_setup_service.apply_mailbox_diff(
+                            mailboxes, to_start, to_stop, new_config.working_path, logger
+                        )
+                        config = new_config
+                        sink = choose_sink(config, minio_service)
+                        _set("mailboxes_configured", len(mailboxes))
+                        logger.info(
+                            "Config reloaded: +%d -%d mailbox(es); %d active.",
+                            len(to_start), len(to_stop), len(mailboxes),
+                        )
+                except Exception as e:
+                    logger.error(
+                        "Config reload failed; keeping current config: %s",
+                        e, exc_info=True,
+                    )
+
             logger.info("Starting new email processing cycle...")
             process_emails_from_mailboxes(
                 config=config,
                 acknowledge_bad_mail_service=acknowledge_bad_mail_service,
                 mailboxes=mailboxes,
                 minio_service=minio_service,
+                sink=sink,
             )
-            logger.info(
-                f"Email processing cycle complete. Sleeping for {sleep_interval}s."
-            )
-            time.sleep(sleep_interval)
+            _set("last_successful_poll", time.time())
+            logger.info("Email processing cycle complete.")
+            _wait_for_next_cycle(config, mailboxes, sleep_interval, logger)
     except KeyboardInterrupt:
         logger.info("Keyboard interrupt received. Shutting down application...")
     except Exception as e:

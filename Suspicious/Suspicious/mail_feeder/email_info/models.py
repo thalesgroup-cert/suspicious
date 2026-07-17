@@ -1,5 +1,4 @@
 from pydantic import BaseModel, EmailStr, Field, PositiveInt
-from typing import Optional
 
 
 class MailInstanceModel(BaseModel):

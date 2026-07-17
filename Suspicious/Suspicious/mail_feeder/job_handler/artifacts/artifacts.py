@@ -1,14 +1,33 @@
 import logging
-from typing import List
+from typing import Any
 from pydantic import ValidationError
 
 from .models import ArtifactModel
 from .utils import safe_execution
 from cortex_job.cortex_utils.cortex_and_job_management import CortexJob
-from settings.models import AllowListFile, AllowListDomain
+from settings.models import AllowListFile, AllowListDomain, WatcherLegitDomain, DenyListDomain, WatcherMonitoredDomain
 from url_process.url_utils.url_handler import URLHandler
 
 fetch_mail_logger = logging.getLogger("tasp.cron.fetch_and_process_emails")
+
+
+def _sender_domain_for_case(case) -> str | None:
+    """Extract the registered domain of the sender from a mail-origin case.
+    Returns None if not available (web submit, missing fields, any error)."""
+    try:
+        mail = getattr(getattr(case, "fileOrMail", None), "mail", None)
+        if mail is None:
+            return None
+        mail_from = getattr(mail, "mail_from", None) or ""
+        if "@" not in mail_from:
+            return None
+        host = mail_from.rsplit("@", 1)[1].strip().rstrip(">").strip()
+        if not host:
+            return None
+        from url_process.url_utils.url_planner import _registered_domain_lower
+        return _registered_domain_lower(host) or None
+    except Exception:
+        return None
 
 
 class ArtifactJobLauncherService:
@@ -17,12 +36,16 @@ class ArtifactJobLauncherService:
     """
 
     def __init__(self):
-        self.launched_job_ids: List[int] = []
+        self.pending_dispatch_intents: list[tuple[Any, str]] = []
 
-    def process_artifacts(self, artifacts: list) -> List[int]:
+    def process_artifacts(self, artifacts: list) -> "ArtifactJobLauncherService":
         """
-        Validate artifacts and dispatch them to the correct handler.
-        Returns a list of launched job IDs.
+        Validate artifacts and queue dispatch intents for later dispatch.
+        Returns self so the caller can later call dispatch_pending(case).
+
+        Deduplicates by (artifact_type, value) within a single call so the
+        same URL / domain / hash extracted multiple times from one email
+        does not trigger N×analyzer Cortex jobs.
         """
         handlers = {
             "IP": self._process_ip_artifact,
@@ -31,12 +54,24 @@ class ArtifactJobLauncherService:
             "Domain": self._process_domain_artifact,
             "MailAddress": self._process_mail_artifact,
         }
+        seen: set = set()
         for artifact in artifacts:
             try:
                 artifact_data = ArtifactModel(artifact_type=artifact.artifact_type)
             except ValidationError as e:
                 fetch_mail_logger.error(f"Artifact validation failed: {e}")
                 continue
+
+            value = self._artifact_value(artifact, artifact_data.artifact_type)
+            if value is not None:
+                key = (artifact_data.artifact_type, value)
+                if key in seen:
+                    fetch_mail_logger.debug(
+                        "Skipping duplicate %s artifact: %s",
+                        artifact_data.artifact_type, value,
+                    )
+                    continue
+                seen.add(key)
 
             handler = handlers.get(artifact_data.artifact_type)
             if handler:
@@ -45,7 +80,49 @@ class ArtifactJobLauncherService:
             else:
                 fetch_mail_logger.warning(f"No handler for artifact type {artifact_data.artifact_type}")
 
-        return self.launched_job_ids
+        return self
+
+    def dispatch_pending(self, case) -> list:
+        """Replay queued dispatch intents now that Case exists. Returns the
+        flat list of Cortex job IDs returned across all dispatches.
+        Intents are consumed (cleared) on success.
+        """
+        from url_process.url_utils.url_planner import filter_dispatch_intents
+        job_ids: list = []
+        cortex = CortexJob()
+        sender_domain = _sender_domain_for_case(case)
+        intents = filter_dispatch_intents(self.pending_dispatch_intents, sender_domain=sender_domain)
+        for value, data_type in intents:
+            try:
+                job_ids.extend(cortex.launch_cortex_jobs(value, data_type, case=case))
+            except Exception as e:
+                fetch_mail_logger.error(
+                    "Failed to launch Cortex jobs (case=%s data_type=%s value=%r): %s",
+                    getattr(case, "id", None),
+                    data_type,
+                    value,
+                    e,
+                )
+        self.pending_dispatch_intents = []
+        return job_ids
+
+    @staticmethod
+    def _artifact_value(artifact, artifact_type: str):
+        """Return the comparable value for de-duplication, or None."""
+        try:
+            if artifact_type == "IP" and artifact.artifactIsIp:
+                return artifact.artifactIsIp.ip.address
+            if artifact_type == "URL" and artifact.artifactIsUrl:
+                return artifact.artifactIsUrl.url.address
+            if artifact_type == "Hash" and artifact.artifactIsHash:
+                return artifact.artifactIsHash.hash.value
+            if artifact_type == "Domain" and artifact.artifactIsDomain:
+                return artifact.artifactIsDomain.domain.value
+            if artifact_type == "MailAddress" and artifact.artifactIsMailAddress:
+                return artifact.artifactIsMailAddress.mail_address.address
+        except Exception:
+            return None
+        return None
 
     def _process_ip_artifact(self, artifact):
         if artifact.artifactIsIp:
@@ -68,17 +145,17 @@ class ArtifactJobLauncherService:
                 fetch_mail_logger.warning(f"Invalid URL: {url_obj.address}")
                 return
 
-            from domain_process.models import Domain  # lazy import
+            from domain_process.models import Domain
             domain_instance = Domain.objects.filter(value=domain_str).first()
 
-            if not self._is_domain_allow_listed(domain_instance, url_obj):
+            if not self._is_domain_allow_listed(domain_instance, url_obj) and not self._is_domain_deny_listed(domain_instance, url_obj):
                 self._launch_cortex_jobs(url_obj, "url")
             url_obj.save()
 
     def _process_domain_artifact(self, artifact):
         if artifact.artifactIsDomain:
             domain_obj = artifact.artifactIsDomain.domain
-            if not self._is_domain_allow_listed(domain_obj):
+            if not self._is_domain_allow_listed(domain_obj) and not self._is_domain_deny_listed(domain_obj):
                 self._launch_cortex_jobs(domain_obj, "domain")
             domain_obj.save()
 
@@ -91,18 +168,13 @@ class ArtifactJobLauncherService:
             from email_process.email_utils.email_handler import get_domain, _create_or_update_domain
             domain_str = get_domain(mail_obj)
             domain_instance = _create_or_update_domain(domain_str)
-            if not self._is_domain_allow_listed(domain_instance, mail_obj):
+            if not self._is_domain_allow_listed(domain_instance, mail_obj) and not self._is_domain_deny_listed(domain_instance, mail_obj):
                 self._launch_cortex_jobs(mail_obj, "mail")
             mail_obj.save()
 
     def _launch_cortex_jobs(self, obj, artifact_type: str):
-        """
-        Launch Cortex jobs for the given object and artifact type.
-        """
-        try:
-            self.launched_job_ids += CortexJob().launch_cortex_jobs(obj, artifact_type)
-        except Exception as e:
-            fetch_mail_logger.error(f"Failed to launch Cortex jobs for {artifact_type}: {e}")
+        """Queue a (value, data_type) intent. Dispatch happens after Case creation."""
+        self.pending_dispatch_intents.append((obj, artifact_type))
 
     def _is_hash_allow_listed(self, hash_obj) -> bool:
         """
@@ -121,7 +193,10 @@ class ArtifactJobLauncherService:
         """
         Checks if a domain is allow-listed. Updates its and optionally related object's IOC attributes if it is.
         """
-        if domain_obj and AllowListDomain.objects.filter(domain=domain_obj).exists():
+        if domain_obj and (
+            AllowListDomain.objects.filter(domain=domain_obj).exists()
+            or WatcherLegitDomain.objects.filter(domain=domain_obj).exists()
+        ):
             fetch_mail_logger.info(f"Domain {domain_obj} is allow-listed")
             domain_obj.ioc_score = 0
             domain_obj.ioc_confidence = 100
@@ -132,6 +207,25 @@ class ArtifactJobLauncherService:
                 related_obj.ioc_score = 0
                 related_obj.ioc_confidence = 100
                 related_obj.ioc_level = "SAFE-ALLOW_LISTED"
+                related_obj.save()
+            return True
+        return False
+
+    def _is_domain_deny_listed(self, domain_obj, related_obj=None) -> bool:
+        """
+        Checks if a domain is deny-listed. Updates its and optionally related object's IOC attributes if it is.
+        """
+        if domain_obj and DenyListDomain.objects.filter(domain=domain_obj).exists() or WatcherMonitoredDomain.objects.filter(domain=domain_obj).exists():
+            fetch_mail_logger.info(f"Domain {domain_obj} is deny-listed")
+            domain_obj.ioc_score = 100
+            domain_obj.ioc_confidence = 100
+            domain_obj.ioc_level = "dangerous"
+            domain_obj.save()
+
+            if related_obj:
+                related_obj.ioc_score = 100
+                related_obj.ioc_confidence = 100
+                related_obj.ioc_level = "dangerous"
                 related_obj.save()
             return True
         return False

@@ -4,7 +4,7 @@ class UploadFileForm(forms.Form):
     file = forms.FileField()
 
 class UploadURLForm(forms.Form):
-    url = forms.URLField(max_length=255)
+    url = forms.URLField(max_length=2048)
 
 class UploadOtherForm(forms.Form):
     other = forms.CharField(max_length=255, required=True)

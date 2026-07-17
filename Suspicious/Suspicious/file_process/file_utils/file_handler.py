@@ -5,14 +5,6 @@ from django.db.models import F
 from django.db import transaction
 from file_process.models import File, HashFromFile
 from hash_process.models import Hash
-import json
-from pathlib import Path
-
-CONFIG_PATH = "/app/settings.json"
-with open(CONFIG_PATH) as config_file:
-    config = json.load(config_file)
-
-suspicious_config = config.get('suspicious', {})
 
 logger = logging.getLogger(__name__)
 
@@ -40,7 +32,6 @@ class FileHandler:
         if file:
             file_path = file.name
             tmp_path_raw = file.temporary_file_path()
-            # Remove leading '/tmp/' if present
             tmp_path = tmp_path_raw.replace("/tmp/", "")
             hash_value = cls.hash_file(tmp_path_raw)
         elif mail:
@@ -75,7 +66,6 @@ class FileHandler:
             size = 0
 
         with transaction.atomic():
-            # Get or create the Hash instance for the file
             hash_instance, created = Hash.objects.get_or_create(
                 value=hash_value,
                 defaults={"hashtype": "SHA-256"}
@@ -84,7 +74,6 @@ class FileHandler:
                 hash_instance.times_sent = F('times_sent') + 1
                 hash_instance.save()
 
-            # Look up an existing File instance linked to this hash
             file_instance = File.objects.filter(linked_hash=hash_instance).first()
 
             if file_instance:
@@ -108,7 +97,6 @@ class FileHandler:
             File: The newly created File instance.
         """
         try:
-            # Determine the file type (extension) or mark as 'unknown'
             filetype = tmp_path.split('.')[-1] if '.' in tmp_path else 'unknown'
             file_instance = File.objects.create(
                 linked_hash=hash_instance,
@@ -117,7 +105,6 @@ class FileHandler:
                 filetype=filetype,
                 size=size
             )
-            # Create the linking relation between the hash and the file
             HashFromFile.objects.create(
                 hash=hash_instance,
                 file=file_instance
@@ -142,24 +129,20 @@ class FileHandler:
             File: The updated File instance.
         """
         try:
-            # Handle potential FileField by accessing the 'name' attribute if available
             existing_name = file_instance.file_path
             if hasattr(existing_name, 'name'):
                 existing_name = existing_name.name
 
-            # Update other_names if the new file name differs from the stored one
             if file_path and existing_name != file_path:
                 other_names = file_instance.other_names
                 if not other_names:
                     other_names = []
                 elif isinstance(other_names, str):
-                    # Convert a string representation of a list into an actual list
                     other_names = [name.strip() for name in other_names.strip('[]').split(',') if name.strip()]
                 if file_path not in other_names:
                     other_names.append(file_path)
                 file_instance.other_names = str(other_names)
 
-            # Update temporary path, file size, and increment times_sent safely
             file_instance.tmp_path = tmp_path
             file_instance.size = size
             file_instance.times_sent = F('times_sent') + 1
@@ -185,7 +168,6 @@ class FileHandler:
         try:
             with open(file_path, "rb") as f:
                 file_hash = hashlib.sha256()
-                # Read file in 8 KB chunks until EOF
                 for chunk in iter(lambda: f.read(8192), b""):
                     file_hash.update(chunk)
                 return file_hash.hexdigest()

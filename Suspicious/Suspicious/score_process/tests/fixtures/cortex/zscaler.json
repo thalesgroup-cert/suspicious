@@ -1,0 +1,4 @@
+{
+  "summary": {"taxonomies": [{"level": "info", "namespace": "Zscaler", "predicate": "Classification", "value": "CORPORATE_MARKETING"}]},
+  "full": {"url": "www.thalesgroup.com", "urlClassifications": ["CORPORATE_MARKETING"], "urlClassificationsWithSecurityAlert": []}
+}

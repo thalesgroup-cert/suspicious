@@ -1,19 +1,11 @@
 import logging
-from contextlib import contextmanager
 from typing import List, Union, Optional
+
+from common.safe_exec import make_safe_execution
 
 logger = logging.getLogger("tasp.cron.fetch_and_process_emails")
 
-@contextmanager
-def safe_execution(context: str):
-    """
-    Standardized try/except wrapper for logging and exception propagation.
-    """
-    try:
-        yield
-    except Exception as e:
-        logger.error(f"[global_submissions] Error during {context}: {e}", exc_info=True)
-        raise
+safe_execution = make_safe_execution("global_submissions", logger)
 
 
 def flatten_id_lists(*lists: List[Union[int, List[int]]]) -> List[int]:

@@ -12,7 +12,7 @@ from import_export.admin import ImportExportModelAdmin
 from knox.models import AuthToken
 
 from .models import UserProfile, CISOProfile, APIKey
-from api.views import generate_api_key
+from api.utils.api_keys import generate_api_key
 
 
 # =============================================================================
@@ -44,16 +44,13 @@ class APIKeyForm(forms.ModelForm):
         self.request = kwargs.pop("request", None)
         super().__init__(*args, **kwargs)
 
-        # Default expiration
         if not self.instance.pk:
             self.fields["expiration"].initial = 30
 
-        # Editing existing key → lock fields
         if self.instance.pk:
             self.fields["user"].widget = forms.HiddenInput()
             self.fields["expiration"].widget = forms.HiddenInput()
 
-        # Non-superusers can only create keys for themselves
         if self.request and not self.request.user.is_superuser:
             self.fields["user"].queryset = User.objects.filter(id=self.request.user.id)
             self.fields["user"].initial = self.request.user
@@ -83,17 +80,27 @@ class APIKeyAdmin(admin.ModelAdmin):
     # Display helpers
     # ------------------------------------------------------------------
 
+    def _get_auth_token(self, obj):
+        auth_token_id = getattr(obj, "auth_token_id", None)
+        if not auth_token_id:
+            return None
+        return AuthToken.objects.filter(pk=auth_token_id).first()
+
     def display_user(self, obj):
-        return obj.auth_token.user if obj.auth_token else None
+        token = self._get_auth_token(obj)
+        return token.user if token else None
 
     def display_digest(self, obj):
-        return obj.auth_token.digest if obj.auth_token else None
+        token = self._get_auth_token(obj)
+        return token.digest if token else None
 
     def display_created(self, obj):
-        return obj.auth_token.created if obj.auth_token else None
+        token = self._get_auth_token(obj)
+        return token.created if token else None
 
     def display_expiry(self, obj):
-        return obj.auth_token.expiry if obj.auth_token else None
+        token = self._get_auth_token(obj)
+        return token.expiry if token else None
 
     display_user.short_description = "User"
     display_digest.short_description = "Digest"
@@ -188,11 +195,11 @@ class APIKeyAdmin(admin.ModelAdmin):
     key_details.short_description = "Key details"
 
 
-# Auto-cleanup Knox token when APIKey is deleted
 @receiver(post_delete, sender=APIKey)
 def delete_authtoken_on_apikey_delete(sender, instance, **kwargs):
-    if instance.auth_token:
-        instance.auth_token.delete()
+    auth_token_id = getattr(instance, "auth_token_id", None)
+    if auth_token_id:
+        AuthToken.objects.filter(pk=auth_token_id).delete()
 
 
 # =============================================================================
@@ -231,11 +238,11 @@ class UserProfileAdmin(ImportExportModelAdmin):
         "wants_acknowledgement", "wants_results", "creation_date",
     )
     list_filter = ("country", "region", "gbu", "wants_acknowledgement", "wants_results", "creation_date")
+    list_select_related = ("user",)
     search_fields = ("user__username", "function", "gbu", "country", "region")
-    ordering = ("creation_date",)
+    ordering = ("-creation_date",)
     actions = ("enable_acknowledgement", "disable_acknowledgement")
 
-    # Actions
 
     def enable_acknowledgement(self, request, queryset):
         updated = queryset.update(wants_acknowledgement=True)
@@ -269,6 +276,7 @@ class CISOProfileAdmin(ImportExportModelAdmin):
 
     list_display = ("user", "function", "gbu", "country", "region", "scope", "creation_date")
     list_filter = ("country", "region", "gbu", "scope", "creation_date")
+    list_select_related = ("user",)
     search_fields = ("user__username", "function", "gbu", "country", "region", "scope")
-    ordering = ("creation_date",)
+    ordering = ("-creation_date",)
     readonly_fields = ("scope",)

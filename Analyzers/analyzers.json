@@ -1,0 +1,16 @@
+[
+    {
+        "name": "AI_Mail_Analyzer",
+        "version": "2.0",
+        "author": "THA-CERT //GCL & ECR",
+        "url": "-",
+        "license": "-",
+        "description": "-",
+        "dataTypeList": [
+            "file"
+        ],
+        "baseConfig": "-",
+        "configurationItems": [],
+        "dockerImage": "aimailanalyzer:v2"
+    }
+]
