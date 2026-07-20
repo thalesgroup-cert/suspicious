@@ -21,6 +21,7 @@ export default mergeConfig(
         "react-dom/client",
         "react/jsx-dev-runtime",
         "axios",
+        "react-joyride",
         "@mui/icons-material/BlockOutlined",
         "@mui/icons-material/CheckCircleOutlined",
         "@mui/icons-material/EmailOutlined",
