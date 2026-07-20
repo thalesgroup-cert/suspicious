@@ -62,6 +62,18 @@ services:
       redis_broker:
         condition: service_healthy
 
+  suspicious_celery_beat:
+    extends:
+      file: compose_apps.yaml
+      service: suspicious_celery_beat
+    image: ghcr.io/thalesgroup-cert/suspicious:${SUSPICIOUS_VERSION:?SUSPICIOUS_VERSION is required}
+    container_name: ${SVC_PREFIX:-}suspicious_celery_beat
+    depends_on:
+      suspicious:
+        condition: service_healthy
+      redis_broker:
+        condition: service_healthy
+
   # ── Data stores ───────────────────────────────────────────────────────────
 
   db_suspicious:
