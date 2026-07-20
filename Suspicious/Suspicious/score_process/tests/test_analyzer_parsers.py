@@ -149,6 +149,7 @@ class AiMailParserTests(SimpleTestCase):
     def test_manifest_matches_versioned_and_bare(self, _m):
         names = self._mk().manifest.cortex_names
         self.assertIn("AI_Mail_Analyzer", names)
+        self.assertIn("AI_Mail_Analyzer_1_4", names)
         self.assertIn("AI_Mail_Analyzer_2_0", names)
 
 

@@ -48,7 +48,7 @@ DANGEROUS_MALSCORE_THRESHOLD = 6.5
 class AiMailParser(AnalyzerParser):
     manifest = AnalyzerManifest(
         name="ai_mail",
-        cortex_names=("AI_Mail_Analyzer", "AI_Mail_Analyzer_2_0"),
+        cortex_names=("AI_Mail_Analyzer", "AI_Mail_Analyzer_1_4", "AI_Mail_Analyzer_2_0"),
         data_types=("file",),
     )
 
