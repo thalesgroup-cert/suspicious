@@ -7,6 +7,7 @@ from settings.models import WatcherLegitDomain
 
 from mail_feeder.global_submission.gsubmission import GlobalSubmissionService as glo
 from mail_feeder.global_submission.models import MailSubmissionData
+from mail_feeder.utils.user_creation.creation import UserCreationService
 
 from .utils import safe_execution
 
@@ -78,10 +79,13 @@ def _resolve_user(
     Priority:
       1. reported_by (full email from metadata.json) — direct DB lookup,
          no guessing.
-      2. Username extracted from the workdir path convention
+      2. reported_by, via the same get-or-create-and-LDAP-enrich flow the
+         case_creator path already uses — covers a legitimate reporter who
+         has no Django User yet (e.g. LDAP sync hasn't run for them).
+      3. Username extracted from the workdir path convention
          (e.g. 'theo.bhang-submission-260326141159/...') — tried against
          all legitimate domains via variant generation.
-      3. None — processing continues with an empty user field.
+      4. None — processing continues with an empty user field.
 
     The path-convention fallback exists only for buckets that predate
     metadata.json. Remove it once all feeder-produced buckets write manifests.
@@ -94,7 +98,18 @@ def _resolve_user(
             )
             return user
         fetch_mail_logger.warning(
-            "No user found for reported_by=%s — falling back to path parsing",
+            "No user found for reported_by=%s — trying LDAP-backed creation",
+            reported_by,
+        )
+        user = UserCreationService().get_or_create_user(reported_by)
+        if user:
+            fetch_mail_logger.info(
+                "Created/resolved user %s from reported_by=%s via LDAP",
+                user.username, reported_by,
+            )
+            return user
+        fetch_mail_logger.warning(
+            "LDAP-backed creation failed for reported_by=%s — falling back to path parsing",
             reported_by,
         )
 
