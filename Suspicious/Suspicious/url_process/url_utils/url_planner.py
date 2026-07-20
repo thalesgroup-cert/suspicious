@@ -33,6 +33,11 @@ DEFAULT_SUSPICIOUS_TLDS = (
 OPEN_REDIRECT_KEYS = frozenset({"url", "next", "redirect", "r", "dest", "continue", "return", "u"})
 RISKY_PATH_SUFFIXES = (".exe", ".scr", ".js", ".hta", ".iso", ".zip", ".rar", ".7z", ".msi", ".bat", ".cmd")
 
+# Must match URL.canonical_key's max_length (url_process/models.py) — the key
+# is advisory for dedup/grouping, so truncating an oversized path/query is
+# safe; writing more than the column allows is not.
+CANONICAL_KEY_MAX_LEN = 512
+
 
 def canonical_key(url: str) -> str:
     """Return the canonical equivalence key for ``url``.
@@ -44,7 +49,8 @@ def canonical_key(url: str) -> str:
 
     URLs that differ only in query values (victim id, tracking token) collapse
     to one key; a URL that introduces a *new* query key (e.g. ``redirect``)
-    stays distinct on purpose.
+    stays distinct on purpose. Truncated to ``CANONICAL_KEY_MAX_LEN`` so an
+    unusually long path/query can't overflow the storage column.
     """
     if "://" not in url:
         url = "http://" + url
@@ -56,7 +62,8 @@ def canonical_key(url: str) -> str:
     path = parts.path or "/"
     query_keys = sorted(parse_qs(parts.query, keep_blank_values=True).keys())
     query = "?" + "&".join(query_keys) if query_keys else ""
-    return f"{parts.scheme}://{host}{port}{path}{query}"
+    key = f"{parts.scheme}://{host}{port}{path}{query}"
+    return key[:CANONICAL_KEY_MAX_LEN]
 
 
 def _cfg_list(key: str, default: tuple[str, ...]) -> tuple[str, ...]:
