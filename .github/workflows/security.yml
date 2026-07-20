@@ -42,15 +42,20 @@ jobs:
           sarif_file: trivy-fs.sarif
           category: trivy-fs
 
-  gitleaks:
-    runs-on: ubuntu-latest
-    steps:
-      - uses: actions/checkout@v7
-        with:
-          fetch-depth: 0
-      - uses: gitleaks/gitleaks-action@v3
-        env:
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+  # gitleaks: disabled — gitleaks-action v3 requires a paid license for org
+  # repos (no GITLEAKS_LICENSE secret configured) and fails every run with
+  # "missing gitleaks license" before scanning anything. Re-enable by
+  # restoring this job once a license secret is added, or swap to a
+  # license-free scanner/gitleaks-action version.
+  # gitleaks:
+  #   runs-on: ubuntu-latest
+  #   steps:
+  #     - uses: actions/checkout@v7
+  #       with:
+  #         fetch-depth: 0
+  #     - uses: gitleaks/gitleaks-action@v3
+  #       env:
+  #         GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
 
   pip-audit:
     runs-on: ubuntu-latest
