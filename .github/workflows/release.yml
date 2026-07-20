@@ -77,6 +77,12 @@ jobs:
           image: ${{ matrix.image }}@${{ steps.build.outputs.digest }}
           format: spdx-json
           output-file: sbom-${{ matrix.name }}.spdx.json
+          # Job only has contents:read; release-asset upload needs
+          # contents:write and fails with "Resource not accessible by
+          # integration". SBOM is already uploaded as a workflow artifact
+          # below, so skip the redundant release attach instead of widening
+          # permissions.
+          upload-release-assets: false
 
       - name: Upload SBOM artifact
         uses: actions/upload-artifact@v7
