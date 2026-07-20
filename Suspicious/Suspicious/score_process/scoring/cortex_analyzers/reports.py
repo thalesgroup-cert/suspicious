@@ -139,8 +139,7 @@ class CortexAnalyzerReports:
         report.confidence = 0
         report.category   = "Failed task"
         report.level      = "info"
-        report.details    = {}
-        report.save(update_fields=["score", "confidence", "category", "level", "details"])
+        report.save(update_fields=["score", "confidence", "category", "level"])
         return 1
 
     # ── queryset helpers ──────────────────────────────────────────────────

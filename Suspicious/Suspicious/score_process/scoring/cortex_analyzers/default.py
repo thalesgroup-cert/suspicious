@@ -39,8 +39,8 @@ class DefaultTaxonomyParser(AnalyzerParser):
                 if tax_level is None or SEVERITY_ORDER.get(lvl, 1) > SEVERITY_ORDER.get(tax_level, 1):
                     tax_level = lvl
                 val = tax.get("value")
-                if val and val not in category:
-                    category.append(val)
+                if val is not None and str(val) not in category:
+                    category.append(str(val))
                 if tax.get("predicate"):
                     details[tax["predicate"]] = val
             level = tax_level or "info"
@@ -50,12 +50,12 @@ class DefaultTaxonomyParser(AnalyzerParser):
             for el in full["results"]:
                 if isinstance(el, dict):
                     threat = el.get("threat")
-                    if threat and threat not in category:
-                        category.append(threat)
+                    if threat is not None and str(threat) not in category:
+                        category.append(str(threat))
                     for k, v in el.items():
                         details.setdefault(k, v)
                 else:
-                    category.append(el)
+                    category.append(str(el))
                     details.setdefault("raw_results", []).append(el)
 
         return AnalyzerResult(
