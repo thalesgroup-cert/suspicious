@@ -33,6 +33,7 @@ from api.views.investigations import (
 from api.views.profile import (
     ProfileView,
     AppearanceView,
+    AvatarUploadView,
     PreferencesView,
     SemanticColorsView,
     ResetSemanticColorsView,
@@ -100,11 +101,12 @@ urlpatterns = [
     path("campaigns/pca/", CampaignPcaView.as_view(), name="campaign-pca"),
     path("campaigns/mail-volume/", CampaignMailVolumeView.as_view(), name="campaign-mail-volume"),
 
-    path("profile/",             ProfileView.as_view(),             name="profile"),
-    path("profile/appearance/",  AppearanceView.as_view(),          name="profile-appearance"),
-    path("profile/preferences/", PreferencesView.as_view(),         name="profile-preferences"),
-    path("profile/colors/",      SemanticColorsView.as_view(),      name="profile-colors"),
-    path("profile/colors/reset/",ResetSemanticColorsView.as_view(), name="profile-colors-reset"),
+    path("profile/",              ProfileView.as_view(),             name="profile"),
+    path("profile/appearance/",   AppearanceView.as_view(),          name="profile-appearance"),
+    path("profile/avatar/upload/",AvatarUploadView.as_view(),        name="profile-avatar-upload"),
+    path("profile/preferences/",  PreferencesView.as_view(),         name="profile-preferences"),
+    path("profile/colors/",       SemanticColorsView.as_view(),      name="profile-colors"),
+    path("profile/colors/reset/", ResetSemanticColorsView.as_view(), name="profile-colors-reset"),
 
     path("submissions/", SubmissionListView.as_view(), name="submissions-list"),
     path("submissions/<int:submission_id>/", SubmissionDetailsView.as_view(), name="submission-details"),

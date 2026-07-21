@@ -186,3 +186,113 @@ class AvatarPresignedUrlExpansionTests(APITestCase):
             resp = self.client.get("/api/profile/")
         self.assertEqual(resp.status_code, 200)
         self.assertNotIn("url", resp.data["avatar"])
+
+
+import io
+import os
+from PIL import Image
+
+
+def _jpeg_upload(width=300, height=300, name="photo.jpg", content_type="image/jpeg"):
+    from django.core.files.uploadedfile import SimpleUploadedFile
+    buf = io.BytesIO()
+    # ponytail: random noise (not a solid fill) so JPEG compression can't
+    # shrink a "big" image back under AVATAR_MAX_BYTES — a solid-color
+    # 3000x3000 JPEG compresses to ~140KB, which would silently defeat
+    # test_oversized_upload_rejected_without_storage_call.
+    raw = os.urandom(width * height * 3)
+    Image.frombytes("RGB", (width, height), raw).save(buf, format="JPEG")
+    return SimpleUploadedFile(name, buf.getvalue(), content_type=content_type)
+
+
+class AvatarUploadEndpointTests(APITestCase):
+    def setUp(self):
+        self.user = User.objects.create_user(username="dave", password="pw12345!")
+        self.client.force_authenticate(user=self.user)
+        self.url = "/api/profile/avatar/upload/"
+
+    def test_upload_sets_avatar_style_and_seed(self):
+        fake_client = mock.MagicMock()
+        fake_client.bucket_exists.return_value = True
+        fake_client.presigned_get_object.return_value = "https://rustfs/signed"
+        with mock.patch(
+            "profiles.profiles_utils.avatar_storage.get_s3_client",
+            return_value=fake_client,
+        ):
+            resp = self.client.post(
+                self.url, {"avatar": _jpeg_upload()}, format="multipart"
+            )
+        self.assertEqual(resp.status_code, 200, resp.content)
+        self.assertEqual(resp.data["avatar"]["style"], "upload")
+        self.assertTrue(resp.data["avatar"]["seed"].startswith(f"avatars/{self.user.id}/"))
+        self.assertEqual(resp.data["avatar"]["url"], "https://rustfs/signed")
+        fake_client.put_object.assert_called_once()
+
+    def test_oversized_upload_rejected_without_storage_call(self):
+        fake_client = mock.MagicMock()
+        big = _jpeg_upload(width=3000, height=3000)
+        with mock.patch(
+            "profiles.profiles_utils.avatar_storage.get_s3_client",
+            return_value=fake_client,
+        ):
+            resp = self.client.post(self.url, {"avatar": big}, format="multipart")
+        if resp.status_code == 200:
+            self.fail("expected rejection for an oversized upload")
+        self.assertEqual(resp.status_code, 400)
+        fake_client.put_object.assert_not_called()
+
+    def test_corrupt_file_rejected(self):
+        from django.core.files.uploadedfile import SimpleUploadedFile
+        bad = SimpleUploadedFile("photo.jpg", b"not-an-image", content_type="image/jpeg")
+        fake_client = mock.MagicMock()
+        with mock.patch(
+            "profiles.profiles_utils.avatar_storage.get_s3_client",
+            return_value=fake_client,
+        ):
+            resp = self.client.post(self.url, {"avatar": bad}, format="multipart")
+        self.assertEqual(resp.status_code, 400)
+        fake_client.put_object.assert_not_called()
+
+    def test_no_file_provided(self):
+        resp = self.client.post(self.url, {}, format="multipart")
+        self.assertEqual(resp.status_code, 400)
+
+    def test_reupload_deletes_previous_object(self):
+        from profiles.models import UserProfile
+        profile, _ = UserProfile.objects.get_or_create(user=self.user)
+        profile.avatar = {"style": "upload", "seed": "avatars/1/old.jpg"}
+        profile.save(update_fields=["avatar"])
+
+        fake_client = mock.MagicMock()
+        fake_client.bucket_exists.return_value = True
+        fake_client.presigned_get_object.return_value = "https://rustfs/signed"
+        with mock.patch(
+            "profiles.profiles_utils.avatar_storage.get_s3_client",
+            return_value=fake_client,
+        ):
+            resp = self.client.post(
+                self.url, {"avatar": _jpeg_upload()}, format="multipart"
+            )
+        self.assertEqual(resp.status_code, 200, resp.content)
+        fake_client.remove_object.assert_called_once_with(
+            "suspicious-avatars", "avatars/1/old.jpg"
+        )
+
+    def test_upload_works_for_ciso_profile(self):
+        from profiles.models import CISOProfile
+        CISOProfile.objects.get_or_create(
+            user=self.user,
+            defaults={"function": "f", "gbu": "g", "country": "c", "region": "r"},
+        )
+        fake_client = mock.MagicMock()
+        fake_client.bucket_exists.return_value = True
+        fake_client.presigned_get_object.return_value = "https://rustfs/signed"
+        with mock.patch(
+            "profiles.profiles_utils.avatar_storage.get_s3_client",
+            return_value=fake_client,
+        ):
+            resp = self.client.post(
+                self.url, {"avatar": _jpeg_upload()}, format="multipart"
+            )
+        self.assertEqual(resp.status_code, 200, resp.content)
+        self.assertEqual(resp.data["avatar"]["style"], "upload")

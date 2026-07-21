@@ -1,8 +1,15 @@
+from rest_framework.parsers import MultiPartParser
 from rest_framework.permissions import IsAuthenticated
 from rest_framework.response import Response
 from rest_framework.views import APIView
 
 from profiles.models import UserProfile, CISOProfile
+from profiles.profiles_utils.avatar_storage import (
+    InvalidAvatarImage,
+    delete_avatar,
+    process_avatar_image,
+    store_avatar,
+)
 from api.serializers.profile import (
     UserProfileSerializer,
     CISOProfileSerializer,
@@ -122,3 +129,44 @@ class ResetSemanticColorsView(APIView):
                 "profile": ProfileSerializerClass(profile).data,
             }
         )
+
+
+# ---------------------------------------------------------------------------
+# POST /api/profile/avatar/upload/
+# ---------------------------------------------------------------------------
+
+class AvatarUploadView(APIView):
+    permission_classes = [IsAuthenticated]
+    parser_classes = [MultiPartParser]
+
+    def post(self, request):
+        upload = request.FILES.get("avatar")
+        if upload is None:
+            return Response({"detail": "No file provided."}, status=400)
+
+        try:
+            processed = process_avatar_image(
+                content_type=upload.content_type,
+                size=upload.size,
+                raw=upload.read(),
+            )
+        except InvalidAvatarImage as exc:
+            return Response({"detail": str(exc)}, status=400)
+
+        profile, SerializerClass = _get_profile(request.user)
+        old_avatar = profile.avatar or {}
+
+        try:
+            key = store_avatar(request.user.id, processed)
+        except Exception:
+            return Response(
+                {"detail": "Avatar storage is unavailable."}, status=502
+            )
+
+        if old_avatar.get("style") == "upload" and old_avatar.get("seed"):
+            delete_avatar(old_avatar["seed"])
+
+        profile.avatar = {"style": "upload", "seed": key}
+        profile.save(update_fields=["avatar", "last_update"])
+
+        return Response(SerializerClass(profile).data)
