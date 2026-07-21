@@ -8,6 +8,7 @@ directly, same as tasp.cron.fetch_emails and mail_feeder do.
 from __future__ import annotations
 
 import io
+import logging
 import uuid
 from datetime import timedelta
 
@@ -15,6 +16,8 @@ from PIL import Image, UnidentifiedImageError
 
 from common.clients import get_s3_client
 from settings.config import get_section
+
+logger = logging.getLogger(__name__)
 
 DEFAULT_AVATAR_BUCKET = "suspicious-avatars"
 AVATAR_MAX_BYTES = 2 * 1024 * 1024
@@ -30,7 +33,8 @@ class InvalidAvatarImage(Exception):
 def _avatar_bucket_name() -> str:
     try:
         return (get_section("storage.s3") or {}).get("avatars_bucket") or DEFAULT_AVATAR_BUCKET
-    except Exception:
+    except Exception as exc:
+        logger.warning(f"Failed to read avatars_bucket from config: {exc}. Using default: {DEFAULT_AVATAR_BUCKET}")
         return DEFAULT_AVATAR_BUCKET
 
 
@@ -54,7 +58,7 @@ def process_avatar_image(content_type: str, size: int, raw: bytes) -> bytes:
     try:
         Image.open(io.BytesIO(raw)).verify()
         image = Image.open(io.BytesIO(raw)).convert("RGB")
-    except (UnidentifiedImageError, OSError) as exc:
+    except (UnidentifiedImageError, OSError, Image.DecompressionBombError) as exc:
         raise InvalidAvatarImage("File is not a valid image") from exc
 
     width, height = image.size

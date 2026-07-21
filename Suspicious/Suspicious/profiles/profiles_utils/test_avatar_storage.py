@@ -60,6 +60,17 @@ class ProcessAvatarImageTest(SimpleTestCase):
         out_img = Image.open(io.BytesIO(out))
         self.assertEqual(dict(out_img.getexif()), {})
 
+    def test_decompression_bomb_raises_invalid_avatar_image(self):
+        # A real bomb file has huge declared dimensions but a tiny byte
+        # size (a solid color compresses to almost nothing) — Pillow's
+        # guard fires off the declared header size, not actual decoded
+        # memory, so we don't need to allocate a giant image here: lower
+        # MAX_IMAGE_PIXELS instead so an ordinary small image trips it.
+        raw = _jpeg_bytes(width=300, height=300)
+        with mock.patch.object(Image, "MAX_IMAGE_PIXELS", 100):
+            with self.assertRaises(InvalidAvatarImage):
+                process_avatar_image("image/jpeg", len(raw), raw)
+
 
 class StoreAvatarTest(SimpleTestCase):
     def test_store_avatar_uploads_and_returns_key(self):
@@ -86,6 +97,21 @@ class StoreAvatarTest(SimpleTestCase):
         ):
             store_avatar(1, b"bytes")
         fake_client.make_bucket.assert_called_once_with("suspicious-avatars")
+
+    def test_store_avatar_uses_configured_bucket_name(self):
+        fake_client = mock.MagicMock()
+        fake_client.bucket_exists.return_value = True
+        with mock.patch(
+            "profiles.profiles_utils.avatar_storage.get_s3_client",
+            return_value=fake_client,
+        ), mock.patch(
+            "profiles.profiles_utils.avatar_storage.get_section",
+            return_value={"avatars_bucket": "custom-bucket"},
+        ):
+            store_avatar(42, b"jpegbytes")
+        # Verify that custom-bucket was used, not the default
+        call = fake_client.put_object.call_args
+        self.assertEqual(call.args[0], "custom-bucket")
 
 
 class DeleteAvatarTest(SimpleTestCase):
