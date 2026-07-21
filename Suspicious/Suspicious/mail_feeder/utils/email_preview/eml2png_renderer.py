@@ -45,9 +45,26 @@ _REMOTE_CSS_RE = re.compile(
     r"<link\b[^>]*>|@import\b[^;]*;", re.IGNORECASE | re.DOTALL
 )
 
+# imgkit's `no-images` option only blocks <img> tag loads — not CSS
+# background-image/@font-face url(...) (in <style> blocks or inline
+# style="" attributes) or other resource-fetching tags. Phishing HTML
+# routinely hides tracking pixels in exactly those spots. The render
+# worker has no route to arbitrary external hosts, so each such fetch
+# blocks on connect until timeout instead of failing fast, and enough of
+# them trip the Celery soft time limit.
+_REMOTE_URL_FUNC_RE = re.compile(
+    r"url\(\s*['\"]?https?://[^'\")]+['\"]?\s*\)", re.IGNORECASE
+)
+_REMOTE_SRC_ATTR_RE = re.compile(
+    r'\b(?:src|data)\s*=\s*(["\'])https?://.*?\1', re.IGNORECASE
+)
 
-def _strip_remote_css(html: str) -> str:
-    return _REMOTE_CSS_RE.sub("", html)
+
+def _strip_remote_resources(html: str) -> str:
+    html = _REMOTE_CSS_RE.sub("", html)
+    html = _REMOTE_URL_FUNC_RE.sub("url()", html)
+    html = _REMOTE_SRC_ATTR_RE.sub("", html)
+    return html
 
 
 class Eml2PngRenderer:
@@ -137,8 +154,9 @@ class Eml2PngRenderer:
         and fall back to the text/plain body wrapped in <pre>. The body
         HTML is rendered as-is but rasterised to a PNG with remote images,
         JavaScript and local-file access all disabled at imgkit time (see
-        _render_html_to_png) — so it cannot phone home, read host files, or
-        execute script. Only remote CSS <link>/@import can still fetch.
+        _render_html_to_png), and remote-fetching CSS/attributes stripped
+        (see _strip_remote_resources) — so it cannot phone home, read host
+        files, or execute script.
         """
         header_rows = []
         for name in _VISIBLE_HEADERS:
@@ -222,7 +240,7 @@ class Eml2PngRenderer:
 
         if html_part is not None:
             try:
-                return _strip_remote_css(html_part.get_content())
+                return _strip_remote_resources(html_part.get_content())
             except Exception:
                 logger.exception("Failed to decode HTML body; falling back to text/plain")
 
