@@ -12,13 +12,25 @@ _RETRY = dict(max_retries=3, acks_late=True)
 CASE_LOCK_TTL = 120
 
 
+_FETCH_EMAILS_LOCK_KEY = "fetch_emails_lock"
+_FETCH_EMAILS_LOCK_TTL = 1800  # dead-man's switch: run has been seen taking 90-180s+
+                                # and growing (legacy per-bucket tag scan cost rises
+                                # with total bucket count); TTL just bounds a worker
+                                # crash mid-run, not the expected runtime.
+
+
 @shared_task(bind=True, **_RETRY)
 def fetch_emails(self):
     from tasp.cron.fetch_emails import fetch_and_process_emails
+    if not cache.add(_FETCH_EMAILS_LOCK_KEY, 1, timeout=_FETCH_EMAILS_LOCK_TTL):
+        logger.info("fetch_emails: previous run still in flight, skipping this tick")
+        return
     try:
         fetch_and_process_emails()
     except Exception as exc:
         raise self.retry(exc=exc, countdown=60 * 2 ** self.request.retries)
+    finally:
+        cache.delete(_FETCH_EMAILS_LOCK_KEY)
 
 
 @shared_task(bind=True, **_RETRY)
