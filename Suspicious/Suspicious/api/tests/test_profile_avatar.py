@@ -125,6 +125,34 @@ class AvatarUploadStyleRejectedViaAppearanceTests(APITestCase):
         self.assertEqual(resp.status_code, 400)
 
 
+class AvatarValidationViaProfileEndpointTests(APITestCase):
+    """PATCH /api/profile/ must apply the same AvatarField validation as
+    PATCH /profile/appearance/ — regression test for the bypass where
+    UserProfileSerializer/CISOProfileSerializer listed "avatar" in
+    Meta.fields without an explicit AvatarField, so DRF auto-generated an
+    unvalidated bare JSONField."""
+
+    def setUp(self):
+        self.user = User.objects.create_user(username="dave", password="pw12345!")
+        self.client.force_authenticate(user=self.user)
+        self.url = "/api/profile/"
+
+    def test_upload_style_rejected_via_profile_patch(self):
+        resp = self.client.patch(
+            self.url, {"avatar": {"style": "upload", "seed": "x"}}, format="json"
+        )
+        self.assertEqual(resp.status_code, 400, resp.content)
+
+    def test_valid_avatar_accepted_via_profile_patch(self):
+        resp = self.client.patch(
+            self.url,
+            {"avatar": {"style": "avataaars", "seed": "abc123"}},
+            format="json",
+        )
+        self.assertEqual(resp.status_code, 200, resp.content)
+        self.assertEqual(resp.data["avatar"], {"style": "avataaars", "seed": "abc123"})
+
+
 class AvatarPresignedUrlExpansionTests(APITestCase):
     def setUp(self):
         self.user = User.objects.create_user(username="carol", password="pw12345!")

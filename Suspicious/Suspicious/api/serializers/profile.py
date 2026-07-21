@@ -169,6 +169,7 @@ class AvatarField(serializers.JSONField):
 
 class UserProfileSerializer(serializers.ModelSerializer):
     semantic_colors = SemanticColorsField(required=False)
+    avatar = AvatarField(required=False)
 
     class Meta:
         model = UserProfile
@@ -211,6 +212,7 @@ class UserProfileSerializer(serializers.ModelSerializer):
 
 class CISOProfileSerializer(serializers.ModelSerializer):
     semantic_colors = SemanticColorsField(required=False)
+    avatar = AvatarField(required=False)
 
     class Meta:
         model = CISOProfile
