@@ -52,7 +52,9 @@ class UserCreationService:
         return user
 
     def create_user(self, username: str) -> User:
-        user, created = User.objects.get_or_create(username=username)
+        user, created = User.objects.get_or_create(
+            username=username, defaults={"email": username}
+        )
         if created:
             user.set_unusable_password()
             user.full_clean()
@@ -64,7 +66,9 @@ class UserCreationService:
 
     def create_default_user(self) -> User:
         suspicious_email = _suspicious_email()
-        user, created = User.objects.get_or_create(username=suspicious_email)
+        user, created = User.objects.get_or_create(
+            username=suspicious_email, defaults={"email": suspicious_email}
+        )
         if created:
             user.set_unusable_password()
             user.save()
