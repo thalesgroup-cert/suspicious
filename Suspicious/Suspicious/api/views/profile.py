@@ -163,8 +163,12 @@ class AvatarUploadView(APIView):
                 size=upload.size,
                 raw=upload.read(),
             )
-        except InvalidAvatarImage as exc:
-            return Response({"detail": str(exc)}, status=400)
+        except InvalidAvatarImage:
+            logger.exception(
+                "avatar process_avatar_image failed validation for user_id=%s",
+                request.user.id,
+            )
+            return Response({"detail": "Invalid avatar image."}, status=400)
 
         profile, SerializerClass = _get_profile(request.user)
         old_avatar = profile.avatar or {}
