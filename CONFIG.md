@@ -251,6 +251,7 @@ mismatch gives `Access denied for user 'suspicious'`.
     "backend": "local",
     "s3": {
         "endpoint": "rustfs:9000",
+        "public_endpoint": "localhost:9000",
         "access_key": "MINIO_ACCESS_KEY",
         "secret_key": "MINIO_SECRET_KEY",
         "secure": false,
@@ -265,6 +266,16 @@ mismatch gives `Access denied for user 'suspicious'`.
 does **not** require the RustFS service — handy for a minimal dev run. Set
 `"backend": "s3"` to use object storage; then `secret_key` here must match the
 RustFS credentials in `.env` (`MINIO_ROOT_PASSWORD`), and RustFS must be running.
+
+`endpoint` is the Docker-internal host the app container uses for
+put/get/bucket calls. Presigned URLs (mail-attachment links, uploaded
+avatar photos) are opened directly by the browser, which can't resolve that
+internal hostname — set `public_endpoint` to whatever host:port the browser
+*can* reach (behind Traefik in production, that's usually a routed
+subdomain; for a local dev stack it's `localhost:<published-9000-port>`,
+which needs its own port mapping since rustfs only `expose`s 9000 to the
+Docker network by default). Omit `public_endpoint` and it falls back to
+`endpoint` — existing single-endpoint deployments are unaffected.
 
 #### Feeder fast metadata
 

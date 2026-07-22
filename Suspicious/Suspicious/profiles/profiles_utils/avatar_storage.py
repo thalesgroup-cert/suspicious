@@ -14,7 +14,7 @@ from datetime import timedelta
 
 from PIL import Image, UnidentifiedImageError
 
-from common.clients import get_s3_client
+from common.clients import get_s3_client, get_s3_presign_client
 from settings.config import get_section
 
 logger = logging.getLogger(__name__)
@@ -98,7 +98,7 @@ def delete_avatar(key: str) -> None:
 def presigned_avatar_url(key: str) -> str | None:
     """Presigned GET URL for a stored avatar, or None on any failure."""
     try:
-        client = get_s3_client()
+        client = get_s3_presign_client()
         return client.presigned_get_object(
             _avatar_bucket_name(), key, expires=AVATAR_URL_EXPIRES
         )

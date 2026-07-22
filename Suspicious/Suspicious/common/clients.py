@@ -32,6 +32,24 @@ def get_s3_client() -> Minio:
     )
 
 
+def get_s3_presign_client() -> Minio:
+    """MinIO/rustfs client for signing browser-facing URLs.
+
+    ``storage.s3.endpoint`` is the Docker-internal host the app container
+    uses for put/get calls; browsers can't resolve it. Presigned URLs must
+    be signed against ``storage.s3.public_endpoint`` instead — falls back
+    to ``endpoint`` when unset, so existing single-endpoint deployments are
+    unaffected.
+    """
+    cfg = get_section("storage.s3")
+    return Minio(
+        endpoint=cfg.get("public_endpoint") or cfg["endpoint"],
+        access_key=cfg["access_key"],
+        secret_key=cfg["secret_key"],
+        secure=cfg.get("public_secure", cfg.get("secure", False)),
+    )
+
+
 def _disable_chromadb_telemetry() -> None:
     """Suppress ChromaDB telemetry via env vars and best-effort monkey-patching."""
     try:

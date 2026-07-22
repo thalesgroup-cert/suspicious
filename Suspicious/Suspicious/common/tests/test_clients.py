@@ -18,6 +18,34 @@ class GetS3ClientTest(SimpleTestCase):
         )
 
 
+class GetS3PresignClientTest(SimpleTestCase):
+    def test_uses_public_endpoint_when_set(self):
+        section = {
+            "endpoint": "rustfs:9000", "public_endpoint": "localhost:35002",
+            "access_key": "ak", "secret_key": "sk", "secure": False,
+        }
+        with mock.patch("common.clients.get_section", return_value=section), \
+             mock.patch("common.clients.Minio") as minio_cls:
+            from common.clients import get_s3_presign_client
+            get_s3_presign_client()
+        minio_cls.assert_called_once_with(
+            endpoint="localhost:35002", access_key="ak", secret_key="sk", secure=False
+        )
+
+    def test_falls_back_to_internal_endpoint_when_unset(self):
+        section = {
+            "endpoint": "rustfs:9000", "access_key": "ak",
+            "secret_key": "sk", "secure": False,
+        }
+        with mock.patch("common.clients.get_section", return_value=section), \
+             mock.patch("common.clients.Minio") as minio_cls:
+            from common.clients import get_s3_presign_client
+            get_s3_presign_client()
+        minio_cls.assert_called_once_with(
+            endpoint="rustfs:9000", access_key="ak", secret_key="sk", secure=False
+        )
+
+
 class GetChromaClientTest(SimpleTestCase):
     def test_builds_http_client_from_section(self):
         section = {"host": "chromadb", "port": 8000}

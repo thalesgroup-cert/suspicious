@@ -141,7 +141,7 @@ class PresignedAvatarUrlTest(SimpleTestCase):
         fake_client = mock.MagicMock()
         fake_client.presigned_get_object.return_value = "https://rustfs/signed"
         with mock.patch(
-            "profiles.profiles_utils.avatar_storage.get_s3_client",
+            "profiles.profiles_utils.avatar_storage.get_s3_presign_client",
             return_value=fake_client,
         ):
             url = presigned_avatar_url("avatars/1/abc.jpg")
@@ -151,7 +151,7 @@ class PresignedAvatarUrlTest(SimpleTestCase):
         fake_client = mock.MagicMock()
         fake_client.presigned_get_object.side_effect = Exception("boom")
         with mock.patch(
-            "profiles.profiles_utils.avatar_storage.get_s3_client",
+            "profiles.profiles_utils.avatar_storage.get_s3_presign_client",
             return_value=fake_client,
         ):
             url = presigned_avatar_url("avatars/1/abc.jpg")
