@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-# Author : THA-CERT //ECR
+# Author : THA-CERT // TBH and RBA
 
 from cortexutils.analyzer import Analyzer
 
