@@ -27,4 +27,22 @@ describe("UserAvatar", () => {
     expect(svg).toContain(">JD<");
     expect(svg).not.toContain("zz9k2x");
   });
+
+  it("renders the uploaded photo when style is upload and a url is present", () => {
+    render(
+      <UserAvatar
+        avatar={{ style: "upload", seed: "avatars/1/x.jpg", url: "https://rustfs/signed" }}
+        initials="EF"
+      />
+    );
+    const img = screen.getByRole("img");
+    expect(img.getAttribute("src")).toBe("https://rustfs/signed");
+  });
+
+  it("falls back to initials when style is upload but url is missing", () => {
+    render(
+      <UserAvatar avatar={{ style: "upload", seed: "avatars/1/x.jpg" }} initials="GH" />
+    );
+    expect(screen.getByText("GH")).toBeInTheDocument();
+  });
 });
