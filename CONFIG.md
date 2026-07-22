@@ -281,16 +281,23 @@ data:`), a `public_endpoint` on a different origin than the app — a bare
 console-visible network error, the `<img>` just never loads. Two ways to
 avoid it:
 - **Same-origin (recommended, no CSP change):** set `public_endpoint` to
-  the app's own domain (`storage.s3.public_endpoint = "<DOMAIN_CORP>"`,
-  `public_secure = true`) and route S3 GETs through Traefik under that
-  domain — see the `suspicious-storage` router in `tls.yaml`, which
-  matches `PathPrefix` on the configured bucket names (S3 path-style URLs
-  put the bucket name first in the path, so no prefix-stripping is
-  needed) and forwards to `rustfs:9000` with `passHostHeader: true`
-  (required — S3 SigV4 signs the `host` header, so whatever Host the
-  browser sent when the URL was signed must reach rustfs unchanged, or
-  signature verification fails). Keep that router's bucket-name list in
-  sync with `avatars_bucket` / `media_bucket` / `feeder_bucket`.
+  whatever origin users actually type into the address bar — `self` in CSP
+  terms means the *browser's* origin, not `DOMAIN_CORP`. They're usually
+  the same, but not always: a cert issued for `DOMAIN_CORP` still lets a
+  browser load the app over `https://localhost` (or any other name that
+  resolves to the same box) if it's been told to tolerate the mismatch,
+  and CSP then evaluates against `localhost`, not `DOMAIN_CORP`. Check
+  Traefik's `access.log` (the `Referer` column on any request) if unsure
+  which origin is actually in play. Then set `public_secure = true` and
+  route S3 GETs through Traefik under that origin — see the
+  `suspicious-storage` router in `tls.yaml`, which matches `PathPrefix` on
+  the configured bucket names (S3 path-style URLs put the bucket name
+  first in the path, so no prefix-stripping is needed) and forwards to
+  `rustfs:9000` with `passHostHeader: true` (required — S3 SigV4 signs the
+  `host` header, so whatever Host the browser sent when the URL was
+  signed must reach rustfs unchanged, or signature verification fails).
+  Keep that router's bucket-name list in sync with `avatars_bucket` /
+  `media_bucket` / `feeder_bucket`.
 - **No Traefik in front (plain-HTTP dev stack):** there's no CSP at all in
   that path, so a bare `localhost:<published-9000-port>` `public_endpoint`
   works — see the `/deploy-full-e2e` flow in `CLAUDE.md`.
