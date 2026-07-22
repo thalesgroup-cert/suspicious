@@ -120,9 +120,10 @@ def build_verdict(report: dict) -> list:
     return taxonomies
 
 
-def analyze(header_text: str) -> dict:
-    """Full pipeline: raw header text -> signals + taxonomy-shaped verdict."""
-    msg = parse_headers(header_text)
+def analyze_message(msg) -> dict:
+    """Full pipeline on an already-parsed email.message.Message: signals +
+    taxonomy-shaped verdict. Works the same whether msg came from a bare
+    header block or a full .eml (only header access is used, never body)."""
     report = {
         "auth_results": parse_auth_results(msg),
         "reply_to": check_domain_mismatch(msg, "Reply-To"),
@@ -131,3 +132,8 @@ def analyze(header_text: str) -> dict:
     }
     report["taxonomies"] = build_verdict(report)
     return report
+
+
+def analyze(header_text: str) -> dict:
+    """Full pipeline: raw header text -> signals + taxonomy-shaped verdict."""
+    return analyze_message(parse_headers(header_text))

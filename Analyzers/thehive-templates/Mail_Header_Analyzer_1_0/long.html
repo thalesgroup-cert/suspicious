@@ -1,0 +1,77 @@
+<div class="panel panel-info" ng-if="success">
+    <div class="panel-heading bg-primary text-white">
+        <h4 class="panel-title">Mail Header Analysis</h4>
+    </div>
+    <div class="panel-body">
+
+        <!-- Authentication Results -->
+        <h4 class="text-info">Authentication Results</h4>
+        <table class="table table-striped table-bordered table-condensed">
+            <thead>
+                <tr>
+                    <th>Mechanism</th>
+                    <th>Verdict</th>
+                </tr>
+            </thead>
+            <tbody>
+                <tr ng-repeat="mechanism in ['spf', 'dkim', 'dmarc']">
+                    <td>{{mechanism.toUpperCase()}}</td>
+                    <td>
+                        <span ng-if="content.auth_results[mechanism] === 'pass'" class="label label-success">{{content.auth_results[mechanism]}}</span>
+                        <span ng-if="content.auth_results[mechanism] === 'none'" class="label label-default">{{content.auth_results[mechanism]}}</span>
+                        <span ng-if="content.auth_results[mechanism] !== 'pass' && content.auth_results[mechanism] !== 'none'" class="label label-danger">{{content.auth_results[mechanism]}}</span>
+                    </td>
+                </tr>
+            </tbody>
+        </table>
+
+        <hr>
+
+        <!-- Address Consistency -->
+        <h4 class="text-info">Address Consistency</h4>
+        <dl class="dl-horizontal">
+            <dt>Reply-To:</dt>
+            <dd>
+                <span ng-if="!content.reply_to.present" class="label label-default">absent</span>
+                <span ng-if="content.reply_to.present && content.reply_to.match" class="label label-success">matches From ({{content.reply_to.from_domain}})</span>
+                <span ng-if="content.reply_to.present && !content.reply_to.match" class="label label-danger">{{content.reply_to.from_domain}} != {{content.reply_to.other_domain}}</span>
+            </dd>
+            <dt>Return-Path:</dt>
+            <dd>
+                <span ng-if="!content.return_path.present" class="label label-default">absent</span>
+                <span ng-if="content.return_path.present && content.return_path.match" class="label label-success">matches From ({{content.return_path.from_domain}})</span>
+                <span ng-if="content.return_path.present && !content.return_path.match" class="label label-danger">{{content.return_path.from_domain}} != {{content.return_path.other_domain}}</span>
+            </dd>
+        </dl>
+
+        <hr>
+
+        <!-- Display Name Spoofing -->
+        <h4 class="text-info">Display Name Spoofing</h4>
+        <dl class="dl-horizontal">
+            <dt>Display name:</dt>
+            <dd>{{content.display_name_spoofing.display_name || '(none)'}}</dd>
+            <dt>Verdict:</dt>
+            <dd>
+                <span ng-if="!content.display_name_spoofing.spoofed" class="label label-success">No spoofing detected</span>
+                <span ng-if="content.display_name_spoofing.spoofed" class="label label-danger">Spoofed address embedded in display name</span>
+            </dd>
+        </dl>
+        <div ng-if="content.display_name_spoofing.embedded_addresses.length" style="margin-top:5px;">
+            <strong class="text-danger">Embedded addresses:</strong>
+            <ul style="margin-bottom:0; padding-left:20px;">
+                <li ng-repeat="addr in content.display_name_spoofing.embedded_addresses" class="text-danger">{{addr}}</li>
+            </ul>
+        </div>
+
+    </div>
+</div>
+
+<div class="panel panel-danger" ng-if="!success">
+    <div class="panel-heading">
+        <strong>{{artifact.data | fang}}</strong>
+    </div>
+    <div class="panel-body">
+        <p>{{content.errorMessage}}</p>
+    </div>
+</div>

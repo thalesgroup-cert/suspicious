@@ -1,5 +1,7 @@
 """Pure-logic tests for mail_header_analysis.py — stdlib `email` only, no
 cortexutils/network dependency needed, so these run without the Docker image."""
+import email
+import email.policy
 import sys
 from pathlib import Path
 
@@ -126,3 +128,23 @@ def test_analyze_end_to_end():
     assert report["reply_to"]["match"] is False
     predicates = {t["predicate"] for t in report["taxonomies"]}
     assert {"SPF", "DKIM", "DMARC", "ReplyToMatch", "ReturnPathMatch", "DisplayNameSpoofing"} == predicates
+
+
+def test_analyze_message_works_on_a_full_eml_not_just_bare_headers():
+    """The .eml data-type entry point parses a full message (headers + body)
+    via email.message_from_bytes — analyze_message must give the same result
+    as the bare-header-block entry point since it only ever touches headers."""
+    eml_bytes = (
+        b'From: "Legit Bank" <billing@legit-bank.com>\r\n'
+        b"Reply-To: attacker@evil.com\r\n"
+        b"Authentication-Results: mx.example.com; spf=fail; dkim=fail; dmarc=fail\r\n"
+        b"Subject: Urgent action required\r\n"
+        b"Content-Type: text/plain\r\n"
+        b"\r\n"
+        b"Click here to verify your account.\r\n"
+    )
+    msg = email.message_from_bytes(eml_bytes, policy=email.policy.default)
+    report = mha.analyze_message(msg)
+    assert report["auth_results"] == {"spf": "fail", "dkim": "fail", "dmarc": "fail"}
+    assert report["reply_to"]["match"] is False
+    assert report["reply_to"]["from_domain"] == "legit-bank.com"
