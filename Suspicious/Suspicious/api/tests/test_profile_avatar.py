@@ -4,6 +4,8 @@ from django.contrib.auth import get_user_model
 from rest_framework.test import APITestCase
 from rest_framework.authtoken.models import Token  # noqa: F401 (import style parity)
 
+from profiles.profiles_utils.avatar_storage import AVATAR_MAX_BYTES
+
 User = get_user_model()
 
 
@@ -240,6 +242,35 @@ class AvatarUploadEndpointTests(APITestCase):
             self.fail("expected rejection for an oversized upload")
         self.assertEqual(resp.status_code, 400)
         fake_client.put_object.assert_not_called()
+
+    def test_oversized_upload_rejected_before_read(self):
+        """The view must reject on declared .size alone, before ever calling
+        process_avatar_image or upload.read(). Uses a mock upload (tiny
+        actual body, oversized declared .size) so the assertion holds
+        regardless of what a real multipart parser would report — going
+        through the test client would re-derive .size from actual bytes
+        transmitted, defeating the point of this test, so the view is
+        invoked directly instead."""
+        from api.views.profile import AvatarUploadView
+
+        fake_upload = mock.MagicMock()
+        fake_upload.content_type = "image/jpeg"
+        fake_upload.size = AVATAR_MAX_BYTES + 1
+        fake_upload.read = mock.MagicMock(
+            side_effect=AssertionError("upload.read() must not be called before the size gate")
+        )
+
+        request = mock.MagicMock()
+        request.FILES = {"avatar": fake_upload}
+        request.user = self.user
+
+        with mock.patch("api.views.profile.process_avatar_image") as mock_process:
+            resp = AvatarUploadView().post(request)
+
+        self.assertEqual(resp.status_code, 400)
+        self.assertIn(str(AVATAR_MAX_BYTES), resp.data["detail"])
+        mock_process.assert_not_called()
+        fake_upload.read.assert_not_called()
 
     def test_corrupt_file_rejected(self):
         from django.core.files.uploadedfile import SimpleUploadedFile

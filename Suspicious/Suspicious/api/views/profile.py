@@ -1,3 +1,5 @@
+import logging
+
 from rest_framework.parsers import MultiPartParser
 from rest_framework.permissions import IsAuthenticated
 from rest_framework.response import Response
@@ -5,6 +7,7 @@ from rest_framework.views import APIView
 
 from profiles.models import UserProfile, CISOProfile
 from profiles.profiles_utils.avatar_storage import (
+    AVATAR_MAX_BYTES,
     InvalidAvatarImage,
     delete_avatar,
     process_avatar_image,
@@ -17,6 +20,8 @@ from api.serializers.profile import (
     PreferencesSerializer,
     SemanticColorsSerializer,
 )
+
+logger = logging.getLogger(__name__)
 
 
 # ---------------------------------------------------------------------------
@@ -144,6 +149,14 @@ class AvatarUploadView(APIView):
         if upload is None:
             return Response({"detail": "No file provided."}, status=400)
 
+        if upload.size > AVATAR_MAX_BYTES:
+            return Response(
+                {
+                    "detail": f"File too large: {upload.size} bytes (max {AVATAR_MAX_BYTES})"
+                },
+                status=400,
+            )
+
         try:
             processed = process_avatar_image(
                 content_type=upload.content_type,
@@ -159,6 +172,9 @@ class AvatarUploadView(APIView):
         try:
             key = store_avatar(request.user.id, processed)
         except Exception:
+            logger.exception(
+                "avatar store_avatar failed for user_id=%s", request.user.id
+            )
             return Response(
                 {"detail": "Avatar storage is unavailable."}, status=502
             )

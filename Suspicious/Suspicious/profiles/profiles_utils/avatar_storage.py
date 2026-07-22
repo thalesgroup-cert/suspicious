@@ -91,8 +91,8 @@ def delete_avatar(key: str) -> None:
     try:
         client = get_s3_client()
         client.remove_object(_avatar_bucket_name(), key)
-    except Exception:
-        pass
+    except Exception as exc:
+        logger.warning(f"Failed to delete avatar object {key!r}: {exc}")
 
 
 def presigned_avatar_url(key: str) -> str | None:
@@ -102,5 +102,6 @@ def presigned_avatar_url(key: str) -> str | None:
         return client.presigned_get_object(
             _avatar_bucket_name(), key, expires=AVATAR_URL_EXPIRES
         )
-    except Exception:
+    except Exception as exc:
+        logger.warning(f"Failed to presign avatar URL for {key!r}: {exc}")
         return None
