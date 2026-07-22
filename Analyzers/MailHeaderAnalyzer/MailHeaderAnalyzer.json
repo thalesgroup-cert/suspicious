@@ -1,0 +1,12 @@
+{
+  "name": "Mail_Header_Analyzer",
+  "version": "1.0",
+  "author": "THA-CERT //ECR",
+  "url": "-",
+  "license": "-",
+  "description": "Rule-based verdict on a raw email header block: SPF/DKIM/DMARC authentication results, From/Reply-To/Return-Path domain mismatches, and display-name spoofing.",
+  "dataTypeList": ["mail_header"],
+  "command": "MailHeaderAnalyzer/mail_header_analyzer.py",
+  "baseConfig": "-",
+  "configurationItems": []
+}

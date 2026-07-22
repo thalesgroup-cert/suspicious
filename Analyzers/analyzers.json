@@ -12,5 +12,19 @@
         "baseConfig": "-",
         "configurationItems": [],
         "dockerImage": "aimailanalyzer:v2"
+    },
+    {
+        "name": "Mail_Header_Analyzer",
+        "version": "1.0",
+        "author": "THA-CERT //ECR",
+        "url": "-",
+        "license": "-",
+        "description": "-",
+        "dataTypeList": [
+            "mail_header"
+        ],
+        "baseConfig": "-",
+        "configurationItems": [],
+        "dockerImage": "mailheaderanalyzer:v1"
     }
 ]
