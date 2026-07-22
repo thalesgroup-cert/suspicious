@@ -154,7 +154,7 @@ function DirtyBar({
   const theme = useTheme();
   const isDark = theme.palette.mode === "dark";
   return (
-    <Collapse in={dirty}>
+    <Collapse in={dirty} unmountOnExit>
       <InnerCard sx={{
         px: 2, py: 1.25, display: "flex", flexWrap: "wrap", alignItems: "center",
         rowGap: 1, columnGap: 1.5,
@@ -424,6 +424,7 @@ export default function ProfilePage() {
   );
   const [avatarStyle, setAvatarStyle] = React.useState<string>("");
   const [avatarSeed,  setAvatarSeed]  = React.useState<string>("");
+  const [avatarUrl,   setAvatarUrl]   = React.useState<string | undefined>(undefined);
   const [avatarOptions, setAvatarOptions] =
     React.useState<Record<string, string[]>>({});
 
@@ -441,6 +442,7 @@ export default function ProfilePage() {
       if (!profileData.auto_seasonal) setThemeName(t);
       setAvatarStyle(profileData.avatar?.style ?? "");
       setAvatarSeed(profileData.avatar?.seed ?? "");
+      setAvatarUrl(profileData.avatar?.url ?? undefined);
       setAvatarOptions(profileData.avatar?.options ?? {});
     }
   }
@@ -565,6 +567,14 @@ export default function ProfilePage() {
     setAvatarStyle(baseProfile?.avatar?.style ?? "");
     setAvatarSeed(baseProfile?.avatar?.seed ?? "");
     setAvatarOptions(baseProfile?.avatar?.options ?? {});
+  }
+
+  function onAvatarUploaded(avatar: { style: "upload"; seed: string; url?: string }) {
+    queryClient.setQueryData<UserProfile>(["profile"], (prev) => ({
+      ...(prev ?? baseProfile as UserProfile),
+      avatar: avatar as UserProfile["avatar"],
+    }));
+    enqueueSnackbar("Avatar uploaded.", { variant: "success" });
   }
 
   const setStyleWithSeed = (s: string) => {
@@ -853,6 +863,8 @@ export default function ProfilePage() {
                 style={avatarStyle} seed={avatarSeed}
                 setStyle={setStyleWithSeed} setSeed={setAvatarSeed}
                 options={avatarOptions} setOptions={setAvatarOptions}
+                photoUrl={avatarUrl}
+                onUploaded={onAvatarUploaded}
                 firstName={me.first_name} lastName={me.last_name}
                 dirtyBar={
                   <DirtyBar
