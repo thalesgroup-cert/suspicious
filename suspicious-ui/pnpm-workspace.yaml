@@ -13,3 +13,6 @@ overrides:
   # via axios — but pin the patched floor so the audit gate stays green.
   undici: 7.28.0
   form-data: 4.0.6
+  # minimatch (via eslint's @eslint/config-array) pulls brace-expansion
+  # 5.0.6 — ReDoS via consecutive non-expanding {} groups (GHSA-3jxr-9vmj-r5cp).
+  brace-expansion: 5.0.7
