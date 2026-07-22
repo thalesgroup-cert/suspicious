@@ -1,11 +1,3 @@
-"""Pure header-analysis logic for MailHeaderAnalyzer.
-
-No cortexutils dependency and no network calls — parses a raw email header
-block (stdlib `email` only) into a handful of deterministic phishing
-signals, then maps them to taxonomy-shaped verdicts. Kept separate from
-mail_header_analyzer.py (the cortexutils.Analyzer glue) so it's unit-testable
-with zero dependencies, matching AIMailAnalyzer's own mail_analysis.py split.
-"""
 from __future__ import annotations
 
 import re
