@@ -4,6 +4,7 @@
 import os
 import email
 
+import numpy as np
 from cortexutils.analyzer import Analyzer
 import torch
 from sentence_transformers import SentenceTransformer
@@ -93,15 +94,28 @@ class AIMailClassifier(Analyzer):
         sub_classification_probabilities = mail_analysis.getSubClassificationProbabilities(device, [safe_model, spam_model, dangerous_model], email_embedding, classification_probabilities)
         sub_classification_info = mail_analysis.getSubClassificationInfo(sub_classification_probabilities)
 
+        # Explainability: labeled probability breakdowns + which sentences drove the call
+        classification_breakdown = mail_analysis.get_classification_breakdown(classification_probabilities)
+        sub_classification_breakdown = mail_analysis.get_sub_classification_breakdown(sub_classification_probabilities)
+        contributing_phrases = mail_analysis.get_contributing_phrases(
+            device, safe_suspicious_model, spam_dangerous_model, vectorizer,
+            mail_body,
+            classification_index=int(np.argmax(classification_probabilities)),
+            baseline_probability=float(np.max(classification_probabilities)),
+        )
+
         # Build report
         self.report({
             'malscore': str(classification_info['score']),
             'classification': classification_info['classification'],
             'confidence': str(classification_info['confidence']),
             'classification_probabilities': str(classification_probabilities),
+            'classification_breakdown': classification_breakdown,
             'sub_classification': sub_classification_info['classification'],
             'sub_classification_confidence': str(sub_classification_info['confidence']),
             'sub_classification_probabilities': str(sub_classification_probabilities),
+            'sub_classification_breakdown': sub_classification_breakdown,
+            'contributing_phrases': contributing_phrases,
             'report': {
                 'mail_file_name': self.filename,
                 'mail_file_path': self.filepath,
