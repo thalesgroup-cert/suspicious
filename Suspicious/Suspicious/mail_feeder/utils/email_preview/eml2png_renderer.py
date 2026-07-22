@@ -39,6 +39,23 @@ _DEFAULT_PREVIEW_BUCKET = "mail-previews"
 
 _RENDER_WIDTH_PX = 900
 
+# wkhtmltoimage renders the *entire* page as one image with no pagination —
+# an email body with pathological height (a long forwarded/quoted chain, or
+# a hostile HTML payload designed to bloat the render) produces an
+# arbitrarily tall PNG with no upper bound. `--height` hard-crops the
+# render instead of scaling it, which is fine for a preview thumbnail (it
+# only needs to show the top of the email, not be a full readable
+# document). Observed in production: previews up to 1.7GB before this cap,
+# from an unbounded-height render, filling the mail-previews bucket.
+_MAX_RENDER_HEIGHT_PX = 4000
+
+# Belt-and-suspenders: even a capped-height render can still bloat past a
+# sane size (e.g. many large embedded images at full color). Drop the
+# render entirely rather than store it — MailPreviewView already treats a
+# missing preview as a 404 + lazy re-render trigger, so this degrades the
+# same way any other render failure does.
+_MAX_PNG_BYTES = 15 * 1024 * 1024
+
 _VISIBLE_HEADERS = ("From", "To", "Cc", "Subject", "Date", "Reply-To")
 
 _REMOTE_CSS_RE = re.compile(
@@ -264,6 +281,7 @@ class Eml2PngRenderer:
             "format": "png",
             "encoding": "utf-8",
             "width": str(_RENDER_WIDTH_PX),
+            "height": str(_MAX_RENDER_HEIGHT_PX),
             "quiet": "",
             "no-images": "",
             "disable-javascript": "",
@@ -271,10 +289,20 @@ class Eml2PngRenderer:
         }
 
         try:
-            return imgkit.from_string(html, output_path=False, options=options)
+            png_bytes = imgkit.from_string(html, output_path=False, options=options)
         except Exception as exc:
             logger.error("imgkit failed to render preview: %s", exc)
             return None
+
+        if png_bytes and len(png_bytes) > _MAX_PNG_BYTES:
+            logger.warning(
+                "imgkit preview render exceeded %d bytes (got %d) even after "
+                "the %dpx height cap — dropping instead of storing",
+                _MAX_PNG_BYTES, len(png_bytes), _MAX_RENDER_HEIGHT_PX,
+            )
+            return None
+
+        return png_bytes
 
 
 # ---------------------------------------------------------------------------

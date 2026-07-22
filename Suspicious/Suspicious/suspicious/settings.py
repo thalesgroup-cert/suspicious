@@ -549,6 +549,10 @@ CELERY_BEAT_SCHEDULE = {
         "task": "tasp.tasks.delete_old_reports",
         "schedule": crontab(day_of_month=1, hour=0, minute=0),
     },
+    "purge-old-mail-previews": {
+        "task": "tasp.tasks.purge_old_mail_previews",
+        "schedule": crontab(hour=3, minute=0),
+    },
     "materialise-dashboard-snapshots": {
         "task": "tasp.tasks.materialise_dashboard_snapshots",
         "schedule": crontab(hour=2, minute=0),
