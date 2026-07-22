@@ -88,6 +88,22 @@ def delete_old_reports(self):
 
 
 @shared_task(bind=True, **_RETRY)
+def purge_old_mail_previews(self, older_than_days: int = 90):
+    """Age-only bucket sweep; see mail_feeder.utils.email_preview.retention
+    for why this never touches Mail.preview_object_key. Oversized-but-recent
+    outliers (the actual disk-usage incident) are a manual
+    `purge_mail_previews --min-size-mb` call, not part of the automated
+    sweep — an automatic size cutoff could delete a legitimately long
+    email's preview the same day it was rendered.
+    """
+    from mail_feeder.utils.email_preview.retention import purge_mail_previews
+    try:
+        purge_mail_previews(older_than_days=older_than_days)
+    except Exception as exc:
+        raise self.retry(exc=exc, countdown=60 * 2 ** self.request.retries)
+
+
+@shared_task(bind=True, **_RETRY)
 def materialise_dashboard_snapshots(self):
     from tasp.cron.dashboard_snapshot import materialise_dashboard_snapshots as _run
     try:
