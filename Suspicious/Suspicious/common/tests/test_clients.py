@@ -14,7 +14,8 @@ class GetS3ClientTest(SimpleTestCase):
             from common.clients import get_s3_client
             get_s3_client()
         minio_cls.assert_called_once_with(
-            endpoint="rustfs:9000", access_key="ak", secret_key="sk", secure=False
+            endpoint="rustfs:9000", access_key="ak", secret_key="sk", secure=False,
+            region="us-east-1",
         )
 
 
@@ -29,7 +30,8 @@ class GetS3PresignClientTest(SimpleTestCase):
             from common.clients import get_s3_presign_client
             get_s3_presign_client()
         minio_cls.assert_called_once_with(
-            endpoint="localhost:35002", access_key="ak", secret_key="sk", secure=False
+            endpoint="localhost:35002", access_key="ak", secret_key="sk", secure=False,
+            region="us-east-1",
         )
 
     def test_falls_back_to_internal_endpoint_when_unset(self):
@@ -42,8 +44,22 @@ class GetS3PresignClientTest(SimpleTestCase):
             from common.clients import get_s3_presign_client
             get_s3_presign_client()
         minio_cls.assert_called_once_with(
-            endpoint="rustfs:9000", access_key="ak", secret_key="sk", secure=False
+            endpoint="rustfs:9000", access_key="ak", secret_key="sk", secure=False,
+            region="us-east-1",
         )
+
+    def test_region_is_never_auto_detected_over_the_network(self):
+        """Regression guard: presign client must not need live connectivity
+        to public_endpoint just to construct a signature."""
+        section = {
+            "endpoint": "rustfs:9000", "public_endpoint": "unreachable-from-backend:9999",
+            "access_key": "ak", "secret_key": "sk", "secure": False,
+        }
+        with mock.patch("common.clients.get_section", return_value=section), \
+             mock.patch("common.clients.Minio") as minio_cls:
+            from common.clients import get_s3_presign_client
+            get_s3_presign_client()
+        self.assertEqual(minio_cls.call_args.kwargs["region"], "us-east-1")
 
 
 class GetChromaClientTest(SimpleTestCase):

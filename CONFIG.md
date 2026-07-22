@@ -277,6 +277,22 @@ which needs its own port mapping since rustfs only `expose`s 9000 to the
 Docker network by default). Omit `public_endpoint` and it falls back to
 `endpoint` — existing single-endpoint deployments are unaffected.
 
+The client that signs `public_endpoint` URLs pins `region` to a fixed value
+(`"us-east-1"` unless `storage.s3.region` overrides it) instead of letting
+the SDK auto-detect it. Auto-detection does a live bucket-location request
+against the endpoint being signed for — and the whole point of
+`public_endpoint` is that it's reachable from a browser, not necessarily
+from wherever the Django/Celery process signing the URL runs, so that
+request can't be relied on to succeed.
+
+**DB overrides settings.json at runtime.** `storage.s3` (like other
+sections) is seeded into the `RuntimeConfig` table on first run and served
+from there — Redis-cached — ahead of `settings.json`. Editing the file
+after `seed_config` has already run does **nothing** until the matching DB
+row is updated too (Settings page in the UI, or
+`RuntimeConfig.objects.filter(key="storage.s3")` in a shell) and the cache
+entry is invalidated (`settings.config.invalidate_cache("storage.s3")`).
+
 #### Feeder fast metadata
 
 `fast_metadata` (default `false`) controls the email-ingestion fast path. The
