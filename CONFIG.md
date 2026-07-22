@@ -251,7 +251,7 @@ mismatch gives `Access denied for user 'suspicious'`.
     "backend": "local",
     "s3": {
         "endpoint": "rustfs:9000",
-        "public_endpoint": "localhost:9000",
+        "public_endpoint": "localhost:35002",
         "access_key": "MINIO_ACCESS_KEY",
         "secret_key": "MINIO_SECRET_KEY",
         "secure": false,
@@ -271,11 +271,29 @@ RustFS credentials in `.env` (`MINIO_ROOT_PASSWORD`), and RustFS must be running
 put/get/bucket calls. Presigned URLs (mail-attachment links, uploaded
 avatar photos) are opened directly by the browser, which can't resolve that
 internal hostname — set `public_endpoint` to whatever host:port the browser
-*can* reach (behind Traefik in production, that's usually a routed
-subdomain; for a local dev stack it's `localhost:<published-9000-port>`,
-which needs its own port mapping since rustfs only `expose`s 9000 to the
-Docker network by default). Omit `public_endpoint` and it falls back to
-`endpoint` — existing single-endpoint deployments are unaffected.
+*can* reach. Omit it and it falls back to `endpoint` — existing
+single-endpoint deployments are unaffected.
+
+**Behind Traefik** (`security-headers` middleware in
+`traefik/dynamic/tls.yaml` sets `Content-Security-Policy: img-src 'self'
+data:`), a `public_endpoint` on a different origin than the app — a bare
+`host:port` — gets silently dropped by the browser's CSP enforcement; no
+console-visible network error, the `<img>` just never loads. Two ways to
+avoid it:
+- **Same-origin (recommended, no CSP change):** set `public_endpoint` to
+  the app's own domain (`storage.s3.public_endpoint = "<DOMAIN_CORP>"`,
+  `public_secure = true`) and route S3 GETs through Traefik under that
+  domain — see the `suspicious-storage` router in `tls.yaml`, which
+  matches `PathPrefix` on the configured bucket names (S3 path-style URLs
+  put the bucket name first in the path, so no prefix-stripping is
+  needed) and forwards to `rustfs:9000` with `passHostHeader: true`
+  (required — S3 SigV4 signs the `host` header, so whatever Host the
+  browser sent when the URL was signed must reach rustfs unchanged, or
+  signature verification fails). Keep that router's bucket-name list in
+  sync with `avatars_bucket` / `media_bucket` / `feeder_bucket`.
+- **No Traefik in front (plain-HTTP dev stack):** there's no CSP at all in
+  that path, so a bare `localhost:<published-9000-port>` `public_endpoint`
+  works — see the `/deploy-full-e2e` flow in `CLAUDE.md`.
 
 The client that signs `public_endpoint` URLs pins `region` to a fixed value
 (`"us-east-1"` unless `storage.s3.region` overrides it) instead of letting

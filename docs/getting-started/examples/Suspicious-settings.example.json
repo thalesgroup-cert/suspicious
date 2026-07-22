@@ -48,7 +48,7 @@
         "backend": "local",
         "s3": {
             "endpoint": "rustfs:9000",
-            "public_endpoint": "localhost:9000",
+            "public_endpoint": "localhost:35002",
             "access_key": "minio",
             "secret_key": "meridian_dev_minio_pw",
             "secure": false,
