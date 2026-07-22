@@ -17,11 +17,12 @@ vi.mock("@/features/profile/api", () => ({
   updatePreferences: vi.fn(),
   updateSemanticColors: vi.fn(),
   resetSemanticColors: vi.fn(),
+  uploadAvatar: vi.fn(),
 }));
 
 
 import { getMe } from "@/api/auth";
-import { getProfile, updatePreferences } from "@/features/profile/api";
+import { getProfile, updatePreferences, uploadAvatar } from "@/features/profile/api";
 import { getStyleCategories } from "@/features/profile/avatar";
 import ProfilePage from "../ProfilePage";
 
@@ -128,6 +129,30 @@ describe("ProfilePage - Test Suite", () => {
       await waitFor(() => {
         expect(screen.getByLabelText("Eyes options")).toHaveTextContent("Auto");
       });
+    });
+
+    it("shows the uploaded photo and clears the dirty state after a successful upload", async () => {
+      const user = userEvent.setup();
+      vi.mocked(uploadAvatar).mockResolvedValue({
+        ...fixtureProfile,
+        avatar: { style: "upload", seed: "avatars/1/x.jpg", url: "https://signed" },
+      });
+
+      renderWithProviders(<ProfilePage />, { initialPath: "/profile" });
+      await user.click(await screen.findByText("Avatar"));
+
+      const file = new File(["bytes"], "photo.jpg", { type: "image/jpeg" });
+      const input = screen.getByLabelText(/upload photo/i) as HTMLInputElement;
+      await user.upload(input, file);
+
+      await waitFor(() => {
+        expect(uploadAvatar).toHaveBeenCalledWith(file);
+      });
+      await waitFor(() => {
+        const img = screen.getAllByRole("img").find((el) => el.getAttribute("src") === "https://signed");
+        expect(img).toBeTruthy();
+      });
+      expect(screen.queryByText("Unsaved avatar changes")).not.toBeInTheDocument();
     });
 
     it("locks the seed to the real initials when switching to the Initials style", async () => {

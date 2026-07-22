@@ -14,6 +14,8 @@ export type AvatarConfig = {
   style: string;
   seed: string;
   options?: Record<string, string[]>;
+  /** Presigned MinIO URL, present only when style === "upload". Server-populated; never sent by the client. */
+  url?: string;
 };
 
 export const AVATAR_STYLES = [

@@ -1,4 +1,4 @@
-import { describe, it, expect, vi } from "vitest";
+import { describe, it, expect, vi, beforeEach } from "vitest";
 import { render, screen } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { AvatarPanel } from "@/features/profile/AvatarPanel";
@@ -9,6 +9,7 @@ function renderPanel(
 ) {
   const setOptions = vi.fn();
   const setSeed = vi.fn();
+  const onUploaded = vi.fn();
   render(
     <AvatarPanel
       style="avataaars"
@@ -20,10 +21,11 @@ function renderPanel(
       firstName="Al"
       lastName="Ice"
       dirtyBar={null}
+      onUploaded={onUploaded}
       {...overrides}
     />,
   );
-  return { setOptions, setSeed };
+  return { setOptions, setSeed, onUploaded };
 }
 
 describe("AvatarPanel style options (enum categories)", () => {
@@ -88,5 +90,60 @@ describe("AvatarPanel styles with no color fields", () => {
     renderPanel({ style: "notionists" });
     expect(screen.queryByText("Colors")).not.toBeInTheDocument();
     expect(screen.queryByText("Background")).not.toBeInTheDocument();
+  });
+});
+
+vi.mock("@/features/profile/api", () => ({
+  uploadAvatar: vi.fn(),
+}));
+
+import { uploadAvatar } from "@/features/profile/api";
+
+describe("AvatarPanel upload", () => {
+  beforeEach(() => vi.clearAllMocks());
+
+  it("uploads the selected file and calls onUploaded with the result", async () => {
+    vi.mocked(uploadAvatar).mockResolvedValue({
+      id: 1,
+      avatar: { style: "upload", seed: "avatars/1/x.jpg", url: "https://signed" },
+    } as never);
+
+    const onUploaded = vi.fn();
+    renderPanel({ onUploaded });
+
+    const file = new File(["bytes"], "photo.jpg", { type: "image/jpeg" });
+    const input = screen.getByLabelText(/upload photo/i) as HTMLInputElement;
+    await userEvent.upload(input, file);
+
+    await vi.waitFor(() => {
+      expect(uploadAvatar).toHaveBeenCalledWith(file);
+      expect(onUploaded).toHaveBeenCalledWith({
+        style: "upload", seed: "avatars/1/x.jpg", url: "https://signed",
+      });
+    });
+  });
+
+  it("shows an inline error when the upload is rejected", async () => {
+    vi.mocked(uploadAvatar).mockRejectedValue({
+      response: { data: { detail: "File too large: 3000000 bytes (max 2097152)" } },
+    });
+
+    renderPanel();
+
+    const file = new File(["bytes"], "photo.jpg", { type: "image/jpeg" });
+    const input = screen.getByLabelText(/upload photo/i) as HTMLInputElement;
+    await userEvent.upload(input, file);
+
+    expect(await screen.findByText(/file too large/i)).toBeInTheDocument();
+  });
+
+  it("rejects an oversized file client-side without calling the API", async () => {
+    renderPanel();
+    const big = new File([new Uint8Array(3 * 1024 * 1024)], "big.jpg", { type: "image/jpeg" });
+    const input = screen.getByLabelText(/upload photo/i) as HTMLInputElement;
+    await userEvent.upload(input, big);
+
+    expect(await screen.findByText(/2\s*mb/i)).toBeInTheDocument();
+    expect(uploadAvatar).not.toHaveBeenCalled();
   });
 });

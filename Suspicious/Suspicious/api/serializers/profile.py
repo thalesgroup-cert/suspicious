@@ -1,6 +1,7 @@
 import re
 from rest_framework import serializers
 from profiles.models import UserProfile, CISOProfile, Theme, DEFAULT_SEMANTIC_COLORS
+from profiles.profiles_utils.avatar_storage import presigned_avatar_url
 
 
 # ---------------------------------------------------------------------------
@@ -140,6 +141,12 @@ class AvatarField(serializers.JSONField):
         style = data.get("style")
         seed = data.get("seed")
 
+        if style == "upload":
+            raise serializers.ValidationError(
+                "avatar.style 'upload' can only be set via "
+                "POST /profile/avatar/upload/."
+            )
+
         if style not in ALLOWED_AVATAR_STYLES:
             raise serializers.ValidationError(
                 f"avatar.style must be one of {sorted(ALLOWED_AVATAR_STYLES)}. Got: {style!r}"
@@ -162,6 +169,7 @@ class AvatarField(serializers.JSONField):
 
 class UserProfileSerializer(serializers.ModelSerializer):
     semantic_colors = SemanticColorsField(required=False)
+    avatar = AvatarField(required=False)
 
     class Meta:
         model = UserProfile
@@ -194,11 +202,17 @@ class UserProfileSerializer(serializers.ModelSerializer):
     def to_representation(self, instance):
         rep = super().to_representation(instance)
         rep["semantic_colors"] = instance.get_semantic_colors()
+        avatar = rep.get("avatar") or {}
+        if avatar.get("style") == "upload" and avatar.get("seed"):
+            url = presigned_avatar_url(avatar["seed"])
+            if url:
+                rep["avatar"] = {**avatar, "url": url}
         return rep
 
 
 class CISOProfileSerializer(serializers.ModelSerializer):
     semantic_colors = SemanticColorsField(required=False)
+    avatar = AvatarField(required=False)
 
     class Meta:
         model = CISOProfile
@@ -232,6 +246,11 @@ class CISOProfileSerializer(serializers.ModelSerializer):
     def to_representation(self, instance):
         rep = super().to_representation(instance)
         rep["semantic_colors"] = instance.get_semantic_colors()
+        avatar = rep.get("avatar") or {}
+        if avatar.get("style") == "upload" and avatar.get("seed"):
+            url = presigned_avatar_url(avatar["seed"])
+            if url:
+                rep["avatar"] = {**avatar, "url": url}
         return rep
 
 

@@ -1,7 +1,7 @@
 import * as React from "react";
 import { Box, Button, Divider, Stack, Typography } from "@mui/material";
 import { alpha, useTheme } from "@mui/material/styles";
-import { PersonOutlined, CasinoOutlined } from "@mui/icons-material";
+import { PersonOutlined, CasinoOutlined, AddAPhotoOutlined } from "@mui/icons-material";
 import { CaptionLabel, InnerCard } from "@/features/profile/components/cards";
 import { UserAvatar } from "@/features/profile/components/UserAvatar";
 import { ColorField } from "@/features/profile/components/ColorField";
@@ -15,12 +15,15 @@ import {
   type AvatarConfig,
 } from "@/features/profile/avatar";
 import { initials as initialsFn } from "@/features/profile/utils";
+import { uploadAvatar } from "@/features/profile/api";
 
 export function AvatarPanel({
   style, seed, setStyle, setSeed,
   options, setOptions,
   firstName, lastName,
   dirtyBar,
+  photoUrl,
+  onUploaded,
 }: {
   style: string; seed: string;
   setStyle: (s: string) => void; setSeed: (s: string) => void;
@@ -28,12 +31,53 @@ export function AvatarPanel({
   setOptions: (o: Record<string, string[]>) => void;
   firstName?: string; lastName?: string;
   dirtyBar: React.ReactNode;
+  photoUrl?: string;
+  onUploaded: (avatar: { style: "upload"; seed: string; url?: string }) => void;
 }) {
   const theme = useTheme();
   const inits = initialsFn(firstName, lastName);
   const isInitials = style === "initials";
   const effectiveSeed = isInitials ? inits : seed;
   const config: AvatarConfig = { style, seed: effectiveSeed, options };
+
+  const displayConfig: AvatarConfig =
+    style === "upload" ? { style, seed, url: photoUrl } : config;
+
+  const ACCEPTED_TYPES = ["image/jpeg", "image/png", "image/webp"];
+  const MAX_BYTES = 2 * 1024 * 1024;
+
+  const [uploadError, setUploadError] = React.useState<string | null>(null);
+  const [uploading, setUploading] = React.useState(false);
+
+  const handleFileSelect = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    e.target.value = "";
+    if (!file) return;
+    setUploadError(null);
+
+    if (!ACCEPTED_TYPES.includes(file.type)) {
+      setUploadError("Only JPG, PNG, or WebP images are supported.");
+      return;
+    }
+    if (file.size > MAX_BYTES) {
+      setUploadError(`File too large — max 2 MB, got ${(file.size / 1024 / 1024).toFixed(1)} MB.`);
+      return;
+    }
+
+    setUploading(true);
+    try {
+      const updated = await uploadAvatar(file);
+      if (updated.avatar?.style === "upload" && updated.avatar.seed) {
+        onUploaded({ style: "upload", seed: updated.avatar.seed, url: updated.avatar.url });
+      }
+    } catch (err: unknown) {
+      const detail =
+        (err as { response?: { data?: { detail?: string } } })?.response?.data?.detail;
+      setUploadError(detail ?? "Upload failed — please try again.");
+    } finally {
+      setUploading(false);
+    }
+  };
 
   const categories = getStyleCategories(style);
   const styleOptionCats = categories.filter((c) => c.kind === "enum");
@@ -90,7 +134,7 @@ export function AvatarPanel({
           }}
         >
           <InnerCard sx={{ p: 2.5, display: "flex", flexDirection: "column", alignItems: "center", gap: 1.25 }}>
-            <UserAvatar avatar={config} initials={inits} sx={{ width: 96, height: 96, fontSize: 34, fontWeight: 950 }} />
+            <UserAvatar avatar={displayConfig} initials={inits} sx={{ width: 96, height: 96, fontSize: 34, fontWeight: 950 }} />
             <Typography sx={{ fontWeight: 900, fontSize: 14, textAlign: "center" }}>
               {AVATAR_STYLES.find((s) => s.key === style)?.label ?? "Initials"}
             </Typography>
@@ -112,6 +156,32 @@ export function AvatarPanel({
           <Stack spacing={1}>
             <CaptionLabel>Style</CaptionLabel>
             <Box sx={{ display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(84px, 1fr))", gap: 1 }}>
+              <Box
+                component="label"
+                htmlFor="avatar-upload-input"
+                sx={{
+                  cursor: uploading ? "wait" : "pointer", borderRadius: 2.5, p: 1,
+                  display: "flex", flexDirection: "column", alignItems: "center", gap: 0.5,
+                  border: `1px solid ${style === "upload" ? theme.palette.primary.main : alpha(theme.palette.divider, 0.5)}`,
+                  background: style === "upload" ? alpha(theme.palette.primary.main, 0.08) : "transparent",
+                }}
+              >
+                <Box sx={{ width: 44, height: 44, display: "grid", placeItems: "center" }}>
+                  <AddAPhotoOutlined sx={{ fontSize: 22 }} />
+                </Box>
+                <Typography variant="caption" sx={{ fontWeight: style === "upload" ? 900 : 700, fontSize: 10.5 }}>
+                  Upload photo
+                </Typography>
+                <input
+                  id="avatar-upload-input"
+                  aria-label="Upload photo"
+                  type="file"
+                  accept="image/jpeg,image/png,image/webp"
+                  disabled={uploading}
+                  onChange={handleFileSelect}
+                  style={{ display: "none" }}
+                />
+              </Box>
               {AVATAR_STYLES.map((s) => {
                 const selected = s.key === style;
                 const preview = renderAvatarDataUri({
@@ -144,6 +214,11 @@ export function AvatarPanel({
                 );
               })}
             </Box>
+            {uploadError && (
+              <Typography variant="caption" color="error" role="alert">
+                {uploadError}
+              </Typography>
+            )}
           </Stack>
 
           {styleOptionCats.length > 0 && (
