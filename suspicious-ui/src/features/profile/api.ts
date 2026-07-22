@@ -61,6 +61,18 @@ export async function getProfile(): Promise<UserProfile> {
 }
 
 // ---------------------------------------------------------------------------
+// POST /api/profile/avatar/upload/
+// ---------------------------------------------------------------------------
+
+export async function uploadAvatar(file: File): Promise<UserProfile> {
+  const form = new FormData();
+  form.append("avatar", file);
+  const { data } = await api.post<UserProfile>("/profile/avatar/upload/", form);
+  return data;
+}
+
+// ---------------------------------------------------------------------------
+// PATCH /api/profile/appearance/
 // ---------------------------------------------------------------------------
 
 export async function updateAppearance(
