@@ -130,6 +130,30 @@ def test_analyze_end_to_end():
     assert {"SPF", "DKIM", "DMARC", "ReplyToMatch", "ReturnPathMatch", "DisplayNameSpoofing"} == predicates
 
 
+def test_analyze_recovers_flattened_headers_with_no_real_linebreaks():
+    """Outlook's "Internet headers" popup, copy-pasted, commonly hands back
+    one long line instead of newline-separated headers. Without reflowing,
+    message_from_string reads the whole blob as one header's value and
+    every later header vanishes."""
+    flattened = (
+        "Received: from a.example (1.2.3.4) by b.example; Wed, 22 Jul 2026 18:26:54 +0200 "
+        "Authentication-Results: mx.example.com; spf=pass; dkim=pass; dmarc=pass "
+        "From: Attacker <attacker@evil.com> "
+        "Reply-To: attacker@evil.com"
+    )
+    report = mha.analyze(flattened)
+    assert report["auth_results"] == {"spf": "pass", "dkim": "pass", "dmarc": "pass"}
+    assert report["reply_to"]["from_domain"] == "evil.com"
+
+
+def test_get_domain_undoes_bracket_defanged_dots():
+    """CERT analysts routinely defang IOCs ("evil[.]com") before sharing a
+    header dump; parseaddr reads "[.]" as an RFC 5322 domain-literal and
+    fails the whole address, so domain extraction must undo it first."""
+    assert mha.get_domain("attacker@evil[.]com") == "evil.com"
+    assert mha.get_domain("Attacker <attacker@evil[.]com>") == "evil.com"
+
+
 def test_analyze_message_works_on_a_full_eml_not_just_bare_headers():
     """The .eml data-type entry point parses a full message (headers + body)
     via email.message_from_bytes — analyze_message must give the same result
