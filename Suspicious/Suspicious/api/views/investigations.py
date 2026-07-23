@@ -218,12 +218,18 @@ class InvestigationAccessMixin:
         if not query.children:
             return AnalyzerReport.objects.none()
 
+        # No .distinct() needed: every filter above is a plain equality/IN on
+        # AnalyzerReport's own FK columns (never a reverse/M2M traversal), and
+        # every select_related() relation is forward FK/O2O — this queryset
+        # structurally can't fan out into duplicate rows. distinct() was
+        # forcing MySQL to sort/dedupe the full 9-table-wide join with no
+        # LIMIT to cap it, and _dedup_analyzer_reports() below already
+        # de-dupes in Python regardless.
         qs = (
             AnalyzerReport.objects
             .filter(query)
             .select_related(*self.analyzer_report_select_related)
             .order_by("-creation_date", "-pk")
-            .distinct()
         )
         return _dedup_analyzer_reports(qs)
 

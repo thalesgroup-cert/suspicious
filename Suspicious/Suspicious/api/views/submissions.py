@@ -119,6 +119,10 @@ class SubmissionListView(ListAPIView):
         search = (self.request.query_params.get("search") or "").strip()
         if search:
             id_q = Q(pk=int(search)) if search.isdigit() else Q()
+            # No .distinct() needed: fileOrMail and nonFileIocs are forward
+            # O2O relations from Case's side, never reverse/M2M, so a Case
+            # row can't fan out into duplicates through these joins (same
+            # reasoning as InvestigationAccessMixin.get_queryset).
             queryset = queryset.filter(
                 id_q
                 | Q(description__icontains=search)
@@ -129,7 +133,7 @@ class SubmissionListView(ListAPIView):
                 | Q(nonFileIocs__url__address__icontains=search)
                 | Q(nonFileIocs__ip__address__icontains=search)
                 | Q(nonFileIocs__hash__value__icontains=search)
-            ).distinct()
+            )
 
         ordering = self.request.query_params.get("ordering", "-created_at")
         db_ordering = self.ORDERING_MAP.get(ordering)
@@ -268,6 +272,10 @@ class SubmissionDetailsView(RetrieveAPIView):
         if not filters.children:
             return []
 
+        # No .distinct() needed: every filter above is a plain equality/IN on
+        # AnalyzerReport's own FK columns, and every select_related() relation
+        # is forward FK/O2O — structurally can't fan out into duplicate rows.
+        # _dedup_analyzer_reports() below already de-dupes in Python regardless.
         qs = (
             AnalyzerReport.objects.filter(filters)
             .select_related(
@@ -275,7 +283,6 @@ class SubmissionDetailsView(RetrieveAPIView):
                 "file", "ip", "mail_body", "mail_header",
             )
             .order_by("-creation_date", "-id")
-            .distinct()
         )
         return _dedup_analyzer_reports(qs)
 
