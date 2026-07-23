@@ -1,0 +1,12 @@
+{
+  "name": "Mail_Header_Analyzer",
+  "version": "1.0",
+  "author": "THA-CERT // TBH and RBA",
+  "url": "-",
+  "license": "-",
+  "description": "Rule-based verdict on email headers: SPF/DKIM/DMARC authentication results, From/Reply-To/Return-Path domain mismatches, and display-name spoofing. Accepts either a raw header block (mail_header) or a .eml file.",
+  "dataTypeList": ["mail_header", "file"],
+  "command": "MailHeaderAnalyzer/mail_header_analyzer.py",
+  "baseConfig": "-",
+  "configurationItems": []
+}
