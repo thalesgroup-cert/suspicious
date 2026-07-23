@@ -136,10 +136,16 @@ export function AvatarPanel({
           <InnerCard sx={{ p: 2.5, display: "flex", flexDirection: "column", alignItems: "center", gap: 1.25 }}>
             <UserAvatar avatar={displayConfig} initials={inits} sx={{ width: 96, height: 96, fontSize: 34, fontWeight: 950 }} />
             <Typography sx={{ fontWeight: 900, fontSize: 14, textAlign: "center" }}>
-              {AVATAR_STYLES.find((s) => s.key === style)?.label ?? "Initials"}
+              {style === "upload"
+                ? "Uploaded photo"
+                : AVATAR_STYLES.find((s) => s.key === style)?.label ?? "Initials"}
             </Typography>
             <Typography variant="caption" color="text.secondary" sx={{ textAlign: "center" }}>
-              {isInitials ? "Always your initials" : `seed: ${seed || "—"}`}
+              {style === "upload"
+                ? "Your uploaded photo"
+                : isInitials
+                  ? "Always your initials"
+                  : `seed: ${seed || "—"}`}
             </Typography>
             <Button
               fullWidth size="small" variant="outlined" startIcon={<CasinoOutlined />}
