@@ -21,6 +21,9 @@ _DEFAULT_CHROMA_HOST = "chromadb"
 _DEFAULT_CHROMA_PORT = 8000
 
 
+_DEFAULT_S3_REGION = "us-east-1"
+
+
 def get_s3_client() -> Minio:
     """MinIO/rustfs client from the shared ``storage.s3`` section."""
     cfg = get_section("storage.s3")
@@ -29,6 +32,32 @@ def get_s3_client() -> Minio:
         access_key=cfg["access_key"],
         secret_key=cfg["secret_key"],
         secure=cfg.get("secure", False),
+        region=cfg.get("region", _DEFAULT_S3_REGION),
+    )
+
+
+def get_s3_presign_client() -> Minio:
+    """MinIO/rustfs client for signing browser-facing URLs.
+
+    ``storage.s3.endpoint`` is the Docker-internal host the app container
+    uses for put/get calls; browsers can't resolve it. Presigned URLs must
+    be signed against ``storage.s3.public_endpoint`` instead — falls back
+    to ``endpoint`` when unset, so existing single-endpoint deployments are
+    unaffected.
+
+    ``region`` is pinned explicitly (not left for the SDK to auto-detect)
+    because auto-detection does a live bucket-location HTTP call against
+    the endpoint being signed for — and ``public_endpoint`` is reachable
+    from a browser, not necessarily from wherever this signing code runs,
+    so that lookup can't be relied on to succeed.
+    """
+    cfg = get_section("storage.s3")
+    return Minio(
+        endpoint=cfg.get("public_endpoint") or cfg["endpoint"],
+        access_key=cfg["access_key"],
+        secret_key=cfg["secret_key"],
+        secure=cfg.get("public_secure", cfg.get("secure", False)),
+        region=cfg.get("region", _DEFAULT_S3_REGION),
     )
 
 

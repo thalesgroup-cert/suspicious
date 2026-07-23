@@ -251,6 +251,7 @@ mismatch gives `Access denied for user 'suspicious'`.
     "backend": "local",
     "s3": {
         "endpoint": "rustfs:9000",
+        "public_endpoint": "localhost:35002",
         "access_key": "MINIO_ACCESS_KEY",
         "secret_key": "MINIO_SECRET_KEY",
         "secure": false,
@@ -265,6 +266,57 @@ mismatch gives `Access denied for user 'suspicious'`.
 does **not** require the RustFS service — handy for a minimal dev run. Set
 `"backend": "s3"` to use object storage; then `secret_key` here must match the
 RustFS credentials in `.env` (`MINIO_ROOT_PASSWORD`), and RustFS must be running.
+
+`endpoint` is the Docker-internal host the app container uses for
+put/get/bucket calls. Presigned URLs (mail-attachment links, uploaded
+avatar photos) are opened directly by the browser, which can't resolve that
+internal hostname — set `public_endpoint` to whatever host:port the browser
+*can* reach. Omit it and it falls back to `endpoint` — existing
+single-endpoint deployments are unaffected.
+
+**Behind Traefik** (`security-headers` middleware in
+`traefik/dynamic/tls.yaml` sets `Content-Security-Policy: img-src 'self'
+data:`), a `public_endpoint` on a different origin than the app — a bare
+`host:port` — gets silently dropped by the browser's CSP enforcement; no
+console-visible network error, the `<img>` just never loads. Two ways to
+avoid it:
+- **Same-origin (recommended, no CSP change):** set `public_endpoint` to
+  whatever origin users actually type into the address bar — `self` in CSP
+  terms means the *browser's* origin, not `DOMAIN_CORP`. They're usually
+  the same, but not always: a cert issued for `DOMAIN_CORP` still lets a
+  browser load the app over `https://localhost` (or any other name that
+  resolves to the same box) if it's been told to tolerate the mismatch,
+  and CSP then evaluates against `localhost`, not `DOMAIN_CORP`. Check
+  Traefik's `access.log` (the `Referer` column on any request) if unsure
+  which origin is actually in play. Then set `public_secure = true` and
+  route S3 GETs through Traefik under that origin — see the
+  `suspicious-storage` router in `tls.yaml`, which matches `PathPrefix` on
+  the configured bucket names (S3 path-style URLs put the bucket name
+  first in the path, so no prefix-stripping is needed) and forwards to
+  `rustfs:9000` with `passHostHeader: true` (required — S3 SigV4 signs the
+  `host` header, so whatever Host the browser sent when the URL was
+  signed must reach rustfs unchanged, or signature verification fails).
+  Keep that router's bucket-name list in sync with `avatars_bucket` /
+  `media_bucket` / `feeder_bucket`.
+- **No Traefik in front (plain-HTTP dev stack):** there's no CSP at all in
+  that path, so a bare `localhost:<published-9000-port>` `public_endpoint`
+  works — see the `/deploy-full-e2e` flow in `CLAUDE.md`.
+
+The client that signs `public_endpoint` URLs pins `region` to a fixed value
+(`"us-east-1"` unless `storage.s3.region` overrides it) instead of letting
+the SDK auto-detect it. Auto-detection does a live bucket-location request
+against the endpoint being signed for — and the whole point of
+`public_endpoint` is that it's reachable from a browser, not necessarily
+from wherever the Django/Celery process signing the URL runs, so that
+request can't be relied on to succeed.
+
+**DB overrides settings.json at runtime.** `storage.s3` (like other
+sections) is seeded into the `RuntimeConfig` table on first run and served
+from there — Redis-cached — ahead of `settings.json`. Editing the file
+after `seed_config` has already run does **nothing** until the matching DB
+row is updated too (Settings page in the UI, or
+`RuntimeConfig.objects.filter(key="storage.s3")` in a shell) and the cache
+entry is invalidated (`settings.config.invalidate_cache("storage.s3")`).
 
 #### Feeder fast metadata
 

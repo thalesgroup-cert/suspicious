@@ -5,7 +5,7 @@ from minio import Minio
 from minio.error import S3Error
 from minio.commonconfig import Tags
 
-from common.clients import get_s3_client
+from common.clients import get_s3_client, get_s3_presign_client
 
 logger = logging.getLogger(__name__)
 
@@ -24,6 +24,7 @@ class MinioManager:
         Initialize the MinIO client from the shared ``storage.s3`` runtime config.
         """
         self.client = self._default_client()
+        self.presign_client = self._presign_client()
 
     def _default_client(self) -> Optional[Minio]:
         """
@@ -38,6 +39,19 @@ class MinioManager:
             return client
         except Exception as e:
             logger.critical("Failed to initialize MinIO client: %s", e, exc_info=True)
+            return None
+
+    def _presign_client(self) -> Optional[Minio]:
+        """
+        Client for signing browser-facing URLs (storage.s3.public_endpoint).
+
+        Returns:
+            Minio | None: Initialized client or None on failure.
+        """
+        try:
+            return get_s3_presign_client()
+        except Exception as e:
+            logger.critical("Failed to initialize MinIO presign client: %s", e, exc_info=True)
             return None
 
     def bucket_exists(self, bucket_name: str) -> bool:
@@ -170,13 +184,13 @@ class MinioManager:
         Returns:
             str | None: Presigned URL or None on failure.
         """
-        if not self.client:
-            logger.error("MinIO client unavailable for presigned URL.")
+        if not self.presign_client:
+            logger.error("MinIO presign client unavailable for presigned URL.")
             return None
         try:
             if method.lower() == "get":
-                return self.client.presigned_get_object(bucket_name, object_name, expires=expires_seconds)
-            return self.client.presigned_put_object(bucket_name, object_name, expires=expires_seconds)
+                return self.presign_client.presigned_get_object(bucket_name, object_name, expires=expires_seconds)
+            return self.presign_client.presigned_put_object(bucket_name, object_name, expires=expires_seconds)
         except Exception as e:
             logger.error("Failed to generate presigned URL for '%s/%s': %s", bucket_name, object_name, e)
             return None

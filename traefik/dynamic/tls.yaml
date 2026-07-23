@@ -11,6 +11,13 @@
 #   https://<DOMAIN>/media/*     → Django media files on suspicious:9020
 #   https://<DOMAIN>/oidc/*      → Django OIDC views on suspicious:9020
 #   https://<DOMAIN>/docs/*      → Django API docs (drf-spectacular) on suspicious:9020
+#   https://<DOMAIN>/<bucket>/*  → RustFS/MinIO S3 API on rustfs:9000 (presigned
+#                                   GETs — avatar photos, mail attachments).
+#                                   Same-origin so the img-src 'self' CSP below
+#                                   allows them; keep the bucket-name list in the
+#                                   suspicious-storage router in sync with
+#                                   storage.s3.{avatars_bucket,media_bucket,
+#                                   feeder_bucket} in settings.
 #   https://<DOMAIN>/*           → Nginx SPA (suspicious_ui:80) — catch-all
 #
 # The SPA router has a lower priority than the API router so path-prefix
@@ -156,6 +163,26 @@ http:
         - forward-real-ip
       tls: {}
 
+    # ── Storage router (RustFS/MinIO) — presigned S3 GETs ────────────────
+    # Presigned URLs are signed with endpoint=DOMAIN so they stay same-origin
+    # (storage.s3.public_endpoint / public_secure in settings) — the CSP
+    # img-src below is 'self' only, a foreign origin would just fail to
+    # load with no visible error. S3 path-style URLs put the bucket name
+    # first in the path, so no prefix stripping needed; the object key
+    # (path beyond the bucket) and query-string signature pass through as-is.
+    suspicious-storage:
+      entryPoints:
+        - websecure
+      rule: >-
+        PathPrefix(`/suspicious-avatars`)
+        || PathPrefix(`/suspicious-media`)
+        || PathPrefix(`/suspicious-feeder`)
+      priority: 20
+      service: rustfs-service
+      middlewares:
+        - security-headers
+      tls: {}
+
     # ── SPA router (Nginx) — catch-all ───────────────────────────────────
     # Handles everything else: /, /login, /submissions, /dashboard, etc.
     # React Router handles client-side navigation; Nginx returns index.html
@@ -189,6 +216,16 @@ http:
         servers:
           - url: "http://suspicious_ui:80"
         passHostHeader: false
+
+    # RustFS/MinIO — S3 SigV4 signs the "host" header (X-Amz-SignedHeaders),
+    # so whatever Host the browser sent when the URL was signed (DOMAIN) MUST
+    # reach rustfs unchanged, or signature verification fails. passHostHeader
+    # true is required here — the opposite of the other two services above.
+    rustfs-service:
+      loadBalancer:
+        servers:
+          - url: "http://rustfs:9000"
+        passHostHeader: true
 
 # ── TLS ───────────────────────────────────────────────────────────────────
 

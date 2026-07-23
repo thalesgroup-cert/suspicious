@@ -124,7 +124,7 @@ Assumes: Docker + Compose v2 working, outbound internet, a user in the `docker` 
 
 Base them on `docs/getting-started/examples/*.example` (already a coherent "Meridian Group" example set) and layer in:
 - `deployment/.env` — copy `deployment/.env.example`, fill in the `DOMAIN_CORP`/passwords from the docs example, and set `CORTEX_PATH` to an **absolute** path (e.g. `$(pwd)/cortex` under `deployment/`) — a relative path fails Cortex's mount with "mount path must be absolute".
-- `Suspicious/settings.json` — copy `docs/getting-started/examples/Suspicious-settings.example.json`. Keep `app.debug: true` (plain HTTP, no Traefik). `database.password` **must equal** `.env`'s `MYSQL_PASSWORD`.
+- `Suspicious/settings.json` — copy `docs/getting-started/examples/Suspicious-settings.example.json`. Keep `app.debug: true` (plain HTTP, no Traefik). `database.password` **must equal** `.env`'s `MYSQL_PASSWORD`. If `storage.backend` is set to `s3` (mail attachments, uploaded avatar photos), also set `storage.s3.public_endpoint` to `localhost:${MINIO_API_PORT:-35002}` — `storage.s3.endpoint` (`rustfs:9000`) is Docker-internal and unresolvable from the browser, so presigned URLs built from it 404/NXDOMAIN client-side (avatar photo silently falls back to initials, no error shown). `compose_databases.yaml`'s `rustfs` service publishes that port to the host for exactly this; see CONFIG.md § 2.6.
 - `email-feeder/config.json` — copy `docs/getting-started/examples/email-feeder-config.example.json`.
 - `suspicious-ui/.env` — copy `docs/getting-started/examples/suspicious-ui-env.example` verbatim.
 
