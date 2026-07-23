@@ -12,6 +12,7 @@ from rest_framework.views import APIView
 
 from case_handler.models import Case
 from cortex_job.models import AnalyzerReport
+from cortex_job.cortex_utils.case_targets import collect_case_targets
 from api.utils.investigation_pagination import InvestigationPagination
 from api.serializers.investigations import (
     API_RESULT_TO_INTERNAL,
@@ -139,91 +140,35 @@ class InvestigationAccessMixin:
             raise NotFound("Investigation not found.") from exc
 
     def get_analyzer_reports_queryset(self, obj: Case):
-        query = Q()
-
-        file_or_mail = getattr(obj, "fileOrMail", None)
-        non_file_iocs = getattr(obj, "nonFileIocs", None)
-
-        if obj.fileOrMail_id and file_or_mail:
-            if file_or_mail.file_id:
-                query |= Q(file_id=file_or_mail.file_id)
-
-            if file_or_mail.mail_id and getattr(file_or_mail, "mail", None):
-                mail = file_or_mail.mail
-
-                if mail.mail_body_id:
-                    query |= Q(mail_body_id=mail.mail_body_id)
-
-                if mail.mail_header_id:
-                    query |= Q(mail_header_id=mail.mail_header_id)
-
-                attachment_file_ids = list(
-                    mail.mail_attachments.exclude(file_id__isnull=True)
-                    .values_list("file_id", flat=True)
-                )
-                if attachment_file_ids:
-                    query |= Q(file_id__in=attachment_file_ids)
-
-                url_ids = []
-                ip_ids = []
-                hash_ids = []
-                domain_ids = []
-                mail_address_ids = []
-
-                for artifact in mail.mail_artifacts.select_related(
-                    "artifactIsUrl",
-                    "artifactIsIp",
-                    "artifactIsHash",
-                    "artifactIsDomain",
-                    "artifactIsMailAddress",
-                ):
-                    if artifact.artifactIsUrl_id and artifact.artifactIsUrl and artifact.artifactIsUrl.url_id:
-                        url_ids.append(artifact.artifactIsUrl.url_id)
-
-                    if artifact.artifactIsIp_id and artifact.artifactIsIp and artifact.artifactIsIp.ip_id:
-                        ip_ids.append(artifact.artifactIsIp.ip_id)
-
-                    if artifact.artifactIsHash_id and artifact.artifactIsHash and artifact.artifactIsHash.hash_id:
-                        hash_ids.append(artifact.artifactIsHash.hash_id)
-
-                    if artifact.artifactIsDomain_id and artifact.artifactIsDomain and artifact.artifactIsDomain.domain_id:
-                        domain_ids.append(artifact.artifactIsDomain.domain_id)
-
-                    if (
-                        artifact.artifactIsMailAddress_id
-                        and artifact.artifactIsMailAddress
-                        and artifact.artifactIsMailAddress.mail_address_id
-                    ):
-                        mail_address_ids.append(artifact.artifactIsMailAddress.mail_address_id)
-
-                if url_ids:
-                    query |= Q(url_id__in=url_ids)
-                if ip_ids:
-                    query |= Q(ip_id__in=ip_ids)
-                if hash_ids:
-                    query |= Q(hash_id__in=hash_ids)
-                if domain_ids:
-                    query |= Q(domain_id__in=domain_ids)
-                if mail_address_ids:
-                    query |= Q(mail_id__in=mail_address_ids)
-
-        if obj.nonFileIocs_id and non_file_iocs:
-            if non_file_iocs.url_id:
-                query |= Q(url_id=non_file_iocs.url_id)
-            if non_file_iocs.ip_id:
-                query |= Q(ip_id=non_file_iocs.ip_id)
-            if non_file_iocs.hash_id:
-                query |= Q(hash_id=non_file_iocs.hash_id)
-
-        if not query.children:
+        targets = collect_case_targets(obj)
+        if not targets:
             return AnalyzerReport.objects.none()
 
+        field_by_type = {
+            "file": "file_id", "mail_body": "mail_body_id", "mail_header": "mail_header_id",
+            "url": "url_id", "ip": "ip_id", "hash": "hash_id", "domain": "domain_id",
+            "mail": "mail_id",
+        }
+        ids_by_field: dict[str, list[int]] = {}
+        for instance, data_type in targets:
+            ids_by_field.setdefault(field_by_type[data_type], []).append(instance.pk)
+
+        query = Q()
+        for field, ids in ids_by_field.items():
+            query |= Q(**{f"{field}__in": ids})
+
+        # No .distinct() needed: every filter above is a plain equality/IN on
+        # AnalyzerReport's own FK columns (never a reverse/M2M traversal), and
+        # every select_related() relation is forward FK/O2O — this queryset
+        # structurally can't fan out into duplicate rows. distinct() was
+        # forcing MySQL to sort/dedupe the full 9-table-wide join with no
+        # LIMIT to cap it, and _dedup_analyzer_reports() below already
+        # de-dupes in Python regardless.
         qs = (
             AnalyzerReport.objects
             .filter(query)
             .select_related(*self.analyzer_report_select_related)
             .order_by("-creation_date", "-pk")
-            .distinct()
         )
         return _dedup_analyzer_reports(qs)
 
