@@ -23,7 +23,7 @@ from api.serializers.submissions import (
 )
 from case_handler.models import Case
 from cortex_job.models import AnalyzerReport
-from cortex_job.cortex_utils.case_targets import collect_case_targets
+from cortex_job.cortex_utils.case_targets import build_analyzer_report_filter, collect_case_targets
 from tasp.services.challenge import notify_and_record_challenge
 
 logger = logging.getLogger(__name__)
@@ -204,18 +204,7 @@ class SubmissionDetailsView(RetrieveAPIView):
         if not targets:
             return []
 
-        field_by_type = {
-            "file": "file_id", "mail_body": "mail_body_id", "mail_header": "mail_header_id",
-            "url": "url_id", "ip": "ip_id", "hash": "hash_id", "domain": "domain_id",
-            "mail": "mail_id",
-        }
-        ids_by_field: dict[str, list[int]] = {}
-        for instance, data_type in targets:
-            ids_by_field.setdefault(field_by_type[data_type], []).append(instance.pk)
-
-        filters = Q()
-        for field, ids in ids_by_field.items():
-            filters |= Q(**{f"{field}__in": ids})
+        filters = build_analyzer_report_filter(targets)
 
         # No .distinct() needed: every filter above is a plain equality/IN on
         # AnalyzerReport's own FK columns, and every select_related() relation

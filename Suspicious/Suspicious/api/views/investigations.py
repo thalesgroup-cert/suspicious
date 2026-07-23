@@ -12,7 +12,7 @@ from rest_framework.views import APIView
 
 from case_handler.models import Case
 from cortex_job.models import AnalyzerReport
-from cortex_job.cortex_utils.case_targets import collect_case_targets
+from cortex_job.cortex_utils.case_targets import build_analyzer_report_filter, collect_case_targets
 from api.utils.investigation_pagination import InvestigationPagination
 from api.serializers.investigations import (
     API_RESULT_TO_INTERNAL,
@@ -144,18 +144,7 @@ class InvestigationAccessMixin:
         if not targets:
             return AnalyzerReport.objects.none()
 
-        field_by_type = {
-            "file": "file_id", "mail_body": "mail_body_id", "mail_header": "mail_header_id",
-            "url": "url_id", "ip": "ip_id", "hash": "hash_id", "domain": "domain_id",
-            "mail": "mail_id",
-        }
-        ids_by_field: dict[str, list[int]] = {}
-        for instance, data_type in targets:
-            ids_by_field.setdefault(field_by_type[data_type], []).append(instance.pk)
-
-        query = Q()
-        for field, ids in ids_by_field.items():
-            query |= Q(**{f"{field}__in": ids})
+        query = build_analyzer_report_filter(targets)
 
         # No .distinct() needed: every filter above is a plain equality/IN on
         # AnalyzerReport's own FK columns (never a reverse/M2M traversal), and

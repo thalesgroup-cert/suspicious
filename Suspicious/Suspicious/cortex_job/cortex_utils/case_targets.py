@@ -78,3 +78,24 @@ def collect_case_targets(case) -> list[tuple[models.Model, str]]:
             _add(non_file_iocs.hash, "hash")
 
     return [(instance, data_type) for (data_type, _pk), instance in seen.items()]
+
+
+_FIELD_BY_TYPE = {
+    "file": "file_id", "mail_body": "mail_body_id", "mail_header": "mail_header_id",
+    "url": "url_id", "ip": "ip_id", "hash": "hash_id", "domain": "domain_id",
+    "mail": "mail_id",
+}
+
+
+def build_analyzer_report_filter(targets: list[tuple[models.Model, str]]) -> models.Q:
+    """Build the AnalyzerReport Q filter (OR of per-field `IN` clauses) from
+    collect_case_targets()'s output. Shared by investigations.py and
+    submissions.py so the id-bucketing/OR-Q glue lives in one place."""
+    ids_by_field: dict[str, list[int]] = {}
+    for instance, data_type in targets:
+        ids_by_field.setdefault(_FIELD_BY_TYPE[data_type], []).append(instance.pk)
+
+    query = models.Q()
+    for field, ids in ids_by_field.items():
+        query |= models.Q(**{f"{field}__in": ids})
+    return query
