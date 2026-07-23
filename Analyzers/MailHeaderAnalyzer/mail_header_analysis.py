@@ -6,16 +6,42 @@ from email.utils import parseaddr
 
 _AUTH_RESULT_RE = re.compile(r'\b(spf|dkim|dmarc)\s*=\s*(\w+)', re.IGNORECASE)
 _EMBEDDED_ADDRESS_RE = re.compile(r'[\w.+-]+@[\w.-]+\.\w+')
+_HEADER_BOUNDARY_RE = re.compile(r' (?=[A-Za-z][\w-]*:(?:\s|$))')
+_DEFANGED_DOT_RE = re.compile(r'\[\.\]|\(\.\)')
+
+
+def _reflow_flattened_headers(header_text: str) -> str:
+    """Recover header boundaries when a paste tool (Outlook's "Internet
+    headers" popup is the classic offender) strips the real newlines and
+    hands back one long line, e.g. "...Transport; Wed, 22 Jul 2026
+    18:26:54 +0200 Received: from ...". Without this, message_from_string
+    reads the whole blob as the value of the very first header and every
+    later header (Authentication-Results, From, Reply-To...) silently
+    disappears.
+    ponytail: heuristic split on " Name:" boundaries, only when the block
+    looks flattened (near-zero real newlines) so a normal multi-line paste
+    is left untouched; upgrade to a real unfolding parser if this
+    misfires on some header's free-text value.
+    """
+    if header_text.count("\n") > 2:
+        return header_text
+    return _HEADER_BOUNDARY_RE.sub("\n", header_text)
 
 
 def parse_headers(header_text: str):
     """Parse a raw header block into an email.message.Message."""
-    return message_from_string(header_text or "")
+    return message_from_string(_reflow_flattened_headers(header_text or ""))
 
 
 def get_domain(address: str) -> str:
-    """Lowercased domain from an email address/header value, "" if unparseable."""
-    _, addr = parseaddr(address or "")
+    """Lowercased domain from an email address/header value, "" if unparseable.
+
+    ponytail: undoes only the "[.]"/"(.)"-style dot defanging analysts use
+    when sharing IOCs (a bracketed dot otherwise reads to parseaddr as an
+    RFC 5322 domain-literal and fails the whole address); add more patterns
+    (e.g. "[at]") if a defanging convention shows up that this misses.
+    """
+    _, addr = parseaddr(_DEFANGED_DOT_RE.sub(".", address or ""))
     if "@" not in addr:
         return ""
     return addr.rsplit("@", 1)[1].lower()
