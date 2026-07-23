@@ -439,7 +439,6 @@ export default function ProfilePage() {
       const t = (profileData.theme as ThemeName) ?? ("light" as ThemeName);
       setPickedTheme(t);
       setAutoSeasonal(!!profileData.auto_seasonal);
-      if (!profileData.auto_seasonal) setThemeName(t);
       setAvatarStyle(profileData.avatar?.style ?? "");
       setAvatarSeed(profileData.avatar?.seed ?? "");
       setAvatarUrl(profileData.avatar?.url ?? undefined);
