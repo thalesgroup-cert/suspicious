@@ -1,5 +1,6 @@
 from enum import Enum
 import os
+import re
 from typing import NamedTuple
 import numpy as np
 from collections import defaultdict
@@ -194,7 +195,59 @@ def getSubClassificationInfo(global_sub_probabilities):
 
     result = {
         'classification': classification,
-        'confidence': confidence, 
+        'confidence': confidence,
     }
 
     return result
+
+def get_classification_breakdown(global_probabilities):
+    """Label the raw main-classification array by enum name, e.g.
+    {"SAFE": 0.83, "UNWANTED": 0.12, "DANGEROUS": 0.05}."""
+    return {name.name: float(p) for name, p in zip(ClassificationName, global_probabilities)}
+
+def get_sub_classification_breakdown(global_sub_probabilities):
+    """Label the raw sub-classification array by enum name."""
+    return {name.name: float(p) for name, p in zip(SubClassificationName, global_sub_probabilities)}
+
+def split_into_sentences(mail_body, max_sentences=40):
+    """Split a mail body into sentence-ish chunks for occlusion analysis.
+
+    Caps at max_sentences so a pathologically long body can't turn the
+    per-sentence re-embedding pass in get_contributing_phrases into an
+    unbounded number of model calls.
+    """
+    sentences = [s.strip() for s in re.split(r'(?<=[.!?\n])\s+', mail_body) if s.strip()]
+    return sentences[:max_sentences]
+
+def rank_phrase_impacts(sentences, impacts, top_n=5):
+    """Pair sentences with their occlusion impact, keep only sentences whose
+    removal *reduced* confidence in the predicted class (impact > 0), and
+    return the top_n by impact descending."""
+    ranked = sorted(zip(sentences, impacts), key=lambda pair: pair[1], reverse=True)
+    return [
+        {"text": text, "impact": round(float(impact), 4)}
+        for text, impact in ranked[:top_n]
+        if impact > 0
+    ]
+
+def get_contributing_phrases(device, safe_suspicious_model, spam_dangerous_model, vectorizer,
+                              mail_body, classification_index, baseline_probability, top_n=5):
+    """Sentence-level occlusion: re-embed the body with each sentence removed
+    and measure how much confidence in the predicted class drops. Sentences
+    whose removal drops confidence the most are the ones driving the
+    classification."""
+    sentences = split_into_sentences(mail_body)
+    if len(sentences) < 2:
+        return []
+
+    variants = [" ".join(sentences[:i] + sentences[i + 1:]) for i in range(len(sentences))]
+    embeddings = vectorizer.encode(variants, show_progress_bar=False)
+
+    impacts = [
+        baseline_probability - getMainClassificationProbabilities(
+            device, safe_suspicious_model, spam_dangerous_model, embedding.reshape(1, -1)
+        )[classification_index]
+        for embedding in embeddings
+    ]
+
+    return rank_phrase_impacts(sentences, impacts, top_n)
