@@ -10,9 +10,11 @@ from rest_framework.permissions import BasePermission, IsAuthenticated
 from rest_framework.response import Response
 from rest_framework.views import APIView
 
-from case_handler.models import Case
+from case_handler.lifecycle import IllegalTransition, LifecycleState, transition
+from case_handler.models import Case, Result
 from cortex_job.models import AnalyzerReport
 from cortex_job.cortex_utils.case_targets import build_analyzer_report_filter, collect_case_targets
+from tasp.tasks import dispatch_case_analysis
 from api.utils.investigation_pagination import InvestigationPagination
 from api.serializers.investigations import (
     API_RESULT_TO_INTERNAL,
@@ -375,3 +377,58 @@ class InvestigationGlobalEditView(InvestigationAccessMixin, APIView):
             },
         )
         return Response(serializer.data, status=status.HTTP_200_OK)
+
+
+@extend_schema(
+    tags=["Investigations"],
+    responses={
+        202: OpenApiResponse(description="Analysis redispatched."),
+        400: OpenApiResponse(description="No analyzable artifacts on this case."),
+        403: OpenApiResponse(description="Not authorized."),
+        404: OpenApiResponse(description="Investigation not found."),
+        409: OpenApiResponse(description="Case is still being analyzed."),
+    },
+)
+class InvestigationRedoAnalysisView(InvestigationAccessMixin, APIView):
+    permission_classes = [IsAuthenticated, IsInvestigator]
+
+    def post(self, request, case_id: int):
+        case = self.get_case_or_404(case_id)
+
+        if case.lifecycle_state not in (LifecycleState.FINALIZED, LifecycleState.CONTESTED):
+            return Response(
+                {"detail": "Case is still being analyzed."},
+                status=status.HTTP_409_CONFLICT,
+            )
+
+        targets = collect_case_targets(case)
+        if not targets:
+            return Response(
+                {"detail": "No analyzable artifacts on this case."},
+                status=status.HTTP_400_BAD_REQUEST,
+            )
+
+        try:
+            transition(case, LifecycleState.ANALYZING)
+        except IllegalTransition:
+            return Response(
+                {"detail": "Case is still being analyzed."},
+                status=status.HTTP_409_CONFLICT,
+            )
+
+        case.results = Result.INCONCLUSIVE
+        case.score = 0
+        case.final_score = 0
+        case.description = ""
+        case.save(update_fields=["results", "score", "final_score", "description"])
+
+        intents = [
+            (f"{instance._meta.app_label}.{instance._meta.model_name}", instance.pk, data_type)
+            for instance, data_type in targets
+        ]
+        dispatch_case_analysis.delay(case.id, intents)
+
+        return Response(
+            {"status": "queued", "dispatched": len(intents)},
+            status=status.HTTP_202_ACCEPTED,
+        )
