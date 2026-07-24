@@ -58,7 +58,7 @@ validators==0.35.0
 hashid==3.1.4
 
 # Cybersecurity and Incident Response
-thehive4py==2.0.3
+thehive4py==2.1.0
 cortex4py==2.1.0
 pymisp==2.5.33.1
 vt-py==0.22.0
