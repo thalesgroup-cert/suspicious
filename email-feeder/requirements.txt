@@ -6,7 +6,7 @@ chardet==7.4.3
 jinja2==3.1.6
 pydantic==2.13.4
 # Outlook .msg (OLE) -> EmailMessage conversion for "Forward as Attachment".
-extract-msg==0.55.0
+extract-msg==0.56.0
 
 # Structured logging — JSON formatter consumed by log aggregators.
 # Plain-text fallback kept inside logger_service when this is absent.
