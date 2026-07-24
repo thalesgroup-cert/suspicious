@@ -3,6 +3,6 @@ html2text
 chardet
 torch>=2.13.0
 torchvision>=0.28.0
-torchaudio>=2.9
+torchaudio>=2.11.0
 numpy>=1.26
 sentence_transformers>=5.0
