@@ -7,7 +7,7 @@ python-ldap==3.4.7
 djangorestframework==3.17.1
 django-rest-knox==5.1.0
 django-filter==26.1
-drf-spectacular==0.29.0
+drf-spectacular==0.30.0
 gunicorn==25.3.0
 whitenoise==6.12.0
 # Environment Configuration
@@ -38,7 +38,7 @@ fontawesomefree==6.6.0
 django-import-export==4.4.1
 
 # Request Handling
-requests==2.33.1
+requests==2.34.2
 PyJWT==2.13.0
 minio==7.2.20
 tenacity==9.1.4
@@ -58,7 +58,7 @@ validators==0.35.0
 hashid==3.1.4
 
 # Cybersecurity and Incident Response
-thehive4py==2.0.3
+thehive4py==2.1.0
 cortex4py==2.1.0
 pymisp==2.5.33.1
 vt-py==0.22.0

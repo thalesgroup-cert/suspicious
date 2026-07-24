@@ -28,8 +28,10 @@ LEGAL_TRANSITIONS = {
                                LifecycleState.FINALIZED},
     LifecycleState.ANALYZING: {LifecycleState.SCORING},
     LifecycleState.SCORING:   {LifecycleState.FINALIZED},
-    LifecycleState.FINALIZED: {LifecycleState.CONTESTED},
-    LifecycleState.CONTESTED: {LifecycleState.FINALIZED},
+    # ANALYZING added on both terminal states for the redo-analysis feature:
+    # an investigator can send a finished case back for a fresh analysis run.
+    LifecycleState.FINALIZED: {LifecycleState.CONTESTED, LifecycleState.ANALYZING},
+    LifecycleState.CONTESTED: {LifecycleState.FINALIZED, LifecycleState.ANALYZING},
 }
 
 
