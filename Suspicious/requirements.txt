@@ -7,7 +7,7 @@ python-ldap==3.4.7
 djangorestframework==3.17.1
 django-rest-knox==5.1.0
 django-filter==26.1
-drf-spectacular==0.29.0
+drf-spectacular==0.30.0
 gunicorn==25.3.0
 whitenoise==6.12.0
 # Environment Configuration
