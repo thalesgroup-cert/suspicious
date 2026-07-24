@@ -277,9 +277,13 @@ def _process_file_ioc_base(
             reports, analyzers_reports_file, str(file_ioc.file_path.name), case_id
         )
 
+        scoring_reports_file = CortexAnalyzerReports.exclude_ai_analyzer(analyzers_reports_file)
+        if not scoring_reports_file:
+            return failure
+
         try:
             file_score, file_confidence, file_weight = compute_weighted_scores(
-                analyzers_reports_file, "file"
+                scoring_reports_file, "file"
             )
         except ValueError:
             update_cases_logger.warning("Zero analyzer weight for file %r — defaulting to 0.", file_ioc)
