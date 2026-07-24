@@ -7,10 +7,10 @@
 -r requirements.txt
 
 pandas>=3.0.3
-scikit-learn>=1.5
+scikit-learn>=1.9.0
 imbalanced-learn>=0.14.2
-matplotlib>=3.9
+matplotlib>=3.11.1
 seaborn>=0.13.2
-tqdm>=4.66
+tqdm>=4.69.0
 bs4>=0.0.2
 jupyter>=1.1

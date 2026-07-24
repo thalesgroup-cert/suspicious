@@ -19,6 +19,7 @@ vi.mock("@/features/investigation/api", () => ({
   getAllInvestigations: vi.fn(),
   getInvestigationDetails: vi.fn(),
   editGlobalCase: vi.fn(),
+  redoAnalysis: vi.fn(),
   buildSortOrdering: vi.fn((field: string, dir: string) => `${dir === "asc" ? "" : "-"}${field}`),
 }));
 
@@ -96,6 +97,7 @@ import { getMe } from "@/api/auth";
 import {
   getAllInvestigations,
   getInvestigationDetails,
+  redoAnalysis,
 } from "@/features/investigation/api";
 import InvestigationPage from "@/pages/InvestigationPage";
 import { getCaseComments, addCaseComment } from "@/features/comments/api";
@@ -105,6 +107,7 @@ const mockGetAll = vi.mocked(getAllInvestigations);
 const mockGetDetails = vi.mocked(getInvestigationDetails);
 const mockGetComments = vi.mocked(getCaseComments);
 const mockAddComment = vi.mocked(addCaseComment);
+const mockRedoAnalysis = vi.mocked(redoAnalysis);
 
 function renderInvestigation() {
   return renderWithProviders(<InvestigationPage />, { initialPath: "/investigation" });
@@ -331,5 +334,103 @@ describe("InvestigationPage", () => {
     await waitFor(() =>
       expect(mockAddComment).toHaveBeenCalledWith(7, "looks clean")
     );
+  });
+
+  describe("Redo analysis", () => {
+    it("is disabled while the case is not terminal", async () => {
+      const user = userEvent.setup();
+      mockGetDetails.mockResolvedValue({ ...mockDetails, status: "IN_PROGRESS" } as never);
+      renderInvestigation();
+
+      await waitFor(() =>
+        expect(screen.getByText(/phish\.evil\.com|reporter@corp/i)).toBeInTheDocument()
+      );
+      const row = screen.getByText(/phish\.evil\.com|reporter@corp/i).closest("tr") ??
+                  screen.getByText(/phish\.evil\.com|reporter@corp/i);
+      await user.click(row);
+
+      await waitFor(() => {
+        expect(screen.getByRole("button", { name: /redo analysis/i })).toBeDisabled();
+      });
+    });
+
+    it("opens a confirmation dialog before calling the API", async () => {
+      const user = userEvent.setup();
+      renderInvestigation(); // mockDetails.status is "DONE" (terminal) by default
+
+      await waitFor(() =>
+        expect(screen.getByText(/phish\.evil\.com|reporter@corp/i)).toBeInTheDocument()
+      );
+      const row = screen.getByText(/phish\.evil\.com|reporter@corp/i).closest("tr") ??
+                  screen.getByText(/phish\.evil\.com|reporter@corp/i);
+      await user.click(row);
+
+      await waitFor(() =>
+        expect(screen.getByRole("button", { name: /redo analysis/i })).toBeEnabled()
+      );
+      await user.click(screen.getByRole("button", { name: /redo analysis/i }));
+
+      await waitFor(() => {
+        expect(screen.getByText("Redo analysis?")).toBeInTheDocument();
+      });
+      expect(mockRedoAnalysis).not.toHaveBeenCalled();
+    });
+
+    it("calls redoAnalysis and refetches details on confirm", async () => {
+      const user = userEvent.setup();
+      mockRedoAnalysis.mockResolvedValue({ status: "queued", dispatched: 1 });
+      renderInvestigation();
+
+      await waitFor(() =>
+        expect(screen.getByText(/phish\.evil\.com|reporter@corp/i)).toBeInTheDocument()
+      );
+      const row = screen.getByText(/phish\.evil\.com|reporter@corp/i).closest("tr") ??
+                  screen.getByText(/phish\.evil\.com|reporter@corp/i);
+      await user.click(row);
+
+      await waitFor(() =>
+        expect(screen.getByRole("button", { name: /redo analysis/i })).toBeEnabled()
+      );
+      await user.click(screen.getByRole("button", { name: /redo analysis/i }));
+      await waitFor(() => expect(screen.getByText("Redo analysis?")).toBeInTheDocument());
+
+      const dialog = screen.getByRole("dialog");
+      await user.click(within(dialog).getByRole("button", { name: /redo analysis/i }));
+
+      await waitFor(() => {
+        expect(mockRedoAnalysis).toHaveBeenCalledWith(7);
+      });
+      await waitFor(() => {
+        expect(mockGetDetails).toHaveBeenCalledTimes(2); // initial load + post-redo refetch
+      });
+    });
+
+    it("shows the server's error message on a 409", async () => {
+      const user = userEvent.setup();
+      mockRedoAnalysis.mockRejectedValue({
+        response: { status: 409, data: { detail: "Case is still being analyzed." } },
+      });
+      renderInvestigation();
+
+      await waitFor(() =>
+        expect(screen.getByText(/phish\.evil\.com|reporter@corp/i)).toBeInTheDocument()
+      );
+      const row = screen.getByText(/phish\.evil\.com|reporter@corp/i).closest("tr") ??
+                  screen.getByText(/phish\.evil\.com|reporter@corp/i);
+      await user.click(row);
+
+      await waitFor(() =>
+        expect(screen.getByRole("button", { name: /redo analysis/i })).toBeEnabled()
+      );
+      await user.click(screen.getByRole("button", { name: /redo analysis/i }));
+      await waitFor(() => expect(screen.getByText("Redo analysis?")).toBeInTheDocument());
+
+      const dialog = screen.getByRole("dialog");
+      await user.click(within(dialog).getByRole("button", { name: /redo analysis/i }));
+
+      await waitFor(() => {
+        expect(screen.getByText("Case is still being analyzed.")).toBeInTheDocument();
+      });
+    });
   });
 });

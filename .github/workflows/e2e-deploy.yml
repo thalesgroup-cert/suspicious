@@ -10,6 +10,10 @@ on:
 
 jobs:
   smoke:
+    # Dependabot PRs are the majority of PR volume and rarely change stack
+    # wiring — skip the full 40-min bootstrap for them specifically; human
+    # PRs still always get it regardless of which paths changed.
+    if: github.actor != 'dependabot[bot]'
     runs-on: ubuntu-latest
     timeout-minutes: 40
     steps:
