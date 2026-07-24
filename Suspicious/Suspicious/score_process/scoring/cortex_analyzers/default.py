@@ -19,7 +19,12 @@ def get_level_score_confidence(level: str) -> tuple[int, int]:
         case "suspicious":
             return 7, 70
         case "info":
-            return 5, 50
+            # Not 5: engine.NEUTRAL == 5 is the "no confident signal" sentinel,
+            # and "info" (analyzer added context, no security verdict — e.g.
+            # FileInfo's filetype tag) must not collide with it, or a mail with
+            # only neutral/informational findings gets forced to Inconclusive
+            # instead of banding Safe.
+            return 2, 50
         case "safe":
             return 0, 100
         case _:
@@ -30,7 +35,8 @@ class DefaultTaxonomyParser(AnalyzerParser):
     manifest = AnalyzerManifest(name="default", cortex_names=())
 
     def parse(self, summary: Any, full: Any) -> AnalyzerResult:
-        level, category, details, score, confidence = "info", [], {}, 5, 50
+        level, category, details = "info", [], {}
+        score, confidence = get_level_score_confidence(level)
 
         if isinstance(summary, dict) and summary.get("taxonomies"):
             tax_level = None
