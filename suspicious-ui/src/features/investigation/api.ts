@@ -365,3 +365,10 @@ export async function editGlobalCase(
   const res = await api.patch(`/investigations/${caseId}/edit-global/`, payload);
   return normalizeDetails(res.data);
 }
+
+export async function redoAnalysis(
+  caseId: number,
+): Promise<{ status: string; dispatched: number }> {
+  const res = await api.post(`/investigations/${caseId}/redo-analysis/`);
+  return res.data;
+}

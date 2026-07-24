@@ -57,14 +57,14 @@
     "@vitest/browser": "4.1.10",
     "@vitest/browser-playwright": "4.1.10",
     "boneyard-js": "1.8.1",
-    "eslint": "10.4.0",
+    "eslint": "10.7.0",
     "eslint-plugin-react-hooks": "7.1.1",
     "eslint-plugin-react-refresh": "0.5.2",
     "globals": "17.6.0",
     "jsdom": "29.1.1",
     "playwright": "1.60.0",
     "typescript": "6.0.3",
-    "typescript-eslint": "8.64.0",
+    "typescript-eslint": "8.65.0",
     "vite": "8.0.16",
     "vitest": "4.1.10"
   }
