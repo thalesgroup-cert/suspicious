@@ -38,7 +38,7 @@ fontawesomefree==6.6.0
 django-import-export==4.4.1
 
 # Request Handling
-requests==2.33.1
+requests==2.34.2
 PyJWT==2.13.0
 minio==7.2.20
 tenacity==9.1.4
