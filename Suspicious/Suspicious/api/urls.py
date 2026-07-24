@@ -29,6 +29,7 @@ from api.views.investigations import (
     InvestigationDetailsView,
     InvestigationGlobalEditView,
     InvestigationListView,
+    InvestigationRedoAnalysisView,
 )
 from api.views.profile import (
     ProfileView,
@@ -125,6 +126,8 @@ urlpatterns = [
     path("investigations/", InvestigationListView.as_view(), name="investigation-list"),
     path("investigations/<int:case_id>/", InvestigationDetailsView.as_view(), name="investigation-details"),
     path("investigations/<int:case_id>/edit-global/", InvestigationGlobalEditView.as_view(), name="investigation-edit-global"),
+    path("investigations/<int:case_id>/redo-analysis/",
+         InvestigationRedoAnalysisView.as_view(), name="investigation-redo-analysis"),
 
     path("submit/config/", SubmitConfigView.as_view(), name="submit-config"),
     path("submit/url/", SubmitUrlView.as_view(), name="submit-url"),

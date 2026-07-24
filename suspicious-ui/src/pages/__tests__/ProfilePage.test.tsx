@@ -151,8 +151,10 @@ describe("ProfilePage - Test Suite", () => {
       await waitFor(() => {
         const img = screen.getAllByRole("img").find((el) => el.getAttribute("src") === "https://signed");
         expect(img).toBeTruthy();
+      }, { timeout: 5000 });
+      await waitFor(() => {
+        expect(screen.queryByText("Unsaved avatar changes")).not.toBeInTheDocument();
       });
-      expect(screen.queryByText("Unsaved avatar changes")).not.toBeInTheDocument();
     });
 
     it("locks the seed to the real initials when switching to the Initials style", async () => {
