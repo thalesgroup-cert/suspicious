@@ -15,6 +15,41 @@ concurrency:
   cancel-in-progress: true
 
 jobs:
+  # Detects which areas changed so unrelated jobs below can skip themselves —
+  # a Dependabot bump to one ecosystem (e.g. a single npm package) doesn't
+  # need the Python test suite, migration check, or every docker-build entry
+  # to run. Skipped jobs report as "skipped", which satisfies required status
+  # checks the same as "success". workflow_dispatch has no base to diff
+  # against, so every gated job below also has an explicit `|| workflow_dispatch`
+  # fallback to run in full on manual trigger.
+  changes:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      pull-requests: read
+    outputs:
+      backend: ${{ steps.filter.outputs.backend }}
+      feeder: ${{ steps.filter.outputs.feeder }}
+      analyzers: ${{ steps.filter.outputs.analyzers }}
+      ui: ${{ steps.filter.outputs.ui }}
+      ci: ${{ steps.filter.outputs.ci }}
+    steps:
+      - uses: actions/checkout@v7
+      - uses: dorny/paths-filter@v3
+        id: filter
+        with:
+          filters: |
+            backend:
+              - 'Suspicious/**'
+            feeder:
+              - 'email-feeder/**'
+            analyzers:
+              - 'Analyzers/**'
+            ui:
+              - 'suspicious-ui/**'
+            ci:
+              - '.github/workflows/**'
+
   commit-lint:
     if: github.event_name == 'pull_request'
     runs-on: ubuntu-latest
@@ -33,6 +68,13 @@ jobs:
           npx --yes -p @commitlint/cli -p @commitlint/config-conventional commitlint --from HEAD~1 --to HEAD --config .github/commitlint.config.js
 
   backend-lint:
+    needs: changes
+    if: >
+      needs.changes.outputs.backend == 'true' ||
+      needs.changes.outputs.feeder == 'true' ||
+      needs.changes.outputs.analyzers == 'true' ||
+      needs.changes.outputs.ci == 'true' ||
+      github.event_name == 'workflow_dispatch'
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v7
@@ -44,6 +86,11 @@ jobs:
         run: ruff check Suspicious/ email-feeder/ Analyzers/
 
   migration-check:
+    needs: changes
+    if: >
+      needs.changes.outputs.backend == 'true' ||
+      needs.changes.outputs.ci == 'true' ||
+      github.event_name == 'workflow_dispatch'
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v7
@@ -65,6 +112,11 @@ jobs:
             python manage.py makemigrations --check --dry-run --settings=suspicious.settings
 
   backend-test:
+    needs: changes
+    if: >
+      needs.changes.outputs.backend == 'true' ||
+      needs.changes.outputs.ci == 'true' ||
+      github.event_name == 'workflow_dispatch'
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v7
@@ -90,6 +142,11 @@ jobs:
             python manage.py test --settings=suspicious.test_settings -v2
 
   feeder-test:
+    needs: changes
+    if: >
+      needs.changes.outputs.feeder == 'true' ||
+      needs.changes.outputs.ci == 'true' ||
+      github.event_name == 'workflow_dispatch'
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v7
@@ -106,6 +163,11 @@ jobs:
         run: python -m pytest tests -v
 
   frontend:
+    needs: changes
+    if: >
+      needs.changes.outputs.ui == 'true' ||
+      needs.changes.outputs.ci == 'true' ||
+      github.event_name == 'workflow_dispatch'
     runs-on: ubuntu-latest
     defaults:
       run:
@@ -133,6 +195,13 @@ jobs:
         run: pnpm run build
 
   docker-build:
+    needs: changes
+    if: >
+      github.event_name == 'workflow_dispatch' ||
+      needs.changes.outputs.ci == 'true' ||
+      (matrix.name == 'suspicious' && needs.changes.outputs.backend == 'true') ||
+      (matrix.name == 'suspicious-ui' && needs.changes.outputs.ui == 'true') ||
+      (matrix.name == 'suspicious-feeder' && needs.changes.outputs.feeder == 'true')
     runs-on: ubuntu-latest
     strategy:
       fail-fast: false
