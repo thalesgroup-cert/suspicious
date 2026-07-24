@@ -15,7 +15,49 @@ concurrency:
   cancel-in-progress: true
 
 jobs:
+  # See ci.yml's `changes` job for the rationale — duplicated here rather than
+  # shared via a reusable workflow since it's ~15 lines and each workflow
+  # file's job graph differs enough that the indirection isn't worth it.
+  changes:
+    if: github.event_name != 'schedule'
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      pull-requests: read
+    outputs:
+      backend: ${{ steps.filter.outputs.backend }}
+      feeder: ${{ steps.filter.outputs.feeder }}
+      analyzers: ${{ steps.filter.outputs.analyzers }}
+      ui: ${{ steps.filter.outputs.ui }}
+      ci: ${{ steps.filter.outputs.ci }}
+    steps:
+      - uses: actions/checkout@v7
+      - uses: dorny/paths-filter@v3
+        id: filter
+        with:
+          filters: |
+            backend:
+              - 'Suspicious/**'
+            feeder:
+              - 'email-feeder/**'
+            analyzers:
+              - 'Analyzers/**'
+            ui:
+              - 'suspicious-ui/**'
+            ci:
+              - '.github/workflows/**'
+
   trivy-fs:
+    needs: changes
+    if: >
+      always() &&
+      (github.event_name == 'schedule' ||
+       github.event_name == 'workflow_dispatch' ||
+       needs.changes.outputs.backend == 'true' ||
+       needs.changes.outputs.feeder == 'true' ||
+       needs.changes.outputs.analyzers == 'true' ||
+       needs.changes.outputs.ui == 'true' ||
+       needs.changes.outputs.ci == 'true')
     runs-on: ubuntu-latest
     permissions:
       contents: read
@@ -57,37 +99,82 @@ jobs:
   #       env:
   #         GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
 
-  pip-audit:
+  # Same `matrix` context constraint as ci.yml's docker-build split applies
+  # here — a job-level `if` can't see `matrix.path`, so this can't stay one
+  # matrix job either.
+  pip-audit-suspicious:
+    needs: changes
+    if: >
+      always() &&
+      (github.event_name == 'schedule' ||
+       github.event_name == 'workflow_dispatch' ||
+       needs.changes.outputs.ci == 'true' ||
+       needs.changes.outputs.backend == 'true')
     runs-on: ubuntu-latest
-    strategy:
-      fail-fast: false
-      matrix:
-        path: [Suspicious, email-feeder, Analyzers/AIMailAnalyzer]
     steps:
       - uses: actions/checkout@v7
-      - uses: actions/setup-python@v6
+      - uses: actions/setup-python@v7
         with:
           python-version: "3.12"
       - run: pip install pip-audit
-      - name: pip-audit ${{ matrix.path }}
+      - name: pip-audit Suspicious
         # Gating: a known-vulnerable dependency fails the build. If an advisory
         # has no fix yet, triage it and add `--ignore-vuln <GHSA/CVE-id>` here
         # rather than re-muting the whole audit.
         #
-        # Suspicious-only: GHSA-f4j7-r4q5-qw2c (chromadb pre-auth RCE via
-        # trust_remote_code on the collections API) has no fix released yet.
-        # We only use chromadb as an HttpClient (common.clients.get_chroma_
-        # client — get_collection/get/delete), never the vulnerable server
-        # code path or trust_remote_code.
+        # GHSA-f4j7-r4q5-qw2c (chromadb pre-auth RCE via trust_remote_code on
+        # the collections API) has no fix released yet. We only use chromadb
+        # as an HttpClient (common.clients.get_chroma_client —
+        # get_collection/get/delete), never the vulnerable server code path
+        # or trust_remote_code.
         run: |
-          if [ "${{ matrix.path }}" = "Suspicious" ]; then
-            pip-audit -r Suspicious/requirements.txt --strict \
-              --ignore-vuln GHSA-f4j7-r4q5-qw2c
-          else
-            pip-audit -r ${{ matrix.path }}/requirements.txt --strict
-          fi
+          pip-audit -r Suspicious/requirements.txt --strict \
+            --ignore-vuln GHSA-f4j7-r4q5-qw2c
+
+  pip-audit-email-feeder:
+    needs: changes
+    if: >
+      always() &&
+      (github.event_name == 'schedule' ||
+       github.event_name == 'workflow_dispatch' ||
+       needs.changes.outputs.ci == 'true' ||
+       needs.changes.outputs.feeder == 'true')
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7
+      - uses: actions/setup-python@v7
+        with:
+          python-version: "3.12"
+      - run: pip install pip-audit
+      - name: pip-audit email-feeder
+        run: pip-audit -r email-feeder/requirements.txt --strict
+
+  pip-audit-analyzers:
+    needs: changes
+    if: >
+      always() &&
+      (github.event_name == 'schedule' ||
+       github.event_name == 'workflow_dispatch' ||
+       needs.changes.outputs.ci == 'true' ||
+       needs.changes.outputs.analyzers == 'true')
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7
+      - uses: actions/setup-python@v7
+        with:
+          python-version: "3.12"
+      - run: pip install pip-audit
+      - name: pip-audit Analyzers/AIMailAnalyzer
+        run: pip-audit -r Analyzers/AIMailAnalyzer/requirements.txt --strict
 
   npm-audit:
+    needs: changes
+    if: >
+      always() &&
+      (github.event_name == 'schedule' ||
+       github.event_name == 'workflow_dispatch' ||
+       needs.changes.outputs.ui == 'true' ||
+       needs.changes.outputs.ci == 'true')
     runs-on: ubuntu-latest
     defaults:
       run:

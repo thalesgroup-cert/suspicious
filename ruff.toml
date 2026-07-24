@@ -8,8 +8,16 @@ extend-exclude = [
 ]
 
 [lint]
-# Default select (E, F, W subset). Ignore the intentional "config loaded after
-# logger" import-ordering pattern used across cron/service modules.
+# Explicit select, matching ruff's own documented default (E4, E7, E9, F).
+# Spelled out rather than left implicit: CI installs `ruff` unpinned
+# (`pip install ruff`), and an implicit/unset `select` rides whatever a given
+# ruff release's default happens to be. That silently pulled in far more
+# rules (comprehensions, import-sorting, ruff-specific checks, ...) on a
+# newer release and failed backend-lint on ~1500 pre-existing findings across
+# the whole tree, unrelated to whatever a given PR actually touched.
+select = ["E4", "E7", "E9", "F"]
+# Ignore the intentional "config loaded after logger" import-ordering pattern
+# used across cron/service modules.
 ignore = [
     "E402",  # module-level import not at top — deliberate: CONFIG_PATH blocks
              # are intentionally placed after logger setup in several modules.
