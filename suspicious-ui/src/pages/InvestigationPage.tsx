@@ -10,6 +10,10 @@ import {
   CardContent,
   Chip,
   CircularProgress,
+  Dialog,
+  DialogActions,
+  DialogContent,
+  DialogTitle,
   Divider,
   Drawer,
   FormControl,
@@ -40,6 +44,7 @@ import {
   CloseOutlined,
   ExpandMoreOutlined,
   RestartAltOutlined,
+  ReplayOutlined,
 } from "@mui/icons-material";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { Skeleton } from "boneyard-js/react";
@@ -54,6 +59,7 @@ import {
   getAllInvestigations,
   getInvestigationDetails,
   editGlobalCase,
+  redoAnalysis,
   buildSortOrdering,
   type InvestigationDetails,
   type InvestigationListResponse,
@@ -237,6 +243,21 @@ export default function InvestigationPage() {
     },
   });
 
+  const redoMutation = useMutation({
+    mutationFn: (caseId: number) => redoAnalysis(caseId),
+    onSuccess: async () => {
+      // ponytail: detailsQuery.refetch() already covers this query directly;
+      // also invalidating ["investigationDetails"] would double-fire it
+      // since the query is active (invalidate + explicit refetch both fetch).
+      await Promise.all([
+        detailsQuery.refetch(),
+        investigationsQuery.refetch(),
+        qc.invalidateQueries({ queryKey: ["investigation"] }),
+      ]);
+    },
+  });
+  const [redoConfirmOpen, setRedoConfirmOpen] = React.useState(false);
+
   const commentsQuery = useQuery({
     queryKey: ["caseComments", selectedIdNum],
     queryFn: () => getCaseComments(selectedIdNum),
@@ -288,6 +309,8 @@ export default function InvestigationPage() {
 
   React.useEffect(() => {
     editMutation.reset();
+    redoMutation.reset();
+    setRedoConfirmOpen(false);
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [selectedId]);
 
@@ -998,6 +1021,29 @@ export default function InvestigationPage() {
                         Cancel
                       </Button>
                     ) : null}
+                    {detailsReady ? (
+                      <Tooltip
+                        title={
+                          detailsQuery.data?.status === "DONE" || detailsQuery.data?.status === "CHALLENGED"
+                            ? ""
+                            : "Case is still being analyzed."
+                        }
+                      >
+                        <span>
+                          <Button
+                            size="small"
+                            startIcon={<ReplayOutlined sx={{ fontSize: "13px !important" }} />}
+                            disabled={
+                              !(detailsQuery.data?.status === "DONE" || detailsQuery.data?.status === "CHALLENGED")
+                            }
+                            onClick={() => setRedoConfirmOpen(true)}
+                            sx={{ textTransform: "none", fontWeight: 800, borderRadius: 2, fontSize: 12, py: 0.3 }}
+                          >
+                            Redo analysis
+                          </Button>
+                        </span>
+                      </Tooltip>
+                    ) : null}
                   </Stack>
 
                   {detailsQuery.isLoading ? (
@@ -1205,6 +1251,43 @@ export default function InvestigationPage() {
           </Stack>
         )}
       </Drawer>
+
+      <Dialog open={redoConfirmOpen} onClose={() => setRedoConfirmOpen(false)}>
+        <DialogTitle>Redo analysis?</DialogTitle>
+        <DialogContent>
+          <Typography variant="body2">
+            This re-runs every analyzer for this case's artifacts. The current
+            verdict is cleared and the case goes back to in-progress. Prior
+            analyzer results stay visible as history, they are not deleted.
+            This may trigger billed or rate-limited external lookups.
+          </Typography>
+          {redoMutation.isError ? (
+            <Alert severity="error" sx={{ mt: 1.5 }}>
+              {(redoMutation.error as { response?: { data?: { detail?: string } } })
+                ?.response?.data?.detail ?? "Redo failed — please try again."}
+            </Alert>
+          ) : null}
+        </DialogContent>
+        <DialogActions>
+          <Button onClick={() => setRedoConfirmOpen(false)} disabled={redoMutation.isPending}>
+            Cancel
+          </Button>
+          <Button
+            variant="contained"
+            color="warning"
+            disabled={redoMutation.isPending || !hasNumericSelectedId}
+            startIcon={redoMutation.isPending ? <CircularProgress size={13} color="inherit" /> : <ReplayOutlined />}
+            onClick={() => {
+              if (!hasNumericSelectedId) return;
+              redoMutation.mutate(selectedIdNum, {
+                onSuccess: () => setRedoConfirmOpen(false),
+              });
+            }}
+          >
+            {redoMutation.isPending ? "Redoing…" : "Redo analysis"}
+          </Button>
+        </DialogActions>
+      </Dialog>
     </Box>
     </Skeleton>
   );

@@ -15,6 +15,41 @@ concurrency:
   cancel-in-progress: true
 
 jobs:
+  # Detects which areas changed so unrelated jobs below can skip themselves —
+  # a Dependabot bump to one ecosystem (e.g. a single npm package) doesn't
+  # need the Python test suite, migration check, or every docker-build entry
+  # to run. Skipped jobs report as "skipped", which satisfies required status
+  # checks the same as "success". workflow_dispatch has no base to diff
+  # against, so every gated job below also has an explicit `|| workflow_dispatch`
+  # fallback to run in full on manual trigger.
+  changes:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      pull-requests: read
+    outputs:
+      backend: ${{ steps.filter.outputs.backend }}
+      feeder: ${{ steps.filter.outputs.feeder }}
+      analyzers: ${{ steps.filter.outputs.analyzers }}
+      ui: ${{ steps.filter.outputs.ui }}
+      ci: ${{ steps.filter.outputs.ci }}
+    steps:
+      - uses: actions/checkout@v7
+      - uses: dorny/paths-filter@v3
+        id: filter
+        with:
+          filters: |
+            backend:
+              - 'Suspicious/**'
+            feeder:
+              - 'email-feeder/**'
+            analyzers:
+              - 'Analyzers/**'
+            ui:
+              - 'suspicious-ui/**'
+            ci:
+              - '.github/workflows/**'
+
   commit-lint:
     if: github.event_name == 'pull_request'
     runs-on: ubuntu-latest
@@ -33,17 +68,29 @@ jobs:
           npx --yes -p @commitlint/cli -p @commitlint/config-conventional commitlint --from HEAD~1 --to HEAD --config .github/commitlint.config.js
 
   backend-lint:
+    needs: changes
+    if: >
+      needs.changes.outputs.backend == 'true' ||
+      needs.changes.outputs.feeder == 'true' ||
+      needs.changes.outputs.analyzers == 'true' ||
+      needs.changes.outputs.ci == 'true' ||
+      github.event_name == 'workflow_dispatch'
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v7
-      - uses: actions/setup-python@v6
+      - uses: actions/setup-python@v7
         with:
           python-version: "3.12"
-      - run: pip install ruff
+      - run: pip install ruff==0.15.13
       - name: ruff check
         run: ruff check Suspicious/ email-feeder/ Analyzers/
 
   migration-check:
+    needs: changes
+    if: >
+      needs.changes.outputs.backend == 'true' ||
+      needs.changes.outputs.ci == 'true' ||
+      github.event_name == 'workflow_dispatch'
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v7
@@ -65,6 +112,11 @@ jobs:
             python manage.py makemigrations --check --dry-run --settings=suspicious.settings
 
   backend-test:
+    needs: changes
+    if: >
+      needs.changes.outputs.backend == 'true' ||
+      needs.changes.outputs.ci == 'true' ||
+      github.event_name == 'workflow_dispatch'
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v7
@@ -90,10 +142,15 @@ jobs:
             python manage.py test --settings=suspicious.test_settings -v2
 
   feeder-test:
+    needs: changes
+    if: >
+      needs.changes.outputs.feeder == 'true' ||
+      needs.changes.outputs.ci == 'true' ||
+      github.event_name == 'workflow_dispatch'
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v7
-      - uses: actions/setup-python@v6
+      - uses: actions/setup-python@v7
         with:
           python-version: "3.12"
       - name: Install feeder deps
@@ -106,6 +163,11 @@ jobs:
         run: python -m pytest tests -v
 
   frontend:
+    needs: changes
+    if: >
+      needs.changes.outputs.ui == 'true' ||
+      needs.changes.outputs.ci == 'true' ||
+      github.event_name == 'workflow_dispatch'
     runs-on: ubuntu-latest
     defaults:
       run:
@@ -132,26 +194,62 @@ jobs:
       - name: Production build
         run: pnpm run build
 
-  docker-build:
+  # `matrix` isn't a valid context in a job-level `if` (only in
+  # strategy/container/services/steps), so unlike the other path-gated jobs
+  # this one can't stay a single matrix job — split per image instead.
+  docker-build-suspicious:
+    needs: changes
+    if: >
+      github.event_name == 'workflow_dispatch' ||
+      needs.changes.outputs.ci == 'true' ||
+      needs.changes.outputs.backend == 'true'
     runs-on: ubuntu-latest
-    strategy:
-      fail-fast: false
-      matrix:
-        include:
-          - name: suspicious
-            context: ./Suspicious
-          - name: suspicious-ui
-            context: ./suspicious-ui
-          - name: suspicious-feeder
-            context: ./email-feeder
     steps:
       - uses: actions/checkout@v7
       - uses: docker/setup-buildx-action@v4
-      - name: Build ${{ matrix.name }} (no push)
+      - name: Build suspicious (no push)
         uses: docker/build-push-action@v7
         with:
-          context: ${{ matrix.context }}
+          context: ./Suspicious
           push: false
-          tags: ${{ matrix.name }}:ci
-          cache-from: type=gha,scope=${{ matrix.name }}
-          cache-to: type=gha,mode=max,scope=${{ matrix.name }}
+          tags: suspicious:ci
+          cache-from: type=gha,scope=suspicious
+          cache-to: type=gha,mode=max,scope=suspicious
+
+  docker-build-suspicious-ui:
+    needs: changes
+    if: >
+      github.event_name == 'workflow_dispatch' ||
+      needs.changes.outputs.ci == 'true' ||
+      needs.changes.outputs.ui == 'true'
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7
+      - uses: docker/setup-buildx-action@v4
+      - name: Build suspicious-ui (no push)
+        uses: docker/build-push-action@v7
+        with:
+          context: ./suspicious-ui
+          push: false
+          tags: suspicious-ui:ci
+          cache-from: type=gha,scope=suspicious-ui
+          cache-to: type=gha,mode=max,scope=suspicious-ui
+
+  docker-build-suspicious-feeder:
+    needs: changes
+    if: >
+      github.event_name == 'workflow_dispatch' ||
+      needs.changes.outputs.ci == 'true' ||
+      needs.changes.outputs.feeder == 'true'
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7
+      - uses: docker/setup-buildx-action@v4
+      - name: Build suspicious-feeder (no push)
+        uses: docker/build-push-action@v7
+        with:
+          context: ./email-feeder
+          push: false
+          tags: suspicious-feeder:ci
+          cache-from: type=gha,scope=suspicious-feeder
+          cache-to: type=gha,mode=max,scope=suspicious-feeder
