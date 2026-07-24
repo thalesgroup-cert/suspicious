@@ -184,3 +184,25 @@ class CortexAnalyzerReports:
         )
 
         return AnalyzerReport.objects.filter(id__in=latest_id_subquery)
+
+    @staticmethod
+    def exclude_ai_analyzer(reports):
+        """Drop the AI mail classifier's own report from a per-artifact
+        report list before weighting.
+
+        AI_Mail_Analyzer attaches its report to the mail archive's `file`
+        (see cortex_and_job_management.manage_ai_jobs), and collect.py
+        already surfaces that same score/confidence separately as the
+        dedicated `ai` override signal (built from case.score_ai/
+        confidence_ai). Leaving it inside this generic per-file weighted
+        blend double-counts it — inflating base_conf enough to tie
+        ai.confidence, which silences score_case()'s ai-override branch on
+        a tie and lets the case fall back to the (possibly neutral) base
+        score instead of the AI's actual verdict.
+        """
+        from cortex_job.cortex_utils.cortex_and_job_management import _get_cortex_config
+
+        ai_name = _get_cortex_config().get("analyzers", {}).get("ai")
+        if not ai_name:
+            return list(reports)
+        return [r for r in reports if r.analyzer.name != ai_name]
