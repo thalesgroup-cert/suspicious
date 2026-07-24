@@ -23,6 +23,7 @@ from api.serializers.submissions import (
 )
 from case_handler.models import Case
 from cortex_job.models import AnalyzerReport
+from cortex_job.cortex_utils.case_targets import build_analyzer_report_filter, collect_case_targets
 from tasp.services.challenge import notify_and_record_challenge
 
 logger = logging.getLogger(__name__)
@@ -203,74 +204,11 @@ class SubmissionDetailsView(RetrieveAPIView):
         return obj
 
     def _get_analyzer_reports_queryset(self, obj: Case):
-        filters = Q()
-
-        linked_file_or_mail = getattr(obj, "fileOrMail", None)
-        linked_non_file_iocs = getattr(obj, "nonFileIocs", None)
-
-        if obj.fileOrMail_id and linked_file_or_mail is not None:
-            if linked_file_or_mail.file_id:
-                filters |= Q(file_id=linked_file_or_mail.file_id)
-
-            if linked_file_or_mail.mail_id and getattr(linked_file_or_mail, "mail", None):
-                mail = linked_file_or_mail.mail
-
-                if mail.mail_body_id:
-                    filters |= Q(mail_body_id=mail.mail_body_id)
-                if mail.mail_header_id:
-                    filters |= Q(mail_header_id=mail.mail_header_id)
-
-                attachment_file_ids = list(
-                    mail.mail_attachments.exclude(file_id__isnull=True)
-                    .values_list("file_id", flat=True)
-                )
-                if attachment_file_ids:
-                    filters |= Q(file_id__in=attachment_file_ids)
-
-                artifact_url_ids, artifact_ip_ids, artifact_hash_ids = [], [], []
-                artifact_domain_ids, artifact_mail_address_ids = [], []
-
-                for artifact in mail.mail_artifacts.select_related(
-                    "artifactIsUrl", "artifactIsUrl__url", "artifactIsIp", "artifactIsHash",
-                    "artifactIsDomain", "artifactIsMailAddress",
-                ):
-                    if artifact.artifactIsUrl_id and artifact.artifactIsUrl and artifact.artifactIsUrl.url_id:
-                        artifact_url_ids.append(artifact.artifactIsUrl.url_id)
-                        if getattr(artifact.artifactIsUrl.url, "analyzed_url_id", None):
-                            artifact_url_ids.append(artifact.artifactIsUrl.url.analyzed_url_id)
-                    if artifact.artifactIsIp_id and artifact.artifactIsIp and artifact.artifactIsIp.ip_id:
-                        artifact_ip_ids.append(artifact.artifactIsIp.ip_id)
-                    if artifact.artifactIsHash_id and artifact.artifactIsHash and artifact.artifactIsHash.hash_id:
-                        artifact_hash_ids.append(artifact.artifactIsHash.hash_id)
-                    if artifact.artifactIsDomain_id and artifact.artifactIsDomain and artifact.artifactIsDomain.domain_id:
-                        artifact_domain_ids.append(artifact.artifactIsDomain.domain_id)
-                    if (artifact.artifactIsMailAddress_id and artifact.artifactIsMailAddress
-                            and artifact.artifactIsMailAddress.mail_address_id):
-                        artifact_mail_address_ids.append(artifact.artifactIsMailAddress.mail_address_id)
-
-                if artifact_url_ids:
-                    filters |= Q(url_id__in=artifact_url_ids)
-                if artifact_ip_ids:
-                    filters |= Q(ip_id__in=artifact_ip_ids)
-                if artifact_hash_ids:
-                    filters |= Q(hash_id__in=artifact_hash_ids)
-                if artifact_domain_ids:
-                    filters |= Q(domain_id__in=artifact_domain_ids)
-                if artifact_mail_address_ids:
-                    filters |= Q(mail_id__in=artifact_mail_address_ids)
-
-        if obj.nonFileIocs_id and linked_non_file_iocs is not None:
-            if linked_non_file_iocs.url_id:
-                filters |= Q(url_id=linked_non_file_iocs.url_id)
-                if getattr(getattr(linked_non_file_iocs, "url", None), "analyzed_url_id", None):
-                    filters |= Q(url_id=linked_non_file_iocs.url.analyzed_url_id)
-            if linked_non_file_iocs.ip_id:
-                filters |= Q(ip_id=linked_non_file_iocs.ip_id)
-            if linked_non_file_iocs.hash_id:
-                filters |= Q(hash_id=linked_non_file_iocs.hash_id)
-
-        if not filters.children:
+        targets = collect_case_targets(obj)
+        if not targets:
             return []
+
+        filters = build_analyzer_report_filter(targets)
 
         # No .distinct() needed: every filter above is a plain equality/IN on
         # AnalyzerReport's own FK columns, and every select_related() relation
