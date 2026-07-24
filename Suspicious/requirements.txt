@@ -78,7 +78,7 @@ celery[redis]==5.6.3
 django-celery-results==2.6.0
 
 # Secrets
-hvac==2.3.0
+hvac==2.4.0
 
 # Observability
 # 1.28.0+ needed: opentelemetry-proto pins protobuf<5 below that, which
