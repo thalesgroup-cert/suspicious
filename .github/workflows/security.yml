@@ -99,44 +99,73 @@ jobs:
   #       env:
   #         GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
 
-  pip-audit:
+  # Same `matrix` context constraint as ci.yml's docker-build split applies
+  # here — a job-level `if` can't see `matrix.path`, so this can't stay one
+  # matrix job either.
+  pip-audit-suspicious:
     needs: changes
     if: >
       always() &&
       (github.event_name == 'schedule' ||
        github.event_name == 'workflow_dispatch' ||
        needs.changes.outputs.ci == 'true' ||
-       (matrix.path == 'Suspicious' && needs.changes.outputs.backend == 'true') ||
-       (matrix.path == 'email-feeder' && needs.changes.outputs.feeder == 'true') ||
-       (matrix.path == 'Analyzers/AIMailAnalyzer' && needs.changes.outputs.analyzers == 'true'))
+       needs.changes.outputs.backend == 'true')
     runs-on: ubuntu-latest
-    strategy:
-      fail-fast: false
-      matrix:
-        path: [Suspicious, email-feeder, Analyzers/AIMailAnalyzer]
     steps:
       - uses: actions/checkout@v7
       - uses: actions/setup-python@v6
         with:
           python-version: "3.12"
       - run: pip install pip-audit
-      - name: pip-audit ${{ matrix.path }}
+      - name: pip-audit Suspicious
         # Gating: a known-vulnerable dependency fails the build. If an advisory
         # has no fix yet, triage it and add `--ignore-vuln <GHSA/CVE-id>` here
         # rather than re-muting the whole audit.
         #
-        # Suspicious-only: GHSA-f4j7-r4q5-qw2c (chromadb pre-auth RCE via
-        # trust_remote_code on the collections API) has no fix released yet.
-        # We only use chromadb as an HttpClient (common.clients.get_chroma_
-        # client — get_collection/get/delete), never the vulnerable server
-        # code path or trust_remote_code.
+        # GHSA-f4j7-r4q5-qw2c (chromadb pre-auth RCE via trust_remote_code on
+        # the collections API) has no fix released yet. We only use chromadb
+        # as an HttpClient (common.clients.get_chroma_client —
+        # get_collection/get/delete), never the vulnerable server code path
+        # or trust_remote_code.
         run: |
-          if [ "${{ matrix.path }}" = "Suspicious" ]; then
-            pip-audit -r Suspicious/requirements.txt --strict \
-              --ignore-vuln GHSA-f4j7-r4q5-qw2c
-          else
-            pip-audit -r ${{ matrix.path }}/requirements.txt --strict
-          fi
+          pip-audit -r Suspicious/requirements.txt --strict \
+            --ignore-vuln GHSA-f4j7-r4q5-qw2c
+
+  pip-audit-email-feeder:
+    needs: changes
+    if: >
+      always() &&
+      (github.event_name == 'schedule' ||
+       github.event_name == 'workflow_dispatch' ||
+       needs.changes.outputs.ci == 'true' ||
+       needs.changes.outputs.feeder == 'true')
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7
+      - uses: actions/setup-python@v6
+        with:
+          python-version: "3.12"
+      - run: pip install pip-audit
+      - name: pip-audit email-feeder
+        run: pip-audit -r email-feeder/requirements.txt --strict
+
+  pip-audit-analyzers:
+    needs: changes
+    if: >
+      always() &&
+      (github.event_name == 'schedule' ||
+       github.event_name == 'workflow_dispatch' ||
+       needs.changes.outputs.ci == 'true' ||
+       needs.changes.outputs.analyzers == 'true')
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7
+      - uses: actions/setup-python@v6
+        with:
+          python-version: "3.12"
+      - run: pip install pip-audit
+      - name: pip-audit Analyzers/AIMailAnalyzer
+        run: pip-audit -r Analyzers/AIMailAnalyzer/requirements.txt --strict
 
   npm-audit:
     needs: changes

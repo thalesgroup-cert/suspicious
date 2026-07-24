@@ -194,33 +194,62 @@ jobs:
       - name: Production build
         run: pnpm run build
 
-  docker-build:
+  # `matrix` isn't a valid context in a job-level `if` (only in
+  # strategy/container/services/steps), so unlike the other path-gated jobs
+  # this one can't stay a single matrix job — split per image instead.
+  docker-build-suspicious:
     needs: changes
     if: >
       github.event_name == 'workflow_dispatch' ||
       needs.changes.outputs.ci == 'true' ||
-      (matrix.name == 'suspicious' && needs.changes.outputs.backend == 'true') ||
-      (matrix.name == 'suspicious-ui' && needs.changes.outputs.ui == 'true') ||
-      (matrix.name == 'suspicious-feeder' && needs.changes.outputs.feeder == 'true')
+      needs.changes.outputs.backend == 'true'
     runs-on: ubuntu-latest
-    strategy:
-      fail-fast: false
-      matrix:
-        include:
-          - name: suspicious
-            context: ./Suspicious
-          - name: suspicious-ui
-            context: ./suspicious-ui
-          - name: suspicious-feeder
-            context: ./email-feeder
     steps:
       - uses: actions/checkout@v7
       - uses: docker/setup-buildx-action@v4
-      - name: Build ${{ matrix.name }} (no push)
+      - name: Build suspicious (no push)
         uses: docker/build-push-action@v7
         with:
-          context: ${{ matrix.context }}
+          context: ./Suspicious
           push: false
-          tags: ${{ matrix.name }}:ci
-          cache-from: type=gha,scope=${{ matrix.name }}
-          cache-to: type=gha,mode=max,scope=${{ matrix.name }}
+          tags: suspicious:ci
+          cache-from: type=gha,scope=suspicious
+          cache-to: type=gha,mode=max,scope=suspicious
+
+  docker-build-suspicious-ui:
+    needs: changes
+    if: >
+      github.event_name == 'workflow_dispatch' ||
+      needs.changes.outputs.ci == 'true' ||
+      needs.changes.outputs.ui == 'true'
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7
+      - uses: docker/setup-buildx-action@v4
+      - name: Build suspicious-ui (no push)
+        uses: docker/build-push-action@v7
+        with:
+          context: ./suspicious-ui
+          push: false
+          tags: suspicious-ui:ci
+          cache-from: type=gha,scope=suspicious-ui
+          cache-to: type=gha,mode=max,scope=suspicious-ui
+
+  docker-build-suspicious-feeder:
+    needs: changes
+    if: >
+      github.event_name == 'workflow_dispatch' ||
+      needs.changes.outputs.ci == 'true' ||
+      needs.changes.outputs.feeder == 'true'
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7
+      - uses: docker/setup-buildx-action@v4
+      - name: Build suspicious-feeder (no push)
+        uses: docker/build-push-action@v7
+        with:
+          context: ./email-feeder
+          push: false
+          tags: suspicious-feeder:ci
+          cache-from: type=gha,scope=suspicious-feeder
+          cache-to: type=gha,mode=max,scope=suspicious-feeder
