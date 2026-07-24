@@ -1,9 +1,13 @@
 from django.contrib.auth import get_user_model
 from django.test import TestCase
+from django.utils import timezone
 
-from case_handler.models import Case, CaseHasNonFileIocs
+from case_handler.models import Case, CaseHasFileOrMail, CaseHasNonFileIocs, Result
 from cortex_job.models import Analyzer, AnalyzerReport
+from file_process.models import File
+from hash_process.models import Hash
 from ip_process.models import IP
+from mail_feeder.models import Mail, MailArchive
 from score_process.scoring.collect import collect_signals
 from score_process.scoring.engine import Signal
 
@@ -56,3 +60,53 @@ class CollectSignalsTest(TestCase):
         )
         _, ai, _, _ = collect_signals(case)
         self.assertEqual(ai.confidence, 100)
+
+    def test_ai_report_on_archive_file_not_double_counted_as_generic_signal(self):
+        """Regression (prod case 61682): AI_Mail_Analyzer attaches its own
+        AnalyzerReport to the mail archive's `file` (cortex_and_job_management.py
+        manage_ai_jobs), which is the *same* value collect_signals already
+        surfaces separately via case.score_ai/confidence_ai as `ai`. Without
+        excluding it, that one report also gets pulled into the generic
+        per-file weighted signal, inflating base_conf to tie ai.confidence —
+        which silences the AI override in score_case() on ties and lets a
+        low-confidence neutral signal elsewhere decide the case instead.
+        """
+        from settings.config import get_section
+
+        mail = Mail.objects.create(
+            subject="s", reportedBy="r", date=timezone.now(), to="t", mail_id="m-ai-dup",
+        )
+        archive_file = File.objects.create(
+            linked_hash=Hash.objects.create(value="dup-archive-hash"), tmp_path="x.eml",
+        )
+        MailArchive.objects.create(mail=mail, archive=archive_file)
+
+        ai_name = get_section("integrations.cortex").get("analyzers", {}).get("ai")
+        ai_analyzer = Analyzer.objects.create(
+            analyzer_cortex_id="ai-dup-1", name=ai_name, weight=1.0,
+        )
+        AnalyzerReport.objects.create(
+            cortex_job_id="job-ai-dup", type="file", status="Success", analyzer=ai_analyzer,
+            file=archive_file, level="safe", confidence=100, score=0,
+            report_summary={}, report_full={}, report_taxonomy={},
+        )
+
+        case = Case.objects.create(
+            description="", reporter=self.user, score_ai=0, confidence_ai=100,
+            results_ai=Result.SAFE, category_ai="Internal",
+        )
+        fm = CaseHasFileOrMail.objects.create(case=case, mail=mail)
+        case.fileOrMail = fm
+        case.save(update_fields=["fileOrMail"])
+
+        signals, ai, _, ai_missing = collect_signals(case)
+
+        self.assertIsNotNone(ai)
+        self.assertEqual(ai.score, 0)
+        self.assertEqual(ai.confidence, 100)
+        self.assertFalse(ai_missing)
+        self.assertEqual(
+            signals, [],
+            "AI's own archive-file report leaked into the generic per-file "
+            "signal list, double-counting it alongside the dedicated `ai` signal.",
+        )
