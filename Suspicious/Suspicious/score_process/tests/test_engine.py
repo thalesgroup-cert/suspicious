@@ -85,6 +85,14 @@ class ScoreCaseTest(SimpleTestCase):
         v = score_case([sig(1, 90), sig(2, 90)])
         self.assertEqual(v.result, Result.SAFE)
 
+    def test_info_only_signal_is_safe_not_inconclusive(self):
+        """Regression: an 'info'-level analyzer (e.g. FileInfo, present on
+        every attachment) used to score exactly NEUTRAL(5), forcing a case
+        with no other findings to Inconclusive even when nothing suspicious
+        was ever found. get_level_score_confidence('info') now returns 2."""
+        v = score_case([sig(2, 50)])
+        self.assertEqual(v.result, Result.SAFE)
+
     def test_final_score_and_result_agree_on_non_integer_mean(self):
         v = score_case([sig(4, 60), sig(5, 40)])
         self.assertEqual(v.final_score, 4)

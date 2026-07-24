@@ -99,6 +99,16 @@ class DefaultParserTests(SimpleTestCase):
         self.assertEqual(get_level_score_confidence("safe"), (0, 100))
         self.assertEqual(get_level_score_confidence("nonsense"), (0, 0))
 
+    def test_info_score_does_not_collide_with_neutral_sentinel(self):
+        from score_process.scoring.engine import NEUTRAL
+        score, _ = get_level_score_confidence("info")
+        self.assertNotEqual(
+            score, NEUTRAL,
+            "info (analyzer added context, no security verdict) must not "
+            "share engine.NEUTRAL's value or a mail with only info-level "
+            "findings gets forced to Inconclusive instead of Safe.",
+        )
+
     def test_fileinfo_fixture_parses_info(self):
         f = load_fixture("fileinfo")
         r = self._mk().parse(f["summary"], f["full"])
@@ -210,7 +220,7 @@ class ZscalerParserTests(SimpleTestCase):
     def test_benign_is_info(self):
         r = self._run("zscaler")
         self.assertEqual(r.level, "info")
-        self.assertEqual(r.score, 5)
+        self.assertEqual(r.score, 2)
         self.assertIn("CORPORATE_MARKETING", r.category)
 
     def test_security_alert_is_malicious(self):
