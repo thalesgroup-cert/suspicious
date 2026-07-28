@@ -109,6 +109,9 @@ export type InvestigationDetails = {
   challenge_reason?: string;
   reporter_context?: string;
   reporter_note?: string;
+  is_allowlisted: boolean;
+  is_denylisted: boolean;
+  list_reason: string;
   [key: string]: unknown;
 };
 
@@ -287,6 +290,9 @@ function normalizeDetails(input: unknown): InvestigationDetails {
     result: normalizeResult(data.result),
     is_challengeable: asBoolean(data.is_challengeable, false),
     is_challenged: asBoolean(data.is_challenged, false),
+    is_allowlisted: asBoolean(data.is_allowlisted, false),
+    is_denylisted: asBoolean(data.is_denylisted, false),
+    list_reason: asString(data.list_reason),
     analyzer_reports: analyzerReportsRaw.map(normalizeAnalyzerReport),
     case_infos: normalizeCaseInfos(data.case_infos),
     raw: data.raw ?? data,

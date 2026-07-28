@@ -889,7 +889,22 @@ export default function InvestigationPage() {
               </Stack>
             </Box>
 
+            <Skeleton
+              name="investigation-drawer-details"
+              loading={detailsQuery.isFetching && detailsQuery.isPlaceholderData}
+              animate="shimmer"
+            >
             <Box sx={{ flex: 1, overflowY: "auto" }}>
+
+              {/* ── Allow/deny-list banner ────────────────────────────────────── */}
+              {(detailsQuery.data?.is_allowlisted || detailsQuery.data?.is_denylisted) ? (
+                <Box sx={{ px: 2.25, pt: 2 }}>
+                  <Alert severity={detailsQuery.data?.is_denylisted ? "error" : "success"}>
+                    {detailsQuery.data?.is_denylisted ? "This case matched the deny list." : "This case matched the allow list."}
+                    {detailsQuery.data?.list_reason ? ` ${detailsQuery.data.list_reason}` : ""}
+                  </Alert>
+                </Box>
+              ) : null}
 
               {/* ── Summary strip ──────────────────────────────────────────────── */}
               <Box
@@ -1248,6 +1263,7 @@ export default function InvestigationPage() {
 
               </Stack>
             </Box>
+            </Skeleton>
           </Stack>
         )}
       </Drawer>
