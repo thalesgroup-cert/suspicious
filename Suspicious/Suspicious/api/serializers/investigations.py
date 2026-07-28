@@ -265,6 +265,7 @@ class InvestigationDetailsSerializer(InvestigationRowSerializer):
             "analyzer_reports", "case_infos", "raw",
             "challenge_proposed_result", "challenge_reason",
             "reporter_context", "reporter_note",
+            "is_allowlisted", "is_denylisted", "list_reason",
         ]
 
     def get_analyzer_reports(self, obj: Case) -> list[dict[str, Any]]:

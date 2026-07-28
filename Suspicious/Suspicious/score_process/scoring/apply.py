@@ -12,9 +12,11 @@ def apply_verdict(case, verdict) -> None:
     case.confidence = verdict.final_confidence
     case.results = verdict.result
     case.analysis_done = verdict.n_scored
+    case.is_denylisted = verdict.is_denylisted
+    case.list_reason = verdict.list_reason
     case.save(update_fields=[
         "final_score", "final_confidence", "score", "confidence",
-        "results", "analysis_done",
+        "results", "analysis_done", "is_denylisted", "list_reason",
     ])
 
     mail = getattr(case.fileOrMail, "mail", None) if case.fileOrMail else None

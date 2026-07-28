@@ -69,16 +69,18 @@ def collect_signals(case):
     if case.confidence_ai and not ai_missing:
         ai = AiSignal(score=case.score_ai or 0, confidence=min(round(case.confidence_ai or 0), 100))
 
-    deny_listed = _compute_deny_listed(case)
-    return signals, ai, deny_listed, ai_missing
+    deny_listed, deny_reason = _compute_deny_listed(case)
+    return signals, ai, deny_listed, ai_missing, deny_reason
 
 
-def _compute_deny_listed(case) -> bool:
+def _compute_deny_listed(case) -> tuple[bool, str]:
     deny = get_deny_listed_domains_set()
     if case.fileOrMail and case.fileOrMail.mail:
-        if _check_mail_artifacts_for_deny_list(case.fileOrMail.mail, deny, logger):
-            return True
+        found, reason = _check_mail_artifacts_for_deny_list(case.fileOrMail.mail, deny, logger)
+        if found:
+            return True, reason
     if case.nonFileIocs and getattr(case.nonFileIocs, "url", None):
-        if _is_address_deny_listed(case.nonFileIocs.url.address, deny, logger):
-            return True
-    return False
+        address = case.nonFileIocs.url.address
+        if _is_address_deny_listed(address, deny, logger):
+            return True, f"URL deny-listed: {address}"
+    return False, ""

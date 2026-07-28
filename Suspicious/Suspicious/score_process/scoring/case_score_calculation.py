@@ -175,24 +175,26 @@ def _is_address_deny_listed(address: str, deny_list: Set[str], _logger: logging.
 
 def _check_mail_artifacts_for_deny_list(
     mail, deny_list: Set[str], _logger: logging.Logger
-) -> bool:
+) -> tuple[bool, str]:
     """
     Scan ALL mail artifacts for deny-listed domains.
 
-    Returns True if at least one was found. Previously the function
-    returned on the first match, leaving subsequent deny-listed artifacts
-    unscored.
+    Returns (True, reason for the first match) if at least one was found.
+    Previously the function returned on the first match, leaving subsequent
+    deny-listed artifacts unscored — it still scans them all for scoring
+    side effects, but only the first match's reason is reported.
     """
     try:
         artifacts = getattr(mail, "mail_artifacts", None)
         if artifacts is None:
-            return False
+            return False, ""
         artifacts = artifacts.all()
     except Exception as exc:
         _logger.error("Error accessing mail artifacts: %s", exc)
-        return False
+        return False, ""
 
     found_any = False
+    first_reason = ""
 
     for artifact in artifacts:
         domain_obj, url_obj, address, source = None, None, None, "Unknown"
@@ -222,6 +224,8 @@ def _check_mail_artifacts_for_deny_list(
             "Deny-listed %s found: %s (artifact id=%s).",
             source, address, getattr(artifact, "id", "N/A"),
         )
+        if not first_reason:
+            first_reason = f"{source} deny-listed: {address}"
 
         if hasattr(artifact, "artifact_score") and hasattr(artifact, "artifact_confidence"):
             artifact.artifact_score      = ARTIFACT_DENY_LIST_SCORE
@@ -243,6 +247,6 @@ def _check_mail_artifacts_for_deny_list(
 
         found_any = True
 
-    return found_any
+    return found_any, first_reason
 
 

@@ -6,6 +6,7 @@ from case_handler.models import (
     CaseArtifact,
     CaseHasFileOrMail,
     CaseHasNonFileIocs,
+    Result,
 )
 import logging
 
@@ -52,15 +53,19 @@ class CaseCreator:
             reporter=self.user
         )
 
+        allow_reason = kwargs.pop('allow_reason', '')
+
         for key, value in kwargs.items():
             logger.debug(f"Processing key: {key}, value: {getattr(value, 'id', 'None')}")
             if key == 'allow_listed' and value:
-                case.results = "SAFE-ALLOW_LISTED"
+                case.results = Result.ALLOW_LISTED
                 case.final_score = 0
                 case.final_confidence = 100
                 case.status = "Done"
                 case.lifecycle_state = LifecycleState.FINALIZED
                 case.finalized_at = timezone.now()
+                case.is_allowlisted = True
+                case.list_reason = allow_reason
                 break
 
             if value:
@@ -203,7 +208,7 @@ class CaseCreator:
             from tasp.cron.kpi import sync_monthly_kpi
             kpi = sync_monthly_kpi()
 
-            if case.results == "SAFE-ALLOW_LISTED":
+            if case.results == Result.ALLOW_LISTED:
                 if kpi.monthly_cases_summary:
                     kpi.monthly_cases_summary.allow_listed_cases += 1
                     kpi.monthly_cases_summary.save()
@@ -228,12 +233,17 @@ class CaseCreator:
             kpi = sync_monthly_kpi()
 
             user_cases_monthly_stats = UserCasesMonthlyStats.objects.filter(user=self.user, month=kpi.month, year=kpi.year).first()
-            if not user_cases_monthly_stats:
+            is_new = user_cases_monthly_stats is None
+            if is_new:
                 user_cases_monthly_stats = UserCasesMonthlyStats(user=self.user, month=kpi.month, year=kpi.year)
 
-            if case.results == "SAFE-ALLOW_LISTED":
-                user_cases_monthly_stats.allow_listed_cases = F('allow_listed_cases') + 1
-                user_cases_monthly_stats.save(update_fields=['allow_listed_cases'])
+            if case.results == Result.ALLOW_LISTED:
+                if is_new:
+                    user_cases_monthly_stats.allow_listed_cases = 1
+                    user_cases_monthly_stats.save()
+                else:
+                    user_cases_monthly_stats.allow_listed_cases = F('allow_listed_cases') + 1
+                    user_cases_monthly_stats.save(update_fields=['allow_listed_cases'])
 
         except Exception as e:
             print(f"Error updating user cases monthly stats: {e!s}")

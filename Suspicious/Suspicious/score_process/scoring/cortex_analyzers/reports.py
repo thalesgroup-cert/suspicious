@@ -37,8 +37,8 @@ class CortexAnalyzerReports:
             if mail:
                 CortexJobManager().manage_ai_jobs(case)
 
-            signals, ai, deny_listed, ai_missing = collect_signals(case)
-            verdict = score_case(signals, ai, deny_listed, ai_missing)
+            signals, ai, deny_listed, ai_missing, deny_reason = collect_signals(case)
+            verdict = score_case(signals, ai, deny_listed, ai_missing, deny_reason)
             apply_verdict(case, verdict)
 
             update_cases_logger.info(
