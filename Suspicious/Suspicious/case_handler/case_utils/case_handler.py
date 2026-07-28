@@ -62,6 +62,7 @@ class CaseHandler:
             url_instance=None,
             hash_instance=None,
             allow_listed=False,
+            allow_reason="",
         )
 
         if self.file_form.is_valid():
@@ -71,75 +72,79 @@ class CaseHandler:
                     self.request.user, base_path=self.base_case_path
                 ).handle(file)
             else:
-                fi, hi, wl = self._handle_file_form(result["allow_listed"])
-                result.update(file_instance=fi, hash_instance=hi, allow_listed=wl)
+                fi, hi, wl, reason = self._handle_file_form(result["allow_listed"])
+                result.update(file_instance=fi, hash_instance=hi, allow_listed=wl, allow_reason=reason or result["allow_reason"])
 
         if self.url_form.is_valid():
-            ui, wl = self._handle_url_form(result["allow_listed"])
-            result.update(url_instance=ui, allow_listed=wl)
+            ui, wl, reason = self._handle_url_form(result["allow_listed"])
+            result.update(url_instance=ui, allow_listed=wl, allow_reason=reason or result["allow_reason"])
 
         if self.other_form.is_valid():
-            ii, hi, wl = self._handle_other_form(result["allow_listed"])
-            result.update(ip_instance=ii, hash_instance=hi, allow_listed=wl)
+            ii, hi, wl, reason = self._handle_other_form(result["allow_listed"])
+            result.update(ip_instance=ii, hash_instance=hi, allow_listed=wl, allow_reason=reason or result["allow_reason"])
 
         return result
 
-    def _handle_file_form(self, allow_listed: bool) -> Tuple[Optional[object], Optional[object], bool]:
+    def _handle_file_form(self, allow_listed: bool) -> Tuple[Optional[object], Optional[object], bool, str]:
         """
         Process non-email file input: scanning, hashing, allow_listing or analysis.
         """
         file = self.file_form.cleaned_data.get("file")
         if not file:
-            return None, None, allow_listed
+            return None, None, allow_listed, ""
 
         try:
             file_inst, hash_inst = FileHandler.handle_file(file)
             if not file_inst or not hash_inst:
-                return file_inst, hash_inst, allow_listed
+                return file_inst, hash_inst, allow_listed, ""
 
-            if AllowListFile.objects.filter(linked_file_hash=hash_inst).exists() or AllowListFiletype.objects.filter(filetype=file_inst.filetype).exists():
+            if AllowListFile.objects.filter(linked_file_hash=hash_inst).exists():
                 self._allow_list_file(file_inst, hash_inst)
-                return file_inst, hash_inst, True
+                return file_inst, hash_inst, True, "File hash is allow-listed."
+
+            if AllowListFiletype.objects.filter(filetype=file_inst.filetype).exists():
+                self._allow_list_file(file_inst, hash_inst)
+                return file_inst, hash_inst, True, f"File type '{file_inst.filetype}' is allow-listed."
 
             self._launch_analysis(file_inst, hash_inst, data_type="file")
-            return file_inst, hash_inst, False
+            return file_inst, hash_inst, False, ""
 
         except Exception:
             logger.exception("Error processing file form")
-            return None, None, allow_listed
+            return None, None, allow_listed, ""
 
     def _allow_list_file(self, file_inst, hash_inst):
         file_inst.update_allow_listed()
         hash_inst.update_allow_listed()
         logger.info("File and hash marked as allow_listed.")
 
-    def _handle_url_form(self, allow_listed: bool) -> Tuple[Optional[object], bool]:
+    def _handle_url_form(self, allow_listed: bool) -> Tuple[Optional[object], bool, str]:
         """
         Process URL submission: parse, check allow_list, or analyze.
         """
         url = self.url_form.cleaned_data.get("url")
         if not url:
-            return None, allow_listed
+            return None, allow_listed, ""
 
         try:
             url_inst, domain = URLHandler().handle_url(url)
             if url_inst and domain:
                 if not AllowListDomain.objects.filter(domain=domain).exists() and not WatcherLegitDomain.objects.filter(domain=domain).exists():
                     self._launch_analysis(url_inst, None, data_type="url")
-                    return url_inst, False
+                    return url_inst, False, ""
                 url_inst.update_allow_listed()
-                return url_inst, True
+                return url_inst, True, f"Domain '{domain}' is allow-listed."
         except Exception:
             logger.exception("Error processing URL form")
-        return None, allow_listed
+        return None, allow_listed, ""
 
-    def _handle_other_form(self, allow_listed: bool) -> Tuple[Optional[object], Optional[object], bool]:
+    def _handle_other_form(self, allow_listed: bool) -> Tuple[Optional[object], Optional[object], bool, str]:
         """
         Process IP or hash input depending on format.
         """
         other = self.other_form.cleaned_data.get("other")
         if not other:
-            return None, None, allow_listed
+            return None, None, allow_listed, ""
 
         try:
             is_ip = IPHandler().validate_ip(other)
@@ -148,20 +153,20 @@ class CaseHandler:
                 ip_inst = IPHandler().handle_ip(other)
                 if ip_inst:
                     self._launch_analysis(ip_inst, ip_inst, data_type="ip")
-                return ip_inst, None, allow_listed
+                return ip_inst, None, allow_listed, ""
 
             if is_hash:
                 hash_inst = HashHandler().handle_hash(other)
                 if hash_inst:
                     if AllowListFile.objects.filter(linked_file_hash=hash_inst).exists():
                         hash_inst.update_allow_listed()
-                        return None, hash_inst, True
+                        return None, hash_inst, True, "File hash is allow-listed."
                     self._launch_analysis(hash_inst, None, data_type="hash")
-                return None, hash_inst, False
+                return None, hash_inst, False, ""
 
         except Exception:
             logger.exception("Error processing other form")
-        return None, None, allow_listed
+        return None, None, allow_listed, ""
 
     def handle_case(
         self,
@@ -170,6 +175,7 @@ class CaseHandler:
         url_inst=None,
         hash_inst=None,
         allow_listed=False,
+        allow_reason="",
         mail_inst=None,
     ):
         """
@@ -182,6 +188,7 @@ class CaseHandler:
             url_instance=url_inst,
             hash_instance=hash_inst,
             allow_listed=allow_listed,
+            allow_reason=allow_reason,
         )
         logger.debug("Creating case with: %s", ctx)
         description = ""

@@ -32,6 +32,12 @@ const RESULT_META: Record<string, ResultMeta> = {
     label:    "SAFE",
     icon:     <CheckCircleOutlined fontSize="small" />,
   },
+  ALLOW_LISTED: {
+    group:    "result",
+    storeKey: "safe",
+    label:    "ALLOW-LISTED",
+    icon:     <CheckCircleOutlined fontSize="small" />,
+  },
   SUSPICIOUS: {
     group:    "result",
     storeKey: "suspicious",

@@ -49,9 +49,16 @@ class ScoreCaseTest(SimpleTestCase):
         self.assertEqual(v.result, Result.INCONCLUSIVE)
 
     def test_deny_list_overrides_to_dangerous(self):
-        v = score_case([sig(1, 90)], deny_listed=True)
+        v = score_case([sig(1, 90)], deny_listed=True, deny_reason="Domain deny-listed: evil.example")
         self.assertEqual(v.result, Result.DANGEROUS)
         self.assertEqual(v.final_score, 10)
+        self.assertTrue(v.is_denylisted)
+        self.assertEqual(v.list_reason, "Domain deny-listed: evil.example")
+
+    def test_not_deny_listed_leaves_reason_fields_default(self):
+        v = score_case([sig(1, 90)])
+        self.assertFalse(v.is_denylisted)
+        self.assertEqual(v.list_reason, "")
 
     def test_deny_list_wins_over_empty_signals(self):
         v = score_case([sig(0, 0, fail=True)], deny_listed=True)

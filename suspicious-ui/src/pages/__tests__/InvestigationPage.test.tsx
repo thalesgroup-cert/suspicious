@@ -209,6 +209,85 @@ describe("InvestigationPage", () => {
     });
   });
 
+  it("does not show stale details from the previous case while the next one loads", async () => {
+    const user = userEvent.setup();
+    const rowB = { ...mockRow, id: 8, info: "Other suspicious case", artifact: "http://other.evil.com/x" };
+    mockGetAll.mockResolvedValue({
+      count: 2, next: null, previous: null, results: [mockRow, rowB],
+    } as never);
+
+    let resolveSecond!: (value: unknown) => void;
+    const secondDetailsPromise = new Promise((resolve) => { resolveSecond = resolve; });
+    mockGetDetails.mockImplementation(((id: number) =>
+      id === 7 ? Promise.resolve(mockDetails) : secondDetailsPromise) as never);
+
+    renderInvestigation();
+
+    await waitFor(() => expect(screen.getByText(mockRow.info)).toBeInTheDocument());
+    await user.click(screen.getByText(mockRow.info).closest("tr")!);
+    await waitFor(() => expect(screen.getByText(/PhishingURLAnalyzer/i)).toBeInTheDocument());
+
+    await user.click(screen.getByText(rowB.info).closest("tr")!);
+
+    await waitFor(() => {
+      expect(screen.queryByText(/PhishingURLAnalyzer/i)).not.toBeInTheDocument();
+    });
+
+    resolveSecond({ ...mockDetails, id: 8, analyzer_reports: [] });
+  });
+
+  it("shows a deny-list banner with reason for a deny-listed case", async () => {
+    const user = userEvent.setup();
+    mockGetDetails.mockResolvedValue({
+      ...mockDetails,
+      is_denylisted: true,
+      is_allowlisted: false,
+      list_reason: "Domain deny-listed: evil.example",
+    } as never);
+    renderInvestigation();
+
+    await waitFor(() =>
+      expect(
+        screen.getByText(/phish\.evil\.com|reporter@corp/i)
+      ).toBeInTheDocument()
+    );
+
+    const row = screen.getByText(/phish\.evil\.com|reporter@corp/i).closest("tr") ??
+                screen.getByText(/phish\.evil\.com|reporter@corp/i);
+    await user.click(row);
+
+    await waitFor(() => {
+      expect(screen.getByRole("alert")).toHaveTextContent(
+        /this case matched the deny list\.\s*domain deny-listed: evil\.example/i
+      );
+    });
+  });
+
+  it("shows an allow-list banner for an allow-listed case", async () => {
+    const user = userEvent.setup();
+    mockGetDetails.mockResolvedValue({
+      ...mockDetails,
+      is_denylisted: false,
+      is_allowlisted: true,
+      list_reason: "Domain 'safe.example' is allow-listed.",
+    } as never);
+    renderInvestigation();
+
+    await waitFor(() =>
+      expect(
+        screen.getByText(/phish\.evil\.com|reporter@corp/i)
+      ).toBeInTheDocument()
+    );
+
+    const row = screen.getByText(/phish\.evil\.com|reporter@corp/i).closest("tr") ??
+                screen.getByText(/phish\.evil\.com|reporter@corp/i);
+    await user.click(row);
+
+    await waitFor(() => {
+      expect(screen.getByRole("alert")).toHaveTextContent(/this case matched the allow list/i);
+    });
+  });
+
   it("does not show a challenge panel when the case has no proposed verdict", async () => {
     const user = userEvent.setup();
     renderInvestigation();
