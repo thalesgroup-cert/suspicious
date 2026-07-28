@@ -22,7 +22,7 @@ import {
 import { Outlet, useLocation, useNavigate } from "react-router-dom";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { getMe, logout, type Me } from "@/api/auth";
-import { getProfile } from "@/features/profile/api";
+import { getProfile, updatePreferences } from "@/features/profile/api";
 import { useThemeMode } from "@/styles/ThemeStore";
 
 import {
@@ -101,6 +101,27 @@ export default function AppLayout() {
     try { localStorage.setItem("suspicious.sidebar.pinned", pinned ? "1" : "0"); }
     catch { /* localStorage blocked in this env */ }
   }, [pinned]);
+
+  // localStorage is browser-scoped and gets wiped when the app runs inside a
+  // portal iframe with storage partitioning — the profile field is the
+  // source of truth once it loads, same as theme/colors.
+  const hydratedPinFromServer = React.useRef(false);
+  React.useEffect(() => {
+    if (hydratedPinFromServer.current) return;
+    if (profileQuery.data?.sidebar_pinned === undefined) return;
+    hydratedPinFromServer.current = true;
+    setPinned(profileQuery.data.sidebar_pinned);
+  }, [profileQuery.data]);
+
+  function togglePinned() {
+    setPinned((p) => {
+      const next = !p;
+      updatePreferences({ sidebar_pinned: next }).catch(() => {
+        /* best-effort — localStorage still covers this browser */
+      });
+      return next;
+    });
+  }
 
   const [prevPathname, setPrevPathname] = React.useState(location.pathname);
   if (location.pathname !== prevPathname) {
@@ -214,7 +235,7 @@ export default function AppLayout() {
           <Tooltip title={pinned ? "Unpin sidebar" : "Pin sidebar"} placement="right">
             <IconButton
               size="small"
-              onClick={() => setPinned((p) => !p)}
+              onClick={togglePinned}
               aria-label={pinned ? "Unpin sidebar" : "Pin sidebar"}
               sx={{
                 width: 28,

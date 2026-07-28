@@ -20,6 +20,7 @@ export type UserProfile = {
   auto_seasonal:         boolean;
   avatar?:               AvatarConfig;
   tour_completed?:       boolean;
+  sidebar_pinned?:       boolean;
   semantic_colors:       {
     result: ResultColors;
     status: StatusColors;
@@ -42,6 +43,7 @@ export type PreferencesPayload = {
   wants_acknowledgement?: boolean;
   wants_results?:         boolean;
   tour_completed?:        boolean;
+  sidebar_pinned?:        boolean;
 };
 
 export type SemanticColorsPayload = {

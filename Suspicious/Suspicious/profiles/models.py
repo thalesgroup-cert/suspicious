@@ -115,6 +115,11 @@ class UserProfile(SemanticColorsMixin, models.Model):
         verbose_name=_("Guided tour completed"),
         help_text=_("True once the user has seen the first-connection guided tour."),
     )
+    sidebar_pinned = models.BooleanField(
+        default=False,
+        verbose_name=_("Sidebar pinned"),
+        help_text=_("True if the user has pinned the navigation sidebar open."),
+    )
     creation_date = models.DateTimeField(auto_now_add=True)
     last_update = models.DateTimeField(auto_now=True)
     def __str__(self):
@@ -158,6 +163,11 @@ class CISOProfile(SemanticColorsMixin, models.Model):
         default=False,
         verbose_name=_("Guided tour completed"),
         help_text=_("True once the user has seen the first-connection guided tour."),
+    )
+    sidebar_pinned = models.BooleanField(
+        default=False,
+        verbose_name=_("Sidebar pinned"),
+        help_text=_("True if the user has pinned the navigation sidebar open."),
     )
     creation_date = models.DateTimeField(auto_now_add=True)
     last_update = models.DateTimeField(auto_now=True)

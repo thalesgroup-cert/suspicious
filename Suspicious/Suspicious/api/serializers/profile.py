@@ -186,6 +186,7 @@ class UserProfileSerializer(serializers.ModelSerializer):
             "semantic_colors",
             "avatar",
             "tour_completed",
+            "sidebar_pinned",
             "creation_date",
             "last_update",
         ]
@@ -230,6 +231,7 @@ class CISOProfileSerializer(serializers.ModelSerializer):
             "semantic_colors",
             "avatar",
             "tour_completed",
+            "sidebar_pinned",
             "creation_date",
             "last_update",
         ]
@@ -278,6 +280,7 @@ class PreferencesSerializer(serializers.Serializer):
     wants_acknowledgement = serializers.BooleanField(required=False)
     wants_results         = serializers.BooleanField(required=False)
     tour_completed        = serializers.BooleanField(required=False)
+    sidebar_pinned        = serializers.BooleanField(required=False)
 
     def update(self, instance, validated_data):
         for attr, value in validated_data.items():
