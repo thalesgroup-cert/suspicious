@@ -114,8 +114,8 @@ class DashboardPerUserStatsAccessTests(TestCase):
 
 
 class MonthlyReporterStatsAccessTests(TestCase):
-    """Per-reporter stats (colleague-level) must be elevated-only, like the
-    per-user stats. Regular reporters only get org-wide aggregates."""
+    """Per-reporter stats are open to every authenticated user (dashboard
+    parity with monthly-cases/total-cases)."""
 
     def setUp(self):
         self.client = APIClient()
@@ -123,10 +123,10 @@ class MonthlyReporterStatsAccessTests(TestCase):
         self.cert = _make_user("rep_stats_cert", groups=["CERT"])
         self.ciso = _make_user("rep_stats_ciso", groups=["CISO"])
 
-    def test_regular_user_forbidden(self):
+    def test_regular_user_allowed(self):
         self.client.force_authenticate(self.reporter)
         resp = self.client.get(reverse("monthly-reporters-list"))
-        self.assertEqual(resp.status_code, 403)
+        self.assertEqual(resp.status_code, 200)
 
     def test_cert_allowed(self):
         self.client.force_authenticate(self.cert)
@@ -146,18 +146,18 @@ class MonthlyReporterStatsAccessTests(TestCase):
 
 
 class TopPrefixesAccessTests(TestCase):
-    """Per-user/group case-count ranking is the same colleague-level data as
-    MonthlyReporterStats — regular reporters must not be able to enumerate it."""
+    """Per-user/group case-count ranking is open to every authenticated user,
+    same as the other dashboard aggregates."""
 
     def setUp(self):
         self.client = APIClient()
         self.reporter = _make_user("prefixes_reporter")
         self.cert = _make_user("prefixes_cert", groups=["CERT"])
 
-    def test_regular_user_forbidden(self):
+    def test_regular_user_allowed(self):
         self.client.force_authenticate(self.reporter)
         resp = self.client.get(reverse("top-prefixes"), {"type": "user"})
-        self.assertEqual(resp.status_code, 403)
+        self.assertEqual(resp.status_code, 200)
 
     def test_cert_user_allowed(self):
         self.client.force_authenticate(self.cert)
@@ -165,10 +165,9 @@ class TopPrefixesAccessTests(TestCase):
         self.assertEqual(resp.status_code, 200)
 
 
-class DashboardSummaryTopPrefixesScrubTests(TestCase):
-    """DashboardSummaryView embeds top_prefixes in every response — it must be
-    scrubbed for non-elevated users even though the endpoint itself stays open
-    (regular users still get the org-wide KPI aggregates)."""
+class DashboardSummaryTopPrefixesTests(TestCase):
+    """DashboardSummaryView embeds top_prefixes in every response, unscrubbed,
+    for every authenticated user."""
 
     def setUp(self):
         self.client = APIClient()
@@ -178,11 +177,10 @@ class DashboardSummaryTopPrefixesScrubTests(TestCase):
     def _get(self):
         return self.client.get(reverse("dashboard-summary"), {"month": 5, "year": 2026})
 
-    def test_regular_user_gets_empty_top_prefixes(self):
+    def test_regular_user_request_succeeds(self):
         self.client.force_authenticate(self.reporter)
         resp = self._get()
         self.assertEqual(resp.status_code, 200)
-        self.assertEqual(resp.data["top_prefixes"], [])
 
     def test_elevated_user_request_succeeds(self):
         self.client.force_authenticate(self.cert)
