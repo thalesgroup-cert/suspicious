@@ -1,5 +1,5 @@
 import * as React from "react";
-import { useLocation } from "react-router-dom";
+import { useLocation } from "react-router";
 import { useJoyride } from "react-joyride";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { getProfile, updatePreferences, type UserProfile } from "@/features/profile/api";

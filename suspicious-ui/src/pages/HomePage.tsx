@@ -35,7 +35,7 @@ import {
   DonutLargeOutlined,
   HistoryOutlined,
 } from "@mui/icons-material";
-import { useNavigate, Link as RouterLink } from "react-router-dom";
+import { useNavigate, Link as RouterLink } from "react-router";
 import { useMutation, useQuery } from "@tanstack/react-query";
 import { useTheme } from "@mui/material/styles";
 import { useThemeMode, type ThemeCapabilities } from "@/styles/ThemeStore";

@@ -10,7 +10,7 @@ import {
 } from "@mui/material";
 import { alpha, useTheme } from "@mui/material/styles";
 import { HelpOutlineOutlined, LogoutOutlined } from "@mui/icons-material";
-import { NavLink } from "react-router-dom";
+import { NavLink } from "react-router";
 
 import type { Me } from "@/api/auth";
 import type { NavItemConfig } from "@/layouts/nav";

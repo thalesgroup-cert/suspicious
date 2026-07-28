@@ -1,6 +1,6 @@
 import { describe, it, expect, vi, beforeEach } from "vitest";
 import { screen, waitFor } from "@testing-library/react";
-import { Routes, Route } from "react-router-dom";
+import { Routes, Route } from "react-router";
 import { renderWithProviders, mockMe } from "@/test/utils";
 
 // ---------------------------------------------------------------------------

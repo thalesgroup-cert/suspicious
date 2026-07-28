@@ -19,7 +19,7 @@ describe("MailPreview", () => {
     ).toBeInTheDocument();
   });
 
-  it("renders an <img> with the given url and alt text", () => {
+  it("does not fetch the image until 'Load preview' is clicked", () => {
     render(
       <MailPreview
         url="/api/cases/42/mail-preview.png"
@@ -27,6 +27,10 @@ describe("MailPreview", () => {
         alt="case-42-preview"
       />
     );
+    expect(screen.queryByRole("img")).toBeNull();
+
+    fireEvent.click(screen.getByRole("button", { name: /load preview/i }));
+
     const img = screen.getByRole("img", { name: "case-42-preview" }) as HTMLImageElement;
     expect(img).toBeInTheDocument();
     expect(img.src).toContain("/api/cases/42/mail-preview.png");
@@ -36,6 +40,7 @@ describe("MailPreview", () => {
     render(
       <MailPreview url="/api/cases/42/mail-preview.png" variant="thumbnail" maxRetries={0} />
     );
+    fireEvent.click(screen.getByRole("button", { name: /load preview/i }));
 
     fireEvent.error(screen.getByRole("img"));
 
@@ -52,6 +57,7 @@ describe("MailPreview", () => {
         retryDelayMs={1000}
       />
     );
+    fireEvent.click(screen.getByRole("button", { name: /load preview/i }));
 
     fireEvent.error(screen.getByRole("img"));
     expect(screen.queryByText(/^No preview$/i)).toBeNull();

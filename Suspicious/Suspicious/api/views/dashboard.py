@@ -12,7 +12,6 @@ from rest_framework.response import Response
 from rest_framework.views import APIView
 
 from api.permissions.settings import IsAdminOrCERT
-from api.permissions.dashboard import StatsReadPermission
 
 from dashboard.models import (
     GroupMonthlyStats,
@@ -112,9 +111,7 @@ class DashboardSummaryView(APIView):
         return requested_scope
 
     def _scrub(self, payload: dict) -> dict:
-        if StatsReadPermission().has_permission(self.request, self):
-            return payload
-        return {**payload, "top_prefixes": []}
+        return payload
 
 
 class MonthlyCasesSummaryListView(generics.ListAPIView):
@@ -127,7 +124,7 @@ class MonthlyCasesSummaryListView(generics.ListAPIView):
 
 
 class MonthlyReporterStatsListView(generics.ListAPIView):
-    permission_classes = [StatsReadPermission]
+    permission_classes = [IsAuthenticated]
     queryset = MonthlyReporterStats.objects.all()
     serializer_class = MonthlyReporterStatsSerializer
     filter_backends = [DjangoFilterBackend]
@@ -290,7 +287,7 @@ class UserCasesMonthlyStatsAggregateView(MonthYearQueryMixin, APIView):
 
 
 class TopPrefixesView(APIView):
-    permission_classes = [StatsReadPermission]
+    permission_classes = [IsAuthenticated]
 
     DEFAULT_LIMIT = 10
     MAX_LIMIT = 50

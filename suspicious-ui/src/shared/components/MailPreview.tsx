@@ -11,15 +11,18 @@
  *   - <MailPreview variant="full" .../>       full-width block for the
  *                                              investigation detail page
  *
- * Loading state shows a skeleton. On a 404 (the backend enqueues a
- * background (re)render and 404s on a cache miss), we retry a few times
- * with a cache-busting query param so the freshly rendered PNG is picked
- * up without a manual reload; after `maxRetries` we fall back to a subtle
- * "No preview" hint instead of a broken image icon.
+ * The image is not fetched until the user clicks "Load preview" — every row
+ * on a list page mounting its own eager <img> was the actual cost, not the
+ * render itself. Once clicked, a skeleton shows while it loads. On a 404
+ * (the backend enqueues a background (re)render and 404s on a cache miss),
+ * we retry a few times with a cache-busting query param so the freshly
+ * rendered PNG is picked up without a manual reload; after `maxRetries` we
+ * fall back to a subtle "No preview" hint instead of a broken image icon.
  */
 import { useEffect, useRef, useState } from "react";
-import { Box, Skeleton, Typography, Stack } from "@mui/material";
+import { Box, Skeleton, Typography, Stack, IconButton, Button, Tooltip } from "@mui/material";
 import AttachEmailRoundedIcon from "@mui/icons-material/AttachEmailRounded";
+import VisibilityRoundedIcon from "@mui/icons-material/VisibilityRounded";
 
 export type MailPreviewProps = {
   /** Relative URL from the API, e.g. "/api/cases/42/mail-preview.png". `null`/empty = no preview. */
@@ -44,7 +47,7 @@ export default function MailPreview({
   maxRetries = 3,
   retryDelayMs = 4000,
 }: MailPreviewProps) {
-  const [status, setStatus] = useState<"loading" | "ready" | "error">("loading");
+  const [status, setStatus] = useState<"idle" | "loading" | "ready" | "error">("idle");
   const [attempt, setAttempt] = useState(0);
   const timerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
@@ -91,6 +94,34 @@ export default function MailPreview({
         justifyContent: "center",
       }}
     >
+      {status === "idle" && (
+        <Box
+          sx={{
+            width: "100%",
+            height: isThumb ? THUMB_HEIGHT : 200,
+            display: "flex",
+            alignItems: "center",
+            justifyContent: "center",
+            bgcolor: "action.hover",
+          }}
+        >
+          {isThumb ? (
+            <Tooltip title="Load preview">
+              <IconButton size="small" onClick={() => setStatus("loading")} aria-label="Load preview">
+                <VisibilityRoundedIcon fontSize="small" />
+              </IconButton>
+            </Tooltip>
+          ) : (
+            <Button
+              size="small"
+              startIcon={<VisibilityRoundedIcon />}
+              onClick={() => setStatus("loading")}
+            >
+              Load preview
+            </Button>
+          )}
+        </Box>
+      )}
       {status === "loading" && (
         <Skeleton
           variant="rectangular"
@@ -99,13 +130,12 @@ export default function MailPreview({
           sx={{ position: "absolute", inset: 0 }}
         />
       )}
-      {status !== "error" && (
+      {(status === "loading" || status === "ready") && (
         <Box
           component="img"
           key={attempt}
           src={src}
           alt={alt ?? "Email preview"}
-          loading="lazy"
           onLoad={() => setStatus("ready")}
           onError={handleError}
           sx={{

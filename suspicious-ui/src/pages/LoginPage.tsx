@@ -23,7 +23,7 @@ import {
   BoltOutlined,
   HubOutlined,
 } from "@mui/icons-material";
-import { useNavigate } from "react-router-dom";
+import { useNavigate } from "react-router";
 import { useQuery } from "@tanstack/react-query";
 import {
   motion,
