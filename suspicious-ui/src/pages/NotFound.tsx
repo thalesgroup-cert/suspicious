@@ -2,7 +2,7 @@ import * as React from "react";
 import { Box, Button, Stack, Typography } from "@mui/material";
 import { alpha, useTheme } from "@mui/material/styles";
 import { HomeOutlined, ArrowBackOutlined, SearchOffOutlined } from "@mui/icons-material";
-import { useNavigate, useLocation } from "react-router-dom";
+import { useNavigate, useLocation } from "react-router";
 
 type Props = {
   /**

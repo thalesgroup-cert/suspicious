@@ -19,7 +19,7 @@ import {
   MenuRounded,
   PushPinOutlined,
 } from "@mui/icons-material";
-import { Outlet, useLocation, useNavigate } from "react-router-dom";
+import { Outlet, useLocation, useNavigate } from "react-router";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { getMe, logout, type Me } from "@/api/auth";
 import { getProfile, updatePreferences } from "@/features/profile/api";

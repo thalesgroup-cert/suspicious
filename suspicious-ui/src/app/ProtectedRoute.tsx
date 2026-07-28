@@ -1,5 +1,5 @@
 import * as React from "react";
-import { Navigate, useLocation } from "react-router-dom";
+import { Navigate, useLocation } from "react-router";
 import { useQuery } from "@tanstack/react-query";
 import { getMe } from "@/api/auth";
 import PageLoader from "@/styles/components/PageLoader";

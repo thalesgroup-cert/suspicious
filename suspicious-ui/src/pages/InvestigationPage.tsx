@@ -48,7 +48,7 @@ import {
 } from "@mui/icons-material";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { Skeleton } from "boneyard-js/react";
-import { useNavigate, useSearchParams } from "react-router-dom";
+import { useNavigate, useSearchParams } from "react-router";
 import { alpha } from "@mui/material/styles";
 import { useTheme } from "@mui/material/styles";
 

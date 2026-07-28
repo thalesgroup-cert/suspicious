@@ -15,4 +15,11 @@ overrides:
   form-data: 4.0.6
   # minimatch (via eslint's @eslint/config-array) pulls brace-expansion
   # 5.0.6 — ReDoS via consecutive non-expanding {} groups (GHSA-3jxr-9vmj-r5cp).
-  brace-expansion: 5.0.7
+  # 5.0.7 fixed that but is itself vulnerable to a separate unbounded-
+  # expansion-length DoS (GHSA-mh99-v99m-4gvg); 5.0.8 fixes both.
+  brace-expansion: 5.0.8
+  # postcss (via vite/@vitejs/plugin-react, dev-only) <=8.5.17 auto-loads
+  # sourceMappingURL comments as a local file path with no traversal check,
+  # letting a crafted comment in tooling-processed CSS read arbitrary files
+  # off disk (GHSA-r28c-9q8g-f849). 8.5.18 fixes it.
+  postcss: 8.5.18
