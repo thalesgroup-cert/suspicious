@@ -90,6 +90,11 @@ class Case(models.Model):
     thehive_alert_id = models.CharField(
         max_length=64, blank=True, default="", verbose_name="TheHive Alert ID",
     )
+    is_allowlisted = models.BooleanField(default=False, verbose_name="Is Allowlisted")
+    is_denylisted = models.BooleanField(default=False, verbose_name="Is Denylisted")
+    list_reason = models.TextField(
+        blank=True, default="", verbose_name="Allow/Deny List Reason",
+    )
 
     class Meta:
         ordering = ['-creation_date']

@@ -30,7 +30,7 @@ class CollectSignalsTest(TestCase):
         case.nonFileIocs = iocs
         case.save()
 
-        signals, ai, deny_listed, ai_missing = collect_signals(case)
+        signals, ai, deny_listed, ai_missing, deny_reason = collect_signals(case)
 
         self.assertTrue(all(isinstance(s, Signal) for s in signals))
         self.assertEqual(len(signals), 1)
@@ -41,15 +41,16 @@ class CollectSignalsTest(TestCase):
 
     def test_no_iocs_yields_no_signals(self):
         case = Case.objects.create(description="", reporter=self.user)
-        signals, ai, deny_listed, ai_missing = collect_signals(case)
+        signals, ai, deny_listed, ai_missing, deny_reason = collect_signals(case)
         self.assertEqual(signals, [])
         self.assertFalse(deny_listed)
+        self.assertEqual(deny_reason, "")
 
     def test_ai_confidence_is_already_0_100(self):
         case = Case.objects.create(
             description="", reporter=self.user, score_ai=6, confidence_ai=100,
         )
-        _, ai, _, _ = collect_signals(case)
+        _, ai, _, _, _ = collect_signals(case)
         self.assertIsNotNone(ai)
         self.assertEqual(ai.confidence, 100)
         self.assertEqual(ai.score, 6)
@@ -58,7 +59,7 @@ class CollectSignalsTest(TestCase):
         case = Case.objects.create(
             description="", reporter=self.user, score_ai=6, confidence_ai=150,
         )
-        _, ai, _, _ = collect_signals(case)
+        _, ai, _, _, _ = collect_signals(case)
         self.assertEqual(ai.confidence, 100)
 
     def test_ai_report_on_archive_file_not_double_counted_as_generic_signal(self):
@@ -99,7 +100,7 @@ class CollectSignalsTest(TestCase):
         case.fileOrMail = fm
         case.save(update_fields=["fileOrMail"])
 
-        signals, ai, _, ai_missing = collect_signals(case)
+        signals, ai, _, ai_missing, _ = collect_signals(case)
 
         self.assertIsNotNone(ai)
         self.assertEqual(ai.score, 0)

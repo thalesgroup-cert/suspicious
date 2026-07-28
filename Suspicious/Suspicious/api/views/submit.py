@@ -67,6 +67,7 @@ def process_case(request, file_form, url_form, other_form):
         url_inst=results.get("url_instance"),
         hash_inst=results.get("hash_instance"),
         allow_listed=results.get("allow_listed"),
+        allow_reason=results.get("allow_reason", ""),
     )
     if case is not None:
         handler.dispatch_pending(case)

@@ -31,6 +31,8 @@ class CaseVerdict:
     result: str
     n_malicious: int
     n_scored: int
+    is_denylisted: bool = False
+    list_reason: str = ""
 
 
 def band(score: float) -> str:
@@ -41,13 +43,13 @@ def band(score: float) -> str:
     return Result.DANGEROUS
 
 
-def score_case(signals, ai=None, deny_listed=False, ai_missing=False) -> CaseVerdict:
+def score_case(signals, ai=None, deny_listed=False, ai_missing=False, deny_reason="") -> CaseVerdict:
     scored = [s for s in signals if not s.is_failure]
     n_malicious = sum(1 for s in scored if s.is_malicious)
     n_scored = len(scored)
 
     if deny_listed:
-        return CaseVerdict(10, 100, Result.DANGEROUS, n_malicious, n_scored)
+        return CaseVerdict(10, 100, Result.DANGEROUS, n_malicious, n_scored, is_denylisted=True, list_reason=deny_reason)
 
     if not scored:
         return CaseVerdict(NEUTRAL, 0, Result.FAILURE, 0, 0)
