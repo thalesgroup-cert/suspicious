@@ -264,7 +264,7 @@ class InvestigationDetailsSerializer(InvestigationRowSerializer):
         fields = InvestigationRowSerializer.Meta.fields + [
             "analyzer_reports", "case_infos", "raw",
             "challenge_proposed_result", "challenge_reason",
-            "reporter_context", "reporter_note",
+            "reporter_context", "reporter_note", "thehive_alert_id",
             "is_allowlisted", "is_denylisted", "list_reason",
         ]
 
@@ -337,6 +337,7 @@ class InvestigationDetailsSerializer(InvestigationRowSerializer):
                 "creation_date": obj.creation_date,
                 "last_update": obj.last_update,
                 "last_update_by_id": obj.last_update_by_id,
+                "thehive_alert_id": obj.thehive_alert_id,
             },
             "fileOrMail": file_or_mail,
             "nonFileIocs": non_file_iocs,
