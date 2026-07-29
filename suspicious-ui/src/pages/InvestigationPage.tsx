@@ -889,12 +889,13 @@ export default function InvestigationPage() {
               </Stack>
             </Box>
 
+            <Box sx={{ flex: 1, minHeight: 0, overflowY: "auto" }}>
             <Skeleton
               name="investigation-drawer-details"
               loading={detailsQuery.isFetching && detailsQuery.isPlaceholderData}
               animate="shimmer"
             >
-            <Box sx={{ flex: 1, overflowY: "auto" }}>
+            <Box>
 
               {/* ── Allow/deny-list banner ────────────────────────────────────── */}
               {(detailsQuery.data?.is_allowlisted || detailsQuery.data?.is_denylisted) ? (
@@ -1264,6 +1265,7 @@ export default function InvestigationPage() {
               </Stack>
             </Box>
             </Skeleton>
+            </Box>
           </Stack>
         )}
       </Drawer>
