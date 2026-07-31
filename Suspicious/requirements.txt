@@ -64,7 +64,7 @@ pymisp==2.5.33.1
 vt-py==0.22.0
 
 # Vector store
-chromadb==1.5.8
+chromadb==1.5.9
 
 # Logging
 python-json-logger==4.1.0  # v4.x changed the API; pin to v3 until we migrate
