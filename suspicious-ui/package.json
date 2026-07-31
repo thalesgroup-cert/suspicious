@@ -42,7 +42,7 @@
     "react-router": "8.3.0",
     "recharts": "3.8.1",
     "zod": "4.4.3",
-    "zustand": "5.0.13"
+    "zustand": "5.0.14"
   },
   "devDependencies": {
     "@eslint/js": "10.0.1",
