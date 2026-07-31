@@ -10,6 +10,7 @@ from api.views.campaigns import (
 from api.views.challenge import CaseChallengeTokenView
 from api.views.comments import CaseCommentListCreateView
 from api.views.dashboard import (
+    AIModelRetrainRunListCreateView,
     DashboardSummaryView,
     MonthlyCasesSummaryAggregateView,
     MonthlyCasesSummaryListView,
@@ -84,6 +85,7 @@ urlpatterns = [
     path("stats/monthly-cases/aggregate/", MonthlyCasesSummaryAggregateView.as_view(), name="monthly-cases-aggregate"),
     path("stats/monthly-reporters/", MonthlyReporterStatsListView.as_view(), name="monthly-reporters-list"),
     path("stats/total-cases/", TotalCasesStatsListView.as_view(), name="total-cases-list"),
+    path("stats/ai-model-runs/", AIModelRetrainRunListCreateView.as_view(), name="ai-model-runs"),
 
     path("stats/user-cases/", UserCasesMonthlyStatsListView.as_view(), name="user-cases-list"),
     path("stats/user-cases/<int:pk>/", UserCasesMonthlyStatsDetailView.as_view(), name="user-cases-detail"),

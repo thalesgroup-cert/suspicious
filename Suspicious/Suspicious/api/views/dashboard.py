@@ -12,8 +12,10 @@ from rest_framework.response import Response
 from rest_framework.views import APIView
 
 from api.permissions.settings import IsAdminOrCERT
+from api.permissions.dashboard import MLRetrainIngestPermission, StatsReadPermission
 
 from dashboard.models import (
+    AIModelRetrainRun,
     GroupMonthlyStats,
     MonthlyCasesSummary,
     MonthlyReporterStats,
@@ -22,6 +24,7 @@ from dashboard.models import (
 )
 from dashboard.snapshot import build_dashboard_payload, get_snapshot
 from api.serializers.dashboard import (
+    AIModelRetrainRunSerializer,
     DashboardSummaryQuerySerializer,
     DashboardSummaryResponseSerializer,
     MonthlyCasesSummaryAggregateSerializer,
@@ -139,6 +142,23 @@ class TotalCasesStatsListView(generics.ListAPIView):
     filter_backends = [DjangoFilterBackend]
     filterset_class = TotalCasesStatsFilter
     pagination_class = DashboardLimitOffsetPagination
+
+
+class AIModelRetrainRunListCreateView(generics.ListCreateAPIView):
+    """GET: dashboard panel reads retrain history (F1/accuracy per run per
+    sub-model). POST: promote.py (Analyzers/AIMailAnalyzer/retrain model
+    monthly/) pushes a run's results here right after promoting it to the
+    live models/ directory — best-effort, not required for promotion to
+    succeed.
+    """
+    queryset = AIModelRetrainRun.objects.all()
+    serializer_class = AIModelRetrainRunSerializer
+    pagination_class = DashboardLimitOffsetPagination
+
+    def get_permissions(self):
+        if self.request.method == "POST":
+            return [MLRetrainIngestPermission()]
+        return [StatsReadPermission()]
 
 
 class UserCasesMonthlyStatsListView(generics.ListAPIView):

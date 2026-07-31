@@ -32,7 +32,10 @@ class FileHandler:
         if file:
             file_path = file.name
             tmp_path_raw = file.temporary_file_path()
-            tmp_path = tmp_path_raw.replace("/tmp/", "")
+            # tmp_path is always stored absolute (matches the `mail` branch
+            # below) - _handle_file_logic and CortexJob.get_data_value both
+            # use it directly, no "/tmp/" prefix reconstruction.
+            tmp_path = tmp_path_raw
             hash_value = cls.hash_file(tmp_path_raw)
         elif mail:
             file_path = os.path.basename(mail)
@@ -60,7 +63,7 @@ class FileHandler:
             tuple: (file_instance, hash_instance).
         """
         try:
-            size = os.path.getsize("/tmp/"+ tmp_path)
+            size = os.path.getsize(tmp_path)
         except FileNotFoundError:
             logger.error("Temporary file not found at: %s", tmp_path)
             size = 0

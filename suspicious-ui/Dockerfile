@@ -1,5 +1,14 @@
 # build
 FROM node:alpine AS build
+# Proxy build args so npm/pnpm reach the registry through the corporate CONNECT
+# proxy (real, trusted cert) instead of a direct — TLS-intercepted — connection.
+# Build stage only; the final nginx image does not carry these. Empty by default.
+ARG HTTP_PROXY
+ARG HTTPS_PROXY
+ENV http_proxy=${HTTP_PROXY} \
+    https_proxy=${HTTPS_PROXY} \
+    HTTP_PROXY=${HTTP_PROXY} \
+    HTTPS_PROXY=${HTTPS_PROXY}
 WORKDIR /app
 RUN npm install -g pnpm@11.1.3
 

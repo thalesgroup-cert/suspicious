@@ -34,6 +34,7 @@ export const fixtureDashboardSummary: DashboardSummary = {
     new_users: 4,
     total_reporters: 128,
     total_cases: 512,
+    challenged_cases: 37,
   },
   danger_counts: {
     failure: 1,

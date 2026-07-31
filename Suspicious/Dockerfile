@@ -55,13 +55,14 @@ RUN uv pip install --system --no-cache -r requirements-connectors.txt
 # Pre-download NLTK data. nltk.download() returns False on failure instead
 # of raising, which once produced images missing the stopwords corpus —
 # fail the build instead.
-RUN python - <<EOF
-import sys
-import nltk
-for package in ("stopwords", "punkt", "punkt_tab"):
-    if not nltk.download(package, download_dir="/usr/local/share/nltk_data"):
-        sys.exit(f"NLTK download failed: {package}")
-EOF
+#
+# One RUN line, not a heredoc: heredoc RUN syntax (`<<EOF`) is a BuildKit-only
+# Dockerfile feature. Without the buildx plugin, the classic builder silently
+# runs this with empty stdin instead of erroring — "python -" then exits 0
+# having imported nothing and downloaded nothing, so the build reports
+# success while /usr/local/share/nltk_data is never created (only caught
+# later, opaquely, when the runtime stage's COPY fails to find it).
+RUN python -c "import sys, nltk; failed = [p for p in ('stopwords', 'punkt', 'punkt_tab') if not nltk.download(p, download_dir='/usr/local/share/nltk_data')]; sys.exit('NLTK download failed: ' + ', '.join(failed)) if failed else None"
 
 ################
 # RUNTIME     #
@@ -79,21 +80,31 @@ ENV PYTHONDONTWRITEBYTECODE=1 \
 
 WORKDIR /app
 
-RUN apt-get update && \
-    apt-get install -y --no-install-recommends \
+# Re-declare proxy build args for the runtime stage. Without them, apt reaches
+# download.docker.com directly and (behind a TLS-intercepting corporate proxy)
+# gets an untrusted MITM cert; routing this step through the CONNECT proxy sees
+# the real, trusted cert instead. Scoped to this RUN so the proxy is NOT baked
+# into the runtime image (which would break inter-container networking). Empty
+# in default builds → identical behaviour to before.
+ARG HTTP_PROXY
+ARG HTTPS_PROXY
+RUN http_proxy="${HTTP_PROXY}" https_proxy="${HTTPS_PROXY}" apt-get update && \
+    http_proxy="${HTTP_PROXY}" https_proxy="${HTTPS_PROXY}" apt-get install -y --no-install-recommends \
     curl \
     ca-certificates \
     gnupg \
     lsb-release && \
-    curl -fsSL https://download.docker.com/linux/debian/gpg | gpg --dearmor -o /usr/share/keyrings/docker-archive-keyring.gpg && \
+    https_proxy="${HTTPS_PROXY}" curl -fsSL https://download.docker.com/linux/debian/gpg | gpg --dearmor -o /usr/share/keyrings/docker-archive-keyring.gpg && \
     echo "deb [arch=$(dpkg --print-architecture) signed-by=/usr/share/keyrings/docker-archive-keyring.gpg] https://download.docker.com/linux/debian $(lsb_release -cs) stable" > /etc/apt/sources.list.d/docker.list && \
-    apt-get update && \
-    apt-get install -y docker-ce-cli && \
+    http_proxy="${HTTP_PROXY}" https_proxy="${HTTPS_PROXY}" apt-get update && \
+    http_proxy="${HTTP_PROXY}" https_proxy="${HTTPS_PROXY}" apt-get install -y docker-ce-cli && \
     apt-get clean && \
     rm -rf /var/lib/apt/lists/*
 
-# Runtime libs only
-RUN apt-get update && apt-get install -y --no-install-recommends \
+# Runtime libs only. Needs the same proxy threading as the block above —
+# plain `apt-get update` here has no route out behind a corporate proxy.
+RUN http_proxy="${HTTP_PROXY}" https_proxy="${HTTPS_PROXY}" apt-get update && \
+    http_proxy="${HTTP_PROXY}" https_proxy="${HTTPS_PROXY}" apt-get install -y --no-install-recommends \
         libldap-common \
         libsasl2-2 \
         wkhtmltopdf \

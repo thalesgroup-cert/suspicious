@@ -1,10 +1,22 @@
 from rest_framework import serializers
 from dashboard.models import (
+    AIModelRetrainRun,
     MonthlyCasesSummary,
     MonthlyReporterStats,
     TotalCasesStats,
     UserCasesMonthlyStats,
 )
+
+
+class AIModelRetrainRunSerializer(serializers.ModelSerializer):
+    class Meta:
+        model = AIModelRetrainRun
+        fields = [
+            "id", "run_timestamp", "dataset_dir", "label", "model_name",
+            "f1_score", "accuracy", "f1_score_golden", "accuracy_golden",
+            "promoted", "creation_date",
+        ]
+        read_only_fields = ["id", "creation_date"]
 
 
 class DashboardSummaryQuerySerializer(serializers.Serializer):
@@ -28,6 +40,9 @@ class DashboardKpisSerializer(serializers.Serializer):
     new_users = serializers.IntegerField(min_value=0)
     total_reporters = serializers.IntegerField(min_value=0)
     total_cases = serializers.IntegerField(min_value=0)
+    # required=False/default=0: pre-existing DashboardSnapshot rows (materialised
+    # before this field existed) won't have this key and must not 500.
+    challenged_cases = serializers.IntegerField(min_value=0, required=False, default=0)
 
 
 class DashboardDangerCountsSerializer(serializers.Serializer):

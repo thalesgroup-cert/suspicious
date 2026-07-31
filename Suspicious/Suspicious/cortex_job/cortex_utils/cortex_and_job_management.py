@@ -401,9 +401,9 @@ class CortexJob:
         if data_type == "file":
             if not hasattr(data, "tmp_path"):
                 raise TypeError("File object must have 'tmp_path' attribute")
-            data_value = (
-                data.tmp_path if "tar.gz" in data.tmp_path else f"/tmp/{data.tmp_path}"
-            )
+            # tmp_path is always stored absolute (file_process/file_utils/
+            # file_handler.py) - no "/tmp/" prefix reconstruction needed.
+            data_value = data.tmp_path
 
         elif data_type in {"url", "ip", "mail"}:
             if not hasattr(data, "address"):

@@ -21,10 +21,15 @@ COPY --from=ghcr.io/astral-sh/uv:latest /uv /uvx /bin/
 WORKDIR /worker/
 
 # install dependencies
+# uv/pip only honor lowercase http_proxy/https_proxy - Docker's own proxy
+# injection (~/.docker/config.json) only sets the uppercase ARGs, which is
+# why apt-get above works (apt reads it via a separate mechanism) but uv
+# doesn't unless explicitly passed here (same fix as Suspicious/Dockerfile
+# and email-feeder/Dockerfile).
 COPY requirements.txt .
-RUN uv pip install --system --upgrade pip
-RUN uv pip install --system --no-cache torch torchvision torchaudio --index-url https://download.pytorch.org/whl/cpu
-RUN uv pip install --system --no-cache -r requirements.txt
+RUN http_proxy="${HTTP_PROXY}" https_proxy="${HTTPS_PROXY}" uv pip install --system --upgrade pip
+RUN http_proxy="${HTTP_PROXY}" https_proxy="${HTTPS_PROXY}" uv pip install --system --no-cache torch torchvision torchaudio --index-url https://download.pytorch.org/whl/cpu
+RUN http_proxy="${HTTP_PROXY}" https_proxy="${HTTPS_PROXY}" uv pip install --system --no-cache -r requirements.txt
 
 COPY . /worker/AIMailAnalyzer/
 

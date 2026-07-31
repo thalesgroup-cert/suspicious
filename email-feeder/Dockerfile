@@ -29,8 +29,11 @@ ENV HTTP_PROXY=${HTTP_PROXY} \
 # System dependencies
 # (minimal + no recommends)
 # -------------------------
-RUN apt-get update && \
-    apt-get install -y --no-install-recommends \
+# apt-get reads lowercase http_proxy/https_proxy, not the uppercase
+# HTTP_PROXY/HTTPS_PROXY ENV vars set above (those are for Python/requests) —
+# without this, apt can't reach deb.debian.org behind a corporate proxy.
+RUN http_proxy="${HTTP_PROXY}" https_proxy="${HTTPS_PROXY}" apt-get update && \
+    http_proxy="${HTTP_PROXY}" https_proxy="${HTTPS_PROXY}" apt-get install -y --no-install-recommends \
         ca-certificates \
         curl \
         libmariadb3 \

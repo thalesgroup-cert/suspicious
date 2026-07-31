@@ -14,3 +14,17 @@ seaborn>=0.13.2
 tqdm>=4.70.0
 bs4>=0.0.2
 jupyter>=1.1.1
+
+# retrain model monthly/ (IMAP fetch pipeline)
+python-dotenv>=1.0
+
+# retrain model monthly/promote.py (push run metrics to the Suspicious
+# dashboard) - not pinned elsewhere here, only a transitive dep of
+# sentence-transformers/huggingface_hub until now.
+requests>=2.32
+
+# retrain model monthly/Re_Train_Model/utils.py training-run monitoring
+# (per-epoch loss/accuracy/time + current-vs-previous label sample counts).
+# Defaults to WANDB_MODE=offline (no account/API key, writes to ./wandb/
+# locally) - see run_monthly_cycle.sh.
+wandb>=0.17
