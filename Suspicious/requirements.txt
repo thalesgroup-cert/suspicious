@@ -11,7 +11,7 @@ drf-spectacular==0.30.0
 gunicorn==25.3.0
 whitenoise==6.12.0
 # Environment Configuration
-docker==7.1.0
+docker==7.2.0
 
 # Parsing and Text Extraction
 beautifulsoup4==4.13.5
