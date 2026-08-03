@@ -1,5 +1,13 @@
 import * as React from "react";
-import { Box, Stack, ToggleButton, ToggleButtonGroup, Typography } from "@mui/material";
+import {
+  Box,
+  Stack,
+  ToggleButton,
+  ToggleButtonGroup,
+  Tooltip as MuiTooltip,
+  Typography,
+} from "@mui/material";
+import { InfoOutlined } from "@mui/icons-material";
 import { alpha, useTheme } from "@mui/material/styles";
 import {
   ResponsiveContainer,
@@ -37,13 +45,30 @@ const SERIES_ORDER = Object.keys(SERIES_COLORS);
 
 type Metric = "f1_score" | "accuracy" | "f1_score_golden";
 
-const METRIC_META: Record<Metric, { label: string; short: string; toggle: string }> = {
-  f1_score: { label: "F1-score", short: "F1", toggle: "F1" },
-  accuracy: { label: "Précision (accuracy)", short: "Précision", toggle: "Précision" },
+const METRIC_META: Record<
+  Metric,
+  { label: string; short: string; toggle: string; description: string }
+> = {
+  f1_score: {
+    label: "F1-score",
+    short: "F1",
+    toggle: "F1",
+    description:
+      "Équilibre entre la precision (parmi les mails signalés comme malveillants, combien le sont vraiment) et le recall (parmi les mails vraiment malveillants, combien ont été détectés). Calculé sur un échantillon de test tiré aléatoirement du dataset à chaque cycle de réentraînement.",
+  },
+  accuracy: {
+    label: "Précision (accuracy)",
+    short: "Précision",
+    toggle: "Précision",
+    description:
+      "Pourcentage de prédictions correctes, toutes classes confondues."
+  },
   f1_score_golden: {
     label: "F1-score sur le golden set",
     short: "F1 (golden)",
     toggle: "Golden",
+    description:
+      "F1-score mesuré sur un jeu de mails fixe (le \"golden set\"), jamais utilisé pour l'entraînement et identique d'un cycle à l'autre. Contrairement au F1-score classique (échantillon de test différent à chaque cycle), c'est la seule courbe vraiment comparable dans le temps - une hausse ici reflète un vrai progrès du modèle.",
   },
 };
 
@@ -160,9 +185,14 @@ export default function AiModelHealthTrendChart({ runs }: { runs: AiModelRun[] }
       direction="row"
       sx={{ alignItems: "center", justifyContent: "space-between", mb: 0.5, flexShrink: 0 }}
     >
-      <Typography sx={{ fontSize: 12, fontWeight: 700, color: "text.secondary" }}>
-        Évolution du {METRIC_META[metric].label.toLowerCase()} par modèle
-      </Typography>
+      <Stack direction="row" spacing={0.5} sx={{ alignItems: "center" }}>
+        <Typography sx={{ fontSize: 12, fontWeight: 700, color: "text.secondary" }}>
+          Évolution du {METRIC_META[metric].label.toLowerCase()} par modèle
+        </Typography>
+        <MuiTooltip title={METRIC_META[metric].description} arrow placement="top">
+          <InfoOutlined sx={{ fontSize: 14, color: "text.secondary", cursor: "help" }} />
+        </MuiTooltip>
+      </Stack>
       <ToggleButtonGroup
         size="small"
         exclusive

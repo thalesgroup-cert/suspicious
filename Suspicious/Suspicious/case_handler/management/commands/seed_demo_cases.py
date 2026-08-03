@@ -2,7 +2,7 @@
 Seed the database with fictional demo cases for local / UI testing.
 
 Populates realistic-looking phishing investigation cases for the fictional
-company **Eco**, so the React UI (Investigations list, Dashboard) has content
+company **Meridian**, so the React UI (Investigations list, Dashboard) has content
 to display without running the full submit → Cortex → finalise pipeline.
 
 Usage (inside the container):
@@ -33,43 +33,43 @@ User = get_user_model()
 
 MARKER = "[demo-seed]"
 
-# Fictional Eco personas (reporters). Spread across regions to exercise the
+# Fictional Meridian personas (reporters). Spread across regions to exercise the
 # region logic; kept in sync with the greenmail mailboxes in the compose override.
 PERSONAS = [
-    ("elena.voss@eco.example", "Elena", "Voss"),
-    ("adaeze.okafor@eco.example", "Adaeze", "Okafor"),
-    ("jordan.kim@eco.example", "Jordan", "Kim"),
-    ("camila.reyes@eco.example", "Camila", "Reyes"),
-    ("haruto.sato@eco.example", "Haruto", "Sato"),
-    ("sam.whitfield@eco.example", "Sam", "Whitfield"),
+    ("elena.voss@meridian.example", "Elena", "Voss"),
+    ("adaeze.okafor@meridian.example", "Adaeze", "Okafor"),
+    ("jordan.kim@meridian.example", "Jordan", "Kim"),
+    ("camila.reyes@meridian.example", "Camila", "Reyes"),
+    ("haruto.sato@meridian.example", "Haruto", "Sato"),
+    ("sam.whitfield@meridian.example", "Sam", "Whitfield"),
 ]
 
 # (subject, sender, result)
 SAMPLES = [
     ("Your mailbox is almost full - verify now to avoid suspension",
-     "it-support@ec0-secure.example", Result.DANGEROUS),
+     "it-support@meridian-secure.example", Result.DANGEROUS),
     ("Invoice #4021 overdue - immediate payment required",
-     "billing@invoices-eco.example", Result.SUSPICIOUS),
+     "billing@invoices-meridian.example", Result.SUSPICIOUS),
     ("HR: Updated remote-work policy (action required)",
-     "hr@eco.example", Result.SAFE),
+     "hr@meridian.example", Result.SAFE),
     ("Security alert: unusual sign-in to your account",
-     "no-reply@account-eco-security.example", Result.DANGEROUS),
+     "no-reply@account-meridian-security.example", Result.DANGEROUS),
     ("You have (3) quarantined messages - release now",
-     "postmaster@eco-mailguard.example", Result.SUSPICIOUS),
+     "postmaster@meridian-mailguard.example", Result.SUSPICIOUS),
     ("Team lunch next Friday - RSVP",
-     "camila.reyes@eco.example", Result.SAFE),
+     "camila.reyes@meridian.example", Result.SAFE),
     ("DocuSign: Please review and sign document",
-     "dse@docu-sign-eco.example", Result.SUSPICIOUS),
+     "dse@docu-sign-meridian.example", Result.SUSPICIOUS),
     ("Payroll update - confirm your bank details",
-     "payroll@eco-finance.example", Result.DANGEROUS),
+     "payroll@meridian-finance.example", Result.DANGEROUS),
     ("Reset your password within 24h",
-     "helpdesk@eco-it.example", Result.DANGEROUS),
-    ("Weekly newsletter - Eco insights",
-     "news@eco.example", Result.SAFE),
+     "helpdesk@meridian-it.example", Result.DANGEROUS),
+    ("Weekly newsletter - Meridian insights",
+     "news@meridian.example", Result.SAFE),
     ("Shared document: Q3 forecast.xlsx",
-     "jordan.kim@eco.example", Result.INCONCLUSIVE),
+     "jordan.kim@meridian.example", Result.INCONCLUSIVE),
     ("Your parcel could not be delivered - reschedule",
-     "tracking@parcel-eco.example", Result.SUSPICIOUS),
+     "tracking@parcel-meridian.example", Result.SUSPICIOUS),
 ]
 
 # Plausible score ranges per verdict (0-100 scale).
@@ -84,7 +84,7 @@ AI_CATEGORIES = ["Phishing", "Spam", "Legitimate", "Malware", "Uncategorized"]
 
 
 class Command(BaseCommand):
-    help = "Seed fictional Eco demo cases for local / UI testing."
+    help = "Seed fictional Meridian demo cases for local / UI testing."
 
     def add_arguments(self, parser):
         parser.add_argument("--count", type=int, default=24,
@@ -158,7 +158,7 @@ class Command(BaseCommand):
                 subject=subject,
                 reportedBy=reporter.email,
                 date=dt,
-                to="suspicious@eco.example",
+                to="suspicious@meridian.example",
                 mail_from=sender,
                 mail_id=str(uuid.uuid4()),
             )

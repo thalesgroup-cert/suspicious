@@ -38,24 +38,24 @@ load_dotenv()
 
 IMAP_HOST = os.environ.get("IMAP_HOST", "127.0.0.1")
 IMAP_PORT = int(os.environ.get("IMAP_PORT", 3143))
-IMAP_USER = os.environ.get("IMAP_USER", "suspicious@eco.example")
-IMAP_PASSWORD = os.environ.get("IMAP_PASSWORD", "eco_dev_imap_pw")
+IMAP_USER = os.environ.get("IMAP_USER", "suspicious@meridian.example")
+IMAP_PASSWORD = os.environ.get("IMAP_PASSWORD", "meridian_dev_imap_pw")
 
-# Analystes CERT fictifs "Eco" (mêmes personas que docker-compose.override.yml)
-ANALYSTS = ["elena.voss@eco.example", "sam.whitfield@eco.example"]
+# Analystes CERT fictifs "Meridian" (mêmes personas que docker-compose.override.yml)
+ANALYSTS = ["elena.voss@meridian.example", "sam.whitfield@meridian.example"]
 
 EMPLOYEES = [
-    ("Jordan Kim", "jordan.kim@eco.example"),
-    ("Camila Reyes", "camila.reyes@eco.example"),
-    ("Haruto Sato", "haruto.sato@eco.example"),
-    ("Adaeze Okafor", "adaeze.okafor@eco.example"),
+    ("Jordan Kim", "jordan.kim@meridian.example"),
+    ("Camila Reyes", "camila.reyes@meridian.example"),
+    ("Haruto Sato", "haruto.sato@meridian.example"),
+    ("Adaeze Okafor", "adaeze.okafor@meridian.example"),
 ]
 
 EXECS = [("Elena Voss", "CISO"), ("Marcus Ferreira", "CFO"), ("Lian Zhou", "CEO")]
 
 FAKE_DOMAINS = [
-    "eco-secure-portal.net", "eco-hr-verify.com", "account-eco.support",
-    "eco-billing-center.info", "secure-eco-mail.online",
+    "meridian-secure-portal.net", "meridian-hr-verify.com", "account-meridian.support",
+    "meridian-billing-center.info", "secure-meridian-mail.online",
 ]
 
 # ── Générateurs de contenu par catégorie ────────────────────────────────
@@ -83,36 +83,49 @@ def _legit_external():
     domain = random.choice(partner_domains)
     subjects_bodies = [
         ("Contract Renewal - Q3 Review",
-         f"Dear Eco team,\n\nAs discussed, please find attached the renewed service contract for review. "
+         f"Dear Meridian team,\n\nAs discussed, please find attached the renewed service contract for review. "
          f"Let us know if you have questions.\n\nBest regards,\nPartner Corp Account Team"),
         ("Facture Fournisseur - Echéance 30 jours",
          f"Bonjour,\n\nVeuillez trouver ci-joint la facture n°{random.randint(10000,99999)} relative à notre "
          f"dernière commande. Paiement sous 30 jours.\n\nCordialement,\nService Comptabilité"),
     ]
     subject, body = random.choice(subjects_bodies)
-    return f"contact@{domain}", "jordan.kim@eco.example", subject, body
+    return f"contact@{domain}", "jordan.kim@meridian.example", subject, body
 
 
 def _spam():
+    # Body includes a random reward/discount amount and a claim code so each
+    # generated mail hashes uniquely (calculate_hash() dedupes on body text -
+    # a fully static template here would cap this label at a handful of rows
+    # forever, no matter how many mails are seeded).
     subjects_bodies = [
         ("You've been selected! Claim your reward now",
-         "CONGRATULATIONS! You are one of our lucky winners. Click below to claim your $500 gift card before it expires!"),
+         f"CONGRATULATIONS! You are one of our lucky winners. Click below to claim your "
+         f"${random.choice([250, 500, 750, 1000])} gift card before it expires! Code: {random.randint(100000,999999)}"),
         ("Meilleurs prix sur les montres de luxe - -70%",
-         "Profitez de notre vente flash exceptionnelle, stock limité, livraison gratuite en France."),
+         f"Profitez de notre vente flash exceptionnelle (-{random.choice([50,60,70,80])}%), stock limité "
+         f"({random.randint(3,20)} restants), livraison gratuite en France. Réf. promo {random.randint(1000,9999)}."),
         ("Perte de poids garantie en 2 semaines",
-         "Notre nouvelle formule révolutionnaire fait fureur. Commandez maintenant et économisez 50%."),
+         f"Notre nouvelle formule révolutionnaire fait fureur. Commandez avant le "
+         f"{random.randint(1,28)}/{random.randint(1,12)} et économisez {random.choice([30,40,50])}%."),
     ]
     subject, body = random.choice(subjects_bodies)
-    return f"promo@{random.choice(['dealz-now.biz','superoffers.top'])}", "jordan.kim@eco.example", subject, body
+    return f"promo@{random.choice(['dealz-now.biz','superoffers.top'])}", "jordan.kim@meridian.example", subject, body
 
 
 def _newsletter():
+    # Same reasoning as _spam(): a random issue number/week makes each body
+    # unique so the dataset can actually accumulate more than 1-2 rows.
     subjects_bodies = [
-        ("Your Weekly Tech Digest", "This week in tech: new frameworks, security patches, and industry news. Unsubscribe anytime."),
-        ("Bulletin mensuel Cybersécurité", "Ce mois-ci : les dernières vulnérabilités CVE, tendances ransomware, et bonnes pratiques."),
+        (f"Your Weekly Tech Digest - Week {random.randint(1,52)}",
+         f"This week in tech: new frameworks, security patches, and industry news "
+         f"(issue #{random.randint(100,999)}). Unsubscribe anytime."),
+        (f"Bulletin mensuel Cybersécurité - N°{random.randint(1,99)}",
+         f"Ce mois-ci : les dernières vulnérabilités CVE ({random.randint(2020,2026)}-{random.randint(1000,90000)}), "
+         f"tendances ransomware, et bonnes pratiques."),
     ]
     subject, body = random.choice(subjects_bodies)
-    return "newsletter@security-weekly.com", "sam.whitfield@eco.example", subject, body
+    return "newsletter@security-weekly.com", "sam.whitfield@meridian.example", subject, body
 
 
 def _classic_phishing():
@@ -123,7 +136,7 @@ def _classic_phishing():
          f"Dear {emp},\n\nWe detected unusual activity on your account. To avoid suspension within 24h, "
          f"please verify your identity here: https://{domain}/verify?user={emp.split()[0].lower()}\n\nIT Security Team"),
         ("Votre mot de passe expire aujourd'hui",
-         f"Bonjour {emp},\n\nVotre mot de passe Eco expire dans quelques heures. Cliquez ici pour le renouveler "
+         f"Bonjour {emp},\n\nVotre mot de passe Meridian expire dans quelques heures. Cliquez ici pour le renouveler "
          f"immédiatement : https://{domain}/reset\n\nSupport Informatique"),
     ]
     subject, body = random.choice(subjects_bodies)
@@ -138,7 +151,7 @@ def _whaling_phishing():
         (f"Urgent - Confidential wire transfer",
          f"Hi {emp.split()[0]},\n\nI need you to process an urgent, confidential wire transfer for a deal we're "
          f"closing today. Call is not possible right now, please handle by email only. Amount: €{random.randint(15,95)}k. "
-         f"I'll send bank details shortly.\n\n{exec_name}\n{exec_title}, Eco"),
+         f"I'll send bank details shortly.\n\n{exec_name}\n{exec_title}, Meridian"),
         (f"Demande urgente et confidentielle",
          f"Bonjour {emp.split()[0]},\n\nJ'ai besoin de votre aide immédiatement pour un virement urgent lié à une "
          f"acquisition en cours, strictement confidentiel. Répondez uniquement par mail.\n\n{exec_name}"),
@@ -153,7 +166,7 @@ def _clone_phishing():
     domain = random.choice(FAKE_DOMAINS)
     subjects_bodies = [
         ("Contract Renewal - Q3 Review",
-         f"Dear Eco team,\n\nAs discussed, please find the renewed contract for review here: "
+         f"Dear Meridian team,\n\nAs discussed, please find the renewed contract for review here: "
          f"https://{domain}/contract-review-Q3.pdf\n\nBest regards,\nPartner Corp Account Team"),
         ("Facture Fournisseur - Echéance 30 jours",
          f"Bonjour,\n\nVeuillez consulter la facture mise à jour ici (lien sécurisé) : https://{domain}/facture.pdf\n\n"

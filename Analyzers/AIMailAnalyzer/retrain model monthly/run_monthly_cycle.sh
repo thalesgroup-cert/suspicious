@@ -12,17 +12,18 @@
 #      a real production deploy (see promote.py's own docstring for why that
 #      step is manual/gated in the real flow).
 #
-# Steps 2-4 run inside the retrain-trainer:latest throwaway image (see
-# Dockerfile.trainer) because `pip install torch` into a host venv hits a
-# per-user disk quota in this sandbox that Docker builds don't.
+# Steps 2-4 all run inside ONE retrain-trainer:latest container (see
+# Dockerfile.trainer) - fetch -> train -> promote chained with `&&` so a
+# failed fetch never trains on stale data and a failed training never gets
+# promoted. Single container instead of one-per-step: negligible savings at
+# the real monthly cadence, but simpler to reason about than 3 separate
+# `docker run` invocations. `pip install torch` into a host venv hits a
+# per-user disk quota in this sandbox that Docker builds don't, hence the
+# container in the first place.
 #
-# Each sub-model's training run is logged to W&B (see
-# Re_Train_Model/utils.py:_wandb_start_run) - epoch loss/accuracy/time, plus
-# a current-vs-previous-cycle comparison of how many samples went into each
-# taxonomy label (persisted in label_count_history.json, independent of
-# W&B's online/offline mode). Defaults to WANDB_MODE=offline (local files
-# under ./wandb/, no account needed) - export WANDB_MODE=online +
-# WANDB_API_KEY before invoking to push to a real W&B project instead.
+# Each sub-model's training run logs a current-vs-previous-cycle comparison
+# of how many samples went into each taxonomy label (persisted in
+# label_count_history.json, see Re_Train_Model/utils.py:_log_label_counts).
 #
 # Driven by cron for the "every 30 min" cadence (crontab -l), each firing
 # running `--once` under a flock so an overrunning cycle can't overlap with
@@ -71,44 +72,31 @@ VECTORIZER="sentence-transformers/paraphrase-multilingual-mpnet-base-v2"
 # leaves that parent invisible inside the container -> ModuleNotFoundError.
 AIMAILANALYZER_DIR="$(cd .. && pwd)"
 
-# W&B run monitoring (per-epoch loss/accuracy/time + current-vs-previous
-# label sample counts, see Re_Train_Model/utils.py:_wandb_start_run).
-# Offline by default: no W&B account/API key in this sandbox, and the
-# pypi.org/proxy flakiness seen elsewhere this session makes depending on
-# the wandb.ai cloud service a bad default. Runs land under ./wandb/ and can
-# be pushed later with `wandb sync <run dir>` if you set up a real account.
-mkdir -p "$AIMAILANALYZER_DIR/retrain model monthly/wandb"
-export WANDB_MODE="${WANDB_MODE:-offline}"
-export WANDB_PROJECT="${WANDB_PROJECT:-aimailanalyzer-retrain}"
-
-run_trainer() {
+# Runs a shell one-liner inside the trainer image (overrides the image's
+# default `python3` entrypoint) so fetch/train/promote can be chained with
+# `&&` in a single container instead of three separate `docker run`s.
+run_trainer_shell() {
   docker run --rm --network host \
     -v "$AIMAILANALYZER_DIR:/aimailanalyzer" \
     -w "/aimailanalyzer/retrain model monthly" \
     -v "$HF_CACHE:/root/.cache/huggingface" \
     -e HF_HOME=/root/.cache/huggingface \
     -e VECTORIZER_PATH="$VECTORIZER" \
-    -e WANDB_MODE="$WANDB_MODE" \
-    -e WANDB_PROJECT="$WANDB_PROJECT" \
-    -e WANDB_DIR="/aimailanalyzer/retrain model monthly/wandb" \
     --env-file .env \
-    "$TRAINER_IMAGE" "$@"
+    --entrypoint sh \
+    "$TRAINER_IMAGE" -c "$1"
 }
 
 while true; do
   echo "===== $(date '+%Y-%m-%d %H:%M:%S') : monthly cycle start ====="
 
-  echo "--- [1/4] analysts triage: +10 mails across taxonomy folders ---"
+  echo "--- [1/2] analysts triage: +10 mails across taxonomy folders ---"
   "$SEED_PY" simulate_mail_arrival.py --once
 
-  echo "--- [2/4] incremental IMAP fetch -> cumulative dataset ---"
-  run_trainer generator_dataset.py
-
-  echo "--- [3/4] retrain all sub-models ---"
-  run_trainer main_retrainmodels.py data_export
-
-  echo "--- [4/4] promote + push metrics to AI Model Health dashboard ---"
-  run_trainer promote.py data_export_results/latest --force
+  echo "--- [2/2] fetch -> train -> promote (single container) ---"
+  run_trainer_shell "python3 generator_dataset.py && \
+    python3 main_retrainmodels.py data_export && \
+    python3 promote.py data_export_results/latest --force"
 
   echo "===== $(date '+%Y-%m-%d %H:%M:%S') : cycle done ====="
 

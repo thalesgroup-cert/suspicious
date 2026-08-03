@@ -27,11 +27,6 @@ from torch.utils.data import DataLoader, TensorDataset
 from tqdm import tqdm
 import hashlib
 
-try:
-    import wandb
-except ImportError:  # optional - only present inside retrain-trainer:latest
-    wandb = None
-
 # ResNetMLP must be the exact architecture the production analyzer loads
 # (Analyzers/AIMailAnalyzer/ResNetMLP.py), not a local copy - a prior version
 # of this pipeline embedded its own ResNetMLP(input_dim, hidden_dim, output_dim)
@@ -65,10 +60,9 @@ def num_classes_for(model_name: str) -> int:
 
 
 # One file, keyed by model name, holding each past run's per-label sample
-# counts - gives W&B a "previous cycle" (last month, or last 30min in the
-# dev simulation) to diff the current cycle against without needing
-# wandb.Api() (that needs WANDB_MODE=online + network; this sandbox defaults
-# to offline, see run_monthly_cycle.sh).
+# counts - gives train_model_pipeline() a "previous cycle" (last month, or
+# last 30min in the dev simulation) to diff the current cycle against, so
+# label drift/growth is visible in the training logs run over run.
 _RETRAIN_DIR = os.path.abspath(os.path.join(os.path.dirname(__file__), ".."))
 LABEL_HISTORY_PATH = os.path.join(_RETRAIN_DIR, "label_count_history.json")
 _HISTORY_KEEP = 50
@@ -116,59 +110,23 @@ def _record_label_counts(model_name: str, run_timestamp: str, counts: dict):
     return previous
 
 
-def _wandb_start_run(model_name, run_timestamp, num_epochs, batch_size, num_classes, label_counts):
-    """Best-effort - a broken/absent W&B setup must never fail a retrain
-    cycle. Defaults to WANDB_MODE=offline (writes locally under ./wandb/,
-    no account or API key needed) since this sandbox has no W&B credentials;
-    set WANDB_MODE=online + WANDB_API_KEY to push to a real project instead."""
-    if wandb is None or os.environ.get("WANDB_DISABLED", "").lower() == "true":
-        return None
-
+def _log_label_counts(model_name, run_timestamp, label_counts):
+    """Records this run's per-label sample counts and prints a diff against
+    the previous cycle for this model, so label drift/growth is visible in
+    the training logs run over run."""
     previous = _record_label_counts(model_name, run_timestamp, label_counts)
+    if previous is None:
+        return
 
-    try:
-        run = wandb.init(
-            project=os.environ.get("WANDB_PROJECT", "aimailanalyzer-retrain"),
-            group=run_timestamp,
-            job_type="retrain",
-            name=f"{model_name}-{run_timestamp}",
-            mode=os.environ.get("WANDB_MODE", "offline"),
-            reinit=True,
-            config={
-                "model_name": model_name,
-                "num_epochs": num_epochs,
-                "batch_size": batch_size,
-                "num_classes": num_classes,
-                "run_timestamp": run_timestamp,
-            },
-        )
-    except Exception as exc:
-        print(f"[wandb] init failed ({exc}) - continuing without W&B logging")
-        return None
-
-    prev_counts = previous["counts"] if previous else {}
-    prev_total = previous["total"] if previous else 0
+    prev_counts = previous["counts"]
+    prev_total = previous["total"]
     current_total = sum(label_counts.values())
 
-    log_payload = {f"samples/current/{label}": n for label, n in label_counts.items()}
-    log_payload["samples/current/total"] = current_total
-
-    table = wandb.Table(columns=["label", "current", "previous", "delta"])
+    print(f"  Samples: {current_total} (was {prev_total}, delta {current_total - prev_total:+d})")
     for label in sorted(set(label_counts) | set(prev_counts)):
         cur = label_counts.get(label, 0)
         prev = prev_counts.get(label, 0)
-        table.add_data(label, cur, prev, cur - prev)
-    log_payload["samples/comparison_table"] = table
-
-    if previous:
-        log_payload["samples/previous/total"] = prev_total
-        log_payload["samples/delta/total"] = current_total - prev_total
-        for label in set(label_counts) | set(prev_counts):
-            log_payload[f"samples/previous/{label}"] = prev_counts.get(label, 0)
-            log_payload[f"samples/delta/{label}"] = label_counts.get(label, 0) - prev_counts.get(label, 0)
-
-    wandb.log(log_payload)
-    return run
+        print(f"    {label:<28} {cur:>4} (was {prev:>4}, delta {cur - prev:+d})")
 
 
 def calculate_hash(data, hash_type="sha256"):
@@ -267,7 +225,8 @@ def pre_process(
     Returns:
         X_train, y_train, X_test, y_test, label_counts, X_golden, y_golden :
             numpy arrays + a {label: sample_count} dict (train+test combined,
-            pre-oversampling) for the W&B "current vs previous cycle" panel.
+            pre-oversampling) for the "current vs previous cycle" comparison
+            logged by _log_label_counts().
             X_golden/y_golden are None when no golden mail for this label's
             taxonomy exists yet (e.g. brand new golden set, or a label with
             zero golden coverage).
@@ -369,7 +328,6 @@ def train_model(
     model.train()
     training_started = time.time()
     for epoch in range(num_epochs):
-        epoch_started = time.time()
         total_loss = 0
         correct = 0
         total = 0
@@ -394,14 +352,6 @@ def train_model(
         epoch_loss = total_loss / len(train_loader)
         epoch_acc = 100 * correct / total
         print(f"Epoch {epoch+1}/{num_epochs} - Loss: {epoch_loss:.4f}, Accuracy: {epoch_acc:.2f}%")
-
-        if wandb is not None and wandb.run is not None:
-            wandb.log({
-                "train/epoch": epoch + 1,
-                "train/loss": epoch_loss,
-                "train/accuracy": epoch_acc,
-                "train/epoch_time_s": time.time() - epoch_started,
-            })
 
     training_time_s = time.time() - training_started
 
@@ -486,16 +436,8 @@ def train_model_pipeline(
     print(f"Nombre de classes pour {model_name}: {num_classes}")
 
     run_timestamp = run_timestamp or datetime.now().strftime("%Y-%m-%d_%H%M%S")
-    wandb_run = None
     if label_counts is not None:
-        wandb_run = _wandb_start_run(
-            model_name=model_name,
-            run_timestamp=run_timestamp,
-            num_epochs=num_epochs,
-            batch_size=32,
-            num_classes=num_classes,
-            label_counts=label_counts,
-        )
+        _log_label_counts(model_name, run_timestamp, label_counts)
 
     model, train_loader, test_loader, training_time_s = train_model(
         X_train=X_train,
@@ -528,23 +470,6 @@ def train_model_pipeline(
         golden_metrics = evaluate_model(model, golden_loader, target_names=None, device="cpu")
         metrics["f1_score_golden"] = golden_metrics["f1_score"]
         metrics["accuracy_golden"] = golden_metrics["accuracy"]
-
-    if wandb_run is not None:
-        log_payload = {
-            "eval/accuracy": metrics["accuracy"],
-            "eval/precision": metrics["precision"],
-            "eval/recall": metrics["recall"],
-            "eval/f1_score": metrics["f1_score"],
-            "train/total_time_s": training_time_s,
-        }
-        if golden_metrics is not None:
-            log_payload["eval_golden/accuracy"] = golden_metrics["accuracy"]
-            log_payload["eval_golden/f1_score"] = golden_metrics["f1_score"]
-            wandb.summary["eval_golden/f1_score"] = golden_metrics["f1_score"]
-        wandb.log(log_payload)
-        wandb.summary["train/total_time_s"] = training_time_s
-        wandb.summary["eval/f1_score"] = metrics["f1_score"]
-        wandb.finish()
 
     return model, metrics
 
