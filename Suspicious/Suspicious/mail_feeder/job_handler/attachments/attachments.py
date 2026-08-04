@@ -131,7 +131,6 @@ class AttachmentJobLauncherService:
         Decide whether to launch Cortex jobs or mark the file and hash as allowlisted.
         """
         ext = file_model.tmp_path.split(".")[-1]
-        file_model.tmp_path = file_model.tmp_path.replace("/tmp/", "")
         file_model.save()
 
         if not AllowListFile.objects.filter(linked_file_hash=hash_model).exists() \
@@ -160,5 +159,4 @@ class AttachmentJobLauncherService:
             hash_model.ioc_level = "SAFE-ALLOW_LISTED"
 
             hash_model.save()
-            file_model.tmp_path = "/tmp/" + file_model.tmp_path
             file_model.save()

@@ -14,3 +14,11 @@ seaborn>=0.13.2
 tqdm>=4.70.0
 bs4>=0.0.2
 jupyter>=1.1.1
+
+# retrain model monthly/ (IMAP fetch pipeline)
+python-dotenv>=1.0
+
+# retrain model monthly/promote.py (push run metrics to the Suspicious
+# dashboard) - not pinned elsewhere here, only a transitive dep of
+# sentence-transformers/huggingface_hub until now.
+requests>=2.32

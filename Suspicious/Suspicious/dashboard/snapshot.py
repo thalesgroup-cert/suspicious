@@ -23,6 +23,7 @@ def build_dashboard_payload(*, month: int, year: int, scope: str) -> dict:
     cases_agg = _get_cases_aggregate(month=month, year=year)
     reporters_agg = _get_reporters_aggregate(month=month, year=year)
     total_cases_agg = _get_total_cases_aggregate(month=month, year=year)
+    challenged_agg = _get_challenged_cases_aggregate(month=month, year=year)
 
     malicious_total = (
         cases_agg["classic_phishing_cases"]
@@ -39,6 +40,7 @@ def build_dashboard_payload(*, month: int, year: int, scope: str) -> dict:
             "new_users": reporters_agg["new_users"],
             "total_reporters": reporters_agg["total_reporters"],
             "total_cases": total_cases_agg["total_cases"],
+            "challenged_cases": challenged_agg["challenged_cases"],
         },
         "danger_counts": {
             "failure": cases_agg["failure_cases"],
@@ -110,6 +112,18 @@ def _get_total_cases_aggregate(*, month: int, year: int) -> dict:
         creation_date__year=year,
     ).aggregate(
         total_cases=Coalesce(Sum("total_cases"), 0),
+    )
+
+
+def _get_challenged_cases_aggregate(*, month: int, year: int) -> dict:
+    # UserCasesMonthlyStats.month is written zero-padded (date.today().strftime("%m"),
+    # see tasp/cron/kpi.py + tasp/services/challenge.py) - must match here or every
+    # single-digit month (Jan-Sep) silently returns zero rows.
+    return UserCasesMonthlyStats.objects.filter(
+        month=f"{month:02d}",
+        year=str(year),
+    ).aggregate(
+        challenged_cases=Coalesce(Sum("challenged_cases"), 0),
     )
 
 

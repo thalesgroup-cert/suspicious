@@ -62,9 +62,24 @@ backups
 
 # ===== ML models / weights (large, fetched at build/runtime) =====
 Analyzers/AIMailAnalyzer/models
+Analyzers/AIMailAnalyzer/models_backup
 Analyzers/AIMailAnalyzer/vectorizers/paraphrase-multilingual-mpnet-base-v2/model.safetensors
 Analyzers/AIMailAnalyzer/vectorizers/paraphrase-multilingual-mpnet-base-v2/config.json
 Analyzers/AIMailAnalyzer/vectorizers/paraphrase-multilingual-mpnet-base-v2/1_Pooling
+
+# ===== Monthly retrain pipeline: fetched mail + run outputs, never commit =====
+Analyzers/AIMailAnalyzer/retrain model monthly/data_export/
+Analyzers/AIMailAnalyzer/retrain model monthly/data_base_results/
+Analyzers/AIMailAnalyzer/retrain model monthly/*_results/
+Analyzers/AIMailAnalyzer/retrain model monthly/wandb/
+Analyzers/AIMailAnalyzer/retrain model monthly/label_count_history.json
+# golden_set.json pins content hashes from THIS deployment's own fetched
+# mail (dataset.pkl, also gitignored above) - not portable across installs.
+Analyzers/AIMailAnalyzer/retrain model monthly/golden_set.json
+# promote.py's intermediate output dir before weights get copied up to the
+# real Analyzers/AIMailAnalyzer/models/ (already ignored above) - binary
+# .pth files, never commit.
+Analyzers/AIMailAnalyzer/retrain model monthly/models/
 
 # ===== Docs (MkDocs) =====
 /site/
@@ -81,3 +96,6 @@ docs/superpowers
 .idea
 .DS_Store
 Thumbs.db
+CLAUDE.local.md
+*.bak
+/get-docker.sh

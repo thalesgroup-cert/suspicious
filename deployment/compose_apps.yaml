@@ -147,6 +147,20 @@ services:
     environment:
       http_proxy:  "${HTTP_PROXY:-}"
       https_proxy: "${HTTPS_PROXY:-}"
+      # Cortex's entrypoint spawns the JVM via `su - cortex`, which recomputes
+      # the process's groups fresh from /etc/group for the "cortex" user -
+      # it does NOT inherit a compose-level `group_add` on the container's
+      # root process (tried that first; su discards it). And the image bakes
+      # its OWN unrelated "docker" group at a fixed GID, which won't match
+      # the host's docker.sock group anyway (that varies per host - check
+      # with `stat -c '%g' /var/run/docker.sock`). So instead we use Cortex's
+      # own `--daemon-user <uid>[:<gid>]` mechanism (entrypoint's
+      # `groupmod -g $DAEMON_GID cortex`) to make cortex's PRIMARY gid equal
+      # the host socket's real gid directly.
+      # Do NOT "fix" this by chgrp-ing the host socket itself (e.g. to 1001) -
+      # that only helps Cortex and breaks every other user/process on the
+      # host that relies on being in the real `docker` group.
+      daemon_user: "1001:${DOCKER_SOCK_GID:-115}"
       # Cortex bundles a fabric8 Kubernetes client (eagerly constructed even
       # though jobs run via docker.sock) that REJECTS `*` wildcards in NO_PROXY
       # and refuses to boot. Two sources leak a corporate wildcard in here: the

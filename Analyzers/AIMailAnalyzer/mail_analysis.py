@@ -165,9 +165,24 @@ def getSubClassificationProbabilities(device, models, email_embedding, main_clas
     import torch
     email_tensor = torch.tensor(email_embedding, dtype=torch.float32).to(device)
 
+    # Fixed by the [safe_model(2), spam_model(2), dangerous_model(4)] calling
+    # convention documented on y_dangerous_encoder in retrain model
+    # monthly/Re_Train_Model/variable.py - not derivable from
+    # main_classification_probabilities, which holds one scalar weight per
+    # model position, not each model's own output width.
+    _SUB_MODEL_WIDTHS = (2, 2, 4)
+
     global_sub_probabilities = []
 
     for i, model in enumerate(models):
+        if model is None:
+            # Sub-model not available (e.g. not enough labeled samples yet
+            # to train it - see retrain model monthly/main_retrainmodels.py's
+            # per-model resilience). Contribute an all-zero slice so the
+            # concatenated vector keeps its expected width and downstream
+            # argmax never picks a sub-class we have no signal for.
+            global_sub_probabilities.append(np.zeros(_SUB_MODEL_WIDTHS[i]))
+            continue
         model.eval()
         with torch.no_grad():
             output = model(email_tensor)

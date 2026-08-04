@@ -109,6 +109,39 @@ class MonthlyReporterStats(models.Model):
         return str(self.id)
 
 
+class AIModelRetrainRun(models.Model):
+    """One row per sub-model per retraining run of AIMailAnalyzer
+    (Analyzers/AIMailAnalyzer/retrain model monthly/), pushed by promote.py
+    after a run is promoted to the live models/ directory. Powers the
+    "AI model health" dashboard panel — F1/accuracy trend and last-promoted
+    version per sub-model.
+    """
+    run_timestamp = models.DateTimeField()
+    dataset_dir = models.CharField(max_length=255)
+    label = models.CharField(max_length=64)  # e.g. "dangerous", "safe_suspicious"
+    model_name = models.CharField(max_length=128)  # e.g. "dangerous_30_epochs_model"
+    f1_score = models.FloatField()
+    accuracy = models.FloatField()
+    # Scored against a fixed held-out benchmark (retrain model monthly/
+    # golden_set.py) instead of the regular random test split, which is a
+    # different slice of the ever-growing cumulative dataset every cycle -
+    # f1_score/accuracy above aren't comparable across runs, these are.
+    # Null until a golden set exists and has coverage for this label.
+    f1_score_golden = models.FloatField(null=True, blank=True)
+    accuracy_golden = models.FloatField(null=True, blank=True)
+    promoted = models.BooleanField(default=False)
+    creation_date = models.DateTimeField(auto_now_add=True)
+
+    class Meta:
+        indexes = [
+            models.Index(fields=["label", "-run_timestamp"], name="ai_run_label_ts_idx"),
+        ]
+        ordering = ["-run_timestamp"]
+
+    def __str__(self):
+        return f"{self.label}@{self.run_timestamp:%Y-%m-%d %H:%M} (F1={self.f1_score:.3f})"
+
+
 class TotalCasesStats(models.Model):
     id = models.AutoField(primary_key=True)
     total_cases = models.PositiveIntegerField(default=0)

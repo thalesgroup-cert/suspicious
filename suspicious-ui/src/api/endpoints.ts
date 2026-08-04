@@ -4,4 +4,5 @@ export const endpoints = {
   me: "/auth/me/",
   dashboardSummary: "/dashboard/summary/",
   connectors: "/connectors/",
+  aiModelRuns: "/stats/ai-model-runs/",
 };

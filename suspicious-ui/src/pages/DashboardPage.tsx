@@ -18,6 +18,8 @@ import ThreatDistributionPanel from "@/features/dashboard/components/ThreatDistr
 import TopPrefixesPanel from "@/features/dashboard/components/TopPrefixesPanel";
 import { DashboardEmpty, DashboardLoading } from "@/features/dashboard/components/StatePanels";
 import KpiTrendPanels from "@/features/dashboard/components/KpiTrendPanels";
+import AiModelHealthPanel from "@/features/dashboard/components/AiModelHealthPanel";
+import ChallengedPanel from "@/features/dashboard/components/ChallengedPanel";
 
 // ---------------------------------------------------------------------------
 // Helpers
@@ -51,7 +53,7 @@ const EMPTY_SUMMARY: DashboardSummary = {
   month: 1,
   year: 1970,
   scope: "ALL",
-  kpis: { new_users: 0, total_reporters: 0, total_cases: 0 },
+  kpis: { new_users: 0, total_reporters: 0, total_cases: 0, challenged_cases: 0 },
   danger_counts: {
     failure: 0, safe: 0, inconclusive: 0, suspicious: 0, dangerous: 0, malicious: 0,
   },
@@ -62,6 +64,8 @@ const DASHBOARD_PANEL_KEYS = {
   KPI_TRENDS: "kpi-trends",
   TOP_PREFIXES: "top-prefixes",
   THREAT_DISTRIBUTION: "threat-distribution",
+  AI_MODEL_HEALTH: "ai-model-health",
+  CHALLENGED_MAILS: "challenged-mails",
 } as const;
 
 const DASHBOARD_BREAKPOINTS = { lg: 1200, md: 900, sm: 600, xs: 0 };
@@ -76,24 +80,32 @@ type ResponsiveLayouts = Partial<Record<string, Layout>>;
 
 const DEFAULT_DASHBOARD_LAYOUTS: ResponsiveLayouts = {
   lg: [
-    { i: DASHBOARD_PANEL_KEYS.KPI_TRENDS,          x: 0,  y: 0,          w: 12, h: 6,       minW: 6,  minH: 4 },
-    { i: DASHBOARD_PANEL_KEYS.TOP_PREFIXES,         x: 0,  y: 6,          w: 8,  h: BOTTOM_H, minW: 4, minH: BOTTOM_MIN_H },
-    { i: DASHBOARD_PANEL_KEYS.THREAT_DISTRIBUTION,  x: 8,  y: 6,          w: 4,  h: BOTTOM_H, minW: 4, minH: BOTTOM_MIN_H },
+    { i: DASHBOARD_PANEL_KEYS.KPI_TRENDS,          x: 0,  y: 0,                   w: 12, h: 6,       minW: 6,  minH: 4 },
+    { i: DASHBOARD_PANEL_KEYS.TOP_PREFIXES,         x: 0,  y: 6,                   w: 8,  h: BOTTOM_H, minW: 4, minH: BOTTOM_MIN_H },
+    { i: DASHBOARD_PANEL_KEYS.THREAT_DISTRIBUTION,  x: 8,  y: 6,                   w: 4,  h: BOTTOM_H, minW: 4, minH: BOTTOM_MIN_H },
+    { i: DASHBOARD_PANEL_KEYS.AI_MODEL_HEALTH,      x: 0,  y: 6 + BOTTOM_H,        w: 8,  h: BOTTOM_H, minW: 6, minH: BOTTOM_MIN_H },
+    { i: DASHBOARD_PANEL_KEYS.CHALLENGED_MAILS,     x: 8,  y: 6 + BOTTOM_H,        w: 4,  h: BOTTOM_H, minW: 4, minH: BOTTOM_MIN_H },
   ],
   md: [
-    { i: DASHBOARD_PANEL_KEYS.KPI_TRENDS,          x: 0,  y: 0,          w: 12, h: 6,       minW: 6,  minH: 4 },
-    { i: DASHBOARD_PANEL_KEYS.TOP_PREFIXES,         x: 0,  y: 6,          w: 7,  h: BOTTOM_H, minW: 4, minH: BOTTOM_MIN_H },
-    { i: DASHBOARD_PANEL_KEYS.THREAT_DISTRIBUTION,  x: 7,  y: 6,          w: 5,  h: BOTTOM_H, minW: 4, minH: BOTTOM_MIN_H },
+    { i: DASHBOARD_PANEL_KEYS.KPI_TRENDS,          x: 0,  y: 0,                   w: 12, h: 6,       minW: 6,  minH: 4 },
+    { i: DASHBOARD_PANEL_KEYS.TOP_PREFIXES,         x: 0,  y: 6,                   w: 7,  h: BOTTOM_H, minW: 4, minH: BOTTOM_MIN_H },
+    { i: DASHBOARD_PANEL_KEYS.THREAT_DISTRIBUTION,  x: 7,  y: 6,                   w: 5,  h: BOTTOM_H, minW: 4, minH: BOTTOM_MIN_H },
+    { i: DASHBOARD_PANEL_KEYS.AI_MODEL_HEALTH,      x: 0,  y: 6 + BOTTOM_H,        w: 8,  h: BOTTOM_H, minW: 6, minH: BOTTOM_MIN_H },
+    { i: DASHBOARD_PANEL_KEYS.CHALLENGED_MAILS,     x: 8,  y: 6 + BOTTOM_H,        w: 4,  h: BOTTOM_H, minW: 4, minH: BOTTOM_MIN_H },
   ],
   sm: [
     { i: DASHBOARD_PANEL_KEYS.KPI_TRENDS,          x: 0,  y: 0,                   w: 6, h: 6,       minH: 4 },
     { i: DASHBOARD_PANEL_KEYS.TOP_PREFIXES,         x: 0,  y: 6,                   w: 6, h: BOTTOM_H, minH: BOTTOM_MIN_H },
     { i: DASHBOARD_PANEL_KEYS.THREAT_DISTRIBUTION,  x: 0,  y: 6 + BOTTOM_H,        w: 6, h: BOTTOM_H, minH: BOTTOM_MIN_H },
+    { i: DASHBOARD_PANEL_KEYS.AI_MODEL_HEALTH,      x: 0,  y: 6 + 2 * BOTTOM_H,    w: 6, h: BOTTOM_H, minH: BOTTOM_MIN_H },
+    { i: DASHBOARD_PANEL_KEYS.CHALLENGED_MAILS,     x: 0,  y: 6 + 3 * BOTTOM_H,    w: 6, h: BOTTOM_H, minH: BOTTOM_MIN_H },
   ],
   xs: [
     { i: DASHBOARD_PANEL_KEYS.KPI_TRENDS,          x: 0,  y: 0,                          w: 1, h: 6,       minH: 4 },
     { i: DASHBOARD_PANEL_KEYS.TOP_PREFIXES,         x: 0,  y: 6,                          w: 1, h: BOTTOM_H, minH: BOTTOM_MIN_H },
     { i: DASHBOARD_PANEL_KEYS.THREAT_DISTRIBUTION,  x: 0,  y: 6 + BOTTOM_H,               w: 1, h: BOTTOM_H, minH: BOTTOM_MIN_H },
+    { i: DASHBOARD_PANEL_KEYS.AI_MODEL_HEALTH,      x: 0,  y: 6 + 2 * BOTTOM_H,           w: 1, h: BOTTOM_H, minH: BOTTOM_MIN_H },
+    { i: DASHBOARD_PANEL_KEYS.CHALLENGED_MAILS,     x: 0,  y: 6 + 3 * BOTTOM_H,           w: 1, h: BOTTOM_H, minH: BOTTOM_MIN_H },
   ],
 };
 
@@ -101,6 +113,24 @@ const ResponsiveGridLayout = WidthProvider(Responsive);
 
 function isValidLayouts(value: unknown): value is ResponsiveLayouts {
   return !!value && typeof value === "object" && !Array.isArray(value);
+}
+
+// A layout persisted to localStorage before a panel was added (or after one
+// was removed) won't have a grid item for every current
+// DASHBOARD_PANEL_KEYS entry - react-grid-layout crashes rendering a
+// <Box key={...}> with no matching layout item. Backfill missing panels
+// from DEFAULT_DASHBOARD_LAYOUTS and drop stale ones, for every breakpoint.
+function ensureAllPanelsPresent(layouts: ResponsiveLayouts): ResponsiveLayouts {
+  const allKeys = new Set<string>(Object.values(DASHBOARD_PANEL_KEYS));
+  const result: ResponsiveLayouts = {};
+  for (const breakpoint of Object.keys(DASHBOARD_BREAKPOINTS)) {
+    const existing = (layouts[breakpoint] ?? []).filter((item) => allKeys.has(item.i));
+    const existingKeys = new Set(existing.map((item) => item.i));
+    const fallback = DEFAULT_DASHBOARD_LAYOUTS[breakpoint] ?? [];
+    const missing = fallback.filter((item) => !existingKeys.has(item.i));
+    result[breakpoint] = [...existing, ...missing];
+  }
+  return result;
 }
 
 function getStorageKey(userId?: string | number) {
@@ -113,7 +143,7 @@ function loadLayoutsFromStorage(storageKey: string): ResponsiveLayouts {
     const raw = window.localStorage.getItem(storageKey);
     if (!raw) return DEFAULT_DASHBOARD_LAYOUTS;
     const parsed = JSON.parse(raw);
-    return isValidLayouts(parsed) ? parsed : DEFAULT_DASHBOARD_LAYOUTS;
+    return isValidLayouts(parsed) ? ensureAllPanelsPresent(parsed) : DEFAULT_DASHBOARD_LAYOUTS;
   } catch {
     return DEFAULT_DASHBOARD_LAYOUTS;
   }
@@ -591,6 +621,29 @@ export default function DashboardPage() {
             >
               <DashboardPanelShell title="Threat Distribution">
                 <ThreatDistributionPanel dangerCounts={data.danger_counts} />
+              </DashboardPanelShell>
+            </Box>
+
+            <Box
+              key={DASHBOARD_PANEL_KEYS.AI_MODEL_HEALTH}
+              className="dashboard-draggable-panel"
+              sx={{ height: "100%", minHeight: 0, overflow: "hidden" }}
+            >
+              <DashboardPanelShell title="AI Model Health">
+                <AiModelHealthPanel />
+              </DashboardPanelShell>
+            </Box>
+
+            <Box
+              key={DASHBOARD_PANEL_KEYS.CHALLENGED_MAILS}
+              className="dashboard-draggable-panel"
+              sx={{ height: "100%", minHeight: 0, overflow: "hidden" }}
+            >
+              <DashboardPanelShell title="Challenged Mails">
+                <ChallengedPanel
+                  totalCases={data.kpis.total_cases}
+                  challengedCases={data.kpis.challenged_cases}
+                />
               </DashboardPanelShell>
             </Box>
           </ResponsiveGridLayout>

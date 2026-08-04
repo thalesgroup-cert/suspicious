@@ -1,0 +1,28 @@
+# Throwaway image for running the retrain pipeline in this sandbox, where
+# `pip install torch` directly into a host venv hits a per-user disk quota
+# that Docker builds don't (see conversation notes). NOT part of the
+# production image set — dev/CI convenience only, not referenced by
+# deployment/docker-compose*.yml.
+FROM python:3.12-slim-bookworm
+
+WORKDIR /work
+
+ARG HTTP_PROXY
+ARG HTTPS_PROXY
+ENV http_proxy=${HTTP_PROXY} \
+    https_proxy=${HTTPS_PROXY} \
+    PYTHONUNBUFFERED=1
+
+COPY requirements.txt /work/requirements.txt
+COPY requirements-train.txt /work/requirements-train.txt
+
+# requirements.txt/-train.txt first (whatever torch/torchvision/torchaudio
+# build pip resolves from PyPI by default), THEN reinstall the matched
+# CPU-only torch+torchvision+torchaudio triplet from the same index LAST so
+# it's authoritative - installing torch alone first and requirements.txt
+# after let a mismatched torchvision build (different index/ABI) overwrite
+# it, breaking `torchvision::nms` at import time.
+RUN pip install --no-cache-dir -r requirements.txt -r requirements-train.txt && \
+    pip install --no-cache-dir torch torchvision torchaudio --index-url https://download.pytorch.org/whl/cpu
+
+ENTRYPOINT ["python3"]

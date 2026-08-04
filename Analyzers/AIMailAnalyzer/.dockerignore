@@ -15,13 +15,22 @@ venv/
 .ruff_cache/
 .mypy_cache/
 
-# Large ML weights — fetched at build/runtime, never sent in build context
-models/
-vectorizers/paraphrase-multilingual-mpnet-base-v2/model.safetensors
-vectorizers/paraphrase-multilingual-mpnet-base-v2/config.json
-vectorizers/paraphrase-multilingual-mpnet-base-v2/1_Pooling/
+# Large ML weights — fetched at build/runtime, never sent in build context.
+# TEMPORARILY DISABLED for a local dev build (2026-07-30): this sandbox has
+# no actual build/runtime fetch mechanism wired up, so excluding these left
+# the analyzer permanently broken ("Unrecognized model ... model_type key").
+# Restore these 4 lines once a real fetch step exists.
+# models/
+# vectorizers/paraphrase-multilingual-mpnet-base-v2/model.safetensors
+# vectorizers/paraphrase-multilingual-mpnet-base-v2/config.json
+# vectorizers/paraphrase-multilingual-mpnet-base-v2/1_Pooling/
 
 # Secrets / logs / OS cruft
 *.env
 *.log
 .DS_Store
+
+# Monthly retraining pipeline — operational tooling, not used by
+# ai_mail_classifier.py at runtime. Also keeps locally-fetched training mail
+# and IMAP credentials out of any built/pushed image.
+retrain model monthly/
