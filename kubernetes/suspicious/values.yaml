@@ -43,3 +43,8 @@ cache:
   auth:
     enabled: true
     password: ""
+
+tlsBundle:
+  certfile: ""
+  keyfile: ""
+  rootcafile: ""
