@@ -26,10 +26,16 @@ WORKDIR /worker/
 # why apt-get above works (apt reads it via a separate mechanism) but uv
 # doesn't unless explicitly passed here (same fix as Suspicious/Dockerfile
 # and email-feeder/Dockerfile).
-COPY requirements.txt .
+#
+# requirements-client.txt, NOT requirements.txt: ai_mail_classifier.py is a
+# thin HTTP client now (see inference_server/ for where model loading
+# actually happens) - no torch/sentence_transformers needed in this image
+# at all, which is most of what made every Cortex job's container slow to
+# start. Keep this image light; the heavy ML deps live in the persistent
+# inference_server/ image instead.
+COPY requirements-client.txt .
 RUN http_proxy="${HTTP_PROXY}" https_proxy="${HTTPS_PROXY}" uv pip install --system --upgrade pip
-RUN http_proxy="${HTTP_PROXY}" https_proxy="${HTTPS_PROXY}" uv pip install --system --no-cache torch torchvision torchaudio --index-url https://download.pytorch.org/whl/cpu
-RUN http_proxy="${HTTP_PROXY}" https_proxy="${HTTPS_PROXY}" uv pip install --system --no-cache -r requirements.txt
+RUN http_proxy="${HTTP_PROXY}" https_proxy="${HTTPS_PROXY}" uv pip install --system --no-cache -r requirements-client.txt
 
 COPY . /worker/AIMailAnalyzer/
 

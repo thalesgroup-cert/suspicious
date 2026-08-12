@@ -69,6 +69,7 @@ type InvestigationAnalyzerReport = {
   categories: string[];
   report_summary?: unknown;
   report_taxonomy?: unknown;
+  report_full?: unknown;
   target: InvestigationAnalyzerTarget | null;
   created_at?: string;
 };
@@ -262,6 +263,7 @@ function normalizeAnalyzerReport(input: unknown): InvestigationAnalyzerReport {
     categories: asStringArray(report.categories),
     report_summary: report.report_summary,
     report_taxonomy: report.report_taxonomy,
+    report_full: report.report_full,
     target: normalizeAnalyzerTarget(report.target),
     created_at: typeof report.created_at === "string" ? report.created_at : undefined,
   };

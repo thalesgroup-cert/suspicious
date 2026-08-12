@@ -13,8 +13,10 @@ export {
   fmtDate,
   kindLabel,
   groupReportsByArtifact,
+  getSubCategoryProbabilities,
   type ReportGroup,
   type ReportLike,
+  type SubCategoryProbability,
 } from "@/shared/lib/scoreUtils";
 
 // ---------------------------------------------------------------------------

@@ -61,7 +61,11 @@ export default function AiModelHealthPanel() {
 
   const { data, isLoading, isError } = useQuery({
     queryKey: ["ai-model-runs"],
-    queryFn: () => getAiModelRuns(50),
+    // 1000 = DashboardLimitOffsetPagination's max_limit - the last-50 window
+    // used to silently drop July's runs once daily volume grew past ~50/day
+    // (July's whole history disappeared behind newer rows), so pull the
+    // full history the server allows instead of guessing a cutoff.
+    queryFn: () => getAiModelRuns(1000),
   });
 
   const grouped = React.useMemo(() => groupByLabel(data ?? []), [data]);

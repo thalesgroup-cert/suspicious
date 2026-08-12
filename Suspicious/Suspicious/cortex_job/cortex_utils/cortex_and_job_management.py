@@ -166,13 +166,25 @@ class CortexJob:
         """
         Launch Cortex AI jobs for the given value and data type.
 
+        Dispatches the personal (this deployment's own trained model)
+        analyzer, and - best-effort, only if configured - the public
+        (public-dataset-trained) comparison analyzer, against the same
+        mail archive. The public dispatch never affects the personal job's
+        outcome or return value: it's purely a second, informational
+        AnalyzerReport for side-by-side display (see
+        InvestigationAnalyzerReportCard.tsx) - Case.manage_ai_jobs only ever
+        reads the personal ("ai") analyzer's report, so a failure or absence
+        of the public one can't touch case.results_ai.
+
         Args:
             value: The object to analyze (file, archive, etc.).
             data_type (str): The type of data ('file', 'mail_body', etc.).
             case (Case): The case the dispatched jobs belong to.
 
         Returns:
-            str or None: The job ID of the launched Cortex AI job, or None if launch failed.
+            str or None: The job ID of the launched personal-analyzer Cortex
+            job, or None if that launch failed (the public one, if any, is
+            reported only via logging - see its own try/except below).
         """
         if data_type != "file":
             return None
@@ -188,19 +200,33 @@ class CortexJob:
             fetch_mail_logger.info("Skipping AI analyzer for .eml file")
             return None
 
+        cortex_config = _get_cortex_config()
+        ai_analyzers = cortex_config.get("analyzers", {})
+
+        personal_job_id = None
         try:
-            cortex_config = _get_cortex_config()
-            ai_analyzer_name = (cortex_config.get("analyzers", {}).get("ai", {}))
+            ai_analyzer_name = ai_analyzers.get("ai", {})
             analyzer = self.api.analyzers.get_by_name(ai_analyzer_name)
             if not analyzer:
                 fetch_mail_logger.warning(f"AI analyzer '{ai_analyzer_name}' not found")
-                return None
-
-            report = CortexJob.run(self.api, analyzer, archive, "file", case)
-            return getattr(report, "id", None)
+            else:
+                report = CortexJob.run(self.api, analyzer, archive, "file", case)
+                personal_job_id = getattr(report, "id", None)
         except Exception as e:
             fetch_mail_logger.error(f"Error launching Cortex AI job: {e}")
-            return None
+
+        public_analyzer_name = ai_analyzers.get("ai_public")
+        if public_analyzer_name:
+            try:
+                public_analyzer = self.api.analyzers.get_by_name(public_analyzer_name)
+                if not public_analyzer:
+                    fetch_mail_logger.warning(f"Public AI analyzer '{public_analyzer_name}' not found")
+                else:
+                    CortexJob.run(self.api, public_analyzer, archive, "file", case)
+            except Exception as e:
+                fetch_mail_logger.error(f"Error launching Cortex public AI job: {e}")
+
+        return personal_job_id
 
     @staticmethod
     def run(api, analyzer, value, data_type, case):
@@ -383,6 +409,45 @@ class CortexJob:
         return report
 
     @staticmethod
+    def _ensure_local_file(file_instance) -> None:
+        """Re-materialise file_instance.tmp_path on local disk from durable
+        storage (file_instance.file_path, S3/MinIO-backed when
+        storage.backend="s3") if it's missing.
+
+        tmp_path lives under a local, non-volume container path
+        (e.g. /app/case/... for web-submitted mail) - it only survives as
+        long as THIS container instance does. Any restart/redeploy between
+        the initial submission and a later dispatch (redo-analysis, a
+        Cortex retry, ...) loses it, even though file_path's own storage
+        backend still has the real content. Fail-open: any error here is
+        left for the caller to handle via the existing get_data_value/
+        run_analyzer exception paths - this only ever helps, never blocks.
+        """
+        import os
+
+        tmp_path = getattr(file_instance, "tmp_path", None)
+        if not tmp_path or os.path.exists(tmp_path):
+            return
+
+        file_field = getattr(file_instance, "file_path", None)
+        if not file_field:
+            return
+
+        try:
+            os.makedirs(os.path.dirname(tmp_path), exist_ok=True)
+            with file_field.open("rb") as src, open(tmp_path, "wb") as dst:
+                import shutil
+                shutil.copyfileobj(src, dst)
+            fetch_mail_logger.info(
+                "Re-materialised %s from durable storage (local tmp_path was missing, "
+                "likely lost to a container restart)", tmp_path,
+            )
+        except Exception:
+            fetch_mail_logger.exception(
+                "Failed to re-materialise %s from durable storage", tmp_path
+            )
+
+    @staticmethod
     def get_data_value(data, data_type):
         """
         Retrieve the value of the data object based on its type.
@@ -404,6 +469,7 @@ class CortexJob:
             # tmp_path is always stored absolute (file_process/file_utils/
             # file_handler.py) - no "/tmp/" prefix reconstruction needed.
             data_value = data.tmp_path
+            CortexJob._ensure_local_file(data)
 
         elif data_type in {"url", "ip", "mail"}:
             if not hasattr(data, "address"):

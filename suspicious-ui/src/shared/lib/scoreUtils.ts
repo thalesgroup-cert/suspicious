@@ -176,6 +176,49 @@ export type ReportGroup<T = ReportLike> = {
   reports: T[];
 };
 
+// ---------------------------------------------------------------------------
+// AI Mail Analyzer sub-category breakdown
+// ---------------------------------------------------------------------------
+
+export type SubCategoryProbability = { label: string; pct: number };
+
+function parseProbabilityDict(dict: unknown): SubCategoryProbability[] | null {
+  if (!dict || typeof dict !== "object") return null;
+  const entries = Object.entries(dict as Record<string, unknown>)
+    .map(([label, raw]) => {
+      // ai_mail_classifier.py formats these as percentage strings ("12.34%"),
+      // but tolerate a plain 0-1 fraction too in case that ever changes.
+      const pct =
+        typeof raw === "string"
+          ? parseFloat(raw.replace("%", ""))
+          : typeof raw === "number"
+            ? raw * 100
+            : NaN;
+      return { label, pct };
+    })
+    .filter((entry) => !Number.isNaN(entry.pct));
+  if (!entries.length) return null;
+  return entries.sort((a, b) => b.pct - a.pct);
+}
+
+/**
+ * Reads the AI Mail Analyzer's per-sub-category probabilities out of an
+ * AnalyzerReport's `report_full` (the raw Cortex "full" payload - report()'s
+ * own `report.sub_probabilities` dict, see ai_mail_classifier.py). Returns
+ * null for any other analyzer, or a report shape that doesn't carry this
+ * breakdown, so callers can hide the section entirely.
+ */
+export function getSubCategoryProbabilities(reportFull: unknown): SubCategoryProbability[] | null {
+  if (!reportFull || typeof reportFull !== "object") return null;
+  const full = reportFull as Record<string, unknown>;
+  const nested = isObject(full.report) ? full.report : full;
+  return parseProbabilityDict(nested.sub_probabilities) ?? parseProbabilityDict(full.sub_probabilities);
+}
+
+function isObject(value: unknown): value is Record<string, unknown> {
+  return typeof value === "object" && value !== null;
+}
+
 export function groupReportsByArtifact<T extends ReportLike>(reports: T[]): ReportGroup<T>[] {
   const order: string[] = [];
   const map: Record<string, ReportGroup<T>> = {};

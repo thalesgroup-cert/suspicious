@@ -13,10 +13,12 @@ import {
 import { ExpandMoreOutlined } from "@mui/icons-material";
 import { alpha, useTheme } from "@mui/material/styles";
 
+import { SubCategoryBarChart } from "@/shared/components/SubCategoryBarChart";
 import {
   fmtDate,
   getConfidenceTone,
   getRiskTone,
+  getSubCategoryProbabilities,
   normalizeConfidence,
   normalizeScore,
   prettySummary,
@@ -45,6 +47,7 @@ export function InvestigationAnalyzerReportCard({
 
   const readableSummary = prettySummary(report.report_summary);
   const plainSummary = summarizeForReading(report);
+  const subCategoryProbabilities = getSubCategoryProbabilities(report.report_full);
 
   const cardBg = isDark
     ? `linear-gradient(180deg, ${risk.softBg} 0%, rgba(255,255,255,.03) 100%)`
@@ -180,6 +183,22 @@ export function InvestigationAnalyzerReportCard({
                 />
               </Box>
             </Stack>
+
+            {subCategoryProbabilities ? (
+              <Box
+                sx={{
+                  p: 1.5,
+                  borderRadius: 2,
+                  border: `1px solid ${detailBorder}`,
+                  background: detailBg,
+                }}
+              >
+                <Typography variant="body2" sx={{ mb: 1.25, fontWeight: 800 }}>
+                  Répartition par sous-catégorie
+                </Typography>
+                <SubCategoryBarChart data={subCategoryProbabilities} />
+              </Box>
+            ) : null}
 
             <Box
               sx={{

@@ -10,7 +10,39 @@
             "file"
         ],
         "baseConfig": "-",
-        "configurationItems": [],
+        "configurationItems": [
+            {
+                "name": "variant",
+                "description": "Which model weights to classify with - 'personal' (this deployment's own trained model) or 'public' (see Analyzers/AIMailAnalyzer/models_public/).",
+                "type": "string",
+                "multi": false,
+                "required": false,
+                "defaultValue": "personal"
+            }
+        ],
+        "dockerImage": "aimailanalyzer:v2"
+    },
+    {
+        "name": "AI_Mail_Analyzer_Public",
+        "version": "1.0",
+        "author": "THA-CERT //GCL & ECR",
+        "url": "-",
+        "license": "-",
+        "description": "Same AI_Mail_Analyzer image and code, run against the public-dataset-trained model weights (models_public/) for side-by-side comparison against the personal deployment's own model. Purely comparative - never feeds Case.results_ai (see cortex_and_job_management.py:manage_ai_jobs).",
+        "dataTypeList": [
+            "file"
+        ],
+        "baseConfig": "-",
+        "configurationItems": [
+            {
+                "name": "variant",
+                "description": "Which model weights to classify with - 'personal' (this deployment's own trained model) or 'public' (see Analyzers/AIMailAnalyzer/models_public/).",
+                "type": "string",
+                "multi": false,
+                "required": false,
+                "defaultValue": "public"
+            }
+        ],
         "dockerImage": "aimailanalyzer:v2"
     }
 ]

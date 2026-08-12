@@ -248,6 +248,27 @@ def dispatch_case_analysis(self, case_id: int, intents: list):
                 "Failed to launch Cortex jobs (case=%s data_type=%s)", case_id, data_type
             )
 
+    # launch_cortex_jobs() above deliberately excludes the AI analyzer for
+    # .eml files (it would receive the raw uploaded mail, not the
+    # headers+body archive AI_Mail_Analyzer expects) - only
+    # mail_feeder/global_submission/gsubmission.py used to dispatch AI, via
+    # the mail's MailArchive, and only at first ingestion. Redo-analysis
+    # (api/views/investigations.py:InvestigationRedoAnalysisView) re-enters
+    # here and never went through gsubmission.py, so it silently never
+    # re-ran the AI analyzer. Mirror gsubmission.py's own call so both the
+    # initial dispatch and every redo cover the AI analyzer too.
+    file_or_mail = getattr(case, "fileOrMail", None)
+    mail = getattr(file_or_mail, "mail", None) if file_or_mail else None
+    if mail is not None:
+        mail_archive = mail.mail_archive.filter(archive__isnull=False).first()
+        if mail_archive is not None:
+            try:
+                cortex.launch_cortex_ai_jobs(mail_archive, "file", case=case)
+            except Exception:
+                logger.exception(
+                    "Failed to launch Cortex AI job (case=%s)", case_id
+                )
+
     case.dispatched_at = timezone.now()
     case.save(update_fields=["dispatched_at"])
     reconcile_case.delay(case_id)
