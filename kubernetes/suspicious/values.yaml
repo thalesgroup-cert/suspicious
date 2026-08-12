@@ -2,12 +2,6 @@
 imagePullSecrets: []
 fullnameOverride: ""
 
-global:
-  security:
-    # broker/cache point the bitnami/redis subchart at valkey/valkey instead of
-    # bitnami/redis, which trips the chart's built-in image-provenance check.
-    allowInsecureImages: true
-
 mysql:
   enabled: true
   architecture: standalone   # or "replication" for a read replica
@@ -22,6 +16,13 @@ mysql:
 broker:
   enabled: true
   architecture: standalone
+  # scoped to this alias only (not the umbrella's true global:) — this
+  # subchart's image.repository below is valkey/valkey, not bitnami/redis,
+  # which trips the chart's built-in image-provenance check. mysql doesn't
+  # need this: it only overrides .tag, still within the recognized repo.
+  global:
+    security:
+      allowInsecureImages: true
   image:
     repository: valkey/valkey
     tag: "9-alpine"
@@ -32,6 +33,10 @@ broker:
 cache:
   enabled: true
   architecture: standalone
+  # see broker's comment above — same reason, scoped to this alias only.
+  global:
+    security:
+      allowInsecureImages: true
   image:
     repository: valkey/valkey
     tag: "9-alpine"
