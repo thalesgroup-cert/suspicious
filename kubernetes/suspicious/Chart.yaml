@@ -1,0 +1,7 @@
+apiVersion: v2
+name: suspicious
+description: Thales CERT Suspicious — AI-powered phishing and threat-analysis platform
+type: application
+version: 0.1.0
+appVersion: "1.0.0"
+home: https://github.com/thalesgroup-cert/suspicious

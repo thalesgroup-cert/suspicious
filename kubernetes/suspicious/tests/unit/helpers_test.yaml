@@ -1,0 +1,9 @@
+suite: helpers
+templates:
+  - suspicious/deployment.yaml   # any template that includes the helpers; doesn't exist yet
+tests:
+  - it: fullname defaults to release-name-chartname
+    asserts:
+      - equal:
+          path: metadata.name
+          value: my-release-suspicious
