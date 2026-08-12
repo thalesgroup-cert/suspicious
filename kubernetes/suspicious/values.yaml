@@ -1,3 +1,40 @@
 # Global
 imagePullSecrets: []
 fullnameOverride: ""
+
+global:
+  security:
+    # broker/cache point the bitnami/redis subchart at valkey/valkey instead of
+    # bitnami/redis, which trips the chart's built-in image-provenance check.
+    allowInsecureImages: true
+
+mysql:
+  enabled: true
+  architecture: standalone   # or "replication" for a read replica
+  auth:
+    database: suspicious
+    username: suspicious
+    password: ""             # required — set via -f or --set
+    rootPassword: ""         # required — set via -f or --set
+  image:
+    tag: "8.0.42"
+
+broker:
+  enabled: true
+  architecture: standalone
+  image:
+    repository: valkey/valkey
+    tag: "9-alpine"
+  auth:
+    enabled: true
+    password: ""
+
+cache:
+  enabled: true
+  architecture: standalone
+  image:
+    repository: valkey/valkey
+    tag: "9-alpine"
+  auth:
+    enabled: true
+    password: ""
