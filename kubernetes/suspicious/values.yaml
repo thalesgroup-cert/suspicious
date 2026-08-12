@@ -73,3 +73,5 @@ django:
   secretKey: ""   # if empty, generated once and kept stable across upgrades (Step 4)
 
 settings: {}   # arbitrary extra/override keys, mirrors Suspicious-settings.example.json shape
+
+feederConfig: {}   # mirrors email-feeder-config.example.json structure
