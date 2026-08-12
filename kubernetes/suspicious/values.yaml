@@ -48,3 +48,28 @@ tlsBundle:
   certfile: ""
   keyfile: ""
   rootcafile: ""
+
+storage:
+  s3:
+    endpoint: ""
+    region: ""
+    bucket: ""
+    forcePathStyle: true
+    publicEndpoint: ""
+    accessKey: ""
+    secretKey: ""
+
+cortex:
+  baseUrl: ""
+  apiKey: ""
+  webhookSecret: ""
+
+elasticsearch:
+  baseUrl: ""
+  username: ""
+  password: ""
+
+django:
+  secretKey: ""   # if empty, generated once and kept stable across upgrades (Step 4)
+
+settings: {}   # arbitrary extra/override keys, mirrors Suspicious-settings.example.json shape
