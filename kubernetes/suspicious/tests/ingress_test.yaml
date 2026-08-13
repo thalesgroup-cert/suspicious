@@ -1,0 +1,26 @@
+suite: ingress
+templates:
+  - ingress.yaml
+tests:
+  - it: routes /admin and /api to the suspicious service, catch-all to ui
+    set:
+      ingress.host: "suspicious.example.com"
+    asserts:
+      - equal:
+          path: spec.rules[0].http.paths[0].path
+          value: /api/docs
+      - equal:
+          path: spec.rules[0].http.paths[0].backend.service.name
+          value: RELEASE-NAME-suspicious
+      - equal:
+          path: spec.rules[0].http.paths[9].path
+          value: /
+      - equal:
+          path: spec.rules[0].http.paths[9].backend.service.name
+          value: RELEASE-NAME-suspicious-ui
+  - it: renders nothing when disabled
+    set:
+      ingress.enabled: false
+    asserts:
+      - hasDocuments:
+          count: 0

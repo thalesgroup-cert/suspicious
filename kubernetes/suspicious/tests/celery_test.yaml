@@ -1,0 +1,33 @@
+suite: celery worker deployment
+templates:
+  - celery/deployment.yaml
+  - secret-settings.yaml
+tests:
+  - it: runs the celery worker command
+    template: celery/deployment.yaml
+    asserts:
+      - equal:
+          path: spec.template.spec.containers[0].command
+          value: ["celery", "-A", "suspicious", "worker", "--loglevel=info"]
+  - it: exec probe pings this pod by hostname
+    template: celery/deployment.yaml
+    asserts:
+      - equal:
+          path: spec.template.spec.containers[0].readinessProbe.exec.command
+          value:
+            - sh
+            - -c
+            - "celery -A suspicious inspect ping -d celery@$HOSTNAME"
+  - it: replicas is overridable
+    template: celery/deployment.yaml
+    set:
+      celery.worker.replicas: 3
+    asserts:
+      - equal:
+          path: spec.replicas
+          value: 3
+  - it: sets a checksum/config annotation derived from secret-settings.yaml
+    template: celery/deployment.yaml
+    asserts:
+      - exists:
+          path: spec.template.metadata.annotations["checksum/config"]

@@ -1,0 +1,56 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: {{ include "suspicious.fullname" . }}-celery-beat
+  labels:
+    {{- include "suspicious.labels" . | nindent 4 }}
+    app.kubernetes.io/component: celery-beat
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app.kubernetes.io/instance: {{ .Release.Name }}
+      app.kubernetes.io/component: celery-beat
+  template:
+    metadata:
+      labels:
+        app.kubernetes.io/instance: {{ .Release.Name }}
+        app.kubernetes.io/component: celery-beat
+      annotations:
+        checksum/config: {{ include (print $.Template.BasePath "/secret-settings.yaml") . | sha256sum }}
+    spec:
+      {{- with .Values.imagePullSecrets }}
+      imagePullSecrets:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+      containers:
+        - name: celery-beat
+          image: "{{ .Values.suspicious.image.repository }}:{{ .Values.suspicious.image.tag | default .Chart.AppVersion }}"
+          imagePullPolicy: {{ .Values.suspicious.image.pullPolicy }}
+          command: ["celery", "-A", "suspicious", "beat", "--loglevel=info"]
+          env:
+            - name: SUSPICIOUS_CONFIG_PATH
+              value: /app/settings.json
+          volumeMounts:
+            - name: settings
+              mountPath: /app/settings.json
+              subPath: settings.json
+              readOnly: true
+            - name: tls-bundle
+              mountPath: /etc/private
+              readOnly: true
+          livenessProbe:
+            exec:
+              command: ["sh", "-c", "pgrep -f 'celery -A suspicious beat'"]
+            periodSeconds: 60
+            timeoutSeconds: 10
+            failureThreshold: 3
+          resources:
+            {{- toYaml .Values.celery.beat.resources | nindent 12 }}
+      volumes:
+        - name: settings
+          secret:
+            secretName: {{ include "suspicious.fullname" . }}-settings
+        - name: tls-bundle
+          secret:
+            secretName: {{ include "suspicious.fullname" . }}-tls-bundle

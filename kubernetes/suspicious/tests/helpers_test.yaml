@@ -1,0 +1,11 @@
+suite: helpers
+templates:
+  - suspicious/deployment.yaml
+  - secret-settings.yaml
+tests:
+  - it: fullname defaults to release-name-chartname
+    template: suspicious/deployment.yaml
+    asserts:
+      - equal:
+          path: metadata.name
+          value: RELEASE-NAME-suspicious

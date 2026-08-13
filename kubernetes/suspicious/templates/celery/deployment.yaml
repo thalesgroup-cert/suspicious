@@ -1,0 +1,61 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: {{ include "suspicious.fullname" . }}-celery
+  labels:
+    {{- include "suspicious.labels" . | nindent 4 }}
+    app.kubernetes.io/component: celery
+spec:
+  replicas: {{ .Values.celery.worker.replicas }}
+  selector:
+    matchLabels:
+      app.kubernetes.io/instance: {{ .Release.Name }}
+      app.kubernetes.io/component: celery
+  template:
+    metadata:
+      labels:
+        app.kubernetes.io/instance: {{ .Release.Name }}
+        app.kubernetes.io/component: celery
+      annotations:
+        checksum/config: {{ include (print $.Template.BasePath "/secret-settings.yaml") . | sha256sum }}
+    spec:
+      {{- with .Values.imagePullSecrets }}
+      imagePullSecrets:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+      containers:
+        - name: celery
+          image: "{{ .Values.suspicious.image.repository }}:{{ .Values.suspicious.image.tag | default .Chart.AppVersion }}"
+          imagePullPolicy: {{ .Values.suspicious.image.pullPolicy }}
+          command: ["celery", "-A", "suspicious", "worker", "--loglevel=info"]
+          env:
+            - name: SUSPICIOUS_CONFIG_PATH
+              value: /app/settings.json
+          volumeMounts:
+            - name: settings
+              mountPath: /app/settings.json
+              subPath: settings.json
+              readOnly: true
+            - name: tls-bundle
+              mountPath: /etc/private
+              readOnly: true
+          readinessProbe:
+            exec:
+              command: ["sh", "-c", "celery -A suspicious inspect ping -d celery@$HOSTNAME"]
+            periodSeconds: 60
+            timeoutSeconds: 10
+          livenessProbe:
+            exec:
+              command: ["sh", "-c", "celery -A suspicious inspect ping -d celery@$HOSTNAME"]
+            periodSeconds: 60
+            timeoutSeconds: 10
+            failureThreshold: 3
+          resources:
+            {{- toYaml .Values.celery.worker.resources | nindent 12 }}
+      volumes:
+        - name: settings
+          secret:
+            secretName: {{ include "suspicious.fullname" . }}-settings
+        - name: tls-bundle
+          secret:
+            secretName: {{ include "suspicious.fullname" . }}-tls-bundle

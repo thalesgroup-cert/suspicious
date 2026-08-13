@@ -1,0 +1,41 @@
+suite: suspicious deployment+service
+templates:
+  - suspicious/deployment.yaml
+  - suspicious/service.yaml
+  - secret-settings.yaml
+tests:
+  - it: mounts the settings and tls-bundle secrets
+    template: suspicious/deployment.yaml
+    asserts:
+      - contains:
+          path: spec.template.spec.volumes
+          content:
+            name: settings
+            secret:
+              secretName: RELEASE-NAME-suspicious-settings
+      - contains:
+          path: spec.template.spec.volumes
+          content:
+            name: tls-bundle
+            secret:
+              secretName: RELEASE-NAME-suspicious-tls-bundle
+  - it: readiness probe hits /api/health/
+    template: suspicious/deployment.yaml
+    asserts:
+      - equal:
+          path: spec.template.spec.containers[0].readinessProbe.httpGet.path
+          value: /api/health/
+      - equal:
+          path: spec.template.spec.containers[0].readinessProbe.httpGet.port
+          value: 9020
+  - it: service targets port 9020
+    template: suspicious/service.yaml
+    asserts:
+      - equal:
+          path: spec.ports[0].port
+          value: 9020
+  - it: sets a checksum/config annotation derived from secret-settings.yaml
+    template: suspicious/deployment.yaml
+    asserts:
+      - exists:
+          path: spec.template.metadata.annotations["checksum/config"]

@@ -1,0 +1,57 @@
+apiVersion: apps/v1
+kind: StatefulSet
+metadata:
+  name: {{ include "suspicious.fullname" . }}-chromadb
+  labels:
+    {{- include "suspicious.labels" . | nindent 4 }}
+    app.kubernetes.io/component: chromadb
+spec:
+  serviceName: {{ include "suspicious.fullname" . }}-chromadb
+  replicas: 1
+  selector:
+    matchLabels:
+      app.kubernetes.io/instance: {{ .Release.Name }}
+      app.kubernetes.io/component: chromadb
+  template:
+    metadata:
+      labels:
+        app.kubernetes.io/instance: {{ .Release.Name }}
+        app.kubernetes.io/component: chromadb
+    spec:
+      {{- with .Values.imagePullSecrets }}
+      imagePullSecrets:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+      containers:
+        - name: chromadb
+          image: "{{ .Values.chromadb.image.repository }}:{{ .Values.chromadb.image.tag }}"
+          imagePullPolicy: {{ .Values.chromadb.image.pullPolicy }}
+          ports:
+            - containerPort: 8000
+          volumeMounts:
+            - name: data
+              mountPath: /chroma/chroma
+          readinessProbe:
+            httpGet:
+              path: /api/v2/heartbeat
+              port: 8000
+            periodSeconds: 30
+          livenessProbe:
+            httpGet:
+              path: /api/v2/heartbeat
+              port: 8000
+            periodSeconds: 30
+            failureThreshold: 3
+          resources:
+            {{- toYaml .Values.chromadb.resources | nindent 12 }}
+  volumeClaimTemplates:
+    - metadata:
+        name: data
+      spec:
+        accessModes: ["ReadWriteOnce"]
+        {{- if .Values.chromadb.persistence.storageClassName }}
+        storageClassName: {{ .Values.chromadb.persistence.storageClassName }}
+        {{- end }}
+        resources:
+          requests:
+            storage: {{ .Values.chromadb.persistence.size }}
