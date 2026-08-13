@@ -124,3 +124,11 @@ django:
 settings: {}   # arbitrary extra/override keys, mirrors Suspicious-settings.example.json shape
 
 feederConfig: {}   # mirrors email-feeder-config.example.json structure
+
+ingress:
+  enabled: true
+  className: ""
+  host: ""
+  annotations: {}
+  tls:
+    secretName: ""
