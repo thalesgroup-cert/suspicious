@@ -1,0 +1,42 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: {{ include "suspicious.fullname" . }}-ui
+  labels:
+    {{- include "suspicious.labels" . | nindent 4 }}
+    app.kubernetes.io/component: ui
+spec:
+  replicas: {{ .Values.suspiciousUi.replicas }}
+  selector:
+    matchLabels:
+      app.kubernetes.io/instance: {{ .Release.Name }}
+      app.kubernetes.io/component: ui
+  template:
+    metadata:
+      labels:
+        app.kubernetes.io/instance: {{ .Release.Name }}
+        app.kubernetes.io/component: ui
+    spec:
+      {{- with .Values.imagePullSecrets }}
+      imagePullSecrets:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+      containers:
+        - name: ui
+          image: "{{ .Values.suspiciousUi.image.repository }}:{{ .Values.suspiciousUi.image.tag | default .Chart.AppVersion }}"
+          imagePullPolicy: {{ .Values.suspiciousUi.image.pullPolicy }}
+          ports:
+            - containerPort: 80
+          readinessProbe:
+            httpGet:
+              path: /
+              port: 80
+            periodSeconds: 30
+          livenessProbe:
+            httpGet:
+              path: /
+              port: 80
+            periodSeconds: 30
+            failureThreshold: 3
+          resources:
+            {{- toYaml .Values.suspiciousUi.resources | nindent 12 }}

@@ -12,6 +12,16 @@ suspicious:
   service:
     port: 9020
 
+suspiciousUi:
+  image:
+    repository: ghcr.io/thalesgroup-cert/suspicious-ui
+    tag: ""
+    pullPolicy: IfNotPresent
+  replicas: 1
+  resources: {}
+  service:
+    port: 80
+
 celery:
   worker:
     replicas: 1

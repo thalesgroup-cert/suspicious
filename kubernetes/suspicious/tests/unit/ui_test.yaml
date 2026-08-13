@@ -1,0 +1,20 @@
+suite: suspicious-ui deployment+service
+templates:
+  - ui/deployment.yaml
+  - ui/service.yaml
+tests:
+  - it: readiness probe hits /
+    template: ui/deployment.yaml
+    asserts:
+      - equal:
+          path: spec.template.spec.containers[0].readinessProbe.httpGet.path
+          value: /
+      - equal:
+          path: spec.template.spec.containers[0].readinessProbe.httpGet.port
+          value: 80
+  - it: service targets port 80
+    template: ui/service.yaml
+    asserts:
+      - equal:
+          path: spec.ports[0].port
+          value: 80
