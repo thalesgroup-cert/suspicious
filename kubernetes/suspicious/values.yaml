@@ -106,6 +106,18 @@ elasticsearch:
   username: ""
   password: ""
 
+chromadb:
+  image:
+    repository: chromadb/chroma
+    tag: "1.5.5"
+    pullPolicy: IfNotPresent
+  resources: {}
+  service:
+    port: 8000
+  persistence:
+    size: 10Gi
+    storageClassName: ""
+
 django:
   secretKey: ""   # if empty, generated once and kept stable across upgrades (Step 4)
 
