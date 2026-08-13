@@ -29,6 +29,16 @@ celery:
   beat:
     resources: {}   # NOTE: no `replicas` key here on purpose — see Global Constraints
 
+feeder:
+  image:
+    repository: ghcr.io/thalesgroup-cert/suspicious-feeder
+    tag: ""
+    pullPolicy: IfNotPresent
+  replicas: 1
+  resources: {}
+  service:
+    port: 9091
+
 mysql:
   enabled: true
   architecture: standalone   # or "replication" for a read replica
