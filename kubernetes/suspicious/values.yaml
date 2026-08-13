@@ -64,7 +64,12 @@ broker:
     repository: valkey/valkey
     tag: "9-alpine"
   auth:
-    enabled: true
+    # Suspicious's Django app builds redis://{host}:6379/0 with no
+    # credentials anywhere (suspicious/settings.py) — same as the
+    # existing docker-compose deployment. A generated Bitnami/Redis
+    # password here would just cause NOAUTH errors with no code path
+    # to consume it, so auth stays off until the app gains one.
+    enabled: false
     password: ""
 
 cache:
@@ -78,7 +83,7 @@ cache:
     repository: valkey/valkey
     tag: "9-alpine"
   auth:
-    enabled: true
+    enabled: false
     password: ""
 
 tlsBundle:
