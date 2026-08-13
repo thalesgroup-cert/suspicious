@@ -9,12 +9,28 @@ tests:
       - equal:
           path: spec.volumeClaimTemplates[0].spec.resources.requests.storage
           value: 10Gi
-  - it: readiness probe hits the heartbeat endpoint
+  - it: readiness probe hits the v2 heartbeat endpoint
     template: chromadb/statefulset.yaml
     asserts:
       - equal:
           path: spec.template.spec.containers[0].readinessProbe.httpGet.path
-          value: /api/v1/heartbeat
+          value: /api/v2/heartbeat
+  - it: mounts persistent data at /chroma/chroma (the image's default persist_directory)
+    template: chromadb/statefulset.yaml
+    asserts:
+      - equal:
+          path: spec.template.spec.containers[0].volumeMounts[0].mountPath
+          value: /chroma/chroma
+  - it: sets imagePullSecrets when configured
+    template: chromadb/statefulset.yaml
+    set:
+      imagePullSecrets:
+        - name: my-registry-secret
+    asserts:
+      - equal:
+          path: spec.template.spec.imagePullSecrets
+          value:
+            - name: my-registry-secret
   - it: service targets port 8000
     template: chromadb/service.yaml
     asserts:
