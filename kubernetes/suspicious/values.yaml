@@ -96,7 +96,6 @@ storage:
     endpoint: ""
     region: ""
     bucket: ""
-    forcePathStyle: true
     publicEndpoint: ""
     accessKey: ""
     secretKey: ""

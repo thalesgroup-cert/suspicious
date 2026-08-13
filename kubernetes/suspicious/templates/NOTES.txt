@@ -9,6 +9,10 @@ This chart does NOT deploy, and assumes already reachable:
   - S3-compatible storage (values: storage.s3.*)
   - Vault / any secret manager (this chart uses plain k8s Secrets)
 
+Set an explicit django.secretKey (rather than leaving it unset) to avoid a
+one-time cosmetic pod restart on the first `helm upgrade` after a keyless
+install — see values.yaml's django.secretKey comment.
+
 Known gaps not covered by this chart (see docs/superpowers/specs/2026-07-28-helm-chart-design.md):
   - No security-headers equivalent to the compose Traefik middleware
     (HSTS/CSP/X-Frame-Options) — add via your ingress controller's own
