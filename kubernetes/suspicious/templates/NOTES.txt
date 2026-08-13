@@ -1,0 +1,17 @@
+Suspicious has been deployed as release "{{ .Release.Name }}" in namespace "{{ .Release.Namespace }}".
+
+Web UI: {{ if .Values.ingress.enabled }}https://{{ .Values.ingress.host }}/{{ else }}(ingress disabled — port-forward {{ include "suspicious.fullname" . }}-ui:{{ .Values.suspiciousUi.service.port }}){{ end }}
+API health: {{ if .Values.ingress.enabled }}https://{{ .Values.ingress.host }}/api/health/{{ else }}(ingress disabled — port-forward {{ include "suspicious.fullname" . }}:{{ .Values.suspicious.service.port }}){{ end }}
+
+This chart does NOT deploy, and assumes already reachable:
+  - Cortex           (values: cortex.baseUrl / cortex.apiKey)
+  - Elasticsearch    (values: elasticsearch.baseUrl)
+  - S3-compatible storage (values: storage.s3.*)
+  - Vault / any secret manager (this chart uses plain k8s Secrets)
+
+Known gaps not covered by this chart (see docs/superpowers/specs/2026-07-28-helm-chart-design.md):
+  - No security-headers equivalent to the compose Traefik middleware
+    (HSTS/CSP/X-Frame-Options) — add via your ingress controller's own
+    annotations/CRDs.
+  - No /admin IP allowlist — add a NetworkPolicy or controller annotation.
+  - No HPA / PodDisruptionBudget — add if/when load requires it.
