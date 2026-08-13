@@ -16,6 +16,8 @@ celery:
   worker:
     replicas: 1
     resources: {}
+  beat:
+    resources: {}   # NOTE: no `replicas` key here on purpose — see Global Constraints
 
 mysql:
   enabled: true
