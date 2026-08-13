@@ -12,6 +12,11 @@ suspicious:
   service:
     port: 9020
 
+celery:
+  worker:
+    replicas: 1
+    resources: {}
+
 mysql:
   enabled: true
   architecture: standalone   # or "replication" for a read replica

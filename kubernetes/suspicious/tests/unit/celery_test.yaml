@@ -1,0 +1,24 @@
+suite: celery worker deployment
+templates:
+  - celery/deployment.yaml
+tests:
+  - it: runs the celery worker command
+    asserts:
+      - equal:
+          path: spec.template.spec.containers[0].command
+          value: ["celery", "-A", "suspicious", "worker", "--loglevel=info"]
+  - it: exec probe pings this pod by hostname
+    asserts:
+      - equal:
+          path: spec.template.spec.containers[0].readinessProbe.exec.command
+          value:
+            - sh
+            - -c
+            - "celery -A suspicious inspect ping -d celery@$HOSTNAME"
+  - it: replicas is overridable
+    set:
+      celery.worker.replicas: 3
+    asserts:
+      - equal:
+          path: spec.replicas
+          value: 3
