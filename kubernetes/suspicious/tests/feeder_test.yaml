@@ -2,6 +2,7 @@ suite: feeder deployment+service
 templates:
   - feeder/deployment.yaml
   - feeder/service.yaml
+  - secret-feeder-config.yaml
 tests:
   - it: mounts the feeder-config secret
     template: feeder/deployment.yaml
@@ -27,3 +28,8 @@ tests:
       - equal:
           path: spec.ports[0].port
           value: 9091
+  - it: sets a checksum/config annotation derived from secret-feeder-config.yaml
+    template: feeder/deployment.yaml
+    asserts:
+      - exists:
+          path: spec.template.metadata.annotations["checksum/config"]

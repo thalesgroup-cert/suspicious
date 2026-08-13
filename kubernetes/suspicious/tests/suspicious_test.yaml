@@ -2,6 +2,7 @@ suite: suspicious deployment+service
 templates:
   - suspicious/deployment.yaml
   - suspicious/service.yaml
+  - secret-settings.yaml
 tests:
   - it: mounts the settings and tls-bundle secrets
     template: suspicious/deployment.yaml
@@ -33,3 +34,8 @@ tests:
       - equal:
           path: spec.ports[0].port
           value: 9020
+  - it: sets a checksum/config annotation derived from secret-settings.yaml
+    template: suspicious/deployment.yaml
+    asserts:
+      - exists:
+          path: spec.template.metadata.annotations["checksum/config"]

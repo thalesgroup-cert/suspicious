@@ -16,6 +16,8 @@ spec:
       labels:
         app.kubernetes.io/instance: {{ .Release.Name }}
         app.kubernetes.io/component: celery
+      annotations:
+        checksum/config: {{ include (print $.Template.BasePath "/secret-settings.yaml") . | sha256sum }}
     spec:
       {{- with .Values.imagePullSecrets }}
       imagePullSecrets:
