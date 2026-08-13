@@ -2,6 +2,16 @@
 imagePullSecrets: []
 fullnameOverride: ""
 
+suspicious:
+  image:
+    repository: ghcr.io/thalesgroup-cert/suspicious
+    tag: ""
+    pullPolicy: IfNotPresent
+  replicas: 1
+  resources: {}
+  service:
+    port: 9020
+
 mysql:
   enabled: true
   architecture: standalone   # or "replication" for a read replica
