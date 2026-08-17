@@ -63,6 +63,7 @@
             "analyzers": {
                 "header": "MailHeader_4_0",
                 "ai": "AI_Mail_Analyzer_1_4",
+                "ai_public": "AI_Mail_Analyzer_Public_1_0",
                 "sandbox": "ThreatGridOnPrem_1_0",
                 "yara": "Yara_Boosted_3_2",
                 "file_info": "FileInfo_8_0"

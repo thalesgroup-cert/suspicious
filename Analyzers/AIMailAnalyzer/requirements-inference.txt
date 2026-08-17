@@ -1,0 +1,7 @@
+# Extra deps for inference_server/server.py, on top of requirements.txt
+# (torch/sentence_transformers already pinned there - not duplicated here
+# for the same reason noted in requirements-train.txt).
+-r requirements.txt
+
+fastapi>=0.115
+uvicorn[standard]>=0.32

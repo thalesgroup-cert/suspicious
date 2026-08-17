@@ -185,7 +185,7 @@ class InvestigationAnalyzerReportSerializer(serializers.ModelSerializer):
         fields = [
             "id", "cortex_job_id", "type", "status", "analyzer_name", "analyzer_id",
             "level", "confidence", "score", "category", "categories",
-            "report_summary", "report_taxonomy", "target", "created_at",
+            "report_summary", "report_taxonomy", "report_full", "target", "created_at",
         ]
 
     def get_categories(self, obj: AnalyzerReport) -> list[str]:

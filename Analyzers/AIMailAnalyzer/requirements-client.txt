@@ -1,0 +1,13 @@
+# Deps for ai_mail_classifier.py ONLY - the thin, one-shot Cortex analyzer
+# client (untar + HTTP call to inference_server/, see that folder). No
+# torch/sentence_transformers here on purpose: those moved to the persistent
+# inference_server/ (requirements-inference.txt), which now owns all model
+# loading. Keeping this file separate from requirements.txt (still the
+# torch/numpy/sentence_transformers source of truth for
+# requirements-train.txt and requirements-inference.txt, see those files'
+# own comments) means this optimization can't accidentally strip a dep
+# either of those two still needs.
+cortexutils
+html2text
+chardet
+requests

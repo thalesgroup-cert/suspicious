@@ -41,6 +41,17 @@ def collect_case_targets(case) -> list[tuple[models.Model, str]]:
             for attachment in mail.mail_attachments.exclude(file_id__isnull=True).select_related("file"):
                 _add(attachment.file, "file")
 
+            # AI_Mail_Analyzer runs against the mail's MailArchive (the
+            # headers+body tar.gz), dispatched via CortexJob.launch_cortex_ai_jobs
+            # - not the raw uploaded file/attachments above. Its AnalyzerReport
+            # is linked via file=<archive file>, so without this the AI report
+            # exists and is correctly tied to the case via CaseAnalyzerJob, but
+            # never shows up here (the case detail view builds its
+            # AnalyzerReport query from this function's output only).
+            mail_archive = mail.mail_archive.filter(archive__isnull=False).select_related("archive").order_by("-id").first()
+            if mail_archive is not None:
+                _add(mail_archive.archive, "file")
+
             for artifact in mail.mail_artifacts.select_related(
                 "artifactIsUrl", "artifactIsUrl__url",
                 "artifactIsIp", "artifactIsIp__ip",

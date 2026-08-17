@@ -18,6 +18,11 @@ jupyter>=1.1.1
 # retrain model monthly/ (IMAP fetch pipeline)
 python-dotenv>=1.0
 
+# retrain model monthly/generator_dataset_month_replay.py (month-window IMAP
+# SEARCH bounds) - already a transitive dep of pandas, pinned explicitly
+# since this script imports it directly.
+python-dateutil>=2.9
+
 # retrain model monthly/promote.py (push run metrics to the Suspicious
 # dashboard) - not pinned elsewhere here, only a transitive dep of
 # sentence-transformers/huggingface_hub until now.

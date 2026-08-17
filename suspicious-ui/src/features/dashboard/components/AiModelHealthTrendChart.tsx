@@ -96,6 +96,26 @@ function pivotByRun(runs: AiModelRun[], metric: Metric): PivotRow[] {
   return [...byTs.values()].sort((a, b) => a.ts - b.ts);
 }
 
+/** Pads the Y domain to the actual data range instead of a fixed [0,1] -
+ * scores here mostly sit in a narrow 0.92-1.0 band, so a full [0,1] axis
+ * flattens real cycle-to-cycle variation to an invisible sliver. */
+function computeYDomain(data: PivotRow[], labels: string[]): [number, number] {
+  let min = Infinity;
+  let max = -Infinity;
+  for (const row of data) {
+    for (const label of labels) {
+      const value = row[label];
+      if (typeof value === "number") {
+        if (value < min) min = value;
+        if (value > max) max = value;
+      }
+    }
+  }
+  if (!Number.isFinite(min) || !Number.isFinite(max)) return [0, 1];
+  const pad = Math.max((max - min) * 0.15, 0.02);
+  return [Math.max(0, min - pad), Math.min(1, max + pad)];
+}
+
 function formatTick(ts: number): string {
   return new Date(ts).toLocaleString(undefined, {
     month: "short",
@@ -174,6 +194,7 @@ export default function AiModelHealthTrendChart({ runs }: { runs: AiModelRun[] }
     );
     return SERIES_ORDER.filter((l) => present.has(l));
   }, [runs, metric]);
+  const yDomain = React.useMemo(() => computeYDomain(data, labels), [data, labels]);
 
   const gridColor = alpha(theme.palette.divider, isDark ? 0.16 : 0.45);
   const axisColor = alpha(theme.palette.text.secondary, 0.65);
@@ -262,12 +283,12 @@ export default function AiModelHealthTrendChart({ runs }: { runs: AiModelRun[] }
               minTickGap={48}
             />
             <YAxis
-              domain={[0, 1]}
-              ticks={[0, 0.25, 0.5, 0.75, 1]}
+              domain={yDomain}
+              tickFormatter={(v: number) => v.toFixed(3)}
               tick={{ fontSize: 10, fill: axisColor }}
               stroke={gridColor}
               tickLine={false}
-              width={30}
+              width={42}
               label={{
                 value: METRIC_META[metric].short,
                 angle: -90,

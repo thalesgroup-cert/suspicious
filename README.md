@@ -25,6 +25,8 @@
 
 # Suspicious
 
+![Home page screenshot](https://github.com/user-attachments/assets/6ef12c50-aa1b-40bc-97cc-0cf44ea5619c)
+
 > **Documentation:** <https://thalesgroup-cert.github.io/suspicious/>
 
 Suspicious inspects, classifies, and reports suspicious emails, files, URLs, IPs,

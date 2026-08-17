@@ -87,10 +87,15 @@ def main(dataset_dir):
     os.symlink(run_timestamp, latest_link)
 
     print("\n" + "=" * 80)
-    print("🎉 TOUS LES MODÈLES ONT ÉTÉ ENTRAÎNÉS AVEC SUCCÈS!")
+    if failed:
+        print(f"⚠️  ENTRAÎNEMENT TERMINÉ AVEC {len(failed)} ÉCHEC(S): {', '.join(failed)}")
+    else:
+        print("🎉 TOUS LES MODÈLES ONT ÉTÉ ENTRAÎNÉS AVEC SUCCÈS!")
     print(f"📂 Résultats: {base_output_dir}/  (manifest: {manifest_path})")
     print(f"🔗 Pointeur 'latest': {latest_link}")
     print("=" * 80)
+
+    return 1 if failed else 0
 
 
 if __name__ == "__main__":
@@ -126,4 +131,4 @@ Exemples d'utilisation:
     if not dataset_dir:
         parser.error("Vous devez fournir le dossier dataset (positionnel ou --dataset)")
 
-    main(dataset_dir)
+    sys.exit(main(dataset_dir))
