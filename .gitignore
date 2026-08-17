@@ -80,11 +80,6 @@ Analyzers/AIMailAnalyzer/retrain model monthly/golden_set.json
 # real Analyzers/AIMailAnalyzer/models/ (already ignored above) - binary
 # .pth files, never commit.
 Analyzers/AIMailAnalyzer/retrain model monthly/models/
-# run_prod_retrain_cycle.sh's own cadence-tracking marker (last completed run
-# timestamp) - host-local state, not portable across installs.
-Analyzers/AIMailAnalyzer/retrain model monthly/.retrain_state/
-# Note: generator_dataset_month_replay.py's progression cursor
-# (.month_replay_state.json) lives inside data_export/, already ignored above.
 
 # ===== Docs (MkDocs) =====
 /site/
