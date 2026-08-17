@@ -48,7 +48,7 @@ def collect_case_targets(case) -> list[tuple[models.Model, str]]:
             # exists and is correctly tied to the case via CaseAnalyzerJob, but
             # never shows up here (the case detail view builds its
             # AnalyzerReport query from this function's output only).
-            mail_archive = mail.mail_archive.filter(archive__isnull=False).select_related("archive").first()
+            mail_archive = mail.mail_archive.filter(archive__isnull=False).select_related("archive").order_by("-id").first()
             if mail_archive is not None:
                 _add(mail_archive.archive, "file")
 

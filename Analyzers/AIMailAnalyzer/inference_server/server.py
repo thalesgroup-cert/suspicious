@@ -164,4 +164,8 @@ def classify(req: ClassifyRequest):
         "contributing_phrases": contributing_phrases,
         "main_probabilities": main_probabilities,
         "sub_probabilities": sub_probabilities,
+        # str(list), matching the pre-refactor ai_mail_classifier.py format
+        # so chromadb_utils.add_to_suspicious_collection's json.loads(...)
+        # keeps working unchanged.
+        "email_embedding": str(email_embedding.tolist()[0]),
     }

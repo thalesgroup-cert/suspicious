@@ -1,19 +1,12 @@
-
-
 #!/usr/bin/env python3
 # Author : THA-CERT //GCL
 
 import os
-import numpy as np
-import zipfile
-from collections import defaultdict
 import email
 
 import requests
 from cortexutils.analyzer import Analyzer
-import torch
-from sentence_transformers import SentenceTransformer
-import time
+
 import mail_analysis
 
 # Cortex spawns this analyzer in its own ephemeral, one-shot container per
@@ -55,131 +48,70 @@ class AIMailClassifier(Analyzer):
 
     def run(self):
         Analyzer.run(self)
-        
-        # Use CPU (because no gpu)
-        device = torch.device("cpu")
-
-        # Initialize vectorizer
-        try:
-            vectorizer = SentenceTransformer('/worker/AIMailAnalyzer/vectorizers/paraphrase-multilingual-mpnet-base-v2')
-        except Exception as e:
-            self.error(f"Error loading vectorizer: {e}")
-            return
-        
-        # Load models. safe_suspicious/spam_dangerous/safe/dangerous are
-        # required for the main SAFE/UNWANTED/DANGEROUS verdict. spam_model
-        # (unwanted, spam-vs-newsletter) only feeds the secondary sub-
-        # classification and is loaded separately - the retrain pipeline can
-        # legitimately promote 4 of 5 models when one taxonomy sub-class
-        # doesn't have enough labeled samples yet (see
-        # main_retrainmodels.py's per-model try/except), and a missing
-        # spam_model must not block reporting the main verdict.
-        try:
-            safe_suspicious_model = ResNetMLP(768, 2).to(device)
-            safe_suspicious_model.load_state_dict(torch.load("/worker/AIMailAnalyzer/models/safe_suspicious_30_epochs_model.pth", weights_only=True))
-            spam_dangerous_model = ResNetMLP(768, 2).to(device)
-            spam_dangerous_model.load_state_dict(torch.load("/worker/AIMailAnalyzer/models/spam_dangerous_30_epochs_model.pth", weights_only=True))
-
-            safe_model = ResNetMLP(768, 2).to(device)
-            safe_model.load_state_dict(torch.load("/worker/AIMailAnalyzer/models/safe_30_epochs_model.pth", weights_only=True))
-            dangerous_model = ResNetMLP(768, 4).to(device)
-            dangerous_model.load_state_dict(torch.load("/worker/AIMailAnalyzer/models/dangerous_30_epochs_model.pth", weights_only=True))
-        except Exception as e:
-            self.error(f"Error loading models: {e}")
-            return
-
-        try:
-            spam_model = ResNetMLP(768, 2).to(device)
-            spam_model.load_state_dict(torch.load("/worker/AIMailAnalyzer/models/unwanted_30_epochs_model.pth", weights_only=True))
-        except Exception as e:
-            print(f"[warn] unwanted_30_epochs_model.pth unavailable, sub-classification will skip spam/newsletter: {e}")
-            spam_model = None
 
         # Untar file
-        mail_analysis.untar_file(self.filepath, './tmp/')
+        if not mail_analysis.untar_file(self.filepath, './tmp/'):
+            self.error(f"Error extracting archive: {self.filepath}")
+            return
 
         # Get mail content and headers
+        mail_body = None
+        mail_headers = None
         for file in os.listdir('./tmp/'):
             if file.endswith('.txt'):
-                with open('./tmp/' + file, 'r') as f:
+                with open('./tmp/' + file, 'r', encoding='utf-8', errors='replace') as f:
                     mail_body = f.read()
             if file.endswith('.headers'):
-                with open('./tmp/' + file, 'r') as f:
+                with open('./tmp/' + file, 'r', encoding='utf-8', errors='replace') as f:
                     msg = email.message_from_file(f)
                     mail_headers = mail_analysis.get_header_dict_list(msg)
-        
-             
-        # Get mail embedding
-        email_embedding = vectorizer.encode([mail_body], show_progress_bar=False)
 
-        # Classify mail
-        classification_probabilities = mail_analysis.getMainClassificationProbabilities(device, safe_suspicious_model, spam_dangerous_model, email_embedding)
-        classification_info = mail_analysis.getMainClassificationInfo(classification_probabilities)
+        if mail_body is None or mail_headers is None:
+            self.error(f"Archive {self.filepath} is missing the expected .txt/.headers member")
+            return
 
-        # Get sub classification
-        sub_classification_probabilities = mail_analysis.getSubClassificationProbabilities(device, [safe_model, spam_model, dangerous_model], email_embedding, classification_probabilities)
-        sub_classification_info = mail_analysis.getSubClassificationInfo(sub_classification_probabilities)
-
-        # Explainability: labeled probability breakdowns + which sentences drove the call
-        classification_breakdown = mail_analysis.get_classification_breakdown(classification_probabilities)
-        sub_classification_breakdown = mail_analysis.get_sub_classification_breakdown(sub_classification_probabilities)
-        contributing_phrases = mail_analysis.get_contributing_phrases(
-            device, safe_suspicious_model, spam_dangerous_model, vectorizer,
-            mail_body,
-            classification_index=int(np.argmax(classification_probabilities)),
-            baseline_probability=float(np.max(classification_probabilities)),
-        )
-        
-# ── DEBUG : affichage façon suspicious_cli.py ──────────────────────
-        SUB_LABELS = ["INTERNAL", "EXTERNAL", "SPAM", "NEWSLETTER",
-                      "CLASSIC_PHISHING", "WHALING_PHISHING", "CLONE_PHISHING", "BLACKMAILING_PHISHING"]
-
-        
-        print("\nProbabilités principales :")
-        for name, p in zip(["SAFE", "UNWANTED", "DANGEROUS"], classification_probabilities):
-            print(f"  {name:<10} {float(p):.2%}")
-
-        print("\nProbabilités des sous-classes :")
-        for name, p in zip(SUB_LABELS, sub_classification_probabilities):
-            print(f"  {name:<22} {float(p):.2%}")
-        print()
-   
-
-        # ── Construction des dicts de probabilités pour le rapport Cortex ──
-        main_probabilities_dict = {
-            name: f"{float(p):.2%}"
-            for name, p in zip(["SAFE", "UNWANTED", "DANGEROUS"], classification_probabilities)
-        }
-        sub_probabilities_dict = {
-            name: f"{float(p):.2%}"
-            for name, p in zip(SUB_LABELS, sub_classification_probabilities)
-        }
-
-        
+        # Classify via the persistent inference server, which owns the
+        # vectorizer and every model variant (see inference_server/server.py
+        # for why: this image is spawned fresh per Cortex job, so loading a
+        # full SentenceTransformer + 5 ResNetMLP checkpoints here every time
+        # would be reloaded from disk on every single mail).
+        try:
+            resp = requests.post(
+                f"{INFERENCE_SERVER_URL}/classify",
+                json={"mail_body": mail_body, "variant": self.variant},
+                timeout=INFERENCE_TIMEOUT,
+            )
+            resp.raise_for_status()
+            result = resp.json()
+        except Exception as e:
+            self.error(f"Error calling inference server: {e}")
+            return
 
         # Build report
         self.report({
-            'malscore': str(classification_info['score']),
-            'classification': classification_info['classification'],
-            'confidence': str(classification_info['confidence']),
-            'classification_probabilities': str(classification_probabilities),
-            'classification_breakdown': classification_breakdown,
-            'sub_classification': sub_classification_info['classification'],
-            'sub_classification_confidence': str(sub_classification_info['confidence']),
-            'sub_classification_probabilities': str(sub_classification_probabilities),
-            'sub_classification_breakdown': sub_classification_breakdown,
-            'contributing_phrases': contributing_phrases,
-    
+            'malscore': result['malscore'],
+            'classification': result['classification'],
+            'confidence': result['confidence'],
+            'classification_probabilities': result['classification_probabilities'],
+            'classification_breakdown': result['classification_breakdown'],
+            'sub_classification': result['sub_classification'],
+            'sub_classification_confidence': result['sub_classification_confidence'],
+            'sub_classification_probabilities': result['sub_classification_probabilities'],
+            'sub_classification_breakdown': result['sub_classification_breakdown'],
+            'contributing_phrases': result['contributing_phrases'],
+
             'report': {
                 'mail_file_name': self.filename,
                 'mail_file_path': self.filepath,
-                'classification_probabilities': str(classification_probabilities),
-                'main_probabilities': main_probabilities_dict,
-                'sub_probabilities': sub_probabilities_dict,
+                'classification_probabilities': result['classification_probabilities'],
+                'main_probabilities': result['main_probabilities'],
+                'sub_probabilities': result['sub_probabilities'],
                 'analyzed_mail_content': mail_body,
-                
+                'analyzed_mail_headers': str(mail_headers),
+                'email_embedding': result['email_embedding'],
             }
         })
+
+
 if __name__ == "__main__":
     AIMailClassifier().run()
-
