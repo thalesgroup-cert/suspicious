@@ -10,7 +10,7 @@ extract-msg==0.56.0
 
 # Structured logging — JSON formatter consumed by log aggregators.
 # Plain-text fallback kept inside logger_service when this is absent.
-python-json-logger==4.1.0
+python-json-logger==4.2.0
 
 # Observability — OTel SDK + auto-instrumentation for outbound HTTP.
 # Mirror of the versions pinned in Suspicious/requirements.txt so
