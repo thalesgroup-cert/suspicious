@@ -19,7 +19,7 @@ compoundfiles==0.3
 compressed-rtf==1.0.7
 extract-msg==0.56.0
 pyspf==2.0.14
-tldextract==5.3.1
+tldextract==5.3.2
 dkimpy==1.1.8
 email-validator==2.3.0
 # Mail preview: imgkit wraps the wkhtmltopdf binary that ships in the
