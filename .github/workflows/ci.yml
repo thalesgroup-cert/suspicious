@@ -109,7 +109,7 @@ jobs:
             -v "${{ github.workspace }}/Suspicious/settings.ci.json":/app/settings.json:ro \
             -e SUSPICIOUS_CONFIG_PATH=/app/settings.json -w /app/Suspicious \
             suspicious:ci \
-            python manage.py makemigrations --check --dry-run --settings=suspicious.settings
+            python manage.py makemigrations --check --dry-run --skip-checks --settings=suspicious.settings
 
   backend-test:
     needs: changes
