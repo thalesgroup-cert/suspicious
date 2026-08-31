@@ -59,7 +59,7 @@
     "boneyard-js": "1.8.1",
     "eslint": "10.8.0",
     "eslint-plugin-react-hooks": "7.1.1",
-    "eslint-plugin-react-refresh": "0.5.2",
+    "eslint-plugin-react-refresh": "0.5.4",
     "globals": "17.9.0",
     "jsdom": "30.0.1",
     "playwright": "1.62.1",
