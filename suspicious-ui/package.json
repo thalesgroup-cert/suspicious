@@ -57,7 +57,7 @@
     "@vitest/browser": "4.1.10",
     "@vitest/browser-playwright": "4.1.10",
     "boneyard-js": "1.8.1",
-    "eslint": "10.8.0",
+    "eslint": "10.9.1",
     "eslint-plugin-react-hooks": "7.1.1",
     "eslint-plugin-react-refresh": "0.5.4",
     "globals": "17.9.0",
