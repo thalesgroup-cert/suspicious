@@ -10,6 +10,18 @@ from email_process.models import MailAddress
 class Analyzer(models.Model):
     name = models.CharField(max_length=50, unique=True, db_index=True)
     weight = models.FloatField(default=0.2)
+    TIER_AUTHORITATIVE = 1
+    TIER_STRONG = 2
+    TIER_CONTEXTUAL = 3
+    TIER_CHOICES = [
+        (TIER_AUTHORITATIVE, "Authoritative"),
+        (TIER_STRONG, "Strong"),
+        (TIER_CONTEXTUAL, "Contextual"),
+    ]
+    tier = models.PositiveSmallIntegerField(
+        choices=TIER_CHOICES, default=TIER_CONTEXTUAL, db_index=True,
+        help_text="Fixed trust classification. 1 = authoritative source, 3 = contextual/noisy.",
+    )
     analyzer_cortex_id = models.CharField(max_length=50, unique=True, db_index=True)
     is_active = models.BooleanField(default=True)
     creation_date = models.DateTimeField(auto_now_add=True, db_index=True)
