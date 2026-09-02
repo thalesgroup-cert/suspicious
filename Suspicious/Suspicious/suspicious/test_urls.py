@@ -9,6 +9,10 @@ from api.views.connectors import (
     ConnectorStateView,
     ConnectorTestView,
 )
+from api.views.settings import (
+    AnalyzerSettingsDetailView,
+    AnalyzerSettingsListView,
+)
 
 urlpatterns: list = [
     path("api/config/<str:scope>/", ServiceConfigView.as_view(), name="service-config"),
@@ -28,5 +32,15 @@ urlpatterns: list = [
         "api/connectors/<str:name>/deliveries/",
         ConnectorDeliveriesView.as_view(),
         name="connector-deliveries",
+    ),
+    path(
+        "api/settings/analyzers/",
+        AnalyzerSettingsListView.as_view(),
+        name="settings-analyzers",
+    ),
+    path(
+        "api/settings/analyzers/<int:analyzer_id>/",
+        AnalyzerSettingsDetailView.as_view(),
+        name="settings-analyzer-detail",
     ),
 ]

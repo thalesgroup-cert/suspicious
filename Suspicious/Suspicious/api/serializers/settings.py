@@ -55,19 +55,26 @@ class EmailFeederStateUpdateSerializer(serializers.Serializer):
 class AnalyzerSettingsSerializer(serializers.ModelSerializer):
     class Meta:
         model = Analyzer
-        fields = ["id", "name", "weight", "analyzer_cortex_id", "is_active"]
+        fields = ["id", "name", "weight", "tier", "analyzer_cortex_id", "is_active"]
 
 
-class AnalyzerWeightUpdateSerializer(serializers.Serializer):
+class AnalyzerUpdateSerializer(serializers.Serializer):
     weight = serializers.DecimalField(
         max_digits=3,
         decimal_places=1,
         min_value=Decimal("0.0"),
         max_value=Decimal("1.0"),
+        required=False,
     )
+    tier = serializers.IntegerField(min_value=1, max_value=3, required=False)
 
     def validate_weight(self, value: Decimal) -> Decimal:
         return value.quantize(Decimal("0.1"))
+
+    def validate(self, attrs):
+        if "weight" not in attrs and "tier" not in attrs:
+            raise serializers.ValidationError("Provide 'weight' and/or 'tier'.")
+        return attrs
 
 
 class MailboxSerializer(serializers.ModelSerializer):
