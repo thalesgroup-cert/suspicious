@@ -6,6 +6,7 @@ from cortex4py.exceptions import CortexException
 from .utils import load_config
 from .models import CronConfig
 from cortex_job.models import Analyzer
+from cortex_job.migrations._tier_seed import tier_for
 import pybreaker
 from common.http_client import get_breaker, RETRY
 
@@ -53,6 +54,11 @@ def sync_cortex_analyzers(config_path: str = CONFIG_PATH) -> None:
             Analyzer.objects.update_or_create(
                 name=analyzer.name,
                 defaults={"analyzer_cortex_id": analyzer.id, "is_active": True},
+                create_defaults={
+                    "analyzer_cortex_id": analyzer.id,
+                    "is_active": True,
+                    "tier": tier_for(analyzer.name),
+                },
             )
             remote_names.append(analyzer.name)
         Analyzer.objects.exclude(name__in=remote_names).update(is_active=False)

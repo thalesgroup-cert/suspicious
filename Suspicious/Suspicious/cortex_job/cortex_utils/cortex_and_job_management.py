@@ -7,6 +7,7 @@ from django.utils import timezone
 
 from common.http_client import get_breaker, RETRY
 from cortex_job.cortex_utils.session_cortex_api import SessionCortexApi
+from cortex_job.migrations._tier_seed import tier_for
 from cortex_job.models import Analyzer, AnalyzerReport, CaseAnalyzerJob
 from mail_feeder.models import MailBody, MailArchive, MailInfo, MailHeader
 from case_handler.models import Case, Result
@@ -454,6 +455,7 @@ class CortexJob:
                     analyzer_cortex_id=analyzer.id,
                     name=analyzer.name,
                     weight=0.2,
+                    tier=tier_for(analyzer.name),
                 )
         except Exception as e:
             fetch_mail_logger.warning(
