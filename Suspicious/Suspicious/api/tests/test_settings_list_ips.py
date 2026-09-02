@@ -40,6 +40,33 @@ class IpsAllowSectionTests(TestCase):
         self.assertEqual(r.json()["created"], [])
         self.assertEqual(AllowListIp.objects.count(), 1)
 
+    def test_invalid_ip_rejected_whole_batch(self):
+        # "not-an-ip" is garbage; "192.168.001.1" is a leading-zero octal
+        # ambiguity that stdlib ipaddress rejects (CVE-2021-29921). Either
+        # one rejects the entire batch — nothing is created.
+        r = self.client.post(
+            self._list_url(),
+            {"values": ["10.0.0.1", "not-an-ip", "192.168.001.1"]},
+            format="json",
+        )
+        self.assertEqual(r.status_code, 400)
+        self.assertEqual(AllowListIp.objects.count(), 0)
+
+    def test_ipv6_normalised_on_create(self):
+        r = self.client.post(
+            self._list_url(),
+            {"values": ["0:0:0:0:0:0:0:1"]},
+            format="json",
+        )
+        self.assertEqual(r.status_code, 201)
+        self.assertEqual(AllowListIp.objects.get().ip.address, "::1")
+
+    def test_valid_cidr_string_rejected(self):
+        # ip_address() does not accept networks — "10.0.0.0/8" is not a host IP
+        r = self.client.post(self._list_url(), {"values": ["10.0.0.0/8"]}, format="json")
+        self.assertEqual(r.status_code, 400)
+        self.assertEqual(AllowListIp.objects.count(), 0)
+
     def test_delete_removes_entry(self):
         self.client.post(self._list_url(), {"values": ["8.8.8.8"]}, format="json")
         obj = AllowListIp.objects.get()

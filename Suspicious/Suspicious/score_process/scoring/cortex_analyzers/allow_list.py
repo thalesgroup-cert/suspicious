@@ -1,6 +1,7 @@
 """
 Allow-list checks for files, filetypes, URLs, domain, and IP IOCs.
 """
+import ipaddress
 import logging
 
 from file_process.models import File
@@ -45,7 +46,11 @@ def check_allow_list(data: str, data_type: str) -> AllowListResult:
                     result.DomainAllowList = "Safe WL triggered"
 
         elif data_type == "ip":
-            if AllowListIp.objects.filter(ip__address=data).exists():
+            try:
+                needle = ipaddress.ip_address(data).compressed
+            except ValueError:
+                needle = data
+            if AllowListIp.objects.filter(ip__address=needle).exists():
                 result.IpAllowList = "Safe IPW triggered"
 
     except Exception as exc:

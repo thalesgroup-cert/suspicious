@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import ipaddress
 from dataclasses import dataclass
 from typing import Any, Callable, Type
 
@@ -242,6 +243,19 @@ def _bulk_create_ip_links(values: list[str], user: User) -> CreateResult:
 
     No watcher equivalent for IPs — watcher_conflicts is always empty.
     """
+    normalised: list[str] = []
+    invalid: list[str] = []
+    for value in values:
+        try:
+            normalised.append(ipaddress.ip_address(value).compressed)
+        except ValueError:
+            invalid.append(value)
+    if invalid:
+        raise ValidationError(
+            {"values": [f"Not a valid IP address: {v}" for v in invalid]}
+        )
+    values = normalised
+
     existing_links = set(
         AllowListIp.objects.filter(ip__address__in=values)
         .values_list("ip__address", flat=True)
