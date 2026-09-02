@@ -12,6 +12,8 @@ from api.views.connectors import (
 from api.views.settings import (
     AnalyzerSettingsDetailView,
     AnalyzerSettingsListView,
+    SettingsListItemDeleteView,
+    SettingsListView,
 )
 
 urlpatterns: list = [
@@ -42,5 +44,15 @@ urlpatterns: list = [
         "api/settings/analyzers/<int:analyzer_id>/",
         AnalyzerSettingsDetailView.as_view(),
         name="settings-analyzer-detail",
+    ),
+    path(
+        "api/settings/list/<str:section>/",
+        SettingsListView.as_view(),
+        name="settings-list",
+    ),
+    path(
+        "api/settings/list/<str:section>/<int:item_id>/",
+        SettingsListItemDeleteView.as_view(),
+        name="settings-list-delete",
     ),
 ]
