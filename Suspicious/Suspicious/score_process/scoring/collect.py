@@ -27,7 +27,7 @@ def _signals_from(scores, confidences, offset, source):
     can fire on a high-score artifact regardless of its confidence."""
     out = []
     for score, conf in zip(scores[offset:], confidences[offset:]):
-        normalized_confidence = min(round(conf / 10), 100)
+        normalized_confidence = min(round(conf), 100)
         out.append(Signal(
             source=source, score=score, confidence=normalized_confidence,
             is_malicious=score >= MALICIOUS_SCORE_THRESHOLD, is_failure=False,

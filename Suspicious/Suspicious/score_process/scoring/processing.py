@@ -64,7 +64,7 @@ def compute_weighted_scores(reports, label):
 
     valid = [r for r in reports if r.status != "Failure"]
     weighted_score      = round(sum(r.score      * r.analyzer.weight for r in valid) / total_weight)
-    weighted_confidence = round(sum(r.confidence * r.analyzer.weight for r in valid) / total_weight) * 10
+    weighted_confidence = round(sum(r.confidence * r.analyzer.weight for r in valid) / total_weight)
     return weighted_score, weighted_confidence, total_weight
 
 

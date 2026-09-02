@@ -39,6 +39,11 @@ class CollectSignalsTest(TestCase):
         self.assertEqual(signals[0].confidence, 100)
         self.assertFalse(deny_listed)
 
+    def test_signal_confidence_is_0_100_scale(self):
+        from score_process.scoring.collect import _signals_from
+        sigs = _signals_from([7], [70], 0, "url")
+        self.assertEqual(sigs[0].confidence, 70)
+
     def test_no_iocs_yields_no_signals(self):
         case = Case.objects.create(description="", reporter=self.user)
         signals, ai, deny_listed, ai_missing, deny_reason = collect_signals(case)
