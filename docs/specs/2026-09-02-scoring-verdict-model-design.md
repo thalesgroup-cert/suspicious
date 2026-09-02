@@ -125,11 +125,13 @@ Given the voting sources (tier 1–3, each `malicious`/`suspicious`/`clean`):
 | Verdict | Rule |
 |---|---|
 | **Dangerous** | a Tier-1 source says `malicious` with confidence ≥ `HIGH_CONFIDENCE` (default 70), or with no numeric confidence (tier alone carries it) · **or** ≥ 2 Tier-2 sources say `malicious` · **or** trust-weighted `malicious` share ≥ `DANGEROUS_SHARE` (default 0.5) |
-| **Suspicious** | a trusted (Tier-1/2) source says `suspicious` or `malicious` but not enough for Dangerous · **or** only Tier-3 sources flag it (`malicious`/`suspicious`) — Tier-3-only evidence **caps at Suspicious** |
-| **Safe** | ≥ 1 Tier-1 source says `clean` **and** no trusted source flags it |
+| **Safe** | ≥ 1 Tier-1 source says `clean`, **no trusted (Tier-1/2) source flags it**, and **no Tier-3 source says `malicious`**. A Tier-3 `suspicious` alone does **not** block Safe — this is what stops a noisy contextual source (e.g. `Urlscan_io_Search`, which returns `suspicious` for *every* URL with ≥1 prior scan) from overriding two authoritative "clean" verdicts. |
+| **Suspicious** | a trusted (Tier-1/2) source says `suspicious` or `malicious` but not enough for Dangerous · **or** any source flags it (`malicious`/`suspicious`) and Safe did not fire — Tier-3-only evidence, or a Tier-3 `malicious` against a Tier-1 clean, **caps at Suspicious** |
 | **Inconclusive** | fewer than `MIN_TRUSTED_COVERAGE` (default 1) Tier-1/2 sources returned a verdict — regardless of the ratio |
 
 Each rule that fires contributes a `rationale` line. Rule order: Inconclusive-coverage check first, then Dangerous, then Safe, then Suspicious as the fallback when something flagged it.
+
+> **Validated 2026-09-02** by a standalone prototype (`docs/specs/verdict-prototype.py`) fed analyzer outputs modelled verbatim from the official Cortex-Analyzers `summary()` logic (GTI `threat_score` bands, VT `last_analysis_stats`, Yara `match_count`, urlscan Search `total`, AbuseIPDB `abuseConfidenceScore`, HybridAnalysis `report_verdict`). All five GTI-comparison cases resolve to their expected band — the two false negatives (Mirai unpacked) and two false positives (`auth.users.pub`, `8.8.8.8`) are fixed; the aligned case stays aligned. The Safe-rule refinement above (Tier-3 `suspicious` does not block Safe) was the one change the prototype forced.
 
 Trust-weighted share = `Σ(weight · tier_multiplier for sources voting malicious) / Σ(weight · tier_multiplier for all voting sources)`, with `tier_multiplier` default `{1: 4, 2: 2, 3: 1}`.
 
