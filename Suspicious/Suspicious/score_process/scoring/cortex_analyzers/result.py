@@ -24,6 +24,7 @@ class AllowListResult(BaseModel):
     FileAllowList:     Optional[str] = None
     DomainAllowList:   Optional[str] = None
     FiletypeAllowList: Optional[str] = None
+    IpAllowList:       Optional[str] = None
 
 
 PENDING = object()
