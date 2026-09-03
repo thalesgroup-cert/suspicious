@@ -114,14 +114,16 @@ def get_case_info_value(obj: Case) -> str:
             )
 
     if getattr(obj, "observable_group_id", None):
-        arts = list(obj.observable_group.artifacts.select_related("url", "ip", "hash", "domain")[:3])
+        # .all() hits the prefetch cache set by get_case_list_queryset;
+        # slicing / .count() would each issue a fresh query per row.
+        arts = list(obj.observable_group.artifacts.all())
         vals = []
-        for a in arts:
+        for a in arts[:3]:
             o = a.observable()
-            v = getattr(o, "address", None) or getattr(o, "value", None) if o else None
+            v = (getattr(o, "address", None) or getattr(o, "value", None)) if o else None
             if v:
                 vals.append(v)
-        total = obj.observable_group.artifacts.count()
+        total = len(arts)
         if vals:
             extra = f" +{total - len(vals)} more" if total > len(vals) else ""
             return ", ".join(vals) + extra

@@ -206,6 +206,20 @@ class SubmitIndicatorsView(APIView):
         valid = [p for p in parsed if p.type]
         skipped = [p.raw for p in parsed if not p.type]
 
+        # Cap first — before any per-indicator work (the SSRF check below can
+        # do a DNS lookup per URL). The field also has a max_length, this is
+        # the semantic limit.
+        if not valid:
+            return _error_response(
+                detail="No valid indicator found.",
+                http_status=status.HTTP_400_BAD_REQUEST,
+            )
+        if len(valid) > IOC_GROUP_MAX:
+            return _error_response(
+                detail=f"Too many indicators ({len(valid)}). The limit is {IOC_GROUP_MAX} per submission.",
+                http_status=status.HTTP_400_BAD_REQUEST,
+            )
+
         # SSRF parity with SubmitUrlSerializer: a URL indicator that targets a
         # private / reserved / link-local address (incl. 169.254.169.254) is
         # dropped to `skipped`, not created + dispatched.
@@ -222,12 +236,7 @@ class SubmitIndicatorsView(APIView):
 
         if not valid:
             return _error_response(
-                detail="No valid indicator found.",
-                http_status=status.HTTP_400_BAD_REQUEST,
-            )
-        if len(valid) > IOC_GROUP_MAX:
-            return _error_response(
-                detail=f"Too many indicators ({len(valid)}). The limit is {IOC_GROUP_MAX} per submission.",
+                detail="No valid indicator found (all were unresolvable or blocked).",
                 http_status=status.HTTP_400_BAD_REQUEST,
             )
 

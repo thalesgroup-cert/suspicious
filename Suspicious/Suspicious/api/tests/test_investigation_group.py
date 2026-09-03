@@ -53,14 +53,17 @@ class InvestigationGroupApiTests(TestCase):
 
     def test_group_case_findable_by_indicator(self):
         g = ObservableGroup.objects.create()
-        ObservableGroupArtifact.objects.create(
-            group=g, artifact_type="IP", ip=IP.objects.create(address="8.8.8.8")
-        )
+        for addr in ("8.8.8.8", "1.1.1.1", "9.9.9.9"):
+            ObservableGroupArtifact.objects.create(
+                group=g, artifact_type="IP", ip=IP.objects.create(address=addr)
+            )
         case = Case.objects.create(description="d", reporter=self.user, observable_group=g)
 
-        r = self.client.get("/api/investigations/?search=8.8.8.8")
-        ids = [row["id"] for row in r.json()["results"]]
-        self.assertIn(case.id, ids)
+        r = self.client.get("/api/investigations/?search=1.1.1.1")
+        rows = [row for row in r.json()["results"] if row["id"] == case.id]
+        # exactly one row despite the 3-artifact reverse-FK fan-out (.distinct())
+        self.assertEqual(len(rows), 1)
+        self.assertEqual(rows[0]["type"], "IOC")
 
     def test_mail_case_has_no_observable_group_key(self):
         case = Case.objects.create(description="d", reporter=self.user)

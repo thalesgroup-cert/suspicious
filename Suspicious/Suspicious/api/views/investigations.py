@@ -121,7 +121,14 @@ class InvestigationAccessMixin:
     analyzer_report_select_related = ANALYZER_REPORT_SELECT_RELATED
 
     def get_case_list_queryset(self):
-        return Case.objects.select_related(*CASE_LIST_SELECT_RELATED)
+        # prefetch the group artifacts so get_case_info_value's IOC branch
+        # doesn't fire 2 queries per row on a list page of IOC cases.
+        return Case.objects.select_related(*CASE_LIST_SELECT_RELATED).prefetch_related(
+            "observable_group__artifacts__url",
+            "observable_group__artifacts__ip",
+            "observable_group__artifacts__hash",
+            "observable_group__artifacts__domain",
+        )
 
     def get_case_detail_queryset(self):
         return (
