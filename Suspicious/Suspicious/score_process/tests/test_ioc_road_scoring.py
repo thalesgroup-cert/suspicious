@@ -48,3 +48,24 @@ class IocRoadScoringTests(TestCase):
         self.assertEqual(case.results, Result.DANGEROUS)
         self.assertEqual(ip.ioc_level.lower(), "dangerous")
         self.assertEqual(case.score, 9)
+
+    def test_deny_listed_domain_forces_dangerous_despite_clean_analyzers(self):
+        from domain_process.models import Domain
+        from settings.models import DenyListDomain
+
+        domain = Domain.objects.create(value="evil-phish.example")
+        DenyListDomain.objects.create(domain=domain, user=self.user)
+        group = ObservableGroup.objects.create()
+        ObservableGroupArtifact.objects.create(
+            group=group, artifact_type="DOMAIN", domain=domain
+        )
+        case = Case.objects.create(description="t", reporter=self.user, observable_group=group)
+        AnalyzerReport.objects.create(cortex_job_id="j4", type="domain", status="Success",
+            analyzer=self.gti, domain=domain, level="safe", confidence=90, score=0,
+            report_summary={}, report_taxonomy={}, report_full={})
+
+        finalise_ioc_group(case)
+
+        case.refresh_from_db(); domain.refresh_from_db()
+        self.assertEqual(case.results, Result.DANGEROUS)
+        self.assertEqual(domain.ioc_level.lower(), "dangerous")

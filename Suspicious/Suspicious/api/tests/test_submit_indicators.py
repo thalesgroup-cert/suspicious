@@ -37,6 +37,29 @@ class SubmitIndicatorsTests(TestCase):
         r = self.client.post("/api/submit/indicators/", {"indicators": "??? ###"}, format="json")
         self.assertEqual(r.status_code, 400)
 
+    @patch("api.views.submit.dispatch_case_analysis.delay")
+    def test_ssrf_url_indicator_is_skipped_not_dispatched(self, _mock):
+        r = self.client.post(
+            "/api/submit/indicators/",
+            {"indicators": "8.8.8.8\nhxxp://169[.]254[.]169[.]254/latest/meta-data/"},
+            format="json",
+        )
+        self.assertEqual(r.status_code, 201)
+        body = r.json()
+        self.assertEqual(body["observable_count"], 1)  # only 8.8.8.8
+        self.assertEqual(len(body["skipped"]), 1)
+        case = Case.objects.get(id=body["case_id"])
+        self.assertFalse(
+            ObservableGroupArtifact.objects.filter(
+                group=case.observable_group, artifact_type="URL"
+            ).exists()
+        )
+
+    def test_oversized_blob_is_rejected(self):
+        blob = "8.8.8.8\n" * 40000  # ~320 KB, over the 100*2048 field cap
+        r = self.client.post("/api/submit/indicators/", {"indicators": blob}, format="json")
+        self.assertEqual(r.status_code, 400)
+
     def test_over_cap_is_400(self):
         blob = "\n".join(f"10.0.0.{i}" for i in range(1, 130))
         r = self.client.post("/api/submit/indicators/", {"indicators": blob}, format="json")

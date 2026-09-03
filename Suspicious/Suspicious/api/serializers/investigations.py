@@ -276,6 +276,15 @@ class InvestigationDetailsSerializer(InvestigationRowSerializer):
         from api.utils.observable_report import assemble_observables
         return {"observables": assemble_observables(case)}
 
+    def to_representation(self, instance):
+        # Road isolation: the key exists only for IOC-group cases. Dropping it
+        # here (not in one view) keeps every consumer — detail, global-edit —
+        # consistent.
+        data = super().to_representation(instance)
+        if data.get("observable_group") is None:
+            data.pop("observable_group", None)
+        return data
+
     def get_analyzer_reports(self, obj: Case) -> list[dict[str, Any]]:
         queryset = self.context.get("analyzer_reports_qs")
         if queryset is None:

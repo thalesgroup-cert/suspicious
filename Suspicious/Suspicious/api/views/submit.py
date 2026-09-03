@@ -12,6 +12,7 @@ from api.serializers.submit import (
     SubmitIndicatorsSerializer,
     SubmitOtherSerializer,
     SubmitUrlSerializer,
+    _check_no_ssrf_ip,
 )
 from api.utils.indicators import parse_indicators
 from case_handler.case_utils.case_handler import CaseHandler
@@ -205,6 +206,20 @@ class SubmitIndicatorsView(APIView):
         valid = [p for p in parsed if p.type]
         skipped = [p.raw for p in parsed if not p.type]
 
+        # SSRF parity with SubmitUrlSerializer: a URL indicator that targets a
+        # private / reserved / link-local address (incl. 169.254.169.254) is
+        # dropped to `skipped`, not created + dispatched.
+        safe_valid = []
+        for p in valid:
+            if p.type == "url":
+                try:
+                    _check_no_ssrf_ip(p.value)
+                except ValueError:
+                    skipped.append(p.raw)
+                    continue
+            safe_valid.append(p)
+        valid = safe_valid
+
         if not valid:
             return _error_response(
                 detail="No valid indicator found.",
@@ -215,6 +230,8 @@ class SubmitIndicatorsView(APIView):
                 detail=f"Too many indicators ({len(valid)}). The limit is {IOC_GROUP_MAX} per submission.",
                 http_status=status.HTTP_400_BAD_REQUEST,
             )
+
+        from django.db import transaction
 
         from case_handler.case_utils.case_creator import CaseCreator
         from case_handler.models import ObservableGroup, ObservableGroupArtifact
@@ -230,21 +247,37 @@ class SubmitIndicatorsView(APIView):
             "domain": (Domain, "value", "domain"),
         }
 
+        def _resolve(model, field, value):
+            # These columns have no unique constraint, so a concurrent submit
+            # can leave duplicates; take the first rather than raising
+            # MultipleObjectsReturned on every later submission of that value.
+            existing = model.objects.filter(**{field: value}).first()
+            return existing or model.objects.create(**{field: value})
+
         context = ser.validated_data.get("context") or ""
 
-        group = ObservableGroup.objects.create(label=context[:255])
-        for p in valid:
-            model, field, art_field = _MODEL[p.type]
-            obj, _ = model.objects.get_or_create(**{field: p.value})
-            ObservableGroupArtifact.objects.create(
-                group=group, artifact_type=p.type.upper(), **{art_field: obj}
-            )
+        class _NoCase(Exception):
+            pass
 
-        case = CaseCreator(request.user).create_case(
-            description=context, reporter_context=context, observable_group_instance=group,
-        )
-        if case is None:
-            logger.error("SubmitIndicatorsView: CaseCreator returned no case for group=%s", group.id)
+        try:
+            with transaction.atomic():
+                group = ObservableGroup.objects.create(label=context[:255])
+                for p in valid:
+                    model, field, art_field = _MODEL[p.type]
+                    obj = _resolve(model, field, p.value)
+                    ObservableGroupArtifact.objects.create(
+                        group=group, artifact_type=p.type.upper(), **{art_field: obj}
+                    )
+
+                case = CaseCreator(request.user).create_case(
+                    description=context, reporter_context=context,
+                    observable_group_instance=group,
+                )
+                if case is None:
+                    raise _NoCase
+        except _NoCase:
+            # atomic() rolled the group + artifacts back — no orphans.
+            logger.error("SubmitIndicatorsView: CaseCreator returned no case")
             return _error_response(
                 detail="An internal error occurred while creating the case.",
                 code="internal_error",

@@ -62,15 +62,10 @@ def collect_signals(case):
                 failures += process_ioc(ioc, ioc_type, reports, scores, confidences, 0)
                 signals += _signals_from(scores, confidences, off, ioc_type)
 
-    if case.observable_group_id:
-        for art in case.observable_group.artifacts.select_related("url", "ip", "hash", "domain"):
-            obj = art.observable()
-            if obj is None:
-                continue
-            ioc_type = art.artifact_type.lower()
-            off = len(scores)
-            failures += process_ioc(obj, ioc_type, reports, scores, confidences, 0)
-            signals += _signals_from(scores, confidences, off, ioc_type)
+    # NB: ObservableGroup (IOC-road) cases never reach here — get_report()
+    # branches to finalise_ioc_group() before collect_signals() is called.
+    # The categorical engine (score_observable) owns that road; running the
+    # weighted process_ioc here would double-score the shared observable rows.
 
     signals += [Signal("failed", 0, 0, False, True) for _ in range(failures)]
     ai_missing = (case.results_ai == Result.INCONCLUSIVE)

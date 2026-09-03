@@ -322,10 +322,7 @@ class InvestigationDetailsView(InvestigationAccessMixin, APIView):
                 "analyzer_reports_qs": analyzer_reports_qs,
             },
         )
-        data = serializer.data
-        if data.get("observable_group") is None:
-            data.pop("observable_group", None)
-        return Response(data, status=status.HTTP_200_OK)
+        return Response(serializer.data, status=status.HTTP_200_OK)
 
 
 @extend_schema(

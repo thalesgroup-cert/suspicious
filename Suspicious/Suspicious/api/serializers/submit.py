@@ -239,7 +239,12 @@ class SubmitFileSerializer(OptionalContextMixin, serializers.Serializer):
 
 
 class SubmitIndicatorsSerializer(OptionalContextMixin, serializers.Serializer):
-    indicators = serializers.CharField(required=True, trim_whitespace=False)
+    # Cap the blob well above the 100-indicator limit (checked in the view
+    # after parsing) so a multi-MB body can't be refanged + validated line by
+    # line before the count check runs. 100 * a generous per-URL max.
+    indicators = serializers.CharField(
+        required=True, trim_whitespace=False, max_length=100 * 2048,
+    )
 
 
 class SubmitConfigSerializer(serializers.Serializer):
