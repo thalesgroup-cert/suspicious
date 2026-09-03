@@ -259,6 +259,7 @@ class InvestigationDetailsSerializer(InvestigationRowSerializer):
     case_infos = serializers.SerializerMethodField()
     raw = serializers.SerializerMethodField()
     reporter_note = serializers.SerializerMethodField()
+    observable_group = serializers.SerializerMethodField()
 
     class Meta(InvestigationRowSerializer.Meta):
         fields = InvestigationRowSerializer.Meta.fields + [
@@ -266,7 +267,14 @@ class InvestigationDetailsSerializer(InvestigationRowSerializer):
             "challenge_proposed_result", "challenge_reason",
             "reporter_context", "reporter_note", "thehive_alert_id",
             "is_allowlisted", "is_denylisted", "list_reason",
+            "observable_group",
         ]
+
+    def get_observable_group(self, case):
+        if not case.observable_group_id:
+            return None
+        from api.utils.observable_report import assemble_observables
+        return {"observables": assemble_observables(case)}
 
     def get_analyzer_reports(self, obj: Case) -> list[dict[str, Any]]:
         queryset = self.context.get("analyzer_reports_qs")
