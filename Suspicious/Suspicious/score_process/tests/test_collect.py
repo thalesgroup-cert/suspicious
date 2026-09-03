@@ -116,3 +116,40 @@ class CollectSignalsTest(TestCase):
             "AI's own archive-file report leaked into the generic per-file "
             "signal list, double-counting it alongside the dedicated `ai` signal.",
         )
+
+
+class CollectSignalsGroupTests(TestCase):
+    def test_group_case_produces_signal_per_observable(self):
+        from django.contrib.auth.models import User
+        from ip_process.models import IP
+        from cortex_job.models import Analyzer, AnalyzerReport
+        from case_handler.models import Case, ObservableGroup, ObservableGroupArtifact
+        from score_process.scoring.collect import collect_signals
+
+        u = User.objects.create_user("csg_u", password="p")
+        analyzer = Analyzer.objects.create(name="Abuse", analyzer_cortex_id="Abuse", weight=1)
+        g = ObservableGroup.objects.create()
+        for i, a in enumerate(("3.3.3.3", "4.4.4.4")):
+            ip = IP.objects.create(address=a)
+            AnalyzerReport.objects.create(
+                cortex_job_id=f"jg{i}", type="ip", status="Success", analyzer=analyzer,
+                ip=ip, level="malicious", confidence=9, score=9,
+                report_summary={"taxonomies": [{"level": "malicious", "value": "abuse"}]},
+                report_taxonomy={}, report_full={},
+            )
+            ObservableGroupArtifact.objects.create(group=g, artifact_type="IP", ip=ip)
+        case = Case.objects.create(description="d", reporter=u, observable_group=g)
+
+        signals, ai, deny, ai_missing, reason = collect_signals(case)
+        self.assertGreaterEqual(len(signals), 2)
+
+    def test_case_without_group_or_iocs_yields_no_signals(self):
+        from django.contrib.auth.models import User
+        from case_handler.models import Case
+        from score_process.scoring.collect import collect_signals
+
+        u = User.objects.create_user("csg_empty", password="p")
+        case = Case.objects.create(description="d", reporter=u)
+
+        signals, ai, deny, ai_missing, reason = collect_signals(case)
+        self.assertEqual(signals, [])

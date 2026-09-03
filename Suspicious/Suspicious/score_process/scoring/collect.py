@@ -62,6 +62,16 @@ def collect_signals(case):
                 failures += process_ioc(ioc, ioc_type, reports, scores, confidences, 0)
                 signals += _signals_from(scores, confidences, off, ioc_type)
 
+    if case.observable_group_id:
+        _FIELD = {"URL": "url", "IP": "ip", "HASH": "hash", "DOMAIN": "domain"}
+        for art in case.observable_group.artifacts.select_related("url", "ip", "hash", "domain"):
+            obj = art.observable()
+            if obj is None:
+                continue
+            off = len(scores)
+            failures += process_ioc(obj, _FIELD[art.artifact_type], reports, scores, confidences, 0)
+            signals += _signals_from(scores, confidences, off, art.artifact_type.lower())
+
     signals += [Signal("failed", 0, 0, False, True) for _ in range(failures)]
     ai_missing = (case.results_ai == Result.INCONCLUSIVE)
 
