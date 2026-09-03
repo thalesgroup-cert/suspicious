@@ -1,7 +1,7 @@
 from django.test import SimpleTestCase
 
 from score_process.scoring.sources import SourceVerdict
-from score_process.scoring.observable_engine import score_observable
+from score_process.scoring.observable_engine import score_observable, score_group, ObservableVerdict
 
 
 def sv(verdict, tier=3, weight=0.2, confidence=None, failed=False, name="s"):
@@ -68,3 +68,30 @@ class ScoreObservableTests(SimpleTestCase):
     def test_tier1_clean_plus_tier3_malicious_is_suspicious(self):
         v = score_observable([sv("clean", tier=1), sv("malicious", tier=3)])
         self.assertEqual(v.band, "Suspicious")
+
+
+def ov(band, confidence=80):
+    return ObservableVerdict(band, confidence, None, {}, [])
+
+
+class ScoreGroupTests(SimpleTestCase):
+    def test_worst_of_wins(self):
+        g = score_group([ov("Safe"), ov("Suspicious"), ov("Dangerous")])
+        self.assertEqual(g.band, "Dangerous")
+
+    def test_inconclusive_ignored_when_others_have_verdict(self):
+        g = score_group([ov("Inconclusive"), ov("Safe"), ov("Suspicious")])
+        self.assertEqual(g.band, "Suspicious")
+
+    def test_all_inconclusive_is_inconclusive(self):
+        g = score_group([ov("Inconclusive"), ov("Inconclusive")])
+        self.assertEqual(g.band, "Inconclusive")
+
+    def test_counts_and_rationale(self):
+        g = score_group([ov("Dangerous"), ov("Dangerous"), ov("Safe")])
+        self.assertEqual(g.counts["Dangerous"], 2)
+        self.assertTrue(any("2 of 3" in line for line in g.rationale))
+
+    def test_confidence_is_min_at_worst_band(self):
+        g = score_group([ov("Dangerous", 40), ov("Dangerous", 90), ov("Safe", 100)])
+        self.assertEqual(g.confidence, 40)

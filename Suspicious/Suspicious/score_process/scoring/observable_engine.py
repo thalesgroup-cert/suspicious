@@ -113,3 +113,38 @@ def score_observable(sources: list) -> ObservableVerdict:
     # Nothing flagged at all.
     rationale.append("No source flags the indicator.")
     return ObservableVerdict("Safe", _confidence(sources), None, counts, rationale)
+
+
+# ─────────────────────────────────────────────────────────────────────────────
+# Group verdict — one band for a whole IOC-group case (spec §4.4)
+# ─────────────────────────────────────────────────────────────────────────────
+
+_BAND_ORDER = {"Safe": 0, "Suspicious": 1, "Dangerous": 2}
+
+
+@dataclass(frozen=True)
+class GroupVerdict:
+    band: str            # worst observable band; "Inconclusive" iff ALL are Inconclusive
+    confidence: int      # min confidence among observables AT the worst band
+    counts: dict         # {"Dangerous": n, "Suspicious": n, "Safe": n, "Inconclusive": n}
+    rationale: list
+
+
+def score_group(observables: list) -> GroupVerdict:
+    """Worst-of banding across a case's observables. Inconclusive ones are ignored."""
+    counts = {"Dangerous": 0, "Suspicious": 0, "Safe": 0, "Inconclusive": 0}
+    for o in observables:
+        counts[o.band] = counts.get(o.band, 0) + 1
+
+    total = len(observables)
+    assessed = [o for o in observables if o.band != "Inconclusive"]
+    if not assessed:
+        return GroupVerdict("Inconclusive", 0, counts,
+                            [f"None of {total} observable(s) could be assessed."])
+
+    worst = max(assessed, key=lambda o: _BAND_ORDER[o.band]).band
+    conf = min(o.confidence for o in assessed if o.band == worst)
+    rationale = [f"{counts[worst]} of {total} observable(s) are {worst}."]
+    if counts["Inconclusive"]:
+        rationale.append(f"{counts['Inconclusive']} could not be assessed.")
+    return GroupVerdict(worst, conf, counts, rationale)
