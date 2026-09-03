@@ -12,9 +12,15 @@ def observable_reports(case) -> list[tuple]:
     """Per group artifact: (art, obj, field, [reports]) with ONE AnalyzerReport
     query for the whole group, bucketed in Python by FK id. Reports are newest
     first. Shared by collect_observable_sources and assemble_observables so the
-    detail/report paths don't issue one query per observable."""
+    detail/report paths don't issue one query per observable.
+
+    A URL that the planner collapsed/reused (``analyzed_url`` set) carries no
+    reports of its own — they are filed against the representative it points to,
+    so that representative's reports are folded in here."""
     arts = []
-    for art in case.observable_group.artifacts.select_related("url", "ip", "hash", "domain"):
+    for art in case.observable_group.artifacts.select_related(
+        "url", "url__analyzed_url", "ip", "hash", "domain"
+    ):
         field = _FIELD[art.artifact_type]
         obj = getattr(art, field)
         if obj is not None:
@@ -24,7 +30,19 @@ def observable_reports(case) -> list[tuple]:
 
     from cortex_job.cortex_utils.case_targets import build_analyzer_report_filter
 
-    q = build_analyzer_report_filter([(obj, field) for (_a, obj, field) in arts])
+    # pk -> (field, observable pk) so a report on a URL's analysed representative
+    # buckets to the observable the analyst submitted.
+    pk_to_key: dict[tuple, tuple] = {}
+    targets = []
+    for (_a, obj, field) in arts:
+        pk_to_key[(field, obj.pk)] = (field, obj.pk)
+        targets.append((obj, field))
+        rep = getattr(obj, "analyzed_url", None) if field == "url" else None
+        if rep is not None:
+            pk_to_key[(field, rep.pk)] = (field, obj.pk)
+            targets.append((rep, field))
+
+    q = build_analyzer_report_filter(targets)
     reports = list(
         AnalyzerReport.objects.filter(q)
         .select_related("analyzer")
@@ -33,9 +51,11 @@ def observable_reports(case) -> list[tuple]:
 
     buckets: dict[tuple, list] = {}
     for r in reports:
-        for (_a, obj, field) in arts:
-            if getattr(r, f"{field}_id") == obj.pk:
-                buckets.setdefault((field, obj.pk), []).append(r)
+        for field in {f for (_a, _o, f) in arts}:
+            rid = getattr(r, f"{field}_id", None)
+            key = pk_to_key.get((field, rid)) if rid else None
+            if key:
+                buckets.setdefault(key, []).append(r)
                 break
 
     return [(art, obj, field, buckets.get((field, obj.pk), [])) for (art, obj, field) in arts]

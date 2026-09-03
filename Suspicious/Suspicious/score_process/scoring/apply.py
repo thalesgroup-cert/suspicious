@@ -9,6 +9,16 @@ from score_process.scoring.update_handler import (
 logger = logging.getLogger(__name__)
 
 _DERIVED_SCORE = {"Safe": 2, "Suspicious": 6, "Dangerous": 9, "Inconclusive": 5}
+# Map the categorical band onto the legacy IOC-level vocabulary
+# (safe/info/suspicious/malicious/critical) that admin filters + cross-case
+# reuse read — the ObservableGroup rows are globally shared.
+_BAND_TO_IOC_LEVEL = {
+    "Safe": "safe", "Inconclusive": "info",
+    "Suspicious": "suspicious", "Dangerous": "malicious",
+}
+# Stronger markers set by other paths (deny list / allow list) — never
+# downgraded by an IOC-road re-score.
+_STICKY_IOC_LEVELS = {"critical", "SAFE-ALLOW_LISTED"}
 
 
 def apply_verdict(case, verdict) -> None:
@@ -72,7 +82,8 @@ def finalise_ioc_group(case) -> None:
                 list(v.rationale) + [f"Indicator is on the deny list ({matched})."],
             )
         obs_verdicts.append(v)
-        obj.ioc_level = v.band.lower()
+        if obj.ioc_level not in _STICKY_IOC_LEVELS:
+            obj.ioc_level = _BAND_TO_IOC_LEVEL.get(v.band, "info")
         obj.ioc_score = _DERIVED_SCORE.get(v.band, 5)
         obj.ioc_confidence = v.confidence
         obj.save(update_fields=["ioc_level", "ioc_score", "ioc_confidence"])
@@ -86,7 +97,9 @@ def finalise_ioc_group(case) -> None:
     for v in obs_verdicts:
         rationale.extend(v.rationale)
     case.verdict_rationale = rationale
-    case.analysis_done = len(obs_verdicts)
+    # analyzer-report count (matches the mail road's verdict.n_scored), not the
+    # observable count — feeds _describe()'s "reused" branch + the admin/UI field.
+    case.analysis_done = sum(len(s) for s in per_obs.values())
     case.save(update_fields=[
         "results", "score", "final_score", "confidence", "final_confidence",
         "verdict_rationale", "analysis_done",

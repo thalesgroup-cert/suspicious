@@ -23,6 +23,15 @@ class ParseIndicatorsTests(SimpleTestCase):
         self.assertEqual(types["example.com"], "domain")
         self.assertEqual(types["http://example.com/x"], "url")
 
+    def test_non_domain_shapes_are_unclassified(self):
+        # parity with the frontend preview regex — these are NOT domains
+        types = {p.value: p.type for p in parse_indicators(
+            "user@example.com\n8.8.8.8:80\n1.2.3.4.5"
+        )}
+        self.assertIsNone(types["user@example.com"])
+        self.assertIsNone(types["8.8.8.8:80"])
+        self.assertIsNone(types["1.2.3.4.5"])
+
     def test_dedupe_preserves_order(self):
         out = parse_indicators("8.8.8.8\n8.8.8.8\n1.1.1.1")
         self.assertEqual([p.value for p in out], ["8.8.8.8", "1.1.1.1"])

@@ -10,14 +10,16 @@ from ip_process.models import IP
 
 
 class ThehiveGroupObservablesTests(TestCase):
-    def _group_case(self):
+    def _group_case(self, results="Inconclusive"):
         u = User.objects.create_user("u", password="p")
         g = ObservableGroup.objects.create()
         for a in ("8.8.8.8", "1.1.1.1"):
             ObservableGroupArtifact.objects.create(
                 group=g, artifact_type="IP", ip=IP.objects.create(address=a)
             )
-        return Case.objects.create(description="d", reporter=u, observable_group=g)
+        return Case.objects.create(
+            description="d", reporter=u, observable_group=g, results=results
+        )
 
     def test_builds_one_observable_per_target(self):
         case = self._group_case()
@@ -26,7 +28,7 @@ class ThehiveGroupObservablesTests(TestCase):
         self.assertTrue(all(o["dataType"] == "ip" for o in obs))
 
     def test_on_case_finalised_creates_alert_with_observables(self):
-        case = self._group_case()
+        case = self._group_case(results="Dangerous")
         connector = TheHiveConnector({"url": "https://hive", "api_key": "k"})
         with mock.patch(
             "connectors.contrib.thehive.phishing.create_new_alert",
@@ -36,6 +38,8 @@ class ThehiveGroupObservablesTests(TestCase):
         ) as aoi:
             connector.on_case_finalised(mock.Mock(case_id=case.id))
         cna.assert_called_once()
+        # severity (4th positional arg) derived from the verdict: Dangerous -> 4
+        self.assertEqual(cna.call_args[0][3], 4)
         aoi.assert_called_once()
         _t, _id, sent, _u, _k = aoi.call_args[0]
         self.assertEqual(_id, "alert-1")

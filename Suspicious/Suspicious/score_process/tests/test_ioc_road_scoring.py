@@ -46,7 +46,7 @@ class IocRoadScoringTests(TestCase):
 
         case.refresh_from_db(); ip.refresh_from_db()
         self.assertEqual(case.results, Result.DANGEROUS)
-        self.assertEqual(ip.ioc_level.lower(), "dangerous")
+        self.assertEqual(ip.ioc_level.lower(), "malicious")
         self.assertEqual(case.score, 9)
 
     def test_deny_listed_domain_forces_dangerous_despite_clean_analyzers(self):
@@ -68,4 +68,4 @@ class IocRoadScoringTests(TestCase):
 
         case.refresh_from_db(); domain.refresh_from_db()
         self.assertEqual(case.results, Result.DANGEROUS)
-        self.assertEqual(domain.ioc_level.lower(), "dangerous")
+        self.assertEqual(domain.ioc_level.lower(), "malicious")

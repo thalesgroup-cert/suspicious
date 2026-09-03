@@ -54,11 +54,16 @@ class TheHiveConnector(Connector):
         if not observables:
             return
 
+        # TheHive severity 1=Low 2=Medium 3=High 4=Critical
+        severity = {
+            "Safe": 1, "Inconclusive": 2, "Suspicious": 3, "Dangerous": 4,
+        }.get(str(case.results), 2)
+
         alert = create_new_alert(
             None,
             f"Suspicious IOC case #{case.id}",
             f"{len(observables)} indicator(s) — verdict {case.results}",
-            2, 2, 2, "Suspicious", url, key,
+            severity, 2, 2, "Suspicious", url, key,
             [f"suspicious:case:{case.id}"],
         )
         alert_id = (alert or {}).get("_id")

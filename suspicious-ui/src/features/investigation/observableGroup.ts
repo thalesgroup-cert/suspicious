@@ -34,6 +34,13 @@ export type Observable = z.infer<typeof observableSchema>;
 export type ObservableGroup = z.infer<typeof observableGroupSchema>;
 
 export function parseObservableGroup(x: unknown): ObservableGroup | undefined {
+  if (x === undefined || x === null) return undefined;
   const parsed = observableGroupSchema.safeParse(x);
-  return parsed.success ? parsed.data : undefined;
+  if (!parsed.success) {
+    // A present-but-unparseable payload means the backend shape drifted;
+    // the page will silently fall back to the legacy layout without this.
+    console.warn("observable_group payload failed validation", parsed.error.issues);
+    return undefined;
+  }
+  return parsed.data;
 }

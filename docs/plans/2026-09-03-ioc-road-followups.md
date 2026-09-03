@@ -18,57 +18,58 @@ Suite went 658 → 856, all green. The `@override_settings(ROOT_URLCONF=
 "suspicious.urls")` decorators on the IOC-road test modules are now redundant but
 left in place (harmless).
 
-## 2. Backend / frontend indicator classifier disagree
+## 2. Backend / frontend indicator classifier disagree — ✅ DONE 2026-09-03
 
-`api/utils/indicators.py::_classify` uses a loose domain heuristic
-(`"." in v and " " not in v and "/" not in v`) that accepts `user@example.com`,
-`8.8.8.8:80`, `1.2.3.4.5` as `domain`; the frontend `parseIndicators.ts` regex
-(`^[a-z0-9.-]+\.[a-z]{2,}$`) rejects them. Preview count can differ from the
-server's `observable_count`. Port the frontend regex to `_classify`.
+`_classify` now uses `_DOMAIN = re.compile(r"^[a-z0-9.-]+\.[a-z]{2,}$", re.I)`,
+the same pattern as `parseIndicators.ts`. `user@host`, `host:port`, all-numeric
+strings now classify as `None` on both sides.
 
-## 3. `ioc_level` vocabulary widening on shared rows
+## 3. `ioc_level` vocabulary widening on shared rows — ✅ DONE 2026-09-03
 
-`finalise_ioc_group` writes `"dangerous"` / `"inconclusive"` into
-`IP/URL/Hash/Domain.ioc_level`, whose legacy vocabulary is
-`safe / info / suspicious / malicious / critical / SAFE-ALLOW_LISTED`. Those rows
-are globally shared, so this can clobber the deny-list `critical` marker and the
-allow-list markers. Display-only impact today (admin `list_filter`). Decide:
-separate field for the IOC-road band, or map bands to the legacy vocabulary.
+`finalise_ioc_group` now maps the categorical band onto the legacy vocabulary
+(`_BAND_TO_IOC_LEVEL`: Safe→safe, Inconclusive→info, Suspicious→suspicious,
+Dangerous→malicious) before writing `ioc_level`, and skips the write entirely
+when the row already carries a stronger sticky marker (`critical`,
+`SAFE-ALLOW_LISTED`). The Case verdict itself stays categorical
+(`case.results = Result.DANGEROUS` etc.).
 
-## 4. URL-planner `analyzed_url` blind spot
+## 4. URL-planner `analyzed_url` blind spot — ✅ DONE 2026-09-03
 
-With `url_analysis.enabled` (default off), `plan_url_analysis` marks >5
-same-domain URLs `SKIPPED` and collapses same-canonical-key URLs to a
-representative. `assemble_observables` / `observable_reports` filter
-`AnalyzerReport` on the observable itself and never follow `analyzed_url`, so a
-skipped/collapsed URL observable renders "no sources / Inconclusive" forever even
-though `collect_case_targets` dispatched its `analyzed_url`. Follow `analyzed_url`
-in the assembly.
+`observable_reports` now `select_related("url__analyzed_url")` and, for a URL
+observable whose `analyzed_url` is set (collapsed/reused by the planner), folds
+the representative's `AnalyzerReport` rows into that observable's bucket. Covered
+by `test_collapsed_url_observable_shows_representative_reports`.
 
-## 5. `parseObservableGroup` silent fallback (frontend)
+## 5. `parseObservableGroup` silent fallback (frontend) — ✅ DONE 2026-09-03
 
-`suspicious-ui/src/features/investigation/observableGroup.ts::parseObservableGroup`
-returns `undefined` on any backend shape change → the investigation page silently
-falls back to the legacy analyzer layout. Add a `console.warn` on
-`!parsed.success`.
+Now `console.warn`s with `parsed.error.issues` when a *present* payload fails
+validation (still returns `undefined` for the absent/null case without noise).
 
-## 6. `case.analysis_done` semantics differ by road
+## 6. `case.analysis_done` semantics differ by road — ✅ DONE 2026-09-03
 
-IOC road writes observable-count; mail road writes analyzer-count
-(`verdict.n_scored`). Surfaces as `tests_done` in the UI and feeds `_describe`'s
-"reused from a prior identical submission" branch. Low impact; note when touching
-either path.
+`finalise_ioc_group` now writes `sum(len(sources))` across observables
+(analyzer-report count, matching the mail road's `verdict.n_scored`) instead of
+the observable count.
 
-## 7. TheHive alert severity hardcoded
+## 7. TheHive alert severity hardcoded — ✅ DONE 2026-09-03
 
-`TheHiveConnector.on_case_finalised` passes `severity/tlp/pap = 2/2/2` for every
-IOC-group alert. Derive severity from `case.results` (Dangerous → higher).
+`on_case_finalised` now derives TheHive severity from `case.results`
+(Safe→1 / Inconclusive→2 / Suspicious→3 / Dangerous→4); tlp/pap stay 2.
 
-## 8. Scoring-plan Task 14 — `mail_band_escalation` wiring (not started)
+## 8. Scoring-plan Task 14 — `mail_band_escalation` wiring — BLOCKED, needs a design decision
 
-From the scoring-verdict-model plan's own self-review: `mail_band_escalation` is
-defined and unit-tested but never called from `get_report` for mail cases with
-embedded IOCs. Wiring it needs the embedded-IOC `ObservableVerdict` list
-(`collect_case_targets`-derived) computed in `reports.py::get_report` after
-`apply_verdict`, then re-save `case.results`. ~5 steps, same shape as the
-IOC-road finalise wiring.
+Attempted 2026-09-03, reverted. The plan's self-review assumed the mail signal
+path was already isolated from embedded IOCs (Option B: "mail score = AI + YARA +
+sandbox only"). It is **not**: `collect_signals` → `process_mail` →
+`process_mail_artifact` → `process_ioc` still scores every embedded
+URL/IP/hash/domain mail artifact into `score_case`'s signal aggregate. So layering
+`mail_band_escalation` on top double-counts embedded IOCs.
+
+Doing this properly requires first stopping `process_mail` from feeding
+`mail_artifacts` into the aggregate signal list — a real behavior change to the
+mail verdict path with mail-backtest drift, which needs the user's sign-off (it's
+the Option-B split the original design called for but the scoring plan never
+actually implemented). Not a mechanical follow-up.
+
+`mail_band_escalation` itself stays defined + unit-tested (`test_mail_escalation.py`),
+ready for that work.

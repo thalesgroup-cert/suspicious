@@ -39,6 +39,30 @@ class InvestigationGroupApiTests(TestCase):
         self.assertEqual(obs[0]["value"], "8.8.8.8")
         self.assertEqual(obs[0]["sources"][0]["report"]["as_owner"], "Google LLC")
 
+    def test_collapsed_url_observable_shows_representative_reports(self):
+        from url_process.models import URL
+
+        rep = URL.objects.create(address="http://evil.test/a")
+        dup = URL.objects.create(
+            address="http://evil.test/a?utm=1", analyzed_url=rep,
+            analysis_status=URL.AnalysisStatus.REUSED,
+        )
+        g = ObservableGroup.objects.create()
+        ObservableGroupArtifact.objects.create(group=g, artifact_type="URL", url=dup)
+        case = Case.objects.create(description="d", reporter=self.user, observable_group=g)
+        a = Analyzer.objects.create(name="Urlscan", analyzer_cortex_id="us1", tier=2)
+        # report is filed against the representative, not the submitted dup
+        AnalyzerReport.objects.create(
+            cortex_job_id="j2", type="url", status="Success", analyzer=a,
+            url=rep, level="malicious", confidence=80, score=9,
+            report_summary={}, report_taxonomy={}, report_full={},
+        )
+
+        r = self.client.get(f"/api/investigations/{case.id}/")
+        obs = r.json()["observable_group"]["observables"]
+        self.assertEqual(len(obs[0]["sources"]), 1)
+        self.assertEqual(obs[0]["sources"][0]["name"], "Urlscan")
+
     def test_group_case_type_and_info(self):
         g = ObservableGroup.objects.create()
         ObservableGroupArtifact.objects.create(

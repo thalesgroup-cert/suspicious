@@ -8,6 +8,10 @@ from typing import Optional
 
 _SPLIT = re.compile(r"[\s,;]+")
 _HASH = re.compile(r"^[a-fA-F0-9]{32}$|^[a-fA-F0-9]{40}$|^[a-fA-F0-9]{64}$")
+# Same pattern as the frontend preview (parseIndicators.ts) so the count the
+# analyst sees matches what the server accepts. Rejects user@host, host:port,
+# and all-numeric strings.
+_DOMAIN = re.compile(r"^[a-z0-9.-]+\.[a-z]{2,}$", re.IGNORECASE)
 
 
 def _refang(s: str) -> str:
@@ -35,7 +39,7 @@ def _classify(value: str) -> Optional[str]:
         pass
     if value.startswith(("http://", "https://")):
         return "url"
-    if "." in value and " " not in value and "/" not in value:
+    if "/" not in value and _DOMAIN.match(value):
         return "domain"
     return None
 
