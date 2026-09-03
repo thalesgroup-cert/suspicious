@@ -1,4 +1,5 @@
 import { api } from "@/api/client";
+import { parseObservableGroup, type ObservableGroup } from "./observableGroup";
 
 export type InvestigationStatus =
   | "NEW"
@@ -112,6 +113,8 @@ export type InvestigationDetails = {
   is_allowlisted: boolean;
   is_denylisted: boolean;
   list_reason: string;
+  /** Present only for IOC-group cases (Task 9 payload); undefined for mail/file. */
+  observable_group?: ObservableGroup;
   [key: string]: unknown;
 };
 
@@ -295,6 +298,7 @@ function normalizeDetails(input: unknown): InvestigationDetails {
     list_reason: asString(data.list_reason),
     analyzer_reports: analyzerReportsRaw.map(normalizeAnalyzerReport),
     case_infos: normalizeCaseInfos(data.case_infos),
+    observable_group: parseObservableGroup(data.observable_group),
     raw: data.raw ?? data,
   };
 }

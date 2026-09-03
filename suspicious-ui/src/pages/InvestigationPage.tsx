@@ -75,6 +75,7 @@ import MailPreview from "@/shared/components/MailPreview";
 
 import { SoftCard } from "@/features/investigation/components/cards";
 import { InvestigationAnalyzerReportCard } from "@/features/investigation/components/InvestigationAnalyzerReportCard";
+import { ObservableGroupPanel } from "@/features/investigation/ObservableGroupPanel";
 import { CommentThread } from "@/features/comments/CommentThread";
 import { addCaseComment, getCaseComments } from "@/features/comments/api";
 import {
@@ -347,6 +348,7 @@ export default function InvestigationPage() {
     () => detailsQuery.data?.analyzer_reports ?? [],
     [detailsQuery.data]
   );
+  const observableGroup = detailsQuery.data?.observable_group;
   const reportGroups = React.useMemo(
     () => groupReportsByArtifact(analyzerReports),
     [analyzerReports]
@@ -1139,7 +1141,10 @@ export default function InvestigationPage() {
                   </Box>
                 ) : null}
 
-                {/* ── Analysis results — grouped by artifact ────────────────────── */}
+                {/* ── Analysis results — IOC-group cases get the VT-style panel ─── */}
+                {observableGroup ? (
+                  <ObservableGroupPanel group={observableGroup} caseId={selectedIdNum} />
+                ) : (
                 <Box sx={{ px: 2.25, pt: 2, pb: 1 }}>
                   <Stack direction="row" sx={{ mb: 1.25, alignItems: "center", justifyContent: "space-between" }}>
                     <Typography sx={{ fontSize: 10, fontWeight: 700, textTransform: "uppercase", letterSpacing: "0.08em", color: "text.disabled" }}>
@@ -1237,6 +1242,7 @@ export default function InvestigationPage() {
                     </Stack>
                   )}
                 </Box>
+                )}
 
                 {/* ── Raw details ───────────────────────────────────────────────── */}
                 <Accordion disableGutters sx={{ background: "transparent", "&:before": { display: "none" } }}>
