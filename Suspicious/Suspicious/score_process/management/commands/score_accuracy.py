@@ -47,6 +47,8 @@ class Command(BaseCommand):
                 f"{d['name']:<45} GTI {d.get('gti_verdict', '?'):<16} "
                 f"expected {exp:<12} got {got:<12} {verdict}"
             )
-        self.stdout.write(self.style.SUCCESS(f"\n{dict(tally)}"))
-        if tally["false_positive"] or tally["false_negative"]:
+        has_errors = tally["false_positive"] or tally["false_negative"]
+        style = self.style.ERROR if has_errors else self.style.SUCCESS
+        self.stdout.write(style(f"\n{dict(tally)}"))
+        if has_errors:
             raise SystemExit(1)

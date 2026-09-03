@@ -1,6 +1,6 @@
 """Pure, DB-free case-scoring core. No Django models are queried or mutated
 here — inputs are plain dataclasses, output is a CaseVerdict."""
-from dataclasses import dataclass
+from dataclasses import dataclass, replace
 
 from case_handler.models import Result
 
@@ -47,13 +47,14 @@ def mail_band_escalation(verdict, embedded):
     final_score is untouched — the AI/YARA/sandbox score still owns the number."""
     if not embedded:
         return verdict
+    if verdict.result not in _BAND_RANK:
+        return verdict
     worst = max(
         (_OBS_TO_RESULT[o.band] for o in embedded if o.band in _OBS_TO_RESULT),
         key=lambda r: _BAND_RANK[r], default=None,
     )
     if worst is None or _BAND_RANK[worst] <= _BAND_RANK.get(verdict.result, 0):
         return verdict
-    from dataclasses import replace
     line = f"Band raised to {worst} by an embedded indicator."
     return replace(verdict, result=worst, rationale=tuple(verdict.rationale) + (line,))
 

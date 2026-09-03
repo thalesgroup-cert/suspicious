@@ -22,8 +22,14 @@ class ScoreObservableTests(SimpleTestCase):
         v = score_observable([sv("malicious", tier=2), sv("malicious", tier=2), sv("clean", tier=3)])
         self.assertEqual(v.band, "Dangerous")
 
-    def test_weighted_malicious_share_over_half_is_dangerous(self):
+    def test_tier3_only_high_share_still_caps_at_suspicious(self):
+        # 3 tier-3 malicious vs 1 tier-3 clean -> share .75, but no trusted source -> capped
         v = score_observable([sv("malicious"), sv("malicious"), sv("malicious"), sv("clean")])
+        self.assertEqual(v.band, "Suspicious")
+
+    def test_share_over_half_with_a_trusted_malicious_is_dangerous(self):
+        # same share, but one of the malicious voters is tier-2 -> Dangerous
+        v = score_observable([sv("malicious", tier=2), sv("malicious"), sv("malicious"), sv("clean")])
         self.assertEqual(v.band, "Dangerous")
 
     def test_tier3_only_flag_caps_at_suspicious(self):

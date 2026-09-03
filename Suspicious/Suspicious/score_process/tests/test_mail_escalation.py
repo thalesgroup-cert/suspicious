@@ -31,6 +31,11 @@ class MailBandEscalationTests(SimpleTestCase):
         out = mail_band_escalation(cv(Result.SAFE), [ov("Suspicious")])
         self.assertEqual(out.result, Result.SUSPICIOUS)
 
+    def test_does_not_escalate_allowlisted_or_failure(self):
+        for r in (Result.ALLOW_LISTED, Result.FAILURE, Result.UNCHALLENGED):
+            out = mail_band_escalation(cv(r), [ov("Dangerous")])
+            self.assertEqual(out.result, r)
+
     def test_old_positional_construction_still_works(self):
         v = CaseVerdict(2, 80, Result.SAFE, 0, 3, False, "")
         self.assertEqual(v.result, Result.SAFE)

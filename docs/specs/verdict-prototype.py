@@ -139,6 +139,7 @@ def score_observable(sources: list) -> ObservableVerdict:
     trusted_flag = [s for s in trusted_voting if s.verdict in _FLAGGED]
     any_flag = [s for s in voting if s.verdict in _FLAGGED]
     t3_malicious = [s for s in voting if s.tier == 3 and s.verdict == "malicious"]
+    _trusted_malicious = any(s.tier in (1, 2) and s.verdict == "malicious" for s in voting)
     rationale = []
 
     # Rule 0 — coverage: too few trusted sources voted AND nothing flags the
@@ -160,7 +161,7 @@ def score_observable(sources: list) -> ObservableVerdict:
     if len(t2_mal) >= 2:
         rationale.append(f"{len(t2_mal)} strong sources agree malicious.")
         return ObservableVerdict("Dangerous", _confidence(sources), None, counts, rationale)
-    if share >= DANGEROUS_SHARE:
+    if share >= DANGEROUS_SHARE and _trusted_malicious:
         rationale.append(f"Trust-weighted malicious share {share:.0%}.")
         return ObservableVerdict("Dangerous", _confidence(sources), None, counts, rationale)
 
