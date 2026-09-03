@@ -68,6 +68,25 @@ def generate_ref() -> str:
     return datetime.now().strftime("%y%m%d") + "-" + str(token_hex(3))[:5]
 
 
+_THEHIVE_DATATYPE = {"ip": "ip", "url": "url", "domain": "domain", "hash": "hash", "file": "file", "mail": "mail"}
+
+
+def build_group_observables(case):
+    from cortex_job.cortex_utils.case_targets import collect_case_targets
+    out = []
+    for inst, data_type in collect_case_targets(case):
+        value = getattr(inst, "address", None) or getattr(inst, "value", None)
+        if not value:
+            continue
+        out.append({
+            "dataType": _THEHIVE_DATATYPE.get(data_type, "other"),
+            "data": value,
+            "message": f"Suspicious IOC-road observable ({data_type})",
+            "tags": [f"suspicious:case:{case.id}"],
+        })
+    return out
+
+
 def create_new_alert(ticket_id, title, description, severity, tlp, pap, app_name, thehive_url, api_key, tags=None):
     if ticket_id is None:
         ticket_id = generate_ref()
