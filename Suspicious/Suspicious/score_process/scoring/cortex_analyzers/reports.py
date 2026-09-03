@@ -33,6 +33,14 @@ class CortexAnalyzerReports:
             return
 
         try:
+            if getattr(case, "observable_group_id", None):
+                from score_process.scoring.apply import finalise_ioc_group
+                finalise_ioc_group(case)
+                update_cases_logger.info(
+                    "get_report: case %s → IOC-road categorical finalise", case.id
+                )
+                return
+
             mail = getattr(case.fileOrMail, "mail", None) if case.fileOrMail else None
             if mail:
                 CortexJobManager().manage_ai_jobs(case)
