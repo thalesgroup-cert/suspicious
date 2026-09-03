@@ -4,22 +4,19 @@ Surfaced by the whole-branch review of `impl/ioc-analysis-road` (merged into
 `design/ioc-road-and-verdict-model`, 2026-09-03). None of these blocked the
 merge; they are tracked here so they are not lost with the SDD scratch workspace.
 
-## 1. `api/__init__.py` CI test-discovery gap — HIGH (do first)
+## 1. `api/__init__.py` CI test-discovery gap — ✅ DONE 2026-09-03
 
-`Suspicious/Suspicious/api/` is the only Django app with no `__init__.py`.
-Django's no-label test discovery (what CI `backend-test` runs:
-`manage.py test --settings=suspicious.test_settings`) does **not** recurse into
-the namespace-package `api/`, so the entire `api/tests/` tree never runs in CI —
-~97 pre-existing tests plus ~20 added by this branch. The IOC-road backend tests
-pass only under explicit invocation; new `api/tests/*` modules pin
-`@override_settings(ROOT_URLCONF="suspicious.urls")` so they *can* be run, but
-they do not gate.
+`Suspicious/Suspicious/api/` was the only Django app with no `__init__.py`, so
+Django's no-label test discovery (CI `backend-test`) never recursed into it —
+the entire `api/tests/` tree (198 tests) was silently skipped.
 
-Fix is its own task: add `api/__init__.py`, then either repoint
-`suspicious/test_settings.py` `ROOT_URLCONF` to the real `suspicious.urls`
-(check first why the stub `suspicious/test_urls.py` exists — the connectors
-suite + eager-Celery config), or add the `@override_settings` to the ~20
-pre-existing api test classes that 404 without it. Turns CI red until complete.
+Fixed in one commit: added the empty `api/__init__.py`; replaced the historical
+`suspicious/test_urls.py` stub (a host-without-Docker workaround, obsolete since
+CI runs in the image) with `from suspicious.urls import urlpatterns`; fixed one
+rotted mock in `test_profile_avatar.py` (`get_s3_presign_client` wasn't patched).
+Suite went 658 → 856, all green. The `@override_settings(ROOT_URLCONF=
+"suspicious.urls")` decorators on the IOC-road test modules are now redundant but
+left in place (harmless).
 
 ## 2. Backend / frontend indicator classifier disagree
 

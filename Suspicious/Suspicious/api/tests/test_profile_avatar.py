@@ -220,6 +220,9 @@ class AvatarUploadEndpointTests(APITestCase):
         with mock.patch(
             "profiles.profiles_utils.avatar_storage.get_s3_client",
             return_value=fake_client,
+        ), mock.patch(
+            "profiles.profiles_utils.avatar_storage.get_s3_presign_client",
+            return_value=fake_client,
         ):
             resp = self.client.post(
                 self.url, {"avatar": _jpeg_upload()}, format="multipart"
