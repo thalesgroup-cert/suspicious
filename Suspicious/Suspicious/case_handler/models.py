@@ -95,6 +95,8 @@ class Case(models.Model):
     list_reason = models.TextField(
         blank=True, default="", verbose_name="Allow/Deny List Reason",
     )
+    inconclusive_reason = models.CharField(max_length=20, blank=True, default="")
+    verdict_rationale = models.JSONField(default=list, blank=True)
 
     class Meta:
         ordering = ['-creation_date']

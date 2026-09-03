@@ -33,6 +33,29 @@ class CaseVerdict:
     n_scored: int
     is_denylisted: bool = False
     list_reason: str = ""
+    inconclusive_reason: str = ""
+    n_failed: int = 0
+    rationale: tuple = ()
+
+
+_BAND_RANK = {Result.SAFE: 0, Result.INCONCLUSIVE: 0, Result.SUSPICIOUS: 1, Result.DANGEROUS: 2}
+_OBS_TO_RESULT = {"Safe": Result.SAFE, "Suspicious": Result.SUSPICIOUS, "Dangerous": Result.DANGEROUS}
+
+
+def mail_band_escalation(verdict, embedded):
+    """Raise (never lower) a mail case's band to the worst embedded-IOC band.
+    final_score is untouched — the AI/YARA/sandbox score still owns the number."""
+    if not embedded:
+        return verdict
+    worst = max(
+        (_OBS_TO_RESULT[o.band] for o in embedded if o.band in _OBS_TO_RESULT),
+        key=lambda r: _BAND_RANK[r], default=None,
+    )
+    if worst is None or _BAND_RANK[worst] <= _BAND_RANK.get(verdict.result, 0):
+        return verdict
+    from dataclasses import replace
+    line = f"Band raised to {worst} by an embedded indicator."
+    return replace(verdict, result=worst, rationale=tuple(verdict.rationale) + (line,))
 
 
 def band(score: float) -> str:
