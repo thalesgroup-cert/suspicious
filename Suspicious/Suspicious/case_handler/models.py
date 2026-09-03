@@ -64,6 +64,10 @@ class Case(models.Model):
     category_ai = models.CharField(max_length=20, default='Uncategorized', verbose_name='Category AI', db_index=True)
     fileOrMail = models.ForeignKey('CaseHasFileOrMail', on_delete=models.CASCADE, related_name='cases', null=True, blank=True, db_index=True)
     nonFileIocs = models.ForeignKey('CaseHasNonFileIocs', on_delete=models.CASCADE, related_name='cases', null=True, blank=True, db_index=True)
+    observable_group = models.ForeignKey(
+        "ObservableGroup", on_delete=models.CASCADE, related_name="cases",
+        null=True, blank=True, db_index=True,
+    )
     is_challenged = models.BooleanField(default=False)
     is_challengeable = models.BooleanField(default=True)
     challenged_result = models.CharField(max_length=20, choices=Result.choices, default=Result.UNCHALLENGED, verbose_name='Challenged Result')
