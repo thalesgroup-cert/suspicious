@@ -22,6 +22,14 @@ export type ApiErrorResponse = {
   non_field_errors?: string[];
 } & Record<string, unknown>;
 
-export type SubmitMode = "file" | "artifact";
+export type SubmitIndicatorsResponse = {
+  status: "success";
+  case_id: number;
+  observable_count: number;
+  accepted: boolean;
+  skipped: string[];
+};
+
+export type SubmitMode = "file" | "artifact" | "indicators";
 
 export type ArtifactKind = "url" | "ioc";

@@ -26,6 +26,7 @@ import {
   InsertDriveFileOutlined,
   PublicOutlined,
   CloudUploadOutlined,
+  FormatListBulletedOutlined,
 } from "@mui/icons-material";
 import { useMutation, useQuery } from "@tanstack/react-query";
 import { Skeleton } from "boneyard-js/react";
@@ -41,9 +42,11 @@ import { getMe, type Me } from "@/api/auth";
 import {
   getSubmitConfig,
   submitFile,
+  submitIndicators,
   submitIoc,
   submitUrl,
 } from "@/features/submit/api";
+import { parseIndicators } from "@/features/submit/parseIndicators";
 import {
   ModeSelectorCard,
   SectionHeader,
@@ -56,7 +59,11 @@ import {
   type ArtifactForm,
   type FileForm,
 } from "@/features/submit/schema";
-import type { SubmitMode, SubmitSuccessResponse } from "@/features/submit/types";
+import type {
+  SubmitIndicatorsResponse,
+  SubmitMode,
+  SubmitSuccessResponse,
+} from "@/features/submit/types";
 import {
   classifyArtifact,
   extractApiErrorMessage,
@@ -98,6 +105,8 @@ export default function SubmitPage() {
   const [mode, setMode] = React.useState<SubmitMode>("file");
   const [selectedFile, setSelectedFile] = React.useState<File | null>(null);
   const [fallbackCta, setFallbackCta] = React.useState(false);
+  const [indicatorsText, setIndicatorsText] = React.useState("");
+  const [indicatorsContext, setIndicatorsContext] = React.useState("");
 
   const artifactForm = useForm<ArtifactForm>({
     resolver: zodResolver(artifactSchema),
@@ -174,7 +183,45 @@ export default function SubmitPage() {
     },
   });
 
-  const loadingOpen = artifactMutation.isPending || fileMutation.isPending;
+  const indicatorsMutation = useMutation({
+    mutationFn: () =>
+      submitIndicators({
+        indicators: indicatorsText,
+        context: indicatorsContext || undefined,
+      }),
+    onSuccess: (res: SubmitIndicatorsResponse) => {
+      enqueueSnackbar(
+        `Submitted — ${res.observable_count} indicator(s), case #${res.case_id}`,
+        { variant: "success" }
+      );
+      if (res.skipped.length) {
+        enqueueSnackbar(
+          `${res.skipped.length} line(s) not recognised and skipped`,
+          { variant: "warning" }
+        );
+      }
+      navigate(
+        `/submissions?q=${encodeURIComponent(
+          String(res.case_id)
+        )}&open=${encodeURIComponent(String(res.case_id))}`
+      );
+      setIndicatorsText("");
+      setIndicatorsContext("");
+    },
+    onError: (error) => {
+      enqueueSnackbar(extractApiErrorMessage(error), { variant: "error" });
+    },
+  });
+
+  const indicatorsPreview = React.useMemo(
+    () => parseIndicators(indicatorsText),
+    [indicatorsText]
+  );
+
+  const loadingOpen =
+    artifactMutation.isPending ||
+    fileMutation.isPending ||
+    indicatorsMutation.isPending;
 
   // -------------------------------------------------------------------------
   // Auth guard
@@ -247,7 +294,7 @@ export default function SubmitPage() {
               <Box
                 sx={{
                   display: "grid",
-                  gridTemplateColumns: { xs: "1fr", md: "repeat(2, 1fr)" },
+                  gridTemplateColumns: { xs: "1fr", md: "repeat(3, 1fr)" },
                   gap: 1.5,
                 }}
               >
@@ -265,6 +312,13 @@ export default function SubmitPage() {
                   subtitle="Submit a link, bare domain, hash, IP, or any other text-based indicator. Type is detected automatically."
                   icon={<FingerprintOutlined />}
                   onClick={() => switchMode("artifact")}
+                />
+                <ModeSelectorCard
+                  active={mode === "indicators"}
+                  title="Indicators"
+                  subtitle="Paste one or many URLs, IPs, hashes or domains — analysed together as one case."
+                  icon={<FormatListBulletedOutlined />}
+                  onClick={() => switchMode("indicators")}
                 />
               </Box>
             </Stack>
@@ -486,6 +540,84 @@ export default function SubmitPage() {
                       onClick={artifactForm.handleSubmit((v) =>
                         artifactMutation.mutate(v)
                       )}
+                      sx={{
+                        borderRadius: 2,
+                        textTransform: "none",
+                        fontWeight: 850,
+                        minWidth: 160,
+                      }}
+                    >
+                      Submit
+                    </Button>
+                  </Stack>
+                </Stack>
+              ) : null}
+
+              {/* ---------------------------------------------------------- */}
+              {/* ---------------------------------------------------------- */}
+              {mode === "indicators" ? (
+                <Stack spacing={2.5}>
+                  <SectionHeader
+                    title="Indicators"
+                    subtitle="One per line, or comma / space separated. Defanged forms (hxxp://, [.]) are accepted."
+                  />
+
+                  <TextField
+                    label="Indicators"
+                    placeholder={"hxxp://evil[.]com\n8.8.8.8\n<sha256>"}
+                    multiline
+                    minRows={6}
+                    value={indicatorsText}
+                    onChange={(e) => setIndicatorsText(e.target.value)}
+                  />
+
+                  {indicatorsPreview.length ? (
+                    <Stack spacing={0.75}>
+                      {indicatorsPreview.map((p, i) => (
+                        <Stack
+                          key={`${p.value}-${i}`}
+                          direction="row"
+                          spacing={1}
+                          sx={{ alignItems: "center", justifyContent: "space-between" }}
+                        >
+                          <Typography
+                            variant="body2"
+                            sx={{ fontFamily: "monospace", wordBreak: "break-all" }}
+                          >
+                            {p.value}
+                          </Typography>
+                          <Chip
+                            size="small"
+                            label={p.type ?? "unrecognised"}
+                            color={p.type ? "default" : "error"}
+                          />
+                        </Stack>
+                      ))}
+                    </Stack>
+                  ) : null}
+
+                  <Typography variant="body2" color="text.secondary">
+                    {indicatorsPreview.filter((p) => p.type).length} indicator(s),{" "}
+                    {indicatorsPreview.filter((p) => !p.type).length} unrecognised
+                  </Typography>
+
+                  <TextField
+                    label="Context (optional)"
+                    placeholder="Source, related case, user report…"
+                    multiline
+                    minRows={4}
+                    value={indicatorsContext}
+                    onChange={(e) => setIndicatorsContext(e.target.value)}
+                  />
+
+                  <Stack direction="row" sx={{ justifyContent: "flex-end" }} >
+                    <Button
+                      variant="contained"
+                      disabled={
+                        indicatorsPreview.filter((p) => p.type).length === 0 ||
+                        indicatorsMutation.isPending
+                      }
+                      onClick={() => indicatorsMutation.mutate()}
                       sx={{
                         borderRadius: 2,
                         textTransform: "none",
