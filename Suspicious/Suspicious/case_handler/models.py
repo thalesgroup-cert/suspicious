@@ -9,6 +9,7 @@ from ip_process.models import IP
 from url_process.models import URL
 from file_process.models import File
 from hash_process.models import Hash
+from domain_process.models import Domain
 from mail_feeder.models import Mail
 from django.utils.translation import gettext_lazy as _
 from django.utils import timezone
@@ -310,3 +311,45 @@ class CaseArtifact(models.Model):
             or self.ip_id or self.mail_id or 'orphan'
         )
         return f"Case #{self.case_id} - {self.artifact_type}: {artifact_id}"
+
+
+class ObservableGroup(models.Model):
+    """A set of indicators submitted together and analysed as one Case.
+    The IOC-road analogue of Mail: a thin envelope over N observables."""
+    label = models.CharField(max_length=255, blank=True, default="")
+    creation_date = models.DateTimeField(auto_now_add=True, db_index=True)
+    last_update = models.DateTimeField(auto_now=True)
+
+    class Meta:
+        ordering = ["-creation_date"]
+
+    def __str__(self):
+        return self.label or f"ObservableGroup #{self.pk}"
+
+
+class ObservableGroupArtifact(models.Model):
+    class Type(models.TextChoices):
+        URL = "URL", "URL"
+        IP = "IP", "IP"
+        HASH = "HASH", "Hash"
+        DOMAIN = "DOMAIN", "Domain"
+
+    group = models.ForeignKey(ObservableGroup, on_delete=models.CASCADE, related_name="artifacts", db_index=True)
+    artifact_type = models.CharField(max_length=10, choices=Type.choices, db_index=True)
+    url = models.ForeignKey(URL, on_delete=models.CASCADE, null=True, blank=True, related_name="observable_group_artifacts")
+    ip = models.ForeignKey(IP, on_delete=models.CASCADE, null=True, blank=True, related_name="observable_group_artifacts")
+    hash = models.ForeignKey(Hash, on_delete=models.CASCADE, null=True, blank=True, related_name="observable_group_artifacts")
+    domain = models.ForeignKey(Domain, on_delete=models.CASCADE, null=True, blank=True, related_name="observable_group_artifacts")
+    creation_date = models.DateTimeField(auto_now_add=True, db_index=True)
+
+    class Meta:
+        ordering = ["creation_date"]
+        indexes = [models.Index(fields=["group", "artifact_type"])]
+
+    def observable(self):
+        return self.url or self.ip or self.hash or self.domain
+
+    def __str__(self):
+        obj = self.observable()
+        val = getattr(obj, "address", None) or getattr(obj, "value", None) or self.pk
+        return f"{self.artifact_type}: {val}"
