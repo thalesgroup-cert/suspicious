@@ -243,6 +243,13 @@ class SubmitIndicatorsView(APIView):
         case = CaseCreator(request.user).create_case(
             description=context, reporter_context=context, observable_group_instance=group,
         )
+        if case is None:
+            logger.error("SubmitIndicatorsView: CaseCreator returned no case for group=%s", group.id)
+            return _error_response(
+                detail="An internal error occurred while creating the case.",
+                code="internal_error",
+                http_status=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            )
 
         targets = collect_case_targets(case)
         intents = [

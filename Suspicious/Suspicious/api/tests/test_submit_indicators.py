@@ -56,3 +56,11 @@ class SubmitIndicatorsTests(TestCase):
         mock_delay.assert_called_once()
         _case_id, intents = mock_delay.call_args[0]
         self.assertEqual(len(intents), 3)
+
+    @patch("api.views.submit.dispatch_case_analysis.delay")
+    @patch("case_handler.case_utils.case_creator.CaseCreator.create_case", return_value=None)
+    def test_case_creation_failure_is_500_not_traceback(self, _mock_create, _mock_delay):
+        r = self.client.post("/api/submit/indicators/",
+                             {"indicators": "8.8.8.8"}, format="json")
+        self.assertEqual(r.status_code, 500)
+        self.assertEqual(r.json()["code"], "internal_error")
