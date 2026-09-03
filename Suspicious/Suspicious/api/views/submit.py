@@ -9,11 +9,17 @@ from rest_framework.views import APIView
 from api.serializers.submit import (
     SubmitConfigSerializer,
     SubmitFileSerializer,
+    SubmitIndicatorsSerializer,
     SubmitOtherSerializer,
     SubmitUrlSerializer,
 )
+from api.utils.indicators import parse_indicators
 from case_handler.case_utils.case_handler import CaseHandler
+from cortex_job.cortex_utils.case_targets import collect_case_targets
 from tasp.forms import UploadFileForm, UploadOtherForm, UploadURLForm
+from tasp.tasks import dispatch_case_analysis
+
+IOC_GROUP_MAX = 100
 
 logger = logging.getLogger(__name__)
 
@@ -186,6 +192,75 @@ class SubmitOtherView(BaseSubmitView):
             }
         )
         return file_form, url_form, other_form
+
+
+class SubmitIndicatorsView(APIView):
+    permission_classes = [IsAuthenticated]
+
+    def post(self, request):
+        ser = SubmitIndicatorsSerializer(data=request.data, context={"request": request})
+        ser.is_valid(raise_exception=True)
+
+        parsed = parse_indicators(ser.validated_data["indicators"])
+        valid = [p for p in parsed if p.type]
+        skipped = [p.raw for p in parsed if not p.type]
+
+        if not valid:
+            return _error_response(
+                detail="No valid indicator found.",
+                http_status=status.HTTP_400_BAD_REQUEST,
+            )
+        if len(valid) > IOC_GROUP_MAX:
+            return _error_response(
+                detail=f"Too many indicators ({len(valid)}). The limit is {IOC_GROUP_MAX} per submission.",
+                http_status=status.HTTP_400_BAD_REQUEST,
+            )
+
+        from case_handler.case_utils.case_creator import CaseCreator
+        from case_handler.models import ObservableGroup, ObservableGroupArtifact
+        from domain_process.models import Domain
+        from hash_process.models import Hash
+        from ip_process.models import IP
+        from url_process.models import URL
+
+        _MODEL = {
+            "url": (URL, "address", "url"),
+            "ip": (IP, "address", "ip"),
+            "hash": (Hash, "value", "hash"),
+            "domain": (Domain, "value", "domain"),
+        }
+
+        context = ser.validated_data.get("context") or ""
+
+        group = ObservableGroup.objects.create(label=context[:255])
+        for p in valid:
+            model, field, art_field = _MODEL[p.type]
+            obj, _ = model.objects.get_or_create(**{field: p.value})
+            ObservableGroupArtifact.objects.create(
+                group=group, artifact_type=p.type.upper(), **{art_field: obj}
+            )
+
+        case = CaseCreator(request.user).create_case(
+            description=context, reporter_context=context, observable_group_instance=group,
+        )
+
+        targets = collect_case_targets(case)
+        intents = [
+            (f"{inst._meta.app_label}.{inst._meta.model_name}", inst.pk, data_type)
+            for inst, data_type in targets
+        ]
+        dispatch_case_analysis.delay(case.id, intents)
+
+        return Response(
+            {
+                "status": "success",
+                "case_id": case.id,
+                "observable_count": len(valid),
+                "accepted": True,
+                "skipped": skipped,
+            },
+            status=status.HTTP_201_CREATED,
+        )
 
 
 class SubmitFileView(BaseSubmitView):

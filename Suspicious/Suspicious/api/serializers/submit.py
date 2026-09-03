@@ -238,5 +238,9 @@ class SubmitFileSerializer(OptionalContextMixin, serializers.Serializer):
         return uploaded_file
 
 
+class SubmitIndicatorsSerializer(OptionalContextMixin, serializers.Serializer):
+    indicators = serializers.CharField(required=True, trim_whitespace=False)
+
+
 class SubmitConfigSerializer(serializers.Serializer):
     suspicious_email = serializers.EmailField()

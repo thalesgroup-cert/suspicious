@@ -49,6 +49,7 @@ from api.views.settings import (
 from api.views.submit import (
     SubmitConfigView,
     SubmitFileView,
+    SubmitIndicatorsView,
     SubmitOtherView,
     SubmitUrlView,
 )
@@ -133,6 +134,7 @@ urlpatterns = [
     path("submit/url/", SubmitUrlView.as_view(), name="submit-url"),
     path("submit/other/", SubmitOtherView.as_view(), name="submit-other"),
     path("submit/file/", SubmitFileView.as_view(), name="submit-file"),
+    path("submit/indicators/", SubmitIndicatorsView.as_view(), name="submit-indicators"),
 
     path("home/summary/", HomeSummaryView.as_view(), name="home-summary"),
 
