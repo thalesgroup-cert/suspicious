@@ -133,19 +133,21 @@ def score_observable(sources: list) -> ObservableVerdict:
         counts[s.verdict] += 1
     voting = [s for s in sources if s.verdict != "no-data"]
     trusted_voting = [s for s in voting if s.tier in (1, 2)]
-    rationale = []
-
-    if len(trusted_voting) < MIN_TRUSTED_COVERAGE:
-        rationale.append(f"Only {len(trusted_voting)} trusted source(s) returned a verdict — cannot assess.")
-        return ObservableVerdict("Inconclusive", _confidence(sources, split=1.0),
-                                 "thin_coverage", counts, rationale)
-
     t1_mal = [s for s in trusted_voting if s.tier == 1 and s.verdict == "malicious"]
     t2_mal = [s for s in trusted_voting if s.tier == 2 and s.verdict == "malicious"]
     t1_clean = [s for s in trusted_voting if s.tier == 1 and s.verdict == "clean"]
     trusted_flag = [s for s in trusted_voting if s.verdict in _FLAGGED]
     any_flag = [s for s in voting if s.verdict in _FLAGGED]
     t3_malicious = [s for s in voting if s.tier == 3 and s.verdict == "malicious"]
+    rationale = []
+
+    # Rule 0 — coverage: too few trusted sources voted AND nothing flags the
+    # observable. A Tier-3 flag under thin coverage is still actionable (spec
+    # §4.2: "Tier-3-only evidence caps at Suspicious"), so it falls through.
+    if len(trusted_voting) < MIN_TRUSTED_COVERAGE and not any_flag:
+        rationale.append(f"Only {len(trusted_voting)} trusted source(s) returned a verdict — cannot assess.")
+        return ObservableVerdict("Inconclusive", _confidence(sources, split=1.0),
+                                 "thin_coverage", counts, rationale)
 
     total_w = sum(_mult(s) for s in voting) or 1.0
     share = sum(_mult(s) for s in voting if s.verdict == "malicious") / total_w

@@ -127,7 +127,7 @@ Given the voting sources (tier 1–3, each `malicious`/`suspicious`/`clean`):
 | **Dangerous** | a Tier-1 source says `malicious` with confidence ≥ `HIGH_CONFIDENCE` (default 70), or with no numeric confidence (tier alone carries it) · **or** ≥ 2 Tier-2 sources say `malicious` · **or** trust-weighted `malicious` share ≥ `DANGEROUS_SHARE` (default 0.5) |
 | **Safe** | ≥ 1 Tier-1 source says `clean`, **no trusted (Tier-1/2) source flags it**, and **no Tier-3 source says `malicious`**. A Tier-3 `suspicious` alone does **not** block Safe — this is what stops a noisy contextual source (e.g. `Urlscan_io_Search`, which returns `suspicious` for *every* URL with ≥1 prior scan) from overriding two authoritative "clean" verdicts. |
 | **Suspicious** | a trusted (Tier-1/2) source says `suspicious` or `malicious` but not enough for Dangerous · **or** any source flags it (`malicious`/`suspicious`) and Safe did not fire — Tier-3-only evidence, or a Tier-3 `malicious` against a Tier-1 clean, **caps at Suspicious** |
-| **Inconclusive** | fewer than `MIN_TRUSTED_COVERAGE` (default 1) Tier-1/2 sources returned a verdict — regardless of the ratio |
+| **Inconclusive** | fewer than `MIN_TRUSTED_COVERAGE` (default 1) Tier-1/2 sources returned a verdict **and no source (any tier) flags it** → `inconclusive_reason = "thin_coverage"`. If a Tier-3 source *does* flag it while trusted coverage is thin, that is actionable → falls through to Suspicious/Dangerous, not buried as Inconclusive. |
 
 Each rule that fires contributes a `rationale` line. Rule order: Inconclusive-coverage check first, then Dangerous, then Safe, then Suspicious as the fallback when something flagged it.
 
