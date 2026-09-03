@@ -33,7 +33,7 @@ API_STATUS_TO_INTERNAL = {
     "CHALLENGED": "Challenged",
 }
 
-INVESTIGATION_TYPE_CHOICES = ("FILE", "MAIL", "URL", "IP", "HASH", "UNKNOWN")
+INVESTIGATION_TYPE_CHOICES = ("FILE", "MAIL", "URL", "IP", "HASH", "IOC", "UNKNOWN")
 INVESTIGATION_RESULT_CHOICES = tuple(API_RESULT_TO_INTERNAL.keys()) + ("UNKNOWN",)
 INVESTIGATION_ORDERING_CHOICES = ("-creation_date", "creation_date", "-id", "id", "status", "-status", "result", "-result")
 
@@ -80,6 +80,9 @@ def get_case_type(obj: Case) -> str:
         if non_file_iocs.hash_id:
             return "HASH"
 
+    if getattr(obj, "observable_group_id", None):
+        return "IOC"
+
     return "UNKNOWN"
 
 
@@ -109,6 +112,20 @@ def get_case_info_value(obj: Case) -> str:
                 or obj.description
                 or ""
             )
+
+    if getattr(obj, "observable_group_id", None):
+        arts = list(obj.observable_group.artifacts.select_related("url", "ip", "hash", "domain")[:3])
+        vals = []
+        for a in arts:
+            o = a.observable()
+            v = getattr(o, "address", None) or getattr(o, "value", None) if o else None
+            if v:
+                vals.append(v)
+        total = obj.observable_group.artifacts.count()
+        if vals:
+            extra = f" +{total - len(vals)} more" if total > len(vals) else ""
+            return ", ".join(vals) + extra
+        return f"{total} indicator(s)"
 
     return obj.description or ""
 

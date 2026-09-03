@@ -7,8 +7,8 @@ const group = {
     value: "8.8.8.8", type: "ip",
     verdict: { band: "Safe", confidence: 90, rationale: ["GTI (authoritative) reports clean."] },
     sources: [
-      { name: "GTI", tier: 1, verdict: "clean", confidence: 95, evidence: "0 detections", failed: false, report_full: {} },
-      { name: "AbuseIPDB", tier: 3, verdict: "suspicious", confidence: 30, evidence: "conf 12%", failed: false, report_full: {} },
+      { name: "GTI", tier: 1, verdict: "clean", confidence: 95, evidence: "0 detections", failed: false, report: {} },
+      { name: "AbuseIPDB", tier: 3, verdict: "suspicious", confidence: 30, evidence: "conf 12%", failed: false, report: {} },
     ],
   }],
 };

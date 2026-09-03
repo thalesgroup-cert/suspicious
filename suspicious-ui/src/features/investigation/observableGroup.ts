@@ -9,7 +9,7 @@ const sourceSchema = z.object({
   confidence: z.number().nullable(),
   evidence: z.string(),
   failed: z.boolean(),
-  report_full: z.unknown(),
+  report: z.unknown(),
 });
 
 const observableSchema = z.object({

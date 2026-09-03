@@ -48,14 +48,14 @@ export function SourceTable({ sources }: { sources: Source[] }) {
             <TableCell>
               <Accordion disableGutters sx={{ background: "transparent", "&:before": { display: "none" } }}>
                 <AccordionSummary expandIcon={<ExpandMoreOutlined />}>
-                  <Typography variant="caption">Raw report</Typography>
+                  <Typography variant="caption">Analyzer detail</Typography>
                 </AccordionSummary>
                 <AccordionDetails>
                   <Box
                     component="pre"
                     sx={{ m: 0, p: 1.25, borderRadius: 2, overflow: "auto", maxHeight: 220, fontSize: 12 }}
                   >
-                    {JSON.stringify(source.report_full, null, 2)}
+                    {JSON.stringify(source.report, null, 2)}
                   </Box>
                 </AccordionDetails>
               </Accordion>

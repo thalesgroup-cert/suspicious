@@ -16,6 +16,7 @@ export type InvestigationType =
   | "URL"
   | "IP"
   | "HASH"
+  | "IOC"
   | "UNKNOWN";
 
 export type InvestigationResult =
@@ -203,6 +204,7 @@ function normalizeType(value: unknown): InvestigationType {
     case "URL": return "URL";
     case "IP": return "IP";
     case "HASH": return "HASH";
+    case "IOC": return "IOC";
     default: return "UNKNOWN";
   }
 }

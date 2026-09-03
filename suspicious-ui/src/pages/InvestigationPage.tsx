@@ -512,7 +512,7 @@ export default function InvestigationPage() {
                   onChange={(e) => setType(e.target.value as InvestigationType | "ALL")}
                 >
                   <MenuItem value="ALL">All</MenuItem>
-                  {(["FILE", "MAIL", "URL", "IP", "HASH", "UNKNOWN"] as const).map((t) => (
+                  {(["FILE", "MAIL", "URL", "IP", "HASH", "IOC", "UNKNOWN"] as const).map((t) => (
                     <MenuItem key={t} value={t}>{t}</MenuItem>
                   ))}
                 </Select>
@@ -1075,7 +1075,10 @@ export default function InvestigationPage() {
                     <Stack spacing={1.25}>
                       <Stack direction="row" spacing={1} sx={{ alignItems: "center", flexWrap: "wrap" }} >
                         <ResultChip result={String(currentClassification ?? "UNKNOWN")} minWidth={BADGE_W} />
-                        <Chip size="small" label={`Score ${currentScore ?? "—"}/10`} variant="outlined" sx={{ fontWeight: 800 }} />
+                        {/* IOC road has no analyst-visible score — the stored band number is not a real 0–10 score. */}
+                        {!observableGroup && (
+                          <Chip size="small" label={`Score ${currentScore ?? "—"}/10`} variant="outlined" sx={{ fontWeight: 800 }} />
+                        )}
                         <Chip size="small" label={`Confidence ${currentConfidence ?? "—"}%`} variant="outlined" sx={{ fontWeight: 800 }} />
                       </Stack>
                       <Stack direction="row" spacing={0.75} sx={{ opacity: 0.65, flexWrap: "wrap" }}>

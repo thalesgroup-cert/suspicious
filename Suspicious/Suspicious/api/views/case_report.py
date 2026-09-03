@@ -20,7 +20,7 @@ class CaseReportView(APIView):
 
     def get(self, request, case_id):
         case = get_object_or_404(Case, pk=case_id)
-        observables = assemble_observables(case) if case.observable_group_id else []
+        observables = assemble_observables(case, full=True) if case.observable_group_id else []
         html = render_to_string(
             "case_report/report.html",
             {"case": case, "observables": observables, "generated_at": timezone.now()},

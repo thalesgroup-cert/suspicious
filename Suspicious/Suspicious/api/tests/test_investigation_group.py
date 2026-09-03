@@ -21,7 +21,7 @@ class InvestigationGroupApiTests(TestCase):
         self.client = APIClient()
         self.client.force_authenticate(self.user)
 
-    def test_group_case_exposes_observables_and_report_full(self):
+    def test_group_case_exposes_observables_and_report(self):
         g = ObservableGroup.objects.create()
         ip = IP.objects.create(address="8.8.8.8")
         ObservableGroupArtifact.objects.create(group=g, artifact_type="IP", ip=ip)
@@ -30,14 +30,37 @@ class InvestigationGroupApiTests(TestCase):
         AnalyzerReport.objects.create(
             cortex_job_id="j", type="ip", status="Success", analyzer=a,
             ip=ip, level="safe", confidence=95, score=0,
-            report_summary={}, report_taxonomy={}, report_full={"as_owner": "Google LLC"},
+            report_summary={"as_owner": "Google LLC"}, report_taxonomy={}, report_full={},
         )
 
         r = self.client.get(f"/api/investigations/{case.id}/")
         body = r.json()
         obs = body["observable_group"]["observables"]
         self.assertEqual(obs[0]["value"], "8.8.8.8")
-        self.assertEqual(obs[0]["sources"][0]["report_full"]["as_owner"], "Google LLC")
+        self.assertEqual(obs[0]["sources"][0]["report"]["as_owner"], "Google LLC")
+
+    def test_group_case_type_and_info(self):
+        g = ObservableGroup.objects.create()
+        ObservableGroupArtifact.objects.create(
+            group=g, artifact_type="IP", ip=IP.objects.create(address="8.8.8.8")
+        )
+        case = Case.objects.create(description="d", reporter=self.user, observable_group=g)
+
+        r = self.client.get(f"/api/investigations/{case.id}/")
+        body = r.json()
+        self.assertEqual(body["type"], "IOC")
+        self.assertIn("8.8.8.8", body["info"])
+
+    def test_group_case_findable_by_indicator(self):
+        g = ObservableGroup.objects.create()
+        ObservableGroupArtifact.objects.create(
+            group=g, artifact_type="IP", ip=IP.objects.create(address="8.8.8.8")
+        )
+        case = Case.objects.create(description="d", reporter=self.user, observable_group=g)
+
+        r = self.client.get("/api/investigations/?search=8.8.8.8")
+        ids = [row["id"] for row in r.json()["results"]]
+        self.assertIn(case.id, ids)
 
     def test_mail_case_has_no_observable_group_key(self):
         case = Case.objects.create(description="d", reporter=self.user)

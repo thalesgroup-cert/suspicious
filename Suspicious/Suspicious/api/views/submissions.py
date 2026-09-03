@@ -120,10 +120,8 @@ class SubmissionListView(ListAPIView):
         search = (self.request.query_params.get("search") or "").strip()
         if search:
             id_q = Q(pk=int(search)) if search.isdigit() else Q()
-            # No .distinct() needed: fileOrMail and nonFileIocs are forward
-            # O2O relations from Case's side, never reverse/M2M, so a Case
-            # row can't fan out into duplicates through these joins (same
-            # reasoning as InvestigationAccessMixin.get_queryset).
+            # .distinct(): observable_group__artifacts is a reverse FK, so the
+            # join fans a group case out to one row per indicator.
             queryset = queryset.filter(
                 id_q
                 | Q(description__icontains=search)
@@ -134,7 +132,11 @@ class SubmissionListView(ListAPIView):
                 | Q(nonFileIocs__url__address__icontains=search)
                 | Q(nonFileIocs__ip__address__icontains=search)
                 | Q(nonFileIocs__hash__value__icontains=search)
-            )
+                | Q(observable_group__artifacts__url__address__icontains=search)
+                | Q(observable_group__artifacts__ip__address__icontains=search)
+                | Q(observable_group__artifacts__hash__value__icontains=search)
+                | Q(observable_group__artifacts__domain__value__icontains=search)
+            ).distinct()
 
         ordering = self.request.query_params.get("ordering", "-created_at")
         db_ordering = self.ORDERING_MAP.get(ordering)

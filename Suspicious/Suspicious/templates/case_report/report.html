@@ -70,7 +70,11 @@
   <h2>Verdict</h2>
   <p><span class="verdict {{ case.results }}">{{ case.results }}</span></p>
   {% if case.final_score or case.final_confidence %}
+  {% if observables %}
+  <p class="sub">Confidence: {{ case.final_confidence }}</p>
+  {% else %}
   <p class="sub">Score: {{ case.final_score }} &nbsp;·&nbsp; Confidence: {{ case.final_confidence }}</p>
+  {% endif %}
   {% endif %}
   {% if case.inconclusive_reason %}
   <p class="sub">Inconclusive reason: {{ case.inconclusive_reason }}</p>
@@ -121,7 +125,7 @@
     {% for s in o.sources %}
     <details>
       <summary>Raw report — {{ s.name }}</summary>
-      <pre>{{ s.report_full|pprint }}</pre>
+      <pre>{{ s.report|pprint }}</pre>
     </details>
     {% endfor %}
     {% endif %}

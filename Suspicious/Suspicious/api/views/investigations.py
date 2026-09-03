@@ -38,6 +38,7 @@ CASE_LIST_SELECT_RELATED = (
     "nonFileIocs__url",
     "nonFileIocs__ip",
     "nonFileIocs__hash",
+    "observable_group",
 )
 
 CASE_DETAIL_SELECT_RELATED = (
@@ -50,6 +51,7 @@ CASE_DETAIL_SELECT_RELATED = (
     "nonFileIocs__url",
     "nonFileIocs__ip",
     "nonFileIocs__hash",
+    "observable_group",
 )
 
 ANALYZER_REPORT_SELECT_RELATED = (
@@ -186,9 +188,15 @@ class InvestigationAccessMixin:
                 | Q(nonFileIocs__url__address__icontains=search)
                 | Q(nonFileIocs__ip__address__icontains=search)
                 | Q(nonFileIocs__hash__value__icontains=search)
+                | Q(observable_group__artifacts__url__address__icontains=search)
+                | Q(observable_group__artifacts__ip__address__icontains=search)
+                | Q(observable_group__artifacts__hash__value__icontains=search)
+                | Q(observable_group__artifacts__domain__value__icontains=search)
             )
 
-            queryset = queryset.filter(id_q | text_q)
+            # .distinct(): observable_group__artifacts is a reverse FK, so the
+            # join fans a group case out to one row per indicator.
+            queryset = queryset.filter(id_q | text_q).distinct()
 
         if status_filter != "ALL":
             if status_filter == "UNKNOWN":
@@ -207,6 +215,8 @@ class InvestigationAccessMixin:
                 queryset = queryset.filter(nonFileIocs__ip_id__isnull=False)
             elif type_filter == "HASH":
                 queryset = queryset.filter(nonFileIocs__hash_id__isnull=False)
+            elif type_filter == "IOC":
+                queryset = queryset.filter(observable_group_id__isnull=False)
             elif type_filter == "UNKNOWN":
                 queryset = queryset.filter(
                     fileOrMail__file_id__isnull=True,
@@ -214,6 +224,7 @@ class InvestigationAccessMixin:
                     nonFileIocs__url_id__isnull=True,
                     nonFileIocs__ip_id__isnull=True,
                     nonFileIocs__hash_id__isnull=True,
+                    observable_group_id__isnull=True,
                 )
 
         if result_filter != "ALL":
