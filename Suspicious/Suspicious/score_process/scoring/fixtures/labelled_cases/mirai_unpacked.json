@@ -1,0 +1,13 @@
+{
+  "name": "Linux ELF Mirai — unpacked",
+  "observable": "9a4b...unpacked-elf",
+  "type": "file",
+  "gti_verdict": "suspicious",
+  "expected_band": "Suspicious",
+  "sources": [
+    {"name": "Yara_Boosted_3_2", "tier": 2, "weight": 0.3, "verdict": "clean", "confidence": null, "failed": false, "evidence": "0 rules matched"},
+    {"name": "GoogleThreatIntelligence_GetReport", "tier": 1, "weight": 0.9, "verdict": "suspicious", "confidence": 67, "failed": false, "evidence": "threat_score 67 (relationships: known Mirai C2)"},
+    {"name": "VirusTotal_GetReport_3_1", "tier": 1, "weight": 0.8, "verdict": "suspicious", "confidence": 45, "failed": false, "evidence": "2/72 engines flag suspicious"},
+    {"name": "CIRCLHashlookup_1_1", "tier": 2, "weight": 0.3, "verdict": "no-data", "confidence": null, "failed": false, "evidence": "hash unknown to NSRL"}
+  ]
+}

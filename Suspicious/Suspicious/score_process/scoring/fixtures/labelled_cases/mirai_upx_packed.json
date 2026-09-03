@@ -1,0 +1,13 @@
+{
+  "name": "Linux ELF Mirai — UPX packed",
+  "observable": "2f0c...upx-packed-elf",
+  "type": "file",
+  "gti_verdict": "suspicious",
+  "expected_band": "Dangerous",
+  "sources": [
+    {"name": "Yara_Boosted_3_2", "tier": 2, "weight": 0.3, "verdict": "malicious", "confidence": null, "failed": false, "evidence": "2 rules: UPX_ELF_packed, Mirai_generic_strings"},
+    {"name": "GoogleThreatIntelligence_GetReport", "tier": 1, "weight": 0.9, "verdict": "suspicious", "confidence": 71, "failed": false, "evidence": "threat_score 71, severity MEDIUM"},
+    {"name": "VirusTotal_GetReport_3_1", "tier": 1, "weight": 0.8, "verdict": "malicious", "confidence": 55, "failed": false, "evidence": "4/64 engines"},
+    {"name": "FileInfo_8_0", "tier": 3, "weight": 0.2, "verdict": "no-data", "confidence": null, "failed": false, "evidence": "ELF 64-bit LSB executable"}
+  ]
+}
