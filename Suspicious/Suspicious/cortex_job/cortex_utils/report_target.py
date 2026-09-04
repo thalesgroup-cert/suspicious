@@ -11,15 +11,15 @@ def analyzer_report_target_value(report) -> Optional[str]:
         return getattr(report.url, "address", None)
     if report.domain_id:
         return getattr(report.domain, "value", None)
-    if report.hash_id:
-        return getattr(report.hash, "value", None)
-    if report.ip_id:
-        return getattr(report.ip, "address", None)
-    if report.file_id:
-        f = getattr(report.file, "file_path", None)
-        return getattr(f, "name", None)
     if report.mail_id:
         return getattr(report.mail, "address", None)
+    if report.hash_id:
+        return getattr(report.hash, "value", None)
+    if report.file_id:
+        f = getattr(report.file, "file_path", None)
+        return getattr(f, "name", None) or None
+    if report.ip_id:
+        return getattr(report.ip, "address", None)
     if report.mail_body_id:
         return getattr(report.mail_body, "fuzzy_hash", None)
     if report.mail_header_id:
