@@ -2,6 +2,7 @@ import json
 import logging
 
 import pybreaker
+from cortex4py.exceptions import NotFoundError
 from django.db import transaction
 from django.utils import timezone
 
@@ -638,6 +639,21 @@ class CortexJobManager:
 
     @staticmethod
     def get_job_from_api(job_id):
+        """Fetch a Cortex job by ID.
+
+        Returns the job on success. Returns the "old_job" sentinel ONLY when
+        Cortex has positively confirmed the job no longer exists (HTTP 404 ->
+        cortex4py NotFoundError) — that's the one condition under which
+        get_cortex_jobs_results permanently marks a report "Deleted". Any
+        other failure (network error, breaker open, auth error, 5xx, ...)
+        returns None instead, so the caller leaves the report's current
+        status untouched: a later poll can retry, and the existing
+        stale-job timeout in get_cortex_jobs_results is what eventually
+        gives up on a job that's transiently unreachable for too long. A job
+        that briefly couldn't be reached is not the same as a job Cortex
+        says is gone — collapsing both to "Deleted" here would silently and
+        irreversibly discard in-progress analyzer results on a network blip.
+        """
         cc = _get_cortex_config()
         try:
             api = SessionCortexApi(
@@ -647,23 +663,23 @@ class CortexJobManager:
             )
         except Exception as e:
             fetch_mail_logger.error(f"Failed to initialize Cortex API: {e}")
-            api = None
-        for api in [api]:
-            if api is None:
-                continue
-            try:
-                job = _fetch_job(api, job_id)
-                if job:
-                    return job
-            except pybreaker.CircuitBreakerError as e:
-                update_cases_logger.warning(
-                    "[breaker:cortex] open — get_job_from_api skipped for job %s: %s", job_id, e
-                )
-            except Exception as e:
-                update_cases_logger.error(
-                    f"Error fetching job {job_id}: {e}", exc_info=True
-                )
-        return "old_job"
+            return None
+
+        try:
+            job = _fetch_job(api, job_id)
+            if job:
+                return job
+        except NotFoundError:
+            return "old_job"
+        except pybreaker.CircuitBreakerError as e:
+            update_cases_logger.warning(
+                "[breaker:cortex] open — get_job_from_api skipped for job %s: %s", job_id, e
+            )
+        except Exception as e:
+            update_cases_logger.error(
+                f"Error fetching job {job_id}: {e}", exc_info=True
+            )
+        return None
 
     @staticmethod
     def get_report_from_api(job_id):
@@ -817,9 +833,13 @@ class CortexJobManager:
                 "No AI Mail Analyzer report found for archive file: %s",
                 mail_archive.archive,
             )
+            # `analyzer` was never assigned above (the .get() that would set
+            # it is exactly what raised) — use the configured AI analyzer
+            # name directly, not a lookup through a nonexistent report.
+            ai_analyzer_name = cortex_config.get("analyzers", {}).get("ai", {})
             last_job = (
                 CaseAnalyzerJob.objects
-                .filter(case=case, analyzer__name=analyzer.analyzer.name)
+                .filter(case=case, analyzer__name=ai_analyzer_name)
                 .order_by("-created_at")
                 .first()
             )

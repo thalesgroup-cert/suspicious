@@ -43,7 +43,19 @@ class CortexAnalyzerReports:
 
             mail = getattr(case.fileOrMail, "mail", None) if case.fileOrMail else None
             if mail:
-                CortexJobManager().manage_ai_jobs(case)
+                # AI classification is supplementary — never let a bug or
+                # transient failure in here block the scoring pass below
+                # (previously it could: an unhandled exception here used to
+                # propagate to the outer except and skip collect_signals /
+                # score_case / apply_verdict entirely, silently leaving
+                # every mail case's verdict at its default Inconclusive).
+                try:
+                    CortexJobManager().manage_ai_jobs(case)
+                except Exception as exc:
+                    update_cases_logger.error(
+                        "get_report: manage_ai_jobs failed for case %s: %s",
+                        case.id, exc, exc_info=True,
+                    )
 
             signals, ai, deny_listed, ai_missing, deny_reason = collect_signals(case)
             verdict = score_case(signals, ai, deny_listed, ai_missing, deny_reason)
