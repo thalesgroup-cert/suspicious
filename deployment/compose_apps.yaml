@@ -161,6 +161,17 @@ services:
       NO_PROXY:    "${CORTEX_NO_PROXY:-localhost,127.0.0.1,cortex,elasticsearch,rustfs,chromadb,vault,suspicious}"
       JAVA_OPTS:   "-Djavax.net.ssl.trustStore=/etc/cortex/keystore.jks"
       job_directory: "${CORTEX_PATH}/jobs"
+      # The Cortex process runs as uid 1001 (entrypoint `su cortex`). The
+      # docker.sock is bind-mounted :ro so the entrypoint's own
+      # `chown cortex /var/run/docker.sock` is a no-op — instead run Cortex
+      # with gid = the host socket's group so it can reach the daemon and
+      # the docker job-runner isn't silently disabled. Group varies per host:
+      #   stat -c '%g' /var/run/docker.sock
+      daemon_user: "1001:${DOCKER_SOCK_GID:-999}"
+      # Read the analyzer/responder catalogs from the mounted files, not the
+      # network, on every boot.
+      analyzer_url:  "/opt/Cortex-Analyzers-Public/analyzers/analyzers.json"
+      responder_url: "/opt/Cortex-Analyzers-Public/responders/responders.json"
     volumes:
       - "${CA_PATH}/keystore.jks:/etc/cortex/keystore.jks:ro"
       - "${CORTEX_PATH}/jobs:${CORTEX_PATH}/jobs:Z"
