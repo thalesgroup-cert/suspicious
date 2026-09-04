@@ -79,3 +79,37 @@ def sync_cortex_analyzers(config_path: str = CONFIG_PATH) -> None:
             )
             remote_names.append(analyzer.name)
         Analyzer.objects.exclude(name__in=remote_names).update(is_active=False)
+
+    _warn_on_unresolved_configured_analyzers(remote_names)
+
+
+def _warn_on_unresolved_configured_analyzers(remote_names: list[str]) -> None:
+    """integrations.cortex.analyzers.{header,ai,sandbox,yara,file_info} are
+    plain name strings that cortex_and_job_management's dispatch resolves via
+    api.analyzers.get_by_name() at *dispatch* time — a miss there is just a
+    fetch_mail_logger.warning() next to hundreds of routine ones, easy to
+    never notice (this is exactly how "header": "MailHeader_4_0" sat wrong
+    for who knows how long: the repo's real header analyzer is
+    Mail_Header_Analyzer_1_0, so mail_header jobs for it silently never
+    fired). Cross-check against the analyzer list this same task just
+    fetched and log loudly — same 404/breaker/network exceptions above still
+    apply, so this only ever runs when the fetch itself succeeded, i.e. this
+    IS the authoritative, current set of what Cortex has enabled.
+    """
+    try:
+        from settings.config import get_section
+        configured = get_section("integrations.cortex").get("analyzers", {}) or {}
+    except Exception as exc:
+        log_analyzers.error("Could not load integrations.cortex.analyzers to validate: %s", exc)
+        return
+
+    remote_set = set(remote_names)
+    for role, name in configured.items():
+        if name and name not in remote_set:
+            log_analyzers.error(
+                "integrations.cortex.analyzers.%s = %r does not match any analyzer "
+                "currently enabled in Cortex — dispatch for this role will silently "
+                "find nothing every time. Check the analyzer's real registered name "
+                "(Cortex organization analyzer list) against settings.json.",
+                role, name,
+            )
