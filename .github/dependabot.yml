@@ -16,6 +16,15 @@ updates:
     directory: /suspicious-ui
     schedule:
       interval: weekly
+    groups:
+      # react and react-dom must move in lockstep — a lone react bump fails
+      # the build with "Incompatible React versions" (see PR #311).
+      react:
+        patterns:
+          - "react"
+          - "react-dom"
+          - "@types/react"
+          - "@types/react-dom"
   - package-ecosystem: docker
     directory: /Suspicious
     schedule:
