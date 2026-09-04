@@ -13,6 +13,7 @@ import {
 } from "@mui/material";
 import { ExpandMoreOutlined } from "@mui/icons-material";
 
+import { AnalyzerEnrichment } from "./AnalyzerEnrichment";
 import type { Source } from "./observableGroup";
 
 const VERDICT_COLOR: Record<string, "error" | "warning" | "success" | "default"> = {
@@ -51,6 +52,9 @@ export function SourceTable({ sources }: { sources: Source[] }) {
                   <Typography variant="caption">Analyzer detail</Typography>
                 </AccordionSummary>
                 <AccordionDetails>
+                  {source.enrichment ? (
+                    <AnalyzerEnrichment enrichment={source.enrichment} />
+                  ) : null}
                   <Box
                     component="pre"
                     sx={{ m: 0, p: 1.25, borderRadius: 2, overflow: "auto", maxHeight: 220, fontSize: 12 }}

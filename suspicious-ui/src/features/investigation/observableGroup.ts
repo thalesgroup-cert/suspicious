@@ -1,5 +1,7 @@
 import { z } from "zod";
 
+import { enrichmentSchema } from "./enrichment";
+
 const sourceSchema = z.object({
   name: z.string(),
   tier: z.number(),
@@ -10,6 +12,7 @@ const sourceSchema = z.object({
   evidence: z.string(),
   failed: z.boolean(),
   report: z.unknown(),
+  enrichment: enrichmentSchema.nullable().optional(),
 });
 
 const observableSchema = z.object({
