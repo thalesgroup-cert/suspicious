@@ -1,4 +1,5 @@
-# Extra deps for train_models.ipynb / mailbox_to_csv.ipynb, on top of requirements.txt
+# Extra deps for train_models.ipynb / mailbox_to_csv.ipynb / build_test_dataset.py
+# / train_test_models.py, on top of requirements.txt
 # (this doesn't duplicate torch/numpy/sentence_transformers pins here on purpose --
 # a second independent copy is exactly how the health.py/ai_mail_classifier.py
 # model-dim drift happened).
@@ -7,6 +8,7 @@
 -r requirements.txt
 
 pandas>=3.0.5
+pyarrow>=19.0.0
 scikit-learn>=1.9.0
 imbalanced-learn>=0.14.2
 matplotlib>=3.11.1
