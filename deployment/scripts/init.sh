@@ -179,6 +179,49 @@ if grep -q "127.0.0.1:9200" "$CORTEX_CONF"; then
     sed -i 's/127.0.0.1:9200/elasticsearch:9200/g' "$CORTEX_CONF"
 fi
 
+# Wire this repo's custom-analyzer catalog (Analyzers/analyzers.json, mounted
+# at /opt/Cortex-Analyzers-AI/analyzers/analyzers.json — see
+# CUSTOM_ANALYZERS_PATH) into analyzer.urls. Setting analyzer_urls via the
+# cortex compose service's env alone is NOT enough: the entrypoint injects it
+# early in the generated config, and this file's own `analyzer { urls = [...] }`
+# block appears later via `include` — HOCON's last-assignment-wins means the
+# file always overrides the env var. Anchored on the known default line from
+# the downloaded sample; a no-op if the array was customized some other way
+# (rare — application.conf is gitignored and only ever regenerated here when
+# absent) or if this has already run once.
+CUSTOM_CATALOG_LINE='"/opt/Cortex-Analyzers-AI/analyzers/analyzers.json"'
+if ! grep -qF "$CUSTOM_CATALOG_LINE" "$CORTEX_CONF"; then
+    if grep -q 'catalogs.download.strangebee.com/latest/json/analyzers.json' "$CORTEX_CONF"; then
+        sed -i "/catalogs.download.strangebee.com\/latest\/json\/analyzers.json\"/a\\    ${CUSTOM_CATALOG_LINE}" "$CORTEX_CONF"
+        echo "→ Added custom-analyzer catalog to analyzer.urls"
+    else
+        echo "→ analyzer.urls doesn't match the expected default — leaving it alone; add ${CUSTOM_CATALOG_LINE} to it by hand if this repo's custom analyzers (AIMailAnalyzer, MailHeaderAnalyzer) need to be visible to Cortex."
+    fi
+else
+    echo "→ Custom-analyzer catalog already wired into analyzer.urls"
+fi
+
+# job.directory / job.dockerDirectory: the docker job-runner's nested
+# `docker run -v <dir>:/job` needs the HOST path, which only matches
+# CORTEX_PATH/jobs because compose mounts it at the identical path inside
+# the container. Without this the file relies solely on the `job_directory`
+# env var the compose service also sets — belt-and-suspenders, since (as
+# above) a later file-level assignment in this same file would silently win
+# over that env var if one ever gets added here for another reason.
+if ! grep -q '^job {' "$CORTEX_CONF"; then
+    cat >> "$CORTEX_CONF" <<EOF
+
+## ── init.sh: local job-runner path (idempotent; safe to hand-edit above this) ──
+job {
+  directory = "${CORTEX_PATH}/jobs"
+  dockerDirectory = \${job.directory}
+}
+EOF
+    echo "→ Added job.directory to application.conf"
+else
+    echo "→ job.directory already present in application.conf"
+fi
+
 [ ! -f "$CORTEX_LOG" ] && touch "$CORTEX_LOG"
 perm_clog=$(stat -c '%a' "$CORTEX_LOG")
 
@@ -211,11 +254,30 @@ SOCK_GROUP=$(stat -c '%g' "$DOCKER_SOCK")
 SOCK_MODE=$(stat -c '%a' "$DOCKER_SOCK")
 echo "→ Docker socket owner: $SOCK_OWNER:$SOCK_GROUP (mode $SOCK_MODE)"
 
-if [ "$SOCK_OWNER" -eq 1001 ] || [ "$SOCK_GROUP" -eq 1001 ]; then
-    echo "→ Permissions OK for Cortex (uid/gid 1001)"
+# The docker.sock mount into cortex is :ro, so the entrypoint's own
+# `chown cortex /var/run/docker.sock` no-ops — Cortex (running as uid 1001,
+# via compose_apps.yaml's daemon_user) needs to be in the socket's actual
+# GID instead, and that GID varies per host (this is NOT the historical
+# "uid/gid 1001" assumption — that only ever matched a host that happened
+# to have docker's own group at 1001). Auto-detect and keep .env in sync
+# so a fresh init doesn't quietly leave Cortex's docker job-runner disabled
+# — the only symptom otherwise is "runner didn't generate any output file"
+# on every single analyzer job, buried in Cortex's own container logs.
+if grep -q '^DOCKER_SOCK_GID=' .env; then
+    CURRENT_SOCK_GID=$(grep '^DOCKER_SOCK_GID=' .env | cut -d= -f2)
 else
-    echo "WARNING: Docker socket not owned by uid/gid 1001"
-    echo "Cortex may fail unless permissions are adjusted"
+    CURRENT_SOCK_GID=""
+fi
+
+if [ "$CURRENT_SOCK_GID" != "$SOCK_GROUP" ]; then
+    if grep -q '^DOCKER_SOCK_GID=' .env; then
+        sed -i "s/^DOCKER_SOCK_GID=.*/DOCKER_SOCK_GID=${SOCK_GROUP}/" .env
+    else
+        echo "DOCKER_SOCK_GID=${SOCK_GROUP}" >> .env
+    fi
+    echo "→ DOCKER_SOCK_GID set to ${SOCK_GROUP} in .env (was '${CURRENT_SOCK_GID:-unset}') — recreate cortex to pick it up if it's already running"
+else
+    echo "→ DOCKER_SOCK_GID already correct (${SOCK_GROUP})"
 fi
 
 # -------------------------------------------------
@@ -225,6 +287,21 @@ echo "[9/11] Checking certificates..."
 CERTFILE="$CA_PATH/certfile.pem"
 KEYFILE="$CA_PATH/keyfile.pem"
 ROOTCAFILE="$CA_PATH/rootcafile.pem"
+
+# Docker creates a bind-mount source as a directory when it's absent at
+# container-create time (see deployment/scripts/check-mounts.sh — same
+# footgun, different set of paths). If a service ever mounted these before
+# certs existed here, that leaves an empty directory where mv/generation
+# below expects a file; clear it so this step can actually run.
+for stray in "$CERTFILE" "$KEYFILE" "$ROOTCAFILE" "$CA_PATH/keystore.jks"; do
+    if [ -d "$stray" ]; then
+        if rmdir "$stray" 2>/dev/null; then
+            echo "→ removed stray empty directory (Docker bind-mount artifact): $stray"
+        else
+            echo "ERROR: $stray is a non-empty directory but a file is expected — inspect and remove it by hand."
+        fi
+    fi
+done
 
 if [ ! -f "$CERTFILE" ] || [ ! -f "$KEYFILE" ] || [ ! -f "$ROOTCAFILE" ]; then
     echo "→ Missing certificates, generating..."
