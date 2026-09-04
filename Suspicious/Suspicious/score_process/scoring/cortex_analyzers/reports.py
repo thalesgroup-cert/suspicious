@@ -128,11 +128,13 @@ class CortexAnalyzerReports:
             if isinstance(category, list):
                 category = ", ".join(str(c) for c in category)
 
+            from score_process.scoring.enrichment.registry import enrich
             report.score      = result_dict.get("score",      0)
             report.confidence = result_dict.get("confidence", 0)
             report.category   = category
             report.level      = result_dict.get("level",    "info")
-            report.save(update_fields=["score", "confidence", "category", "level"])
+            report.enrichment = enrich(report)
+            report.save(update_fields=["score", "confidence", "category", "level", "enrichment"])
 
         except Exception as exc:
             update_cases_logger.error(
