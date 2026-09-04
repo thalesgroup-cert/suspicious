@@ -17,7 +17,7 @@ def _analyzer(name, cid):
 
 class SyncCortexTierTests(TestCase):
     def _run_sync(self, remote):
-        with mock.patch.object(sync_cortex, "Api"), \
+        with mock.patch.object(sync_cortex, "SessionCortexApi"), \
              mock.patch.object(sync_cortex, "load_config", return_value=mock.Mock()), \
              mock.patch.object(sync_cortex, "_fetch_all_analyzers", return_value=remote):
             sync_cortex.sync_cortex_analyzers()
