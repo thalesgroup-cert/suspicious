@@ -54,6 +54,10 @@ class AnalyzerReport(models.Model):
     report_summary = models.JSONField()
     report_taxonomy = models.JSONField()
     report_full = models.JSONField()
+    # Structured, display-ready fields extracted from report_full by
+    # score_process.scoring.enrichment (VT vendor list, geo/ASN, dates,
+    # threat class, filenames). None = not extracted / no extractor / failed.
+    enrichment = models.JSONField(null=True, blank=True, default=None)
     creation_date = models.DateTimeField(auto_now_add=True, db_index=True)
     last_update = models.DateTimeField(auto_now=True)
 
