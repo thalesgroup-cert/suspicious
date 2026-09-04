@@ -39,3 +39,21 @@ class CaseReportTests(TestCase):
         self.assertIn(
             self.client.get(f"/api/cases/{self.case.id}/report/").status_code, (401, 403)
         )
+
+    def test_report_renders_enrichment(self):
+        from cortex_job.models import Analyzer, AnalyzerReport
+        a = Analyzer.objects.create(name="VirusTotal_GetReport_3_1", analyzer_cortex_id="vt", tier=1)
+        ip = self.case.observable_group.artifacts.first().ip
+        AnalyzerReport.objects.create(
+            cortex_job_id="j", type="ip", status="Success", analyzer=a, ip=ip,
+            level="malicious", confidence=90, score=10,
+            report_summary={}, report_taxonomy={}, report_full={},
+            enrichment={"source": "virustotal", "malicious_count": 42, "total": 70,
+                        "as_owner": "Evil Hosting LLC", "threat_label": "trojan.emotet",
+                        "vendors": [{"name": "Kaspersky", "category": "malicious", "result": "Trojan"}]},
+        )
+        r = self.client.get(f"/api/cases/{self.case.id}/report/?format=html")
+        body = r.content.decode()
+        self.assertIn("Evil Hosting LLC", body)
+        self.assertIn("42 / 70", body)
+        self.assertIn("trojan.emotet", body)

@@ -34,6 +34,7 @@
     font-size: 11px; font-family: sans-serif; background: #eceff3; color: #445; vertical-align: middle;
   }
   .sub { color: #555; font-size: 12px; margin: 6px 0; }
+  .enrichment { margin: 8px 0; }
   table { border-collapse: collapse; width: 100%; margin-top: 10px; font-size: 12px; }
   th, td { border: 1px solid #ddd; padding: 6px 8px; text-align: left; vertical-align: top; }
   th { background: #f6f6f6; }
@@ -123,6 +124,27 @@
       </tbody>
     </table>
     {% for s in o.sources %}
+    {% if s.enrichment %}
+    <div class="enrichment">
+      {% if s.enrichment.malicious_count is not None %}
+      <p class="sub">{{ s.enrichment.malicious_count }} / {{ s.enrichment.total }} vendors flagged this</p>
+      {% endif %}
+      {% if s.enrichment.threat_label %}<p class="sub">Threat: {{ s.enrichment.threat_label }}</p>{% endif %}
+      {% if s.enrichment.as_owner %}<p class="sub">AS owner: {{ s.enrichment.as_owner }}{% if s.enrichment.country %} ({{ s.enrichment.country }}){% endif %}</p>{% endif %}
+      {% if s.enrichment.first_seen %}<p class="sub">First seen: {{ s.enrichment.first_seen }}</p>{% endif %}
+      {% if s.enrichment.last_seen %}<p class="sub">Last seen: {{ s.enrichment.last_seen }}</p>{% endif %}
+      {% if s.enrichment.meaningful_name %}<p class="sub">Filename: {{ s.enrichment.meaningful_name }}</p>{% endif %}
+      {% with flagged=s.enrichment.vendors %}
+      {% if flagged %}
+      <table><thead><tr><th>Vendor</th><th>Verdict</th><th>Result</th></tr></thead><tbody>
+      {% for v in flagged %}{% if v.category == "malicious" or v.category == "suspicious" %}
+        <tr><td>{{ v.name }}</td><td>{{ v.category }}</td><td>{{ v.result|default:"—" }}</td></tr>
+      {% endif %}{% endfor %}
+      </tbody></table>
+      {% endif %}
+      {% endwith %}
+    </div>
+    {% endif %}
     <details>
       <summary>Raw report — {{ s.name }}</summary>
       <pre>{{ s.report|pprint }}</pre>
