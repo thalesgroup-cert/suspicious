@@ -67,7 +67,7 @@ vt-py==0.22.0
 chromadb==1.5.9
 
 # Logging
-python-json-logger==4.1.0  # v4.x changed the API; pin to v3 until we migrate
+python-json-logger==4.2.0  # v4.x changed the API; pin to v3 until we migrate
 
 # Image rendering (cairosvg: SVG→PNG for Outlook email previews)
 pillow==12.3.0
