@@ -34,7 +34,7 @@ def _attributes(report_full: Any) -> Optional[dict]:
 def _iso(ts: Any) -> Optional[str]:
     try:
         ts = int(ts)
-    except (TypeError, ValueError):
+    except (TypeError, ValueError, OverflowError, OSError):
         return None
     if ts <= 0:
         return None
@@ -111,9 +111,12 @@ def _extract(report_full: Any, data_type: str, value: Optional[str]) -> Optional
     if legacy is not None:
         scans = legacy.get("scans") if isinstance(legacy.get("scans"), dict) else {}
         out["vendors"] = _vendors_from_scans(scans)
-        out["malicious_count"] = int(legacy.get("positives") or 0)
-        out["suspicious_count"] = 0
-        out["total"] = int(legacy.get("total") or len(scans) or 0)
+        try:
+            out["malicious_count"] = int(legacy.get("positives") or 0)
+            out["suspicious_count"] = 0
+            out["total"] = int(legacy.get("total") or len(scans) or 0)
+        except (TypeError, ValueError):
+            pass
         out["vt_link"] = _vt_link(dt, value)
         return out
 
@@ -122,9 +125,12 @@ def _extract(report_full: Any, data_type: str, value: Optional[str]) -> Optional
         out["vendors"] = _vendors_from_results(results)
     stats = attrs.get("last_analysis_stats")
     if isinstance(stats, dict):
-        out["malicious_count"] = int(stats.get("malicious") or 0)
-        out["suspicious_count"] = int(stats.get("suspicious") or 0)
-        out["total"] = sum(int(v or 0) for v in stats.values())
+        try:
+            out["malicious_count"] = int(stats.get("malicious") or 0)
+            out["suspicious_count"] = int(stats.get("suspicious") or 0)
+            out["total"] = sum(int(v or 0) for v in stats.values())
+        except (TypeError, ValueError):
+            pass
     elif "vendors" in out:
         cats = [v["category"] for v in out["vendors"]]
         out["malicious_count"] = cats.count("malicious")
