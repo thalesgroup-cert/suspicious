@@ -1,0 +1,39 @@
+name: GHCR cleanup
+
+on:
+  schedule:
+    - cron: "0 3 * * 0" # weekly, Sunday 03:00 UTC
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  packages: write
+
+jobs:
+  prune-untagged:
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        package: [suspicious, suspicious-ui, suspicious-feeder]
+    steps:
+      # Every image push (release.yml, on every main-branch push) also pushes
+      # a SLSA provenance attestation as a separate, untagged package version
+      # (0 downloads — it's only ever referenced, never pulled directly).
+      # min-versions-to-keep: 0 + delete-only-untagged-versions: true is the
+      # standard idiom for "delete every untagged version, touch nothing
+      # tagged" — latest/semver/sha-* versions are never candidates.
+      #
+      # GITHUB_TOKEN can't delete versions of org-owned GHCR packages (no
+      # delete scope for org packages). Add a classic PAT with read:packages
+      # + delete:packages as the GHCR_CLEANUP_TOKEN repo secret, or this job
+      # fails with a 403.
+      - name: Delete untagged versions
+        uses: actions/delete-package-versions@v5
+        with:
+          package-name: ${{ matrix.package }}
+          package-type: container
+          org: thalesgroup-cert
+          token: ${{ secrets.GHCR_CLEANUP_TOKEN }}
+          min-versions-to-keep: 0
+          delete-only-untagged-versions: "true"

@@ -54,7 +54,12 @@ jobs:
           images: ${{ matrix.image }}
           tags: |
             type=raw,value=latest,enable={{is_default_branch}}
-            type=sha,prefix=sha-,enable={{is_default_branch}}
+            # sha-<commit> only on an actual release (a v* tag push), not on
+            # every ordinary main-branch push — that was flooding GHCR with a
+            # tagged image (+ provenance attestation) per merge. is_default_branch
+            # is false for tag-push events, so this and the `latest` line above
+            # are mutually exclusive triggers.
+            type=sha,prefix=sha-,enable=${{ startsWith(github.ref, 'refs/tags/v') }}
             type=raw,value=test,enable=${{ github.ref == 'refs/heads/test' }}
             type=semver,pattern={{version}}
             type=semver,pattern={{major}}.{{minor}}
