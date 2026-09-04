@@ -58,6 +58,7 @@ class VirustotalExtractTests(SimpleTestCase):
 
 class _StubReport:
     url_id = domain_id = hash_id = ip_id = file_id = mail_id = None
+    mail_body_id = mail_header_id = None
     type = "ip"
 
     def __init__(self, analyzer_name, report_full={"results": {"positives": 1, "total": 10, "scans": {}}}):

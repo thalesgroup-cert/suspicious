@@ -204,31 +204,21 @@ class InvestigationAnalyzerReportSerializer(serializers.ModelSerializer):
         fields = [
             "id", "cortex_job_id", "type", "status", "analyzer_name", "analyzer_id",
             "level", "confidence", "score", "category", "categories",
-            "report_summary", "report_taxonomy", "target", "created_at",
+            "report_summary", "report_taxonomy", "enrichment", "target", "created_at",
         ]
 
     def get_categories(self, obj: AnalyzerReport) -> list[str]:
         return normalize_categories(obj.get_category())
 
     def get_target(self, obj: AnalyzerReport) -> dict[str, Any]:
-        if obj.url_id:
-            return {"kind": "URL", "id": obj.url_id, "value": getattr(obj.url, "address", str(obj.url_id))}
-        if obj.domain_id:
-            return {"kind": "DOMAIN", "id": obj.domain_id, "value": getattr(obj.domain, "value", str(obj.domain_id))}
-        if obj.mail_id:
-            return {"kind": "MAIL", "id": obj.mail_id, "value": getattr(obj.mail, "address", str(obj.mail_id))}
-        if obj.hash_id:
-            return {"kind": "HASH", "id": obj.hash_id, "value": getattr(obj.hash, "value", str(obj.hash_id))}
-        if obj.file_id:
-            file_field = getattr(obj.file, "file_path", None)
-            file_name = getattr(file_field, "name", None)
-            return {"kind": "FILE", "id": obj.file_id, "value": file_name or str(obj.file_id)}
-        if obj.ip_id:
-            return {"kind": "IP", "id": obj.ip_id, "value": getattr(obj.ip, "address", str(obj.ip_id))}
-        if obj.mail_body_id:
-            return {"kind": "MAIL_BODY", "id": obj.mail_body_id, "value": getattr(obj.mail_body, "fuzzy_hash", str(obj.mail_body_id))}
-        if obj.mail_header_id:
-            return {"kind": "MAIL_HEADER", "id": obj.mail_header_id, "value": getattr(obj.mail_header, "fuzzy_hash", str(obj.mail_header_id))}
+        from cortex_job.cortex_utils.report_target import analyzer_report_target_value
+        value = analyzer_report_target_value(obj)
+        for attr, kind in (("url_id", "URL"), ("domain_id", "DOMAIN"), ("mail_id", "MAIL"),
+                           ("hash_id", "HASH"), ("file_id", "FILE"), ("ip_id", "IP"),
+                           ("mail_body_id", "MAIL_BODY"), ("mail_header_id", "MAIL_HEADER")):
+            fk = getattr(obj, attr)
+            if fk:
+                return {"kind": kind, "id": fk, "value": value if value is not None else str(fk)}
         return {"kind": "UNKNOWN", "id": None, "value": None}
 
 

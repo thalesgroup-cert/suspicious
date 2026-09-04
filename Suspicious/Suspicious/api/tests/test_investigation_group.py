@@ -93,3 +93,19 @@ class InvestigationGroupApiTests(TestCase):
         case = Case.objects.create(description="d", reporter=self.user)
         r = self.client.get(f"/api/investigations/{case.id}/")
         self.assertNotIn("observable_group", r.json())
+
+    def test_source_carries_enrichment(self):
+        g = ObservableGroup.objects.create()
+        ip = IP.objects.create(address="8.8.8.8")
+        ObservableGroupArtifact.objects.create(group=g, artifact_type="IP", ip=ip)
+        case = Case.objects.create(description="d", reporter=self.user, observable_group=g)
+        a = Analyzer.objects.create(name="VirusTotal_GetReport_3_1", analyzer_cortex_id="vt", tier=1)
+        AnalyzerReport.objects.create(
+            cortex_job_id="j", type="ip", status="Success", analyzer=a, ip=ip,
+            level="suspicious", confidence=60, score=7,
+            report_summary={}, report_taxonomy={},
+            report_full={}, enrichment={"source": "virustotal", "as_owner": "Google LLC", "vendors": []},
+        )
+        r = self.client.get(f"/api/investigations/{case.id}/")
+        src = r.json()["observable_group"]["observables"][0]["sources"][0]
+        self.assertEqual(src["enrichment"]["as_owner"], "Google LLC")

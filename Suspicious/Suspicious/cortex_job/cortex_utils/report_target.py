@@ -20,4 +20,8 @@ def analyzer_report_target_value(report) -> Optional[str]:
         return getattr(f, "name", None)
     if report.mail_id:
         return getattr(report.mail, "address", None)
+    if report.mail_body_id:
+        return getattr(report.mail_body, "fuzzy_hash", None)
+    if report.mail_header_id:
+        return getattr(report.mail_header, "fuzzy_hash", None)
     return None

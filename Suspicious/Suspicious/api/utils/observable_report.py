@@ -31,6 +31,7 @@ def assemble_observables(case, *, full: bool = False) -> list[dict]:
                 "name": sv.name, "tier": sv.tier, "verdict": sv.verdict,
                 "confidence": sv.confidence, "evidence": sv.evidence,
                 "failed": sv.failed,
+                "enrichment": rep.enrichment,
                 "report": rep.report_full if full else rep.report_summary,
             })
         verdict = None
