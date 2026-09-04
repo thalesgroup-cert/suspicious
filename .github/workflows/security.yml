@@ -122,14 +122,32 @@ jobs:
         # has no fix yet, triage it and add `--ignore-vuln <GHSA/CVE-id>` here
         # rather than re-muting the whole audit.
         #
-        # GHSA-f4j7-r4q5-qw2c (chromadb pre-auth RCE via trust_remote_code on
-        # the collections API) has no fix released yet. We only use chromadb
-        # as an HttpClient (common.clients.get_chroma_client —
-        # get_collection/get/delete), never the vulnerable server code path
-        # or trust_remote_code.
+        # All of the ignores below are server-side ChromaDB / NLTK issues with
+        # no fixed release yet. We only touch chromadb via
+        # common.clients.get_chroma_client -> chromadb.HttpClient
+        # (get_collection/get/query/delete) against an internal, single-tenant
+        # chromadb service that is not externally exposed, and nltk only via
+        # word_tokenize/stopwords with no caller-controlled paths.
+        #
+        # GHSA-f4j7-r4q5-qw2c  chromadb pre-auth RCE via trust_remote_code on
+        #                      the collections API — server path, never set.
+        # GHSA-36p7-vc44-83pf  chromadb code injection via trust_remote_code +
+        #                      UPDATE_COLLECTION (CVE-2026-45833) — same class.
+        # GHSA-2wm9-hf6c-p5cr  chromadb cross-tenant read/write for any authed
+        #                      user (CVE-2026-45830) — single default tenant.
+        # GHSA-xph7-9rjv-w5fr  chromadb SimpleRBACAuthorizationProvider ignores
+        #                      tenant/db/collection scope (CVE-2026-45831) — that
+        #                      provider is not used; internal service.
+        # GHSA-8mgp-746c-j5xp  nltk model-artifact APIs bypass path security
+        #                      (CVE-2026-81726) — TransitionParser /
+        #                      AveragedPerceptron / PerceptronTagger unused.
         run: |
           pip-audit -r Suspicious/requirements.txt --strict \
-            --ignore-vuln GHSA-f4j7-r4q5-qw2c
+            --ignore-vuln GHSA-f4j7-r4q5-qw2c \
+            --ignore-vuln GHSA-36p7-vc44-83pf \
+            --ignore-vuln GHSA-2wm9-hf6c-p5cr \
+            --ignore-vuln GHSA-xph7-9rjv-w5fr \
+            --ignore-vuln GHSA-8mgp-746c-j5xp
 
   pip-audit-email-feeder:
     needs: changes
@@ -190,4 +208,20 @@ jobs:
           cache: pnpm
           cache-dependency-path: suspicious-ui/pnpm-lock.yaml
       - run: pnpm install --frozen-lockfile
-      - run: pnpm audit --audit-level=high
+      - name: pnpm audit
+        # The registry's advisories/bulk endpoint times out intermittently
+        # (pnpm's own 2 built-in retries aren't enough), failing the gate on
+        # infra flake rather than a real vuln. Bump the fetch timeout and wrap
+        # in an outer retry. A genuine advisory fails every attempt too, so the
+        # gate still catches it — it just costs ~2min of retries first.
+        # ponytail: shell retry loop; revisit if pnpm gains a native
+        # audit-retry flag.
+        env:
+          npm_config_fetch_timeout: "300000"
+        run: |
+          for attempt in 1 2 3 4 5; do
+            pnpm audit --audit-level=high && exit 0
+            echo "::warning::pnpm audit attempt $attempt failed; retrying in 30s"
+            sleep 30
+          done
+          exit 1
