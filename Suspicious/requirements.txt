@@ -8,7 +8,7 @@ djangorestframework==3.18.0
 django-rest-knox==5.1.0
 django-filter==26.1
 drf-spectacular==0.30.0
-gunicorn==26.0.0
+gunicorn==26.2.0
 whitenoise==6.12.0
 # Environment Configuration
 docker==7.2.0
