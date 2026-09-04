@@ -12,7 +12,7 @@ const sourceSchema = z.object({
   evidence: z.string(),
   failed: z.boolean(),
   report: z.unknown(),
-  enrichment: enrichmentSchema.nullable().optional(),
+  enrichment: enrichmentSchema.nullable().optional().catch(undefined),
 });
 
 const observableSchema = z.object({

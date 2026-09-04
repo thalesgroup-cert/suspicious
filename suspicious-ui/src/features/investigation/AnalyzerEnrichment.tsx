@@ -86,7 +86,8 @@ function VendorTable({ enrichment }: { enrichment: Enrichment }) {
     (v) => v.category === "malicious" || v.category === "suspicious",
   );
 
-  const flaggedCount = enrichment.malicious_count ?? flagging.length;
+  const flaggedCount =
+    (enrichment.malicious_count ?? 0) + (enrichment.suspicious_count ?? 0) || flagging.length;
   const total = enrichment.total ?? enrichment.vendors?.length ?? 0;
 
   const list = showAll ? vendors : flagging;

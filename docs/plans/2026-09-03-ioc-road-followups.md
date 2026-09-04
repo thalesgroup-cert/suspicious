@@ -73,3 +73,31 @@ actually implemented). Not a mechanical follow-up.
 
 `mail_band_escalation` itself stays defined + unit-tested (`test_mail_escalation.py`),
 ready for that work.
+
+## 9. VT report enrichment — PRE-MERGE backtest checklist (from the 2026-09-04 whole-branch review)
+
+Before FF-merging `impl/ioc-analysis-road` into `design/`, on a real instance with
+this branch's migrations applied, run `python manage.py backtest_scoring --road all`
+and `score_accuracy`, and classify every `X -> Y` band transition into one of
+these four — none is a regression, but they are distinct and must be named
+in the merge notes:
+
+- **(a) `malicious_count == 1`, no `popular_threat_classification` → malicious→suspicious.**
+  Intended — the SOC's `8.8.8.8` lone-FP class.
+- **(b) `malicious_count == 0`, `suspicious_count == 1` → (was) suspicious→safe.**
+  ELIMINATED by the `s >= 1` fix (final-fix commit) — should not appear.
+- **(c) `malicious_count == 0`, `reputation <= -25` → safe→suspicious.**
+  A deliberate escalation (VT community reputation is a real signal). Spec §5.2.
+- **(d) Malicious-verdict confidence rescale** `max(55, min(95, round(50 + 45*m/total)))`.
+  Old value was a flat `100`. This only crosses `observable_engine.HIGH_CONFIDENCE = 70`
+  at ratio ≥ 44%, so below that VT stops satisfying `decisive_t1` and no longer
+  drives Dangerous *on its own* via Rule 1. Mitigating: the branch's own
+  `score_process/scoring/fixtures/labelled_cases/*.json` already hand-encode VT
+  confidences of 40/45/55 for 3/89, 2/72, 4/64 — this change aligns the parser
+  with the categorical engine's reference dataset. Also: safe-verdict confidence
+  100→90 has zero IOC-road effect and a tiny mail-road effect (lowers `base_conf`,
+  lets the AI signal win marginally more often — escalation direction).
+
+Also spot-check that `AnalyzerReport.enrichment` is populated on new VT reports
+(it is, per `test_enrichment_persist`) and optionally run
+`python manage.py backfill_enrichment --dry-run` to see the historical count.

@@ -21,6 +21,9 @@ def _stats(full: Any) -> Optional[dict]:
                 stats = inner.get("last_analysis_stats")
                 if isinstance(stats, dict):
                     return stats
+        flat = res.get("attributes")
+        if isinstance(flat, dict) and isinstance(flat.get("last_analysis_stats"), dict):
+            return flat["last_analysis_stats"]
         if isinstance(res.get("last_analysis_stats"), dict):
             return res["last_analysis_stats"]
     return None
@@ -65,7 +68,7 @@ class VirusTotalGetReportParser(AnalyzerParser):
             if m >= 2 or (m >= 1 and has_class):
                 level = "malicious"
                 confidence = max(55, min(95, round(50 + 45 * m / max(total_e, 1))))
-            elif m == 1 or s >= 2 or (isinstance(reputation, (int, float)) and reputation <= -25 and m == 0):
+            elif m == 1 or s >= 1 or (isinstance(reputation, (int, float)) and reputation <= -25 and m == 0):
                 level = "suspicious"
                 confidence = 60
             else:

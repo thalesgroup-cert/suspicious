@@ -193,6 +193,8 @@ def _extract(report_full: Any, data_type: str, value: Optional[str]) -> Optional
                 out["threat_label"] = str(label)
             cats = ptc.get("popular_threat_category")
             if isinstance(cats, list) and cats and isinstance(cats[0], dict):
-                out["threat_category"] = str(cats[0].get("value") or "")
+                cat_val = cats[0].get("value")
+                if cat_val:
+                    out["threat_category"] = str(cat_val)
 
     return out

@@ -16,7 +16,6 @@ class AnalyzerTierTests(TestCase):
 
 class AnalyzerReportEnrichmentTest(TestCase):
     def test_enrichment_defaults_none_and_round_trips(self):
-        from cortex_job.models import Analyzer, AnalyzerReport
         a = Analyzer.objects.create(name="X", analyzer_cortex_id="x1")
         r = AnalyzerReport.objects.create(
             cortex_job_id="j", type="ip", status="Success", analyzer=a,

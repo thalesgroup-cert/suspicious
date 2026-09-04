@@ -16,7 +16,8 @@ class Command(BaseCommand):
     def handle(self, *args, **opts):
         qs = (AnalyzerReport.objects
               .filter(enrichment__isnull=True, status="Success")
-              .select_related("analyzer", "ip", "url", "hash", "domain", "file")
+              .select_related("analyzer", "ip", "url", "hash", "domain", "file",
+                              "mail", "mail_body", "mail_header")
               .order_by("id"))
         if opts["limit"]:
             qs = qs[:opts["limit"]]

@@ -262,6 +262,16 @@ class VirusTotalParserTests(SimpleTestCase):
                     {"results": {"data": {"attributes": None}}})
         self.assertEqual(r.level, "info")
 
+    def test_data_less_attributes_shape_is_scored(self):
+        # results.attributes.last_analysis_stats (no `data` wrapper) — the v3
+        # variant enrichment/_attributes handles. _stats must read it too so the
+        # level and the enrichment agree, instead of early-returning level="info".
+        p = VirusTotalGetReportParser(analyzer_name="VirusTotal_GetReport_3_1", data="x", data_type="hash")
+        r = p.parse({"taxonomies": [{"level": "info", "value": "VT"}]},
+                    {"results": {"attributes": {"last_analysis_stats":
+                        {"malicious": 50, "suspicious": 0, "harmless": 20, "undetected": 0}}}})
+        self.assertEqual(r.level, "malicious")
+
 
 from score_process.scoring.cortex_analyzers.contrib.urlscan import UrlscanSearchParser
 
