@@ -208,4 +208,20 @@ jobs:
           cache: pnpm
           cache-dependency-path: suspicious-ui/pnpm-lock.yaml
       - run: pnpm install --frozen-lockfile
-      - run: pnpm audit --audit-level=high
+      - name: pnpm audit
+        # The registry's advisories/bulk endpoint times out intermittently
+        # (pnpm's own 2 built-in retries aren't enough), failing the gate on
+        # infra flake rather than a real vuln. Bump the fetch timeout and wrap
+        # in an outer retry. A genuine advisory fails every attempt too, so the
+        # gate still catches it — it just costs ~2min of retries first.
+        # ponytail: shell retry loop; revisit if pnpm gains a native
+        # audit-retry flag.
+        env:
+          npm_config_fetch_timeout: "300000"
+        run: |
+          for attempt in 1 2 3 4 5; do
+            pnpm audit --audit-level=high && exit 0
+            echo "::warning::pnpm audit attempt $attempt failed; retrying in 30s"
+            sleep 30
+          done
+          exit 1
