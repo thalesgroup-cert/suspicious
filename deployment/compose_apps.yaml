@@ -169,8 +169,11 @@ services:
       #   stat -c '%g' /var/run/docker.sock
       daemon_user: "1001:${DOCKER_SOCK_GID:-999}"
       # Read the analyzer/responder catalogs from the mounted files, not the
-      # network, on every boot.
-      analyzer_url:  "/opt/Cortex-Analyzers-Public/analyzers/analyzers.json"
+      # network, on every boot. analyzer_urls (plural) is comma-separated —
+      # the public catalog plus this repo's own custom-analyzer one
+      # (Analyzers/analyzers.json, mounted below); analyzer_url (singular)
+      # only ever takes the first and silently drops the rest.
+      analyzer_urls: "/opt/Cortex-Analyzers-Public/analyzers/analyzers.json,/opt/Cortex-Analyzers-AI/analyzers/analyzers.json"
       responder_url: "/opt/Cortex-Analyzers-Public/responders/responders.json"
     volumes:
       - "${CA_PATH}/keystore.jks:/etc/cortex/keystore.jks:ro"
@@ -180,7 +183,7 @@ services:
       - "/var/run/docker.sock:/var/run/docker.sock:ro"
       - "${DOCKER_PATH}/config.json:/home/cortex/.docker/config.json:ro"
       - "${CORTEX_PATH}/Cortex-Analyzers/:/opt/Cortex-Analyzers/:ro"
-      - "${AIANALYZER_PATH}/analyzers.json:/opt/Cortex-Analyzers-AI/analyzers/analyzers.json:ro"
+      - "${CUSTOM_ANALYZERS_PATH}/analyzers.json:/opt/Cortex-Analyzers-AI/analyzers/analyzers.json:ro"
       - "${CORTEX_PATH}/Cortex-Analyzers-Public/analyzers/analyzers.json:/opt/Cortex-Analyzers-Public/analyzers/analyzers.json:ro"
       - "${CORTEX_PATH}/Cortex-Analyzers-Public/responders/responders.json:/opt/Cortex-Analyzers-Public/responders/responders.json:ro"
       - "${YARA_PATH}/rules/:/opt/Yara/rules:ro"

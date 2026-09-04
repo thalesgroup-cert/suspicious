@@ -75,7 +75,7 @@ DIRS=(
     "${CORTEX_PATH}/Cortex-Analyzers-Public/analyzers"
     "${CORTEX_PATH}/Cortex-Analyzers-Public/responders"
     "${CORTEX_PATH}/jobs"
-    "${AIANALYZER_PATH}"
+    "${CUSTOM_ANALYZERS_PATH}"
     "${YARA_PATH}"
 )
 
