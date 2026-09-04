@@ -354,6 +354,61 @@ class CirclHashlookupParserTests(SimpleTestCase):
         self.assertEqual(r.score, 10)
 
 
+from score_process.scoring.cortex_analyzers.contrib.spamhaus_dbl import SpamhausDblParser
+
+class SpamhausDblParserTests(SimpleTestCase):
+    """Regression: the upstream analyzer always tags its own taxonomy "info"
+    (see contrib/spamhaus_dbl.py's docstring) — DefaultTaxonomyParser took
+    that at face value, so a real Malware/Botnet-C&C DBL listing scored
+    identically to a clean domain: "info" -> "no-data" in the categorical
+    engine. This parser reads the `classification` value directly instead."""
+
+    def _run(self, classification, return_code="127.0.1.2"):
+        p = SpamhausDblParser(analyzer_name="SpamhausDBL_1_0", data="evil.example", data_type="domain")
+        full = {"return_code": return_code, "classification": classification}
+        summary = {"taxonomies": [
+            {"level": "info", "namespace": "SpamhausDBL", "predicate": "return_code", "value": return_code},
+            {"level": "info", "namespace": "SpamhausDBL", "predicate": "classification", "value": classification},
+        ]}
+        return p.parse(summary, full)
+
+    def test_clean_is_safe(self):
+        r = self._run("Clean", return_code="NXDOMAIN")
+        self.assertEqual(r.level, "safe")
+
+    def test_spam_listing_is_suspicious_not_info(self):
+        r = self._run("Spam")
+        self.assertEqual(r.level, "suspicious")
+
+    def test_malware_listing_is_malicious(self):
+        r = self._run("Malware", return_code="127.0.1.5")
+        self.assertEqual(r.level, "malicious")
+        self.assertEqual(r.score, 10)
+
+    def test_botnet_cc_listing_is_malicious(self):
+        r = self._run("Botnet C&C", return_code="127.0.1.6")
+        self.assertEqual(r.level, "malicious")
+
+    def test_abused_legit_domain_is_suspicious_not_malicious(self):
+        """A compromised legitimate domain is a real signal but not itself
+        malicious infrastructure — must not get the same level as an
+        outright Malware/Botnet-C&C listing."""
+        r = self._run("Abused legit malware", return_code="127.0.1.105")
+        self.assertEqual(r.level, "suspicious")
+
+    def test_rate_limited_query_is_info_not_safe_or_malicious(self):
+        """A Spamhaus-side query response, not a verdict about the domain —
+        must not be silently read as "clean"."""
+        r = self._run("Excessive number of queries", return_code="127.255.255.255")
+        self.assertEqual(r.level, "info")
+
+    def test_real_case_9_report_is_no_longer_no_data(self):
+        """Exact payload captured live from Cortex for dbltest.com (Spamhaus's
+        own DBL test domain) — this used to score "info" (-> no-data)."""
+        r = self._run("Spam")
+        self.assertNotEqual(r.level, "info")
+
+
 class BespokeParserResolutionTests(SimpleTestCase):
     def test_registry_resolves_all_bespoke_parsers(self):
         reg = AnalyzerParserRegistry()
@@ -371,6 +426,7 @@ class BespokeParserResolutionTests(SimpleTestCase):
             "Urlscan_io_Search_0_1_1": "UrlscanSearchParser",
             "MISP_2_1": "MispParser",
             "CIRCLHashlookup_1_1": "CirclHashlookupParser",
+            "SpamhausDBL_1_0": "SpamhausDblParser",
         }
         for cortex_name, cls_name in cases.items():
             self.assertEqual(reg.resolve(_A(cortex_name)).__name__, cls_name)
