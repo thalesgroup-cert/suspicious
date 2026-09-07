@@ -56,3 +56,76 @@ EXTRACTORS: dict[str, Callable[[Any], list[tuple[str, str]]]] = {
     "UnshortenLink_1_2": _unshorten,
     "QrDecode_1_0": _qrdecode,
 }
+
+
+# data_type -> (module, class, value-field). Verified against the observable models.
+_MODEL_BY_TYPE = {
+    "url": ("url_process.models", "URL", "address"),
+    "domain": ("domain_process.models", "Domain", "value"),
+    "ip": ("ip_process.models", "IP", "address"),
+    "hash": ("hash_process.models", "Hash", "value"),
+    "mail": ("email_process.models", "MailAddress", "address"),
+}
+
+
+def _resolve_observable(value: str, data_type: str):
+    """Get-or-create the observable model for `value`. None on an unknown type."""
+    spec = _MODEL_BY_TYPE.get(data_type)
+    if spec is None:
+        return None
+    from importlib import import_module
+
+    module, cls_name, field = spec
+    model = getattr(import_module(module), cls_name)
+    obj, _ = model.objects.get_or_create(**{field: value})
+    return obj
+
+
+# IOC-road: ObservableGroupArtifact.Type is upper-cased (URL/IP/HASH/DOMAIN).
+_OGA_TYPE = {"url": "URL", "domain": "DOMAIN", "ip": "IP", "hash": "HASH"}
+
+# Mail-road: data_type -> (join model, MailArtifact FK attr, MailArtifact.artifact_type, join FK field)
+_MAIL_JOIN = {
+    "url": ("ArtifactIsUrl", "artifactIsUrl", "URL", "url"),
+    "ip": ("ArtifactIsIp", "artifactIsIp", "IP", "ip"),
+    "hash": ("ArtifactIsHash", "artifactIsHash", "Hash", "hash"),
+    "domain": ("ArtifactIsDomain", "artifactIsDomain", "Domain", "domain"),
+    "mail": ("ArtifactIsMailAddress", "artifactIsMailAddress", "MailAddress", "mail_address"),
+}
+
+
+def _attach_to_case(case, obj, data_type: str) -> None:
+    """Link `obj` to `case` the way the rest of the codebase does: an
+    ObservableGroupArtifact for an IOC-group case, else a MailArtifact +
+    ArtifactIsX join row for a mail case. Idempotent."""
+    if getattr(case, "observable_group_id", None):
+        art_type = _OGA_TYPE.get(data_type)
+        if art_type is None:
+            return
+        from case_handler.models import ObservableGroupArtifact
+
+        ObservableGroupArtifact.objects.get_or_create(
+            group_id=case.observable_group_id, artifact_type=art_type, **{data_type: obj}
+        )
+        return
+
+    mail = getattr(getattr(case, "fileOrMail", None), "mail", None)
+    if mail is None:
+        logger.warning("derived: case %s has neither observable_group nor mail", case.pk)
+        return
+
+    spec = _MAIL_JOIN.get(data_type)
+    if spec is None:
+        return
+    import mail_feeder.models as mf
+
+    join_cls_name, fk_attr, art_type, join_field = spec
+    join_cls = getattr(mf, join_cls_name)
+    if mf.MailArtifact.objects.filter(
+        mail=mail, artifact_type=art_type, **{f"{fk_attr}__{join_field}": obj}
+    ).exists():
+        return
+    ma = mf.MailArtifact.objects.create(mail=mail, artifact_type=art_type)
+    join = join_cls.objects.create(artifact=ma, **{join_field: obj})
+    setattr(ma, fk_attr, join)
+    ma.save(update_fields=[fk_attr])
