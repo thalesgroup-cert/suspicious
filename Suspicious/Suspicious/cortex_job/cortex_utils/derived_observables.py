@@ -216,8 +216,8 @@ def score_derived_observables(case) -> dict:
         note = ""
         rank = _BAND_RANK.get(band, 0)
         if rank >= 1 and rank > _BAND_RANK.get(_parent_band(d), 0):
-            note = (f"Escalated to {band}: {d.via_analyzer} extracted "
-                    f"{d.child_value} → {band}.")
+            short = (d.child_value[:100] + "…") if len(d.child_value) > 100 else d.child_value
+            note = f"Escalated to {band}: {d.via_analyzer} extracted {short} → {band}."[:255]
             out[(d.parent_type, d.parent_id)] = (band, note)
         d.escalation_note = note
         d.save(update_fields=["child_band", "escalation_note"])

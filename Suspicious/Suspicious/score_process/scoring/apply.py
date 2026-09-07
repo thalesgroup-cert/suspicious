@@ -101,14 +101,15 @@ def finalise_ioc_group(case) -> None:
         i = idx_by_key.get((ptype, pid))
         if i is None:
             continue
+        obj = obj_by_key[(ptype, pid)]
+        if obj.ioc_level in _STICKY_IOC_LEVELS:
+            continue  # allow/deny-listed marker wins — child still votes via score_group
         v = obs_verdicts[i]
         if _BAND_RANK.get(eband, 0) <= _BAND_RANK.get(v.band, 0):
             continue
         obs_verdicts[i] = ObservableVerdict(
             eband, v.confidence, None, v.counts, list(v.rationale) + [note])
-        obj = obj_by_key[(ptype, pid)]
-        if obj.ioc_level not in _STICKY_IOC_LEVELS:
-            obj.ioc_level = _BAND_TO_IOC_LEVEL.get(eband, "info")
+        obj.ioc_level = _BAND_TO_IOC_LEVEL.get(eband, "info")
         obj.ioc_score = _DERIVED_SCORE.get(eband, 5)
         obj.save(update_fields=["ioc_level", "ioc_score"])
 

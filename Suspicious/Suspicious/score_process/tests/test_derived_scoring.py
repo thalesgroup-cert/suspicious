@@ -47,6 +47,24 @@ class DerivedScoringTests(TestCase):
         self.assertIn("UnshortenLink_1_2", note)
         self.assertEqual(DerivedObservable.objects.get().child_band, "Dangerous")
 
+    def test_long_child_value_note_fits_column(self):
+        self.d = DerivedObservable.objects.get()
+        self.d.child_value = "https://evil.example/login?" + "a=b&" * 130  # ~540 chars
+        self.d.save(update_fields=["child_value"])
+        _report(self.vt, self.child, "malicious")
+        score_derived_observables(self.case)  # must not raise (MySQL 1406)
+        self.assertLessEqual(len(DerivedObservable.objects.get().escalation_note), 255)
+
+    def test_sticky_parent_not_escalated(self):
+        self.parent.ioc_level = "SAFE-ALLOW_LISTED"
+        self.parent.save(update_fields=["ioc_level"])
+        _report(self.vt, self.child, "malicious")
+        finalise_ioc_group(self.case)
+        self.case.refresh_from_db()
+        self.parent.refresh_from_db()
+        self.assertEqual(self.parent.ioc_level, "SAFE-ALLOW_LISTED")
+        self.assertFalse(any("Escalated" in r for r in self.case.verdict_rationale))
+
     def test_safe_child_yields_nothing(self):
         _report(self.vt, self.child, "safe")
         self.assertEqual(score_derived_observables(self.case), {})
