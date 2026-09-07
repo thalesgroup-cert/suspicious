@@ -32,6 +32,26 @@ def _qrdecode(full: Any) -> list[tuple[str, str]]:
     return out
 
 
+def _blocked(value: str, data_type: str) -> str:
+    """Non-empty reason if `value` must not become a live observable."""
+    if data_type == "url":
+        from api.serializers.submit import _check_no_ssrf_ip
+        try:
+            _check_no_ssrf_ip(value)
+        except ValueError as exc:
+            return str(exc) or "SSRF-blocked target"
+    if data_type in ("url", "domain"):
+        from score_process.scoring.cortex_analyzers.allow_list import check_allow_list
+        try:
+            allow = check_allow_list(value, data_type)
+            for reason in allow.model_dump().values():
+                if reason:
+                    return f"allow-listed ({reason})"
+        except Exception:  # noqa: BLE001 — never block ingestion on an allow-list error
+            logger.warning("derived: allow-list check failed for %r", value, exc_info=True)
+    return ""
+
+
 EXTRACTORS: dict[str, Callable[[Any], list[tuple[str, str]]]] = {
     "UnshortenLink_1_2": _unshorten,
     "QrDecode_1_0": _qrdecode,
