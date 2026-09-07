@@ -59,6 +59,14 @@ class CortexAnalyzerReports:
 
             signals, ai, deny_listed, ai_missing, deny_reason = collect_signals(case)
             verdict = score_case(signals, ai, deny_listed, ai_missing, deny_reason)
+
+            # Derived-observable escalation (mail road): a child observable
+            # extracted from a parent MailArtifact that scored worse than its
+            # parent raises the case band and bumps the parent artifact's
+            # level — nothing else on the mail road writes per-artifact levels.
+            if mail:
+                verdict = CortexAnalyzerReports._apply_derived_escalation(case, mail, verdict)
+
             apply_verdict(case, verdict)
 
             update_cases_logger.info(
@@ -71,6 +79,41 @@ class CortexAnalyzerReports:
             update_cases_logger.error(
                 "get_report: error scoring case %s: %s", case.id, exc, exc_info=True
             )
+
+    @staticmethod
+    def _apply_derived_escalation(case, mail, verdict):
+        """Escalate the mail case band and bump parent MailArtifact levels for
+        any derived child that scored strictly above its parent."""
+        from cortex_job.cortex_utils.derived_observables import (
+            score_derived_observables, _MAIL_JOIN,
+        )
+        from score_process.scoring.engine import mail_band_escalation
+        from score_process.scoring.observable_engine import ObservableVerdict
+        from mail_feeder.models import MailArtifact
+
+        escalations = score_derived_observables(case)
+        if not escalations:
+            return verdict
+
+        rank = {"Suspicious": 1, "Dangerous": 2}
+        worst_band, note = max(escalations.values(), key=lambda bn: rank.get(bn[0], 0))
+        verdict = mail_band_escalation(
+            verdict, [ObservableVerdict(worst_band, 100, None, {}, [])], note=note
+        )
+
+        # mirror _STICKY_IOC_LEVELS: an allow/deny-listed artifact keeps its level
+        sticky = {"critical", "SAFE-ALLOW_LISTED"}
+        ioc_level = {"Suspicious": "suspicious", "Dangerous": "malicious"}
+        for (ptype, pid), (band, _n) in escalations.items():
+            spec = _MAIL_JOIN.get(ptype)
+            if spec is None:
+                continue
+            _join_cls, fk_attr, _art_type, join_field = spec
+            (MailArtifact.objects
+             .filter(mail=mail, **{f"{fk_attr}__{join_field}_id": pid})
+             .exclude(artifact_level__in=sticky)
+             .update(artifact_level=ioc_level[band]))
+        return verdict
 
     # ── report processing helpers ─────────────────────────────────────────
 
