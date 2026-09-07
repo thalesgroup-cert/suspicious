@@ -162,3 +162,39 @@ class CaseAnalyzerJob(models.Model):
             models.Index(fields=["case", "status"]),
             models.Index(fields=["status", "created_at"]),
         ]
+
+
+class DerivedObservable(models.Model):
+    """Provenance: an observable that an extractor analyzer surfaced from
+    another observable's report, within one case. See
+    docs/specs/2026-09-07-derived-observables-design.md."""
+
+    case = models.ForeignKey(
+        "case_handler.Case", on_delete=models.CASCADE, related_name="derived_observables"
+    )
+    source_report = models.ForeignKey(
+        AnalyzerReport, on_delete=models.CASCADE, related_name="derived_observables"
+    )
+    via_analyzer = models.CharField(max_length=64)
+
+    parent_type = models.CharField(max_length=16)   # url|domain|ip|hash|file
+    parent_id = models.PositiveIntegerField()
+    child_type = models.CharField(max_length=16)    # url|domain|ip|hash|mail
+    child_id = models.PositiveIntegerField()
+    child_value = models.CharField(max_length=512)
+
+    child_band = models.CharField(max_length=16, blank=True, default="")
+    escalation_note = models.CharField(max_length=255, blank=True, default="")
+    created_at = models.DateTimeField(auto_now_add=True)
+
+    class Meta:
+        constraints = [
+            models.UniqueConstraint(
+                fields=["source_report", "child_type", "child_id"],
+                name="uniq_derived_per_report_child",
+            )
+        ]
+        indexes = [models.Index(fields=["case", "parent_type", "parent_id"])]
+
+    def __str__(self):
+        return f"Case #{self.case_id}: {self.parent_type}#{self.parent_id} -> {self.child_type}#{self.child_id} via {self.via_analyzer}"
