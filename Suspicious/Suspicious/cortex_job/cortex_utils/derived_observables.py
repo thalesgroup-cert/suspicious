@@ -6,6 +6,11 @@ from __future__ import annotations
 import logging
 from typing import Any, Callable
 
+from django.db import transaction
+
+from settings.config import get_config
+from cortex_job.cortex_utils.cortex_and_job_management import CortexJob
+
 logger = logging.getLogger("tasp.cron.update_ongoing_case_jobs")
 
 _OBSERVABLE_TYPES = {"url", "domain", "ip", "hash", "mail"}
@@ -125,7 +130,97 @@ def _attach_to_case(case, obj, data_type: str) -> None:
         mail=mail, artifact_type=art_type, **{f"{fk_attr}__{join_field}": obj}
     ).exists():
         return
-    ma = mf.MailArtifact.objects.create(mail=mail, artifact_type=art_type)
-    join = join_cls.objects.create(artifact=ma, **{join_field: obj})
-    setattr(ma, fk_attr, join)
-    ma.save(update_fields=[fk_attr])
+    with transaction.atomic():
+        ma = mf.MailArtifact.objects.create(mail=mail, artifact_type=art_type)
+        join = join_cls.objects.create(artifact=ma, **{join_field: obj})
+        setattr(ma, fk_attr, join)
+        ma.save(update_fields=[fk_attr])
+
+
+_PARENT_TYPE_BY_FIELD = {"url": "url", "domain": "domain", "ip": "ip",
+                         "hash": "hash", "file": "file"}
+
+
+def _finished_extractor_reports(case):
+    """Success reports for this case's observables whose analyzer is an extractor."""
+    from cortex_job.models import AnalyzerReport
+    from cortex_job.cortex_utils.case_targets import (
+        collect_case_targets, build_analyzer_report_filter,
+    )
+    targets = collect_case_targets(case)
+    if not targets:
+        return []
+    q = build_analyzer_report_filter(targets)
+    return list(
+        AnalyzerReport.objects.filter(q, status="Success", analyzer__name__in=EXTRACTORS)
+        .select_related("analyzer")
+        .order_by("creation_date")
+    )
+
+
+def _report_parent(report):
+    """(parent_type, parent_obj) the extractor report was filed against."""
+    for field, ptype in _PARENT_TYPE_BY_FIELD.items():
+        obj = getattr(report, field, None)
+        if obj is not None:
+            return ptype, obj
+    return None, None
+
+
+def ingest_derived_observables(case) -> int:
+    """Turn this case's finished extractor reports into new observables +
+    dispatched jobs. Returns the number of observables newly attached this call.
+    0 when disabled, nothing to do, or every extractor report already processed.
+    """
+    # Default-on: only an explicit `false` disables. get_config's cache returns
+    # None (not the passed default) for an unset key, so `not ...` can't be used.
+    if get_config("derived_observables.enabled", True) is False:
+        return 0
+
+    derived_children = {
+        (d.child_type, d.child_id) for d in case.derived_observables.all()
+    }
+    processed_report_ids = set(
+        case.derived_observables.values_list("source_report_id", flat=True)
+    )
+    new_count = 0
+
+    for report in _finished_extractor_reports(case):
+        if report.id in processed_report_ids:
+            continue
+        parent_type, parent = _report_parent(report)
+        if parent is None:
+            continue
+        if (parent_type, parent.pk) in derived_children:
+            continue  # 1-hop cap
+
+        fn = EXTRACTORS[report.analyzer.name]
+        for value, data_type in fn(report.report_full):
+            try:
+                reason = _blocked(value, data_type)
+                if reason:
+                    logger.info("derived: skip %r (%s)", value, reason)
+                    continue
+                obj = _resolve_observable(value, data_type)
+                if obj is None:
+                    continue
+                _attach_to_case(case, obj, data_type)
+                _, created = case.derived_observables.get_or_create(
+                    source_report=report, child_type=data_type, child_id=obj.pk,
+                    defaults=dict(
+                        via_analyzer=report.analyzer.name,
+                        parent_type=parent_type, parent_id=parent.pk,
+                        child_value=value[:512],
+                    ),
+                )
+                if not created:
+                    continue
+                CortexJob().launch_cortex_jobs(value=obj, data_type=data_type, case=case)
+                new_count += 1
+            except Exception as exc:  # noqa: BLE001 — one bad value must not abort the pass
+                logger.warning(
+                    "derived: skip %r: %s", value, exc, exc_info=True
+                )
+                continue
+
+    return new_count
