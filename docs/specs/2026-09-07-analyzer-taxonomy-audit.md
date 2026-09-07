@@ -68,8 +68,15 @@ New bespoke parsers, same shape as `spamhaus_dbl.py`:
    inside a QR / "quishing", the real URL inside an ATP wrapper). With
    auto-extract off, Cortex never turns that into a new observable, so no
    analyzer ever runs on it. Their own `info` taxonomy is correct; the miss is
-   upstream of scoring. Flipping the flag needs a check that Suspicious ingests
-   Cortex-extracted artifacts into the IOC road.
+   upstream of scoring.
+   - **Phase A — DONE** (`url_process/url_utils/url_unwrap.py`): SafeLinks and
+     Proofpoint URLDefense are unwrapped at *submission* time (no Cortex, no
+     loop) so the real target becomes its own observable. Wired into
+     `SubmitIndicatorsView` and the mail feeder's `_handle_url`.
+   - **Phase B — still open:** UnshortenLink (redirect-following) and QrDecode
+     (image decode) need the analyzer to run *and* an "analyzer output → new
+     observable → re-dispatch → re-score" loop. Also: the single-URL
+     `SubmitUrlView` (form-based, one case) is not covered by Phase A.
 2. **DomainMailSPFDMARC** severity calibration (see table). Either accept the
    upstream's aggressive mapping or add a parser that caps it at `suspicious`.
 3. **Cyberprotect** — verify against `GET /api/analyzer` + a live report that

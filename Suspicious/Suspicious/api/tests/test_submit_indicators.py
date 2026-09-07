@@ -33,6 +33,35 @@ class SubmitIndicatorsTests(TestCase):
         self.assertEqual(r.status_code, 201)
         self.assertEqual(r.json()["skipped"], ["!!!garbage!!!"])
 
+    @patch("api.views.submit.dispatch_case_analysis.delay")
+    def test_safelinks_wrapped_url_also_creates_the_real_target(self, _mock):
+        wrapped = ("https://x.safelinks.protection.outlook.com/?url="
+                   "https%3A%2F%2Fevil.test%2Fphish&reserved=0")
+        r = self.client.post("/api/submit/indicators/", {"indicators": wrapped}, format="json")
+        self.assertEqual(r.status_code, 201)
+        case = Case.objects.get(id=r.json()["case_id"])
+        addrs = set(
+            ObservableGroupArtifact.objects
+            .filter(group=case.observable_group, artifact_type="URL")
+            .values_list("url__address", flat=True)
+        )
+        self.assertIn("https://evil.test/phish", addrs)   # real target extracted
+        self.assertEqual(len(addrs), 2)                    # wrapper kept too
+
+    @patch("api.views.submit.dispatch_case_analysis.delay")
+    def test_unwrapped_target_still_ssrf_checked(self, _mock):
+        wrapped = ("https://x.safelinks.protection.outlook.com/?url="
+                   "http%3A%2F%2F169.254.169.254%2Flatest&reserved=0")
+        r = self.client.post("/api/submit/indicators/", {"indicators": wrapped}, format="json")
+        self.assertEqual(r.status_code, 201)
+        case = Case.objects.get(id=r.json()["case_id"])
+        addrs = list(
+            ObservableGroupArtifact.objects
+            .filter(group=case.observable_group, artifact_type="URL")
+            .values_list("url__address", flat=True)
+        )
+        self.assertNotIn("http://169.254.169.254/latest", addrs)
+
     def test_zero_valid_is_400(self):
         r = self.client.post("/api/submit/indicators/", {"indicators": "??? ###"}, format="json")
         self.assertEqual(r.status_code, 400)

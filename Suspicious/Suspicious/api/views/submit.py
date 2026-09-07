@@ -14,7 +14,7 @@ from api.serializers.submit import (
     SubmitUrlSerializer,
     _check_no_ssrf_ip,
 )
-from api.utils.indicators import parse_indicators
+from api.utils.indicators import expand_wrappers, parse_indicators
 from case_handler.case_utils.case_handler import CaseHandler
 from cortex_job.cortex_utils.case_targets import collect_case_targets
 from tasp.forms import UploadFileForm, UploadOtherForm, UploadURLForm
@@ -203,7 +203,10 @@ class SubmitIndicatorsView(APIView):
         ser.is_valid(raise_exception=True)
 
         parsed = parse_indicators(ser.validated_data["indicators"])
-        valid = [p for p in parsed if p.type]
+        # Unwrap SafeLinks / URLDefense links so the real target also becomes an
+        # observable — before the cap + SSRF checks below, so the unwrapped
+        # targets are subject to both.
+        valid = expand_wrappers([p for p in parsed if p.type])
         skipped = [p.raw for p in parsed if not p.type]
 
         # Cap first — before any per-indicator work (the SSRF check below can
