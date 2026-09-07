@@ -26,6 +26,14 @@ const observableSchema = z.object({
     })
     .nullable(),
   sources: z.array(sourceSchema),
+  derived_from: z
+    .object({
+      value: z.string(),
+      via_analyzer: z.string(),
+    })
+    .nullable()
+    .optional(),
+  escalation_note: z.string().optional(),
 });
 
 export const observableGroupSchema = z.object({

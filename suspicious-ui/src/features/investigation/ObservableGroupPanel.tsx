@@ -120,6 +120,18 @@ export function ObservableGroupPanel({
                   <Typography variant="caption" color="text.secondary">
                     {flagged} / {total} sources flagged this
                   </Typography>
+                  {observable.derived_from && (
+                    <Chip
+                      size="small"
+                      variant="outlined"
+                      label={`⛓ extracted from ${observable.derived_from.value} via ${observable.derived_from.via_analyzer}`}
+                    />
+                  )}
+                  {observable.escalation_note && (
+                    <Typography variant="caption" color="warning.main">
+                      {observable.escalation_note}
+                    </Typography>
+                  )}
                 </Stack>
               </AccordionSummary>
               <AccordionDetails>

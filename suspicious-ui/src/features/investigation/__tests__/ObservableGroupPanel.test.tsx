@@ -55,4 +55,28 @@ describe("ObservableGroupPanel", () => {
     expect(screen.getByText("8.8.8.8")).toBeInTheDocument();
     expect(screen.getByText("AbuseIPDB")).toBeInTheDocument();
   });
+
+  it("shows extraction provenance on a derived observable", () => {
+    const groupWithDerived = {
+      observables: [
+        {
+          value: "https://tinyurl.com/x", type: "url",
+          verdict: { band: "Dangerous", confidence: 80, rationale: [] },
+          sources: [],
+          derived_from: null,
+          escalation_note: "Escalated to Dangerous: UnshortenLink_1_2 extracted https://evil.example/login → Dangerous.",
+        },
+        {
+          value: "https://evil.example/login", type: "url",
+          verdict: { band: "Dangerous", confidence: 90, rationale: [] },
+          sources: [],
+          derived_from: { value: "https://tinyurl.com/x", via_analyzer: "UnshortenLink_1_2" },
+          escalation_note: "",
+        },
+      ],
+    };
+    render(<ObservableGroupPanel group={groupWithDerived} />);
+    expect(screen.getByText(/extracted from/i)).toBeInTheDocument();
+    expect(screen.getByText(/Escalated to Dangerous/)).toBeInTheDocument();
+  });
 });
