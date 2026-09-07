@@ -6,9 +6,23 @@ source's vote plus its analyzer report.
 """
 from __future__ import annotations
 
+from importlib import import_module
+
 from score_process.scoring.observable_collect import observable_reports
 from score_process.scoring.observable_engine import score_observable
 from score_process.scoring.sources import source_verdict_from_report
+
+
+def _parent_value(d):
+    """Return the parent observable's value field (e.g., address, value)."""
+    from cortex_job.cortex_utils.derived_observables import _MODEL_BY_TYPE
+
+    spec = _MODEL_BY_TYPE.get(d.parent_type)
+    if not spec:
+        return None
+    module, cls_name, field = spec
+    obj = getattr(import_module(module), cls_name).objects.filter(pk=d.parent_id).first()
+    return getattr(obj, field, None) if obj else None
 
 
 def assemble_observables(case, *, full: bool = False) -> list[dict]:
@@ -18,6 +32,14 @@ def assemble_observables(case, *, full: bool = False) -> list[dict]:
     full=False (API detail) attaches report_summary; full=True (downloadable
     report) attaches report_full.
     """
+    # ponytail: query derived_observables once before loop
+    derived = {}       # (child_type, child_id) -> DerivedObservable
+    escalation = {}    # (parent_type, parent_id) -> note
+    for d in case.derived_observables.all():
+        derived[(d.child_type, d.child_id)] = d
+        if d.escalation_note:
+            escalation[(d.parent_type, d.parent_id)] = d.escalation_note
+
     observables = []
     for art, obj, _field, reports in observable_reports(case):
         seen, sources, svs = set(), [], []
@@ -38,10 +60,16 @@ def assemble_observables(case, *, full: bool = False) -> list[dict]:
         if svs:
             v = score_observable(svs)
             verdict = {"band": v.band, "confidence": v.confidence, "rationale": v.rationale}
+
+        key = (art.artifact_type.lower(), obj.pk)
+        d = derived.get(key)
         observables.append({
             "value": getattr(obj, "address", None) or getattr(obj, "value", None),
             "type": art.artifact_type.lower(),
             "verdict": verdict,
             "sources": sources,
+            "derived_from": ({"value": _parent_value(d), "via_analyzer": d.via_analyzer}
+                             if d else None),
+            "escalation_note": escalation.get(key, ""),
         })
     return observables
