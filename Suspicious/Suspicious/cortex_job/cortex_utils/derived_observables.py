@@ -170,7 +170,9 @@ def _report_parent(report):
 def ingest_derived_observables(case) -> int:
     """Turn this case's finished extractor reports into new observables +
     dispatched jobs. Returns the number of observables newly attached this call.
-    0 when disabled, nothing to do, or every extractor report already processed.
+    0 when disabled or when every child is already attached. Idempotency is per
+    (source_report, child_type, child_id) via get_or_create, so a sibling value
+    that failed transiently is retried on the next pass.
     """
     # Default-on: only an explicit `false` disables. get_config's cache returns
     # None (not the passed default) for an unset key, so `not ...` can't be used.
@@ -180,14 +182,9 @@ def ingest_derived_observables(case) -> int:
     derived_children = {
         (d.child_type, d.child_id) for d in case.derived_observables.all()
     }
-    processed_report_ids = set(
-        case.derived_observables.values_list("source_report_id", flat=True)
-    )
     new_count = 0
 
     for report in _finished_extractor_reports(case):
-        if report.id in processed_report_ids:
-            continue
         parent_type, parent = _report_parent(report)
         if parent is None:
             continue

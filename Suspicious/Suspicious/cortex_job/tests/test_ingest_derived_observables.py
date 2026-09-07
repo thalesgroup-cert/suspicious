@@ -73,6 +73,12 @@ class IngestTests(TestCase):
         self.assertEqual(ingest_derived_observables(self.case), 0)
 
     @patch("cortex_job.cortex_utils.derived_observables.CortexJob")
+    @patch("cortex_job.cortex_utils.derived_observables.get_config", return_value=None)
+    def test_unset_config_keeps_feature_on(self, _cfg, MockCortex):
+        MockCortex.return_value.launch_cortex_jobs.return_value = ["r1"]
+        self.assertEqual(ingest_derived_observables(self.case), 1)
+
+    @patch("cortex_job.cortex_utils.derived_observables.CortexJob")
     def test_ssrf_child_is_dropped(self, MockCortex):
         self.report.report_full = {"found": True, "url": "http://169.254.169.254/latest"}
         self.report.save(update_fields=["report_full"])
