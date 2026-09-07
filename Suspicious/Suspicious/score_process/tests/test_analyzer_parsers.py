@@ -409,6 +409,61 @@ class SpamhausDblParserTests(SimpleTestCase):
         self.assertNotEqual(r.level, "info")
 
 
+from score_process.scoring.cortex_analyzers.contrib.threatminer import ThreatMinerParser
+
+class ThreatMinerParserTests(SimpleTestCase):
+    """Regression: upstream summary() defaults level to "suspicious" and only
+    drops to "safe" when rows exist — so an unknown indicator (or a failed call
+    to its flaky API) got a phantom Tier-3 "suspicious" vote that forces the
+    observable to Suspicious. ThreatMiner has no verdict — always "info"."""
+
+    def _run(self, full):
+        p = ThreatMinerParser(analyzer_name="ThreatMiner_1_0", data="evil.example", data_type="domain")
+        return p.parse({"taxonomies": [{"level": "suspicious"}]}, full)
+
+    def test_no_data_is_info_not_suspicious(self):
+        r = self._run({"status_code": "404", "status_message": "No results found.", "results": []})
+        self.assertEqual(r.level, "info")
+
+    def test_rows_present_is_info_not_safe(self):
+        r = self._run({"status_code": "200", "results": [{"domain": "evil.example"}, {"ip": "1.2.3.4"}]})
+        self.assertEqual(r.level, "info")
+        self.assertIn("2 ThreatMiner record(s)", r.category)
+
+    def test_missing_or_scalar_results_do_not_crash(self):
+        self.assertEqual(self._run({}).level, "info")
+        self.assertEqual(self._run({"results": 5}).level, "info")
+
+
+from score_process.scoring.cortex_analyzers.contrib.team_cymru_mhr import TeamCymruMhrParser
+
+class TeamCymruMhrParserTests(SimpleTestCase):
+    """Regression: upstream hardcodes taxonomy level to "info", so a hash
+    confirmed in Team Cymru's Malware Hash Registry scored identically to a
+    clean one ("info" -> "no-data"). This parser reads `status`/`detection_pct`."""
+
+    def _run(self, full):
+        p = TeamCymruMhrParser(analyzer_name="TeamCymruMHR_1_0", data="abc123", data_type="hash")
+        return p.parse({"taxonomies": [{"level": "info"}]}, full)
+
+    def test_found_record_is_malicious_not_info(self):
+        r = self._run({"status": "found_record", "detection_pct": "79", "last_seen": "2026-01-01"})
+        self.assertEqual(r.level, "malicious")
+        self.assertEqual(r.score, 10)
+
+    def test_low_detection_pct_is_suspicious(self):
+        r = self._run({"status": "found_record", "detection_pct": "4", "last_seen": "2026-01-01"})
+        self.assertEqual(r.level, "suspicious")
+
+    def test_no_record_is_info(self):
+        r = self._run({"status": "No record found for abc123"})
+        self.assertEqual(r.level, "info")
+
+    def test_garbage_pct_defaults_to_malicious(self):
+        r = self._run({"status": "found_record", "detection_pct": None})
+        self.assertEqual(r.level, "malicious")
+
+
 class BespokeParserResolutionTests(SimpleTestCase):
     def test_registry_resolves_all_bespoke_parsers(self):
         reg = AnalyzerParserRegistry()
@@ -427,6 +482,8 @@ class BespokeParserResolutionTests(SimpleTestCase):
             "MISP_2_1": "MispParser",
             "CIRCLHashlookup_1_1": "CirclHashlookupParser",
             "SpamhausDBL_1_0": "SpamhausDblParser",
+            "ThreatMiner_1_0": "ThreatMinerParser",
+            "TeamCymruMHR_1_0": "TeamCymruMhrParser",
         }
         for cortex_name, cls_name in cases.items():
             self.assertEqual(reg.resolve(_A(cortex_name)).__name__, cls_name)
