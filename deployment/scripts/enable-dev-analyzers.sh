@@ -19,7 +19,10 @@ KEY=$(python3 -c "import json,sys; print(json.load(open('../Suspicious/settings.
 # analyzerDefinitionId : keyless, returns useful data for the listed dtypes
 ANALYZERS=(
   DShield_lookup_1_0                        # ip   — SANS ISC reputation
-  Cyberprotect_ThreatScore_3_0              # ip/domain/url/hash — threat score
+  # Cyberprotect_ThreatScore_3_0 — removed: public API is IP-filtered, every
+  #   job returns 403 "Blocked by IP filtering" -> no data. Needs a licensed
+  #   account. score_process has a bespoke parser (contrib/cyberprotect.py) so
+  #   a deployment with API access can re-add this line and get it scored.
   CyberCrime-Tracker_1_0                    # ip/domain/url — C2 tracker
   SpamhausDBL_1_0                           # domain — Spamhaus DBL
   StopForumSpam_1_0                         # ip/mail — abuse reputation

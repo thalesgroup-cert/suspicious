@@ -33,8 +33,8 @@ All 15 analyzers are **Tier 3** (none match the tier-1/2 name prefixes in
 |---|---|---|
 | **ThreatMiner_1_0** | default `suspicious`; → `safe` iff `len(results) != 0` | **BUG — worst.** Inverted. Unknown/never-seen indicator, or a failed call to its flaky API, → phantom Tier-3 `suspicious` → observable forced to **Suspicious**. A row hit → unearned `safe` vote. Systematic false-positive generator. |
 | **TeamCymruMHR_1_0** | hardcoded `level = 'info'`, taxonomies emitted only when `status == "found_record"` | **BUG — signal lost.** Team Cymru's Malware Hash Registry only returns a record for AV-flagged samples. A confirmed-malware hash → `info` → `no-data`. AV `detection_pct` buried in the value. Same class as SpamhausDBL. |
-| **DomainMailSPFDMARC_1_2** | dynamic: no SPF + no DMARC → `malicious`×2; one missing → `suspicious` | **Populated but over-aggressive.** Levels *are* set, so `DefaultTaxonomyParser` works — but "no DMARC record" = `malicious` is harsh (many legit small domains). Two Tier-3 `malicious` votes → blocks Safe, → Suspicious. Decision, not touched. |
-| **Cyberprotect_ThreatScore_3_0** | passes through `raw['threatscore']['level']` from the vendor API | **Probably fine.** Depends on the vendor returning cortex-style level strings. If it ever returns `"high"`/numeric, `DefaultTaxonomyParser` → `info`. Can't confirm without live data. Low priority. |
+| **DomainMailSPFDMARC_1_2** | dynamic: no SPF + no DMARC → `malicious`×2; one missing → `suspicious` | **FIXED.** Confirmed live: `neverssl.com` and `github.io` (legit non-mail domains) get `malicious`/`suspicious` taxonomies → forced to Suspicious as bare domain IOCs. Weak mail auth is not a maliciousness signal. `DomainMailSpfDmarcParser` → always `info`, posture in `details`. |
+| **Cyberprotect_ThreatScore_3_0** | passes through `raw['threatscore']['level']` from the vendor API | **FIXED + removed from the keyless set.** Verified live: the public API is IP-filtered (`403 "Blocked by IP filtering"`) → every job returns no data. When it *does* work its bands are `safe/low/medium/high/critical`; `DefaultTaxonomyParser` silently drops `high`/`critical` to no-data. Removed from `enable-dev-analyzers.sh`; `CyberprotectThreatScoreParser` maps the bands so a licensed deployment can re-enable it. |
 | DShield_lookup_1_0 | `safe`/`suspicious`/`malicious` from `maxrisk` + threatfeed count | OK |
 | CyberCrime-Tracker_1_0 | `malicious` iff `hit_count > 0` | OK |
 | StopForumSpam_1_0 | `safe`/`suspicious`/`malicious` from confidence vs configured thresholds | OK |
@@ -77,7 +77,5 @@ New bespoke parsers, same shape as `spamhaus_dbl.py`:
      (image decode) need the analyzer to run *and* an "analyzer output → new
      observable → re-dispatch → re-score" loop. Also: the single-URL
      `SubmitUrlView` (form-based, one case) is not covered by Phase A.
-2. **DomainMailSPFDMARC** severity calibration (see table). Either accept the
-   upstream's aggressive mapping or add a parser that caps it at `suspicious`.
-3. **Cyberprotect** — verify against `GET /api/analyzer` + a live report that
-   `threatscore.level` is a cortex level string.
+2. ~~DomainMailSPFDMARC severity calibration~~ — DONE (see table).
+3. ~~Cyberprotect verification~~ — DONE (see table).
