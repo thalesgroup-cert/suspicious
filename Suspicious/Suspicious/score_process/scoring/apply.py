@@ -19,6 +19,7 @@ _BAND_TO_IOC_LEVEL = {
 # Stronger markers set by other paths (deny list / allow list) — never
 # downgraded by an IOC-road re-score.
 _STICKY_IOC_LEVELS = {"critical", "SAFE-ALLOW_LISTED"}
+_BAND_RANK = {"Safe": 0, "Inconclusive": 0, "Suspicious": 1, "Dangerous": 2}
 
 
 def apply_verdict(case, verdict) -> None:
@@ -73,6 +74,7 @@ def finalise_ioc_group(case) -> None:
     deny = get_deny_listed_domains_set()
     per_obs = collect_observable_sources(case)
     obs_verdicts = []
+    idx_by_key = {}
     for (_art_type, _pk, obj), sources in per_obs.items():
         v = score_observable(sources)
         matched = _deny_listed_value(_art_type, obj, deny)
@@ -81,12 +83,34 @@ def finalise_ioc_group(case) -> None:
                 "Dangerous", 100, None, v.counts,
                 list(v.rationale) + [f"Indicator is on the deny list ({matched})."],
             )
+        idx_by_key[(_art_type.lower(), obj.pk)] = len(obs_verdicts)
         obs_verdicts.append(v)
         if obj.ioc_level not in _STICKY_IOC_LEVELS:
             obj.ioc_level = _BAND_TO_IOC_LEVEL.get(v.band, "info")
         obj.ioc_score = _DERIVED_SCORE.get(v.band, 5)
         obj.ioc_confidence = v.confidence
         obj.save(update_fields=["ioc_level", "ioc_score", "ioc_confidence"])
+
+    # Derived-observable escalation: a child (extracted) observable that scored
+    # worse than its parent raises the parent's verdict. _parent_band re-reads
+    # ioc_level, which the loop above has just persisted.
+    from cortex_job.cortex_utils.derived_observables import score_derived_observables
+
+    obj_by_key = {(_art.lower(), o.pk): o for (_art, _p, o) in per_obs}
+    for (ptype, pid), (eband, note) in score_derived_observables(case).items():
+        i = idx_by_key.get((ptype, pid))
+        if i is None:
+            continue
+        v = obs_verdicts[i]
+        if _BAND_RANK.get(eband, 0) <= _BAND_RANK.get(v.band, 0):
+            continue
+        obs_verdicts[i] = ObservableVerdict(
+            eband, v.confidence, None, v.counts, list(v.rationale) + [note])
+        obj = obj_by_key[(ptype, pid)]
+        if obj.ioc_level not in _STICKY_IOC_LEVELS:
+            obj.ioc_level = _BAND_TO_IOC_LEVEL.get(eband, "info")
+        obj.ioc_score = _DERIVED_SCORE.get(eband, 5)
+        obj.save(update_fields=["ioc_level", "ioc_score"])
 
     g = score_group(obs_verdicts) if obs_verdicts else None
     band = g.band if g else "Inconclusive"

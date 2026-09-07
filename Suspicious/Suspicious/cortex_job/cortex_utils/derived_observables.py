@@ -167,6 +167,63 @@ def _report_parent(report):
     return None, None
 
 
+_BAND_RANK = {"Safe": 0, "Inconclusive": 0, "Suspicious": 1, "Dangerous": 2}
+_IOC_LEVEL_TO_BAND = {"safe": "Safe", "info": "Inconclusive", "suspicious": "Suspicious",
+                      "malicious": "Dangerous", "critical": "Dangerous"}
+
+
+def _child_band(child_type, child_id) -> str:
+    """Score a child observable through the IOC engine (newest report per analyzer)."""
+    from cortex_job.models import AnalyzerReport
+    from score_process.scoring.observable_engine import score_observable
+    from score_process.scoring.sources import source_verdict_from_report
+
+    reports = (AnalyzerReport.objects
+               .filter(status="Success", **{f"{child_type}_id": child_id})
+               .select_related("analyzer").order_by("-creation_date"))
+    seen, svs = set(), []
+    for r in reports:
+        if r.analyzer_id in seen:
+            continue
+        seen.add(r.analyzer_id)
+        svs.append(source_verdict_from_report(r))
+    return score_observable(svs).band if svs else "Inconclusive"
+
+
+def _parent_band(d) -> str:
+    """Parent's current band, read from its observable model's ioc_level
+    (IOC road) or artifact_level (mail road)."""
+    spec = _MODEL_BY_TYPE.get(d.parent_type)
+    if spec is None:
+        return "Inconclusive"
+    from importlib import import_module
+
+    module, cls_name, _ = spec
+    model = getattr(import_module(module), cls_name)
+    obj = model.objects.filter(pk=d.parent_id).first()
+    lvl = getattr(obj, "ioc_level", "info") if obj else "info"
+    return _IOC_LEVEL_TO_BAND.get(str(lvl).lower(), "Inconclusive")
+
+
+def score_derived_observables(case) -> dict:
+    """Score every derived child, persist child_band + escalation_note on the row.
+    Return {(parent_type, parent_id): (band, note)} for children that scored
+    Suspicious/Dangerous strictly above their parent's current band."""
+    out: dict = {}
+    for d in case.derived_observables.all():
+        band = _child_band(d.child_type, d.child_id)
+        d.child_band = band
+        note = ""
+        rank = _BAND_RANK.get(band, 0)
+        if rank >= 1 and rank > _BAND_RANK.get(_parent_band(d), 0):
+            note = (f"Escalated to {band}: {d.via_analyzer} extracted "
+                    f"{d.child_value} → {band}.")
+            out[(d.parent_type, d.parent_id)] = (band, note)
+        d.escalation_note = note
+        d.save(update_fields=["child_band", "escalation_note"])
+    return out
+
+
 def ingest_derived_observables(case) -> int:
     """Turn this case's finished extractor reports into new observables +
     dispatched jobs. Returns the number of observables newly attached this call.
