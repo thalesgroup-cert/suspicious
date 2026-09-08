@@ -5,7 +5,11 @@ from django.test import SimpleTestCase, TestCase
 from cortex_job.models import Analyzer, AnalyzerReport
 from file_process.models import File
 from hash_process.models import Hash
-from score_process.scoring.processing import compute_weighted_scores, process_file_ioc
+from score_process.scoring.processing import (
+    compute_weighted_scores,
+    process_file_ioc,
+    process_mail,
+)
 
 
 class _Analyzer:
@@ -82,3 +86,33 @@ class FileHashCombinedConfidenceScaleTest(TestCase):
         self.assertGreaterEqual(f.file_confidence, 0)
         self.assertLessEqual(f.file_confidence, 100)
         self.assertLessEqual(abs(f.file_confidence - expected), 1)
+
+
+class ProcessMailScoreArtifactsFlagTest(TestCase):
+    """score_artifacts=False skips the mail_artifacts loop entirely — the only
+    call site of process_mail_artifact."""
+
+    def test_score_artifacts_false_skips_embedded_artifact_loop(self):
+        from datetime import datetime, timezone as tz
+        from mail_feeder.models import Mail, MailArtifact, ArtifactIsUrl
+        from url_process.models import URL
+
+        mail = Mail.objects.create(subject="s", reportedBy="r@x.test",
+            date=datetime(2026, 1, 1, tzinfo=tz.utc), to="a@x.test", mail_id="pm1")
+        url = URL.objects.create(address="https://evil.test/x")
+        ma = MailArtifact.objects.create(mail=mail, artifact_type="URL")
+        join = ArtifactIsUrl.objects.create(url=url, artifact=ma)
+        ma.artifactIsUrl = join
+        ma.save(update_fields=["artifactIsUrl"])
+        a = Analyzer.objects.create(name="GTI", analyzer_cortex_id="GTI", weight=0.2)
+        AnalyzerReport.objects.create(cortex_job_id="pmju", type="url", status="Success",
+            analyzer=a, url=url, level="malicious", confidence=95, score=9,
+            report_summary={}, report_taxonomy={}, report_full={})
+
+        scores, confs = [], []
+        with patch("score_process.scoring.processing.process_mail_artifact") as spy:
+            failures = process_mail(mail, [], scores, confs, 0, 1, score_artifacts=False)
+
+        spy.assert_not_called()
+        self.assertEqual(scores, [])
+        self.assertEqual(failures, 0)

@@ -190,8 +190,13 @@ class MailEmbeddedSignalOptOutTests(TestCase):
     def test_embedded_url_score_not_in_signals(self, _cfg):
         case = self._mail_case_with_embedded_bad_url()
         signals, *_ = collect_signals(case)
-        self.assertTrue(all(s.source in {"mail", "file"} for s in signals if not s.is_failure))
-        self.assertLessEqual(sum(1 for s in signals if not s.is_failure), 2)
+        self.assertFalse(any(s.score >= 8 for s in signals if not s.is_failure))
+
+    @patch("score_process.scoring.collect.get_config", return_value=None)
+    def test_flag_unset_defaults_on(self, _cfg):
+        case = self._mail_case_with_embedded_bad_url()
+        signals, *_ = collect_signals(case)
+        self.assertFalse(any(s.score >= 8 for s in signals if not s.is_failure))
 
     @patch("score_process.scoring.collect.get_config", return_value=False)
     def test_flag_off_keeps_embedded_url_in_signals(self, _cfg):

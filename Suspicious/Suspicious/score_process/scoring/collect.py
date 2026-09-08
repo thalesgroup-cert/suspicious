@@ -51,7 +51,10 @@ def collect_signals(case):
         mail = getattr(case.fileOrMail, "mail", None)
         if mail:
             off = len(scores)
-            score_artifacts = not get_config("scoring.mail_embedded_categorical", True)
+            # Default ON: only an explicitly stored False keeps embedded IOCs
+            # voting here. get_config returns None (not the default arg) for an
+            # unset key once the cache is warm, so compare against False directly.
+            score_artifacts = get_config("scoring.mail_embedded_categorical") is False
             failures += process_mail(mail, reports, scores, confidences, 0, case.id,
                                      score_artifacts=score_artifacts)
             signals += _signals_from(scores, confidences, off, "mail")
