@@ -73,19 +73,29 @@ describe("ProfilePage - Test Suite", () => {
   });
 
   describe("CISO scope", () => {
-    it("opens the scope dialog from the profile chip", async () => {
+    beforeEach(() => {
       vi.mocked(getMe).mockResolvedValue({
         ...fixtureMe,
         groups: ["CISO"],
         ciso_scope: "EMEA",
       });
+    });
+
+    it("shows a Management scope tab for a CISO", async () => {
+      renderWithProviders(<ProfilePage />, { initialPath: "/profile" });
+      expect(
+        await screen.findByText(/management scope/i, {}, { timeout: 5000 })
+      ).toBeInTheDocument();
+    });
+
+    it("opens the scope tab from the profile chip", async () => {
       renderWithProviders(<ProfilePage />, { initialPath: "/profile" });
 
       const chip = await screen.findByText(/scope: emea/i, {}, { timeout: 5000 });
       await userEvent.click(chip);
 
       expect(
-        await screen.findByText(/select your management scope/i)
+        await screen.findByRole("button", { name: /save scope/i })
       ).toBeInTheDocument();
     });
   });
