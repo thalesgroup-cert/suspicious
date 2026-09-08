@@ -42,3 +42,15 @@ class MailBandEscalationTests(SimpleTestCase):
         self.assertEqual(v.rationale, ())
         self.assertEqual(v.n_failed, 0)
         self.assertEqual(v.inconclusive_reason, "")
+
+    def test_raised_band_lifts_confidence_from_the_embedded_verdict(self):
+        v = cv(Result.INCONCLUSIVE, score=2)
+        out = mail_band_escalation(
+            v, [ObservableVerdict("Dangerous", 92, None, {}, ["GTI reports malicious."])])
+        self.assertEqual(out.result, Result.DANGEROUS)
+        self.assertGreaterEqual(out.final_confidence, 92)
+
+    def test_confidence_not_lowered_when_band_not_raised(self):
+        v = cv(Result.DANGEROUS, score=9)
+        out = mail_band_escalation(v, [ObservableVerdict("Suspicious", 40, None, {}, [])])
+        self.assertEqual(out.final_confidence, v.final_confidence)

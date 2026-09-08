@@ -64,9 +64,15 @@ def mail_band_escalation(verdict, embedded, note: str = ""):
     if not raising and not note:
         return verdict
     line = note or f"Band raised to {worst} by an embedded indicator."
+    new_conf = verdict.final_confidence
+    if raising:
+        worst_conf = max((getattr(o, "confidence", 0) for o in embedded
+                          if _OBS_TO_RESULT.get(o.band) == worst), default=0)
+        new_conf = max(verdict.final_confidence, min(round(worst_conf), 100))
     return replace(
         verdict,
         result=worst if raising else verdict.result,
+        final_confidence=new_conf,
         rationale=tuple(verdict.rationale) + (line,),
     )
 
