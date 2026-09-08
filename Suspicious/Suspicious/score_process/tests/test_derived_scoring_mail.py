@@ -1,11 +1,16 @@
-"""Mail-road parent escalation for derived observables (Task 8).
+"""Mail-road embedded-observable escalation, end to end through get_report.
 
-On the mail road a derived child is itself a MailArtifact, so its analyzer
-reports already move the case verdict on their own. The wiring's added value is:
-  1. bump the parent MailArtifact.artifact_level to the child's band
-  2. an explicit rationale line naming the extraction
+On the mail road a derived child is itself a MailArtifact. With the categorical
+merge (Task 5, `scoring.mail_embedded_categorical` default-ON) every embedded
+observable is scored on its own analyzer reports via `score_observable`:
+  1. its own MailArtifact.artifact_level is set to its band
+  2. the case band is raised to the worst embedded band with the analyzers'
+     rationale (e.g. "VirusTotal_GetReport_3_1 (authoritative) reports malicious")
+
+Flag OFF → `_apply_derived_escalation` (Phase B): the parent MailArtifact is
+bumped to the child's band instead — covered by the last test.
 """
-from unittest import expectedFailure
+from unittest.mock import patch
 
 from django.contrib.auth import get_user_model
 from django.test import TestCase
@@ -69,34 +74,54 @@ class MailDerivedEscalationTests(TestCase):
             report_taxonomy={}, report_full={},
         )
 
-    # unblocked by Task 5 (mail_embedded_categorical): with embedded MailArtifact
-    # reports no longer feeding score_case (Task 4) and the categorical merge not
-    # yet wired, the case-level escalation rationale is absent. Task 5 restores it
-    # and removes this marker. The parent-artifact-level bump still works.
-    @expectedFailure
-    def test_malicious_derived_child_escalates_parent_artifact_and_rationale(self):
+    def _child_ma(self):
+        return MailArtifact.objects.get(artifactIsUrl__url=self.child)
+
+    def test_malicious_child_bumps_its_own_mail_artifact_level(self):
+        self._child_report("malicious", 9)
+
+        CortexAnalyzerReports.get_report(self.case)
+
+        self.assertEqual(self._child_ma().artifact_level, "malicious")
+
+    def test_malicious_child_escalates_case_with_analyzer_named_rationale(self):
         self._child_report("malicious", 9)
 
         CortexAnalyzerReports.get_report(self.case)
 
         self.case.refresh_from_db()
-        self.parent_ma.refresh_from_db()
-        self.assertEqual(self.parent_ma.artifact_level, "malicious")
-        self.assertTrue(any("Escalated to Dangerous" in r for r in self.case.verdict_rationale))
-        self.assertTrue(any("UnshortenLink_1_2" in r for r in self.case.verdict_rationale))
+        self.assertEqual(self.case.results, Result.DANGEROUS)
+        self.assertTrue(self.case.verdict_rationale)
+        self.assertTrue(any("VirusTotal_GetReport_3_1" in r
+                            for r in self.case.verdict_rationale))
 
-    # unblocked by Task 5 (mail_embedded_categorical) — see the malicious case above.
-    @expectedFailure
-    def test_suspicious_derived_child_escalates_parent_artifact_and_rationale(self):
+    def test_suspicious_child_bumps_its_own_mail_artifact_level(self):
+        self._child_report("suspicious", 6)
+
+        CortexAnalyzerReports.get_report(self.case)
+
+        self.assertEqual(self._child_ma().artifact_level, "suspicious")
+
+    def test_suspicious_child_escalates_case_with_analyzer_named_rationale(self):
         self._child_report("suspicious", 6)
 
         CortexAnalyzerReports.get_report(self.case)
 
         self.case.refresh_from_db()
+        self.assertEqual(self.case.results, Result.SUSPICIOUS)
+        self.assertTrue(any("VirusTotal_GetReport_3_1" in r
+                            for r in self.case.verdict_rationale))
+
+    @patch("settings.config.get_config", return_value=False)
+    def test_flag_off_falls_back_to_parent_artifact_bump(self, _cfg):
+        """Flag OFF → _apply_derived_escalation: the *parent* MailArtifact is
+        bumped to the derived child's band (Phase B behaviour)."""
+        self._child_report("malicious", 9)
+
+        CortexAnalyzerReports.get_report(self.case)
+
         self.parent_ma.refresh_from_db()
-        self.assertEqual(self.parent_ma.artifact_level, "suspicious")
-        self.assertTrue(any("Escalated to Suspicious" in r for r in self.case.verdict_rationale))
-        self.assertTrue(any("UnshortenLink_1_2" in r for r in self.case.verdict_rationale))
+        self.assertEqual(self.parent_ma.artifact_level, "malicious")
 
     def test_allow_listed_parent_artifact_keeps_its_level(self):
         self._child_report("malicious", 9)

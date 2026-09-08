@@ -60,12 +60,13 @@ class CortexAnalyzerReports:
             signals, ai, deny_listed, ai_missing, deny_reason = collect_signals(case)
             verdict = score_case(signals, ai, deny_listed, ai_missing, deny_reason)
 
-            # Derived-observable escalation (mail road): a child observable
-            # extracted from a parent MailArtifact that scored worse than its
-            # parent raises the case band and bumps the parent artifact's
-            # level — nothing else on the mail road writes per-artifact levels.
+            # Embedded-observable escalation (mail road): every embedded
+            # observable of the mail is scored on its own analyzer reports via
+            # the trust-weighted categorical engine; the mail band is raised to
+            # the worst embedded band and the analyzers' rationale folded in.
+            # (Flag OFF → _apply_derived_escalation, the Phase B behaviour.)
             if mail:
-                verdict = CortexAnalyzerReports._apply_derived_escalation(case, mail, verdict)
+                verdict = CortexAnalyzerReports._apply_embedded_escalation(case, mail, verdict)
 
             apply_verdict(case, verdict)
 
@@ -81,9 +82,82 @@ class CortexAnalyzerReports:
             )
 
     @staticmethod
+    def _apply_embedded_escalation(case, mail, verdict):
+        """Score every embedded observable of `mail` on its own analyzer reports
+        via the trust-weighted categorical engine; raise the mail band to the
+        worst embedded band and fold the analyzers' rationale in. Writes
+        per-observable ioc_* (global) and per-MailArtifact artifact_*
+        (case-scoped) levels.
+
+        Flag `scoring.mail_embedded_categorical` default-ON — only an explicit
+        stored `False` routes back to the Phase B `_apply_derived_escalation`
+        (get_config returns None, not the default, for an unset warm-cache key).
+        """
+        from dataclasses import replace
+        from settings.config import get_config
+        if get_config("scoring.mail_embedded_categorical") is False:
+            return CortexAnalyzerReports._apply_derived_escalation(case, mail, verdict)
+
+        from case_handler.models import Result
+        from score_process.scoring.observable_collect import mail_observable_reports
+        from score_process.scoring.observable_engine import score_observable
+        from score_process.scoring.sources import source_verdict_from_report
+        from score_process.scoring.engine import mail_band_escalation
+        from score_process.scoring.bands import (
+            _BAND_TO_IOC_LEVEL, _DERIVED_SCORE, _STICKY_IOC_LEVELS,
+        )
+        from cortex_job.cortex_utils.derived_observables import score_derived_observables
+
+        # keep DerivedObservable.child_band / escalation_note fresh for the chip
+        # UI — its return value is no longer used for the band merge.
+        score_derived_observables(case)
+
+        embedded, rationale_lines = [], []
+        for m_art, obj, _field, reports in mail_observable_reports(mail):
+            seen, svs = set(), []
+            for r in reports:
+                if r.analyzer_id in seen:
+                    continue
+                seen.add(r.analyzer_id)
+                svs.append(source_verdict_from_report(r))
+            if not svs:
+                continue
+            v = score_observable(svs)
+            embedded.append(v)
+            rationale_lines.extend(v.rationale)
+
+            ioc_level = _BAND_TO_IOC_LEVEL.get(v.band, "info")
+            score = _DERIVED_SCORE.get(v.band, 5)
+            if getattr(obj, "ioc_level", "info") not in _STICKY_IOC_LEVELS:
+                obj.ioc_level = ioc_level
+            obj.ioc_score = score
+            obj.ioc_confidence = v.confidence
+            obj.save(update_fields=["ioc_level", "ioc_score", "ioc_confidence"])
+
+            if m_art.artifact_level not in _STICKY_IOC_LEVELS:
+                m_art.artifact_level = ioc_level
+                m_art.artifact_score = score
+                m_art.artifact_confidence = v.confidence
+                m_art.save(update_fields=[
+                    "artifact_level", "artifact_score", "artifact_confidence"])
+
+        if not embedded:
+            return verdict
+
+        note = "; ".join(rationale_lines[:5]) or None
+        # A body-less mail with only embedded evidence scores Result.FAILURE
+        # (score_case has no scorable signal); it is not a scoring failure when
+        # an embedded observable carries a verdict — rebase so the merge applies.
+        base = replace(verdict, result=Result.INCONCLUSIVE) \
+            if verdict.result == Result.FAILURE else verdict
+        return mail_band_escalation(base, embedded, note=note)
+
+    @staticmethod
     def _apply_derived_escalation(case, mail, verdict):
         """Escalate the mail case band and bump parent MailArtifact levels for
-        any derived child that scored strictly above its parent."""
+        any derived child that scored strictly above its parent.
+
+        Flag-OFF fallback for `_apply_embedded_escalation` (Phase B behaviour)."""
         from cortex_job.cortex_utils.derived_observables import (
             score_derived_observables, _MAIL_JOIN,
         )
