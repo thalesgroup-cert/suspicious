@@ -104,7 +104,8 @@ class CortexAnalyzerReports:
         from score_process.scoring.sources import source_verdict_from_report
         from score_process.scoring.engine import mail_band_escalation
         from score_process.scoring.bands import (
-            _BAND_TO_IOC_LEVEL, _DERIVED_SCORE, _STICKY_IOC_LEVELS,
+            _BAND_ORDER, _BAND_RANK, _BAND_TO_IOC_LEVEL, _DERIVED_SCORE,
+            _STICKY_IOC_LEVELS,
         )
         from cortex_job.cortex_utils.derived_observables import score_derived_observables
 
@@ -128,11 +129,15 @@ class CortexAnalyzerReports:
 
             ioc_level = _BAND_TO_IOC_LEVEL.get(v.band, "info")
             score = _DERIVED_SCORE.get(v.band, 5)
+            # A sticky marker (deny/allow-list) skips the WHOLE re-score, not
+            # just the level string — deliberate departure from spec §5's
+            # literal "write score/confidence unconditionally" (matches the
+            # Phase B IOC-road final-review guidance).
             if getattr(obj, "ioc_level", "info") not in _STICKY_IOC_LEVELS:
                 obj.ioc_level = ioc_level
-            obj.ioc_score = score
-            obj.ioc_confidence = v.confidence
-            obj.save(update_fields=["ioc_level", "ioc_score", "ioc_confidence"])
+                obj.ioc_score = score
+                obj.ioc_confidence = v.confidence
+                obj.save(update_fields=["ioc_level", "ioc_score", "ioc_confidence"])
 
             if m_art.artifact_level not in _STICKY_IOC_LEVELS:
                 m_art.artifact_level = ioc_level
@@ -145,11 +150,14 @@ class CortexAnalyzerReports:
             return verdict
 
         note = "; ".join(rationale_lines[:5]) or None
-        # A body-less mail with only embedded evidence scores Result.FAILURE
-        # (score_case has no scorable signal); it is not a scoring failure when
-        # an embedded observable carries a verdict — rebase so the merge applies.
+        worst = max(embedded, key=lambda v: _BAND_ORDER.get(v.band, 0))
+        # A body-less mail scores Result.FAILURE (score_case has no scorable
+        # signal). Only rebase to Inconclusive when the embedded evidence
+        # actually raises the band (Suspicious/Dangerous) — an all-Safe/no-data
+        # body-less mail stays FAILURE.
         base = replace(verdict, result=Result.INCONCLUSIVE) \
-            if verdict.result == Result.FAILURE else verdict
+            if verdict.result == Result.FAILURE and _BAND_RANK.get(worst.band, 0) > 0 \
+            else verdict
         return mail_band_escalation(base, embedded, note=note)
 
     @staticmethod

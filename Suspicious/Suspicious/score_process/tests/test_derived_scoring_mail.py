@@ -16,6 +16,12 @@ from django.contrib.auth import get_user_model
 from django.test import TestCase
 from django.utils import timezone
 
+from settings.config import get_config as _real_get_config
+
+
+def _flag_off(key, *a, **kw):
+    return False if key == "scoring.mail_embedded_categorical" else _real_get_config(key, *a, **kw)
+
 from case_handler.models import Case, CaseHasFileOrMail, Result
 from cortex_job.models import Analyzer, AnalyzerReport, DerivedObservable
 from mail_feeder.models import Mail, MailArtifact, ArtifactIsUrl
@@ -112,8 +118,9 @@ class MailDerivedEscalationTests(TestCase):
         self.assertTrue(any("VirusTotal_GetReport_3_1" in r
                             for r in self.case.verdict_rationale))
 
-    @patch("settings.config.get_config", return_value=False)
-    def test_flag_off_falls_back_to_parent_artifact_bump(self, _cfg):
+    @patch("score_process.scoring.collect.get_config", side_effect=_flag_off)
+    @patch("settings.config.get_config", side_effect=_flag_off)
+    def test_flag_off_falls_back_to_parent_artifact_bump(self, _cfg, _cfg2):
         """Flag OFF → _apply_derived_escalation: the *parent* MailArtifact is
         bumped to the derived child's band (Phase B behaviour)."""
         self._child_report("malicious", 9)

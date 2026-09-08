@@ -12,6 +12,13 @@ from unittest.mock import patch
 from django.contrib.auth import get_user_model
 from django.test import TestCase
 
+from settings.config import get_config as _real_get_config
+
+
+def _flag_off(key, *a, **kw):
+    """get_config side_effect: only the categorical flag is forced False."""
+    return False if key == "scoring.mail_embedded_categorical" else _real_get_config(key, *a, **kw)
+
 from case_handler.models import Case, CaseHasFileOrMail, Result
 from cortex_job.models import Analyzer, AnalyzerReport
 from mail_feeder.models import Mail, MailArtifact, ArtifactIsUrl
@@ -95,6 +102,18 @@ class MailEmbeddedEscalationTests(TestCase):
         ma = MailArtifact.objects.get(artifactIsUrl__url=self.url)
         self.assertEqual(ma.artifact_level, "SAFE-ALLOW_LISTED")
 
+    def test_sticky_ioc_level_keeps_score_and_confidence(self):
+        """A sticky global row skips the WHOLE re-score, not just the level."""
+        URL.objects.filter(pk=self.url.pk).update(
+            ioc_level="critical", ioc_score=3.0, ioc_confidence=11.0)
+        self._rep(self.gti, "malicious", 95, 9)
+        CortexAnalyzerReports._apply_embedded_escalation(
+            self.case, self.mail, self._verdict(Result.INCONCLUSIVE))
+        self.url.refresh_from_db()
+        self.assertEqual(self.url.ioc_level, "critical")
+        self.assertEqual(self.url.ioc_score, 3.0)
+        self.assertEqual(self.url.ioc_confidence, 11.0)
+
     def test_failure_base_verdict_still_escalates_on_embedded_evidence(self):
         """A body-less mail scores Result.FAILURE (no scorable signal); an
         embedded Tier-1 malicious verdict must still raise the band."""
@@ -104,7 +123,15 @@ class MailEmbeddedEscalationTests(TestCase):
         self.assertEqual(v.result, Result.DANGEROUS)
         self.assertTrue(v.rationale)
 
-    @patch("settings.config.get_config", return_value=False)
+    def test_failure_base_verdict_unchanged_when_embedded_is_clean(self):
+        """Body-less mail + one clean Tier-1 embedded URL → no band raise, so
+        the FAILURE verdict is not rebased."""
+        self._rep(self.gti, "safe", 95, 0)
+        v = CortexAnalyzerReports._apply_embedded_escalation(
+            self.case, self.mail, self._verdict(Result.FAILURE))
+        self.assertEqual(v.result, Result.FAILURE)
+
+    @patch("settings.config.get_config", side_effect=_flag_off)
     def test_flag_off_falls_back_to_derived_escalation(self, _cfg):
         with patch.object(CortexAnalyzerReports, "_apply_derived_escalation",
                           return_value="FALLBACK") as fb:
