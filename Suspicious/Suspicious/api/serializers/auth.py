@@ -70,8 +70,10 @@ class AuthenticatedUserSerializer(serializers.ModelSerializer):
         return list(obj.groups.values_list("name", flat=True))
 
     def get_ciso_scope(self, obj) -> str:
+        from profiles.profiles_utils.scope import clean_scope
+
         try:
-            return obj.cisoprofile.scope or ""
+            return clean_scope(obj.cisoprofile.scope) or ""
         except CISOProfile.DoesNotExist:
             return ""
 

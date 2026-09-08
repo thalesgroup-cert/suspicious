@@ -28,6 +28,11 @@ vi.mock("@/features/comments/api", () => ({
   addCaseComment: vi.fn(),
 }));
 
+vi.mock("@/features/home/api", () => ({
+  getHomeSummary: vi.fn().mockResolvedValue({ suggested_scopes: {} }),
+  setCisoScope: vi.fn().mockResolvedValue({ scope: "EMEA" }),
+}));
+
 // ---------------------------------------------------------------------------
 // Test data
 // ---------------------------------------------------------------------------
@@ -386,6 +391,27 @@ describe("InvestigationPage", () => {
     await waitFor(() => {
       expect(mockGetAll).not.toHaveBeenCalled();
     });
+  });
+
+  it("prompts a scopeless CISO to set a scope instead of listing cases", async () => {
+    mockGetMe.mockResolvedValue({ ...mockMe, groups: ["CISO"], ciso_scope: "" } as never);
+
+    renderInvestigation();
+
+    await waitFor(() => {
+      expect(
+        screen.getByRole("heading", { name: /select your management scope/i })
+      ).toBeInTheDocument();
+    });
+    expect(mockGetAll).not.toHaveBeenCalled();
+  });
+
+  it("lists cases for a CISO who already has a scope", async () => {
+    mockGetMe.mockResolvedValue({ ...mockMe, groups: ["CISO"], ciso_scope: "EMEA" } as never);
+
+    renderInvestigation();
+
+    await waitFor(() => expect(mockGetAll).toHaveBeenCalled());
   });
 
   it("shows the comment thread and posts an analyst note", async () => {
