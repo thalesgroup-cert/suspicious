@@ -42,8 +42,9 @@ class DerivedScoringTests(TestCase):
         _report(self.vt, self.child, "malicious")
         out = score_derived_observables(self.case)
         self.assertIn(("url", self.parent.pk), out)
-        band, note = out[("url", self.parent.pk)]
+        band, note, conf = out[("url", self.parent.pk)]
         self.assertEqual(band, "Dangerous")
+        self.assertGreater(conf, 0)
         self.assertIn("UnshortenLink_1_2", note)
         self.assertEqual(DerivedObservable.objects.get().child_band, "Dangerous")
 
@@ -77,3 +78,15 @@ class DerivedScoringTests(TestCase):
         self.assertEqual(self.parent.ioc_level, "malicious")
         self.assertEqual(self.case.results, Result.DANGEROUS)
         self.assertTrue(any("Escalated" in r for r in self.case.verdict_rationale))
+
+    def test_escalated_parent_confidence_comes_from_child_not_stale_parent(self):
+        """Parent has no analyzer reports of its own (confidence 0); a Dangerous
+        child must lift the parent's ioc_confidence, not leave it at 0."""
+        _report(self.vt, self.child, "malicious")
+        finalise_ioc_group(self.case)
+        self.case.refresh_from_db()
+        self.parent.refresh_from_db()
+        self.child.refresh_from_db()
+        self.assertGreater(self.parent.ioc_confidence, 0)
+        self.assertEqual(self.parent.ioc_confidence, self.child.ioc_confidence)
+        self.assertGreater(self.case.confidence, 0)

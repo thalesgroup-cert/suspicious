@@ -2,6 +2,7 @@
 The only place Case scoring fields are written by the scoring path."""
 import logging
 
+from cortex_job.cortex_utils.derived_observables import _BAND_RANK
 from score_process.scoring.update_handler import (
     save_case_results, update_kpi_and_user_stats,
 )
@@ -19,7 +20,6 @@ _BAND_TO_IOC_LEVEL = {
 # Stronger markers set by other paths (deny list / allow list) — never
 # downgraded by an IOC-road re-score.
 _STICKY_IOC_LEVELS = {"critical", "SAFE-ALLOW_LISTED"}
-_BAND_RANK = {"Safe": 0, "Inconclusive": 0, "Suspicious": 1, "Dangerous": 2}
 
 
 def apply_verdict(case, verdict) -> None:
@@ -97,7 +97,7 @@ def finalise_ioc_group(case) -> None:
     from cortex_job.cortex_utils.derived_observables import score_derived_observables
 
     obj_by_key = {(_art.lower(), o.pk): o for (_art, _p, o) in per_obs}
-    for (ptype, pid), (eband, note) in score_derived_observables(case).items():
+    for (ptype, pid), (eband, note, child_confidence) in score_derived_observables(case).items():
         i = idx_by_key.get((ptype, pid))
         if i is None:
             continue
@@ -107,11 +107,15 @@ def finalise_ioc_group(case) -> None:
         v = obs_verdicts[i]
         if _BAND_RANK.get(eband, 0) <= _BAND_RANK.get(v.band, 0):
             continue
+        # The parent's own confidence is pre-escalation (often thin/zero); the
+        # child drove the new band, so its confidence carries the verdict.
+        confidence = max(v.confidence, child_confidence)
         obs_verdicts[i] = ObservableVerdict(
-            eband, v.confidence, None, v.counts, list(v.rationale) + [note])
+            eband, confidence, None, v.counts, list(v.rationale) + [note])
         obj.ioc_level = _BAND_TO_IOC_LEVEL.get(eband, "info")
         obj.ioc_score = _DERIVED_SCORE.get(eband, 5)
-        obj.save(update_fields=["ioc_level", "ioc_score"])
+        obj.ioc_confidence = confidence
+        obj.save(update_fields=["ioc_level", "ioc_score", "ioc_confidence"])
 
     g = score_group(obs_verdicts) if obs_verdicts else None
     band = g.band if g else "Inconclusive"

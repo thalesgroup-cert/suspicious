@@ -31,6 +31,23 @@ class ObservableReportDerivedTests(TestCase):
         self.assertIn("Escalated", rows["https://tinyurl.com/x"]["escalation_note"])
         self.assertIsNone(rows["https://tinyurl.com/x"]["derived_from"])
 
+    def test_dangling_parent_pointer_yields_none_and_does_not_raise(self):
+        group = ObservableGroup.objects.create(label="g")
+        reporter = get_user_model().objects.create_user("r3", "", "x")
+        case = Case.objects.create(observable_group=group, reporter=reporter, description="")
+        child = URL.objects.create(address="https://evil.example/login")
+        ObservableGroupArtifact.objects.create(group=group, artifact_type="URL", url=child)
+        un = Analyzer.objects.create(name="UnshortenLink_1_2", analyzer_cortex_id="UnshortenLink_1_2")
+        src = AnalyzerReport.objects.create(cortex_job_id="js3", type="url", status="Success",
+            analyzer=un, url=child, level="info", confidence=0, score=0,
+            report_summary={}, report_taxonomy={}, report_full={})
+        DerivedObservable.objects.create(case=case, source_report=src, via_analyzer="UnshortenLink_1_2",
+            parent_type="url", parent_id=999999999, child_type="url", child_id=child.pk,
+            child_value=child.address)
+
+        rows = {r["value"]: r for r in assemble_observables(case)}
+        self.assertIsNone(rows["https://evil.example/login"]["derived_from"])
+
     def test_plain_observable_has_empty_fields(self):
         group = ObservableGroup.objects.create(label="g")
         reporter = get_user_model().objects.create_user("r2", "", "x")

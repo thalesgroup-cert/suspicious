@@ -85,6 +85,30 @@ class IngestTests(TestCase):
         self.assertEqual(ingest_derived_observables(self.case), 0)
         self.assertFalse(DerivedObservable.objects.exists())
 
+    @patch("cortex_job.cortex_utils.derived_observables._blocked", return_value="")
+    @patch("cortex_job.cortex_utils.derived_observables.CortexJob")
+    def test_existing_child_not_reblocked_or_redispatched(self, MockCortex, mock_blocked):
+        MockCortex.return_value.launch_cortex_jobs.return_value = ["r1"]
+        ingest_derived_observables(self.case)
+        self.assertEqual(mock_blocked.call_count, 1)
+
+        mock_blocked.reset_mock()
+        MockCortex.return_value.launch_cortex_jobs.reset_mock()
+        self.assertEqual(ingest_derived_observables(self.case), 0)
+        mock_blocked.assert_not_called()
+        MockCortex.return_value.launch_cortex_jobs.assert_not_called()
+
+    @patch("cortex_job.cortex_utils.derived_observables.CortexJob")
+    def test_values_are_capped_per_report(self, MockCortex):
+        MockCortex.return_value.launch_cortex_jobs.return_value = ["r1"]
+        many = lambda _full: [(f"https://evil.example/p{i}", "url") for i in range(25)]
+        with patch.dict(
+            "cortex_job.cortex_utils.derived_observables.EXTRACTORS",
+            {"UnshortenLink_1_2": many},
+        ):
+            ingest_derived_observables(self.case)
+        self.assertEqual(DerivedObservable.objects.filter(case=self.case).count(), 20)
+
     @patch("cortex_job.cortex_utils.derived_observables.CortexJob")
     def test_bad_extracted_value_is_skipped_not_fatal(self, MockCortex):
         """One extracted value that blows up mid-processing skips; the rest proceed."""

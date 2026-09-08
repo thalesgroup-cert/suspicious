@@ -4,6 +4,7 @@ See docs/specs/2026-09-07-derived-observables-design.md.
 from __future__ import annotations
 
 import logging
+import socket
 from typing import Any, Callable
 
 from django.db import transaction
@@ -14,6 +15,10 @@ from cortex_job.cortex_utils.cortex_and_job_management import CortexJob
 logger = logging.getLogger("tasp.cron.update_ongoing_case_jobs")
 
 _OBSERVABLE_TYPES = {"url", "domain", "ip", "hash", "mail"}
+
+# Cap extracted values processed per extractor report — a QR image can encode
+# dozens of URLs; each one costs a DNS resolve + allow-list check + dispatch.
+_MAX_DERIVED_PER_REPORT = 20
 
 
 def _unshorten(full: Any) -> list[tuple[str, str]]:
@@ -41,10 +46,15 @@ def _blocked(value: str, data_type: str) -> str:
     """Non-empty reason if `value` must not become a live observable."""
     if data_type == "url":
         from api.serializers.submit import _check_no_ssrf_ip
+        # ponytail: process-global socket timeout; fine for prefork Celery workers, revisit if threaded
+        _prev_timeout = socket.getdefaulttimeout()
+        socket.setdefaulttimeout(5)
         try:
             _check_no_ssrf_ip(value)
         except ValueError as exc:
             return str(exc) or "SSRF-blocked target"
+        finally:
+            socket.setdefaulttimeout(_prev_timeout)
     if data_type in ("url", "domain"):
         from score_process.scoring.cortex_analyzers.allow_list import check_allow_list
         try:
@@ -153,7 +163,7 @@ def _finished_extractor_reports(case):
     q = build_analyzer_report_filter(targets)
     return list(
         AnalyzerReport.objects.filter(q, status="Success", analyzer__name__in=EXTRACTORS)
-        .select_related("analyzer")
+        .select_related("analyzer", "url", "domain", "ip", "hash", "file")
         .order_by("creation_date")
     )
 
@@ -172,8 +182,9 @@ _IOC_LEVEL_TO_BAND = {"safe": "Safe", "info": "Inconclusive", "suspicious": "Sus
                       "malicious": "Dangerous", "critical": "Dangerous"}
 
 
-def _child_band(child_type, child_id) -> str:
-    """Score a child observable through the IOC engine (newest report per analyzer)."""
+def _child_verdict(child_type, child_id) -> tuple[str, int]:
+    """Score a child observable through the IOC engine (newest report per
+    analyzer). Returns (band, confidence)."""
     from cortex_job.models import AnalyzerReport
     from score_process.scoring.observable_engine import score_observable
     from score_process.scoring.sources import source_verdict_from_report
@@ -187,7 +198,10 @@ def _child_band(child_type, child_id) -> str:
             continue
         seen.add(r.analyzer_id)
         svs.append(source_verdict_from_report(r))
-    return score_observable(svs).band if svs else "Inconclusive"
+    if not svs:
+        return "Inconclusive", 0
+    v = score_observable(svs)
+    return v.band, v.confidence
 
 
 def _parent_band(d) -> str:
@@ -207,18 +221,18 @@ def _parent_band(d) -> str:
 
 def score_derived_observables(case) -> dict:
     """Score every derived child, persist child_band + escalation_note on the row.
-    Return {(parent_type, parent_id): (band, note)} for children that scored
-    Suspicious/Dangerous strictly above their parent's current band."""
+    Return {(parent_type, parent_id): (band, note, child_confidence)} for children
+    that scored Suspicious/Dangerous strictly above their parent's current band."""
     out: dict = {}
     for d in case.derived_observables.all():
-        band = _child_band(d.child_type, d.child_id)
+        band, confidence = _child_verdict(d.child_type, d.child_id)
         d.child_band = band
         note = ""
         rank = _BAND_RANK.get(band, 0)
         if rank >= 1 and rank > _BAND_RANK.get(_parent_band(d), 0):
             short = (d.child_value[:100] + "…") if len(d.child_value) > 100 else d.child_value
             note = f"Escalated to {band}: {d.via_analyzer} extracted {short} → {band}."[:255]
-            out[(d.parent_type, d.parent_id)] = (band, note)
+            out[(d.parent_type, d.parent_id)] = (band, note, confidence)
         d.escalation_note = note
         d.save(update_fields=["child_band", "escalation_note"])
     return out
@@ -249,14 +263,25 @@ def ingest_derived_observables(case) -> int:
             continue  # 1-hop cap
 
         fn = EXTRACTORS[report.analyzer.name]
-        for value, data_type in fn(report.report_full):
+        pairs = fn(report.report_full)
+        if len(pairs) > _MAX_DERIVED_PER_REPORT:
+            logger.info(
+                "derived: report %s yielded %d values, processing first %d",
+                report.pk, len(pairs), _MAX_DERIVED_PER_REPORT,
+            )
+        for value, data_type in pairs[:_MAX_DERIVED_PER_REPORT]:
             try:
+                # Cheap DB get_or_create first (no network), then early-skip a
+                # value already attached to this case — do NOT re-block (timeout-
+                # less DNS), re-resolve, or re-dispatch it on every reconcile pass.
+                obj = _resolve_observable(value, data_type)
+                if obj is None:
+                    continue
+                if (data_type, obj.pk) in derived_children:
+                    continue
                 reason = _blocked(value, data_type)
                 if reason:
                     logger.info("derived: skip %r (%s)", value, reason)
-                    continue
-                obj = _resolve_observable(value, data_type)
-                if obj is None:
                     continue
                 _attach_to_case(case, obj, data_type)
                 _, created = case.derived_observables.get_or_create(
@@ -269,6 +294,9 @@ def ingest_derived_observables(case) -> int:
                 )
                 if not created:
                     continue
+                # ponytail: fire-and-forget — a Cortex outage (empty job list) still
+                # records the child; no dispatch retry, next reconcile pass won't
+                # re-dispatch. Matches the primary dispatch path.
                 CortexJob().launch_cortex_jobs(value=obj, data_type=data_type, case=case)
                 new_count += 1
             except Exception as exc:  # noqa: BLE001 — one bad value must not abort the pass

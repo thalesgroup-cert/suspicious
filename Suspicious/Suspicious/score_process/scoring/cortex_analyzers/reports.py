@@ -96,7 +96,7 @@ class CortexAnalyzerReports:
             return verdict
 
         rank = {"Suspicious": 1, "Dangerous": 2}
-        worst_band, note = max(escalations.values(), key=lambda bn: rank.get(bn[0], 0))
+        worst_band, note, _conf = max(escalations.values(), key=lambda bn: rank.get(bn[0], 0))
         verdict = mail_band_escalation(
             verdict, [ObservableVerdict(worst_band, 100, None, {}, [])], note=note
         )
@@ -104,7 +104,7 @@ class CortexAnalyzerReports:
         # mirror _STICKY_IOC_LEVELS: an allow/deny-listed artifact keeps its level
         sticky = {"critical", "SAFE-ALLOW_LISTED"}
         ioc_level = {"Suspicious": "suspicious", "Dangerous": "malicious"}
-        for (ptype, pid), (band, _n) in escalations.items():
+        for (ptype, pid), (band, _note, _conf) in escalations.items():
             spec = _MAIL_JOIN.get(ptype)
             if spec is None:
                 continue

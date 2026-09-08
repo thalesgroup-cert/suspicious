@@ -63,13 +63,16 @@ def assemble_observables(case, *, full: bool = False) -> list[dict]:
 
         key = (art.artifact_type.lower(), obj.pk)
         d = derived.get(key)
+        pv = _parent_value(d) if d else None
         observables.append({
             "value": getattr(obj, "address", None) or getattr(obj, "value", None),
             "type": art.artifact_type.lower(),
             "verdict": verdict,
             "sources": sources,
-            "derived_from": ({"value": _parent_value(d), "via_analyzer": d.via_analyzer}
-                             if d else None),
+            # None when the parent row is gone — the frontend schema requires
+            # derived_from.value to be a non-null string.
+            "derived_from": ({"value": pv, "via_analyzer": d.via_analyzer}
+                             if pv else None),
             "escalation_note": escalation.get(key, ""),
         })
     return observables
