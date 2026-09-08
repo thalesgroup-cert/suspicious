@@ -12,6 +12,7 @@ from api.serializers.home import (
 from case_handler.models import Case
 from dashboard.models import GroupMonthlyStats, UserCasesMonthlyStats, TotalCasesStats
 from profiles.models import CISOProfile, UserProfile
+from profiles.profiles_utils.scope import clean_scope, parse_scope_groups
 
 
 @extend_schema(
@@ -48,7 +49,7 @@ class HomeSummaryView(APIView):
         ciso_profile = CISOProfile.objects.filter(user=request.user).first()
         active_profile = ciso_profile if is_ciso and ciso_profile else user_profile
 
-        ciso_scope = self._clean_scope(getattr(ciso_profile, "scope", None)) if ciso_profile else None
+        ciso_scope = clean_scope(getattr(ciso_profile, "scope", None)) if ciso_profile else None
         show_scope_modal = bool(is_ciso and not ciso_scope)
 
         personal_stats = self._aggregate_user_stats(
@@ -134,7 +135,7 @@ class HomeSummaryView(APIView):
     def _aggregate_scope_stats(cls, *, scope: str, month: str, year: str) -> dict:
         qs = GroupMonthlyStats.objects.filter(month=month, year=year)
 
-        scope_groups = cls._parse_scope_groups(scope)
+        scope_groups = parse_scope_groups(scope)
         if scope_groups is not None:
             qs = qs.filter(group_name__in=scope_groups)
 
@@ -172,27 +173,6 @@ class HomeSummaryView(APIView):
             return None
         normalized = str(value).strip()
         return normalized or None
-
-    @staticmethod
-    def _clean_scope(value):
-        if value is None:
-            return None
-        normalized = str(value).strip()
-        if not normalized or normalized.lower() == "not defined":
-            return None
-        return normalized
-
-    @staticmethod
-    def _parse_scope_groups(scope: str):
-        if not scope:
-            return []
-
-        normalized = scope.strip()
-        if normalized.upper() == "ALL":
-            return None
-
-        parts = [part.strip() for part in normalized.split("|")]
-        return [part for part in parts if part]
 
     @staticmethod
     def _build_spotlight(is_ciso: bool, is_cert: bool, total_cases: int, challenge_cases: int):

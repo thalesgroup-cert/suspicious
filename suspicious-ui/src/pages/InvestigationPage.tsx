@@ -73,6 +73,7 @@ import { ResultChip } from "@/shared/components/ResultChip";
 import { CopyIconButton } from "@/shared/components/CopyIconButton";
 import MailPreview from "@/shared/components/MailPreview";
 
+import { CisoScopeDialog } from "@/features/home/components/CisoScopeDialog";
 import { SoftCard } from "@/features/investigation/components/cards";
 import { InvestigationAnalyzerReportCard } from "@/features/investigation/components/InvestigationAnalyzerReportCard";
 import { CommentThread } from "@/features/comments/CommentThread";
@@ -175,6 +176,14 @@ export default function InvestigationPage() {
     () => groups.includes("CISO") || groups.includes("CERT") || groups.includes("Admin"),
     [groups]
   );
+  // A CISO with no scope set can't meaningfully browse cases yet — prompt them
+  // to pick one first (same modal Home shows on first connection).
+  const needsScope =
+    !!me &&
+    groups.includes("CISO") &&
+    !groups.includes("CERT") &&
+    !groups.includes("Admin") &&
+    !me.ciso_scope;
 
   const investigationListParams = React.useMemo(() => {
     const needsRawOrdering = sortField === "status" || sortField === "result";
@@ -197,7 +206,7 @@ export default function InvestigationPage() {
   const investigationsQuery = useQuery<InvestigationListResponse>({
     queryKey: ["investigation", investigationListParams],
     queryFn: () => getAllInvestigations(investigationListParams),
-    enabled: !!me && isElevated,
+    enabled: !!me && isElevated && !needsScope,
     retry: false,
     placeholderData: (prev) => prev,
     refetchInterval: (query) => {
@@ -379,6 +388,14 @@ export default function InvestigationPage() {
   }
   if (!isElevated) {
     return <Box sx={{ p: 3 }}><Alert severity="error">Access denied.</Alert></Box>;
+  }
+  if (needsScope) {
+    return (
+      <Box sx={{ p: 3 }}>
+        <Alert severity="info">Select your management scope to view investigations.</Alert>
+        <CisoScopeDialog open />
+      </Box>
+    );
   }
   if (investigationsQuery.isLoading && !investigationsQuery.data) {
     return <Box sx={{ minHeight: "60vh", display: "grid", placeItems: "center" }}><CircularProgress /></Box>;

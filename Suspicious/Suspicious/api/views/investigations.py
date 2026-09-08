@@ -25,6 +25,7 @@ from api.serializers.investigations import (
     InvestigationRowSerializer,
 )
 from score_process.score_utils.send_mail.service import MailNotificationService
+from profiles.profiles_utils.scope import scoped_case_queryset
 
 logger = logging.getLogger(__name__)
 
@@ -119,10 +120,13 @@ class InvestigationAccessMixin:
     analyzer_report_select_related = ANALYZER_REPORT_SELECT_RELATED
 
     def get_case_list_queryset(self):
-        return Case.objects.select_related(*CASE_LIST_SELECT_RELATED)
+        return scoped_case_queryset(
+            Case.objects.select_related(*CASE_LIST_SELECT_RELATED),
+            self.request.user,
+        )
 
     def get_case_detail_queryset(self):
-        return (
+        return scoped_case_queryset(
             Case.objects.select_related(*CASE_DETAIL_SELECT_RELATED)
             .prefetch_related(
                 "fileOrMail__mail__mail_attachments",
@@ -132,7 +136,8 @@ class InvestigationAccessMixin:
                 "fileOrMail__mail__mail_artifacts__artifactIsHash",
                 "fileOrMail__mail__mail_artifacts__artifactIsDomain",
                 "fileOrMail__mail__mail_artifacts__artifactIsMailAddress",
-            )
+            ),
+            self.request.user,
         )
 
     def get_case_or_404(self, case_id: int) -> Case:
