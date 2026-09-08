@@ -71,6 +71,43 @@ def observable_reports(case) -> list[tuple]:
             for (art, obj, field) in arts]
 
 
+# MailArtifact.artifact_type -> (MailArtifact FK attr, join-model observable FK, bucket field).
+# Bucket field matches AnalyzerReport's FK name (mail = the MailAddress FK).
+_MAIL_ART = {
+    "URL": ("artifactIsUrl", "url", "url"),
+    "IP": ("artifactIsIp", "ip", "ip"),
+    "Hash": ("artifactIsHash", "hash", "hash"),
+    "Domain": ("artifactIsDomain", "domain", "domain"),
+    "MailAddress": ("artifactIsMailAddress", "mail_address", "mail"),
+}
+
+
+def mail_observable_reports(mail) -> list[tuple]:
+    """Mail-side sibling of observable_reports: per embedded observable of a mail
+    (URL/IP/Hash/Domain/MailAddress), (mail_artifact, obj, field, [reports]) with
+    ONE AnalyzerReport query for the whole mail, newest first."""
+    arts = []
+    for m_art in mail.mail_artifacts.select_related(
+        "artifactIsUrl__url", "artifactIsUrl__url__analyzed_url",
+        "artifactIsIp__ip", "artifactIsHash__hash",
+        "artifactIsDomain__domain", "artifactIsMailAddress__mail_address",
+    ):
+        spec = _MAIL_ART.get(m_art.artifact_type)
+        if spec is None:
+            continue
+        fk_attr, join_field, field = spec
+        join = getattr(m_art, fk_attr, None)
+        obj = getattr(join, join_field, None) if join is not None else None
+        if obj is not None:
+            arts.append((m_art, obj, field))
+    if not arts:
+        return []
+
+    buckets = _bucket_reports([((f, o.pk), o, f) for (_m, o, f) in arts])
+    return [(m_art, obj, field, buckets.get((field, obj.pk), []))
+            for (m_art, obj, field) in arts]
+
+
 def collect_observable_sources(case):
     out = {}
     for art, obj, _field, reports in observable_reports(case):
