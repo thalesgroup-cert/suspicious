@@ -222,6 +222,13 @@ wiring is disabled.
   show the `escalation_note`.
 - **Mail detail** (investigations serializer): expose the same two fields on the
   artifact list; render the note.
+  > **Deferred (2026-09-08):** the initial cut ships the mail road as
+  > **scoring/escalation logic only** — `mail_band_escalation` runs, the parent
+  > `MailArtifact.artifact_level` is bumped, and the escalation line lands in
+  > `case.verdict_rationale`, so an analyst sees *why* a quishing mail escalated.
+  > The per-artifact "extracted from … via …" chip + structured `escalation_note`
+  > on the mail detail page (`api/serializers/investigations.py` + mail UI) is a
+  > tracked follow-up.
 
 ### 7. Config
 
