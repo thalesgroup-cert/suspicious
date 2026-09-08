@@ -4,7 +4,7 @@ See docs/specs/2026-09-07-derived-observables-design.md.
 from __future__ import annotations
 
 import logging
-import socket
+from concurrent.futures import ThreadPoolExecutor, TimeoutError as _FutureTimeout
 from typing import Any, Callable
 
 from django.db import transaction
@@ -42,19 +42,37 @@ def _qrdecode(full: Any) -> list[tuple[str, str]]:
     return out
 
 
+_SSRF_RESOLVE_TIMEOUT_S = 5
+
+
+def _ssrf_blocked(value: str) -> str:
+    """Run the SSRF/DNS check with a hard wall-clock cap. `getaddrinfo` ignores
+    the Python socket timeout, so a hostname on a blackholed resolver can only
+    be bounded from outside. A hang is treated as blocked (fail closed)."""
+    from api.serializers.submit import _check_no_ssrf_ip
+
+    # ponytail: leaked resolver thread on timeout, bounded by _MAX_DERIVED_PER_REPORT.
+    # No `with` — its shutdown(wait=True) would block on the very hang we're capping.
+    ex = ThreadPoolExecutor(max_workers=1)
+    fut = ex.submit(_check_no_ssrf_ip, value)
+    try:
+        fut.result(timeout=_SSRF_RESOLVE_TIMEOUT_S)
+        return ""
+    except ValueError as exc:
+        return str(exc) or "SSRF-blocked target"
+    except _FutureTimeout:
+        logger.warning("derived: SSRF resolve timed out for %r; blocking", value)
+        return "SSRF resolve timed out"
+    finally:
+        ex.shutdown(wait=False, cancel_futures=True)
+
+
 def _blocked(value: str, data_type: str) -> str:
     """Non-empty reason if `value` must not become a live observable."""
     if data_type == "url":
-        from api.serializers.submit import _check_no_ssrf_ip
-        # ponytail: process-global socket timeout; fine for prefork Celery workers, revisit if threaded
-        _prev_timeout = socket.getdefaulttimeout()
-        socket.setdefaulttimeout(5)
-        try:
-            _check_no_ssrf_ip(value)
-        except ValueError as exc:
-            return str(exc) or "SSRF-blocked target"
-        finally:
-            socket.setdefaulttimeout(_prev_timeout)
+        reason = _ssrf_blocked(value)
+        if reason:
+            return reason
     if data_type in ("url", "domain"):
         from score_process.scoring.cortex_analyzers.allow_list import check_allow_list
         try:
