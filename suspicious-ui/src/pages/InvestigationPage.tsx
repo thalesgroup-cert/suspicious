@@ -126,6 +126,9 @@ export default function InvestigationPage() {
     setPage(0);
   }
   const [page, setPage] = React.useState(0);
+
+  const anyFilterActive =
+    !!qDebounced || status !== "ALL" || type !== "ALL" || result !== "ALL" || !!from || !!to;
   const [pageSize, setPageSize] = React.useState(10);
 
   const filtersActive =
@@ -661,7 +664,13 @@ export default function InvestigationPage() {
 
           {total === 0 ? (
             <Box sx={{ p: 3 }}>
-              <Alert severity="info">No investigations match your filters.</Alert>
+              <Alert severity="info">
+                {anyFilterActive
+                  ? "No investigations match your filters."
+                  : me.ciso_scope
+                    ? `No submissions have been sent within your scope (${me.ciso_scope}).`
+                    : "No investigations yet."}
+              </Alert>
             </Box>
           ) : (
             <Box sx={{ overflowX: "auto" }}>

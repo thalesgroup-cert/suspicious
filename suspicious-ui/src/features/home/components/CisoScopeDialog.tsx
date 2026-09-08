@@ -19,16 +19,34 @@ import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { getHomeSummary, setCisoScope } from "@/features/home/api";
 
 /**
- * The "select your management scope" modal shown to a CISO who has no scope
- * set yet — on first connection (Home) and when they open Investigation.
- * Forced modal: no dismiss until a scope is confirmed.
+ * The "select your management scope" modal.
+ *
+ * Two modes:
+ *  - forced (no `onClose`): shown to a CISO with no scope set yet, on Home and
+ *    Investigation. No dismiss until a scope is confirmed.
+ *  - editable (`onClose` given): reopened from the profile to narrow/widen an
+ *    existing scope. Dismissible, and pre-selects the current scope.
  */
-export function CisoScopeDialog({ open }: { open: boolean }) {
+export function CisoScopeDialog({
+  open,
+  onClose,
+  currentScope,
+}: {
+  open: boolean;
+  onClose?: () => void;
+  currentScope?: string;
+}) {
   const theme = useTheme();
   const isDark = theme.palette.mode === "dark";
   const qc = useQueryClient();
 
-  const [scopeChoice, setScopeChoice] = React.useState("");
+  const [scopeChoice, setScopeChoice] = React.useState(currentScope ?? "");
+
+  // Re-seed when the dialog is (re)opened from the profile.
+  React.useEffect(() => {
+    // eslint-disable-next-line react-hooks/set-state-in-effect
+    if (open) setScopeChoice(currentScope ?? "");
+  }, [open, currentScope]);
 
   const now = React.useMemo(() => new Date(), []);
   const summaryQuery = useQuery({
@@ -46,11 +64,17 @@ export function CisoScopeDialog({ open }: { open: boolean }) {
       qc.invalidateQueries({ queryKey: ["me"] });
       qc.invalidateQueries({ queryKey: ["homeSummary"] });
       qc.invalidateQueries({ queryKey: ["investigation"] });
+      onClose?.();
     },
   });
 
   return (
-    <Dialog open={open} maxWidth="sm" fullWidth>
+    <Dialog
+      open={open}
+      maxWidth="sm"
+      fullWidth
+      onClose={onClose ? () => onClose() : undefined}
+    >
       <DialogTitle>Select your management scope</DialogTitle>
       <DialogContent>
         <Stack spacing={1.25} sx={{ mt: 1 }}>
@@ -127,6 +151,15 @@ export function CisoScopeDialog({ open }: { open: boolean }) {
       </DialogContent>
 
       <DialogActions>
+        {onClose ? (
+          <Button
+            onClick={() => onClose()}
+            disabled={scopeMutation.isPending}
+            sx={{ borderRadius: 3, textTransform: "none", fontWeight: 800 }}
+          >
+            Cancel
+          </Button>
+        ) : null}
         <Button
           variant="contained"
           disabled={!scopeChoice || scopeMutation.isPending}

@@ -20,6 +20,11 @@ vi.mock("@/features/profile/api", () => ({
   uploadAvatar: vi.fn(),
 }));
 
+vi.mock("@/features/home/api", () => ({
+  getHomeSummary: vi.fn().mockResolvedValue({ suggested_scopes: { country: "RO", region: "EMEA" } }),
+  setCisoScope: vi.fn().mockResolvedValue({ scope: "RO" }),
+}));
+
 
 import { getMe } from "@/api/auth";
 import { getProfile, updatePreferences, uploadAvatar } from "@/features/profile/api";
@@ -65,6 +70,24 @@ describe("ProfilePage - Test Suite", () => {
       ).toBeInTheDocument();
     });
 
+  });
+
+  describe("CISO scope", () => {
+    it("opens the scope dialog from the profile chip", async () => {
+      vi.mocked(getMe).mockResolvedValue({
+        ...fixtureMe,
+        groups: ["CISO"],
+        ciso_scope: "EMEA",
+      });
+      renderWithProviders(<ProfilePage />, { initialPath: "/profile" });
+
+      const chip = await screen.findByText(/scope: emea/i, {}, { timeout: 5000 });
+      await userEvent.click(chip);
+
+      expect(
+        await screen.findByText(/select your management scope/i)
+      ).toBeInTheDocument();
+    });
   });
 
   describe("State across navigation", () => {
