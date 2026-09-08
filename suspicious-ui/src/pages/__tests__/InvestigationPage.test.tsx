@@ -414,6 +414,17 @@ describe("InvestigationPage", () => {
     await waitFor(() => expect(mockGetAll).toHaveBeenCalled());
   });
 
+  it("tells a scoped CISO when nothing was submitted in their scope", async () => {
+    mockGetMe.mockResolvedValue({ ...mockMe, groups: ["CISO"], ciso_scope: "RO" } as never);
+    mockGetAll.mockResolvedValue({ results: [], count: 0 } as never);
+
+    renderInvestigation();
+
+    expect(
+      await screen.findByText(/no submissions have been sent within your scope \(RO\)/i)
+    ).toBeInTheDocument();
+  });
+
   it("shows the comment thread and posts an analyst note", async () => {
     const user = userEvent.setup();
     renderInvestigation();

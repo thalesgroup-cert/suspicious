@@ -53,6 +53,7 @@ import { ColorSettingsPanel } from "@/features/profile/ColorSettingsPanel";
 import { AvatarPanel } from "@/features/profile/AvatarPanel";
 import { UserAvatar } from "@/features/profile/components/UserAvatar";
 import { randomSeed } from "@/features/profile/avatar";
+import { CisoScopeDialog } from "@/features/home/components/CisoScopeDialog";
 
 import {
   CaptionLabel,
@@ -395,6 +396,7 @@ export default function ProfilePage() {
   const pageStatusColors   = useStatusColors();
 
   const [section, setSection] = React.useState<Section>("preferences");
+  const [scopeDialogOpen, setScopeDialogOpen] = React.useState(false);
 
   // ── Queries ──────────────────────────────────────────────────────────────
 
@@ -713,8 +715,11 @@ export default function ProfilePage() {
                     <Chip size="small" label="Standard" variant="outlined"
                       sx={{ height: 24, "& .MuiChip-label": { fontSize: 12 } }} />
                   )}
-                  {scope ? (
-                    <Chip size="small" label={`Scope: ${scope}`} variant="outlined"
+                  {groups.includes("CISO") ? (
+                    <Chip size="small" label={`Scope: ${scope || "not set"}`} variant="outlined"
+                      clickable onClick={() => setScopeDialogOpen(true)}
+                      onDelete={() => setScopeDialogOpen(true)}
+                      deleteIcon={<TuneOutlined />}
                       sx={{ height: 24, "& .MuiChip-label": { fontSize: 12 } }} />
                   ) : null}
                 </Stack>
@@ -877,6 +882,14 @@ export default function ProfilePage() {
           </CardContent>
         </SoftCard>
       </Box>
+
+      {groups.includes("CISO") ? (
+        <CisoScopeDialog
+          open={scopeDialogOpen}
+          onClose={() => setScopeDialogOpen(false)}
+          currentScope={scope || undefined}
+        />
+      ) : null}
     </Box>
     </Skeleton>
   );
