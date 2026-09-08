@@ -803,7 +803,7 @@ export default function HomePage() {
           </Grid>
         </Grid>
 
-        <CisoScopeDialog open={showScopeModal} />
+        <CisoScopeDialog open={showScopeModal} allowAll={groups.includes("Admin")} />
       </Box>
     </Box>
   );

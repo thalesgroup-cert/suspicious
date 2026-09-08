@@ -188,6 +188,34 @@ class CISOInvestigationScopeTests(TestCase):
         self.profile.refresh_from_db()
         self.assertEqual(self.profile.scope, "FR")
 
+    def test_multi_group_scope_is_intersection(self):
+        # A reporter in FR *and* MG; another in FR only.
+        both = _make_user("fr_mg_rep", groups=["FR", "EMEA", "MG"])
+        fr_only = _make_user("fr_only_rep", groups=["FR", "EMEA"])
+        both_case = Case.objects.create(reporter=both, description="both")
+        fr_case = Case.objects.create(reporter=fr_only, description="fr")
+
+        self.profile.scope = "FR|MG"
+        self.profile.save()
+        self.client.force_authenticate(self.ciso)
+        resp = self.client.get(reverse("investigation-list"))
+        # AND: only the reporter in both groups, not fr_only or the EMEA case.
+        self.assertEqual(self._ids(resp), {both_case.id})
+        self.assertNotIn(fr_case.id, self._ids(resp))
+
+    def test_all_scope_rejected_for_non_admin(self):
+        self.client.force_authenticate(self.ciso)
+        resp = self.client.patch(reverse("profile"), {"scope": "ALL"}, format="json")
+        self.assertEqual(resp.status_code, 400)
+
+    def test_all_scope_allowed_for_admin(self):
+        self.ciso.groups.add(Group.objects.get_or_create(name="Admin")[0])
+        self.client.force_authenticate(self.ciso)
+        resp = self.client.patch(reverse("profile"), {"scope": "ALL"}, format="json")
+        self.assertEqual(resp.status_code, 200)
+        self.profile.refresh_from_db()
+        self.assertEqual(self.profile.scope, "ALL")
+
 
 class DashboardPerUserStatsAccessTests(TestCase):
     """Regression for the per-user-stats data leak: regular reporters must
