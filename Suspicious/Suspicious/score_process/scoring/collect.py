@@ -16,6 +16,7 @@ from score_process.scoring.case_score_calculation import (
     _is_address_deny_listed,
 )
 from case_handler.models import Result
+from settings.config import get_config
 
 logger = logging.getLogger("tasp.cron.update_ongoing_case_jobs")
 
@@ -50,7 +51,9 @@ def collect_signals(case):
         mail = getattr(case.fileOrMail, "mail", None)
         if mail:
             off = len(scores)
-            failures += process_mail(mail, reports, scores, confidences, 0, case.id)
+            score_artifacts = not get_config("scoring.mail_embedded_categorical", True)
+            failures += process_mail(mail, reports, scores, confidences, 0, case.id,
+                                     score_artifacts=score_artifacts)
             signals += _signals_from(scores, confidences, off, "mail")
 
     if case.nonFileIocs:

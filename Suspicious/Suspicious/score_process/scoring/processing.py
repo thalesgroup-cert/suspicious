@@ -90,7 +90,8 @@ def process_reports(analyzers_reports, mail_part, part_type, is_malicious):
 
 # ── Mail processing ───────────────────────────────────────────────────────────
 
-def process_mail(mail, reports, total_scores, total_confidences, is_malicious, case_id):
+def process_mail(mail, reports, total_scores, total_confidences, is_malicious, case_id,
+                 *, score_artifacts: bool = True):
     from mail_feeder.models import Mail
     mail = Mail.objects.prefetch_related(*_PROCESS_MAIL_PREFETCH).get(pk=mail.pk)
     total_failures = 0
@@ -125,7 +126,7 @@ def process_mail(mail, reports, total_scores, total_confidences, is_malicious, c
                 reports, total_scores, total_confidences, is_malicious, case_id,
             )
 
-    if hasattr(mail, "mail_artifacts"):
+    if score_artifacts and hasattr(mail, "mail_artifacts"):
         update_cases_logger.info("Processing mail artifacts.")
         for artifact in mail.mail_artifacts.all():
             total_failures += log_and_process(

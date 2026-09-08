@@ -1,3 +1,5 @@
+from unittest.mock import patch
+
 from django.contrib.auth import get_user_model
 from django.test import TestCase
 from django.utils import timezone
@@ -144,3 +146,55 @@ class CollectSignalsGroupTests(TestCase):
 
         signals, ai, deny, ai_missing, reason = collect_signals(case)
         self.assertEqual(signals, [])
+
+
+class MailEmbeddedSignalOptOutTests(TestCase):
+    """When scoring.mail_embedded_categorical is ON (default), an embedded
+    URL's analyzer score must NOT appear among the Signals fed to score_case —
+    it is scored by the categorical path instead."""
+
+    def _mail_case_with_embedded_bad_url(self):
+        from datetime import datetime, timezone as tz
+        from mail_feeder.models import MailArtifact, ArtifactIsUrl, MailBody
+        from url_process.models import URL
+
+        u = get_user_model().objects.create_user("mesoo_r", password="x")
+        mail = Mail.objects.create(subject="s", reportedBy="r@x.test",
+            date=datetime(2026, 1, 1, tzinfo=tz.utc), to="a@x.test", mail_id="mesoo1")
+        case = Case.objects.create(description="", reporter=u)
+        case.fileOrMail = CaseHasFileOrMail.objects.create(mail=mail, case=case)
+        case.save()
+
+        url = URL.objects.create(address="https://evil.test/login")
+        ma = MailArtifact.objects.create(mail=mail, artifact_type="URL")
+        join = ArtifactIsUrl.objects.create(url=url, artifact=ma)
+        ma.artifactIsUrl = join
+        ma.save(update_fields=["artifactIsUrl"])
+        a = Analyzer.objects.create(name="GTI", analyzer_cortex_id="GTI", tier=1)
+        AnalyzerReport.objects.create(cortex_job_id="ju", type="url", status="Success",
+            analyzer=a, url=url, level="malicious", confidence=95, score=9,
+            report_summary={"taxonomies": [{"level": "malicious"}]}, report_taxonomy={}, report_full={})
+
+        # a benign mail_body report so score_case has an intrinsic signal
+        body = MailBody.objects.create(body_score=2, body_confidence=60, body_level="safe",
+            body_value="hi", fuzzy_hash="bh")
+        mail.mail_body = body
+        mail.save(update_fields=["mail_body"])
+        AnalyzerReport.objects.create(cortex_job_id="jb", type="mail_body", status="Success",
+            analyzer=Analyzer.objects.create(name="Yara_Boosted_3_2", analyzer_cortex_id="Yara_Boosted_3_2", tier=2),
+            mail_body=body, level="safe", confidence=60, score=2,
+            report_summary={}, report_taxonomy={}, report_full={})
+        return case
+
+    @patch("score_process.scoring.collect.get_config", return_value=True)
+    def test_embedded_url_score_not_in_signals(self, _cfg):
+        case = self._mail_case_with_embedded_bad_url()
+        signals, *_ = collect_signals(case)
+        self.assertTrue(all(s.source in {"mail", "file"} for s in signals if not s.is_failure))
+        self.assertLessEqual(sum(1 for s in signals if not s.is_failure), 2)
+
+    @patch("score_process.scoring.collect.get_config", return_value=False)
+    def test_flag_off_keeps_embedded_url_in_signals(self, _cfg):
+        case = self._mail_case_with_embedded_bad_url()
+        signals, *_ = collect_signals(case)
+        self.assertTrue(any(s.score >= 8 for s in signals))  # the bad URL still votes
