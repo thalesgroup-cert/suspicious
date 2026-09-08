@@ -98,6 +98,26 @@ describe("ProfilePage - Test Suite", () => {
         await screen.findByRole("button", { name: /save scope/i })
       ).toBeInTheDocument();
     });
+
+    it("hides 'All cases' from a non-Admin CISO", async () => {
+      renderWithProviders(<ProfilePage />, { initialPath: "/profile" });
+      const chip = await screen.findByText(/scope: emea/i, {}, { timeout: 5000 });
+      await userEvent.click(chip);
+      await screen.findByRole("button", { name: /save scope/i });
+      expect(screen.queryByLabelText(/all cases/i)).not.toBeInTheDocument();
+    });
+
+    it("shows 'All cases' to an Admin-group CISO", async () => {
+      vi.mocked(getMe).mockResolvedValue({
+        ...fixtureMe,
+        groups: ["CISO", "Admin"],
+        ciso_scope: "EMEA",
+      });
+      renderWithProviders(<ProfilePage />, { initialPath: "/profile" });
+      const chip = await screen.findByText(/scope: emea/i, {}, { timeout: 5000 });
+      await userEvent.click(chip);
+      expect(await screen.findByLabelText(/all cases/i)).toBeInTheDocument();
+    });
   });
 
   describe("State across navigation", () => {

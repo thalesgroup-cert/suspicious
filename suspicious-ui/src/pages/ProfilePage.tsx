@@ -878,7 +878,11 @@ export default function ProfilePage() {
                     Current scope: <b>{scope || "not set"}</b>
                   </Typography>
                 </Box>
-                <ScopePicker currentScope={scope || undefined} enabled />
+                <ScopePicker
+                  currentScope={scope || undefined}
+                  enabled
+                  allowAll={groups.includes("Admin")}
+                />
               </Stack>
             ) : (
               <AvatarPanel

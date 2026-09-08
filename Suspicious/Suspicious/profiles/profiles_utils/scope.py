@@ -1,9 +1,12 @@
 """CISO scope helpers.
 
 A CISOProfile.scope is a pipe-delimited list of org-unit group names
-(e.g. "EMEA|FR"), the literal "ALL", or unset ("Not defined" / "").
-A case belongs to a scope when its reporter is in one of those groups —
-the same rule dashboard.update_group_monthly_stats uses.
+(e.g. "EMEA|Off GBU"), the literal "ALL", or unset ("Not defined" / "").
+Each name is a different org dimension (region / country / GBU), so
+multiple names are AND-ed: a case is in scope when its reporter is in
+*every* selected group. A Romanian Off-GBU reporter carries
+{RO, EMEA, Off GBU}, so "RO|Off GBU" narrows to that reporter — it does
+not union everyone in RO with everyone in Off GBU.
 """
 from __future__ import annotations
 
@@ -54,4 +57,8 @@ def scoped_case_queryset(queryset, user):
         return queryset
     if not groups:
         return queryset.none()
-    return queryset.filter(reporter__groups__name__in=groups).distinct()
+    # AND across dimensions: chained .filter() on a reverse M2M requires the
+    # reporter to be in *all* of the named groups.
+    for name in groups:
+        queryset = queryset.filter(reporter__groups__name=name)
+    return queryset.distinct()
