@@ -11,6 +11,7 @@ from django.db import transaction
 
 from settings.config import get_config
 from cortex_job.cortex_utils.cortex_and_job_management import CortexJob
+from score_process.scoring.bands import _BAND_RANK
 
 logger = logging.getLogger("tasp.cron.update_ongoing_case_jobs")
 
@@ -195,7 +196,6 @@ def _report_parent(report):
     return None, None
 
 
-_BAND_RANK = {"Safe": 0, "Inconclusive": 0, "Suspicious": 1, "Dangerous": 2}
 _IOC_LEVEL_TO_BAND = {"safe": "Safe", "info": "Inconclusive", "suspicious": "Suspicious",
                       "malicious": "Dangerous", "critical": "Dangerous"}
 

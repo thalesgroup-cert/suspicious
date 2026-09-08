@@ -2,24 +2,14 @@
 The only place Case scoring fields are written by the scoring path."""
 import logging
 
-from cortex_job.cortex_utils.derived_observables import _BAND_RANK
+from score_process.scoring.bands import (
+    _BAND_RANK, _BAND_TO_IOC_LEVEL, _DERIVED_SCORE, _STICKY_IOC_LEVELS,
+)
 from score_process.scoring.update_handler import (
     save_case_results, update_kpi_and_user_stats,
 )
 
 logger = logging.getLogger(__name__)
-
-_DERIVED_SCORE = {"Safe": 2, "Suspicious": 6, "Dangerous": 9, "Inconclusive": 5}
-# Map the categorical band onto the legacy IOC-level vocabulary
-# (safe/info/suspicious/malicious/critical) that admin filters + cross-case
-# reuse read — the ObservableGroup rows are globally shared.
-_BAND_TO_IOC_LEVEL = {
-    "Safe": "safe", "Inconclusive": "info",
-    "Suspicious": "suspicious", "Dangerous": "malicious",
-}
-# Stronger markers set by other paths (deny list / allow list) — never
-# downgraded by an IOC-road re-score.
-_STICKY_IOC_LEVELS = {"critical", "SAFE-ALLOW_LISTED"}
 
 
 def apply_verdict(case, verdict) -> None:
