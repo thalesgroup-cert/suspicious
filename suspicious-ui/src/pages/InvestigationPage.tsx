@@ -396,7 +396,7 @@ export default function InvestigationPage() {
     return (
       <Box sx={{ p: 3 }}>
         <Alert severity="info">Select your management scope to view investigations.</Alert>
-        <CisoScopeDialog open />
+        <CisoScopeDialog open allowAll={groups.includes("Admin")} />
       </Box>
     );
   }

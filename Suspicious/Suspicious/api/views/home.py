@@ -137,6 +137,12 @@ class HomeSummaryView(APIView):
 
         scope_groups = parse_scope_groups(scope)
         if scope_groups is not None:
+            # ponytail: exact for a single-group scope. For a multi-group
+            # (AND) scope the per-group snapshot can't express the
+            # intersection, so this KPI tile is an upper bound — the
+            # Investigation list (scoped_case_queryset) is the source of
+            # truth. Recompute from Case here if multi-group KPIs must be
+            # exact.
             qs = qs.filter(group_name__in=scope_groups)
 
         return cls._normalize_stats(qs.aggregate(**cls._build_aggregate_kwargs()))

@@ -19,10 +19,13 @@ export function CisoScopeDialog({
   open,
   onClose,
   currentScope,
+  allowAll = false,
 }: {
   open: boolean;
   onClose?: () => void;
   currentScope?: string;
+  /** Show the "All cases" option (Admin group only). */
+  allowAll?: boolean;
 }) {
   return (
     <Dialog
@@ -37,6 +40,7 @@ export function CisoScopeDialog({
           key={open ? "open" : "closed"}
           enabled={open}
           currentScope={currentScope}
+          allowAll={allowAll}
           onSaved={onClose}
           onCancel={onClose}
         />

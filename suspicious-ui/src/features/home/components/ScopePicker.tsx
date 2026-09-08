@@ -30,21 +30,26 @@ function serialize(all: boolean, groups: string[]): string {
  * The management-scope multi-select, shared by the forced first-run dialog
  * (CisoScopeDialog) and the "Management scope" profile tab.
  *
- * A CISO may pick any combination of their own org units (region / country /
- * GBU) — cases are matched if the reporter is in *any* selected group — or
- * "All cases". Server-side `validate_scope` rejects anything outside those.
+ * A CISO picks a combination of their own org units (region / country / GBU).
+ * Multiple picks are AND-ed server-side — "Country: RO" + "GBU: Off GBU"
+ * narrows to reporters in both, it does not widen. "All cases" (no
+ * restriction) is only offered to Admin-group users; `validate_scope`
+ * enforces the same server-side.
  */
 export function ScopePicker({
   currentScope,
   onSaved,
   onCancel,
   enabled = true,
+  allowAll = false,
 }: {
   currentScope?: string;
   onSaved?: () => void;
   onCancel?: () => void;
   /** Skip fetching suggestions until the picker is actually visible. */
   enabled?: boolean;
+  /** Show the "All cases" option (Admin group only). */
+  allowAll?: boolean;
 }) {
   const qc = useQueryClient();
 
@@ -69,7 +74,10 @@ export function ScopePicker({
 
   // Callers that need to re-seed from a changed `currentScope` (the dialog on
   // reopen) pass a `key` to remount instead — keeps this state dead simple.
-  const initial = React.useMemo(() => parse(currentScope), [currentScope]);
+  const initial = React.useMemo(() => {
+    const p = parse(currentScope);
+    return allowAll ? p : { all: false, groups: p.groups };
+  }, [currentScope, allowAll]);
   const [all, setAll] = React.useState(initial.all);
   const [groups, setGroups] = React.useState<string[]>(initial.groups);
 
@@ -94,7 +102,8 @@ export function ScopePicker({
     <Stack spacing={1.5}>
       <Typography color="text.secondary">
         This controls dashboards, investigations and submission visibility for your CISO view.
-        Cases are shown when the reporter belongs to any scope you select.
+        Picking more than one narrows the scope — a case is shown only when its reporter
+        belongs to every unit you select.
       </Typography>
 
       <FormGroup>
@@ -121,18 +130,20 @@ export function ScopePicker({
             No org-unit suggestions available for your profile.
           </Typography>
         ) : null}
-        <FormControlLabel
-          control={
-            <Checkbox
-              checked={all}
-              onChange={() => {
-                setAll((v) => !v);
-                setGroups([]);
-              }}
-            />
-          }
-          label="All cases (no restriction)"
-        />
+        {allowAll ? (
+          <FormControlLabel
+            control={
+              <Checkbox
+                checked={all}
+                onChange={() => {
+                  setAll((v) => !v);
+                  setGroups([]);
+                }}
+              />
+            }
+            label="All cases (no restriction)"
+          />
+        ) : null}
       </FormGroup>
 
       {mutation.isError ? <Alert severity="error">Failed to save scope.</Alert> : null}
