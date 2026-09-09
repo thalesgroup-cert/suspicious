@@ -37,6 +37,9 @@ class MailObservableReportsTests(TestCase):
 
     def test_yields_one_row_per_embedded_observable_with_its_reports(self):
         r = self._rep("j1", "url", self.url)
+        # exact row count — mail_observable_reports doesn't dedupe by (field, pk),
+        # and the dict-by-field below would silently hide a duplicate row.
+        self.assertEqual(len(list(mail_observable_reports(self.mail))), 2)
         rows = {f: (obj, reps) for (_a, obj, f, reps) in mail_observable_reports(self.mail)}
         self.assertEqual(rows["url"][0].pk, self.url.pk)
         self.assertEqual([x.id for x in rows["url"][1]], [r.id])

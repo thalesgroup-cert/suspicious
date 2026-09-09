@@ -12,6 +12,8 @@ from __future__ import annotations
 _BAND_RANK = {"Safe": 0, "Inconclusive": 0, "Suspicious": 1, "Dangerous": 2}
 
 # worst-of ordering when picking the dominant embedded verdict.
+# NOTE: distinct from observable_engine._BAND_ORDER (3 keys, no Inconclusive).
+# This one includes Inconclusive=1 for worst-of ordering across mixed verdicts.
 _BAND_ORDER = {"Safe": 0, "Inconclusive": 1, "Suspicious": 2, "Dangerous": 3}
 
 # band -> legacy ioc_level string that admin filters + cross-case reuse read.

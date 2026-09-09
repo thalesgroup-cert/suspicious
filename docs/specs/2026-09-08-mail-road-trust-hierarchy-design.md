@@ -176,13 +176,22 @@ just stop using its return value for the mail-band merge.
 
 ### 5. Per-`MailArtifact` level writes
 
-`_write_mail_artifact_level(m_art, v)`:
-- `m_art.artifact_level` = `_BAND_TO_IOC_LEVEL[v.band]` (`Safe→safe`,
-  `Suspicious→suspicious`, `Dangerous→malicious`, `Inconclusive→info`) —
-  **unless** already in `_STICKY` (`critical`, `SAFE-ALLOW_LISTED`).
-- `m_art.artifact_score` = `_DERIVED_SCORE[v.band]`, `m_art.artifact_confidence`
-  = `v.confidence`.
-- `save(update_fields=[…])`.
+Shipped behaviour (a deliberate departure from this section's original "write
+score/confidence unconditionally"): the **whole** write block — level *and*
+score *and* confidence — is guarded on `_STICKY_IOC_LEVELS`, for BOTH the global
+observable row (`obj.ioc_*`) and the per-`MailArtifact` row (`m_art.artifact_*`):
+
+- If the current level is in `_STICKY_IOC_LEVELS` (`critical`,
+  `SAFE-ALLOW_LISTED`) → skip the row entirely; a deny/allow-list marker owns
+  the score and confidence too, not just the level string.
+- Otherwise write `artifact_level` = `_BAND_TO_IOC_LEVEL[v.band]` (`Safe→safe`,
+  `Suspicious→suspicious`, `Dangerous→malicious`, `Inconclusive→info`),
+  `artifact_score` = `_DERIVED_SCORE[v.band]`, `artifact_confidence` =
+  `v.confidence`, then `save(update_fields=[…])`.
+
+The IOC road's *primary* loop (`finalise_ioc_group`) still writes
+`ioc_score`/`ioc_confidence` unconditionally; only its derived loop and this mail
+path skip the whole block for a sticky level.
 
 These fields already exist on `MailArtifact` (write-once defaults today). The
 `_BAND_TO_IOC_LEVEL` / `_DERIVED_SCORE` / `_STICKY` maps live in
@@ -287,3 +296,6 @@ This changes how **every mail case** is scored. Gate on:
   flipped without a deploy, and remove the flag once the SOC confirms the
   verdict quality on real traffic.
 - Fallback path documented above (Tier multiplier).
+- `ArtifactIsX.times_sent` / observable `times_sent` no longer increment for
+  mail-embedded observables when the flag is ON (the artifact-scoring loop is
+  skipped). These feed admin display + a URL-handler heuristic only, not scoring.

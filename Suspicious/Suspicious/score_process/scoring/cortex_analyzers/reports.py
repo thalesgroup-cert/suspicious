@@ -113,7 +113,7 @@ class CortexAnalyzerReports:
         # UI — its return value is no longer used for the band merge.
         score_derived_observables(case)
 
-        embedded, rationale_lines = [], []
+        embedded, rationale_lines, embedded_report_count = [], [], 0
         for m_art, obj, _field, reports in mail_observable_reports(mail):
             seen, svs = set(), []
             for r in reports:
@@ -123,6 +123,7 @@ class CortexAnalyzerReports:
                 svs.append(source_verdict_from_report(r))
             if not svs:
                 continue
+            embedded_report_count += len(svs)
             v = score_observable(svs)
             embedded.append(v)
             rationale_lines.extend(v.rationale)
@@ -154,10 +155,17 @@ class CortexAnalyzerReports:
         # A body-less mail scores Result.FAILURE (score_case has no scorable
         # signal). Only rebase to Inconclusive when the embedded evidence
         # actually raises the band (Suspicious/Dangerous) — an all-Safe/no-data
-        # body-less mail stays FAILURE.
-        base = replace(verdict, result=Result.INCONCLUSIVE) \
+        # body-less mail stays FAILURE. Rebasing also derives final_score from
+        # the worst embedded band so case.score matches the escalated case.results
+        # (the IOC road does the same in finalise_ioc_group).
+        base = replace(verdict, result=Result.INCONCLUSIVE,
+                       final_score=_DERIVED_SCORE.get(worst.band, 5)) \
             if verdict.result == Result.FAILURE and _BAND_RANK.get(worst.band, 0) > 0 \
             else verdict
+        # The embedded analyzer reports WERE scored (on their own observables) —
+        # count them in n_scored so apply_verdict's case.analysis_done reflects
+        # them, band raised or not. Matches finalise_ioc_group's analyzer count.
+        base = replace(base, n_scored=base.n_scored + embedded_report_count)
         return mail_band_escalation(base, embedded, note=note)
 
     @staticmethod

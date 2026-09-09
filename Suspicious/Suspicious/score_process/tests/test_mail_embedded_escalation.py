@@ -74,6 +74,8 @@ class MailEmbeddedEscalationTests(TestCase):
         v = CortexAnalyzerReports._apply_embedded_escalation(
             self.case, self.mail, self._verdict(Result.INCONCLUSIVE))
         self.assertEqual(v.result, Result.DANGEROUS)
+        # base n_scored=1 + the 2 deduped GTI/urlscan reports on the one URL.
+        self.assertEqual(v.n_scored, 3)
         self.assertTrue(any("authoritative" in r.lower() or "GoogleThreatIntelligence" in r
                             for r in v.rationale))
         ma = MailArtifact.objects.get(artifactIsUrl__url=self.url)
@@ -121,6 +123,9 @@ class MailEmbeddedEscalationTests(TestCase):
         v = CortexAnalyzerReports._apply_embedded_escalation(
             self.case, self.mail, self._verdict(Result.FAILURE))
         self.assertEqual(v.result, Result.DANGEROUS)
+        # rebased FAILURE→Dangerous must also carry the Dangerous score (9), so
+        # case.score matches case.results (real FAILURE verdicts start at NEUTRAL 5).
+        self.assertEqual(v.final_score, 9)
         self.assertTrue(v.rationale)
 
     def test_failure_base_verdict_unchanged_when_embedded_is_clean(self):
