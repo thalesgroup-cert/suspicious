@@ -235,7 +235,42 @@ class CISOProfileSerializer(serializers.ModelSerializer):
             "creation_date",
             "last_update",
         ]
-        read_only_fields = ["id", "scope", "creation_date", "last_update"]
+        read_only_fields = ["id", "creation_date", "last_update"]
+
+    def validate_scope(self, value):
+        """A CISO may only scope themselves to a pipe-joined subset of their
+        own org units (region / country / gbu). "ALL" (no restriction) is
+        reserved for members of the Admin group. This stops a CISO widening
+        their own visibility beyond their remit."""
+        normalized = (value or "").strip()
+        instance = self.instance
+
+        if not normalized:
+            return normalized
+        if normalized.upper() == "ALL":
+            is_admin = bool(
+                instance
+                and instance.user.groups.filter(name="Admin").exists()
+            )
+            if not is_admin:
+                raise serializers.ValidationError(
+                    'Scope "ALL" is reserved for administrators.'
+                )
+            return "ALL"
+        allowed = {
+            str(getattr(instance, attr, "") or "").strip()
+            for attr in ("region", "country", "gbu")
+        }
+        allowed.discard("")
+
+        parts = [p.strip() for p in normalized.split("|") if p.strip()]
+        invalid = [p for p in parts if p not in allowed]
+        if not parts or invalid:
+            raise serializers.ValidationError(
+                f"Invalid scope. Allowed values: {sorted(allowed)} "
+                "(combine with '|' to narrow)."
+            )
+        return "|".join(sorted(parts))
 
     def validate_theme(self, value):
         valid = {choice[0] for choice in Theme.choices}

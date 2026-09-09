@@ -11,15 +11,27 @@ overrides:
   # Transitive vulns flagged by npm-audit (security.yml), none reachable in
   # our own code — undici comes in via jsdom/vitest browser mode, form-data
   # via axios — but pin the patched floor so the audit gate stays green.
-  undici: 7.28.0
+  # undici <7.29.0: cross-user info disclosure, response desync, CRLF via
+  # blob body type, cookie-attribute injection (GHSA-jr45-8vmc-qm54 et al).
+  undici: 7.29.0
   form-data: 4.0.6
   # minimatch (via eslint's @eslint/config-array) pulls brace-expansion
   # 5.0.6 — ReDoS via consecutive non-expanding {} groups (GHSA-3jxr-9vmj-r5cp).
-  # 5.0.7 fixed that but is itself vulnerable to a separate unbounded-
-  # expansion-length DoS (GHSA-mh99-v99m-4gvg); 5.0.8 fixes both.
-  brace-expansion: 5.0.8
+  # 5.0.7/5.0.8 fixed that plus an unbounded-expansion DoS; 5.0.9 fixes a
+  # further DoS via unbounded intermediate arrays that bypassed the earlier
+  # guard.
+  brace-expansion: 5.0.9
   # postcss (via vite/@vitejs/plugin-react, dev-only) <=8.5.17 auto-loads
-  # sourceMappingURL comments as a local file path with no traversal check,
-  # letting a crafted comment in tooling-processed CSS read arbitrary files
-  # off disk (GHSA-r28c-9q8g-f849). 8.5.18 fixes it.
-  postcss: 8.5.18
+  # sourceMappingURL comments as a local file path with no traversal check
+  # (GHSA-r28c-9q8g-f849); <=8.5.22 an incomplete fix of the same still lets
+  # an attacker-controlled comment read files (GHSA-6g55-p6wh-862q). 8.5.23
+  # fixes both.
+  postcss: 8.5.23
+  # nanoid <3.3.18 (via postcss → vite, dev-only): custom generators loop
+  # indefinitely on a non-integer size (GHSA-qrpm-p2h7-hrv2).
+  nanoid: 3.3.18
+  # browserslist <=4.28.6 (via eslint-plugin-react-hooks → @babel/core,
+  # dev-only): unbounded memory growth (no cache eviction) and an uncaught
+  # crash / prototype write when fed untrusted browserslist-stats.json
+  # custom stats (GHSA-c83g-rgw3-j3cx). 4.28.7 fixes both.
+  browserslist: 4.28.7

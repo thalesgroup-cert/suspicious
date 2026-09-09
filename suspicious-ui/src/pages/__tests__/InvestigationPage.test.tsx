@@ -36,6 +36,11 @@ vi.mock("@/features/settings/components/connectors", () => ({
   getEnabledConnectors: vi.fn().mockResolvedValue([]),
 }));
 
+vi.mock("@/features/home/api", () => ({
+  getHomeSummary: vi.fn().mockResolvedValue({ suggested_scopes: {} }),
+  setCisoScope: vi.fn().mockResolvedValue({ scope: "EMEA" }),
+}));
+
 // ---------------------------------------------------------------------------
 // Test data
 // ---------------------------------------------------------------------------
@@ -399,6 +404,38 @@ describe("InvestigationPage", () => {
     await waitFor(() => {
       expect(mockGetAll).not.toHaveBeenCalled();
     });
+  });
+
+  it("prompts a scopeless CISO to set a scope instead of listing cases", async () => {
+    mockGetMe.mockResolvedValue({ ...mockMe, groups: ["CISO"], ciso_scope: "" } as never);
+
+    renderInvestigation();
+
+    await waitFor(() => {
+      expect(
+        screen.getByRole("heading", { name: /select your management scope/i })
+      ).toBeInTheDocument();
+    });
+    expect(mockGetAll).not.toHaveBeenCalled();
+  });
+
+  it("lists cases for a CISO who already has a scope", async () => {
+    mockGetMe.mockResolvedValue({ ...mockMe, groups: ["CISO"], ciso_scope: "EMEA" } as never);
+
+    renderInvestigation();
+
+    await waitFor(() => expect(mockGetAll).toHaveBeenCalled());
+  });
+
+  it("tells a scoped CISO when nothing was submitted in their scope", async () => {
+    mockGetMe.mockResolvedValue({ ...mockMe, groups: ["CISO"], ciso_scope: "RO" } as never);
+    mockGetAll.mockResolvedValue({ results: [], count: 0 } as never);
+
+    renderInvestigation();
+
+    expect(
+      await screen.findByText(/no submissions have been sent within your scope \(RO\)/i)
+    ).toBeInTheDocument();
   });
 
   it("shows the comment thread and posts an analyst note", async () => {

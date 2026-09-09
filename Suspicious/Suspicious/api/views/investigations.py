@@ -25,6 +25,7 @@ from api.serializers.investigations import (
     InvestigationRowSerializer,
 )
 from score_process.score_utils.send_mail.service import MailNotificationService
+from profiles.profiles_utils.scope import scoped_case_queryset
 
 logger = logging.getLogger(__name__)
 
@@ -123,15 +124,18 @@ class InvestigationAccessMixin:
     def get_case_list_queryset(self):
         # prefetch the group artifacts so get_case_info_value's IOC branch
         # doesn't fire 2 queries per row on a list page of IOC cases.
-        return Case.objects.select_related(*CASE_LIST_SELECT_RELATED).prefetch_related(
-            "observable_group__artifacts__url",
-            "observable_group__artifacts__ip",
-            "observable_group__artifacts__hash",
-            "observable_group__artifacts__domain",
+        return scoped_case_queryset(
+            Case.objects.select_related(*CASE_LIST_SELECT_RELATED).prefetch_related(
+                "observable_group__artifacts__url",
+                "observable_group__artifacts__ip",
+                "observable_group__artifacts__hash",
+                "observable_group__artifacts__domain",
+            ),
+            self.request.user,
         )
 
     def get_case_detail_queryset(self):
-        return (
+        return scoped_case_queryset(
             Case.objects.select_related(*CASE_DETAIL_SELECT_RELATED)
             .prefetch_related(
                 "fileOrMail__mail__mail_attachments",
@@ -141,7 +145,8 @@ class InvestigationAccessMixin:
                 "fileOrMail__mail__mail_artifacts__artifactIsHash",
                 "fileOrMail__mail__mail_artifacts__artifactIsDomain",
                 "fileOrMail__mail__mail_artifacts__artifactIsMailAddress",
-            )
+            ),
+            self.request.user,
         )
 
     def get_case_or_404(self, case_id: int) -> Case:

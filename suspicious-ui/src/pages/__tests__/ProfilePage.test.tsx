@@ -20,6 +20,11 @@ vi.mock("@/features/profile/api", () => ({
   uploadAvatar: vi.fn(),
 }));
 
+vi.mock("@/features/home/api", () => ({
+  getHomeSummary: vi.fn().mockResolvedValue({ suggested_scopes: { country: "RO", region: "EMEA" } }),
+  setCisoScope: vi.fn().mockResolvedValue({ scope: "RO" }),
+}));
+
 
 import { getMe } from "@/api/auth";
 import { getProfile, updatePreferences, uploadAvatar } from "@/features/profile/api";
@@ -65,6 +70,54 @@ describe("ProfilePage - Test Suite", () => {
       ).toBeInTheDocument();
     });
 
+  });
+
+  describe("CISO scope", () => {
+    beforeEach(() => {
+      vi.mocked(getMe).mockResolvedValue({
+        ...fixtureMe,
+        groups: ["CISO"],
+        ciso_scope: "EMEA",
+      });
+    });
+
+    it("shows a Management scope tab for a CISO", async () => {
+      renderWithProviders(<ProfilePage />, { initialPath: "/profile" });
+      expect(
+        await screen.findByText(/management scope/i, {}, { timeout: 5000 })
+      ).toBeInTheDocument();
+    });
+
+    it("opens the scope tab from the profile chip", async () => {
+      renderWithProviders(<ProfilePage />, { initialPath: "/profile" });
+
+      const chip = await screen.findByText(/scope: emea/i, {}, { timeout: 5000 });
+      await userEvent.click(chip);
+
+      expect(
+        await screen.findByRole("button", { name: /save scope/i })
+      ).toBeInTheDocument();
+    });
+
+    it("hides 'All cases' from a non-Admin CISO", async () => {
+      renderWithProviders(<ProfilePage />, { initialPath: "/profile" });
+      const chip = await screen.findByText(/scope: emea/i, {}, { timeout: 5000 });
+      await userEvent.click(chip);
+      await screen.findByRole("button", { name: /save scope/i });
+      expect(screen.queryByLabelText(/all cases/i)).not.toBeInTheDocument();
+    });
+
+    it("shows 'All cases' to an Admin-group CISO", async () => {
+      vi.mocked(getMe).mockResolvedValue({
+        ...fixtureMe,
+        groups: ["CISO", "Admin"],
+        ciso_scope: "EMEA",
+      });
+      renderWithProviders(<ProfilePage />, { initialPath: "/profile" });
+      const chip = await screen.findByText(/scope: emea/i, {}, { timeout: 5000 });
+      await userEvent.click(chip);
+      expect(await screen.findByLabelText(/all cases/i)).toBeInTheDocument();
+    });
   });
 
   describe("State across navigation", () => {

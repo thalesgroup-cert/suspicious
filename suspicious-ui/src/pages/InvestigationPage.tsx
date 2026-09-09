@@ -79,6 +79,7 @@ import { ResultChip } from "@/shared/components/ResultChip";
 import { CopyIconButton } from "@/shared/components/CopyIconButton";
 import MailPreview from "@/shared/components/MailPreview";
 
+import { CisoScopeDialog } from "@/features/home/components/CisoScopeDialog";
 import { SoftCard } from "@/features/investigation/components/cards";
 import { InvestigationAnalyzerReportCard } from "@/features/investigation/components/InvestigationAnalyzerReportCard";
 import { ObservableGroupPanel } from "@/features/investigation/ObservableGroupPanel";
@@ -133,6 +134,9 @@ export default function InvestigationPage() {
     setPage(0);
   }
   const [page, setPage] = React.useState(0);
+
+  const anyFilterActive =
+    !!qDebounced || status !== "ALL" || type !== "ALL" || result !== "ALL" || !!from || !!to;
   const [pageSize, setPageSize] = React.useState(10);
 
   const filtersActive =
@@ -183,6 +187,14 @@ export default function InvestigationPage() {
     () => groups.includes("CISO") || groups.includes("CERT") || groups.includes("Admin"),
     [groups]
   );
+  // A CISO with no scope set can't meaningfully browse cases yet — prompt them
+  // to pick one first (same modal Home shows on first connection).
+  const needsScope =
+    !!me &&
+    groups.includes("CISO") &&
+    !groups.includes("CERT") &&
+    !groups.includes("Admin") &&
+    !me.ciso_scope;
 
   const investigationListParams = React.useMemo(() => {
     const needsRawOrdering = sortField === "status" || sortField === "result";
@@ -205,7 +217,7 @@ export default function InvestigationPage() {
   const investigationsQuery = useQuery<InvestigationListResponse>({
     queryKey: ["investigation", investigationListParams],
     queryFn: () => getAllInvestigations(investigationListParams),
-    enabled: !!me && isElevated,
+    enabled: !!me && isElevated && !needsScope,
     retry: false,
     placeholderData: (prev) => prev,
     refetchInterval: (query) => {
@@ -414,6 +426,14 @@ export default function InvestigationPage() {
   }
   if (!isElevated) {
     return <Box sx={{ p: 3 }}><Alert severity="error">Access denied.</Alert></Box>;
+  }
+  if (needsScope) {
+    return (
+      <Box sx={{ p: 3 }}>
+        <Alert severity="info">Select your management scope to view investigations.</Alert>
+        <CisoScopeDialog open allowAll={groups.includes("Admin")} />
+      </Box>
+    );
   }
   if (investigationsQuery.isLoading && !investigationsQuery.data) {
     return <Box sx={{ minHeight: "60vh", display: "grid", placeItems: "center" }}><CircularProgress /></Box>;
@@ -679,7 +699,13 @@ export default function InvestigationPage() {
 
           {total === 0 ? (
             <Box sx={{ p: 3 }}>
-              <Alert severity="info">No investigations match your filters.</Alert>
+              <Alert severity="info">
+                {anyFilterActive
+                  ? "No investigations match your filters."
+                  : me.ciso_scope
+                    ? `No submissions have been sent within your scope (${me.ciso_scope}).`
+                    : "No investigations yet."}
+              </Alert>
             </Box>
           ) : (
             <Box sx={{ overflowX: "auto" }}>

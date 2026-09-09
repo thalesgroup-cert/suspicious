@@ -53,6 +53,7 @@ import { ColorSettingsPanel } from "@/features/profile/ColorSettingsPanel";
 import { AvatarPanel } from "@/features/profile/AvatarPanel";
 import { UserAvatar } from "@/features/profile/components/UserAvatar";
 import { randomSeed } from "@/features/profile/avatar";
+import { ScopePicker } from "@/features/home/components/ScopePicker";
 
 import {
   CaptionLabel,
@@ -71,7 +72,7 @@ import {
 // Types
 // ---------------------------------------------------------------------------
 
-type Section = "preferences" | "appearance" | "colors" | "avatar";
+type Section = "preferences" | "appearance" | "colors" | "avatar" | "scope";
 
 // ---------------------------------------------------------------------------
 // ToggleRow
@@ -614,6 +615,8 @@ export default function ProfilePage() {
   const scope      = (me as any)?.ciso_scope;
   const displayName = [me.first_name, me.last_name].filter(Boolean).join(" ") || me.username;
 
+  const isCiso = groups.includes("CISO");
+
   const NAV = [
     {
       key: "preferences" as Section,
@@ -622,6 +625,15 @@ export default function ProfilePage() {
       icon: <TuneOutlined />,
       dirty: prefsDirty,
     },
+    ...(isCiso
+      ? [{
+          key: "scope" as Section,
+          label: "Management scope",
+          sub: "Which submissions you can see",
+          icon: <ShieldOutlined />,
+          dirty: false,
+        }]
+      : []),
     {
       key: "appearance" as Section,
       label: "Appearance",
@@ -643,7 +655,7 @@ export default function ProfilePage() {
       icon: <PersonOutlined />,
       dirty: avatarDirty,
     },
-  ] as const;
+  ];
 
   const anyDirty = prefsDirty || themeDirty || avatarDirty;
 
@@ -713,8 +725,9 @@ export default function ProfilePage() {
                     <Chip size="small" label="Standard" variant="outlined"
                       sx={{ height: 24, "& .MuiChip-label": { fontSize: 12 } }} />
                   )}
-                  {scope ? (
-                    <Chip size="small" label={`Scope: ${scope}`} variant="outlined"
+                  {isCiso ? (
+                    <Chip size="small" label={`Scope: ${scope || "not set"}`} variant="outlined"
+                      clickable onClick={() => setSection("scope")}
                       sx={{ height: 24, "& .MuiChip-label": { fontSize: 12 } }} />
                   ) : null}
                 </Stack>
@@ -857,6 +870,20 @@ export default function ProfilePage() {
               />
             ) : section === "colors" ? (
               <ColorsPanel />
+            ) : section === "scope" ? (
+              <Stack spacing={1.5}>
+                <Box>
+                  <Typography sx={{ fontWeight: 950, fontSize: 18 }}>Management scope</Typography>
+                  <Typography color="text.secondary" variant="body2">
+                    Current scope: <b>{scope || "not set"}</b>
+                  </Typography>
+                </Box>
+                <ScopePicker
+                  currentScope={scope || undefined}
+                  enabled
+                  allowAll={groups.includes("Admin")}
+                />
+              </Stack>
             ) : (
               <AvatarPanel
                 style={avatarStyle} seed={avatarSeed}
