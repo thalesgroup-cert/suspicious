@@ -315,6 +315,50 @@ class SubmitIndicatorsView(APIView):
         )
 
 
+class SubmitIocFileExtractView(APIView):
+    """Extract candidate indicators from an uploaded IOC-list file
+    (.txt / .csv / .json). Does NOT create a case — the caller reviews the
+    result and submits it through /submit/indicators/."""
+
+    permission_classes = [IsAuthenticated]
+
+    MAX_BYTES = 2 * 1024 * 1024
+    ALLOWED_EXT = (".txt", ".csv", ".json")
+
+    def post(self, request):
+        f = request.FILES.get("file")
+        if f is None:
+            return _error_response(
+                detail="No file provided.", http_status=status.HTTP_400_BAD_REQUEST
+            )
+        name = (f.name or "").lower()
+        if not name.endswith(self.ALLOWED_EXT):
+            return _error_response(
+                detail="Unsupported file type. Upload a .txt, .csv or .json IOC list.",
+                http_status=status.HTTP_400_BAD_REQUEST,
+            )
+        if (f.size or 0) > self.MAX_BYTES:
+            return _error_response(
+                detail=f"File too large ({f.size} bytes). The limit is {self.MAX_BYTES} bytes.",
+                http_status=status.HTTP_400_BAD_REQUEST,
+            )
+
+        from api.utils.indicators import indicators_from_file
+
+        parsed = indicators_from_file(f.name or "", f.read())
+        valid = [p.value for p in parsed if p.type]
+        skipped = [p.value for p in parsed if not p.type]
+        return Response(
+            {
+                "status": "success",
+                "indicators": "\n".join(valid),
+                "found": len(valid),
+                "skipped": skipped,
+            },
+            status=status.HTTP_200_OK,
+        )
+
+
 class SubmitFileView(BaseSubmitView):
     serializer_class = SubmitFileSerializer
     submission_type = "file"

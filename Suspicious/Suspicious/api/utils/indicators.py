@@ -62,6 +62,33 @@ def expand_wrappers(indicators: list[ParsedIndicator]) -> list[ParsedIndicator]:
     return out
 
 
+def _json_strings(node) -> list[str]:
+    if isinstance(node, str):
+        return [node]
+    if isinstance(node, dict):
+        return [s for v in node.values() for s in _json_strings(v)]
+    if isinstance(node, list):
+        return [s for v in node for s in _json_strings(v)]
+    return []
+
+
+def indicators_from_file(name: str, raw: bytes) -> list["ParsedIndicator"]:
+    """Extract indicators from an uploaded IOC-list file (.txt / .csv / .json).
+
+    JSON is flattened to its string leaves; .txt/.csv fall straight through
+    parse_indicators (its splitter already handles newlines, commas and
+    semicolons). No new detection logic — parse_indicators does refang + type.
+    """
+    text = raw.decode("utf-8", "replace")
+    if name.lower().endswith(".json"):
+        import json
+        try:
+            text = "\n".join(_json_strings(json.loads(text)))
+        except ValueError:
+            pass  # not valid JSON — treat as plain text
+    return parse_indicators(text)
+
+
 def parse_indicators(text: str) -> list[ParsedIndicator]:
     seen: set[str] = set()
     out: list[ParsedIndicator] = []

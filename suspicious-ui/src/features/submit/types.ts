@@ -30,6 +30,6 @@ export type SubmitIndicatorsResponse = {
   skipped: string[];
 };
 
-export type SubmitMode = "file" | "artifact" | "indicators";
+export type SubmitMode = "file" | "indicators";
 
 export type ArtifactKind = "url" | "ioc";

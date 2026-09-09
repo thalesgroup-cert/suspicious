@@ -51,6 +51,7 @@ from api.views.submit import (
     SubmitConfigView,
     SubmitFileView,
     SubmitIndicatorsView,
+    SubmitIocFileExtractView,
     SubmitOtherView,
     SubmitUrlView,
 )
@@ -140,6 +141,7 @@ urlpatterns = [
     path("submit/other/", SubmitOtherView.as_view(), name="submit-other"),
     path("submit/file/", SubmitFileView.as_view(), name="submit-file"),
     path("submit/indicators/", SubmitIndicatorsView.as_view(), name="submit-indicators"),
+    path("submit/indicators/extract/", SubmitIocFileExtractView.as_view(), name="submit-indicators-extract"),
 
     path("home/summary/", HomeSummaryView.as_view(), name="home-summary"),
 
