@@ -58,6 +58,7 @@ from api.views.submissions import (
     SubmissionChallengeView,
     SubmissionDetailsView,
     SubmissionListView,
+    SubmissionTicketView,
 )
 from api.views.oidc import OIDCCallbackView, OIDCLoginView
 from api.views.cortex_webhook import CortexWebhookView
@@ -115,6 +116,7 @@ urlpatterns = [
     path("submissions/", SubmissionListView.as_view(), name="submissions-list"),
     path("submissions/<int:submission_id>/", SubmissionDetailsView.as_view(), name="submission-details"),
     path("submissions/<int:submission_id>/challenge/", SubmissionChallengeView.as_view(), name="submission-challenge"),
+    path("submissions/<int:submission_id>/ticket/", SubmissionTicketView.as_view(), name="submission-ticket"),
     path("submissions/<int:submission_id>/urls/<int:url_id>/analyze/",
          SubmissionUrlAnalyzeView.as_view(), name="submission-url-analyze"),
 

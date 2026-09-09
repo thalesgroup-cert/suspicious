@@ -37,6 +37,7 @@ class TheHiveConnector(Connector):
     def on_case_finalised(self, event) -> None:
         from case_handler.models import Case
         from connectors.contrib.thehive.phishing import (
+            THEHIVE_SEVERITY,
             add_observables_to_item,
             build_group_observables,
             create_new_alert,
@@ -54,10 +55,7 @@ class TheHiveConnector(Connector):
         if not observables:
             return
 
-        # TheHive severity 1=Low 2=Medium 3=High 4=Critical
-        severity = {
-            "Safe": 1, "Inconclusive": 2, "Suspicious": 3, "Dangerous": 4,
-        }.get(str(case.results), 2)
+        severity = THEHIVE_SEVERITY.get(str(case.results), 2)
 
         alert = create_new_alert(
             None,

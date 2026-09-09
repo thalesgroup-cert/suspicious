@@ -1,6 +1,7 @@
 import logging
 
 from django.db.models import Q
+from django.utils import timezone
 from drf_spectacular.utils import OpenApiExample, OpenApiParameter, extend_schema
 from rest_framework import status
 from rest_framework.exceptions import ValidationError
@@ -21,6 +22,7 @@ from api.serializers.submissions import (
     SubmissionDetailsSerializer,
     SubmissionListSerializer,
 )
+from api.views.investigations import IsInvestigator
 from case_handler.models import Case
 from cortex_job.models import AnalyzerReport
 from cortex_job.cortex_utils.case_targets import build_analyzer_report_filter, collect_case_targets
@@ -77,6 +79,23 @@ def _dedup_analyzer_reports(reports) -> list:
             result.append(report)
     return result
 
+
+
+def case_analyzer_reports(case) -> list:
+    """Newest AnalyzerReport per (analyzer, target) across every observable of a
+    case. Shared by the submission detail and ticket views."""
+    targets = collect_case_targets(case)
+    if not targets:
+        return []
+    qs = (
+        AnalyzerReport.objects.filter(build_analyzer_report_filter(targets))
+        .select_related(
+            "analyzer", "url", "domain", "mail", "hash",
+            "file", "ip", "mail_body", "mail_header",
+        )
+        .order_by("-creation_date", "-id")
+    )
+    return _dedup_analyzer_reports(qs)
 
 
 class SubmissionPagination(PageNumberPagination):
@@ -206,25 +225,10 @@ class SubmissionDetailsView(RetrieveAPIView):
         return obj
 
     def _get_analyzer_reports_queryset(self, obj: Case):
-        targets = collect_case_targets(obj)
-        if not targets:
-            return []
-
-        filters = build_analyzer_report_filter(targets)
-
-        # No .distinct() needed: every filter above is a plain equality/IN on
+        # No .distinct() needed: every filter is a plain equality/IN on
         # AnalyzerReport's own FK columns, and every select_related() relation
         # is forward FK/O2O — structurally can't fan out into duplicate rows.
-        # _dedup_analyzer_reports() below already de-dupes in Python regardless.
-        qs = (
-            AnalyzerReport.objects.filter(filters)
-            .select_related(
-                "analyzer", "url", "domain", "mail", "hash",
-                "file", "ip", "mail_body", "mail_header",
-            )
-            .order_by("-creation_date", "-id")
-        )
-        return _dedup_analyzer_reports(qs)
+        return case_analyzer_reports(obj)
 
     @extend_schema(summary="Retrieve submission details")
     def retrieve(self, request, *args, **kwargs):
@@ -284,3 +288,66 @@ class SubmissionChallengeView(APIView):
             logger.exception("Challenge notify failed for case %s", obj.id)
 
         return Response({"detail": "Challenge submitted."}, status=status.HTTP_200_OK)
+
+
+_RECOMMENDED_ACTION = {
+    "Dangerous": "Block the listed observables at the perimeter and notify the reporter; "
+                 "treat as a confirmed threat.",
+    "Suspicious": "Review the listed observables against the analyzer evidence; block if confirmed.",
+    "Safe": "No action required; close the case.",
+    "Inconclusive": "Insufficient signal — escalate for manual analyst review.",
+}
+
+
+class SubmissionTicketView(APIView):
+    """Ticket-shaped JSON for a case: verdict, observables with their per-IOC
+    verdict, and an analyzer summary — the payload a SOC analyst pushes into
+    TheHive / a ticketing system."""
+
+    permission_classes = [IsAuthenticated, IsInvestigator]
+
+    @extend_schema(summary="Ticket-shaped SOAR payload for a submission")
+    def get(self, request, submission_id: int):
+        from connectors.contrib.thehive.phishing import THEHIVE_SEVERITY, ticket_observables
+        from score_process.scoring.sources import source_verdict_from_report
+
+        case = get_object_or_404(
+            Case.objects.select_related(*CASE_DETAIL_SELECT_RELATED), pk=submission_id
+        )
+
+        reports = case_analyzer_reports(case)
+        by_verdict: dict = {}
+        analyzers: list = []
+        for rep in reports:
+            sv = source_verdict_from_report(rep)
+            by_verdict[sv.verdict] = by_verdict.get(sv.verdict, 0) + 1
+            if sv.name not in analyzers:
+                analyzers.append(sv.name)
+
+        result = str(case.results)
+        return Response({
+            "case_id": case.id,
+            "generated_at": timezone.now().isoformat(),
+            "title": f"Suspicious case #{case.id} — {result}",
+            "verdict": {
+                "result": result,
+                "score": case.final_score,
+                "confidence": case.final_confidence,
+                "severity": THEHIVE_SEVERITY.get(result, 2),
+                "tlp": 2,
+                "pap": 2,
+                # ponytail: results_ai/category_ai stand-in until roadmap item #2
+                # (Case.threat_classification) lands.
+                "ai_classification": case.category_ai or case.results_ai,
+                "rationale": list(case.verdict_rationale or []),
+            },
+            "observables": ticket_observables(case),
+            "analyzer_summary": {
+                "total_reports": len(reports),
+                "by_verdict": by_verdict,
+                "analyzers": analyzers,
+            },
+            "recommended_action": _RECOMMENDED_ACTION.get(
+                result, _RECOMMENDED_ACTION["Inconclusive"]
+            ),
+        })

@@ -70,21 +70,55 @@ def generate_ref() -> str:
 
 _THEHIVE_DATATYPE = {"ip": "ip", "url": "url", "domain": "domain", "hash": "hash", "file": "file", "mail": "mail"}
 
+# TheHive alert severity: 1=Low 2=Medium 3=High 4=Critical.
+THEHIVE_SEVERITY = {"Safe": 1, "Inconclusive": 2, "Suspicious": 3, "Dangerous": 4}
 
-def build_group_observables(case):
+# persisted observable ioc_level (score_process.scoring.bands) -> ticket verdict word.
+_IOC_LEVEL_TO_VERDICT = {
+    "malicious": "malicious", "critical": "malicious",
+    "suspicious": "suspicious",
+    "safe": "safe", "SAFE-ALLOW_LISTED": "safe",
+    "info": "inconclusive",
+}
+
+
+def _case_observables(case):
+    """(inst, data_type, value) for every distinct IOC-road observable of a case
+    (mail/file/observable-group alike), skipping targets with no printable value."""
     from cortex_job.cortex_utils.case_targets import collect_case_targets
-    out = []
     for inst, data_type in collect_case_targets(case):
         value = getattr(inst, "address", None) or getattr(inst, "value", None)
-        if not value:
-            continue
-        out.append({
+        if value:
+            yield inst, data_type, value
+
+
+def build_group_observables(case):
+    return [
+        {
             "dataType": _THEHIVE_DATATYPE.get(data_type, "other"),
             "data": value,
             "message": f"Suspicious IOC-road observable ({data_type})",
             "tags": [f"suspicious:case:{case.id}"],
-        })
-    return out
+        }
+        for inst, data_type, value in _case_observables(case)
+    ]
+
+
+def ticket_observables(case):
+    """Case observables plus the per-IOC categorical verdict the scoring pass
+    already persisted on each row — for the SOAR ticket payload."""
+    return [
+        {
+            "dataType": _THEHIVE_DATATYPE.get(data_type, "other"),
+            "data": value,
+            "verdict": _IOC_LEVEL_TO_VERDICT.get(getattr(inst, "ioc_level", "info"), "inconclusive"),
+            "score": getattr(inst, "ioc_score", None),
+            "confidence": getattr(inst, "ioc_confidence", None),
+            "tags": [f"suspicious:case:{case.id}"],
+            "message": f"Suspicious IOC-road observable ({data_type})",
+        }
+        for inst, data_type, value in _case_observables(case)
+    ]
 
 
 def create_new_alert(ticket_id, title, description, severity, tlp, pap, app_name, thehive_url, api_key, tags=None):
