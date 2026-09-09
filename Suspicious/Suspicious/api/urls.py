@@ -69,6 +69,7 @@ from api.views.connectors import (
     ConnectorListView,
     ConnectorStateView,
     ConnectorTestView,
+    EnabledConnectorsView,
 )
 from api.views.url_analysis import SubmissionUrlAnalyzeView
 
@@ -147,6 +148,7 @@ urlpatterns = [
     path("config/<str:scope>/", ServiceConfigView.as_view(), name="service-config"),
 
     path("connectors/", ConnectorListView.as_view(), name="connectors-list"),
+    path("connectors/enabled/", EnabledConnectorsView.as_view(), name="connectors-enabled"),
     path("connectors/<str:name>/", ConnectorStateView.as_view(), name="connector-state"),
     path("connectors/<str:name>/config/", ConnectorConfigView.as_view(), name="connector-config"),
     path("connectors/<str:name>/test/", ConnectorTestView.as_view(), name="connector-test"),

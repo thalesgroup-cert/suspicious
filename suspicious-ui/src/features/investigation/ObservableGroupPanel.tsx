@@ -3,7 +3,6 @@ import {
   AccordionDetails,
   AccordionSummary,
   Box,
-  Button,
   Chip,
   Stack,
   Typography,
@@ -44,13 +43,7 @@ function flaggedRatio(observable: Observable) {
   return { flagged, total };
 }
 
-export function ObservableGroupPanel({
-  group,
-  caseId,
-}: {
-  group: ObservableGroup;
-  caseId?: number;
-}) {
+export function ObservableGroupPanel({ group }: { group: ObservableGroup }) {
   const band = worstBand(group.observables);
   const worst = group.observables.find((o) => o.verdict?.band === band);
 
@@ -70,15 +63,6 @@ export function ObservableGroupPanel({
             worst?.verdict ? `${band} · ${worst.verdict.confidence}%` : band
           }
         />
-        <Box sx={{ flex: 1 }} />
-        <Button
-          variant="outlined"
-          size="small"
-          disabled={!caseId}
-          onClick={() => window.open(`/api/cases/${caseId}/report/`, "_blank")}
-        >
-          Full report
-        </Button>
       </Stack>
 
       <Stack direction="row" spacing={0.75} sx={{ mb: 1.5, flexWrap: "wrap" }}>

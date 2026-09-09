@@ -67,6 +67,11 @@ class TheHiveConnector(Connector):
         alert_id = (alert or {}).get("_id")
         if alert_id:
             add_observables_to_item("alert", alert_id, observables, url, key)
+            # record it so a later manual "Push to TheHive" updates this alert
+            # instead of creating a duplicate.
+            if not case.thehive_alert_id:
+                case.thehive_alert_id = alert_id
+                case.save(update_fields=["thehive_alert_id"])
 
     def health_check(self) -> HealthStatus:
         url, key = self.config.get("url"), self.config.get("api_key")

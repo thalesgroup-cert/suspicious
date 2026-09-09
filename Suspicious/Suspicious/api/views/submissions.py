@@ -299,55 +299,86 @@ _RECOMMENDED_ACTION = {
 }
 
 
+def build_ticket(case) -> dict:
+    """The ticket-shaped SOAR payload for a case: verdict, observables with
+    their per-IOC verdict, and an analyzer summary."""
+    from connectors.contrib.thehive.phishing import THEHIVE_SEVERITY, ticket_observables
+    from score_process.scoring.sources import source_verdict_from_report
+
+    reports = case_analyzer_reports(case)
+    by_verdict: dict = {}
+    analyzers: list = []
+    for rep in reports:
+        sv = source_verdict_from_report(rep)
+        by_verdict[sv.verdict] = by_verdict.get(sv.verdict, 0) + 1
+        if sv.name not in analyzers:
+            analyzers.append(sv.name)
+
+    result = str(case.results)
+    return {
+        "case_id": case.id,
+        "generated_at": timezone.now().isoformat(),
+        "title": f"Suspicious case #{case.id} — {result}",
+        "verdict": {
+            "result": result,
+            "score": case.final_score,
+            "confidence": case.final_confidence,
+            "severity": THEHIVE_SEVERITY.get(result, 2),
+            "tlp": 2,
+            "pap": 2,
+            # ponytail: results_ai/category_ai stand-in until roadmap item #2
+            # (Case.threat_classification) lands.
+            "ai_classification": case.category_ai or case.results_ai,
+            "rationale": list(case.verdict_rationale or []),
+        },
+        "observables": ticket_observables(case),
+        "analyzer_summary": {
+            "total_reports": len(reports),
+            "by_verdict": by_verdict,
+            "analyzers": analyzers,
+        },
+        "recommended_action": _RECOMMENDED_ACTION.get(
+            result, _RECOMMENDED_ACTION["Inconclusive"]
+        ),
+    }
+
+
 class SubmissionTicketView(APIView):
-    """Ticket-shaped JSON for a case: verdict, observables with their per-IOC
-    verdict, and an analyzer summary — the payload a SOC analyst pushes into
-    TheHive / a ticketing system."""
+    """GET: the ticket-shaped SOAR payload for a case (verdict, per-IOC
+    verdicts, analyzer summary). POST: push that payload to TheHive as an
+    alert — creating one, or updating the case's existing alert."""
 
     permission_classes = [IsAuthenticated, IsInvestigator]
 
-    @extend_schema(summary="Ticket-shaped SOAR payload for a submission")
-    def get(self, request, submission_id: int):
-        from connectors.contrib.thehive.phishing import THEHIVE_SEVERITY, ticket_observables
-        from score_process.scoring.sources import source_verdict_from_report
-
-        case = get_object_or_404(
+    def _case(self, submission_id: int) -> Case:
+        return get_object_or_404(
             Case.objects.select_related(*CASE_DETAIL_SELECT_RELATED), pk=submission_id
         )
 
-        reports = case_analyzer_reports(case)
-        by_verdict: dict = {}
-        analyzers: list = []
-        for rep in reports:
-            sv = source_verdict_from_report(rep)
-            by_verdict[sv.verdict] = by_verdict.get(sv.verdict, 0) + 1
-            if sv.name not in analyzers:
-                analyzers.append(sv.name)
+    @extend_schema(summary="Ticket-shaped SOAR payload for a submission")
+    def get(self, request, submission_id: int):
+        return Response(build_ticket(self._case(submission_id)))
 
-        result = str(case.results)
-        return Response({
-            "case_id": case.id,
-            "generated_at": timezone.now().isoformat(),
-            "title": f"Suspicious case #{case.id} — {result}",
-            "verdict": {
-                "result": result,
-                "score": case.final_score,
-                "confidence": case.final_confidence,
-                "severity": THEHIVE_SEVERITY.get(result, 2),
-                "tlp": 2,
-                "pap": 2,
-                # ponytail: results_ai/category_ai stand-in until roadmap item #2
-                # (Case.threat_classification) lands.
-                "ai_classification": case.category_ai or case.results_ai,
-                "rationale": list(case.verdict_rationale or []),
-            },
-            "observables": ticket_observables(case),
-            "analyzer_summary": {
-                "total_reports": len(reports),
-                "by_verdict": by_verdict,
-                "analyzers": analyzers,
-            },
-            "recommended_action": _RECOMMENDED_ACTION.get(
-                result, _RECOMMENDED_ACTION["Inconclusive"]
-            ),
-        })
+    @extend_schema(summary="Push a submission's ticket to TheHive as an alert")
+    def post(self, request, submission_id: int):
+        from connectors.contrib.thehive.phishing import TheHivePushError, push_ticket
+        from connectors.delivery import get_state
+        from connectors.registry import registry
+
+        case = self._case(submission_id)
+
+        if not get_state("thehive").enabled:
+            return Response({"detail": "TheHive connector is not enabled."},
+                            status=status.HTTP_409_CONFLICT)
+        cfg = registry.instantiate("thehive").config
+        url, key = cfg.get("url"), cfg.get("api_key")
+        if not url or not key:
+            return Response({"detail": "TheHive connector is not configured."},
+                            status=status.HTTP_409_CONFLICT)
+
+        try:
+            result = push_ticket(case, build_ticket(case), url=url, key=key)
+        except TheHivePushError as exc:
+            return Response({"detail": f"TheHive push failed: {exc}"},
+                            status=status.HTTP_502_BAD_GATEWAY)
+        return Response(result, status=status.HTTP_200_OK)

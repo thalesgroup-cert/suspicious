@@ -7,6 +7,7 @@ import {
   LinearProgress,
   Box,
   Button,
+  ButtonGroup,
   CardContent,
   Chip,
   CircularProgress,
@@ -45,8 +46,11 @@ import {
   ExpandMoreOutlined,
   RestartAltOutlined,
   ReplayOutlined,
+  DescriptionOutlined,
+  NorthEastOutlined,
 } from "@mui/icons-material";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
+import { useSnackbar } from "notistack";
 import { Skeleton } from "boneyard-js/react";
 import { useNavigate, useSearchParams } from "react-router";
 import { alpha } from "@mui/material/styles";
@@ -67,6 +71,8 @@ import {
   type InvestigationStatus,
   type InvestigationType,
 } from "@/features/investigation/api";
+import { pushSubmissionToTheHive } from "@/features/submissions/api";
+import { getEnabledConnectors } from "@/features/settings/components/connectors";
 import { useDebounced } from "@/shared/hooks/useDebounced";
 import { StatusChip } from "@/shared/components/StatusChip";
 import { ResultChip } from "@/shared/components/ResultChip";
@@ -96,6 +102,7 @@ export default function InvestigationPage() {
   const navigate = useNavigate();
   const [searchParams] = useSearchParams();
   const qc = useQueryClient();
+  const { enqueueSnackbar } = useSnackbar();
   const theme = useTheme();
   const isDark = theme.palette.mode === "dark";
 
@@ -258,6 +265,32 @@ export default function InvestigationPage() {
     },
   });
   const [redoConfirmOpen, setRedoConfirmOpen] = React.useState(false);
+
+  const enabledConnectorsQuery = useQuery({
+    queryKey: ["enabledConnectors"],
+    queryFn: getEnabledConnectors,
+    enabled: !!me,
+    staleTime: 60_000,
+  });
+  const theHiveEnabled = (enabledConnectorsQuery.data ?? []).includes("thehive");
+
+  const pushMutation = useMutation({
+    mutationFn: (caseId: number) => pushSubmissionToTheHive(caseId),
+    onSuccess: (res) => {
+      enqueueSnackbar(
+        res.status === "updated"
+          ? "Updated the existing TheHive alert."
+          : "Created an alert in TheHive.",
+        { variant: "success" },
+      );
+    },
+    onError: (err: unknown) => {
+      const detail =
+        (err as { response?: { data?: { detail?: string } } })?.response?.data
+          ?.detail ?? "Push to TheHive failed.";
+      enqueueSnackbar(detail, { variant: "error" });
+    },
+  });
 
   const commentsQuery = useQuery({
     queryKey: ["caseComments", selectedIdNum],
@@ -830,6 +863,38 @@ export default function InvestigationPage() {
                 </Box>
 
                 <Stack direction="row" spacing={1} sx={{ alignItems: "center" }} >
+                  {hasNumericSelectedId ? (
+                    <ButtonGroup variant="outlined" sx={{ borderRadius: 2 }}>
+                      <Button
+                        startIcon={<DescriptionOutlined />}
+                        onClick={() =>
+                          window.open(
+                            `/api/cases/${selectedIdNum}/report/`,
+                            "_blank",
+                          )
+                        }
+                        sx={{ textTransform: "none", fontWeight: 800 }}
+                      >
+                        Full report
+                      </Button>
+                      {theHiveEnabled ? (
+                        <Button
+                          startIcon={
+                            pushMutation.isPending ? (
+                              <CircularProgress size={13} color="inherit" />
+                            ) : (
+                              <NorthEastOutlined />
+                            )
+                          }
+                          disabled={!detailsReady || pushMutation.isPending}
+                          onClick={() => pushMutation.mutate(selectedIdNum)}
+                          sx={{ textTransform: "none", fontWeight: 800 }}
+                        >
+                          {pushMutation.isPending ? "Pushing…" : "Push to TheHive"}
+                        </Button>
+                      ) : null}
+                    </ButtonGroup>
+                  ) : null}
                   <Tooltip
                     title={detailsReady ? "" : "Load details to edit global override"}
                     arrow
@@ -1146,7 +1211,7 @@ export default function InvestigationPage() {
 
                 {/* ── Analysis results — IOC-group cases get the VT-style panel ─── */}
                 {observableGroup ? (
-                  <ObservableGroupPanel group={observableGroup} caseId={selectedIdNum} />
+                  <ObservableGroupPanel group={observableGroup} />
                 ) : (
                 <Box sx={{ px: 2.25, pt: 2, pb: 1 }}>
                   <Stack direction="row" sx={{ mb: 1.25, alignItems: "center", justifyContent: "space-between" }}>
