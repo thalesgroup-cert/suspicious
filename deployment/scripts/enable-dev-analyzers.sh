@@ -37,15 +37,26 @@ ANALYZERS=(
   MSDefenderOffice365_SafeLinksDecoder_1_0  # url — decode ATP SafeLinks
   DomainMailSPFDMARC_1_2                    # domain — SPF/DMARC posture
   QrDecode_1_0                              # file — decode QR codes
+  Lookyloo_Screenshot_1_0                   # url/domain/ip — needs a Lookyloo instance (public CIRCL by default)
 )
+
+# Public CIRCL Lookyloo instance by default; override for a private prod instance.
+LOOKYLOO_URL="${LOOKYLOO_URL:-https://lookyloo.circl.lu}"
 
 cfg='{"auto_extract_artifacts":false,"check_tlp":false,"max_tlp":2,"check_pap":false,"max_pap":2}'
 ok=0 already=0 err=0
 for a in "${ANALYZERS[@]}"; do
+  acfg=$cfg
+  if [[ $a == Lookyloo_Screenshot* ]]; then
+    # config key "instance" is UNVERIFIED — the analyzer source is not vendored
+    # here; confirm against GET /api/analyzer/Lookyloo_Screenshot_1_0 on a live
+    # dev Cortex. A wrong key yields a 400 (logged, loop continues).
+    acfg="${cfg%\}},\"instance\":\"$LOOKYLOO_URL\"}"
+  fi
   body=$(curl -s --noproxy '*' -w '\n%{http_code}' -X POST \
     -H "Authorization: Bearer $KEY" -H 'Content-Type: application/json' \
     "$CORTEX_URL/api/organization/analyzer/$a" \
-    -d "{\"name\":\"$a\",\"configuration\":$cfg,\"rate\":null,\"rateUnit\":null,\"jobCache\":null}")
+    -d "{\"name\":\"$a\",\"configuration\":$acfg,\"rate\":null,\"rateUnit\":null,\"jobCache\":null}")
   code=${body##*$'\n'}
   case "$code" in
     201)                                  echo "→ enabled          $a"; ok=$((ok+1));;
