@@ -78,6 +78,7 @@ import { StatusChip } from "@/shared/components/StatusChip";
 import { ResultChip } from "@/shared/components/ResultChip";
 import { CopyIconButton } from "@/shared/components/CopyIconButton";
 import MailPreview from "@/shared/components/MailPreview";
+import { ScreenshotPanel } from "@/shared/components/ScreenshotPanel";
 
 import { CisoScopeDialog } from "@/features/home/components/CisoScopeDialog";
 import { SoftCard } from "@/features/investigation/components/cards";
@@ -1232,6 +1233,16 @@ export default function InvestigationPage() {
                       variant="full"
                       alt={`Preview of email for case ${selectedIdNum}`}
                     />
+                  </Box>
+                ) : null}
+
+                {/* ── Page screenshot captured by the analyzer ─────────────────── */}
+                {detailsQuery.data?.screenshot_url ? (
+                  <Box sx={{ px: 2.25, py: 2 }}>
+                    <Typography sx={{ fontSize: 10, fontWeight: 700, textTransform: "uppercase", letterSpacing: "0.08em", color: "text.disabled", mb: 0.75 }}>
+                      Page screenshot
+                    </Typography>
+                    <ScreenshotPanel src={detailsQuery.data.screenshot_url} label="Page screenshot" />
                   </Box>
                 ) : null}
 

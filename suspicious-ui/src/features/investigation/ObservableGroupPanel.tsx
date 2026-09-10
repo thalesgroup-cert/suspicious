@@ -11,6 +11,7 @@ import { ExpandMoreOutlined } from "@mui/icons-material";
 
 import type { ObservableGroup, Observable } from "./observableGroup";
 import { SourceTable } from "./SourceTable";
+import { ScreenshotPanel } from "@/shared/components/ScreenshotPanel";
 
 const BAND_COLOR: Record<string, "error" | "warning" | "success" | "default"> = {
   Dangerous: "error",
@@ -119,7 +120,15 @@ export function ObservableGroupPanel({ group }: { group: ObservableGroup }) {
                 </Stack>
               </AccordionSummary>
               <AccordionDetails>
-                <SourceTable sources={observable.sources} />
+                <Stack spacing={1.5}>
+                  {observable.screenshot_url && (
+                    <ScreenshotPanel
+                      src={observable.screenshot_url}
+                      label={`Screenshot — ${observable.value}`}
+                    />
+                  )}
+                  <SourceTable sources={observable.sources} />
+                </Stack>
               </AccordionDetails>
             </Accordion>
           );
