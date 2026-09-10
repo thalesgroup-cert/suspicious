@@ -281,6 +281,15 @@ class CortexAnalyzerReports:
             report.enrichment = enrich(report)
             report.save(update_fields=["score", "confidence", "category", "level", "enrichment"])
 
+            try:
+                from score_process.scoring.screenshots import registry as _shots
+                png = _shots.capture(report)
+                if png:
+                    _shots.store(report, png)   # ponytail: inline; move to a Celery task if it slows the reconcile tick
+            except Exception:
+                update_cases_logger.exception(
+                    "screenshot capture failed for report id=%s", getattr(report, "id", "?"))
+
         except Exception as exc:
             update_cases_logger.error(
                 "Error saving analyzer report id=%s: %s",
