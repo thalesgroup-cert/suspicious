@@ -137,7 +137,7 @@ class SubmissionTicketPushTests(TestCase):
         self.case.save(update_fields=["thehive_alert_id"])
         with mock.patch("connectors.registry.registry.instantiate") as inst, \
              mock.patch("connectors.contrib.thehive.phishing.update_alert") as upd, \
-             mock.patch("connectors.contrib.thehive.phishing.add_observables_to_item") as add, \
+             mock.patch("connectors.contrib.thehive.phishing.add_observables_to_item"), \
              mock.patch("connectors.contrib.thehive.phishing.create_new_alert") as cna:
             inst.return_value.config = self._cfg()
             r = self.client.post(self._url())

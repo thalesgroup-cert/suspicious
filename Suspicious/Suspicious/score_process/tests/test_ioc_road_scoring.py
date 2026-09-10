@@ -31,7 +31,8 @@ class IocRoadScoringTests(TestCase):
 
         finalise_ioc_group(case)
 
-        case.refresh_from_db(); ip.refresh_from_db()
+        case.refresh_from_db()
+        ip.refresh_from_db()
         self.assertEqual(case.results, Result.SAFE)
         self.assertEqual(ip.ioc_level.lower(), "safe")
         self.assertEqual(case.score, 2)
@@ -44,7 +45,8 @@ class IocRoadScoringTests(TestCase):
 
         finalise_ioc_group(case)
 
-        case.refresh_from_db(); ip.refresh_from_db()
+        case.refresh_from_db()
+        ip.refresh_from_db()
         self.assertEqual(case.results, Result.DANGEROUS)
         self.assertEqual(ip.ioc_level.lower(), "malicious")
         self.assertEqual(case.score, 9)
@@ -66,6 +68,7 @@ class IocRoadScoringTests(TestCase):
 
         finalise_ioc_group(case)
 
-        case.refresh_from_db(); domain.refresh_from_db()
+        case.refresh_from_db()
+        domain.refresh_from_db()
         self.assertEqual(case.results, Result.DANGEROUS)
         self.assertEqual(domain.ioc_level.lower(), "malicious")

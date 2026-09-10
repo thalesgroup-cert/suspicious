@@ -44,7 +44,7 @@ class BackfillEnrichmentTests(TestCase):
         self.assertEqual(r.enrichment["source"], "manual")
 
     def test_dry_run_stdout_reports_correct_count(self):
-        r = self._vt_report(addr="2.2.2.2", job="j4")
+        self._vt_report(addr="2.2.2.2", job="j4")
         out = StringIO()
         call_command("backfill_enrichment", "--dry-run", stdout=out)
         self.assertIn("would write 1", out.getvalue())

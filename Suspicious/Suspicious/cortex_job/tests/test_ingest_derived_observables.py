@@ -101,7 +101,8 @@ class IngestTests(TestCase):
     @patch("cortex_job.cortex_utils.derived_observables.CortexJob")
     def test_values_are_capped_per_report(self, MockCortex):
         MockCortex.return_value.launch_cortex_jobs.return_value = ["r1"]
-        many = lambda _full: [(f"https://evil.example/p{i}", "url") for i in range(25)]
+        def many(_full):
+            return [(f"https://evil.example/p{i}", "url") for i in range(25)]
         with patch.dict(
             "cortex_job.cortex_utils.derived_observables.EXTRACTORS",
             {"UnshortenLink_1_2": many},
@@ -114,10 +115,11 @@ class IngestTests(TestCase):
         """One extracted value that blows up mid-processing skips; the rest proceed."""
         MockCortex.return_value.launch_cortex_jobs.return_value = ["r1"]
         good = URL.objects.create(address="https://evil.example/good")
-        two_values = lambda _full: [
-            ("https://evil.example/bad", "url"),
-            ("https://evil.example/good", "url"),
-        ]
+        def two_values(_full):
+            return [
+                ("https://evil.example/bad", "url"),
+                ("https://evil.example/good", "url"),
+            ]
         with patch.dict(
             "cortex_job.cortex_utils.derived_observables.EXTRACTORS",
             {"UnshortenLink_1_2": two_values},

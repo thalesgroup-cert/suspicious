@@ -1,5 +1,4 @@
 from django.test import TestCase
-from cortex_job.models import Analyzer
 from cortex_job.migrations import _tier_seed  # helper module we add alongside migrations
 
 

@@ -275,19 +275,22 @@ def main() -> None:
                ["unwanted", "dangerous"], device, args.out)
 
     # --- safe: on classes [0,1] -> internal(0)/external(1) ---
-    mask_tr = np.isin(y_train, [0, 1]); mask_te = np.isin(y_test, [0, 1])
+    mask_tr = np.isin(y_train, [0, 1])
+    mask_te = np.isin(y_test, [0, 1])
     _train_one("safe", X_train[mask_tr], y_train[mask_tr], X_test[mask_te], y_test[mask_te],
                ["internal", "external"], device, args.out)
 
     # --- unwanted: on classes [2,3] -> spam(0)/newsletter(1) ---
-    mask_tr = np.isin(y_train, [2, 3]); mask_te = np.isin(y_test, [2, 3])
+    mask_tr = np.isin(y_train, [2, 3])
+    mask_te = np.isin(y_test, [2, 3])
     y_train_u = np.array([0 if v == 2 else 1 for v in y_train[mask_tr]])
     y_test_u = np.array([0 if v == 2 else 1 for v in y_test[mask_te]])
     _train_one("unwanted", X_train[mask_tr], y_train_u, X_test[mask_te], y_test_u,
                ["spam", "newsletter"], device, args.out)
 
     # --- dangerous: on classes [4,5,6,7] -> classic(0)/clone(1)/blackmail(2)/whaling(3) ---
-    mask_tr = np.isin(y_train, [4, 5, 6, 7]); mask_te = np.isin(y_test, [4, 5, 6, 7])
+    mask_tr = np.isin(y_train, [4, 5, 6, 7])
+    mask_te = np.isin(y_test, [4, 5, 6, 7])
     y_train_d = np.array([v - 4 for v in y_train[mask_tr]])
     y_test_d = np.array([v - 4 for v in y_test[mask_te]])
     _train_one("dangerous", X_train[mask_tr], y_train_d, X_test[mask_te], y_test_d,
