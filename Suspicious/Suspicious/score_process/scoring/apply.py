@@ -12,7 +12,7 @@ from score_process.scoring.update_handler import (
 logger = logging.getLogger(__name__)
 
 
-def apply_verdict(case, verdict) -> None:
+def apply_verdict(case, verdict, explanation=None) -> None:
     case.final_score = verdict.final_score
     case.final_confidence = verdict.final_confidence
     case.score = verdict.final_score
@@ -23,11 +23,15 @@ def apply_verdict(case, verdict) -> None:
     case.list_reason = verdict.list_reason
     case.inconclusive_reason = getattr(verdict, "inconclusive_reason", "") or ""
     case.verdict_rationale = list(getattr(verdict, "rationale", ()) or [])
-    case.save(update_fields=[
+    update_fields = [
         "final_score", "final_confidence", "score", "confidence",
         "results", "analysis_done", "is_denylisted", "list_reason",
         "inconclusive_reason", "verdict_rationale",
-    ])
+    ]
+    if explanation is not None:
+        case.verdict_explanation = explanation
+        update_fields.append("verdict_explanation")
+    case.save(update_fields=update_fields)
 
     mail = getattr(case.fileOrMail, "mail", None) if case.fileOrMail else None
     save_case_results(case, mail)
@@ -121,8 +125,31 @@ def finalise_ioc_group(case) -> None:
     # analyzer-report count (matches the mail road's verdict.n_scored), not the
     # observable count — feeds _describe()'s "reused" branch + the admin/UI field.
     case.analysis_done = sum(len(s) for s in per_obs.values())
+
+    # An explanation failure must NEVER break finalisation.
+    try:
+        from cortex_job.cortex_utils.case_targets import (
+            build_analyzer_report_filter, collect_case_targets,
+        )
+        from cortex_job.models import AnalyzerReport
+        from score_process.scoring.explanation.adapters import explain_observable_group
+
+        _targets = collect_case_targets(case)
+        _reports = (
+            AnalyzerReport.objects.filter(build_analyzer_report_filter(_targets))
+            if _targets else AnalyzerReport.objects.none()
+        )
+        case.verdict_explanation = explain_observable_group(
+            case, g, obs_verdicts, _reports
+        ).to_dict()
+    except Exception:
+        logger.exception(
+            "verdict explanation failed for case %s", getattr(case, "id", "?")
+        )
+        case.verdict_explanation = None
+
     case.save(update_fields=[
         "results", "score", "final_score", "confidence", "final_confidence",
-        "verdict_rationale", "analysis_done",
+        "verdict_rationale", "analysis_done", "verdict_explanation",
     ])
     update_kpi_and_user_stats(case)
