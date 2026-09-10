@@ -185,8 +185,10 @@ for the reader. Instead inline the image:
 ### 9. Deployment / enablement
 
 - **`deployment/scripts/enable-dev-analyzers.sh`** — add `Lookyloo_Screenshot`
-  with config `{"instance_url": "https://lookyloo.circl.lu"}` (public, keyless).
-  Do **not** add `Urlscan.io_Scan` (API key).
+  with config `{"Lookyloo_instance": "https://lookyloo.circl.lu/"}` (config key
+  from the THA-CERT analyzer manifest; public, keyless — the analyzer also
+  defaults this URL if the key is omitted). Do **not** add `Urlscan.io_Scan`
+  (API key).
 - `Lookyloo_Screenshot` and `Urlscan.io_Scan` are `url`/`domain` **type-dispatch**
   analyzers → `CortexJob.get_analyzers_by_type` runs them automatically once
   enabled in Cortex; **no `settings.json` change**.
@@ -264,13 +266,12 @@ feature is self-gating: without a screenshot analyzer, `screenshot_url` stays
 SOC roadmap Lot 1 / P1 "Analyse" item *"Afficher un screenshot de la page
 analysée"* has its plumbing delivered by this branch — capture, storage, the
 serve endpoint, the report inlining and the UI panels are all in place and
-tested. The Lookyloo path, however, is **not yet verified end to end**: it
-depends on two facts no code on this branch has seen against a live analyzer —
+tested. The analyzer config key is now confirmed from the THA-CERT
+`Lookyloo_Screenshot` manifest (`Lookyloo_instance`, def-id
+`Lookyloo_Screenshot_1_0`). One fact remains unverified against a live analyzer:
 the `report_full` screenshot key (`full["screenshot"]` vs `full["raw"]`, top
-level or under `results`) that `lookyloo.extract` guesses, and the
-`Lookyloo_Screenshot` analyzer config key / def-id used to enable it. Both
-extractors fail closed (wrong key → `None` → no UI change), so nothing can
-break — but the item is "delivered" only once a single real Lookyloo capture is
-diffed and both keys are confirmed. Residuals unchanged: the on-demand capture
-button, `Urlscan.io_Scan` enabled in dev, and the screenshot in the TheHive
-ticket.
+level or under `results`) that `lookyloo.extract` guesses. It fails closed
+(wrong key → `None` → no UI change), so nothing can break — but the item is
+"delivered" only once a single real Lookyloo capture is diffed and that key is
+confirmed. Residuals unchanged: the on-demand capture button, `Urlscan.io_Scan`
+enabled in dev, and the screenshot in the TheHive ticket.
