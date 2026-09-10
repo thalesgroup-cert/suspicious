@@ -71,6 +71,19 @@ class CaseReportScreenshotTests(TestCase):
         self.assertIn("Screenshot omitted from the report", body)
 
     @patch("api.views.case_report.get_s3_client")
+    def test_cap_stops_minio_fetches(self, get_client):
+        # Each screenshot is exactly half the 6 MB cap, so the first two fill it
+        # exactly and every later row must be skipped BEFORE hitting MinIO.
+        half = _PNG + b"\x00" * (3 * 1024 * 1024 - len(_PNG))
+        get_object = get_client.return_value.get_object
+        get_object.return_value = MagicMock(read=lambda: half)
+        body = self._get().content.decode()
+        embedded = body.count("data:image/png;base64,")
+        self.assertEqual(embedded, 2)
+        self.assertEqual(get_object.call_count, embedded)
+        self.assertIn("Screenshot omitted from the report", body)
+
+    @patch("api.views.case_report.get_s3_client")
     def test_fetch_failure_renders_omitted_note(self, get_client):
         get_client.return_value.get_object.side_effect = RuntimeError("minio down")
         body = self._get().content.decode()

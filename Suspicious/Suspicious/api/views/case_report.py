@@ -39,6 +39,8 @@ def _inline_screenshots(observables):
         if not url:
             continue
         o["screenshot_omitted"] = True  # until an image is actually inlined
+        if used >= _REPORT_IMG_CAP:
+            continue  # budget already blown — don't touch the DB or MinIO
         report_id = url.split("report=")[-1]
         try:
             rep = (
@@ -75,7 +77,7 @@ class CaseReportView(APIView):
     def get(self, request, case_id):
         case = get_object_or_404(Case, pk=case_id)
         observables = assemble_observables(case, full=True) if case.observable_group_id else []
-        _inline_screenshots(observables)
+        observables = _inline_screenshots(observables)
         html = render_to_string(
             "case_report/report.html",
             {"case": case, "observables": observables, "generated_at": timezone.now()},
