@@ -12,9 +12,9 @@ from rest_framework.views import APIView
 
 from case_handler.lifecycle import IllegalTransition, LifecycleState, transition
 from case_handler.models import Case, Result
-from cortex_job.models import AnalyzerReport
-from cortex_job.cortex_utils.case_targets import build_analyzer_report_filter, collect_case_targets
+from cortex_job.cortex_utils.case_targets import collect_case_targets
 from tasp.tasks import dispatch_case_analysis
+from api.utils.analyzer_reports import ANALYZER_REPORT_SELECT_RELATED, reports_for_case
 from api.utils.investigation_pagination import InvestigationPagination
 from api.serializers.investigations import (
     API_RESULT_TO_INTERNAL,
@@ -53,18 +53,6 @@ CASE_DETAIL_SELECT_RELATED = (
     "nonFileIocs__ip",
     "nonFileIocs__hash",
     "observable_group",
-)
-
-ANALYZER_REPORT_SELECT_RELATED = (
-    "analyzer",
-    "url",
-    "domain",
-    "mail",
-    "hash",
-    "file",
-    "ip",
-    "mail_body",
-    "mail_header",
 )
 
 
@@ -156,26 +144,12 @@ class InvestigationAccessMixin:
             raise NotFound("Investigation not found.") from exc
 
     def get_analyzer_reports_queryset(self, obj: Case):
-        targets = collect_case_targets(obj)
-        if not targets:
-            return AnalyzerReport.objects.none()
-
-        query = build_analyzer_report_filter(targets)
-
-        # No .distinct() needed: every filter above is a plain equality/IN on
-        # AnalyzerReport's own FK columns (never a reverse/M2M traversal), and
-        # every select_related() relation is forward FK/O2O — this queryset
-        # structurally can't fan out into duplicate rows. distinct() was
-        # forcing MySQL to sort/dedupe the full 9-table-wide join with no
-        # LIMIT to cap it, and _dedup_analyzer_reports() below already
-        # de-dupes in Python regardless.
-        qs = (
-            AnalyzerReport.objects
-            .filter(query)
-            .select_related(*self.analyzer_report_select_related)
-            .order_by("-creation_date", "-pk")
-        )
-        return _dedup_analyzer_reports(qs)
+        # reports_for_case() builds the same filter/select_related/order_by
+        # queryset (no .distinct(): every filter is a plain equality/IN on
+        # AnalyzerReport's own FK columns and every select_related relation is
+        # forward FK/O2O, so it can't fan out into duplicate rows).
+        # _dedup_analyzer_reports() de-dupes per (analyzer, target) in Python.
+        return _dedup_analyzer_reports(reports_for_case(obj))
 
     def filter_case_queryset(self, queryset, validated_filters: dict):
         search = validated_filters.get("search")

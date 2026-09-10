@@ -8,6 +8,7 @@ from api.views.campaigns import (
     CampaignPcaView,
 )
 from api.views.case_report import CaseReportView
+from api.views.case_screenshot import CaseScreenshotView
 from api.views.challenge import CaseChallengeTokenView
 from api.views.comments import CaseCommentListCreateView
 from api.views.dashboard import (
@@ -97,6 +98,7 @@ urlpatterns = [
 
     path("cases/<int:case_id>/download/", DownloadCaseArchiveView.as_view(), name="case-download"),
     path("cases/<int:case_id>/mail-preview.png", MailPreviewView.as_view(), name="case-mail-preview"),
+    path("cases/<int:case_id>/screenshot.png", CaseScreenshotView.as_view(), name="case-screenshot"),
     path("cases/<int:case_id>/challenge/<str:token>/", CaseChallengeTokenView.as_view(), name="case-challenge"),
     path("cases/<int:case_id>/challenge/", CaseChallengeTokenView.as_view(), name="case-challenge-legacy"),
     path("cases/<int:case_id>/comments/", CaseCommentListCreateView.as_view(), name="case-comments"),
