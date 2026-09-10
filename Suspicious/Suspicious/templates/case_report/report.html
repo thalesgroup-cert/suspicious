@@ -151,6 +151,12 @@
     </details>
     {% endfor %}
     {% endif %}
+
+    {% if o.screenshot_data_uri %}
+    <img class="observable-screenshot" alt="Screenshot of {{ o.value }}" src="{{ o.screenshot_data_uri }}" style="max-width:100%;border:1px solid #ccc;margin-top:.5rem;">
+    {% elif o.screenshot_omitted %}
+    <p class="empty">Screenshot omitted from the report (size cap) — open the investigation view.</p>
+    {% endif %}
   </div>
   {% endfor %}
 </div>
