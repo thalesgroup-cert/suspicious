@@ -58,6 +58,12 @@ class AnalyzerReport(models.Model):
     # score_process.scoring.enrichment (VT vendor list, geo/ASN, dates,
     # threat class, filenames). None = not extracted / no extractor / failed.
     enrichment = models.JSONField(null=True, blank=True, default=None)
+    # (bucket, key) of the page screenshot captured by a screenshot analyzer
+    # (Lookyloo_Screenshot / Urlscan.io_Scan) and stored in MinIO by
+    # score_process.scoring.screenshots. Blank = none captured. Mirrors
+    # Mail.preview_bucket / Mail.preview_object_key.
+    screenshot_bucket = models.CharField(max_length=255, blank=True, default="")
+    screenshot_key = models.CharField(max_length=512, blank=True, default="", db_index=True)
     creation_date = models.DateTimeField(auto_now_add=True, db_index=True)
     last_update = models.DateTimeField(auto_now=True)
 
