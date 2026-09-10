@@ -76,8 +76,26 @@ type InvestigationAnalyzerReport = {
   created_at?: string;
 };
 
+export type VerdictSourceLine = {
+  name: string;
+  tier: number;
+  verdict: string;
+  counted: boolean;
+  note: string;
+};
+export type VerdictExplanationDTO = {
+  band: string;
+  confidence: number;
+  decisive_rule: string;
+  analyst_paragraph: string;
+  reporter_paragraph: string;
+  confidence_reading: string;
+  sources: VerdictSourceLine[];
+};
+
 type InvestigationCaseInfos = {
   id?: number;
+  verdict_explanation?: VerdictExplanationDTO | null;
   score?: number | null;
   confidence?: number | null;
   results?: string | null;
