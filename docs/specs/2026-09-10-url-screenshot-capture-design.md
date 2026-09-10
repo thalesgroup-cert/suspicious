@@ -248,3 +248,11 @@ feature is self-gating: without a screenshot analyzer, `screenshot_url` stays
 - `Urlscan.io_Scan` enabled in dev.
 - Screenshot in the TheHive ticket payload and any PDF export.
 - `Urlscan_io_Search` historical screenshots as a secondary source.
+
+### Roadmap status
+
+SOC roadmap Lot 1 / P1 "Analyse" item *"Afficher un screenshot de la page
+analysée"* is delivered by this branch for any URL processed by an enabled
+screenshot analyzer. Residuals unchanged: the on-demand capture button,
+`Urlscan.io_Scan` enabled in dev, the screenshot in the TheHive ticket, and the
+unverified Lookyloo config key.
