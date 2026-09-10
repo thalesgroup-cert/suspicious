@@ -105,6 +105,8 @@ export type InvestigationDetails = {
   is_challenged: boolean;
   /** Relative URL to the rendered .eml→png preview, or null when absent / not a mail. */
   mail_preview_url?: string | null;
+  /** Relative URL to the captured page screenshot, or null when none was captured. */
+  screenshot_url?: string | null;
   raw?: unknown;
   analyzer_reports: InvestigationAnalyzerReport[];
   case_infos?: InvestigationCaseInfos;

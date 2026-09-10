@@ -56,6 +56,9 @@ def assemble_observables(case, *, full: bool = False) -> list[dict]:
                 "enrichment": rep.enrichment,
                 "report": rep.report_full if full else rep.report_summary,
             })
+        shot = next(
+            (rep.id for rep in reports if getattr(rep, "screenshot_key", "")), None
+        )
         verdict = None
         if svs:
             v = score_observable(svs)
@@ -74,5 +77,8 @@ def assemble_observables(case, *, full: bool = False) -> list[dict]:
             "derived_from": ({"value": pv, "via_analyzer": d.via_analyzer}
                              if pv else None),
             "escalation_note": escalation.get(key, ""),
+            "screenshot_url": (
+                f"/api/cases/{case.pk}/screenshot.png?report={shot}"
+                if shot else None),
         })
     return observables

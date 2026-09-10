@@ -269,6 +269,7 @@ class InvestigationDetailsSerializer(InvestigationRowSerializer):
     raw = serializers.SerializerMethodField()
     reporter_note = serializers.SerializerMethodField()
     observable_group = serializers.SerializerMethodField()
+    screenshot_url = serializers.SerializerMethodField()
 
     class Meta(InvestigationRowSerializer.Meta):
         fields = InvestigationRowSerializer.Meta.fields + [
@@ -276,8 +277,15 @@ class InvestigationDetailsSerializer(InvestigationRowSerializer):
             "challenge_proposed_result", "challenge_reason",
             "reporter_context", "reporter_note", "thehive_alert_id",
             "is_allowlisted", "is_denylisted", "list_reason",
-            "observable_group",
+            "observable_group", "screenshot_url",
         ]
+
+    def get_screenshot_url(self, obj: Case) -> str | None:
+        from api.utils.analyzer_reports import reports_for_case
+
+        if reports_for_case(obj).exclude(screenshot_key="").exists():
+            return f"/api/cases/{obj.pk}/screenshot.png"
+        return None
 
     def get_observable_group(self, case):
         if not case.observable_group_id:

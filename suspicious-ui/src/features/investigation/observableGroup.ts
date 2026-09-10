@@ -34,6 +34,7 @@ const observableSchema = z.object({
     .nullable()
     .optional(),
   escalation_note: z.string().optional(),
+  screenshot_url: z.string().nullable().optional(),
 });
 
 export const observableGroupSchema = z.object({
