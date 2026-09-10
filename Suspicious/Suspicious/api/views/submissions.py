@@ -22,10 +22,9 @@ from api.serializers.submissions import (
     SubmissionDetailsSerializer,
     SubmissionListSerializer,
 )
-from api.views.investigations import IsInvestigator
+from api.utils.analyzer_reports import reports_for_case
+from api.views.investigations import IsInvestigator, _dedup_analyzer_reports
 from case_handler.models import Case
-from cortex_job.models import AnalyzerReport
-from cortex_job.cortex_utils.case_targets import build_analyzer_report_filter, collect_case_targets
 from tasp.services.challenge import notify_and_record_challenge
 
 logger = logging.getLogger(__name__)
@@ -47,55 +46,14 @@ CASE_DETAIL_SELECT_RELATED = CASE_LIST_SELECT_RELATED + (
 )
 
 
-def _dedup_analyzer_reports(reports) -> list:
-    """
-    Keep only the most recent AnalyzerReport per (analyzer_id, target_key).
-
-    The queryset is already ordered by -creation_date, -pk so the first
-    occurrence of each key is the newest. We preserve that order.
-    """
-    def _target_key(r) -> tuple:
-        for attr, label in (
-            ("url_id",         "url"),
-            ("domain_id",      "domain"),
-            ("mail_id",        "mail"),
-            ("hash_id",        "hash"),
-            ("file_id",        "file"),
-            ("ip_id",          "ip"),
-            ("mail_body_id",   "mail_body"),
-            ("mail_header_id", "mail_header"),
-        ):
-            val = getattr(r, attr, None)
-            if val:
-                return (label, val)
-        return ("unknown", None)
-
-    seen: set = set()
-    result: list = []
-    for report in reports:
-        key = (report.analyzer_id, _target_key(report))
-        if key not in seen:
-            seen.add(key)
-            result.append(report)
-    return result
-
-
-
 def case_analyzer_reports(case) -> list:
     """Newest AnalyzerReport per (analyzer, target) across every observable of a
-    case. Shared by the submission detail and ticket views."""
-    targets = collect_case_targets(case)
-    if not targets:
-        return []
-    qs = (
-        AnalyzerReport.objects.filter(build_analyzer_report_filter(targets))
-        .select_related(
-            "analyzer", "url", "domain", "mail", "hash",
-            "file", "ip", "mail_body", "mail_header",
-        )
-        .order_by("-creation_date", "-id")
-    )
-    return _dedup_analyzer_reports(qs)
+    case. Shared by the submission detail and ticket views.
+
+    Byte-equivalent to what the investigation detail builds: same targets, same
+    select_related, same ``-creation_date, -pk`` order, same Python dedup.
+    """
+    return _dedup_analyzer_reports(reports_for_case(case))
 
 
 class SubmissionPagination(PageNumberPagination):

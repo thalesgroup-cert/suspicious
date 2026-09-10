@@ -29,7 +29,8 @@ class CaseReportScreenshotTests(TestCase):
         self.client.force_authenticate(self.user)
 
         g = ObservableGroup.objects.create()
-        a = Analyzer.objects.create(
+        self.group = g
+        self.analyzer = a = Analyzer.objects.create(
             name="Lookyloo_Screenshot", analyzer_cortex_id="lk1", tier=2
         )
         for i in range(3):
@@ -72,15 +73,32 @@ class CaseReportScreenshotTests(TestCase):
 
     @patch("api.views.case_report.get_s3_client")
     def test_cap_stops_minio_fetches(self, get_client):
-        # Each screenshot is exactly half the 6 MB cap, so the first two fill it
-        # exactly and every later row must be skipped BEFORE hitting MinIO.
-        half = _PNG + b"\x00" * (3 * 1024 * 1024 - len(_PNG))
+        # 2.5 MB per image against the 6 MB cap: the size does NOT divide the cap
+        # evenly, so the running total never lands exactly on it. Rows 1-2 embed
+        # (5 MB), row 3's fetch overshoots and spends the budget, and every row
+        # after that must be skipped BEFORE touching MinIO.
+        url = URL.objects.create(address="http://obs3.test")
+        ObservableGroupArtifact.objects.create(
+            group=self.group, artifact_type="URL", url=url
+        )
+        rep = AnalyzerReport.objects.create(
+            cortex_job_id="j3", type="url", status="Success", analyzer=self.analyzer,
+            url=url, level="safe", confidence=90, score=0,
+            report_summary={}, report_taxonomy={}, report_full={},
+        )
+        rep.screenshot_bucket = "shots"
+        rep.screenshot_key = f"report-{rep.id}.png"
+        rep.save(update_fields=["screenshot_bucket", "screenshot_key"])
+
+        img = _PNG + b"\x00" * (5 * 1024 * 1024 // 2 - len(_PNG))
         get_object = get_client.return_value.get_object
-        get_object.return_value = MagicMock(read=lambda: half)
+        get_object.return_value = MagicMock(read=lambda: img)
         body = self._get().content.decode()
         embedded = body.count("data:image/png;base64,")
         self.assertEqual(embedded, 2)
-        self.assertEqual(get_object.call_count, embedded)
+        # 2 embedded + 1 fetch that overshot the cap; the 4th row never fetches.
+        self.assertEqual(get_object.call_count, 3)
+        self.assertLess(get_object.call_count, 4)
         self.assertIn("Screenshot omitted from the report", body)
 
     @patch("api.views.case_report.get_s3_client")

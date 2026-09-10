@@ -134,7 +134,9 @@ measurably slows the reconcile tick.
 - Stream `client.get_object(bucket, key)` as `image/png`, `Cache-Control:
   private, max-age=300`, `Content-Disposition: inline; filename="case_<id>_screenshot.png"`.
 - No screenshot → **404** (no lazy re-enqueue: there is no fallback renderer).
-- MinIO error → 502, short message (MailPreviewView already models this).
+- MinIO error → **404**, short message (matches `MailPreviewView`; avoids
+  disclosing infra state to a reporter-role caller — the `logger.warning`
+  carries the real distinction for ops).
 
 Route in `api/urls.py`:
 `path("cases/<int:case_id>/screenshot.png", CaseScreenshotView.as_view(), name="case-screenshot")`.
@@ -191,11 +193,19 @@ for the reader. Instead inline the image:
 - **Analyzer isolation classification** — the 2-bucket split (code-execution
   sandbox tier vs. egress-allowlist tier) is tracked in the team's engineering
   memory, not in-repo. Both screenshot analyzers are egress-only: neither runs
-  attacker code in-process, each just needs outbound (Lookyloo → its instance
-  host; urlscan → `urlscan.io`), so both sit in the egress-allowlist tier. See
-  also §Non-goals.
+  attacker code in-process, and both screenshot fetches are host-guarded (never
+  the analysed URL). `Lookyloo_Screenshot` needs outbound to its instance host
+  from the **analyzer tier** only — its PNG comes back base64-inline in
+  `report_full`, so nothing downstream egresses. `Urlscan.io_Scan` is different:
+  the screenshot is fetched from `urlscan.io` inside `create_and_save_report`,
+  i.e. in the **app/worker tier** on the reconcile tick, alongside the worker's
+  existing enrichment/connector outbound calls. See also §Non-goals.
 - **Prod runbook note** — set a private Lookyloo instance URL and the urlscan
-  API key; both hosts on the analyzer-tier egress allowlist.
+  API key. Egress allowlist: the Lookyloo instance host on the analyzer tier;
+  `urlscan.io` on the **app/worker** tier (the urlscan screenshot GET runs
+  there, not in the analyzer). A blocked app-tier egress silently disables the
+  urlscan screenshot path (`extract` returns `None`), so raise that failure to
+  `logger.error` or a metric to distinguish it from "no screenshot analyzer ran".
 
 ### 10. Backfill — `score_process/management/commands/backfill_screenshots.py`
 
@@ -211,7 +221,7 @@ analyzers with an empty `screenshot_key`, run `capture` + `store`. `--dry-run`,
 | Lookyloo payload missing / not PNG | `extract` returns `None`; no screenshot for that report |
 | urlscan fetch times out / 4xx | `extract` returns `None`; other analyzers unaffected |
 | image > 8 MB | dropped, one log line |
-| MinIO down at serve time | endpoint 502; investigation JSON still loads (screenshot is a separate request) |
+| MinIO down at serve time | endpoint 404 (logged); investigation JSON still loads (screenshot is a separate request) |
 | No screenshot analyzer ran | `screenshot_url` is `null`; UI renders nothing extra |
 
 ## Testing
@@ -223,7 +233,7 @@ analyzers with an empty `screenshot_key`, run `capture` + `store`. `--dry-run`,
 | `registry.capture` | dispatches by name; unknown analyzer → `None`; extractor raising → `None` (logged) |
 | `registry.store` | mocked `Minio` — bucket ensured, `put_object` args, `(bucket, key)` saved with `update_fields` |
 | `_save_report` | report from `Lookyloo_Screenshot` → fields populated; `capture` raising → report still saved with score/enrichment |
-| endpoint | 200 streams PNG; best-pick order (Lookyloo before urlscan, then newest); `?report=<id>` selects; 404 when none; 404 for a foreign `report` id; 403 non-investigator; 502 on MinIO error |
+| endpoint | 200 streams PNG; best-pick order (Lookyloo before urlscan, then newest); `?report=<id>` selects; 404 when none; 404 for a foreign `report` id; 403 non-investigator; 404 on MinIO error |
 | serializer | `screenshot_url` present when a report has a key, `null` otherwise; per-observable url in `assemble_observables` |
 | HTML report | data-URI inlined into the row; total cap respected → later images skipped with the note |
 | frontend | `ScreenshotPanel` renders `<img src>`; fallback on error |
@@ -252,7 +262,15 @@ feature is self-gating: without a screenshot analyzer, `screenshot_url` stays
 ### Roadmap status
 
 SOC roadmap Lot 1 / P1 "Analyse" item *"Afficher un screenshot de la page
-analysée"* is delivered by this branch for any URL processed by an enabled
-screenshot analyzer. Residuals unchanged: the on-demand capture button,
-`Urlscan.io_Scan` enabled in dev, the screenshot in the TheHive ticket, and the
-unverified Lookyloo config key.
+analysée"* has its plumbing delivered by this branch — capture, storage, the
+serve endpoint, the report inlining and the UI panels are all in place and
+tested. The Lookyloo path, however, is **not yet verified end to end**: it
+depends on two facts no code on this branch has seen against a live analyzer —
+the `report_full` screenshot key (`full["screenshot"]` vs `full["raw"]`, top
+level or under `results`) that `lookyloo.extract` guesses, and the
+`Lookyloo_Screenshot` analyzer config key / def-id used to enable it. Both
+extractors fail closed (wrong key → `None` → no UI change), so nothing can
+break — but the item is "delivered" only once a single real Lookyloo capture is
+diffed and both keys are confirmed. Residuals unchanged: the on-demand capture
+button, `Urlscan.io_Scan` enabled in dev, and the screenshot in the TheHive
+ticket.

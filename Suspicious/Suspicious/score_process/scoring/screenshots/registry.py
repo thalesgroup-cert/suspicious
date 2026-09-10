@@ -39,7 +39,13 @@ def capture(report) -> Optional[bytes]:
 def store(report, png: bytes) -> None:
     client = get_s3_client()
     bucket = getattr(settings, "SCREENSHOT_BUCKET", _DEFAULT_BUCKET)
-    ensure_bucket(client, bucket)
+    try:
+        ensure_bucket(client, bucket)
+    except Exception as exc:  # noqa: BLE001
+        # Mirrors eml2png_renderer._ensure_bucket: a service account that can
+        # put/get a pre-created bucket but not bucket_exists/ListAllMyBuckets
+        # must still reach put_object below.
+        logger.warning("ensure_bucket(%s) failed (continuing): %s", bucket, exc)
     key = f"report-{report.id}.png"
     client.put_object(bucket, key, io.BytesIO(png), length=len(png), content_type="image/png")
     report.screenshot_bucket = bucket

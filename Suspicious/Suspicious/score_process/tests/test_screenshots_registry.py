@@ -28,6 +28,7 @@ class CaptureDispatchTest(TestCase):
     @patch("score_process.scoring.screenshots.registry.urlscan.extract", return_value=PNG)
     def test_dispatches_urlscan(self, ex):
         self.assertEqual(registry.capture(_report("Urlscan.io_Scan")), PNG)
+        ex.assert_called_once()
 
     def test_unknown_analyzer_returns_none(self):
         self.assertIsNone(registry.capture(_report("VirusTotal_GetReport_3_1")))
@@ -49,6 +50,21 @@ class StoreTest(TestCase):
         args, kwargs = client.put_object.call_args
         self.assertEqual(args[0], "analyzer-screenshots")
         self.assertEqual(args[1], f"report-{r.id}.png")
+        r.refresh_from_db()
+        self.assertEqual(r.screenshot_bucket, "analyzer-screenshots")
+        self.assertEqual(r.screenshot_key, f"report-{r.id}.png")
+
+    @patch("score_process.scoring.screenshots.registry.ensure_bucket",
+           side_effect=RuntimeError("AccessDenied: ListAllMyBuckets"))
+    @patch("score_process.scoring.screenshots.registry.get_s3_client")
+    def test_store_continues_when_ensure_bucket_raises(self, get_client, ensure):
+        # A hardened MinIO service account can put/get a pre-created bucket but
+        # not bucket_exists — store() must fall through to put_object anyway.
+        client = MagicMock()
+        get_client.return_value = client
+        r = _report("Lookyloo_Screenshot")
+        registry.store(r, PNG)
+        client.put_object.assert_called_once()
         r.refresh_from_db()
         self.assertEqual(r.screenshot_bucket, "analyzer-screenshots")
         self.assertEqual(r.screenshot_key, f"report-{r.id}.png")

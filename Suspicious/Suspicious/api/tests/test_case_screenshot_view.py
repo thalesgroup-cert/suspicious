@@ -111,6 +111,34 @@ class CaseScreenshotViewTest(TestCase):
         resp = self.client.get(self._url(report=999999))
         self.assertEqual(resp.status_code, 404)
 
+    @patch("api.views.case_screenshot.get_s3_client")
+    def test_404_for_another_cases_real_report_id(self, client):
+        # ?report= must be scoped to *this* case: another case's genuine
+        # screenshot-bearing report id must 404, not leak its image.
+        client.return_value.get_object.return_value = self._obj()
+        self._report(self.lookyloo, "s/look.png")
+
+        other_group = ObservableGroup.objects.create()
+        other_url = URL.objects.create(address="http://other-evil.test/page")
+        ObservableGroupArtifact.objects.create(
+            group=other_group, artifact_type="URL", url=other_url
+        )
+        Case.objects.create(
+            description="d2", reporter=self.user, observable_group=other_group
+        )
+        foreign = AnalyzerReport.objects.create(
+            cortex_job_id="j2", type="url", status="Success",
+            analyzer=self.lookyloo, url=other_url,
+            level="malicious", confidence=80, score=9,
+            report_summary={}, report_taxonomy={}, report_full={},
+            screenshot_bucket="screenshots", screenshot_key="s/foreign.png",
+        )
+
+        resp = self.client.get(self._url(report=foreign.id))
+
+        self.assertEqual(resp.status_code, 404)
+        client.return_value.get_object.assert_not_called()
+
     def test_404_for_non_integer_report_id(self):
         self._report(self.lookyloo, "s/look.png")
         resp = self.client.get(self._url(report="abc"))

@@ -14,7 +14,7 @@ from case_handler.lifecycle import IllegalTransition, LifecycleState, transition
 from case_handler.models import Case, Result
 from cortex_job.cortex_utils.case_targets import collect_case_targets
 from tasp.tasks import dispatch_case_analysis
-from api.utils.analyzer_reports import ANALYZER_REPORT_SELECT_RELATED, reports_for_case
+from api.utils.analyzer_reports import reports_for_case
 from api.utils.investigation_pagination import InvestigationPagination
 from api.serializers.investigations import (
     API_RESULT_TO_INTERNAL,
@@ -107,8 +107,6 @@ def _dedup_analyzer_reports(reports) -> list:
 
 
 class InvestigationAccessMixin:
-    analyzer_report_select_related = ANALYZER_REPORT_SELECT_RELATED
-
     def get_case_list_queryset(self):
         # prefetch the group artifacts so get_case_info_value's IOC branch
         # doesn't fire 2 queries per row on a list page of IOC cases.

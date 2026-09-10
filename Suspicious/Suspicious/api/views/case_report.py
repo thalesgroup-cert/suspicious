@@ -59,6 +59,7 @@ def _inline_screenshots(observables):
                            report_id, exc)
             continue
         if used + len(data) > _REPORT_IMG_CAP:
+            used = _REPORT_IMG_CAP  # budget spent: skip the rest without fetching
             continue
         used += len(data)
         o["screenshot_data_uri"] = (
