@@ -18,8 +18,8 @@ investigation views and in the downloadable HTML report.
 
 The screenshot comes **only** from the isolated analyzer tier — no app-side
 capture — which keeps rendering of attacker-controlled URLs off the Suspicious
-host, consistent with the analyzer-isolation direction
-(`docs/specs/2026-09-02-analyzer-classification.md`).
+host, consistent with the analyzer-isolation direction (the 2-bucket isolation
+classification is tracked in the team's engineering memory, not in-repo).
 
 Net effect: an analyst opening a URL case sees the rendered page next to the
 verdict and per-source table; the extracted report carries the same image inline.
@@ -188,9 +188,12 @@ for the reader. Instead inline the image:
 - `Lookyloo_Screenshot` and `Urlscan.io_Scan` are `url`/`domain` **type-dispatch**
   analyzers → `CortexJob.get_analyzers_by_type` runs them automatically once
   enabled in Cortex; **no `settings.json` change**.
-- **`docs/specs/2026-09-02-analyzer-classification.md`** — add both to
-  **bucket ② (egress-allowlist, no sandbox)**: neither runs attacker code, each
-  needs outbound (Lookyloo → its instance host; urlscan → `urlscan.io`).
+- **Analyzer isolation classification** — the 2-bucket split (code-execution
+  sandbox tier vs. egress-allowlist tier) is tracked in the team's engineering
+  memory, not in-repo. Both screenshot analyzers are egress-only: neither runs
+  attacker code in-process, each just needs outbound (Lookyloo → its instance
+  host; urlscan → `urlscan.io`), so both sit in the egress-allowlist tier. See
+  also §Non-goals.
 - **Prod runbook note** — set a private Lookyloo instance URL and the urlscan
   API key; both hosts on the analyzer-tier egress allowlist.
 

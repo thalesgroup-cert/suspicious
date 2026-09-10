@@ -49,7 +49,6 @@
 | `templates/case_report/report.html` | `<img>` per observable |
 | `score_process/management/commands/backfill_screenshots.py` | **new** — backfill historical reports |
 | `deployment/scripts/enable-dev-analyzers.sh` | enable `Lookyloo_Screenshot` |
-| `docs/specs/2026-09-02-analyzer-classification.md` | add both analyzers to bucket ② |
 
 ### Frontend
 
@@ -1298,30 +1297,24 @@ git commit -m "feat(screenshots): backfill_screenshots management command"
 
 ---
 
-## Task 12: Enable `Lookyloo_Screenshot` in dev + classification doc
+## Task 12: Enable `Lookyloo_Screenshot` in dev
 
 **Files:**
 - Modify: `deployment/scripts/enable-dev-analyzers.sh` (add `Lookyloo_Screenshot` with the public CIRCL instance)
-- Modify: `docs/specs/2026-09-02-analyzer-classification.md` (add both analyzers to bucket ②)
 - Test: none automated — deployment script; verified manually against the dev stack
+
+> **Note:** earlier drafts of this task also said to update
+> `docs/specs/2026-09-02-analyzer-classification.md`. That file does not exist in
+> this repo or its history — the 2-bucket analyzer-isolation classification is
+> tracked in the team's engineering memory, not in-repo. Both screenshot
+> analyzers are egress-only (no attacker code in-process); that fact is now
+> recorded in the feature design doc §9. No in-repo classification doc to edit.
 
 - [ ] **Step 1: Add Lookyloo to the dev analyzer set**
 
 In `deployment/scripts/enable-dev-analyzers.sh`, add `Lookyloo_Screenshot` to the `ANALYZERS` array. If the script only enables keyless analyzers by name, extend it to also POST the analyzer config `{"instance_url": "https://lookyloo.circl.lu"}` for Lookyloo (follow the existing `cortex4py` / `SessionCortexApi` enable call in the script). Do **not** add `Urlscan.io_Scan` (needs an API key).
 
-- [ ] **Step 2: Update the classification doc**
-
-In `docs/specs/2026-09-02-analyzer-classification.md`, under **Bucket ② (egress-allowlist, no sandbox)** add:
-
-```
-- Lookyloo_Screenshot — submits the URL to a Lookyloo instance, returns the
-  rendered PNG. No attacker code in-process. Egress: the Lookyloo instance host
-  (dev: lookyloo.circl.lu; prod: the private instance).
-- Urlscan.io_Scan — submits the URL to urlscan.io, returns scan JSON + a
-  screenshot URL. No attacker code in-process. Egress: urlscan.io. API key.
-```
-
-- [ ] **Step 3: Manual verification (document the result in the commit body)**
+- [ ] **Step 2: Manual verification (document the result in the commit body)**
 
 ```
 # with the dev stack up and Cortex reachable:
@@ -1332,10 +1325,10 @@ curl -s -o /tmp/shot.png -H "Authorization: Token <t>" \
   http://localhost/api/cases/<id>/screenshot.png && file /tmp/shot.png   # -> PNG image data
 ```
 
-- [ ] **Step 4: Commit**
+- [ ] **Step 3: Commit**
 
 ```bash
-git add deployment/scripts/enable-dev-analyzers.sh docs/specs/2026-09-02-analyzer-classification.md
+git add deployment/scripts/enable-dev-analyzers.sh
 git commit -m "feat(deployment): enable Lookyloo_Screenshot in the dev analyzer set"
 ```
 
@@ -1382,7 +1375,7 @@ git commit -m "docs: URL screenshot capture — mark roadmap item done, note res
 - §6 serializers → Task 8
 - §7 HTML report data URIs → Task 9
 - §8 frontend → Task 10
-- §9 deployment / classification doc → Task 12
+- §9 deployment (enable Lookyloo in dev) → Task 12
 - §10 backfill → Task 11
 - Error-handling + testing tables → covered across each task's tests; whole-feature guard → Task 13
 
