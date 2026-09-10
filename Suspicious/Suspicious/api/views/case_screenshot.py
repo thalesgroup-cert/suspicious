@@ -42,8 +42,12 @@ class CaseScreenshotView(APIView):
 
         candidates = reports_for_case(case).exclude(screenshot_key="")
 
-        report_id = request.query_params.get("report")
-        if report_id:
+        raw_report_id = request.query_params.get("report")
+        if raw_report_id not in (None, ""):
+            try:
+                report_id = int(raw_report_id)
+            except (TypeError, ValueError) as exc:
+                raise NotFound("Unknown report") from exc
             report = candidates.filter(pk=report_id).first()
         else:
             report = (

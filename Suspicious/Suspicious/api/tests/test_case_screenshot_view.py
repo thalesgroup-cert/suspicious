@@ -110,3 +110,8 @@ class CaseScreenshotViewTest(TestCase):
         self._report(self.lookyloo, "s/look.png")
         resp = self.client.get(self._url(report=999999))
         self.assertEqual(resp.status_code, 404)
+
+    def test_404_for_non_integer_report_id(self):
+        self._report(self.lookyloo, "s/look.png")
+        resp = self.client.get(self._url(report="abc"))
+        self.assertEqual(resp.status_code, 404)
