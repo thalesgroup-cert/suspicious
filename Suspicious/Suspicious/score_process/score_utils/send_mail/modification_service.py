@@ -113,9 +113,9 @@ class ModificationEmailService:
                 _RESULT_TO_COLOR_KEY.get(raw_result, "color_inconclusive"),
                 "#94A3B8",
             ),
-            "result_guidance": _RESULT_GUIDANCE.get(
-                raw_result,
-                "Please review the case details on the portal."
+            "result_guidance": (
+                (getattr(self.case, "verdict_explanation", None) or {}).get("reporter_paragraph")
+                or _RESULT_GUIDANCE.get(raw_result, "Please review the case details on the portal.")
             ),
             "contact_cta": contact_cta,
         }

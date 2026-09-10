@@ -197,9 +197,9 @@ class FinalEmailService:
                 "#94A3B8",
             ),
             "result_label": _RESULT_LABEL.get(raw_result, raw_result),
-            "result_guidance": _RESULT_GUIDANCE.get(
-                raw_result,
-                "Please review the case details on the portal."
+            "result_guidance": (
+                (getattr(self.case, "verdict_explanation", None) or {}).get("reporter_paragraph")
+                or _RESULT_GUIDANCE.get(raw_result, "Please review the case details on the portal.")
             ),
             "result_ai":        getattr(self.case, "results_ai",  None),
             "category_ai":      getattr(self.case, "category_ai", None),
