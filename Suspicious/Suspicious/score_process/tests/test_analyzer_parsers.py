@@ -209,6 +209,45 @@ class ReportsRewireTests(SimpleTestCase):
         self.assertEqual(r.level, "info")
 
 
+from score_process.scoring.cortex_analyzers.contrib.lookyloo import LookylooScreenshotParser
+
+class LookylooScreenshotParserTests(SimpleTestCase):
+    """Lookyloo's {"level":"safe","predicate":"Screenshot","value":"OK"} taxonomy
+    means the capture succeeded, not that the site is clean — it must NOT become
+    a safe/clean vote. Payload shape captured live from Cortex 2026-09-10."""
+
+    def _run(self, summary, full):
+        p = LookylooScreenshotParser(
+            analyzer_name="Lookyloo_Screenshot_1_0", data="http://x", data_type="url")
+        return p.parse(summary, full)
+
+    def test_safe_ok_taxonomy_is_info_not_safe(self):
+        summary = {"taxonomies": [
+            {"level": "safe", "namespace": "Lookyloo",
+             "predicate": "Screenshot", "value": "OK"}]}
+        full = {"submitted_url": "http://x", "status": "Capture done",
+                "url": "https://lookyloo.circl.lu/tree/abc",
+                "redirections": ["http://x", "http://x/final"],
+                "screenshot": "iVBORw0KGgo"}
+        r = self._run(summary, full)
+        self.assertEqual(r.level, "info")
+        self.assertEqual(r.score, 2)          # get_level_score_confidence("info")
+        self.assertEqual(r.confidence, 50)
+        self.assertEqual(r.category, [])      # no verdict label
+        self.assertEqual(r.details["capture_status"], "Capture done")
+        self.assertEqual(r.details["redirections"], ["http://x", "http://x/final"])
+
+    def test_no_verdict_even_on_empty_full(self):
+        r = self._run({}, None)
+        self.assertEqual(r.level, "info")
+        self.assertEqual(r.category, [])
+
+    def test_info_level_maps_to_no_data_source_verdict(self):
+        # the whole point: sources._LEVEL_TO_VERDICT has no "info" key
+        from score_process.scoring.sources import _LEVEL_TO_VERDICT
+        self.assertNotIn("info", _LEVEL_TO_VERDICT)
+
+
 from score_process.scoring.cortex_analyzers.contrib.zscaler import ZscalerParser
 
 class ZscalerParserTests(SimpleTestCase):
@@ -560,6 +599,7 @@ class BespokeParserResolutionTests(SimpleTestCase):
             "Zscaler_1_3": "ZscalerParser",
             "VirusTotal_GetReport_3_1": "VirusTotalGetReportParser",
             "Urlscan_io_Search_0_1_1": "UrlscanSearchParser",
+            "Lookyloo_Screenshot_1_0": "LookylooScreenshotParser",
             "MISP_2_1": "MispParser",
             "CIRCLHashlookup_1_1": "CirclHashlookupParser",
             "SpamhausDBL_1_0": "SpamhausDblParser",
