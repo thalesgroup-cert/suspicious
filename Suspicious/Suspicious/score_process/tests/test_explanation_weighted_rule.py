@@ -29,3 +29,10 @@ class WeightedRuleTest(SimpleTestCase):
     def test_weighted_consensus_rule(self):
         v = score_case([sig(6, 90, mal=True), sig(6, 90, mal=True), sig(1, 90)])
         self.assertEqual(v.rule, "weighted-consensus")
+
+    def test_malicious_count_beats_incomplete_branch(self):
+        # score >= 8 -> malicious, but confidence < CONF_FLOOR. score_case still
+        # calls this Dangerous by malicious count, so the rule must agree.
+        v = score_case([sig(9, 30, mal=True)])
+        self.assertEqual(v.result, "Dangerous")
+        self.assertEqual(v.rule, "weighted-consensus")

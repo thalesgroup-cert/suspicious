@@ -89,14 +89,16 @@ def band(score: float) -> str:
 
 def _classify_rule(*, ai, base_conf, ai_missing, final_score, final_conf,
                    n_malicious, n_scored, result, worst, wmean) -> str:
+    # Mirror score_case's band order: the malicious-count test decides Dangerous
+    # before any incomplete-analysis branch, so it must be checked first here too.
+    if n_malicious >= max(1, n_scored // 3):
+        return "weighted-consensus"
     if ai is not None and ai.confidence > base_conf:
         return "ai-classifier-decisive"
     if ai_missing:
         return "analysis-incomplete"
     if final_score == NEUTRAL or final_conf < CONF_FLOOR:
         return "analysis-incomplete"
-    if n_malicious >= max(1, n_scored // 3):
-        return "weighted-consensus"
     if result == Result.SAFE and n_malicious == 0:
         return "no-signal"
     if worst > wmean:

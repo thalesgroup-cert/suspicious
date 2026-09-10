@@ -43,6 +43,11 @@ def _build(case) -> VerdictExplanation:
                  n_total=len(lines), data_type="indicator",
                  missing="coverage is thin", share=0.0)
     analyst, reporter, reading = compose("unknown", band, conf, lines, **facts)
+    # A historical case's stored rationale IS the real "why" — the generic
+    # "based on 0 of N source(s)" line would bury it. Keep it as the analyst text.
+    rationale = list(getattr(case, "verdict_rationale", None) or [])
+    if rationale:
+        analyst = " ".join(rationale)
     return VerdictExplanation(band, conf, "unknown", analyst, reporter, reading,
                               tuple(lines))
 
