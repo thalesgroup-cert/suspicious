@@ -15,10 +15,13 @@
 - **No new runtime dependency.** `minio` and `requests` are already in `Suspicious/requirements*.txt`; add nothing.
 - **No app-side / headless capture.** Screenshots come only from Cortex analyzer reports.
 - **Do not change** scoring, the categorical verdict engine, `mail_band_escalation`, the Cortex webhook, `dispatch_pending`, `CaseAnalyzerJob`, or `finalise_case`.
-- **Additive migration only.** New nullable/blank fields on `AnalyzerReport`; no data migration.
+- **Additive migration only.** New blank fields on `AnalyzerReport`; no data migration. Next `cortex_job` migration number is **`0015`** (head: `0014_derivedobservable`).
 - Screenshot capture/store failures must never break report scoring — isolate in their own `try/except`.
 - 8 MB per-image cap on capture; 6 MB total-embedded cap in the HTML report.
-- Conventional Commits. Commit after every task. Backend tasks end with `python manage.py test cortex_job score_process api` green. Frontend tasks end with `pnpm test` green and `pnpm lint` clean.
+- Conventional Commits. Commit after every task with explicit `git add <paths>` — never `git add -A`.
+- Tests run through **`ww test`** (`~/.local/bin/ww-test`), never an ad-hoc `docker compose run` string. Backend tasks end with the `cortex_job` / `score_process` / `api` suites green; frontend tasks end with `pnpm test` green and `pnpm lint` clean.
+- After a containerised backend test run, remove the stray root-owned `Suspicious/Suspicious/gunicorn.conf.py` before committing.
+- Django project lives at `Suspicious/Suspicious/` (nested); all `manage.py` paths in this plan are relative to there.
 - `python manage.py backtest_scoring` must show zero verdict drift (regression guard — this feature touches no scoring path).
 - Frontend: follow `suspicious-ui/src` patterns — TanStack Query for server state, Zod schemas in `features/*/`, MUI components, no new state libraries.
 
@@ -687,7 +690,17 @@ git commit -m "feat(screenshots): capture screenshot when saving an analyzer rep
 
 **Permissions:** use `[IsAuthenticated, CanAccessSubmission]` + `self.check_object_permissions(request, case)` — identical to `MailPreviewView` (`api/views/mail_preview.py`).
 
-**Best-pick order:** reports with a non-empty `screenshot_key` linked to the case, ordered `Lookyloo_Screenshot` before `Urlscan.io_Scan`, then `-last_update`. "Linked to the case" = the report's observable belongs to the case's `ObservableGroup` or `nonFileIocs` **or** the case's mail embedded artifacts — reuse the queryset builder the investigation detail already uses (`api/views/investigations.py` builds `analyzer_reports_qs`; factor it into `api/utils/` if it is inline, otherwise import it).
+**Best-pick order:** reports with a non-empty `screenshot_key` linked to the case, ordered `Lookyloo_Screenshot` before `Urlscan.io_Scan`, then `-last_update`.
+
+**Case → reports queryset:** the investigation serializer already has
+`InvestigationCaseSerializer.get_analyzer_reports_queryset(obj)` in
+`api/views/investigations.py:158`, which resolves the case's targets and calls
+`build_analyzer_report_filter(targets)` → `AnalyzerReport.objects.filter(query)`.
+Extract the case→queryset logic into `api/utils/analyzer_reports.py` as
+`reports_for_case(case) -> QuerySet[AnalyzerReport]` and call it from both the
+serializer method and this view. (Locate `build_analyzer_report_filter` — grep
+`api/` and `cortex_job/` — and keep it where it is; only the *case→targets→filter*
+wrapper moves.)
 
 - [ ] **Step 1: Write the failing test**
 
