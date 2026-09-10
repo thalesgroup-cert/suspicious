@@ -72,6 +72,7 @@ def finalise_ioc_group(case) -> None:
             v = ObservableVerdict(
                 "Dangerous", 100, None, v.counts,
                 list(v.rationale) + [f"Indicator is on the deny list ({matched})."],
+                rule="deny-listed",
             )
         idx_by_key[(_art_type.lower(), obj.pk)] = len(obs_verdicts)
         obs_verdicts.append(v)
@@ -101,7 +102,8 @@ def finalise_ioc_group(case) -> None:
         # child drove the new band, so its confidence carries the verdict.
         confidence = max(v.confidence, child_confidence)
         obs_verdicts[i] = ObservableVerdict(
-            eband, confidence, None, v.counts, list(v.rationale) + [note])
+            eband, confidence, None, v.counts, list(v.rationale) + [note],
+            rule="derived-observable-escalation")
         obj.ioc_level = _BAND_TO_IOC_LEVEL.get(eband, "info")
         obj.ioc_score = _DERIVED_SCORE.get(eband, 5)
         obj.ioc_confidence = confidence
