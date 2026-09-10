@@ -190,6 +190,11 @@ class FinalEmailService:
         """
         raw_result = getattr(self.case, "results", None) or "Failure"
 
+        # Trust the stored reporter paragraph only if it describes the case's
+        # current band — an analyst override leaves a stale explanation behind.
+        _ve = getattr(self.case, "verdict_explanation", None) or {}
+        _reporter = _ve.get("reporter_paragraph") if _ve.get("band") == raw_result else None
+
         return {
             "result":       raw_result,
             "result_color": self.theme_ctx.get(
@@ -198,7 +203,7 @@ class FinalEmailService:
             ),
             "result_label": _RESULT_LABEL.get(raw_result, raw_result),
             "result_guidance": (
-                (getattr(self.case, "verdict_explanation", None) or {}).get("reporter_paragraph")
+                _reporter
                 or _RESULT_GUIDANCE.get(raw_result, "Please review the case details on the portal.")
             ),
             "result_ai":        getattr(self.case, "results_ai",  None),

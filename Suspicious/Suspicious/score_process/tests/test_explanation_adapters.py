@@ -40,7 +40,8 @@ class AdapterTest(TestCase):
         )
         self.assertEqual(ve.band, "Dangerous")
         self.assertEqual(ve.confidence, 90)
-        self.assertEqual(ve.decisive_rule, "group-worst-of")
+        # single observable -> the observable's escalated rule, not group-worst-of
+        self.assertEqual(ve.decisive_rule, "tier1-authoritative-malicious")
         self.assertTrue(ve.analyst_paragraph)
         self.assertTrue(ve.reporter_paragraph)
         self.assertEqual(ve.sources[0].name, "GTI")
@@ -60,6 +61,38 @@ class AdapterTest(TestCase):
         self.assertEqual(ve.band, "Dangerous")
         self.assertEqual(ve.confidence, 77)
         self.assertTrue(ve.sources[0].counted)
+
+    def test_single_observable_ignores_non_none_group_verdict(self):
+        # finalise_ioc_group always passes a group verdict; for one observable
+        # the real reason is that observable's escalated rule, not group-worst-of.
+        rep = _report(_analyzer("GTI", tier=1), level="malicious")
+        ve = explain_observable_group(
+            None,
+            GroupVerdict("Dangerous", 90, {"Dangerous": 1}, ["worst-of"],
+                         rule="group-worst-of"),
+            [ObservableVerdict("Dangerous", 77, None, {"malicious": 1}, ["x"],
+                               rule="tier1-authoritative-malicious")],
+            reports=[rep],
+        )
+        self.assertEqual(ve.decisive_rule, "tier1-authoritative-malicious")
+        self.assertEqual(ve.band, "Dangerous")
+        self.assertEqual(ve.confidence, 77)
+
+    def test_multi_observable_group_counts_observables_not_reports(self):
+        r1 = _report(_analyzer("GTI", tier=1), level="malicious")
+        r2 = _report(_analyzer("VT", tier=1), level="malicious")
+        r3 = _report(_analyzer("Whois", tier=3), level="safe", category="")
+        ve = explain_observable_group(
+            None,
+            GroupVerdict("Dangerous", 60, {"Dangerous": 1, "Safe": 1}, ["worst-of"],
+                         rule="group-worst-of"),
+            [ObservableVerdict("Dangerous", 60, None, {"malicious": 1}, ["x"],
+                               rule="tier1-authoritative-malicious"),
+             ObservableVerdict("Safe", 80, None, {"clean": 1}, ["y"], rule="no-flag")],
+            reports=[r1, r2, r3],
+        )
+        self.assertEqual(ve.decisive_rule, "group-worst-of")
+        self.assertIn("1 of 2", ve.analyst_paragraph)
 
     def test_empty_case_is_thin_coverage(self):
         ve = explain_observable_group(None, None, [], reports=[])

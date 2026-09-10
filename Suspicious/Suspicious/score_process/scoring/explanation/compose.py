@@ -23,8 +23,8 @@ _RULE_TEMPLATES = {
         "reporter": "Multiple independent security sources flagged this as malicious.",
     },
     "weighted-malicious-share": {
-        "analyst": "The trust-weighted share of sources calling this malicious is "
-                   "{share:.0%}, past the threshold for Dangerous.",
+        "analyst": "The trust-weighted share of sources calling this {data_type} malicious is "
+                   "past the threshold for a Dangerous verdict.",
         "reporter": "The weight of evidence points to this being malicious.",
     },
     "tier1-authoritative-clean": {
@@ -68,7 +68,7 @@ _RULE_TEMPLATES = {
     },
     "weighted-consensus": {
         "analyst": "The trust-weighted average of {n_counted} analyzer result(s) puts this "
-                   "case at {band}.",
+                   "{data_type} at {band}.",
         "reporter": "The overall weight of the analysis puts this at {band}.",
     },
     "single-strong-signal": {
@@ -77,9 +77,9 @@ _RULE_TEMPLATES = {
         "reporter": "One part of the analysis was decisive for this verdict.",
     },
     "embedded-ioc-escalation": {
-        "analyst": "An indicator embedded in this message scored {band}, which raised the "
+        "analyst": "An indicator embedded in this {data_type} scored {band}, which raised the "
                    "case band.",
-        "reporter": "A link or attachment in this message was found to be a threat.",
+        "reporter": "A link or attachment in this {data_type} was found to be a threat.",
     },
     "ai-classifier-decisive": {
         "analyst": "The AI phishing classifier was the highest-confidence signal and set "
@@ -87,8 +87,8 @@ _RULE_TEMPLATES = {
         "reporter": "Automated phishing detection was decisive for this verdict.",
     },
     "no-signal": {
-        "analyst": "No analyzer flagged anything in this message.",
-        "reporter": "No security check flagged this message.",
+        "analyst": "No analyzer flagged anything in this {data_type}.",
+        "reporter": "No security check flagged this {data_type}.",
     },
     "analysis-incomplete": {
         "analyst": "The verdict is Inconclusive: {missing}.",

@@ -24,7 +24,8 @@ _COUNTED_PREDICATES = {
     "weighted-consensus": lambda sv: sv.verdict in _FLAGGED,
     "single-strong-signal": lambda sv: sv.verdict in _FLAGGED and (sv.confidence or 0) >= 50,
     "embedded-ioc-escalation": lambda sv: sv.verdict in _FLAGGED,
-    "ai-classifier-decisive": lambda sv: "ai" in sv.name.lower() or "mail_analyzer" in sv.name.lower(),
+    "ai-classifier-decisive": lambda sv: "ai_mail" in sv.name.lower()
+    or "aimailanalyzer" in sv.name.lower().replace("_", ""),
 }
 
 _BANDS = {"Safe", "Suspicious", "Dangerous", "Inconclusive"}
@@ -41,13 +42,6 @@ def _missing_phrase(reason) -> str:
     if not reason:
         return "coverage is thin"
     return str(reason)
-
-
-def _malicious_share(source_lines) -> float:
-    non_failed = [s for s in source_lines if s.verdict != "failed"]
-    if not non_failed:
-        return 0.0
-    return sum(1 for s in non_failed if s.verdict == "malicious") / len(non_failed)
 
 
 def _norm_band(value) -> str:
@@ -96,16 +90,16 @@ def _source_lines(rule, reports) -> list[SourceLine]:
     return lines
 
 
-def _build(rule, band, confidence, source_lines, data_type, missing) -> VerdictExplanation:
-    n_counted = sum(1 for s in source_lines if s.counted)
+def _build(rule, band, confidence, source_lines, data_type, missing,
+           n_counted=None, n_total=None) -> VerdictExplanation:
+    counted = sum(1 for s in source_lines if s.counted)
     facts = dict(
         source=next((s.name for s in source_lines if s.counted), "a source"),
-        n_context=len(source_lines) - n_counted,
-        n_counted=n_counted,
-        n_total=len(source_lines),
+        n_context=len(source_lines) - counted,
+        n_counted=counted if n_counted is None else n_counted,
+        n_total=len(source_lines) if n_total is None else n_total,
         data_type=data_type,
         missing=missing,
-        share=_malicious_share(source_lines),
     )
     analyst, reporter, reading = compose(rule, band, confidence, source_lines, **facts)
     return VerdictExplanation(band, int(confidence), rule, analyst, reporter, reading, tuple(source_lines))
@@ -119,29 +113,36 @@ def explain_observable_group(case, group_verdict, per_observable, reports) -> Ve
     ``reports``: iterable[AnalyzerReport] for the case
     """
     per_observable = list(per_observable or [])
+    n_counted = n_total = None
 
-    if group_verdict is not None:
+    # finalise_ioc_group always builds a group verdict (score_group runs whenever
+    # there is >=1 observable), so `group_verdict is not None` can't be the test
+    # for "is this a real group case". Branch on the observable count instead.
+    if len(per_observable) == 1 or (per_observable and group_verdict is None):
+        o = per_observable[0]
+        rule = o.rule or "unknown"
+        band = o.band
+        confidence = o.confidence
+        reason = o.inconclusive_reason
+    elif group_verdict is not None:
         rule = group_verdict.rule or "group-worst-of"
         band = group_verdict.band
         confidence = group_verdict.confidence
         reason = getattr(group_verdict, "inconclusive_reason", None)
-    elif per_observable:
-        rule = per_observable[0].rule or "unknown"
-        band = per_observable[0].band
-        confidence = per_observable[0].confidence
-        reason = per_observable[0].inconclusive_reason
+        if len(per_observable) > 1:
+            # "{n_counted} of {n_total} submitted indicator(s)" counts observables
+            n_counted = group_verdict.counts.get(group_verdict.band, 0)
+            n_total = len(per_observable)
     else:
         rule = "thin-coverage"
         band = "Inconclusive"
         confidence = 0
         reason = None
 
-    if not reason and per_observable:
-        reason = per_observable[0].inconclusive_reason
-
     source_lines = _source_lines(rule, reports)
     return _build(rule, band, confidence, source_lines,
-                  _case_data_type(case), _missing_phrase(reason))
+                  _case_data_type(case), _missing_phrase(reason),
+                  n_counted=n_counted, n_total=n_total)
 
 
 def explain_mail_case(case, verdict, analyzer_reports, embedded_verdicts) -> VerdictExplanation:
@@ -157,4 +158,4 @@ def explain_mail_case(case, verdict, analyzer_reports, embedded_verdicts) -> Ver
     missing = _missing_phrase(getattr(verdict, "inconclusive_reason", "") or "")
 
     source_lines = _source_lines(rule, analyzer_reports)
-    return _build(rule, band, confidence, source_lines, "mail", missing)
+    return _build(rule, band, confidence, source_lines, _case_data_type(case), missing)

@@ -50,6 +50,17 @@ class BackfillVerdictExplanationTests(TestCase):
         self.assertTrue(ve["analyst_paragraph"])
         self.assertTrue(ve["sources"])
 
+    def test_preserves_historical_rationale(self):
+        case = self._finalized_case()
+        case.verdict_rationale = ["GTI reports malicious."]
+        case.save(update_fields=["verdict_rationale"])
+        call_command("backfill_verdict_explanation", stdout=StringIO())
+        case.refresh_from_db()
+        self.assertIn(
+            "GTI reports malicious.", case.verdict_explanation["analyst_paragraph"]
+        )
+        self.assertEqual(case.verdict_explanation["decisive_rule"], "unknown")
+
     def test_dry_run_writes_nothing(self):
         case = self._finalized_case()
         out = StringIO()

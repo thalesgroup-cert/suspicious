@@ -56,3 +56,16 @@ class EmailVerdictExplanationTests(TestCase):
         self.assertEqual(
             self._mod_ctx(case)["result_guidance"], MOD_GUIDANCE["Dangerous"]
         )
+
+    def test_final_ignores_stale_paragraph_after_override(self):
+        # case is Dangerous now, explanation still describes the old Safe verdict
+        case = self._case({"band": "Safe", "reporter_paragraph": _PARAGRAPH})
+        self.assertEqual(
+            self._final_ctx(case)["result_guidance"], FINAL_GUIDANCE["Dangerous"]
+        )
+
+    def test_modification_ignores_stale_paragraph_after_override(self):
+        case = self._case({"band": "Safe", "reporter_paragraph": _PARAGRAPH})
+        self.assertEqual(
+            self._mod_ctx(case)["result_guidance"], MOD_GUIDANCE["Dangerous"]
+        )
