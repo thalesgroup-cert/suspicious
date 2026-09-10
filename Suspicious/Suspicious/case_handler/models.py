@@ -102,6 +102,10 @@ class Case(models.Model):
     )
     inconclusive_reason = models.CharField(max_length=20, blank=True, default="")
     verdict_rationale = models.JSONField(default=list, blank=True)
+    # Structured explanation of the verdict (score_process.scoring.explanation).
+    # None = not computed / old case; every render surface falls back to
+    # verdict_rationale / _RESULT_GUIDANCE when null.
+    verdict_explanation = models.JSONField(null=True, blank=True, default=None)
 
     class Meta:
         ordering = ['-creation_date']
