@@ -162,16 +162,62 @@ by design: an analyst reads the `.result.txt` files and reports back whether
 the output is good enough to make training unnecessary. That verdict is this
 spike's actual deliverable, not a passing test suite.
 
+## Result (2026-09-11)
+
+The spike was run for real: Ollama (Docker service, `qwen2.5:7b-instruct`,
+CPU-only) prompted against all 6 fixtures, twice — once revealing two prompt
+defects (internal rule-key names like `weighted-malicious-share` leaking
+into reader-facing text; a chatbot-style sign-off), fixed in `prompt.py`,
+and once more after also fixing a validator defect the first run's real
+output exposed (see below). Final run: **4/6 PASS, 2/6 FAIL** — but a FAIL
+here means "the validator flagged something," not "the narration was bad."
+Reading all six narrations in full:
+
+- **The verdict was never contradicted, on any of the 6 real generations.**
+  Band, score, and confidence were always stated correctly; reasoning was
+  always grounded in the actual analyzer data given, with tone calibrated
+  to severity (hedged language for Suspicious, urgency for Dangerous,
+  reassurance for Safe).
+- **One FAIL was the lock catching a real hallucination**, not noise: on
+  `mail_suspicious`, the model wrote "the confidence level is below 75%" —
+  a number that appears nowhere in the input facts (real confidence: 58).
+  The lock correctly flagged this fabricated figure. This is the safety
+  mechanism doing exactly its job.
+- **One FAIL is a known, accepted, reproduced limitation**: on
+  `mail_dangerous`, generic safety advice ("report any suspicious links")
+  uses "suspicious" as an ordinary English word, not a re-verdict — the
+  lexical lock can't distinguish that from an actual contradiction without
+  semantic understanding, which would require another LLM call and defeat
+  the point of a *deterministic* lock (see `verdict_lock.py`'s docstring).
+  Reproduced across two separate generations; judged acceptable given a
+  human reads every narration by design.
+- **Two validator bugs were found and fixed via real output, not
+  hypothetically**: the negation check only looked back a fixed 40
+  characters, missing "the evidence is **not** strong enough to ...
+  label the case as highly **dangerous**" (59 characters apart) — fixed by
+  scoping negation to the current sentence instead of a character count.
+  A test now pins this exact case.
+
+**Verdict: prompting a locally-run 7B instruct model, with the verdict-lock
+as a safety net, is good enough.** This matches the LLM Council's
+prediction and is now backed by real evidence rather than a forecast.
+**Recommendation: do not build the teacher-distillation/fine-tuning
+pipeline.** The next step, if this capability is wanted for real, is
+integration work (see Open Questions below), not training.
+
 ## Open Questions / Follow-on Work (not in this spec)
 
-- If the spike output is judged good enough: spec the integration into case
-  finalization, report/email/UI rendering, and likely packaging as a Cortex
-  analyzer (matching the AIMailAnalyzer deployment pattern already used in
-  this codebase).
-- If judged inadequate: revisit teacher distillation, but only after the
-  data-governance question the council raised (can real case content be sent
-  to a hosted teacher API at all) is resolved on its own — not decided by
-  default because a spike happened to work around it with synthetic data.
+- **Decided (see Result above): judged good enough.** Next spec should cover
+  integration into case finalization, report/email/UI rendering, and likely
+  packaging as a Cortex analyzer (matching the AIMailAnalyzer deployment
+  pattern already used in this codebase) — using a real prompted model, not
+  a fine-tuned one.
+- Teacher distillation is not ruled out forever, only deprioritized: revisit
+  only if real production use surfaces a quality gap prompting can't fix,
+  and only after the data-governance question the council raised (can real
+  case content be sent to a hosted teacher API at all) is resolved on its
+  own — not decided by default because this spike worked around it with
+  synthetic data.
 - Standing up Ollama itself (install, model pull, resource sizing) is
   environment setup, tracked in the implementation plan, not a design
   decision.
