@@ -67,7 +67,8 @@ services:
     volumes:
       - ollama_models:/root/.ollama
     ports:
-      - "127.0.0.1:11434:11434"
+      - "127.0.0.1:11435:11434"   # host port 11434 is taken by a native Ollama install on this box;
+                                   # containers reach this service via `http://ollama:11434` regardless
     networks:
       - suspicious_network
 

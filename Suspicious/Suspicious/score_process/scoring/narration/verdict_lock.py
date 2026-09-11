@@ -20,7 +20,7 @@ from dataclasses import dataclass, field
 
 _BAND_WORDS = ("Safe", "Suspicious", "Dangerous", "Inconclusive")
 _CONFIDENCE_TOLERANCE = 10  # percentage points
-_NEGATION_WINDOW_CHARS = 40
+_SENTENCE_BOUNDARY_RE = re.compile(r"[.!?]\s+")
 _NEGATION_RE = re.compile(
     r"\b(no|not|none|nothing|never|isn't|aren't|wasn't|weren't|doesn't|didn't|won't|can't|couldn't)\b",
     re.IGNORECASE,
@@ -47,9 +47,15 @@ def render_fixed_facts(verdict: dict) -> str:
 
 
 def _is_negated(text: str, match_start: int) -> bool:
-    """Check the text immediately preceding a match for a negation marker."""
-    window_start = max(0, match_start - _NEGATION_WINDOW_CHARS)
-    return bool(_NEGATION_RE.search(text[window_start:match_start]))
+    """Check the current sentence, up to the match, for a negation marker.
+    Scoped to the sentence rather than a fixed character window because a
+    real negation can sit many words before the band word it negates
+    (e.g. "the evidence is not strong enough to ... label the case as
+    highly dangerous")."""
+    preceding = text[:match_start]
+    boundaries = list(_SENTENCE_BOUNDARY_RE.finditer(preceding))
+    sentence_start = boundaries[-1].end() if boundaries else 0
+    return bool(_NEGATION_RE.search(preceding[sentence_start:]))
 
 
 def _near_confidence_word(text: str, match_start: int, match_end: int) -> bool:

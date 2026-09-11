@@ -76,6 +76,18 @@ class ValidateNarrationTest(SimpleTestCase):
         result = validate_narration(text, verdict)
         self.assertTrue(result.passed)
 
+    def test_negation_many_words_before_band_in_same_sentence_does_not_fail(self):
+        # Observed on a real Ollama generation: negation and the band word
+        # were 59 characters apart, past a fixed-width lookback window.
+        verdict = {"band": "Suspicious", "score": 4.8, "confidence": 55, "rule": "group-worst-of"}
+        text = (
+            "The confidence level of 55 out of 100 indicates that while there "
+            "are some red flags, the evidence is not strong enough to "
+            "conclusively label the case as highly dangerous."
+        )
+        result = validate_narration(text, verdict)
+        self.assertTrue(result.passed)
+
 
 class BandWordsPinnedTest(SimpleTestCase):
     def test_band_words_match_canonical_bands(self):
