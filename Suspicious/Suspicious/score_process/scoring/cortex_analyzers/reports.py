@@ -68,7 +68,22 @@ class CortexAnalyzerReports:
             if mail:
                 verdict = CortexAnalyzerReports._apply_embedded_escalation(case, mail, verdict)
 
-            apply_verdict(case, verdict)
+            # An explanation failure must NEVER break finalisation.
+            _explanation = None
+            try:
+                from score_process.scoring.explanation.adapters import explain_mail_case
+                from cortex_job.cortex_utils.case_targets import (
+                    build_analyzer_report_filter, collect_case_targets)
+                from cortex_job.models import AnalyzerReport
+                _tg = collect_case_targets(case)
+                _rp = (AnalyzerReport.objects.filter(build_analyzer_report_filter(_tg))
+                       if _tg else AnalyzerReport.objects.none())
+                _explanation = explain_mail_case(case, verdict, _rp, []).to_dict()
+            except Exception:
+                update_cases_logger.exception(
+                    "verdict explanation failed for case %s", getattr(case, "id", "?"))
+
+            apply_verdict(case, verdict, explanation=_explanation)
 
             update_cases_logger.info(
                 "get_report: case %s → %s (score=%s conf=%s, %d/%d malicious).",

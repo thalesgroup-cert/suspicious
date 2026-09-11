@@ -44,6 +44,8 @@
     background: #f6f8fa; border: 1px solid #e1e4e8; border-radius: 4px;
     padding: 10px; overflow-x: auto; font-size: 11px; white-space: pre-wrap; word-break: break-word;
   }
+  .src-table { margin-top: 10px; }
+  h3 { font-size: 14px; margin: 18px 0 6px; }
   .empty { color: #666; font-style: italic; }
   @media print { body { padding: 0; } .obs { break-inside: avoid; } }
 </style>
@@ -80,7 +82,19 @@
   {% if case.inconclusive_reason %}
   <p class="sub">Inconclusive reason: {{ case.inconclusive_reason }}</p>
   {% endif %}
-  {% if case.verdict_rationale %}
+  {% if case.verdict_explanation %}
+  <h3>Why this verdict</h3>
+  <p>{{ case.verdict_explanation.analyst_paragraph }}</p>
+  <p class="sub">{{ case.verdict_explanation.confidence_reading }}</p>
+  {% if case.verdict_explanation.sources %}
+  <table class="src-table">
+    <tr><th>Source</th><th>Tier</th><th>Verdict</th><th>Counted</th><th>Note</th></tr>
+    {% for s in case.verdict_explanation.sources %}
+    <tr><td>{{ s.name }}</td><td>{{ s.tier }}</td><td>{{ s.verdict }}</td><td>{% if s.counted %}yes{% else %}&mdash;{% endif %}</td><td>{{ s.note }}</td></tr>
+    {% endfor %}
+  </table>
+  {% endif %}
+  {% elif case.verdict_rationale %}
   <ul>
     {% for line in case.verdict_rationale %}<li>{{ line }}</li>{% endfor %}
   </ul>

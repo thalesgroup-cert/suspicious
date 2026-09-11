@@ -29,6 +29,7 @@ class ObservableVerdict:
     inconclusive_reason: Optional[str]   # "thin_coverage" | None
     counts: dict         # {"malicious": n, "suspicious": n, "clean": n, "no-data": n}
     rationale: list
+    rule: str = ""       # key of the decision that fired (for the explanation adapter)
 
 
 def _mult(s: SourceVerdict) -> float:
@@ -75,7 +76,8 @@ def score_observable(sources: list) -> ObservableVerdict:
             f"Only {len(trusted_voting)} trusted source(s) returned a verdict — cannot assess."
         )
         return ObservableVerdict("Inconclusive", _confidence(sources, split=1.0),
-                                 "thin_coverage", counts, rationale)
+                                 "thin_coverage", counts, rationale,
+                                 rule="thin-coverage")
 
     total_w = sum(_mult(s) for s in voting) or 1.0
     share = sum(_mult(s) for s in voting if s.verdict == "malicious") / total_w
@@ -84,13 +86,16 @@ def score_observable(sources: list) -> ObservableVerdict:
     decisive_t1 = [s for s in t1_mal if s.confidence is None or s.confidence >= HIGH_CONFIDENCE]
     if decisive_t1:
         rationale.append(f"{decisive_t1[0].name} (authoritative) reports malicious.")
-        return ObservableVerdict("Dangerous", _confidence(sources), None, counts, rationale)
+        return ObservableVerdict("Dangerous", _confidence(sources), None, counts, rationale,
+                                 rule="tier1-authoritative-malicious")
     if len(t2_mal) >= 2:
         rationale.append(f"{len(t2_mal)} strong sources agree the indicator is malicious.")
-        return ObservableVerdict("Dangerous", _confidence(sources), None, counts, rationale)
+        return ObservableVerdict("Dangerous", _confidence(sources), None, counts, rationale,
+                                 rule="tier2-consensus-malicious")
     if share >= DANGEROUS_SHARE and _trusted_malicious:
         rationale.append(f"Trust-weighted malicious share is {share:.0%}.")
-        return ObservableVerdict("Dangerous", _confidence(sources), None, counts, rationale)
+        return ObservableVerdict("Dangerous", _confidence(sources), None, counts, rationale,
+                                 rule="weighted-malicious-share")
 
     # Rule 2 — Safe: a Tier-1 clean verdict beats Tier-3 noise (e.g. Urlscan_io_Search
     # returns "suspicious" for every URL with >=1 prior scan). A Tier-3 *malicious*
@@ -101,19 +106,24 @@ def score_observable(sources: list) -> ObservableVerdict:
         rationale.append(
             f"{t1_clean[0].name} (authoritative) reports clean; no trusted source flags it{note}."
         )
-        return ObservableVerdict("Safe", _confidence(sources), None, counts, rationale)
+        return ObservableVerdict("Safe", _confidence(sources), None, counts, rationale,
+                                 rule="tier1-authoritative-clean")
 
     # Rule 3 — Suspicious: something flagged it, not enough for Dangerous.
     if any_flag:
         if trusted_flag:
             rationale.append(f"{trusted_flag[0].name} flags the indicator; evidence is not decisive.")
+            _rule = "trusted-flag-not-decisive"
         else:
             rationale.append("Only contextual/low-trust sources flag this — capped at Suspicious.")
-        return ObservableVerdict("Suspicious", _confidence(sources), None, counts, rationale)
+            _rule = "contextual-only-flag"
+        return ObservableVerdict("Suspicious", _confidence(sources), None, counts, rationale,
+                                 rule=_rule)
 
     # Nothing flagged at all.
     rationale.append("No source flags the indicator.")
-    return ObservableVerdict("Safe", _confidence(sources), None, counts, rationale)
+    return ObservableVerdict("Safe", _confidence(sources), None, counts, rationale,
+                             rule="no-flag")
 
 
 # ─────────────────────────────────────────────────────────────────────────────
@@ -129,6 +139,7 @@ class GroupVerdict:
     confidence: int      # min confidence among observables AT the worst band
     counts: dict         # {"Dangerous": n, "Suspicious": n, "Safe": n, "Inconclusive": n}
     rationale: list
+    rule: str = ""       # key of the decision that fired (for the explanation adapter)
 
 
 def score_group(observables: list) -> GroupVerdict:
@@ -141,11 +152,12 @@ def score_group(observables: list) -> GroupVerdict:
     assessed = [o for o in observables if o.band != "Inconclusive"]
     if not assessed:
         return GroupVerdict("Inconclusive", 0, counts,
-                            [f"None of {total} observable(s) could be assessed."])
+                            [f"None of {total} observable(s) could be assessed."],
+                            rule="group-worst-of")
 
     worst = max(assessed, key=lambda o: _BAND_ORDER[o.band]).band
     conf = min(o.confidence for o in assessed if o.band == worst)
     rationale = [f"{counts[worst]} of {total} observable(s) are {worst}."]
     if counts["Inconclusive"]:
         rationale.append(f"{counts['Inconclusive']} could not be assessed.")
-    return GroupVerdict(worst, conf, counts, rationale)
+    return GroupVerdict(worst, conf, counts, rationale, rule="group-worst-of")

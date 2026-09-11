@@ -84,6 +84,7 @@ import { CisoScopeDialog } from "@/features/home/components/CisoScopeDialog";
 import { SoftCard } from "@/features/investigation/components/cards";
 import { InvestigationAnalyzerReportCard } from "@/features/investigation/components/InvestigationAnalyzerReportCard";
 import { ObservableGroupPanel } from "@/features/investigation/ObservableGroupPanel";
+import { VerdictExplanation } from "@/features/investigation/VerdictExplanation";
 import { CommentThread } from "@/features/comments/CommentThread";
 import { addCaseComment, getCaseComments } from "@/features/comments/api";
 import {
@@ -1243,6 +1244,15 @@ export default function InvestigationPage() {
                       Page screenshot
                     </Typography>
                     <ScreenshotPanel src={detailsQuery.data.screenshot_url} label="Page screenshot" />
+                  </Box>
+                ) : null}
+
+                {detailsQuery.data?.case_infos?.verdict_explanation ? (
+                  <Box sx={{ px: 2.25, py: 2 }}>
+                    <Typography sx={{ fontSize: 10, fontWeight: 700, textTransform: "uppercase", letterSpacing: "0.08em", color: "text.disabled", mb: 0.75 }}>
+                      Why this verdict
+                    </Typography>
+                    <VerdictExplanation data={detailsQuery.data.case_infos.verdict_explanation} />
                   </Box>
                 ) : null}
 
