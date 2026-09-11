@@ -49,68 +49,84 @@ describe("SubmitPage", () => {
     mockApiGet.mockResolvedValue({ data: "suspicious@corp.test" } as never);
   });
 
-  it("renders both submission modes", async () => {
+  it("renders the two submission modes", async () => {
     renderSubmit();
 
     expect(
       await screen.findByText("Drag and drop or click to browse")
     ).toBeInTheDocument();
-    expect(screen.getByText("URL, Domain or Indicator")).toBeInTheDocument();
+    // File mode is default; the mode cards show File + Indicators, no third.
+    expect(screen.getAllByText("Indicators").length).toBeGreaterThan(0);
+    expect(screen.queryByText("URL, Domain or Indicator")).not.toBeInTheDocument();
   });
 
-  it("shows file dropzone in file mode (default)", async () => {
-    renderSubmit();
-
-    expect(
-      await screen.findByText("Drag and drop or click to browse")
-    ).toBeInTheDocument();
-  });
-
-  it("switches to artifact mode and shows text input", async () => {
+  it("switches to indicators mode and shows the textarea + IOC upload", async () => {
     const user = userEvent.setup();
     renderSubmit();
 
-    await user.click(await screen.findByText("URL, Domain or Indicator"));
+    await user.click((await screen.findAllByText("Indicators"))[0]);
 
+    expect(await screen.findByLabelText("Indicators")).toBeInTheDocument();
     expect(
-      await screen.findByLabelText(/url, domain or indicator/i)
+      screen.getByRole("button", { name: /upload ioc list/i })
     ).toBeInTheDocument();
   });
 
-  it("submit button is disabled when artifact input is empty", async () => {
+  it("submit is disabled until a recognised indicator is entered", async () => {
     const user = userEvent.setup();
     renderSubmit();
 
-    await user.click(await screen.findByText("URL, Domain or Indicator"));
-    await screen.findByLabelText(/url, domain or indicator/i);
+    await user.click((await screen.findAllByText("Indicators"))[0]);
+    const field = await screen.findByLabelText("Indicators");
 
     expect(screen.getByRole("button", { name: "Submit" })).toBeDisabled();
+    await user.type(field, "8.8.8.8");
+    await waitFor(() =>
+      expect(screen.getByRole("button", { name: "Submit" })).not.toBeDisabled()
+    );
   });
 
-  it("submits a URL artifact and calls api.post", async () => {
+  it("submits a single indicator through /submit/indicators/", async () => {
     const user = userEvent.setup();
     mockApiPost.mockResolvedValue({
-      data: {
-        status: "success",
-        accepted: true,
-        submission_type: "url",
-        result_type: "case",
-        case_id: 42,
-        message: "Accepted",
-      },
+      data: { status: "success", case_id: 42, observable_count: 1, accepted: true, skipped: [] },
     } as never);
 
     renderSubmit();
-
-    await user.click(await screen.findByText("URL, Domain or Indicator"));
-
-    const field = await screen.findByLabelText(/url, domain or indicator/i);
-    await user.type(field, "http://evil.example.com/phishing");
+    await user.click((await screen.findAllByText("Indicators"))[0]);
+    await user.type(await screen.findByLabelText("Indicators"), "http://evil.example/x");
 
     const submitBtn = screen.getByRole("button", { name: "Submit" });
     await waitFor(() => expect(submitBtn).not.toBeDisabled());
     await user.click(submitBtn);
 
-    await waitFor(() => expect(mockApiPost).toHaveBeenCalled());
+    await waitFor(() =>
+      expect(mockApiPost).toHaveBeenCalledWith(
+        "/submit/indicators/",
+        expect.objectContaining({ indicators: expect.stringContaining("evil.example") })
+      )
+    );
+  });
+
+  it("uploads an IOC list and populates the textarea for review", async () => {
+    const user = userEvent.setup();
+    mockApiPost.mockResolvedValue({
+      data: { status: "success", indicators: "1.1.1.1\nevil.test", found: 2, skipped: [] },
+    } as never);
+
+    renderSubmit();
+    await user.click((await screen.findAllByText("Indicators"))[0]);
+    await screen.findByLabelText("Indicators");
+
+    const file = new File(["1.1.1.1\nevil.test\n"], "iocs.txt", { type: "text/plain" });
+    const input = document.querySelector('input[type="file"][accept=".txt,.csv,.json"]');
+    await user.upload(input as HTMLInputElement, file);
+
+    await waitFor(() =>
+      expect(mockApiPost).toHaveBeenCalledWith("/submit/indicators/extract/", expect.any(FormData))
+    );
+    await waitFor(() =>
+      expect((screen.getByLabelText("Indicators") as HTMLTextAreaElement).value).toContain("evil.test")
+    );
   });
 });

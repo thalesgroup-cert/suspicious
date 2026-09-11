@@ -1,0 +1,34 @@
+{
+  "data_type": "url",
+  "report_full": {
+    "results": {
+      "data": {
+        "id": "http://promo-deals.example/win",
+        "type": "url",
+        "attributes": {
+          "last_analysis_stats": {
+            "malicious": 2,
+            "suspicious": 0,
+            "harmless": 76,
+            "undetected": 0,
+            "timeout": 0
+          },
+          "last_analysis_results": {
+            "CRDF": {"category": "malicious", "result": "malware", "engine_name": "CRDF", "method": "blacklist"},
+            "Seclookup": {"category": "malicious", "result": "malicious", "engine_name": "Seclookup", "method": "blacklist"},
+            "Google Safebrowsing": {"category": "harmless", "result": "clean", "engine_name": "Google Safebrowsing", "method": "blacklist"},
+            "Kaspersky": {"category": "harmless", "result": "clean", "engine_name": "Kaspersky", "method": "blacklist"},
+            "Fortinet": {"category": "harmless", "result": "clean", "engine_name": "Fortinet", "method": "blacklist"},
+            "BitDefender": {"category": "harmless", "result": "clean", "engine_name": "BitDefender", "method": "blacklist"}
+          },
+          "last_final_url": "http://promo-deals.example/win",
+          "reputation": 0,
+          "first_submission_date": 1700000000,
+          "last_analysis_date": 1725000000,
+          "tags": []
+        }
+      }
+    }
+  },
+  "expect": {"level": "malicious", "confidence_min": 55, "confidence_max": 62}
+}

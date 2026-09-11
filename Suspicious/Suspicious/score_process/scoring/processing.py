@@ -64,7 +64,7 @@ def compute_weighted_scores(reports, label):
 
     valid = [r for r in reports if r.status != "Failure"]
     weighted_score      = round(sum(r.score      * r.analyzer.weight for r in valid) / total_weight)
-    weighted_confidence = round(sum(r.confidence * r.analyzer.weight for r in valid) / total_weight) * 10
+    weighted_confidence = round(sum(r.confidence * r.analyzer.weight for r in valid) / total_weight)
     return weighted_score, weighted_confidence, total_weight
 
 
@@ -90,7 +90,8 @@ def process_reports(analyzers_reports, mail_part, part_type, is_malicious):
 
 # ── Mail processing ───────────────────────────────────────────────────────────
 
-def process_mail(mail, reports, total_scores, total_confidences, is_malicious, case_id):
+def process_mail(mail, reports, total_scores, total_confidences, is_malicious, case_id,
+                 *, score_artifacts: bool = True):
     from mail_feeder.models import Mail
     mail = Mail.objects.prefetch_related(*_PROCESS_MAIL_PREFETCH).get(pk=mail.pk)
     total_failures = 0
@@ -125,7 +126,7 @@ def process_mail(mail, reports, total_scores, total_confidences, is_malicious, c
                 reports, total_scores, total_confidences, is_malicious, case_id,
             )
 
-    if hasattr(mail, "mail_artifacts"):
+    if score_artifacts and hasattr(mail, "mail_artifacts"):
         update_cases_logger.info("Processing mail artifacts.")
         for artifact in mail.mail_artifacts.all():
             total_failures += log_and_process(

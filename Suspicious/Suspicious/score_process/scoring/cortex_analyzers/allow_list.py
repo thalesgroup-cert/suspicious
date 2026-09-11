@@ -1,6 +1,7 @@
 """
-Allow-list checks for files, filetypes, URLs, and domain IOCs.
+Allow-list checks for files, filetypes, URLs, domain, and IP IOCs.
 """
+import ipaddress
 import logging
 
 from file_process.models import File
@@ -8,6 +9,7 @@ from settings.models import (
     AllowListDomain,
     AllowListFile,
     AllowListFiletype,
+    AllowListIp,
     WatcherLegitDomain,
 )
 from .utils import extract_domain
@@ -42,6 +44,14 @@ def check_allow_list(data: str, data_type: str) -> AllowListResult:
 
                 elif WatcherLegitDomain.objects.filter(domain__value=domain).exists():
                     result.DomainAllowList = "Safe WL triggered"
+
+        elif data_type == "ip":
+            try:
+                needle = ipaddress.ip_address(data).compressed
+            except ValueError:
+                needle = data
+            if AllowListIp.objects.filter(ip__address=needle).exists():
+                result.IpAllowList = "Safe IPW triggered"
 
     except Exception as exc:
         logger.error("Allow-list check failed for %r (%s): %s", data, data_type, exc)

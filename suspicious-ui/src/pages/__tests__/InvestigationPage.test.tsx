@@ -28,6 +28,14 @@ vi.mock("@/features/comments/api", () => ({
   addCaseComment: vi.fn(),
 }));
 
+vi.mock("@/features/submissions/api", () => ({
+  pushSubmissionToTheHive: vi.fn(),
+}));
+
+vi.mock("@/features/settings/components/connectors", () => ({
+  getEnabledConnectors: vi.fn().mockResolvedValue([]),
+}));
+
 vi.mock("@/features/home/api", () => ({
   getHomeSummary: vi.fn().mockResolvedValue({ suggested_scopes: {} }),
   setCisoScope: vi.fn().mockResolvedValue({ scope: "EMEA" }),
@@ -106,7 +114,11 @@ import {
 } from "@/features/investigation/api";
 import InvestigationPage from "@/pages/InvestigationPage";
 import { getCaseComments, addCaseComment } from "@/features/comments/api";
+import { pushSubmissionToTheHive } from "@/features/submissions/api";
+import { getEnabledConnectors } from "@/features/settings/components/connectors";
 
+const mockPush = vi.mocked(pushSubmissionToTheHive);
+const mockEnabledConnectors = vi.mocked(getEnabledConnectors);
 const mockGetMe = vi.mocked(getMe);
 const mockGetAll = vi.mocked(getAllInvestigations);
 const mockGetDetails = vi.mocked(getInvestigationDetails);
@@ -125,6 +137,7 @@ function renderInvestigation() {
 describe("InvestigationPage", () => {
   beforeEach(() => {
     vi.clearAllMocks();
+    mockEnabledConnectors.mockResolvedValue([]);
     mockGetMe.mockResolvedValue({ ...mockMe, groups: ["CERT"] } as never);
     mockGetAll.mockResolvedValue(mockListResponse as never);
     mockGetDetails.mockResolvedValue(mockDetails as never);
@@ -450,6 +463,56 @@ describe("InvestigationPage", () => {
     await waitFor(() =>
       expect(mockAddComment).toHaveBeenCalledWith(7, "looks clean")
     );
+  });
+
+  describe("Report + push to TheHive", () => {
+    async function openDrawer(user: ReturnType<typeof userEvent.setup>) {
+      renderInvestigation();
+      await waitFor(() =>
+        expect(screen.getByText(/phish\.evil\.com|reporter@corp/i)).toBeInTheDocument(),
+      );
+      const row =
+        screen.getByText(/phish\.evil\.com|reporter@corp/i).closest("tr") ??
+        screen.getByText(/phish\.evil\.com|reporter@corp/i);
+      await user.click(row);
+      await waitFor(() => expect(mockGetDetails).toHaveBeenCalledWith(7));
+    }
+
+    it("opens the HTML report in a new tab", async () => {
+      const user = userEvent.setup();
+      const openSpy = vi.spyOn(window, "open").mockImplementation(() => null);
+      await openDrawer(user);
+
+      await user.click(screen.getByRole("button", { name: /full report/i }));
+      expect(openSpy).toHaveBeenCalledWith("/api/cases/7/report/", "_blank");
+      openSpy.mockRestore();
+    });
+
+    it("hides the TheHive button when the connector is not enabled", async () => {
+      const user = userEvent.setup();
+      mockEnabledConnectors.mockResolvedValue([]);
+      await openDrawer(user);
+      expect(
+        screen.queryByRole("button", { name: /push to thehive/i }),
+      ).not.toBeInTheDocument();
+    });
+
+    it("pushes to TheHive and reports the result", async () => {
+      const user = userEvent.setup();
+      mockEnabledConnectors.mockResolvedValue(["thehive"]);
+      mockPush.mockResolvedValue({
+        status: "created",
+        alert_id: "~1",
+        alert_url: "https://hive/alerts/~1/details",
+      });
+      await openDrawer(user);
+
+      const btn = await screen.findByRole("button", { name: /push to thehive/i });
+      await user.click(btn);
+
+      await waitFor(() => expect(mockPush).toHaveBeenCalledWith(7));
+      expect(await screen.findByText(/created an alert in thehive/i)).toBeInTheDocument();
+    });
   });
 
   describe("Redo analysis", () => {

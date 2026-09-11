@@ -4,7 +4,7 @@ from django.utils import timezone
 
 from case_handler.models import Case, CaseHasFileOrMail
 from cortex_job.cortex_utils.cortex_and_job_management import CortexJobManager
-from cortex_job.models import Analyzer, AnalyzerReport
+from cortex_job.models import Analyzer, AnalyzerReport, CaseAnalyzerJob
 from file_process.models import File
 from hash_process.models import Hash
 from mail_feeder.models import Mail, MailArchive
@@ -87,3 +87,56 @@ class ManageAiJobsCategoryLengthTest(TestCase):
         self.case.refresh_from_db()
         max_length = Case._meta.get_field("category_ai").max_length
         self.assertLessEqual(len(self.case.category_ai), max_length)
+
+
+class ManageAiJobsNoReportYetTest(TestCase):
+    """Regression: a MailArchive with no AnalyzerReport for the AI analyzer
+    yet (analysis genuinely still pending, or the AI analyzer was never
+    dispatched) is a normal, common state — NOT an error. The
+    AnalyzerReport.DoesNotExist handler referenced an `analyzer` variable
+    that only the *successful* .get() above it would have bound, so this
+    path raised UnboundLocalError every time instead of running its own
+    (already-written, otherwise-correct) fallback logic. Because
+    manage_ai_jobs is invoked from get_report() before collect_signals /
+    score_case / apply_verdict, that crash silently skipped verdict
+    computation for every mail case reaching this state, leaving
+    Case.results at its default Inconclusive regardless of the real
+    analyzer findings.
+    """
+
+    def setUp(self):
+        user = get_user_model().objects.create_user(username="ai_pending_u", password="x")
+        mail = Mail.objects.create(
+            subject="s", reportedBy="r", date=timezone.now(), to="t", mail_id="m-pending"
+        )
+        self.case = Case.objects.create(description="", reporter=user, status="On Going")
+        fm = CaseHasFileOrMail.objects.create(case=self.case, mail=mail)
+        self.case.fileOrMail = fm
+        self.case.save(update_fields=["fileOrMail"])
+
+        hash_obj = Hash.objects.create(value="pendinghash")
+        self.file_obj = File.objects.create(linked_hash=hash_obj, tmp_path="pending.tar.gz")
+        MailArchive.objects.create(mail=mail, archive=self.file_obj)
+
+    def test_no_report_yet_and_no_dispatched_job_marks_inconclusive(self):
+        # No CaseAnalyzerJob for the AI analyzer either -> "never dispatched".
+        CortexJobManager().manage_ai_jobs(self.case)  # must not raise
+
+        self.case.refresh_from_db()
+        self.assertEqual(self.case.results_ai, "Inconclusive")
+
+    def test_no_report_yet_but_job_still_running_does_not_mark_inconclusive(self):
+        from settings.config import get_section
+
+        ai_name = get_section("integrations.cortex").get("analyzers", {}).get("ai")
+        analyzer = Analyzer.objects.create(analyzer_cortex_id="ai-pending-1", name=ai_name, weight=0.2)
+        CaseAnalyzerJob.objects.create(
+            case=self.case, cortex_job_id="job-ai-pending",
+            analyzer=analyzer, status=CaseAnalyzerJob.STATUS_INPROGRESS,
+        )
+
+        CortexJobManager().manage_ai_jobs(self.case)  # must not raise
+
+        self.case.refresh_from_db()
+        # results_ai is untouched (default) while the job is still running.
+        self.assertEqual(self.case.results_ai, "Suspicious")

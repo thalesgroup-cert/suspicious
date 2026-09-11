@@ -33,13 +33,57 @@ class CortexAnalyzerReports:
             return
 
         try:
+            if getattr(case, "observable_group_id", None):
+                from score_process.scoring.apply import finalise_ioc_group
+                finalise_ioc_group(case)
+                update_cases_logger.info(
+                    "get_report: case %s → IOC-road categorical finalise", case.id
+                )
+                return
+
             mail = getattr(case.fileOrMail, "mail", None) if case.fileOrMail else None
             if mail:
-                CortexJobManager().manage_ai_jobs(case)
+                # AI classification is supplementary — never let a bug or
+                # transient failure in here block the scoring pass below
+                # (previously it could: an unhandled exception here used to
+                # propagate to the outer except and skip collect_signals /
+                # score_case / apply_verdict entirely, silently leaving
+                # every mail case's verdict at its default Inconclusive).
+                try:
+                    CortexJobManager().manage_ai_jobs(case)
+                except Exception as exc:
+                    update_cases_logger.error(
+                        "get_report: manage_ai_jobs failed for case %s: %s",
+                        case.id, exc, exc_info=True,
+                    )
 
             signals, ai, deny_listed, ai_missing, deny_reason = collect_signals(case)
             verdict = score_case(signals, ai, deny_listed, ai_missing, deny_reason)
-            apply_verdict(case, verdict)
+
+            # Embedded-observable escalation (mail road): every embedded
+            # observable of the mail is scored on its own analyzer reports via
+            # the trust-weighted categorical engine; the mail band is raised to
+            # the worst embedded band and the analyzers' rationale folded in.
+            # (Flag OFF → _apply_derived_escalation, the Phase B behaviour.)
+            if mail:
+                verdict = CortexAnalyzerReports._apply_embedded_escalation(case, mail, verdict)
+
+            # An explanation failure must NEVER break finalisation.
+            _explanation = None
+            try:
+                from score_process.scoring.explanation.adapters import explain_mail_case
+                from cortex_job.cortex_utils.case_targets import (
+                    build_analyzer_report_filter, collect_case_targets)
+                from cortex_job.models import AnalyzerReport
+                _tg = collect_case_targets(case)
+                _rp = (AnalyzerReport.objects.filter(build_analyzer_report_filter(_tg))
+                       if _tg else AnalyzerReport.objects.none())
+                _explanation = explain_mail_case(case, verdict, _rp, []).to_dict()
+            except Exception:
+                update_cases_logger.exception(
+                    "verdict explanation failed for case %s", getattr(case, "id", "?"))
+
+            apply_verdict(case, verdict, explanation=_explanation)
 
             update_cases_logger.info(
                 "get_report: case %s → %s (score=%s conf=%s, %d/%d malicious).",
@@ -51,6 +95,130 @@ class CortexAnalyzerReports:
             update_cases_logger.error(
                 "get_report: error scoring case %s: %s", case.id, exc, exc_info=True
             )
+
+    @staticmethod
+    def _apply_embedded_escalation(case, mail, verdict):
+        """Score every embedded observable of `mail` on its own analyzer reports
+        via the trust-weighted categorical engine; raise the mail band to the
+        worst embedded band and fold the analyzers' rationale in. Writes
+        per-observable ioc_* (global) and per-MailArtifact artifact_*
+        (case-scoped) levels.
+
+        Flag `scoring.mail_embedded_categorical` default-ON — only an explicit
+        stored `False` routes back to the Phase B `_apply_derived_escalation`
+        (get_config returns None, not the default, for an unset warm-cache key).
+        """
+        from dataclasses import replace
+        from settings.config import get_config
+        if get_config("scoring.mail_embedded_categorical") is False:
+            return CortexAnalyzerReports._apply_derived_escalation(case, mail, verdict)
+
+        from case_handler.models import Result
+        from score_process.scoring.observable_collect import mail_observable_reports
+        from score_process.scoring.observable_engine import score_observable
+        from score_process.scoring.sources import source_verdict_from_report
+        from score_process.scoring.engine import mail_band_escalation
+        from score_process.scoring.bands import (
+            _BAND_ORDER, _BAND_RANK, _BAND_TO_IOC_LEVEL, _DERIVED_SCORE,
+            _STICKY_IOC_LEVELS,
+        )
+        from cortex_job.cortex_utils.derived_observables import score_derived_observables
+
+        # keep DerivedObservable.child_band / escalation_note fresh for the chip
+        # UI — its return value is no longer used for the band merge.
+        score_derived_observables(case)
+
+        embedded, rationale_lines, embedded_report_count = [], [], 0
+        for m_art, obj, _field, reports in mail_observable_reports(mail):
+            seen, svs = set(), []
+            for r in reports:
+                if r.analyzer_id in seen:
+                    continue
+                seen.add(r.analyzer_id)
+                svs.append(source_verdict_from_report(r))
+            if not svs:
+                continue
+            embedded_report_count += len(svs)
+            v = score_observable(svs)
+            embedded.append(v)
+            rationale_lines.extend(v.rationale)
+
+            ioc_level = _BAND_TO_IOC_LEVEL.get(v.band, "info")
+            score = _DERIVED_SCORE.get(v.band, 5)
+            # A sticky marker (deny/allow-list) skips the WHOLE re-score, not
+            # just the level string — deliberate departure from spec §5's
+            # literal "write score/confidence unconditionally" (matches the
+            # Phase B IOC-road final-review guidance).
+            if getattr(obj, "ioc_level", "info") not in _STICKY_IOC_LEVELS:
+                obj.ioc_level = ioc_level
+                obj.ioc_score = score
+                obj.ioc_confidence = v.confidence
+                obj.save(update_fields=["ioc_level", "ioc_score", "ioc_confidence"])
+
+            if m_art.artifact_level not in _STICKY_IOC_LEVELS:
+                m_art.artifact_level = ioc_level
+                m_art.artifact_score = score
+                m_art.artifact_confidence = v.confidence
+                m_art.save(update_fields=[
+                    "artifact_level", "artifact_score", "artifact_confidence"])
+
+        if not embedded:
+            return verdict
+
+        note = "; ".join(rationale_lines[:5]) or None
+        worst = max(embedded, key=lambda v: _BAND_ORDER.get(v.band, 0))
+        # A body-less mail scores Result.FAILURE (score_case has no scorable
+        # signal). Only rebase to Inconclusive when the embedded evidence
+        # actually raises the band (Suspicious/Dangerous) — an all-Safe/no-data
+        # body-less mail stays FAILURE. Rebasing also derives final_score from
+        # the worst embedded band so case.score matches the escalated case.results
+        # (the IOC road does the same in finalise_ioc_group).
+        base = replace(verdict, result=Result.INCONCLUSIVE,
+                       final_score=_DERIVED_SCORE.get(worst.band, 5)) \
+            if verdict.result == Result.FAILURE and _BAND_RANK.get(worst.band, 0) > 0 \
+            else verdict
+        # The embedded analyzer reports WERE scored (on their own observables) —
+        # count them in n_scored so apply_verdict's case.analysis_done reflects
+        # them, band raised or not. Matches finalise_ioc_group's analyzer count.
+        base = replace(base, n_scored=base.n_scored + embedded_report_count)
+        return mail_band_escalation(base, embedded, note=note)
+
+    @staticmethod
+    def _apply_derived_escalation(case, mail, verdict):
+        """Escalate the mail case band and bump parent MailArtifact levels for
+        any derived child that scored strictly above its parent.
+
+        Flag-OFF fallback for `_apply_embedded_escalation` (Phase B behaviour)."""
+        from cortex_job.cortex_utils.derived_observables import (
+            score_derived_observables, _MAIL_JOIN,
+        )
+        from score_process.scoring.engine import mail_band_escalation
+        from score_process.scoring.observable_engine import ObservableVerdict
+        from mail_feeder.models import MailArtifact
+
+        escalations = score_derived_observables(case)
+        if not escalations:
+            return verdict
+
+        rank = {"Suspicious": 1, "Dangerous": 2}
+        worst_band, note, _conf = max(escalations.values(), key=lambda bn: rank.get(bn[0], 0))
+        verdict = mail_band_escalation(
+            verdict, [ObservableVerdict(worst_band, 100, None, {}, [])], note=note
+        )
+
+        # mirror _STICKY_IOC_LEVELS: an allow/deny-listed artifact keeps its level
+        sticky = {"critical", "SAFE-ALLOW_LISTED"}
+        ioc_level = {"Suspicious": "suspicious", "Dangerous": "malicious"}
+        for (ptype, pid), (band, _note, _conf) in escalations.items():
+            spec = _MAIL_JOIN.get(ptype)
+            if spec is None:
+                continue
+            _join_cls, fk_attr, _art_type, join_field = spec
+            (MailArtifact.objects
+             .filter(mail=mail, **{f"{fk_attr}__{join_field}_id": pid})
+             .exclude(artifact_level__in=sticky)
+             .update(artifact_level=ioc_level[band]))
+        return verdict
 
     # ── report processing helpers ─────────────────────────────────────────
 
@@ -120,11 +288,22 @@ class CortexAnalyzerReports:
             if isinstance(category, list):
                 category = ", ".join(str(c) for c in category)
 
+            from score_process.scoring.enrichment.registry import enrich
             report.score      = result_dict.get("score",      0)
             report.confidence = result_dict.get("confidence", 0)
             report.category   = category
             report.level      = result_dict.get("level",    "info")
-            report.save(update_fields=["score", "confidence", "category", "level"])
+            report.enrichment = enrich(report)
+            report.save(update_fields=["score", "confidence", "category", "level", "enrichment"])
+
+            try:
+                from score_process.scoring.screenshots import registry as _shots
+                png = _shots.capture(report)
+                if png:
+                    _shots.store(report, png)   # ponytail: inline; move to a Celery task if it slows the reconcile tick
+            except Exception:
+                update_cases_logger.exception(
+                    "screenshot capture failed for report id=%s", getattr(report, "id", "?"))
 
         except Exception as exc:
             update_cases_logger.error(

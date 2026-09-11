@@ -12,9 +12,9 @@ from rest_framework.views import APIView
 
 from case_handler.lifecycle import IllegalTransition, LifecycleState, transition
 from case_handler.models import Case, Result
-from cortex_job.models import AnalyzerReport
-from cortex_job.cortex_utils.case_targets import build_analyzer_report_filter, collect_case_targets
+from cortex_job.cortex_utils.case_targets import collect_case_targets
 from tasp.tasks import dispatch_case_analysis
+from api.utils.analyzer_reports import reports_for_case
 from api.utils.investigation_pagination import InvestigationPagination
 from api.serializers.investigations import (
     API_RESULT_TO_INTERNAL,
@@ -39,6 +39,7 @@ CASE_LIST_SELECT_RELATED = (
     "nonFileIocs__url",
     "nonFileIocs__ip",
     "nonFileIocs__hash",
+    "observable_group",
 )
 
 CASE_DETAIL_SELECT_RELATED = (
@@ -51,18 +52,7 @@ CASE_DETAIL_SELECT_RELATED = (
     "nonFileIocs__url",
     "nonFileIocs__ip",
     "nonFileIocs__hash",
-)
-
-ANALYZER_REPORT_SELECT_RELATED = (
-    "analyzer",
-    "url",
-    "domain",
-    "mail",
-    "hash",
-    "file",
-    "ip",
-    "mail_body",
-    "mail_header",
+    "observable_group",
 )
 
 
@@ -117,11 +107,16 @@ def _dedup_analyzer_reports(reports) -> list:
 
 
 class InvestigationAccessMixin:
-    analyzer_report_select_related = ANALYZER_REPORT_SELECT_RELATED
-
     def get_case_list_queryset(self):
+        # prefetch the group artifacts so get_case_info_value's IOC branch
+        # doesn't fire 2 queries per row on a list page of IOC cases.
         return scoped_case_queryset(
-            Case.objects.select_related(*CASE_LIST_SELECT_RELATED),
+            Case.objects.select_related(*CASE_LIST_SELECT_RELATED).prefetch_related(
+                "observable_group__artifacts__url",
+                "observable_group__artifacts__ip",
+                "observable_group__artifacts__hash",
+                "observable_group__artifacts__domain",
+            ),
             self.request.user,
         )
 
@@ -147,26 +142,12 @@ class InvestigationAccessMixin:
             raise NotFound("Investigation not found.") from exc
 
     def get_analyzer_reports_queryset(self, obj: Case):
-        targets = collect_case_targets(obj)
-        if not targets:
-            return AnalyzerReport.objects.none()
-
-        query = build_analyzer_report_filter(targets)
-
-        # No .distinct() needed: every filter above is a plain equality/IN on
-        # AnalyzerReport's own FK columns (never a reverse/M2M traversal), and
-        # every select_related() relation is forward FK/O2O — this queryset
-        # structurally can't fan out into duplicate rows. distinct() was
-        # forcing MySQL to sort/dedupe the full 9-table-wide join with no
-        # LIMIT to cap it, and _dedup_analyzer_reports() below already
-        # de-dupes in Python regardless.
-        qs = (
-            AnalyzerReport.objects
-            .filter(query)
-            .select_related(*self.analyzer_report_select_related)
-            .order_by("-creation_date", "-pk")
-        )
-        return _dedup_analyzer_reports(qs)
+        # reports_for_case() builds the same filter/select_related/order_by
+        # queryset (no .distinct(): every filter is a plain equality/IN on
+        # AnalyzerReport's own FK columns and every select_related relation is
+        # forward FK/O2O, so it can't fan out into duplicate rows).
+        # _dedup_analyzer_reports() de-dupes per (analyzer, target) in Python.
+        return _dedup_analyzer_reports(reports_for_case(obj))
 
     def filter_case_queryset(self, queryset, validated_filters: dict):
         search = validated_filters.get("search")
@@ -191,9 +172,15 @@ class InvestigationAccessMixin:
                 | Q(nonFileIocs__url__address__icontains=search)
                 | Q(nonFileIocs__ip__address__icontains=search)
                 | Q(nonFileIocs__hash__value__icontains=search)
+                | Q(observable_group__artifacts__url__address__icontains=search)
+                | Q(observable_group__artifacts__ip__address__icontains=search)
+                | Q(observable_group__artifacts__hash__value__icontains=search)
+                | Q(observable_group__artifacts__domain__value__icontains=search)
             )
 
-            queryset = queryset.filter(id_q | text_q)
+            # .distinct(): observable_group__artifacts is a reverse FK, so the
+            # join fans a group case out to one row per indicator.
+            queryset = queryset.filter(id_q | text_q).distinct()
 
         if status_filter != "ALL":
             if status_filter == "UNKNOWN":
@@ -212,6 +199,8 @@ class InvestigationAccessMixin:
                 queryset = queryset.filter(nonFileIocs__ip_id__isnull=False)
             elif type_filter == "HASH":
                 queryset = queryset.filter(nonFileIocs__hash_id__isnull=False)
+            elif type_filter == "IOC":
+                queryset = queryset.filter(observable_group_id__isnull=False)
             elif type_filter == "UNKNOWN":
                 queryset = queryset.filter(
                     fileOrMail__file_id__isnull=True,
@@ -219,6 +208,7 @@ class InvestigationAccessMixin:
                     nonFileIocs__url_id__isnull=True,
                     nonFileIocs__ip_id__isnull=True,
                     nonFileIocs__hash_id__isnull=True,
+                    observable_group_id__isnull=True,
                 )
 
         if result_filter != "ALL":
@@ -354,11 +344,15 @@ class InvestigationGlobalEditView(InvestigationAccessMixin, APIView):
         obj.final_confidence = validated["confidence"]
         obj.results = API_RESULT_TO_INTERNAL[validated["classification"]]
         obj.last_update_by = request.user
+        # The stored explanation described the previous verdict — drop it so a
+        # stale "why" is never emailed / shown after an analyst override.
+        obj.verdict_explanation = None
         obj.save(
             update_fields=[
                 "final_score",
                 "final_confidence",
                 "results",
+                "verdict_explanation",
                 "last_update_by",
                 "last_update",
             ]
@@ -425,7 +419,10 @@ class InvestigationRedoAnalysisView(InvestigationAccessMixin, APIView):
         case.score = 0
         case.final_score = 0
         case.description = ""
-        case.save(update_fields=["results", "score", "final_score", "description"])
+        case.verdict_explanation = None
+        case.save(update_fields=[
+            "results", "score", "final_score", "description", "verdict_explanation",
+        ])
 
         intents = [
             (f"{instance._meta.app_label}.{instance._meta.model_name}", instance.pk, data_type)

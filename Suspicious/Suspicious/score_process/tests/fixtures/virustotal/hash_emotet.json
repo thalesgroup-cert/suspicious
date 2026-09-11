@@ -1,0 +1,55 @@
+{
+  "data_type": "hash",
+  "report_full": {
+    "results": {
+      "data": {
+        "id": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+        "type": "file",
+        "attributes": {
+          "last_analysis_stats": {
+            "malicious": 65,
+            "suspicious": 3,
+            "harmless": 0,
+            "undetected": 2,
+            "timeout": 0
+          },
+          "last_analysis_results": {
+            "Microsoft": {"category": "malicious", "result": "TrojanDownloader:Win32/Emotet", "engine_name": "Microsoft", "method": "blacklist"},
+            "Kaspersky": {"category": "malicious", "result": "Trojan-Banker.Win32.Emotet.abcd", "engine_name": "Kaspersky", "method": "blacklist"},
+            "ESET-NOD32": {"category": "malicious", "result": "a variant Of Win32/Emotet.CX", "engine_name": "ESET-NOD32", "method": "blacklist"},
+            "Symantec": {"category": "suspicious", "result": "ML.Attribute.HighConfidence", "engine_name": "Symantec", "method": "blacklist"},
+            "Avast": {"category": "undetected", "result": null, "engine_name": "Avast", "method": "blacklist"}
+          },
+          "popular_threat_classification": {
+            "suggested_threat_label": "trojan.emotet/heur",
+            "popular_threat_category": [
+              {"value": "trojan", "count": 30},
+              {"value": "downloader", "count": 8}
+            ]
+          },
+          "meaningful_name": "invoice_2026.exe",
+          "names": [
+            "invoice_2026.exe",
+            "INVOICE_2026.exe",
+            "document.exe",
+            "scan_0012.exe",
+            "payment_advice.exe",
+            "order_confirmation.exe",
+            "9f3a2b.exe",
+            "setup.exe",
+            "update.exe",
+            "svchost32.exe",
+            "remittance.exe",
+            "PO-88213.exe"
+          ],
+          "size": 245760,
+          "type_description": "Win32 EXE",
+          "first_submission_date": 1546502400,
+          "last_analysis_date": 1725000000,
+          "tags": ["peexe", "trojan", "emotet"]
+        }
+      }
+    }
+  },
+  "expect": {"level": "malicious", "confidence_min": 90}
+}

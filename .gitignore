@@ -65,6 +65,8 @@ Analyzers/AIMailAnalyzer/models
 Analyzers/AIMailAnalyzer/vectorizers/paraphrase-multilingual-mpnet-base-v2/model.safetensors
 Analyzers/AIMailAnalyzer/vectorizers/paraphrase-multilingual-mpnet-base-v2/config.json
 Analyzers/AIMailAnalyzer/vectorizers/paraphrase-multilingual-mpnet-base-v2/1_Pooling
+# Generated training data (mailbox_to_csv.ipynb / build_test_dataset.py output) — derived, not source.
+Analyzers/AIMailAnalyzer/*.csv
 
 # ===== Docs (MkDocs) =====
 /site/

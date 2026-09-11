@@ -160,7 +160,7 @@ export function fmtDate(iso: string) {
 export function kindLabel(kind: string) {
   const labels: Record<string, string> = {
     FILE: "File", URL: "URL", IP: "IP address", HASH: "Hash",
-    DOMAIN: "Domain", MAIL: "Email address",
+    DOMAIN: "Domain", MAIL: "Email address", IOC: "IOC group",
     MAIL_BODY: "Mail body", MAIL_HEADER: "Mail header", UNKNOWN: "Unknown",
   };
   return labels[kind.toUpperCase()] ?? kind;

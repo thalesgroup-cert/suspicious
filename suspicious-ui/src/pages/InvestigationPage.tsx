@@ -7,6 +7,7 @@ import {
   LinearProgress,
   Box,
   Button,
+  ButtonGroup,
   CardContent,
   Chip,
   CircularProgress,
@@ -45,8 +46,11 @@ import {
   ExpandMoreOutlined,
   RestartAltOutlined,
   ReplayOutlined,
+  DescriptionOutlined,
+  NorthEastOutlined,
 } from "@mui/icons-material";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
+import { useSnackbar } from "notistack";
 import { Skeleton } from "boneyard-js/react";
 import { useNavigate, useSearchParams } from "react-router";
 import { alpha } from "@mui/material/styles";
@@ -67,15 +71,20 @@ import {
   type InvestigationStatus,
   type InvestigationType,
 } from "@/features/investigation/api";
+import { pushSubmissionToTheHive } from "@/features/submissions/api";
+import { getEnabledConnectors } from "@/features/settings/components/connectors";
 import { useDebounced } from "@/shared/hooks/useDebounced";
 import { StatusChip } from "@/shared/components/StatusChip";
 import { ResultChip } from "@/shared/components/ResultChip";
 import { CopyIconButton } from "@/shared/components/CopyIconButton";
 import MailPreview from "@/shared/components/MailPreview";
+import { ScreenshotPanel } from "@/shared/components/ScreenshotPanel";
 
 import { CisoScopeDialog } from "@/features/home/components/CisoScopeDialog";
 import { SoftCard } from "@/features/investigation/components/cards";
 import { InvestigationAnalyzerReportCard } from "@/features/investigation/components/InvestigationAnalyzerReportCard";
+import { ObservableGroupPanel } from "@/features/investigation/ObservableGroupPanel";
+import { VerdictExplanation } from "@/features/investigation/VerdictExplanation";
 import { CommentThread } from "@/features/comments/CommentThread";
 import { addCaseComment, getCaseComments } from "@/features/comments/api";
 import {
@@ -96,6 +105,7 @@ export default function InvestigationPage() {
   const navigate = useNavigate();
   const [searchParams] = useSearchParams();
   const qc = useQueryClient();
+  const { enqueueSnackbar } = useSnackbar();
   const theme = useTheme();
   const isDark = theme.palette.mode === "dark";
 
@@ -270,6 +280,32 @@ export default function InvestigationPage() {
   });
   const [redoConfirmOpen, setRedoConfirmOpen] = React.useState(false);
 
+  const enabledConnectorsQuery = useQuery({
+    queryKey: ["enabledConnectors"],
+    queryFn: getEnabledConnectors,
+    enabled: !!me,
+    staleTime: 60_000,
+  });
+  const theHiveEnabled = (enabledConnectorsQuery.data ?? []).includes("thehive");
+
+  const pushMutation = useMutation({
+    mutationFn: (caseId: number) => pushSubmissionToTheHive(caseId),
+    onSuccess: (res) => {
+      enqueueSnackbar(
+        res.status === "updated"
+          ? "Updated the existing TheHive alert."
+          : "Created an alert in TheHive.",
+        { variant: "success" },
+      );
+    },
+    onError: (err: unknown) => {
+      const detail =
+        (err as { response?: { data?: { detail?: string } } })?.response?.data
+          ?.detail ?? "Push to TheHive failed.";
+      enqueueSnackbar(detail, { variant: "error" });
+    },
+  });
+
   const commentsQuery = useQuery({
     queryKey: ["caseComments", selectedIdNum],
     queryFn: () => getCaseComments(selectedIdNum),
@@ -359,6 +395,7 @@ export default function InvestigationPage() {
     () => detailsQuery.data?.analyzer_reports ?? [],
     [detailsQuery.data]
   );
+  const observableGroup = detailsQuery.data?.observable_group;
   const reportGroups = React.useMemo(
     () => groupReportsByArtifact(analyzerReports),
     [analyzerReports]
@@ -530,7 +567,7 @@ export default function InvestigationPage() {
                   onChange={(e) => setType(e.target.value as InvestigationType | "ALL")}
                 >
                   <MenuItem value="ALL">All</MenuItem>
-                  {(["FILE", "MAIL", "URL", "IP", "HASH", "UNKNOWN"] as const).map((t) => (
+                  {(["FILE", "MAIL", "URL", "IP", "HASH", "IOC", "UNKNOWN"] as const).map((t) => (
                     <MenuItem key={t} value={t}>{t}</MenuItem>
                   ))}
                 </Select>
@@ -854,6 +891,38 @@ export default function InvestigationPage() {
                 </Box>
 
                 <Stack direction="row" spacing={1} sx={{ alignItems: "center" }} >
+                  {hasNumericSelectedId ? (
+                    <ButtonGroup variant="outlined" sx={{ borderRadius: 2 }}>
+                      <Button
+                        startIcon={<DescriptionOutlined />}
+                        onClick={() =>
+                          window.open(
+                            `/api/cases/${selectedIdNum}/report/`,
+                            "_blank",
+                          )
+                        }
+                        sx={{ textTransform: "none", fontWeight: 800 }}
+                      >
+                        Full report
+                      </Button>
+                      {theHiveEnabled ? (
+                        <Button
+                          startIcon={
+                            pushMutation.isPending ? (
+                              <CircularProgress size={13} color="inherit" />
+                            ) : (
+                              <NorthEastOutlined />
+                            )
+                          }
+                          disabled={!detailsReady || pushMutation.isPending}
+                          onClick={() => pushMutation.mutate(selectedIdNum)}
+                          sx={{ textTransform: "none", fontWeight: 800 }}
+                        >
+                          {pushMutation.isPending ? "Pushing…" : "Push to TheHive"}
+                        </Button>
+                      ) : null}
+                    </ButtonGroup>
+                  ) : null}
                   <Tooltip
                     title={detailsReady ? "" : "Load details to edit global override"}
                     arrow
@@ -1099,7 +1168,10 @@ export default function InvestigationPage() {
                     <Stack spacing={1.25}>
                       <Stack direction="row" spacing={1} sx={{ alignItems: "center", flexWrap: "wrap" }} >
                         <ResultChip result={String(currentClassification ?? "UNKNOWN")} minWidth={BADGE_W} />
-                        <Chip size="small" label={`Score ${currentScore ?? "—"}/10`} variant="outlined" sx={{ fontWeight: 800 }} />
+                        {/* IOC road has no analyst-visible score — the stored band number is not a real 0–10 score. */}
+                        {!observableGroup && (
+                          <Chip size="small" label={`Score ${currentScore ?? "—"}/10`} variant="outlined" sx={{ fontWeight: 800 }} />
+                        )}
                         <Chip size="small" label={`Confidence ${currentConfidence ?? "—"}%`} variant="outlined" sx={{ fontWeight: 800 }} />
                       </Stack>
                       <Stack direction="row" spacing={0.75} sx={{ opacity: 0.65, flexWrap: "wrap" }}>
@@ -1165,7 +1237,29 @@ export default function InvestigationPage() {
                   </Box>
                 ) : null}
 
-                {/* ── Analysis results — grouped by artifact ────────────────────── */}
+                {/* ── Page screenshot captured by the analyzer ─────────────────── */}
+                {detailsQuery.data?.screenshot_url ? (
+                  <Box sx={{ px: 2.25, py: 2 }}>
+                    <Typography sx={{ fontSize: 10, fontWeight: 700, textTransform: "uppercase", letterSpacing: "0.08em", color: "text.disabled", mb: 0.75 }}>
+                      Page screenshot
+                    </Typography>
+                    <ScreenshotPanel src={detailsQuery.data.screenshot_url} label="Page screenshot" />
+                  </Box>
+                ) : null}
+
+                {detailsQuery.data?.case_infos?.verdict_explanation ? (
+                  <Box sx={{ px: 2.25, py: 2 }}>
+                    <Typography sx={{ fontSize: 10, fontWeight: 700, textTransform: "uppercase", letterSpacing: "0.08em", color: "text.disabled", mb: 0.75 }}>
+                      Why this verdict
+                    </Typography>
+                    <VerdictExplanation data={detailsQuery.data.case_infos.verdict_explanation} />
+                  </Box>
+                ) : null}
+
+                {/* ── Analysis results — IOC-group cases get the VT-style panel ─── */}
+                {observableGroup ? (
+                  <ObservableGroupPanel group={observableGroup} />
+                ) : (
                 <Box sx={{ px: 2.25, pt: 2, pb: 1 }}>
                   <Stack direction="row" sx={{ mb: 1.25, alignItems: "center", justifyContent: "space-between" }}>
                     <Typography sx={{ fontSize: 10, fontWeight: 700, textTransform: "uppercase", letterSpacing: "0.08em", color: "text.disabled" }}>
@@ -1263,6 +1357,7 @@ export default function InvestigationPage() {
                     </Stack>
                   )}
                 </Box>
+                )}
 
                 {/* ── Raw details ───────────────────────────────────────────────── */}
                 <Accordion disableGutters sx={{ background: "transparent", "&:before": { display: "none" } }}>

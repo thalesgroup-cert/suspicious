@@ -83,6 +83,20 @@ def _serialize_connector(name: str) -> dict:
     }
 
 
+class EnabledConnectorsView(APIView):
+    """Names of the currently-enabled connectors. Unlike ConnectorListView this
+    leaks no config/schema/health detail, so any authenticated user (e.g. an
+    investigator deciding whether to show a "Push to TheHive" button) can read
+    it."""
+
+    permission_classes = [IsAuthenticated]
+
+    def get(self, request):
+        return Response({
+            "enabled": [n for n in registry.names() if get_state(n).enabled],
+        })
+
+
 class ConnectorListView(APIView):
     permission_classes = [IsAuthenticated, IsAdminOrCERT]
 

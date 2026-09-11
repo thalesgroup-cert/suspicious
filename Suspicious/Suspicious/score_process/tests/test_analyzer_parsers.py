@@ -209,6 +209,45 @@ class ReportsRewireTests(SimpleTestCase):
         self.assertEqual(r.level, "info")
 
 
+from score_process.scoring.cortex_analyzers.contrib.lookyloo import LookylooScreenshotParser
+
+class LookylooScreenshotParserTests(SimpleTestCase):
+    """Lookyloo's {"level":"safe","predicate":"Screenshot","value":"OK"} taxonomy
+    means the capture succeeded, not that the site is clean — it must NOT become
+    a safe/clean vote. Payload shape captured live from Cortex 2026-09-10."""
+
+    def _run(self, summary, full):
+        p = LookylooScreenshotParser(
+            analyzer_name="Lookyloo_Screenshot_1_0", data="http://x", data_type="url")
+        return p.parse(summary, full)
+
+    def test_safe_ok_taxonomy_is_info_not_safe(self):
+        summary = {"taxonomies": [
+            {"level": "safe", "namespace": "Lookyloo",
+             "predicate": "Screenshot", "value": "OK"}]}
+        full = {"submitted_url": "http://x", "status": "Capture done",
+                "url": "https://lookyloo.circl.lu/tree/abc",
+                "redirections": ["http://x", "http://x/final"],
+                "screenshot": "iVBORw0KGgo"}
+        r = self._run(summary, full)
+        self.assertEqual(r.level, "info")
+        self.assertEqual(r.score, 2)          # get_level_score_confidence("info")
+        self.assertEqual(r.confidence, 50)
+        self.assertEqual(r.category, [])      # no verdict label
+        self.assertEqual(r.details["capture_status"], "Capture done")
+        self.assertEqual(r.details["redirections"], ["http://x", "http://x/final"])
+
+    def test_no_verdict_even_on_empty_full(self):
+        r = self._run({}, None)
+        self.assertEqual(r.level, "info")
+        self.assertEqual(r.category, [])
+
+    def test_info_level_maps_to_no_data_source_verdict(self):
+        # the whole point: sources._LEVEL_TO_VERDICT has no "info" key
+        from score_process.scoring.sources import _LEVEL_TO_VERDICT
+        self.assertNotIn("info", _LEVEL_TO_VERDICT)
+
+
 from score_process.scoring.cortex_analyzers.contrib.zscaler import ZscalerParser
 
 class ZscalerParserTests(SimpleTestCase):
@@ -261,6 +300,16 @@ class VirusTotalParserTests(SimpleTestCase):
         r = p.parse({"taxonomies": [{"level": "info", "value": "VT"}]},
                     {"results": {"data": {"attributes": None}}})
         self.assertEqual(r.level, "info")
+
+    def test_data_less_attributes_shape_is_scored(self):
+        # results.attributes.last_analysis_stats (no `data` wrapper) — the v3
+        # variant enrichment/_attributes handles. _stats must read it too so the
+        # level and the enrichment agree, instead of early-returning level="info".
+        p = VirusTotalGetReportParser(analyzer_name="VirusTotal_GetReport_3_1", data="x", data_type="hash")
+        r = p.parse({"taxonomies": [{"level": "info", "value": "VT"}]},
+                    {"results": {"attributes": {"last_analysis_stats":
+                        {"malicious": 50, "suspicious": 0, "harmless": 20, "undetected": 0}}}})
+        self.assertEqual(r.level, "malicious")
 
 
 from score_process.scoring.cortex_analyzers.contrib.urlscan import UrlscanSearchParser
@@ -344,6 +393,197 @@ class CirclHashlookupParserTests(SimpleTestCase):
         self.assertEqual(r.score, 10)
 
 
+from score_process.scoring.cortex_analyzers.contrib.spamhaus_dbl import SpamhausDblParser
+
+class SpamhausDblParserTests(SimpleTestCase):
+    """Regression: the upstream analyzer always tags its own taxonomy "info"
+    (see contrib/spamhaus_dbl.py's docstring) — DefaultTaxonomyParser took
+    that at face value, so a real Malware/Botnet-C&C DBL listing scored
+    identically to a clean domain: "info" -> "no-data" in the categorical
+    engine. This parser reads the `classification` value directly instead."""
+
+    def _run(self, classification, return_code="127.0.1.2"):
+        p = SpamhausDblParser(analyzer_name="SpamhausDBL_1_0", data="evil.example", data_type="domain")
+        full = {"return_code": return_code, "classification": classification}
+        summary = {"taxonomies": [
+            {"level": "info", "namespace": "SpamhausDBL", "predicate": "return_code", "value": return_code},
+            {"level": "info", "namespace": "SpamhausDBL", "predicate": "classification", "value": classification},
+        ]}
+        return p.parse(summary, full)
+
+    def test_clean_is_safe(self):
+        r = self._run("Clean", return_code="NXDOMAIN")
+        self.assertEqual(r.level, "safe")
+
+    def test_spam_listing_is_suspicious_not_info(self):
+        r = self._run("Spam")
+        self.assertEqual(r.level, "suspicious")
+
+    def test_malware_listing_is_malicious(self):
+        r = self._run("Malware", return_code="127.0.1.5")
+        self.assertEqual(r.level, "malicious")
+        self.assertEqual(r.score, 10)
+
+    def test_botnet_cc_listing_is_malicious(self):
+        r = self._run("Botnet C&C", return_code="127.0.1.6")
+        self.assertEqual(r.level, "malicious")
+
+    def test_abused_legit_domain_is_suspicious_not_malicious(self):
+        """A compromised legitimate domain is a real signal but not itself
+        malicious infrastructure — must not get the same level as an
+        outright Malware/Botnet-C&C listing."""
+        r = self._run("Abused legit malware", return_code="127.0.1.105")
+        self.assertEqual(r.level, "suspicious")
+
+    def test_rate_limited_query_is_info_not_safe_or_malicious(self):
+        """A Spamhaus-side query response, not a verdict about the domain —
+        must not be silently read as "clean"."""
+        r = self._run("Excessive number of queries", return_code="127.255.255.255")
+        self.assertEqual(r.level, "info")
+
+    def test_real_case_9_report_is_no_longer_no_data(self):
+        """Exact payload captured live from Cortex for dbltest.com (Spamhaus's
+        own DBL test domain) — this used to score "info" (-> no-data)."""
+        r = self._run("Spam")
+        self.assertNotEqual(r.level, "info")
+
+
+from score_process.scoring.cortex_analyzers.contrib.threatminer import ThreatMinerParser
+
+class ThreatMinerParserTests(SimpleTestCase):
+    """Regression: upstream summary() defaults level to "suspicious" and only
+    drops to "safe" when rows exist — so an unknown indicator (or a failed call
+    to its flaky API) got a phantom Tier-3 "suspicious" vote that forces the
+    observable to Suspicious. ThreatMiner has no verdict — always "info"."""
+
+    def _run(self, full):
+        p = ThreatMinerParser(analyzer_name="ThreatMiner_1_0", data="evil.example", data_type="domain")
+        return p.parse({"taxonomies": [{"level": "suspicious"}]}, full)
+
+    def test_no_data_is_info_not_suspicious(self):
+        r = self._run({"status_code": "404", "status_message": "No results found.", "results": []})
+        self.assertEqual(r.level, "info")
+
+    def test_rows_present_is_info_not_safe(self):
+        r = self._run({"status_code": "200", "results": [{"domain": "evil.example"}, {"ip": "1.2.3.4"}]})
+        self.assertEqual(r.level, "info")
+        self.assertIn("2 ThreatMiner record(s)", r.category)
+
+    def test_missing_or_scalar_results_do_not_crash(self):
+        self.assertEqual(self._run({}).level, "info")
+        self.assertEqual(self._run({"results": 5}).level, "info")
+
+
+from score_process.scoring.cortex_analyzers.contrib.team_cymru_mhr import TeamCymruMhrParser
+
+class TeamCymruMhrParserTests(SimpleTestCase):
+    """Regression: upstream hardcodes taxonomy level to "info", so a hash
+    confirmed in Team Cymru's Malware Hash Registry scored identically to a
+    clean one ("info" -> "no-data"). This parser reads `status`/`detection_pct`."""
+
+    def _run(self, full):
+        p = TeamCymruMhrParser(analyzer_name="TeamCymruMHR_1_0", data="abc123", data_type="hash")
+        return p.parse({"taxonomies": [{"level": "info"}]}, full)
+
+    def test_found_record_is_malicious_not_info(self):
+        r = self._run({"status": "found_record", "detection_pct": "79", "last_seen": "2026-01-01"})
+        self.assertEqual(r.level, "malicious")
+        self.assertEqual(r.score, 10)
+
+    def test_low_detection_pct_is_suspicious(self):
+        r = self._run({"status": "found_record", "detection_pct": "4", "last_seen": "2026-01-01"})
+        self.assertEqual(r.level, "suspicious")
+
+    def test_no_record_is_info(self):
+        r = self._run({"status": "No record found for abc123"})
+        self.assertEqual(r.level, "info")
+
+    def test_garbage_pct_defaults_to_malicious(self):
+        r = self._run({"status": "found_record", "detection_pct": None})
+        self.assertEqual(r.level, "malicious")
+
+
+from score_process.scoring.cortex_analyzers.contrib.domain_mail_spf_dmarc import DomainMailSpfDmarcParser
+
+class DomainMailSpfDmarcParserTests(SimpleTestCase):
+    """Regression: the upstream analyzer maps "no DMARC record" to a
+    `malicious` taxonomy, so a legit domain that simply doesn't send mail
+    (neverssl.com, github.io) got forced to Suspicious/Dangerous. Weak mail
+    auth is not evidence a domain is malicious — the mail road does its own
+    real auth-posture analysis. This parser always maps to "info"."""
+
+    def _run(self, summary):
+        p = DomainMailSpfDmarcParser(analyzer_name="DomainMailSPFDMARC_1_2",
+                                     data="neverssl.com", data_type="domain")
+        full = {"DomainMailSPFDMARC": {"spf": {"record": None, "valid": False,
+                                              "error": "An SPF record does not exist."},
+                                       "dmarc": {"record": None, "valid": False,
+                                                 "error": "A DMARC record does not exist."}}}
+        return p.parse(summary, full)
+
+    def test_both_missing_is_info_not_malicious(self):
+        r = self._run({"taxonomies": [
+            {"level": "malicious", "namespace": "DomainMailSPF_DMARC", "predicate": "DMARC", "value": "no"},
+            {"level": "malicious", "namespace": "DomainMailSPF_DMARC", "predicate": "SPF", "value": "no"},
+        ]})
+        self.assertEqual(r.level, "info")
+
+    def test_dmarc_missing_is_info_not_suspicious(self):
+        r = self._run({"taxonomies": [
+            {"level": "safe", "namespace": "DomainMailSPF_DMARC", "predicate": "SPF", "value": "yes"},
+            {"level": "suspicious", "namespace": "DomainMailSPF_DMARC", "predicate": "DMARC", "value": "no"},
+        ]})
+        self.assertEqual(r.level, "info")
+
+    def test_posture_is_carried_in_details(self):
+        r = self._run({"taxonomies": []})
+        self.assertIn("spf", r.details)
+        self.assertIn("dmarc", r.details)
+
+    def test_garbage_full_does_not_crash(self):
+        p = DomainMailSpfDmarcParser(analyzer_name="DomainMailSPFDMARC_1_2", data="x", data_type="domain")
+        self.assertEqual(p.parse({"taxonomies": []}, None).level, "info")
+        self.assertEqual(p.parse({}, {"DomainMailSPFDMARC": 5}).level, "info")
+
+
+from score_process.scoring.cortex_analyzers.contrib.cyberprotect import CyberprotectThreatScoreParser
+
+class CyberprotectThreatScoreParserTests(SimpleTestCase):
+    """The upstream analyzer passes `raw['threatscore']['level']` straight
+    through. Cyberprotect's bands are safe/low/medium/high/critical — none but
+    "safe" are cortex taxonomy levels, so DefaultTaxonomyParser silently drops
+    a `high`/`critical` verdict to no-data. This parser maps the bands
+    explicitly (and tolerates a safe/suspicious/malicious vocabulary too)."""
+
+    def _run(self, full):
+        p = CyberprotectThreatScoreParser(analyzer_name="Cyberprotect_ThreatScore_3_0",
+                                          data="1.2.3.4", data_type="ip")
+        return p.parse({"taxonomies": [{"level": "info"}]}, full)
+
+    def test_high_band_is_malicious(self):
+        self.assertEqual(self._run({"threatscore": {"value": 88, "level": "high"}}).level, "malicious")
+
+    def test_critical_band_is_malicious(self):
+        self.assertEqual(self._run({"threatscore": {"value": 99, "level": "CRITICAL"}}).level, "malicious")
+
+    def test_medium_band_is_suspicious(self):
+        self.assertEqual(self._run({"threatscore": {"value": 55, "level": "medium"}}).level, "suspicious")
+
+    def test_low_band_is_info(self):
+        self.assertEqual(self._run({"threatscore": {"value": 12, "level": "low"}}).level, "info")
+
+    def test_safe_band_is_safe(self):
+        self.assertEqual(self._run({"threatscore": {"value": 0, "level": "safe"}}).level, "safe")
+
+    def test_api_error_or_missing_is_info(self):
+        self.assertEqual(self._run({"code": 403, "error": "forbidden"}).level, "info")
+        self.assertEqual(self._run({}).level, "info")
+        self.assertEqual(self._run(None).level, "info")
+
+    def test_cortex_vocabulary_also_understood(self):
+        self.assertEqual(self._run({"threatscore": {"level": "malicious"}}).level, "malicious")
+
+
 class BespokeParserResolutionTests(SimpleTestCase):
     def test_registry_resolves_all_bespoke_parsers(self):
         reg = AnalyzerParserRegistry()
@@ -359,8 +599,14 @@ class BespokeParserResolutionTests(SimpleTestCase):
             "Zscaler_1_3": "ZscalerParser",
             "VirusTotal_GetReport_3_1": "VirusTotalGetReportParser",
             "Urlscan_io_Search_0_1_1": "UrlscanSearchParser",
+            "Lookyloo_Screenshot_1_0": "LookylooScreenshotParser",
             "MISP_2_1": "MispParser",
             "CIRCLHashlookup_1_1": "CirclHashlookupParser",
+            "SpamhausDBL_1_0": "SpamhausDblParser",
+            "ThreatMiner_1_0": "ThreatMinerParser",
+            "TeamCymruMHR_1_0": "TeamCymruMhrParser",
+            "DomainMailSPFDMARC_1_2": "DomainMailSpfDmarcParser",
+            "Cyberprotect_ThreatScore_3_0": "CyberprotectThreatScoreParser",
         }
         for cortex_name, cls_name in cases.items():
             self.assertEqual(reg.resolve(_A(cortex_name)).__name__, cls_name)

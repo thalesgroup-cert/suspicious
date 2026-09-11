@@ -1,0 +1,36 @@
+{
+  "data_type": "ip",
+  "report_full": {
+    "results": {
+      "data": {
+        "id": "8.8.8.8",
+        "type": "ip_address",
+        "attributes": {
+          "last_analysis_stats": {
+            "malicious": 0,
+            "suspicious": 0,
+            "harmless": 90,
+            "undetected": 0,
+            "timeout": 0
+          },
+          "last_analysis_results": {
+            "Kaspersky": {"category": "harmless", "result": null, "engine_name": "Kaspersky", "method": "blacklist"},
+            "Google Safebrowsing": {"category": "harmless", "result": "clean", "engine_name": "Google Safebrowsing", "method": "blacklist"},
+            "CrowdStrike": {"category": "harmless", "result": null, "engine_name": "CrowdStrike", "method": "blacklist"},
+            "Fortinet": {"category": "harmless", "result": "clean", "engine_name": "Fortinet", "method": "blacklist"}
+          },
+          "as_owner": "Google LLC",
+          "asn": 15169,
+          "country": "US",
+          "continent": "NA",
+          "network": "8.8.8.0/24",
+          "reputation": 0,
+          "first_submission_date": 1546502400,
+          "last_analysis_date": 1725000000,
+          "tags": []
+        }
+      }
+    }
+  },
+  "expect": {"level": "safe", "confidence_min": 85}
+}

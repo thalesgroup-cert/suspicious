@@ -1,4 +1,5 @@
 import { api } from "@/api/client";
+import { parseObservableGroup, type ObservableGroup } from "./observableGroup";
 
 export type InvestigationStatus =
   | "NEW"
@@ -15,6 +16,7 @@ export type InvestigationType =
   | "URL"
   | "IP"
   | "HASH"
+  | "IOC"
   | "UNKNOWN";
 
 export type InvestigationResult =
@@ -69,12 +71,31 @@ type InvestigationAnalyzerReport = {
   categories: string[];
   report_summary?: unknown;
   report_taxonomy?: unknown;
+  enrichment?: unknown;
   target: InvestigationAnalyzerTarget | null;
   created_at?: string;
 };
 
+export type VerdictSourceLine = {
+  name: string;
+  tier: number;
+  verdict: string;
+  counted: boolean;
+  note: string;
+};
+export type VerdictExplanationDTO = {
+  band: string;
+  confidence: number;
+  decisive_rule: string;
+  analyst_paragraph: string;
+  reporter_paragraph: string;
+  confidence_reading: string;
+  sources: VerdictSourceLine[];
+};
+
 type InvestigationCaseInfos = {
   id?: number;
+  verdict_explanation?: VerdictExplanationDTO | null;
   score?: number | null;
   confidence?: number | null;
   results?: string | null;
@@ -102,6 +123,8 @@ export type InvestigationDetails = {
   is_challenged: boolean;
   /** Relative URL to the rendered .eml→png preview, or null when absent / not a mail. */
   mail_preview_url?: string | null;
+  /** Relative URL to the captured page screenshot, or null when none was captured. */
+  screenshot_url?: string | null;
   raw?: unknown;
   analyzer_reports: InvestigationAnalyzerReport[];
   case_infos?: InvestigationCaseInfos;
@@ -112,6 +135,8 @@ export type InvestigationDetails = {
   is_allowlisted: boolean;
   is_denylisted: boolean;
   list_reason: string;
+  /** Present only for IOC-group cases (Task 9 payload); undefined for mail/file. */
+  observable_group?: ObservableGroup;
   [key: string]: unknown;
 };
 
@@ -200,6 +225,7 @@ function normalizeType(value: unknown): InvestigationType {
     case "URL": return "URL";
     case "IP": return "IP";
     case "HASH": return "HASH";
+    case "IOC": return "IOC";
     default: return "UNKNOWN";
   }
 }
@@ -262,6 +288,7 @@ function normalizeAnalyzerReport(input: unknown): InvestigationAnalyzerReport {
     categories: asStringArray(report.categories),
     report_summary: report.report_summary,
     report_taxonomy: report.report_taxonomy,
+    enrichment: report.enrichment,
     target: normalizeAnalyzerTarget(report.target),
     created_at: typeof report.created_at === "string" ? report.created_at : undefined,
   };
@@ -295,6 +322,7 @@ function normalizeDetails(input: unknown): InvestigationDetails {
     list_reason: asString(data.list_reason),
     analyzer_reports: analyzerReportsRaw.map(normalizeAnalyzerReport),
     case_infos: normalizeCaseInfos(data.case_infos),
+    observable_group: parseObservableGroup(data.observable_group),
     raw: data.raw ?? data,
   };
 }
