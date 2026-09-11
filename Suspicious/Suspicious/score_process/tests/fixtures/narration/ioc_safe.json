@@ -1,7 +1,7 @@
 {
   "verdict": {"band": "Safe", "score": 0.0, "confidence": 90, "rule": "no-malicious-sources"},
   "analyzer_reports": [
-    {"analyzer": "VirusTotal_v3", "report_full": {"observable": "docs.example-cloud.com", "positives": 0, "total": 72}},
+    {"analyzer": "VirusTotal_v3", "report_full": {"observable": "docs.example.com", "positives": 0, "total": 72}},
     {"analyzer": "GTI", "report_full": {"reputation": "clean", "categories": ["cloud storage"]}}
   ]
 }

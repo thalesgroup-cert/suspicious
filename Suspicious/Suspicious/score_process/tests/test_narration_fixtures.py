@@ -3,7 +3,7 @@ from pathlib import Path
 
 from django.test import SimpleTestCase
 
-FIXTURES_DIR = Path(__file__).resolve().parents[4] / "docs" / "research" / "fixtures"
+FIXTURES_DIR = Path(__file__).resolve().parent / "fixtures" / "narration"
 FIXTURE_NAMES = [
     "mail_safe.json",
     "mail_suspicious.json",
