@@ -278,12 +278,12 @@ git commit -m "feat(narration): add prompt builder for verdict narration spike"
 ### Task 3: Synthetic case fixtures
 
 **Files:**
-- Create: `docs/research/fixtures/mail_safe.json`
-- Create: `docs/research/fixtures/mail_suspicious.json`
-- Create: `docs/research/fixtures/mail_dangerous.json`
-- Create: `docs/research/fixtures/ioc_safe.json`
-- Create: `docs/research/fixtures/ioc_suspicious_multi.json`
-- Create: `docs/research/fixtures/ioc_dangerous_single.json`
+- Create: `Suspicious/Suspicious/score_process/tests/fixtures/narration/mail_safe.json`
+- Create: `Suspicious/Suspicious/score_process/tests/fixtures/narration/mail_suspicious.json`
+- Create: `Suspicious/Suspicious/score_process/tests/fixtures/narration/mail_dangerous.json`
+- Create: `Suspicious/Suspicious/score_process/tests/fixtures/narration/ioc_safe.json`
+- Create: `Suspicious/Suspicious/score_process/tests/fixtures/narration/ioc_suspicious_multi.json`
+- Create: `Suspicious/Suspicious/score_process/tests/fixtures/narration/ioc_dangerous_single.json`
 - Test: `Suspicious/Suspicious/score_process/tests/test_narration_fixtures.py`
 
 **Interfaces:**
@@ -298,7 +298,7 @@ from pathlib import Path
 
 from django.test import SimpleTestCase
 
-FIXTURES_DIR = Path(__file__).resolve().parents[4] / "docs" / "research" / "fixtures"
+FIXTURES_DIR = Path(__file__).resolve().parent / "fixtures" / "narration"
 FIXTURE_NAMES = [
     "mail_safe.json",
     "mail_suspicious.json",
@@ -413,7 +413,7 @@ Expected: PASS (1 test, 6 subtests)
 - [ ] **Step 5: Commit**
 
 ```bash
-git add docs/research/fixtures/ Suspicious/Suspicious/score_process/tests/test_narration_fixtures.py
+git add Suspicious/Suspicious/score_process/tests/fixtures/narration/ Suspicious/Suspicious/score_process/tests/test_narration_fixtures.py
 git commit -m "test(narration): add synthetic case fixtures for the narration spike"
 ```
 

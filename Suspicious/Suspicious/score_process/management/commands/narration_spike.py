@@ -19,6 +19,7 @@ class Command(BaseCommand):
         parser.add_argument("fixture_path", type=str)
         parser.add_argument("--ollama-url", default="http://localhost:11434")
         parser.add_argument("--model", default="qwen2.5:7b-instruct")
+        parser.add_argument("--timeout", type=int, default=600)
 
     def handle(self, *args, **options):
         fixture_path = Path(options["fixture_path"])
@@ -35,7 +36,7 @@ class Command(BaseCommand):
             response = requests.post(
                 f"{options['ollama_url']}/api/generate",
                 json={"model": options["model"], "prompt": prompt, "stream": False},
-                timeout=120,
+                timeout=options["timeout"],
             )
             response.raise_for_status()
         except requests.RequestException as exc:

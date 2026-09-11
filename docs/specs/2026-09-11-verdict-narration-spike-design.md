@@ -107,7 +107,7 @@ CLI: `manage.py narration_spike <fixture_path> [--ollama-url URL] [--model NAME]
 - Writes `<fixture>.result.txt`: `PASS`/`FAIL`, the reasons if failed, and
   the full raw narration text, for a human to read.
 
-### `docs/research/fixtures/*.json`
+### `Suspicious/Suspicious/score_process/tests/fixtures/narration/*.json`
 
 Hand-written synthetic cases, one per fixture, covering:
 - Mail road: Safe, Suspicious, Dangerous bands (varying `AI_Mail_Analyzer`
@@ -175,3 +175,5 @@ spike's actual deliverable, not a passing test suite.
 - Standing up Ollama itself (install, model pull, resource sizing) is
   environment setup, tracked in the implementation plan, not a design
   decision.
+- `verdict_lock`'s current dict-shaped input (`{"band", "score", "confidence", "rule"}`) matches no real verdict object this codebase produces (`CaseVerdict`, `GroupVerdict`/`ObservableVerdict`, `VerdictExplanation` all have different field names/shapes). An adapter translating each into this dict shape is required before any live integration — not assumed drop-in.
+- `validate_narration` only checks band and confidence, not score (the spec originally called for score too). Full score validation was deferred: the score has no stated scale in the codebase today, and a human reads every narration in this spike's workflow regardless. Revisit if/when this becomes a production validator with no human in the loop.

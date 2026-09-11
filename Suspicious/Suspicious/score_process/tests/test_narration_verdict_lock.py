@@ -1,6 +1,8 @@
 from django.test import SimpleTestCase
 
+from score_process.scoring.explanation.adapters import _BANDS
 from score_process.scoring.narration.verdict_lock import (
+    _BAND_WORDS,
     render_fixed_facts,
     validate_narration,
 )
@@ -49,3 +51,32 @@ class ValidateNarrationTest(SimpleTestCase):
         text = "This is Dangerous with roughly 88% confidence."
         result = validate_narration(text, verdict)
         self.assertTrue(result.passed)
+
+    def test_negated_contradicting_band_does_not_fail(self):
+        verdict = {"band": "Safe", "score": 0.0, "confidence": 90, "rule": "no-malicious-sources"}
+        text = "No suspicious indicators were found. Nothing dangerous was detected."
+        result = validate_narration(text, verdict)
+        self.assertTrue(result.passed)
+
+    def test_negated_band_via_contraction_does_not_fail(self):
+        verdict = {"band": "Dangerous", "score": 9.5, "confidence": 85, "rule": "malicious-count"}
+        text = "This message is not safe to open; do not click the link."
+        result = validate_narration(text, verdict)
+        self.assertTrue(result.passed)
+
+    def test_decimal_percentage_parsed_correctly(self):
+        verdict = {"band": "Dangerous", "score": 9.5, "confidence": 90, "rule": "malicious-count"}
+        text = "This is Dangerous with roughly 88.5% confidence."
+        result = validate_narration(text, verdict)
+        self.assertTrue(result.passed)
+
+    def test_unrelated_percentage_not_flagged(self):
+        verdict = {"band": "Suspicious", "score": 4.8, "confidence": 55, "rule": "group-worst-of"}
+        text = "Only about 5% of security engines flagged this domain as suspicious."
+        result = validate_narration(text, verdict)
+        self.assertTrue(result.passed)
+
+
+class BandWordsPinnedTest(SimpleTestCase):
+    def test_band_words_match_canonical_bands(self):
+        self.assertEqual(set(_BAND_WORDS), _BANDS)

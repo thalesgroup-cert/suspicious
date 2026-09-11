@@ -68,6 +68,9 @@ Analyzers/AIMailAnalyzer/vectorizers/paraphrase-multilingual-mpnet-base-v2/1_Poo
 # Generated training data (mailbox_to_csv.ipynb / build_test_dataset.py output) — derived, not source.
 Analyzers/AIMailAnalyzer/*.csv
 
+# ===== Narration spike raw output =====
+Suspicious/Suspicious/score_process/tests/fixtures/narration/*.result.txt
+
 # ===== Docs (MkDocs) =====
 /site/
 .docs-venv/
