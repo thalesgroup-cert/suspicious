@@ -1,0 +1,8 @@
+{
+  "verdict": {"band": "Dangerous", "score": 9.2, "confidence": 88, "rule": "embedded-ioc-escalation"},
+  "analyzer_reports": [
+    {"analyzer": "AI_Mail_Analyzer", "report_full": {"classification": "phishing", "confidence": 0.94, "language": "en"}},
+    {"analyzer": "SPF_DKIM_DMARC", "report_full": {"spf": "fail", "dkim": "fail", "dmarc": "fail"}},
+    {"analyzer": "VirusTotal_v3", "report_full": {"url": "hxxp://secure-hr-portal-update.example-fake.com/reset", "positives": 41, "total": 70}}
+  ]
+}
