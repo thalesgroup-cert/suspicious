@@ -12,7 +12,12 @@ _INSTRUCTIONS = (
     "restate them differently, soften them, or draw your own conclusion "
     "about whether this case is safe or dangerous. Explain what the "
     "analyzer findings below mean in plain language, and how they support "
-    "the given verdict."
+    "the given verdict. Never mention the decisive rule's internal name "
+    "(e.g. \"weighted-malicious-share\", \"group-worst-of\") — instead "
+    "describe in plain words why that pattern of findings led to this "
+    "verdict. Write the report as a finished document, not a conversation: "
+    "do not end with an offer to answer further questions or any other "
+    "chat-style closing."
 )
 
 
