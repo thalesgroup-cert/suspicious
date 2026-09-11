@@ -628,15 +628,30 @@ docker exec -it ollama ollama pull qwen2.5:7b-instruct
 
 ## 3. Run the spike against every fixture
 
-From `Suspicious/Suspicious/`:
+Fixtures live at `Suspicious/Suspicious/score_process/tests/fixtures/narration/`
+(inside the Django app tree, not under `docs/`, so they're always reachable
+under a container mount — see Task 3's ledger ruling). There's no local
+Python/Django environment in this repo's dev setup, so run each fixture
+through the `suspicious` container, from `deployment/`:
 
 ```bash
-for f in ../../docs/research/fixtures/*.json; do
-  python manage.py narration_spike "$f"
+cd deployment
+for name in mail_safe mail_suspicious mail_dangerous ioc_safe ioc_suspicious_multi ioc_dangerous_single; do
+  docker compose --env-file .env run --rm --no-deps \
+    -v "$(cd .. && pwd)/Suspicious/Suspicious:/app" -w /app \
+    suspicious python manage.py narration_spike \
+    "score_process/tests/fixtures/narration/${name}.json" \
+    --ollama-url http://ollama:11434
 done
 ```
 
-Each run writes `<fixture>.result.txt` next to the fixture it read.
+`--ollama-url http://ollama:11434` addresses the `ollama` service by its
+Docker Compose service name over `suspicious_network` — `localhost` would
+not resolve to the Ollama container from inside the `suspicious` container.
+
+Each run writes `<fixture>.result.txt` next to the fixture it read — since
+the container bind-mounts the same directory, the result files also appear
+on the host at `Suspicious/Suspicious/score_process/tests/fixtures/narration/`.
 
 ## 4. Read the results
 
