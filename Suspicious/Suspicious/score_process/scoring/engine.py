@@ -36,6 +36,7 @@ class CaseVerdict:
     inconclusive_reason: str = ""
     n_failed: int = 0
     rationale: tuple = ()
+    rule: str = ""
 
 
 _BAND_RANK = {Result.SAFE: 0, Result.INCONCLUSIVE: 0, Result.SUSPICIOUS: 1, Result.DANGEROUS: 2}
@@ -74,6 +75,7 @@ def mail_band_escalation(verdict, embedded, note: str = ""):
         result=worst if raising else verdict.result,
         final_confidence=new_conf,
         rationale=tuple(verdict.rationale) + (line,),
+        **({"rule": "embedded-ioc-escalation"} if raising else {}),
     )
 
 
@@ -85,16 +87,36 @@ def band(score: float) -> str:
     return Result.DANGEROUS
 
 
+def _classify_rule(*, ai, base_conf, ai_missing, final_score, final_conf,
+                   n_malicious, n_scored, result, worst, wmean) -> str:
+    # Mirror score_case's band order: the malicious-count test decides Dangerous
+    # before any incomplete-analysis branch, so it must be checked first here too.
+    if n_malicious >= max(1, n_scored // 3):
+        return "weighted-consensus"
+    if ai is not None and ai.confidence > base_conf:
+        return "ai-classifier-decisive"
+    if ai_missing:
+        return "analysis-incomplete"
+    if final_score == NEUTRAL or final_conf < CONF_FLOOR:
+        return "analysis-incomplete"
+    if result == Result.SAFE and n_malicious == 0:
+        return "no-signal"
+    if worst > wmean:
+        return "single-strong-signal"
+    return "weighted-consensus"
+
+
 def score_case(signals, ai=None, deny_listed=False, ai_missing=False, deny_reason="") -> CaseVerdict:
     scored = [s for s in signals if not s.is_failure]
     n_malicious = sum(1 for s in scored if s.is_malicious)
     n_scored = len(scored)
 
     if deny_listed:
-        return CaseVerdict(10, 100, Result.DANGEROUS, n_malicious, n_scored, is_denylisted=True, list_reason=deny_reason)
+        return CaseVerdict(10, 100, Result.DANGEROUS, n_malicious, n_scored, is_denylisted=True,
+                           list_reason=deny_reason, rule="deny-listed")
 
     if not scored:
-        return CaseVerdict(NEUTRAL, 0, Result.FAILURE, 0, 0)
+        return CaseVerdict(NEUTRAL, 0, Result.FAILURE, 0, 0, rule="analysis-incomplete")
 
     conf_sum = sum(s.confidence for s in scored) or 1
     worst = max((s.score for s in scored if s.confidence >= CONF_FLOOR), default=0)
@@ -124,4 +146,10 @@ def score_case(signals, ai=None, deny_listed=False, ai_missing=False, deny_reaso
         result=result,
         n_malicious=n_malicious,
         n_scored=n_scored,
+        rule=_classify_rule(
+            ai=ai, base_conf=base_conf, ai_missing=ai_missing,
+            final_score=final_score, final_conf=final_conf,
+            n_malicious=n_malicious, n_scored=n_scored,
+            result=result, worst=worst, wmean=wmean,
+        ),
     )

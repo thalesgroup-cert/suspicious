@@ -344,11 +344,15 @@ class InvestigationGlobalEditView(InvestigationAccessMixin, APIView):
         obj.final_confidence = validated["confidence"]
         obj.results = API_RESULT_TO_INTERNAL[validated["classification"]]
         obj.last_update_by = request.user
+        # The stored explanation described the previous verdict — drop it so a
+        # stale "why" is never emailed / shown after an analyst override.
+        obj.verdict_explanation = None
         obj.save(
             update_fields=[
                 "final_score",
                 "final_confidence",
                 "results",
+                "verdict_explanation",
                 "last_update_by",
                 "last_update",
             ]
@@ -415,7 +419,10 @@ class InvestigationRedoAnalysisView(InvestigationAccessMixin, APIView):
         case.score = 0
         case.final_score = 0
         case.description = ""
-        case.save(update_fields=["results", "score", "final_score", "description"])
+        case.verdict_explanation = None
+        case.save(update_fields=[
+            "results", "score", "final_score", "description", "verdict_explanation",
+        ])
 
         intents = [
             (f"{instance._meta.app_label}.{instance._meta.model_name}", instance.pk, data_type)

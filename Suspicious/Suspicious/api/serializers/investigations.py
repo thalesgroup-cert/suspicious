@@ -317,6 +317,7 @@ class InvestigationDetailsSerializer(InvestigationRowSerializer):
             "confidence_ai": obj.confidence_ai,
             "classification_ai": normalize_result_to_api(obj.results_ai),
             "category_ai": obj.category_ai,
+            "verdict_explanation": obj.verdict_explanation,
         }
 
     def get_reporter_note(self, obj: Case) -> str:

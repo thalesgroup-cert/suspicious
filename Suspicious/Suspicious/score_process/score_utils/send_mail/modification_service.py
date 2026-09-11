@@ -104,6 +104,11 @@ class ModificationEmailService:
             else ""
         )
 
+        # Trust the stored reporter paragraph only if it describes the case's
+        # current band — an analyst override leaves a stale explanation behind.
+        _ve = getattr(self.case, "verdict_explanation", None) or {}
+        _reporter = _ve.get("reporter_paragraph") if _ve.get("band") == raw_result else None
+
         return {
             "id":             getattr(self.case, "id", ""),
             "type":           self._case_type(),
@@ -113,9 +118,9 @@ class ModificationEmailService:
                 _RESULT_TO_COLOR_KEY.get(raw_result, "color_inconclusive"),
                 "#94A3B8",
             ),
-            "result_guidance": _RESULT_GUIDANCE.get(
-                raw_result,
-                "Please review the case details on the portal."
+            "result_guidance": (
+                _reporter
+                or _RESULT_GUIDANCE.get(raw_result, "Please review the case details on the portal.")
             ),
             "contact_cta": contact_cta,
         }
