@@ -67,6 +67,12 @@ Analyzers/AIMailAnalyzer/vectorizers/paraphrase-multilingual-mpnet-base-v2/model
 Analyzers/AIMailAnalyzer/vectorizers/paraphrase-multilingual-mpnet-base-v2/config.json
 Analyzers/AIMailAnalyzer/vectorizers/paraphrase-multilingual-mpnet-base-v2/1_Pooling
 
+# Same pattern for AiMailPublicAnalyzer's own weights/vectorizer copy - real
+# .pth files never committed (see Analyzers/AiMailPublicAnalyzer/models/README.md
+# for the filenames expected there), models/README.md itself stays tracked.
+Analyzers/AiMailPublicAnalyzer/models/*.pth
+Analyzers/AiMailPublicAnalyzer/vectorizers/paraphrase-multilingual-mpnet-base-v2/model.safetensors
+
 # ===== Monthly retrain pipeline: fetched mail + run outputs, never commit =====
 Analyzers/AIMailAnalyzer/retrain model monthly/data_export/
 Analyzers/AIMailAnalyzer/retrain model monthly/data_base_results/

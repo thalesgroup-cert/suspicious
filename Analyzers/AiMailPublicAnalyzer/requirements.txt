@@ -1,0 +1,4 @@
+cortexutils
+torch>=2.13.0
+numpy>=2.5.1
+sentence_transformers>=5.6.1
