@@ -1,5 +1,5 @@
 /**
- * ScreenshotPanel — shows the analyzer's captured page screenshot next to the
+ * ScreenshotPanel: shows the analyzer's captured page screenshot next to the
  * verdict on an investigation detail page.
  *
  * The backend serves the PNG at `/api/cases/<id>/screenshot.png` (auth via the

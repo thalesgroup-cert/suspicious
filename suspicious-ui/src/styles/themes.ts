@@ -1,8 +1,6 @@
 import { createTheme, alpha, type ThemeOptions } from "@mui/material/styles";
 
-// ---------------------------------------------------------------------------
 // Font stacks
-// ---------------------------------------------------------------------------
 
 const sansStack = [
   "Inter", "system-ui", "-apple-system", "Segoe UI",
@@ -23,9 +21,7 @@ const roundedStack = [
   "Segoe UI", "Roboto", "Arial", "sans-serif",
 ].join(",");
 
-// ---------------------------------------------------------------------------
 // Texture helpers
-// ---------------------------------------------------------------------------
 
 const border = (hex: string, a: number) => `1px solid ${alpha(hex, a)}`;
 
@@ -52,9 +48,7 @@ const noiseSVG = (opacity = 0.06) => {
 const tintedScanlines = (hex: string, a = 0.04, step = 3) =>
   `repeating-linear-gradient(0deg, ${alpha(hex, a)}, ${alpha(hex, a)} 1px, transparent 1px, transparent ${step}px)`;
 
-// ---------------------------------------------------------------------------
 // Base MUI theme defaults (shared across all themes)
-// ---------------------------------------------------------------------------
 
 const base: ThemeOptions = {
   shape: { borderRadius: 4 },
@@ -217,9 +211,7 @@ const base: ThemeOptions = {
   },
 };
 
-// ---------------------------------------------------------------------------
 // Helper factories
-// ---------------------------------------------------------------------------
 
 function mkDark(opts: {
   bg: string;
@@ -309,9 +301,7 @@ function mkLight(opts: {
   });
 }
 
-// ---------------------------------------------------------------------------
 // ThemeName
-// ---------------------------------------------------------------------------
 
 export type ThemeName =
   | "midnight"
@@ -341,9 +331,7 @@ export function getSeasonalThemeName(date = new Date()): ThemeName {
   return "light";
 }
 
-// ---------------------------------------------------------------------------
 // Themes
-// ---------------------------------------------------------------------------
 
 export const themes: Record<ThemeName, ReturnType<typeof createTheme>> = {
 

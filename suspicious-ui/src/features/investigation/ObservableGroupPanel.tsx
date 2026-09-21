@@ -124,7 +124,7 @@ export function ObservableGroupPanel({ group }: { group: ObservableGroup }) {
                   {observable.screenshot_url && (
                     <ScreenshotPanel
                       src={observable.screenshot_url}
-                      label={`Screenshot — ${observable.value}`}
+                      label={`Screenshot: ${observable.value}`}
                     />
                   )}
                   <SourceTable sources={observable.sources} />

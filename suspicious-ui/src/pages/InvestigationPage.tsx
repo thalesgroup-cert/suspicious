@@ -97,9 +97,7 @@ import {
   short,
 } from "@/features/investigation/utils";
 
-// ---------------------------------------------------------------------------
 // Page
-// ---------------------------------------------------------------------------
 
 export default function InvestigationPage() {
   const navigate = useNavigate();
@@ -189,7 +187,7 @@ export default function InvestigationPage() {
     () => groups.includes("CISO") || groups.includes("CERT") || groups.includes("Admin"),
     [groups]
   );
-  // A CISO with no scope set can't meaningfully browse cases yet — prompt them
+  // A CISO with no scope set can't meaningfully browse cases yet: prompt them
   // to pick one first (same modal Home shows on first connection).
   const needsScope =
     !!me &&
@@ -471,8 +469,6 @@ export default function InvestigationPage() {
       animate="shimmer"
     >
     <Box sx={{ p: { xs: 2, md: 3 } }}>
-      {/* ------------------------------------------------------------------ */}
-      {/* ------------------------------------------------------------------ */}
       <Stack
         direction={{ xs: "column", md: "row" }}
         spacing={2}
@@ -520,8 +516,6 @@ export default function InvestigationPage() {
         </Stack>
       </Stack>
 
-      {/* ------------------------------------------------------------------ */}
-      {/* ------------------------------------------------------------------ */}
       <SoftCard sx={{ mb: 2 }}>
         <CardContent sx={{ p: { xs: 2.25, md: 3 } }}>
           <Stack spacing={1.5}>
@@ -693,8 +687,6 @@ export default function InvestigationPage() {
         </CardContent>
       </SoftCard>
 
-      {/* ------------------------------------------------------------------ */}
-      {/* ------------------------------------------------------------------ */}
       <SoftCard>
         <CardContent sx={{ p: 0 }}>
           {investigationsQuery.isFetching ? <LinearProgress /> : null}
@@ -836,8 +828,6 @@ export default function InvestigationPage() {
         </CardContent>
       </SoftCard>
 
-      {/* ------------------------------------------------------------------ */}
-      {/* ------------------------------------------------------------------ */}
       <Drawer
         anchor="right"
         open={openDrawer}
@@ -1168,7 +1158,7 @@ export default function InvestigationPage() {
                     <Stack spacing={1.25}>
                       <Stack direction="row" spacing={1} sx={{ alignItems: "center", flexWrap: "wrap" }} >
                         <ResultChip result={String(currentClassification ?? "UNKNOWN")} minWidth={BADGE_W} />
-                        {/* IOC road has no analyst-visible score — the stored band number is not a real 0–10 score. */}
+                        {/* IOC road has no analyst-visible score: the stored band number is not a real 0-10 score. */}
                         {!observableGroup && (
                           <Chip size="small" label={`Score ${currentScore ?? "—"}/10`} variant="outlined" sx={{ fontWeight: 800 }} />
                         )}
@@ -1256,7 +1246,7 @@ export default function InvestigationPage() {
                   </Box>
                 ) : null}
 
-                {/* ── Analysis results — IOC-group cases get the VT-style panel ─── */}
+                {/* Analysis results: IOC-group cases get the VT-style panel */}
                 {observableGroup ? (
                   <ObservableGroupPanel group={observableGroup} />
                 ) : (
@@ -1403,7 +1393,7 @@ export default function InvestigationPage() {
           {redoMutation.isError ? (
             <Alert severity="error" sx={{ mt: 1.5 }}>
               {(redoMutation.error as { response?: { data?: { detail?: string } } })
-                ?.response?.data?.detail ?? "Redo failed — please try again."}
+                ?.response?.data?.detail ?? "Redo failed. Please try again."}
             </Alert>
           ) : null}
         </DialogContent>

@@ -2,9 +2,7 @@ import * as React from "react";
 import { CssBaseline, ThemeProvider } from "@mui/material";
 import { themes, type ThemeName, getSeasonalThemeName } from "./themes";
 
-// ---------------------------------------------------------------------------
 // Storage keys
-// ---------------------------------------------------------------------------
 
 const STORAGE_KEY      = "suspicious.theme";
 const STORAGE_KEY_AUTO = "suspicious.theme.auto";
@@ -12,10 +10,8 @@ const DEFAULT_THEME: ThemeName = "light";
 
 const THEME_HYDRATE_EVENT = "suspicious:theme-hydrate";
 
-// ---------------------------------------------------------------------------
-// ---------------------------------------------------------------------------
 
-/** Named feature flags — each describes a visual capability a theme provides. */
+/** Named feature flags: each describes a visual capability a theme provides. */
 type ThemeEffects = {
   /** Glass-morphism surfaces (backdrop-filter: blur). */
   hasGlassEffect?: boolean;
@@ -31,7 +27,7 @@ type ThemeEffects = {
   hasBrigadeScanEffect?: boolean;
   /** MGS stealth utilities: cardboard box, camo overlay, HUD alert states. */
   hasStealthMode?: boolean;
-  /** MGS alert / caution state — colours shift on `.hud-alertable` elements. */
+  /** MGS alert / caution state: colours shift on `.hud-alertable` elements. */
   hasAlertStates?: boolean;
   /** Christmas lights garland animation (winter). */
   hasSeasonalLights?: boolean;
@@ -52,7 +48,7 @@ export type ThemeCapabilities = {
   label: string;
   /** Short description of the theme's visual character. */
   description: string;
-  /** Narrative / lore context (optional — present for "character" themes). */
+  /** Narrative / lore context (optional, present for "character" themes). */
   lore?: string;
   /** Whether the resolved palette is dark mode. */
   isDark: boolean;
@@ -60,7 +56,7 @@ export type ThemeCapabilities = {
   season?: "spring" | "summer" | "autumn" | "winter";
   /**
    * CSS utility class names injected by this theme's CssBaseline.
-   * Apply them directly to DOM elements — no extra stylesheet needed.
+   * Apply them directly to DOM elements; no extra stylesheet needed.
    */
   utilityClasses: readonly string[];
   /**
@@ -278,9 +274,7 @@ export const THEME_CAPABILITIES: Record<ThemeName, ThemeCapabilities> = {
   },
 };
 
-// ---------------------------------------------------------------------------
 // Context type
-// ---------------------------------------------------------------------------
 
 type ThemeCtx = {
   themeName:    ThemeName;
@@ -294,9 +288,7 @@ type ThemeCtx = {
 
 const ThemeContext = React.createContext<ThemeCtx | null>(null);
 
-// ---------------------------------------------------------------------------
 // Hooks
-// ---------------------------------------------------------------------------
 
 export function useThemeMode() {
   const ctx = React.useContext(ThemeContext);
@@ -304,8 +296,6 @@ export function useThemeMode() {
   return ctx;
 }
 
-// ---------------------------------------------------------------------------
-// ---------------------------------------------------------------------------
 
 export function hydrateThemeFromServer(theme: string, autoSeasonal: boolean): void {
   try {
@@ -320,14 +310,12 @@ export function hydrateThemeFromServer(theme: string, autoSeasonal: boolean): vo
       })
     );
   } catch {
-    // localStorage unavailable (private browsing extreme mode) — silently
+    // localStorage unavailable (private browsing extreme mode): silently
     // fall through; the event still fires if dispatchEvent hasn't thrown.
   }
 }
 
-// ---------------------------------------------------------------------------
 // Helpers
-// ---------------------------------------------------------------------------
 
 function isValidThemeName(value: unknown): value is ThemeName {
   return typeof value === "string" && value in themes;
@@ -365,9 +353,7 @@ function getInitialTheme(): ThemeName {
   }
 }
 
-// ---------------------------------------------------------------------------
 // Provider
-// ---------------------------------------------------------------------------
 
 export function AppThemeProvider({ children }: { children: React.ReactNode }) {
   const [themeName, setThemeNameState] = React.useState<ThemeName>(getInitialTheme);

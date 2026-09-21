@@ -67,9 +67,7 @@ import {
   resolveId,
 } from "@/features/submit/utils";
 
-// ---------------------------------------------------------------------------
 // Page
-// ---------------------------------------------------------------------------
 
 export default function SubmitPage() {
   const theme = useTheme();
@@ -117,9 +115,7 @@ export default function SubmitPage() {
     },
   });
 
-  // -------------------------------------------------------------------------
   // Shared post-submission navigation
-  // -------------------------------------------------------------------------
 
   function handleSuccess(res: SubmitSuccessResponse) {
     const id = resolveId(res);
@@ -136,9 +132,7 @@ export default function SubmitPage() {
     }
   }
 
-  // -------------------------------------------------------------------------
   // Mutations
-  // -------------------------------------------------------------------------
 
   const iocFileMutation = useMutation({
     mutationFn: extractIocsFromFile,
@@ -152,7 +146,7 @@ export default function SubmitPage() {
       );
       enqueueSnackbar(
         `Added ${res.found} indicator(s) from file${
-          res.skipped.length ? ` — ${res.skipped.length} token(s) not recognised` : ""
+          res.skipped.length ? `, ${res.skipped.length} token(s) not recognised` : ""
         }. Review below, then submit.`,
         { variant: "success" },
       );
@@ -182,7 +176,7 @@ export default function SubmitPage() {
       }),
     onSuccess: (res: SubmitIndicatorsResponse) => {
       enqueueSnackbar(
-        `Submitted — ${res.observable_count} indicator(s), case #${res.case_id}`,
+        `Submitted: ${res.observable_count} indicator(s), case #${res.case_id}`,
         { variant: "success" }
       );
       if (res.skipped.length) {
@@ -214,9 +208,7 @@ export default function SubmitPage() {
     indicatorsMutation.isPending ||
     iocFileMutation.isPending;
 
-  // -------------------------------------------------------------------------
   // Auth guard
-  // -------------------------------------------------------------------------
 
   if (meQuery.isLoading) {
     return (
@@ -234,9 +226,7 @@ export default function SubmitPage() {
     );
   }
 
-  // -------------------------------------------------------------------------
   // Handlers
-  // -------------------------------------------------------------------------
 
   async function copyEmail() {
     try {
@@ -252,9 +242,7 @@ export default function SubmitPage() {
     setFallbackCta(false);
   }
 
-  // -------------------------------------------------------------------------
   // Render
-  // -------------------------------------------------------------------------
 
   return (
     <Skeleton
@@ -264,8 +252,6 @@ export default function SubmitPage() {
     >
     <Container data-tour="submit-form" maxWidth="lg" sx={{ py: { xs: 2.5, md: 3.5 }, pb: 8 }}>
       <Stack spacing={2}>
-        {/* ---------------------------------------------------------------- */}
-        {/* ---------------------------------------------------------------- */}
         <SoftCard>
           <CardContent sx={{ p: { xs: 2.25, md: 3 } }}>
             <Stack spacing={2}>
@@ -299,7 +285,7 @@ export default function SubmitPage() {
                 <ModeSelectorCard
                   active={mode === "indicators"}
                   title="Indicators"
-                  subtitle="Paste one or many URLs, IPs, hashes or domains — or upload an IOC-list file. Type is detected automatically; analysed together as one case."
+                  subtitle="Paste one or many URLs, IPs, hashes or domains, or upload an IOC-list file. Type is detected automatically; analysed together as one case."
                   icon={<FormatListBulletedOutlined />}
                   helper="Recommended"
                   onClick={() => switchMode("indicators")}
@@ -309,8 +295,6 @@ export default function SubmitPage() {
           </CardContent>
         </SoftCard>
 
-        {/* ---------------------------------------------------------------- */}
-        {/* ---------------------------------------------------------------- */}
         <Box
           sx={{
             display: "grid",
@@ -321,8 +305,6 @@ export default function SubmitPage() {
         >
           <SoftCard>
             <CardContent sx={{ p: { xs: 2.25, md: 3 } }}>
-              {/* ---------------------------------------------------------- */}
-              {/* ---------------------------------------------------------- */}
               {mode === "file" ? (
                 <Stack spacing={2.5}>
                   <SectionHeader
@@ -468,8 +450,6 @@ export default function SubmitPage() {
                 </Stack>
               ) : null}
 
-              {/* ---------------------------------------------------------- */}
-              {/* ---------------------------------------------------------- */}
               {mode === "indicators" ? (
                 <Stack spacing={2.5}>
                   <SectionHeader
@@ -503,7 +483,7 @@ export default function SubmitPage() {
                       />
                     </Button>
                     <Typography variant="caption" color="text.secondary">
-                      .txt / .csv / .json — indicators are added below for review, not submitted yet.
+                      .txt / .csv / .json: indicators are added below for review, not submitted yet.
                     </Typography>
                   </Stack>
 
@@ -658,8 +638,6 @@ export default function SubmitPage() {
         </Alert>
       </Stack>
 
-      {/* ------------------------------------------------------------------ */}
-      {/* ------------------------------------------------------------------ */}
       <Dialog open={loadingOpen} onClose={() => {}} maxWidth="xs" fullWidth>
         <DialogContent sx={{ py: 4 }}>
           <Stack spacing={2} sx={{ alignItems: "center", textAlign: "center" }} >

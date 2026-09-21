@@ -68,15 +68,11 @@ import {
   writeLocalProfile,
 } from "@/features/profile/utils";
 
-// ---------------------------------------------------------------------------
 // Types
-// ---------------------------------------------------------------------------
 
 type Section = "preferences" | "appearance" | "colors" | "avatar" | "scope";
 
-// ---------------------------------------------------------------------------
 // ToggleRow
-// ---------------------------------------------------------------------------
 
 function ToggleRow({
   icon, title, subtitle, checked, onChange, accentColor,
@@ -142,9 +138,7 @@ function ToggleRow({
   );
 }
 
-// ---------------------------------------------------------------------------
 // DirtyBar
-// ---------------------------------------------------------------------------
 
 function DirtyBar({
   dirty, saving, onSave, onReset, label = "Unsaved changes",
@@ -189,9 +183,7 @@ function DirtyBar({
   );
 }
 
-// ---------------------------------------------------------------------------
 // PreferencesPanel
-// ---------------------------------------------------------------------------
 
 function PreferencesPanel({
   wantsAck, setWantsAck, wantsResults, setWantsResults,
@@ -254,9 +246,7 @@ function PreferencesPanel({
   );
 }
 
-// ---------------------------------------------------------------------------
 // AppearancePanel
-// ---------------------------------------------------------------------------
 
 function AppearancePanel({
   pickedTheme, setPickedTheme, autoSeasonal, setAutoSeasonal,
@@ -285,7 +275,7 @@ function AppearancePanel({
         <Box>
           <Typography variant="h6" sx={{ fontWeight: 950, letterSpacing: -0.2 }} >Appearance</Typography>
           <Typography variant="body2" color="text.secondary">
-            Pick a theme. Preview is instant — save to persist across sessions.
+            Pick a theme. Preview is instant, save to persist across sessions.
           </Typography>
         </Box>
       </Stack>
@@ -294,7 +284,7 @@ function AppearancePanel({
 
       <DirtyBar
         dirty={dirty} saving={saving} onSave={onSave} onReset={onReset}
-        label="Unsaved appearance changes — save to persist across sessions"
+        label="Unsaved appearance changes: save to persist across sessions"
       />
 
       <InnerCard sx={{ px: 2, py: 1.25 }}>
@@ -349,7 +339,7 @@ function AppearancePanel({
         />
         {autoSeasonal ? (
           <Alert severity="info" sx={{ borderRadius: 2.5 }}>
-            Seasonal is enabled — the active theme is automatic. Saving updates your preferred
+            Seasonal is enabled: the active theme is automatic. Saving updates your preferred
             manual theme for when seasonal is disabled.
           </Alert>
         ) : null}
@@ -372,16 +362,12 @@ function AppearancePanel({
   );
 }
 
-// ---------------------------------------------------------------------------
-// ---------------------------------------------------------------------------
 
 function ColorsPanel() {
   return <ColorSettingsPanel />;
 }
 
-// ---------------------------------------------------------------------------
 // Page
-// ---------------------------------------------------------------------------
 
 export default function ProfilePage() {
   const queryClient = useQueryClient();
@@ -486,7 +472,7 @@ export default function ProfilePage() {
       enqueueSnackbar("Preferences saved.", { variant: "success" });
     },
     onError: (err) =>
-      enqueueSnackbar(`Preferences API failed — ${apiErrorText(err)}`, { variant: "warning" }),
+      enqueueSnackbar(`Preferences API failed: ${apiErrorText(err)}`, { variant: "warning" }),
   });
 
   const appearanceMutation = useMutation({
@@ -496,7 +482,7 @@ export default function ProfilePage() {
       enqueueSnackbar("Appearance saved.", { variant: "success" });
     },
     onError: (err) =>
-      enqueueSnackbar(`Appearance API failed — ${apiErrorText(err)}`, { variant: "warning" }),
+      enqueueSnackbar(`Appearance API failed: ${apiErrorText(err)}`, { variant: "warning" }),
   });
 
   // ── Dirty detection ──────────────────────────────────────────────────────

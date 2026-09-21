@@ -31,7 +31,7 @@ function serialize(all: boolean, groups: string[]): string {
  * (CisoScopeDialog) and the "Management scope" profile tab.
  *
  * A CISO picks a combination of their own org units (region / country / GBU).
- * Multiple picks are AND-ed server-side — "Country: RO" + "GBU: Off GBU"
+ * Multiple picks are AND-ed server-side: "Country: RO" + "GBU: Off GBU"
  * narrows to reporters in both, it does not widen. "All cases" (no
  * restriction) is only offered to Admin-group users; `validate_scope`
  * enforces the same server-side.
@@ -73,7 +73,7 @@ export function ScopePicker({
   );
 
   // Callers that need to re-seed from a changed `currentScope` (the dialog on
-  // reopen) pass a `key` to remount instead — keeps this state dead simple.
+  // reopen) pass a `key` to remount instead, keeping this state dead simple.
   const initial = React.useMemo(() => {
     const p = parse(currentScope);
     return allowAll ? p : { all: false, groups: p.groups };
@@ -102,7 +102,7 @@ export function ScopePicker({
     <Stack spacing={1.5}>
       <Typography color="text.secondary">
         This controls dashboards, investigations and submission visibility for your CISO view.
-        Picking more than one narrows the scope — a case is shown only when its reporter
+        Picking more than one narrows the scope: a case is shown only when its reporter
         belongs to every unit you select.
       </Typography>
 

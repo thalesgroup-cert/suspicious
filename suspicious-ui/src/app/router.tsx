@@ -5,8 +5,6 @@ import ProtectedRoute from "@/app/ProtectedRoute";
 import PublicOnlyRoute from "@/app/PublicOnlyRoute";
 import PageLoader from "@/styles/components/PageLoader";
 
-// ---------------------------------------------------------------------------
-// ---------------------------------------------------------------------------
 
 const LoginPage        = lazy(() => import("@/pages/LoginPage"));
 const HomePage         = lazy(() => import("@/pages/HomePage"));

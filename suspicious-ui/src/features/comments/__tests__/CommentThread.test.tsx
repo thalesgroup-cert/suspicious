@@ -52,7 +52,7 @@ describe("CommentThread", () => {
     fireEvent.change(textarea, { target: { value: "typed comment" } });
     fireEvent.click(screen.getByRole("button", { name: "Add" }));
 
-    expect(await screen.findByText("Failed to add comment — try again.")).toBeInTheDocument();
+    expect(await screen.findByText("Failed to add comment. Try again.")).toBeInTheDocument();
     expect((textarea as HTMLTextAreaElement).value).toBe("typed comment");
   });
 });
