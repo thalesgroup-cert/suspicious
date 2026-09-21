@@ -1,4 +1,3 @@
-import re
 from django.test import SimpleTestCase
 from score_process.scoring.explanation.compose import compose, RULE_KEYS
 from score_process.scoring.explanation.types import SourceLine
