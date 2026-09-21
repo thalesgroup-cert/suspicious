@@ -59,3 +59,18 @@ services:
       - "127.0.0.1:3389:389"
     networks:
       - suspicious_network
+
+  ollama:
+    image: ollama/ollama:latest
+    container_name: ${SVC_PREFIX:-}ollama
+    restart: unless-stopped
+    volumes:
+      - ollama_models:/root/.ollama
+    ports:
+      - "127.0.0.1:11435:11434"   # host port 11434 is taken by a native Ollama install on this box;
+                                   # containers reach this service via `http://ollama:11434` regardless
+    networks:
+      - suspicious_network
+
+volumes:
+  ollama_models:

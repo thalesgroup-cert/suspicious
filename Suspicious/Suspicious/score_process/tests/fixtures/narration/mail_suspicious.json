@@ -1,0 +1,8 @@
+{
+  "verdict": {"band": "Suspicious", "score": 5.5, "confidence": 58, "rule": "weighted-malicious-share"},
+  "analyzer_reports": [
+    {"analyzer": "AI_Mail_Analyzer", "report_full": {"classification": "possible_phishing", "confidence": 0.61, "language": "fr"}},
+    {"analyzer": "SPF_DKIM_DMARC", "report_full": {"spf": "softfail", "dkim": "none", "dmarc": "none"}},
+    {"analyzer": "URLhaus", "report_full": {"url": "hxxp://update-billing-portal.example.net/login", "listed": false}}
+  ]
+}
