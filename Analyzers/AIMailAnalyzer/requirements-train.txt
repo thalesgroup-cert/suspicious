@@ -9,9 +9,9 @@
 
 pandas>=3.0.5
 pyarrow>=19.0.0
-scikit-learn>=1.9.0
+scikit-learn>=1.9.1
 imbalanced-learn>=0.14.2
-matplotlib>=3.11.1
+matplotlib>=3.11.2
 seaborn>=0.13.2
 tqdm>=4.70.0
 bs4>=0.0.2
