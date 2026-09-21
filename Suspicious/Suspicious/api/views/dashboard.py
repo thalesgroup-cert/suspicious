@@ -146,7 +146,7 @@ class UserCasesMonthlyStatsListView(generics.ListAPIView):
     to prevent unbounded scans (e.g. from Power BI imports).
 
     Per-user breakdowns name individual analysts and their case volumes,
-    so access is limited to Admin/CERT — regular reporters only ever see
+    so access is limited to Admin/CERT: regular reporters only ever see
     org-wide aggregates, never colleague-level figures.
     """
     permission_classes = [IsAdminOrCERT]

@@ -12,11 +12,11 @@ Subsystem probes:
 - cortex : HTTP HEAD against the configured Cortex base URL (informational)
 
 HTTP status:
-- 200 when db + redis are healthy (Cortex flaps must not restart the container —
+- 200 when db + redis are healthy (Cortex flaps must not restart the container:
   app already degrades gracefully via tenacity + circuit breaker)
 - 503 when either DB or Redis is unreachable
 
-Endpoint is unauthenticated by design — Docker healthchecks cannot present
+Endpoint is unauthenticated by design: Docker healthchecks cannot present
 auth, and the payload only reveals subsystem reachability, not sensitive state.
 
 Closes audit findings O7 + R9 (`docs/superpowers/specs/2026-05-06-audit/`).
@@ -90,7 +90,7 @@ def _check_cortex() -> bool | None:
     """Return True/False on a real probe, None when Cortex isn't configured."""
     try:
         from cortex_job.cortex_utils.cortex_and_job_management import API_URL
-    except Exception:  # pragma: no cover — defensive import
+    except Exception: # pragma: no cover: defensive import
         return None
 
     url = (API_URL or "").rstrip("/")

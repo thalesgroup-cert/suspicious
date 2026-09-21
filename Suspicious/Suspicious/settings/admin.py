@@ -24,18 +24,14 @@ from hash_process.models import Hash
 User = get_user_model()
 
 
-# =========================
 # Helpers
-# =========================
 def normalize_value(value):
     if value is None:
         return None
     return str(value).strip().lower()
 
 
-# =========================
 # Mailbox
-# =========================
 class MailboxResource(resources.ModelResource):
     class Meta:
         model = Mailbox
@@ -69,9 +65,7 @@ class MailboxAdmin(ImportExportModelAdmin):
     ordering = ("creation_date",)
 
 
-# =========================
 # EmailFeederState
-# =========================
 class EmailFeederStateResource(resources.ModelResource):
     class Meta:
         model = EmailFeederState
@@ -89,9 +83,7 @@ class EmailFeederStateAdmin(ImportExportModelAdmin):
     ordering = ("-updated_at",)
 
 
-# =========================
 # AllowListDomain
-# =========================
 class AllowListDomainResource(resources.ModelResource):
     domain = fields.Field(
         column_name="domain__value",
@@ -127,9 +119,7 @@ class AllowListDomainAdmin(ImportExportModelAdmin):
     ordering = ("-creation_date",)
 
 
-# =========================
 # WatcherLegitDomain
-# =========================
 class WatcherLegitDomainResource(resources.ModelResource):
     domain = fields.Field(
         column_name="domain__value",
@@ -185,9 +175,7 @@ class WatcherLegitDomainAdmin(ImportExportModelAdmin):
     ordering = ("-creation_date",)
 
 
-# =========================
 # DenyListDomain
-# =========================
 class DenyListDomainResource(resources.ModelResource):
     domain = fields.Field(
         column_name="domain__value",
@@ -223,9 +211,7 @@ class DenyListDomainAdmin(ImportExportModelAdmin):
     ordering = ("-creation_date",)
 
 
-# =========================
 # WatcherMonitoredDomain
-# =========================
 class WatcherMonitoredDomainResource(resources.ModelResource):
     domain = fields.Field(
         column_name="domain__value",
@@ -281,9 +267,7 @@ class WatcherMonitoredDomainAdmin(ImportExportModelAdmin):
     ordering = ("-creation_date",)
 
 
-# =========================
 # CampaignDomainAllowList
-# =========================
 class CampaignDomainAllowListResource(resources.ModelResource):
     domain = fields.Field(
         column_name="domain__value",
@@ -319,9 +303,7 @@ class CampaignDomainAllowListAdmin(ImportExportModelAdmin):
     ordering = ("-creation_date",)
 
 
-# =========================
 # AllowListFile
-# =========================
 class AllowListFileResource(resources.ModelResource):
     linked_file_hash = fields.Field(
         column_name="linked_file_hash__value",
@@ -357,9 +339,7 @@ class AllowListFileAdmin(ImportExportModelAdmin):
     ordering = ("-creation_date",)
 
 
-# =========================
 # DenyListFile
-# =========================
 class DenyListFileResource(resources.ModelResource):
     linked_file_hash = fields.Field(
         column_name="linked_file_hash__value",
@@ -395,9 +375,7 @@ class DenyListFileAdmin(ImportExportModelAdmin):
     ordering = ("-creation_date",)
 
 
-# =========================
 # AllowListFiletype
-# =========================
 class AllowListFiletypeResource(resources.ModelResource):
     user = fields.Field(
         column_name="user_id",
@@ -422,9 +400,7 @@ class AllowListFiletypeAdmin(ImportExportModelAdmin):
     ordering = ("-creation_date",)
 
 
-# =========================
 # RuntimeConfig
-# =========================
 @admin.register(RuntimeConfig)
 class RuntimeConfigAdmin(admin.ModelAdmin):
     list_display = ("scope", "key", "value", "updated_at")

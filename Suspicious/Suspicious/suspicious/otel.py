@@ -10,7 +10,7 @@ logger = logging.getLogger(__name__)
 
 try:
     from opentelemetry import trace
-except ImportError:  # pragma: no cover — import-time only
+except ImportError:  # pragma: no cover (import-time only)
     trace = None  # type: ignore[assignment]
 
 
@@ -56,7 +56,7 @@ def configure(
     enabled:        When False, this function is a no-op.
     """
     if not enabled:
-        logger.debug("OTel disabled — skipping instrumentation.")
+        logger.debug("OTel disabled, skipping instrumentation.")
         return
 
     try:
@@ -69,7 +69,7 @@ def configure(
         from opentelemetry.instrumentation.requests import RequestsInstrumentor
         from opentelemetry.instrumentation.celery import CeleryInstrumentor
     except ImportError as exc:
-        logger.warning("OpenTelemetry packages not installed — tracing disabled: %s", exc)
+        logger.warning("OpenTelemetry packages not installed, tracing disabled: %s", exc)
         return
 
     resource = Resource.create({"service.name": service_name})

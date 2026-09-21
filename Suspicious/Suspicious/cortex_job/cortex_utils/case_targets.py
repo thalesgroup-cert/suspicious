@@ -1,4 +1,4 @@
-"""Shared artifact-walk for an existing Case — used both to build the
+"""Shared artifact-walk for an existing Case: used both to build the
 AnalyzerReport query (investigations/submissions detail views) and to build
 Cortex dispatch intents (redo-analysis)."""
 from __future__ import annotations

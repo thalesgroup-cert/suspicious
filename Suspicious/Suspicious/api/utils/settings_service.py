@@ -26,9 +26,7 @@ from settings.models import (
 
 User = get_user_model()
 
-# ---------------------------------------------------------------------------
 # Return type for all bulk create handlers
-# ---------------------------------------------------------------------------
 
 CreateResult = dict[str, list[str]]
 
@@ -52,9 +50,7 @@ def _make_result(
     }
 
 
-# ---------------------------------------------------------------------------
 # Config dataclass
-# ---------------------------------------------------------------------------
 
 @dataclass(frozen=True)
 class ListSectionConfig:
@@ -72,9 +68,7 @@ class ListSectionConfig:
         return self.model.objects.all()
 
 
-# ---------------------------------------------------------------------------
 # Queryset factories (unchanged)
-# ---------------------------------------------------------------------------
 
 def _domain_list_queryset(model: Type[Model]) -> QuerySet:
     return model.objects.select_related("domain").order_by("-creation_date")
@@ -104,9 +98,7 @@ def _watcher_monitored_queryset() -> QuerySet:
     return WatcherMonitoredDomain.objects.select_related("domain").order_by("-last_update", "-creation_date")
 
 
-# ---------------------------------------------------------------------------
-# Bulk create handlers — all return CreateResult
-# ---------------------------------------------------------------------------
+# Bulk create handlers: all return CreateResult
 
 def _bulk_create_domain_links(
     *,
@@ -118,10 +110,10 @@ def _bulk_create_domain_links(
     Create domain allowlist/denylist entries with full conflict reporting.
 
     Buckets:
-      watcher_conflicts — value is in WatcherLegitDomain OR WatcherMonitoredDomain
+      watcher_conflicts: value is in WatcherLegitDomain OR WatcherMonitoredDomain
                           (managed by Watcher; user does not need to add manually)
-      duplicates        — value already in this editable list for this user
-      created           — genuinely new entries
+      duplicates       : value already in this editable list for this user
+      created          : genuinely new entries
     """
     # ── Pre-fetch sets for O(1) lookups ──────────────────────────────────
     watcher_legit_set = set(
@@ -194,7 +186,7 @@ def _bulk_create_hash_links(values: list[str], user: User) -> CreateResult:
     """
     Create file hash allowlist entries with duplicate reporting.
 
-    No watcher equivalent for hashes — watcher_conflicts is always empty.
+    No watcher equivalent for hashes: watcher_conflicts is always empty.
     """
     existing_links = set(
         AllowListFile.objects.filter(linked_file_hash__value__in=values)
@@ -241,7 +233,7 @@ def _bulk_create_ip_links(values: list[str], user: User) -> CreateResult:
     """
     Create IP allowlist entries with duplicate reporting.
 
-    No watcher equivalent for IPs — watcher_conflicts is always empty.
+    No watcher equivalent for IPs: watcher_conflicts is always empty.
     """
     normalised: list[str] = []
     invalid: list[str] = []
@@ -333,9 +325,7 @@ def _bulk_create_filetypes(values: list[str], user: User) -> CreateResult:
     )
 
 
-# ---------------------------------------------------------------------------
 # Section registry
-# ---------------------------------------------------------------------------
 
 SETTINGS_LIST_SECTIONS: dict[str, ListSectionConfig] = {
     "domains_allow": ListSectionConfig(
@@ -416,9 +406,7 @@ SETTINGS_LIST_SECTIONS: dict[str, ListSectionConfig] = {
 }
 
 
-# ---------------------------------------------------------------------------
 # Service
-# ---------------------------------------------------------------------------
 
 class SettingsListSectionService:
 

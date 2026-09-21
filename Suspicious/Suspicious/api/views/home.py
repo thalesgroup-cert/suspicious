@@ -139,7 +139,7 @@ class HomeSummaryView(APIView):
         if scope_groups is not None:
             # ponytail: exact for a single-group scope. For a multi-group
             # (AND) scope the per-group snapshot can't express the
-            # intersection, so this KPI tile is an upper bound — the
+            # intersection, so this KPI tile is an upper bound: the
             # Investigation list (scoped_case_queryset) is the source of
             # truth. Recompute from Case here if multi-group KPIs must be
             # exact.

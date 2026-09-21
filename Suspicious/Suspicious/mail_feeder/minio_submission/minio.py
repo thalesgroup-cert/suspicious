@@ -17,15 +17,13 @@ logger = logging.getLogger(__name__)
 User = get_user_model()
 
 
-# ---------------------------------------------------------------------------
 # User resolution
-# ---------------------------------------------------------------------------
 
 def _get_user_by_email(email: str) -> Optional[object]:
     """
     Look up a Django user whose email matches `email` (case-insensitive).
 
-    This is the fast path used when reported_by comes from metadata.json —
+    This is the fast path used when reported_by comes from metadata.json:
     the full address is already known, no variant generation required.
     """
     if not email or "@" not in email:
@@ -77,15 +75,15 @@ def _resolve_user(
     Resolve the reporting user from best-available source.
 
     Priority:
-      1. reported_by (full email from metadata.json) — direct DB lookup,
+      1. reported_by (full email from metadata.json): direct DB lookup,
          no guessing.
       2. reported_by, via the same get-or-create-and-LDAP-enrich flow the
-         case_creator path already uses — covers a legitimate reporter who
+         case_creator path already uses, covers a legitimate reporter who
          has no Django User yet (e.g. LDAP sync hasn't run for them).
       3. Username extracted from the workdir path convention
-         (e.g. 'theo.bhang-submission-260326141159/...') — tried against
+         (e.g. 'theo.bhang-submission-260326141159/...'), tried against
          all legitimate domains via variant generation.
-      4. None — processing continues with an empty user field.
+      4. None: processing continues with an empty user field.
 
     The path-convention fallback exists only for buckets that predate
     metadata.json. Remove it once all feeder-produced buckets write manifests.
@@ -98,7 +96,7 @@ def _resolve_user(
             )
             return user
         fetch_mail_logger.warning(
-            "No user found for reported_by=%s — trying LDAP-backed creation",
+            "No user found for reported_by=%s, trying LDAP-backed creation",
             reported_by,
         )
         user = UserCreationService().get_or_create_user(reported_by)
@@ -109,7 +107,7 @@ def _resolve_user(
             )
             return user
         fetch_mail_logger.warning(
-            "LDAP-backed creation failed for reported_by=%s — falling back to path parsing",
+            "LDAP-backed creation failed for reported_by=%s, falling back to path parsing",
             reported_by,
         )
 
@@ -138,9 +136,7 @@ def _resolve_user(
     return user
 
 
-# ---------------------------------------------------------------------------
 # Service
-# ---------------------------------------------------------------------------
 
 class MinioEmailService:
     """

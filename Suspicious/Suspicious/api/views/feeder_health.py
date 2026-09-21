@@ -48,7 +48,7 @@ class FeederHealthView(APIView):
     Returns 200 in all reachability scenarios (online or offline); the
     `online` flag tells the UI how to render. We do *not* return 5xx
     when the feeder is down because that would surface as a generic
-    error toast — the badge needs the full payload.
+    error toast: the badge needs the full payload.
     """
 
     permission_classes = [IsAuthenticated, IsAdminOrCERT]

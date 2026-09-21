@@ -23,9 +23,6 @@ from __future__ import annotations
 from typing import Any
 
 
-# ---------------------------------------------------------------------------
-# ---------------------------------------------------------------------------
-
 THEME_PALETTES: dict[str, dict[str, str]] = {
 
     # ── 1. MIDNIGHT ───────────────────────────────────────────────────────
@@ -321,9 +318,7 @@ THEME_PALETTES: dict[str, dict[str, str]] = {
 _DEFAULT_PALETTE = THEME_PALETTES["graphite"]
 
 
-# ---------------------------------------------------------------------------
 # Semantic color resolver
-# ---------------------------------------------------------------------------
 
 def _hex(color_entry: Any) -> str | None:
     """Extract hex from {"main": "#FF0000"} or a bare "#FF0000" string."""
@@ -367,9 +362,7 @@ def resolve_semantic_colors(profile) -> dict[str, str]:
     }
 
 
-# ---------------------------------------------------------------------------
 # Public API
-# ---------------------------------------------------------------------------
 
 def resolve_email_theme(profile) -> dict[str, str]:
     """

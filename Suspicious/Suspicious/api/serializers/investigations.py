@@ -295,7 +295,7 @@ class InvestigationDetailsSerializer(InvestigationRowSerializer):
 
     def to_representation(self, instance):
         # Road isolation: the key exists only for IOC-group cases. Dropping it
-        # here (not in one view) keeps every consumer — detail, global-edit —
+        # here (not in one view) keeps every consumer (detail, global-edit)
         # consistent.
         data = super().to_representation(instance)
         if data.get("observable_group") is None:

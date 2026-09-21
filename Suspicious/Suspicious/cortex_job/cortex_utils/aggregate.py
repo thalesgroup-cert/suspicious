@@ -20,7 +20,7 @@ class CaseAggregate:
 
     @property
     def scored(self) -> int:
-        """Terminal, non-deleted reports — the denominator for descriptions."""
+        """Terminal, non-deleted reports: the denominator for descriptions."""
         return self.total - self.deleted
 
 

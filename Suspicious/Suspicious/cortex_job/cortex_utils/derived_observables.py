@@ -17,7 +17,7 @@ logger = logging.getLogger("tasp.cron.update_ongoing_case_jobs")
 
 _OBSERVABLE_TYPES = {"url", "domain", "ip", "hash", "mail"}
 
-# Cap extracted values processed per extractor report — a QR image can encode
+# Cap extracted values processed per extractor report: a QR image can encode
 # dozens of URLs; each one costs a DNS resolve + allow-list check + dispatch.
 _MAX_DERIVED_PER_REPORT = 20
 
@@ -53,7 +53,7 @@ def _ssrf_blocked(value: str) -> str:
     from api.serializers.submit import _check_no_ssrf_ip
 
     # ponytail: leaked resolver thread on timeout, bounded by _MAX_DERIVED_PER_REPORT.
-    # No `with` — its shutdown(wait=True) would block on the very hang we're capping.
+    # No `with`: its shutdown(wait=True) would block on the very hang we're capping.
     ex = ThreadPoolExecutor(max_workers=1)
     fut = ex.submit(_check_no_ssrf_ip, value)
     try:
@@ -81,7 +81,7 @@ def _blocked(value: str, data_type: str) -> str:
             for reason in allow.model_dump().values():
                 if reason:
                     return f"allow-listed ({reason})"
-        except Exception:  # noqa: BLE001 — never block ingestion on an allow-list error
+        except Exception: # noqa: BLE001: never block ingestion on an allow-list error
             logger.warning("derived: allow-list check failed for %r", value, exc_info=True)
     return ""
 
@@ -290,7 +290,7 @@ def ingest_derived_observables(case) -> int:
         for value, data_type in pairs[:_MAX_DERIVED_PER_REPORT]:
             try:
                 # Cheap DB get_or_create first (no network), then early-skip a
-                # value already attached to this case — do NOT re-block (timeout-
+                # value already attached to this case: do NOT re-block (timeout-
                 # less DNS), re-resolve, or re-dispatch it on every reconcile pass.
                 obj = _resolve_observable(value, data_type)
                 if obj is None:
@@ -312,12 +312,12 @@ def ingest_derived_observables(case) -> int:
                 )
                 if not created:
                     continue
-                # ponytail: fire-and-forget — a Cortex outage (empty job list) still
+                # ponytail: fire-and-forget: a Cortex outage (empty job list) still
                 # records the child; no dispatch retry, next reconcile pass won't
                 # re-dispatch. Matches the primary dispatch path.
                 CortexJob().launch_cortex_jobs(value=obj, data_type=data_type, case=case)
                 new_count += 1
-            except Exception as exc:  # noqa: BLE001 — one bad value must not abort the pass
+            except Exception as exc: # noqa: BLE001: one bad value must not abort the pass
                 logger.warning(
                     "derived: skip %r: %s", value, exc, exc_info=True
                 )

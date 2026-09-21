@@ -105,7 +105,7 @@ class BaseSubmitView(APIView):
 
         if results.get("allow_listed"):
             return _build_submission_response(
-                message="Submission accepted (allowlisted — no case created).",
+                message="Submission accepted (allowlisted, no case created).",
                 submission_type=self.submission_type,
                 case=None,
                 accepted=True,
@@ -204,12 +204,12 @@ class SubmitIndicatorsView(APIView):
 
         parsed = parse_indicators(ser.validated_data["indicators"])
         # Unwrap SafeLinks / URLDefense links so the real target also becomes an
-        # observable — before the cap + SSRF checks below, so the unwrapped
+        # observable: before the cap + SSRF checks below, so the unwrapped
         # targets are subject to both.
         valid = expand_wrappers([p for p in parsed if p.type])
         skipped = [p.raw for p in parsed if not p.type]
 
-        # Cap first — before any per-indicator work (the SSRF check below can
+        # Cap first: before any per-indicator work (the SSRF check below can
         # do a DNS lookup per URL). The field also has a max_length, this is
         # the semantic limit.
         if not valid:
@@ -288,7 +288,7 @@ class SubmitIndicatorsView(APIView):
                 if case is None:
                     raise _NoCase
         except _NoCase:
-            # atomic() rolled the group + artifacts back — no orphans.
+            # atomic() rolled the group + artifacts back: no orphans.
             logger.error("SubmitIndicatorsView: CaseCreator returned no case")
             return _error_response(
                 detail="An internal error occurred while creating the case.",
@@ -317,7 +317,7 @@ class SubmitIndicatorsView(APIView):
 
 class SubmitIocFileExtractView(APIView):
     """Extract candidate indicators from an uploaded IOC-list file
-    (.txt / .csv / .json). Does NOT create a case — the caller reviews the
+    (.txt / .csv / .json). Does NOT create a case: the caller reviews the
     result and submits it through /submit/indicators/."""
 
     permission_classes = [IsAuthenticated]
@@ -395,7 +395,7 @@ class SubmitFileView(BaseSubmitView):
 
         if results.get("allow_listed"):
             return _build_submission_response(
-                message="Submission accepted (allowlisted — no case created).",
+                message="Submission accepted (allowlisted, no case created).",
                 submission_type=self.submission_type,
                 case=None,
                 accepted=True,

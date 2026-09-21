@@ -5,7 +5,7 @@ A CISOProfile.scope is a pipe-delimited list of org-unit group names
 Each name is a different org dimension (region / country / GBU), so
 multiple names are AND-ed: a case is in scope when its reporter is in
 *every* selected group. A Romanian Off-GBU reporter carries
-{RO, EMEA, Off GBU}, so "RO|Off GBU" narrows to that reporter — it does
+{RO, EMEA, Off GBU}, so "RO|Off GBU" narrows to that reporter; it does
 not union everyone in RO with everyone in Off GBU.
 """
 from __future__ import annotations

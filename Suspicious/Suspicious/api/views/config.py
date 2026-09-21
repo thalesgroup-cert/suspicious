@@ -1,4 +1,4 @@
-"""GET /api/config/{scope}/ — the config authority endpoint.
+"""GET /api/config/{scope}/: the config authority endpoint.
 
 Returns a scope's effective config (shared + the scope) with non-secret fields
 from the DB runtime tier and secret leaves overlaid from Vault. Sensitive: the

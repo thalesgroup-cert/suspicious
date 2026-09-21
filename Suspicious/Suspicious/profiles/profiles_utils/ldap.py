@@ -18,11 +18,11 @@ def _ldap_config() -> dict:
 
 
 # Django auth group names that also carry real RBAC meaning (api/permissions,
-# SUBMISSION_ELEVATED_GROUPS, and — on this branch specifically —
+# SUBMISSION_ELEVATED_GROUPS, and (on this branch specifically)
 # tasp/views.py's is_admin_or_cert()/TaspService and
 # tasp/templatetags/utils.py, which all treat "Champions" as elevated
 # alongside Admin/CERT). LDAP-derived attribute values (title/
-# businessCategory) must never be allowed to silently join one of these —
+# businessCategory) must never be allowed to silently join one of these,
 # see add_user_to_group.
 RESERVED_GROUP_NAMES = {"Admin", "CERT", "CISO", "Champions"}
 

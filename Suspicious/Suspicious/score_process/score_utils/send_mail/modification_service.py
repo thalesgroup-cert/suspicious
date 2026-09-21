@@ -35,7 +35,7 @@ _RESULT_GUIDANCE = {
         "until a full review has been completed."
     ),
     "Safe": (
-        "The item has been assessed as safe. You may proceed, but remain vigilant — "
+        "The item has been assessed as safe. You may proceed, but remain vigilant: "
         "no analysis is entirely conclusive."
     ),
     "Inconclusive": (

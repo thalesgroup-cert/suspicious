@@ -1,5 +1,5 @@
 """Parse a free-text blob of indicators into typed, deduped entries.
-Reuses Suspicious's existing per-type validators — no new detection logic."""
+Reuses Suspicious's existing per-type validators: no new detection logic."""
 from __future__ import annotations
 
 import re
@@ -77,7 +77,7 @@ def indicators_from_file(name: str, raw: bytes) -> list["ParsedIndicator"]:
 
     JSON is flattened to its string leaves; .txt/.csv fall straight through
     parse_indicators (its splitter already handles newlines, commas and
-    semicolons). No new detection logic — parse_indicators does refang + type.
+    semicolons). No new detection logic: parse_indicators does refang + type.
     """
     text = raw.decode("utf-8", "replace")
     if name.lower().endswith(".json"):
@@ -85,7 +85,7 @@ def indicators_from_file(name: str, raw: bytes) -> list["ParsedIndicator"]:
         try:
             text = "\n".join(_json_strings(json.loads(text)))
         except ValueError:
-            pass  # not valid JSON — treat as plain text
+            pass  # not valid JSON: treat as plain text
     return parse_indicators(text)
 
 

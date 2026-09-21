@@ -115,7 +115,7 @@ class CaseAnalyzerJob(models.Model):
 
     One row per (case, cortex_job_id). Multiple cases may share the same
     cortex_job_id when a deduplicated artifact (file, URL, hash, etc.) is
-    referenced by several cases — that's why this is a junction table and
+    referenced by several cases: that's why this is a junction table and
     not an FK on AnalyzerReport.
 
     Status mirrors AnalyzerReport.status but is per-case so we can answer

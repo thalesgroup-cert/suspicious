@@ -72,7 +72,7 @@ def assemble_observables(case, *, full: bool = False) -> list[dict]:
             "type": art.artifact_type.lower(),
             "verdict": verdict,
             "sources": sources,
-            # None when the parent row is gone — the frontend schema requires
+            # None when the parent row is gone: the frontend schema requires
             # derived_from.value to be a non-null string.
             "derived_from": ({"value": pv, "via_analyzer": d.via_analyzer}
                              if pv else None),

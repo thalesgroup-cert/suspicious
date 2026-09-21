@@ -140,7 +140,7 @@ class CaseCreator:
         else:
             print("Done creating related model...")
 
-    # CaseArtifact has FK/choice only for url/ip/hash here — DOMAIN observables
+    # CaseArtifact has FK/choice only for url/ip/hash here: DOMAIN observables
     # are tracked by ObservableGroupArtifact only (same as the mail path).
     _GROUP_ARTIFACT_MAP = {
         'URL': ('url', CaseArtifact.ArtifactType.URL),
@@ -150,7 +150,7 @@ class CaseCreator:
 
     def _attach_observable_group(self, group, case):
         """Attach the ObservableGroup to the case and write a CaseArtifact row
-        per url/ip/hash observable (domains are skipped — no CaseArtifact FK)."""
+        per url/ip/hash observable (domains are skipped: no CaseArtifact FK)."""
         case.save()
         case.observable_group = group
         case.save(update_fields=["observable_group"])
@@ -278,7 +278,7 @@ class CaseCreator:
 
     def _get_related_model(self, key):
         """
-        Deprecated. Kept for backwards compatibility — returns CaseArtifact
+        Deprecated. Kept for backwards compatibility: returns CaseArtifact
         for any known key. Prefer the consolidated write path in
         _create_related_model.
         """

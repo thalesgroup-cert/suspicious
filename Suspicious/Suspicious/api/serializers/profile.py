@@ -4,9 +4,7 @@ from profiles.models import UserProfile, CISOProfile, Theme, DEFAULT_SEMANTIC_CO
 from profiles.profiles_utils.avatar_storage import presigned_avatar_url
 
 
-# ---------------------------------------------------------------------------
 # Hex color validator
-# ---------------------------------------------------------------------------
 
 HEX_RE = re.compile(r'^#[0-9A-Fa-f]{6}$')
 
@@ -18,9 +16,6 @@ def _validate_hex(value: str, field_path: str) -> str:
         )
     return value.upper()
 
-
-# ---------------------------------------------------------------------------
-# ---------------------------------------------------------------------------
 
 RESULT_KEYS = {"safe", "suspicious", "dangerous", "inconclusive"}
 STATUS_KEYS = {"done", "in_progress", "new", "failure", "challenged", "unknown"}
@@ -60,9 +55,6 @@ class SemanticColorsField(serializers.JSONField):
 
         return result_out
 
-
-# ---------------------------------------------------------------------------
-# ---------------------------------------------------------------------------
 
 ALLOWED_AVATAR_STYLES = {
     "bottts", "identicon", "initials", "avataaars",
@@ -163,9 +155,7 @@ class AvatarField(serializers.JSONField):
         return result
 
 
-# ---------------------------------------------------------------------------
 # Profile serializers
-# ---------------------------------------------------------------------------
 
 class UserProfileSerializer(serializers.ModelSerializer):
     semantic_colors = SemanticColorsField(required=False)
@@ -291,11 +281,8 @@ class CISOProfileSerializer(serializers.ModelSerializer):
         return rep
 
 
-# ---------------------------------------------------------------------------
-# ---------------------------------------------------------------------------
-
 class AppearanceSerializer(serializers.Serializer):
-    """PATCH /profile/appearance/ — theme + seasonal flag + colors."""
+    """PATCH /profile/appearance/: theme + seasonal flag + colors."""
     theme         = serializers.ChoiceField(
         choices=Theme.choices, required=False
     )
@@ -311,7 +298,7 @@ class AppearanceSerializer(serializers.Serializer):
 
 
 class PreferencesSerializer(serializers.Serializer):
-    """PATCH /profile/preferences/ — notification preferences."""
+    """PATCH /profile/preferences/: notification preferences."""
     wants_acknowledgement = serializers.BooleanField(required=False)
     wants_results         = serializers.BooleanField(required=False)
     tour_completed        = serializers.BooleanField(required=False)
@@ -326,7 +313,7 @@ class PreferencesSerializer(serializers.Serializer):
 
 class SemanticColorsSerializer(serializers.Serializer):
     """
-    PATCH /profile/colors/ — colors-only endpoint.
+    PATCH /profile/colors/: colors-only endpoint.
     Lets the frontend sync color changes without touching theme or preferences.
     """
     semantic_colors = SemanticColorsField(required=True)

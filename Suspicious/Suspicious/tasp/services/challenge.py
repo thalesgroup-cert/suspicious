@@ -47,7 +47,7 @@ class CaseChallengeService:
         mail_header = f"Case ID {self.case.id} challenged by {self.case.reporter.username}"
         proposed = getattr(self.case, "challenge_proposed_result", "")
         if proposed:
-            mail_header += f" — reporter says it should be {proposed}"
+            mail_header += f" (reporter says it should be {proposed})"
             reason = getattr(self.case, "challenge_reason", "")
             if reason:
                 mail_header += f" (reason: {reason})"
@@ -76,7 +76,7 @@ def run_case_challenge(case, logger) -> None:
 
 def notify_and_record_challenge(case, logger) -> None:
     """Stats + CERT/TheHive notification for an already-marked challenge.
-    Unlike run_case_challenge, does NOT validate/mark — the caller (in-app
+    Unlike run_case_challenge, does NOT validate/mark: the caller (in-app
     view) has already marked the case, including the proposed verdict."""
     service = CaseChallengeService(case, logger)
     service.update_user_stats()

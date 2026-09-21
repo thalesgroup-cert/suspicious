@@ -35,9 +35,7 @@ def _safe_attachment_destination(
     return destination, safe_filename
 
 
-# -------------------------
 # Attachments
-# -------------------------
 
 def extract_email_attachments(
     email_message: Message,
@@ -90,9 +88,7 @@ def extract_email_attachments(
     return attachments
 
 
-# -------------------------
 # Headers
-# -------------------------
 
 def get_header_dict_list(email_message: Message) -> Dict[str, str]:
     return {
@@ -101,9 +97,7 @@ def get_header_dict_list(email_message: Message) -> Dict[str, str]:
     }
 
 
-# -------------------------
 # Main parser
-# -------------------------
 
 def parse_email(
     email_message: Message,

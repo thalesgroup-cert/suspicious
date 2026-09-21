@@ -47,7 +47,7 @@ def _required_field_filled(name: str, field, section: dict) -> bool:
 
 
 def _compute_status(name: str, config_schema, enabled: bool, section: dict) -> str:
-    """Disabled/partial/connected — mirrors Watcher's own connector status
+    """Disabled/partial/connected: mirrors Watcher's own connector status
     logic. No 'disconnected' state: Watcher's badge config defines one but
     its _compute_status never returns it."""
     if not enabled:
@@ -159,7 +159,7 @@ def _mask_secrets(section: dict, section_name: str) -> dict:
 def _apply_to_secret_leaves(payload: dict, schema, action) -> dict:
     """Deep-copy ``payload`` and call ``action(parent_dict, leaf_key)`` on every
     secret-typed leaf present in it. The schema is the authoritative source of
-    which fields are secret — never SECRET_FIELDS, so connector-defined secrets
+    which fields are secret: never SECRET_FIELDS, so connector-defined secrets
     are handled even if they are absent from that static map."""
     cleaned = copy.deepcopy(payload)
     for field in schema:
@@ -186,7 +186,7 @@ def _strip_secret_leaves(payload: dict, schema) -> dict:
 
 def _mask_secret_leaves(payload: dict, schema) -> dict:
     """Copy of payload with every secret-typed leaf that is present replaced by
-    the mask — used for the response body so cleartext secrets are never echoed."""
+    the mask: used for the response body so cleartext secrets are never echoed."""
     def mask(node, leaf):
         if leaf in node:
             node[leaf] = SECRET_MASK
@@ -238,10 +238,10 @@ class ConnectorConfigView(APIView):
                     {"errors": {field_key: "secret store not configured"}},
                     status=status.HTTP_409_CONFLICT,
                 )
-            except Exception as exc:  # noqa: BLE001 — surface any Vault write failure as 502
+            except Exception as exc: # noqa: BLE001: surface any Vault write failure as 502
                 # Not logger.exception(): the traceback/exception message can
                 # echo back the failed HTTP request (hvac wraps requests
-                # errors, which sometimes embed the request body) — and that
+                # errors, which sometimes embed the request body): and that
                 # body is exactly the secret `value` this loop is writing.
                 # Log the exception's type only, never its string form.
                 logger.error(
@@ -270,7 +270,7 @@ class ConnectorTestView(APIView):
             return Response(status=status.HTTP_404_NOT_FOUND)
         try:
             health = registry.instantiate(name).health_check()
-        except Exception as exc:  # noqa: BLE001 — surface as failed health
+        except Exception as exc: # noqa: BLE001: surface as failed health
             from connectors.base import HealthStatus
             health = HealthStatus(ok=False, detail=str(exc))
         state = get_state(name)

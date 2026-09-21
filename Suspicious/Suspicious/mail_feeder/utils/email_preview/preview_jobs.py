@@ -35,7 +35,7 @@ def fetch_eml_bytes(storage, bucket_name: str) -> Optional[bytes]:
     Resolves both storage layouts. Legacy: bucket-per-submission, where
     ``bucket_name`` is a real bucket holding the .eml at the root. Portable
     prefix contract: one shared feeder bucket where the submission id is a
-    *prefix* — MailArchive.bucket_name still carries that id, so when no
+    *prefix*: MailArchive.bucket_name still carries that id, so when no
     bucket of that name exists we fall back to the feeder bucket + prefix
     (otherwise list_objects raises NoSuchBucket and no preview renders).
 
@@ -90,7 +90,7 @@ def enqueue_preview_render(mail_id: int, *, dedup_window: int = 300) -> bool:
     """Enqueue `render_mail_preview` for one mail, at most once per window.
 
     Used by MailPreviewView to lazily (re)generate a preview on a cache
-    miss — e.g. the MinIO object vanished — without blocking the request
+    miss (e.g. the MinIO object vanished) without blocking the request
     or hammering the worker when many `<img>` tags retry at once. A short
     Redis/cache lock (`preview_render:<id>`) collapses the burst to a
     single enqueue. Returns True when enqueued, False when a recent

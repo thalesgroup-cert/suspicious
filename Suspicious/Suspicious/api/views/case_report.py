@@ -20,7 +20,7 @@ logger = logging.getLogger(__name__)
 
 # Total bytes of screenshot data embedded across one report. A downloaded HTML
 # file can't authenticate to /api/…, so screenshots must be inlined as data
-# URIs — but not without a ceiling.
+# URIs: but not without a ceiling.
 _REPORT_IMG_CAP = 6 * 1024 * 1024
 
 
@@ -40,7 +40,7 @@ def _inline_screenshots(observables):
             continue
         o["screenshot_omitted"] = True  # until an image is actually inlined
         if used >= _REPORT_IMG_CAP:
-            continue  # budget already blown — don't touch the DB or MinIO
+            continue  # budget already blown: don't touch the DB or MinIO
         report_id = url.split("report=")[-1]
         try:
             rep = (
