@@ -45,7 +45,7 @@ class AiNarrationConnector(Connector):
                 ok=has_key,
                 detail=f"selected provider: {name} ({'configured' if has_key else 'no API key'})",
             )
-        url = self.config.get("ollama_url", "http://localhost:11434")
+        url = self.config.get("ollama_url") or "http://localhost:11434"
         try:
             requests.get(f"{url}/api/version", timeout=5).raise_for_status()
             return HealthStatus(ok=True, detail=f"selected provider: ollama ({url}, reachable)")

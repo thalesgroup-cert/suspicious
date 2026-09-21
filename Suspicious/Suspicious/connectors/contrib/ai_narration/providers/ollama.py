@@ -4,11 +4,16 @@ import requests
 
 
 def generate(prompt: str, config: dict) -> str:
-    url = config.get("ollama_url", "http://localhost:11434")
-    model = config.get("ollama_model", "qwen2.5:7b-instruct")
+    url = config.get("ollama_url") or "http://localhost:11434"
+    model = config.get("ollama_model") or "qwen2.5:7b-instruct"
     response = requests.post(
         f"{url}/api/generate",
-        json={"model": model, "prompt": prompt, "stream": False},
+        json={
+            "model": model,
+            "prompt": prompt,
+            "stream": False,
+            "options": {"num_ctx": 8192},
+        },
         timeout=600,
     )
     response.raise_for_status()

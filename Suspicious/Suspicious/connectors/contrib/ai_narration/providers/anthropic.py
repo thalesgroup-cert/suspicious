@@ -6,7 +6,7 @@ _API_VERSION = "2023-06-01"
 
 def generate(prompt: str, config: dict) -> str:
     api_key = config["anthropic_api_key"]
-    model = config.get("anthropic_model", "claude-haiku-4-5-20251001")
+    model = config.get("anthropic_model") or "claude-haiku-4-5-20251001"
     response = requests.post(
         "https://api.anthropic.com/v1/messages",
         headers={

@@ -9,6 +9,7 @@ from django.core.management.base import BaseCommand, CommandError
 from django.utils import timezone
 
 from api.utils.analyzer_reports import reports_for_case
+from api.views.investigations import _dedup_analyzer_reports
 from case_handler.models import Case
 from connectors.contrib.ai_narration.adapters import case_to_verdict_dict
 from connectors.contrib.ai_narration import select as select_module
@@ -17,6 +18,20 @@ from connectors.models import ConnectorDelivery
 from connectors.registry import registry
 from score_process.scoring.narration.prompt import build_prompt
 from score_process.scoring.narration.verdict_lock import validate_narration
+
+_MAX_REPORTS = 20
+_MAX_REPORT_FULL_CHARS = 4000
+
+
+def _cap_report_full(report_full: dict) -> dict:
+    serialized = json.dumps(report_full)
+    if len(serialized) <= _MAX_REPORT_FULL_CHARS:
+        return report_full
+    return {
+        "_truncated": True,
+        "original_size_chars": len(serialized),
+        "preview": serialized[:_MAX_REPORT_FULL_CHARS],
+    }
 
 
 class Command(BaseCommand):
@@ -42,12 +57,17 @@ class Command(BaseCommand):
                 raise CommandError(f"no case with id {case_id}")
             if not case.verdict_explanation:
                 raise CommandError(
-                    f"case {case_id} has no verdict_explanation yet -- it hasn't been finalized"
+                    f"case {case_id} has no scoring verdict (verdict_explanation is empty) "
+                    f"-- it may be allow-listed or otherwise never scored"
                 )
-            verdict = case_to_verdict_dict(case)
+            try:
+                verdict = case_to_verdict_dict(case)
+            except ValueError as exc:
+                raise CommandError(str(exc))
+            deduped_reports = _dedup_analyzer_reports(reports_for_case(case))[:_MAX_REPORTS]
             analyzer_reports = [
-                {"analyzer": r.analyzer.name, "report_full": r.report_full}
-                for r in reports_for_case(case)
+                {"analyzer": r.analyzer.name, "report_full": _cap_report_full(r.report_full)}
+                for r in deduped_reports
             ]
         else:
             fixture_path = Path(options["fixture"])
@@ -60,6 +80,10 @@ class Command(BaseCommand):
             case_id = None
 
         connector = registry.instantiate("ai_narration")
+        health = connector.health_check()
+        if not health.ok:
+            raise CommandError(f"ai_narration provider not usable: {health.detail}")
+
         prompt = build_prompt(verdict, analyzer_reports)
         provider_name, generate = select_module.select_provider(connector.config)
 
@@ -68,15 +92,15 @@ class Command(BaseCommand):
             narration = generate(prompt, connector.config)
         except Exception as exc:  # noqa: BLE001 — record it, don't crash unrecorded
             ConnectorDelivery.objects.create(
-                connector="ai_narration", event="manual_test", case_id=case_id,
-                status=ConnectorDelivery.STATUS_FAILED, error=str(exc),
+                connector="ai_narration", event=f"manual_test:{provider_name}", case_id=case_id,
+                status=ConnectorDelivery.STATUS_FAILED, error=str(exc)[:5000],
                 duration_ms=int((timezone.now() - started).total_seconds() * 1000),
             )
             raise CommandError(f"provider {provider_name} call failed: {exc}")
 
         result = validate_narration(narration, verdict)
         ConnectorDelivery.objects.create(
-            connector="ai_narration", event="manual_test", case_id=case_id,
+            connector="ai_narration", event=f"manual_test:{provider_name}", case_id=case_id,
             status=ConnectorDelivery.STATUS_SUCCESS,
             duration_ms=int((timezone.now() - started).total_seconds() * 1000),
         )

@@ -28,3 +28,9 @@ class CaseToVerdictDictTest(TestCase):
         self.assertEqual(result["band"], "Dangerous")
         self.assertEqual(result["score"], 9.2)
         self.assertEqual(result["confidence"], 88)
+
+    def test_raises_on_unknown_band(self):
+        self.case.results = "Failure"
+        self.case.save(update_fields=["results"])
+        with self.assertRaises(ValueError):
+            case_to_verdict_dict(self.case)

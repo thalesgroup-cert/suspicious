@@ -18,6 +18,7 @@ class OllamaProviderTest(SimpleTestCase):
         self.assertEqual(url[0], "http://x:11434/api/generate")
         self.assertEqual(kwargs["json"]["model"], "qwen2.5:7b-instruct")
         self.assertEqual(kwargs["json"]["prompt"], "a prompt")
+        self.assertEqual(kwargs["json"]["options"]["num_ctx"], 8192)
 
     @mock.patch("connectors.contrib.ai_narration.providers.ollama.requests.post")
     def test_generate_uses_defaults_when_config_empty(self, mock_post):

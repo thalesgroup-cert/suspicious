@@ -6,8 +6,15 @@ from __future__ import annotations
 
 from case_handler.models import Case
 
+_KNOWN_BANDS = ("Safe", "Suspicious", "Dangerous", "Inconclusive")
+
 
 def case_to_verdict_dict(case: Case) -> dict:
+    if case.results not in _KNOWN_BANDS:
+        raise ValueError(
+            f"case {case.pk} has band {case.results!r}, which the narration "
+            f"lock does not model (only {_KNOWN_BANDS}) -- cannot safely narrate"
+        )
     rule = "unknown"
     if case.verdict_explanation:
         rule = case.verdict_explanation.get("decisive_rule", "unknown")

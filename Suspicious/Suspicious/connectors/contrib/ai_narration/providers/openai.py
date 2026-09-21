@@ -4,7 +4,7 @@ import requests
 
 def generate(prompt: str, config: dict) -> str:
     api_key = config["openai_api_key"]
-    model = config.get("openai_model", "gpt-4o-mini")
+    model = config.get("openai_model") or "gpt-4o-mini"
     response = requests.post(
         "https://api.openai.com/v1/chat/completions",
         headers={"Authorization": f"Bearer {api_key}"},

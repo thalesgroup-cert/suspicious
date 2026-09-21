@@ -9,7 +9,10 @@ from django.core.management.base import CommandError
 from django.test import TestCase
 
 from case_handler.models import Case, ObservableGroup
+from connectors.base import HealthStatus
 from connectors.models import ConnectorDelivery, ConnectorState
+
+_HEALTHY = HealthStatus(ok=True, detail="selected provider: ollama (reachable)")
 
 
 class TestAiNarrationCommandTest(TestCase):
@@ -42,19 +45,25 @@ class TestAiNarrationCommandTest(TestCase):
         ConnectorState.objects.update_or_create(name="ai_narration", defaults={"enabled": True})
         fixture_path = self._write_fixture()
         with mock.patch(
+            "connectors.contrib.ai_narration.connector.AiNarrationConnector.health_check",
+            return_value=_HEALTHY,
+        ), mock.patch(
             "connectors.contrib.ai_narration.select.select_provider",
             return_value=("ollama", mock.Mock(return_value="This is Dangerous based on the evidence.")),
         ):
             call_command("test_ai_narration", fixture=str(fixture_path))
         delivery = ConnectorDelivery.objects.get()
         self.assertEqual(delivery.connector, "ai_narration")
-        self.assertEqual(delivery.event, "manual_test")
+        self.assertEqual(delivery.event, "manual_test:ollama")
         self.assertIsNone(delivery.case_id)
         self.assertEqual(delivery.status, ConnectorDelivery.STATUS_SUCCESS)
 
     def test_case_id_mode_records_success_delivery_with_case_id(self):
         ConnectorState.objects.update_or_create(name="ai_narration", defaults={"enabled": True})
         with mock.patch(
+            "connectors.contrib.ai_narration.connector.AiNarrationConnector.health_check",
+            return_value=_HEALTHY,
+        ), mock.patch(
             "connectors.contrib.ai_narration.select.select_provider",
             return_value=("ollama", mock.Mock(return_value="This is Dangerous based on the evidence.")),
         ):
@@ -80,6 +89,9 @@ class TestAiNarrationCommandTest(TestCase):
             raise RuntimeError("provider unreachable")
 
         with mock.patch(
+            "connectors.contrib.ai_narration.connector.AiNarrationConnector.health_check",
+            return_value=_HEALTHY,
+        ), mock.patch(
             "connectors.contrib.ai_narration.select.select_provider",
             return_value=("ollama", _boom),
         ):
@@ -88,3 +100,22 @@ class TestAiNarrationCommandTest(TestCase):
         delivery = ConnectorDelivery.objects.get()
         self.assertEqual(delivery.status, ConnectorDelivery.STATUS_FAILED)
         self.assertIn("provider unreachable", delivery.error)
+
+    def test_unknown_band_case_raises_command_error_no_delivery(self):
+        ConnectorState.objects.update_or_create(name="ai_narration", defaults={"enabled": True})
+        self.case.results = "Failure"
+        self.case.save(update_fields=["results"])
+        with self.assertRaises(CommandError):
+            call_command("test_ai_narration", case_id=self.case.pk)
+        self.assertEqual(ConnectorDelivery.objects.count(), 0)
+
+    def test_unhealthy_provider_raises_before_generation_no_delivery(self):
+        ConnectorState.objects.update_or_create(name="ai_narration", defaults={"enabled": True})
+        fixture_path = self._write_fixture()
+        with mock.patch(
+            "connectors.contrib.ai_narration.connector.AiNarrationConnector.health_check",
+            return_value=HealthStatus(ok=False, detail="ollama unreachable"),
+        ):
+            with self.assertRaises(CommandError):
+                call_command("test_ai_narration", fixture=str(fixture_path))
+        self.assertEqual(ConnectorDelivery.objects.count(), 0)
