@@ -1,0 +1,13 @@
+{
+  "name": "http://auth.users.pub",
+  "observable": "http://auth.users.pub",
+  "type": "url",
+  "gti_verdict": "not suspicious",
+  "expected_band": "Safe",
+  "sources": [
+    {"name": "GoogleThreatIntelligence_GetReport", "tier": 1, "weight": 0.9, "verdict": "clean", "confidence": 88, "failed": false, "evidence": "threat_score 12, no detections"},
+    {"name": "VirusTotal_GetReport_3_1", "tier": 1, "weight": 0.8, "verdict": "clean", "confidence": 90, "failed": false, "evidence": "0/78 engines"},
+    {"name": "Urlscan_io_Search_0_1_1", "tier": 3, "weight": 0.2, "verdict": "suspicious", "confidence": null, "failed": false, "evidence": "4 prior scans (benign)"},
+    {"name": "Zscaler_1_3", "tier": 3, "weight": 0.2, "verdict": "no-data", "confidence": null, "failed": false, "evidence": "category: Miscellaneous"}
+  ]
+}

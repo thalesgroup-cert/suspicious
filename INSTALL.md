@@ -362,7 +362,7 @@ you prefer.
 | `could not read secret … from Vault at http://vault:8200` | `VAULT_ADDR` points at an unreachable Vault | leave `VAULT_ADDR` unset for local dev |
 | Cortex won't start: `mount path must be absolute` | `CORTEX_PATH` is relative | set `CORTEX_PATH` to an absolute path |
 | `DisallowedHost` over HTTPS | `app.allowed_hosts` missing `DOMAIN_CORP` | add your domain to `allowed_hosts` |
-| `:9021/api/...` returns the page HTML, not JSON | the UI does not proxy `/api`; Traefik does | call the API through the Traefik domain |
+| `:9021/api/...` returns the page HTML, not JSON | running a `suspicious_ui` image built before the nginx `/api` proxy was added | rebuild it (`docker compose build suspicious_ui`), or reach the API through the Traefik domain |
 | `docker compose build` → `uv pip install` timeout | no proxy on a proxy-only network | set `HTTP_PROXY` / `HTTPS_PROXY` in `.env` |
 | `manage.py seed_config: Unknown command` | running a published image older than your code | build from source (`docker compose build suspicious`) |
 

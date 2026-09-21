@@ -15,11 +15,16 @@ venv/
 .ruff_cache/
 .mypy_cache/
 
-# Large ML weights — fetched at build/runtime, never sent in build context
-models/
+# Vectorizer weights — fetched at build time by the Dockerfile itself (always
+# the same public checkpoint), never sent in the build context.
 vectorizers/paraphrase-multilingual-mpnet-base-v2/model.safetensors
 vectorizers/paraphrase-multilingual-mpnet-base-v2/config.json
 vectorizers/paraphrase-multilingual-mpnet-base-v2/1_Pooling/
+
+# models/ is NOT ignored: unlike the vectorizer there is no fixed public
+# source for it — it's whatever train_models.ipynb / train_test_models.py
+# produced, and the Dockerfile has no way to fetch it. It must be present in
+# the build context (see AIMailAnalyzer.pdf's Setup section).
 
 # Secrets / logs / OS cruft
 *.env

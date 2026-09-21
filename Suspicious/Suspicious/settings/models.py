@@ -4,6 +4,7 @@ from django.contrib.auth.hashers import make_password
 
 from domain_process.models import Domain
 from hash_process.models import Hash
+from ip_process.models import IP
 
 
 class Mailbox(models.Model):
@@ -48,6 +49,23 @@ class AllowListDomain(models.Model):
 
     def __str__(self):
         return self.domain.value if self.domain else f"AllowListDomain #{self.id}"
+
+
+class AllowListIp(models.Model):
+    id = models.AutoField(primary_key=True)
+    ip = models.ForeignKey(
+        IP,
+        on_delete=models.CASCADE,
+        related_name="allow_lists",
+        null=True,
+        blank=True,
+    )
+    user = models.ForeignKey(settings.AUTH_USER_MODEL, on_delete=models.CASCADE)
+    creation_date = models.DateTimeField(auto_now_add=True)
+    last_update = models.DateTimeField(auto_now=True)
+
+    def __str__(self):
+        return self.ip.address if self.ip else f"AllowListIp #{self.id}"
 
 
 class WatcherLegitDomain(models.Model):

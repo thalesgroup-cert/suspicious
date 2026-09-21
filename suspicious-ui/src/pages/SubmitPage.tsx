@@ -26,6 +26,7 @@ import {
   InsertDriveFileOutlined,
   PublicOutlined,
   CloudUploadOutlined,
+  FormatListBulletedOutlined,
 } from "@mui/icons-material";
 import { useMutation, useQuery } from "@tanstack/react-query";
 import { Skeleton } from "boneyard-js/react";
@@ -39,11 +40,12 @@ import { env } from "@/lib/runtimeEnv";
 import { getMe, type Me } from "@/api/auth";
 
 import {
+  extractIocsFromFile,
   getSubmitConfig,
   submitFile,
-  submitIoc,
-  submitUrl,
+  submitIndicators,
 } from "@/features/submit/api";
+import { parseIndicators } from "@/features/submit/parseIndicators";
 import {
   ModeSelectorCard,
   SectionHeader,
@@ -51,17 +53,17 @@ import {
   SoftCard,
 } from "@/features/submit/components/cards";
 import {
-  artifactSchema,
   fileSchema,
-  type ArtifactForm,
   type FileForm,
 } from "@/features/submit/schema";
-import type { SubmitMode, SubmitSuccessResponse } from "@/features/submit/types";
+import type {
+  SubmitIndicatorsResponse,
+  SubmitMode,
+  SubmitSuccessResponse,
+} from "@/features/submit/types";
 import {
-  classifyArtifact,
   extractApiErrorMessage,
   formatBytes,
-  normaliseUrl,
   resolveId,
 } from "@/features/submit/utils";
 
@@ -98,12 +100,8 @@ export default function SubmitPage() {
   const [mode, setMode] = React.useState<SubmitMode>("file");
   const [selectedFile, setSelectedFile] = React.useState<File | null>(null);
   const [fallbackCta, setFallbackCta] = React.useState(false);
-
-  const artifactForm = useForm<ArtifactForm>({
-    resolver: zodResolver(artifactSchema),
-    defaultValues: { value: "", context: "" },
-    mode: "onChange",
-  });
+  const [indicatorsText, setIndicatorsText] = React.useState("");
+  const [indicatorsContext, setIndicatorsContext] = React.useState("");
 
   const fileForm = useForm<FileForm>({
     resolver: zodResolver(fileSchema),
@@ -142,20 +140,22 @@ export default function SubmitPage() {
   // Mutations
   // -------------------------------------------------------------------------
 
-  const artifactMutation = useMutation({
-    mutationFn: (input: ArtifactForm) => {
-      const kind = classifyArtifact(input.value);
-      if (kind === "url") {
-        return submitUrl({
-          url: normaliseUrl(input.value),
-          context: input.context,
-        });
-      }
-      return submitIoc(input);
-    },
+  const iocFileMutation = useMutation({
+    mutationFn: extractIocsFromFile,
     onSuccess: (res) => {
-      handleSuccess(res);
-      artifactForm.reset();
+      if (!res.found) {
+        enqueueSnackbar("No indicators found in that file.", { variant: "warning" });
+        return;
+      }
+      setIndicatorsText((prev) =>
+        prev.trim() ? `${prev.trimEnd()}\n${res.indicators}` : res.indicators,
+      );
+      enqueueSnackbar(
+        `Added ${res.found} indicator(s) from file${
+          res.skipped.length ? ` — ${res.skipped.length} token(s) not recognised` : ""
+        }. Review below, then submit.`,
+        { variant: "success" },
+      );
     },
     onError: (error) => {
       enqueueSnackbar(extractApiErrorMessage(error), { variant: "error" });
@@ -174,7 +174,45 @@ export default function SubmitPage() {
     },
   });
 
-  const loadingOpen = artifactMutation.isPending || fileMutation.isPending;
+  const indicatorsMutation = useMutation({
+    mutationFn: () =>
+      submitIndicators({
+        indicators: indicatorsText,
+        context: indicatorsContext || undefined,
+      }),
+    onSuccess: (res: SubmitIndicatorsResponse) => {
+      enqueueSnackbar(
+        `Submitted — ${res.observable_count} indicator(s), case #${res.case_id}`,
+        { variant: "success" }
+      );
+      if (res.skipped.length) {
+        enqueueSnackbar(
+          `${res.skipped.length} line(s) not recognised and skipped`,
+          { variant: "warning" }
+        );
+      }
+      navigate(
+        `/submissions?q=${encodeURIComponent(
+          String(res.case_id)
+        )}&open=${encodeURIComponent(String(res.case_id))}`
+      );
+      setIndicatorsText("");
+      setIndicatorsContext("");
+    },
+    onError: (error) => {
+      enqueueSnackbar(extractApiErrorMessage(error), { variant: "error" });
+    },
+  });
+
+  const indicatorsPreview = React.useMemo(
+    () => parseIndicators(indicatorsText),
+    [indicatorsText]
+  );
+
+  const loadingOpen =
+    fileMutation.isPending ||
+    indicatorsMutation.isPending ||
+    iocFileMutation.isPending;
 
   // -------------------------------------------------------------------------
   // Auth guard
@@ -236,9 +274,9 @@ export default function SubmitPage() {
                   Submit
                 </Typography>
                 <Typography color="text.secondary" sx={{ maxWidth: 760 }}>
-                  Send a file, URL, domain, hash, or IP for checks.
-                  Choose the artifact type, add short factual context, and
-                  submit it for analysis.
+                  Upload a file or email, or paste one or many indicators
+                  (URL, domain, hash, IP). Types are detected automatically;
+                  add short factual context and submit for analysis.
                 </Typography>
               </Stack>
 
@@ -254,17 +292,17 @@ export default function SubmitPage() {
                 <ModeSelectorCard
                   active={mode === "file"}
                   title="File"
-                  subtitle="Upload an attachment or sample for analysis."
+                  subtitle="Upload an attachment, sample or email (.eml / .msg) for analysis."
                   icon={<UploadFileOutlined />}
-                  helper="Recommended"
                   onClick={() => switchMode("file")}
                 />
                 <ModeSelectorCard
-                  active={mode === "artifact"}
-                  title="URL, Domain or Indicator"
-                  subtitle="Submit a link, bare domain, hash, IP, or any other text-based indicator. Type is detected automatically."
-                  icon={<FingerprintOutlined />}
-                  onClick={() => switchMode("artifact")}
+                  active={mode === "indicators"}
+                  title="Indicators"
+                  subtitle="Paste one or many URLs, IPs, hashes or domains — or upload an IOC-list file. Type is detected automatically; analysed together as one case."
+                  icon={<FormatListBulletedOutlined />}
+                  helper="Recommended"
+                  onClick={() => switchMode("indicators")}
                 />
               </Box>
             </Stack>
@@ -432,60 +470,99 @@ export default function SubmitPage() {
 
               {/* ---------------------------------------------------------- */}
               {/* ---------------------------------------------------------- */}
-              {mode === "artifact" ? (
+              {mode === "indicators" ? (
                 <Stack spacing={2.5}>
                   <SectionHeader
-                    title="URL, domain or indicator"
-                    subtitle="Paste a full URL, bare domain, hash, IP, or other indicator. The type is detected automatically."
+                    title="Indicators"
+                    subtitle="One per line, or comma / space separated. Defanged forms (hxxp://, [.]) are accepted."
                   />
 
+                  <Stack
+                    direction="row"
+                    spacing={1}
+                    sx={{ alignItems: "center", flexWrap: "wrap" }}
+                  >
+                    <Button
+                      component="label"
+                      variant="outlined"
+                      size="small"
+                      startIcon={<UploadFileOutlined fontSize="small" />}
+                      disabled={iocFileMutation.isPending}
+                      sx={{ textTransform: "none", borderRadius: 2 }}
+                    >
+                      {iocFileMutation.isPending ? "Reading…" : "Upload IOC list"}
+                      <input
+                        hidden
+                        type="file"
+                        accept=".txt,.csv,.json"
+                        onChange={(e) => {
+                          const f = e.target.files?.[0];
+                          if (f) iocFileMutation.mutate(f);
+                          e.target.value = "";
+                        }}
+                      />
+                    </Button>
+                    <Typography variant="caption" color="text.secondary">
+                      .txt / .csv / .json — indicators are added below for review, not submitted yet.
+                    </Typography>
+                  </Stack>
+
                   <TextField
-                    label="URL, domain or indicator"
-                    placeholder="https://evil.com  ·  evil.com  ·  SHA256 / MD5 / IP"
-                    error={!!artifactForm.formState.errors.value}
-                    helperText={
-                      artifactForm.formState.errors.value?.message ??
-                      "Full URLs and bare domains are submitted for reputation and detonation. Everything else is correlated as an indicator."
-                    }
-                    {...artifactForm.register("value")}
+                    label="Indicators"
+                    placeholder={"hxxp://evil[.]com\n8.8.8.8\n<sha256>"}
+                    multiline
+                    minRows={6}
+                    value={indicatorsText}
+                    onChange={(e) => setIndicatorsText(e.target.value)}
                   />
+
+                  {indicatorsPreview.length ? (
+                    <Stack spacing={0.75}>
+                      {indicatorsPreview.map((p, i) => (
+                        <Stack
+                          key={`${p.value}-${i}`}
+                          direction="row"
+                          spacing={1}
+                          sx={{ alignItems: "center", justifyContent: "space-between" }}
+                        >
+                          <Typography
+                            variant="body2"
+                            sx={{ fontFamily: "monospace", wordBreak: "break-all" }}
+                          >
+                            {p.value}
+                          </Typography>
+                          <Chip
+                            size="small"
+                            label={p.type ?? "unrecognised"}
+                            color={p.type ? "default" : "error"}
+                          />
+                        </Stack>
+                      ))}
+                    </Stack>
+                  ) : null}
+
+                  <Typography variant="body2" color="text.secondary">
+                    {indicatorsPreview.filter((p) => p.type).length} indicator(s),{" "}
+                    {indicatorsPreview.filter((p) => !p.type).length} unrecognised
+                  </Typography>
 
                   <TextField
                     label="Context (optional)"
-                    placeholder="Source, related case, user report, or observed behavior."
+                    placeholder="Source, related case, user report…"
                     multiline
                     minRows={4}
-                    {...artifactForm.register("context")}
+                    value={indicatorsContext}
+                    onChange={(e) => setIndicatorsContext(e.target.value)}
                   />
-
-                  {fallbackCta ? (
-                    <Alert
-                      severity="success"
-                      action={
-                        <Button
-                          color="inherit"
-                          size="small"
-                          onClick={() => navigate("/submissions")}
-                          sx={{ fontWeight: 850, textTransform: "none" }}
-                        >
-                          View submissions
-                        </Button>
-                      }
-                    >
-                      Submitted successfully. Navigate to see the result.
-                    </Alert>
-                  ) : null}
 
                   <Stack direction="row" sx={{ justifyContent: "flex-end" }} >
                     <Button
                       variant="contained"
                       disabled={
-                        !artifactForm.formState.isValid ||
-                        artifactMutation.isPending
+                        indicatorsPreview.filter((p) => p.type).length === 0 ||
+                        indicatorsMutation.isPending
                       }
-                      onClick={artifactForm.handleSubmit((v) =>
-                        artifactMutation.mutate(v)
-                      )}
+                      onClick={() => indicatorsMutation.mutate()}
                       sx={{
                         borderRadius: 2,
                         textTransform: "none",
@@ -576,8 +653,8 @@ export default function SubmitPage() {
         </Box>
 
         <Alert severity="info" sx={{ borderRadius: 3 }}>
-          Submit one artifact at a time for cleaner triage and easier backend
-          correlation.
+          Related indicators submitted together are correlated as one case.
+          Keep unrelated artifacts in separate submissions.
         </Alert>
       </Stack>
 

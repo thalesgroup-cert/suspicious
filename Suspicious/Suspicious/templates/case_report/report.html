@@ -1,0 +1,178 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>Case {{ case.id }} — IOC Report</title>
+<style>
+  :root { color-scheme: light; }
+  * { box-sizing: border-box; }
+  body {
+    font: 14px/1.5 -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+    color: #1a1a1a;
+    background: #fff;
+    margin: 0;
+    padding: 32px;
+  }
+  .wrap { max-width: 900px; margin: 0 auto; }
+  h1 { font-size: 20px; margin: 0 0 4px; }
+  h2 { font-size: 15px; margin: 28px 0 8px; border-bottom: 1px solid #ddd; padding-bottom: 4px; }
+  .meta { color: #666; font-size: 12px; margin-bottom: 24px; }
+  .meta div { margin: 2px 0; }
+  .verdict {
+    display: inline-block; padding: 4px 12px; border-radius: 4px;
+    font-weight: 600; font-size: 15px; border: 1px solid #ccc; background: #f4f4f4;
+  }
+  .verdict.Safe { background: #e6f4ea; border-color: #99d3ab; color: #1c6b36; }
+  .verdict.Suspicious { background: #fdf1e3; border-color: #edc48a; color: #8a5200; }
+  .verdict.Dangerous { background: #fce8e8; border-color: #e6a3a3; color: #9b1c1c; }
+  .verdict.Inconclusive { background: #eef1f5; border-color: #b9c2d0; color: #3c4a63; }
+  ul { margin: 8px 0; padding-left: 20px; }
+  .obs { margin: 20px 0; padding: 16px; border: 1px solid #e3e3e3; border-radius: 6px; }
+  .obs-head { font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace; font-size: 15px; font-weight: 600; word-break: break-all; }
+  .badge {
+    display: inline-block; margin-left: 8px; padding: 1px 8px; border-radius: 10px;
+    font-size: 11px; font-family: sans-serif; background: #eceff3; color: #445; vertical-align: middle;
+  }
+  .sub { color: #555; font-size: 12px; margin: 6px 0; }
+  .enrichment { margin: 8px 0; }
+  table { border-collapse: collapse; width: 100%; margin-top: 10px; font-size: 12px; }
+  th, td { border: 1px solid #ddd; padding: 6px 8px; text-align: left; vertical-align: top; }
+  th { background: #f6f6f6; }
+  details { margin: 6px 0; }
+  summary { cursor: pointer; font-size: 12px; color: #345; }
+  pre {
+    background: #f6f8fa; border: 1px solid #e1e4e8; border-radius: 4px;
+    padding: 10px; overflow-x: auto; font-size: 11px; white-space: pre-wrap; word-break: break-word;
+  }
+  .src-table { margin-top: 10px; }
+  h3 { font-size: 14px; margin: 18px 0 6px; }
+  .empty { color: #666; font-style: italic; }
+  @media print { body { padding: 0; } .obs { break-inside: avoid; } }
+</style>
+</head>
+<body>
+<div class="wrap">
+  <h1>Suspicious — Indicator Analysis Report</h1>
+  <div class="meta">
+    <div>Case #{{ case.id }}</div>
+    <div>Generated {{ generated_at }}</div>
+    <div>Reporter: {{ case.reporter.username }}</div>
+    {% if case.creation_date %}<div>Case created: {{ case.creation_date }}</div>{% endif %}
+  </div>
+
+  {% if case.description %}
+  <h2>Description</h2>
+  <p>{{ case.description }}</p>
+  {% endif %}
+
+  {% if case.reporter_context %}
+  <h2>Reporter context</h2>
+  <p>{{ case.reporter_context }}</p>
+  {% endif %}
+
+  <h2>Verdict</h2>
+  <p><span class="verdict {{ case.results }}">{{ case.results }}</span></p>
+  {% if case.final_score or case.final_confidence %}
+  {% if observables %}
+  <p class="sub">Confidence: {{ case.final_confidence }}</p>
+  {% else %}
+  <p class="sub">Score: {{ case.final_score }} &nbsp;·&nbsp; Confidence: {{ case.final_confidence }}</p>
+  {% endif %}
+  {% endif %}
+  {% if case.inconclusive_reason %}
+  <p class="sub">Inconclusive reason: {{ case.inconclusive_reason }}</p>
+  {% endif %}
+  {% if case.verdict_explanation %}
+  <h3>Why this verdict</h3>
+  <p>{{ case.verdict_explanation.analyst_paragraph }}</p>
+  <p class="sub">{{ case.verdict_explanation.confidence_reading }}</p>
+  {% if case.verdict_explanation.sources %}
+  <table class="src-table">
+    <tr><th>Source</th><th>Tier</th><th>Verdict</th><th>Counted</th><th>Note</th></tr>
+    {% for s in case.verdict_explanation.sources %}
+    <tr><td>{{ s.name }}</td><td>{{ s.tier }}</td><td>{{ s.verdict }}</td><td>{% if s.counted %}yes{% else %}&mdash;{% endif %}</td><td>{{ s.note }}</td></tr>
+    {% endfor %}
+  </table>
+  {% endif %}
+  {% elif case.verdict_rationale %}
+  <ul>
+    {% for line in case.verdict_rationale %}<li>{{ line }}</li>{% endfor %}
+  </ul>
+  {% endif %}
+
+  <h2>Indicators</h2>
+  {% if not observables %}
+  <p class="empty">No indicator observables on this case.</p>
+  {% endif %}
+  {% for o in observables %}
+  <div class="obs">
+    <div class="obs-head">{{ o.value }}<span class="badge">{{ o.type }}</span></div>
+    {% if o.verdict %}
+    <p class="sub">
+      <span class="verdict {{ o.verdict.band }}">{{ o.verdict.band }}</span>
+      &nbsp;·&nbsp; Confidence: {{ o.verdict.confidence }}
+    </p>
+    {% if o.verdict.rationale %}
+    <ul>
+      {% for line in o.verdict.rationale %}<li>{{ line }}</li>{% endfor %}
+    </ul>
+    {% endif %}
+    {% else %}
+    <p class="sub">No computed verdict (no trusted-source votes).</p>
+    {% endif %}
+
+    {% if o.sources %}
+    <table>
+      <thead>
+        <tr><th>Source</th><th>Tier</th><th>Verdict</th><th>Evidence</th></tr>
+      </thead>
+      <tbody>
+        {% for s in o.sources %}
+        <tr>
+          <td>{{ s.name }}{% if s.failed %} (failed){% endif %}</td>
+          <td>{{ s.tier }}</td>
+          <td>{{ s.verdict }}{% if s.confidence is not None %} ({{ s.confidence }}){% endif %}</td>
+          <td>{{ s.evidence }}</td>
+        </tr>
+        {% endfor %}
+      </tbody>
+    </table>
+    {% for s in o.sources %}
+    {% if s.enrichment %}
+    <div class="enrichment">
+      {% if s.enrichment.malicious_count is not None %}
+      <p class="sub">{{ s.enrichment.malicious_count }} / {{ s.enrichment.total }} vendors flagged this</p>
+      {% endif %}
+      {% if s.enrichment.threat_label %}<p class="sub">Threat: {{ s.enrichment.threat_label }}</p>{% endif %}
+      {% if s.enrichment.as_owner %}<p class="sub">AS owner: {{ s.enrichment.as_owner }}{% if s.enrichment.country %} ({{ s.enrichment.country }}){% endif %}</p>{% endif %}
+      {% if s.enrichment.first_seen %}<p class="sub">First seen: {{ s.enrichment.first_seen }}</p>{% endif %}
+      {% if s.enrichment.last_seen %}<p class="sub">Last seen: {{ s.enrichment.last_seen }}</p>{% endif %}
+      {% if s.enrichment.meaningful_name %}<p class="sub">Filename: {{ s.enrichment.meaningful_name }}</p>{% endif %}
+      {% with flagged=s.enrichment.vendors %}
+      {% if flagged %}
+      <table><thead><tr><th>Vendor</th><th>Verdict</th><th>Result</th></tr></thead><tbody>
+      {% for v in flagged %}{% if v.category == "malicious" or v.category == "suspicious" %}
+        <tr><td>{{ v.name }}</td><td>{{ v.category }}</td><td>{{ v.result|default:"—" }}</td></tr>
+      {% endif %}{% endfor %}
+      </tbody></table>
+      {% endif %}
+      {% endwith %}
+    </div>
+    {% endif %}
+    <details>
+      <summary>Raw report — {{ s.name }}</summary>
+      <pre>{{ s.report|pprint }}</pre>
+    </details>
+    {% endfor %}
+    {% endif %}
+
+    {% if o.screenshot_data_uri %}
+    <img class="observable-screenshot" alt="Screenshot of {{ o.value }}" src="{{ o.screenshot_data_uri }}" style="max-width:100%;border:1px solid #ccc;margin-top:.5rem;">
+    {% elif o.screenshot_omitted %}
+    <p class="empty">Screenshot omitted from the report (size cap) — open the investigation view.</p>
+    {% endif %}
+  </div>
+  {% endfor %}
+</div>
+</body>
+</html>

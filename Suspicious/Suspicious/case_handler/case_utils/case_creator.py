@@ -54,6 +54,7 @@ class CaseCreator:
         )
 
         allow_reason = kwargs.pop('allow_reason', '')
+        group = kwargs.pop('observable_group_instance', None)
 
         for key, value in kwargs.items():
             logger.debug(f"Processing key: {key}, value: {getattr(value, 'id', 'None')}")
@@ -70,6 +71,9 @@ class CaseCreator:
 
             if value:
                 self._create_related_model(key, value, case)
+
+        if group is not None:
+            self._attach_observable_group(group, case)
 
         try:
             case.save()
@@ -135,6 +139,30 @@ class CaseCreator:
                 print(f"Error creating case_has_iocs: {e!s}")
         else:
             print("Done creating related model...")
+
+    # CaseArtifact has FK/choice only for url/ip/hash here — DOMAIN observables
+    # are tracked by ObservableGroupArtifact only (same as the mail path).
+    _GROUP_ARTIFACT_MAP = {
+        'URL': ('url', CaseArtifact.ArtifactType.URL),
+        'IP': ('ip', CaseArtifact.ArtifactType.IP),
+        'HASH': ('hash', CaseArtifact.ArtifactType.HASH),
+    }
+
+    def _attach_observable_group(self, group, case):
+        """Attach the ObservableGroup to the case and write a CaseArtifact row
+        per url/ip/hash observable (domains are skipped — no CaseArtifact FK)."""
+        case.save()
+        case.observable_group = group
+        case.save(update_fields=["observable_group"])
+        for art in group.artifacts.select_related("url", "ip", "hash", "domain"):
+            obj = art.observable()
+            mapping = self._GROUP_ARTIFACT_MAP.get(art.artifact_type)
+            if obj is None or mapping is None:
+                continue
+            fk_name, artifact_type = mapping
+            CaseArtifact.objects.get_or_create(
+                case=case, artifact_type=artifact_type, **{fk_name: obj},
+            )
 
     def _create_case_file_or_mail(self, key, value, case):
         """

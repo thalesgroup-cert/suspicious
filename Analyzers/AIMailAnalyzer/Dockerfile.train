@@ -1,0 +1,16 @@
+# Throwaway image for build_test_dataset.py / train_test_models.py.
+# Not part of the deployed analyzer image (see Dockerfile for that) --
+# training needs pandas/sklearn/imbalanced-learn on top of the runtime deps.
+FROM python:3.12-slim
+
+RUN apt-get update -y && apt-get install -y --no-install-recommends build-essential && rm -rf /var/lib/apt/lists/*
+
+COPY --from=ghcr.io/astral-sh/uv:latest /uv /uvx /bin/
+
+WORKDIR /work
+COPY requirements.txt requirements-train.txt ./
+RUN uv pip install --system --upgrade pip
+RUN uv pip install --system --no-cache torch torchvision torchaudio --index-url https://download.pytorch.org/whl/cpu
+RUN uv pip install --system --no-cache -r requirements.txt -r requirements-train.txt
+
+ENTRYPOINT ["/bin/bash"]

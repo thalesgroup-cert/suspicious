@@ -106,14 +106,16 @@ services:
       VAULT_SECRET_ID: "${VAULT_SECRET_ID:-}"
       SUSPICIOUS_CONFIG_PATH: "/app/settings.json"
     healthcheck:
-      # ponytail: process-liveness only, not tick-freshness — inspect ping
-      # has no beat equivalent. Upgrade to checking celerybeat-schedule's
-      # mtime if beat ever silently wedges again without dying outright.
-      test: ["CMD-SHELL", "pgrep -f 'celery -A suspicious beat' || exit 1"]
+      # Tick-freshness, not just process-liveness: beat rewrites
+      # celerybeat-schedule (workdir /app/Suspicious) on every sync, which
+      # PersistentScheduler does every 180s. A wedged-but-alive beat stops
+      # syncing, so a stale mtime catches it. python is the app runtime —
+      # guaranteed present; the image has no pgrep/ps.
+      test: ["CMD-SHELL", "python -c \"import os,sys,time; sys.exit(0 if time.time()-os.path.getmtime('/app/Suspicious/celerybeat-schedule') < 600 else 1)\""]
       interval: 60s
       timeout: 10s
       retries: 3
-      start_period: 30s
+      start_period: 120s
     networks:
       - suspicious_network
 
@@ -159,6 +161,20 @@ services:
       NO_PROXY:    "${CORTEX_NO_PROXY:-localhost,127.0.0.1,cortex,elasticsearch,rustfs,chromadb,vault,suspicious}"
       JAVA_OPTS:   "-Djavax.net.ssl.trustStore=/etc/cortex/keystore.jks"
       job_directory: "${CORTEX_PATH}/jobs"
+      # The Cortex process runs as uid 1001 (entrypoint `su cortex`). The
+      # docker.sock is bind-mounted :ro so the entrypoint's own
+      # `chown cortex /var/run/docker.sock` is a no-op — instead run Cortex
+      # with gid = the host socket's group so it can reach the daemon and
+      # the docker job-runner isn't silently disabled. Group varies per host:
+      #   stat -c '%g' /var/run/docker.sock
+      daemon_user: "1001:${DOCKER_SOCK_GID:-999}"
+      # Read the analyzer/responder catalogs from the mounted files, not the
+      # network, on every boot. analyzer_urls (plural) is comma-separated —
+      # the public catalog plus this repo's own custom-analyzer one
+      # (Analyzers/analyzers.json, mounted below); analyzer_url (singular)
+      # only ever takes the first and silently drops the rest.
+      analyzer_urls: "/opt/Cortex-Analyzers-Public/analyzers/analyzers.json,/opt/Cortex-Analyzers-AI/analyzers/analyzers.json"
+      responder_url: "/opt/Cortex-Analyzers-Public/responders/responders.json"
     volumes:
       - "${CA_PATH}/keystore.jks:/etc/cortex/keystore.jks:ro"
       - "${CORTEX_PATH}/jobs:${CORTEX_PATH}/jobs:Z"
@@ -167,7 +183,7 @@ services:
       - "/var/run/docker.sock:/var/run/docker.sock:ro"
       - "${DOCKER_PATH}/config.json:/home/cortex/.docker/config.json:ro"
       - "${CORTEX_PATH}/Cortex-Analyzers/:/opt/Cortex-Analyzers/:ro"
-      - "${AIANALYZER_PATH}/analyzers.json:/opt/Cortex-Analyzers-AI/analyzers/analyzers.json:ro"
+      - "${CUSTOM_ANALYZERS_PATH}/analyzers.json:/opt/Cortex-Analyzers-AI/analyzers/analyzers.json:ro"
       - "${CORTEX_PATH}/Cortex-Analyzers-Public/analyzers/analyzers.json:/opt/Cortex-Analyzers-Public/analyzers/analyzers.json:ro"
       - "${CORTEX_PATH}/Cortex-Analyzers-Public/responders/responders.json:/opt/Cortex-Analyzers-Public/responders/responders.json:ro"
       - "${YARA_PATH}/rules/:/opt/Yara/rules:ro"

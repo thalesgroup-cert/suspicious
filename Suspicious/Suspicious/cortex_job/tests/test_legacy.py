@@ -208,3 +208,71 @@ class GetCortexJobsResultsScoringTests(TestCase):
         self.report.refresh_from_db()
         self.assertEqual(result, "Failure")
         self.assertEqual(self.report.status, "Failure")
+
+
+class GetJobFromApiFailureModeTests(TestCase):
+    """Regression: get_job_from_api used to collapse every failure — a
+    confirmed-gone job (404), a transient network error, an open circuit
+    breaker, auth errors, anything — to the same "old_job" sentinel, which
+    get_cortex_jobs_results turns into a permanent, unretriable "Deleted"
+    status. Only a Cortex-confirmed 404 (NotFoundError) should do that;
+    everything else must leave the report's current status alone so a
+    later poll (or the existing stale-job timeout) can retry/resolve it."""
+
+    def test_not_found_returns_old_job_sentinel(self):
+        from cortex4py.exceptions import NotFoundError
+        from cortex_job.cortex_utils.cortex_and_job_management import CortexJobManager
+
+        with patch(
+            "cortex_job.cortex_utils.cortex_and_job_management._fetch_job",
+            side_effect=NotFoundError("gone"),
+        ):
+            result = CortexJobManager.get_job_from_api("job-404")
+
+        self.assertEqual(result, "old_job")
+
+    def test_transient_network_error_returns_none_not_old_job(self):
+        import requests
+        from cortex_job.cortex_utils.cortex_and_job_management import CortexJobManager
+
+        with patch(
+            "cortex_job.cortex_utils.cortex_and_job_management._fetch_job",
+            side_effect=requests.ConnectionError("boom"),
+        ):
+            result = CortexJobManager.get_job_from_api("job-net-err")
+
+        self.assertIsNone(result)
+
+    def test_circuit_breaker_open_returns_none_not_old_job(self):
+        import pybreaker
+        from cortex_job.cortex_utils.cortex_and_job_management import CortexJobManager
+
+        with patch(
+            "cortex_job.cortex_utils.cortex_and_job_management._fetch_job",
+            side_effect=pybreaker.CircuitBreakerError("open"),
+        ):
+            result = CortexJobManager.get_job_from_api("job-breaker-open")
+
+        self.assertIsNone(result)
+
+    def test_none_from_get_job_from_api_leaves_report_pending_not_deleted(self):
+        """End-to-end through get_cortex_jobs_results: a transient failure
+        (mocked as None from get_job_from_api) must NOT flip a Waiting
+        report to Deleted."""
+        analyzer = Analyzer.objects.create(analyzer_cortex_id="tf-1", name="tf", weight=0.2)
+        domain = Domain.objects.create(value="pending.example")
+        report = AnalyzerReport.objects.create(
+            cortex_job_id="job-transient", type="domain", status="Waiting",
+            analyzer=analyzer, domain=domain, level="info", confidence=0, score=0,
+            report_summary={}, report_taxonomy={}, report_full={},
+        )
+
+        with patch.object(CortexJobManager, "get_job_from_api", return_value=None):
+            CortexJobManager._job_cache.clear()
+            CortexJobManager._report_cache.clear()
+            status = CortexJobManager.get_cortex_jobs_results(report, "domain")
+
+        report.refresh_from_db()
+        self.assertEqual(status, "Waiting")
+        self.assertEqual(report.status, "Waiting")
+        self.assertNotEqual(report.status, "Deleted")

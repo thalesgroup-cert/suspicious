@@ -61,7 +61,7 @@
             "url": "http://cortex:9001",
             "api_key": "",
             "analyzers": {
-                "header": "MailHeader_4_0",
+                "header": "Mail_Header_Analyzer_1_0",
                 "ai": "AI_Mail_Analyzer_1_4",
                 "sandbox": "ThreatGridOnPrem_1_0",
                 "yara": "Yara_Boosted_3_2",

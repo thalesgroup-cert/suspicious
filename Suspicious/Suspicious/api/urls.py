@@ -7,6 +7,8 @@ from api.views.campaigns import (
     CampaignMailVolumeView,
     CampaignPcaView,
 )
+from api.views.case_report import CaseReportView
+from api.views.case_screenshot import CaseScreenshotView
 from api.views.challenge import CaseChallengeTokenView
 from api.views.comments import CaseCommentListCreateView
 from api.views.dashboard import (
@@ -49,6 +51,8 @@ from api.views.settings import (
 from api.views.submit import (
     SubmitConfigView,
     SubmitFileView,
+    SubmitIndicatorsView,
+    SubmitIocFileExtractView,
     SubmitOtherView,
     SubmitUrlView,
 )
@@ -56,6 +60,7 @@ from api.views.submissions import (
     SubmissionChallengeView,
     SubmissionDetailsView,
     SubmissionListView,
+    SubmissionTicketView,
 )
 from api.views.oidc import OIDCCallbackView, OIDCLoginView
 from api.views.cortex_webhook import CortexWebhookView
@@ -66,6 +71,7 @@ from api.views.connectors import (
     ConnectorListView,
     ConnectorStateView,
     ConnectorTestView,
+    EnabledConnectorsView,
 )
 from api.views.url_analysis import SubmissionUrlAnalyzeView
 
@@ -92,9 +98,11 @@ urlpatterns = [
 
     path("cases/<int:case_id>/download/", DownloadCaseArchiveView.as_view(), name="case-download"),
     path("cases/<int:case_id>/mail-preview.png", MailPreviewView.as_view(), name="case-mail-preview"),
+    path("cases/<int:case_id>/screenshot.png", CaseScreenshotView.as_view(), name="case-screenshot"),
     path("cases/<int:case_id>/challenge/<str:token>/", CaseChallengeTokenView.as_view(), name="case-challenge"),
     path("cases/<int:case_id>/challenge/", CaseChallengeTokenView.as_view(), name="case-challenge-legacy"),
     path("cases/<int:case_id>/comments/", CaseCommentListCreateView.as_view(), name="case-comments"),
+    path("cases/<int:case_id>/report/", CaseReportView.as_view(), name="case-report"),
 
     path("dashboard/summary/", DashboardSummaryView.as_view(), name="dashboard-summary"),
 
@@ -112,6 +120,7 @@ urlpatterns = [
     path("submissions/", SubmissionListView.as_view(), name="submissions-list"),
     path("submissions/<int:submission_id>/", SubmissionDetailsView.as_view(), name="submission-details"),
     path("submissions/<int:submission_id>/challenge/", SubmissionChallengeView.as_view(), name="submission-challenge"),
+    path("submissions/<int:submission_id>/ticket/", SubmissionTicketView.as_view(), name="submission-ticket"),
     path("submissions/<int:submission_id>/urls/<int:url_id>/analyze/",
          SubmissionUrlAnalyzeView.as_view(), name="submission-url-analyze"),
 
@@ -133,6 +142,8 @@ urlpatterns = [
     path("submit/url/", SubmitUrlView.as_view(), name="submit-url"),
     path("submit/other/", SubmitOtherView.as_view(), name="submit-other"),
     path("submit/file/", SubmitFileView.as_view(), name="submit-file"),
+    path("submit/indicators/", SubmitIndicatorsView.as_view(), name="submit-indicators"),
+    path("submit/indicators/extract/", SubmitIocFileExtractView.as_view(), name="submit-indicators-extract"),
 
     path("home/summary/", HomeSummaryView.as_view(), name="home-summary"),
 
@@ -141,6 +152,7 @@ urlpatterns = [
     path("config/<str:scope>/", ServiceConfigView.as_view(), name="service-config"),
 
     path("connectors/", ConnectorListView.as_view(), name="connectors-list"),
+    path("connectors/enabled/", EnabledConnectorsView.as_view(), name="connectors-enabled"),
     path("connectors/<str:name>/", ConnectorStateView.as_view(), name="connector-state"),
     path("connectors/<str:name>/config/", ConnectorConfigView.as_view(), name="connector-config"),
     path("connectors/<str:name>/test/", ConnectorTestView.as_view(), name="connector-test"),

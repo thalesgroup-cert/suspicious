@@ -16,6 +16,7 @@ from score_process.scoring.case_score_calculation import (
     _is_address_deny_listed,
 )
 from case_handler.models import Result
+from settings.config import get_config
 
 logger = logging.getLogger("tasp.cron.update_ongoing_case_jobs")
 
@@ -27,7 +28,7 @@ def _signals_from(scores, confidences, offset, source):
     can fire on a high-score artifact regardless of its confidence."""
     out = []
     for score, conf in zip(scores[offset:], confidences[offset:]):
-        normalized_confidence = min(round(conf / 10), 100)
+        normalized_confidence = min(round(conf), 100)
         out.append(Signal(
             source=source, score=score, confidence=normalized_confidence,
             is_malicious=score >= MALICIOUS_SCORE_THRESHOLD, is_failure=False,
@@ -50,7 +51,12 @@ def collect_signals(case):
         mail = getattr(case.fileOrMail, "mail", None)
         if mail:
             off = len(scores)
-            failures += process_mail(mail, reports, scores, confidences, 0, case.id)
+            # Default ON: only an explicitly stored False keeps embedded IOCs
+            # voting here. get_config returns None (not the default arg) for an
+            # unset key once the cache is warm, so compare against False directly.
+            score_artifacts = get_config("scoring.mail_embedded_categorical") is False
+            failures += process_mail(mail, reports, scores, confidences, 0, case.id,
+                                     score_artifacts=score_artifacts)
             signals += _signals_from(scores, confidences, off, "mail")
 
     if case.nonFileIocs:
@@ -61,6 +67,11 @@ def collect_signals(case):
                 off = len(scores)
                 failures += process_ioc(ioc, ioc_type, reports, scores, confidences, 0)
                 signals += _signals_from(scores, confidences, off, ioc_type)
+
+    # NB: ObservableGroup (IOC-road) cases never reach here — get_report()
+    # branches to finalise_ioc_group() before collect_signals() is called.
+    # The categorical engine (score_observable) owns that road; running the
+    # weighted process_ioc here would double-score the shared observable rows.
 
     signals += [Signal("failed", 0, 0, False, True) for _ in range(failures)]
     ai_missing = (case.results_ai == Result.INCONCLUSIVE)

@@ -13,6 +13,8 @@ import {
 import { ExpandMoreOutlined } from "@mui/icons-material";
 import { alpha, useTheme } from "@mui/material/styles";
 
+import { AnalyzerEnrichment } from "../AnalyzerEnrichment";
+import { parseEnrichment } from "../enrichment";
 import {
   fmtDate,
   getConfidenceTone,
@@ -280,6 +282,30 @@ export function InvestigationAnalyzerReportCard({
                         >
                           {JSON.stringify(report.report_taxonomy, null, 2)}
                         </Box>
+                      </AccordionDetails>
+                    </Accordion>
+                  ) : null}
+
+                  {report.enrichment ? (
+                    <Accordion
+                      disableGutters
+                      sx={{
+                        borderRadius: 2,
+                        border: `1px solid ${detailBorder}`,
+                        background: isDark
+                          ? "rgba(255,255,255,.02)"
+                          : alpha(theme.palette.background.paper, 0.4),
+                        "&:before": { display: "none" },
+                      }}
+                    >
+                      <AccordionSummary expandIcon={<ExpandMoreOutlined />} onClick={(e) => e.stopPropagation()}>
+                        <Typography variant="body2" sx={{ fontWeight: 800 }} >Enrichment</Typography>
+                      </AccordionSummary>
+                      <AccordionDetails onClick={(e) => e.stopPropagation()}>
+                        {(() => {
+                          const parsed = parseEnrichment(report.enrichment);
+                          return parsed ? <AnalyzerEnrichment enrichment={parsed} /> : null;
+                        })()}
                       </AccordionDetails>
                     </Accordion>
                   ) : null}

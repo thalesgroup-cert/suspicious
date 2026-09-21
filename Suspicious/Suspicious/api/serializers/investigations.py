@@ -33,7 +33,7 @@ API_STATUS_TO_INTERNAL = {
     "CHALLENGED": "Challenged",
 }
 
-INVESTIGATION_TYPE_CHOICES = ("FILE", "MAIL", "URL", "IP", "HASH", "UNKNOWN")
+INVESTIGATION_TYPE_CHOICES = ("FILE", "MAIL", "URL", "IP", "HASH", "IOC", "UNKNOWN")
 INVESTIGATION_RESULT_CHOICES = tuple(API_RESULT_TO_INTERNAL.keys()) + ("UNKNOWN",)
 INVESTIGATION_ORDERING_CHOICES = ("-creation_date", "creation_date", "-id", "id", "status", "-status", "result", "-result")
 
@@ -80,6 +80,9 @@ def get_case_type(obj: Case) -> str:
         if non_file_iocs.hash_id:
             return "HASH"
 
+    if getattr(obj, "observable_group_id", None):
+        return "IOC"
+
     return "UNKNOWN"
 
 
@@ -109,6 +112,22 @@ def get_case_info_value(obj: Case) -> str:
                 or obj.description
                 or ""
             )
+
+    if getattr(obj, "observable_group_id", None):
+        # .all() hits the prefetch cache set by get_case_list_queryset;
+        # slicing / .count() would each issue a fresh query per row.
+        arts = list(obj.observable_group.artifacts.all())
+        vals = []
+        for a in arts[:3]:
+            o = a.observable()
+            v = (getattr(o, "address", None) or getattr(o, "value", None)) if o else None
+            if v:
+                vals.append(v)
+        total = len(arts)
+        if vals:
+            extra = f" +{total - len(vals)} more" if total > len(vals) else ""
+            return ", ".join(vals) + extra
+        return f"{total} indicator(s)"
 
     return obj.description or ""
 
@@ -185,31 +204,21 @@ class InvestigationAnalyzerReportSerializer(serializers.ModelSerializer):
         fields = [
             "id", "cortex_job_id", "type", "status", "analyzer_name", "analyzer_id",
             "level", "confidence", "score", "category", "categories",
-            "report_summary", "report_taxonomy", "target", "created_at",
+            "report_summary", "report_taxonomy", "enrichment", "target", "created_at",
         ]
 
     def get_categories(self, obj: AnalyzerReport) -> list[str]:
         return normalize_categories(obj.get_category())
 
     def get_target(self, obj: AnalyzerReport) -> dict[str, Any]:
-        if obj.url_id:
-            return {"kind": "URL", "id": obj.url_id, "value": getattr(obj.url, "address", str(obj.url_id))}
-        if obj.domain_id:
-            return {"kind": "DOMAIN", "id": obj.domain_id, "value": getattr(obj.domain, "value", str(obj.domain_id))}
-        if obj.mail_id:
-            return {"kind": "MAIL", "id": obj.mail_id, "value": getattr(obj.mail, "address", str(obj.mail_id))}
-        if obj.hash_id:
-            return {"kind": "HASH", "id": obj.hash_id, "value": getattr(obj.hash, "value", str(obj.hash_id))}
-        if obj.file_id:
-            file_field = getattr(obj.file, "file_path", None)
-            file_name = getattr(file_field, "name", None)
-            return {"kind": "FILE", "id": obj.file_id, "value": file_name or str(obj.file_id)}
-        if obj.ip_id:
-            return {"kind": "IP", "id": obj.ip_id, "value": getattr(obj.ip, "address", str(obj.ip_id))}
-        if obj.mail_body_id:
-            return {"kind": "MAIL_BODY", "id": obj.mail_body_id, "value": getattr(obj.mail_body, "fuzzy_hash", str(obj.mail_body_id))}
-        if obj.mail_header_id:
-            return {"kind": "MAIL_HEADER", "id": obj.mail_header_id, "value": getattr(obj.mail_header, "fuzzy_hash", str(obj.mail_header_id))}
+        from cortex_job.cortex_utils.report_target import analyzer_report_target_value
+        value = analyzer_report_target_value(obj)
+        for attr, kind in (("url_id", "URL"), ("domain_id", "DOMAIN"), ("mail_id", "MAIL"),
+                           ("hash_id", "HASH"), ("file_id", "FILE"), ("ip_id", "IP"),
+                           ("mail_body_id", "MAIL_BODY"), ("mail_header_id", "MAIL_HEADER")):
+            fk = getattr(obj, attr)
+            if fk:
+                return {"kind": kind, "id": fk, "value": value if value is not None else str(fk)}
         return {"kind": "UNKNOWN", "id": None, "value": None}
 
 
@@ -259,6 +268,8 @@ class InvestigationDetailsSerializer(InvestigationRowSerializer):
     case_infos = serializers.SerializerMethodField()
     raw = serializers.SerializerMethodField()
     reporter_note = serializers.SerializerMethodField()
+    observable_group = serializers.SerializerMethodField()
+    screenshot_url = serializers.SerializerMethodField()
 
     class Meta(InvestigationRowSerializer.Meta):
         fields = InvestigationRowSerializer.Meta.fields + [
@@ -266,7 +277,30 @@ class InvestigationDetailsSerializer(InvestigationRowSerializer):
             "challenge_proposed_result", "challenge_reason",
             "reporter_context", "reporter_note", "thehive_alert_id",
             "is_allowlisted", "is_denylisted", "list_reason",
+            "observable_group", "screenshot_url",
         ]
+
+    def get_screenshot_url(self, obj: Case) -> str | None:
+        from api.utils.analyzer_reports import reports_for_case
+
+        if reports_for_case(obj).exclude(screenshot_key="").exists():
+            return f"/api/cases/{obj.pk}/screenshot.png"
+        return None
+
+    def get_observable_group(self, case):
+        if not case.observable_group_id:
+            return None
+        from api.utils.observable_report import assemble_observables
+        return {"observables": assemble_observables(case)}
+
+    def to_representation(self, instance):
+        # Road isolation: the key exists only for IOC-group cases. Dropping it
+        # here (not in one view) keeps every consumer — detail, global-edit —
+        # consistent.
+        data = super().to_representation(instance)
+        if data.get("observable_group") is None:
+            data.pop("observable_group", None)
+        return data
 
     def get_analyzer_reports(self, obj: Case) -> list[dict[str, Any]]:
         queryset = self.context.get("analyzer_reports_qs")
@@ -283,6 +317,7 @@ class InvestigationDetailsSerializer(InvestigationRowSerializer):
             "confidence_ai": obj.confidence_ai,
             "classification_ai": normalize_result_to_api(obj.results_ai),
             "category_ai": obj.category_ai,
+            "verdict_explanation": obj.verdict_explanation,
         }
 
     def get_reporter_note(self, obj: Case) -> str:

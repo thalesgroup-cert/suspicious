@@ -32,6 +32,8 @@ from typing import Optional
 
 from django.conf import settings
 
+from common.clients import ensure_bucket
+
 logger = logging.getLogger(__name__)
 
 _DEFAULT_PREVIEW_BUCKET = "mail-previews"
@@ -350,8 +352,7 @@ def _build_minio_client():
 def _ensure_bucket(client, bucket: str) -> None:
     """Create the preview bucket on first use; idempotent."""
     try:
-        if not client.bucket_exists(bucket):
-            client.make_bucket(bucket)
+        ensure_bucket(client, bucket)
     except Exception:
         logger.warning(
             "ensure_bucket(%s) failed (continuing — put_object will retry)",

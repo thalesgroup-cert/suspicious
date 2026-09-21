@@ -9,11 +9,18 @@ from rest_framework.views import APIView
 from api.serializers.submit import (
     SubmitConfigSerializer,
     SubmitFileSerializer,
+    SubmitIndicatorsSerializer,
     SubmitOtherSerializer,
     SubmitUrlSerializer,
+    _check_no_ssrf_ip,
 )
+from api.utils.indicators import expand_wrappers, parse_indicators
 from case_handler.case_utils.case_handler import CaseHandler
+from cortex_job.cortex_utils.case_targets import collect_case_targets
 from tasp.forms import UploadFileForm, UploadOtherForm, UploadURLForm
+from tasp.tasks import dispatch_case_analysis
+
+IOC_GROUP_MAX = 100
 
 logger = logging.getLogger(__name__)
 
@@ -186,6 +193,170 @@ class SubmitOtherView(BaseSubmitView):
             }
         )
         return file_form, url_form, other_form
+
+
+class SubmitIndicatorsView(APIView):
+    permission_classes = [IsAuthenticated]
+
+    def post(self, request):
+        ser = SubmitIndicatorsSerializer(data=request.data, context={"request": request})
+        ser.is_valid(raise_exception=True)
+
+        parsed = parse_indicators(ser.validated_data["indicators"])
+        # Unwrap SafeLinks / URLDefense links so the real target also becomes an
+        # observable — before the cap + SSRF checks below, so the unwrapped
+        # targets are subject to both.
+        valid = expand_wrappers([p for p in parsed if p.type])
+        skipped = [p.raw for p in parsed if not p.type]
+
+        # Cap first — before any per-indicator work (the SSRF check below can
+        # do a DNS lookup per URL). The field also has a max_length, this is
+        # the semantic limit.
+        if not valid:
+            return _error_response(
+                detail="No valid indicator found.",
+                http_status=status.HTTP_400_BAD_REQUEST,
+            )
+        if len(valid) > IOC_GROUP_MAX:
+            return _error_response(
+                detail=f"Too many indicators ({len(valid)}). The limit is {IOC_GROUP_MAX} per submission.",
+                http_status=status.HTTP_400_BAD_REQUEST,
+            )
+
+        # SSRF parity with SubmitUrlSerializer: a URL indicator that targets a
+        # private / reserved / link-local address (incl. 169.254.169.254) is
+        # dropped to `skipped`, not created + dispatched.
+        safe_valid = []
+        for p in valid:
+            if p.type == "url":
+                try:
+                    _check_no_ssrf_ip(p.value)
+                except ValueError:
+                    skipped.append(p.raw)
+                    continue
+            safe_valid.append(p)
+        valid = safe_valid
+
+        if not valid:
+            return _error_response(
+                detail="No valid indicator found (all were unresolvable or blocked).",
+                http_status=status.HTTP_400_BAD_REQUEST,
+            )
+
+        from django.db import transaction
+
+        from case_handler.case_utils.case_creator import CaseCreator
+        from case_handler.models import ObservableGroup, ObservableGroupArtifact
+        from domain_process.models import Domain
+        from hash_process.models import Hash
+        from ip_process.models import IP
+        from url_process.models import URL
+
+        _MODEL = {
+            "url": (URL, "address", "url"),
+            "ip": (IP, "address", "ip"),
+            "hash": (Hash, "value", "hash"),
+            "domain": (Domain, "value", "domain"),
+        }
+
+        def _resolve(model, field, value):
+            # These columns have no unique constraint, so a concurrent submit
+            # can leave duplicates; take the first rather than raising
+            # MultipleObjectsReturned on every later submission of that value.
+            existing = model.objects.filter(**{field: value}).first()
+            return existing or model.objects.create(**{field: value})
+
+        context = ser.validated_data.get("context") or ""
+
+        class _NoCase(Exception):
+            pass
+
+        try:
+            with transaction.atomic():
+                group = ObservableGroup.objects.create(label=context[:255])
+                for p in valid:
+                    model, field, art_field = _MODEL[p.type]
+                    obj = _resolve(model, field, p.value)
+                    ObservableGroupArtifact.objects.create(
+                        group=group, artifact_type=p.type.upper(), **{art_field: obj}
+                    )
+
+                case = CaseCreator(request.user).create_case(
+                    description=context, reporter_context=context,
+                    observable_group_instance=group,
+                )
+                if case is None:
+                    raise _NoCase
+        except _NoCase:
+            # atomic() rolled the group + artifacts back — no orphans.
+            logger.error("SubmitIndicatorsView: CaseCreator returned no case")
+            return _error_response(
+                detail="An internal error occurred while creating the case.",
+                code="internal_error",
+                http_status=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            )
+
+        targets = collect_case_targets(case)
+        intents = [
+            (f"{inst._meta.app_label}.{inst._meta.model_name}", inst.pk, data_type)
+            for inst, data_type in targets
+        ]
+        dispatch_case_analysis.delay(case.id, intents)
+
+        return Response(
+            {
+                "status": "success",
+                "case_id": case.id,
+                "observable_count": len(valid),
+                "accepted": True,
+                "skipped": skipped,
+            },
+            status=status.HTTP_201_CREATED,
+        )
+
+
+class SubmitIocFileExtractView(APIView):
+    """Extract candidate indicators from an uploaded IOC-list file
+    (.txt / .csv / .json). Does NOT create a case — the caller reviews the
+    result and submits it through /submit/indicators/."""
+
+    permission_classes = [IsAuthenticated]
+
+    MAX_BYTES = 2 * 1024 * 1024
+    ALLOWED_EXT = (".txt", ".csv", ".json")
+
+    def post(self, request):
+        f = request.FILES.get("file")
+        if f is None:
+            return _error_response(
+                detail="No file provided.", http_status=status.HTTP_400_BAD_REQUEST
+            )
+        name = (f.name or "").lower()
+        if not name.endswith(self.ALLOWED_EXT):
+            return _error_response(
+                detail="Unsupported file type. Upload a .txt, .csv or .json IOC list.",
+                http_status=status.HTTP_400_BAD_REQUEST,
+            )
+        if (f.size or 0) > self.MAX_BYTES:
+            return _error_response(
+                detail=f"File too large ({f.size} bytes). The limit is {self.MAX_BYTES} bytes.",
+                http_status=status.HTTP_400_BAD_REQUEST,
+            )
+
+        from api.utils.indicators import indicators_from_file
+
+        parsed = indicators_from_file(f.name or "", f.read())
+        valid = [p.value for p in parsed if p.type]
+        skipped = [p.value for p in parsed if not p.type]
+        return Response(
+            {
+                "status": "success",
+                "indicators": "\n".join(valid),
+                "found": len(valid),
+                "skipped": skipped,
+            },
+            status=status.HTTP_200_OK,
+        )
 
 
 class SubmitFileView(BaseSubmitView):

@@ -37,32 +37,40 @@ class FileHandler:
         elif mail:
             file_path = os.path.basename(mail)
             tmp_path = mail
-            hash_value = cls.hash_file(tmp_path)
+            tmp_path_raw = mail
+            hash_value = cls.hash_file(tmp_path_raw)
 
         if not hash_value:
             logger.error("Failed to compute hash for file: %s", file_path)
             return None, None
 
         handler = cls()
-        return handler._handle_file_logic(file_path, tmp_path, hash_value)
+        return handler._handle_file_logic(file_path, tmp_path, hash_value, tmp_path_raw)
 
-    def _handle_file_logic(self, file_path: str, tmp_path: str, hash_value: str):
+    def _handle_file_logic(self, file_path: str, tmp_path: str, hash_value: str, tmp_path_raw: str):
         """
         Process the file by checking its size, ensuring a Hash instance exists,
         and then creating or updating the associated File instance.
 
         Args:
             file_path (str): The original file name.
-            tmp_path (str): The temporary file path.
+            tmp_path (str): The temporary file path, stored on the File model.
+                Convention is inconsistent by caller (stripped of a leading
+                "/tmp/" for the `file` branch, left absolute for the `mail`
+                branch — downstream code in mail_feeder/job_handler strips
+                and re-prefixes it at its own pace) so it must NOT be used to
+                locate the file on disk here.
             hash_value (str): The SHA-256 hash of the file.
+            tmp_path_raw (str): The real, directly-openable absolute path —
+                the same path `hash_file()` already read the bytes from.
 
         Returns:
             tuple: (file_instance, hash_instance).
         """
         try:
-            size = os.path.getsize("/tmp/"+ tmp_path)
+            size = os.path.getsize(tmp_path_raw)
         except FileNotFoundError:
-            logger.error("Temporary file not found at: %s", tmp_path)
+            logger.error("Temporary file not found at: %s", tmp_path_raw)
             size = 0
 
         with transaction.atomic():

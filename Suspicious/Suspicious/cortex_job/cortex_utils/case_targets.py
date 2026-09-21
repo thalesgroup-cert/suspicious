@@ -77,6 +77,17 @@ def collect_case_targets(case) -> list[tuple[models.Model, str]]:
         if non_file_iocs.hash_id:
             _add(non_file_iocs.hash, "hash")
 
+    group = getattr(case, "observable_group", None)
+    if case.observable_group_id and group:
+        for art in group.artifacts.select_related("url", "ip", "hash", "domain"):
+            obj = art.observable()
+            if obj is None:
+                continue
+            data_type = art.artifact_type.lower()
+            _add(obj, data_type)
+            if data_type == "url" and getattr(obj, "analyzed_url_id", None):
+                _add(obj.analyzed_url, "url")
+
     return [(instance, data_type) for (data_type, _pk), instance in seen.items()]
 
 

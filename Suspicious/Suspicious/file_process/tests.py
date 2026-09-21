@@ -104,6 +104,25 @@ class FileHandlerProcessingTests(TestCase):
             relation = HashFromFile.objects.filter(file=file_instance, hash=hash_instance).first()
             self.assertIsNotNone(relation)
 
+    def test_handle_file_mail_branch_reads_size_from_real_absolute_path(self):
+        """Regression: the `mail=` branch passes an already-absolute path
+        (e.g. /tmp/emailAnalysis/<sub>/<id>/x.eml). Size must be read from
+        that path directly, not from "/tmp/" + it (a double prefix that
+        always 404s and silently stores size=0)."""
+        import os
+        import tempfile
+        with tempfile.NamedTemporaryFile(dir="/tmp", suffix=".eml", delete=True) as tf:
+            tf.write(b"a body of a known length")
+            tf.flush()
+            real_size = os.path.getsize(tf.name)
+
+            with patch.object(FileHandler, 'hash_file', return_value="mailhash123"):
+                file_instance, hash_instance = FileHandler.handle_file(mail=tf.name)
+
+        self.assertIsInstance(file_instance, File)
+        self.assertEqual(file_instance.size, real_size)
+        self.assertNotEqual(file_instance.size, 0)
+
 
 class FileHandlerExceptionTests(TestCase):
 
@@ -132,4 +151,4 @@ class FileHandlerExceptionTests(TestCase):
         mock_filter.return_value.first.return_value = file_instance
         with patch.object(FileHandler, '_update_existing_file_instance', side_effect=Exception("DB failure")):
             with self.assertRaises(Exception):
-                self.handler._handle_file_logic("files/testfile.txt", "/tmp/testfile.txt", self.hash.value)
+                self.handler._handle_file_logic("files/testfile.txt", "/tmp/testfile.txt", self.hash.value, "/tmp/testfile.txt")

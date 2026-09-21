@@ -38,6 +38,7 @@ import {
   OpenInNewOutlined,
   ExpandMoreOutlined,
   RestartAltOutlined,
+  DescriptionOutlined,
 } from "@mui/icons-material";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { Skeleton } from "boneyard-js/react";
@@ -165,6 +166,14 @@ export default function SubmissionsPage() {
   });
 
   const me: Me | undefined = React.useMemo(() => meQuery.data, [meQuery.data]);
+
+  const isInvestigator = React.useMemo(
+    () =>
+      (me?.groups ?? []).some((g) =>
+        g === "CERT" || g === "CISO" || g === "Admin",
+      ),
+    [me],
+  );
 
   const profileQuery = useQuery({
     queryKey: ["profile"],
@@ -831,10 +840,24 @@ export default function SubmissionsPage() {
                     <CopyIconButton text={String(selectedRow.id)} title="Copy ID" />
                   </Stack>
                 </Box>
-                <Button onClick={() => setOpenDrawer(false)}
-                  sx={{ textTransform: "none", borderRadius: 2, alignSelf: "flex-start" }}>
-                  Close
-                </Button>
+                <Stack direction="row" spacing={1} sx={{ alignItems: "center" }}>
+                  {isInvestigator ? (
+                    <Button
+                      variant="outlined"
+                      startIcon={<DescriptionOutlined />}
+                      onClick={() =>
+                        window.open(`/api/cases/${selectedRow.id}/report/`, "_blank")
+                      }
+                      sx={{ textTransform: "none", borderRadius: 2, fontWeight: 800 }}
+                    >
+                      Full report
+                    </Button>
+                  ) : null}
+                  <Button onClick={() => setOpenDrawer(false)}
+                    sx={{ textTransform: "none", borderRadius: 2, alignSelf: "flex-start" }}>
+                    Close
+                  </Button>
+                </Stack>
               </Stack>
 
               <Stack direction="row" spacing={1} sx={{ mt: 1.5, flexWrap: "wrap" }}>

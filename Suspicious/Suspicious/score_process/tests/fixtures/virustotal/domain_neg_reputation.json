@@ -1,0 +1,30 @@
+{
+  "data_type": "domain",
+  "report_full": {
+    "results": {
+      "data": {
+        "id": "sketchy-rewards.example",
+        "type": "domain",
+        "attributes": {
+          "last_analysis_stats": {
+            "malicious": 0,
+            "suspicious": 0,
+            "harmless": 88,
+            "undetected": 2,
+            "timeout": 0
+          },
+          "last_analysis_results": {
+            "Google Safebrowsing": {"category": "harmless", "result": "clean", "engine_name": "Google Safebrowsing", "method": "blacklist"},
+            "Kaspersky": {"category": "harmless", "result": "clean", "engine_name": "Kaspersky", "method": "blacklist"},
+            "Fortinet": {"category": "undetected", "result": "unrated", "engine_name": "Fortinet", "method": "blacklist"}
+          },
+          "reputation": -40,
+          "first_submission_date": 1700000000,
+          "last_analysis_date": 1725000000,
+          "tags": []
+        }
+      }
+    }
+  },
+  "expect": {"level": "suspicious", "confidence_min": 55, "confidence_max": 65}
+}

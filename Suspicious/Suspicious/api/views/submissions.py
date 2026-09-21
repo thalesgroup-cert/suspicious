@@ -1,6 +1,7 @@
 import logging
 
 from django.db.models import Q
+from django.utils import timezone
 from drf_spectacular.utils import OpenApiExample, OpenApiParameter, extend_schema
 from rest_framework import status
 from rest_framework.exceptions import ValidationError
@@ -21,9 +22,9 @@ from api.serializers.submissions import (
     SubmissionDetailsSerializer,
     SubmissionListSerializer,
 )
+from api.utils.analyzer_reports import reports_for_case
+from api.views.investigations import IsInvestigator, _dedup_analyzer_reports
 from case_handler.models import Case
-from cortex_job.models import AnalyzerReport
-from cortex_job.cortex_utils.case_targets import build_analyzer_report_filter, collect_case_targets
 from tasp.services.challenge import notify_and_record_challenge
 
 logger = logging.getLogger(__name__)
@@ -45,38 +46,14 @@ CASE_DETAIL_SELECT_RELATED = CASE_LIST_SELECT_RELATED + (
 )
 
 
-def _dedup_analyzer_reports(reports) -> list:
+def case_analyzer_reports(case) -> list:
+    """Newest AnalyzerReport per (analyzer, target) across every observable of a
+    case. Shared by the submission detail and ticket views.
+
+    Byte-equivalent to what the investigation detail builds: same targets, same
+    select_related, same ``-creation_date, -pk`` order, same Python dedup.
     """
-    Keep only the most recent AnalyzerReport per (analyzer_id, target_key).
-
-    The queryset is already ordered by -creation_date, -pk so the first
-    occurrence of each key is the newest. We preserve that order.
-    """
-    def _target_key(r) -> tuple:
-        for attr, label in (
-            ("url_id",         "url"),
-            ("domain_id",      "domain"),
-            ("mail_id",        "mail"),
-            ("hash_id",        "hash"),
-            ("file_id",        "file"),
-            ("ip_id",          "ip"),
-            ("mail_body_id",   "mail_body"),
-            ("mail_header_id", "mail_header"),
-        ):
-            val = getattr(r, attr, None)
-            if val:
-                return (label, val)
-        return ("unknown", None)
-
-    seen: set = set()
-    result: list = []
-    for report in reports:
-        key = (report.analyzer_id, _target_key(report))
-        if key not in seen:
-            seen.add(key)
-            result.append(report)
-    return result
-
+    return _dedup_analyzer_reports(reports_for_case(case))
 
 
 class SubmissionPagination(PageNumberPagination):
@@ -120,10 +97,8 @@ class SubmissionListView(ListAPIView):
         search = (self.request.query_params.get("search") or "").strip()
         if search:
             id_q = Q(pk=int(search)) if search.isdigit() else Q()
-            # No .distinct() needed: fileOrMail and nonFileIocs are forward
-            # O2O relations from Case's side, never reverse/M2M, so a Case
-            # row can't fan out into duplicates through these joins (same
-            # reasoning as InvestigationAccessMixin.get_queryset).
+            # .distinct(): observable_group__artifacts is a reverse FK, so the
+            # join fans a group case out to one row per indicator.
             queryset = queryset.filter(
                 id_q
                 | Q(description__icontains=search)
@@ -134,7 +109,11 @@ class SubmissionListView(ListAPIView):
                 | Q(nonFileIocs__url__address__icontains=search)
                 | Q(nonFileIocs__ip__address__icontains=search)
                 | Q(nonFileIocs__hash__value__icontains=search)
-            )
+                | Q(observable_group__artifacts__url__address__icontains=search)
+                | Q(observable_group__artifacts__ip__address__icontains=search)
+                | Q(observable_group__artifacts__hash__value__icontains=search)
+                | Q(observable_group__artifacts__domain__value__icontains=search)
+            ).distinct()
 
         ordering = self.request.query_params.get("ordering", "-created_at")
         db_ordering = self.ORDERING_MAP.get(ordering)
@@ -204,25 +183,10 @@ class SubmissionDetailsView(RetrieveAPIView):
         return obj
 
     def _get_analyzer_reports_queryset(self, obj: Case):
-        targets = collect_case_targets(obj)
-        if not targets:
-            return []
-
-        filters = build_analyzer_report_filter(targets)
-
-        # No .distinct() needed: every filter above is a plain equality/IN on
+        # No .distinct() needed: every filter is a plain equality/IN on
         # AnalyzerReport's own FK columns, and every select_related() relation
         # is forward FK/O2O — structurally can't fan out into duplicate rows.
-        # _dedup_analyzer_reports() below already de-dupes in Python regardless.
-        qs = (
-            AnalyzerReport.objects.filter(filters)
-            .select_related(
-                "analyzer", "url", "domain", "mail", "hash",
-                "file", "ip", "mail_body", "mail_header",
-            )
-            .order_by("-creation_date", "-id")
-        )
-        return _dedup_analyzer_reports(qs)
+        return case_analyzer_reports(obj)
 
     @extend_schema(summary="Retrieve submission details")
     def retrieve(self, request, *args, **kwargs):
@@ -282,3 +246,97 @@ class SubmissionChallengeView(APIView):
             logger.exception("Challenge notify failed for case %s", obj.id)
 
         return Response({"detail": "Challenge submitted."}, status=status.HTTP_200_OK)
+
+
+_RECOMMENDED_ACTION = {
+    "Dangerous": "Block the listed observables at the perimeter and notify the reporter; "
+                 "treat as a confirmed threat.",
+    "Suspicious": "Review the listed observables against the analyzer evidence; block if confirmed.",
+    "Safe": "No action required; close the case.",
+    "Inconclusive": "Insufficient signal — escalate for manual analyst review.",
+}
+
+
+def build_ticket(case) -> dict:
+    """The ticket-shaped SOAR payload for a case: verdict, observables with
+    their per-IOC verdict, and an analyzer summary."""
+    from connectors.contrib.thehive.phishing import THEHIVE_SEVERITY, ticket_observables
+    from score_process.scoring.sources import source_verdict_from_report
+
+    reports = case_analyzer_reports(case)
+    by_verdict: dict = {}
+    analyzers: list = []
+    for rep in reports:
+        sv = source_verdict_from_report(rep)
+        by_verdict[sv.verdict] = by_verdict.get(sv.verdict, 0) + 1
+        if sv.name not in analyzers:
+            analyzers.append(sv.name)
+
+    result = str(case.results)
+    return {
+        "case_id": case.id,
+        "generated_at": timezone.now().isoformat(),
+        "title": f"Suspicious case #{case.id} — {result}",
+        "verdict": {
+            "result": result,
+            "score": case.final_score,
+            "confidence": case.final_confidence,
+            "severity": THEHIVE_SEVERITY.get(result, 2),
+            "tlp": 2,
+            "pap": 2,
+            # ponytail: results_ai/category_ai stand-in until roadmap item #2
+            # (Case.threat_classification) lands.
+            "ai_classification": case.category_ai or case.results_ai,
+            "rationale": list(case.verdict_rationale or []),
+        },
+        "observables": ticket_observables(case),
+        "analyzer_summary": {
+            "total_reports": len(reports),
+            "by_verdict": by_verdict,
+            "analyzers": analyzers,
+        },
+        "recommended_action": _RECOMMENDED_ACTION.get(
+            result, _RECOMMENDED_ACTION["Inconclusive"]
+        ),
+    }
+
+
+class SubmissionTicketView(APIView):
+    """GET: the ticket-shaped SOAR payload for a case (verdict, per-IOC
+    verdicts, analyzer summary). POST: push that payload to TheHive as an
+    alert — creating one, or updating the case's existing alert."""
+
+    permission_classes = [IsAuthenticated, IsInvestigator]
+
+    def _case(self, submission_id: int) -> Case:
+        return get_object_or_404(
+            Case.objects.select_related(*CASE_DETAIL_SELECT_RELATED), pk=submission_id
+        )
+
+    @extend_schema(summary="Ticket-shaped SOAR payload for a submission")
+    def get(self, request, submission_id: int):
+        return Response(build_ticket(self._case(submission_id)))
+
+    @extend_schema(summary="Push a submission's ticket to TheHive as an alert")
+    def post(self, request, submission_id: int):
+        from connectors.contrib.thehive.phishing import TheHivePushError, push_ticket
+        from connectors.delivery import get_state
+        from connectors.registry import registry
+
+        case = self._case(submission_id)
+
+        if not get_state("thehive").enabled:
+            return Response({"detail": "TheHive connector is not enabled."},
+                            status=status.HTTP_409_CONFLICT)
+        cfg = registry.instantiate("thehive").config
+        url, key = cfg.get("url"), cfg.get("api_key")
+        if not url or not key:
+            return Response({"detail": "TheHive connector is not configured."},
+                            status=status.HTTP_409_CONFLICT)
+
+        try:
+            result = push_ticket(case, build_ticket(case), url=url, key=key)
+        except TheHivePushError as exc:
+            return Response({"detail": f"TheHive push failed: {exc}"},
+                            status=status.HTTP_502_BAD_GATEWAY)
+        return Response(result, status=status.HTTP_200_OK)

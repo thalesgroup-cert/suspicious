@@ -9,6 +9,7 @@ from ip_process.models import IP
 from url_process.models import URL
 from file_process.models import File
 from hash_process.models import Hash
+from domain_process.models import Domain
 from mail_feeder.models import Mail
 from django.utils.translation import gettext_lazy as _
 from django.utils import timezone
@@ -63,6 +64,10 @@ class Case(models.Model):
     category_ai = models.CharField(max_length=20, default='Uncategorized', verbose_name='Category AI', db_index=True)
     fileOrMail = models.ForeignKey('CaseHasFileOrMail', on_delete=models.CASCADE, related_name='cases', null=True, blank=True, db_index=True)
     nonFileIocs = models.ForeignKey('CaseHasNonFileIocs', on_delete=models.CASCADE, related_name='cases', null=True, blank=True, db_index=True)
+    observable_group = models.ForeignKey(
+        "ObservableGroup", on_delete=models.CASCADE, related_name="cases",
+        null=True, blank=True, db_index=True,
+    )
     is_challenged = models.BooleanField(default=False)
     is_challengeable = models.BooleanField(default=True)
     challenged_result = models.CharField(max_length=20, choices=Result.choices, default=Result.UNCHALLENGED, verbose_name='Challenged Result')
@@ -95,6 +100,12 @@ class Case(models.Model):
     list_reason = models.TextField(
         blank=True, default="", verbose_name="Allow/Deny List Reason",
     )
+    inconclusive_reason = models.CharField(max_length=20, blank=True, default="")
+    verdict_rationale = models.JSONField(default=list, blank=True)
+    # Structured explanation of the verdict (score_process.scoring.explanation).
+    # None = not computed / old case; every render surface falls back to
+    # verdict_rationale / _RESULT_GUIDANCE when null.
+    verdict_explanation = models.JSONField(null=True, blank=True, default=None)
 
     class Meta:
         ordering = ['-creation_date']
@@ -308,3 +319,45 @@ class CaseArtifact(models.Model):
             or self.ip_id or self.mail_id or 'orphan'
         )
         return f"Case #{self.case_id} - {self.artifact_type}: {artifact_id}"
+
+
+class ObservableGroup(models.Model):
+    """A set of indicators submitted together and analysed as one Case.
+    The IOC-road analogue of Mail: a thin envelope over N observables."""
+    label = models.CharField(max_length=255, blank=True, default="")
+    creation_date = models.DateTimeField(auto_now_add=True, db_index=True)
+    last_update = models.DateTimeField(auto_now=True)
+
+    class Meta:
+        ordering = ["-creation_date"]
+
+    def __str__(self):
+        return self.label or f"ObservableGroup #{self.pk}"
+
+
+class ObservableGroupArtifact(models.Model):
+    class Type(models.TextChoices):
+        URL = "URL", "URL"
+        IP = "IP", "IP"
+        HASH = "HASH", "Hash"
+        DOMAIN = "DOMAIN", "Domain"
+
+    group = models.ForeignKey(ObservableGroup, on_delete=models.CASCADE, related_name="artifacts", db_index=True)
+    artifact_type = models.CharField(max_length=10, choices=Type.choices, db_index=True)
+    url = models.ForeignKey(URL, on_delete=models.CASCADE, null=True, blank=True, related_name="observable_group_artifacts")
+    ip = models.ForeignKey(IP, on_delete=models.CASCADE, null=True, blank=True, related_name="observable_group_artifacts")
+    hash = models.ForeignKey(Hash, on_delete=models.CASCADE, null=True, blank=True, related_name="observable_group_artifacts")
+    domain = models.ForeignKey(Domain, on_delete=models.CASCADE, null=True, blank=True, related_name="observable_group_artifacts")
+    creation_date = models.DateTimeField(auto_now_add=True, db_index=True)
+
+    class Meta:
+        ordering = ["creation_date"]
+        indexes = [models.Index(fields=["group", "artifact_type"])]
+
+    def observable(self):
+        return self.url or self.ip or self.hash or self.domain
+
+    def __str__(self):
+        obj = self.observable()
+        val = getattr(obj, "address", None) or getattr(obj, "value", None) or self.pk
+        return f"{self.artifact_type}: {val}"

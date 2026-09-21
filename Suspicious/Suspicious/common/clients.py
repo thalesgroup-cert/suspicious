@@ -61,6 +61,12 @@ def get_s3_presign_client() -> Minio:
     )
 
 
+def ensure_bucket(client, name: str) -> None:
+    """Create the MinIO bucket if it does not exist yet. Idempotent."""
+    if not client.bucket_exists(name):
+        client.make_bucket(name)
+
+
 def _disable_chromadb_telemetry() -> None:
     """Suppress ChromaDB telemetry via env vars and best-effort monkey-patching."""
     try:

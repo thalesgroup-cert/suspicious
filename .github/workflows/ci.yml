@@ -129,9 +129,10 @@ jobs:
           tags: suspicious:ci
           cache-from: type=gha
           cache-to: type=gha,mode=max
-      # Full discovery (no app labels): suspicious.test_settings provides the
-      # eager-Celery config the connectors suite needs and the stub URLConf;
-      # real-settings boot is still exercised by the migration-check job.
+      # Full discovery (no app labels): suspicious.test_settings adds the
+      # eager-Celery config the connectors suite needs and re-exports the real
+      # project URLConf; real-settings boot is still exercised by the
+      # migration-check job.
       - name: Django test suite
         run: |
           docker run --rm \

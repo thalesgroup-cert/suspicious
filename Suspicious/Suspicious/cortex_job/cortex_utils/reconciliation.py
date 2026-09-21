@@ -39,6 +39,7 @@ def finalise(case) -> None:
 
 
 from case_handler.lifecycle import LifecycleState, transition
+from cortex_job.cortex_utils.derived_observables import ingest_derived_observables
 from cortex_job.models import CaseAnalyzerJob
 
 _TERMINAL = {LifecycleState.FINALIZED, LifecycleState.CONTESTED}
@@ -70,6 +71,11 @@ def reconcile_case_core(case) -> None:
         return
 
     if case.dispatched_at is None and case.creation_date > timezone.now() - RECONCILE_DISPATCH_GRACE:
+        return
+
+    if ingest_derived_observables(case) > 0:
+        # Extractors surfaced new indicators — they are pending CaseAnalyzerJobs
+        # now; the next reconcile pass (webhook or 300s poll) carries on.
         return
 
     if case.lifecycle_state != LifecycleState.SCORING:

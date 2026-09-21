@@ -1,0 +1,16 @@
+{
+  "data_type": "url",
+  "report_full": {
+    "results": {
+      "positives": 3,
+      "total": 70,
+      "scans": {
+        "A": {"detected": true, "result": "X"},
+        "B": {"detected": false, "result": null},
+        "C": {"detected": true, "result": "Y"},
+        "D": {"detected": true, "result": "Z"}
+      }
+    }
+  },
+  "expect": {"level": "malicious"}
+}

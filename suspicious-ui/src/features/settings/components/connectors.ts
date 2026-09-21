@@ -64,6 +64,13 @@ export async function putConnectorConfig(
   return data.config as Record<string, unknown>;
 }
 
+/** Names of enabled connectors — readable by any authenticated user, unlike
+ *  listConnectors() which is Admin/CERT only. */
+export async function getEnabledConnectors(): Promise<string[]> {
+  const { data } = await api.get(`${endpoints.connectors}enabled/`);
+  return (data.enabled ?? []) as string[];
+}
+
 export async function testConnector(name: string) {
   const { data } = await api.post(`${endpoints.connectors}${name}/test/`);
   return data as { ok: boolean; detail: string };
