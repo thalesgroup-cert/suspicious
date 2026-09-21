@@ -77,6 +77,9 @@ Suspicious/Suspicious/score_process/tests/fixtures/narration/*.result.txt
 docs/reference/openapi.yaml
 docs/superpowers
 
+# ===== Research screenshots (local-only, not for the repo) =====
+docs/research/screenshots/
+
 # ===== Tooling / editors =====
 .claude/
 .codegraph
