@@ -71,7 +71,7 @@ python-json-logger==4.2.0  # v4.x changed the API; pin to v3 until we migrate
 
 # Image rendering (cairosvg: SVG→PNG for Outlook email previews)
 pillow==12.3.0
-cairosvg==2.9.0
+cairosvg==2.9.1
 
 # Task Queue
 celery[redis]==5.6.3
