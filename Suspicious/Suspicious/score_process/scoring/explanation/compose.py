@@ -131,7 +131,10 @@ def _fill(tmpl: str, band: str, confidence: int, sources, facts: dict) -> str:
 def compose(rule, band, confidence, sources, **facts):
     t = _RULE_TEMPLATES.get(rule, _GENERIC)
     reading = _confidence_reading(band, confidence)
-    analyst = _fill(t["analyst"], band, confidence, sources, facts) + " " + reading
+    # `reading` is always rendered as its own field alongside the analyst
+    # paragraph (UI panel, downloadable report) — it must not also be
+    # appended here, or every surface shows the same sentence twice.
+    analyst = _fill(t["analyst"], band, confidence, sources, facts)
     reporter = _fill(t["reporter"], band, confidence, sources, facts) + " " + \
         _RECOMMENDATION.get(band, _RECOMMENDATION["Inconclusive"])
     return analyst, reporter, reading

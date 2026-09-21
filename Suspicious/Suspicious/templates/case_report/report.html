@@ -4,39 +4,81 @@
 <meta charset="utf-8">
 <title>Case {{ case.id }} — IOC Report</title>
 <style>
-  :root { color-scheme: light; }
+  :root {
+    color-scheme: light;
+    --ink: #1a1d23; --sub: #5a6472; --line: #e4e7ec; --panel: #f8f9fb;
+    --safe-bg: #eafaf0; --safe-border: #8fd6ab; --safe-ink: #146334;
+    --susp-bg: #fff6e8; --susp-border: #f0c273; --susp-ink: #7a4a00;
+    --dang-bg: #fdecec; --dang-border: #eda3a3; --dang-ink: #8a1616;
+    --incon-bg: #eef1f6; --incon-border: #b7c1d1; --incon-ink: #38445c;
+  }
   * { box-sizing: border-box; }
   body {
-    font: 14px/1.5 -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
-    color: #1a1a1a;
+    font: 14px/1.55 -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+    color: var(--ink);
     background: #fff;
     margin: 0;
-    padding: 32px;
+    padding: 0 0 48px;
   }
-  .wrap { max-width: 900px; margin: 0 auto; }
-  h1 { font-size: 20px; margin: 0 0 4px; }
-  h2 { font-size: 15px; margin: 28px 0 8px; border-bottom: 1px solid #ddd; padding-bottom: 4px; }
-  .meta { color: #666; font-size: 12px; margin-bottom: 24px; }
-  .meta div { margin: 2px 0; }
-  .verdict {
-    display: inline-block; padding: 4px 12px; border-radius: 4px;
-    font-weight: 600; font-size: 15px; border: 1px solid #ccc; background: #f4f4f4;
+  .wrap { max-width: 880px; margin: 0 auto; padding: 0 32px; }
+
+  /* ---- Executive summary (verdict-colored header) --------------------- */
+  .summary {
+    padding: 32px; margin-bottom: 8px; border-bottom: 4px solid var(--line);
   }
-  .verdict.Safe { background: #e6f4ea; border-color: #99d3ab; color: #1c6b36; }
-  .verdict.Suspicious { background: #fdf1e3; border-color: #edc48a; color: #8a5200; }
-  .verdict.Dangerous { background: #fce8e8; border-color: #e6a3a3; color: #9b1c1c; }
-  .verdict.Inconclusive { background: #eef1f5; border-color: #b9c2d0; color: #3c4a63; }
+  .summary.Safe        { background: var(--safe-bg);  border-bottom-color: var(--safe-border); }
+  .summary.Suspicious  { background: var(--susp-bg);  border-bottom-color: var(--susp-border); }
+  .summary.Dangerous   { background: var(--dang-bg);  border-bottom-color: var(--dang-border); }
+  .summary.Inconclusive,
+  .summary.Unchallenged,
+  .summary.AllowListed,
+  .summary.Failure     { background: var(--incon-bg); border-bottom-color: var(--incon-border); }
+  .summary-inner { max-width: 816px; margin: 0 auto; }
+  .brand { font-size: 12px; font-weight: 700; letter-spacing: .06em; text-transform: uppercase; color: var(--sub); margin-bottom: 10px; }
+  .verdict-row { display: flex; align-items: baseline; gap: 14px; flex-wrap: wrap; margin-bottom: 6px; }
+  .verdict-badge {
+    display: inline-block; padding: 6px 16px; border-radius: 6px;
+    font-weight: 800; font-size: 19px; letter-spacing: -.01em;
+    border: 1px solid transparent; background: #fff;
+  }
+  .Safe        .verdict-badge { border-color: var(--safe-border); color: var(--safe-ink); }
+  .Suspicious  .verdict-badge { border-color: var(--susp-border); color: var(--susp-ink); }
+  .Dangerous   .verdict-badge { border-color: var(--dang-border); color: var(--dang-ink); }
+  .Inconclusive .verdict-badge, .Unchallenged .verdict-badge,
+  .AllowListed .verdict-badge, .Failure .verdict-badge { border-color: var(--incon-border); color: var(--incon-ink); }
+  .stat-line { font-size: 13px; color: var(--sub); }
+  .stat-line b { color: var(--ink); }
+  .lead {
+    font-size: 16px; line-height: 1.6; margin: 18px 0 0; max-width: 68ch;
+  }
+  .case-meta { font-size: 12px; color: var(--sub); margin-top: 18px; display: flex; gap: 18px; flex-wrap: wrap; }
+
+  /* ---- Section rhythm --------------------------------------------------*/
+  h2 {
+    font-size: 12px; font-weight: 700; letter-spacing: .06em; text-transform: uppercase;
+    color: var(--sub); margin: 36px 0 10px; padding-bottom: 8px; border-bottom: 1px solid var(--line);
+  }
+  h3 { font-size: 14px; margin: 18px 0 6px; }
+  .section-divider {
+    margin: 40px 0 8px; padding-top: 24px; border-top: 2px solid var(--line);
+  }
+  .section-divider .eyebrow {
+    font-size: 11px; font-weight: 700; letter-spacing: .08em; text-transform: uppercase;
+    color: var(--sub);
+  }
+  .section-divider p { margin: 4px 0 0; color: var(--sub); font-size: 13px; }
+
   ul { margin: 8px 0; padding-left: 20px; }
-  .obs { margin: 20px 0; padding: 16px; border: 1px solid #e3e3e3; border-radius: 6px; }
+  .obs { margin: 16px 0; padding: 16px; border: 1px solid var(--line); border-radius: 8px; background: var(--panel); }
   .obs-head { font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace; font-size: 15px; font-weight: 600; word-break: break-all; }
   .badge {
     display: inline-block; margin-left: 8px; padding: 1px 8px; border-radius: 10px;
     font-size: 11px; font-family: sans-serif; background: #eceff3; color: #445; vertical-align: middle;
   }
-  .sub { color: #555; font-size: 12px; margin: 6px 0; }
+  .sub { color: var(--sub); font-size: 12px; margin: 6px 0; }
   .enrichment { margin: 8px 0; }
   table { border-collapse: collapse; width: 100%; margin-top: 10px; font-size: 12px; }
-  th, td { border: 1px solid #ddd; padding: 6px 8px; text-align: left; vertical-align: top; }
+  th, td { border: 1px solid var(--line); padding: 6px 8px; text-align: left; vertical-align: top; }
   th { background: #f6f6f6; }
   details { margin: 6px 0; }
   summary { cursor: pointer; font-size: 12px; color: #345; }
@@ -45,20 +87,46 @@
     padding: 10px; overflow-x: auto; font-size: 11px; white-space: pre-wrap; word-break: break-word;
   }
   .src-table { margin-top: 10px; }
-  h3 { font-size: 14px; margin: 18px 0 6px; }
-  .empty { color: #666; font-style: italic; }
-  @media print { body { padding: 0; } .obs { break-inside: avoid; } }
+  .empty { color: var(--sub); font-style: italic; }
+  footer { margin-top: 48px; padding-top: 16px; border-top: 1px solid var(--line); font-size: 11px; color: var(--sub); }
+  @media print {
+    body { padding: 0; }
+    .summary { border-bottom-width: 2px; }
+    .obs { break-inside: avoid; }
+  }
 </style>
 </head>
 <body>
-<div class="wrap">
-  <h1>Suspicious — Indicator Analysis Report</h1>
-  <div class="meta">
-    <div>Case #{{ case.id }}</div>
-    <div>Generated {{ generated_at }}</div>
-    <div>Reporter: {{ case.reporter.username }}</div>
-    {% if case.creation_date %}<div>Case created: {{ case.creation_date }}</div>{% endif %}
+
+  {# ---- Executive summary: what anyone opening this file sees first ---- #}
+  <div class="summary {{ case.results }}">
+    <div class="summary-inner">
+      <div class="brand">Suspicious &middot; Indicator Analysis Report</div>
+      <div class="verdict-row">
+        <span class="verdict-badge">{{ case.results }}</span>
+        {% if case.final_score or case.final_confidence %}
+        <span class="stat-line">
+          {% if not observables %}<b>Score {{ case.final_score }}</b>&nbsp;&middot;&nbsp;{% endif %}<b>Confidence {{ case.final_confidence }}</b>
+        </span>
+        {% endif %}
+      </div>
+
+      {% if case.verdict_explanation.reporter_paragraph %}
+      <p class="lead">{{ case.verdict_explanation.reporter_paragraph }}</p>
+      {% elif case.inconclusive_reason %}
+      <p class="lead">{{ case.inconclusive_reason }}</p>
+      {% endif %}
+
+      <div class="case-meta">
+        <span>Case #{{ case.id }}</span>
+        <span>Generated {{ generated_at }}</span>
+        <span>Reporter: {{ case.reporter.username }}</span>
+        {% if case.creation_date %}<span>Case created: {{ case.creation_date }}</span>{% endif %}
+      </div>
+    </div>
   </div>
+
+  <div class="wrap">
 
   {% if case.description %}
   <h2>Description</h2>
@@ -70,18 +138,12 @@
   <p>{{ case.reporter_context }}</p>
   {% endif %}
 
-  <h2>Verdict</h2>
-  <p><span class="verdict {{ case.results }}">{{ case.results }}</span></p>
-  {% if case.final_score or case.final_confidence %}
-  {% if observables %}
-  <p class="sub">Confidence: {{ case.final_confidence }}</p>
-  {% else %}
-  <p class="sub">Score: {{ case.final_score }} &nbsp;·&nbsp; Confidence: {{ case.final_confidence }}</p>
-  {% endif %}
-  {% endif %}
-  {% if case.inconclusive_reason %}
-  <p class="sub">Inconclusive reason: {{ case.inconclusive_reason }}</p>
-  {% endif %}
+  {# ---- Technical detail: everything below is the analyst-facing tier -- #}
+  <div class="section-divider">
+    <div class="eyebrow">Technical detail</div>
+    <p>How this verdict was reached — sources, scoring, and per-indicator evidence.</p>
+  </div>
+
   {% if case.verdict_explanation %}
   <h3>Why this verdict</h3>
   <p>{{ case.verdict_explanation.analyst_paragraph }}</p>
@@ -95,6 +157,7 @@
   </table>
   {% endif %}
   {% elif case.verdict_rationale %}
+  <h3>Analyst notes</h3>
   <ul>
     {% for line in case.verdict_rationale %}<li>{{ line }}</li>{% endfor %}
   </ul>
@@ -109,7 +172,7 @@
     <div class="obs-head">{{ o.value }}<span class="badge">{{ o.type }}</span></div>
     {% if o.verdict %}
     <p class="sub">
-      <span class="verdict {{ o.verdict.band }}">{{ o.verdict.band }}</span>
+      <span class="verdict-badge" style="font-size:12px;padding:2px 10px;">{{ o.verdict.band }}</span>
       &nbsp;·&nbsp; Confidence: {{ o.verdict.confidence }}
     </p>
     {% if o.verdict.rationale %}
@@ -167,12 +230,14 @@
     {% endif %}
 
     {% if o.screenshot_data_uri %}
-    <img class="observable-screenshot" alt="Screenshot of {{ o.value }}" src="{{ o.screenshot_data_uri }}" style="max-width:100%;border:1px solid #ccc;margin-top:.5rem;">
+    <img class="observable-screenshot" alt="Screenshot of {{ o.value }}" src="{{ o.screenshot_data_uri }}" style="max-width:100%;border:1px solid #ccc;margin-top:.5rem;border-radius:6px;">
     {% elif o.screenshot_omitted %}
     <p class="empty">Screenshot omitted from the report (size cap) — open the investigation view.</p>
     {% endif %}
   </div>
   {% endfor %}
-</div>
+
+  <footer>Generated by Suspicious &middot; internal / authorized access only</footer>
+  </div>
 </body>
 </html>
