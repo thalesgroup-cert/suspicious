@@ -7,7 +7,7 @@
 -r requirements.txt
 
 pandas>=3.0.5
-scikit-learn>=1.9.0
+scikit-learn>=1.9.1
 imbalanced-learn>=0.14.2
 matplotlib>=3.11.1
 seaborn>=0.13.2
