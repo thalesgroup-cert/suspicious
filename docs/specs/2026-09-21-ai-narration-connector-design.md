@@ -365,3 +365,26 @@ CLI: `manage.py test_ai_narration [--case-id N | --fixture PATH]`
 - Cost/rate-limit handling for paid external providers is entirely
   unaddressed here — acceptable for a human-triggered-one-case-at-a-time
   test command, not acceptable once/if this becomes automatic.
+- **Prompt injection from real case content**, surfaced by the whole-branch
+  review: once `--case-id` mode is used, attacker-influenced text (a
+  phishing email's own body, subject, or an analyzer's rendering of it)
+  reaches the LLM prompt for the first time on this branch. `verdict_lock`
+  is lexical and passes on silence, so a compliant-looking injected
+  narration that simply avoids band words is not caught. Blast radius today
+  is one human reading stdout — acceptable for this manual-only phase — but
+  this is a second precondition, alongside the data-governance question,
+  that must be resolved before any report/email/UI rendering follow-on.
+- `score_process.scoring.narration.prompt.build_prompt` places the FIXED
+  CASE FACTS block first and the analyzer-reports block after. If a
+  provider's context window is exceeded, most local runtimes (Ollama/
+  llama.cpp included) truncate from the front — meaning the fixed facts are
+  exactly what gets silently dropped first, not the (usually much larger)
+  analyzer-reports block. This connector mitigates the immediate risk by
+  capping and deduplicating real-case reports before they reach the prompt
+  (see the fix-wave commit), but the more durable fix — moving the fixed
+  facts block to the end of the prompt, immediately before the
+  instructions, so it survives truncation regardless of prompt size — was
+  deliberately left out of this branch: `build_prompt` is shared,
+  already-merged code (PR #346) with its own tests, and reordering its
+  output deserves its own scoped change and review, not a fix folded into
+  an unrelated branch.
