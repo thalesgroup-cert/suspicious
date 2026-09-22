@@ -5,7 +5,7 @@
 <title>Case {{ case.id }}: IOC Report</title>
 <style>
   :root {
-    color-scheme: light;
+    color-scheme: light dark;
     --page-bg: #F3F4F6;
     --paper:   #FFFFFF;
     --ink:     #0B1220;
@@ -24,6 +24,44 @@
     --r-md: 10px;
     --font-sans: "Inter", system-ui, -apple-system, "Segoe UI", Roboto, Arial, sans-serif;
     --font-mono: "IBM Plex Mono", ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Courier New", monospace;
+    /* Tints/washes are tokens, not inline rgba(), so the dark-mode block
+       below redefines them once instead of chasing every literal. */
+    --tint-1: rgba(11,18,32,.015);
+    --tint-2: rgba(11,18,32,.025);
+    --tint-3: rgba(11,18,32,.03);
+    --tint-4: rgba(11,18,32,.05);
+    --wash-1: rgba(27,95,255,.06);
+    --wash-2: rgba(13,118,107,.045);
+    --card-shadow: 0 2px 8px rgba(11,18,32,.09), 0 0 0 1px rgba(11,18,32,.03);
+  }
+  @media (prefers-color-scheme: dark) {
+    /* Suspicious's own "midnight" theme (suspicious-ui/src/styles/themes.ts),
+       not an invented dark palette. */
+    :root {
+      --page-bg: #03050D;
+      --paper:   #070C1A;
+      --ink:     #E6ECF8;
+      --sub:     rgba(230,236,248,.72);
+      --sub-2:   rgba(123,179,255,.82);
+      --line:    rgba(77,143,255,.16);
+      --divider: rgba(77,143,255,.13);
+      --primary-ink: #7BB3FF;
+      --tint-1: rgba(77,143,255,.05);
+      --tint-2: rgba(77,143,255,.07);
+      --tint-3: rgba(77,143,255,.05);
+      --tint-4: rgba(255,255,255,.06);
+      --wash-1: rgba(77,143,255,.2);
+      --wash-2: rgba(123,179,255,.13);
+      --card-shadow: 0 4px 32px rgba(3,5,13,.65), inset 0 1px 0 rgba(123,179,255,.09);
+    }
+    /* Badge.tsx's own dark-mode formula: bg alpha .1->.14, border alpha
+       .45->.35, ink becomes the plain band color instead of a darkened
+       shade (the darkened shades below are tuned for a light background). */
+    .band-Safe, .band-AllowListed  { --band-bg: rgba(34,197,94,.14);  --band-ink: var(--safe); }
+    .band-Suspicious               { --band-bg: rgba(245,158,11,.14); --band-ink: var(--suspicious); }
+    .band-Dangerous, .band-Failure { --band-bg: rgba(239,68,68,.14);  --band-ink: var(--dangerous); }
+    .band-Inconclusive             { --band-bg: rgba(148,163,184,.18); --band-ink: var(--inconclusive); }
+    .band-Unchallenged             { --band-bg: rgba(100,116,139,.14); --band-ink: var(--unknown); }
   }
   * { box-sizing: border-box; }
   body {
@@ -31,8 +69,8 @@
     color: var(--ink);
     background-color: var(--page-bg);
     background-image:
-      radial-gradient(ellipse 1200px 600px at 15% -5%, rgba(27,95,255,.06), transparent 55%),
-      radial-gradient(ellipse 800px 400px at 90% 10%, rgba(13,118,107,.045), transparent 50%);
+      radial-gradient(ellipse 1200px 600px at 15% -5%, var(--wash-1), transparent 55%),
+      radial-gradient(ellipse 800px 400px at 90% 10%, var(--wash-2), transparent 50%);
     margin: 0;
     padding: 32px 24px 56px;
   }
@@ -41,7 +79,7 @@
     background: var(--paper);
     border: 1px solid var(--line);
     border-radius: var(--r-lg);
-    box-shadow: 0 2px 8px rgba(11,18,32,.09), 0 0 0 1px rgba(11,18,32,.03);
+    box-shadow: var(--card-shadow);
     overflow: hidden;
   }
 
@@ -96,13 +134,13 @@
 
   .obs {
     margin: 14px 0; padding: 16px; border-radius: var(--r-md);
-    border: 1px solid var(--line); background: rgba(11,18,32,.015);
+    border: 1px solid var(--line); background: var(--tint-1);
   }
   .obs-head { font-family: var(--font-mono); font-size: 14px; font-weight: 600; word-break: break-all; }
   .type-tag {
     display: inline-block; margin-left: 8px; padding: 1px 9px; border-radius: 999px;
     font-size: 10.5px; font-weight: 700; letter-spacing: .03em; text-transform: uppercase;
-    font-family: var(--font-sans); background: rgba(11,18,32,.05); color: var(--sub); vertical-align: middle;
+    font-family: var(--font-sans); background: var(--tint-4); color: var(--sub); vertical-align: middle;
   }
   .obs-verdict-pill { font-size: 11px; padding: 2px 10px; }
   .sub { color: var(--sub); font-size: 12px; margin: 6px 0; }
@@ -112,7 +150,7 @@
   th, td { padding: 7px 10px; text-align: left; vertical-align: top; border-bottom: 1px solid var(--line); }
   thead th, tr:first-child > th {
     font-size: 11px; font-weight: 700; letter-spacing: .04em; text-transform: uppercase;
-    color: var(--sub-2); background: rgba(11,18,32,.025); border-bottom: 1px solid var(--divider);
+    color: var(--sub-2); background: var(--tint-2); border-bottom: 1px solid var(--divider);
   }
   tbody tr:last-child td, tr:last-child td { border-bottom: none; }
 
@@ -122,7 +160,7 @@
     padding: 4px 0;
   }
   pre {
-    background: rgba(11,18,32,.03); border: 1px solid var(--line); border-radius: var(--r-md);
+    background: var(--tint-3); border: 1px solid var(--line); border-radius: var(--r-md);
     padding: 12px; overflow-x: auto; font-size: 11px; font-family: var(--font-mono);
     white-space: pre-wrap; word-break: break-word; color: var(--ink);
   }
@@ -142,6 +180,21 @@
   .band-Unchallenged            { --band-border: var(--unknown); --band-bg: rgba(100,116,139,.1); --band-ink: #334155; }
 
   @media print {
+    /* Printed output stays light regardless of OS dark-mode preference.
+       Last in source order so it wins the cascade when both apply. */
+    :root {
+      --page-bg: #F3F4F6; --paper: #FFFFFF; --ink: #0B1220;
+      --sub: rgba(11,18,32,.62); --sub-2: rgba(11,18,32,.5);
+      --line: rgba(11,18,32,.08); --divider: rgba(11,18,32,.1);
+      --primary-ink: #1449CC;
+      --tint-1: rgba(11,18,32,.015); --tint-2: rgba(11,18,32,.025);
+      --tint-3: rgba(11,18,32,.03); --tint-4: rgba(11,18,32,.05);
+    }
+    .band-Safe, .band-AllowListed  { --band-bg: rgba(34,197,94,.1);  --band-ink: #15803D; }
+    .band-Suspicious               { --band-bg: rgba(245,158,11,.1); --band-ink: #B45309; }
+    .band-Dangerous, .band-Failure { --band-bg: rgba(239,68,68,.1);  --band-ink: #B91C1C; }
+    .band-Inconclusive             { --band-bg: rgba(148,163,184,.14); --band-ink: #475569; }
+    .band-Unchallenged             { --band-bg: rgba(100,116,139,.1); --band-ink: #334155; }
     body { background: #fff; padding: 0; }
     .card { box-shadow: none; border: none; border-radius: 0; }
     .obs { break-inside: avoid; }
