@@ -8,30 +8,14 @@ from pathlib import Path
 from django.core.management.base import BaseCommand, CommandError
 from django.utils import timezone
 
-from api.utils.analyzer_reports import reports_for_case
-from api.views.investigations import _dedup_analyzer_reports
 from case_handler.models import Case
-from connectors.contrib.ai_narration.adapters import case_to_verdict_dict
+from connectors.contrib.ai_narration.adapters import analyzer_reports_for_prompt, case_to_verdict_dict
 from connectors.contrib.ai_narration import select as select_module
 from connectors.delivery import get_state
 from connectors.models import ConnectorDelivery
 from connectors.registry import registry
 from score_process.scoring.narration.prompt import build_prompt
 from score_process.scoring.narration.verdict_lock import validate_narration
-
-_MAX_REPORTS = 20
-_MAX_REPORT_FULL_CHARS = 4000
-
-
-def _cap_report_full(report_full: dict) -> dict:
-    serialized = json.dumps(report_full)
-    if len(serialized) <= _MAX_REPORT_FULL_CHARS:
-        return report_full
-    return {
-        "_truncated": True,
-        "original_size_chars": len(serialized),
-        "preview": serialized[:_MAX_REPORT_FULL_CHARS],
-    }
 
 
 class Command(BaseCommand):
@@ -64,11 +48,7 @@ class Command(BaseCommand):
                 verdict = case_to_verdict_dict(case)
             except ValueError as exc:
                 raise CommandError(str(exc))
-            deduped_reports = _dedup_analyzer_reports(reports_for_case(case))[:_MAX_REPORTS]
-            analyzer_reports = [
-                {"analyzer": r.analyzer.name, "report_full": _cap_report_full(r.report_full)}
-                for r in deduped_reports
-            ]
+            analyzer_reports = analyzer_reports_for_prompt(case)
         else:
             fixture_path = Path(options["fixture"])
             try:
