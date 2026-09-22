@@ -10,8 +10,8 @@ from rest_framework.permissions import IsAuthenticated
 from rest_framework.renderers import StaticHTMLRenderer
 from rest_framework.views import APIView
 
+from api.permissions.submissions import CanAccessSubmission
 from api.utils.observable_report import assemble_observables
-from api.views.investigations import IsInvestigator
 from case_handler.models import Case
 from common.clients import get_s3_client
 from cortex_job.models import AnalyzerReport
@@ -70,13 +70,14 @@ def _inline_screenshots(observables):
 
 
 class CaseReportView(APIView):
-    permission_classes = [IsAuthenticated, IsInvestigator]
+    permission_classes = [IsAuthenticated, CanAccessSubmission]
     # ponytail: html renderer so DRF's ?format=html negotiation doesn't 404;
     # the view still returns a plain HttpResponse, untouched by the renderer.
     renderer_classes = [StaticHTMLRenderer]
 
     def get(self, request, case_id):
         case = get_object_or_404(Case, pk=case_id)
+        self.check_object_permissions(request, case)
         observables = assemble_observables(case, full=True) if case.observable_group_id else []
         observables = _inline_screenshots(observables)
         html = render_to_string(
