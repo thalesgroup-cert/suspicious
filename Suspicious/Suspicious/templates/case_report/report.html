@@ -2,63 +2,243 @@
 <html lang="en">
 <head>
 <meta charset="utf-8">
-<title>Case {{ case.id }} — IOC Report</title>
+<title>Case {{ case.id }}: IOC Report</title>
 <style>
-  :root { color-scheme: light; }
+  :root {
+    color-scheme: light dark;
+    --page-bg: #F3F4F6;
+    --paper:   #FFFFFF;
+    --ink:     #0B1220;
+    --sub:     rgba(11,18,32,.62);
+    --sub-2:   rgba(11,18,32,.5);
+    --line:    rgba(11,18,32,.08);
+    --divider: rgba(11,18,32,.1);
+    --primary:     #1B5FFF;
+    --primary-ink: #1449CC;
+    --safe:         #22C55E;
+    --suspicious:   #F59E0B;
+    --dangerous:    #EF4444;
+    --inconclusive: #94A3B8;
+    --unknown:      #64748B;
+    --r-lg: 14px;
+    --r-md: 10px;
+    --font-sans: "Inter", system-ui, -apple-system, "Segoe UI", Roboto, Arial, sans-serif;
+    --font-mono: "IBM Plex Mono", ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Courier New", monospace;
+    /* Tints/washes are tokens, not inline rgba(), so the dark-mode block
+       below redefines them once instead of chasing every literal. */
+    --tint-1: rgba(11,18,32,.015);
+    --tint-2: rgba(11,18,32,.025);
+    --tint-3: rgba(11,18,32,.03);
+    --tint-4: rgba(11,18,32,.05);
+    --wash-1: rgba(27,95,255,.06);
+    --wash-2: rgba(13,118,107,.045);
+    --card-shadow: 0 2px 8px rgba(11,18,32,.09), 0 0 0 1px rgba(11,18,32,.03);
+  }
+  @media (prefers-color-scheme: dark) {
+    /* Suspicious's own "midnight" theme (suspicious-ui/src/styles/themes.ts),
+       not an invented dark palette. */
+    :root {
+      --page-bg: #03050D;
+      --paper:   #070C1A;
+      --ink:     #E6ECF8;
+      --sub:     rgba(230,236,248,.72);
+      --sub-2:   rgba(123,179,255,.82);
+      --line:    rgba(77,143,255,.16);
+      --divider: rgba(77,143,255,.13);
+      --primary-ink: #7BB3FF;
+      --tint-1: rgba(77,143,255,.05);
+      --tint-2: rgba(77,143,255,.07);
+      --tint-3: rgba(77,143,255,.05);
+      --tint-4: rgba(255,255,255,.06);
+      --wash-1: rgba(77,143,255,.2);
+      --wash-2: rgba(123,179,255,.13);
+      --card-shadow: 0 4px 32px rgba(3,5,13,.65), inset 0 1px 0 rgba(123,179,255,.09);
+    }
+    /* Badge.tsx's own dark-mode formula: bg alpha .1->.14, border alpha
+       .45->.35, ink becomes the plain band color instead of a darkened
+       shade (the darkened shades below are tuned for a light background). */
+    .band-Safe, .band-AllowListed  { --band-bg: rgba(34,197,94,.14);  --band-ink: var(--safe); }
+    .band-Suspicious               { --band-bg: rgba(245,158,11,.14); --band-ink: var(--suspicious); }
+    .band-Dangerous, .band-Failure { --band-bg: rgba(239,68,68,.14);  --band-ink: var(--dangerous); }
+    .band-Inconclusive             { --band-bg: rgba(148,163,184,.18); --band-ink: var(--inconclusive); }
+    .band-Unchallenged             { --band-bg: rgba(100,116,139,.14); --band-ink: var(--unknown); }
+  }
   * { box-sizing: border-box; }
   body {
-    font: 14px/1.5 -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
-    color: #1a1a1a;
-    background: #fff;
+    font: 13px/1.55 var(--font-sans);
+    color: var(--ink);
+    background-color: var(--page-bg);
+    background-image:
+      radial-gradient(ellipse 1200px 600px at 15% -5%, var(--wash-1), transparent 55%),
+      radial-gradient(ellipse 800px 400px at 90% 10%, var(--wash-2), transparent 50%);
     margin: 0;
-    padding: 32px;
+    padding: 32px 24px 56px;
   }
-  .wrap { max-width: 900px; margin: 0 auto; }
-  h1 { font-size: 20px; margin: 0 0 4px; }
-  h2 { font-size: 15px; margin: 28px 0 8px; border-bottom: 1px solid #ddd; padding-bottom: 4px; }
-  .meta { color: #666; font-size: 12px; margin-bottom: 24px; }
-  .meta div { margin: 2px 0; }
-  .verdict {
-    display: inline-block; padding: 4px 12px; border-radius: 4px;
-    font-weight: 600; font-size: 15px; border: 1px solid #ccc; background: #f4f4f4;
+  .page { max-width: 880px; margin: 0 auto; }
+  .card {
+    background: var(--paper);
+    border: 1px solid var(--line);
+    border-radius: var(--r-lg);
+    box-shadow: var(--card-shadow);
+    overflow: hidden;
   }
-  .verdict.Safe { background: #e6f4ea; border-color: #99d3ab; color: #1c6b36; }
-  .verdict.Suspicious { background: #fdf1e3; border-color: #edc48a; color: #8a5200; }
-  .verdict.Dangerous { background: #fce8e8; border-color: #e6a3a3; color: #9b1c1c; }
-  .verdict.Inconclusive { background: #eef1f5; border-color: #b9c2d0; color: #3c4a63; }
-  ul { margin: 8px 0; padding-left: 20px; }
-  .obs { margin: 20px 0; padding: 16px; border: 1px solid #e3e3e3; border-radius: 6px; }
-  .obs-head { font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace; font-size: 15px; font-weight: 600; word-break: break-all; }
-  .badge {
-    display: inline-block; margin-left: 8px; padding: 1px 8px; border-radius: 10px;
-    font-size: 11px; font-family: sans-serif; background: #eceff3; color: #445; vertical-align: middle;
+
+  /* ---- Brand + executive summary --------------------------------------- */
+  .summary { padding: 28px 32px 24px; border-top: 4px solid var(--band-border, var(--divider)); }
+  .brand-row { display: flex; align-items: center; gap: 10px; margin-bottom: 22px; }
+  .brand-mark {
+    width: 30px; height: 30px; border-radius: 8px; flex-shrink: 0;
+    background-image: linear-gradient(180deg, #2868FF, #1450E8);
+    box-shadow: 0 2px 8px rgba(27,95,255,.32), inset 0 1px 0 rgba(255,255,255,.15);
+    color: #fff; font-family: var(--font-mono); font-weight: 800; font-size: 15px;
+    display: flex; align-items: center; justify-content: center;
   }
-  .sub { color: #555; font-size: 12px; margin: 6px 0; }
+  .brand-word { font-weight: 950; font-size: 15px; letter-spacing: -0.03em; color: var(--ink); }
+  .brand-eyebrow {
+    font-size: 11px; font-weight: 700; letter-spacing: .06em; text-transform: uppercase;
+    color: var(--sub-2); margin-top: 1px;
+  }
+  .verdict-row { display: flex; align-items: center; gap: 14px; flex-wrap: wrap; margin-bottom: 4px; }
+  .pill {
+    display: inline-flex; align-items: center; justify-content: center;
+    border-radius: 999px; border: 1px solid transparent; font-weight: 900;
+    background: var(--paper); color: var(--sub);
+  }
+  .pill.band {
+    background: var(--band-bg, rgba(100,116,139,.1));
+    border-color: var(--band-border, rgba(100,116,139,.45));
+    color: var(--band-ink, var(--unknown));
+  }
+  .verdict-pill { font-size: 18px; letter-spacing: -0.01em; padding: 8px 20px; }
+  .stat-line { font-size: 13px; color: var(--sub); }
+  .stat-line b { color: var(--ink); font-weight: 700; }
+  .lead { font-size: 15px; line-height: 1.6; margin: 16px 0 0; max-width: 66ch; color: var(--ink); }
+  .case-meta { font-size: 12px; color: var(--sub); margin-top: 18px; display: flex; gap: 18px; flex-wrap: wrap; }
+
+  /* ---- Body ------------------------------------------------------------ */
+  .body { padding: 4px 32px 32px; }
+  h2 {
+    font-size: 11.5px; font-weight: 700; letter-spacing: .05em; text-transform: uppercase;
+    color: var(--sub-2); margin: 30px 0 10px; padding-bottom: 8px; border-bottom: 1px solid var(--divider);
+  }
+  h3 { font-size: 16px; font-weight: 750; letter-spacing: -0.2px; margin: 16px 0 6px; color: var(--ink); }
+  p { margin: 0 0 8px; }
+  .section-divider { margin: 34px 0 6px; padding-top: 22px; border-top: 1px solid var(--divider); }
+  .section-divider .eyebrow {
+    font-size: 11px; font-weight: 700; letter-spacing: .07em; text-transform: uppercase; color: var(--sub-2);
+  }
+  .section-divider p { margin: 4px 0 0; color: var(--sub); font-size: 13px; }
+
+  ul { margin: 6px 0; padding-left: 20px; }
+  li { margin: 2px 0; }
+
+  .obs {
+    margin: 14px 0; padding: 16px; border-radius: var(--r-md);
+    border: 1px solid var(--line); background: var(--tint-1);
+  }
+  .obs-head { font-family: var(--font-mono); font-size: 14px; font-weight: 600; word-break: break-all; }
+  .type-tag {
+    display: inline-block; margin-left: 8px; padding: 1px 9px; border-radius: 999px;
+    font-size: 10.5px; font-weight: 700; letter-spacing: .03em; text-transform: uppercase;
+    font-family: var(--font-sans); background: var(--tint-4); color: var(--sub); vertical-align: middle;
+  }
+  .obs-verdict-pill { font-size: 11px; padding: 2px 10px; }
+  .sub { color: var(--sub); font-size: 12px; margin: 6px 0; }
   .enrichment { margin: 8px 0; }
+
   table { border-collapse: collapse; width: 100%; margin-top: 10px; font-size: 12px; }
-  th, td { border: 1px solid #ddd; padding: 6px 8px; text-align: left; vertical-align: top; }
-  th { background: #f6f6f6; }
-  details { margin: 6px 0; }
-  summary { cursor: pointer; font-size: 12px; color: #345; }
+  th, td { padding: 7px 10px; text-align: left; vertical-align: top; border-bottom: 1px solid var(--line); }
+  thead th, tr:first-child > th {
+    font-size: 11px; font-weight: 700; letter-spacing: .04em; text-transform: uppercase;
+    color: var(--sub-2); background: var(--tint-2); border-bottom: 1px solid var(--divider);
+  }
+  tbody tr:last-child td, tr:last-child td { border-bottom: none; }
+
+  details { margin: 8px 0; }
+  summary {
+    cursor: pointer; font-size: 12px; font-weight: 600; color: var(--primary-ink);
+    padding: 4px 0;
+  }
   pre {
-    background: #f6f8fa; border: 1px solid #e1e4e8; border-radius: 4px;
-    padding: 10px; overflow-x: auto; font-size: 11px; white-space: pre-wrap; word-break: break-word;
+    background: var(--tint-3); border: 1px solid var(--line); border-radius: var(--r-md);
+    padding: 12px; overflow-x: auto; font-size: 11px; font-family: var(--font-mono);
+    white-space: pre-wrap; word-break: break-word; color: var(--ink);
   }
   .src-table { margin-top: 10px; }
-  h3 { font-size: 14px; margin: 18px 0 6px; }
-  .empty { color: #666; font-style: italic; }
-  @media print { body { padding: 0; } .obs { break-inside: avoid; } }
+  .empty { color: var(--sub); font-style: italic; }
+  .observable-screenshot { border: 1px solid var(--line); border-radius: var(--r-md); }
+
+  footer {
+    margin-top: 8px; padding-top: 16px; border-top: 1px solid var(--divider);
+    font-size: 11px; color: var(--sub-2);
+  }
+
+  .band-Safe, .band-AllowListed { --band-border: var(--safe); --band-bg: rgba(34,197,94,.1); --band-ink: #15803D; }
+  .band-Suspicious              { --band-border: var(--suspicious); --band-bg: rgba(245,158,11,.1); --band-ink: #B45309; }
+  .band-Dangerous, .band-Failure { --band-border: var(--dangerous); --band-bg: rgba(239,68,68,.1); --band-ink: #B91C1C; }
+  .band-Inconclusive            { --band-border: var(--inconclusive); --band-bg: rgba(148,163,184,.14); --band-ink: #475569; }
+  .band-Unchallenged            { --band-border: var(--unknown); --band-bg: rgba(100,116,139,.1); --band-ink: #334155; }
+
+  @media print {
+    /* Printed output stays light regardless of OS dark-mode preference.
+       Last in source order so it wins the cascade when both apply. */
+    :root {
+      --page-bg: #F3F4F6; --paper: #FFFFFF; --ink: #0B1220;
+      --sub: rgba(11,18,32,.62); --sub-2: rgba(11,18,32,.5);
+      --line: rgba(11,18,32,.08); --divider: rgba(11,18,32,.1);
+      --primary-ink: #1449CC;
+      --tint-1: rgba(11,18,32,.015); --tint-2: rgba(11,18,32,.025);
+      --tint-3: rgba(11,18,32,.03); --tint-4: rgba(11,18,32,.05);
+    }
+    .band-Safe, .band-AllowListed  { --band-bg: rgba(34,197,94,.1);  --band-ink: #15803D; }
+    .band-Suspicious               { --band-bg: rgba(245,158,11,.1); --band-ink: #B45309; }
+    .band-Dangerous, .band-Failure { --band-bg: rgba(239,68,68,.1);  --band-ink: #B91C1C; }
+    .band-Inconclusive             { --band-bg: rgba(148,163,184,.14); --band-ink: #475569; }
+    .band-Unchallenged             { --band-bg: rgba(100,116,139,.1); --band-ink: #334155; }
+    body { background: #fff; padding: 0; }
+    .card { box-shadow: none; border: none; border-radius: 0; }
+    .obs { break-inside: avoid; }
+  }
 </style>
 </head>
 <body>
-<div class="wrap">
-  <h1>Suspicious — Indicator Analysis Report</h1>
-  <div class="meta">
-    <div>Case #{{ case.id }}</div>
-    <div>Generated {{ generated_at }}</div>
-    <div>Reporter: {{ case.reporter.username }}</div>
-    {% if case.creation_date %}<div>Case created: {{ case.creation_date }}</div>{% endif %}
+<div class="page">
+<div class="card">
+
+  {# Executive summary: what anyone opening this file sees first #}
+  <div class="summary band-{{ case.results }}">
+    <div class="brand-row">
+      <div class="brand-mark">S</div>
+      <div>
+        <div class="brand-word">Suspicious</div>
+        <div class="brand-eyebrow">Indicator Analysis Report</div>
+      </div>
+    </div>
+
+    <div class="verdict-row">
+      <span class="pill band verdict-pill">{{ case.results }}</span>
+      {% if case.final_score or case.final_confidence %}
+      <span class="stat-line">
+        {% if not observables %}<b>Score {{ case.final_score }}</b>&nbsp;&middot;&nbsp;{% endif %}<b>Confidence {{ case.final_confidence }}</b>
+      </span>
+      {% endif %}
+    </div>
+
+    {% if case.verdict_explanation.reporter_paragraph %}
+    <p class="lead">{{ case.verdict_explanation.reporter_paragraph }}</p>
+    {% elif case.inconclusive_reason %}
+    <p class="lead">{{ case.inconclusive_reason }}</p>
+    {% endif %}
+
+    <div class="case-meta">
+      <span>Case #{{ case.id }}</span>
+      <span>Generated {{ generated_at }}</span>
+      <span>Reporter: {{ case.reporter.username }}</span>
+      {% if case.creation_date %}<span>Case created: {{ case.creation_date }}</span>{% endif %}
+    </div>
   </div>
+
+  <div class="body">
 
   {% if case.description %}
   <h2>Description</h2>
@@ -70,18 +250,12 @@
   <p>{{ case.reporter_context }}</p>
   {% endif %}
 
-  <h2>Verdict</h2>
-  <p><span class="verdict {{ case.results }}">{{ case.results }}</span></p>
-  {% if case.final_score or case.final_confidence %}
-  {% if observables %}
-  <p class="sub">Confidence: {{ case.final_confidence }}</p>
-  {% else %}
-  <p class="sub">Score: {{ case.final_score }} &nbsp;·&nbsp; Confidence: {{ case.final_confidence }}</p>
-  {% endif %}
-  {% endif %}
-  {% if case.inconclusive_reason %}
-  <p class="sub">Inconclusive reason: {{ case.inconclusive_reason }}</p>
-  {% endif %}
+  {# Technical detail: everything below is the analyst-facing tier #}
+  <div class="section-divider">
+    <div class="eyebrow">Technical detail</div>
+    <p>How this verdict was reached: sources, scoring, and per-indicator evidence.</p>
+  </div>
+
   {% if case.verdict_explanation %}
   <h3>Why this verdict</h3>
   <p>{{ case.verdict_explanation.analyst_paragraph }}</p>
@@ -95,6 +269,7 @@
   </table>
   {% endif %}
   {% elif case.verdict_rationale %}
+  <h3>Analyst notes</h3>
   <ul>
     {% for line in case.verdict_rationale %}<li>{{ line }}</li>{% endfor %}
   </ul>
@@ -106,10 +281,10 @@
   {% endif %}
   {% for o in observables %}
   <div class="obs">
-    <div class="obs-head">{{ o.value }}<span class="badge">{{ o.type }}</span></div>
+    <div class="obs-head">{{ o.value }}<span class="type-tag">{{ o.type }}</span></div>
     {% if o.verdict %}
     <p class="sub">
-      <span class="verdict {{ o.verdict.band }}">{{ o.verdict.band }}</span>
+      <span class="pill band obs-verdict-pill band-{{ o.verdict.band }}">{{ o.verdict.band }}</span>
       &nbsp;·&nbsp; Confidence: {{ o.verdict.confidence }}
     </p>
     {% if o.verdict.rationale %}
@@ -160,19 +335,23 @@
     </div>
     {% endif %}
     <details>
-      <summary>Raw report — {{ s.name }}</summary>
+      <summary>Raw report: {{ s.name }}</summary>
       <pre>{{ s.report|pprint }}</pre>
     </details>
     {% endfor %}
     {% endif %}
 
     {% if o.screenshot_data_uri %}
-    <img class="observable-screenshot" alt="Screenshot of {{ o.value }}" src="{{ o.screenshot_data_uri }}" style="max-width:100%;border:1px solid #ccc;margin-top:.5rem;">
+    <img class="observable-screenshot" alt="Screenshot of {{ o.value }}" src="{{ o.screenshot_data_uri }}" style="max-width:100%;margin-top:.5rem;">
     {% elif o.screenshot_omitted %}
-    <p class="empty">Screenshot omitted from the report (size cap) — open the investigation view.</p>
+    <p class="empty">Screenshot omitted from the report (size cap): open the investigation view.</p>
     {% endif %}
   </div>
   {% endfor %}
+
+  <footer>Generated by Suspicious &middot; internal / authorized access only</footer>
+  </div>
+</div>
 </div>
 </body>
 </html>

@@ -31,7 +31,7 @@ def update_ongoing_cases() -> None:
     Bounded scan: at most CRON_BATCH_SIZE oldest cases per tick. Covers
     cases whose webhook delivery was missed/delayed *and* jobless cases
     (zero CaseAnalyzerJob rows) that no per-job trigger would ever revisit.
-    No lock is taken here — `reconcile_case` owns the per-case
+    No lock is taken here: `reconcile_case` owns the per-case
     `case_update_lock:<id>` lock, so a case already being processed by the
     webhook task is simply skipped there and re-picked up next tick.
     """

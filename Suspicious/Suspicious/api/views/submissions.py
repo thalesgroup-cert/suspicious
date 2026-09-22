@@ -185,7 +185,7 @@ class SubmissionDetailsView(RetrieveAPIView):
     def _get_analyzer_reports_queryset(self, obj: Case):
         # No .distinct() needed: every filter is a plain equality/IN on
         # AnalyzerReport's own FK columns, and every select_related() relation
-        # is forward FK/O2O — structurally can't fan out into duplicate rows.
+        # is forward FK/O2O: structurally can't fan out into duplicate rows.
         return case_analyzer_reports(obj)
 
     @extend_schema(summary="Retrieve submission details")
@@ -253,7 +253,7 @@ _RECOMMENDED_ACTION = {
                  "treat as a confirmed threat.",
     "Suspicious": "Review the listed observables against the analyzer evidence; block if confirmed.",
     "Safe": "No action required; close the case.",
-    "Inconclusive": "Insufficient signal — escalate for manual analyst review.",
+    "Inconclusive": "Insufficient signal, escalate for manual analyst review.",
 }
 
 
@@ -276,7 +276,7 @@ def build_ticket(case) -> dict:
     return {
         "case_id": case.id,
         "generated_at": timezone.now().isoformat(),
-        "title": f"Suspicious case #{case.id} — {result}",
+        "title": f"Suspicious case #{case.id}: {result}",
         "verdict": {
             "result": result,
             "score": case.final_score,
@@ -304,7 +304,7 @@ def build_ticket(case) -> dict:
 class SubmissionTicketView(APIView):
     """GET: the ticket-shaped SOAR payload for a case (verdict, per-IOC
     verdicts, analyzer summary). POST: push that payload to TheHive as an
-    alert — creating one, or updating the case's existing alert."""
+    alert: creating one, or updating the case's existing alert."""
 
     permission_classes = [IsAuthenticated, IsInvestigator]
 

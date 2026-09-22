@@ -17,9 +17,7 @@ export {
   type ReportLike,
 } from "@/shared/lib/scoreUtils";
 
-// ---------------------------------------------------------------------------
 // Investigation-specific helpers
-// ---------------------------------------------------------------------------
 
 export function short(s: string, n = 42) {
   const t = (s ?? "").trim();

@@ -1,7 +1,7 @@
 """Read the portable feeder contract: one bucket, prefix-per-submission.
 
 Lists submission prefixes under a single feeder bucket and drives each
-submission's status via its `_status.json` object — the portable replacement
+submission's status via its `_status.json` object: the portable replacement
 for the legacy bucket-per-submission + bucket-tag scheme.
 """
 from __future__ import annotations
@@ -46,7 +46,7 @@ class PrefixSource:
             try:
                 status = self.read_status(submission_id)
             except Exception:
-                logger.warning("No/invalid _status.json for %s — skipping", submission_id)
+                logger.warning("No/invalid _status.json for %s, skipping", submission_id)
                 continue
             if status.get("status") in (sc.STATUS_TODO, sc.STATUS_PROCESSING):
                 yield submission_id
@@ -92,7 +92,7 @@ class PrefixSource:
             try:
                 safe_rel = _safe_object_name(rel)
             except ValueError:
-                logger.warning("Unsafe object name %r in %s — skipped",
+                logger.warning("Unsafe object name %r in %s, skipped",
                                obj.object_name, submission_id)
                 continue
             dst = os.path.join(local_root, safe_rel)

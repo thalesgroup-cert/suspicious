@@ -10,9 +10,7 @@ import logging
 warnings.filterwarnings("ignore", category=SyntaxWarning, module=r"spf$")
 warnings.filterwarnings("ignore", category=SyntaxWarning, module=r"simhash(\..*)?$")
 
-# ---------------------------------------------------------------------------
 # Load configuration file
-# ---------------------------------------------------------------------------
 
 import os as _os
 CONFIG_PATH = _os.environ.get("SUSPICIOUS_CONFIG_PATH", "/app/settings.json")
@@ -49,16 +47,12 @@ _redis_cfg  = _config.get("redis", {})
 _observ  = _config.get("observability", {})
 _otel    = _observ.get("opentelemetry", {})
 
-# ---------------------------------------------------------------------------
 # Base directories
-# ---------------------------------------------------------------------------
 
 BASE_DIR       = Path(__file__).resolve().parent.parent.parent
 FILES_BASE_DIR = Path(__file__).resolve().parent.parent
 
-# ---------------------------------------------------------------------------
 # Security
-# ---------------------------------------------------------------------------
 
 from suspicious.secrets import get_secret
 
@@ -112,9 +106,7 @@ if not DEBUG:
             "'django-insecure' prefix and use at least 50 random characters."
         )
 
-# ---------------------------------------------------------------------------
 # Application definition
-# ---------------------------------------------------------------------------
 
 INSTALLED_APPS = [
     "django.contrib.admin",
@@ -171,9 +163,7 @@ ASGI_APPLICATION = "suspicious.asgi.application"
 
 SITE_ID = 1
 
-# ---------------------------------------------------------------------------
 # Templates
-# ---------------------------------------------------------------------------
 
 TEMPLATES = [
     {
@@ -191,9 +181,7 @@ TEMPLATES = [
     },
 ]
 
-# ---------------------------------------------------------------------------
 # Database
-# ---------------------------------------------------------------------------
 
 if _is_test:
     DATABASES = {
@@ -248,9 +236,7 @@ else:
 
 DEFAULT_AUTO_FIELD = "django.db.models.BigAutoField"
 
-# ---------------------------------------------------------------------------
-# Cache — Redis (redis_cache container)
-# ---------------------------------------------------------------------------
+# Cache: Redis (redis_cache container)
 
 _redis_cache_host = _redis_cfg.get("cache_host", "redis_cache")
 
@@ -264,8 +250,6 @@ else:
         }
     }
 
-# ---------------------------------------------------------------------------
-# ---------------------------------------------------------------------------
 
 SESSION_ENGINE               = "django.contrib.sessions.backends.cache"
 SESSION_CACHE_ALIAS          = "default"
@@ -273,8 +257,6 @@ SESSION_EXPIRE_AT_BROWSER_CLOSE = True
 SESSION_COOKIE_HTTPONLY      = True
 SESSION_COOKIE_SAMESITE      = "Lax"
 
-# ---------------------------------------------------------------------------
-# ---------------------------------------------------------------------------
 
 AUTHENTICATION_BACKENDS = []
 
@@ -328,8 +310,6 @@ if _ldap_uri:
 
 AUTHENTICATION_BACKENDS.append("django.contrib.auth.backends.ModelBackend")
 
-# ---------------------------------------------------------------------------
-# ---------------------------------------------------------------------------
 
 OIDC_SERVER_URL    = _oidc.get("server_url", "")
 OIDC_CLIENT_ID     = _oidc.get("client_id", "")
@@ -338,9 +318,7 @@ OIDC_SCOPES        = _oidc.get("scopes", "openid email profile")
 OIDC_REDIRECT_URI  = _oidc.get("redirect_uri", "")
 
 
-# ---------------------------------------------------------------------------
 # Django REST Framework
-# ---------------------------------------------------------------------------
 
 REST_FRAMEWORK = {
     "DEFAULT_AUTHENTICATION_CLASSES": (
@@ -370,17 +348,13 @@ REST_FRAMEWORK = {
     "DEFAULT_SCHEMA_CLASS": "drf_spectacular.openapi.AutoSchema",
 }
 
-# ---------------------------------------------------------------------------
 # OpenTelemetry
-# ---------------------------------------------------------------------------
 
 OTEL_ENABLED                 = _otel.get("enabled", False)
 OTEL_SERVICE_NAME            = _otel.get("service_name", "suspicious")
 OTEL_EXPORTER_OTLP_ENDPOINT  = _otel.get("otlp_endpoint", "http://tempo:4318")
 
-# ---------------------------------------------------------------------------
 # Knox (token auth)
-# ---------------------------------------------------------------------------
 
 REST_KNOX = {
     "SECURE_HASH_ALGORITHM": "hashlib.sha3_512",
@@ -388,13 +362,11 @@ REST_KNOX = {
     "AUTO_REFRESH": False,
 }
 
-# ---------------------------------------------------------------------------
 # drf-spectacular (OpenAPI schema)
-# ---------------------------------------------------------------------------
 
 SPECTACULAR_SETTINGS = {
     "TITLE":               "Suspicious API",
-    "DESCRIPTION":         "Suspicious — security intake and automated analysis platform.",
+    "DESCRIPTION":         "Suspicious: security intake and automated analysis platform.",
     "VERSION":             "1.0.0",
     "SERVE_INCLUDE_SCHEMA": False,
     "SECURITY": [{"TokenAuth": []}],
@@ -410,8 +382,6 @@ SPECTACULAR_SETTINGS = {
     },
 }
 
-# ---------------------------------------------------------------------------
-# ---------------------------------------------------------------------------
 
 _storage_backend = _storage.get("backend", "local").lower()
 _DUAL_WRITE = str(_features.get("dual_storage_write", "0")).strip().lower() in {
@@ -434,9 +404,7 @@ elif _storage_backend == "dual" or (_storage_backend == "local" and _DUAL_WRITE)
 else:
     _default_file_backend = "django.core.files.storage.FileSystemStorage"
 
-# ---------------------------------------------------------------------------
 # Static and media files
-# ---------------------------------------------------------------------------
 
 STORAGES = {
     "default": {"BACKEND": _default_file_backend},
@@ -449,9 +417,7 @@ STATIC_ROOT = FILES_BASE_DIR / "static"
 MEDIA_URL  = "/media/"
 MEDIA_ROOT = FILES_BASE_DIR / "media"
 
-# ---------------------------------------------------------------------------
 # File uploads
-# ---------------------------------------------------------------------------
 
 FILE_UPLOAD_HANDLERS = [
     "django.core.files.uploadhandler.TemporaryFileUploadHandler",
@@ -463,9 +429,7 @@ DATA_UPLOAD_MAX_MEMORY_SIZE = MAX_UPLOAD_SIZE
 FILE_UPLOAD_MAX_MEMORY_SIZE = 0
 SUBMIT_FILE_MAX_BYTES       = MAX_UPLOAD_SIZE
 
-# ---------------------------------------------------------------------------
 # Password validation
-# ---------------------------------------------------------------------------
 
 AUTH_PASSWORD_VALIDATORS = [
     {"NAME": "django.contrib.auth.password_validation.UserAttributeSimilarityValidator"},
@@ -477,9 +441,7 @@ AUTH_PASSWORD_VALIDATORS = [
     {"NAME": "django.contrib.auth.password_validation.NumericPasswordValidator"},
 ]
 
-# ---------------------------------------------------------------------------
 # Internationalisation
-# ---------------------------------------------------------------------------
 
 LANGUAGE_CODE = "en-us"
 TIME_ZONE = _app.get("timezone", "UTC")
@@ -487,15 +449,11 @@ USE_I18N      = True
 USE_L10N      = True
 USE_TZ        = True
 
-# ---------------------------------------------------------------------------
 # Submission groups
-# ---------------------------------------------------------------------------
 
 SUBMISSION_ELEVATED_GROUPS = ("CERT", "CISO", "Admin")
 
-# ---------------------------------------------------------------------------
-# Celery — broker (redis_broker container) + result backend (MariaDB)
-# ---------------------------------------------------------------------------
+# Celery: broker (redis_broker container) + result backend (MariaDB)
 
 from celery.schedules import crontab
 
@@ -559,9 +517,7 @@ CELERY_BEAT_SCHEDULE = {
     },
 }
 
-# ---------------------------------------------------------------------------
 # Logging
-# ---------------------------------------------------------------------------
 
 _trace_level = getattr(logging, _app.get("log_level", "INFO").upper(), logging.INFO)
 
@@ -578,7 +534,7 @@ def _app_logger(name: str) -> tuple[dict, dict]:
     """Build the (handler, logger) pair for one Django app's dedicated log
     file. Plain per-app log? Add the name to APP_LOGGERS above. Need a
     different handler/rotation/name mapping (a cross-cutting pipeline
-    logger)? Write it by hand below, unchanged — don't force it through
+    logger)? Write it by hand below, unchanged; don't force it through
     this generator."""
     handler = (
         {"class": "logging.NullHandler"}

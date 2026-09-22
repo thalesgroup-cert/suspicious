@@ -233,7 +233,7 @@ def resolve_logo(raw: str | None, outlook_png_width: int = _OUTLOOK_PNG_WIDTH) -
                 "outlook_src": outlook_src,
             }
 
-    # ── URL or absolute file path — pass through unchanged ────────────────
+    # URL or absolute file path — pass through unchanged
     if raw.startswith("http://") or raw.startswith("https://") or raw.startswith("/"):
         lower = raw.lower()
         mime  = (
@@ -252,7 +252,7 @@ def resolve_logo(raw: str | None, outlook_png_width: int = _OUTLOOK_PNG_WIDTH) -
             "outlook_src": "",
         }
 
-    # ── Raw base64 — detect, wrap in data URI, and convert if SVG ─────────
+    # Raw base64 — detect, wrap in data URI, and convert if SVG
     b64  = re.sub(r"\s+", "", raw)
     mime = _sniff_raw_base64(b64)
     if mime:

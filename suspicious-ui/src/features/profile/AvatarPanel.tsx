@@ -60,7 +60,7 @@ export function AvatarPanel({
       return;
     }
     if (file.size > MAX_BYTES) {
-      setUploadError(`File too large — max 2 MB, got ${(file.size / 1024 / 1024).toFixed(1)} MB.`);
+      setUploadError(`File too large: max 2 MB, got ${(file.size / 1024 / 1024).toFixed(1)} MB.`);
       return;
     }
 
@@ -73,7 +73,7 @@ export function AvatarPanel({
     } catch (err: unknown) {
       const detail =
         (err as { response?: { data?: { detail?: string } } })?.response?.data?.detail;
-      setUploadError(detail ?? "Upload failed — please try again.");
+      setUploadError(detail ?? "Upload failed. Please try again.");
     } finally {
       setUploading(false);
     }
@@ -116,7 +116,7 @@ export function AvatarPanel({
         <Box>
           <Typography variant="h6" sx={{ fontWeight: 950, letterSpacing: -0.2 }}>Avatar</Typography>
           <Typography variant="body2" color="text.secondary">
-            Build your avatar — pick a style, then dial in every color and detail.
+            Build your avatar: pick a style, then dial in every color and detail.
           </Typography>
         </Box>
       </Stack>

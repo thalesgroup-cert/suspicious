@@ -73,7 +73,7 @@ def score_observable(sources: list) -> ObservableVerdict:
     # Suspicious").
     if len(trusted_voting) < MIN_TRUSTED_COVERAGE and not any_flag:
         rationale.append(
-            f"Only {len(trusted_voting)} trusted source(s) returned a verdict — cannot assess."
+            f"Only {len(trusted_voting)} trusted source(s) returned a verdict: cannot assess."
         )
         return ObservableVerdict("Inconclusive", _confidence(sources, split=1.0),
                                  "thin_coverage", counts, rationale,
@@ -115,7 +115,7 @@ def score_observable(sources: list) -> ObservableVerdict:
             rationale.append(f"{trusted_flag[0].name} flags the indicator; evidence is not decisive.")
             _rule = "trusted-flag-not-decisive"
         else:
-            rationale.append("Only contextual/low-trust sources flag this — capped at Suspicious.")
+            rationale.append("Only contextual/low-trust sources flag this, capped at Suspicious.")
             _rule = "contextual-only-flag"
         return ObservableVerdict("Suspicious", _confidence(sources), None, counts, rationale,
                                  rule=_rule)

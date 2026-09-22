@@ -41,7 +41,7 @@ _DEFAULT_PREVIEW_BUCKET = "mail-previews"
 
 _RENDER_WIDTH_PX = 900
 
-# wkhtmltoimage renders the *entire* page as one image with no pagination —
+# wkhtmltoimage renders the *entire* page as one image with no pagination:
 # an email body with pathological height (a long forwarded/quoted chain, or
 # a hostile HTML payload designed to bloat the render) produces an
 # arbitrarily tall PNG with no upper bound. `--height` hard-crops the
@@ -53,7 +53,7 @@ _MAX_RENDER_HEIGHT_PX = 4000
 
 # Belt-and-suspenders: even a capped-height render can still bloat past a
 # sane size (e.g. many large embedded images at full color). Drop the
-# render entirely rather than store it — MailPreviewView already treats a
+# render entirely rather than store it; MailPreviewView already treats a
 # missing preview as a 404 + lazy re-render trigger, so this degrades the
 # same way any other render failure does.
 _MAX_PNG_BYTES = 15 * 1024 * 1024
@@ -64,7 +64,7 @@ _REMOTE_CSS_RE = re.compile(
     r"<link\b[^>]*>|@import\b[^;]*;", re.IGNORECASE | re.DOTALL
 )
 
-# imgkit's `no-images` option only blocks <img> tag loads — not CSS
+# imgkit's `no-images` option only blocks <img> tag loads, not CSS
 # background-image/@font-face url(...) (in <style> blocks or inline
 # style="" attributes) or other resource-fetching tags. Phishing HTML
 # routinely hides tracking pixels in exactly those spots. The render
@@ -96,14 +96,12 @@ class Eml2PngRenderer:
         except Exception:
             self._imgkit_available = False
 
-    # ------------------------------------------------------------------
     # Public API
-    # ------------------------------------------------------------------
 
     def render_eml_path_to_png_bytes(self, eml_path: Path) -> Optional[bytes]:
         if not self._imgkit_available:
             logger.error(
-                "imgkit not importable — install imgkit and wkhtmltopdf "
+                "imgkit not importable, install imgkit and wkhtmltopdf "
                 "in the runtime image to enable mail previews"
             )
             return None
@@ -162,9 +160,7 @@ class Eml2PngRenderer:
         mail.preview_object_key = key
         mail.save(update_fields=["preview_bucket", "preview_object_key"])
 
-    # ------------------------------------------------------------------
     # Internals
-    # ------------------------------------------------------------------
 
     def _build_preview_html(self, msg: EmailMessage) -> str:
         """Wrap the parsed message in a minimal, safe HTML document.
@@ -174,7 +170,7 @@ class Eml2PngRenderer:
         HTML is rendered as-is but rasterised to a PNG with remote images,
         JavaScript and local-file access all disabled at imgkit time (see
         _render_html_to_png), and remote-fetching CSS/attributes stripped
-        (see _strip_remote_resources) — so it cannot phone home, read host
+        (see _strip_remote_resources), so it cannot phone home, read host
         files, or execute script.
         """
         header_rows = []
@@ -299,7 +295,7 @@ class Eml2PngRenderer:
         if png_bytes and len(png_bytes) > _MAX_PNG_BYTES:
             logger.warning(
                 "imgkit preview render exceeded %d bytes (got %d) even after "
-                "the %dpx height cap — dropping instead of storing",
+                "the %dpx height cap, dropping instead of storing",
                 _MAX_PNG_BYTES, len(png_bytes), _MAX_RENDER_HEIGHT_PX,
             )
             return None
@@ -307,15 +303,13 @@ class Eml2PngRenderer:
         return png_bytes
 
 
-# ---------------------------------------------------------------------------
 # MinIO helpers
-# ---------------------------------------------------------------------------
 
 def _build_minio_client():
     """Build the MinIO client used to store previews, or None on failure.
 
     Prefer the platform-wide client (`storage.s3` runtime config), so
-    previews live in the same MinIO instance as every other object — the
+    previews live in the same MinIO instance as every other object: the
     same source the rest of the backend and the preview *fetch* path use.
     Falls back to legacy django-minio-storage `MINIO_STORAGE_*` settings
     for older deployments that still configure storage that way.
@@ -355,6 +349,6 @@ def _ensure_bucket(client, bucket: str) -> None:
         ensure_bucket(client, bucket)
     except Exception:
         logger.warning(
-            "ensure_bucket(%s) failed (continuing — put_object will retry)",
+            "ensure_bucket(%s) failed (continuing, put_object will retry)",
             bucket, exc_info=True,
         )

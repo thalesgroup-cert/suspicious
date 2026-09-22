@@ -1,11 +1,11 @@
 """Rule-based composition of the analyst + reporter explanation text.
-No generated text — parameterised sentence templates keyed on the decisive rule."""
+No generated text: parameterised sentence templates keyed on the decisive rule."""
 from __future__ import annotations
 
 _RECOMMENDATION = {
     "Dangerous": "Do not interact with it; contact your security team if you already did.",
     "Suspicious": "Avoid interacting with any files or links until the review completes.",
-    "Safe": "No threat was found, but stay vigilant — no analysis is fully conclusive.",
+    "Safe": "No threat was found, but stay vigilant: no analysis is fully conclusive.",
     "Inconclusive": "Treat the item with caution until a human review completes.",
 }
 
@@ -13,7 +13,7 @@ _RECOMMENDATION = {
 _RULE_TEMPLATES = {
     "tier1-authoritative-malicious": {
         "analyst": "{source} is an authoritative threat-intelligence source and reported "
-                   "this {data_type} malicious — that determines the verdict on its own. "
+                   "this {data_type} malicious, which determines the verdict on its own. "
                    "{n_context} other source(s) were consulted for context.",
         "reporter": "This was confirmed malicious by a trusted threat-intelligence source.",
     },
@@ -34,7 +34,7 @@ _RULE_TEMPLATES = {
     },
     "trusted-flag-not-decisive": {
         "analyst": "{source} flags this {data_type}, but the evidence is not strong enough "
-                   "for a malicious verdict — capped at Suspicious.",
+                   "for a malicious verdict, capped at Suspicious.",
         "reporter": "A security source raised a concern, but it is not confirmed malicious.",
     },
     "contextual-only-flag": {
@@ -106,7 +106,7 @@ _GENERIC = {
 
 def _confidence_reading(band: str, confidence: int) -> str:
     if band == "Safe" and confidence < 40:
-        return ("A low risk score with low confidence does not mean the item is safe — it "
+        return ("A low risk score with low confidence does not mean the item is safe: it "
                 "means the analyzers could not gather enough signal to be sure. Treat it "
                 "as unconfirmed.")
     if confidence >= 70:
@@ -131,7 +131,8 @@ def _fill(tmpl: str, band: str, confidence: int, sources, facts: dict) -> str:
 def compose(rule, band, confidence, sources, **facts):
     t = _RULE_TEMPLATES.get(rule, _GENERIC)
     reading = _confidence_reading(band, confidence)
-    analyst = _fill(t["analyst"], band, confidence, sources, facts) + " " + reading
+    # `reading` renders separately everywhere (UI panel, report); don't append it here too.
+    analyst = _fill(t["analyst"], band, confidence, sources, facts)
     reporter = _fill(t["reporter"], band, confidence, sources, facts) + " " + \
         _RECOMMENDATION.get(band, _RECOMMENDATION["Inconclusive"])
     return analyst, reporter, reading

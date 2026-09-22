@@ -1,7 +1,7 @@
 """
 Delete objects from the `mail-previews` MinIO bucket by age and/or size.
 
-Deliberately does not touch Mail.preview_object_key — see
+Deliberately does not touch Mail.preview_object_key, see
 mail_feeder.utils.email_preview.retention for why a deleted preview is
 safe to leave "pointed at" (MailPreviewView lazily re-renders on next
 view instead of erroring).
@@ -34,7 +34,7 @@ class Command(BaseCommand):
 
         if older_than_days is None and min_size_mb is None:
             raise CommandError(
-                "Provide --older-than-days and/or --min-size-mb — refusing "
+                "Provide --older-than-days and/or --min-size-mb, refusing "
                 "to run with no criteria (that would match every object)."
             )
 

@@ -57,7 +57,7 @@ export function NavItem({
             { duration: 150 }
           ),
 
-          // ── Idle icon shell — matches SoftCard divider/bg system ────────
+          // Idle icon shell: matches SoftCard divider/bg system
           "& .nav-icon": {
             width: 32,
             height: 32,
@@ -101,7 +101,7 @@ export function NavItem({
             },
           },
 
-          // ── Active — SoftCard glassmorphism treatment ────────────────────
+          // Active: SoftCard glassmorphism treatment
           "&.active": {
             color: theme.palette.text.primary,
             background: isDark

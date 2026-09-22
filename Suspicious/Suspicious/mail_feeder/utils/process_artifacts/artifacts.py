@@ -114,7 +114,7 @@ class ArtifactService:
         decoded = extract_url_info(data_value)
         if decoded.decoded_url:
             urls.add(decoded.decoded_url)
-        # SafeLinks / URLDefense — the real target becomes its own artifact.
+        # SafeLinks / URLDefense: the real target becomes its own artifact.
         urls.update(unwrap_url(data_value))
 
         for url in urls:

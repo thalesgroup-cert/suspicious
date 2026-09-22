@@ -47,7 +47,7 @@ export type ExtractIocsResponse = {
   skipped: string[];
 };
 
-/** Extract candidate IOCs from an uploaded .txt/.csv/.json list — no case created. */
+/** Extract candidate IOCs from an uploaded .txt/.csv/.json list; no case created. */
 export async function extractIocsFromFile(file: File): Promise<ExtractIocsResponse> {
   const form = new FormData();
   form.append("file", file);

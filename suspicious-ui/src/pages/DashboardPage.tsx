@@ -19,9 +19,7 @@ import TopPrefixesPanel from "@/features/dashboard/components/TopPrefixesPanel";
 import { DashboardEmpty, DashboardLoading } from "@/features/dashboard/components/StatePanels";
 import KpiTrendPanels from "@/features/dashboard/components/KpiTrendPanels";
 
-// ---------------------------------------------------------------------------
 // Helpers
-// ---------------------------------------------------------------------------
 
 function monthName(m: number) {
   return new Date(2000, m - 1, 1).toLocaleString("en", { month: "long" });
@@ -43,9 +41,7 @@ function getMonthWindow(month: number, year: number, windowSize: number) {
   return out.reverse();
 }
 
-// ---------------------------------------------------------------------------
 // Constants
-// ---------------------------------------------------------------------------
 
 const EMPTY_SUMMARY: DashboardSummary = {
   month: 1,
@@ -124,9 +120,7 @@ function saveLayoutsToStorage(storageKey: string, layouts: ResponsiveLayouts) {
   try { window.localStorage.setItem(storageKey, JSON.stringify(layouts)); } catch { /* ignore */ }
 }
 
-// ---------------------------------------------------------------------------
-// DashboardPanelShell — drag handle + visible affordances
-// ---------------------------------------------------------------------------
+// DashboardPanelShell: drag handle + visible affordances
 
 type DashboardPanelShellProps = { title: string; children: React.ReactNode };
 
@@ -227,9 +221,7 @@ function DragDots({ isDark, dividerColor }: { isDark: boolean; dividerColor: str
   );
 }
 
-// ---------------------------------------------------------------------------
-// Global grid CSS overrides — injected once
-// ---------------------------------------------------------------------------
+// Global grid CSS overrides: injected once
 
 function GridStyles() {
   const theme = useTheme();
@@ -336,9 +328,7 @@ function GridStyles() {
   );
 }
 
-// ---------------------------------------------------------------------------
 // Page
-// ---------------------------------------------------------------------------
 
 export default function DashboardPage() {
   const now = new Date();

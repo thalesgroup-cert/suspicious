@@ -30,9 +30,7 @@ _DISCOVERY_CACHE_KEY = "oidc:discovery"
 _DISCOVERY_CACHE_TTL = 3600
 
 
-# ---------------------------------------------------------------------------
 # Guards
-# ---------------------------------------------------------------------------
 
 def _oidc_enabled() -> bool:
     """Return True only when all three required settings are non-empty."""
@@ -54,9 +52,7 @@ def _frontend_url(path: str = "/") -> str:
     return f"{base}{path}"
 
 
-# ---------------------------------------------------------------------------
 # OIDC Discovery
-# ---------------------------------------------------------------------------
 
 def _get_discovery() -> dict:
     """
@@ -83,9 +79,7 @@ def _get_discovery() -> dict:
     return doc
 
 
-# ---------------------------------------------------------------------------
 # PKCE helpers
-# ---------------------------------------------------------------------------
 
 def _generate_pkce_pair() -> dict:
     """
@@ -99,9 +93,7 @@ def _generate_pkce_pair() -> dict:
     return {"code_verifier": code_verifier, "code_challenge": code_challenge}
 
 
-# ---------------------------------------------------------------------------
 # Redirect URI
-# ---------------------------------------------------------------------------
 
 def _redirect_uri(request) -> str:
     override = getattr(settings, "OIDC_REDIRECT_URI", None)
@@ -110,9 +102,7 @@ def _redirect_uri(request) -> str:
     return request.build_absolute_uri("/api/oidc/callback/")
 
 
-# ---------------------------------------------------------------------------
 # GET /api/oidc/login/
-# ---------------------------------------------------------------------------
 
 class OIDCLoginView(APIView):
     """
@@ -163,9 +153,7 @@ class OIDCLoginView(APIView):
         return redirect(auth_url)
 
 
-# ---------------------------------------------------------------------------
 # GET /api/oidc/callback/
-# ---------------------------------------------------------------------------
 
 class OIDCCallbackView(APIView):
     """
@@ -185,7 +173,7 @@ class OIDCCallbackView(APIView):
             logger.warning("OIDC provider returned error: %s", error)
             # codeql[py/url-redirection]: _frontend_url always prepends the
             # admin-configured CSRF_TRUSTED_ORIGINS[0] + a hardcoded "/login"
-            # path — `error` only ever reaches the percent-encoded
+            # path: `error` only ever reaches the percent-encoded
             # `sso_error` query VALUE, never the scheme/host/path, so there's
             # no attacker-controlled redirect target here.
             return redirect(_frontend_error(error))
@@ -202,7 +190,7 @@ class OIDCCallbackView(APIView):
         code_verifier    = request.session.pop("oidc_code_verifier", None)
 
         if not session_state or state != session_state:
-            logger.warning("OIDC state mismatch — possible CSRF attack")
+            logger.warning("OIDC state mismatch: possible CSRF attack")
             return redirect(_frontend_error("state_mismatch"))
 
         if not code_verifier:
@@ -247,7 +235,7 @@ class OIDCCallbackView(APIView):
         if claims is None:
             return redirect(_frontend_error("token_validation_failed"))
 
-        # ── Userinfo (optional — claims may already have what we need) ────
+        # Userinfo (optional: claims may already have what we need)
         email = claims.get("email")
         if not email and access_token:
             try:
@@ -299,9 +287,7 @@ class OIDCCallbackView(APIView):
         return response
 
 
-# ---------------------------------------------------------------------------
 # ID token validation
-# ---------------------------------------------------------------------------
 
 def _validate_id_token(
     id_token_raw: str,
@@ -317,7 +303,7 @@ def _validate_id_token(
       • Validates aud (must match OIDC_CLIENT_ID), iss, exp, nbf
       • Verifies the nonce claim
 
-    Without PyJWT (fallback — not recommended for production):
+    Without PyJWT (fallback: not recommended for production):
       • Base64-decodes the payload without signature verification
       • Only verifies the nonce claim
     """
@@ -326,14 +312,14 @@ def _validate_id_token(
 
     if not settings.DEBUG:
         logger.error(
-            "PyJWT not installed and DEBUG is off — refusing to validate "
+            "PyJWT not installed and DEBUG is off, refusing to validate "
             "OIDC id_token without signature verification. "
             "Install PyJWT[cryptography]."
         )
         return None
 
     logger.warning(
-        "PyJWT not installed — falling back to unverified id_token decode. "
+        "PyJWT not installed, falling back to unverified id_token decode. "
         "DEBUG is on so this is permitted, but install PyJWT[cryptography] "
         "for any non-development use."
     )
@@ -399,16 +385,14 @@ def _validate_id_token_fallback(
     return claims
 
 
-# ---------------------------------------------------------------------------
 # User resolution
-# ---------------------------------------------------------------------------
 
 def _get_or_create_user(claims: dict, email: str) -> "User":
     """
     Map OIDC claims to a local Django user.
 
     Lookup strategy:
-      1. By email — most stable cross-provider identifier.
+      1. By email: most stable cross-provider identifier.
       2. Fall back to preferred_username or sub if email is absent
          (shouldn't happen after the email guard in the callback, but
          defensive programming is warranted here).

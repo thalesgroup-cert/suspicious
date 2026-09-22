@@ -36,9 +36,7 @@ import { ACCOUNT_NAV, PRIMARY_NAV, SECTIONS, WORKSPACE_NAV } from "@/layouts/nav
 import { HelpButton, LogoutButton, NavItem, NavSection, UserCard } from "@/layouts/components/navComponents";
 import { HelpTourProvider } from "@/features/help/HelpTourProvider";
 
-// ---------------------------------------------------------------------------
 // AppLayout
-// ---------------------------------------------------------------------------
 
 export default function AppLayout() {
   const theme = useTheme();
@@ -103,7 +101,7 @@ export default function AppLayout() {
   }, [pinned]);
 
   // localStorage is browser-scoped and gets wiped when the app runs inside a
-  // portal iframe with storage partitioning — the profile field is the
+  // portal iframe with storage partitioning; the profile field is the
   // source of truth once it loads, same as theme/colors.
   const hydratedPinFromServer = React.useRef(false);
   React.useEffect(() => {
@@ -117,7 +115,7 @@ export default function AppLayout() {
     setPinned((p) => {
       const next = !p;
       updatePreferences({ sidebar_pinned: next }).catch(() => {
-        /* best-effort — localStorage still covers this browser */
+        /* best-effort; localStorage still covers this browser */
       });
       return next;
     });
@@ -156,7 +154,7 @@ export default function AppLayout() {
     }
   }
 
-  // ── Sidebar background — fully theme-aware ──────────────────────────────
+  // Sidebar background: fully theme-aware
   const sidebarBg = isDark
     ? `linear-gradient(180deg, ${alpha("#fff", 0.04)} 0%, ${alpha("#fff", 0.02)} 100%)`
     : `linear-gradient(180deg, ${alpha("#fff", 0.92)} 0%, ${alpha(theme.palette.grey[50], 0.97)} 100%)`;

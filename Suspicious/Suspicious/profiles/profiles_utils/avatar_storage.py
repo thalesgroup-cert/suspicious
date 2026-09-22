@@ -1,7 +1,7 @@
 """MinIO-backed storage for uploaded avatar photos.
 
 Deliberately not sharing case_handler's MinioManager (mail/case-artifact
-specific) — profiles has no business importing that app's internals, so
+specific): profiles has no business importing that app's internals, so
 this talks to the shared common.clients.get_s3_client() MinIO client
 directly, same as tasp.cron.fetch_emails and mail_feeder do.
 """
@@ -47,7 +47,7 @@ def process_avatar_image(content_type: str, size: int, raw: bytes) -> bytes:
     """Validate + center-crop + resize + re-encode an uploaded avatar.
 
     Raises InvalidAvatarImage on any validation failure. Returns JPEG
-    bytes ready to store — the re-encode is also what strips EXIF, since
+    bytes ready to store; the re-encode is also what strips EXIF, since
     Pillow does not carry source metadata into a freshly-encoded output.
     """
     if content_type not in AVATAR_ALLOWED_CONTENT_TYPES:

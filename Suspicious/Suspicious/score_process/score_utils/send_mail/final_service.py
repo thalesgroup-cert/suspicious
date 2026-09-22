@@ -37,7 +37,7 @@ _RESULT_GUIDANCE = {
         "further investigation has been completed."
     ),
     "Safe": (
-        "No threats were detected. You may proceed, but remain vigilant — "
+        "No threats were detected. You may proceed, but remain vigilant: "
         "no analysis is 100 % conclusive."
     ),
     "Inconclusive": (

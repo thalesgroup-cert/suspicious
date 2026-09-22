@@ -7,4 +7,5 @@ BUILTIN_CONNECTOR_PATHS: tuple[str, ...] = (
     "connectors.contrib.watcher.connector:WatcherConnector",
     "connectors.contrib.smtp_notify.connector:SmtpNotifyConnector",
     "connectors.contrib.chromadb.connector:ChromaDBConnector",
+    "connectors.contrib.ai_narration.connector:AiNarrationConnector",
 )

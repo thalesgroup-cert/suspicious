@@ -41,9 +41,7 @@ import {
   type Severity,
 } from "@/features/about/components/content";
 
-// ---------------------------------------------------------------------------
 // Page
-// ---------------------------------------------------------------------------
 
 export default function AboutPage() {
   const theme = useTheme();
@@ -205,7 +203,7 @@ export default function AboutPage() {
         <Box>
           <SectionHeader
             title="Key topics"
-            subtitle="Common questions answered inline — no modals, no extra navigation."
+            subtitle="Common questions answered inline: no modals, no extra navigation."
           />
 
           <Grid container spacing={2}>
@@ -221,7 +219,7 @@ export default function AboutPage() {
                     analysis to help determine whether it should be escalated, reviewed, or dismissed.
                   </Typography>
                   <Typography variant="body2" color="text.secondary">
-                    It is a decision aid — it helps structure and accelerate review, but does not replace analyst judgment.
+                    It is a decision aid: it helps structure and accelerate review, but does not replace analyst judgment.
                   </Typography>
                 </Stack>
               </TopicCard>

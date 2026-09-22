@@ -2,7 +2,7 @@
 
 One construction path per backend service; config always comes from the
 runtime-config accessors so Vault-overlaid secrets and DB overrides apply
-uniformly. Factories raise on misconfiguration — call sites keep their own
+uniformly. Factories raise on misconfiguration; call sites keep their own
 try/except policy, as before."""
 from __future__ import annotations
 
@@ -41,13 +41,13 @@ def get_s3_presign_client() -> Minio:
 
     ``storage.s3.endpoint`` is the Docker-internal host the app container
     uses for put/get calls; browsers can't resolve it. Presigned URLs must
-    be signed against ``storage.s3.public_endpoint`` instead — falls back
+    be signed against ``storage.s3.public_endpoint`` instead; falls back
     to ``endpoint`` when unset, so existing single-endpoint deployments are
     unaffected.
 
     ``region`` is pinned explicitly (not left for the SDK to auto-detect)
     because auto-detection does a live bucket-location HTTP call against
-    the endpoint being signed for — and ``public_endpoint`` is reachable
+    the endpoint being signed for, and ``public_endpoint`` is reachable
     from a browser, not necessarily from wherever this signing code runs,
     so that lookup can't be relied on to succeed.
     """

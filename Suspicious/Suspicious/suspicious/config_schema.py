@@ -19,9 +19,7 @@ from typing import Any, List, Optional
 from pydantic import BaseModel, ConfigDict, Field, field_validator
 
 
-# ---------------------------------------------------------------------------
 # Sub-schemas
-# ---------------------------------------------------------------------------
 
 
 class _Permissive(BaseModel):
@@ -132,9 +130,7 @@ class ObservabilityConfig(_Permissive):
     opentelemetry: OpenTelemetryConfig = Field(default_factory=OpenTelemetryConfig)
 
 
-# ---------------------------------------------------------------------------
 # Top-level schema
-# ---------------------------------------------------------------------------
 
 
 class SuspiciousConfig(_Permissive):
@@ -149,9 +145,7 @@ class SuspiciousConfig(_Permissive):
     observability: ObservabilityConfig = Field(default_factory=ObservabilityConfig)
 
 
-# ---------------------------------------------------------------------------
 # Public helper
-# ---------------------------------------------------------------------------
 
 
 class ConfigValidationError(RuntimeError):

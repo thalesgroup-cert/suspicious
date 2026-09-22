@@ -57,11 +57,11 @@ class FileHandler:
             tmp_path (str): The temporary file path, stored on the File model.
                 Convention is inconsistent by caller (stripped of a leading
                 "/tmp/" for the `file` branch, left absolute for the `mail`
-                branch — downstream code in mail_feeder/job_handler strips
+                branch; downstream code in mail_feeder/job_handler strips
                 and re-prefixes it at its own pace) so it must NOT be used to
                 locate the file on disk here.
             hash_value (str): The SHA-256 hash of the file.
-            tmp_path_raw (str): The real, directly-openable absolute path —
+            tmp_path_raw (str): The real, directly-openable absolute path,
                 the same path `hash_file()` already read the bytes from.
 
         Returns:

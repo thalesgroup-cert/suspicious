@@ -30,7 +30,7 @@ def _describe(agg: CaseAggregate, analysis_done: int = 0) -> str:
 def finalise(case) -> None:
     """Compute verdict + side-effects (scoring black box) and set description.
 
-    Does NOT change status/lifecycle_state — the caller owns transitions.
+    Does NOT change status/lifecycle_state: the caller owns transitions.
     """
     agg = aggregate_case(case)
     CortexAnalyzerReports.get_report(case)
@@ -74,7 +74,7 @@ def reconcile_case_core(case) -> None:
         return
 
     if ingest_derived_observables(case) > 0:
-        # Extractors surfaced new indicators — they are pending CaseAnalyzerJobs
+        # Extractors surfaced new indicators: they are pending CaseAnalyzerJobs
         # now; the next reconcile pass (webhook or 300s poll) carries on.
         return
 

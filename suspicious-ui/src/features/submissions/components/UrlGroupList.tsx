@@ -16,9 +16,7 @@ import { alpha, useTheme } from "@mui/material/styles";
 import { analyzeUrl, type UrlArtifact } from "@/features/submissions/api";
 import { CopyIconButton } from "@/shared/components/CopyIconButton";
 
-// ---------------------------------------------------------------------------
 // Helpers
-// ---------------------------------------------------------------------------
 
 function registeredDomain(address: string): string {
   try {
@@ -40,9 +38,7 @@ const STATUS_COLOR: Record<
   skipped: "default",
 };
 
-// ---------------------------------------------------------------------------
 // Component
-// ---------------------------------------------------------------------------
 
 export interface UrlGroupListProps {
   submissionId: number;

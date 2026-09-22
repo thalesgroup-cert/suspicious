@@ -30,7 +30,7 @@ class TheHiveService:
             verify=config.certificate_path or True,
         )
 
-    # ---------- factory ----------
+    # factory
 
     @classmethod
     def from_settings(cls, path: str = None) -> "TheHiveService":
@@ -38,7 +38,7 @@ class TheHiveService:
         raw = get_section("integrations.thehive")
         return cls(TheHiveConfig(**raw))
 
-    # ---------- alerts ----------
+    # alerts
 
     def create_alert(self, alert: AlertCreate) -> Optional[dict]:
         source_ref = alert.source_ref or generate_ref()
@@ -62,7 +62,7 @@ class TheHiveService:
             update_logger.info(f"Alert creation failed: {e}")
             return None
 
-    # ---------- generic retrieval ----------
+    # generic retrieval
 
     def get_item(self, item_id: str) -> Tuple[Optional[str], Optional[dict]]:
         try:
@@ -81,7 +81,7 @@ class TheHiveService:
 
         return None, None
 
-    # ---------- observables ----------
+    # observables
 
     def add_observables(
         self,
@@ -105,7 +105,7 @@ class TheHiveService:
                     f"Observable add failed ({obs.data}): {e}"
                 )
 
-    # ---------- attachments ----------
+    # attachments
 
     def add_attachments(
         self,
@@ -124,7 +124,7 @@ class TheHiveService:
                     f"Attachment failed ({path}): {e}"
                 )
 
-    # ---------- comments ----------
+    # comments
 
     def add_comment(
         self,

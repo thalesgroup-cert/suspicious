@@ -109,7 +109,7 @@ export function FeederPanel() {
         <Typography variant="body2" color="text.secondary" sx={{ fontSize: 13 }}>
           When enabled, the feeder polls the configured mailbox and automatically creates
           new analysis cases for each suspicious message. Disabling it will stop ingestion
-          immediately — existing cases are unaffected.
+          immediately. Existing cases are unaffected.
         </Typography>
       </InnerCard>
     </Stack>

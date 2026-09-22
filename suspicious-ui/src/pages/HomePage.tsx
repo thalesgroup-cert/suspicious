@@ -63,9 +63,7 @@ import {
   type DangerLabel,
 } from "@/features/home/utils";
 
-// ---------------------------------------------------------------------------
 // Types
-// ---------------------------------------------------------------------------
 
 type SubmissionRow = {
   id: number | string;
@@ -83,9 +81,7 @@ type SubmissionsResponse = {
   count?: number;
 };
 
-// ---------------------------------------------------------------------------
 // API
-// ---------------------------------------------------------------------------
 
 async function getMyRecentSubmissions(): Promise<SubmissionRow[]> {
   const res = await api.get("/submissions/", {
@@ -96,9 +92,7 @@ async function getMyRecentSubmissions(): Promise<SubmissionRow[]> {
   return (data.results ?? data.items ?? []).slice(0, 3);
 }
 
-// ---------------------------------------------------------------------------
 // Page
-// ---------------------------------------------------------------------------
 
 export default function HomePage() {
   const navigate = useNavigate();
@@ -242,8 +236,6 @@ export default function HomePage() {
     <Box sx={{ px: { xs: 2, md: 3 }, pb: 8, pt: 0 }}>
       <Box sx={{ maxWidth: 1280, mx: "auto" }}>
 
-        {/* ---------------------------------------------------------------- */}
-        {/* ---------------------------------------------------------------- */}
         <Stack
           direction={{ xs: "column", md: "row" }}
           spacing={1.5}
@@ -271,8 +263,6 @@ export default function HomePage() {
 
         <Grid container spacing={2}>
 
-          {/* -------------------------------------------------------------- */}
-          {/* -------------------------------------------------------------- */}
           <Grid size={{ xs: 12, md: 7 }}>
             <DashboardCard
               title="Threat distribution"
@@ -460,8 +450,6 @@ export default function HomePage() {
             </DashboardCard>
           </Grid>
 
-          {/* -------------------------------------------------------------- */}
-          {/* -------------------------------------------------------------- */}
           <Grid size={{ xs: 12, md: 5 }}>
             <DashboardCard
               title={isCiso ? "Scope health" : "Your monthly share"}
@@ -635,8 +623,6 @@ export default function HomePage() {
             </DashboardCard>
           </Grid>
 
-          {/* -------------------------------------------------------------- */}
-          {/* -------------------------------------------------------------- */}
           <Grid size={{ xs: 12 }}>
             <DashboardCard
               title="Recent submissions"
@@ -703,7 +689,7 @@ export default function HomePage() {
                   <Box sx={{ px: { xs: 1.5, md: 2 }, pb: 2 }}>
                     <Alert severity="info">
                       {capabilities.effects.hasPortalEffect
-                        ? "// NO TEMPORAL RECORDS FOUND — submit your first case to begin the timeline."
+                        ? "// NO TEMPORAL RECORDS FOUND: submit your first case to begin the timeline."
                         : "No submissions yet."}
                     </Alert>
                   </Box>

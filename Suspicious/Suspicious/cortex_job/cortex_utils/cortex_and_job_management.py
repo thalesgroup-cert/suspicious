@@ -13,17 +13,13 @@ from cortex_job.models import Analyzer, AnalyzerReport, CaseAnalyzerJob
 from mail_feeder.models import MailBody, MailArchive, MailInfo, MailHeader
 from case_handler.models import Case, Result
 
-# ------------------------
 # Logger setup
-# ------------------------
 logger = logging.getLogger(__name__)
 update_cases_logger = logging.getLogger("tasp.cron.update_ongoing_case_jobs")
 fetch_mail_logger = logging.getLogger("tasp.cron.fetch_and_process_emails")
 
 
-# ------------------------
 # Lazy Cortex configuration accessor
-# ------------------------
 def _get_cortex_config() -> dict:
     """Cortex config via the runtime accessor; empty dict on failure."""
     try:
@@ -643,7 +639,7 @@ class CortexJobManager:
 
         Returns the job on success. Returns the "old_job" sentinel ONLY when
         Cortex has positively confirmed the job no longer exists (HTTP 404 ->
-        cortex4py NotFoundError) — that's the one condition under which
+        cortex4py NotFoundError): that's the one condition under which
         get_cortex_jobs_results permanently marks a report "Deleted". Any
         other failure (network error, breaker open, auth error, 5xx, ...)
         returns None instead, so the caller leaves the report's current
@@ -651,7 +647,7 @@ class CortexJobManager:
         stale-job timeout in get_cortex_jobs_results is what eventually
         gives up on a job that's transiently unreachable for too long. A job
         that briefly couldn't be reached is not the same as a job Cortex
-        says is gone — collapsing both to "Deleted" here would silently and
+        says is gone: collapsing both to "Deleted" here would silently and
         irreversibly discard in-progress analyzer results on a network blip.
         """
         cc = _get_cortex_config()
@@ -673,7 +669,7 @@ class CortexJobManager:
             return "old_job"
         except pybreaker.CircuitBreakerError as e:
             update_cases_logger.warning(
-                "[breaker:cortex] open — get_job_from_api skipped for job %s: %s", job_id, e
+                "[breaker:cortex] open, get_job_from_api skipped for job %s: %s", job_id, e
             )
         except Exception as e:
             update_cases_logger.error(
@@ -702,7 +698,7 @@ class CortexJobManager:
                     return getattr(report, "report", None)
             except pybreaker.CircuitBreakerError as e:
                 update_cases_logger.warning(
-                    "[breaker:cortex] open — get_report_from_api skipped for job %s: %s", job_id, e
+                    "[breaker:cortex] open, get_report_from_api skipped for job %s: %s", job_id, e
                 )
             except Exception as e:
                 update_cases_logger.error(
@@ -821,7 +817,7 @@ class CortexJobManager:
 
             if analyzer.status == "Failure":
                 update_cases_logger.info(
-                    "AI Mail Analyzer report is Failure for case %s — marked Inconclusive.",
+                    "AI Mail Analyzer report is Failure for case %s, marked Inconclusive.",
                     case.id,
                 )
                 case.results_ai = Result.INCONCLUSIVE
@@ -834,7 +830,7 @@ class CortexJobManager:
                 mail_archive.archive,
             )
             # `analyzer` was never assigned above (the .get() that would set
-            # it is exactly what raised) — use the configured AI analyzer
+            # it is exactly what raised): use the configured AI analyzer
             # name directly, not a lookup through a nonexistent report.
             ai_analyzer_name = cortex_config.get("analyzers", {}).get("ai", {})
             last_job = (
@@ -847,7 +843,7 @@ class CortexJobManager:
                 case.results_ai = Result.INCONCLUSIVE
                 case.save(update_fields=["results_ai"])
                 update_cases_logger.info(
-                    "AI Mail Analyzer unavailable for case %s — marked Inconclusive.",
+                    "AI Mail Analyzer unavailable for case %s, marked Inconclusive.",
                     case.id,
                 )
             return

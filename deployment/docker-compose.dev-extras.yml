@@ -71,6 +71,13 @@ services:
                                    # containers reach this service via `http://ollama:11434` regardless
     networks:
       - suspicious_network
+    deploy:
+      resources:
+        reservations:
+          devices:
+            - driver: nvidia
+              count: 1
+              capabilities: [gpu]
 
 volumes:
   ollama_models:

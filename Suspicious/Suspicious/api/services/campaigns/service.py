@@ -1,5 +1,5 @@
 """
-CampaignQueryService — business logic for the three campaigns endpoints.
+CampaignQueryService: business logic for the three campaigns endpoints.
 
 Each method returns the raw payload dict that the corresponding view
 serializes back to the client, keeping views thin.

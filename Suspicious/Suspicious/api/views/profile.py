@@ -24,9 +24,6 @@ from api.serializers.profile import (
 logger = logging.getLogger(__name__)
 
 
-# ---------------------------------------------------------------------------
-# ---------------------------------------------------------------------------
-
 def _get_profile(user):
     """
     Returns (profile_instance, serializer_class).
@@ -41,9 +38,7 @@ def _get_profile(user):
     return profile, UserProfileSerializer
 
 
-# ---------------------------------------------------------------------------
 # GET / PATCH /api/profile/
-# ---------------------------------------------------------------------------
 
 class ProfileView(APIView):
     permission_classes = [IsAuthenticated]
@@ -60,9 +55,6 @@ class ProfileView(APIView):
         return Response(serializer.data)
 
 
-# ---------------------------------------------------------------------------
-# ---------------------------------------------------------------------------
-
 class AppearanceView(APIView):
     permission_classes = [IsAuthenticated]
 
@@ -75,9 +67,6 @@ class AppearanceView(APIView):
         return Response(ProfileSerializerClass(profile).data)
 
 
-# ---------------------------------------------------------------------------
-# ---------------------------------------------------------------------------
-
 class PreferencesView(APIView):
     permission_classes = [IsAuthenticated]
 
@@ -89,9 +78,6 @@ class PreferencesView(APIView):
 
         return Response(ProfileSerializerClass(profile).data)
 
-
-# ---------------------------------------------------------------------------
-# ---------------------------------------------------------------------------
 
 class SemanticColorsView(APIView):
     permission_classes = [IsAuthenticated]
@@ -114,9 +100,6 @@ class SemanticColorsView(APIView):
         )
 
 
-# ---------------------------------------------------------------------------
-# ---------------------------------------------------------------------------
-
 class ResetSemanticColorsView(APIView):
     permission_classes = [IsAuthenticated]
 
@@ -136,9 +119,7 @@ class ResetSemanticColorsView(APIView):
         )
 
 
-# ---------------------------------------------------------------------------
 # POST /api/profile/avatar/upload/
-# ---------------------------------------------------------------------------
 
 class AvatarUploadView(APIView):
     permission_classes = [IsAuthenticated]

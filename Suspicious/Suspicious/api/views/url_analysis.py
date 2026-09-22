@@ -1,4 +1,4 @@
-"""POST /api/submissions/<id>/urls/<url_id>/analyze/ — on-demand re-analysis.
+"""POST /api/submissions/<id>/urls/<url_id>/analyze/: on-demand re-analysis.
 
 Promotes a `skipped` (or stale `reused`) URL to `pending` and dispatches Cortex
 for that single URL. Reuses CanAccessSubmission so only the submission owner (or

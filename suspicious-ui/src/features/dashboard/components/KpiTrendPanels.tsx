@@ -13,9 +13,7 @@ import {
 import { SoftCard } from "./SoftCard";
 import { useStatusColors } from "@/styles/colorStore";
 
-// ---------------------------------------------------------------------------
 // Types
-// ---------------------------------------------------------------------------
 
 type Spark = {
   labels: string[];
@@ -26,9 +24,7 @@ type Spark = {
 
 type MetricKey = "newUsers" | "reporters" | "submissions";
 
-// ---------------------------------------------------------------------------
 // Helpers
-// ---------------------------------------------------------------------------
 
 function formatNumber(v: unknown) {
   return typeof v === "number" ? v.toLocaleString() : "—";
@@ -48,9 +44,7 @@ function lastTwoNumbers(values: Array<number | null>) {
   return { prev, last };
 }
 
-// ---------------------------------------------------------------------------
 // TrendIcon
-// ---------------------------------------------------------------------------
 
 function TrendIcon(props: { values: Array<number | null> }) {
   const theme = useTheme();
@@ -98,9 +92,7 @@ function TrendIcon(props: { values: Array<number | null> }) {
   );
 }
 
-// ---------------------------------------------------------------------------
 // TrendPanel
-// ---------------------------------------------------------------------------
 
 function TrendPanel(props: {
   title: string;
@@ -114,9 +106,7 @@ function TrendPanel(props: {
   );
 }
 
-// ---------------------------------------------------------------------------
 // KpiTrendPanels (default export)
-// ---------------------------------------------------------------------------
 
 export default function KpiTrendPanels(props: {
   spark: Spark;

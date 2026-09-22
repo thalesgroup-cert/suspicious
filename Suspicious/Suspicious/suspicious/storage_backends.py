@@ -2,7 +2,7 @@
 
 Built on the modern `minio` (7.2.x) client the rest of the app already
 uses (see api.storage.StorageClient), so there is no dependency on
-`django-minio-storage` — which caps `minio<7.2.19` and conflicts with our
+`django-minio-storage`, which caps `minio<7.2.19` and conflicts with our
 pinned `minio==7.2.20`.
 
 Wired in settings via STORAGES["default"] (Django 5.1+ replaced the old

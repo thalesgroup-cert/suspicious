@@ -3,9 +3,7 @@ import { api } from "@/api/client";
 import type { ResultColors, StatusColors } from "@/styles/colorStore";
 import type { AvatarConfig } from "@/features/profile/avatar";
 
-// ---------------------------------------------------------------------------
 // Types
-// ---------------------------------------------------------------------------
 
 export type UserProfile = {
   id:                   number;
@@ -53,18 +51,14 @@ export type SemanticColorsPayload = {
   };
 };
 
-// ---------------------------------------------------------------------------
 // GET /api/profile/
-// ---------------------------------------------------------------------------
 
 export async function getProfile(): Promise<UserProfile> {
   const { data } = await api.get<UserProfile>("/profile/");
   return data;
 }
 
-// ---------------------------------------------------------------------------
 // POST /api/profile/avatar/upload/
-// ---------------------------------------------------------------------------
 
 export async function uploadAvatar(file: File): Promise<UserProfile> {
   const form = new FormData();
@@ -73,9 +67,7 @@ export async function uploadAvatar(file: File): Promise<UserProfile> {
   return data;
 }
 
-// ---------------------------------------------------------------------------
 // PATCH /api/profile/appearance/
-// ---------------------------------------------------------------------------
 
 export async function updateAppearance(
   payload: AppearancePayload
@@ -87,9 +79,7 @@ export async function updateAppearance(
   return data;
 }
 
-// ---------------------------------------------------------------------------
 // PATCH /api/profile/preferences/
-// ---------------------------------------------------------------------------
 
 export async function updatePreferences(
   payload: PreferencesPayload
@@ -101,8 +91,6 @@ export async function updatePreferences(
   return data;
 }
 
-// ---------------------------------------------------------------------------
-// ---------------------------------------------------------------------------
 
 export async function updateSemanticColors(
   payload: SemanticColorsPayload
@@ -114,8 +102,6 @@ export async function updateSemanticColors(
   return data;
 }
 
-// ---------------------------------------------------------------------------
-// ---------------------------------------------------------------------------
 
 export async function resetSemanticColors(): Promise<{
   semantic_colors: UserProfile["semantic_colors"];

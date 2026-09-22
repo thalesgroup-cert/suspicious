@@ -236,9 +236,7 @@ class SubmissionQueue(models.Model):
             f"retries={self.retry_count})"
         )
 
-    # ------------------------------------------------------------------
     # Stage management
-    # ------------------------------------------------------------------
 
     def advance_stage(self, stage: str) -> None:
         """
@@ -274,9 +272,7 @@ class SubmissionQueue(models.Model):
     def is_complete(self) -> bool:
         return self.current_stage == ProcessingStage.NOTIFIED
 
-    # ------------------------------------------------------------------
     # Terminal state helpers
-    # ------------------------------------------------------------------
 
     def mark_done(self) -> None:
         """Mark this submission as fully and successfully processed."""
@@ -304,9 +300,7 @@ class SubmissionQueue(models.Model):
             "Submission %s marked FAILED: %s", self.submission_id, reason[:200]
         )
 
-    # ------------------------------------------------------------------
     # Retry / backoff
-    # ------------------------------------------------------------------
 
     def schedule_retry(self, error: str) -> bool:
         """

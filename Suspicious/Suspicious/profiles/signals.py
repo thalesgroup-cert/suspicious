@@ -4,7 +4,7 @@ Every RBAC check (api IsInvestigator, ProtectedRoute, home, dashboard)
 keys off membership in the ``CISO`` group, but the CISOProfile creation
 paths (LDAP sync, profiles_utils.ciso.process_cisos, admin import) only
 ever create the profile. This signal is the single chokepoint that
-grants — and revokes — the group alongside the profile.
+grants (and revokes) the group alongside the profile.
 """
 import logging
 

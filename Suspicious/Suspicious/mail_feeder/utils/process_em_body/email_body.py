@@ -23,8 +23,8 @@ class EmailBodyService:
         """
         Return stored MailBody instances similar to the given body.
 
-        The simhash-based matching is retired — semantic similarity is now
-        served by ChromaDB — so this returns no matches.
+        The simhash-based matching is retired: semantic similarity is now
+        served by ChromaDB, so this returns no matches.
         """
         return []
 

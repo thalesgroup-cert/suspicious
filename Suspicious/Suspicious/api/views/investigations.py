@@ -78,7 +78,7 @@ def _dedup_analyzer_reports(reports) -> list:
     returned list so the caller doesn't need to re-sort.
 
     target_key is the first non-null FK among url/domain/mail/hash/file/ip/
-    mail_body/mail_header — same priority as resolve_analyzer_report_target.
+    mail_body/mail_header: same priority as resolve_analyzer_report_target.
     """
     def _target_key(r) -> tuple:
         for attr, label in (
@@ -251,7 +251,7 @@ class InvestigationAccessMixin:
         # forward FK or O2O from Case's side, never reverse/M2M, so a Case
         # row can't fan out into duplicates through these joins. distinct()
         # here was forcing MySQL to sort/dedupe the whole joined result set
-        # before LIMIT applied — measured ~1.6s wasted per page on a 41k-row
+        # before LIMIT applied: measured ~1.6s wasted per page on a 41k-row
         # table for zero effect.
         return queryset
 
@@ -344,7 +344,7 @@ class InvestigationGlobalEditView(InvestigationAccessMixin, APIView):
         obj.final_confidence = validated["confidence"]
         obj.results = API_RESULT_TO_INTERNAL[validated["classification"]]
         obj.last_update_by = request.user
-        # The stored explanation described the previous verdict — drop it so a
+        # The stored explanation described the previous verdict: drop it so a
         # stale "why" is never emailed / shown after an analyst override.
         obj.verdict_explanation = None
         obj.save(

@@ -6,9 +6,7 @@ from profiles.models import CISOProfile, UserProfile, merge_semantic_colors
 User = get_user_model()
 
 
-# ---------------------------------------------------------------------------
 # Helpers
-# ---------------------------------------------------------------------------
 
 def _get_profile_for_user(user):
     """
@@ -26,9 +24,7 @@ def _get_profile_for_user(user):
     return None
 
 
-# ---------------------------------------------------------------------------
 # User serializers
-# ---------------------------------------------------------------------------
 
 class AuthenticatedUserSerializer(serializers.ModelSerializer):
     """
@@ -42,7 +38,7 @@ class AuthenticatedUserSerializer(serializers.ModelSerializer):
       - auto_seasonal    whether seasonal auto-theming is enabled
 
     Having all appearance fields here means the frontend can fully hydrate
-    colors AND the theme from a single /auth/me/ response — no separate
+    colors AND the theme from a single /auth/me/ response: no separate
     /profile/ or /profile/colors/ roundtrip needed on page load.
     """
     groups          = serializers.SerializerMethodField()
@@ -107,7 +103,7 @@ class AuthenticatedUserSerializer(serializers.ModelSerializer):
 class LoginUserSerializer(serializers.ModelSerializer):
     """
     Minimal user representation embedded in the login response.
-    Intentionally lighter than AuthenticatedUserSerializer — the login
+    Intentionally lighter than AuthenticatedUserSerializer: the login
     response only needs enough to bootstrap the session.
     """
     groups = serializers.SerializerMethodField()
@@ -125,9 +121,7 @@ class LoginUserSerializer(serializers.ModelSerializer):
         return list(obj.groups.values_list("name", flat=True))
 
 
-# ---------------------------------------------------------------------------
 # Auth serializers
-# ---------------------------------------------------------------------------
 
 class LoginSerializer(serializers.Serializer):
     username = serializers.CharField(
@@ -178,7 +172,7 @@ class LogoutResponseSerializer(serializers.Serializer):
 
 class MeResponseSerializer(AuthenticatedUserSerializer):
     """
-    GET /auth/me/ response — full identity + semantic_colors.
+    GET /auth/me/ response: full identity + semantic_colors.
     Subclasses AuthenticatedUserSerializer; no additional fields needed.
     """
     pass

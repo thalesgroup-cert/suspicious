@@ -33,7 +33,7 @@ DEFAULT_SUSPICIOUS_TLDS = (
 OPEN_REDIRECT_KEYS = frozenset({"url", "next", "redirect", "r", "dest", "continue", "return", "u"})
 RISKY_PATH_SUFFIXES = (".exe", ".scr", ".js", ".hta", ".iso", ".zip", ".rar", ".7z", ".msi", ".bat", ".cmd")
 
-# Must match URL.canonical_key's max_length (url_process/models.py) — the key
+# Must match URL.canonical_key's max_length (url_process/models.py): the key
 # is advisory for dedup/grouping, so truncating an oversized path/query is
 # safe; writing more than the column allows is not.
 CANONICAL_KEY_MAX_LEN = 512
@@ -78,7 +78,7 @@ def _registered_domain_lower(host: str) -> str:
     try:
         from mail_feeder.mail_utils.meioc import tldcache
         return (tldcache(host).registered_domain or "").lower()
-    except Exception:  # noqa: BLE001 — scoring must never raise
+    except Exception:  # noqa: BLE001 (scoring must never raise)
         return ""
 
 
@@ -146,7 +146,7 @@ def score_interestingness(url: str, *, sender_domain: str | None = None) -> int:
             score -= 10
 
         return max(0, min(255, score))
-    except Exception:  # noqa: BLE001 — scoring must never raise
+    except Exception:  # noqa: BLE001 (scoring must never raise)
         logger.warning("score_interestingness failed for %r; defaulting to 0", url, exc_info=True)
         return 0
 
@@ -178,7 +178,7 @@ def _registered_domain_for_url(url) -> str:
         if "://" not in addr:
             addr = "http://" + addr
         return _registered_domain_lower(urlsplit(addr).hostname or "")
-    except Exception:  # noqa: BLE001 — fail-open
+    except Exception:  # noqa: BLE001 (fail-open)
         return ""
 
 
@@ -242,7 +242,7 @@ def plan_url_analysis(url_instances, *, sender_domain=None) -> URLAnalysisPlan:
             u.canonical_key = _safe_canonical(u)
             u.interestingness = score_interestingness(u.address or "", sender_domain=sender_domain)
             u.save(update_fields=["canonical_key", "interestingness"])
-        except Exception:  # noqa: BLE001 — fail-open
+        except Exception:  # noqa: BLE001 (fail-open)
             logger.warning("annotate failed for URL id=%s; fail-open", u.pk, exc_info=True)
         group_key = u.canonical_key or f"__unkeyed__:{u.pk}"
         by_key.setdefault(group_key, []).append(u)
@@ -263,7 +263,7 @@ def plan_url_analysis(url_instances, *, sender_domain=None) -> URLAnalysisPlan:
         prior = None
         try:
             prior = _find_reusable_prior(rep.canonical_key, ttl_days, all_ids)
-        except Exception:  # noqa: BLE001 — fail-open → analyze
+        except Exception:  # noqa: BLE001 (fail-open, still analyze)
             logger.warning("TTL lookup failed for URL id=%s; fail-open", rep.pk, exc_info=True)
         if prior is not None:
             rep.analysis_status = URL.AnalysisStatus.REUSED
