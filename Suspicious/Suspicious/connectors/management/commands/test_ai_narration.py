@@ -1,7 +1,6 @@
 """Manually drive the ai_narration connector against a real case or a
-fixture. See docs/specs/2026-09-21-ai-narration-connector-design.md --
-this command is the ONLY way to exercise the connector in this phase; it
-is not wired to any automatic event."""
+fixture -- the only way to reach a non-Ollama provider; the connector
+also fires automatically via `on_case_finalised` (Ollama-only)."""
 import json
 from pathlib import Path
 
