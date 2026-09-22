@@ -1,5 +1,10 @@
 # AI Narration Connector: Design
 
+> Superseded on the event-wiring question by
+> `docs/specs/2026-09-21-ai-narration-event-wiring-design.md`: the connector
+> no longer has `events=()` / is no longer manual-only. The manual command
+> and provider-selection architecture described below are still accurate.
+
 ## Context
 
 The verdict-narration spike (`docs/specs/2026-09-11-verdict-narration-spike-design.md`)

@@ -46,6 +46,12 @@ unchanged by this spec.
   why this is accepted rather than blocking on it; it remains a
   precondition for any future report/email/UI phase (see the connector
   spec's Open Questions).
+- The generated narration itself -- which can include or reflect real case
+  content such as phishing email text -- is logged at INFO level via the
+  connector's own logger (`connectors.contrib.ai_narration`), so it is
+  subject to whatever log retention/shipping this deployment has
+  configured; this is the deliberate observability mechanism above, not an
+  incidental leak.
 
 ## Architecture
 

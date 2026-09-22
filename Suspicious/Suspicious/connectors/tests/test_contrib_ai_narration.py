@@ -89,6 +89,18 @@ class AiNarrationOnCaseFinalisedTest(TestCase):
         self.assertIn("status=PASS", joined)
 
     @mock.patch("connectors.contrib.ai_narration.connector.ollama.generate")
+    def test_fail_status_logs_with_reasons(self, mock_generate):
+        mock_generate.return_value = "This item is completely safe, nothing to worry about."
+        with self.assertLogs("connectors.contrib.ai_narration", level="INFO") as cm:
+            self.connector.on_case_finalised(_event(self.case, status="Done"))
+        mock_generate.assert_called_once()
+        joined = " ".join(cm.output)
+        self.assertIn(f"case={self.case.id}", joined)
+        self.assertIn("provider=ollama", joined)
+        self.assertIn("status=FAIL", joined)
+        self.assertNotIn("reasons=[]", joined)
+
+    @mock.patch("connectors.contrib.ai_narration.connector.ollama.generate")
     def test_provider_failure_propagates(self, mock_generate):
         mock_generate.side_effect = RuntimeError("ollama unreachable")
         with self.assertRaises(RuntimeError):

@@ -14,7 +14,10 @@ def generate(prompt: str, config: dict) -> str:
             "stream": False,
             "options": {"num_ctx": 8192},
         },
-        timeout=600,
+        # Must stay under Celery's task_soft_time_limit=540s (suspicious/celery.py) --
+        # this call now runs inside connectors.tasks.deliver_event, so a value at or
+        # above 540 would let the soft limit fire first and this timeout never trigger.
+        timeout=300,
     )
     response.raise_for_status()
     return response.json().get("response", "")

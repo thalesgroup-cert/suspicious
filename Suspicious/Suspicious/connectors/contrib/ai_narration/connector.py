@@ -3,7 +3,10 @@ hardcoded to local Ollama only (see
 docs/specs/2026-09-21-ai-narration-event-wiring-design.md) -- the manual
 `manage.py test_ai_narration` command remains available separately for
 driving any configured provider (including external ones) against a
-specific case or fixture."""
+specific case or fixture. "Ollama only" means no external-provider/API-key
+code path exists on this trigger -- it does NOT mean case content stays on
+this machine: `ollama_url` is an operator-configurable DB-backed setting and
+is the actual trust boundary."""
 from __future__ import annotations
 
 import logging
