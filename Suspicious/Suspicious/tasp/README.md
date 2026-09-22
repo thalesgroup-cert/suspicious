@@ -22,22 +22,24 @@
 tasp/
 ├── apps.py
 ├── tasks.py                   # @shared_task wrappers
-├── tests/
-│   ├── test_celery_wrappers.py
-│   ├── test_finalise_case_idempotent.py
-│   ├── test_process_cortex_job.py
-│   ├── test_fail_stale_jobs.py
-│   └── test_update_ongoing_skips_no_pending.py
+├── services/
+│   └── challenge.py           # reporter challenge-a-verdict workflow
+├── tests/                     # tests/test_reconcile_task.py, test_fail_stale_jobs.py, etc.
 └── cron/
     ├── fetch_emails.py
     ├── sync_cortex.py
-    ├── user_and_cases.py      # update_ongoing_case_jobs, sync_user_profiles
+    ├── user_and_cases.py      # update_ongoing_cases, sync_user_profiles
     ├── suspicious.py
     ├── kpi.py
     ├── cleanup.py
-    ├── watcher.py
+    ├── prefix_source.py
     └── dashboard_snapshot.py
 ```
+
+`cron/watcher.py` no longer lives here — Watcher domain-list reconciliation moved to
+`connectors/contrib/watcher/` and is scheduled by the connectors framework's own
+`Schedule` mechanism, not a `tasp` beat entry. See
+[Connectors](../connectors/README.md).
 
 ---
 
@@ -50,7 +52,6 @@ tasp/
 | `update-ongoing-cases` | `tasp.tasks.update_ongoing_cases` | every 300 s | Fallback for missed Cortex webhook deliveries. Skips cases with no pending `CaseAnalyzerJob` via an `Exists()` annotation |
 | `fail-stale-jobs` | `tasp.tasks.fail_stale_jobs` | every 600 s | Auto-fails `CaseAnalyzerJob` rows whose `created_at` is older than `STALE_JOB_TIMEOUT_SECONDS` |
 | `sync-user-profiles` | `tasp.tasks.sync_user_profiles` | every 600 s | Pull profile updates from LDAP/OIDC |
-| `watcher-sync` | `tasp.tasks.watcher_sync` | every 300 s | Run the WatcherLegitDomain / WatcherMonitoredDomain reconciliation |
 | `check-challengeable` | `tasp.tasks.check_challengeable` | daily 00:00 | Refresh the daily "challengeable" flag |
 | `sync-monthly-kpi` | `tasp.tasks.sync_monthly_kpi` | every 300 s | Roll the monthly KPI snapshots |
 | `delete-old-reports` | `tasp.tasks.delete_old_reports` | monthly day 1 | GC ageing `AnalyzerReport` rows |
@@ -60,13 +61,13 @@ All wrappers use `@shared_task(bind=True, max_retries=3, acks_late=True)` with e
 
 ### Webhook-triggered task
 
-`tasp.tasks.process_cortex_job(case_id, job_id)` is **not on the beat schedule** — it is enqueued by `api.views.cortex_webhook` whenever Cortex POSTs `/api/cortex/webhook/`. It acquires the per-case Redis lock `case_update_lock:<case_id>` (TTL 120 s), syncs the single (case, cortex_job_id) pair, and calls `CortexJobManager.finalise_case` when the case's pending-CAJ count reaches zero. The legacy `process_cortex_webhook_case` task was removed; see `tasp.tasks` for the current signature.
+`tasp.tasks.reconcile_case(case_id)` is **not on the beat schedule** — it is enqueued by `api.views.cortex_webhook` whenever Cortex POSTs `/api/cortex/webhook/` (and is also what `update_ongoing_cases` falls back to). It acquires the per-case Redis lock `case_update_lock:<case_id>` (TTL 120 s) and calls `reconcile_case_core` (`cortex_job/cortex_utils/reconciliation.py`) — the single entrypoint that syncs the `CaseAnalyzerJob` ledger and advances the case's lifecycle state machine, emitting a `case_finalised` connector event once the case reaches its terminal state. This is a straight rename from an earlier `process_cortex_job`/`finalise_case` pair; nothing by those names exists anymore.
 
 ---
 
 ## 🔐 Redis lock conventions
 
-- `case_update_lock:<case_id>` — 120 s TTL. Acquired by both `process_cortex_job` and `update_ongoing_case_jobs`; serialises any concurrent updates for the same case.
+- `case_update_lock:<case_id>` — 120 s TTL. Acquired by `reconcile_case`; serialises any concurrent updates for the same case.
 - `cortex_job_processed:<jobId>` — 1 h TTL. Webhook-level idempotency; duplicate Cortex retries short-circuit.
 
 Both use `django.core.cache.add(...)` so the operation is atomic on the Valkey backend.
@@ -76,15 +77,10 @@ Both use `django.core.cache.add(...)` so the operation is atomic on the Valkey b
 ## 🧪 Testing
 
 ```bash
-# Run only the new task tests (avoid the legacy in-tests/ collision):
-docker exec suspicious bash -c "cd /app/Suspicious && python manage.py test \
-    tasp.tests.test_finalise_case_idempotent \
-    tasp.tests.test_process_cortex_job \
-    tasp.tests.test_fail_stale_jobs \
-    tasp.tests.test_update_ongoing_skips_no_pending"
+docker exec suspicious bash -c "cd /app/Suspicious && python manage.py test tasp"
 ```
 
-The legacy `tasp/tests.py` (now exposed as `tasp.tests.test_celery_wrappers` once moved into the package) predates the Django/Celery integration and has known stale failures — these are not introduced by current work.
+`tasp/tests/test_legacy.py` predates the Celery integration; everything else in `tasp/tests/` targets the current task/cron implementations directly.
 
 ---
 

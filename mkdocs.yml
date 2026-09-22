@@ -94,6 +94,7 @@ nav:
           - case_handler: components/backend/case_handler.md
           - cortex_job: components/backend/cortex_job.md
           - score_process: components/backend/score_process.md
+          - connectors: components/backend/connectors.md
           - email_process: components/backend/email_process.md
           - Observable Processors: components/backend/observable-processors.md
           - dashboard: components/backend/dashboard.md
