@@ -165,14 +165,6 @@ export default function SubmissionsPage() {
 
   const me: Me | undefined = React.useMemo(() => meQuery.data, [meQuery.data]);
 
-  const isInvestigator = React.useMemo(
-    () =>
-      (me?.groups ?? []).some((g) =>
-        g === "CERT" || g === "CISO" || g === "Admin",
-      ),
-    [me],
-  );
-
   const profileQuery = useQuery({
     queryKey: ["profile"],
     queryFn: getProfile,
@@ -831,18 +823,16 @@ export default function SubmissionsPage() {
                   </Stack>
                 </Box>
                 <Stack direction="row" spacing={1} sx={{ alignItems: "center" }}>
-                  {isInvestigator ? (
-                    <Button
-                      variant="outlined"
-                      startIcon={<DescriptionOutlined />}
-                      onClick={() =>
-                        window.open(`/api/cases/${selectedRow.id}/report/`, "_blank")
-                      }
-                      sx={{ textTransform: "none", borderRadius: 2, fontWeight: 800 }}
-                    >
-                      Full report
-                    </Button>
-                  ) : null}
+                  <Button
+                    variant="outlined"
+                    startIcon={<DescriptionOutlined />}
+                    onClick={() =>
+                      window.open(`/api/cases/${selectedRow.id}/report/`, "_blank")
+                    }
+                    sx={{ textTransform: "none", borderRadius: 2, fontWeight: 800 }}
+                  >
+                    Full report
+                  </Button>
                   <Button onClick={() => setOpenDrawer(false)}
                     sx={{ textTransform: "none", borderRadius: 2, alignSelf: "flex-start" }}>
                     Close
