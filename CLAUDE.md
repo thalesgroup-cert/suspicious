@@ -97,7 +97,7 @@ python manage.py createsuperuser
 
 ### Frontend (`suspicious-ui/`)
 
-React 19 + TypeScript, Vite, Material-UI (MUI v9), React Router v7, TanStack Query v5, Zustand, React Hook Form + Zod. Test stack: Vitest + jsdom + @testing-library, Playwright for end-to-end. Pages: Submit, Investigations, Campaigns, Alerts, Settings, Dashboard, Profile. API calls are proxied from Vite dev server to the Django backend.
+React 19 + TypeScript, Vite, Material-UI (MUI v9), React Router v7, TanStack Query v5, Zustand, React Hook Form + Zod. Test stack: Vitest + jsdom + @testing-library, Playwright for end-to-end. Pages: Submit, Submissions/Investigations, Campaigns, Dashboard, Settings, Profile, About (`app/router.tsx` is the source of truth for the current route list — an "Alerts" page existed early in the repo's history but was orphaned/unwired and removed as dead code; don't resurrect it from an old doc). API calls are proxied from Vite dev server to the Django backend.
 
 ### Email Feeder (`email-feeder/`)
 

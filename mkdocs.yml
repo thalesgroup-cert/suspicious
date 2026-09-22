@@ -83,7 +83,6 @@ nav:
       - Submitting: user-guide/submitting.md
       - Investigations: user-guide/investigations.md
       - Campaigns: user-guide/campaigns.md
-      - Alerts: user-guide/alerts.md
       - Dashboard: user-guide/dashboard.md
       - Profile & Settings: user-guide/profile.md
   - Architecture: architecture.md
