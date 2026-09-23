@@ -72,12 +72,12 @@ class CortexAnalyzerReports:
             _explanation = None
             try:
                 from score_process.scoring.explanation.adapters import explain_mail_case
-                from cortex_job.cortex_utils.case_targets import (
-                    build_analyzer_report_filter, collect_case_targets)
-                from cortex_job.models import AnalyzerReport
-                _tg = collect_case_targets(case)
-                _rp = (AnalyzerReport.objects.filter(build_analyzer_report_filter(_tg))
-                       if _tg else AnalyzerReport.objects.none())
+                from api.utils.analyzer_reports import reports_for_case
+                from api.views.investigations import _dedup_analyzer_reports
+                # A rerun leaves the old AnalyzerReport row in place alongside
+                # the new one — without dedup, sources would show one row per
+                # historical run instead of one per (analyzer, target).
+                _rp = _dedup_analyzer_reports(reports_for_case(case))
                 _explanation = explain_mail_case(case, verdict, _rp, []).to_dict()
             except Exception:
                 update_cases_logger.exception(

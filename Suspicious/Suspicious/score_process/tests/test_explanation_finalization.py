@@ -100,4 +100,45 @@ class ExplanationFinalizationTests(TestCase):
         self.assertIsInstance(ve, dict)
         self.assertEqual(ve["band"], "Dangerous")
         self.assertTrue(ve["decisive_rule"])
+
+    def test_mail_case_sources_are_deduped_across_reruns(self):
+        """A rerun leaves both the old and new AnalyzerReport rows in the DB
+        (nothing deletes the old one) -- explanation sources must show only
+        the latest per (analyzer, target), not one row per historical run."""
+        mail = Mail.objects.create(
+            subject="s", reportedBy="r", date=timezone.now(), to="t", mail_id="ef-mail-2",
+        )
+        hash_obj = Hash.objects.create(value="ef-mail-hash-2")
+        archive = File.objects.create(linked_hash=hash_obj, tmp_path="ef-mail-2.tar.gz")
+        MailArchive.objects.create(mail=mail, archive=archive)
+
+        ip = IP.objects.create(address="203.0.113.45")
+        AnalyzerReport.objects.create(
+            cortex_job_id="ef3-first-run", type="ip", status="Success", analyzer=self.analyzer,
+            ip=ip, level="malicious", confidence=95, score=10,
+            report_summary={"taxonomies": [{"level": "malicious", "value": "gti"}]},
+            report_taxonomy={}, report_full={},
+        )
+        AnalyzerReport.objects.create(
+            cortex_job_id="ef3-rerun", type="ip", status="Success", analyzer=self.analyzer,
+            ip=ip, level="malicious", confidence=95, score=10,
+            report_summary={"taxonomies": [{"level": "malicious", "value": "gti"}]},
+            report_taxonomy={}, report_full={},
+        )
+        case = Case.objects.create(description="", reporter=self.user)
+        fm = CaseHasFileOrMail.objects.create(case=case, mail=mail)
+        case.fileOrMail = fm
+        iocs = CaseHasNonFileIocs.objects.create(case=case, ip=ip)
+        case.nonFileIocs = iocs
+        case.save()
+
+        CortexAnalyzerReports.get_report(case)
+
+        case.refresh_from_db()
+        ve = case.verdict_explanation
+        gti_sources = [s for s in ve["sources"] if s["name"] == "GTI"]
+        self.assertEqual(
+            len(gti_sources), 1,
+            f"expected 1 deduped GTI source, got {len(gti_sources)}: {gti_sources}",
+        )
         self.assertTrue(ve["analyst_paragraph"])
