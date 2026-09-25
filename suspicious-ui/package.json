@@ -55,7 +55,7 @@
     "@types/react-dom": "19.3.0",
     "@vitejs/plugin-react": "6.1.1",
     "@vitest/browser": "4.1.10",
-    "@vitest/browser-playwright": "4.1.10",
+    "@vitest/browser-playwright": "5.0.1",
     "boneyard-js": "1.8.1",
     "eslint": "10.9.1",
     "eslint-plugin-react-hooks": "7.1.1",
