@@ -86,5 +86,5 @@ hvac==2.4.0
 opentelemetry-sdk==1.44.0
 opentelemetry-instrumentation-django==0.65b0
 opentelemetry-instrumentation-requests==0.65b0
-opentelemetry-instrumentation-celery==0.65b0
+opentelemetry-instrumentation-celery==0.66b0
 opentelemetry-exporter-otlp-proto-http==1.44.0
