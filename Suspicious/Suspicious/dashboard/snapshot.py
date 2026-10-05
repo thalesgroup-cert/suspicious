@@ -128,7 +128,8 @@ def _get_challenged_cases_aggregate(*, month: int, year: int) -> dict:
 
 
 def _get_top_prefixes(*, month: int, year: int, limit: int) -> list[dict]:
-    month_str = str(month)
+    # UserCasesMonthlyStats.month is zero-padded, see _get_challenged_cases_aggregate above.
+    month_str = f"{month:02d}"
     year_str = str(year)
     suspicious_email = getattr(settings, "SUSPICIOUS_EMAIL", None)
 

@@ -69,6 +69,11 @@ class AIMailClassifier(Analyzer):
 
         # Classify via the persistent inference server (models loaded once
         # there, not reloaded on every job - see inference_server/server.py)
+        # Classify via the persistent inference server, which owns the
+        # vectorizer and every model variant (see inference_server/server.py
+        # for why: this image is spawned fresh per Cortex job, so loading a
+        # full SentenceTransformer + 5 ResNetMLP checkpoints here every time
+        # would be reloaded from disk on every single mail).
         try:
             resp = requests.post(
                 f"{INFERENCE_SERVER_URL}/classify",
