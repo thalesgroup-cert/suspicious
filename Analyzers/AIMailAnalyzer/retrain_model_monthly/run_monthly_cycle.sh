@@ -78,7 +78,7 @@ AIMAILANALYZER_DIR="$(cd .. && pwd)"
 run_trainer_shell() {
   docker run --rm --network host \
     -v "$AIMAILANALYZER_DIR:/aimailanalyzer" \
-    -w "/aimailanalyzer/retrain model monthly" \
+    -w "/aimailanalyzer/retrain_model_monthly" \
     -v "$HF_CACHE:/root/.cache/huggingface" \
     -e HF_HOME=/root/.cache/huggingface \
     -e VECTORIZER_PATH="$VECTORIZER" \

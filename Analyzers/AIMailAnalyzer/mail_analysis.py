@@ -177,7 +177,7 @@ def getSubClassificationProbabilities(device, models, email_embedding, main_clas
     for i, model in enumerate(models):
         if model is None:
             # Sub-model not available (e.g. not enough labeled samples yet
-            # to train it - see retrain model monthly/main_retrainmodels.py's
+            # to train it - see retrain_model_monthly/main_retrainmodels.py's
             # per-model resilience). Contribute an all-zero slice so the
             # concatenated vector keeps its expected width and downstream
             # argmax never picks a sub-class we have no signal for.
