@@ -15,15 +15,15 @@ tqdm>=4.70.0
 bs4>=0.0.2
 jupyter>=1.1.1
 
-# retrain model monthly/ (IMAP fetch pipeline)
+# retrain_model_monthly/ (IMAP fetch pipeline)
 python-dotenv>=1.0
 
-# retrain model monthly/generator_dataset_month_replay.py (month-window IMAP
+# retrain_model_monthly/generator_dataset_month_replay.py (month-window IMAP
 # SEARCH bounds) - already a transitive dep of pandas, pinned explicitly
 # since this script imports it directly.
 python-dateutil>=2.9
 
-# retrain model monthly/promote.py (push run metrics to the Suspicious
+# retrain_model_monthly/promote.py (push run metrics to the Suspicious
 # dashboard) - not pinned elsewhere here, only a transitive dep of
 # sentence-transformers/huggingface_hub until now.
 requests>=2.32

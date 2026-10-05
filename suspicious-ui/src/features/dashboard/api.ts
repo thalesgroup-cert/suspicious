@@ -78,7 +78,7 @@ export type AiModelRun = {
   model_name: string;
   f1_score: number;
   accuracy: number;
-  // Scored against a fixed held-out benchmark (retrain model monthly/
+  // Scored against a fixed held-out benchmark (retrain_model_monthly/
   // golden_set.py) instead of a random test split that's a different slice
   // of the dataset every cycle - null until a golden set exists and has
   // coverage for this label, but the only apples-to-apples trend once it does.
