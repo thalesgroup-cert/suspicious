@@ -21,6 +21,21 @@ class MLRetrainIngestPermission(BasePermission):
         return user.groups.filter(name__in=self.allowed_groups).exists()
 
 
+class AIModelHealthReadPermission(BasePermission):
+    """
+    Read access to the AI Model Health panel (retrain-run history/metrics).
+
+    Unlike StatsReadPermission (CISO/CERT/Admin/staff only), this panel is
+    considered safe to expose to any authenticated user - it only shows
+    model training metrics (F1/accuracy over time), no per-mail or
+    per-campaign data.
+    """
+
+    def has_permission(self, request, view) -> bool:
+        user = request.user
+        return bool(user and user.is_authenticated)
+
+
 class StatsReadPermission(BasePermission):
     """
     Restrict stats/dashboard endpoints to elevated operational roles.

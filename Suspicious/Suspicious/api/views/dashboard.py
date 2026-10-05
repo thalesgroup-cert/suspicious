@@ -12,7 +12,7 @@ from rest_framework.response import Response
 from rest_framework.views import APIView
 
 from api.permissions.settings import IsAdminOrCERT
-from api.permissions.dashboard import MLRetrainIngestPermission, StatsReadPermission
+from api.permissions.dashboard import AIModelHealthReadPermission, MLRetrainIngestPermission
 
 from dashboard.models import (
     AIModelRetrainRun,
@@ -158,7 +158,7 @@ class AIModelRetrainRunListCreateView(generics.ListCreateAPIView):
     def get_permissions(self):
         if self.request.method == "POST":
             return [MLRetrainIngestPermission()]
-        return [StatsReadPermission()]
+        return [AIModelHealthReadPermission()]
 
 
 class UserCasesMonthlyStatsListView(generics.ListAPIView):
