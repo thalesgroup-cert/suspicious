@@ -12,7 +12,7 @@ from django.contrib.auth import get_user_model
 from django.test import TestCase
 
 from score_process.score_utils.send_mail.models import (
-    EmailSubjectsConfig, RetryConfig, SuspiciousConfig,
+    EmailSubjectsConfig, SuspiciousConfig,
 )
 from score_process.score_utils.send_mail.service import MailNotificationService
 
@@ -23,7 +23,6 @@ class ReporterRecipientTests(TestCase):
     def _svc(self):
         return MailNotificationService(
             SuspiciousConfig(email=SYS),
-            RetryConfig(max_retries=1, base_delay=0),
             EmailSubjectsConfig(
                 acknowledgement="ack", review="review", final="Analysis [{case_id}] done",
             ),
