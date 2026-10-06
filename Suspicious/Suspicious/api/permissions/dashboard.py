@@ -4,8 +4,8 @@ from rest_framework.permissions import BasePermission
 class MLRetrainIngestPermission(BasePermission):
     """Restrict AI model retrain-run ingestion (POST) to the dedicated
     service account the retrain pipeline's promote.py authenticates as,
-    or staff/superusers. GET (dashboard reads) uses StatsReadPermission
-    instead, same as every other stats endpoint.
+    or staff/superusers. GET (dashboard reads) uses AIModelHealthReadPermission
+    (any authenticated user) instead.
     """
 
     allowed_groups = {"ml-retrain"}

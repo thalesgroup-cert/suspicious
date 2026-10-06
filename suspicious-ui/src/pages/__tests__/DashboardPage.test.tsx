@@ -11,6 +11,7 @@ vi.mock("@/api/auth", () => ({
 
 vi.mock("@/features/dashboard/api", () => ({
   getDashboardSummary: vi.fn(),
+  getAiModelRuns: vi.fn().mockResolvedValue([]),
 }));
 
 
