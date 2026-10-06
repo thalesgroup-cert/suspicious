@@ -8,7 +8,7 @@
 -r requirements.txt
 
 pandas>=3.0.5
-pyarrow>=19.0.0
+pyarrow>=25.0.1
 scikit-learn>=1.9.1
 imbalanced-learn>=0.14.2
 matplotlib>=3.11.2
