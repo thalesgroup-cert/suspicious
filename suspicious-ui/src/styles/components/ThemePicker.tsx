@@ -11,9 +11,7 @@ import { alpha } from "@mui/material/styles";
 import { CheckOutlined, AutoModeOutlined } from "@mui/icons-material";
 import { themes, type ThemeName, getSeasonalThemeName } from "@/styles/themes";
 
-// ---------------------------------------------------------------------------
 // Types
-// ---------------------------------------------------------------------------
 
 type Props = {
   value: ThemeName;
@@ -27,9 +25,7 @@ type ThemeMeta = {
   emoji?: string;
 };
 
-// ---------------------------------------------------------------------------
 // Metadata
-// ---------------------------------------------------------------------------
 
 const ORDER: ThemeName[] = [
   "midnight",
@@ -266,9 +262,7 @@ function Swatch({ name, selected }: { name: ThemeName; selected: boolean }) {
   );
 }
 
-// ---------------------------------------------------------------------------
 // ThemeCard
-// ---------------------------------------------------------------------------
 
 function ThemeCard({
   name,
@@ -428,9 +422,7 @@ function ThemeCard({
   );
 }
 
-// ---------------------------------------------------------------------------
 // Group header
-// ---------------------------------------------------------------------------
 
 function GroupHeader({ title, description }: { title: string; description: string }) {
   const theme = useTheme();
@@ -464,9 +456,7 @@ function GroupHeader({ title, description }: { title: string; description: strin
   );
 }
 
-// ---------------------------------------------------------------------------
 // ThemePicker
-// ---------------------------------------------------------------------------
 
 export function ThemePicker({ value, onChange }: Props) {
   const seasonal = React.useMemo(() => getSeasonalThemeName(new Date()), []);

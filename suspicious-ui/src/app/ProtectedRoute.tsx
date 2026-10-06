@@ -9,7 +9,7 @@ type Props = {
 
   /**
    * Optional role gate. If provided, the user must belong to at least
-   * one of these groups — otherwise they are redirected to "/".
+   * one of these groups, otherwise they are redirected to "/".
    * Example: <ProtectedRoute requireGroups={["CERT", "Admin"]}>
    */
   requireGroups?: string[];

@@ -54,7 +54,8 @@ python manage.py createsuperuser
 | Service | Role |
 |---|---|
 | `suspicious` | Django REST API (Gunicorn, port 9020) |
-| `suspicious_celery` | Celery beat + worker (background jobs, cortex sync, case finalisation) |
+| `suspicious_celery` | Celery worker (background jobs, cortex sync, case finalisation) |
+| `suspicious_celery_beat` | Celery beat scheduler — a separate container from the worker; without it, no periodic task (email polling, stale-job cleanup, connector sync, etc.) ever fires |
 | `suspicious_ui` | React/Vite frontend (Nginx, port 9021) |
 | `db_suspicious` | MariaDB 11.4 (primary read/write; opt-in replica via R6 router) |
 | `redis_broker` / `redis_cache` | Valkey 9 — Celery broker + Django cache (per-case lock, webhook jobId dedup) |
@@ -63,6 +64,7 @@ python manage.py createsuperuser
 | `cortex` | Analyzer execution engine (YARA, AI, sandbox); reports back via HMAC-signed webhook |
 | `chromadb` | Vector DB for semantic similarity search |
 | `email_feeder` | IMAP poller that auto-ingests emails (runs as non-root `feeder` UID) |
+| `vault` | Secrets store — connector credentials and other runtime secrets |
 | `traefik` | Reverse proxy with TLS termination |
 | `tempo` / `grafana` (optional) | OpenTelemetry trace store + dashboards; enable via `observability.opentelemetry.enabled` in `settings.json` and start the stack manually under `deployment/docker/monitoring/` (Grafana port 3000) |
 
@@ -71,8 +73,8 @@ python manage.py createsuperuser
 1. User submits email/file/URL/IP/hash via web UI, API, or the email feeder's IMAP polling.
 2. Django creates a `Case`, then dispatches Cortex analyzers via `CortexJob.run_analyzer` — each call writes an `AnalyzerReport` *and* a `CaseAnalyzerJob` ledger row atomically (`case_id ↔ cortex_job_id` mapping).
 3. Cortex runs analyzers asynchronously (YARA rules, AIMailAnalyzer ML classifier, sandboxing, metadata, FileInfo) and POSTs to `/api/cortex/webhook/` (HMAC-signed, jobId-deduped) when each job finishes.
-4. The webhook view looks up the case via a single indexed read on `CaseAnalyzerJob`, then enqueues `process_cortex_job(case_id, job_id)` on Celery; the task takes a per-case Redis lock, updates the ledger, and calls `finalise_case` once all pending jobs for that case are non-pending.
-5. `finalise_case` aggregates scores (Safe / Inconclusive / Suspicious / Dangerous), pushes to TheHive/MISP if configured, queries ChromaDB for semantically similar past cases, notifies the reporter by SMTP, and updates dashboard KPIs.
+4. The webhook view looks up the case via a single indexed read on `CaseAnalyzerJob`, then enqueues `tasp.tasks.reconcile_case(case_id)` on Celery; the task takes a per-case Redis lock and calls `reconcile_case_core` (`cortex_job/cortex_utils/reconciliation.py`), the single entrypoint that syncs the ledger and advances the case's lifecycle state machine.
+5. Once `reconcile_case_core` aggregates the final score (Safe / Inconclusive / Suspicious / Dangerous) and the case reaches its terminal state, it emits a `case_finalised` event via `connectors.dispatch.emit`. Every connector subscribed to that event (TheHive, MISP, SMTP-notify, ChromaDB, `ai_narration`) fires independently, and dashboard KPIs are updated — see the `connectors` app row below.
 6. Celery beat runs `update_ongoing_cases` every 300s as a webhook-delivery fallback, and `fail_stale_jobs` every 600s to auto-fail any `CaseAnalyzerJob` rows pending beyond `STALE_JOB_TIMEOUT_SECONDS` (24h default).
 
 ### Django Apps (`Suspicious/Suspicious/`)
@@ -83,19 +85,19 @@ python manage.py createsuperuser
 | `case_handler` | Case CRUD and lifecycle |
 | `email_process` | Email parsing and submission |
 | `cortex_job` | Cortex job orchestration (cortex4py). Defines `Analyzer`, `AnalyzerReport`, and the `CaseAnalyzerJob` junction ledger that powers the webhook lookup |
-| `score_process` | Risk scoring, TheHive/MISP integration, ChromaDB queries |
-| `connectors` | Connector framework: registry, dispatch, delivery ledger, contrib connectors for TheHive/MISP/Watcher/SMTP-notify |
+| `score_process` | Risk scoring; rule-based verdict explanation (`scoring/explanation/`) and the deterministic narration safety-lock + prompt builder (`scoring/narration/`) that `ai_narration` calls |
+| `connectors` | Connector framework: registry, dispatch, delivery ledger, circuit breaker, contrib connectors for TheHive/MISP/Watcher/SMTP-notify/ChromaDB/`ai_narration`. See [Connectors](docs/components/backend/connectors.md) |
 | `submission_queue` | Async job queue |
 | `domain_process` / `url_process` / `ip_process` / `hash_process` / `file_process` | Per-observable analysis |
 | `dashboard` | KPI metrics |
 | `mail_feeder` | Outbound SMTP notification templates |
 | `settings` | DB-backed config (blacklists, whitelists, campaign settings) |
-| `tasp` | Celery beat schedule + task wrappers (`fetch_emails`, `sync_cortex`, `update_ongoing_cases`, `process_cortex_job`, `fail_stale_jobs`, `sync_user_profiles`, `delete_old_reports`, `watcher_sync`, `materialise_dashboard_snapshots`) |
+| `tasp` | Celery beat schedule + task wrappers (`fetch_emails`, `sync_cortex`, `update_ongoing_cases`, `reconcile_case`, `fail_stale_jobs`, `sync_user_profiles`, `delete_old_reports`, `materialise_dashboard_snapshots`); per-connector sync (e.g. Watcher) is scheduled separately by `connectors/apps.py` as `connectors.tasks.run_connector_sync`, not a `tasp` task |
 | `profiles` | User profile management |
 
 ### Frontend (`suspicious-ui/`)
 
-React 19 + TypeScript, Vite, Material-UI (MUI v9), React Router v7, TanStack Query v5, Zustand, React Hook Form + Zod. Test stack: Vitest + jsdom + @testing-library, Playwright for end-to-end. Pages: Submit, Investigations, Campaigns, Alerts, Settings, Dashboard, Profile. API calls are proxied from Vite dev server to the Django backend.
+React 19 + TypeScript, Vite, Material-UI (MUI v9), React Router v7, TanStack Query v5, Zustand, React Hook Form + Zod. Test stack: Vitest + jsdom + @testing-library, Playwright for end-to-end. Pages: Submit, Submissions/Investigations, Campaigns, Dashboard, Settings, Profile, About (`app/router.tsx` is the source of truth for the current route list — an "Alerts" page existed early in the repo's history but was orphaned/unwired and removed as dead code; don't resurrect it from an old doc). API calls are proxied from Vite dev server to the Django backend.
 
 ### Email Feeder (`email-feeder/`)
 
@@ -116,7 +118,7 @@ Sentence Transformers model (`paraphrase-multilingual-mpnet-base-v2`) for embedd
 
 ## Full E2E Dev Deployment — `/deploy-full-e2e`
 
-Trigger phrase for this section: "deploy full e2e", "redo the full deploy", "stand up the full stack", `/deploy-full-e2e`. Follow it step by step instead of re-deriving the process — every step below encodes a gotcha that cost real time to find the first time. This builds a *local, dev-only* full stack (all 13 services, real Cortex, no Vault/Traefik — plain HTTP on `localhost:9020`) seeded with a fictional company ("Meridian Group") and a handful of named personas, suitable for exercising the whole submit → analyze → finalize → notify pipeline end to end.
+Trigger phrase for this section: "deploy full e2e", "redo the full deploy", "stand up the full stack", `/deploy-full-e2e`. Follow it step by step instead of re-deriving the process — every step below encodes a gotcha that cost real time to find the first time. This builds a *local, dev-only* full stack (12 services — `db_suspicious`, `redis_cache`, `redis_broker`, `rustfs`, `chromadb`, `suspicious`, `suspicious_celery`, `suspicious_celery_beat`, `suspicious_ui`, `feeder`, plus `cortex`/`elasticsearch` as automatic dependencies of `suspicious` — real Cortex, no Vault/Traefik — plain HTTP on `localhost:9020`) seeded with a fictional company ("Meridian Group") and a handful of named personas, suitable for exercising the whole submit → analyze → finalize → notify pipeline end to end.
 
 Assumes: Docker + Compose v2 working, outbound internet, a user in the `docker` group. No JDK/keytool needed on the host — worked around below. No sudo needed.
 
@@ -203,13 +205,13 @@ for username, first, last, groups in PERSONAS:
 ```
 
 ```bash
-docker compose --env-file .env up -d suspicious suspicious_celery suspicious_ui feeder
+docker compose --env-file .env up -d suspicious suspicious_celery suspicious_celery_beat suspicious_ui feeder
 ```
-`cortex` and `elasticsearch` come up automatically as dependencies of `suspicious`. Confirm everything: `docker compose --env-file .env ps` (all healthy) and `curl --noproxy '*' http://localhost:9020/api/health/` → `{"status": "ok", "checks": {"db": true, "redis": true, "cortex": true}, ...}`.
+`suspicious_celery_beat` is a separate container from the worker — omitting it (as this walkthrough used to) leaves the stack running with no periodic tasks at all: no email polling, no stale-job cleanup, no connector sync. `cortex` and `elasticsearch` come up automatically as dependencies of `suspicious`. Confirm everything: `docker compose --env-file .env ps` (all healthy) and `curl --noproxy '*' http://localhost:9020/api/health/` → `{"status": "ok", "checks": {"db": true, "redis": true, "cortex": true}, ...}`.
 
 ### 6. Edited a config file after containers are already running?
 
-**Recreate, don't just wait.** `docker compose up -d --force-recreate --no-deps suspicious suspicious_celery` — a plain bind-mounted-file edit (most editors write-temp + rename, replacing the inode) can leave a running container looking at the old file even though it's mounted "live". If a config change doesn't seem to take effect, this is why.
+**Recreate, don't just wait.** `docker compose up -d --force-recreate --no-deps suspicious suspicious_celery suspicious_celery_beat` — a plain bind-mounted-file edit (most editors write-temp + rename, replacing the inode) can leave a running container looking at the old file even though it's mounted "live". If a config change doesn't seem to take effect, this is why.
 
 ### 7. Verify
 

@@ -1,5 +1,5 @@
 /**
- * MailPreview — renders the server-side .eml→png preview of a case.
+ * MailPreview: renders the server-side .eml→png preview of a case.
  *
  * The backend exposes the preview at `/api/cases/<case_id>/mail-preview.png`
  * (auth via httpOnly knox cookie). Each Case serializer surfaces a
@@ -11,7 +11,7 @@
  *   - <MailPreview variant="full" .../>       full-width block for the
  *                                              investigation detail page
  *
- * The image is not fetched until the user clicks "Load preview" — every row
+ * The image is not fetched until the user clicks "Load preview": every row
  * on a list page mounting its own eager <img> was the actual cost, not the
  * render itself. Once clicked, a skeleton shows while it loads. On a 404
  * (the backend enqueues a background (re)render and 404s on a cache miss),

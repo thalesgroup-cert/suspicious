@@ -8,9 +8,7 @@ export type ReportLike = {
   target?: { kind?: string | null; value?: string | null } | null;
 };
 
-// ---------------------------------------------------------------------------
 // Score / confidence
-// ---------------------------------------------------------------------------
 
 export function clamp(n: number, min = 0, max = 100) {
   return Math.max(min, Math.min(max, n));
@@ -99,9 +97,7 @@ export function getConfidenceTone(confidence?: number | null) {
   };
 }
 
-// ---------------------------------------------------------------------------
 // Labels
-// ---------------------------------------------------------------------------
 
 export function readStatus(status?: string) {
   const s = (status ?? "").toUpperCase();
@@ -160,14 +156,12 @@ export function fmtDate(iso: string) {
 export function kindLabel(kind: string) {
   const labels: Record<string, string> = {
     FILE: "File", URL: "URL", IP: "IP address", HASH: "Hash",
-    DOMAIN: "Domain", MAIL: "Email address",
+    DOMAIN: "Domain", MAIL: "Email address", IOC: "IOC group",
     MAIL_BODY: "Mail body", MAIL_HEADER: "Mail header", UNKNOWN: "Unknown",
   };
   return labels[kind.toUpperCase()] ?? kind;
 }
 
-// ---------------------------------------------------------------------------
-// ---------------------------------------------------------------------------
 
 export type ReportGroup<T = ReportLike> = {
   key: string;

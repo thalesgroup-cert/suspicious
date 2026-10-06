@@ -1,8 +1,8 @@
 """Shared ``safe_execution`` context manager factory.
 
 Every ``mail_feeder`` submodule and ``tasp.cron`` used to carry its own
-identical copy of a ``safe_execution`` context manager — try/yield/except,
-log the error, re-raise — differing only in the bracketed log prefix. This
+identical copy of a ``safe_execution`` context manager (try/yield/except,
+log the error, re-raise), differing only in the bracketed log prefix. This
 module replaces all of them with a single implementation built per call site
 by :func:`make_safe_execution`.
 """

@@ -62,7 +62,7 @@ def _scope_for_section(section: str) -> str:
 def invalidate_cache(key: str) -> None:
     try:
         cache.delete(_CACHE_PREFIX + key)
-    except Exception:  # noqa: BLE001 — cache is non-critical for a write
+    except Exception:  # noqa: BLE001 (cache is non-critical for a write)
         logger.warning("cache unavailable invalidating runtime config '%s'", key)
 
 

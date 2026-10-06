@@ -98,9 +98,7 @@ class CISOProcessingTests(TestCase):
         result = handle_txt_file(file)
         self.assertEqual(result, ["alice", "bob"])
 
-# ------------------------------
 # LDAP Utility Tests
-# ------------------------------
 class LDAPUtilityTests(TestCase):
 
     def setUp(self):
@@ -120,7 +118,7 @@ class LDAPUtilityTests(TestCase):
     @patch("profiles.profiles_utils.ldap.ldap.set_option")
     @patch("profiles.profiles_utils.ldap._ldap_config", return_value={})
     def test_initialize_ldap_defaults_to_tls_demand(self, mock_config, mock_set_option, mock_initialize):
-        # verify_ssl unset (or true) must default to cert verification ON —
+        # verify_ssl unset (or true) must default to cert verification ON;
         # regression test for the hardcoded OPT_X_TLS_NEVER bypass.
         Ldap().initialize_ldap()
         mock_set_option.assert_called_once_with(
@@ -131,7 +129,7 @@ class LDAPUtilityTests(TestCase):
     @patch("profiles.profiles_utils.ldap.ldap.set_option")
     @patch("profiles.profiles_utils.ldap._ldap_config", return_value={"verify_ssl": "false"})
     def test_initialize_ldap_verify_ssl_false_disables_tls(self, mock_config, mock_set_option, mock_initialize):
-        # Explicit opt-out is still honoured — only the default flipped.
+        # Explicit opt-out is still honoured; only the default flipped.
         Ldap().initialize_ldap()
         mock_set_option.assert_called_once_with(
             ldap_module.OPT_X_TLS_REQUIRE_CERT, ldap_module.OPT_X_TLS_NEVER
@@ -140,7 +138,7 @@ class LDAPUtilityTests(TestCase):
     @patch("profiles.profiles_utils.ldap._ldap_config", return_value={"base_dn": "dc=meridian,dc=example"})
     def test_get_search_results_escapes_filter_chars(self, mock_config):
         # A username containing LDAP filter metacharacters must not be able
-        # to widen or restructure the search filter — regression test for
+        # to widen or restructure the search filter; regression test for
         # the unescaped-filter-injection bug.
         mock_server = MagicMock()
         mock_server.search_s.return_value = []
@@ -154,7 +152,7 @@ class LDAPUtilityTests(TestCase):
 
     def test_add_user_to_group_blocks_reserved_rbac_names(self):
         # businessCategory/title values from the directory must never be
-        # able to join a group that also carries real RBAC meaning —
+        # able to join a group that also carries real RBAC meaning;
         # regression test for the LDAP-attribute-to-privilege-escalation bug.
         user = User.objects.create_user(username="sam.whitfield")
         Ldap.add_user_to_group(user, "Admin")
@@ -163,7 +161,7 @@ class LDAPUtilityTests(TestCase):
     def test_add_user_to_group_blocks_champions(self):
         # "Champions" is treated as elevated (alongside Admin/CERT) by
         # tasp/views.py's is_admin_or_cert()/TaspService and
-        # tasp/templatetags/utils.py on this branch — must be reserved too.
+        # tasp/templatetags/utils.py on this branch; must be reserved too.
         user = User.objects.create_user(username="pat.reyes")
         Ldap.add_user_to_group(user, "Champions")
         self.assertEqual(user.groups.filter(name="Champions").count(), 0)

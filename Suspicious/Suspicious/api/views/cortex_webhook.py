@@ -1,4 +1,4 @@
-"""POST /api/cortex/webhook/ — Cortex job-completion callback.
+"""POST /api/cortex/webhook/: Cortex job-completion callback.
 
 Cortex calls this endpoint when a job finishes (Success or Failure).
 We look up which cases own the job via the CaseAnalyzerJob ledger
@@ -34,7 +34,7 @@ def _find_cases_for_job(job_id: str) -> list[int]:
     Uses the CaseAnalyzerJob ledger written atomically at dispatch time.
     Returns the IDs of cases that still have a pending CaseAnalyzerJob row
     for this jobId. Cases whose CAJ row has already transitioned to
-    Success/Failure/Deleted are not returned — those re-deliveries are
+    Success/Failure/Deleted are not returned: those re-deliveries are
     no-ops.
     """
     from cortex_job.models import CaseAnalyzerJob
@@ -55,7 +55,7 @@ class CortexWebhookView(APIView):
         # ── Authenticate ────────────────────────────────────────────────────
         secret = getattr(settings, "CORTEX_WEBHOOK_SECRET", "")
         if not secret:
-            logger.error("CORTEX_WEBHOOK_SECRET not configured — webhook rejected")
+            logger.error("CORTEX_WEBHOOK_SECRET not configured, webhook rejected")
             return Response({"detail": "Webhook not configured."}, status=status.HTTP_503_SERVICE_UNAVAILABLE)
 
         auth_header = request.headers.get("Authorization", "")

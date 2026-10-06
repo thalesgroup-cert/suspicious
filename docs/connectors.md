@@ -1,10 +1,13 @@
 # Building a connector
 
 Connectors are Suspicious's plugin system for pushing case activity to
-external tools — ticketing, threat-intel platforms, chat, SIEM. The
-built-in TheHive, MISP, Watcher and SMTP-notify integrations are
-themselves connectors (`connectors/contrib/`), and third-party packages
-plug in through the same contract without touching Suspicious code.
+external tools — ticketing, threat-intel platforms, chat, SIEM, an LLM
+narration provider. The built-in TheHive, MISP, Watcher, SMTP-notify,
+ChromaDB, and `ai_narration` integrations are themselves connectors
+(`connectors/contrib/`) — see
+[`connectors/README.md`](https://github.com/thalesgroup-cert/suspicious/blob/main/Suspicious/Suspicious/connectors/README.md)
+for what each one does — and third-party packages plug in through the same
+contract without touching Suspicious code.
 
 **Starting your own:** [`Suspicious/Suspicious/connectors/contrib/template/`](https://github.com/thalesgroup-cert/suspicious/tree/main/Suspicious/Suspicious/connectors/contrib/template)
 is a complete, working package skeleton (manifest, both hooks, `sync()`,

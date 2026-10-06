@@ -1,0 +1,7 @@
+{
+  "verdict": {"band": "Safe", "score": 0.5, "confidence": 92, "rule": "no-malicious-sources"},
+  "analyzer_reports": [
+    {"analyzer": "AI_Mail_Analyzer", "report_full": {"classification": "legitimate", "confidence": 0.92, "language": "en"}},
+    {"analyzer": "SPF_DKIM_DMARC", "report_full": {"spf": "pass", "dkim": "pass", "dmarc": "pass"}}
+  ]
+}

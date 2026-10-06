@@ -25,8 +25,6 @@ import {
   STATUS_LABELS,
 } from "@/styles/colorStore";
 
-// ---------------------------------------------------------------------------
-// ---------------------------------------------------------------------------
 
 const RESULT_ICONS: Record<ResultKey, React.ReactElement> = {
   safe: <CheckCircleOutlined />,
@@ -44,9 +42,7 @@ const STATUS_ICONS: Record<StatusKey, React.ReactElement> = {
   unknown: <DeviceUnknownOutlined />,
 };
 
-// ---------------------------------------------------------------------------
 // Shared chip renderer
-// ---------------------------------------------------------------------------
 
 type SemanticChipProps = {
   /** The hex color for this chip */
@@ -55,7 +51,7 @@ type SemanticChipProps = {
   label: string;
   /** Icon element */
   icon: React.ReactElement;
-  /** Size — small (default) or medium */
+  /** Size: small (default) or medium */
   size?: "small" | "medium";
   /** If true renders as a filled pill (e.g. in a table cell badge) */
   filled?: boolean;
@@ -120,9 +116,7 @@ function SemanticChip({
   return chip;
 }
 
-// ---------------------------------------------------------------------------
-// ResultChip — for safe / suspicious / dangerous / inconclusive
-// ---------------------------------------------------------------------------
+// ResultChip: for safe / suspicious / dangerous / inconclusive
 
 type ResultChipProps = {
   value: ResultKey;
@@ -144,9 +138,7 @@ export function ResultChip({ value, ...rest }: ResultChipProps) {
   );
 }
 
-// ---------------------------------------------------------------------------
-// StatusChip — for done / in_progress / new / failure / challenged / unknown
-// ---------------------------------------------------------------------------
+// StatusChip: for done / in_progress / new / failure / challenged / unknown
 
 type StatusChipProps = {
   value: StatusKey;

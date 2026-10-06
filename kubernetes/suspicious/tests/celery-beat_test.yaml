@@ -1,0 +1,33 @@
+suite: celery beat deployment
+templates:
+  - celery-beat/deployment.yaml
+  - secret-settings.yaml
+tests:
+  - it: runs the celery beat command
+    template: celery-beat/deployment.yaml
+    asserts:
+      - equal:
+          path: spec.template.spec.containers[0].command
+          value: ["celery", "-A", "suspicious", "beat", "--loglevel=info"]
+  - it: liveness probe checks the beat process is running
+    template: celery-beat/deployment.yaml
+    asserts:
+      - equal:
+          path: spec.template.spec.containers[0].livenessProbe.exec.command
+          value:
+            - sh
+            - -c
+            - "pgrep -f 'celery -A suspicious beat'"
+  - it: replicas is always 1, even if a stray values override tries to set celery.beat.replicas
+    template: celery-beat/deployment.yaml
+    set:
+      celery.beat.replicas: 5
+    asserts:
+      - equal:
+          path: spec.replicas
+          value: 1
+  - it: sets a checksum/config annotation derived from secret-settings.yaml
+    template: celery-beat/deployment.yaml
+    asserts:
+      - exists:
+          path: spec.template.metadata.annotations["checksum/config"]

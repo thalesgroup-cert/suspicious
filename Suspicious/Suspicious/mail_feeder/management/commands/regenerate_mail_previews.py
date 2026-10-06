@@ -101,14 +101,12 @@ class Command(BaseCommand):
             )
         )
 
-    # ------------------------------------------------------------------
     # Per-row work
-    # ------------------------------------------------------------------
 
     def _process_one(self, *, mail: Mail, renderer: Eml2PngRenderer, storage, dry_run: bool) -> str:
         archive = MailArchive.objects.filter(mail=mail).first()
         if archive is None or not archive.bucket_name:
-            self.stdout.write(f"  mail#{mail.pk}: no fetchable MailArchive — skipped")
+            self.stdout.write(f"  mail#{mail.pk}: no fetchable MailArchive, skipped")
             return "skipped"
 
         if dry_run:
@@ -128,15 +126,12 @@ class Command(BaseCommand):
                 f"  mail#{mail.pk}: regenerated -> {mail.preview_bucket}/{mail.preview_object_key}"
             ))
         elif outcome == "skipped":
-            self.stdout.write(f"  mail#{mail.pk}: no .eml in bucket — skipped")
+            self.stdout.write(f"  mail#{mail.pk}: no .eml in bucket, skipped")
         else:
             self.stdout.write(self.style.WARNING(
                 f"  mail#{mail.pk}: render failed (see logs)"
             ))
         return outcome
-
-    # ------------------------------------------------------------------
-    # ------------------------------------------------------------------
 
     def _get_storage_client(self):
         from api.storage import StorageClient

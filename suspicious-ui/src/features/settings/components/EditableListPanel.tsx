@@ -179,7 +179,7 @@ function AddBar({
         multiline
         maxRows={3}
         fullWidth
-        helperText="Enter, comma or space separated — Ctrl+Enter to submit"
+        helperText="Enter, comma or space separated. Ctrl+Enter to submit"
         sx={{
           "& .MuiFormHelperText-root": { fontSize: 11, mt: 0.4 },
         }}
@@ -328,7 +328,7 @@ export function EditableListPanel({
         const preview = watchers.slice(0, 3).join(", ");
         const extra   = watchers.length > 3 ? ` +${watchers.length - 3} more` : "";
         enqueueSnackbar(
-          `Already in Watcher list: ${preview}${extra} — no action needed`,
+          `Already in Watcher list: ${preview}${extra}, no action needed`,
           { variant: "info" }
         );
       }

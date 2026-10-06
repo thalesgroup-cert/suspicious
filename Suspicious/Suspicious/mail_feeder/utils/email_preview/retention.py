@@ -2,7 +2,7 @@
 
 Operates directly on the bucket via `list_objects` (one listing call,
 using MinIO's own `.size`/`.last_modified` per object) rather than joining
-through `Mail` rows — there are no Mail-side timestamps to trust for this
+through `Mail` rows: there are no Mail-side timestamps to trust for this
 (a `Mail.date` header is attacker-controlled input parsed from the raw
 email), and it lets this run as a plain bucket sweep independent of the
 DB.
@@ -48,7 +48,7 @@ def purge_mail_previews(
     """Delete mail-preview objects matching age and/or size criteria.
 
     An object is deleted if it satisfies EITHER given criterion (age past
-    `older_than_days`, or size past `min_size_mb`) — at least one of the
+    `older_than_days`, or size past `min_size_mb`): at least one of the
     two must be provided. `dry_run=True` lists/sums matches without
     deleting anything.
     """

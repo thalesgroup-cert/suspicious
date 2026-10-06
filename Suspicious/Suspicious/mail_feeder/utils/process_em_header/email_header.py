@@ -22,8 +22,8 @@ class EmailHeaderService:
         """
         Return stored MailHeader instances similar to the given header.
 
-        The simhash-based matching is retired — semantic similarity is now
-        served by ChromaDB — so this returns no matches.
+        The simhash-based matching is retired: semantic similarity is now
+        served by ChromaDB, so this returns no matches.
         """
         return []
 

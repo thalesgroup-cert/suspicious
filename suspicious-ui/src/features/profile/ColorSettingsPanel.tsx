@@ -37,9 +37,7 @@ import {
 } from "@/features/profile/api";
 import { ResultChip, StatusChip } from "@/features/profile/SemanticChips";
 
-// ---------------------------------------------------------------------------
 // Shared primitives
-// ---------------------------------------------------------------------------
 
 function InnerCard(props: React.PropsWithChildren<{ sx?: object }>) {
   const theme = useTheme();
@@ -70,9 +68,7 @@ function CaptionLabel({ children }: { children: React.ReactNode }) {
   );
 }
 
-// ---------------------------------------------------------------------------
 // PresetButton
-// ---------------------------------------------------------------------------
 
 const PRESET_ICONS: Record<PresetName, React.ReactNode> = {
   default:    <PaletteOutlined sx={{ fontSize: 16 }} />,
@@ -117,9 +113,7 @@ function PresetButton({ name, active, onClick, loading }: {
   );
 }
 
-// ---------------------------------------------------------------------------
 // ColorSwatch
-// ---------------------------------------------------------------------------
 
 function ColorSwatch({ color, label, onChange, saving }: {
   color: string; label: string; onChange: (hex: string) => void; saving?: boolean;
@@ -129,7 +123,7 @@ function ColorSwatch({ color, label, onChange, saving }: {
   const inputRef = React.useRef<HTMLInputElement>(null);
 
   return (
-    <Tooltip title={`${label} — ${color.toUpperCase()}${saving ? " (saving…)" : ""}`} placement="top" arrow>
+    <Tooltip title={`${label}: ${color.toUpperCase()}${saving ? " (saving…)" : ""}`} placement="top" arrow>
       <Box
         onClick={() => inputRef.current?.click()}
         sx={{ display: "flex", flexDirection: "column", alignItems: "center", gap: 0.75, cursor: "pointer", flex: 1, minWidth: 0, opacity: saving ? 0.65 : 1, transition: "opacity .2s" }}
@@ -158,9 +152,7 @@ function ColorSwatch({ color, label, onChange, saving }: {
   );
 }
 
-// ---------------------------------------------------------------------------
 // ColorGroup
-// ---------------------------------------------------------------------------
 
 function ColorGroup<K extends string>({ title, keys, labels, colors, onChange, saving }: {
   title: string; keys: K[]; labels: Record<K, string>;
@@ -180,9 +172,7 @@ function ColorGroup<K extends string>({ title, keys, labels, colors, onChange, s
   );
 }
 
-// ---------------------------------------------------------------------------
 // LivePreview
-// ---------------------------------------------------------------------------
 
 function LivePreview() {
   const theme = useTheme();
@@ -211,10 +201,6 @@ function LivePreview() {
   );
 }
 
-// ---------------------------------------------------------------------------
-// ColorSettingsPanel — main export
-// ---------------------------------------------------------------------------
-
 export function ColorSettingsPanel() {
   const theme = useTheme();
   const isDark = theme.palette.mode === "dark";
@@ -230,7 +216,7 @@ export function ColorSettingsPanel() {
   const updateMutation = useMutation({
     mutationFn: updateSemanticColors,
     onSuccess: ({ profile }) => { queryClient.setQueryData(["profile"], profile); },
-    onError: () => { enqueueSnackbar("Failed to sync colors — stored locally only.", { variant: "warning" }); },
+    onError: () => { enqueueSnackbar("Failed to sync colors. Stored locally only.", { variant: "warning" }); },
   });
 
   const resetMutation = useMutation({
@@ -303,7 +289,7 @@ export function ColorSettingsPanel() {
       <InnerCard sx={{ px: 2, py: 1.25, borderColor: alpha("#56B4E9", isDark ? 0.3 : 0.4), background: alpha("#56B4E9", isDark ? 0.06 : 0.04) }}>
         <Typography variant="body2" color="text.secondary" sx={{ fontSize: 12.5, lineHeight: 1.6 }}>
           <Box component="span" sx={{ fontWeight: 800, color: "#56B4E9" }}>Colorblind-safe</Box>{" "}
-          uses the <strong>Okabe-Ito palette</strong> — distinguishable for protanopia, deuteranopia,
+          uses the <strong>Okabe-Ito palette</strong>, distinguishable for protanopia, deuteranopia,
           and tritanopia. Color is never the <em>only</em> indicator: every chip also shows a distinct icon.
         </Typography>
       </InnerCard>

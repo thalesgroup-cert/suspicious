@@ -1,9 +1,7 @@
 import { type Layout } from "react-grid-layout/legacy";
 import type { PcaPoint } from "@/features/campaigns/api";
 
-// ---------------------------------------------------------------------------
 // Constants
-// ---------------------------------------------------------------------------
 
 export const CLASS_COLORS: Record<string, string> = {
   SAFE: "#22C55E",
@@ -50,9 +48,7 @@ export const DEFAULT_LAYOUTS: Partial<Record<string, Layout>> = {
 
 export const STORAGE_KEY = "campaigns:layouts";
 
-// ---------------------------------------------------------------------------
 // Layout persistence
-// ---------------------------------------------------------------------------
 
 export function loadLayouts(): Partial<Record<string, Layout>> {
   if (typeof window === "undefined") return DEFAULT_LAYOUTS;
@@ -77,9 +73,7 @@ export function saveLayouts(layouts: Partial<Record<string, Layout>>) {
   }
 }
 
-// ---------------------------------------------------------------------------
 // Helpers
-// ---------------------------------------------------------------------------
 
 export function compactLabel(text: string, max = 22) {
   return text.length > max ? `${text.slice(0, max - 1)}…` : text;

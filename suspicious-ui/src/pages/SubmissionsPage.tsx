@@ -38,6 +38,7 @@ import {
   OpenInNewOutlined,
   ExpandMoreOutlined,
   RestartAltOutlined,
+  DescriptionOutlined,
 } from "@mui/icons-material";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { Skeleton } from "boneyard-js/react";
@@ -80,9 +81,7 @@ import {
   withinDates,
 } from "@/features/submissions/utils";
 
-// ---------------------------------------------------------------------------
 // Page
-// ---------------------------------------------------------------------------
 
 export default function SubmissionsPage() {
   const navigate = useNavigate();
@@ -389,8 +388,6 @@ export default function SubmissionsPage() {
       animate="shimmer"
     >
     <Box sx={{ p: { xs: 2, md: 3 } }}>
-      {/* ------------------------------------------------------------------ */}
-      {/* ------------------------------------------------------------------ */}
       <Stack
         direction={{ xs: "column", md: "row" }}
         spacing={2}
@@ -445,8 +442,6 @@ export default function SubmissionsPage() {
         </Stack>
       </Stack>
 
-      {/* ------------------------------------------------------------------ */}
-      {/* ------------------------------------------------------------------ */}
       <SoftCard sx={{ mb: 2 }}>
         <CardContent sx={{ p: { xs: 2.25, md: 3 } }}>
           <Stack spacing={1.5}>
@@ -616,8 +611,6 @@ export default function SubmissionsPage() {
         </CardContent>
       </SoftCard>
 
-      {/* ------------------------------------------------------------------ */}
-      {/* ------------------------------------------------------------------ */}
       <SoftCard>
         <CardContent sx={{ p: 0 }}>
           {total === 0 && !submissionsQuery.isFetching ? (
@@ -784,8 +777,6 @@ export default function SubmissionsPage() {
         </CardContent>
       </SoftCard>
 
-      {/* ------------------------------------------------------------------ */}
-      {/* ------------------------------------------------------------------ */}
       <Drawer
         anchor="right"
         open={openDrawer}
@@ -831,10 +822,22 @@ export default function SubmissionsPage() {
                     <CopyIconButton text={String(selectedRow.id)} title="Copy ID" />
                   </Stack>
                 </Box>
-                <Button onClick={() => setOpenDrawer(false)}
-                  sx={{ textTransform: "none", borderRadius: 2, alignSelf: "flex-start" }}>
-                  Close
-                </Button>
+                <Stack direction="row" spacing={1} sx={{ alignItems: "center" }}>
+                  <Button
+                    variant="outlined"
+                    startIcon={<DescriptionOutlined />}
+                    onClick={() =>
+                      window.open(`/api/cases/${selectedRow.id}/report/`, "_blank")
+                    }
+                    sx={{ textTransform: "none", borderRadius: 2, fontWeight: 800 }}
+                  >
+                    Full report
+                  </Button>
+                  <Button onClick={() => setOpenDrawer(false)}
+                    sx={{ textTransform: "none", borderRadius: 2, alignSelf: "flex-start" }}>
+                    Close
+                  </Button>
+                </Stack>
               </Stack>
 
               <Stack direction="row" spacing={1} sx={{ mt: 1.5, flexWrap: "wrap" }}>
@@ -935,7 +938,7 @@ export default function SubmissionsPage() {
                   </Box>
                 ) : null}
 
-                {/* ── Analysis results — grouped by artifact ────────────────────── */}
+                {/* Analysis results: grouped by artifact */}
                 <Box sx={{ px: 2.25, pt: 2, pb: 1 }}>
                   <Stack direction="row" sx={{ mb: 1.25, alignItems: "center", justifyContent: "space-between" }}>
                     <Typography sx={{ fontSize: 10, fontWeight: 700, textTransform: "uppercase", letterSpacing: "0.08em", color: "text.disabled" }}>
@@ -1037,7 +1040,7 @@ export default function SubmissionsPage() {
                   )}
                 </Box>
 
-                {/* ── URL artifacts — grouped by domain ────────────────────── */}
+                {/* URL artifacts: grouped by domain */}
                 {urlArtifacts.length > 0 && (
                   <Box sx={{ px: 2.25, pt: 2, pb: 1 }}>
                     <Typography sx={{ fontSize: 10, fontWeight: 700, textTransform: "uppercase", letterSpacing: "0.08em", color: "text.disabled", mb: 1.25 }}>
@@ -1052,8 +1055,6 @@ export default function SubmissionsPage() {
         )}
       </Drawer>
 
-      {/* ------------------------------------------------------------------ */}
-      {/* ------------------------------------------------------------------ */}
       <Dialog
         open={challengeId !== null}
         onClose={() => {

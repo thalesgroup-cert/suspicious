@@ -1,5 +1,5 @@
 """cortex4py Api subclass that routes do_* through a shared Session
-with TimeoutHTTPAdapter — needed because vanilla Api uses bare
+with TimeoutHTTPAdapter: needed because vanilla Api uses bare
 requests.get/post with no socket timeout.
 """
 from __future__ import annotations
@@ -38,7 +38,7 @@ class SessionCortexApi(Api):
         except requests.HTTPError as exc:
             if exc.response is not None and exc.response.status_code >= 500:
                 # Let common.http_client.RETRY see and retry the original
-                # HTTPError for 5xx — cortex4py's __recover() below rewraps
+                # HTTPError for 5xx: cortex4py's __recover() below rewraps
                 # it into InvalidInputError, which isn't a requests.HTTPError
                 # subclass and would defeat RETRY's 5xx retry predicate.
                 raise

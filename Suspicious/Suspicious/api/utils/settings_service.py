@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import ipaddress
 from dataclasses import dataclass
 from typing import Any, Callable, Type
 
@@ -10,11 +11,13 @@ from rest_framework.exceptions import NotFound, ValidationError
 
 from domain_process.models import Domain
 from hash_process.models import Hash
+from ip_process.models import IP
 from profiles.models import CISOProfile
 from settings.models import (
     AllowListDomain,
     AllowListFile,
     AllowListFiletype,
+    AllowListIp,
     CampaignDomainAllowList,
     DenyListDomain,
     WatcherLegitDomain,
@@ -23,9 +26,7 @@ from settings.models import (
 
 User = get_user_model()
 
-# ---------------------------------------------------------------------------
 # Return type for all bulk create handlers
-# ---------------------------------------------------------------------------
 
 CreateResult = dict[str, list[str]]
 
@@ -49,9 +50,7 @@ def _make_result(
     }
 
 
-# ---------------------------------------------------------------------------
 # Config dataclass
-# ---------------------------------------------------------------------------
 
 @dataclass(frozen=True)
 class ListSectionConfig:
@@ -69,9 +68,7 @@ class ListSectionConfig:
         return self.model.objects.all()
 
 
-# ---------------------------------------------------------------------------
 # Queryset factories (unchanged)
-# ---------------------------------------------------------------------------
 
 def _domain_list_queryset(model: Type[Model]) -> QuerySet:
     return model.objects.select_related("domain").order_by("-creation_date")
@@ -79,6 +76,10 @@ def _domain_list_queryset(model: Type[Model]) -> QuerySet:
 
 def _hash_list_queryset() -> QuerySet:
     return AllowListFile.objects.select_related("linked_file_hash").order_by("-creation_date")
+
+
+def _ip_list_queryset() -> QuerySet:
+    return AllowListIp.objects.select_related("ip").order_by("-creation_date")
 
 
 def _filetype_queryset() -> QuerySet:
@@ -97,9 +98,7 @@ def _watcher_monitored_queryset() -> QuerySet:
     return WatcherMonitoredDomain.objects.select_related("domain").order_by("-last_update", "-creation_date")
 
 
-# ---------------------------------------------------------------------------
-# Bulk create handlers — all return CreateResult
-# ---------------------------------------------------------------------------
+# Bulk create handlers: all return CreateResult
 
 def _bulk_create_domain_links(
     *,
@@ -111,10 +110,10 @@ def _bulk_create_domain_links(
     Create domain allowlist/denylist entries with full conflict reporting.
 
     Buckets:
-      watcher_conflicts — value is in WatcherLegitDomain OR WatcherMonitoredDomain
+      watcher_conflicts: value is in WatcherLegitDomain OR WatcherMonitoredDomain
                           (managed by Watcher; user does not need to add manually)
-      duplicates        — value already in this editable list for this user
-      created           — genuinely new entries
+      duplicates       : value already in this editable list for this user
+      created          : genuinely new entries
     """
     # ── Pre-fetch sets for O(1) lookups ──────────────────────────────────
     watcher_legit_set = set(
@@ -187,7 +186,7 @@ def _bulk_create_hash_links(values: list[str], user: User) -> CreateResult:
     """
     Create file hash allowlist entries with duplicate reporting.
 
-    No watcher equivalent for hashes — watcher_conflicts is always empty.
+    No watcher equivalent for hashes: watcher_conflicts is always empty.
     """
     existing_links = set(
         AllowListFile.objects.filter(linked_file_hash__value__in=values)
@@ -220,6 +219,66 @@ def _bulk_create_hash_links(values: list[str], user: User) -> CreateResult:
 
     created_ids = list(
         AllowListFile.objects.filter(linked_file_hash__value__in=to_create_values)
+        .values_list("id", flat=True)
+    )
+
+    return _make_result(
+        created=[str(pk) for pk in created_ids],
+        duplicates=duplicates,
+        watcher_conflicts=[],
+    )
+
+
+def _bulk_create_ip_links(values: list[str], user: User) -> CreateResult:
+    """
+    Create IP allowlist entries with duplicate reporting.
+
+    No watcher equivalent for IPs: watcher_conflicts is always empty.
+    """
+    normalised: list[str] = []
+    invalid: list[str] = []
+    for value in values:
+        try:
+            normalised.append(ipaddress.ip_address(value).compressed)
+        except ValueError:
+            invalid.append(value)
+    if invalid:
+        raise ValidationError(
+            {"values": [f"Not a valid IP address: {v}" for v in invalid]}
+        )
+    values = normalised
+
+    existing_links = set(
+        AllowListIp.objects.filter(ip__address__in=values)
+        .values_list("ip__address", flat=True)
+    )
+
+    duplicates: list[str] = []
+    to_create_values: list[str] = []
+
+    for value in values:
+        if value in existing_links:
+            duplicates.append(value)
+        else:
+            to_create_values.append(value)
+
+    if not to_create_values:
+        return _make_result(created=[], duplicates=duplicates, watcher_conflicts=[])
+
+    ip_map = {i.address: i for i in IP.objects.filter(address__in=to_create_values)}
+    missing = [v for v in to_create_values if v not in ip_map]
+    if missing:
+        IP.objects.bulk_create([IP(address=v) for v in missing])
+        ip_map.update({i.address: i for i in IP.objects.filter(address__in=missing)})
+
+    new_entries = [
+        AllowListIp(ip=ip_map[v], user=user)
+        for v in to_create_values
+    ]
+    AllowListIp.objects.bulk_create(new_entries, ignore_conflicts=True)
+
+    created_ids = list(
+        AllowListIp.objects.filter(ip__address__in=to_create_values)
         .values_list("id", flat=True)
     )
 
@@ -266,9 +325,7 @@ def _bulk_create_filetypes(values: list[str], user: User) -> CreateResult:
     )
 
 
-# ---------------------------------------------------------------------------
 # Section registry
-# ---------------------------------------------------------------------------
 
 SETTINGS_LIST_SECTIONS: dict[str, ListSectionConfig] = {
     "domains_allow": ListSectionConfig(
@@ -311,6 +368,13 @@ SETTINGS_LIST_SECTIONS: dict[str, ListSectionConfig] = {
         value_getter=lambda obj: obj.linked_file_hash.value if obj.linked_file_hash else "",
         bulk_create_handler=_bulk_create_hash_links,
     ),
+    "ips_allow": ListSectionConfig(
+        section="ips_allow",
+        model=AllowListIp,
+        queryset_factory=_ip_list_queryset,
+        value_getter=lambda obj: obj.ip.address if obj.ip else "",
+        bulk_create_handler=_bulk_create_ip_links,
+    ),
     "filetypes_allow": ListSectionConfig(
         section="filetypes_allow",
         model=AllowListFiletype,
@@ -342,9 +406,7 @@ SETTINGS_LIST_SECTIONS: dict[str, ListSectionConfig] = {
 }
 
 
-# ---------------------------------------------------------------------------
 # Service
-# ---------------------------------------------------------------------------
 
 class SettingsListSectionService:
 

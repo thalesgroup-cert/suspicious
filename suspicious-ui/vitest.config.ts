@@ -37,6 +37,16 @@ export default mergeConfig(
       setupFiles: ["./src/test/setup.ts"],
       include: ["src/**/*.test.{ts,tsx}"],
       exclude: ["e2e/**", "node_modules/**"],
+      // Parallel file execution in browser mode shares module/dep state
+      // across the concurrently-running suites (same class of issue as the
+      // optimizeDeps race above), which has surfaced as spurious CI failures
+      // in unrelated files — a vi.mock'd module resolving to its real,
+      // unmocked implementation (api.test.ts: "vi.mocked(...).mockResolvedValue
+      // is not a function") or an unrelated assertion failing outright
+      // (ProfilePage.test.tsx). Serializing file execution has been 100%
+      // reliable locally across many runs (and finishes in under a minute for
+      // this suite size) vs. an intermittent per-file flake under parallelism.
+      fileParallelism: false,
       browser: {
         enabled: true,
         provider: playwright(),

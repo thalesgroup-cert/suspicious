@@ -12,9 +12,9 @@ from rest_framework.views import APIView
 
 from case_handler.lifecycle import IllegalTransition, LifecycleState, transition
 from case_handler.models import Case, Result
-from cortex_job.models import AnalyzerReport
-from cortex_job.cortex_utils.case_targets import build_analyzer_report_filter, collect_case_targets
+from cortex_job.cortex_utils.case_targets import collect_case_targets
 from tasp.tasks import dispatch_case_analysis
+from api.utils.analyzer_reports import reports_for_case
 from api.utils.investigation_pagination import InvestigationPagination
 from api.serializers.investigations import (
     API_RESULT_TO_INTERNAL,
@@ -25,6 +25,7 @@ from api.serializers.investigations import (
     InvestigationRowSerializer,
 )
 from score_process.score_utils.send_mail.service import MailNotificationService
+from profiles.profiles_utils.scope import scoped_case_queryset
 
 logger = logging.getLogger(__name__)
 
@@ -38,6 +39,7 @@ CASE_LIST_SELECT_RELATED = (
     "nonFileIocs__url",
     "nonFileIocs__ip",
     "nonFileIocs__hash",
+    "observable_group",
 )
 
 CASE_DETAIL_SELECT_RELATED = (
@@ -50,18 +52,7 @@ CASE_DETAIL_SELECT_RELATED = (
     "nonFileIocs__url",
     "nonFileIocs__ip",
     "nonFileIocs__hash",
-)
-
-ANALYZER_REPORT_SELECT_RELATED = (
-    "analyzer",
-    "url",
-    "domain",
-    "mail",
-    "hash",
-    "file",
-    "ip",
-    "mail_body",
-    "mail_header",
+    "observable_group",
 )
 
 
@@ -87,7 +78,7 @@ def _dedup_analyzer_reports(reports) -> list:
     returned list so the caller doesn't need to re-sort.
 
     target_key is the first non-null FK among url/domain/mail/hash/file/ip/
-    mail_body/mail_header — same priority as resolve_analyzer_report_target.
+    mail_body/mail_header: same priority as resolve_analyzer_report_target.
     """
     def _target_key(r) -> tuple:
         for attr, label in (
@@ -116,13 +107,21 @@ def _dedup_analyzer_reports(reports) -> list:
 
 
 class InvestigationAccessMixin:
-    analyzer_report_select_related = ANALYZER_REPORT_SELECT_RELATED
-
     def get_case_list_queryset(self):
-        return Case.objects.select_related(*CASE_LIST_SELECT_RELATED)
+        # prefetch the group artifacts so get_case_info_value's IOC branch
+        # doesn't fire 2 queries per row on a list page of IOC cases.
+        return scoped_case_queryset(
+            Case.objects.select_related(*CASE_LIST_SELECT_RELATED).prefetch_related(
+                "observable_group__artifacts__url",
+                "observable_group__artifacts__ip",
+                "observable_group__artifacts__hash",
+                "observable_group__artifacts__domain",
+            ),
+            self.request.user,
+        )
 
     def get_case_detail_queryset(self):
-        return (
+        return scoped_case_queryset(
             Case.objects.select_related(*CASE_DETAIL_SELECT_RELATED)
             .prefetch_related(
                 "fileOrMail__mail__mail_attachments",
@@ -132,7 +131,8 @@ class InvestigationAccessMixin:
                 "fileOrMail__mail__mail_artifacts__artifactIsHash",
                 "fileOrMail__mail__mail_artifacts__artifactIsDomain",
                 "fileOrMail__mail__mail_artifacts__artifactIsMailAddress",
-            )
+            ),
+            self.request.user,
         )
 
     def get_case_or_404(self, case_id: int) -> Case:
@@ -142,26 +142,12 @@ class InvestigationAccessMixin:
             raise NotFound("Investigation not found.") from exc
 
     def get_analyzer_reports_queryset(self, obj: Case):
-        targets = collect_case_targets(obj)
-        if not targets:
-            return AnalyzerReport.objects.none()
-
-        query = build_analyzer_report_filter(targets)
-
-        # No .distinct() needed: every filter above is a plain equality/IN on
-        # AnalyzerReport's own FK columns (never a reverse/M2M traversal), and
-        # every select_related() relation is forward FK/O2O — this queryset
-        # structurally can't fan out into duplicate rows. distinct() was
-        # forcing MySQL to sort/dedupe the full 9-table-wide join with no
-        # LIMIT to cap it, and _dedup_analyzer_reports() below already
-        # de-dupes in Python regardless.
-        qs = (
-            AnalyzerReport.objects
-            .filter(query)
-            .select_related(*self.analyzer_report_select_related)
-            .order_by("-creation_date", "-pk")
-        )
-        return _dedup_analyzer_reports(qs)
+        # reports_for_case() builds the same filter/select_related/order_by
+        # queryset (no .distinct(): every filter is a plain equality/IN on
+        # AnalyzerReport's own FK columns and every select_related relation is
+        # forward FK/O2O, so it can't fan out into duplicate rows).
+        # _dedup_analyzer_reports() de-dupes per (analyzer, target) in Python.
+        return _dedup_analyzer_reports(reports_for_case(obj))
 
     def filter_case_queryset(self, queryset, validated_filters: dict):
         search = validated_filters.get("search")
@@ -186,9 +172,15 @@ class InvestigationAccessMixin:
                 | Q(nonFileIocs__url__address__icontains=search)
                 | Q(nonFileIocs__ip__address__icontains=search)
                 | Q(nonFileIocs__hash__value__icontains=search)
+                | Q(observable_group__artifacts__url__address__icontains=search)
+                | Q(observable_group__artifacts__ip__address__icontains=search)
+                | Q(observable_group__artifacts__hash__value__icontains=search)
+                | Q(observable_group__artifacts__domain__value__icontains=search)
             )
 
-            queryset = queryset.filter(id_q | text_q)
+            # .distinct(): observable_group__artifacts is a reverse FK, so the
+            # join fans a group case out to one row per indicator.
+            queryset = queryset.filter(id_q | text_q).distinct()
 
         if status_filter != "ALL":
             if status_filter == "UNKNOWN":
@@ -207,6 +199,8 @@ class InvestigationAccessMixin:
                 queryset = queryset.filter(nonFileIocs__ip_id__isnull=False)
             elif type_filter == "HASH":
                 queryset = queryset.filter(nonFileIocs__hash_id__isnull=False)
+            elif type_filter == "IOC":
+                queryset = queryset.filter(observable_group_id__isnull=False)
             elif type_filter == "UNKNOWN":
                 queryset = queryset.filter(
                     fileOrMail__file_id__isnull=True,
@@ -214,6 +208,7 @@ class InvestigationAccessMixin:
                     nonFileIocs__url_id__isnull=True,
                     nonFileIocs__ip_id__isnull=True,
                     nonFileIocs__hash_id__isnull=True,
+                    observable_group_id__isnull=True,
                 )
 
         if result_filter != "ALL":
@@ -256,7 +251,7 @@ class InvestigationAccessMixin:
         # forward FK or O2O from Case's side, never reverse/M2M, so a Case
         # row can't fan out into duplicates through these joins. distinct()
         # here was forcing MySQL to sort/dedupe the whole joined result set
-        # before LIMIT applied — measured ~1.6s wasted per page on a 41k-row
+        # before LIMIT applied: measured ~1.6s wasted per page on a 41k-row
         # table for zero effect.
         return queryset
 
@@ -349,11 +344,15 @@ class InvestigationGlobalEditView(InvestigationAccessMixin, APIView):
         obj.final_confidence = validated["confidence"]
         obj.results = API_RESULT_TO_INTERNAL[validated["classification"]]
         obj.last_update_by = request.user
+        # The stored explanation described the previous verdict: drop it so a
+        # stale "why" is never emailed / shown after an analyst override.
+        obj.verdict_explanation = None
         obj.save(
             update_fields=[
                 "final_score",
                 "final_confidence",
                 "results",
+                "verdict_explanation",
                 "last_update_by",
                 "last_update",
             ]
@@ -420,7 +419,10 @@ class InvestigationRedoAnalysisView(InvestigationAccessMixin, APIView):
         case.score = 0
         case.final_score = 0
         case.description = ""
-        case.save(update_fields=["results", "score", "final_score", "description"])
+        case.verdict_explanation = None
+        case.save(update_fields=[
+            "results", "score", "final_score", "description", "verdict_explanation",
+        ])
 
         intents = [
             (f"{instance._meta.app_label}.{instance._meta.model_name}", instance.pk, data_type)

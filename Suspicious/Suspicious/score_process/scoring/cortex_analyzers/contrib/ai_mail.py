@@ -121,7 +121,7 @@ class AiMailParser(AnalyzerParser):
             "verify": cfg.get("certificate_path") or True,
         }
 
-    # ── ChromaDB singleton — one client per parser instance ───────────────
+    # ChromaDB singleton — one client per parser instance
 
     @cached_property
     def _chroma_collection(self):

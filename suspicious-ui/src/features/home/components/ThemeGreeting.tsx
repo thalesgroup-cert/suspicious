@@ -55,12 +55,12 @@ export function ThemeGreeting({ caps, name }: { caps: ThemeCapabilities; name: s
     );
   }
 
-  // ── Seasonal ────────────────────────────────────────────────────────────
+  // Seasonal
   const seasonLine: Record<string, string> = {
-    spring: "Spring cycle underway — threats don't take the season off.",
+    spring: "Spring cycle underway. Threats don't take the season off.",
     summer: "Peak season. Stay cool, stay vigilant.",
-    autumn: "Autumn watch — threat embers persist.",
-    winter: "Festive season — peak phishing window. Watch your inbox.",
+    autumn: "Autumn watch. Threat embers persist.",
+    winter: "Festive season. Peak phishing window. Watch your inbox.",
   };
   if (caps.season && seasonLine[caps.season]) {
     return (

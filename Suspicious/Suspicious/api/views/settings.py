@@ -8,7 +8,7 @@ from rest_framework.response import Response
 from api.permissions.settings import IsAdminOrCERT
 from api.serializers.settings import (
     AnalyzerSettingsSerializer,
-    AnalyzerWeightUpdateSerializer,
+    AnalyzerUpdateSerializer,
     CISOUserSerializer,
     EmailFeederStateSerializer,
     EmailFeederStateUpdateSerializer,
@@ -140,7 +140,7 @@ class AnalyzerSettingsDetailView(generics.UpdateAPIView):
     """
 
     permission_classes = [IsAdminOrCERT]
-    serializer_class = AnalyzerWeightUpdateSerializer
+    serializer_class = AnalyzerUpdateSerializer
     queryset = Analyzer.objects.all()
     lookup_url_kwarg = "analyzer_id"
 
@@ -149,7 +149,11 @@ class AnalyzerSettingsDetailView(generics.UpdateAPIView):
         serializer = self.get_serializer(data=request.data)
         serializer.is_valid(raise_exception=True)
 
-        analyzer.weight = serializer.validated_data["weight"]
-        analyzer.save(update_fields=["weight", "last_update"])
+        update_fields = ["last_update"]
+        for field in ("weight", "tier"):
+            if field in serializer.validated_data:
+                setattr(analyzer, field, serializer.validated_data[field])
+                update_fields.append(field)
+        analyzer.save(update_fields=update_fields)
 
         return Response(AnalyzerSettingsSerializer(analyzer).data)

@@ -93,7 +93,7 @@ def purge_old_mail_previews(self, older_than_days: int = 90):
     for why this never touches Mail.preview_object_key. Oversized-but-recent
     outliers (the actual disk-usage incident) are a manual
     `purge_mail_previews --min-size-mb` call, not part of the automated
-    sweep — an automatic size cutoff could delete a legitimately long
+    sweep: an automatic size cutoff could delete a legitimately long
     email's preview the same day it was rendered.
     """
     from mail_feeder.utils.email_preview.retention import purge_mail_previews

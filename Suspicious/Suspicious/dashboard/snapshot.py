@@ -75,9 +75,7 @@ def materialise_snapshot(month: int, year: int) -> None:
     )
 
 
-# ---------------------------------------------------------------------------
 # Private query helpers
-# ---------------------------------------------------------------------------
 
 def _get_cases_aggregate(*, month: int, year: int) -> dict:
     return MonthlyCasesSummary.objects.filter(

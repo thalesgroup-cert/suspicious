@@ -1,0 +1,68 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: {{ include "suspicious.fullname" . }}-feeder
+  labels:
+    {{- include "suspicious.labels" . | nindent 4 }}
+    app.kubernetes.io/component: feeder
+spec:
+  replicas: {{ .Values.feeder.replicas }}
+  selector:
+    matchLabels:
+      app.kubernetes.io/instance: {{ .Release.Name }}
+      app.kubernetes.io/component: feeder
+  template:
+    metadata:
+      labels:
+        app.kubernetes.io/instance: {{ .Release.Name }}
+        app.kubernetes.io/component: feeder
+      annotations:
+        checksum/config: {{ include (print $.Template.BasePath "/secret-feeder-config.yaml") . | sha256sum }}
+    spec:
+      {{- with .Values.imagePullSecrets }}
+      imagePullSecrets:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+      containers:
+        - name: feeder
+          image: "{{ .Values.feeder.image.repository }}:{{ .Values.feeder.image.tag | default .Chart.AppVersion }}"
+          imagePullPolicy: {{ .Values.feeder.image.pullPolicy }}
+          command: ["python3", "main.py"]
+          ports:
+            - containerPort: 9091
+          volumeMounts:
+            - name: feeder-config
+              mountPath: /app/config.json
+              subPath: config.json
+              readOnly: true
+            - name: tls-bundle
+              mountPath: /etc/private
+              readOnly: true
+          startupProbe:
+            httpGet:
+              path: /health
+              port: 9091
+            failureThreshold: 18
+            periodSeconds: 5
+          readinessProbe:
+            httpGet:
+              path: /health
+              port: 9091
+            periodSeconds: 60
+            timeoutSeconds: 10
+          livenessProbe:
+            httpGet:
+              path: /health
+              port: 9091
+            periodSeconds: 60
+            timeoutSeconds: 10
+            failureThreshold: 3
+          resources:
+            {{- toYaml .Values.feeder.resources | nindent 12 }}
+      volumes:
+        - name: feeder-config
+          secret:
+            secretName: {{ include "suspicious.fullname" . }}-feeder-config
+        - name: tls-bundle
+          secret:
+            secretName: {{ include "suspicious.fullname" . }}-tls-bundle

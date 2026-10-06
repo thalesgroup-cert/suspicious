@@ -68,6 +68,150 @@ def generate_ref() -> str:
     return datetime.now().strftime("%y%m%d") + "-" + str(token_hex(3))[:5]
 
 
+_THEHIVE_DATATYPE = {"ip": "ip", "url": "url", "domain": "domain", "hash": "hash", "file": "file", "mail": "mail"}
+
+# TheHive alert severity: 1=Low 2=Medium 3=High 4=Critical.
+THEHIVE_SEVERITY = {"Safe": 1, "Inconclusive": 2, "Suspicious": 3, "Dangerous": 4}
+
+# persisted observable ioc_level (score_process.scoring.bands) -> ticket verdict word.
+_IOC_LEVEL_TO_VERDICT = {
+    "malicious": "malicious", "critical": "malicious",
+    "suspicious": "suspicious",
+    "safe": "safe", "SAFE-ALLOW_LISTED": "safe",
+    "info": "inconclusive",
+}
+
+
+def _case_observables(case):
+    """(inst, data_type, value) for every distinct IOC-road observable of a case
+    (mail/file/observable-group alike), skipping targets with no printable value."""
+    from cortex_job.cortex_utils.case_targets import collect_case_targets
+    for inst, data_type in collect_case_targets(case):
+        value = getattr(inst, "address", None) or getattr(inst, "value", None)
+        if value:
+            yield inst, data_type, value
+
+
+def build_group_observables(case):
+    return [
+        {
+            "dataType": _THEHIVE_DATATYPE.get(data_type, "other"),
+            "data": value,
+            "message": f"Suspicious IOC-road observable ({data_type})",
+            "tags": [f"suspicious:case:{case.id}"],
+        }
+        for inst, data_type, value in _case_observables(case)
+    ]
+
+
+def ticket_observables(case):
+    """Case observables plus the per-IOC categorical verdict the scoring pass
+    already persisted on each row — for the SOAR ticket payload."""
+    return [
+        {
+            "dataType": _THEHIVE_DATATYPE.get(data_type, "other"),
+            "data": value,
+            "verdict": _IOC_LEVEL_TO_VERDICT.get(getattr(inst, "ioc_level", "info"), "inconclusive"),
+            "score": getattr(inst, "ioc_score", None),
+            "confidence": getattr(inst, "ioc_confidence", None),
+            "tags": [f"suspicious:case:{case.id}"],
+            "message": f"Suspicious IOC-road observable ({data_type})",
+        }
+        for inst, data_type, value in _case_observables(case)
+    ]
+
+
+class TheHivePushError(Exception):
+    """A user-triggered TheHive push could not complete."""
+
+
+def _ticket_description(case, ticket) -> str:
+    v = ticket["verdict"]
+    s = ticket["analyzer_summary"]
+    by = ", ".join(f"{k}: {n}" for k, n in s["by_verdict"].items()) or "no verdicts"
+    lines = [
+        f"**Verdict:** {v['result']} (score {v['score']}, confidence {v['confidence']})",
+        f"**Classification:** {v['ai_classification']}",
+        "",
+        "**Why:**",
+        *([f"- {r}" for r in v["rationale"]] or ["- (no rationale recorded)"]),
+        "",
+        f"**Analyzers:** {s['total_reports']} report(s) — {by}",
+        f"Ran: {', '.join(s['analyzers']) or '—'}",
+        "",
+        f"**Recommended action:** {ticket['recommended_action']}",
+        "",
+        "—",
+        f"Suspicious case #{case.id}",
+    ]
+    return "\n".join(lines)
+
+
+def _ticket_alert_observables(ticket) -> list:
+    """TheHive-shaped observables from a ticket payload, folding each row's
+    per-IOC verdict into the message + a tag."""
+    out = []
+    for o in ticket["observables"]:
+        out.append({
+            "dataType": o["dataType"],
+            "data": o["data"],
+            "message": f"{o['message']} — verdict: {o['verdict']}",
+            "tags": list(o.get("tags") or []) + [f"suspicious:verdict:{o['verdict']}"],
+        })
+    return out
+
+
+def update_alert(alert_id, fields, thehive_url, api_key):
+    """PATCH an existing alert's fields (title/description/severity/tags)."""
+    headers = {"Content-Type": "application/json", "Authorization": f"Bearer {api_key}"}
+    url = f"{thehive_url}/api/v1/alert/{alert_id}"
+    try:
+        _thehive_request("PATCH", url, headers=headers, json=fields, verify=_certificate_path())
+    except pybreaker.CircuitBreakerError as e:
+        update_cases_logger.warning("[breaker:thehive] open — update_alert skipped: %s", e)
+        raise TheHivePushError("TheHive circuit breaker open") from e
+    except requests.exceptions.RequestException as e:
+        raise TheHivePushError(f"could not update alert {alert_id}: {e}") from e
+
+
+def push_ticket(case, ticket, *, url, key) -> dict:
+    """Create or update a TheHive alert from a ticket payload. Reuses
+    ``case.thehive_alert_id`` when set (update), else creates and records it.
+    Returns {"status": "created"|"updated", "alert_id", "alert_url"}."""
+    fields = {
+        "title": ticket["title"],
+        "description": _ticket_description(case, ticket),
+        "severity": ticket["verdict"]["severity"],
+        "tags": ["suspicious", f"suspicious:case:{case.id}",
+                 ticket["verdict"]["result"].lower()],
+    }
+    observables = _ticket_alert_observables(ticket)
+    existing = (case.thehive_alert_id or "").strip()
+
+    if existing:
+        update_alert(existing, fields, url, key)
+        add_observables_to_item("alert", existing, observables, url, key)
+        alert_id, action = existing, "updated"
+    else:
+        alert = create_new_alert(
+            f"suspicious-case-{case.id}", fields["title"], fields["description"],
+            fields["severity"], 2, 2, "Suspicious", url, key, fields["tags"],
+        )
+        alert_id = (alert or {}).get("_id")
+        if not alert_id:
+            raise TheHivePushError("TheHive did not return an alert id")
+        add_observables_to_item("alert", alert_id, observables, url, key)
+        case.thehive_alert_id = alert_id
+        case.save(update_fields=["thehive_alert_id"])
+        action = "created"
+
+    return {
+        "status": action,
+        "alert_id": alert_id,
+        "alert_url": f"{url.rstrip('/')}/alerts/{alert_id}/details",
+    }
+
+
 def create_new_alert(ticket_id, title, description, severity, tlp, pap, app_name, thehive_url, api_key, tags=None):
     if ticket_id is None:
         ticket_id = generate_ref()

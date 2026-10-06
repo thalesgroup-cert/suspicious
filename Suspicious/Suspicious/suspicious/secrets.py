@@ -6,7 +6,7 @@ Read order:
 
 In-process cache; values are small and rotation is out of scope here.
 ``fail_fast=True`` (used at boot for SECRET_KEY + DB password) turns any
-Vault error into SystemExit(1) with a readable message — no silent
+Vault error into SystemExit(1) with a readable message, no silent
 fallback to plaintext when Vault is configured.
 """
 from __future__ import annotations
@@ -73,7 +73,7 @@ def get_secret(key: str, default: Any = None, *, fail_fast: bool = False) -> Any
 
     try:
         value = _read_from_vault(key)
-    except Exception as exc:  # noqa: BLE001 — boot must fail readably
+    except Exception as exc:  # noqa: BLE001 (boot must fail readably)
         import hvac
 
         if isinstance(exc, hvac.exceptions.InvalidPath):
@@ -85,7 +85,7 @@ def get_secret(key: str, default: Any = None, *, fail_fast: bool = False) -> Any
         )
         if fail_fast:
             # codeql[py/clear-text-logging-sensitive-data]: this is the READ
-            # failure branch — _read_from_vault raised before ever returning a
+            # failure branch: _read_from_vault raised before ever returning a
             # value, so `message` can only contain the secret's dotted *name*
             # (`key`) and the Vault client's error, never a resolved value.
             sys.stderr.write(f"\n{message}\n\n")
@@ -103,7 +103,7 @@ def _cache_set(key: str, value: Any) -> None:
 def set_secret(key: str, value: str) -> None:
     """Write a secret to Vault KV v2 and refresh this process's cache.
 
-    Raises ``SecretStoreUnavailable`` when no Vault is configured —
+    Raises ``SecretStoreUnavailable`` when no Vault is configured:
     settings.json is read-only config, never a write target.
     """
     if not os.environ.get("VAULT_ADDR"):

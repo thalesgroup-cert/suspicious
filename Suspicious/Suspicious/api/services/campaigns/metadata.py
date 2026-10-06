@@ -294,7 +294,7 @@ def extract_mail_subject(meta: Dict[str, Any]) -> Optional[str]:
 
     Tries direct key lookups first, then parses the stored headers dict
     (which carries the RFC 2822 Subject header from the original email).
-    Returns None — not an empty string — when nothing usable is found.
+    Returns None, not an empty string, when nothing usable is found.
     """
     for key in MAIL_SUBJECT_KEYS:
         value = meta.get(key)

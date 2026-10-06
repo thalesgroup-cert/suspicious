@@ -17,7 +17,6 @@ from .dedup import has_object
 logger = logging.getLogger(__name__)
 
 _SUPPORTED_HASH_TYPES = frozenset({"md5", "sha1", "sha256"})
-_HASH_TYPE_MAP = {"sha-256": "sha256", "sha-1": "sha1", "md2": "md5"}
 
 
 def build_email_object(mail, case_number, detection_level: str) -> Optional[MISPObject]:
@@ -69,8 +68,7 @@ def build_ip_object(ip: IP, case_number: str, detection_level: str) -> MISPObjec
 def build_hash_object(
     hash_obj: Hash, case_number: str, detection_level: str
 ) -> Optional[MISPObject]:
-    raw_type  = (hash_obj.type or "").lower()
-    hash_type = _HASH_TYPE_MAP.get(raw_type, raw_type)
+    hash_type = (hash_obj.hashtype or "").lower().replace("hash", "").replace("-", "").strip()
     if hash_type not in _SUPPORTED_HASH_TYPES:
         logger.warning(
             "[MISPHandler] Unsupported hash type %r for case %s — skipping.",

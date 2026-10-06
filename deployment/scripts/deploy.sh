@@ -29,6 +29,7 @@ ok()   { echo -e "${GREEN}✓ $1${RESET}"; }
 # ── 1. Pre-flight checks ──────────────────────────────────────────────────
 step "Pre-flight checks"
 bash "${SCRIPTS}/check-secrets.sh" .env
+bash "${SCRIPTS}/check-mounts.sh"
 bash "${SCRIPTS}/check-network.sh"
 ok "Pre-flight passed"
 

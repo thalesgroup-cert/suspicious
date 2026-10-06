@@ -6,9 +6,9 @@ import { contrastText } from "@/styles/colorStore";
 
 type Props = {
   label: string;
-  /** Hex color from the semantic store — drives bg/border/text automatically. */
+  /** Hex color from the semantic store; drives bg/border/text automatically. */
   color?: string;
-  /** MUI palette name — fallback when no hex color is available. */
+  /** MUI palette name: fallback when no hex color is available. */
   muiColor?: "success" | "warning" | "error" | "info" | "default";
   icon?: React.ReactNode;
   minWidth?: number;
