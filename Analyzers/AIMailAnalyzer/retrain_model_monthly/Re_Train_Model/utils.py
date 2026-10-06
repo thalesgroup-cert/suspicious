@@ -69,7 +69,7 @@ _HISTORY_KEEP = 50
 
 
 def load_golden_hashes() -> set:
-    """golden_set.py lives one level up (retrain model monthly/, sibling of
+    """golden_set.py lives one level up (retrain_model_monthly/, sibling of
     this Re_Train_Model/ package) - imported lazily via sys.path rather than
     a package-relative import so this module keeps working when exercised
     standalone (e.g. from the trainer Docker image's WORKDIR). Missing

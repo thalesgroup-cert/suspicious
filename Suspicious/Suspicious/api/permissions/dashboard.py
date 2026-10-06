@@ -4,8 +4,8 @@ from rest_framework.permissions import BasePermission
 class MLRetrainIngestPermission(BasePermission):
     """Restrict AI model retrain-run ingestion (POST) to the dedicated
     service account the retrain pipeline's promote.py authenticates as,
-    or staff/superusers. GET (dashboard reads) uses StatsReadPermission
-    instead, same as every other stats endpoint.
+    or staff/superusers. GET (dashboard reads) uses AIModelHealthReadPermission
+    (any authenticated user) instead.
     """
 
     allowed_groups = {"ml-retrain"}
@@ -19,6 +19,21 @@ class MLRetrainIngestPermission(BasePermission):
             return True
 
         return user.groups.filter(name__in=self.allowed_groups).exists()
+
+
+class AIModelHealthReadPermission(BasePermission):
+    """
+    Read access to the AI Model Health panel (retrain-run history/metrics).
+
+    Unlike StatsReadPermission (CISO/CERT/Admin/staff only), this panel is
+    considered safe to expose to any authenticated user - it only shows
+    model training metrics (F1/accuracy over time), no per-mail or
+    per-campaign data.
+    """
+
+    def has_permission(self, request, view) -> bool:
+        user = request.user
+        return bool(user and user.is_authenticated)
 
 
 class StatsReadPermission(BasePermission):

@@ -1,5 +1,5 @@
 """
-Regression tests for the "retrain model monthly" pipeline's label taxonomy.
+Regression tests for the "retrain_model_monthly" pipeline's label taxonomy.
 
 No torch/sentence_transformers required - these only check that
 Re_Train_Model/variable.py's per-model class counts and encoding order still
@@ -14,7 +14,7 @@ from pathlib import Path
 
 _ANALYZER_ROOT = Path(__file__).resolve().parent.parent
 sys.path.insert(0, str(_ANALYZER_ROOT))
-sys.path.insert(0, str(_ANALYZER_ROOT / "retrain model monthly"))
+sys.path.insert(0, str(_ANALYZER_ROOT / "retrain_model_monthly"))
 
 import mail_analysis  # noqa: E402
 from Re_Train_Model import variable  # noqa: E402

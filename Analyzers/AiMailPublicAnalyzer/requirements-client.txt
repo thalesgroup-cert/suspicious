@@ -1,0 +1,7 @@
+# Deps for ai_mail_public_classifier.py ONLY - the thin, one-shot Cortex
+# analyzer client (untar + HTTP call to inference_server/, see that folder).
+# No torch/sentence_transformers here on purpose: those live in the
+# persistent inference_server/ image (requirements-inference.txt), which
+# owns all model loading.
+cortexutils
+requests

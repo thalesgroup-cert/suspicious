@@ -25,6 +25,10 @@ venv/
 # vectorizers/paraphrase-multilingual-mpnet-base-v2/config.json
 # vectorizers/paraphrase-multilingual-mpnet-base-v2/1_Pooling/
 
+# promote.py's pre-overwrite weight backups - never read at runtime by
+# ai_mail_classifier.py or inference_server/, just bloats the build context.
+models_backup/
+
 # Secrets / logs / OS cruft
 *.env
 *.log
@@ -33,4 +37,4 @@ venv/
 # Monthly retraining pipeline — operational tooling, not used by
 # ai_mail_classifier.py at runtime. Also keeps locally-fetched training mail
 # and IMAP credentials out of any built/pushed image.
-retrain model monthly/
+retrain_model_monthly/

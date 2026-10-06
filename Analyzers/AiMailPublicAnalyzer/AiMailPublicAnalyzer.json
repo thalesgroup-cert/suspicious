@@ -1,0 +1,13 @@
+{
+  "name": "AiMailPublicAnalyzer",
+  "version": "1.0",
+  "author": "THA-CERT //ECR",
+  "url": "-",
+  "license": "-",
+  "description": "Independent 2-model cascade (Safe-vs-Suspicious, Suspicious-vs-Dangerous) trained on a public mail dataset. Purely comparative - dispatched alongside AI_Mail_Analyzer by cortex_job/cortex_utils/cortex_and_job_management.py:launch_cortex_ai_jobs as the 'ai_public' analyzer, never feeds Case.results_ai.",
+  "dataTypeList": ["file"],
+  "command": "AiMailPublicAnalyzer/ai_mail_public_classifier.py",
+  "baseConfig": "-",
+  "configurationItems": [],
+  "dockerImage": "aimailpublicanalyzer:v1"
+}
