@@ -18,9 +18,7 @@ COPY --from=ghcr.io/astral-sh/uv:latest /uv /uvx /bin/
 # set work directory
 WORKDIR /worker/
 
-# requirements-client.txt, NOT requirements.txt: ai_mail_public_classifier.py
-# is a thin HTTP client - no torch/sentence_transformers needed in this
-# image at all (see inference_server/ for where model loading happens).
+# Client deps only: model loading lives in inference_server/.
 COPY requirements-client.txt .
 RUN http_proxy="${HTTP_PROXY}" https_proxy="${HTTPS_PROXY}" uv pip install --system --upgrade pip
 RUN http_proxy="${HTTP_PROXY}" https_proxy="${HTTPS_PROXY}" uv pip install --system --no-cache -r requirements-client.txt

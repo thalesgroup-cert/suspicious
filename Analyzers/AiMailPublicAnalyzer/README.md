@@ -50,8 +50,8 @@ détail). Vérifier : `curl http://localhost:8091/health`.
 ## 4. Enregistrer l'analyzer dans Cortex
 
 L'entrée catalogue a déjà été ajoutée dans le fichier réellement monté par
-Cortex (`Analyzers/AIMailAnalyzer/analyzers.json` — un seul fichier monté
-pour tous les analyzers custom AI, voir `deployment/compose_apps.yaml:184`),
+Cortex (`Analyzers/analyzers.json` — un seul fichier monté pour tous les
+analyzers custom, voir `CUSTOM_ANALYZERS_PATH` dans `deployment/compose_apps.yaml`),
 pas besoin d'y retoucher. Il reste à :
 1. Redémarrer/recréer le conteneur `cortex` pour qu'il relise le catalogue
    (`docker compose up -d --force-recreate --no-deps cortex`).

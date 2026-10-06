@@ -1,8 +1,5 @@
-# Persistent inference server image - same base pattern as the parent
-# AiMailPublicAnalyzer/Dockerfile (Cortex one-shot analyzer), but this one
-# stays running: it's built and launched separately (see
-# deployment/compose_apps.yaml's ai_public_inference service), never invoked
-# by Cortex's docker job runner directly.
+# Long-running inference server; built and started by hand (see the README),
+# never launched by Cortex itself.
 FROM python:3.14-slim
 
 ARG HTTP_PROXY
@@ -16,17 +13,13 @@ COPY --from=ghcr.io/astral-sh/uv:latest /uv /uvx /bin/
 
 WORKDIR /worker/AiMailPublicAnalyzer
 
-# Build context is Analyzers/AiMailPublicAnalyzer/ (same as the main
-# Dockerfile) so requirements.txt/-inference.txt are found directly - see
-# compose_apps.yaml's ai_public_inference.build.context.
+# Build context is Analyzers/AiMailPublicAnalyzer/.
 COPY requirements.txt requirements-inference.txt ./
 RUN http_proxy="${HTTP_PROXY}" https_proxy="${HTTPS_PROXY}" uv pip install --system --upgrade pip
 RUN http_proxy="${HTTP_PROXY}" https_proxy="${HTTPS_PROXY}" uv pip install --system --no-cache torch torchvision torchaudio --index-url https://download.pytorch.org/whl/cpu
 RUN http_proxy="${HTTP_PROXY}" https_proxy="${HTTPS_PROXY}" uv pip install --system --no-cache -r requirements-inference.txt
 
-# Whole AiMailPublicAnalyzer/ tree - mail_public_analysis.py, ResNetMLP.py,
-# models/, vectorizers/, this inference_server/ subfolder - server.py
-# imports the first two as siblings via cwd, not a package install.
+# server.py imports mail_public_analysis and ResNetMLP as siblings via cwd.
 COPY . .
 
 EXPOSE 8091

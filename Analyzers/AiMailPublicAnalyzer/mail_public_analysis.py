@@ -3,12 +3,8 @@ import tarfile
 from enum import Enum
 from collections import defaultdict
 
-# ── Safe tar extraction ─────────────────────────────────────────────────────
-# Copied from AIMailAnalyzer/mail_analysis.py (see that file's own comments
-# for the full CVE-2007-4559 / tarbomb rationale) rather than imported -
-# this analyzer's Docker image only COPYs its own directory, so the two
-# images stay fully independent and a change to one can never break the
-# other's build.
+# Copied from AIMailAnalyzer/mail_analysis.py (CVE-2007-4559, tarbombs) rather
+# than imported: this image only COPYs its own directory.
 
 _TAR_MAX_MEMBERS = 1_000
 _TAR_MAX_TOTAL_UNCOMPRESSED = 200 * 1024 * 1024  # 200 MB
@@ -64,11 +60,9 @@ def get_header_dict_list(msg):
     return headers
 
 
-# ── 2-model cascade: Safe-vs-Suspicious then Suspicious-vs-Dangerous ───────
-# Same combination pattern as AIMailAnalyzer's getMainClassificationProbabilities
-# (mail_analysis.py) - the second model's output is weighted by the first
-# model's "not safe" probability mass, so a case only reaches DANGEROUS
-# through both models agreeing it isn't safe AND is on the dangerous side.
+# Cascade as in AIMailAnalyzer's getMainClassificationProbabilities: the second
+# model is weighted by the first one's "not safe" probability, so DANGEROUS
+# needs both models to agree.
 
 class ClassificationName(Enum):
     SAFE = 0
@@ -112,10 +106,8 @@ def get_classification_info(global_probabilities):
         classification = "INCONCLUSIVE"
         confidence = 1 - confidence
 
-    # Cortex taxonomy level - "malicious" is the standard Cortex vocabulary
-    # word for the worst band (see score_process/scoring/cortex_analyzers/
-    # default.py's SEVERITY_ORDER on the Suspicious side, which already
-    # understands safe/suspicious/malicious without any custom parser).
+    # "malicious" is Cortex's word for the worst band (SEVERITY_ORDER in
+    # score_process/scoring/cortex_analyzers/default.py).
     level_by_classification = {
         "SAFE": "safe",
         "SUSPICIOUS": "suspicious",
