@@ -10,6 +10,7 @@ ARG HTTPS_PROXY
 
 RUN apt-get update -y && \
     apt-get upgrade -y && \
+    apt-get install -y --no-install-recommends curl && \
     rm -rf /var/lib/apt/lists/*
 
 COPY --from=ghcr.io/astral-sh/uv:latest /uv /uvx /bin/
@@ -28,6 +29,15 @@ RUN http_proxy="${HTTP_PROXY}" https_proxy="${HTTPS_PROXY}" uv pip install --sys
 # models_public/, vectorizers/, this inference_server/ subfolder - server.py
 # imports the first two as siblings via cwd, not a package install.
 COPY . .
+
+# The vectorizer weights are excluded from the build context (.dockerignore);
+# fetch the public checkpoint here, as the analyzer Dockerfile does.
+RUN VEC=/worker/AIMailAnalyzer/vectorizers/paraphrase-multilingual-mpnet-base-v2 && \
+    BASE=https://huggingface.co/sentence-transformers/paraphrase-multilingual-mpnet-base-v2/resolve/main && \
+    mkdir -p "$VEC/1_Pooling" && \
+    curl -fL -o "$VEC/model.safetensors" "$BASE/model.safetensors" && \
+    curl -fL -o "$VEC/config.json" "$BASE/config.json" && \
+    curl -fL -o "$VEC/1_Pooling/config.json" "$BASE/1_Pooling/config.json"
 
 EXPOSE 8090
 
