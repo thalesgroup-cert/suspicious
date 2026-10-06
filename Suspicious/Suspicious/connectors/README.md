@@ -161,6 +161,19 @@ Framework tests live in `connectors/tests/`; each contrib connector has its own
 (`test_registry.py`, `test_dispatch.py` — covers `delivery.py` too, `test_models.py`,
 `test_events.py`, `test_wiring.py`, `test_status.py`).
 
+### Redelivering lost deliveries
+
+A delivery that exhausts its retries (3 attempts, ~100s) or is skipped by an open
+circuit breaker is not retried again. Replay them once the target is back:
+
+```bash
+manage.py redeliver_connector misp --dry-run          # list affected cases
+manage.py redeliver_connector misp --since 2d          # re-emit case_finalised
+```
+
+Only cases whose latest ledger row is `failed`/`skipped` (and older than `--min-age`,
+default 300s) are re-emitted; connectors deduplicate, so repeating it is safe.
+
 ---
 
 ## 📄 License
