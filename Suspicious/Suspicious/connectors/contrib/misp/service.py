@@ -48,60 +48,56 @@ class MISPService:
     # ── Case update ───────────────────────────────────────────────────────
 
     def update_misp(self, case: Case) -> None:
-        try:
-            mem   = MISPEventManager(self.client)
-            event = mem.get_or_create_event(case)
-            if not event or not getattr(event, "id", None):
-                logger.error("Could not get/create MISP event for case %s.", case.id)
-                return
+        mem   = MISPEventManager(self.client)
+        event = mem.get_or_create_event(case)
+        if not event or not getattr(event, "id", None):
+            raise RuntimeError("Could not get/create MISP event for case %s." % case.id)
 
-            if case.results in SECONDARY_MISP_LEVELS:
-                secondary_client = MISPClient(config=load_misp_settings().security)
-                secondary_mem    = MISPEventManager(secondary_client)
-            else:
-                secondary_client = None
-                secondary_mem    = None
+        if case.results in SECONDARY_MISP_LEVELS:
+            secondary_client = MISPClient(config=load_misp_settings().security)
+            secondary_mem    = MISPEventManager(secondary_client)
+        else:
+            secondary_client = None
+            secondary_mem    = None
+        sec = {"secondary_mem": secondary_mem, "secondary_client": secondary_client}
 
-            if case.fileOrMail and getattr(case.fileOrMail, "mail", None):
-                mail = Mail.objects.prefetch_related(*_UPDATE_MISP_PREFETCH).get(
-                    pk=case.fileOrMail.mail.pk
-                )
-                obj  = build_email_object(mail, case.id, case.results)
-                if obj:
-                    finalize_misp_object(self.client.misp, event.id, obj)
-                    self._maybe_push_monthly(
-                        obj, case.id, case.results, secondary_mem, secondary_client
-                    )
+        # One bad object must not stop the rest; failures are raised together so
+        # the delivery is retried (pushes are deduplicated, so a retry is safe).
+        errors: list[Exception] = []
 
-                if getattr(mail, "mail_attachments", None):
-                    for attachment in mail.mail_attachments.all():
-                        self.add_attachment_object(
-                            event.id, attachment, case.id, case.results,
-                            secondary_mem=secondary_mem,
-                            secondary_client=secondary_client,
-                        )
+        def push(fn, *args, **kwargs) -> None:
+            try:
+                fn(*args, **kwargs)
+            except Exception as exc:  # noqa: BLE001
+                logger.error("MISP push failed for case %s: %s", case.id, exc, exc_info=True)
+                errors.append(exc)
 
-                if getattr(mail, "mail_artifacts", None):
-                    for artifact in mail.mail_artifacts.all():
-                        self.add_artifact_object(
-                            event.id, artifact, case.id, case.results,
-                            secondary_mem=secondary_mem,
-                            secondary_client=secondary_client,
-                        )
+        if case.fileOrMail and getattr(case.fileOrMail, "mail", None):
+            mail = Mail.objects.prefetch_related(*_UPDATE_MISP_PREFETCH).get(
+                pk=case.fileOrMail.mail.pk
+            )
+            obj = build_email_object(mail, case.id, case.results)
+            if obj:
+                push(self._push, event.id, obj, case.id, case.results, **sec)
+            for attachment in mail.mail_attachments.all():
+                push(self.add_attachment_object, event.id, attachment, case.id, case.results, **sec)
+            for artifact in mail.mail_artifacts.all():
+                push(self.add_artifact_object, event.id, artifact, case.id, case.results, **sec)
 
-            if getattr(case, "nonFileIocs", None) and case.nonFileIocs:
-                for ioc_type, ioc in case.nonFileIocs.get_iocs().items():
-                    if ioc:
-                        self.add_artifact_object(
-                            event.id, ioc, case.id, case.results,
-                            ioc_type=ioc_type,
-                            secondary_mem=secondary_mem,
-                            secondary_client=secondary_client,
-                        )
+        if case.nonFileIocs:
+            for ioc_type, ioc in case.nonFileIocs.get_iocs().items():
+                if ioc:
+                    push(self.add_artifact_object, event.id, ioc, case.id, case.results,
+                         ioc_type=ioc_type, **sec)
 
-        except Exception as exc:
-            logger.error("Error updating MISP for case %s: %s", case.id, exc, exc_info=True)
-            raise
+        if errors:
+            raise RuntimeError(
+                "%d MISP push(es) failed for case %s: %s" % (len(errors), case.id, errors[0])
+            ) from errors[0]
+
+    def _push(self, event_id, obj, case_number, detection_level, *, secondary_mem, secondary_client) -> None:
+        finalize_misp_object(self.client.misp, str(event_id), obj)
+        self._maybe_push_monthly(obj, case_number, detection_level, secondary_mem, secondary_client)
 
     # ── Artifact routing ──────────────────────────────────────────────────
 
@@ -116,19 +112,10 @@ class MISPService:
         secondary_mem:    Optional[MISPEventManager] = None,
         secondary_client: Optional[MISPClient]       = None,
     ) -> None:
-        try:
-            obj = self._build_artifact_object(artifact, case_number, detection_level, ioc_type)
-            if not obj:
-                return
-            finalize_misp_object(self.client.misp, event_id, obj)
-            self._maybe_push_monthly(
-                obj, case_number, detection_level, secondary_mem, secondary_client
-            )
-        except Exception as exc:
-            logger.error(
-                "[MISPHandler] Error adding artifact to event %s: %s",
-                event_id, exc, exc_info=True,
-            )
+        obj = self._build_artifact_object(artifact, case_number, detection_level, ioc_type)
+        if obj:
+            self._push(event_id, obj, case_number, detection_level,
+                       secondary_mem=secondary_mem, secondary_client=secondary_client)
 
     def _build_artifact_object(
         self,
@@ -186,19 +173,10 @@ class MISPService:
                 getattr(attachment, "id", attachment), case_number,
             )
             return
-        try:
-            obj = build_hash_object(hash_obj, case_number, detection_level)
-            if not obj:
-                return
-            finalize_misp_object(self.client.misp, event_id, obj)
-            self._maybe_push_monthly(
-                obj, case_number, detection_level, secondary_mem, secondary_client
-            )
-        except Exception as exc:
-            logger.error(
-                "[MISPHandler] Error adding attachment to event %s: %s",
-                event_id, exc, exc_info=True,
-            )
+        obj = build_hash_object(hash_obj, case_number, detection_level)
+        if obj:
+            self._push(event_id, obj, case_number, detection_level,
+                       secondary_mem=secondary_mem, secondary_client=secondary_client)
 
     # ── Monthly event push ────────────────────────────────────────────────
 
@@ -213,30 +191,23 @@ class MISPService:
         """Push a copy of misp_object to the secondary monthly event when warranted."""
         if detection_level not in SECONDARY_MISP_LEVELS or not mem or not client:
             return
-        try:
-            monthly_event = mem.get_or_create_monthly_event()
-            if not monthly_event:
-                return
+        monthly_event = mem.get_or_create_monthly_event()
+        if not monthly_event:
+            raise RuntimeError("Could not get/create the monthly MISP event (case %s)." % case_number)
 
-            monthly_id = getattr(monthly_event, "id", None)
-            if not monthly_id:
-                logger.warning(
-                    "Monthly MISP event has no id for case %s.", case_number
-                )
-                return
-
-            new_obj = MISPObject(misp_object.name)
-            for attr in misp_object.attributes:
-                if attr.object_relation and attr.value:
-                    attr_type = getattr(attr, "type", None) or attr.object_relation
-                    new_obj.add_attribute(
-                        attr.object_relation, type=attr_type, value=attr.value
-                    )
-
-            finalize_misp_object(client.misp, str(monthly_id), new_obj)
-
-        except Exception as exc:
-            logger.error(
-                "Error pushing to monthly MISP event for case %s: %s",
-                case_number, exc, exc_info=True,
+        monthly_id = getattr(monthly_event, "id", None)
+        if not monthly_id:
+            logger.warning(
+                "Monthly MISP event has no id for case %s.", case_number
             )
+            return
+
+        new_obj = MISPObject(misp_object.name)
+        for attr in misp_object.attributes:
+            if attr.object_relation and attr.value:
+                attr_type = getattr(attr, "type", None) or attr.object_relation
+                new_obj.add_attribute(
+                    attr.object_relation, type=attr_type, value=attr.value
+                )
+
+        finalize_misp_object(client.misp, str(monthly_id), new_obj)

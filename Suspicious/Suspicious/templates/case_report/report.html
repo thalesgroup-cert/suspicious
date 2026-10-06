@@ -260,11 +260,11 @@
   <h3>Why this verdict</h3>
   <p>{{ case.verdict_explanation.analyst_paragraph }}</p>
   <p class="sub">{{ case.verdict_explanation.confidence_reading }}</p>
-  {% if case.verdict_explanation.sources %}
+  {% if sources %}
   <table class="src-table">
     <tr><th>Source</th><th>Tier</th><th>Verdict</th><th>Counted</th><th>Note</th></tr>
-    {% for s in case.verdict_explanation.sources %}
-    <tr><td>{{ s.name }}</td><td>{{ s.tier }}</td><td>{{ s.verdict }}</td><td>{% if s.counted %}yes{% else %}&mdash;{% endif %}</td><td>{{ s.note }}</td></tr>
+    {% for s in sources %}
+    <tr><td>{{ s.name }}{% if s.n > 1 %} &times;{{ s.n }}{% endif %}</td><td>{{ s.tier }}</td><td>{{ s.verdict }}</td><td>{% if s.counted %}yes{% else %}&mdash;{% endif %}</td><td>{{ s.note }}</td></tr>
     {% endfor %}
   </table>
   {% endif %}

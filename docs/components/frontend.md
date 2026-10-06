@@ -13,8 +13,9 @@ The web UI is a single-page app in `suspicious-ui/`, served by Nginx
 
 ## Pages
 
-Submit, Investigations, Campaigns, Alerts, Settings, Dashboard, and Profile.
-These map to the flows in the [User Guide](../user-guide/submitting.md).
+Submit, Submissions/Investigations, Campaigns, Dashboard, Settings, Profile,
+and About. These map to the flows in the
+[User Guide](../user-guide/submitting.md).
 
 ## Testing
 

@@ -128,17 +128,14 @@ def finalise_ioc_group(case) -> None:
 
     # An explanation failure must NEVER break finalisation.
     try:
-        from cortex_job.cortex_utils.case_targets import (
-            build_analyzer_report_filter, collect_case_targets,
-        )
-        from cortex_job.models import AnalyzerReport
+        from api.utils.analyzer_reports import reports_for_case
+        from api.views.investigations import _dedup_analyzer_reports
         from score_process.scoring.explanation.adapters import explain_observable_group
 
-        _targets = collect_case_targets(case)
-        _reports = (
-            AnalyzerReport.objects.filter(build_analyzer_report_filter(_targets))
-            if _targets else AnalyzerReport.objects.none()
-        )
+        # A rerun leaves the old AnalyzerReport row in place alongside the new
+        # one — without dedup, sources would show one row per historical run
+        # instead of one per (analyzer, target).
+        _reports = _dedup_analyzer_reports(reports_for_case(case))
         case.verdict_explanation = explain_observable_group(
             case, g, obs_verdicts, _reports
         ).to_dict()

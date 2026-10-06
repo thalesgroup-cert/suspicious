@@ -21,29 +21,48 @@ case_handler/
 ├── admin.py
 ├── apps.py
 ├── models.py
-├── tests.py
+├── lifecycle.py            # LifecycleState choices + transition() state machine
 ├── urls.py
-├── views.py
-├── migrations/
-│   └── *.py
+├── tests/                  # test_case_verdict_explanation_field.py, test_lifecycle_*.py, etc.
+├── management/commands/
+│   └── heal_orphaned_cases.py
 ├── case_utils/
 │   ├── case_creator.py
-│   └── case_handler.py
-├── update_case/
-│   ├── update_case.py
-│   ├── update_handler.py
-│   └── update_score_calculation.py
+│   ├── case_handler.py
+│   └── form_handlers/mail/   # web-form email submission (converters, parser, saver)
 ```
+
+There is no `views.py` here — case CRUD/detail endpoints live in the `api` app,
+which wraps this app's models.
 
 ---
 
 ## ⚙️ Key Components
 
 ### `models.py`
-Defines the data structures for cases and related entities.
+The `Case` model and its related entities. Beyond the obvious scoring fields
+(`status`, `results`, `final_score`, `final_confidence`), notable ones:
+- `lifecycle_state` — drives the `case_handler.lifecycle` state machine (see below)
+- `verdict_rationale` (`JSONField`, list) — the older, free-text rationale lines
+- `verdict_explanation` (`JSONField`, nullable) — the newer, structured
+  rule-based explanation (`band`, `confidence`, `decisive_rule`,
+  `analyst_paragraph`, `reporter_paragraph`, `confidence_reading`, `sources`),
+  composed by `score_process.scoring.explanation`. Every render surface falls
+  back to `verdict_rationale` / a generic guidance string when this is null
+  (historical cases, or a case scored before the field existed).
+- `is_challenged` / `challenge_proposed_result` / `challenge_reason` — the
+  reporter challenge-a-verdict workflow, plus its own `CaseChallengeToken` model
+- `is_allowlisted` / `is_denylisted` / `list_reason` — org allow/deny-list hits
+- `thehive_alert_id`, `kpi_counted` — connector/dashboard bookkeeping
 
-### `views.py`
-Handles the main HTTP endpoints for interacting with cases (e.g., create, retrieve, update). Likely implements Django REST Framework views or standard Django views.
+Related models in the same file: `CaseChallengeToken`, `CaseComment`,
+`CaseHasFileOrMail`, `CaseHasNonFileIocs`, `ObservableGroup` (and its
+`ObservableGroupArtifact`s).
+
+### `lifecycle.py`
+`LifecycleState` (the case's actual state machine, distinct from `results` —
+the verdict band) and `transition()`, the only sanctioned way to move a case
+between states.
 
 ### `urls.py`
 Maps URL patterns to views for routing HTTP requests within the app.
@@ -60,20 +79,14 @@ Includes helper functions to generate and initialize new cases.
 ### `case_utils/case_handler.py`
 Handles logic for updating or processing existing cases.
 
-### `update_case/update_case.py`
-Acts as the entry point for bulk updates or scheduled case management.
-
-### `update_case/update_handler.py`
-Contains the business logic for applying updates to cases.
-
-### `update_case/update_score_calculation.py`
-Implements score computation logic for cases, possibly based on internal or AI-assessed criteria.
+Score computation itself lives in `score_process`, not here — this app owns
+the `Case` record and its lifecycle, not the scoring math.
 
 ---
 
 ## 🧪 Testing
 
-- Located in: `tests.py`
+- Located in: `tests/` (a package, not a single `tests.py`)
 - Use Django's test framework:
 ```bash
 python manage.py test case_handler

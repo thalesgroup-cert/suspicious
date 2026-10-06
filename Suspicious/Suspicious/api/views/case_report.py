@@ -69,6 +69,20 @@ def _inline_screenshots(observables):
     return observables
 
 
+def _collapse_sources(sources):
+    """Merge identical verdict-explanation rows, keeping first-seen order and a
+    count in ``n``. Snapshots finalised before the AnalyzerReport dedup fix hold
+    one row per historical analyzer run."""
+    merged = {}
+    for s in sources or []:
+        key = tuple(sorted((k, str(v)) for k, v in s.items()))
+        if key in merged:
+            merged[key]["n"] += 1
+        else:
+            merged[key] = {**s, "n": 1}
+    return list(merged.values())
+
+
 class CaseReportView(APIView):
     permission_classes = [IsAuthenticated, CanAccessSubmission]
     # ponytail: html renderer so DRF's ?format=html negotiation doesn't 404;
@@ -82,7 +96,12 @@ class CaseReportView(APIView):
         observables = _inline_screenshots(observables)
         html = render_to_string(
             "case_report/report.html",
-            {"case": case, "observables": observables, "generated_at": timezone.now()},
+            {
+                "case": case,
+                "sources": _collapse_sources((case.verdict_explanation or {}).get("sources")),
+                "observables": observables,
+                "generated_at": timezone.now(),
+            },
         )
         resp = HttpResponse(html, content_type="text/html")
         resp["Content-Disposition"] = f'attachment; filename="case-{case.id}-report.html"'

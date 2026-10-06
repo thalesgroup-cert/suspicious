@@ -3,9 +3,12 @@ MISP event manager — get-or-create logic for case and monthly events.
 """
 from __future__ import annotations
 import logging
+import time
+from contextlib import contextmanager
 from datetime import datetime
 from typing import Optional
 
+from django.core.cache import cache
 from pymisp import MISPEvent
 
 from case_handler.models import Case
@@ -20,6 +23,24 @@ from .utils import (
 )
 
 logger = logging.getLogger(__name__)
+
+_LOCK_TTL = 60
+
+
+@contextmanager
+def _event_lock(name: str, wait: float = 45.0):
+    """Serialise find-or-create for one MISP event name across workers; without
+    it concurrent deliveries each miss the search and create duplicate events."""
+    key = f"misp_event_lock:{name}"
+    deadline = time.monotonic() + wait
+    while not cache.add(key, 1, timeout=_LOCK_TTL):
+        if time.monotonic() > deadline:
+            raise RuntimeError("Timed out waiting for MISP event lock %r" % name)
+        time.sleep(0.2)
+    try:
+        yield
+    finally:
+        cache.delete(key)
 
 
 class MISPEventManager:
@@ -40,7 +61,7 @@ class MISPEventManager:
         try:
             results = self._misp.search(
                 controller="events",
-                value=event_name,
+                eventinfo=event_name,
                 metadata=True,
             )
             if not results:
@@ -57,6 +78,10 @@ class MISPEventManager:
 
     def get_or_create_event(self, case: Case) -> Optional[MISPEvent]:
         event_name = "Email Analysis - Case %s" % str(case.id)
+        with _event_lock(event_name):
+            return self._get_or_create_event(case, event_name)
+
+    def _get_or_create_event(self, case: Case, event_name: str) -> Optional[MISPEvent]:
         try:
             event_id = self._find_event_by_name(event_name)
 
@@ -64,7 +89,8 @@ class MISPEventManager:
                 logger.info("Found existing MISP event %s for %r.", event_id, event_name)
                 event_data = self._misp.get_event(event_id)
                 add_case_number_attribute(self._misp, event_data["Event"]["id"], case.id)
-                event_obj = MISPEvent().load(event_data["Event"])
+                event_obj = MISPEvent()
+                event_obj.load(event_data["Event"])
                 tag = get_detection_level_tag(case.results or "")
                 if tag:
                     event_obj.add_tag(tag)
@@ -81,7 +107,8 @@ class MISPEventManager:
             created = self._misp.add_event(event)
             if "Event" in created and "id" in created["Event"]:
                 add_case_number_attribute(self._misp, created["Event"]["id"], case.id)
-                event_obj = MISPEvent().load(created["Event"])
+                event_obj = MISPEvent()
+                event_obj.load(created["Event"])
                 tag = get_detection_level_tag(case.results or "")
                 if tag:
                     event_obj.add_tag(tag)
@@ -96,7 +123,11 @@ class MISPEventManager:
             return None
 
     def get_or_create_monthly_event(self) -> Optional[MISPEvent]:
-        event_name  = current_month_event_name()
+        event_name = current_month_event_name()
+        with _event_lock(event_name):
+            return self._get_or_create_monthly_event(event_name)
+
+    def _get_or_create_monthly_event(self, event_name: str) -> Optional[MISPEvent]:
         event_date  = first_day_of_month()
         tags_config = load_misp_settings().tags or {}
 
