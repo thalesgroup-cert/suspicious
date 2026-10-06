@@ -43,7 +43,7 @@ def _safe_extract(tar_ref, extract_to):
         if not _is_within_directory(extract_to, target):
             raise ValueError(f"Archive entry escapes the extraction directory: {member.name}")
 
-    tar_ref.extractall(path=extract_to, members=members)
+    tar_ref.extractall(path=extract_to, members=members, filter="data")
 
 
 def untar_file(filepath, extract_to):

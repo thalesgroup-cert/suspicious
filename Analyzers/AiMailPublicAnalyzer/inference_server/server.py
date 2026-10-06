@@ -15,6 +15,7 @@ on that network regardless of DNS - see AI_PUBLIC_INFERENCE_SERVER_URL's
 default in ai_mail_public_classifier.py.
 """
 import os
+from contextlib import asynccontextmanager
 
 import torch
 from fastapi import FastAPI, HTTPException
@@ -34,8 +35,6 @@ SAFE_SUSPICIOUS_FILENAME = "safe_suspicious_model.pth"
 SUSPICIOUS_DANGEROUS_FILENAME = "suspicious_dangerous_model.pth"
 
 device = torch.device("cpu")
-app = FastAPI(title="AiMailPublicAnalyzer inference server")
-
 _state = {"vectorizer": None, "models": {}}
 
 
@@ -51,7 +50,12 @@ def _load_model(filename: str):
         return None
 
 
-@app.on_event("startup")
+@asynccontextmanager
+async def lifespan(_app):
+    load_everything()
+    yield
+
+
 def load_everything():
     print("Loading vectorizer...")
     _state["vectorizer"] = SentenceTransformer(VECTORIZER_PATH)
@@ -59,6 +63,9 @@ def load_everything():
     _state["models"][SAFE_SUSPICIOUS_FILENAME] = _load_model(SAFE_SUSPICIOUS_FILENAME)
     _state["models"][SUSPICIOUS_DANGEROUS_FILENAME] = _load_model(SUSPICIOUS_DANGEROUS_FILENAME)
     print("Ready.")
+
+
+app = FastAPI(title="AiMailPublicAnalyzer inference server", lifespan=lifespan)
 
 
 class ClassifyRequest(BaseModel):

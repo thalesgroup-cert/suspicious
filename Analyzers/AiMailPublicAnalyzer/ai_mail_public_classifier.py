@@ -47,13 +47,16 @@ class AiMailPublicClassifier(Analyzer):
     def run(self):
         Analyzer.run(self)
 
-        mail_public_analysis.untar_file(self.filepath, './tmp/')
+        if not mail_public_analysis.untar_file(self.filepath, './tmp/'):
+            self.error("Could not extract the submitted archive (invalid or unsafe tar)")
+            return
 
-        mail_body = None
-        for file in os.listdir('./tmp/'):
+        parts = []
+        for file in sorted(os.listdir('./tmp/')):
             if file.endswith('.txt'):
                 with open('./tmp/' + file, 'r') as f:
-                    mail_body = f.read()
+                    parts.append(f.read())
+        mail_body = "\n".join(parts) if parts else None
 
         if mail_body is None:
             self.error("No mail body (.txt) found in the extracted archive")

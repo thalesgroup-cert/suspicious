@@ -11,10 +11,11 @@ comme analyzer "ai_public" — purement informatif, ne modifie jamais
 
 - Copier tes 2 fichiers `.pth` dans `models/` (voir `models/README.md` pour
   les noms exacts attendus).
-- Copier le vectoriseur (même modèle que AIMailAnalyzer, réutilisable tel
-  quel) :
+- Le vectoriseur (même modèle que AIMailAnalyzer) est déjà versionné dans
+  `vectorizers/`, sauf `model.safetensors` (gitignoré, trop volumineux) :
   ```bash
-  cp -r ../AIMailAnalyzer/vectorizers ./vectorizers
+  cp ../AIMailAnalyzer/vectorizers/paraphrase-multilingual-mpnet-base-v2/model.safetensors \
+     vectorizers/paraphrase-multilingual-mpnet-base-v2/
   ```
 
 ## 2. Builder les 2 images
