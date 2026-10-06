@@ -6,9 +6,16 @@ Mesure uniquement le temps de calcul du modèle (appel HTTP direct à
 /classify), pas le pipeline Cortex complet - isole le coût de calcul du
 bruit du job Cortex (untar, réseau inter-conteneurs, écriture DB).
 
+Attention : le vectoriseur tronque l'entrée à 128 tokens
+(sentence_bert_config.json: max_seq_length). Les mails "moyen" et "long"
+sont donc tronqués et coûtent ~ comme le "court" côté embedding - le script
+mesure la latence au plafond de troncature, pas une montée en charge selon
+la longueur du mail.
+
 Réutilisable tel quel pour comparer les deux serveurs plus tard :
     python3 benchmark_inference.py --url http://localhost:8091   # public, 2 modèles
     python3 benchmark_inference.py --url http://localhost:8090   # personal, 5 modèles
+    python3 benchmark_inference.py --url http://localhost:8090 --variant personal
 """
 from __future__ import annotations
 
@@ -47,37 +54,61 @@ SAMPLE_MAILS = {
     ) * 30,
 }
 
+# Libellés calculés depuis le texte réel, pas estimés à la main.
+SAMPLE_MAILS = {
+    f"{name.split(' (')[0]} (~{len(body.split())} mots)": body
+    for name, body in SAMPLE_MAILS.items()
+}
+
 WARMUP_CALLS = 1
 TIMED_CALLS = 20
+
+
+def _models_loaded(health: dict) -> bool:
+    """AiMailPublicAnalyzer: {"models": {name: bool}};
+    AIMailAnalyzer: {"variants": {variant: {name: bool}}}."""
+    if "variants" in health:
+        return all(all(m.values()) for m in health["variants"].values())
+    return all(health.get("models", {}).values())
 
 
 def check_health(base_url: str) -> None:
     try:
         resp = requests.get(f"{base_url}/health", timeout=5)
         resp.raise_for_status()
-        print(f"Serveur OK : {resp.json()}\n")
+        health = resp.json()
     except Exception as exc:
         print(f"ERREUR : le serveur d'inférence ({base_url}) ne répond pas ({exc}).")
         print("Vérifie qu'il est bien buildé et lancé avant de relancer ce script.")
         sys.exit(1)
+    if not health.get("ready") or not _models_loaded(health):
+        print(f"ERREUR : serveur pas prêt ou modèles manquants : {health}")
+        sys.exit(1)
+    print(f"Serveur OK : {health}\n")
 
 
-def time_call(base_url: str, mail_body: str) -> float:
+def time_call(base_url: str, mail_body: str, variant: str | None = None) -> float:
+    payload = {"mail_body": mail_body}
+    if variant:
+        payload["variant"] = variant
     start = time.perf_counter()
-    resp = requests.post(f"{base_url}/classify", json={"mail_body": mail_body}, timeout=60)
-    resp.raise_for_status()
+    try:
+        resp = requests.post(f"{base_url}/classify", json=payload, timeout=60)
+        resp.raise_for_status()
+    except requests.RequestException as exc:
+        sys.exit(f"ERREUR : appel /classify en échec ({exc})")
     return time.perf_counter() - start
 
 
-def run_benchmark(base_url: str) -> list[dict]:
+def run_benchmark(base_url: str, variant: str | None = None) -> list[dict]:
     rows = []
     for label, mail_body in SAMPLE_MAILS.items():
         print(f"--- {label} ---")
 
         for _ in range(WARMUP_CALLS):
-            time_call(base_url, mail_body)
+            time_call(base_url, mail_body, variant)
 
-        durations = [time_call(base_url, mail_body) for _ in range(TIMED_CALLS)]
+        durations = [time_call(base_url, mail_body, variant) for _ in range(TIMED_CALLS)]
 
         row = {
             "mail_length": label,
@@ -85,12 +116,13 @@ def run_benchmark(base_url: str) -> list[dict]:
             "mean_s": round(statistics.mean(durations), 4),
             "median_s": round(statistics.median(durations), 4),
             "min_s": round(min(durations), 4),
+            "p95_s": round(statistics.quantiles(durations, n=20)[-1], 4),
             "max_s": round(max(durations), 4),
         }
         rows.append(row)
         print(
             f"  moyenne={row['mean_s']}s  médiane={row['median_s']}s  "
-            f"min={row['min_s']}s  max={row['max_s']}s\n"
+            f"min={row['min_s']}s  p95={row['p95_s']}s  max={row['max_s']}s\n"
         )
 
     return rows
@@ -113,13 +145,14 @@ def main() -> None:
         "--url", default="http://localhost:8091",
         help="URL du serveur d'inférence à tester (défaut: http://localhost:8091, AiMailPublicAnalyzer)",
     )
+    parser.add_argument("--variant", default=None, help="variante du serveur personal (AIMailAnalyzer uniquement)")
     args = parser.parse_args()
 
     print(f"Benchmark de latence — {args.url}")
     print(f"({WARMUP_CALLS} appel(s) de chauffe ignoré(s), {TIMED_CALLS} appels chronométrés par longueur)\n")
 
     check_health(args.url)
-    rows = run_benchmark(args.url)
+    rows = run_benchmark(args.url, args.variant)
     csv_path = save_csv(rows, args.url)
 
     print(f"Résultats sauvegardés dans {csv_path}")
