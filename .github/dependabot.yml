@@ -37,6 +37,14 @@ updates:
           - "react-dom"
           - "@types/react"
           - "@types/react-dom"
+    ignore:
+      # vitest 5 is a migration, not a bump: with 5.0.3 one test file fails
+      # ("vitest/browser can only be imported inside Browser Mode") and the
+      # typecheck breaks on toHaveTextContent(RegExp). Remove when migrated.
+      - dependency-name: "vitest"
+        update-types: ["version-update:semver-major"]
+      - dependency-name: "@vitest/*"
+        update-types: ["version-update:semver-major"]
   - package-ecosystem: docker
     directory: /Suspicious
     schedule:
