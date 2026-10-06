@@ -18,9 +18,12 @@ def _fake_client(status):
     bucket.name = BUCKET
     client.list_buckets.return_value = [bucket]
     client.get_bucket_tags.return_value = {"Status": status}
-    obj = mock.Mock()
-    obj.object_name = "u-submission.eml"
-    client.list_objects.return_value = [obj]
+    objs = []
+    for name in ("u-submission.eml", "261006145515-abc/261006145515-abc.eml"):
+        obj = mock.Mock()
+        obj.object_name = name
+        objs.append(obj)
+    client.list_objects.return_value = objs
 
     def fget(_bucket, _name, dst):
         with open(dst, "wb") as f:
@@ -58,12 +61,14 @@ class BucketTagTests(SimpleTestCase):
     def tearDown(self):
         cache.delete(LOCK)
 
-    def _run(self, status, failed):
+    def _run(self, status, failed, ingested=frozenset()):
         client = _fake_client(status)
         with mock.patch.object(fe, "_init_minio_client", return_value=client), \
                 mock.patch.object(fe, "MinioEmailService"), \
-                mock.patch.object(fe, "_handoff_submission", return_value=failed):
+                mock.patch.object(fe, "_already_ingested", return_value=set(ingested)), \
+                mock.patch.object(fe, "_handoff_submission", return_value=failed) as handoff:
             fe._process_minio_buckets(self.base)
+        self.handoff = handoff
         return client
 
     def test_clean_bucket_is_tagged_done(self):
@@ -82,3 +87,12 @@ class BucketTagTests(SimpleTestCase):
     def test_processing_bucket_with_live_lock_is_left_alone(self):
         cache.add(LOCK, "1", timeout=900)
         self.assertEqual(_tags_set(self._run("Processing", [])), [])
+
+    def test_reclaimed_bucket_skips_emails_that_already_have_a_case(self):
+        # the killed run had already ingested this email; redoing it would duplicate the case
+        self._run("Processing", [], ingested={"261006145515-abc"})
+        self.assertEqual(self.handoff.call_args.kwargs["done_emails"], {"261006145515-abc"})
+
+    def test_normal_bucket_does_not_consult_the_database(self):
+        self._run("To Do", [], ingested={"261006145515-abc"})
+        self.assertEqual(self.handoff.call_args.kwargs.get("done_emails", frozenset()), frozenset())

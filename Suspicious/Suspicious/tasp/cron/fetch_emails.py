@@ -177,6 +177,22 @@ def _handoff_submission(bucket_path: str, submission_path: str, identifier: str,
     return failed
 
 
+def _already_ingested(bucket_path: str) -> set[str]:
+    """Email dirs under *bucket_path* that already have a case.
+
+    A bucket reclaimed after a killed run may be half-ingested; redoing those
+    emails would create a second case for the same mail.
+    """
+    from case_handler.models import Case
+
+    dirs = [e.name for e in os.scandir(bucket_path)
+            if e.is_dir() and EMAIL_DIR_PATTERN.match(e.name)]
+    return set(
+        Case.objects.filter(fileOrMail__mail__mail_id__in=dirs)
+        .values_list("fileOrMail__mail__mail_id", flat=True)
+    )
+
+
 # Prefix-based contract helpers (portable feeder contract)
 
 def _feeder_bucket_name() -> str:
@@ -343,9 +359,11 @@ def _process_minio_buckets(base_path: str) -> None:
                     manifest["reported_by"],
                 )
 
+                done = _already_ingested(bucket_path) if status == "Processing" else frozenset()
                 failed = _handoff_submission(
                     bucket_path, submission_path, bucket.name,
                     manifest["reported_by"], minio_processor,
+                    done_emails=done,
                 )
                 if failed:
                     logger.error(
