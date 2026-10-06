@@ -5,10 +5,16 @@ import logging
 
 from django.db import transaction
 
+from connectors.base import EVENT_CASE_CREATED
 from connectors.events import build_case_event
 from connectors.registry import registry
 
 logger = logging.getLogger("connectors.dispatch")
+
+# case_created fires as soon as the Case row exists, before ingest has written
+# the rows connectors read (e.g. MailInfo). A few seconds' head start avoids a
+# spurious failed first attempt in the ledger.
+_START_DELAY_SECONDS = {EVENT_CASE_CREATED: 5}
 
 
 def emit(event_name: str, case) -> None:
@@ -29,7 +35,10 @@ def emit(event_name: str, case) -> None:
         def _enqueue():
             for name in names:
                 try:
-                    deliver_event.delay(name, event_name, payload)
+                    deliver_event.apply_async(
+                        (name, event_name, payload),
+                        countdown=_START_DELAY_SECONDS.get(event_name, 0),
+                    )
                 except Exception:  # noqa: BLE001 — fan-out must never raise
                     logger.exception(
                         "deliver_event enqueue failed for %s/%s", name, event_name
