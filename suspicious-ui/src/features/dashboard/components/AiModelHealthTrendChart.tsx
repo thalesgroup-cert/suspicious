@@ -233,7 +233,9 @@ export default function AiModelHealthTrendChart({ runs }: { runs: AiModelRun[] }
       >
         <ToggleButton value="f1_score">F1</ToggleButton>
         <ToggleButton value="accuracy">Précision</ToggleButton>
-        <ToggleButton value="f1_score_golden">Golden</ToggleButton>
+        {/* Golden set pas encore mis en place - masqué temporairement, à
+            réactiver une fois retrain_model_monthly/golden_set.py utilisé. */}
+        {/* <ToggleButton value="f1_score_golden">Golden</ToggleButton> */}
       </ToggleButtonGroup>
     </Stack>
   );
@@ -245,7 +247,7 @@ export default function AiModelHealthTrendChart({ runs }: { runs: AiModelRun[] }
         <Box sx={{ display: "grid", placeItems: "center", height: 160 }}>
           <Typography sx={{ fontSize: 12, color: "text.secondary", textAlign: "center", px: 2 }}>
             {metric === "f1_score_golden"
-              ? "Pas encore assez de cycles évalués sur le golden set (retrain model monthly/golden_set.py) pour tracer une évolution."
+              ? "Pas encore assez de cycles évalués sur le golden set (retrain_model_monthly/golden_set.py) pour tracer une évolution."
               : "Au moins 2 cycles de réentraînement sont nécessaires pour tracer une évolution."}
           </Typography>
         </Box>

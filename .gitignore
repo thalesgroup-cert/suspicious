@@ -74,18 +74,18 @@ Analyzers/AiMailPublicAnalyzer/models/*.pth
 Analyzers/AiMailPublicAnalyzer/vectorizers/paraphrase-multilingual-mpnet-base-v2/model.safetensors
 
 # ===== Monthly retrain pipeline: fetched mail + run outputs, never commit =====
-Analyzers/AIMailAnalyzer/retrain model monthly/data_export/
-Analyzers/AIMailAnalyzer/retrain model monthly/data_base_results/
-Analyzers/AIMailAnalyzer/retrain model monthly/*_results/
-Analyzers/AIMailAnalyzer/retrain model monthly/wandb/
-Analyzers/AIMailAnalyzer/retrain model monthly/label_count_history.json
+Analyzers/AIMailAnalyzer/retrain_model_monthly/data_export/
+Analyzers/AIMailAnalyzer/retrain_model_monthly/data_base_results/
+Analyzers/AIMailAnalyzer/retrain_model_monthly/*_results/
+Analyzers/AIMailAnalyzer/retrain_model_monthly/wandb/
+Analyzers/AIMailAnalyzer/retrain_model_monthly/label_count_history.json
 # golden_set.json pins content hashes from THIS deployment's own fetched
 # mail (dataset.pkl, also gitignored above) - not portable across installs.
-Analyzers/AIMailAnalyzer/retrain model monthly/golden_set.json
+Analyzers/AIMailAnalyzer/retrain_model_monthly/golden_set.json
 # promote.py's intermediate output dir before weights get copied up to the
 # real Analyzers/AIMailAnalyzer/models/ (already ignored above) - binary
 # .pth files, never commit.
-Analyzers/AIMailAnalyzer/retrain model monthly/models/
+Analyzers/AIMailAnalyzer/retrain_model_monthly/models/
 
 # ===== Docs (MkDocs) =====
 /site/

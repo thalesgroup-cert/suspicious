@@ -8,6 +8,8 @@ import {
   LinearProgress,
   Slider,
   Stack,
+  ToggleButton,
+  ToggleButtonGroup,
   Typography,
 } from "@mui/material";
 import {
@@ -42,6 +44,7 @@ export function ScoringPanel() {
   });
 
   const [drafts, setDrafts] = React.useState<Record<number, number>>({});
+  const [statusFilter, setStatusFilter] = React.useState<"all" | "active" | "inactive">("all");
 
   const analyzersData = analyzersQuery.data;
   const [prevAnalyzersData, setPrevAnalyzersData] = React.useState(analyzersData);
@@ -63,6 +66,11 @@ export function ScoringPanel() {
 
   const analyzers = analyzersQuery.data ?? [];
   const dirtyIds = analyzers.filter((a) => Number((drafts[a.id] ?? a.weight).toFixed(1)) !== Number(a.weight.toFixed(1))).map((a) => a.id);
+  const visibleAnalyzers = analyzers.filter((a) => {
+    if (statusFilter === "active") return a.is_active;
+    if (statusFilter === "inactive") return !a.is_active;
+    return true;
+  });
 
   async function saveAll() {
     for (const id of dirtyIds) {
@@ -120,8 +128,32 @@ export function ScoringPanel() {
         </InnerCard>
       ) : null}
 
+      <Stack direction="row" sx={{ justifyContent: "flex-end" }}>
+        <ToggleButtonGroup
+          size="small"
+          exclusive
+          value={statusFilter}
+          onChange={(_, next) => next && setStatusFilter(next)}
+          sx={{
+            height: 26,
+            "& .MuiToggleButton-root": {
+              fontSize: 11,
+              fontWeight: 700,
+              py: 0,
+              px: 1.25,
+              lineHeight: "24px",
+              textTransform: "none",
+            },
+          }}
+        >
+          <ToggleButton value="all">All</ToggleButton>
+          <ToggleButton value="active">Active</ToggleButton>
+          <ToggleButton value="inactive">Inactive</ToggleButton>
+        </ToggleButtonGroup>
+      </Stack>
+
       <Stack spacing={1.25}>
-        {analyzers.map((a) => {
+        {visibleAnalyzers.map((a) => {
           const draft = drafts[a.id] ?? a.weight;
           const isDirty = Number(draft.toFixed(1)) !== Number(a.weight.toFixed(1));
           const savingThis = updateMutation.isPending && updateMutation.variables?.id === a.id;

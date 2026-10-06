@@ -111,7 +111,7 @@ class MonthlyReporterStats(models.Model):
 
 class AIModelRetrainRun(models.Model):
     """One row per sub-model per retraining run of AIMailAnalyzer
-    (Analyzers/AIMailAnalyzer/retrain model monthly/), pushed by promote.py
+    (Analyzers/AIMailAnalyzer/retrain_model_monthly/), pushed by promote.py
     after a run is promoted to the live models/ directory. Powers the
     "AI model health" dashboard panel — F1/accuracy trend and last-promoted
     version per sub-model.
@@ -122,7 +122,7 @@ class AIModelRetrainRun(models.Model):
     model_name = models.CharField(max_length=128)  # e.g. "dangerous_30_epochs_model"
     f1_score = models.FloatField()
     accuracy = models.FloatField()
-    # Scored against a fixed held-out benchmark (retrain model monthly/
+    # Scored against a fixed held-out benchmark (retrain_model_monthly/
     # golden_set.py) instead of the regular random test split, which is a
     # different slice of the ever-growing cumulative dataset every cycle -
     # f1_score/accuracy above aren't comparable across runs, these are.

@@ -26,7 +26,7 @@
 # n'y a pas de boucle interne à désactiver.
 #
 # Usage (crontab -e) :
-#   */30 * * * * cd "/path/to/Analyzers/AIMailAnalyzer/retrain model monthly" && ./run_month_replay_cycle.sh >> run_month_replay_cycle.log 2>&1
+#   */30 * * * * cd "/path/to/Analyzers/AIMailAnalyzer/retrain_model_monthly" && ./run_month_replay_cycle.sh >> run_month_replay_cycle.log 2>&1
 
 set -uo pipefail
 cd "$(dirname "${BASH_SOURCE[0]}")"
@@ -55,7 +55,7 @@ AIMAILANALYZER_DIR="$(cd .. && pwd)"
 run_trainer_shell() {
   docker run --rm --network host \
     -v "$AIMAILANALYZER_DIR:/aimailanalyzer" \
-    -w "/aimailanalyzer/retrain model monthly" \
+    -w "/aimailanalyzer/retrain_model_monthly" \
     -v "$HF_CACHE:/root/.cache/huggingface" \
     -e HF_HOME=/root/.cache/huggingface \
     -e VECTORIZER_PATH="$VECTORIZER" \
