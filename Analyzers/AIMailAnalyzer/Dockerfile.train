@@ -1,7 +1,7 @@
 # Throwaway image for build_test_dataset.py / train_test_models.py.
 # Not part of the deployed analyzer image (see Dockerfile for that) --
 # training needs pandas/sklearn/imbalanced-learn on top of the runtime deps.
-FROM python:3.12-slim
+FROM python:3.14-slim
 
 RUN apt-get update -y && apt-get install -y --no-install-recommends build-essential && rm -rf /var/lib/apt/lists/*
 
