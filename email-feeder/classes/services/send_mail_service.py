@@ -20,17 +20,24 @@ def _reject_header_crlf(*values: str) -> None:
             raise ValueError("email header value contains a newline (possible injection)")
 
 
+SMTP_TIMEOUT = 10
+
+
 class SendMailService:
     __server: smtplib.SMTP | None = None
 
-    def __init__(self, host: str, port: int, login: str, password: str) -> None:
+    def __init__(
+        self, host: str, port: int, login: str, password: str,
+        timeout: float = SMTP_TIMEOUT,
+    ) -> None:
         self.__host = host
         self.__port = port
         self.__login = login
         self.__password = password
+        self.__timeout = timeout
 
     def connect(self) -> None:
-        self.__server = smtplib.SMTP(self.__host, self.__port)
+        self.__server = smtplib.SMTP(self.__host, self.__port, timeout=self.__timeout)
 
     def start_tls(self) -> None:
         self.__server.starttls()
