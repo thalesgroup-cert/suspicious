@@ -12,7 +12,8 @@ from typing import Any, ClassVar
 
 EVENT_CASE_CREATED = "case_created"
 EVENT_CASE_FINALISED = "case_finalised"
-VALID_EVENTS = frozenset({EVENT_CASE_CREATED, EVENT_CASE_FINALISED})
+EVENT_CASE_MODIFIED = "case_modified"
+VALID_EVENTS = frozenset({EVENT_CASE_CREATED, EVENT_CASE_FINALISED, EVENT_CASE_MODIFIED})
 
 FIELD_TYPES = frozenset({"str", "int", "bool", "url", "secret"})
 
@@ -123,6 +124,9 @@ class Connector(ABC):
         raise NotImplementedError
 
     def on_case_finalised(self, event: CaseEvent) -> None:  # pragma: no cover
+        raise NotImplementedError
+
+    def on_case_modified(self, event: CaseEvent) -> None:  # pragma: no cover
         raise NotImplementedError
 
     def sync(self) -> None:  # pragma: no cover

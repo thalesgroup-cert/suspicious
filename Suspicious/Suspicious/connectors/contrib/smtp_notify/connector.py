@@ -1,9 +1,9 @@
-"""Reporter notification connector — final-result email on case completion.
+"""Reporter notification connector: acknowledgement when the case is created,
+review email when an analyst changes the verdict, final result on completion.
 
-Replaces the inline MailNotificationService call that lived in
-score_process/scoring/update_handler.save_case_results. Ships enabled:
-reporter notification is expected product behavior. send_final's own
-user_analysis_informed flag keeps duplicate deliveries idempotent."""
+Ships enabled: reporter notification is expected product behavior. The
+user_reception_informed / user_analysis_informed flags keep duplicate
+deliveries idempotent, and a failed send raises so the framework retries it."""
 from __future__ import annotations
 
 import logging
@@ -14,7 +14,9 @@ from connectors.base import (
     Connector,
     ConnectorManifest,
     HealthStatus,
+    EVENT_CASE_CREATED,
     EVENT_CASE_FINALISED,
+    EVENT_CASE_MODIFIED,
 )
 from mail_feeder.models import MailInfo
 from score_process.score_utils.send_mail.service import MailNotificationService
@@ -31,7 +33,7 @@ class SmtpNotifyConnector(Connector):
         description="Email the reporter their case verdict. Uses the shared "
                     "email.smtp / email.content config sections.",
         config_schema=(),
-        events=(EVENT_CASE_FINALISED,),
+        events=(EVENT_CASE_CREATED, EVENT_CASE_FINALISED, EVENT_CASE_MODIFIED),
         enabled_by_default=True,
     )
 
@@ -47,6 +49,29 @@ class SmtpNotifyConnector(Connector):
             return HealthStatus(ok=True, detail=f"SMTP {host}:{port} reachable")
         except Exception as exc:  # noqa: BLE001 — health check must not raise
             return HealthStatus(ok=False, detail=str(exc))
+
+    @staticmethod
+    def _case_mail(case_id: int):
+        case = Case.objects.select_related("fileOrMail").get(pk=case_id)
+        return getattr(case.fileOrMail, "mail", None) if case.fileOrMail else None
+
+    def on_case_created(self, event) -> None:
+        mail = self._case_mail(event.case_id)
+        if mail is None:
+            return
+        try:
+            mail_info = MailInfo.objects.get(mail=mail)
+        except MailInfo.DoesNotExist:
+            # The case is created just before ingest records MailInfo: retry.
+            raise RuntimeError(f"MailInfo not written yet for case {event.case_id}") from None
+        MailNotificationService.from_settings().send_acknowledgement(mail_info)
+
+    def on_case_modified(self, event) -> None:
+        try:
+            case = Case.objects.get(pk=event.case_id)
+        except Case.DoesNotExist:
+            return
+        MailNotificationService.from_settings().send_review_email(case)
 
     def on_case_finalised(self, event) -> None:
         if event.status != "Done":
