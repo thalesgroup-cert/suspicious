@@ -142,7 +142,7 @@ def _write_manifest(
         logger.warning("Could not write local manifest copy to %s", local_path, exc_info=True)
 
 
-def _handoff_submission(bucket_path: str, submission_path: str, identifier: str, reported_by: str, processor, reporter_note: str = "", done_emails=frozenset(), on_email_done=None) -> None:
+def _handoff_submission(bucket_path: str, submission_path: str, identifier: str, reported_by: str, processor, reporter_note: str = "", done_emails=frozenset(), on_email_done=None) -> list[str]:
     """Copy the wrapper into each email dir, archive it, hand to the processor.
 
     Shared by the legacy bucket path and the new prefix path.
@@ -152,7 +152,11 @@ def _handoff_submission(bucket_path: str, submission_path: str, identifier: str,
     ``on_email_done(dir_name)`` is called after each successful hand-off so the
     caller can durably record it. The legacy path passes neither (its
     whole-bucket Status tag already gates reprocessing).
+
+    Returns the email dirs the processor reported as failed, so the caller can
+    avoid marking a submission done when part of it was dropped.
     """
+    failed: list[str] = []
     for entry in os.scandir(bucket_path):
         if not (entry.is_dir() and EMAIL_DIR_PATTERN.match(entry.name)):
             continue
@@ -161,12 +165,16 @@ def _handoff_submission(bucket_path: str, submission_path: str, identifier: str,
             continue
         shutil.copy(submission_path, os.path.join(entry.path, "user_submission.eml"))
         shutil.make_archive(entry.path, "gztar", entry.path)
-        processor.process_emails_from_minio_workdir(
+        ok = processor.process_emails_from_minio_workdir(
             entry.path, identifier, reported_by=reported_by,
             reporter_note=reporter_note,
         )
+        if ok is False:
+            failed.append(entry.name)
+            continue
         if on_email_done is not None:
             on_email_done(entry.name)
+    return failed
 
 
 # Prefix-based contract helpers (portable feeder contract)
@@ -214,12 +222,15 @@ def _process_prefix_submissions(base_path: str, bucket_name: str) -> None:
             reported_by = (status or {}).get("reported_by") or _extract_reported_by(wrapper)
             reporter_note = (status or {}).get("reporter_note") or ""
             done_emails = set((status or {}).get("processed_emails") or [])
-            _handoff_submission(
+            failed = _handoff_submission(
                 os.path.dirname(wrapper), wrapper, submission_id,
                 reported_by, processor, reporter_note=reporter_note,
                 done_emails=done_emails,
                 on_email_done=lambda d: source.mark_email_done(submission_id, d),
             )
+            if failed:
+                logger.error("Submission %s: %d email(s) were not ingested: %s",
+                             submission_id, len(failed), failed)
             source.set_status(submission_id, sc.STATUS_DONE)
         except Exception:
             logger.exception("Error processing prefix submission %s", submission_id)
@@ -271,7 +282,10 @@ def _process_minio_buckets(base_path: str) -> None:
 
             try:
                 tags = client.get_bucket_tags(bucket.name)
-                if tags.get("Status") != "To Do":
+                status = tags.get("Status")
+                # "Processing" is picked up too: if no live run holds the lock
+                # below, the worker that tagged it was killed mid-bucket.
+                if status not in ("To Do", "Processing"):
                     continue
             except Exception:
                 continue
@@ -282,6 +296,8 @@ def _process_minio_buckets(base_path: str) -> None:
                 continue
 
             try:
+                if status == "Processing":
+                    logger.warning("Reclaiming bucket %s left in Processing by a killed run", bucket.name)
                 logger.debug("Processing bucket %s", bucket.name)
 
                 try:
@@ -327,17 +343,23 @@ def _process_minio_buckets(base_path: str) -> None:
                     manifest["reported_by"],
                 )
 
-                _handoff_submission(
+                failed = _handoff_submission(
                     bucket_path, submission_path, bucket.name,
                     manifest["reported_by"], minio_processor,
                 )
+                if failed:
+                    logger.error(
+                        "Bucket %s: %d email(s) were not ingested: %s",
+                        bucket.name, len(failed), failed,
+                    )
 
+                final = "Error" if failed else "Done"
                 try:
                     done_tags = Tags.new_bucket_tags()
-                    done_tags["Status"] = "Done"
+                    done_tags["Status"] = final
                     client.set_bucket_tags(bucket.name, done_tags)
                 except Exception:
-                    logger.exception("Failed to tag bucket %s as Done", bucket.name)
+                    logger.exception("Failed to tag bucket %s as %s", bucket.name, final)
 
             except Exception:
                 logger.exception("Error while processing bucket %s", bucket.name)

@@ -8,6 +8,16 @@ from .utils import decode_subject, parse_email_date, safe_execution
 
 logger = logging.getLogger("tasp.cron.fetch_and_process_emails")
 
+def _fit(field: str, value):
+    """Cut a value to the column width. A long header is attacker-controlled,
+    so it must not be able to make full_clean() discard the whole mail."""
+    limit = Mail._meta.get_field(field).max_length
+    if value and limit and len(value) > limit:
+        logger.warning("Truncating mail %s from %d to %d chars", field, len(value), limit)
+        return value[: limit - 1] + "\u2026"
+    return value
+
+
 class EmailService:
     """
     Service responsible for validating input data and creating Mail instances.
@@ -27,14 +37,14 @@ class EmailService:
                 decoded_subject = subject or f"Suspicious Mail by {validated.reportedBy}"
 
                 mail = Mail(
-                    subject=decoded_subject,
-                    reportedBy=validated.reportedBy,
+                    subject=_fit("subject", decoded_subject),
+                    reportedBy=_fit("reportedBy", validated.reportedBy),
                     date=parse_email_date(validated.date),
-                    mail_from=validated.mail_from or "",
-                    to=validated.to,
-                    cc=validated.cc or "",
-                    bcc=validated.bcc or "",
-                    mail_id=validated.id or "",
+                    mail_from=_fit("mail_from", validated.mail_from or ""),
+                    to=_fit("to", validated.to),
+                    cc=_fit("cc", validated.cc or ""),
+                    bcc=_fit("bcc", validated.bcc or ""),
+                    mail_id=_fit("mail_id", validated.id or ""),
                 )
 
                 mail.full_clean()
