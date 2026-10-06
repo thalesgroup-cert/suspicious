@@ -5,9 +5,7 @@ import { useColorStore } from "@/styles/colorStore";
 import { hydrateThemeFromServer } from "@/styles/ThemeStore";
 import type { ResultColors, StatusColors } from "@/styles/colorStore";
 
-// ---------------------------------------------------------------------------
 // Types
-// ---------------------------------------------------------------------------
 
 export type Me = {
   id: number;
@@ -38,8 +36,6 @@ export type LoginResponse = {
   };
 };
 
-// ---------------------------------------------------------------------------
-// ---------------------------------------------------------------------------
 
 function hydrateAppearanceFromMe(me: Me): void {
   // ── Semantic colors ───────────────────────────────────────────────────────
@@ -65,9 +61,7 @@ function hydrateAppearanceFromMe(me: Me): void {
   }
 }
 
-// ---------------------------------------------------------------------------
 // Auth API
-// ---------------------------------------------------------------------------
 
 export async function login(
   username: string,
@@ -87,19 +81,17 @@ export async function logout(): Promise<void> {
     await api.post(endpoints.logout);
   } finally {
     // The server deletes the knox_token cookie in the response.
-    // Colors stay in localStorage — they won't flash on the login page
+    // Colors stay in localStorage: they won't flash on the login page
     // and will be overwritten by the next user's getMe() on login.
   }
 }
 
-// ---------------------------------------------------------------------------
-// ---------------------------------------------------------------------------
 
 export async function hydrateColorsAfterSso(): Promise<void> {
   try {
     await getMe();
   } catch {
-    // Non-fatal — the httpOnly cookie is already set by the server;
+    // Non-fatal: the httpOnly cookie is already set by the server;
     // colors fall back to localStorage defaults.
   }
 }

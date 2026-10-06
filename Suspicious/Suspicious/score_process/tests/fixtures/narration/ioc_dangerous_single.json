@@ -1,0 +1,8 @@
+{
+  "verdict": {"band": "Dangerous", "score": 9.7, "confidence": 91, "rule": "malicious-count"},
+  "analyzer_reports": [
+    {"analyzer": "VirusTotal_v3", "report_full": {"observable": "198.51.100.77", "positives": 57, "total": 90}},
+    {"analyzer": "GTI", "report_full": {"reputation": "malicious", "threat_labels": ["c2", "trojan"]}},
+    {"analyzer": "MISP", "report_full": {"matches": 3, "events": ["APT-fake-campaign-2026-08"]}}
+  ]
+}

@@ -1,14 +1,14 @@
 # LDAP Authentication and Database Connectivity
-django==6.0.7
+django==6.1.1
 django-auth-ldap==5.3.0
 django-mysql==4.19.0
-mysqlclient==2.2.8
-python-ldap==3.4.7
-djangorestframework==3.17.1
+mysqlclient==2.3.0
+python-ldap==3.4.8
+djangorestframework==3.18.1
 django-rest-knox==5.1.0
-django-filter==26.1
+django-filter==26.2
 drf-spectacular==0.30.0
-gunicorn==25.3.0
+gunicorn==26.2.0
 whitenoise==6.12.0
 # Environment Configuration
 docker==7.2.0
@@ -17,9 +17,9 @@ docker==7.2.0
 beautifulsoup4==4.15.0
 compoundfiles==0.3
 compressed-rtf==1.0.7
-extract-msg==0.56.0
+extract-msg==0.56.1
 pyspf==2.0.14
-tldextract==5.3.1
+tldextract==5.3.2
 dkimpy==1.1.8
 email-validator==2.3.0
 # Mail preview: imgkit wraps the wkhtmltopdf binary that ships in the
@@ -28,7 +28,7 @@ email-validator==2.3.0
 imgkit==1.2.3
 
 # Natural Language Processing and Similarity Checking
-nltk==3.10.0
+nltk==3.10.3
 simhash==2.1.2
 
 # Image and Font Utilities
@@ -39,13 +39,13 @@ django-import-export==4.4.1
 
 # Request Handling
 requests==2.34.2
-PyJWT==2.13.0
+PyJWT==2.15.1
 minio==7.2.20
 tenacity==9.1.4
 pybreaker==1.4.1
 
 # Email Handling
-chardet==7.4.3
+chardet==7.6.0
 
 # Templating (Jinja2: TheHive challenge + scoring notification emails —
 # connectors/contrib/thehive/challenge.py, score_process/.../send_mail/utils.py.
@@ -53,25 +53,25 @@ chardet==7.4.3
 jinja2==3.1.6
 
 # Data Analysis and Machine Learning
-numpy==2.5.1
+numpy==2.5.3
 validators==0.35.0
 hashid==3.1.4
 
 # Cybersecurity and Incident Response
 thehive4py==2.1.0
 cortex4py==2.1.0
-pymisp==2.5.34.1
+pymisp==2.5.34.4
 vt-py==0.22.0
 
 # Vector store
 chromadb==1.5.9
 
 # Logging
-python-json-logger==4.1.0  # v4.x changed the API; pin to v3 until we migrate
+python-json-logger==4.2.0  # v4.x changed the API; pin to v3 until we migrate
 
 # Image rendering (cairosvg: SVG→PNG for Outlook email previews)
 pillow==12.3.0
-cairosvg==2.9.0
+cairosvg==2.9.1
 
 # Task Queue
 celery[redis]==5.6.3
@@ -83,8 +83,8 @@ hvac==2.4.0
 # Observability
 # 1.28.0+ needed: opentelemetry-proto pins protobuf<5 below that, which
 # conflicts with the >=5.29.6 fix for PYSEC-2026-1805.
-opentelemetry-sdk==1.44.0
-opentelemetry-instrumentation-django==0.65b0
-opentelemetry-instrumentation-requests==0.65b0
-opentelemetry-instrumentation-celery==0.65b0
-opentelemetry-exporter-otlp-proto-http==1.44.0
+opentelemetry-sdk==1.45.0
+opentelemetry-instrumentation-django==0.66b0
+opentelemetry-instrumentation-requests==0.66b0
+opentelemetry-instrumentation-celery==0.66b0
+opentelemetry-exporter-otlp-proto-http==1.45.0

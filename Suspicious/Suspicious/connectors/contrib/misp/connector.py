@@ -37,6 +37,7 @@ class MISPConnector(Connector):
             ConfigField("instances.secondary.ssl_verify", "bool", default=True),
         ),
         events=(EVENT_CASE_FINALISED,),
+        enabled_by_default=True,
     )
 
     def health_check(self) -> HealthStatus:

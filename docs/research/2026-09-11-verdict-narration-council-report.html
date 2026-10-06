@@ -1,0 +1,227 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<title>LLM Council: Verdict Narration Model</title>
+<style>
+  :root {
+    --bg: #f7f7f5; --card: #ffffff; --border: #e2e0da; --text: #2a2a28;
+    --muted: #6b6a65; --accent: #8a5a3b; --accent-bg: #f2e9e1;
+    --agree: #2f6f4f; --agree-bg: #eaf4ee; --clash: #a63c2e; --clash-bg: #fbecea;
+    --blind: #b8860b; --blind-bg: #fdf6e3;
+  }
+  * { box-sizing: border-box; }
+  body {
+    background: var(--bg); color: var(--text); margin: 0; padding: 32px 20px 64px;
+    font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+    line-height: 1.55;
+  }
+  .wrap { max-width: 880px; margin: 0 auto; }
+  h1 { font-size: 1.5rem; margin: 0 0 4px; }
+  .subtitle { color: var(--muted); font-size: 0.95rem; margin-bottom: 28px; }
+  .question-box {
+    background: var(--card); border: 1px solid var(--border); border-left: 4px solid var(--accent);
+    border-radius: 8px; padding: 18px 20px; margin-bottom: 28px; font-size: 0.95rem;
+  }
+  .question-box strong { display: block; margin-bottom: 6px; color: var(--accent); font-size: 0.8rem; text-transform: uppercase; letter-spacing: 0.04em; }
+  section { margin-bottom: 32px; }
+  h2 { font-size: 1.15rem; margin: 0 0 12px; padding-bottom: 8px; border-bottom: 1px solid var(--border); }
+  .verdict-card {
+    background: var(--card); border: 1px solid var(--border); border-radius: 10px;
+    padding: 22px 24px; box-shadow: 0 1px 3px rgba(0,0,0,0.04);
+  }
+  .verdict-card h3 { font-size: 1rem; margin: 20px 0 8px; color: var(--accent); }
+  .verdict-card h3:first-child { margin-top: 0; }
+  .verdict-card p, .verdict-card li { font-size: 0.93rem; }
+  .verdict-card ul { padding-left: 20px; margin: 8px 0; }
+  .recommendation {
+    background: var(--agree-bg); border: 1px solid var(--agree); border-radius: 8px;
+    padding: 16px 18px; margin-top: 6px;
+  }
+  .first-step {
+    background: var(--accent-bg); border: 1px solid var(--accent); border-radius: 8px;
+    padding: 16px 18px; margin-top: 6px; font-weight: 500;
+  }
+  .grid {
+    display: grid; grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
+    gap: 10px; margin-top: 4px;
+  }
+  .adv-tile {
+    border-radius: 8px; padding: 12px 14px; font-size: 0.85rem; border: 1px solid var(--border);
+  }
+  .adv-tile .name { font-weight: 600; display: block; margin-bottom: 4px; }
+  .tile-strong { background: var(--agree-bg); border-color: var(--agree); }
+  .tile-weak { background: var(--clash-bg); border-color: var(--clash); }
+  .tile-neutral { background: var(--card); }
+  .tag { display: inline-block; font-size: 0.7rem; text-transform: uppercase; letter-spacing: 0.03em; padding: 2px 7px; border-radius: 4px; margin-top: 4px; }
+  .tag-strong { background: var(--agree); color: #fff; }
+  .tag-weak { background: var(--clash); color: #fff; }
+  details {
+    background: var(--card); border: 1px solid var(--border); border-radius: 8px;
+    margin-bottom: 10px; overflow: hidden;
+  }
+  summary {
+    cursor: pointer; padding: 13px 16px; font-weight: 600; font-size: 0.92rem;
+    list-style: none; display: flex; align-items: center; justify-content: space-between;
+  }
+  summary::-webkit-details-marker { display: none; }
+  summary::after { content: "+"; color: var(--muted); font-weight: 400; font-size: 1.1rem; }
+  details[open] summary::after { content: "–"; }
+  .details-body { padding: 0 16px 16px; font-size: 0.9rem; color: #333; }
+  .badge { font-size: 0.72rem; padding: 2px 8px; border-radius: 10px; background: var(--accent-bg); color: var(--accent); margin-left: 8px; }
+  footer { color: var(--muted); font-size: 0.8rem; text-align: center; margin-top: 40px; padding-top: 16px; border-top: 1px solid var(--border); }
+  @media (prefers-color-scheme: dark) {
+    :root:not([data-theme="light"]) {
+      --bg: #1c1b19; --card: #262421; --border: #3a3733; --text: #e8e6e1;
+      --muted: #9b968d; --accent: #d9a679; --accent-bg: #362a20;
+      --agree: #6fbf94; --agree-bg: #1e2b23; --clash: #e08a7a; --clash-bg: #33201c;
+      --blind: #e0c25a; --blind-bg: #332c18;
+    }
+  }
+  :root[data-theme="dark"] {
+    --bg: #1c1b19; --card: #262421; --border: #3a3733; --text: #e8e6e1;
+    --muted: #9b968d; --accent: #d9a679; --accent-bg: #362a20;
+    --agree: #6fbf94; --agree-bg: #1e2b23; --clash: #e08a7a; --clash-bg: #33201c;
+    --blind: #e0c25a; --blind-bg: #332c18;
+  }
+</style>
+</head>
+<body>
+<div class="wrap">
+  <h1>LLM Council: Verdict Narration Model</h1>
+  <div class="subtitle">Pressure-testing a proposed generative report-writer for Suspicious (Thales CERT) &middot; 2026-09-11</div>
+
+  <div class="question-box">
+    <strong>The question brought to council</strong>
+    Should Suspicious build a generative "verdict narration" model — teacher distillation from a hosted LLM into a fine-tuned Qwen2.5-7B-Instruct via LoRA/QLoRA, deployed on-prem — to turn analyzer reports plus a case's already-computed verdict/score/confidence into a rich, plain-language report for non-technical stakeholders? The verdict itself must never be re-derived or contradicted by the model. Team: a solo technical lead plus an AI coding agent, no dedicated ML infra, one prior CPU-trained classifier as ML experience.
+  </div>
+
+  <section>
+    <h2>Council Verdict</h2>
+    <div class="verdict-card">
+
+      <h3>Where the Council Agrees</h3>
+      <ul>
+        <li><strong>"Fixed verdict, never re-derived" is not a training-time property.</strong> No advisor believes LoRA, distillation, or model choice affects this. Four of five land on the same mechanism: template-lock the verdict/score/band as literal injected strings, then run a deterministic post-generation validator that rejects/regenerates on mismatch. This is code, not model behavior — needed under every architecture on the table.</li>
+        <li><strong>The distillation pipeline is solving an unproven problem.</strong> Four of five advisors say: try prompting the base model first. Nobody described running that experiment before committing to teacher distillation, LoRA, and rented GPUs.</li>
+        <li><strong>Solo-lead bandwidth is a real constraint, not a footnote.</strong> One person cannot also be the data pipeline, training infra operator, quality evaluator, and deployer for a document reaching external stakeholders.</li>
+        <li><strong>The open-source framing (open model/code, closed dataset) is fine.</strong> The Alpaca precedent settled this — flag and revisit later, not a blocker.</li>
+      </ul>
+
+      <h3>Where the Council Clashes</h3>
+      <p><strong>The Expansionist vs. everyone else</strong> — and it's lopsided. The Expansionist calls the fixed-verdict architecture a reusable "moat" and proposes generalizing the schema now plus spinning off adjacent fine-tunes from the same ToS-encumbered teacher data. Every peer reviewer, independently, 5 for 5, named this response the weakest: it never engages enforceability or the solo-lead constraint, and its own proposal <em>increases</em> the maintenance surface for someone already stretched thin. Its one salvageable idea — a generic input schema (verdict + evidence + confidence) rather than phishing-specific fields — is worth keeping; the rest of the expansion agenda should be shelved.</p>
+      <p><strong>Train now vs. prompt first</strong> is softer — a matter of sequencing, not real disagreement. Nobody argues for jumping straight to LoRA. The spectrum runs from "prompting probably suffices" to "prompt first, keep a numeric go/no-go gate for later fine-tuning."</p>
+
+      <h3>Blind Spots the Council Caught</h3>
+      <ul>
+        <li><strong>Data governance, not just redistribution ToS.</strong> Four of five peer reviewers independently flagged: sending raw case data — phishing emails, VT/GTI/MISP intel, mail analyzer output — to a hosted third-party API to generate teacher training text is a confidentiality/compliance question for a CERT, separate from and arguably more serious than the redistribution-ToS question every advisor discussed. "Historical/synthetic case shapes" was asserted as low-risk without examination.</li>
+        <li><strong>Staleness lifecycle of the fine-tune itself.</strong> A distilled model bakes in phrasing tied to the deterministic engine's rules at training time. When those rules change (as they just did, in the whole-branch review), the model's learned narrative patterns go stale in weights, not in a cache — a slower-motion, harder-to-detect version of the exact bug that motivated this whole safety constraint.</li>
+        <li>Also worth carrying forward: no human sign-off gate before an AI-narrated report reaches an external stakeholder; no plan for validating factual faithfulness of entities/numbers beyond the verdict string itself.</li>
+      </ul>
+
+      <h3>The Recommendation</h3>
+      <div class="recommendation">
+        Do not start the teacher-distillation pipeline yet. The proposal as written skips the cheap experiment that would tell you whether you need it, and builds the expensive one first.
+        <ul>
+          <li>Build the deterministic verdict-lock + output validator now, regardless of generation approach — this is the actual fix for the bug class you're worried about, and it's a day of work, not a training run.</li>
+          <li>Prompt an on-prem instruct model against real case data with the locked verdict injected, and get an analyst to read the output. This answers "is fine-tuning even necessary" empirically instead of by hunch.</li>
+          <li>Treat fine-tuning as contingent: gated on the prompted baseline demonstrably failing, <em>and</em> on having 200+ genuinely distinct cases with teacher outputs in hand before renting any GPU.</li>
+          <li>Resolve the data-classification question before any teacher API call touches real case content — that's a harder blocker than anything in the original design.</li>
+          <li>Shelve the Expansionist's platform-wide ambitions. A slightly generic input schema now is cheap; spinning off a family of fine-tunes from ToS-encumbered data before the first version ships is not something a solo lead should be doing.</li>
+        </ul>
+      </div>
+
+      <h3>The One Thing to Do First</h3>
+      <div class="first-step">
+        This afternoon, before touching LoRA or a rented GPU: build the deterministic verdict/score/band injector-and-validator (inject as literal strings, regex/schema-check the generated output, fail closed to a template on mismatch), then run it in front of a zero-shot prompt to the on-prem instruct model on a handful of real cases and have an analyst read the results. That single artifact answers the safety-enforceability question, the "is fine-tuning necessary" question, and gives you your first real data point — before spending a dollar on training infrastructure.
+      </div>
+    </div>
+  </section>
+
+  <section>
+    <h2>Advisor Alignment</h2>
+    <div class="grid">
+      <div class="adv-tile tile-neutral"><span class="name">Contrarian</span>Fine-tune buys fluency, not safety — the harness is the real project.</div>
+      <div class="adv-tile tile-neutral"><span class="name">First Principles</span>Narration is a templating problem wearing a modeling costume.</div>
+      <div class="adv-tile tile-weak"><span class="name">Expansionist</span><span class="tag tag-weak">weakest — 5/5 reviews</span> Pushed platform-wide scope, skipped the actual question.</div>
+      <div class="adv-tile tile-neutral"><span class="name">Outsider</span>Solved problem is oversized for the ask; one-person ops risk.</div>
+      <div class="adv-tile tile-strong"><span class="name">Executor</span><span class="tag tag-strong">strongest — 5/5 reviews</span> Prompt this afternoon; gate training on a real data threshold.</div>
+    </div>
+  </section>
+
+  <section>
+    <h2>Advisor Responses (full)</h2>
+
+    <details>
+      <summary>The Contrarian <span class="badge">downside hunter</span></summary>
+      <div class="details-body">
+        <p>The fatal flaw is right in your own setup, and you already named it: you just finished fixing a bug where generated text contradicted an updated verdict. You are now proposing to build a system whose entire job is generating text from case facts, via a fine-tuned model, and asserting "fixed verdict, never re-derived" as if that's a property you can specify into existence. It isn't. LoRA fine-tuning on teacher outputs does not teach a model to treat the verdict field as immutable — it teaches statistical association between case facts and narrative style, including the teacher's phrasing of confidence. A 7B model under distribution shift (a MISP report shape it never saw in training, a classifier score near a decision boundary, an analyzer that errored out) will happily hedge, soften, or flatly restate a different band in prose, because nothing in LoRA training enforces hard constraints — it's gradient descent on token likelihood, not a grammar. Your only real enforcement mechanism is post-hoc: template-lock the verdict/score/confidence as literal injected strings never generated by the model, and regex/parse the output to reject or regenerate anything that emits a competing number or band word. That's not a training-time solution, it's an output-filter solution — which means the fine-tune is buying you narrative fluency, not safety, and the safety has to be built anyway, in the same deterministic style as the system you're augmenting.</p>
+        <p>Second flaw: "solo lead + AI coding agent + one prior CPU classifier" is not a team that safely ships a hallucination-prone generative layer into a CERT tool. Nobody here has bandwidth to build and maintain that output-validation harness rigorously. Skip the fine-tune; that harness is the actual project.</p>
+      </div>
+    </details>
+
+    <details>
+      <summary>The First Principles Thinker <span class="badge">reframer</span></summary>
+      <div class="details-body">
+        <p>First, define the actual job: a translator from structured facts to prose, with a hard non-negotiable — it must never alter, hedge against, or contradict the verdict it's handed. That's not a modeling problem. That's a templating problem wearing a modeling costume.</p>
+        <p>You already have the deterministic system. The generative add-on's only real job is fluency: turning terse rule outputs and analyzer JSON into readable narrative for non-technical stakeholders. Fluency is exactly what a general-purpose instruct model already does at the 99th percentile out of the box, zero training. The entire distillation pipeline — teacher generation, LoRA, rented GPUs, on-prem deployment, open-source packaging — is being built to solve a problem ("does the model sound natural and cover our report sections") that a good system prompt plus a few hand-written examples already solves.</p>
+        <p>Ask what the fine-tune is actually buying you. It's not knowledge (analyzer data goes in the prompt either way). It's not verdict-fidelity (a fine-tuned 7B is more likely to drift than a well-constrained prompted model, because fine-tuning teaches it patterns from training data that can generalize past your guardrails — the exact opposite of what "sole authority on verdict" needs). The only thing distillation reliably buys is house style, and you don't need gradient descent for house style — you need a template and a linter.</p>
+        <p>So the load-bearing question isn't "LoRA vs RAG vs bigger model." It's: have you tried prompting Qwen2.5-7B with structured input and a strict output contract, validated with a deterministic checker, and only reached for training after that demonstrably fails? Nobody described that experiment.</p>
+      </div>
+    </details>
+
+    <details>
+      <summary>The Expansionist <span class="badge">upside hunter</span></summary>
+      <div class="details-body">
+        <p>The upside case here is being drastically undersold by framing this as "add-on report generator." First: the fixed-verdict architecture isn't just a safety constraint, it's a moat. Most vendors bolt LLM narration directly onto their scoring, which is why they can't touch it without breaking trust — this team has decoupled verdict-authority from narration-authority. That decoupling is the reusable asset. Once it exists, the same pipeline narrates ANY structured decision the platform makes, not just phishing verdicts: malware triage, incident timelines, threat-intel enrichment summaries, cross-case pattern reports. Scope the fine-tune's input schema generically now and this becomes the narration layer for the whole platform.</p>
+        <p>Second, undervalued asset: the teacher-generated dataset. Yes it's ToS-encumbered for redistribution, but nothing stops the team from using it internally to spin off adjacent fine-tunes — analyst-facing terse summaries, exec one-pagers, ticket-close notes — all from the same distillation run.</p>
+        <p>Third: publishing the training pipeline isn't just goodwill — a Thales CERT open-sourcing "how we built a compliant, verdict-locked explanation model" is a recruiting and credibility signal. Bigger swing: don't stop at Qwen2.5-7B for on-prem inference — if this works, build a small internal "report-writing model family" across every deterministic system Thales runs.</p>
+      </div>
+    </details>
+
+    <details>
+      <summary>The Outsider <span class="badge">fresh eyes</span></summary>
+      <div class="details-body">
+        <p>Stepping back from all the acronyms: what is being built is "take some data, write a paragraph about it." A person who does this well with a template and a checklist doesn't need to go rent a GPU and grow a whole custom brain to do it. That's the part that reads as confusing to an outsider — the solution is enormously bigger than the problem.</p>
+        <p>The stated goal is a plain-language narrative for people who are explicitly not technical. That's a formatting/tone problem, not a reasoning problem. Any competent instruct model, prompted with the structured facts and a fixed verdict, already does this. Training a new model doesn't make prose "more plain-language" — it mostly changes style consistency, which a good prompt + template also buys, cheaper and reversible.</p>
+        <p>On "verdict never re-derived" — nothing about fine-tuning vs. prompting changes whether that's enforceable. The only thing that actually enforces it is a deterministic post-generation validator that scans the output and fails closed if it doesn't match — needed regardless of which LLM route is chosen, and suspiciously similar to the exact bug the team just fixed.</p>
+        <p>Also: one person is now the data pipeline, the training infra operator, the quality evaluator, AND the deployer, for a security document that goes to outside stakeholders. If this person is out sick for two weeks, who checks the next batch of AI-written verdicts isn't hallucinating? Nobody currently in the described team can.</p>
+      </div>
+    </details>
+
+    <details open>
+      <summary>The Executor <span class="badge">Monday morning</span></summary>
+      <div class="details-body">
+        <p><strong>Step 1 isn't training — it's a prompted baseline, this afternoon.</strong> Zero-shot/few-shot prompt an on-prem instruct model with the fixed verdict + raw analyzer JSON, ask for the narrative. If that output is 80% of the way to "good enough," you have your answer on whether distillation is worth the next six weeks. Nobody should touch LoRA before this exists and has been read by an actual analyst.</p>
+        <p><strong>The "fixed verdict, never re-derived" constraint is not an ML property, it's a plumbing property</strong> — and that's good news. Template-lock the verdict/score/band as a literal injected string, then a cheap regex/JSON-schema validator on every generation checks the output matches the input fact. That's needed whether you fine-tune or just prompt. This is the actual fix for the bug that scared the team — not "train it better," but "never let it assert the verdict unchecked."</p>
+        <p><strong>Skip the teacher-distillation pipeline until the prompted baseline fails.</strong> It's a multi-week detour undertaken by one person with zero prior generative-model training experience, justified only by a hunch.</p>
+        <p><strong>If you do get to fine-tuning:</strong> don't rent GPU compute until you've counted your data. If you can't produce 200+ genuinely distinct historical/synthetic cases with teacher outputs, you have a demo, not a training set — QLoRA on &lt;200 examples on a 7B model is a well-known way to burn a rented A100 overfitting to phrasing.</p>
+        <p><strong>Open-source framing:</strong> solvable but not this week's problem. Publishing code+weights while withholding the dataset is normal (Alpaca did exactly this). Don't let it block anything now.</p>
+      </div>
+    </details>
+  </section>
+
+  <section>
+    <h2>Peer Review Highlights</h2>
+    <details>
+      <summary>What the peer-review round surfaced</summary>
+      <div class="details-body">
+        <p>Five reviewers each saw all five responses anonymized (A=Outsider, B=Contrarian, C=Executor, D=Expansionist, E=First Principles). All five reviews, independently:</p>
+        <ul>
+          <li>Named the Executor's response the strongest — the only one with a concrete, sequenced, falsifiable decision procedure (prompt first, numeric go/no-go gate, Alpaca precedent for the open-source question).</li>
+          <li>Named the Expansionist's response the weakest — it never engaged the enforceability question or the solo-lead bandwidth constraint, and its own proposal (spinning off more fine-tunes, generalizing scope) increases risk for a team that can't absorb it.</li>
+          <li>Four of five independently flagged the same missing point none of the five original advisors raised: sending raw case data to a hosted teacher LLM is a data-governance/confidentiality problem for a CERT, separate from and more serious than the redistribution-ToS question everyone discussed.</li>
+          <li>Two reviewers independently flagged the fine-tune's own staleness lifecycle: when the deterministic engine's rules change, a distilled model's learned phrasing goes stale in its weights — a slower, harder-to-detect version of the exact bug this whole safety property exists to prevent.</li>
+          <li>Other points raised: no human sign-off gate before an AI-narrated report reaches an external stakeholder; no plan for validating factual faithfulness of entities/numbers beyond the verdict string itself.</li>
+        </ul>
+      </div>
+    </details>
+  </section>
+
+  <footer>
+    LLM Council session &middot; Suspicious (Thales CERT) &middot; verdict narration model design &middot; 2026-09-11<br>
+    5 advisors &middot; 5 peer reviews &middot; 1 chairman synthesis
+  </footer>
+</div>
+</body>
+</html>

@@ -51,11 +51,20 @@ def _signals_for(case):
 class Command(BaseCommand):
     help = "Backtest the new scoring engine against stored case verdicts (read-only)."
 
+    def add_arguments(self, parser):
+        parser.add_argument("--road", choices=["mail", "ioc", "all"], default="all")
+
     def handle(self, *args, **options):
         matrix = Counter()
         n = 0
+        cases = Case.objects.exclude(results="")
+        road = options["road"]
+        if road == "mail":
+            cases = cases.filter(fileOrMail__mail__isnull=False)
+        elif road == "ioc":
+            cases = cases.filter(nonFileIocs__isnull=False)
         self.stdout.write("case_id  old -> new  (new_score)")
-        for case in Case.objects.exclude(results="").iterator():
+        for case in cases.iterator():
             signals = _signals_for(case)
             verdict = score_case(signals)
             old, new = case.results, verdict.result

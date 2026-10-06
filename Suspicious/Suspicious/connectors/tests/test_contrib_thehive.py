@@ -10,7 +10,7 @@ class TheHiveConnectorTest(SimpleTestCase):
         m = TheHiveConnector.manifest
         m.validate()
         self.assertEqual(m.name, "thehive")
-        self.assertEqual(m.events, ())
+        self.assertEqual(m.events, ("case_finalised",))
 
     def test_health_check_unconfigured(self):
         status = TheHiveConnector({}).health_check()

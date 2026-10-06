@@ -58,7 +58,7 @@ export function CommentThread({ title, comments, isLoading, onAdd, isAdding }: C
 
       {error ? (
         <Typography variant="caption" color="error" sx={{ display: "block", mb: 0.75 }}>
-          Failed to add comment — try again.
+          Failed to add comment. Try again.
         </Typography>
       ) : null}
 

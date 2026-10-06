@@ -150,7 +150,7 @@ export function DomainPairPanel({ editableSection }: { editableSection: "domains
       <ReadOnlyListPanel
         section={isAllow ? "watcher_legit_domains" : "watcher_monitored_domains"}
         title={isAllow ? "Watcher legit domains" : "Watcher monitored domains"}
-        subtitle="Read-only — synchronized from Watcher automatically."
+        subtitle="Read-only: synchronized from Watcher automatically."
       />
     </Stack>
   );

@@ -154,8 +154,10 @@ upgrade: deploy
 
 ## Start all services (no pull or migration)
 up: check-secrets
+	$(call require_script,$(SCRIPTS)/check-mounts.sh)
 	$(call require_script,$(SCRIPTS)/check-network.sh)
 	$(call require_script,$(SCRIPTS)/replace-tls.sh)
+	@$(SCRIPTS)/check-mounts.sh
 	@$(SCRIPTS)/check-network.sh
 	@$(SCRIPTS)/replace-tls.sh
 	@echo "Starting services…"

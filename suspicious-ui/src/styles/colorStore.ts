@@ -2,9 +2,7 @@
 import { create } from "zustand";
 import { persist } from "zustand/middleware";
 
-// ---------------------------------------------------------------------------
 // Types
-// ---------------------------------------------------------------------------
 
 export type ResultKey = "safe" | "suspicious" | "dangerous" | "inconclusive";
 export type StatusKey = "done" | "in_progress" | "new" | "failure" | "challenged" | "unknown";
@@ -14,9 +12,7 @@ export type ResultColors  = Record<ResultKey, SemanticColor>;
 export type StatusColors  = Record<StatusKey, SemanticColor>;
 export type PresetName    = "default" | "colorblind" | "mono" | "custom";
 
-// ---------------------------------------------------------------------------
 // Human-readable labels
-// ---------------------------------------------------------------------------
 
 export const RESULT_LABELS: Record<ResultKey, string> = {
   safe:         "Safe",
@@ -34,9 +30,7 @@ export const STATUS_LABELS: Record<StatusKey, string> = {
   unknown:     "Unknown",
 };
 
-// ---------------------------------------------------------------------------
 // Presets
-// ---------------------------------------------------------------------------
 
 export const PRESET_DEFAULT: { result: ResultColors; status: StatusColors } = {
   result: {
@@ -98,7 +92,7 @@ export const PRESETS: Record<Exclude<PresetName, "custom">, typeof PRESET_DEFAUL
 export const PRESET_META: Record<PresetName, { label: string; description: string }> = {
   default: {
     label: "Standard",
-    description: "Red / green / amber — familiar, not accessible for all users.",
+    description: "Red / green / amber, familiar, not accessible for all users.",
   },
   colorblind: {
     label: "Colorblind-safe",
@@ -114,9 +108,7 @@ export const PRESET_META: Record<PresetName, { label: string; description: strin
   },
 };
 
-// ---------------------------------------------------------------------------
 // Store
-// ---------------------------------------------------------------------------
 
 type ColorStore = {
   result: ResultColors;
@@ -170,7 +162,7 @@ export const useColorStore = create<ColorStore>()(
           return {
             result: { ...PRESET_DEFAULT.result, ...colors.result },
             status: { ...PRESET_DEFAULT.status, ...colors.status },
-            // Keep preset label as-is — server doesn't store it, and we
+            // Keep preset label as-is: server doesn't store it, and we
             // want to show "Custom" if the user had diverged from a preset.
           };
         }),
@@ -192,16 +184,12 @@ export const useColorStore = create<ColorStore>()(
   )
 );
 
-// ---------------------------------------------------------------------------
 // Selectors
-// ---------------------------------------------------------------------------
 
 export const useResultColors = () => useColorStore((s) => s.result);
 export const useStatusColors  = () => useColorStore((s) => s.status);
 
-// ---------------------------------------------------------------------------
 // Colour math helpers
-// ---------------------------------------------------------------------------
 
 /** Derive a soft background tint (rgba) from a hex string. */
 export function hexToBg(hex: string, isDark: boolean): string {

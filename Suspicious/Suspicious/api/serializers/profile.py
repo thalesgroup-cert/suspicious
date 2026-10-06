@@ -4,9 +4,7 @@ from profiles.models import UserProfile, CISOProfile, Theme, DEFAULT_SEMANTIC_CO
 from profiles.profiles_utils.avatar_storage import presigned_avatar_url
 
 
-# ---------------------------------------------------------------------------
 # Hex color validator
-# ---------------------------------------------------------------------------
 
 HEX_RE = re.compile(r'^#[0-9A-Fa-f]{6}$')
 
@@ -18,9 +16,6 @@ def _validate_hex(value: str, field_path: str) -> str:
         )
     return value.upper()
 
-
-# ---------------------------------------------------------------------------
-# ---------------------------------------------------------------------------
 
 RESULT_KEYS = {"safe", "suspicious", "dangerous", "inconclusive"}
 STATUS_KEYS = {"done", "in_progress", "new", "failure", "challenged", "unknown"}
@@ -60,9 +55,6 @@ class SemanticColorsField(serializers.JSONField):
 
         return result_out
 
-
-# ---------------------------------------------------------------------------
-# ---------------------------------------------------------------------------
 
 ALLOWED_AVATAR_STYLES = {
     "bottts", "identicon", "initials", "avataaars",
@@ -163,9 +155,7 @@ class AvatarField(serializers.JSONField):
         return result
 
 
-# ---------------------------------------------------------------------------
 # Profile serializers
-# ---------------------------------------------------------------------------
 
 class UserProfileSerializer(serializers.ModelSerializer):
     semantic_colors = SemanticColorsField(required=False)
@@ -235,7 +225,42 @@ class CISOProfileSerializer(serializers.ModelSerializer):
             "creation_date",
             "last_update",
         ]
-        read_only_fields = ["id", "scope", "creation_date", "last_update"]
+        read_only_fields = ["id", "creation_date", "last_update"]
+
+    def validate_scope(self, value):
+        """A CISO may only scope themselves to a pipe-joined subset of their
+        own org units (region / country / gbu). "ALL" (no restriction) is
+        reserved for members of the Admin group. This stops a CISO widening
+        their own visibility beyond their remit."""
+        normalized = (value or "").strip()
+        instance = self.instance
+
+        if not normalized:
+            return normalized
+        if normalized.upper() == "ALL":
+            is_admin = bool(
+                instance
+                and instance.user.groups.filter(name="Admin").exists()
+            )
+            if not is_admin:
+                raise serializers.ValidationError(
+                    'Scope "ALL" is reserved for administrators.'
+                )
+            return "ALL"
+        allowed = {
+            str(getattr(instance, attr, "") or "").strip()
+            for attr in ("region", "country", "gbu")
+        }
+        allowed.discard("")
+
+        parts = [p.strip() for p in normalized.split("|") if p.strip()]
+        invalid = [p for p in parts if p not in allowed]
+        if not parts or invalid:
+            raise serializers.ValidationError(
+                f"Invalid scope. Allowed values: {sorted(allowed)} "
+                "(combine with '|' to narrow)."
+            )
+        return "|".join(sorted(parts))
 
     def validate_theme(self, value):
         valid = {choice[0] for choice in Theme.choices}
@@ -256,11 +281,8 @@ class CISOProfileSerializer(serializers.ModelSerializer):
         return rep
 
 
-# ---------------------------------------------------------------------------
-# ---------------------------------------------------------------------------
-
 class AppearanceSerializer(serializers.Serializer):
-    """PATCH /profile/appearance/ — theme + seasonal flag + colors."""
+    """PATCH /profile/appearance/: theme + seasonal flag + colors."""
     theme         = serializers.ChoiceField(
         choices=Theme.choices, required=False
     )
@@ -276,7 +298,7 @@ class AppearanceSerializer(serializers.Serializer):
 
 
 class PreferencesSerializer(serializers.Serializer):
-    """PATCH /profile/preferences/ — notification preferences."""
+    """PATCH /profile/preferences/: notification preferences."""
     wants_acknowledgement = serializers.BooleanField(required=False)
     wants_results         = serializers.BooleanField(required=False)
     tour_completed        = serializers.BooleanField(required=False)
@@ -291,7 +313,7 @@ class PreferencesSerializer(serializers.Serializer):
 
 class SemanticColorsSerializer(serializers.Serializer):
     """
-    PATCH /profile/colors/ — colors-only endpoint.
+    PATCH /profile/colors/: colors-only endpoint.
     Lets the frontend sync color changes without touching theme or preferences.
     """
     semantic_colors = SemanticColorsField(required=True)

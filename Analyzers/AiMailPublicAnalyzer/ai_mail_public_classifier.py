@@ -1,18 +1,10 @@
 #!/usr/bin/env python3
-"""Cortex analyzer client for AiMailPublicAnalyzer.
+"""Cortex client for AiMailPublicAnalyzer: untar, then call inference_server/.
 
-Thin, one-shot client (Cortex spawns this image fresh per job) - all model
-loading happens in the persistent inference_server/ (see that folder's own
-docstring for why). This analyzer's report is purely comparative/informative:
-it is dispatched by cortex_job/cortex_utils/cortex_and_job_management.py's
-launch_cortex_ai_jobs() as the "ai_public" analyzer alongside the personal
-AI_Mail_Analyzer job, and is never read by Case.manage_ai_jobs / case.results_ai.
-
-Report shape: standard Cortex taxonomy (self.build_taxonomy) rather than the
-bespoke malscore/classification/confidence shape AI_Mail_Analyzer uses - the
-generic Suspicious-side parser (score_process/scoring/cortex_analyzers/
-default.py) already understands safe/suspicious/malicious taxonomy levels
-with no analyzer-specific parser needed.
+Dispatched as the "ai_public" analyzer by launch_cortex_ai_jobs(). Its report
+is comparative only and never feeds Case.results_ai. It uses standard Cortex
+taxonomies, which the generic parser in score_process/scoring/cortex_analyzers/
+default.py already reads.
 """
 import os
 import email
@@ -22,9 +14,8 @@ from cortexutils.analyzer import Analyzer
 
 import mail_public_analysis
 
-# Same default-bridge-gateway reachability note as AIMailAnalyzer's client -
-# see inference_server/server.py's docstring. Port 8091, not 8090, so this
-# analyzer's persistent server never collides with AIMailAnalyzer's own.
+# Port 8091 so this server never collides with AIMailAnalyzer's 8090.
+# Reachability through the bridge gateway is explained in inference_server/server.py.
 INFERENCE_SERVER_URL = os.environ.get("AI_PUBLIC_INFERENCE_SERVER_URL", "http://172.17.0.1:8091")
 INFERENCE_TIMEOUT = int(os.environ.get("INFERENCE_TIMEOUT", "60"))
 

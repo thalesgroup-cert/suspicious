@@ -1,0 +1,14 @@
+{
+  "name": "8.8.8.8 — Google public DNS",
+  "observable": "8.8.8.8",
+  "type": "ip",
+  "gti_verdict": "not suspicious",
+  "expected_band": "Safe",
+  "sources": [
+    {"name": "GoogleThreatIntelligence_GetReport", "tier": 1, "weight": 0.9, "verdict": "clean", "confidence": 95, "failed": false, "evidence": "threat_score 0"},
+    {"name": "VirusTotal_GetReport_3_1", "tier": 1, "weight": 0.8, "verdict": "clean", "confidence": 92, "failed": false, "evidence": "0/89 engines"},
+    {"name": "AbuseIPDB_1_0", "tier": 3, "weight": 0.2, "verdict": "no-data", "confidence": null, "failed": false, "evidence": "whitelisted, confidence 0%"},
+    {"name": "Shodan_Host_1_0", "tier": 3, "weight": 0.2, "verdict": "no-data", "confidence": null, "failed": false, "evidence": "ports 53, 443 — Google LLC"},
+    {"name": "MaxMind_GeoInfo_3_0", "tier": 3, "weight": 0.2, "verdict": "no-data", "confidence": null, "failed": false, "evidence": "US, Google LLC, AS15169"}
+  ]
+}

@@ -2,11 +2,11 @@
 common/http_client.py
 ~~~~~~~~~~~~~~~~~~~~~
 Shared HTTP client utilities:
-  - TimeoutHTTPAdapter  — injects default connect/read timeout
-  - make_session()      — returns a Session with the adapter mounted
-  - BREAKERS            — per-integration pybreaker.CircuitBreaker registry
-  - get_breaker()       — look up / create a breaker by integration name
-  - RETRY               — tenacity retry decorator
+  - TimeoutHTTPAdapter: injects default connect/read timeout
+  - make_session(): returns a Session with the adapter mounted
+  - BREAKERS: per-integration pybreaker.CircuitBreaker registry
+  - get_breaker(): look up / create a breaker by integration name
+  - RETRY: tenacity retry decorator
 """
 from __future__ import annotations
 
@@ -85,7 +85,7 @@ def get_breaker(name: str) -> pybreaker.CircuitBreaker:
 
 
 def _is_retryable_http_error(exc: BaseException) -> bool:
-    """Return True for HTTP 5xx errors only — 4xx are client errors, never retried."""
+    """Return True for HTTP 5xx errors only; 4xx are client errors, never retried."""
     return (
         isinstance(exc, requests.HTTPError)
         and getattr(exc, "response", None) is not None

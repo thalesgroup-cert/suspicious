@@ -2,21 +2,21 @@ beautifulsoup4==4.15.0
 requests==2.34.2
 python-dateutil==2.9.0.post0
 minio==7.2.20
-chardet==7.4.3
+chardet==7.6.0
 jinja2==3.1.6
-pydantic==2.13.4
+pydantic==2.13.5
 # Outlook .msg (OLE) -> EmailMessage conversion for "Forward as Attachment".
-extract-msg==0.56.0
+extract-msg==0.56.1
 
 # Structured logging — JSON formatter consumed by log aggregators.
 # Plain-text fallback kept inside logger_service when this is absent.
-python-json-logger==4.1.0
+python-json-logger==4.2.0
 
 # Observability — OTel SDK + auto-instrumentation for outbound HTTP.
 # Mirror of the versions pinned in Suspicious/requirements.txt so
 # trace IDs stay consistent across services. Closes audit O5.
 # 1.28.0+ needed: opentelemetry-proto pins protobuf<5 below that, which
 # conflicts with the >=5.29.6 fix for PYSEC-2026-1805.
-opentelemetry-sdk==1.44.0
-opentelemetry-exporter-otlp-proto-http==1.44.0
-opentelemetry-instrumentation-requests==0.65b0
+opentelemetry-sdk==1.45.0
+opentelemetry-exporter-otlp-proto-http==1.45.0
+opentelemetry-instrumentation-requests==0.66b0

@@ -4,8 +4,6 @@ import { alpha } from "@mui/material/styles";
 import { useTheme } from "@mui/material/styles";
 import { useThemeMode } from "@/styles/ThemeStore";
 
-// ---------------------------------------------------------------------------
-// ---------------------------------------------------------------------------
 
 export type SoftCardProps = React.PropsWithChildren<{
   title: string;

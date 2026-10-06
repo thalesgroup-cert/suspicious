@@ -1,16 +1,9 @@
 #!/usr/bin/env python3
-"""
-Standalone probe for the AiMailPublicAnalyzer thin client image.
+"""Probe for the client image: checks that cortexutils and requests import,
+then pings the inference server's /health. An unreachable server is reported
+but is not a failure, so the image can be smoke-tested without it:
 
-Confirms this image's own deps (cortexutils, requests) import cleanly, and
-best-effort pings the inference server's /health endpoint - informational
-only, never fails the probe on its own: this image can be smoke-tested in
-isolation (CI) without the server running.
-
-Use cases:
-  * CI / container build smoke test:
-        docker run --rm --entrypoint python <image> AiMailPublicAnalyzer/health.py
-  * Operator probe after pushing a new image
+    docker run --rm --entrypoint python <image> AiMailPublicAnalyzer/health.py
 """
 from __future__ import annotations
 

@@ -84,9 +84,7 @@ import {
 
 const ResponsiveGridLayout = WidthProvider(Responsive);
 
-// ---------------------------------------------------------------------------
 // Page
-// ---------------------------------------------------------------------------
 
 export default function CampaignsPage() {
   const theme = useTheme();
@@ -244,8 +242,6 @@ export default function CampaignsPage() {
     <Box sx={{ p: { xs: 1.5, md: 2 } }}>
       <GridStyles />
 
-      {/* ---------------------------------------------------------------- */}
-      {/* ---------------------------------------------------------------- */}
       <Stack
         direction={{ xs: "column", md: "row" }}
         spacing={1.5}
@@ -304,8 +300,6 @@ export default function CampaignsPage() {
         </Stack>
       </Stack>
 
-      {/* ---------------------------------------------------------------- */}
-      {/* ---------------------------------------------------------------- */}
       <ResponsiveGridLayout
         className="campaigns-layout"
         layouts={layouts}

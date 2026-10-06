@@ -66,6 +66,11 @@ Analyzers/AIMailAnalyzer/models_backup
 Analyzers/AIMailAnalyzer/vectorizers/paraphrase-multilingual-mpnet-base-v2/model.safetensors
 Analyzers/AIMailAnalyzer/vectorizers/paraphrase-multilingual-mpnet-base-v2/config.json
 Analyzers/AIMailAnalyzer/vectorizers/paraphrase-multilingual-mpnet-base-v2/1_Pooling
+# Generated training data (mailbox_to_csv.ipynb / build_test_dataset.py output) — derived, not source.
+Analyzers/AIMailAnalyzer/*.csv
+
+# ===== Narration spike raw output =====
+Suspicious/Suspicious/score_process/tests/fixtures/narration/*.result.txt
 
 # Same pattern for AiMailPublicAnalyzer's own weights/vectorizer copy - real
 # .pth files never committed (see Analyzers/AiMailPublicAnalyzer/models/README.md
@@ -92,6 +97,9 @@ Analyzers/AIMailAnalyzer/retrain_model_monthly/models/
 .docs-venv/
 docs/reference/openapi.yaml
 docs/superpowers
+
+# ===== Research screenshots (local-only, not for the repo) =====
+docs/research/screenshots/
 
 # ===== Tooling / editors =====
 .claude/

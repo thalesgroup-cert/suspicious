@@ -48,7 +48,7 @@ class MailFormHandler:
         Returns:
             instance from WebSubmissionService or None on failure.
         """
-        # os.path.basename strips any separator a username could carry — Django's
+        # os.path.basename strips any separator a username could carry: Django's
         # default validator already forbids "/", but this is the barrier CodeQL's
         # path-injection query recognizes, and it's what actually stops every
         # downstream directory built from user_prefix (bucket, local_dir, tmp_dir)

@@ -1,0 +1,15 @@
+apiVersion: v1
+kind: Service
+metadata:
+  name: {{ include "suspicious.fullname" . }}-chromadb
+  labels:
+    {{- include "suspicious.labels" . | nindent 4 }}
+    app.kubernetes.io/component: chromadb
+spec:
+  clusterIP: None
+  selector:
+    app.kubernetes.io/instance: {{ .Release.Name }}
+    app.kubernetes.io/component: chromadb
+  ports:
+    - port: {{ .Values.chromadb.service.port }}
+      targetPort: 8000

@@ -3,14 +3,8 @@ import {
   Alert,
   Box,
   Button,
-  Card,
-  CardContent,
   Chip,
   CircularProgress,
-  Dialog,
-  DialogActions,
-  DialogContent,
-  DialogTitle,
   Divider,
   Grid,
   IconButton,
@@ -25,10 +19,8 @@ import {
 } from "@mui/material";
 import { alpha } from "@mui/material/styles";
 import {
-  ApartmentOutlined,
   ManageSearchOutlined,
   OpenInNewOutlined,
-  PublicOutlined,
   RocketLaunchOutlined,
   LeaderboardOutlined,
   UploadFileOutlined,
@@ -36,7 +28,7 @@ import {
   HistoryOutlined,
 } from "@mui/icons-material";
 import { useNavigate, Link as RouterLink } from "react-router";
-import { useMutation, useQuery } from "@tanstack/react-query";
+import { useQuery } from "@tanstack/react-query";
 import { useTheme } from "@mui/material/styles";
 import { useThemeMode, type ThemeCapabilities } from "@/styles/ThemeStore";
 import { api } from "@/api/client";
@@ -56,6 +48,12 @@ import FeederHealthBadge from "@/shared/components/FeederHealthBadge";
 
 import { DashboardCard } from "@/features/home/components/DashboardCard";
 import { ThemeGreeting } from "@/features/home/components/ThemeGreeting";
+import { CisoScopeDialog } from "@/features/home/components/CisoScopeDialog";
+import {
+  getHomeSummary,
+  type DangerCounts,
+  type HomeSummary,
+} from "@/features/home/api";
 import {
   DANGER_COLORS,
   DANGER_ORDER,
@@ -65,38 +63,7 @@ import {
   type DangerLabel,
 } from "@/features/home/utils";
 
-// ---------------------------------------------------------------------------
 // Types
-// ---------------------------------------------------------------------------
-
-type DangerCounts = {
-  safe?: number;
-  inconclusive?: number;
-  suspicious?: number;
-  dangerous?: number;
-};
-
-type HomeSummary = {
-  show_scope_modal: boolean;
-  monthly: {
-    everyone_items?: number;
-    scope_items?: number;
-    scope_name?: string | null;
-  };
-  danger_counts?: DangerCounts;
-  scope_danger_counts?: DangerCounts | null;
-  suggested_scopes?: {
-    region?: string | null;
-    country?: string | null;
-    gbu?: string | null;
-  };
-  spotlight?: {
-    title: string;
-    description: string;
-    cta_label: string;
-    cta_path: string;
-  };
-};
 
 type SubmissionRow = {
   id: number | string;
@@ -114,22 +81,7 @@ type SubmissionsResponse = {
   count?: number;
 };
 
-// ---------------------------------------------------------------------------
 // API
-// ---------------------------------------------------------------------------
-
-async function getHomeSummary(params?: {
-  month?: number;
-  year?: number;
-}): Promise<HomeSummary> {
-  const res = await api.get("/home/summary/", { params });
-  return res.data;
-}
-
-async function setCisoScope(input: { scope: string }): Promise<{ scope: string }> {
-  const res = await api.post("/home/ciso/scope/", input);
-  return res.data;
-}
 
 async function getMyRecentSubmissions(): Promise<SubmissionRow[]> {
   const res = await api.get("/submissions/", {
@@ -140,9 +92,7 @@ async function getMyRecentSubmissions(): Promise<SubmissionRow[]> {
   return (data.results ?? data.items ?? []).slice(0, 3);
 }
 
-// ---------------------------------------------------------------------------
 // Page
-// ---------------------------------------------------------------------------
 
 export default function HomePage() {
   const navigate = useNavigate();
@@ -166,8 +116,6 @@ export default function HomePage() {
     Failure:      statusColors.failure.main, // optional if your data includes failures
   }), [resultColors, statusColors]);
   const BADGE_W = 132;
-
-  const [scopeChoice, setScopeChoice] = React.useState("");
 
   const now = React.useMemo(() => new Date(), []);
   const currentMonth = now.getMonth() + 1;
@@ -196,14 +144,6 @@ export default function HomePage() {
     queryFn: getMyRecentSubmissions,
     enabled: !!me,
     retry: false,
-  });
-
-  const scopeMutation = useMutation({
-    mutationFn: setCisoScope,
-    onSuccess: () => {
-      homeQuery.refetch();
-      meQuery.refetch();
-    },
   });
 
   React.useEffect(() => {
@@ -248,7 +188,6 @@ export default function HomePage() {
   }
 
   const home = homeQuery.data;
-  const suggested = home?.suggested_scopes ?? {};
   const showScopeModal = Boolean(home?.show_scope_modal && isCiso);
 
   const fullName = [me.first_name, me.last_name].filter(Boolean).join(" ");
@@ -297,8 +236,6 @@ export default function HomePage() {
     <Box sx={{ px: { xs: 2, md: 3 }, pb: 8, pt: 0 }}>
       <Box sx={{ maxWidth: 1280, mx: "auto" }}>
 
-        {/* ---------------------------------------------------------------- */}
-        {/* ---------------------------------------------------------------- */}
         <Stack
           direction={{ xs: "column", md: "row" }}
           spacing={1.5}
@@ -326,8 +263,6 @@ export default function HomePage() {
 
         <Grid container spacing={2}>
 
-          {/* -------------------------------------------------------------- */}
-          {/* -------------------------------------------------------------- */}
           <Grid size={{ xs: 12, md: 7 }}>
             <DashboardCard
               title="Threat distribution"
@@ -515,8 +450,6 @@ export default function HomePage() {
             </DashboardCard>
           </Grid>
 
-          {/* -------------------------------------------------------------- */}
-          {/* -------------------------------------------------------------- */}
           <Grid size={{ xs: 12, md: 5 }}>
             <DashboardCard
               title={isCiso ? "Scope health" : "Your monthly share"}
@@ -690,8 +623,6 @@ export default function HomePage() {
             </DashboardCard>
           </Grid>
 
-          {/* -------------------------------------------------------------- */}
-          {/* -------------------------------------------------------------- */}
           <Grid size={{ xs: 12 }}>
             <DashboardCard
               title="Recent submissions"
@@ -758,7 +689,7 @@ export default function HomePage() {
                   <Box sx={{ px: { xs: 1.5, md: 2 }, pb: 2 }}>
                     <Alert severity="info">
                       {capabilities.effects.hasPortalEffect
-                        ? "// NO TEMPORAL RECORDS FOUND — submit your first case to begin the timeline."
+                        ? "// NO TEMPORAL RECORDS FOUND: submit your first case to begin the timeline."
                         : "No submissions yet."}
                     </Alert>
                   </Box>
@@ -858,89 +789,7 @@ export default function HomePage() {
           </Grid>
         </Grid>
 
-        {/* ---------------------------------------------------------------- */}
-        {/* ---------------------------------------------------------------- */}
-        <Dialog open={showScopeModal} maxWidth="sm" fullWidth>
-          <DialogTitle>Select your management scope</DialogTitle>
-          <DialogContent>
-            <Stack spacing={1.25} sx={{ mt: 1 }}>
-              <Typography color="text.secondary">
-                This controls dashboards and submission visibility for your CISO view.
-              </Typography>
-
-              <Card
-                sx={{
-                  borderRadius: 3,
-                  border: `1px solid ${alpha(theme.palette.divider, theme.palette.mode === "dark" ? 0.18 : 0.7)}`,
-                  background:
-                    theme.palette.mode === "dark"
-                      ? "linear-gradient(180deg, rgba(255,255,255,.06), rgba(255,255,255,.03))"
-                      : `linear-gradient(180deg, ${alpha("#fff", 0.88)}, ${alpha(theme.palette.grey[50], 0.96)})`,
-                }}
-              >
-                <CardContent>
-                  <Stack spacing={1}>
-                    <Typography sx={{ fontWeight: 900 }} >Suggested scopes</Typography>
-
-                    <Stack direction="row" spacing={1} sx={{ flexWrap: "wrap" }}>
-                      {suggested.region ? (
-                        <Chip
-                          icon={<PublicOutlined />}
-                          label={`Region: ${suggested.region}`}
-                          clickable
-                          onClick={() => setScopeChoice(suggested.region ?? "")}
-                          variant={scopeChoice === suggested.region ? "filled" : "outlined"}
-                        />
-                      ) : null}
-
-                      {suggested.country ? (
-                        <Chip
-                          icon={<ApartmentOutlined />}
-                          label={`Country: ${suggested.country}`}
-                          clickable
-                          onClick={() => setScopeChoice(suggested.country ?? "")}
-                          variant={scopeChoice === suggested.country ? "filled" : "outlined"}
-                        />
-                      ) : null}
-
-                      {suggested.gbu ? (
-                        <Chip
-                          label={`GBU: ${suggested.gbu}`}
-                          clickable
-                          onClick={() => setScopeChoice(suggested.gbu ?? "")}
-                          variant={scopeChoice === suggested.gbu ? "filled" : "outlined"}
-                        />
-                      ) : null}
-
-                      {!suggested.region && !suggested.country && !suggested.gbu ? (
-                        <Chip label="No suggestions" variant="outlined" />
-                      ) : null}
-                    </Stack>
-
-                    <Typography variant="caption" color="text.secondary">
-                      You can change it later if your responsibilities change.
-                    </Typography>
-
-                    {scopeMutation.isError ? (
-                      <Alert severity="error">Failed to set scope.</Alert>
-                    ) : null}
-                  </Stack>
-                </CardContent>
-              </Card>
-            </Stack>
-          </DialogContent>
-
-          <DialogActions>
-            <Button
-              variant="contained"
-              disabled={!scopeChoice || scopeMutation.isPending}
-              onClick={() => scopeMutation.mutate({ scope: scopeChoice })}
-              sx={{ borderRadius: 3, textTransform: "none", fontWeight: 950 }}
-            >
-              {scopeMutation.isPending ? "Saving…" : "Confirm scope"}
-            </Button>
-          </DialogActions>
-        </Dialog>
+        <CisoScopeDialog open={showScopeModal} allowAll={groups.includes("Admin")} />
       </Box>
     </Box>
   );

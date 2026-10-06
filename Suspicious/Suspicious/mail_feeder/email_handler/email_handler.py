@@ -130,12 +130,12 @@ class EmailHandlerService:
 
         Resolution order for the source .eml/.msg:
           1. `source_filename` (the file currently being processed)
-             — this is the *attached* message in feeder ingestion and
+             this is the *attached* message in feeder ingestion and
              the renamed `<source_ref>.eml` in web submission. Always
              the right file to preview when provided.
           2. `data.id`-based filename (legacy fallback for callers that
              do not yet thread source_filename through).
-          3. `user_submission.eml` / `.msg` — last-resort fallback so
+          3. `user_submission.eml` / `.msg`: last-resort fallback so
              we still produce *some* preview rather than none.
         """
         with safe_operation("generate_mail_preview_png"):
@@ -150,7 +150,7 @@ class EmailHandlerService:
                 else:
                     fetch_mail_logger.warning(
                         "preview: source_filename %r missing in workdir %s "
-                        "— falling back to legacy resolver",
+                        "falling back to legacy resolver",
                         source_filename, workdir,
                     )
 

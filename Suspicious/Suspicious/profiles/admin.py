@@ -15,9 +15,7 @@ from .models import UserProfile, CISOProfile, APIKey
 from api.utils.api_keys import generate_api_key
 
 
-# =============================================================================
 # API KEY ADMIN (Knox wrapper)
-# =============================================================================
 
 class APIKeyForm(forms.ModelForm):
     """
@@ -76,9 +74,7 @@ class APIKeyAdmin(admin.ModelAdmin):
     readonly_fields = ("key_details",)
     form = APIKeyForm
 
-    # ------------------------------------------------------------------
     # Display helpers
-    # ------------------------------------------------------------------
 
     def _get_auth_token(self, obj):
         auth_token_id = getattr(obj, "auth_token_id", None)
@@ -107,9 +103,7 @@ class APIKeyAdmin(admin.ModelAdmin):
     display_created.short_description = "Created"
     display_expiry.short_description = "Expiry"
 
-    # ------------------------------------------------------------------
     # Permissions & queryset scoping
-    # ------------------------------------------------------------------
 
     def get_queryset(self, request):
         qs = super().get_queryset(request)
@@ -122,9 +116,7 @@ class APIKeyAdmin(admin.ModelAdmin):
             return obj.auth_token.user == request.user
         return True
 
-    # ------------------------------------------------------------------
     # Form injection
-    # ------------------------------------------------------------------
 
     def get_form(self, request, obj=None, **kwargs):
         kwargs["form"] = self.form
@@ -137,9 +129,7 @@ class APIKeyAdmin(admin.ModelAdmin):
 
         return RequestBoundForm
 
-    # ------------------------------------------------------------------
     # Save logic (token generation)
-    # ------------------------------------------------------------------
 
     def save_model(self, request, obj, form, change):
         if not obj.pk:
@@ -174,9 +164,7 @@ class APIKeyAdmin(admin.ModelAdmin):
             mark_safe(f"API Key created: <code>{raw_key}</code><br/>{html}"),
         )
 
-    # ------------------------------------------------------------------
     # Readonly handling
-    # ------------------------------------------------------------------
 
     def get_readonly_fields(self, request, obj=None):
         if obj:
@@ -202,9 +190,7 @@ def delete_authtoken_on_apikey_delete(sender, instance, **kwargs):
         AuthToken.objects.filter(pk=auth_token_id).delete()
 
 
-# =============================================================================
 # KNOX TOKEN ADMIN (read-only)
-# =============================================================================
 
 class AuthTokenAdmin(admin.ModelAdmin):
     list_display = ("user", "digest", "created", "expiry")
@@ -214,9 +200,7 @@ class AuthTokenAdmin(admin.ModelAdmin):
         return False
 
 
-# =============================================================================
 # USER PROFILE ADMIN
-# =============================================================================
 
 class UserProfileResource(resources.ModelResource):
     class Meta:
@@ -256,9 +240,7 @@ class UserProfileAdmin(ImportExportModelAdmin):
     disable_acknowledgement.short_description = "Disable acknowledgements"
 
 
-# =============================================================================
 # CISO PROFILE ADMIN
-# =============================================================================
 
 class CISOProfileResource(resources.ModelResource):
     class Meta:

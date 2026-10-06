@@ -55,7 +55,7 @@ class CaseChallengeTokenView(APIView):
             )
             # codeql[py/stack-trace-exposure]: the only ValueError reachable
             # here is CaseChallengeService.validate()'s "Case already
-            # challenged" — a fixed, deliberately caller-safe literal with no
+            # challenged": a fixed, deliberately caller-safe literal with no
             # interpolated internals, not an arbitrary/uncontrolled exception.
             return Response(
                 {"detail": str(exc)},

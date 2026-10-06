@@ -1,13 +1,16 @@
 """TheHive connector — config/health home for the challenge + campaign flows.
 
-No lifecycle events: TheHive pushes are triggered by the challenge flow
-(tasp/services/challenge.py) and AI phishing-campaign detection, which import
-this package's modules directly. The connector gives those flows a single
-config section, a health probe, and a Settings UI card."""
+The challenge flow (tasp/services/challenge.py) and AI phishing-campaign
+detection import this package's modules directly. On top of that, the
+``case_finalised`` hook pushes IOC-group cases (Case.observable_group) as a
+single alert carrying every observable — mail/file/challenge cases are left to
+the direct-import paths. The connector gives all of this a single config
+section, a health probe, and a Settings UI card."""
 from __future__ import annotations
 
 from common.http_client import make_session
 from connectors.base import (
+    EVENT_CASE_FINALISED,
     ConfigField,
     Connector,
     ConnectorManifest,
@@ -28,7 +31,47 @@ class TheHiveConnector(Connector):
             ConfigField("certificate_path", "str",
                         help="CA bundle path; empty = system trust store"),
         ),
+        events=(EVENT_CASE_FINALISED,),
     )
+
+    def on_case_finalised(self, event) -> None:
+        from case_handler.models import Case
+        from connectors.contrib.thehive.phishing import (
+            THEHIVE_SEVERITY,
+            add_observables_to_item,
+            build_group_observables,
+            create_new_alert,
+        )
+
+        case = Case.objects.get(pk=event.case_id)
+        if not case.observable_group_id:
+            return  # isolation — mail/file cases keep the challenge-flow path
+
+        url, key = self.config.get("url"), self.config.get("api_key")
+        if not url or not key:
+            return
+
+        observables = build_group_observables(case)
+        if not observables:
+            return
+
+        severity = THEHIVE_SEVERITY.get(str(case.results), 2)
+
+        alert = create_new_alert(
+            None,
+            f"Suspicious IOC case #{case.id}",
+            f"{len(observables)} indicator(s) — verdict {case.results}",
+            severity, 2, 2, "Suspicious", url, key,
+            [f"suspicious:case:{case.id}"],
+        )
+        alert_id = (alert or {}).get("_id")
+        if alert_id:
+            add_observables_to_item("alert", alert_id, observables, url, key)
+            # record it so a later manual "Push to TheHive" updates this alert
+            # instead of creating a duplicate.
+            if not case.thehive_alert_id:
+                case.thehive_alert_id = alert_id
+                case.save(update_fields=["thehive_alert_id"])
 
     def health_check(self) -> HealthStatus:
         url, key = self.config.get("url"), self.config.get("api_key")

@@ -317,7 +317,7 @@ class SubmissionDetailsSerializer(SubmissionRowSerializer):
           - nonFileIocs.url
         Each entry carries analysis_status/interestingness/canonical_key so the
         UI can list skipped URLs and offer an on-demand "Analyze" button.
-        De-duplicated by URL id. Uses only prefetched relations — no extra DB hits.
+        De-duplicated by URL id. Uses only prefetched relations: no extra DB hits.
         """
         seen: set = set()
         result: list = []

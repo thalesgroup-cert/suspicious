@@ -21,9 +21,7 @@ import {
 import { SoftCard } from "./SoftCard";
 import { useResultColors, useStatusColors } from "@/styles/colorStore";
 
-// ---------------------------------------------------------------------------
 // Types
-// ---------------------------------------------------------------------------
 
 type TopPrefixesType = "user" | "group";
 
@@ -58,9 +56,7 @@ type TopPrefixesPanelProps = {
   limit?: number;
 };
 
-// ---------------------------------------------------------------------------
 // Helpers
-// ---------------------------------------------------------------------------
 
 function compactLabel(text: string, max = 14) {
   return text.length > max ? `${text.slice(0, max - 1)}…` : text;
@@ -120,9 +116,7 @@ async function fetchTopPrefixes(params: {
   return response.data;
 }
 
-// ---------------------------------------------------------------------------
 // TopPrefixesPanel
-// ---------------------------------------------------------------------------
 
 export default function TopPrefixesPanel({
   month,

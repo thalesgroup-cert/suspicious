@@ -27,9 +27,7 @@ SUBMISSION_EML_SUFFIX = "submission.eml"
 EMAIL_DIR_PATTERN = re.compile(r"^\d{12}-[a-f0-9]+$")
 
 
-# ---------------------------------------------------------------------------
 # MinIO client
-# ---------------------------------------------------------------------------
 
 def _init_minio_client() -> Optional[Minio]:
     try:
@@ -39,14 +37,12 @@ def _init_minio_client() -> Optional[Minio]:
         return None
 
 
-# ---------------------------------------------------------------------------
 # Manifest helpers
-# ---------------------------------------------------------------------------
 
 def _extract_reported_by(submission_eml_path: str) -> str:
     """
     Extract the reporter's bare email address from the submission wrapper .eml.
-    Returns an empty string if parsing fails — never raises.
+    Returns an empty string if parsing fails, never raises.
     """
     try:
         with open(submission_eml_path, "rb") as f:
@@ -68,12 +64,12 @@ def _collect_manifest_fields(
     Walk the already-downloaded bucket directory and build the manifest payload.
 
     Returns a dict ready to be JSON-serialised as metadata.json:
-      submission_id     — bucket name (stable unique ID for this submission)
-      reported_by       — From address extracted from the submission wrapper .eml
-      submitted_at      — UTC ISO-8601 timestamp of manifest creation
-      emails_to_analyze — relative object keys for .eml files to analyse
+      submission_id     : bucket name (stable unique ID for this submission)
+      reported_by       : From address extracted from the submission wrapper .eml
+      submitted_at      : UTC ISO-8601 timestamp of manifest creation
+      emails_to_analyze : relative object keys for .eml files to analyse
                           (excludes the wrapper submission.eml itself)
-      attachments       — relative object keys for every other file
+      attachments       : relative object keys for every other file
     """
     reported_by = _extract_reported_by(submission_path)
     emails_to_analyze: list[str] = []
@@ -111,7 +107,7 @@ def _write_manifest(
     bucket_path so that MinioEmailService can read it from the filesystem
     without an extra round-trip.
 
-    Logs a warning on failure — never raises, so a manifest write failure
+    Logs a warning on failure, never raises, so a manifest write failure
     does not abort the rest of the processing loop.
     """
     raw = json.dumps(manifest, indent=2, ensure_ascii=False).encode("utf-8")
@@ -132,7 +128,7 @@ def _write_manifest(
         )
     except Exception:
         logger.warning(
-            "Failed to write manifest to MinIO bucket %s — "
+            "Failed to write manifest to MinIO bucket %s: "
             "MinioScanner will reconcile on next processor run.",
             bucket_name,
             exc_info=True,
@@ -173,9 +169,7 @@ def _handoff_submission(bucket_path: str, submission_path: str, identifier: str,
             on_email_done(entry.name)
 
 
-# ---------------------------------------------------------------------------
 # Prefix-based contract helpers (portable feeder contract)
-# ---------------------------------------------------------------------------
 
 def _feeder_bucket_name() -> str:
     """Return the configured feeder bucket name, or '' if not set / on error."""
@@ -213,7 +207,7 @@ def _process_prefix_submissions(base_path: str, bucket_name: str) -> None:
             source.set_status(submission_id, sc.STATUS_PROCESSING)
             wrapper = source.download_submission(submission_id, base_path)
             if not wrapper:
-                logger.warning("No wrapper in %s — leaving todo", submission_id)
+                logger.warning("No wrapper in %s, leaving todo", submission_id)
                 source.set_status(submission_id, sc.STATUS_TODO)
                 continue
             status = source.read_status(submission_id)
@@ -238,9 +232,7 @@ def _process_prefix_submissions(base_path: str, bucket_name: str) -> None:
             cache.delete(lock_key)
 
 
-# ---------------------------------------------------------------------------
 # Main entrypoint
-# ---------------------------------------------------------------------------
 
 def fetch_and_process_emails(config_path: str = CONFIG_PATH) -> None:
     """
@@ -322,7 +314,7 @@ def _process_minio_buckets(base_path: str) -> None:
                         submission_path = dst
 
                 if not submission_path:
-                    logger.debug("No submission.eml found in %s — skipping", bucket.name)
+                    logger.debug("No submission.eml found in %s, skipping", bucket.name)
                     continue
 
                 manifest = _collect_manifest_fields(bucket_path, submission_path, bucket.name)

@@ -1,0 +1,35 @@
+suite: feeder deployment+service
+templates:
+  - feeder/deployment.yaml
+  - feeder/service.yaml
+  - secret-feeder-config.yaml
+tests:
+  - it: mounts the feeder-config secret
+    template: feeder/deployment.yaml
+    asserts:
+      - contains:
+          path: spec.template.spec.volumes
+          content:
+            name: feeder-config
+            secret:
+              secretName: RELEASE-NAME-suspicious-feeder-config
+  - it: readiness probe hits /health on 9091
+    template: feeder/deployment.yaml
+    asserts:
+      - equal:
+          path: spec.template.spec.containers[0].readinessProbe.httpGet.path
+          value: /health
+      - equal:
+          path: spec.template.spec.containers[0].readinessProbe.httpGet.port
+          value: 9091
+  - it: service targets port 9091
+    template: feeder/service.yaml
+    asserts:
+      - equal:
+          path: spec.ports[0].port
+          value: 9091
+  - it: sets a checksum/config annotation derived from secret-feeder-config.yaml
+    template: feeder/deployment.yaml
+    asserts:
+      - exists:
+          path: spec.template.metadata.annotations["checksum/config"]

@@ -52,6 +52,7 @@ jobs:
             suspicious:ci \
             python manage.py spectacular \
               --settings=suspicious.settings \
+              --skip-checks \
               --file /docs/reference/openapi.yaml
           test -s docs/reference/openapi.yaml
 

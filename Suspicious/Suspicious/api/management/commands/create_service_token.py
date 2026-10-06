@@ -1,7 +1,7 @@
 """Provision a scoped service principal + Knox token for service-to-service
 config reads. Usage: `python manage.py create_service_token feeder`.
 
-Prints the token to stdout — capture it into the consuming service's env
+Prints the token to stdout: capture it into the consuming service's env
 (e.g. FEEDER_API_TOKEN). Re-running reuses the user and issues a fresh token.
 """
 from __future__ import annotations

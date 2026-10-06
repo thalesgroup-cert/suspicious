@@ -1,8 +1,8 @@
 cortexutils
 html2text
 chardet
-torch>=2.13.0
-torchvision>=0.28.0
+torch>=2.14.1
+torchvision>=0.29.1
 torchaudio>=2.11.0
-numpy>=2.5.1
-sentence_transformers>=5.6.1
+numpy>=2.5.3
+sentence_transformers>=6.1.0

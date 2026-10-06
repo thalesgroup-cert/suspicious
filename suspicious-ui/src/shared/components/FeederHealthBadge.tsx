@@ -1,5 +1,5 @@
 /**
- * FeederHealthBadge — live runtime status of the email_feeder service.
+ * FeederHealthBadge: live runtime status of the email_feeder service.
  *
  * Polls GET /api/feeder/health/ (Admin/CERT-gated) every 30 s and
  * renders a coloured Chip:

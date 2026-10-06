@@ -1,0 +1,9 @@
+{
+  "verdict": {"band": "Suspicious", "score": 4.8, "confidence": 55, "rule": "group-worst-of"},
+  "analyzer_reports": [
+    {"analyzer": "VirusTotal_v3", "report_full": {"observable": "203.0.113.42", "positives": 4, "total": 88}},
+    {"analyzer": "VirusTotal_v3", "report_full": {"observable": "auth-verify-secure.example.org", "positives": 6, "total": 72}},
+    {"analyzer": "GTI", "report_full": {"reputation": "suspicious", "first_seen": "2026-08-30"}},
+    {"analyzer": "MISP", "report_full": {"matches": 0}}
+  ]
+}

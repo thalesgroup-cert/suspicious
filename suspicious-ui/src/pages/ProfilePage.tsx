@@ -53,6 +53,7 @@ import { ColorSettingsPanel } from "@/features/profile/ColorSettingsPanel";
 import { AvatarPanel } from "@/features/profile/AvatarPanel";
 import { UserAvatar } from "@/features/profile/components/UserAvatar";
 import { randomSeed } from "@/features/profile/avatar";
+import { ScopePicker } from "@/features/home/components/ScopePicker";
 
 import {
   CaptionLabel,
@@ -67,15 +68,11 @@ import {
   writeLocalProfile,
 } from "@/features/profile/utils";
 
-// ---------------------------------------------------------------------------
 // Types
-// ---------------------------------------------------------------------------
 
-type Section = "preferences" | "appearance" | "colors" | "avatar";
+type Section = "preferences" | "appearance" | "colors" | "avatar" | "scope";
 
-// ---------------------------------------------------------------------------
 // ToggleRow
-// ---------------------------------------------------------------------------
 
 function ToggleRow({
   icon, title, subtitle, checked, onChange, accentColor,
@@ -141,9 +138,7 @@ function ToggleRow({
   );
 }
 
-// ---------------------------------------------------------------------------
 // DirtyBar
-// ---------------------------------------------------------------------------
 
 function DirtyBar({
   dirty, saving, onSave, onReset, label = "Unsaved changes",
@@ -188,9 +183,7 @@ function DirtyBar({
   );
 }
 
-// ---------------------------------------------------------------------------
 // PreferencesPanel
-// ---------------------------------------------------------------------------
 
 function PreferencesPanel({
   wantsAck, setWantsAck, wantsResults, setWantsResults,
@@ -253,9 +246,7 @@ function PreferencesPanel({
   );
 }
 
-// ---------------------------------------------------------------------------
 // AppearancePanel
-// ---------------------------------------------------------------------------
 
 function AppearancePanel({
   pickedTheme, setPickedTheme, autoSeasonal, setAutoSeasonal,
@@ -284,7 +275,7 @@ function AppearancePanel({
         <Box>
           <Typography variant="h6" sx={{ fontWeight: 950, letterSpacing: -0.2 }} >Appearance</Typography>
           <Typography variant="body2" color="text.secondary">
-            Pick a theme. Preview is instant — save to persist across sessions.
+            Pick a theme. Preview is instant, save to persist across sessions.
           </Typography>
         </Box>
       </Stack>
@@ -293,7 +284,7 @@ function AppearancePanel({
 
       <DirtyBar
         dirty={dirty} saving={saving} onSave={onSave} onReset={onReset}
-        label="Unsaved appearance changes — save to persist across sessions"
+        label="Unsaved appearance changes: save to persist across sessions"
       />
 
       <InnerCard sx={{ px: 2, py: 1.25 }}>
@@ -348,7 +339,7 @@ function AppearancePanel({
         />
         {autoSeasonal ? (
           <Alert severity="info" sx={{ borderRadius: 2.5 }}>
-            Seasonal is enabled — the active theme is automatic. Saving updates your preferred
+            Seasonal is enabled: the active theme is automatic. Saving updates your preferred
             manual theme for when seasonal is disabled.
           </Alert>
         ) : null}
@@ -371,16 +362,12 @@ function AppearancePanel({
   );
 }
 
-// ---------------------------------------------------------------------------
-// ---------------------------------------------------------------------------
 
 function ColorsPanel() {
   return <ColorSettingsPanel />;
 }
 
-// ---------------------------------------------------------------------------
 // Page
-// ---------------------------------------------------------------------------
 
 export default function ProfilePage() {
   const queryClient = useQueryClient();
@@ -485,7 +472,7 @@ export default function ProfilePage() {
       enqueueSnackbar("Preferences saved.", { variant: "success" });
     },
     onError: (err) =>
-      enqueueSnackbar(`Preferences API failed — ${apiErrorText(err)}`, { variant: "warning" }),
+      enqueueSnackbar(`Preferences API failed: ${apiErrorText(err)}`, { variant: "warning" }),
   });
 
   const appearanceMutation = useMutation({
@@ -495,7 +482,7 @@ export default function ProfilePage() {
       enqueueSnackbar("Appearance saved.", { variant: "success" });
     },
     onError: (err) =>
-      enqueueSnackbar(`Appearance API failed — ${apiErrorText(err)}`, { variant: "warning" }),
+      enqueueSnackbar(`Appearance API failed: ${apiErrorText(err)}`, { variant: "warning" }),
   });
 
   // ── Dirty detection ──────────────────────────────────────────────────────
@@ -614,6 +601,8 @@ export default function ProfilePage() {
   const scope      = (me as any)?.ciso_scope;
   const displayName = [me.first_name, me.last_name].filter(Boolean).join(" ") || me.username;
 
+  const isCiso = groups.includes("CISO");
+
   const NAV = [
     {
       key: "preferences" as Section,
@@ -622,6 +611,15 @@ export default function ProfilePage() {
       icon: <TuneOutlined />,
       dirty: prefsDirty,
     },
+    ...(isCiso
+      ? [{
+          key: "scope" as Section,
+          label: "Management scope",
+          sub: "Which submissions you can see",
+          icon: <ShieldOutlined />,
+          dirty: false,
+        }]
+      : []),
     {
       key: "appearance" as Section,
       label: "Appearance",
@@ -643,7 +641,7 @@ export default function ProfilePage() {
       icon: <PersonOutlined />,
       dirty: avatarDirty,
     },
-  ] as const;
+  ];
 
   const anyDirty = prefsDirty || themeDirty || avatarDirty;
 
@@ -713,8 +711,9 @@ export default function ProfilePage() {
                     <Chip size="small" label="Standard" variant="outlined"
                       sx={{ height: 24, "& .MuiChip-label": { fontSize: 12 } }} />
                   )}
-                  {scope ? (
-                    <Chip size="small" label={`Scope: ${scope}`} variant="outlined"
+                  {isCiso ? (
+                    <Chip size="small" label={`Scope: ${scope || "not set"}`} variant="outlined"
+                      clickable onClick={() => setSection("scope")}
                       sx={{ height: 24, "& .MuiChip-label": { fontSize: 12 } }} />
                   ) : null}
                 </Stack>
@@ -857,6 +856,20 @@ export default function ProfilePage() {
               />
             ) : section === "colors" ? (
               <ColorsPanel />
+            ) : section === "scope" ? (
+              <Stack spacing={1.5}>
+                <Box>
+                  <Typography sx={{ fontWeight: 950, fontSize: 18 }}>Management scope</Typography>
+                  <Typography color="text.secondary" variant="body2">
+                    Current scope: <b>{scope || "not set"}</b>
+                  </Typography>
+                </Box>
+                <ScopePicker
+                  currentScope={scope || undefined}
+                  enabled
+                  allowAll={groups.includes("Admin")}
+                />
+              </Stack>
             ) : (
               <AvatarPanel
                 style={avatarStyle} seed={avatarSeed}

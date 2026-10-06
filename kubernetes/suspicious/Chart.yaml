@@ -1,0 +1,24 @@
+apiVersion: v2
+name: suspicious
+description: Thales CERT Suspicious — AI-powered phishing and threat-analysis platform
+type: application
+version: 0.1.0
+appVersion: "1.0.0"
+home: https://github.com/thalesgroup-cert/suspicious
+
+dependencies:
+  - name: mysql
+    version: "14.0.3"
+    repository: "oci://registry-1.docker.io/bitnamicharts"
+    alias: mysql
+    condition: mysql.enabled
+  - name: redis
+    version: "28.0.2"
+    repository: "oci://registry-1.docker.io/bitnamicharts"
+    alias: broker
+    condition: broker.enabled
+  - name: redis
+    version: "28.0.2"
+    repository: "oci://registry-1.docker.io/bitnamicharts"
+    alias: cache
+    condition: cache.enabled

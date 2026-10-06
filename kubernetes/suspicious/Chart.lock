@@ -1,0 +1,12 @@
+dependencies:
+- name: mysql
+  repository: oci://registry-1.docker.io/bitnamicharts
+  version: 14.0.3
+- name: redis
+  repository: oci://registry-1.docker.io/bitnamicharts
+  version: 28.0.2
+- name: redis
+  repository: oci://registry-1.docker.io/bitnamicharts
+  version: 28.0.2
+digest: sha256:5a021f196227913373627e3f14a847c6925e86a54e11c8759bbf035b1659c936
+generated: "2026-08-12T17:16:45.126419739+02:00"

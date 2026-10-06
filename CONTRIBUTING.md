@@ -93,7 +93,7 @@ allowed through.
 
 * All PRs are reviewed by project maintainers.
 * Reviews may request changes for consistency, security, or clarity.
-* Once approved, your PR will be merged into the `dev` branch, then later into `main`.
+* Once approved, your PR is merged directly into `main`.
 
 ---
 

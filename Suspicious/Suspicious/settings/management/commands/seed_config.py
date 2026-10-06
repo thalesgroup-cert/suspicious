@@ -1,7 +1,7 @@
 """Seed the runtime config tier into RuntimeConfig from settings.json.
 
 Idempotent (update_or_create per section). Secret leaf fields are stripped
-before seeding — they live in Vault, provisioned separately. Wired into
+before seeding: they live in Vault, provisioned separately. Wired into
 `make deploy` after migrate.
 """
 from __future__ import annotations

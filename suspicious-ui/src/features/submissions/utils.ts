@@ -24,9 +24,7 @@ export {
   type SubCategoryProbability,
 } from "@/shared/lib/scoreUtils";
 
-// ---------------------------------------------------------------------------
 // Submissions-specific helpers
-// ---------------------------------------------------------------------------
 
 export function prettyResult(result?: SubmissionResult) {
   switch (result) {
@@ -66,9 +64,7 @@ export function toBackendOrdering(
   return "id";
 }
 
-// ---------------------------------------------------------------------------
 // Constants
-// ---------------------------------------------------------------------------
 
 export const STATUS_OPTIONS: Array<SubmissionStatus | "ALL"> = [
   "ALL", "NEW", "IN_PROGRESS", "DONE", "CHALLENGED", "UNKNOWN",

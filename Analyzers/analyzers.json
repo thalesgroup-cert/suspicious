@@ -1,17 +1,29 @@
 [
     {
         "name": "AI_Mail_Analyzer",
-        "version": "2.0",
-        "author": "THA-CERT //GCL & ECR",
+        "version": "1.4",
+        "author": "THA-CERT //ECR",
         "url": "-",
         "license": "-",
-        "description": "-",
-        "dataTypeList": [
-            "file"
-        ],
+        "description": "Classifies a submitted email (safe/unwanted/dangerous, then a finer sub-class) via 5 small ResNet-MLP models over a sentence-transformer embedding of the body. See Analyzers/AIMailAnalyzer/AIMailAnalyzer.pdf.",
+        "dataTypeList": ["file"],
+        "command": "AIMailAnalyzer/ai_mail_classifier.py",
         "baseConfig": "-",
         "configurationItems": [],
-        "dockerImage": "aimailanalyzer:v2"
+        "dockerImage": "aimailanalyzer:local"
+    },
+    {
+        "name": "AiMailPublicAnalyzer",
+        "version": "1.0",
+        "author": "THA-CERT //ECR",
+        "url": "-",
+        "license": "-",
+        "description": "Independent 2-model cascade (Safe-vs-Suspicious, Suspicious-vs-Dangerous) trained on a public mail dataset. Comparative only: dispatched next to AI_Mail_Analyzer as the 'ai_public' analyzer, never feeds Case.results_ai. See Analyzers/AiMailPublicAnalyzer/.",
+        "dataTypeList": ["file"],
+        "command": "AiMailPublicAnalyzer/ai_mail_public_classifier.py",
+        "baseConfig": "-",
+        "configurationItems": [],
+        "dockerImage": "aimailpublicanalyzer:v1"
     },
     {
         "name": "Mail_Header_Analyzer",
@@ -19,12 +31,11 @@
         "author": "THA-CERT // TBH and RBA",
         "url": "-",
         "license": "-",
-        "description": "-",
-        "dataTypeList": [
-            "mail_header"
-        ],
+        "description": "Rule-based verdict on email headers: SPF/DKIM/DMARC authentication results, From/Reply-To/Return-Path domain mismatches, and display-name spoofing. Accepts either a raw header block (mail_header) or a .eml file.",
+        "dataTypeList": ["mail_header", "file"],
+        "command": "MailHeaderAnalyzer/mail_header_analyzer.py",
         "baseConfig": "-",
         "configurationItems": [],
-        "dockerImage": "mailheaderanalyzer:v1"
+        "dockerImage": "mailheaderanalyzer:local"
     }
 ]

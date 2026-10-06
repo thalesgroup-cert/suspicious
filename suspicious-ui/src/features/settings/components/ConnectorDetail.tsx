@@ -91,7 +91,7 @@ export function ConnectorDetail({
   const test = useMutation({
     mutationFn: () => testConnector(connector.name),
     onSuccess: (result) =>
-      setTestResult(result.ok ? `OK — ${result.detail}` : `Failed — ${result.detail}`),
+      setTestResult(result.ok ? `OK: ${result.detail}` : `Failed: ${result.detail}`),
   });
 
   const config = draft ?? configQuery.data ?? {};

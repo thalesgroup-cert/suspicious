@@ -1,0 +1,138 @@
+# Global
+imagePullSecrets: []
+fullnameOverride: ""
+
+suspicious:
+  image:
+    repository: ghcr.io/thalesgroup-cert/suspicious
+    tag: ""
+    pullPolicy: IfNotPresent
+  replicas: 1
+  resources: {}
+  service:
+    port: 9020
+
+suspiciousUi:
+  image:
+    repository: ghcr.io/thalesgroup-cert/suspicious-ui
+    tag: ""
+    pullPolicy: IfNotPresent
+  replicas: 1
+  resources: {}
+  service:
+    port: 80
+
+celery:
+  worker:
+    replicas: 1
+    resources: {}
+  beat:
+    resources: {}   # NOTE: no `replicas` key here on purpose — see Global Constraints
+
+feeder:
+  image:
+    repository: ghcr.io/thalesgroup-cert/suspicious-feeder
+    tag: ""
+    pullPolicy: IfNotPresent
+  replicas: 1
+  resources: {}
+  service:
+    port: 9091
+
+mysql:
+  enabled: true
+  architecture: standalone   # or "replication" for a read replica
+  auth:
+    database: suspicious
+    username: suspicious
+    password: ""             # required — set via -f or --set
+    rootPassword: ""         # required — set via -f or --set
+  image:
+    tag: "8.0.42"
+
+broker:
+  enabled: true
+  architecture: standalone
+  # scoped to this alias only (not the umbrella's true global:) — this
+  # subchart's image.repository below is valkey/valkey, not bitnami/redis,
+  # which trips the chart's built-in image-provenance check. mysql doesn't
+  # need this: it only overrides .tag, still within the recognized repo.
+  global:
+    security:
+      allowInsecureImages: true
+  image:
+    repository: valkey/valkey
+    tag: "9-alpine"
+  auth:
+    # Suspicious's Django app builds redis://{host}:6379/0 with no
+    # credentials anywhere (suspicious/settings.py) — same as the
+    # existing docker-compose deployment. A generated Bitnami/Redis
+    # password here would just cause NOAUTH errors with no code path
+    # to consume it, so auth stays off until the app gains one.
+    enabled: false
+    password: ""
+
+cache:
+  enabled: true
+  architecture: standalone
+  # see broker's comment above — same reason, scoped to this alias only.
+  global:
+    security:
+      allowInsecureImages: true
+  image:
+    repository: valkey/valkey
+    tag: "9-alpine"
+  auth:
+    enabled: false
+    password: ""
+
+tlsBundle:
+  certfile: ""
+  keyfile: ""
+  rootcafile: ""
+
+storage:
+  s3:
+    endpoint: ""
+    region: ""
+    bucket: ""
+    publicEndpoint: ""
+    accessKey: ""
+    secretKey: ""
+
+cortex:
+  baseUrl: ""
+  apiKey: ""
+  webhookSecret: ""
+
+elasticsearch:
+  baseUrl: ""
+  username: ""
+  password: ""
+
+chromadb:
+  image:
+    repository: chromadb/chroma
+    tag: "1.5.5"
+    pullPolicy: IfNotPresent
+  resources: {}
+  service:
+    port: 8000
+  persistence:
+    size: 10Gi
+    storageClassName: ""
+
+django:
+  secretKey: ""   # if empty, generated once and kept stable across upgrades (Step 4)
+
+settings: {}   # arbitrary extra/override keys, mirrors Suspicious-settings.example.json shape
+
+feederConfig: {}   # mirrors email-feeder-config.example.json structure
+
+ingress:
+  enabled: true
+  className: ""
+  host: ""
+  annotations: {}
+  tls:
+    secretName: ""

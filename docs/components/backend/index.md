@@ -9,7 +9,8 @@ apps; each page below documents one.
 | [api](api.md) | REST endpoints and permissions |
 | [case_handler](case_handler.md) | Case CRUD and lifecycle |
 | [cortex_job](cortex_job.md) | Cortex orchestration; `Analyzer`, `AnalyzerReport`, `CaseAnalyzerJob` |
-| [score_process](score_process.md) | Risk scoring, TheHive/MISP, ChromaDB |
+| [score_process](score_process.md) | Risk scoring; rule-based verdict explanation and narration prompt-building |
+| [connectors](connectors.md) | Plugin framework for external integrations (TheHive, MISP, Watcher, ChromaDB, SMTP, `ai_narration`) |
 | [email_process](email_process.md) | Email parsing and submission |
 | [Observable processors](observable-processors.md) | domain / url / ip / hash / file analysis |
 | [dashboard](dashboard.md) | KPI metrics |

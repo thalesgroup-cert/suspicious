@@ -1,0 +1,39 @@
+suite: migrate job
+templates:
+  - migrate-job.yaml
+tests:
+  - it: is a post-install,post-upgrade hook Job
+    asserts:
+      - isKind:
+          of: Job
+      - equal:
+          path: metadata.annotations["helm.sh/hook"]
+          value: post-install,post-upgrade
+      - equal:
+          path: metadata.annotations["helm.sh/hook-delete-policy"]
+          value: before-hook-creation,hook-succeeded
+  - it: runs the migrate command against the same image as the suspicious Deployment
+    asserts:
+      - equal:
+          path: spec.template.spec.containers[0].command
+          value: ["python", "manage.py", "migrate", "--no-input"]
+      - equal:
+          path: spec.template.spec.containers[0].image
+          value: "ghcr.io/thalesgroup-cert/suspicious:1.0.0"
+      - equal:
+          path: spec.template.spec.restartPolicy
+          value: Never
+  - it: mounts the settings and tls-bundle secrets
+    asserts:
+      - contains:
+          path: spec.template.spec.volumes
+          content:
+            name: settings
+            secret:
+              secretName: RELEASE-NAME-suspicious-settings
+      - contains:
+          path: spec.template.spec.volumes
+          content:
+            name: tls-bundle
+            secret:
+              secretName: RELEASE-NAME-suspicious-tls-bundle

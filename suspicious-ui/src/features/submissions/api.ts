@@ -160,6 +160,19 @@ export async function challengeSubmission(
   return res.data;
 }
 
+export type PushToTheHiveResponse = {
+  status: "created" | "updated";
+  alert_id: string;
+  alert_url: string;
+};
+
+export async function pushSubmissionToTheHive(
+  id: number,
+): Promise<PushToTheHiveResponse> {
+  const res = await api.post<PushToTheHiveResponse>(`/submissions/${id}/ticket/`);
+  return res.data;
+}
+
 export type AnalyzeUrlResponse = { status: string; url_id: number };
 
 export async function analyzeUrl(

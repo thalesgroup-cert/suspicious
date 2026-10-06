@@ -12,7 +12,7 @@ Routing policy:
   - Migrations only run on default; replica's schema is managed by
     MariaDB replication, never by Django.
   - Cross-DB relations are allowed because the replica is a logical
-    copy of the primary — same row identities.
+    copy of the primary, same row identities.
 
 Replication lag considerations:
   - The replica is asynchronous. Reads may be stale by a few seconds.

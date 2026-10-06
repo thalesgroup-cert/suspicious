@@ -54,7 +54,7 @@ def _is_blocked_addr(addr: ipaddress._BaseAddress) -> bool:
 
 def _looks_like_numeric_host(host: str) -> bool:
     """True for ambiguous numeric host encodings that HTTP clients resolve to
-    IPv4 but ``ipaddress.ip_address`` rejects as literals — e.g. decimal
+    IPv4 but ``ipaddress.ip_address`` rejects as literals: e.g. decimal
     ``2130706433``, hex ``0x7f000001``, or octal ``0177.0.0.1`` (all 127.0.0.1).
 
     No legitimate DNS hostname is purely numeric/hex, so treating these as
@@ -141,8 +141,8 @@ class SubmitUrlSerializer(OptionalContextMixin, serializers.Serializer):
         except ValueError as exc:
             # codeql[py/stack-trace-exposure]: _check_no_ssrf_ip only ever
             # raises one of three fixed, deliberately user-facing literals
-            # (e.g. "URL targets a private or reserved address.") — never an
-            # interpolated internal detail — so surfacing str(exc) here is
+            # (e.g. "URL targets a private or reserved address."): never an
+            # interpolated internal detail: so surfacing str(exc) here is
             # the intended SSRF-rejection UX, not a leak.
             raise serializers.ValidationError(str(exc)) from exc
         return value
@@ -236,6 +236,15 @@ class SubmitFileSerializer(OptionalContextMixin, serializers.Serializer):
         _check_zip_bomb(uploaded_file)
 
         return uploaded_file
+
+
+class SubmitIndicatorsSerializer(OptionalContextMixin, serializers.Serializer):
+    # Cap the blob well above the 100-indicator limit (checked in the view
+    # after parsing) so a multi-MB body can't be refanged + validated line by
+    # line before the count check runs. 100 * a generous per-URL max.
+    indicators = serializers.CharField(
+        required=True, trim_whitespace=False, max_length=100 * 2048,
+    )
 
 
 class SubmitConfigSerializer(serializers.Serializer):

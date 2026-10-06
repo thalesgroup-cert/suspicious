@@ -30,12 +30,19 @@ and a Celery worker.
 3. Cortex runs analyzers asynchronously and POSTs to `/api/cortex/webhook/`
    (HMAC-signed, jobId-deduped) as each job finishes.
 4. The webhook view looks up the case via a single indexed read on
-   `CaseAnalyzerJob`, then enqueues `process_cortex_job(case_id, job_id)` on
-   Celery; the task takes a per-case Redis lock, updates the ledger, and calls
-   `finalise_case` once all pending jobs are non-pending.
-5. `finalise_case` aggregates scores (Safe / Inconclusive / Suspicious /
-   Dangerous), pushes to TheHive/MISP if configured, queries ChromaDB for
-   similar past cases, notifies the reporter by SMTP, and updates dashboard KPIs.
+   `CaseAnalyzerJob`, then enqueues `tasp.tasks.reconcile_case(case_id)` on
+   Celery; the task takes a per-case Redis lock and calls
+   `reconcile_case_core` (`cortex_job/cortex_utils/reconciliation.py`), the
+   single entrypoint that syncs the ledger and advances the case's lifecycle
+   state machine.
+5. Once `reconcile_case_core` aggregates the final score (Safe /
+   Inconclusive / Suspicious / Dangerous) and the case reaches its terminal
+   state, it emits a `case_finalised` event via `connectors.dispatch.emit`.
+   Every connector subscribed to that event (TheHive, MISP, SMTP-notify,
+   ChromaDB, `ai_narration`) fires independently — pushing tickets, querying
+   similar past cases, notifying the reporter, generating a narration — and
+   updates dashboard KPIs. See [Connectors](components/backend/connectors.md)
+   for how that dispatch/retry/ledger mechanism works.
 6. Celery beat runs `update_ongoing_cases` every 300s as a webhook fallback,
    and `fail_stale_jobs` every 600s to auto-fail jobs pending beyond the
    stale-job timeout.

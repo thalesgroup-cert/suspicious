@@ -1,18 +1,14 @@
 #!/usr/bin/env python3
 """Persistent inference server for AiMailPublicAnalyzer.
 
-Same rationale as AIMailAnalyzer/inference_server/server.py: loads the
-vectorizer + the 2 model weights ONCE at startup and keeps them resident,
-instead of every Cortex job cold-loading them from disk. Kept as a fully
-separate image/process from AIMailAnalyzer's own inference server - no
-shared code, no shared runtime - so this analyzer can never break that one.
+Loads the vectorizer and both models once at startup instead of per Cortex
+job. Separate image and process from AIMailAnalyzer's server, so neither can
+break the other.
 
-Reachability: Cortex spawns each analyzer in its own ephemeral container on
-Docker's default bridge network, which has no DNS to resolve this service by
-Compose name. This service is instead published on the host's default-bridge
-gateway (172.17.0.1 on a stock Docker install), reachable from any container
-on that network regardless of DNS - see AI_PUBLIC_INFERENCE_SERVER_URL's
-default in ai_mail_public_classifier.py.
+Cortex runs analyzers on Docker's default bridge, which has no DNS for Compose
+service names. The port is published on the host and reached through the
+bridge gateway (172.17.0.1 on a stock install); see
+AI_PUBLIC_INFERENCE_SERVER_URL in ai_mail_public_classifier.py.
 """
 import os
 from contextlib import asynccontextmanager
