@@ -4,10 +4,22 @@ updates:
     directory: /Suspicious
     schedule:
       interval: weekly
+    groups:
+      # opentelemetry-* packages pin each other's exact versions (sdk 1.N <->
+      # instrumentation 0.(N+21)b0); a lone bump fails dependency resolution.
+      opentelemetry:
+        patterns:
+          - "opentelemetry-*"
   - package-ecosystem: pip
     directory: /email-feeder
     schedule:
       interval: weekly
+    groups:
+      # opentelemetry-* packages pin each other's exact versions (sdk 1.N <->
+      # instrumentation 0.(N+21)b0); a lone bump fails dependency resolution.
+      opentelemetry:
+        patterns:
+          - "opentelemetry-*"
   - package-ecosystem: pip
     directory: /Analyzers/AIMailAnalyzer
     schedule:
@@ -25,6 +37,14 @@ updates:
           - "react-dom"
           - "@types/react"
           - "@types/react-dom"
+    ignore:
+      # vitest 5 is a migration, not a bump: with 5.0.3 one test file fails
+      # ("vitest/browser can only be imported inside Browser Mode") and the
+      # typecheck breaks on toHaveTextContent(RegExp). Remove when migrated.
+      - dependency-name: "vitest"
+        update-types: ["version-update:semver-major"]
+      - dependency-name: "@vitest/*"
+        update-types: ["version-update:semver-major"]
   - package-ecosystem: docker
     directory: /Suspicious
     schedule:
