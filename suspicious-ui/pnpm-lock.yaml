@@ -119,8 +119,8 @@ importers:
         specifier: 4.1.11
         version: 4.1.11(playwright@1.63.0)(vite@8.1.5(@types/node@25.9.0))(vitest@4.1.11)
       boneyard-js:
-        specifier: 1.8.1
-        version: 1.8.1(react@19.3.0)(vite@8.1.5(@types/node@25.9.0))
+        specifier: 1.10.0
+        version: 1.10.0(react@19.3.0)(vite@8.1.5(@types/node@25.9.0))
       eslint:
         specifier: 10.12.0
         version: 10.12.0
@@ -1270,8 +1270,8 @@ packages:
   bidi-js@1.0.3:
     resolution: {integrity: sha512-RKshQI1R3YQ+n9YJz2QQ147P66ELpa1FQEg20Dk8oW9t2KgLbpDLLp9aGZ7y8WHSshDknG0bknqGw5/tyCs5tw==}
 
-  boneyard-js@1.8.1:
-    resolution: {integrity: sha512-tnffA34xFgGSKpQ6QXebalkz2g/rMRAUIh3S0OBoPTK+OgYR3QEQvD3fHGKNQDbCTjn3W7dgNfiBhZGpnqlcNg==}
+  boneyard-js@1.10.0:
+    resolution: {integrity: sha512-bHyZFdBHswa6Rt2aP0F1pNpPn4/lRcTMRWAt1d7tbFZLoPnwjztr6cmAVa/vaQwTOH9ETD3Lz4vW1iuvQDJNqg==}
     hasBin: true
     peerDependencies:
       '@angular/core': '>=14'
@@ -1624,11 +1624,6 @@ packages:
         optional: true
       react-dom:
         optional: true
-
-  fsevents@2.3.2:
-    resolution: {integrity: sha512-xiqMQR4xAeHTuB9uWm+fFRcIOgKBMiOBP+eXiyT7jsgVCq1bkVygt00oASowB7EdtpOHaaPgKt812P9ab+DDKA==}
-    engines: {node: ^8.16.0 || ^10.6.0 || >=11.0.0}
-    os: [darwin]
 
   fsevents@2.3.3:
     resolution: {integrity: sha512-5xoDfX+fL7faATnagmWPpbFtwh/R77WmMMqqHGS65C3vvB0YHrgF+B1YmZ3441tMj5n63k0212XNoJwzlhffQw==}
@@ -2009,18 +2004,8 @@ packages:
     resolution: {integrity: sha512-qcJu88Q2IWqJsDD529JKMdwGm/dvInW4HvQnRwiH9JtihJvzGOscDtHE3x1pBKeUOTysQ8kVmLnJ2kJu7yhcGA==}
     engines: {node: '>=12'}
 
-  playwright-core@1.62.1:
-    resolution: {integrity: sha512-wPYSwEBJY9GHraISXqyqtx0na0LpO3XEX7jNDhntbex7tzUS7kLnZsOlFruFJB4Hi/rhDMjXGqHewDZ68nYZVw==}
-    engines: {node: '>=20'}
-    hasBin: true
-
   playwright-core@1.63.0:
     resolution: {integrity: sha512-rYCsBF/M5HjUch52bbtVONEFjv6Xu8sm8h72dNlR5bzIE1fvC/bxgspzkjSfU+MweEMmPM8KJebG6nnyxo5mCg==}
-    engines: {node: '>=20'}
-    hasBin: true
-
-  playwright@1.62.1:
-    resolution: {integrity: sha512-0M+L3LAD8/nm554LOla9Ayx0j0tmFZ0FBcoQ7F1VuVHpM/XpiC8RcDzBQB8W5+hA8L22THxELzeF+2WcUzvcLg==}
     engines: {node: '>=20'}
     hasBin: true
 
@@ -3591,9 +3576,9 @@ snapshots:
     dependencies:
       require-from-string: 2.0.2
 
-  boneyard-js@1.8.1(react@19.3.0)(vite@8.1.5(@types/node@25.9.0)):
+  boneyard-js@1.10.0(react@19.3.0)(vite@8.1.5(@types/node@25.9.0)):
     dependencies:
-      playwright: 1.62.1
+      playwright: 1.63.0
     optionalDependencies:
       '@chenglou/pretext': 0.0.5
       react: 19.3.0
@@ -3913,9 +3898,6 @@ snapshots:
       '@emotion/is-prop-valid': 1.4.0
       react: 19.3.0
       react-dom: 19.3.0(react@19.3.0)
-
-  fsevents@2.3.2:
-    optional: true
 
   fsevents@2.3.3:
     optional: true
@@ -4240,15 +4222,7 @@ snapshots:
 
   picomatch@4.0.7: {}
 
-  playwright-core@1.62.1: {}
-
   playwright-core@1.63.0: {}
-
-  playwright@1.62.1:
-    dependencies:
-      playwright-core: 1.62.1
-    optionalDependencies:
-      fsevents: 2.3.2
 
   playwright@1.63.0:
     dependencies:
