@@ -105,3 +105,6 @@ Thumbs.db
 CLAUDE.local.md
 *.bak
 /get-docker.sh
+
+# Analyzers/benchmark_inference.py output
+benchmark_results_*.csv
