@@ -17,6 +17,7 @@ INDEX_TIMEOUT = 10.0       # event/backfill path: a Celery worker is waiting
 MIN_QUERY, MAX_QUERY = 3, 20
 MAX_IDS = 10_000
 MAX_VALUE_CHARS = 512
+MAX_DESCRIPTION_CHARS = MAX_VALUE_CHARS * 8
 TEXT_FIELDS = ("description", "reporter", "mail_subject", "file_name", "observables")
 
 # select_related set that makes build_document() cheap on a Case queryset.
@@ -65,10 +66,14 @@ def ensure_index(client, index: str) -> None:
     if client.indices.exists(index=index):
         return
     body = index_body()
-    # ignore_status=400: another worker created it between exists() and create().
-    client.options(ignore_status=400).indices.create(
-        index=index, settings=body["settings"], mappings=body["mappings"],
-    )
+    from elasticsearch import BadRequestError
+
+    try:
+        client.indices.create(index=index, settings=body["settings"], mappings=body["mappings"])
+    except BadRequestError as exc:
+        # Another worker may have created it between exists() and create().
+        if exc.error != "resource_already_exists_exception":
+            raise
 
 
 def _value(instance, data_type: str) -> str | None:
@@ -84,7 +89,7 @@ def _value(instance, data_type: str) -> str | None:
 def build_document(case) -> dict:
     mail = getattr(case.fileOrMail, "mail", None) if case.fileOrMail_id else None
     doc = {
-        "description": case.description or "",
+        "description": (case.description or "")[:MAX_DESCRIPTION_CHARS],
         "reporter": f"{case.reporter.email} {case.reporter.username}",
         "mail_subject": mail.subject if mail else "",
         "file_name": [],

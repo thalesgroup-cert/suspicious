@@ -800,11 +800,13 @@ docker compose --env-file .env up -d --force-recreate --no-deps suspicious suspi
 docker compose --env-file .env exec suspicious python manage.py reindex_cases
 ```
 
-Expected: `<n> indexed, 0 errors (index suspicious-cases)`. In the admin (`/admin/connectors/connectorstate/`) enable `case_search`, then search the investigations page for a fragment of a known URL/subject: results match the ORM search. Stop `elasticsearch` (`docker compose stop elasticsearch`) and search again: still returns results (fallback), then start it again.
+Order: enable `case_search` first (Settings UI or `PATCH /api/connectors/case_search/` with `{"enabled": true}`), then run the reindex above; events for a disabled connector are dropped, and if reindexing ran first, re-run with `--since <date of the first run>`.
+
+Expected: `<n> indexed, 0 errors (index suspicious-cases)`. Then search the investigations page for a fragment of a known URL/subject: results match the ORM search. Stop `elasticsearch` (`docker compose stop elasticsearch`) and search again: still returns results (fallback), then start it again.
 
 - [ ] **Step 3: Docs and spec alignment**
 
-Add to `docs/components/backend/connectors.md` a `case_search` section: purpose, config keys (`integrations.case_search.url|index|timeout_seconds`), the enable procedure (run `reindex_cases`, then enable), the 3–20 character rule, and the fallback behavior.
+Add to `docs/components/backend/connectors.md` a `case_search` section: purpose, config keys (`integrations.case_search.url|index|timeout_seconds`), the enable procedure (enable first, then run `reindex_cases`), the 3–20 character rule, and the fallback behavior.
 
 Edit the spec so it matches what the plan builds:
 - Config section is `integrations.case_search` (not `integrations.elasticsearch`), since connectors own `integrations.<connector name>`.

@@ -81,14 +81,17 @@ helper from it.
 - Unit: document builder (file case, mail case, IOC group case), query
   builder, fallback when the client raises.
 - Live ES test that runs only when `ES_TEST_URL` is set (CI's compose stub has
-  no Elasticsearch), covering index, search, update-on-modify, and fallback.
+  no Elasticsearch), covering the index + search roundtrip only;
+  update-on-modify and fallback are covered by the mocked unit tests.
 - Existing investigations API tests must pass unchanged with the connector
   disabled.
 
 ## Rollout
 1. Deploy with the connector disabled; migrate and seed config.
-2. Enable it, run `reindex_cases`, compare a sample of searches against the
-   ORM results.
+2. Enable it first (events for a disabled connector are dropped), then run
+   `reindex_cases`; if reindexing ran before enabling, re-run
+   `reindex_cases --since <date of the first run>`. Compare a sample of
+   searches against the ORM results.
 3. Keep the ORM path as the fallback permanently.
 
 ## Risks

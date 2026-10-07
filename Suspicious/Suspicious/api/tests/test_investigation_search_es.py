@@ -43,7 +43,7 @@ class InvestigationSearchEsTests(TestCase):
             self.assertEqual(self._ids("alpha"), [self.a.pk])
 
     def test_numeric_search_still_matches_case_id(self):
-        # ES returns nothing, but a digits-only search of >= 3 chars must still find the pk.
+        # ES returns nothing, but the view ORs the digits-only id match with the ES ids, so the pk is still found.
         case = Case.objects.create(id=424242, description="gamma", reporter=self.user)
         with self._patch([]):
             self.assertEqual(self._ids("424242"), [case.pk])

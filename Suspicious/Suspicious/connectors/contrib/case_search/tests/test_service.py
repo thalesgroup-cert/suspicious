@@ -1,3 +1,5 @@
+import sys
+import types
 from unittest import mock
 
 from django.contrib.auth.models import User
@@ -100,3 +102,33 @@ class SearchCaseIdsTests(TestCase):
         client.search.side_effect = RuntimeError("index_not_found")
         with self._enabled(), mock.patch.object(service, "get_client", return_value=client):
             self.assertIsNone(service.search_case_ids("evil.test"))
+
+
+class FakeBadRequest(Exception):
+    def __init__(self, error):
+        super().__init__(error)
+        self.error = error
+
+
+class EnsureIndexTests(TestCase):
+    def _ensure(self, error):
+        client = mock.Mock()
+        client.indices.exists.return_value = False
+        client.indices.create.side_effect = FakeBadRequest(error)
+        stub = types.SimpleNamespace(BadRequestError=FakeBadRequest)
+        with mock.patch.dict(sys.modules, {"elasticsearch": stub}):
+            service.ensure_index(client, "idx")
+
+    def test_already_exists_is_swallowed(self):
+        self._ensure("resource_already_exists_exception")
+
+    def test_other_bad_request_is_raised(self):
+        with self.assertRaises(FakeBadRequest):
+            self._ensure("illegal_argument_exception")
+
+
+class DescriptionTruncationTests(TestCase):
+    def test_long_description_is_truncated(self):
+        user = User.objects.create_user("trunc", "t@x.io", "pw")
+        case = Case.objects.create(description="x" * 10_000, reporter=user)
+        self.assertEqual(len(service.build_document(case)["description"]), 4096)

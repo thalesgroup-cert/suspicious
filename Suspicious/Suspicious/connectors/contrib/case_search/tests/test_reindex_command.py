@@ -4,6 +4,7 @@ from unittest import mock
 
 from django.contrib.auth.models import User
 from django.core.management import call_command
+from django.core.management.base import CommandError
 from django.test import TestCase
 from django.utils import timezone
 
@@ -39,7 +40,14 @@ class ReindexCommandTests(TestCase):
         self.assertEqual({c.pk for c in bulk.call_args.args[2]}, {self.new.pk})
 
     def test_bad_date_is_a_command_error(self):
-        from django.core.management.base import CommandError
-
         with self.assertRaises(CommandError):
             call_command("reindex_cases", "--since", "not-a-date")
+
+    def test_bulk_errors_raise_command_error_after_writing_counts(self):
+        out = StringIO()
+        with mock.patch.object(service, "get_client") as gc, \
+                mock.patch.object(service, "bulk_index", return_value=(1, 1)):
+            gc.return_value.indices.exists.return_value = True
+            with self.assertRaises(CommandError):
+                call_command("reindex_cases", stdout=out)
+        self.assertIn("1 indexed, 1 errors", out.getvalue())
