@@ -52,54 +52,6 @@ def _find_mail_bucket(client: Minio, mail_id: str) -> Optional[str]:
 
 # ── Public API ────────────────────────────────────────────────────────────────
 
-def build_mail_zip_from_minio(
-    client: Minio,
-    mail_id: str,
-    reporter_name: str,
-) -> Tuple[str, bytes]:
-    """
-    Build an in-memory ZIP of all objects stored under <mail_id>/ and
-    return (filename, zip_bytes).
-
-    Returns ("", b"") when the bucket cannot be found or is empty.
-    """
-    bucket = _find_mail_bucket(client, mail_id)
-    if not bucket:
-        logger.warning("build_mail_zip: no bucket found for mail %s.", mail_id)
-        return "", b""
-
-    prefix     = "%s/" % mail_id
-    zip_buffer = io.BytesIO()
-
-    written = 0
-    with zipfile.ZipFile(zip_buffer, "w", zipfile.ZIP_DEFLATED) as zf:
-        try:
-            objects = client.list_objects(bucket, prefix=prefix, recursive=True)
-            for obj in objects:
-                try:
-                    content = _read_object_safe(client, bucket, obj.object_name)
-                    arcname = obj.object_name.replace(prefix, "", 1)
-                    zf.writestr(arcname, content)
-                    written += 1
-                except Exception as exc:
-                    logger.error(
-                        "build_mail_zip: could not read %s from %s: %s",
-                        obj.object_name, bucket, exc,
-                    )
-        except S3Error as exc:
-            logger.error("build_mail_zip: error listing objects for mail %s: %s", mail_id, exc)
-            return "", b""
-
-    if not written:
-        logger.warning("build_mail_zip: nothing readable for mail %s in %s.", mail_id, bucket)
-        return "", b""
-
-    zip_buffer.seek(0)
-    safe_reporter = reporter_name.replace(" ", "_").replace("/", "_")
-    filename      = "%s_%s.zip" % (safe_reporter, mail_id)
-    return filename, zip_buffer.read()
-
-
 def fetch_mail_files_from_minio(
     client: Minio,
     mail_id: str,
