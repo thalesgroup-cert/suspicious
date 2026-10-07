@@ -25,6 +25,9 @@ from connectors.registry import registry
 logger = logging.getLogger("connectors.delivery")
 
 MAX_ATTEMPTS = 3
+# A hook that is not ready yet (its input is still being written) is rescheduled
+# quickly; these deferrals are not attempts. 12 x 5s is about a minute.
+MAX_DEFERRALS = 12
 
 _HOOKS = {
     EVENT_CASE_CREATED: "on_case_created",
@@ -36,6 +39,26 @@ _HOOKS = {
 
 class RetryableDeliveryError(Exception):
     """Raised to the Celery task to trigger a retry (attempt < MAX_ATTEMPTS)."""
+
+
+class DeliverLater(Exception):
+    """Raised by a hook whose input does not exist yet: try again in ``countdown``
+    seconds. Not a failure: no ledger row, and it does not count against the
+    connector's circuit breaker or its attempts."""
+
+    def __init__(self, message: str = "not ready yet", countdown: int = 5):
+        super().__init__(message)
+        self.countdown = countdown
+
+
+def _run_hook(hook, event):
+    """Call the hook; hand a deferral back instead of raising it, so the circuit
+    breaker around the call sees a success."""
+    try:
+        hook(event)
+    except DeliverLater as later:
+        return later
+    return None
 
 
 def get_state(name: str) -> ConnectorState:
@@ -55,7 +78,8 @@ def _record(connector, event, case_id, status, error, started, attempt):
     )
 
 
-def deliver_now(connector_name: str, event_name: str, payload: dict, attempt: int = 1) -> None:
+def deliver_now(connector_name: str, event_name: str, payload: dict,
+                attempt: int = 1, deferrals: int = 0) -> None:
     started = time.monotonic()
     event = CaseEvent.from_dict(payload)
     breaker = get_breaker(connector_name)
@@ -63,7 +87,13 @@ def deliver_now(connector_name: str, event_name: str, payload: dict, attempt: in
         connector = registry.instantiate(connector_name)
         hook = getattr(connector, _HOOKS[event_name])
         with breaker.calling():
-            hook(event)
+            later = _run_hook(hook, event)
+        if later is not None:
+            if deferrals < MAX_DEFERRALS:
+                raise later
+            raise RuntimeError(f"{later} (still not ready after {deferrals} deferrals)")
+    except DeliverLater:
+        raise
     except pybreaker.CircuitBreakerError as exc:
         _record(connector_name, event_name, event.case_id,
                 ConnectorDelivery.STATUS_SKIPPED, str(exc), started, attempt)

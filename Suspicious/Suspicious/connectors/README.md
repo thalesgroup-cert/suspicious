@@ -108,6 +108,11 @@ connectors/
   records `STATUS_FAILED` and — below `MAX_ATTEMPTS` — raises
   `RetryableDeliveryError`, which `tasks.deliver_event` turns into a Celery retry
   with `30 * 2**attempt` backoff.
+- **`DeliverLater`**: a hook raises it when its input does not exist yet (for example
+  the reporter's `MailInfo`, written just after the case). It is not a failure: no
+  ledger row, no circuit-breaker hit, and it does not use an attempt. The task
+  reschedules itself after `countdown` seconds (default 5), up to `MAX_DEFERRALS`
+  (12, about a minute); after that it counts as an ordinary failure.
 - **`ConnectorState`** (one row per connector, admin-managed) is what
   `enabled=True/False` actually is — seeded from `manifest.enabled_by_default` on
   first read (`delivery.get_state`), overridable per-deployment without a code

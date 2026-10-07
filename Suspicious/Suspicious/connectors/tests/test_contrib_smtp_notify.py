@@ -126,11 +126,12 @@ class AcknowledgementOnCaseCreatedTest(SimpleTestCase):
         svc = self._run(case=case)
         svc.from_settings.return_value.send_acknowledgement.assert_not_called()
 
-    def test_retries_when_mailinfo_is_not_written_yet(self):
+    def test_defers_when_mailinfo_is_not_written_yet(self):
         # the case is created a moment before ingest records MailInfo
+        from connectors.delivery import DeliverLater
         case = mock.Mock()
         case.fileOrMail.mail = mock.Mock()
-        with self.assertRaises(RuntimeError):
+        with self.assertRaises(DeliverLater):
             self._run(case=case, missing_info=True)
         self.svc.from_settings.return_value.send_acknowledgement.assert_not_called()
 
