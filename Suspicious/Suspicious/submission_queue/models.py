@@ -121,7 +121,6 @@ class SubmissionQueue(models.Model):
     submission_id = models.CharField(
         max_length=255,
         unique=True,
-        db_index=True,
         help_text=(
             "Globally unique ID for this submission. "
             "Matches the MinIO subdirectory name, e.g. '251215150557-388c4d591d6f'."
@@ -171,7 +170,6 @@ class SubmissionQueue(models.Model):
         max_length=20,
         choices=SubmissionStatus.choices,
         default=SubmissionStatus.PENDING,
-        db_index=True,
     )
     current_stage = models.CharField(
         max_length=40,
@@ -223,8 +221,6 @@ class SubmissionQueue(models.Model):
         indexes = [
             models.Index(fields=["status", "retry_after"]),
             models.Index(fields=["status", "locked_at"]),
-            models.Index(fields=["submission_id"]),
-            models.Index(fields=["mail_id"]),
         ]
         verbose_name = "Submission queue item"
         verbose_name_plural = "Submission queue"

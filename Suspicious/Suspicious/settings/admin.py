@@ -6,7 +6,6 @@ from import_export.admin import ImportExportModelAdmin
 from import_export.widgets import ForeignKeyWidget
 
 from .models import (
-    Mailbox,
     EmailFeederState,
     AllowListDomain,
     WatcherLegitDomain,
@@ -29,40 +28,6 @@ def normalize_value(value):
     if value is None:
         return None
     return str(value).strip().lower()
-
-
-# Mailbox
-class MailboxResource(resources.ModelResource):
-    class Meta:
-        model = Mailbox
-        fields = (
-            "id",
-            "name",
-            "username",
-            "server",
-            "port",
-            "creation_date",
-            "last_update",
-        )
-        export_order = (
-            "id",
-            "name",
-            "username",
-            "server",
-            "port",
-            "creation_date",
-            "last_update",
-        )
-        import_id_fields = ("id",)
-
-
-@admin.register(Mailbox)
-class MailboxAdmin(ImportExportModelAdmin):
-    resource_class = MailboxResource
-    list_display = ("name", "username", "server", "port", "creation_date", "last_update")
-    list_filter = ("server", "port", "creation_date")
-    search_fields = ("name", "username", "server")
-    ordering = ("creation_date",)
 
 
 # EmailFeederState

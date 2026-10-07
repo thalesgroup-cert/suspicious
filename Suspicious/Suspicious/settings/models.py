@@ -1,29 +1,9 @@
 from django.conf import settings
 from django.db import models
-from django.contrib.auth.hashers import make_password
 
 from domain_process.models import Domain
 from hash_process.models import Hash
 from ip_process.models import IP
-
-
-class Mailbox(models.Model):
-    id = models.AutoField(primary_key=True)
-    name = models.CharField(max_length=50, unique=True)
-    username = models.CharField(max_length=50, unique=True)
-    password = models.CharField(max_length=256)
-    server = models.CharField(max_length=50)
-    port = models.IntegerField()
-    creation_date = models.DateTimeField(auto_now_add=True)
-    last_update = models.DateTimeField(auto_now=True)
-
-    def save(self, *args, **kwargs):
-        if self.password and not str(self.password).startswith("pbkdf2_"):
-            self.password = make_password(self.password)
-        super().save(*args, **kwargs)
-
-    def __str__(self):
-        return self.name
 
 
 class EmailFeederState(models.Model):

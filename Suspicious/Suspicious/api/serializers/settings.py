@@ -4,7 +4,7 @@ from decimal import Decimal
 
 from rest_framework import serializers
 
-from settings.models import EmailFeederState, Mailbox
+from settings.models import EmailFeederState
 from profiles.models import CISOProfile
 from cortex_job.models import Analyzer
 
@@ -75,20 +75,6 @@ class AnalyzerUpdateSerializer(serializers.Serializer):
         if "weight" not in attrs and "tier" not in attrs:
             raise serializers.ValidationError("Provide 'weight' and/or 'tier'.")
         return attrs
-
-
-class MailboxSerializer(serializers.ModelSerializer):
-    class Meta:
-        model = Mailbox
-        fields = [
-            "id",
-            "name",
-            "username",
-            "server",
-            "port",
-            "creation_date",
-            "last_update",
-        ]
 
 
 class CISOUserSerializer(serializers.ModelSerializer):
