@@ -7,7 +7,6 @@ from django.test import SimpleTestCase
 
 from connectors.contrib.thehive.phishing import TheHivePushError
 from score_process.score_utils.chromadb_utils import add_to_suspicious_collection
-from score_process.scoring.cortex_analyzers.contrib import ai_mail
 from score_process.scoring.cortex_analyzers.contrib.ai_mail import AiMailParser
 
 FULL = {
@@ -118,7 +117,9 @@ class AttachScopeTest(SimpleTestCase):
 
     def _run(self, similar_case_ids, existing_alert):
         p = _parser(case_id=9)
-        meta = lambda cid, alerts: {"suspicious_case_id": str(cid), "alert_ids": alerts, "headers": "{'Subject': ['Pay']}"}
+        def meta(cid, alerts):
+            return {"suspicious_case_id": str(cid), "alert_ids": alerts, "headers": "{'Subject': ['Pay']}"}
+
         alerts = '["", "~1"]' if existing_alert else '[""]'
         similar = {"ids": [[f"d{c}" for c in similar_case_ids]],
                    "metadatas": [[meta(c, alerts) for c in similar_case_ids]],
