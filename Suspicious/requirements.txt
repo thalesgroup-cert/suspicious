@@ -65,6 +65,7 @@ vt-py==0.22.0
 
 # Vector store
 chromadb==1.5.9
+elasticsearch>=8.19,<9
 
 # Logging
 python-json-logger==4.2.0  # v4.x changed the API; pin to v3 until we migrate
