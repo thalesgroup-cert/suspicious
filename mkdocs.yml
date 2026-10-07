@@ -102,6 +102,7 @@ nav:
           - tasp: components/backend/tasp.md
           - settings: components/backend/settings.md
           - profiles: components/backend/profiles.md
+          - Model conventions: components/backend/models-guide.md
       - Frontend (React UI): components/frontend.md
       - Email Feeder: components/email-feeder.md
       - AI / ML Analyzers: components/analyzers.md

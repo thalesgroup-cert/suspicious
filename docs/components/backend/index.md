@@ -20,5 +20,7 @@ apps; each page below documents one.
 | [settings](settings.md) | DB-backed config (blacklists, whitelists, campaigns) |
 | [profiles](profiles.md) | User profile management |
 
+Writing or changing a model? Read the [model conventions and safe-change guide](models-guide.md) first.
+
 Code lives under `Suspicious/Suspicious/<app>/`. Selected models and tasks are
 auto-documented in the [Python Code Reference](../../reference/index.md).
