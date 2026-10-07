@@ -26,19 +26,21 @@ ANALYZER_REPORT_SELECT_RELATED = (
 )
 
 
-def reports_for_case(case):
+def reports_for_case(case, *, defer_full=False):
     """Every AnalyzerReport filed against an artifact linked to ``case``.
 
     Ordered newest-first (`-creation_date, -pk`). Empty queryset when the
-    case has no analyzable targets.
+    case has no analyzable targets. ``defer_full`` skips the large
+    ``report_full`` blob for callers that never read it.
     """
     targets = collect_case_targets(case)
     if not targets:
         return AnalyzerReport.objects.none()
 
-    return (
+    qs = (
         AnalyzerReport.objects
         .filter(build_analyzer_report_filter(targets))
         .select_related(*ANALYZER_REPORT_SELECT_RELATED)
         .order_by("-creation_date", "-pk")
     )
+    return qs.defer("report_full") if defer_full else qs

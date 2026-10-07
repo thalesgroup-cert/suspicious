@@ -54,7 +54,10 @@ class CaseAdmin(ImportExportModelAdmin):
     list_display = ('id', 'description', 'reporter', 'status', 'results', 'is_challenged', 'creation_date')
     list_filter = ('status', 'results', 'is_challenged', 'creation_date')
     list_select_related = ('reporter',)
-    search_fields = ('id', 'description', 'reporter__username')
+    # '=id' / '^username' hit indexes; description (TextField icontains) was a table scan.
+    search_fields = ('=id', '^reporter__username')
+    show_full_result_count = False
+    list_per_page = 50
     ordering = ('-creation_date',)
 
 

@@ -9,7 +9,7 @@ class AnalyzerResource(resources.ModelResource):
     class Meta:
         model = Analyzer
         fields = (
-            'id', 'name', 'weight', 'analyzer_cortex_id', 'analyzer_cortex_2_id',
+            'id', 'name', 'weight', 'analyzer_cortex_id',
             'is_active', 'creation_date', 'last_update',
         )
         export_order = fields
@@ -32,7 +32,7 @@ class AnalyzerAdmin(ImportExportModelAdmin):
     resource_class = AnalyzerResource
     list_display = ('id', 'name', 'weight', 'is_active', 'creation_date', 'last_update')
     list_filter = ('is_active', 'creation_date')
-    search_fields = ('name', 'analyzer_cortex_id', 'analyzer_cortex_2_id')
+    search_fields = ('name', 'analyzer_cortex_id')
     ordering = ('-creation_date',)
 
 
@@ -41,9 +41,19 @@ class AnalyzerReportAdmin(ImportExportModelAdmin):
     resource_class = AnalyzerReportResource
     list_display = ('id', 'analyzer', 'type', 'status', 'level', 'score', 'creation_date')
     list_filter = ('type', 'status', 'level', 'creation_date')
-    list_select_related = (
-        'analyzer', 'url', 'hash', 'file', 'ip', 'domain',
-        'mail', 'mail_body', 'mail_header',
-    )
+    list_select_related = ('analyzer',)
+    list_per_page = 50
+    show_full_result_count = False
+    # The changelist never shows the report blobs; loading them per row is the
+    # main cost. The change form is unaffected.
+    _LIST_DEFER = ('report_full', 'report_summary', 'report_taxonomy', 'enrichment')
+
+    def get_queryset(self, request):
+        qs = super().get_queryset(request)
+        match = request.resolver_match
+        if match and match.url_name and match.url_name.endswith('_changelist'):
+            qs = qs.defer(*self._LIST_DEFER)
+        return qs
+
     search_fields = ('analyzer__name', 'cortex_job_id')
     ordering = ('-creation_date',)

@@ -145,7 +145,7 @@ class InvestigationAccessMixin:
         # AnalyzerReport's own FK columns and every select_related relation is
         # forward FK/O2O, so it can't fan out into duplicate rows).
         # _dedup_analyzer_reports() de-dupes per (analyzer, target) in Python.
-        return _dedup_analyzer_reports(reports_for_case(obj))
+        return _dedup_analyzer_reports(reports_for_case(obj, defer_full=True))
 
     def filter_case_queryset(self, queryset, validated_filters: dict):
         search = validated_filters.get("search")
