@@ -5,7 +5,7 @@ from common.model_mixins import AllowListableMixin
 
 class Hash(AllowListableMixin, models.Model):
     id = models.AutoField(primary_key=True)
-    value = models.CharField(max_length=255)
+    value = models.CharField(max_length=255, db_index=True)
     ioc_score = models.FloatField(default=5)
     ioc_confidence = models.FloatField(default=0)
     ioc_level = models.CharField(max_length=20, default='info')

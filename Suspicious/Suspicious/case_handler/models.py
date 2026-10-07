@@ -109,6 +109,9 @@ class Case(models.Model):
 
     class Meta:
         ordering = ['-creation_date']
+        indexes = [
+            models.Index(fields=['status', '-creation_date'], name='case_status_created_idx'),
+        ]
 
     def __str__(self):
         """
