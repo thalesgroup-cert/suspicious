@@ -152,9 +152,12 @@ class MinioEmailService:
         bucket_name: str,
         reported_by: str = "",
         reporter_note: str = "",
-    ) -> None:
+    ) -> bool:
         """
         Process all regular .eml files in a given MinIO work directory.
+
+        Returns False when any email in the directory could not be turned
+        into a case, so the caller can flag the bucket instead of calling it done.
 
         Args:
             workdir:      Local filesystem path to the downloaded email directory.
@@ -166,6 +169,7 @@ class MinioEmailService:
                           that do not yet pass the manifest value.
         """
         email_id = os.path.basename(workdir)
+        ok, completed = True, False
 
         with safe_execution(f"processing MinIO emails {email_id}"):
             fetch_mail_logger.info("Processing MinIO emails in %s", workdir)
@@ -178,7 +182,7 @@ class MinioEmailService:
                 fetch_mail_logger.debug("Processing MinIO email file %s", filename)
 
                 try:
-                    glo().process_single_email(
+                    result = glo().process_single_email(
                         MailSubmissionData(
                             workdir=workdir,
                             filename=filename,
@@ -190,8 +194,13 @@ class MinioEmailService:
                             reporter_note=reporter_note,
                         )
                     )
+                    if result is None:
+                        ok = False
                 except Exception:
                     fetch_mail_logger.exception(
                         "Failed to process email %s in %s; skipping", filename, workdir
                     )
+                    ok = False
                     continue
+            completed = True
+        return ok and completed
