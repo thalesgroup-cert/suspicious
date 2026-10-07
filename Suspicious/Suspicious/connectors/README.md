@@ -68,7 +68,7 @@ connectors/
 
 - **`ConnectorManifest`** — `name` (validated slug), `version`, `category`,
   `description`, `config_schema` (tuple of `ConfigField`), `events` (subset of
-  `EVENT_CASE_CREATED` / `EVENT_CASE_FINALISED` / `EVENT_CAMPAIGN_UPDATED`), `schedules` (tuple of
+  `EVENT_CASE_CREATED` / `EVENT_CASE_FINALISED` / `EVENT_CASE_MODIFIED` / `EVENT_CAMPAIGN_UPDATED`), `schedules` (tuple of
   `Schedule`), `enabled_by_default`. `.validate()` runs at registration time —
   a connector with an invalid manifest fails to register, it does not take the
   app down.
@@ -83,7 +83,7 @@ connectors/
   round-trips through Celery/JSON cleanly.
 - **`Connector`** (ABC) — subclasses set a class-level `manifest` and implement
   `health_check()` (must never raise) plus whichever of `on_case_created`,
-  `on_case_finalised`, `sync` their manifest actually subscribes to.
+  `on_case_finalised`, `on_case_modified`, `sync` their manifest actually subscribes to.
 
 ---
 
@@ -121,7 +121,7 @@ connectors/
 |---|---|---|---|---|
 | `thehive` | Incident Response | `case_finalised`, `campaign_updated` | off | Pushes a TheHive alert for IOC cases, and creates/updates the alert of a detected phishing campaign (see below) |
 | `misp` | Threat Intelligence | `case_finalised` | off | Pushes an MISP event |
-| `smtp_notify` | Notifications | `case_finalised` | **on** | Emails the reporter the final result. Challenge-workflow notifications are separate and wired directly (`tasp/services/challenge.py`), not through this connector |
+| `smtp_notify` | Notifications | `case_created`, `case_finalised`, `case_modified` | **on** | Emails the reporter: acknowledgement on creation, review mail when an analyst changes the verdict, final result on completion. A failed send raises and the framework retries it. Challenge-workflow notifications are separate and wired directly (`tasp/services/challenge.py`), not through this connector |
 | `chromadb` | Maintenance | scheduled (daily) | **on** | Vector-store cleanup, not case-event-driven |
 | `watcher` | Threat Intelligence | scheduled (every 300s) | off | Reconciles the allow/deny domain lists against the Watcher service — moved here from `tasp`; see `tasp/README.md` |
 | `ai_narration` | AI | `case_finalised` | off | See below — the one connector with an extra, hardcoded data-governance restriction |

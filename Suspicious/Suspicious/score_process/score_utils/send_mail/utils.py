@@ -1,7 +1,5 @@
-import time
 import logging
 from pathlib import Path
-from typing import Callable
 
 from jinja2 import Environment, FileSystemLoader
 
@@ -44,31 +42,6 @@ def log_event(level, event: str, **fields):
         event,
         extra={"event": event, **fields},
     )
-
-
-def send_with_retry(
-    send_callable: Callable[[], None],
-    max_retries: int,
-    base_delay: int,
-) -> bool:
-    """
-    Retry helper with exponential backoff.
-    """
-    for attempt in range(1, max_retries + 1):
-        try:
-            send_callable()
-            logger.info("Email sent successfully on attempt %d.", attempt)
-            return True
-        except Exception as exc:
-            logger.warning(
-                "Attempt %d failed: %s", attempt, exc, exc_info=True
-            )
-            if attempt < max_retries:
-                delay = base_delay * (2 ** (attempt - 1))
-                logger.info("Retrying in %d seconds...", delay)
-                time.sleep(delay)
-
-    return False
 
 
 def load_email_config() -> dict:

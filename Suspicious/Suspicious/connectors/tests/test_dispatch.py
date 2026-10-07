@@ -145,6 +145,41 @@ class DispatchTest(TestCase):
         self.assertEqual(DummyConnector.calls, [])
 
 
+class StartDelayTest(TestCase):
+    """case_created fires the moment the Case row exists, before ingest has
+    written the rows connectors read (MailInfo); give it a short head start so
+    the first attempt does not fail and sit in the ledger as a spurious error."""
+
+    def _countdown(self, event_name):
+        import dataclasses
+
+        from connectors.base import EVENT_CASE_CREATED
+        from connectors.registry import ConnectorRegistry
+
+        class Subscriber(DummyConnector):
+            manifest = dataclasses.replace(
+                DummyConnector.manifest, events=(EVENT_CASE_CREATED, EVENT_CASE_FINALISED)
+            )
+
+        ConnectorState.objects.create(name="dummy", enabled=True)
+        registry = ConnectorRegistry()
+        registry.register(Subscriber)
+        from connectors.dispatch import emit
+        with mock.patch("connectors.dispatch.registry", registry), \
+                mock.patch("connectors.delivery.registry", registry), \
+                mock.patch("connectors.tasks.deliver_event") as task:
+            with self.captureOnCommitCallbacks(execute=True):
+                emit(event_name, make_case())
+        return task.apply_async.call_args.kwargs["countdown"]
+
+    def test_case_created_waits_a_moment(self):
+        from connectors.base import EVENT_CASE_CREATED
+        self.assertGreater(self._countdown(EVENT_CASE_CREATED), 0)
+
+    def test_case_finalised_is_not_delayed(self):
+        self.assertEqual(self._countdown(EVENT_CASE_FINALISED), 0)
+
+
 class CampaignEmitTest(TestCase):
     def test_emit_passes_the_campaign_id_in_the_payload(self):
         import dataclasses
@@ -164,5 +199,5 @@ class CampaignEmitTest(TestCase):
                 mock.patch("connectors.tasks.deliver_event") as task:
             with self.captureOnCommitCallbacks(execute=True):
                 emit(EVENT_CAMPAIGN_UPDATED, make_case(), campaign_id=5)
-        payload = task.delay.call_args.args[2]
+        payload = task.apply_async.call_args.args[0][2]
         self.assertEqual(payload["campaign_id"], 5)

@@ -484,7 +484,8 @@ Controls SMTP settings, email content, links, social icons, and per-template log
         "port": 25,
         "username": "smtp_user",
         "password": "smtp_password",
-        "tls": true
+        "tls": true,
+        "timeout": 10
     },
     "content": {
         "footer": "Limited Distribution",
@@ -528,6 +529,7 @@ Controls SMTP settings, email content, links, social icons, and per-template log
 |-----|-------------|
 | `api_base` | Base URL used to build challenge/portal links inside emails |
 | `smtp.tls` | Enable STARTTLS on the SMTP connection |
+| `smtp.timeout` | Seconds to wait for the SMTP server before giving up (default `10`); a failed send is retried by the `smtp_notify` connector |
 | `content.team_name` | Team name shown in email body and footer |
 | `content.global_domain` | Domain shown as a global link in the email footer |
 | `links.security_contact` | `mailto:` URI for the security team — used in Dangerous verdict emails |

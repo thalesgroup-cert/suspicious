@@ -4,7 +4,6 @@ from typing import Optional
 
 from mail_feeder.utils.user_creation.creation import UserCreationService
 from mail_feeder.models import MailInfo
-from score_process.score_utils.send_mail.service import MailNotificationService
 
 from .utils import safe_execution
 from .models import MailInstanceModel, MailInfoData
@@ -30,7 +29,6 @@ class MailInfoService:
             mail_info_data = self._build_mail_info_data(validated_mail, user_email)
 
             mail_info_instance = self._save_mail_info(mail_info_data, mail_instance)
-            self._acknowledge_user(mail_info_instance)
             return mail_info_instance
 
     def _validate_mail_instance(self, mail_instance) -> MailInstanceModel:
@@ -77,14 +75,3 @@ class MailInfoService:
         reception_ok.save()
         fetch_mail_logger.info(f"MailInfo created for {data.user_email}")
         return reception_ok
-
-    def _acknowledge_user(self, mail_info_instance):
-        """
-        Trigger acknowledgment for the user.
-        """
-        try:
-            cls = MailNotificationService.from_settings()
-            cls.send_acknowledgement(mail_info_instance)
-            fetch_mail_logger.info(f"Acknowledgment sent for user {mail_info_instance.user}")
-        except Exception as e:
-            fetch_mail_logger.error(f"Failed to send acknowledgment: {e}")

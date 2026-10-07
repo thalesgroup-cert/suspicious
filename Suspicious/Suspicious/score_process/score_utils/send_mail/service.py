@@ -6,8 +6,8 @@ from .modification_service import ModificationEmailService
 from .acknowledge_service import AcknowledgementEmailService
 from .final_service import FinalEmailService
 
-from .models import EmailSubjectsConfig, RetryConfig, SuspiciousConfig
-from .utils import log_event, build_user_infos, send_with_retry
+from .models import EmailSubjectsConfig, SuspiciousConfig
+from .utils import log_event, build_user_infos
 
 
 logger = logging.getLogger("tasp.cron.update_ongoing_case_jobs")
@@ -25,11 +25,9 @@ class MailNotificationService:
     def __init__(
         self,
         suspicious_cfg: SuspiciousConfig,
-        retry_cfg: RetryConfig,
         subjects: EmailSubjectsConfig,
     ):
         self.suspicious_email = suspicious_cfg.email
-        self.retry_cfg = retry_cfg
         self.subjects = subjects
 
     # ── factory ────────────────────────────────────────────────────────────
@@ -40,27 +38,22 @@ class MailNotificationService:
         branding = get_section("branding")
         email_section = get_section("email")
         suspicious_cfg = SuspiciousConfig(email=branding.get("contact_email", ""))
-        retry_cfg = RetryConfig()
         subjects = EmailSubjectsConfig(**email_section.get("templates", {}))
-        return cls(suspicious_cfg, retry_cfg, subjects)
+        return cls(suspicious_cfg, subjects)
 
     # ── helpers ────────────────────────────────────────────────────────────
 
-    def _send_with_retry(self, action, *, email_type: str, **context) -> bool:
-        success = send_with_retry(
-            action,
-            self.retry_cfg.max_retries,
-            self.retry_cfg.base_delay,
-        )
-        log_event(
-            logging.INFO if success else logging.ERROR,
-            "email_send",
-            email_type=email_type,
-            success=success,
-            retries=self.retry_cfg.max_retries,
-            **context,
-        )
-        return success
+    def _send(self, action, *, email_type: str, **context) -> None:
+        """One attempt. A failure is logged and re-raised so the connector
+        framework retries it (ledger, circuit breaker); no sleeping here."""
+        try:
+            action()
+        except Exception as exc:
+            log_event(logging.ERROR, "email_send", email_type=email_type,
+                      success=False, error=str(exc), **context)
+            raise
+        log_event(logging.INFO, "email_send", email_type=email_type,
+                  success=True, **context)
 
     def _get_recipient(self, user) -> str | None:
         if not user:
@@ -134,7 +127,7 @@ class MailNotificationService:
                 subject=subject,
             )
 
-        self._send_with_retry(
+        self._send(
             action,
             email_type="review",
             case_id=case.id,
@@ -163,14 +156,14 @@ class MailNotificationService:
                 subject=subject,
             )
 
-        if self._send_with_retry(
+        self._send(
             action,
             email_type="acknowledgement",
             mail_id=mail.id,
             recipient=recipient,
-        ):
-            mail.user_reception_informed = True
-            mail.save(update_fields=["user_reception_informed"])
+        )
+        mail.user_reception_informed = True
+        mail.save(update_fields=["user_reception_informed"])
 
     def send_final(self, mail, case) -> None:
         if not mail:
@@ -197,16 +190,11 @@ class MailNotificationService:
                 profile=profile,
             )._send_action(user=recipient, subject=subject)
 
-        if self._send_with_retry(
+        self._send(
             action,
             email_type="final",
             case_id=case.id,
             recipient=recipient,
-        ):
-            mail.user_analysis_informed = True
-            mail.save(update_fields=["user_analysis_informed"])
-        else:
-            raise RuntimeError(
-                f"Failed to send final-result email for case {case.id} "
-                f"after {self.retry_cfg.max_retries} attempts"
-            )
+        )
+        mail.user_analysis_informed = True
+        mail.save(update_fields=["user_analysis_informed"])

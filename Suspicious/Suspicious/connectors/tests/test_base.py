@@ -45,6 +45,12 @@ class ManifestValidationTest(SimpleTestCase):
     def test_case_created_event_valid(self):
         make_manifest(events=(EVENT_CASE_CREATED,)).validate()
 
+    def test_case_modified_event_valid_and_routed_to_its_hook(self):
+        from connectors.base import EVENT_CASE_MODIFIED
+        from connectors.delivery import _HOOKS
+        make_manifest(events=(EVENT_CASE_MODIFIED,)).validate()
+        self.assertEqual(_HOOKS[EVENT_CASE_MODIFIED], "on_case_modified")
+
     def test_campaign_updated_event_valid_and_routed_to_its_hook(self):
         from connectors.base import EVENT_CAMPAIGN_UPDATED
         from connectors.delivery import _HOOKS

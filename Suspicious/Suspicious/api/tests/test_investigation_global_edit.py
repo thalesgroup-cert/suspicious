@@ -25,8 +25,22 @@ class InvestigationGlobalEditVerdictExplanationTest(TestCase):
         self.reporter = _make_user("ge_reporter")
         self.analyst = _make_user("ge_analyst", groups=["CERT"])
 
-    @patch("api.views.investigations.MailNotificationService")
-    def test_patch_clears_stale_verdict_explanation(self, _mail):
+    @patch("api.views.investigations.emit")
+    def test_patch_emits_case_modified_instead_of_mailing_inline(self, emit):
+        case = Case.objects.create(reporter=self.reporter, description="", results="Dangerous")
+        self.client.force_authenticate(self.analyst)
+        resp = self.client.patch(
+            reverse("investigation-edit-global", kwargs={"case_id": case.id}),
+            {"score": 1, "confidence": 20, "classification": "SAFE"},
+            format="json",
+        )
+        self.assertEqual(resp.status_code, 200)
+        emit.assert_called_once()
+        self.assertEqual(emit.call_args.args[0], "case_modified")
+        self.assertEqual(emit.call_args.args[1].id, case.id)
+
+    @patch("api.views.investigations.emit")
+    def test_patch_clears_stale_verdict_explanation(self, _emit):
         case = Case.objects.create(
             reporter=self.reporter, description="", results="Dangerous",
             verdict_explanation={"band": "Dangerous", "reporter_paragraph": "old"},

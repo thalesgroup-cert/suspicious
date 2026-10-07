@@ -40,13 +40,15 @@ class SendHtmlTest(SimpleTestCase):
 
     def test_missing_config_uses_sane_defaults(self):
         _, _, ctor = self._run({})
-        self.assertEqual(ctor, {"host": "", "port": 587, "login": "", "password": ""})
+        self.assertEqual(ctor, {"host": "", "port": 587, "login": "", "password": "", "timeout": 10})
 
     def test_populated_config_passes_through(self):
         _, _, ctor = self._run({
             "server": "smtp.x", "port": 25, "username": "u", "password": "p",
         })
-        self.assertEqual(ctor, {"host": "smtp.x", "port": 25, "login": "u", "password": "p"})
+        self.assertEqual(
+            ctor, {"host": "smtp.x", "port": 25, "login": "u", "password": "p", "timeout": 10},
+        )
 
     def test_crlf_in_recipient_is_rejected_before_send(self):
         svc = SendMailService(host="h", port=25, login="l", password="p")
@@ -58,3 +60,14 @@ class SendHtmlTest(SimpleTestCase):
                 html="<b>hi</b>",
             )
         svc._SendMailService__server.sendmail.assert_not_called()
+
+    def test_timeout_is_configurable(self):
+        _, _, ctor = self._run({"server": "smtp.x", "timeout": 3})
+        self.assertEqual(ctor["timeout"], 3)
+
+
+class ConnectTimeoutTest(SimpleTestCase):
+    def test_connect_never_blocks_forever(self):
+        with mock.patch("score_process.score_utils.send_mail.send_email_service.smtplib.SMTP") as smtp:
+            SendMailService("h", 25, "", "").connect()
+        self.assertEqual(smtp.call_args.kwargs["timeout"], 10)

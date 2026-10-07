@@ -16,3 +16,9 @@ def test_crlf_in_recipient_is_rejected_before_send():
             html="<b>hi</b>",
         )
     svc._SendMailService__server.sendmail.assert_not_called()
+
+
+def test_connect_never_blocks_forever():
+    with mock.patch("classes.services.send_mail_service.smtplib.SMTP") as smtp:
+        SendMailService(host="h", port=25, login="l", password="p").connect()
+    assert smtp.call_args.kwargs["timeout"] == 10

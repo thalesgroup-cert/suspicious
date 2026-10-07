@@ -8,11 +8,6 @@ class UserInfo(BaseModel):
     display_name: str
 
 
-class RetryConfig(BaseModel):
-    max_retries: int = 3
-    base_delay: int = 1
-
-
 class SuspiciousConfig(BaseModel):
     email: str
 
