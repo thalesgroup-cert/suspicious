@@ -42,7 +42,7 @@ def _email_settings() -> tuple[str, tuple[str, ...]]:
 class TheHiveConnector(Connector):
     manifest = ConnectorManifest(
         name="thehive",
-        version="1.0.0",
+        version="1.1.0",
         author="Thales CERT",
         category="Incident Response",
         description="TheHive alerts for challenged cases and phishing campaigns.",
