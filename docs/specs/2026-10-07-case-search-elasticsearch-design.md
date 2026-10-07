@@ -38,7 +38,7 @@ never collides with Cortex's indices). One document per case, id = case pk:
 
 Substring matching uses an `ngram` analyzer (min 3, max 20) on the text
 fields plus a `keyword` sub-field for exact value hits. Queries shorter than 3
-characters use the existing ORM path. Case ids stay on the existing numeric
+characters, or longer than 20 characters, use the existing ORM path (the keyword search analyzer matches the whole query against 3-20 character ngrams). Case ids stay on the existing numeric
 `pk` match.
 
 ### 2. Sync: a `case_search` connector
@@ -49,7 +49,7 @@ from the case and writes it with the case id as the ES id, so replays are
 idempotent. `case_finalised` is the one that picks up observables that appear
 after creation (mail artifacts, derived observables).
 
-- Config: `integrations.elasticsearch.{url, index, timeout_seconds}` in
+- Config: `integrations.case_search.{url, index, timeout_seconds}` in
   `settings.json`, seeded through `seed_config` like the other integrations.
   Default URL `http://elasticsearch:9200`.
 - `health_check()` calls the cluster health endpoint. Index and mapping are
@@ -68,7 +68,7 @@ connector is enabled and healthy:
    status/type/result/date filters, ordering and pagination run in the
    database as today. The `.distinct()` and the 12 joins disappear.
 
-Fallback: any ES error, timeout or open circuit logs a warning and runs the
+Fallback: any ES error or timeout logs a warning and runs the
 current ORM search unchanged. A result set that hits the 10 000 cap is treated
 as "too broad" and the response keeps working with the capped ids.
 
@@ -80,8 +80,8 @@ helper from it.
 ## Testing
 - Unit: document builder (file case, mail case, IOC group case), query
   builder, fallback when the client raises.
-- Integration test against a real ES in CI (the `compose.ci.yaml` already
-  starts one), covering index, search, update-on-modify, and fallback.
+- Live ES test that runs only when `ES_TEST_URL` is set (CI's compose stub has
+  no Elasticsearch), covering index, search, update-on-modify, and fallback.
 - Existing investigations API tests must pass unchanged with the connector
   disabled.
 
