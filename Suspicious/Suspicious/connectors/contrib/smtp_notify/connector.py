@@ -10,6 +10,7 @@ import logging
 import smtplib
 
 from case_handler.models import Case
+from connectors.delivery import DeliverLater
 from connectors.base import (
     Connector,
     ConnectorManifest,
@@ -62,8 +63,8 @@ class SmtpNotifyConnector(Connector):
         try:
             mail_info = MailInfo.objects.get(mail=mail)
         except MailInfo.DoesNotExist:
-            # The case is created just before ingest records MailInfo: retry.
-            raise RuntimeError(f"MailInfo not written yet for case {event.case_id}") from None
+            # The case is created before ingest records MailInfo: not a failure.
+            raise DeliverLater(f"MailInfo not written yet for case {event.case_id}") from None
         MailNotificationService.from_settings().send_acknowledgement(mail_info)
 
     def on_case_modified(self, event) -> None:
