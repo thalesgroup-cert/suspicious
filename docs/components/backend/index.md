@@ -15,7 +15,6 @@ apps; each page below documents one.
 | [Observable processors](observable-processors.md) | domain / url / ip / hash / file analysis |
 | [dashboard](dashboard.md) | KPI metrics |
 | [mail_feeder](mail_feeder.md) | Outbound SMTP notification templates |
-| [submission_queue](submission_queue.md) | Async job queue |
 | [tasp](tasp.md) | Celery beat schedule + task wrappers |
 | [settings](settings.md) | DB-backed config (blacklists, whitelists, campaigns) |
 | [profiles](profiles.md) | User profile management |

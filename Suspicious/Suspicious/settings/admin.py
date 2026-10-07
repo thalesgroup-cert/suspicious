@@ -13,7 +13,6 @@ from .models import (
     WatcherMonitoredDomain,
     CampaignDomainAllowList,
     AllowListFile,
-    DenyListFile,
     AllowListFiletype,
     RuntimeConfig,
 )
@@ -297,42 +296,6 @@ class AllowListFileResource(resources.ModelResource):
 @admin.register(AllowListFile)
 class AllowListFileAdmin(ImportExportModelAdmin):
     resource_class = AllowListFileResource
-    list_display = ("linked_file_hash", "user", "creation_date", "last_update")
-    list_filter = ("creation_date",)
-    list_select_related = ("linked_file_hash", "user")
-    search_fields = ("linked_file_hash__value", "user__username")
-    ordering = ("-creation_date",)
-
-
-# DenyListFile
-class DenyListFileResource(resources.ModelResource):
-    linked_file_hash = fields.Field(
-        column_name="linked_file_hash__value",
-        attribute="linked_file_hash",
-        widget=ForeignKeyWidget(Hash, "value"),
-    )
-    user = fields.Field(
-        column_name="user_id",
-        attribute="user",
-        widget=ForeignKeyWidget(User, "id"),
-    )
-
-    def before_import_row(self, row, **kwargs):
-        hash_value = normalize_value(row.get("linked_file_hash__value"))
-        if hash_value:
-            row["linked_file_hash__value"] = hash_value
-            Hash.objects.get_or_create(value=hash_value)
-
-    class Meta:
-        model = DenyListFile
-        fields = ("id", "linked_file_hash", "user", "creation_date", "last_update")
-        export_order = ("id", "linked_file_hash", "user", "creation_date", "last_update")
-        import_id_fields = ("id",)
-
-
-@admin.register(DenyListFile)
-class DenyListFileAdmin(ImportExportModelAdmin):
-    resource_class = DenyListFileResource
     list_display = ("linked_file_hash", "user", "creation_date", "last_update")
     list_filter = ("creation_date",)
     list_select_related = ("linked_file_hash", "user")

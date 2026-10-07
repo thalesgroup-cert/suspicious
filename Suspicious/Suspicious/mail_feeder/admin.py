@@ -2,7 +2,7 @@ from django.contrib import admin
 from import_export import resources
 from import_export.admin import ImportExportModelAdmin
 from .models import (
-    Mail, MailAnalyzed, MailArtifact, MailAttachment, MailBody, MailHeader, MailInfo,
+    Mail, MailArtifact, MailAttachment, MailBody, MailHeader, MailInfo,
     ArtifactIsDomain, ArtifactIsHash, ArtifactIsIp, ArtifactIsMailAddress, ArtifactIsUrl,MailArchive
 )
 
@@ -11,11 +11,6 @@ class MailResource(resources.ModelResource):
         model = Mail
         fields = ('id', 'subject', 'reportedBy', 'date', 'to', 'cc', 'mail_id', 'times_sent', 'creation_date', 'last_update')
         export_order = ('id', 'subject', 'reportedBy', 'date', 'to', 'cc', 'mail_id', 'times_sent', 'creation_date', 'last_update')
-
-class MailAnalyzedResource(resources.ModelResource):
-    class Meta:
-        model = MailAnalyzed
-        fields = ('id', 'mail', 'is_phishing', 'is_dangerous', 'is_legitimate', 'is_spam', 'creation_date', 'last_update')
 
 class MailArtifactResource(resources.ModelResource):
     class Meta:
@@ -104,15 +99,6 @@ class MailAdmin(ImportExportModelAdmin):
 @admin.register(MailArchive)
 class MailArchiveAdmin(ImportExportModelAdmin):
     resource_class = MailResource
-
-@admin.register(MailAnalyzed)
-class MailAnalyzedAdmin(ImportExportModelAdmin):
-    resource_class = MailAnalyzedResource
-    list_display = ('mail', 'is_phishing', 'is_dangerous', 'is_legitimate', 'is_spam', 'creation_date')
-    list_filter = ('is_phishing', 'is_dangerous', 'is_legitimate', 'is_spam', 'creation_date')
-    list_select_related = ('mail',)
-    search_fields = ('mail__subject',)
-    ordering = ('-creation_date',)
 
 @admin.register(MailArtifact)
 class MailArtifactAdmin(ImportExportModelAdmin):

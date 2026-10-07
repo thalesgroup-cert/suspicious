@@ -98,7 +98,6 @@ nav:
           - Observable Processors: components/backend/observable-processors.md
           - dashboard: components/backend/dashboard.md
           - mail_feeder: components/backend/mail_feeder.md
-          - submission_queue: components/backend/submission_queue.md
           - tasp: components/backend/tasp.md
           - settings: components/backend/settings.md
           - profiles: components/backend/profiles.md

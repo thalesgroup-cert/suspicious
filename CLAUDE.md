@@ -87,7 +87,6 @@ python manage.py createsuperuser
 | `cortex_job` | Cortex job orchestration (cortex4py). Defines `Analyzer`, `AnalyzerReport`, and the `CaseAnalyzerJob` junction ledger that powers the webhook lookup |
 | `score_process` | Risk scoring; rule-based verdict explanation (`scoring/explanation/`) and the deterministic narration safety-lock + prompt builder (`scoring/narration/`) that `ai_narration` calls |
 | `connectors` | Connector framework: registry, dispatch, delivery ledger, circuit breaker, contrib connectors for TheHive/MISP/Watcher/SMTP-notify/ChromaDB/`ai_narration`. See [Connectors](docs/components/backend/connectors.md) |
-| `submission_queue` | Async job queue |
 | `domain_process` / `url_process` / `ip_process` / `hash_process` / `file_process` | Per-observable analysis |
 | `dashboard` | KPI metrics |
 | `mail_feeder` | Outbound SMTP notification templates |

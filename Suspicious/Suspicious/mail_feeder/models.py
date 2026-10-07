@@ -14,11 +14,11 @@ class Mail(models.Model):
     preview_object_key = models.CharField(max_length=512, blank=True, db_index=True)
     mail_header = models.ForeignKey(
         'MailHeader', on_delete=models.CASCADE, related_name='mails',
-        null=True, blank=True, db_index=True
+        null=True, blank=True,
     )
     mail_body = models.ForeignKey(
         'MailBody', on_delete=models.CASCADE, related_name='mails',
-        null=True, blank=True, db_index=True
+        null=True, blank=True,
     )
     date = models.DateTimeField(db_index=True)
     mail_from = models.CharField(max_length=255, db_index=True, blank=True)
@@ -81,7 +81,7 @@ class MailArtifact(models.Model):
         ('MailAddress', 'MailAddress'),
     ]
     mail = models.ForeignKey(
-        Mail, on_delete=models.CASCADE, related_name='mail_artifacts', db_index=True, null=True, blank=True
+        Mail, on_delete=models.CASCADE, related_name='mail_artifacts', null=True, blank=True
     )
     artifact_score = models.FloatField(default=5)
     artifact_confidence = models.FloatField(default=0)
@@ -118,9 +118,9 @@ class MailArtifact(models.Model):
 
 
 class ArtifactIsIp(models.Model):
-    ip = models.ForeignKey(IP, on_delete=models.CASCADE, related_name='ip_artifacts', db_index=True)
+    ip = models.ForeignKey(IP, on_delete=models.CASCADE, related_name='ip_artifacts')
     artifact = models.ForeignKey(
-        'MailArtifact', on_delete=models.CASCADE, related_name='ip_artifacts', db_index=True
+        'MailArtifact', on_delete=models.CASCADE, related_name='ip_artifacts',
     )
     times_sent = models.IntegerField(default=0)
     creation_date = models.DateTimeField(auto_now_add=True, db_index=True)
@@ -136,9 +136,9 @@ class ArtifactIsIp(models.Model):
         return f"ArtifactIsIp ID: {self.pk} - IP ID: {self.ip_id} - Artifact ID: {self.artifact_id}"
 
 class ArtifactIsUrl(models.Model):
-    url = models.ForeignKey(URL, on_delete=models.CASCADE, related_name='url_artifacts', db_index=True)
+    url = models.ForeignKey(URL, on_delete=models.CASCADE, related_name='url_artifacts')
     artifact = models.ForeignKey(
-        'MailArtifact', on_delete=models.CASCADE, related_name='url_artifacts', db_index=True
+        'MailArtifact', on_delete=models.CASCADE, related_name='url_artifacts',
     )
     times_sent = models.IntegerField(default=0)
     creation_date = models.DateTimeField(auto_now_add=True, db_index=True)
@@ -156,9 +156,9 @@ class ArtifactIsUrl(models.Model):
 
 
 class ArtifactIsHash(models.Model):
-    hash = models.ForeignKey(Hash, on_delete=models.CASCADE, related_name='hash_artifacts', db_index=True)
+    hash = models.ForeignKey(Hash, on_delete=models.CASCADE, related_name='hash_artifacts')
     artifact = models.ForeignKey(
-        'MailArtifact', on_delete=models.CASCADE, related_name='hash_artifacts', db_index=True
+        'MailArtifact', on_delete=models.CASCADE, related_name='hash_artifacts',
     )
     times_sent = models.IntegerField(default=0)
     creation_date = models.DateTimeField(auto_now_add=True, db_index=True)
@@ -176,9 +176,9 @@ class ArtifactIsHash(models.Model):
 
 
 class ArtifactIsDomain(models.Model):
-    domain = models.ForeignKey(Domain, on_delete=models.CASCADE, related_name='domain_artifacts', db_index=True)
+    domain = models.ForeignKey(Domain, on_delete=models.CASCADE, related_name='domain_artifacts')
     artifact = models.ForeignKey(
-        'MailArtifact', on_delete=models.CASCADE, related_name='domain_artifacts', db_index=True
+        'MailArtifact', on_delete=models.CASCADE, related_name='domain_artifacts',
     )
     times_sent = models.IntegerField(default=0)
     creation_date = models.DateTimeField(auto_now_add=True, db_index=True)
@@ -197,10 +197,10 @@ class ArtifactIsDomain(models.Model):
 
 class ArtifactIsMailAddress(models.Model):
     mail_address = models.ForeignKey(
-        MailAddress, on_delete=models.CASCADE, related_name='mail_address_artifacts', db_index=True
+        MailAddress, on_delete=models.CASCADE, related_name='mail_address_artifacts',
     )
     artifact = models.ForeignKey(
-        'MailArtifact', on_delete=models.CASCADE, related_name='mail_address_artifacts', db_index=True
+        'MailArtifact', on_delete=models.CASCADE, related_name='mail_address_artifacts',
     )
     times_sent = models.IntegerField(default=0)
     creation_date = models.DateTimeField(auto_now_add=True, db_index=True)
@@ -218,11 +218,11 @@ class ArtifactIsMailAddress(models.Model):
 
 class MailArchive(models.Model):
     mail = models.ForeignKey(
-        Mail, on_delete=models.CASCADE, related_name='mail_archive', db_index=True
+        Mail, on_delete=models.CASCADE, related_name='mail_archive',
     )
     archive = models.ForeignKey(
         File, on_delete=models.CASCADE, related_name='mail_archive',
-        null=True, blank=True, db_index=True
+        null=True, blank=True,
     )
     bucket_name = models.CharField(max_length=255, db_index=True, blank=True)
     def __str__(self):
@@ -232,7 +232,7 @@ class MailArchive(models.Model):
 
 class MailAttachment(models.Model):
     mail = models.ForeignKey(
-        Mail, on_delete=models.CASCADE, related_name='mail_attachments', db_index=True, null=True, blank=True
+        Mail, on_delete=models.CASCADE, related_name='mail_attachments', null=True, blank=True
     )
     attachment_score = models.FloatField(default=5)
     attachment_confidence = models.FloatField(default=0)
@@ -242,7 +242,7 @@ class MailAttachment(models.Model):
     att_hash_level = models.CharField(max_length=20, default='info')
     file = models.ForeignKey(
         File, on_delete=models.CASCADE, related_name='mail_attachments',
-        null=True, blank=True, db_index=True
+        null=True, blank=True,
     )
     creation_date = models.DateTimeField(auto_now_add=True, db_index=True)
     last_update = models.DateTimeField(auto_now=True)
@@ -257,10 +257,10 @@ class MailAttachment(models.Model):
 
 class MailInfo(models.Model):
     user = models.ForeignKey(
-        settings.AUTH_USER_MODEL, on_delete=models.CASCADE, related_name='mail_info', db_index=True
+        settings.AUTH_USER_MODEL, on_delete=models.CASCADE, related_name='mail_info',
     )
     mail = models.ForeignKey(
-        Mail, on_delete=models.CASCADE, related_name='mail_info', db_index=True
+        Mail, on_delete=models.CASCADE, related_name='mail_info',
     )
     is_received = models.BooleanField(default=False)
     user_reception_informed = models.BooleanField(default=False)
@@ -278,23 +278,3 @@ class MailInfo(models.Model):
 
     def __str__(self):
         return f"MailInfo ID: {self.pk} - Mail ID: {self.mail_id} - User ID: {self.user_id}"
-
-
-
-class MailAnalyzed(models.Model):
-    mail = models.ForeignKey(
-        Mail, on_delete=models.CASCADE, related_name='mail_analyzed', db_index=True
-    )
-    is_phishing = models.BooleanField(default=False)
-    is_dangerous = models.BooleanField(default=False)
-    is_legitimate = models.BooleanField(default=False)
-    is_spam = models.BooleanField(default=False)
-    creation_date = models.DateTimeField(auto_now_add=True, db_index=True)
-    last_update = models.DateTimeField(auto_now=True)
-
-    class Meta:
-        ordering = ['-creation_date']
-
-    def __str__(self):
-        return f"MailAnalyzed ID: {self.pk} - Mail ID: {self.mail_id}"
-

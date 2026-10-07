@@ -50,7 +50,7 @@ class Case(models.Model):
     Main incident investigation case, storing scores, analyst decisions and AI predictions.
     """
     description = models.TextField()
-    reporter = models.ForeignKey(settings.AUTH_USER_MODEL, on_delete=models.CASCADE, related_name='cases', db_index=True)
+    reporter = models.ForeignKey(settings.AUTH_USER_MODEL, on_delete=models.CASCADE, related_name='cases')
     analysis_done = models.PositiveIntegerField(default=0)
     status = models.CharField(max_length=20, choices=Status.choices, default=Status.TODO, verbose_name='Status', db_index=True)
     results = models.CharField(max_length=20, choices=Result.choices, default=Result.INCONCLUSIVE, verbose_name='Results', db_index=True)
@@ -62,18 +62,18 @@ class Case(models.Model):
     score_ai = models.FloatField(default=0)
     confidence_ai = models.FloatField(default=0)
     category_ai = models.CharField(max_length=20, default='Uncategorized', verbose_name='Category AI', db_index=True)
-    fileOrMail = models.ForeignKey('CaseHasFileOrMail', on_delete=models.CASCADE, related_name='cases', null=True, blank=True, db_index=True)
-    nonFileIocs = models.ForeignKey('CaseHasNonFileIocs', on_delete=models.CASCADE, related_name='cases', null=True, blank=True, db_index=True)
+    fileOrMail = models.ForeignKey('CaseHasFileOrMail', on_delete=models.CASCADE, related_name='cases', null=True, blank=True)
+    nonFileIocs = models.ForeignKey('CaseHasNonFileIocs', on_delete=models.CASCADE, related_name='cases', null=True, blank=True)
     observable_group = models.ForeignKey(
         "ObservableGroup", on_delete=models.CASCADE, related_name="cases",
-        null=True, blank=True, db_index=True,
+        null=True, blank=True,
     )
     is_challenged = models.BooleanField(default=False)
     is_challengeable = models.BooleanField(default=True)
     challenged_result = models.CharField(max_length=20, choices=Result.choices, default=Result.UNCHALLENGED, verbose_name='Challenged Result')
     creation_date = models.DateTimeField(auto_now_add=True, db_index=True)
     last_update = models.DateTimeField(auto_now=True)
-    last_update_by = models.ForeignKey(settings.AUTH_USER_MODEL, on_delete=models.CASCADE, related_name='cases_last_update_by', null=True, blank=True, db_index=True)
+    last_update_by = models.ForeignKey(settings.AUTH_USER_MODEL, on_delete=models.CASCADE, related_name='cases_last_update_by', null=True, blank=True)
     lifecycle_state = models.CharField(
         max_length=20, choices=LifecycleState.choices,
         default=LifecycleState.CREATED, db_index=True,
@@ -132,7 +132,6 @@ class CaseChallengeToken(models.Model):
         Case,
         on_delete=models.CASCADE,
         related_name="challenge_tokens",
-        db_index=True,
     )
     token_hash = models.CharField(max_length=64, unique=True, db_index=True)
     expires_at = models.DateTimeField(db_index=True)
@@ -188,7 +187,6 @@ class CaseComment(models.Model):
         Case,
         on_delete=models.CASCADE,
         related_name="comments",
-        db_index=True,
     )
     author = models.ForeignKey(
         settings.AUTH_USER_MODEL,
@@ -207,9 +205,9 @@ class CaseHasFileOrMail(models.Model):
     """
     Association model for cases linked to either a file or an email (one-to-one per instance).
     """
-    case = models.ForeignKey('Case', on_delete=models.CASCADE, related_name='case_has_file_or_mail', db_index=True)
-    file = models.ForeignKey(File, on_delete=models.CASCADE, related_name='case_has_file_or_mail', null=True, blank=True, db_index=True)
-    mail = models.ForeignKey(Mail, on_delete=models.CASCADE, related_name='case_has_file_or_mail', null=True, blank=True, db_index=True)
+    case = models.ForeignKey('Case', on_delete=models.CASCADE, related_name='case_has_file_or_mail')
+    file = models.ForeignKey(File, on_delete=models.CASCADE, related_name='case_has_file_or_mail', null=True, blank=True)
+    mail = models.ForeignKey(Mail, on_delete=models.CASCADE, related_name='case_has_file_or_mail', null=True, blank=True)
     creation_date = models.DateTimeField(auto_now_add=True, db_index=True)
     last_update = models.DateTimeField(auto_now=True)
 
@@ -235,10 +233,10 @@ class CaseHasNonFileIocs(models.Model):
     """
     Association model for cases linked to non-file IOCs: URLs, IPs, and hashes.
     """
-    case = models.ForeignKey('Case', on_delete=models.CASCADE, related_name='case_has_non_file_iocs', db_index=True)
-    url = models.ForeignKey(URL, on_delete=models.CASCADE, related_name='case_has_non_file_iocs', null=True, blank=True, db_index=True)
-    ip = models.ForeignKey(IP, on_delete=models.CASCADE, related_name='case_has_non_file_iocs', null=True, blank=True, db_index=True)
-    hash = models.ForeignKey(Hash, on_delete=models.CASCADE, related_name='case_has_non_file_iocs', null=True, blank=True, db_index=True)
+    case = models.ForeignKey('Case', on_delete=models.CASCADE, related_name='case_has_non_file_iocs')
+    url = models.ForeignKey(URL, on_delete=models.CASCADE, related_name='case_has_non_file_iocs', null=True, blank=True)
+    ip = models.ForeignKey(IP, on_delete=models.CASCADE, related_name='case_has_non_file_iocs', null=True, blank=True)
+    hash = models.ForeignKey(Hash, on_delete=models.CASCADE, related_name='case_has_non_file_iocs', null=True, blank=True)
     creation_date = models.DateTimeField(auto_now_add=True, db_index=True)
     last_update = models.DateTimeField(auto_now=True)
 
@@ -285,30 +283,30 @@ class CaseArtifact(models.Model):
 
     case = models.ForeignKey(
         'Case', on_delete=models.CASCADE,
-        related_name='case_artifacts', db_index=True,
+        related_name='case_artifacts',
     )
     artifact_type = models.CharField(
         max_length=10, choices=ArtifactType.choices, db_index=True,
     )
     file = models.ForeignKey(
         File, on_delete=models.CASCADE, related_name='case_artifacts',
-        null=True, blank=True, db_index=True,
+        null=True, blank=True,
     )
     hash = models.ForeignKey(
         Hash, on_delete=models.CASCADE, related_name='case_artifacts',
-        null=True, blank=True, db_index=True,
+        null=True, blank=True,
     )
     url = models.ForeignKey(
         URL, on_delete=models.CASCADE, related_name='case_artifacts',
-        null=True, blank=True, db_index=True,
+        null=True, blank=True,
     )
     ip = models.ForeignKey(
         IP, on_delete=models.CASCADE, related_name='case_artifacts',
-        null=True, blank=True, db_index=True,
+        null=True, blank=True,
     )
     mail = models.ForeignKey(
         Mail, on_delete=models.CASCADE, related_name='case_artifacts',
-        null=True, blank=True, db_index=True,
+        null=True, blank=True,
     )
     creation_date = models.DateTimeField(auto_now_add=True, db_index=True)
     last_update = models.DateTimeField(auto_now=True)
@@ -345,7 +343,7 @@ class ObservableGroupArtifact(models.Model):
         HASH = "HASH", "Hash"
         DOMAIN = "DOMAIN", "Domain"
 
-    group = models.ForeignKey(ObservableGroup, on_delete=models.CASCADE, related_name="artifacts", db_index=True)
+    group = models.ForeignKey(ObservableGroup, on_delete=models.CASCADE, related_name="artifacts")
     artifact_type = models.CharField(max_length=10, choices=Type.choices, db_index=True)
     url = models.ForeignKey(URL, on_delete=models.CASCADE, null=True, blank=True, related_name="observable_group_artifacts")
     ip = models.ForeignKey(IP, on_delete=models.CASCADE, null=True, blank=True, related_name="observable_group_artifacts")

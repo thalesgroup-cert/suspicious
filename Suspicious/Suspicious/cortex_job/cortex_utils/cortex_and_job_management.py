@@ -903,7 +903,7 @@ class CortexJobManager:
             )
 
         except Exception as e:
-            update_cases_logger.error(f"Error updating MailInfo/MailAnalyzed: {e}")
+            update_cases_logger.error(f"Error updating MailInfo: {e}")
 
     def get_sub_class(self, analyzer):
         """

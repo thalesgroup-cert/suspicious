@@ -104,7 +104,7 @@ nothing about prod, so every row still needs the section 6 query on a prod copy.
 
 | Change | Data risk | Dev check | Verdict |
 |---|---|---|---|
-| Drop the 41 redundant FK `db_index=True` | None (the index Django already builds stays) | n/a | Safe now, one migration per app |
+| Drop the 40 redundant FK `db_index=True` | None: the schema state is identical (`makemigrations --check` reports no change); source cleanup only | n/a | Done 2026-10-07 |
 | Composite indexes (`Case`, `AnalyzerReport`, `CaseAnalyzerJob` follow-ups) | None | n/a | Safe, online DDL |
 | `CheckConstraint`: exactly one target on `AnalyzerReport` | Fails if any row has 0 or 2+ targets | 2,522 of 2,522 rows have exactly 1 | Safe after the prod check |
 | Same for `CaseArtifact` and `ObservableGroupArtifact` | Same | 124/124 and 24/24 have exactly 1 | Safe after the prod check |
@@ -114,7 +114,7 @@ nothing about prod, so every row still needs the section 6 query on a prod copy.
 | `TimestampedModel` for new models | None | n/a | Apply to new models only |
 | Rename `created_at`/`updated_at` to the majority names | None to data, large to code | 13 fields | Do not do it |
 | Add `choices` to `Case.results_ai` | None (choices are not a DB constraint) | n/a | Safe |
-| Delete dead models (`submission_queue`, `APIKey`, `DenyListFile`, `MailAnalyzed`) | Drops rows | 0 rows in each on dev | Check prod rows, back up, then drop |
+| Delete dead models (`submission_queue`, `DenyListFile`, `MailAnalyzed`) | Drops rows | 0 rows in each on dev | Done 2026-10-07: each migration refuses to run if the table has rows (`common/migration_utils.refuse_if_rows`). `profiles.APIKey` stays: its admin issues Knox API keys |
 | `report_full` side table | Moves the biggest column | spec 2026-10-07 | Three-release expand/contract |
 | `GeneratedField` for derived columns | None when added | n/a | Optional, use for new derived values |
 
