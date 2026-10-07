@@ -31,19 +31,19 @@ def _read_object_safe(client: Minio, bucket: str, key: str) -> bytes:
 
 def _find_mail_bucket(client: Minio, mail_id: str) -> Optional[str]:
     """
-    Return the bucket name that contains this mail's objects.
+    Return the bucket that holds this mail's objects.
 
-    MinIO bucket names follow the pattern  <prefix>-<short-mail-id>
-    where the short ID is the first UUID segment (before the first dash).
-
-    Scanning all buckets is O(n) but unavoidable without a convention
-    change. The result should be cached by the caller if processing
-    multiple mails from the same reporter in a single run.
+    Bucket names are ``<reporter>-submission-<timestamp>`` and the mail id
+    starts with that timestamp, so reporters whose submissions land in the same
+    second share the suffix. Match on the suffix, then keep the candidate that
+    really contains ``<mail_id>/``.
     """
     short_id = mail_id.split("-")[0]
     try:
         for bucket in client.list_buckets():
-            if bucket.name.endswith("-%s" % short_id):
+            if not bucket.name.endswith("-%s" % short_id):
+                continue
+            if any(True for _ in client.list_objects(bucket.name, prefix="%s/" % mail_id)):
                 return bucket.name
     except S3Error as exc:
         logger.error("Error listing MinIO buckets while searching for mail %s: %s", mail_id, exc)
@@ -71,6 +71,7 @@ def build_mail_zip_from_minio(
     prefix     = "%s/" % mail_id
     zip_buffer = io.BytesIO()
 
+    written = 0
     with zipfile.ZipFile(zip_buffer, "w", zipfile.ZIP_DEFLATED) as zf:
         try:
             objects = client.list_objects(bucket, prefix=prefix, recursive=True)
@@ -79,6 +80,7 @@ def build_mail_zip_from_minio(
                     content = _read_object_safe(client, bucket, obj.object_name)
                     arcname = obj.object_name.replace(prefix, "", 1)
                     zf.writestr(arcname, content)
+                    written += 1
                 except Exception as exc:
                     logger.error(
                         "build_mail_zip: could not read %s from %s: %s",
@@ -87,6 +89,10 @@ def build_mail_zip_from_minio(
         except S3Error as exc:
             logger.error("build_mail_zip: error listing objects for mail %s: %s", mail_id, exc)
             return "", b""
+
+    if not written:
+        logger.warning("build_mail_zip: nothing readable for mail %s in %s.", mail_id, bucket)
+        return "", b""
 
     zip_buffer.seek(0)
     safe_reporter = reporter_name.replace(" ", "_").replace("/", "_")

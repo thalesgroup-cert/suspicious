@@ -18,6 +18,11 @@ from connectors.base import (
 )
 
 
+# What the integration user needs: create the alert, then add observables and
+# files to it. A lapsed license silently drops the last two.
+REQUIRED_PERMISSIONS = ("manageAlert/create", "manageAlert/update", "manageObservable")
+
+
 class TheHiveConnector(Connector):
     manifest = ConnectorManifest(
         name="thehive",
@@ -85,6 +90,15 @@ class TheHiveConnector(Connector):
                 verify=self.config.get("certificate_path") or True,
             )
             response.raise_for_status()
+            granted = response.json().get("permissions")
+            if isinstance(granted, list):
+                missing = [p for p in REQUIRED_PERMISSIONS if p not in granted]
+                if missing:
+                    return HealthStatus(
+                        ok=False,
+                        detail="authenticated, but missing TheHive permissions: "
+                               + ", ".join(missing) + " (expired license or wrong profile?)",
+                    )
             return HealthStatus(ok=True, detail="authenticated")
         except Exception as exc:  # noqa: BLE001 — health check must not raise
             return HealthStatus(ok=False, detail=str(exc))

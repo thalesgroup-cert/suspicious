@@ -35,6 +35,12 @@ def get_similar_dangerous_mails(embedding, suspicious_collection, n_results: int
 def add_to_suspicious_collection(full, alert_id, sourceRef, suspicious_case_id, suspicious_collection):
     timestamp = datetime.now()
 
+    # One document per case: the report is re-parsed on every reconcile pass, and
+    # each extra copy would count as another "similar mail" towards a campaign.
+    doc_id = f"case-{suspicious_case_id}"
+    if suspicious_case_id is not None and suspicious_collection.get(ids=[doc_id]).get("ids"):
+        return None
+
     suspicious_collection.add(
         documents=full["report"]["analyzed_mail_content"],
         embeddings=json.loads(full["report"]["email_embedding"]),
@@ -49,7 +55,8 @@ def add_to_suspicious_collection(full, alert_id, sourceRef, suspicious_case_id, 
             'sourceRefs': json.dumps([str(sourceRef)]),
             'suspicious_case_id': str(suspicious_case_id),
         }],
-        ids=timestamp.strftime("%y%m%d") + "-" + str(token_hex(8)),
+        ids=doc_id if suspicious_case_id is not None
+        else timestamp.strftime("%y%m%d") + "-" + str(token_hex(8)),
     )
 
     return timestamp

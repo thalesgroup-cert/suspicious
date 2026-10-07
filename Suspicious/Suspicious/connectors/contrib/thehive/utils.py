@@ -257,8 +257,10 @@ def get_most_common_alert_id(phishing_campaign):
                 except Exception:
                     continue
             
-            if alert_ids and alert_ids[0]:
-                ids.extend(alert_ids)
+            # A doc stored before any alert existed is [""] and the alert id is
+            # appended after that empty entry, so filter blanks rather than
+            # testing the first element.
+            ids.extend(i for i in alert_ids if i)
 
     if ids:
         return Counter(ids).most_common()[0][0]
