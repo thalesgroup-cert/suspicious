@@ -102,7 +102,7 @@ class TheHivePushError(Exception):
     """A user-triggered TheHive push could not complete."""
 
 
-def _ticket_description(case, ticket) -> str:
+def _ticket_description(case, ticket, pushed_by=None) -> str:
     v = ticket["verdict"]
     s = ticket["analyzer_summary"]
     by = ", ".join(f"{k}: {n}" for k, n in s["by_verdict"].items()) or "no verdicts"
@@ -120,6 +120,7 @@ def _ticket_description(case, ticket) -> str:
         "",
         "—",
         f"Suspicious case #{case.id}",
+        *([f"**Pushed by:** {pushed_by}"] if pushed_by else []),
     ]
     return "\n".join(lines)
 
@@ -151,16 +152,19 @@ def update_alert(alert_id, fields, thehive_url, api_key):
         raise TheHivePushError(f"could not update alert {alert_id}: {e}") from e
 
 
-def push_ticket(case, ticket, *, url, key) -> dict:
+def push_ticket(case, ticket, *, url, key, pushed_by=None) -> dict:
     """Create or update a TheHive alert from a ticket payload. Reuses
     ``case.thehive_alert_id`` when set (update), else creates and records it.
+    ``pushed_by`` (a username) is stamped in the description and as a tag; an
+    update overwrites it with the latest pusher (the audit log keeps the history).
     Returns {"status": "created"|"updated", "alert_id", "alert_url"}."""
     fields = {
         "title": ticket["title"],
-        "description": _ticket_description(case, ticket),
+        "description": _ticket_description(case, ticket, pushed_by),
         "severity": ticket["verdict"]["severity"],
         "tags": ["suspicious", f"suspicious:case:{case.id}",
-                 ticket["verdict"]["result"].lower()],
+                 ticket["verdict"]["result"].lower(),
+                 *([f"suspicious:pushed-by:{pushed_by}"] if pushed_by else [])],
     }
     observables = _ticket_alert_observables(ticket)
     existing = (case.thehive_alert_id or "").strip()

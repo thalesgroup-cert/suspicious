@@ -147,6 +147,48 @@ class SubmissionTicketPushTests(TestCase):
         upd.assert_called_once()
         cna.assert_not_called()
 
+    def test_push_stamps_the_pusher_on_the_alert(self):
+        with mock.patch("connectors.registry.registry.instantiate") as inst, \
+             mock.patch("connectors.contrib.thehive.phishing.create_new_alert",
+                        return_value={"_id": "~999"}) as cna, \
+             mock.patch("connectors.contrib.thehive.phishing.add_observables_to_item"):
+            inst.return_value.config = self._cfg()
+            self.client.post(self._url())
+        description, tags = cna.call_args.args[2], cna.call_args.args[9]
+        self.assertIn(f"**Pushed by:** {self.user.username}", description)
+        self.assertIn(f"suspicious:pushed-by:{self.user.username}", tags)
+
+    def test_push_writes_an_audit_line(self):
+        with mock.patch("connectors.registry.registry.instantiate") as inst, \
+             mock.patch("connectors.contrib.thehive.phishing.create_new_alert",
+                        return_value={"_id": "~999"}), \
+             mock.patch("connectors.contrib.thehive.phishing.add_observables_to_item"), \
+             self.assertLogs("audit.thehive_push", "INFO") as logs:
+            inst.return_value.config = self._cfg()
+            self.client.post(self._url(), REMOTE_ADDR="10.1.2.3")
+        rec = logs.records[0]
+        self.assertEqual(rec.getMessage(), "THEHIVE_PUSH")
+        self.assertEqual(
+            (rec.username, rec.case_id, rec.alert_id, rec.outcome, rec.ip_address),
+            (self.user.username, self.case.id, "~999", "created", "10.1.2.3"),
+        )
+
+    def test_failed_push_is_audited_too(self):
+        from connectors.contrib.thehive.phishing import TheHivePushError
+
+        self.case.thehive_alert_id = "~abc"
+        self.case.save(update_fields=["thehive_alert_id"])
+        with mock.patch("connectors.registry.registry.instantiate") as inst, \
+             mock.patch("connectors.contrib.thehive.phishing.update_alert",
+                        side_effect=TheHivePushError("boom")), \
+             self.assertLogs("audit.thehive_push", "INFO") as logs:
+            inst.return_value.config = self._cfg()
+            r = self.client.post(self._url())
+        self.assertEqual(r.status_code, 502)
+        rec = logs.records[0]
+        self.assertEqual((rec.username, rec.outcome, rec.alert_id), (self.user.username, "failed", "~abc"))
+        self.assertIn("boom", rec.error)
+
     def test_push_requires_investigator(self):
         self.client.force_authenticate(_make_user("plain", investigator=False))
         self.assertEqual(self.client.post(self._url()).status_code, 403)

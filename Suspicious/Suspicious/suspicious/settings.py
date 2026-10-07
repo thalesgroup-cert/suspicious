@@ -582,7 +582,7 @@ if _is_test:
     _file_handlers: dict = {
         name: {"class": "logging.NullHandler"}
         for name in ("fetch_mail", "update_cases",
-                     "fetch_analyzer", "cleanup", "watcher_sync", "audit")
+                     "fetch_analyzer", "cleanup", "watcher_sync", "audit", "audit_thehive")
     }
 else:
     _file_handlers = {
@@ -634,6 +634,15 @@ else:
         "audit": {
             "class":     "logging.handlers.RotatingFileHandler",
             "filename":  "/app/log/cert_downloads.log",
+            "maxBytes":  50 * 1024 * 1024,
+            "backupCount": 10,
+            "formatter": "json",
+            "filters":   ["trace_id"],
+            "level":     "INFO",
+        },
+        "audit_thehive": {
+            "class":     "logging.handlers.RotatingFileHandler",
+            "filename":  "/app/log/thehive_pushes.log",
             "maxBytes":  50 * 1024 * 1024,
             "backupCount": 10,
             "formatter": "json",
@@ -727,6 +736,12 @@ LOGGING = {
         "audit.cert_download": {
             "handlers":  ["audit"],
             "level":     _trace_level,
+            "propagate": False,
+        },
+
+        "audit.thehive_push": {
+            "handlers":  ["audit_thehive"],
+            "level":     "INFO",
             "propagate": False,
         },
     },

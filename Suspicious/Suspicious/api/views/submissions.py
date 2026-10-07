@@ -22,7 +22,9 @@ from api.serializers.submissions import (
     SubmissionDetailsSerializer,
     SubmissionListSerializer,
 )
+from api.audit import log_thehive_push
 from api.utils.analyzer_reports import reports_for_case
+from api.views.downloads import get_request_ip
 from api.views.investigations import IsInvestigator, _dedup_analyzer_reports
 from case_handler.models import Case
 from tasp.services.challenge import notify_and_record_challenge
@@ -334,9 +336,21 @@ class SubmissionTicketView(APIView):
             return Response({"detail": "TheHive connector is not configured."},
                             status=status.HTTP_409_CONFLICT)
 
+        ip = get_request_ip(request)
         try:
-            result = push_ticket(case, build_ticket(case), url=url, key=key)
+            result = push_ticket(
+                case, build_ticket(case), url=url, key=key,
+                pushed_by=request.user.get_username(),
+            )
         except TheHivePushError as exc:
+            log_thehive_push(
+                user=request.user, case_id=case.id, alert_id=case.thehive_alert_id,
+                outcome="failed", ip=ip, error=str(exc),
+            )
             return Response({"detail": f"TheHive push failed: {exc}"},
                             status=status.HTTP_502_BAD_GATEWAY)
+        log_thehive_push(
+            user=request.user, case_id=case.id, alert_id=result["alert_id"],
+            outcome=result["status"], ip=ip,
+        )
         return Response(result, status=status.HTTP_200_OK)
