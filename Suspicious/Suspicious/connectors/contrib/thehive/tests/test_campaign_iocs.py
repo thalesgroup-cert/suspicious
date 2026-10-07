@@ -60,6 +60,23 @@ class UrlTest(SimpleTestCase):
         self.assertLessEqual(len(urls), 100)
 
 
+class BodySourceTest(SimpleTestCase):
+    EML = (b"From: a@evil.example\r\nContent-Type: text/plain; charset=utf-8\r\n\r\n"
+           b"Alternative link: http://185.11.21.31/payroll/login.php\n\nHR Payroll Department\n")
+
+    def test_bodies_are_read_from_the_raw_mail_not_the_flattened_text(self):
+        # the stored .txt loses line breaks, which glues the next word onto a URL
+        m = MailMaterial(headers=HEADERS, eml=self.EML,
+                         text="Alternative link: http://185.11.21.31/payroll/login.phpHR Payroll Department")
+        urls = _iocs(m).urls
+        self.assertIn("http://185.11.21.31/payroll/login.php", urls)
+        self.assertNotIn("http://185.11.21.31/payroll/login.phpHR", urls)
+
+    def test_stored_parts_are_used_when_there_is_no_raw_mail(self):
+        m = MailMaterial(headers=HEADERS, text="go to https://only-text.example/a")
+        self.assertIn("https://only-text.example/a", _iocs(m).urls)
+
+
 class DomainAndIpTest(SimpleTestCase):
     def test_domains_come_from_urls_and_sender_addresses(self):
         m = MailMaterial(headers=HEADERS, text="https://landing.example/x")

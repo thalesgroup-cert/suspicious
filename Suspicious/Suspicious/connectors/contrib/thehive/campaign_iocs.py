@@ -69,6 +69,23 @@ def _attachment_text(name: str, data: bytes) -> str:
     return ""
 
 
+def _mail_bodies(material) -> list[str]:
+    """Decoded text and HTML parts of the raw mail.
+
+    The stored .txt/.html are flattened (line breaks dropped), which glues the
+    word after a URL onto it; the raw mail keeps the original text. The stored
+    parts are the fallback when there is no raw mail.
+    """
+    bodies = []
+    if material.eml:
+        for part in email.message_from_bytes(material.eml).walk():
+            if part.get_content_type() in ("text/plain", "text/html") and not part.get_filename():
+                payload = part.get_payload(decode=True)
+                if payload:
+                    bodies.append(payload.decode(part.get_content_charset() or "utf-8", "replace"))
+    return bodies or [material.html, material.text]
+
+
 def _public_ip(value: str) -> bool:
     try:
         return ipaddress.ip_address(value).is_global
@@ -102,7 +119,7 @@ def extract_iocs(
     headers = email.message_from_string(material.headers or "")
 
     # URLs: both bodies and every readable attachment
-    texts = [material.html, material.text] + [_attachment_text(a.name, a.data) for a in kept]
+    texts = _mail_bodies(material) + [_attachment_text(a.name, a.data) for a in kept]
     for text in texts:
         for url in extract_urls(_refang(text or "")):
             host = (urlparse(url).hostname or "").lower().rstrip(".")

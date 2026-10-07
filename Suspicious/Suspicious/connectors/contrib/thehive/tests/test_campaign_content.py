@@ -24,8 +24,9 @@ NEVER = lambda domain: False
 
 
 def member(case_id, *, reporter="a@meridian.example", verdict="Dangerous", atts=(), html="", minute=10):
-    material = MailMaterial(headers=HEADERS, html=html, text="Pay at https://portal.example/login?u=%d" % case_id,
-                            eml=b"From: x\r\n\r\nbody %d" % case_id, attachments=list(atts))
+    text = "Pay at https://portal.example/login?u=%d" % case_id
+    material = MailMaterial(headers=HEADERS, html=html, text=text,
+                            eml=("From: x\r\n\r\n" + text).encode(), attachments=list(atts))
     kept, skipped = select_attachments(material.attachments)
     iocs = extract_iocs(material, kept, skipped, own_domains=("meridian.example",), is_allowed=NEVER)
     info = MemberInfo(case_id=case_id, reporter=reporter, verdict=verdict, malscore=9.0,
