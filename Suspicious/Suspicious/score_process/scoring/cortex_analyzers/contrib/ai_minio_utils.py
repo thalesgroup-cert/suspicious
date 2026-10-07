@@ -3,9 +3,7 @@ MinIO helpers for the AI analyzer.
 """
 from __future__ import annotations
 
-import io
 import logging
-import zipfile
 from typing import Optional, Tuple
 
 from minio import Minio

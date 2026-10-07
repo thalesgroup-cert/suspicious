@@ -12,7 +12,7 @@ from connectors.contrib.thehive.campaign_alert import (
     merge_iocs,
     severity_for,
 )
-from connectors.contrib.thehive.campaign_iocs import Iocs, extract_iocs
+from connectors.contrib.thehive.campaign_iocs import extract_iocs
 from connectors.contrib.thehive.campaign_material import Attachment, MailMaterial, select_attachments
 
 HEADERS = (
@@ -20,7 +20,10 @@ HEADERS = (
     "Subject: Verify payroll\r\nMessage-ID: <m1@evil1.example>\r\n"
     "Authentication-Results: mx; spf=fail; dmarc=fail\r\n"
 )
-NEVER = lambda domain: False
+
+def NEVER(domain):
+    return False
+
 
 
 def member(case_id, *, reporter="a@meridian.example", verdict="Dangerous", atts=(), html="", minute=10):

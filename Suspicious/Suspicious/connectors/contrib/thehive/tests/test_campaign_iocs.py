@@ -17,7 +17,10 @@ HEADERS = (
     "Received-SPF: fail\r\n"
     "Authentication-Results: mx.meridian.example; spf=fail; dkim=none; dmarc=fail\r\n"
 )
-NEVER = lambda domain: False
+
+def NEVER(domain):
+    return False
+
 
 
 def _pdf(text: str, compress=False) -> bytes:

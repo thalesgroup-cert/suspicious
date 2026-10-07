@@ -44,8 +44,10 @@ class FakeCollection:
 
 
 def _similar(case_ids):
-    meta = lambda cid: {"suspicious_case_id": str(cid), "alert_ids": '[""]',
-                        "headers": "{'Subject': ['Verify payroll']}", "sourceRefs": '[""]'}
+    def meta(cid):
+        return {"suspicious_case_id": str(cid), "alert_ids": '[""]',
+                "headers": "{'Subject': ['Verify payroll']}", "sourceRefs": '[""]'}
+
     return {"ids": [[f"case-{c}" for c in case_ids]], "metadatas": [[meta(c) for c in case_ids]],
             "documents": [["" for _ in case_ids]], "embeddings": [[[0] for _ in case_ids]],
             "distances": [[0.1 for _ in case_ids]]}
@@ -59,7 +61,9 @@ class DetectionTest(TestCase):
             (f"{C}.get_chroma_client", MagicMock()),
             (f"{C}.get_suspicious_collection", MagicMock(return_value=self.coll)),
         ):
-            p = patch(target, value); p.start(); self.addCleanup(p.stop)
+            p = patch(target, value)
+            p.start()
+            self.addCleanup(p.stop)
 
     def _detect(self, case, full, similar=None):
         with patch(f"{C}.ai_full_report", return_value=full), \

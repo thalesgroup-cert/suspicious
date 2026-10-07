@@ -7,7 +7,6 @@ from email.header import decode_header
 
 from .models import Observable
 from collections import Counter, defaultdict
-import json
 import ast
 import logging
 import html

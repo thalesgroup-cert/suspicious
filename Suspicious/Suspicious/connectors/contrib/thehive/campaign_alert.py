@@ -158,7 +158,9 @@ def build_description(campaign, members: list[MemberMaterial], iocs: Iocs, rows,
     reporters = {i.reporter for i in infos}
     verdicts = Counter(i.verdict for i in infos)
     first, last = min(i.created_at for i in infos), max(i.created_at for i in infos)
-    fmt = lambda d: d.strftime("%Y-%m-%d %H:%M UTC")
+    def fmt(d):
+        return d.strftime("%Y-%m-%d %H:%M UTC")
+
     subjects = Counter(i.subject for i in infos).most_common(_TOP)
 
     lines = [
