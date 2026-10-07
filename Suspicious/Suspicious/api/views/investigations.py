@@ -24,6 +24,7 @@ from api.serializers.investigations import (
     InvestigationRowSerializer,
 )
 from connectors.base import EVENT_CASE_MODIFIED
+from connectors.contrib.case_search.service import search_case_ids
 from connectors.dispatch import emit
 from profiles.profiles_utils.scope import scoped_case_queryset
 
@@ -160,25 +161,30 @@ class InvestigationAccessMixin:
             # ── ID search ────────────────────────────────────────────────────
             id_q = Q(pk=int(search)) if search.strip().isdigit() else Q()
 
-            # ── Text search across all meaningful string fields ───────────────
-            text_q = (
-                Q(description__icontains=search)
-                | Q(reporter__email__icontains=search)
-                | Q(reporter__username__icontains=search)
-                | Q(fileOrMail__mail__subject__icontains=search)
-                | Q(fileOrMail__file__file_path__icontains=search)
-                | Q(nonFileIocs__url__address__icontains=search)
-                | Q(nonFileIocs__ip__address__icontains=search)
-                | Q(nonFileIocs__hash__value__icontains=search)
-                | Q(observable_group__artifacts__url__address__icontains=search)
-                | Q(observable_group__artifacts__ip__address__icontains=search)
-                | Q(observable_group__artifacts__hash__value__icontains=search)
-                | Q(observable_group__artifacts__domain__value__icontains=search)
-            )
+            es_ids = search_case_ids(search)
+            if es_ids is not None:
+                # ES answered: the text match is a plain pk filter (no joins, no distinct).
+                queryset = queryset.filter(id_q | Q(pk__in=es_ids))
+            else:
+                # ── Text search across all meaningful string fields ───────────
+                text_q = (
+                    Q(description__icontains=search)
+                    | Q(reporter__email__icontains=search)
+                    | Q(reporter__username__icontains=search)
+                    | Q(fileOrMail__mail__subject__icontains=search)
+                    | Q(fileOrMail__file__file_path__icontains=search)
+                    | Q(nonFileIocs__url__address__icontains=search)
+                    | Q(nonFileIocs__ip__address__icontains=search)
+                    | Q(nonFileIocs__hash__value__icontains=search)
+                    | Q(observable_group__artifacts__url__address__icontains=search)
+                    | Q(observable_group__artifacts__ip__address__icontains=search)
+                    | Q(observable_group__artifacts__hash__value__icontains=search)
+                    | Q(observable_group__artifacts__domain__value__icontains=search)
+                )
 
-            # .distinct(): observable_group__artifacts is a reverse FK, so the
-            # join fans a group case out to one row per indicator.
-            queryset = queryset.filter(id_q | text_q).distinct()
+                # .distinct(): observable_group__artifacts is a reverse FK, so the
+                # join fans a group case out to one row per indicator.
+                queryset = queryset.filter(id_q | text_q).distinct()
 
         if status_filter != "ALL":
             if status_filter == "UNKNOWN":
