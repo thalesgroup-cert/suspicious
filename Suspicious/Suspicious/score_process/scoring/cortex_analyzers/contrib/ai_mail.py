@@ -189,7 +189,8 @@ class AiMailParser(AnalyzerParser):
             campaign = get_phishing_campaign(similar) or campaign
             alert_id, item_type, item = self._get_or_create_alert(campaign, hive_url, hive_key)
 
-            if item_type == "new":
+            created_now = item_type == "new"
+            if created_now:
                 update_suspicious_collection(
                     campaign, alert_id, item.get("sourceRef", ""), collection
                 )
@@ -207,6 +208,11 @@ class AiMailParser(AnalyzerParser):
         all_case_ids = list(dict.fromkeys(campaign_case_ids + [self.case_id]))
 
         minio_client = self._make_minio_client()
+
+        # A new alert gets every campaign case; joining an existing one only this
+        # case, the others were attached when they joined.
+        if not created_now:
+            all_case_ids = [self.case_id]
 
         for case_id in all_case_ids:
             self._attach_case_to_alert(
@@ -264,37 +270,47 @@ class AiMailParser(AnalyzerParser):
         verify: str | bool = True,
     ) -> None:
         try:
-            case     = Case.objects.get(id=case_id)
-            case.thehive_alert_id = alert_id
-            case.save(update_fields=["thehive_alert_id"])
-            mail_id  = str(case.fileOrMail.mail.mail_id)
-            reporter = case.reporter.username
+            # The creator, the case's own pass and every later reconcile all
+            # try to attach a case; hold a per-case lock and attach it once.
+            with cache_lock(f"thehive:attach:{case_id}", ttl=300, wait=120):
+                case = Case.objects.get(id=case_id)
+                if case.thehive_alert_id == alert_id:
+                    return
+                mail_id  = str(case.fileOrMail.mail.mail_id)
+                reporter = case.reporter.username
 
-            zip_name, zip_bytes = build_mail_zip_from_minio(minio_client, mail_id, reporter)
-            headers, _eml, _txt, html = fetch_mail_files_from_minio(minio_client, mail_id)
+                zip_name, zip_bytes = build_mail_zip_from_minio(minio_client, mail_id, reporter)
+                headers, _eml, _txt, html = fetch_mail_files_from_minio(minio_client, mail_id)
 
-            # Independent steps: one refused call (e.g. a TheHive 403) must not
-            # discard the others.
-            steps = []
-            if zip_bytes:
-                steps.append(("attachment", lambda: add_binary_attachment_to_item(
-                    item_type, alert_id, zip_name, zip_bytes, hive_url, hive_key, verify)))
-            if headers:
-                steps.append(("header observables", lambda: add_observables_to_item(
-                    item_type, alert_id, build_mail_observables_from_headers(headers),
-                    hive_url, hive_key)))
-            if html:
-                steps.append(("html observables", lambda: add_observables_to_item(
-                    item_type, alert_id, build_mail_observables_from_html(html),
-                    hive_url, hive_key)))
-            for label, step in steps:
-                try:
-                    step()
-                except Exception as exc:
-                    logger.warning(
-                        "TheHive %s failed for case %s (alert %s): %s",
-                        label, case_id, alert_id, exc,
-                    )
+                # Independent steps: one refused call (e.g. a TheHive 403) must
+                # not discard the others.
+                steps = []
+                if zip_bytes:
+                    steps.append(("attachment", lambda: add_binary_attachment_to_item(
+                        item_type, alert_id, zip_name, zip_bytes, hive_url, hive_key, verify)))
+                if headers:
+                    steps.append(("header observables", lambda: add_observables_to_item(
+                        item_type, alert_id, build_mail_observables_from_headers(headers),
+                        hive_url, hive_key)))
+                if html:
+                    steps.append(("html observables", lambda: add_observables_to_item(
+                        item_type, alert_id, build_mail_observables_from_html(html),
+                        hive_url, hive_key)))
+                failed = False
+                for label, step in steps:
+                    try:
+                        step()
+                    except Exception as exc:
+                        failed = True
+                        logger.warning(
+                            "TheHive %s failed for case %s (alert %s): %s",
+                            label, case_id, alert_id, exc,
+                        )
+
+                # Marked only on success, so a failed case is retried by the next pass.
+                if not failed:
+                    case.thehive_alert_id = alert_id
+                    case.save(update_fields=["thehive_alert_id"])
 
         except Case.DoesNotExist:
             logger.warning("Case %s not found — skipping attachment.", case_id)

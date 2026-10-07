@@ -111,3 +111,70 @@ class AttachStepsTest(SimpleTestCase):
                 p._attach_case_to_alert(7, "~1", "alert", MagicMock(), "http://hive", "k")
         self.assertEqual(add_obs.call_count, 2)
         self.assertTrue(any("attachment" in line.lower() and "403" in line for line in logs.output))
+
+
+class AttachScopeTest(SimpleTestCase):
+    """A new alert gets every campaign case; joining an existing one only the new case."""
+
+    def _run(self, similar_case_ids, existing_alert):
+        p = _parser(case_id=9)
+        meta = lambda cid, alerts: {"suspicious_case_id": str(cid), "alert_ids": alerts, "headers": "{'Subject': ['Pay']}"}
+        alerts = '["", "~1"]' if existing_alert else '[""]'
+        similar = {"ids": [[f"d{c}" for c in similar_case_ids]],
+                   "metadatas": [[meta(c, alerts) for c in similar_case_ids]],
+                   "documents": [["" for _ in similar_case_ids]],
+                   "embeddings": [[[0] for _ in similar_case_ids]],
+                   "distances": [[0.1 for _ in similar_case_ids]]}
+        result = MagicMock()
+        result.details = {"report": {"email_embedding": json.dumps([[0.1]])}}
+        with patch(f"{M}.get_similar_dangerous_mails", return_value=similar), \
+                patch(f"{M}.create_new_alert", return_value={"_id": "~new", "sourceRef": "r"}), \
+                patch(f"{M}.get_item_from_id", return_value=("alert", {"sourceRef": "r"})), \
+                patch(f"{M}.update_suspicious_collection"), \
+                patch.object(AiMailParser, "_attach_case_to_alert") as attach, \
+                patch.object(AiMailParser, "_add_to_chroma"), \
+                patch.object(AiMailParser, "_make_minio_client"):
+            p._handle_campaign(result, MagicMock())
+        return sorted(c.args[0] for c in attach.call_args_list)
+
+    def test_new_alert_attaches_every_campaign_case(self):
+        self.assertEqual(self._run([1, 2, 3], existing_alert=False), [1, 2, 3, 9])
+
+    def test_joining_an_alert_attaches_only_the_new_case(self):
+        self.assertEqual(self._run([1, 2, 3], existing_alert=True), [9])
+
+
+class AttachOnceTest(SimpleTestCase):
+    """The creator, the case's own pass and every reconcile all try to attach a
+    case; it must reach the alert exactly once."""
+
+    def _attach(self, *, already, fail=False):
+        p = _parser()
+        case = MagicMock(thehive_alert_id="~1" if already else "")
+        case.fileOrMail.mail.mail_id = "261007071836-aaa"
+        case.reporter.username = "u"
+        upload = MagicMock(side_effect=RuntimeError("403") if fail else None)
+        with patch(f"{M}.Case") as case_model, \
+                patch(f"{M}.build_mail_zip_from_minio", return_value=("z.zip", b"PK")), \
+                patch(f"{M}.fetch_mail_files_from_minio", return_value=("", "", "", "")), \
+                patch(f"{M}.add_binary_attachment_to_item", upload):
+            case_model.objects.get.return_value = case
+            case_model.DoesNotExist = type("DoesNotExist", (Exception,), {})
+            cache.delete("thehive:attach:7")
+            p._attach_case_to_alert(7, "~1", "alert", MagicMock(), "http://hive", "k")
+        return case, upload
+
+    def test_already_attached_case_is_skipped(self):
+        _case, upload = self._attach(already=True)
+        upload.assert_not_called()
+
+    def test_success_marks_the_case_attached(self):
+        case, upload = self._attach(already=False)
+        upload.assert_called_once()
+        self.assertEqual(case.thehive_alert_id, "~1")
+        case.save.assert_called_with(update_fields=["thehive_alert_id"])
+
+    def test_failure_leaves_it_unmarked_so_the_next_pass_retries(self):
+        case, _upload = self._attach(already=False, fail=True)
+        self.assertEqual(case.thehive_alert_id, "")
+        case.save.assert_not_called()
