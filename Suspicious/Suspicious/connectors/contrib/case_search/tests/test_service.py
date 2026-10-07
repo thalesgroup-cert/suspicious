@@ -132,3 +132,14 @@ class DescriptionTruncationTests(TestCase):
         user = User.objects.create_user("trunc", "t@x.io", "pw")
         case = Case.objects.create(description="x" * 10_000, reporter=user)
         self.assertEqual(len(service.build_document(case)["description"]), 4096)
+
+
+class GetClientTests(TestCase):
+    def test_client_has_no_retries_and_uses_timeout(self):
+        stub = types.ModuleType("elasticsearch")
+        stub.Elasticsearch = mock.Mock()
+        with mock.patch.dict(sys.modules, {"elasticsearch": stub}):
+            service.get_client({"url": "http://es:9200"}, timeout=2.0)
+        stub.Elasticsearch.assert_called_once_with(
+            "http://es:9200", request_timeout=2.0, max_retries=0,
+        )

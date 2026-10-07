@@ -31,7 +31,11 @@ CASE_RELATED = (
 def get_client(config: dict, timeout: float):
     from elasticsearch import Elasticsearch
 
-    return Elasticsearch(config.get("url") or DEFAULT_URL, request_timeout=timeout)
+    # max_retries=0: the client's default 3 retries would multiply request_timeout
+    # (a hung ES = ~4x the 2 s search bound); the connector framework retries events.
+    return Elasticsearch(
+        config.get("url") or DEFAULT_URL, request_timeout=timeout, max_retries=0,
+    )
 
 
 def index_body() -> dict:
