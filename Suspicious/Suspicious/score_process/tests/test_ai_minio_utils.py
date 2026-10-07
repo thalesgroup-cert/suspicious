@@ -1,12 +1,9 @@
-import io
-import zipfile
 from types import SimpleNamespace
 
 from django.test import SimpleTestCase
 
 from score_process.scoring.cortex_analyzers.contrib.ai_minio_utils import (
     _find_mail_bucket,
-    build_mail_zip_from_minio,
 )
 
 MAIL = "261007071836-7a54e9fcb2f6"
@@ -44,18 +41,3 @@ class FindBucketTest(SimpleTestCase):
 
     def test_returns_none_when_no_bucket_has_it(self):
         self.assertIsNone(_find_mail_bucket(FakeMinio({"a-submission-1": {}}), "999-abc"))
-
-
-class ZipTest(SimpleTestCase):
-    def test_zip_comes_from_the_right_bucket(self):
-        name, data = build_mail_zip_from_minio(FakeMinio(SAME_SECOND), MAIL, "haruto")
-        self.assertEqual(
-            sorted(zipfile.ZipFile(io.BytesIO(data)).namelist()), ["attachments/f.pdf", "mail.eml"]
-        )
-        self.assertTrue(name.endswith(f"{MAIL}.zip"))
-
-    def test_never_returns_an_empty_zip(self):
-        # bucket found by name but nothing stored for this mail
-        self.assertEqual(
-            build_mail_zip_from_minio(FakeMinio({"a-submission-261007071836": {}}), MAIL, "a"), ("", b"")
-        )

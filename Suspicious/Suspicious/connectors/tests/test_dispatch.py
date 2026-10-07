@@ -143,3 +143,26 @@ class DispatchTest(TestCase):
         from connectors.delivery import run_sync_now
         run_sync_now("dummy")
         self.assertEqual(DummyConnector.calls, [])
+
+
+class CampaignEmitTest(TestCase):
+    def test_emit_passes_the_campaign_id_in_the_payload(self):
+        import dataclasses
+
+        from connectors.base import EVENT_CAMPAIGN_UPDATED
+        from connectors.registry import ConnectorRegistry
+
+        class Subscriber(DummyConnector):
+            manifest = dataclasses.replace(DummyConnector.manifest, events=(EVENT_CAMPAIGN_UPDATED,))
+
+        ConnectorState.objects.create(name="dummy", enabled=True)
+        registry = ConnectorRegistry()
+        registry.register(Subscriber)
+        from connectors.dispatch import emit
+        with mock.patch("connectors.dispatch.registry", registry), \
+                mock.patch("connectors.delivery.registry", registry), \
+                mock.patch("connectors.tasks.deliver_event") as task:
+            with self.captureOnCommitCallbacks(execute=True):
+                emit(EVENT_CAMPAIGN_UPDATED, make_case(), campaign_id=5)
+        payload = task.delay.call_args.args[2]
+        self.assertEqual(payload["campaign_id"], 5)

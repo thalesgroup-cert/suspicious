@@ -12,7 +12,8 @@ from typing import Any, ClassVar
 
 EVENT_CASE_CREATED = "case_created"
 EVENT_CASE_FINALISED = "case_finalised"
-VALID_EVENTS = frozenset({EVENT_CASE_CREATED, EVENT_CASE_FINALISED})
+EVENT_CAMPAIGN_UPDATED = "campaign_updated"
+VALID_EVENTS = frozenset({EVENT_CASE_CREATED, EVENT_CASE_FINALISED, EVENT_CAMPAIGN_UPDATED})
 
 FIELD_TYPES = frozenset({"str", "int", "bool", "url", "secret"})
 
@@ -93,6 +94,7 @@ class CaseEvent:
     reporter_email: str
     created_at: str
     schema_version: int = CASE_EVENT_SCHEMA_VERSION
+    campaign_id: int | None = None  # set on campaign_updated; the triggering case is case_id
 
     def to_dict(self) -> dict:
         return asdict(self)
@@ -123,6 +125,9 @@ class Connector(ABC):
         raise NotImplementedError
 
     def on_case_finalised(self, event: CaseEvent) -> None:  # pragma: no cover
+        raise NotImplementedError
+
+    def on_campaign_updated(self, event: CaseEvent) -> None:  # pragma: no cover
         raise NotImplementedError
 
     def sync(self) -> None:  # pragma: no cover
