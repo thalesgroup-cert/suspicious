@@ -3,15 +3,13 @@ MISP event manager — get-or-create logic for case and monthly events.
 """
 from __future__ import annotations
 import logging
-import time
-from contextlib import contextmanager
 from datetime import datetime
 from typing import Optional
 
-from django.core.cache import cache
 from pymisp import MISPEvent
 
 from case_handler.models import Case
+from common.locks import cache_lock
 from .client import MISPClient
 from .config_loader import load_misp_settings
 from .utils import (
@@ -27,20 +25,9 @@ logger = logging.getLogger(__name__)
 _LOCK_TTL = 60
 
 
-@contextmanager
 def _event_lock(name: str, wait: float = 45.0):
-    """Serialise find-or-create for one MISP event name across workers; without
-    it concurrent deliveries each miss the search and create duplicate events."""
-    key = f"misp_event_lock:{name}"
-    deadline = time.monotonic() + wait
-    while not cache.add(key, 1, timeout=_LOCK_TTL):
-        if time.monotonic() > deadline:
-            raise RuntimeError("Timed out waiting for MISP event lock %r" % name)
-        time.sleep(0.2)
-    try:
-        yield
-    finally:
-        cache.delete(key)
+    """Serialise find-or-create for one MISP event name across workers."""
+    return cache_lock(f"misp_event_lock:{name}", ttl=_LOCK_TTL, wait=wait)
 
 
 class MISPEventManager:
