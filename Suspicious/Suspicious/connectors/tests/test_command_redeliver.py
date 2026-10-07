@@ -55,3 +55,37 @@ class RedeliverCommandTest(TestCase):
     def test_unknown_connector_errors(self):
         with self.assertRaises(CommandError):
             call_command("redeliver_connector", "nope", stdout=StringIO())
+
+
+class RedeliverCampaignTest(TestCase):
+    """campaign_updated needs the campaign id the original event carried."""
+
+    def setUp(self):
+        self.user = User.objects.create_user("u2", password="x")
+
+    def _failed(self, *, member):
+        from case_handler.models import Campaign, CampaignMember
+        case = Case.objects.create(description="d", reporter=self.user)
+        row = D.objects.create(connector="thehive", event="campaign_updated", case_id=case.id,
+                               status="failed", attempt=3)
+        D.objects.filter(pk=row.pk).update(created_at=timezone.now() - timedelta(hours=1))
+        campaign = Campaign.objects.create(title="c")
+        if member:
+            CampaignMember.objects.create(campaign=campaign, case=case)
+        return case, campaign
+
+    def _run(self):
+        with patch("connectors.management.commands.redeliver_connector.emit") as emit:
+            call_command("redeliver_connector", "thehive", "--event", "campaign_updated", stdout=StringIO())
+        return emit.call_args_list
+
+    def test_emits_with_the_campaign_the_case_belongs_to(self):
+        case, campaign = self._failed(member=True)
+        calls = self._run()
+        self.assertEqual(len(calls), 1)
+        self.assertEqual(calls[0].args, ("campaign_updated", case))
+        self.assertEqual(calls[0].kwargs, {"campaign_id": campaign.id})
+
+    def test_a_case_with_no_campaign_is_skipped(self):
+        self._failed(member=False)
+        self.assertEqual(self._run(), [])

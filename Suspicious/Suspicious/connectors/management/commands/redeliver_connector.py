@@ -12,6 +12,7 @@ from django.core.management.base import BaseCommand, CommandError
 from django.utils import timezone
 
 from case_handler.models import Case
+from connectors.base import EVENT_CAMPAIGN_UPDATED
 from connectors.dispatch import emit
 from connectors.models import ConnectorDelivery
 from connectors.registry import registry
@@ -58,5 +59,11 @@ class Command(BaseCommand):
         self.stdout.write(f"{len(todo)} case(s) to redeliver to {name}: {todo}")
         if opts["dry_run"]:
             return
-        for case in Case.objects.filter(pk__in=todo):
-            emit(opts["event"], case)
+        for case in Case.objects.filter(pk__in=todo).select_related("campaign_membership"):
+            if opts["event"] == EVENT_CAMPAIGN_UPDATED:
+                # the event carries the campaign; a case that left none has nothing to resend
+                membership = getattr(case, "campaign_membership", None)
+                if membership is not None:
+                    emit(opts["event"], case, campaign_id=membership.campaign_id)
+            else:
+                emit(opts["event"], case)
