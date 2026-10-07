@@ -27,7 +27,7 @@ logger = logging.getLogger("connectors.contrib.smtp_notify")
 class SmtpNotifyConnector(Connector):
     manifest = ConnectorManifest(
         name="smtp_notify",
-        version="1.0.0",
+        version="1.1.0",
         author="Thales CERT",
         category="Notifications",
         description="Email the reporter their case verdict. Uses the shared "
