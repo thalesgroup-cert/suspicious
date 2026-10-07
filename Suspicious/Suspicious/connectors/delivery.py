@@ -17,6 +17,7 @@ from connectors.base import (
     EVENT_CASE_CREATED,
     EVENT_CASE_FINALISED,
     EVENT_CASE_MODIFIED,
+    EVENT_CAMPAIGN_UPDATED,
 )
 from connectors.models import ConnectorDelivery, ConnectorState
 from connectors.registry import registry
@@ -29,6 +30,7 @@ _HOOKS = {
     EVENT_CASE_CREATED: "on_case_created",
     EVENT_CASE_FINALISED: "on_case_finalised",
     EVENT_CASE_MODIFIED: "on_case_modified",
+    EVENT_CAMPAIGN_UPDATED: "on_campaign_updated",
 }
 
 

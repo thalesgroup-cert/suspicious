@@ -21,7 +21,7 @@ logger = logging.getLogger("connectors.contrib.misp")
 class MISPConnector(Connector):
     manifest = ConnectorManifest(
         name="misp",
-        version="1.0.0",
+        version="1.0.1",
         author="Thales CERT",
         category="Threat Intelligence",
         description="Push finalised cases (mail object, artifacts, IOCs) to MISP; "

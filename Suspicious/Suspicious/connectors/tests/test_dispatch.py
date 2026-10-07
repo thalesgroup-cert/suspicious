@@ -178,3 +178,26 @@ class StartDelayTest(TestCase):
 
     def test_case_finalised_is_not_delayed(self):
         self.assertEqual(self._countdown(EVENT_CASE_FINALISED), 0)
+
+
+class CampaignEmitTest(TestCase):
+    def test_emit_passes_the_campaign_id_in_the_payload(self):
+        import dataclasses
+
+        from connectors.base import EVENT_CAMPAIGN_UPDATED
+        from connectors.registry import ConnectorRegistry
+
+        class Subscriber(DummyConnector):
+            manifest = dataclasses.replace(DummyConnector.manifest, events=(EVENT_CAMPAIGN_UPDATED,))
+
+        ConnectorState.objects.create(name="dummy", enabled=True)
+        registry = ConnectorRegistry()
+        registry.register(Subscriber)
+        from connectors.dispatch import emit
+        with mock.patch("connectors.dispatch.registry", registry), \
+                mock.patch("connectors.delivery.registry", registry), \
+                mock.patch("connectors.tasks.deliver_event") as task:
+            with self.captureOnCommitCallbacks(execute=True):
+                emit(EVENT_CAMPAIGN_UPDATED, make_case(), campaign_id=5)
+        payload = task.apply_async.call_args.args[0][2]
+        self.assertEqual(payload["campaign_id"], 5)

@@ -6,7 +6,7 @@ from django.utils import timezone
 from connectors.base import CaseEvent
 
 
-def build_case_event(event_name: str, case) -> CaseEvent:
+def build_case_event(event_name: str, case, campaign_id: int | None = None) -> CaseEvent:
     reporter_email = getattr(getattr(case, "reporter", None), "email", "") or ""
     return CaseEvent(
         event=event_name,
@@ -17,4 +17,5 @@ def build_case_event(event_name: str, case) -> CaseEvent:
         confidence=getattr(case, "confidence", None),
         reporter_email=reporter_email,
         created_at=timezone.now().isoformat(),
+        campaign_id=campaign_id,
     )

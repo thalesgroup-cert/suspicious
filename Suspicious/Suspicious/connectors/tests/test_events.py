@@ -24,3 +24,20 @@ class BuildCaseEventTest(TestCase):
         self.assertEqual(event.final_score, 9.0)
         self.assertEqual(event.reporter_email, "rep@example.com")
         self.assertTrue(event.created_at)
+
+
+class CampaignIdTest(TestCase):
+    def _case(self):
+        user = get_user_model().objects.create_user(username="rep2", email="r2@example.com", password="x")
+        return Case.objects.create(reporter=user, description="t")
+
+    def test_campaign_id_is_carried_when_given(self):
+        event = build_case_event("campaign_updated", self._case(), campaign_id=5)
+        self.assertEqual(event.campaign_id, 5)
+
+    def test_defaults_to_none_and_old_payloads_still_load(self):
+        from connectors.base import CaseEvent
+        event = build_case_event("case_finalised", self._case())
+        self.assertIsNone(event.campaign_id)
+        legacy = {k: v for k, v in event.to_dict().items() if k != "campaign_id"}
+        self.assertIsNone(CaseEvent.from_dict(legacy).campaign_id)

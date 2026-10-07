@@ -68,7 +68,7 @@ connectors/
 
 - **`ConnectorManifest`** — `name` (validated slug), `version`, `category`,
   `description`, `config_schema` (tuple of `ConfigField`), `events` (subset of
-  `EVENT_CASE_CREATED` / `EVENT_CASE_FINALISED` / `EVENT_CASE_MODIFIED`), `schedules` (tuple of
+  `EVENT_CASE_CREATED` / `EVENT_CASE_FINALISED` / `EVENT_CASE_MODIFIED` / `EVENT_CAMPAIGN_UPDATED`), `schedules` (tuple of
   `Schedule`), `enabled_by_default`. `.validate()` runs at registration time —
   a connector with an invalid manifest fails to register, it does not take the
   app down.
@@ -119,7 +119,7 @@ connectors/
 
 | Connector | Category | Trigger | Default | Notes |
 |---|---|---|---|---|
-| `thehive` | Incident Response | `case_finalised` | off | Pushes a TheHive alert |
+| `thehive` | Incident Response | `case_finalised`, `campaign_updated` | off | Pushes a TheHive alert for IOC cases, and creates/updates the alert of a detected phishing campaign (see below) |
 | `misp` | Threat Intelligence | `case_finalised` | off | Pushes an MISP event |
 | `smtp_notify` | Notifications | `case_created`, `case_finalised`, `case_modified` | **on** | Emails the reporter: acknowledgement on creation, review mail when an analyst changes the verdict, final result on completion. A failed send raises and the framework retries it. Challenge-workflow notifications are separate and wired directly (`tasp/services/challenge.py`), not through this connector |
 | `chromadb` | Maintenance | scheduled (daily) | **on** | Vector-store cleanup, not case-event-driven |
@@ -161,6 +161,28 @@ Framework tests live in `connectors/tests/`; each contrib connector has its own
 (`test_registry.py`, `test_dispatch.py` — covers `delivery.py` too, `test_models.py`,
 `test_events.py`, `test_wiring.py`, `test_status.py`).
 
+### Phishing campaigns and TheHive
+
+Campaign detection is core, not a connector: when a case is finalised,
+`case_handler/campaigns.py` looks for at least three similar dangerous mails
+(ChromaDB similarity on the AI analyzer's embedding), groups them in a
+`Campaign`, and emits `campaign_updated` (its payload carries `campaign_id`).
+The `thehive` connector creates the campaign's alert in one multipart request,
+then adds only what is new as mails join:
+
+- **Files:** the original mail (first three) and the relevant attachments, as file
+  observables. Empty files, tracking-pixel-sized images, duplicates (by SHA-256) and
+  files above 10 MB are not uploaded; the description lists each with its reason.
+- **Observables:** URLs (refanged; from both bodies, HTML and PDF attachments),
+  domains, public IPs (URL hosts, `Received` chain), sender addresses, hashes,
+  names, subject and message ids. The organisation's own and allow-listed domains
+  are dropped.
+- **Alert:** TLP/PAP amber, severity 3 (4 from ten mails) for a dangerous campaign,
+  a description with the campaign facts, indicators, attachment table and case links.
+
+A failed push shows in the delivery ledger and is retried; `redeliver_connector`
+replays it.
+
 ### Redelivering lost deliveries
 
 A delivery that exhausts its retries (3 attempts, ~100s) or is skipped by an open
@@ -169,6 +191,7 @@ circuit breaker is not retried again. Replay them once the target is back:
 ```bash
 manage.py redeliver_connector misp --dry-run          # list affected cases
 manage.py redeliver_connector misp --since 2d          # re-emit case_finalised
+manage.py redeliver_connector thehive --event campaign_updated   # campaign alerts
 ```
 
 Only cases whose latest ledger row is `failed`/`skipped` (and older than `--min-age`,

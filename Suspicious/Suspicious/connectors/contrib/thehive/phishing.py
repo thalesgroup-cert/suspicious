@@ -4,10 +4,7 @@ from common.http_client import make_session, get_breaker, RETRY
 from datetime import datetime
 from secrets import token_hex
 import logging
-from .utils import extract_urls, extract_mails, parse_headers
 import os
-from email.header import decode_header, make_header
-import re
 
 
 def _thehive_config() -> dict:
@@ -22,26 +19,6 @@ def _certificate_path():
 proxies = {
     "http": None,
     "https": None,
-}
-
-PHISHING_CAMPAIGN_TEMPLATE = {
-    "title": lambda subject: f"Potential phishing campaign: {subject}",
-    "description": lambda classification, sub_classification, email_example: (
-        f"A potential phishing campaign has been detected. "
-        f"The AI Analyzer classified the emails as {sub_classification} ({classification}). "
-        f"\n\n---\n\nExample email:\n```\n{email_example}\n```"
-    ),
-    "severity": 1,
-    "tlp": 1,
-    "pap": 1,
-    "tags": ['enisa:nefarious-activity-abuse="phishing-attack"', "email", "campaign", "suspicious"],
-}
-
-NEW_MAIL_IN_CAMPAIGN_TEMPLATE = {
-    "message": lambda timestamp, suspicious_case_id, n_mail: (
-        f"New mail in phishing campaign detected at {timestamp} "
-        f"in suspicious case {suspicious_case_id}. Total mails: {n_mail}"
-    ),
 }
 
 logger = logging.getLogger(__name__)
@@ -273,78 +250,6 @@ def build_mail_attachments_paths(headers, eml, txt, html, suspicious_case_id):
             attachments.append(path)
 
     return attachments
-
-
-def build_mail_observables_from_html(html):
-    return [
-        {
-            "dataType": "url",
-            "data": url,
-            "tlp": 1,
-            "pap": 1,
-            "tags": ["url", "suspicious", 'enisa:nefarious-activity-abuse="phishing-attack"'],
-            "message": "Mail body URL",
-        }
-        for url in extract_urls(html)
-    ]
-
-
-def decode_mime_header(value):
-    try:
-        if isinstance(value, list):
-            value = value[0]
-        if not isinstance(value, str):
-            value = str(value)
-        if re.search(r"=\?.+?\?[bBqQ]\?.+?\?=", value):
-            return str(make_header(decode_header(value)))
-        return value
-    except Exception:
-        return str(value)
-
-
-def build_mail_observables_from_headers(str_headers):
-    headers = parse_headers(str_headers)
-    observables = []
-
-    if headers.get("Subject"):
-        decoded_subject = decode_mime_header(headers["Subject"][0])
-        observables.append({
-            "dataType": "mail-subject",
-            "data": decoded_subject,
-            "tlp": 1,
-            "pap": 1,
-            "tags": ["subject", "suspicious", 'enisa:nefarious-activity-abuse="phishing-attack"'],
-            "message": "Mail subject",
-        })
-
-    for key, label, message in [
-        ("From", "sender", "Mail sender"),
-        ("Reply-To", "reply-to", "Reply-To"),
-        ("In-Reply-To", "in-reply-to", "In-Reply-To"),
-    ]:
-        if not headers.get(key):
-            continue
-        value = headers[key][0] if key != "In-Reply-To" else headers[key]
-        observables.append({
-            "dataType": "other",
-            "data": str(value),
-            "tlp": 1,
-            "pap": 1,
-            "tags": [label, "suspicious", 'enisa:nefarious-activity-abuse="phishing-attack"'],
-            "message": f'"{key}" header field',
-        })
-        mails = extract_mails(str(value))
-        if mails:
-            observables.append({
-                "dataType": "mail",
-                "data": mails[0],
-                "tlp": 1,
-                "pap": 1,
-                "tags": [label, "suspicious", 'enisa:nefarious-activity-abuse="phishing-attack"'],
-                "message": message,
-            })
-
-    return observables
 
 
 def get_item_from_id(item_id, thehive_url, api_key):

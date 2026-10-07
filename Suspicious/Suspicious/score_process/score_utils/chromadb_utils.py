@@ -35,6 +35,12 @@ def get_similar_dangerous_mails(embedding, suspicious_collection, n_results: int
 def add_to_suspicious_collection(full, alert_id, sourceRef, suspicious_case_id, suspicious_collection):
     timestamp = datetime.now()
 
+    # One document per case: the report is re-parsed on every reconcile pass, and
+    # each extra copy would count as another "similar mail" towards a campaign.
+    doc_id = f"case-{suspicious_case_id}"
+    if suspicious_case_id is not None and suspicious_collection.get(ids=[doc_id]).get("ids"):
+        return None
+
     suspicious_collection.add(
         documents=full["report"]["analyzed_mail_content"],
         embeddings=json.loads(full["report"]["email_embedding"]),
@@ -49,7 +55,8 @@ def add_to_suspicious_collection(full, alert_id, sourceRef, suspicious_case_id, 
             'sourceRefs': json.dumps([str(sourceRef)]),
             'suspicious_case_id': str(suspicious_case_id),
         }],
-        ids=timestamp.strftime("%y%m%d") + "-" + str(token_hex(8)),
+        ids=doc_id if suspicious_case_id is not None
+        else timestamp.strftime("%y%m%d") + "-" + str(token_hex(8)),
     )
 
     return timestamp
@@ -73,20 +80,10 @@ def _parse_list_field(value: str) -> list:
     return [value] if value else []
 
 
-def update_suspicious_collection(phishing_campaign, alert_id, sourceRef, suspicious_collection):
-    for i in range(len(phishing_campaign['ids'][0])):
-        updated_metadatas = dict(phishing_campaign['metadatas'][0][i])
-
-        existing_alert_ids = _parse_list_field(updated_metadatas.get('alert_ids', '[]'))
-        existing_source_refs = _parse_list_field(updated_metadatas.get('sourceRefs', '[]'))
-
-        existing_alert_ids.append(str(alert_id))
-        existing_source_refs.append(str(sourceRef))
-
-        updated_metadatas['alert_ids'] = json.dumps(existing_alert_ids)
-        updated_metadatas['sourceRefs'] = json.dumps(existing_source_refs)
-
-        suspicious_collection.update(
-            ids=phishing_campaign['ids'][0][i],
-            metadatas=updated_metadatas,
-        )
+def set_campaign_ref(suspicious_collection, doc_ids, ref):
+    """Tag documents with their campaign: the Campaigns page groups mails by sourceRefs."""
+    found = suspicious_collection.get(ids=list(doc_ids))
+    for doc_id, metadata in zip(found.get("ids") or [], found.get("metadatas") or []):
+        updated = dict(metadata)
+        updated["sourceRefs"] = json.dumps([ref])
+        suspicious_collection.update(ids=doc_id, metadatas=updated)

@@ -17,14 +17,14 @@ logger = logging.getLogger("connectors.dispatch")
 _START_DELAY_SECONDS = {EVENT_CASE_CREATED: 5}
 
 
-def emit(event_name: str, case) -> None:
+def emit(event_name: str, case, campaign_id: int | None = None) -> None:
     """Fan one event out to every enabled subscriber. Enqueued on_commit so
     connectors never observe uncommitted case state. Never raises."""
     try:
         from connectors.delivery import get_state
         from connectors.tasks import deliver_event
 
-        payload = build_case_event(event_name, case).to_dict()
+        payload = build_case_event(event_name, case, campaign_id).to_dict()
         names = [
             name for name in registry.subscribers(event_name)
             if get_state(name).enabled

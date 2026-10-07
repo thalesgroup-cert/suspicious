@@ -361,3 +361,38 @@ class ObservableGroupArtifact(models.Model):
         obj = self.observable()
         val = getattr(obj, "address", None) or getattr(obj, "value", None) or self.pk
         return f"{self.artifact_type}: {val}"
+
+
+def _new_campaign_ref() -> str:
+    return "CAMP-" + datetime.datetime.now().strftime("%y%m%d") + "-" + secrets.token_hex(3)[:5]
+
+
+class Campaign(models.Model):
+    """A group of similar dangerous mails, detected at finalisation.
+
+    ``ref`` is the stable identity everything else keys on (the Campaigns page
+    groups ChromaDB documents by it, and it is the TheHive alert's sourceRef).
+    ``external_refs`` maps a connector name to its object id, e.g.
+    ``{"thehive": "~123"}``.
+    """
+
+    ref = models.CharField(max_length=32, unique=True, default=_new_campaign_ref)
+    title = models.CharField(max_length=255, blank=True)
+    created_at = models.DateTimeField(auto_now_add=True)
+    updated_at = models.DateTimeField(auto_now=True)
+    external_refs = models.JSONField(default=dict, blank=True)
+
+    def __str__(self):
+        return f"{self.ref} ({self.title[:40]})"
+
+
+class CampaignMember(models.Model):
+    """A case in a campaign; ``synced`` lists the connectors that already got it."""
+
+    campaign = models.ForeignKey(Campaign, on_delete=models.CASCADE, related_name="members")
+    case = models.OneToOneField(Case, on_delete=models.CASCADE, related_name="campaign_membership")
+    joined_at = models.DateTimeField(auto_now_add=True)
+    synced = models.JSONField(default=list, blank=True)
+
+    class Meta:
+        ordering = ["joined_at", "id"]

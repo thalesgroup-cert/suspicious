@@ -51,6 +51,12 @@ class ManifestValidationTest(SimpleTestCase):
         make_manifest(events=(EVENT_CASE_MODIFIED,)).validate()
         self.assertEqual(_HOOKS[EVENT_CASE_MODIFIED], "on_case_modified")
 
+    def test_campaign_updated_event_valid_and_routed_to_its_hook(self):
+        from connectors.base import EVENT_CAMPAIGN_UPDATED
+        from connectors.delivery import _HOOKS
+        make_manifest(events=(EVENT_CAMPAIGN_UPDATED,)).validate()
+        self.assertEqual(_HOOKS[EVENT_CAMPAIGN_UPDATED], "on_campaign_updated")
+
 
 class CaseEventRoundTripTest(SimpleTestCase):
     def test_to_dict_from_dict_round_trip(self):

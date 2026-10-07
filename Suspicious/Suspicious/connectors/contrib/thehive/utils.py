@@ -7,7 +7,6 @@ from email.header import decode_header
 
 from .models import Observable
 from collections import Counter, defaultdict
-import json
 import ast
 import logging
 import html
@@ -243,27 +242,6 @@ def get_phishing_campaign(similar_mails):
         return phshing_campaign_mails
     else:
         return None
-    
-def get_most_common_alert_id(phishing_campaign):
-    ids = []
-    for mail in phishing_campaign['metadatas'][0]:
-        if mail['alert_ids']:
-            try:
-                alert_ids = json.loads(mail['alert_ids'])
-            except json.JSONDecodeError:
-                try:
-                    alert_ids = mail['alert_ids'].strip("'[]").split("', '")
-                    alert_ids = [id.strip("'") for id in alert_ids]
-                except Exception:
-                    continue
-            
-            if alert_ids and alert_ids[0]:
-                ids.extend(alert_ids)
-
-    if ids:
-        return Counter(ids).most_common()[0][0]
-    else:
-        return ''
     
 def get_most_common_subject(phishing_campaign):
     subjects = []
