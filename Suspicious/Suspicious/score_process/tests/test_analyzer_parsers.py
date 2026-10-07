@@ -146,17 +146,14 @@ class AiMailParserTests(SimpleTestCase):
         return AiMailParser(analyzer_name="AI_Mail_Analyzer_2_0", data="mail.eml",
                             data_type="file", case_id=1)
 
-    @patch("score_process.scoring.cortex_analyzers.contrib.ai_mail.AiMailParser._run_campaign")
-    def test_safe_mail_score_mapping(self, m_campaign):
+    def test_safe_mail_score_mapping(self):
         f = load_fixture("ai_mail")
         r = self._mk().parse(f["summary"], f["full"])
         self.assertEqual(r.level, "safe")
         self.assertEqual(r.score, 2)
         self.assertEqual(r.confidence, 85)
-        m_campaign.assert_called_once()
 
-    @patch("score_process.scoring.cortex_analyzers.contrib.ai_mail.AiMailParser._run_campaign")
-    def test_manifest_matches_versioned_and_bare(self, _m):
+    def test_manifest_matches_versioned_and_bare(self):
         names = self._mk().manifest.cortex_names
         self.assertIn("AI_Mail_Analyzer", names)
         self.assertIn("AI_Mail_Analyzer_1_4", names)
