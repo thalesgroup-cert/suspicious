@@ -14,6 +14,7 @@ from common.clients import get_chroma_client
 from common.locks import cache_lock
 from connectors.base import EVENT_CAMPAIGN_UPDATED
 from connectors.contrib.thehive.utils import (
+    parse_and_decode_defaultdict,
     extract_sender_domain_from_headers,
     get_most_common_subject,
     get_phishing_campaign,
@@ -47,6 +48,16 @@ def ai_full_report(case: Case) -> dict | None:
     return full if isinstance(full, dict) and full.get("report") else None
 
 
+def _with_decoded_headers(full: dict) -> dict:
+    """The report keeps the headers as the repr of a defaultdict; decode them to a dict."""
+    report = dict(full["report"])
+    try:
+        report["analyzed_mail_headers"] = parse_and_decode_defaultdict(str(report.get("analyzed_mail_headers", "")))
+    except Exception as exc:  # noqa: BLE001 — keep the raw value rather than lose the mail
+        logger.warning("Could not decode mail headers for campaign detection: %s", exc)
+    return {**full, "report": report}
+
+
 def _case_ids(docs: dict) -> list[int]:
     ids = []
     for meta in docs["metadatas"][0]:
@@ -72,6 +83,7 @@ def detect_campaign(case: Case) -> Campaign | None:
     full = ai_full_report(case)
     if not full:
         return None
+    full = _with_decoded_headers(full)
     try:
         collection = get_suspicious_collection(get_chroma_client())
     except Exception as exc:  # noqa: BLE001

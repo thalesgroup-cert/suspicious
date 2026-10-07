@@ -80,24 +80,6 @@ def _parse_list_field(value: str) -> list:
     return [value] if value else []
 
 
-def update_suspicious_collection(phishing_campaign, alert_id, sourceRef, suspicious_collection):
-    for i in range(len(phishing_campaign['ids'][0])):
-        updated_metadatas = dict(phishing_campaign['metadatas'][0][i])
-
-        existing_alert_ids = _parse_list_field(updated_metadatas.get('alert_ids', '[]'))
-        existing_source_refs = _parse_list_field(updated_metadatas.get('sourceRefs', '[]'))
-
-        existing_alert_ids.append(str(alert_id))
-        existing_source_refs.append(str(sourceRef))
-
-        updated_metadatas['alert_ids'] = json.dumps(existing_alert_ids)
-        updated_metadatas['sourceRefs'] = json.dumps(existing_source_refs)
-
-        suspicious_collection.update(
-            ids=phishing_campaign['ids'][0][i],
-            metadatas=updated_metadatas,
-        )
-
 def set_campaign_ref(suspicious_collection, doc_ids, ref):
     """Tag documents with their campaign: the Campaigns page groups mails by sourceRefs."""
     found = suspicious_collection.get(ids=list(doc_ids))

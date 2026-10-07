@@ -244,29 +244,6 @@ def get_phishing_campaign(similar_mails):
     else:
         return None
     
-def get_most_common_alert_id(phishing_campaign):
-    ids = []
-    for mail in phishing_campaign['metadatas'][0]:
-        if mail['alert_ids']:
-            try:
-                alert_ids = json.loads(mail['alert_ids'])
-            except json.JSONDecodeError:
-                try:
-                    alert_ids = mail['alert_ids'].strip("'[]").split("', '")
-                    alert_ids = [id.strip("'") for id in alert_ids]
-                except Exception:
-                    continue
-            
-            # A doc stored before any alert existed is [""] and the alert id is
-            # appended after that empty entry, so filter blanks rather than
-            # testing the first element.
-            ids.extend(i for i in alert_ids if i)
-
-    if ids:
-        return Counter(ids).most_common()[0][0]
-    else:
-        return ''
-    
 def get_most_common_subject(phishing_campaign):
     subjects = []
     for mail in phishing_campaign['metadatas'][0]:

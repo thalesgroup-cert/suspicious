@@ -117,6 +117,17 @@ class DetectionTest(TestCase):
             self.assertIsNone(self._detect(case, _full(), _similar([1, 2, 3])))
         self.assertNotIn(f"case-{case.id}", self.coll.docs)
 
+    def test_headers_stored_as_a_defaultdict_string_are_decoded(self):
+        # the AI report keeps analyzed_mail_headers as the repr of a defaultdict
+        full = _full()
+        full["report"]["analyzed_mail_headers"] = (
+            "defaultdict(<class 'list'>, {'From': ['HR <hr@trusted.example>'], 'Subject': ['Verify payroll']})"
+        )
+        case = _case()
+        with patch(f"{C}.is_domain_in_campaign_allow_list", side_effect=lambda d: d == "trusted.example"):
+            self.assertIsNone(self._detect(case, full, _similar([1, 2, 3])))
+        self.assertNotIn(f"case-{case.id}", self.coll.docs)
+
     def test_chroma_failure_is_contained(self):
         with patch(f"{C}.get_suspicious_collection", side_effect=RuntimeError("chroma down")):
             self.assertIsNone(self._detect(_case(), _full()))
