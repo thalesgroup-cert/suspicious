@@ -50,6 +50,20 @@ class ReconcileCoreTest(TestCase):
         reconcile_case_core(self.case)
         mock_emit.assert_called_once_with("case_finalised", self.case)
 
+    @patch("cortex_job.cortex_utils.reconciliation.run_campaign_detection")
+    @patch("cortex_job.cortex_utils.reconciliation.emit_connector_event")
+    @patch("cortex_job.cortex_utils.reconciliation.finalise")
+    def test_finalisation_runs_campaign_detection_after_the_event(self, _fin, mock_emit, mock_detect):
+        from django.utils import timezone
+        self.case.dispatched_at = timezone.now()
+        self.case.save(update_fields=["dispatched_at"])
+        order = []
+        mock_emit.side_effect = lambda *a, **k: order.append("emit")
+        mock_detect.side_effect = lambda *a, **k: order.append("detect")
+        reconcile_case_core(self.case)
+        mock_detect.assert_called_once_with(self.case)
+        self.assertEqual(order, ["emit", "detect"])
+
     @patch("cortex_job.cortex_utils.reconciliation.finalise")
     def test_young_undispatched_case_is_not_finalised(self, mock_finalise):
         from case_handler.lifecycle import LifecycleState

@@ -97,3 +97,11 @@ def update_suspicious_collection(phishing_campaign, alert_id, sourceRef, suspici
             ids=phishing_campaign['ids'][0][i],
             metadatas=updated_metadatas,
         )
+
+def set_campaign_ref(suspicious_collection, doc_ids, ref):
+    """Tag documents with their campaign: the Campaigns page groups mails by sourceRefs."""
+    found = suspicious_collection.get(ids=list(doc_ids))
+    for doc_id, metadata in zip(found.get("ids") or [], found.get("metadatas") or []):
+        updated = dict(metadata)
+        updated["sourceRefs"] = json.dumps([ref])
+        suspicious_collection.update(ids=doc_id, metadatas=updated)
