@@ -61,3 +61,15 @@ class CreateCaseWarnsTests(TestCase):
         url = URL.objects.create(address="http://b.test/")
         with self.assertNoLogs("case_handler.case_utils.case_creator", "WARNING"):
             self.assertIsNotNone(CaseCreator(self.user).create_case(url_instance=url))
+
+
+class RealModelShapeTests(TestCase):
+    def test_file_with_own_hash_is_allowed_other_hash_is_not(self):
+        from file_process.models import File
+        from hash_process.models import Hash
+
+        h = Hash.objects.create(value="a" * 64)
+        other = Hash.objects.create(value="b" * 64)
+        f = File.objects.create(linked_hash=h, file_path="x.bin", tmp_path="", other_names="")
+        self.assertIsNone(unexpected_case_shape({"file_instance": f, "hash_instance": h}))
+        self.assertEqual(unexpected_case_shape({"file_instance": f, "hash_instance": other}), "file+hash")
