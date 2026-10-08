@@ -99,6 +99,18 @@ preload_app = False
 def on_starting(server):
     server.log.info("Suspicious (Gunicorn) starting — workers: %d", workers)
 
+def post_worker_init(worker):
+    """Runs in each worker after Django is loaded and before its first request:
+    import the URLconf now instead of making the first user wait ~1.5 s."""
+    from suspicious.warmup import warm_up
+
+    elapsed = warm_up()
+    if elapsed is None:
+        worker.log.warning("worker %s: warm-up failed; first request will be slow", worker.pid)
+    else:
+        worker.log.info("worker %s warmed up in %.2fs", worker.pid, elapsed)
+
+
 def post_fork(server, worker):
     # Explicitly close any inherited DB connections in the worker so Django
     # opens a fresh one. Defensive no-op if preload_app is False, but
