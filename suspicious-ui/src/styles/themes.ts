@@ -1515,18 +1515,19 @@ export const themes: Record<ThemeName, ReturnType<typeof createTheme>> = {
     error: "#FF3B30",
     text: "#FFFFFF",
     shape: { borderRadius: 0 },
+    // Sans, not mono: mono is the terminal-theme marker (spec 1) and this theme is "maximum legibility".
     typography: {
-      fontFamily: monoStack,
-      h1: { fontFamily: monoStack, fontWeight: 900, letterSpacing: -0.5 },
-      h2: { fontFamily: monoStack, fontWeight: 900, letterSpacing: -0.3 },
-      h3: { fontFamily: monoStack, fontWeight: 900 },
-      h4: { fontFamily: monoStack, fontWeight: 800 },
-      h5: { fontFamily: monoStack, fontWeight: 800 },
-      body1: { fontFamily: monoStack, fontSize: 13, lineHeight: 1.6 },
-      body2: { fontFamily: monoStack, fontSize: 12.5, lineHeight: 1.55 },
-      caption: { fontFamily: monoStack, fontSize: 12 },
-      button: { fontFamily: monoStack, fontWeight: 900, letterSpacing: 1.4, textTransform: "uppercase" },
+      h1: { fontWeight: 900, letterSpacing: -0.5 },
+      h2: { fontWeight: 900, letterSpacing: -0.3 },
+      h3: { fontWeight: 900 },
+      h4: { fontWeight: 800 },
+      h5: { fontWeight: 800 },
+      body1: { fontSize: 13, lineHeight: 1.6 },
+      body2: { fontSize: 12.5, lineHeight: 1.55 },
+      caption: { fontSize: 12 },
+      button: { fontWeight: 900, letterSpacing: 1.4, textTransform: "uppercase" },
     },
+    // Solid borders and fills, no alpha (spec 3): hex values are the old alpha colours composited onto paper #0A0A0A (icon buttons onto #000).
     components: {
       MuiCssBaseline: {
         styleOverrides: {
@@ -1559,7 +1560,7 @@ export const themes: Record<ThemeName, ReturnType<typeof createTheme>> = {
             borderRadius: 0,
             backgroundImage: "none",
             backgroundColor: "#0A0A0A",
-            border: "2px solid rgba(255,255,255,.85)",
+            border: "2px solid #DADADA",
             boxShadow: "none",
           },
         },
@@ -1570,7 +1571,7 @@ export const themes: Record<ThemeName, ReturnType<typeof createTheme>> = {
             borderRadius: 0,
             backgroundImage: "none",
             backgroundColor: "#0A0A0A",
-            border: "2px solid rgba(255,255,255,.85)",
+            border: "2px solid #DADADA",
             borderTop: "3px solid #FFD600",
             boxShadow: "none",
           },
@@ -1580,7 +1581,7 @@ export const themes: Record<ThemeName, ReturnType<typeof createTheme>> = {
         styleOverrides: {
           root: {
             borderRadius: 0,
-            border: "2px solid rgba(255,255,255,.85)",
+            border: "2px solid #DADADA",
             letterSpacing: "0.1em",
           },
           outlined: {
@@ -1588,7 +1589,7 @@ export const themes: Record<ThemeName, ReturnType<typeof createTheme>> = {
             color: "#FFD600",
             backgroundColor: "transparent",
             "&:hover": {
-              backgroundColor: alpha("#FFD600", 0.1),
+              backgroundColor: "#221E09",
               border: "2px solid #FFE033",
             },
           },
@@ -1597,7 +1598,7 @@ export const themes: Record<ThemeName, ReturnType<typeof createTheme>> = {
             textDecoration: "underline",
             textUnderlineOffset: 3,
             "&:hover": {
-              backgroundColor: alpha("#FFD600", 0.1),
+              backgroundColor: "#221E09",
               textDecoration: "underline",
             },
           },
@@ -1627,7 +1628,7 @@ export const themes: Record<ThemeName, ReturnType<typeof createTheme>> = {
         styleOverrides: {
           root: {
             borderRadius: 0,
-            border: "1px solid rgba(255,255,255,.4)",
+            border: "1px solid #666666",
             "&:hover": { border: "1px solid #FFD600", color: "#FFD600" },
           },
         },
@@ -1640,17 +1641,16 @@ export const themes: Record<ThemeName, ReturnType<typeof createTheme>> = {
             "&.Mui-focused .MuiOutlinedInput-notchedOutline": {
               borderColor: "#FFD600",
               borderWidth: 2,
-              boxShadow: `0 0 0 3px ${alpha("#FFD600", 0.25)}`,
+              boxShadow: "0 0 0 3px #473D08",
             },
           },
-          notchedOutline: { borderColor: "rgba(255,255,255,.7)", borderWidth: 2, borderRadius: 0 },
+          notchedOutline: { borderColor: "#B6B6B6", borderWidth: 2, borderRadius: 0 },
         },
       },
       MuiChip: {
         styleOverrides: {
           root: {
             borderRadius: 0,
-            fontFamily: monoStack,
             fontWeight: 800,
             fontSize: 11,
             letterSpacing: "0.06em",
@@ -1664,7 +1664,6 @@ export const themes: Record<ThemeName, ReturnType<typeof createTheme>> = {
       MuiTableCell: {
         styleOverrides: {
           head: {
-            fontFamily: monoStack,
             fontSize: 11,
             fontWeight: 900,
             textTransform: "uppercase",
@@ -1674,8 +1673,7 @@ export const themes: Record<ThemeName, ReturnType<typeof createTheme>> = {
             borderBottom: "2px solid #FFD600",
           },
           root: {
-            fontFamily: monoStack,
-            borderBottomColor: "rgba(255,255,255,.25)",
+            borderBottomColor: "#474747",
             borderBottomWidth: 1,
           },
         },
@@ -1683,18 +1681,18 @@ export const themes: Record<ThemeName, ReturnType<typeof createTheme>> = {
       MuiTableRow: {
         styleOverrides: {
           root: {
-            "&:hover": { backgroundColor: alpha("#FFD600", 0.06) },
+            "&:hover": { backgroundColor: "#191609" },
           },
         },
       },
       MuiDivider: {
         styleOverrides: {
-          root: { borderColor: "rgba(255,255,255,.4)", borderWidth: 1 },
+          root: { borderColor: "#6C6C6C", borderWidth: 1 },
         },
       },
       MuiLinearProgress: {
         styleOverrides: {
-          root: { borderRadius: 0, backgroundColor: "rgba(255,255,255,.15)", height: 6 },
+          root: { borderRadius: 0, backgroundColor: "#2F2F2F", height: 6 },
           bar: { borderRadius: 0, backgroundColor: "#FFD600" },
         },
       },
@@ -1703,23 +1701,22 @@ export const themes: Record<ThemeName, ReturnType<typeof createTheme>> = {
           switchBase: {
             "&.Mui-checked": {
               color: "#FFD600",
-              "& + .MuiSwitch-track": { backgroundColor: alpha("#FFD600", 0.4), opacity: 1 },
+              "& + .MuiSwitch-track": { backgroundColor: "#6C5C06", opacity: 1 },
             },
           },
           thumb: { boxShadow: "none" },
-          track: { backgroundColor: "rgba(255,255,255,.2)", opacity: 1, borderRadius: 0 },
+          track: { backgroundColor: "#3B3B3B", opacity: 1, borderRadius: 0 },
         },
       },
       MuiTabs: {
         styleOverrides: {
           indicator: { backgroundColor: "#FFD600", height: 3, borderRadius: 0 },
-          root: { borderBottom: "2px solid rgba(255,255,255,.3)" },
+          root: { borderBottom: "2px solid #545454" },
         },
       },
       MuiTab: {
         styleOverrides: {
           root: {
-            fontFamily: monoStack,
             fontWeight: 800,
             fontSize: 12,
             letterSpacing: "0.06em",
@@ -1731,7 +1728,6 @@ export const themes: Record<ThemeName, ReturnType<typeof createTheme>> = {
       MuiTooltip: {
         styleOverrides: {
           tooltip: {
-            fontFamily: monoStack,
             fontSize: 12,
             borderRadius: 0,
             backgroundColor: "#FFD600",
@@ -1748,7 +1744,6 @@ export const themes: Record<ThemeName, ReturnType<typeof createTheme>> = {
           root: {
             borderRadius: 0,
             borderWidth: 2,
-            fontFamily: monoStack,
           },
         },
 
@@ -2258,7 +2253,8 @@ export const themes: Record<ThemeName, ReturnType<typeof createTheme>> = {
       caption: { fontFamily: monoStack, fontSize: 12 },
       button: { fontFamily: monoStack, letterSpacing: 1.4, fontWeight: 900, textTransform: "uppercase" },
     },
-    shape: { borderRadius: 4 },
+    // Square-ish (spec 3): SoftCard uses 4 x shape, so 1 gives 4px cards like this theme's 4px controls.
+    shape: { borderRadius: 1 },
     components: {
       MuiCssBaseline: {
         styleOverrides: {
@@ -2305,6 +2301,7 @@ export const themes: Record<ThemeName, ReturnType<typeof createTheme>> = {
       MuiPaper: {
         styleOverrides: {
           root: {
+            borderRadius: 4,
             backgroundImage: "none",
             backgroundColor: alpha("#020408", 0.88),
             border: `1px solid ${alpha("#00E5FF", 0.22)}`,
@@ -2337,6 +2334,7 @@ export const themes: Record<ThemeName, ReturnType<typeof createTheme>> = {
       MuiCard: {
         styleOverrides: {
           root: {
+            borderRadius: 4,
             backgroundImage: "none",
             backgroundColor: "#040912",
             border: `1px solid ${alpha("#00E5FF", 0.25)}`,
@@ -2835,7 +2833,8 @@ export const themes: Record<ThemeName, ReturnType<typeof createTheme>> = {
   // ── 11. METAL — Metal Gear Solid, Hideo Kojima ────────────────────────
   metal: createTheme({
     ...base,
-    shape: { borderRadius: 4 },
+    // Square-ish (spec 3): SoftCard uses 4 x shape, so 1.5 gives 6px, this theme's own card radius.
+    shape: { borderRadius: 1.5 },
     typography: {
       fontFamily: sansStack,
       fontSize: 13,
@@ -4177,7 +4176,8 @@ export const themes: Record<ThemeName, ReturnType<typeof createTheme>> = {
   // ─────────────────────────────────────────────────────────────────────────
   future: createTheme({
     ...base,
-    shape: { borderRadius: 6 },
+    // Square-ish (spec 3): SoftCard uses 4 x shape, so 1.5 gives 6px, this theme's button and chip radius.
+    shape: { borderRadius: 1.5 },
     typography: {
       fontFamily: sansStack,
       fontSize: 13,
@@ -4404,7 +4404,7 @@ export const themes: Record<ThemeName, ReturnType<typeof createTheme>> = {
       MuiCard: {
         styleOverrides: {
           root: {
-            borderRadius: 12,
+            borderRadius: 6,
             backgroundColor: "#160E08",
             border: `1px solid ${alpha("#E8720C", 0.2)}`,
             boxShadow: `
@@ -4504,7 +4504,6 @@ export const themes: Record<ThemeName, ReturnType<typeof createTheme>> = {
               border: `1px solid ${alpha("#F5A623", 0.4)}`,
               boxShadow: `0 4px 16px ${alpha("#E8720C", 0.4)}`,
               backgroundImage: `linear-gradient(180deg, #F08030, #D4600A)`,
-              animation: "fennecPulse 3s ease-in-out infinite",
               "&:hover": {
                 backgroundImage: `linear-gradient(180deg, #F59030, #E8720C)`,
                 boxShadow: `0 6px 24px ${alpha("#E8720C", 0.58)}`,
@@ -4587,11 +4586,6 @@ export const themes: Record<ThemeName, ReturnType<typeof createTheme>> = {
             color: alpha("#E8DED0", 0.9),
             transition: "all 150ms ease",
             "&:hover": { backgroundColor: alpha("#E8720C", 0.18) },
-          },
-          filled: {
-            backgroundColor: "#E8720C",
-            color: "#0D0905",
-            border: "none",
           },
           colorSecondary: {
             backgroundColor: alpha("#4A90D9", 0.12),

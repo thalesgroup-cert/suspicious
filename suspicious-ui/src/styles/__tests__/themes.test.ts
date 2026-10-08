@@ -9,7 +9,7 @@ const FIRST_FAMILY: Partial<Record<ThemeName, string>> = {
   paper: "Source Serif 4 Variable",
   // renee: only headings use the serif stack (body stays sans), so it is not asserted here
   sunrise: "Nunito Variable",
-  high_contrast: "IBM Plex Mono",
+  high_contrast: "Inter Variable",
   cyber: "IBM Plex Mono",
 };
 

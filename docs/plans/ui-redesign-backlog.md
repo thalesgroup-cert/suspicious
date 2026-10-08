@@ -23,3 +23,9 @@ Use `ways-of-working:start-task` per item; discuss with the user before building
 ## From theme review
 Group A (midnight, graphite, slate, light, paper, renee). Each needs a change outside `themes.ts`.
 - Card titles in `DashboardCard` are `Typography` body1 with `sx` weight, not a heading variant, so renee's serif-heading rule (h1 to h5) misses them. Home and dashboard. Fix: give the title a heading variant, or accept it.
+
+Group B (high_contrast, cyber, metal, future). Each needs a change outside `themes.ts`.
+- `AppLayout.tsx` line 165 paints a 7% primary radial glow behind every page; on high_contrast it shows as a brown wash top-left (alpha fill, spec 3 forbids). All pages. Fix: skip it when `effects.isAccessibilityTheme`.
+- `features/dashboard/components/SoftCard.tsx` line 68 sets `alpha(divider, 0.28)` as the card border, so dashboard cards drop each theme's own card border (high_contrast's 2px solid + yellow top, cyber's cyan edge). Dashboard. Fix: same treatment the shared SoftCard got in 6x.
+- Status and verdict chips (DONE, SAFE) use the fixed `colorStore` greens with an alpha fill, not the theme's `success` colour; on high_contrast they pass 7:1 (7.85) but keep an alpha fill. Home, submissions.
+- Theme `MuiChip.root` colour overrides (cyber, metal, future, high_contrast) beat `color="warning"`, so `FeederHealthBadge` "Stale" renders in the theme accent, not amber. Home.
