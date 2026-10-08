@@ -7,7 +7,7 @@ from api.views.campaigns import (
     CampaignMailVolumeView,
     CampaignPcaView,
 )
-from api.views.case_report import CaseReportView
+from api.views.case_report import CaseReportMarkdownView, CaseReportView
 from api.views.case_screenshot import CaseScreenshotView
 from api.views.challenge import CaseChallengeTokenView
 from api.views.comments import CaseCommentListCreateView
@@ -103,6 +103,7 @@ urlpatterns = [
     path("cases/<int:case_id>/challenge/", CaseChallengeTokenView.as_view(), name="case-challenge-legacy"),
     path("cases/<int:case_id>/comments/", CaseCommentListCreateView.as_view(), name="case-comments"),
     path("cases/<int:case_id>/report/", CaseReportView.as_view(), name="case-report"),
+    path("cases/<int:case_id>/report.md", CaseReportMarkdownView.as_view(), name="case-report-markdown"),
 
     path("dashboard/summary/", DashboardSummaryView.as_view(), name="dashboard-summary"),
 

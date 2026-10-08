@@ -7,7 +7,7 @@ from django.shortcuts import get_object_or_404
 from django.template.loader import render_to_string
 from django.utils import timezone
 from rest_framework.permissions import IsAuthenticated
-from rest_framework.renderers import StaticHTMLRenderer
+from rest_framework.renderers import BaseRenderer, StaticHTMLRenderer
 from rest_framework.views import APIView
 
 from api.permissions.submissions import CanAccessSubmission
@@ -105,4 +105,40 @@ class CaseReportView(APIView):
         )
         resp = HttpResponse(html, content_type="text/html")
         resp["Content-Disposition"] = f'attachment; filename="case-{case.id}-report.html"'
+        return resp
+
+
+class MarkdownRenderer(BaseRenderer):
+    media_type = "text/markdown"
+    format = "md"
+    charset = "utf-8"
+
+    def render(self, data, accepted_media_type=None, renderer_context=None):
+        return data if isinstance(data, bytes) else str(data).encode("utf-8")
+
+
+class CaseReportMarkdownView(APIView):
+    """The case report as Markdown, for tickets, wikis and chat."""
+
+    permission_classes = [IsAuthenticated, CanAccessSubmission]
+    renderer_classes = [MarkdownRenderer]
+
+    def get(self, request, case_id):
+        from api.utils.analyzer_reports import reports_for_case
+        from api.utils.case_report_markdown import build_markdown_report
+        from api.views.investigations import _dedup_analyzer_reports
+        from score_process.scoring.classification import derive_threat_classification
+        from score_process.scoring.health import analysis_health
+
+        case = get_object_or_404(Case.objects.select_related("reporter"), pk=case_id)
+        self.check_object_permissions(request, case)
+        reports = _dedup_analyzer_reports(reports_for_case(case, defer_full=True))
+        observables = assemble_observables(case) if case.observable_group_id else []
+        text = build_markdown_report(
+            case, observables,
+            _collapse_sources((case.verdict_explanation or {}).get("sources")),
+            derive_threat_classification(case, reports), analysis_health(reports), timezone.now(),
+        )
+        resp = HttpResponse(text, content_type="text/markdown; charset=utf-8")
+        resp["Content-Disposition"] = f'attachment; filename="case-{case.id}-report.md"'
         return resp
