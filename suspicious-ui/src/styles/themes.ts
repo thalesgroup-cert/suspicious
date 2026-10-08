@@ -1,4 +1,4 @@
-import { createTheme, alpha, type ThemeOptions } from "@mui/material/styles";
+import { createTheme, alpha, type Theme, type ThemeOptions } from "@mui/material/styles";
 
 // Font stacks
 
@@ -24,6 +24,7 @@ const roundedStack = [
 // Texture helpers
 
 const border = (hex: string, a: number) => `1px solid ${alpha(hex, a)}`;
+export const edge = (theme: Theme, a: number) => border(theme.palette.text.primary, a);
 
 const scanlines = (a = 0.035, step = 4) =>
   `repeating-linear-gradient(0deg, rgba(255,255,255,${a}), rgba(255,255,255,${a}) 1px, transparent 1px, transparent ${step}px)`;
@@ -104,7 +105,7 @@ const base: ThemeOptions = {
         }),
         notchedOutline: ({ theme }) => ({
           borderColor:
-            theme.palette.mode === "dark" ? alpha("#E5E7EB", 0.14) : alpha("#0B1220", 0.14),
+            alpha(theme.palette.text.primary, theme.palette.mode === "dark" ? 0.14 : 0.14),
         }),
       },
     },
@@ -116,7 +117,7 @@ const base: ThemeOptions = {
           backgroundImage: "none",
           borderRadius: 14,
           border:
-            theme.palette.mode === "dark" ? border("#E5E7EB", 0.1) : border("#0B1220", 0.08),
+            edge(theme, theme.palette.mode === "dark" ? 0.1 : 0.08),
         }),
       },
     },
@@ -125,7 +126,7 @@ const base: ThemeOptions = {
         root: ({ theme }) => ({
           borderRadius: 16,
           border:
-            theme.palette.mode === "dark" ? border("#E5E7EB", 0.12) : border("#0B1220", 0.08),
+            edge(theme, theme.palette.mode === "dark" ? 0.12 : 0.08),
           boxShadow: "none",
         }),
       },
@@ -134,7 +135,7 @@ const base: ThemeOptions = {
       styleOverrides: {
         root: ({ theme }) => ({
           borderColor:
-            theme.palette.mode === "dark" ? alpha("#E5E7EB", 0.1) : alpha("#0B1220", 0.1),
+            alpha(theme.palette.text.primary, theme.palette.mode === "dark" ? 0.1 : 0.1),
         }),
       },
     },
@@ -148,7 +149,7 @@ const base: ThemeOptions = {
           backgroundColor:
             theme.palette.mode === "dark" ? alpha("#FFFFFF", 0.06) : alpha("#0B1220", 0.05),
           border:
-            theme.palette.mode === "dark" ? border("#E5E7EB", 0.12) : border("#0B1220", 0.1),
+            edge(theme, theme.palette.mode === "dark" ? 0.12 : 0.1),
         }),
       },
     },
@@ -162,7 +163,7 @@ const base: ThemeOptions = {
             theme.palette.mode === "dark"
               ? alpha("#0B1220", 0.92)
               : alpha("#0B1220", 0.9),
-          border: border("#E5E7EB", theme.palette.mode === "dark" ? 0.12 : 0.1),
+          border: edge(theme, theme.palette.mode === "dark" ? 0.12 : 0.1),
         }),
       },
     },
@@ -186,7 +187,7 @@ const base: ThemeOptions = {
           fontWeight: 750,
           color: theme.palette.text.secondary,
           backgroundColor:
-            theme.palette.mode === "dark" ? alpha("#FFFFFF", 0.03) : alpha("#0B1220", 0.025),
+            alpha(theme.palette.text.primary, theme.palette.mode === "dark" ? 0.03 : 0.025),
         }),
       },
     },
@@ -195,9 +196,7 @@ const base: ThemeOptions = {
         root: ({ theme }) => ({
           "&:hover": {
             backgroundColor:
-              theme.palette.mode === "dark"
-                ? alpha("#FFFFFF", 0.04)
-                : alpha("#0B1220", 0.03),
+              alpha(theme.palette.text.primary, theme.palette.mode === "dark" ? 0.04 : 0.03),
           },
         }),
       },
