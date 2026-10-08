@@ -65,6 +65,7 @@ class CaseAnalyzerJobConstraintsTest(TestCase):
     def test_analyzer_report_delete_sets_null(self):
         """Deleting an AnalyzerReport leaves the CAJ row but NULLs the FK (SET_NULL)."""
         from cortex_job.models import AnalyzerReport
+        from ip_process.models import IP
         ar = AnalyzerReport.objects.create(
             cortex_job_id="job-setnull",
             type="ip",
@@ -76,6 +77,7 @@ class CaseAnalyzerJobConstraintsTest(TestCase):
             report_summary={},
             report_taxonomy={},
             report_full={},
+            ip=IP.objects.create(address="9.9.9.9"),
         )
         caj = CaseAnalyzerJob.objects.create(
             case=self.case,

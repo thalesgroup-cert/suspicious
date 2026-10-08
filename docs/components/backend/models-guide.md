@@ -59,7 +59,7 @@ class Example(TimestampedModel):
 **Structure**
 1. One abstract timestamp base, with the existing names (`creation_date`, `last_update`). New models inherit it; existing models keep their field names (a rename touches serializers, admin, queries and the frontend for no gain).
 2. Use `TextChoices` for every closed vocabulary, and give the column `choices` (`Case.results_ai` has none today).
-3. A model that targets "one of several" things (like `AnalyzerReport`, `CaseArtifact`) gets a `CheckConstraint` that exactly one target is set. Do not add more nullable FKs without one.
+3. A model that targets "one of several" things (like `AnalyzerReport`, `CaseArtifact`) gets a `CheckConstraint` that exactly one target is set (`AnalyzerReport` is the exception for now, see section 5). Do not add more nullable FKs without one.
 4. Large or rarely read payloads (raw tool output, screenshots, full HTML) go in a side table or object storage, not a column on a hot table. Keep inline JSON small and bounded.
 5. Store a derived value with `GeneratedField(db_persist=True)` instead of computing it in Python (paperless-ngx does this for content length).
 6. Cap what you index: truncate long free text before it is stored or searched (`build_document` caps at 512/4096 characters).
@@ -106,11 +106,11 @@ nothing about prod, so every row still needs the section 6 query on a prod copy.
 |---|---|---|---|
 | Drop the 40 redundant FK `db_index=True` | None: the schema state is identical (`makemigrations --check` reports no change); source cleanup only | n/a | Done 2026-10-07 |
 | Composite indexes (`Case`, `AnalyzerReport`, `CaseAnalyzerJob` follow-ups) | None | n/a | Safe, online DDL |
-| `CheckConstraint`: exactly one target on `AnalyzerReport` | Fails if any row has 0 or 2+ targets | 2,522 of 2,522 rows have exactly 1 | Safe after the prod check |
-| Same for `CaseArtifact` and `ObservableGroupArtifact` | Same | 124/124 and 24/24 have exactly 1 | Safe after the prod check |
-| `CheckConstraint`: a group case has no mail or file road | Fails on a mixed row | 0 violations | Safe after the prod check |
-| `CheckConstraint`: exactly one road per `Case` | **Fails** on a mixed row | 1 of 202 cases (id 21) has both `fileOrMail` and `nonFileIocs` | Needs a data fix first |
-| Unique constraint on allow/deny lists (one row per domain, IP, hash) | Fails on duplicates, and on NULL targets it silently allows many | 0 duplicates, 0 NULL targets in the allow list | Safe after the prod check; make the FK non-null in a second step |
+| `CheckConstraint`: exactly one target on `AnalyzerReport` | Fails if any row has 0 or 2+ targets | 2,522 of 2,522 rows have exactly 1 | AnalyzerReport one-target CHECK: deferred. ADD CHECK is a table copy in MariaDB (NOCOPY/INPLACE/INSTANT are rejected); on the 2.6 GB table it needs about that much free disk and ends with a metadata lock, so it needs a timed rehearsal on a restored copy first. |
+| Same for `CaseArtifact` and `ObservableGroupArtifact` | Same | 124/124 and 24/24 have exactly 1 | Done 2026-10-08 (`caseartifact_one_target_chk`, `observablegroupartifact_one_target_chk`) |
+| `CheckConstraint`: a group case has no mail or file road | Fails on a mixed row | 0 violations | Done 2026-10-08 (`case_group_excludes_other_roads_chk`) |
+| `CheckConstraint`: exactly one road per `Case` | **Fails** on a mixed row | 1 of 202 cases (id 21) has both `fileOrMail` and `nonFileIocs` | Blocked, not wanted: a file plus its own hash is an intentional pair (97 prod cases) |
+| Unique constraint on allow/deny lists (one entry per target row id, not per value: two `Domain` rows with the same value could each have an entry; the application-level value checks prevent that in practice) | Fails on duplicates, and on NULL targets it silently allows many | 0 duplicates, 0 NULL targets in the allow list | Done 2026-10-08 (`uniq_allowlistdomain_domain`, `uniq_denylistdomain_domain`, `uniq_campaigndomainallowlist_domain`, `uniq_allowlistip_ip`, `uniq_allowlistfile_hash`); making the FK non-null is still a second step |
 | `TimestampedModel` for new models | None | n/a | Apply to new models only |
 | Rename `created_at`/`updated_at` to the majority names | None to data, large to code | 13 fields | Do not do it |
 | Add `choices` to `Case.results_ai` | None (choices are not a DB constraint) | n/a | Safe |

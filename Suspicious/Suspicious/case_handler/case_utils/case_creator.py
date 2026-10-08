@@ -15,6 +15,41 @@ from django.db.models import F
 
 logger = logging.getLogger(__name__)
 
+_ARTIFACT_KEYS = (
+    "mail_instance", "file_instance", "ip_instance", "url_instance",
+    "hash_instance", "observable_group_instance",
+)
+
+
+def _describe_shape(present: set) -> str:
+    names = [("group" if k == "observable_group_instance" else k.removesuffix("_instance")) for k in present]
+    return "+".join(sorted(names))
+
+
+def unexpected_case_shape(artifacts: dict) -> str | None:
+    """None when the artifacts form an allowed case shape, else a short description.
+
+    Allowed: mail alone; file alone or with its own hash (``file.linked_hash``);
+    any of ip/url/hash with no mail or file; an observable group alone.
+    Keys other than the artifact keys, and falsy values, are ignored."""
+    present = {k for k in _ARTIFACT_KEYS if artifacts.get(k)}
+    if not present:
+        return None
+    if "observable_group_instance" in present:
+        return None if present == {"observable_group_instance"} else _describe_shape(present)
+    if "mail_instance" in present:
+        return None if present == {"mail_instance"} else _describe_shape(present)
+    if "file_instance" in present:
+        extra = present - {"file_instance"}
+        if not extra:
+            return None
+        own_hash = getattr(artifacts["file_instance"], "linked_hash_id", None)
+        hash_inst = artifacts.get("hash_instance")
+        if extra == {"hash_instance"} and own_hash is not None and getattr(hash_inst, "pk", None) == own_hash:
+            return None
+        return _describe_shape(present)
+    return None  # ip / url / hash only
+
 
 class CaseCreator:
     def __init__(self, user):
@@ -56,6 +91,8 @@ class CaseCreator:
         allow_reason = kwargs.pop('allow_reason', '')
         group = kwargs.pop('observable_group_instance', None)
 
+        shape = unexpected_case_shape({**kwargs, "observable_group_instance": group})
+
         for key, value in kwargs.items():
             logger.debug(f"Processing key: {key}, value: {getattr(value, 'id', 'None')}")
             if key == 'allow_listed' and value:
@@ -80,6 +117,8 @@ class CaseCreator:
             self._update_kpi_stats(case)
             self._update_user_cases_monthly_stats(case)
             case.save()
+            if shape:
+                logger.warning("Case %s has an unexpected shape: %s", case.id, shape)
             return case
         except Exception as e:
             logger.error(f"Error creating case: {e!s}")

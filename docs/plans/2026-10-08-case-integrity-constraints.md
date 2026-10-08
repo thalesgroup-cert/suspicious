@@ -15,7 +15,6 @@
 - Prod facts that must stay true: 97 `Case` rows have both `fileOrMail` and `nonFileIocs` (a file and its own hash), 46 have no road. Neither is rejected by any new constraint.
 - No constraint on "exactly one road per `Case`". Only: `observable_group` set implies `fileOrMail` and `nonFileIocs` are NULL.
 - Constraint names: `<model>_one_target_chk`, `case_group_excludes_other_roads_chk`, `uniq_<table>_<column>`.
-- The `AnalyzerReport` constraint ships in its own migration (largest table, 2.6 GB) so it can be rehearsed and, if needed, held back.
 - `CaseCreator` never refuses a case because of its shape: log a warning, create the case.
 - Use `CheckConstraint(condition=...)` (Django 6.1; `check=` no longer exists).
 - Paths are relative to `Suspicious/Suspicious/` unless they start with `docs/`. Tests: `ww test backend <labels>`. Remove the stray `Suspicious/Suspicious/gunicorn.conf.py` before committing. Commit with explicit `git add <paths>`; end messages with `Co-Authored-By: Claude Sonnet 5.5 <noreply@anthropic.com>`.
@@ -184,6 +183,8 @@ git commit -m "feat(case-handler): warn on unexpected case shapes in CaseCreator
 ---
 
 ### Task 2: Constraints, helper and migrations
+
+Superseded: the `cortex_job` / `AnalyzerReport` pieces of this task were dropped (check deferred, see the spec Rollout); ignore them below.
 
 **Files:**
 - Create: `common/constraints.py`
@@ -405,7 +406,7 @@ def exactly_one_not_null(*fields: str) -> Q:
         constraints = [models.UniqueConstraint(fields=["linked_file_hash"], name="uniq_allowlistfile_hash")]
 ```
 
-Edit the three models files below, then generate one migration per app (each app gets its own file, so the `AnalyzerReport` one can be held back on its own).
+Edit the three models files below, then generate one migration per app .
 
 `cortex_job/models.py` imports `from common.constraints import exactly_one_not_null`; add to `AnalyzerReport.Meta`:
 
@@ -464,7 +465,7 @@ docker compose --env-file .env run --rm --no-deps -w /app -v $PWD/../Suspicious/
 docker compose --env-file .env exec -T db_suspicious mariadb -uroot -pmeridian_dev_root_pw db_suspicious -e "SELECT table_name, constraint_name FROM information_schema.table_constraints WHERE constraint_type='CHECK' AND constraint_name LIKE '%\\_chk' ORDER BY 1; SELECT table_name, constraint_name FROM information_schema.table_constraints WHERE constraint_name LIKE 'uniq\\_allow%' OR constraint_name LIKE 'uniq\\_deny%' OR constraint_name LIKE 'uniq\\_campaign%';"
 ```
 
-Expected: the migrations apply with no error (dev has the one file + hash case, which is valid); the query lists the six CHECK constraints (`case_group_excludes_other_roads_chk`, `casehasfileormail_one_target_chk`, `casehasnonfileiocs_one_target_chk`, `caseartifact_one_target_chk`, `observablegroupartifact_one_target_chk`, `analyzerreport_one_target_chk`) and the five unique constraints.
+Expected: the migrations apply with no error (dev has the one file + hash case, which is valid); the query lists the five CHECK constraints (`case_group_excludes_other_roads_chk`, `casehasfileormail_one_target_chk`, `casehasnonfileiocs_one_target_chk`, `caseartifact_one_target_chk`, `observablegroupartifact_one_target_chk`) and the five unique constraints.
 
 - [ ] **Step 2: Prove a violating write is rejected on MariaDB**
 
@@ -495,6 +496,6 @@ git commit -m "docs(backend): case shapes and integrity constraints"
 ## Prod rollout notes (not part of the code tasks)
 
 1. `make backup-db`.
-2. Rehearse on a restored copy: time `migrate case_handler`, `migrate settings` and `migrate cortex_job`. The `AnalyzerReport` check scans 236k rows; if it blocks writes for longer than you accept, hold `cortex_job` back until off-peak (`python manage.py migrate cortex_job <previous migration>` keeps it out).
+2. Rehearse on a restored copy: time `migrate case_handler` and `migrate settings`. (The `AnalyzerReport` check is deferred: ADD CHECK is a table copy there.)
 3. Deploy; watch `docker compose logs suspicious | grep "unexpected shape"` for a few days. Any hit is a submission path that builds an unexpected case.
 4. Back out a constraint with `python manage.py migrate <app> <previous migration>`; no data is touched.
