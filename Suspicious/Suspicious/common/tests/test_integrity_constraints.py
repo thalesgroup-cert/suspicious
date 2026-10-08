@@ -9,7 +9,7 @@ from case_handler.models import (
     Case, CaseArtifact, CaseHasFileOrMail, CaseHasNonFileIocs,
     ObservableGroup, ObservableGroupArtifact,
 )
-from cortex_job.models import Analyzer, AnalyzerReport
+from cortex_job.models import Analyzer
 from domain_process.models import Domain
 from hash_process.models import Hash
 from ip_process.models import IP
@@ -46,20 +46,6 @@ class IntegrityConstraintTests(TestCase):
         )
 
     # --- one-target rules -------------------------------------------------
-    def _report(self, **targets):
-        return AnalyzerReport.objects.create(
-            cortex_job_id="j", type="url", status="Success", analyzer=self.analyzer,
-            level="info", confidence=1, score=1,
-            report_summary={}, report_taxonomy={}, report_full={}, **targets,
-        )
-
-    def test_analyzer_report_needs_exactly_one_target(self):
-        self._report(url=self.url)
-        with rejected():
-            self._report()
-        with rejected():
-            self._report(url=self.url, ip=self.ip)
-
     def test_case_artifact_needs_exactly_one_target(self):
         CaseArtifact.objects.create(case=self.case, artifact_type="url", url=self.url)
         with rejected():

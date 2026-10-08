@@ -47,7 +47,6 @@ mail + IOC case.**
 ### 1. Constraints (one migration per app, `AddConstraint`)
 | Model | Constraint | Prod evidence |
 |---|---|---|
-| `AnalyzerReport` | exactly one of the 8 target FKs is set | verified |
 | `CaseArtifact` | exactly one of file, hash, url, ip, mail is set | verified |
 | `ObservableGroupArtifact` | exactly one of url, ip, hash, domain is set | verified |
 | `Case` | `observable_group` set implies `fileOrMail` and `nonFileIocs` are null | verified (all 75 group cases are group-only) |
@@ -88,12 +87,10 @@ the read path then.
 1. Prod checks Q1 to Q4 (below): done 2026-10-08, all clean.
 2. Deploy section 2 first (code only, a warning at worst).
 3. Apply the constraint migrations off-peak. `ADD CONSTRAINT CHECK` validates
-   every row and may rebuild the table in MariaDB. For the small tables
-   (`Case` 46k rows, `CaseArtifact` 46k, the `CaseHas*` pair) that is
-   seconds. `AnalyzerReport` is 2.6 GB: test the `ALTER` with
-   `ALGORITHM=NOCOPY` on a restored copy first (it errors instead of
-   rebuilding if it would copy), and skip the `AnalyzerReport` constraint if
-   it would lock writes for minutes.
+   every row and is a table copy in MariaDB (NOCOPY, INPLACE and INSTANT are
+   all rejected for ADD CHECK). For the small tables (`Case` 46k rows,
+   `CaseArtifact` 46k, the `CaseHas*` pair) that is seconds.
+   AnalyzerReport one-target CHECK: deferred. ADD CHECK is a table copy in MariaDB (NOCOPY/INPLACE/INSTANT are rejected); on the 2.6 GB table it needs about that much free disk and ends with a metadata lock, so it needs a timed rehearsal on a restored copy first.
 4. Back out by dropping the constraint (`RemoveConstraint`); no data is touched.
 
 ## Prod queries (read-only)
@@ -143,4 +140,4 @@ Prod results (2026-10-08): Q1 97 cases, all file + hash; Q2, Q3, Q4 all 0.
   by the grep, the test suite, and applying the migrations after the guard has
   logged for a few days.
 - **Lock time on large tables** during `ADD CONSTRAINT`. Mitigated by the
-  `NOCOPY` test and off-peak timing; `AnalyzerReport` may be skipped.
+  off-peak timing; the `AnalyzerReport` check is deferred (see Rollout).

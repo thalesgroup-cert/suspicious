@@ -6,7 +6,6 @@ from url_process.models import URL
 from hash_process.models import Hash
 from domain_process.models import Domain
 from email_process.models import MailAddress
-from common.constraints import exactly_one_not_null
 
 class Analyzer(models.Model):
     name = models.CharField(max_length=50, unique=True, db_index=True)
@@ -70,12 +69,6 @@ class AnalyzerReport(models.Model):
 
     class Meta:
         ordering = ['-creation_date']
-        constraints = [models.CheckConstraint(
-            condition=exactly_one_not_null(
-                "url", "domain", "mail", "hash", "file", "ip", "mail_body", "mail_header",
-            ),
-            name="analyzerreport_one_target_chk",
-        )]
         indexes = [
             models.Index(fields=['type', 'status', 'domain']),
             models.Index(fields=['type', 'status', 'url']),
