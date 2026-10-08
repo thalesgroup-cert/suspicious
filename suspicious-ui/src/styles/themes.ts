@@ -3,7 +3,7 @@ import { createTheme, alpha, type ThemeOptions } from "@mui/material/styles";
 // Font stacks
 
 const sansStack = [
-  "Inter", "system-ui", "-apple-system", "Segoe UI",
+  '"Inter Variable"', "Inter", "system-ui", "-apple-system", "Segoe UI",
   "Roboto", "Arial", "sans-serif",
 ].join(",");
 
@@ -13,11 +13,11 @@ const monoStack = [
 ].join(",");
 
 const serifStack = [
-  '"Iowan Old Style"', '"Palatino Linotype"', "Palatino", "Georgia", "serif",
+  '"Source Serif 4 Variable"', '"Iowan Old Style"', '"Palatino Linotype"', "Palatino", "Georgia", "serif",
 ].join(",");
 
 const roundedStack = [
-  '"Nunito"', "Inter", "system-ui", "-apple-system",
+  '"Nunito Variable"', "Nunito", "Inter", "system-ui", "-apple-system",
   "Segoe UI", "Roboto", "Arial", "sans-serif",
 ].join(",");
 
