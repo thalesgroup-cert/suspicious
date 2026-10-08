@@ -29,3 +29,9 @@ Group B (high_contrast, cyber, metal, future). Each needs a change outside `them
 - `features/dashboard/components/SoftCard.tsx` line 68 sets `alpha(divider, 0.28)` as the card border, so dashboard cards drop each theme's own card border (high_contrast's 2px solid + yellow top, cyber's cyan edge). Dashboard. Fix: same treatment the shared SoftCard got in 6x.
 - Status and verdict chips (DONE, SAFE) use the fixed `colorStore` greens with an alpha fill, not the theme's `success` colour; on high_contrast they pass 7:1 (7.85) but keep an alpha fill. Home, submissions.
 - Theme `MuiChip.root` colour overrides (cyber, metal, future, high_contrast) beat `color="warning"`, so `FeederHealthBadge` "Stale" renders in the theme accent, not amber. Home.
+
+Group C (sunrise, valentine, the_one, winter, spring, summer, autumn).
+- Primary-filled pills (table ID chips "232") keep white text on orange in summer, autumn and sunrise (about 3:1); `mkLight`/`mkDark` take `primary` as a bare colour, so a theme cannot set `primary.contrastText`. Home, submissions. Fix: let the helpers accept a contrastText, or set it in those three themes.
+- Worst case of the `MuiChip.root` colour item above: sunrise `FeederHealthBadge` "Stale" is coral `#C4200F` on the amber warning fill, 1.85:1. Home.
+- `THEME_CAPABILITIES.valentine.isDark` is `true` but the theme is built with `mkLight` (light palette). Fix: set it to `false` in `ThemeStore.tsx`.
+- In themes.ts but over this group's 8-fix cap: summer `warning` `#D97706` gives MUI's white contrastText at 3.19:1 on the filled "Feeder: Stale" chip. Home. Fix: a darker warning such as `#B45309`.

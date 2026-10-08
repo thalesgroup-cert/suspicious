@@ -1803,7 +1803,8 @@ export const themes: Record<ThemeName, ReturnType<typeof createTheme>> = {
       body2: { fontFamily: roundedStack, lineHeight: 1.6 },
       button: { fontFamily: roundedStack, fontWeight: 800 },
     },
-    shape: { borderRadius: 14 },
+    // SoftCard uses 4 x shape: 5 gives 20px, this theme's own MuiCard radius (14 gave 56px).
+    shape: { borderRadius: 5 },
     components: {
       MuiCssBaseline: {
         styleOverrides: {
@@ -1840,6 +1841,8 @@ export const themes: Record<ThemeName, ReturnType<typeof createTheme>> = {
             border: `1px solid ${alpha("#F03D2F", 0.1)}`,
             boxShadow: `0 2px 12px ${alpha("#E84020", 0.1)}, 0 0 0 1px ${alpha("#F03D2F", 0.06)}`,
           },
+          // Keeps plain rounded Paper at its previous 14px after the shape change.
+          rounded: { borderRadius: 14 },
         },
       },
       MuiCard: {
@@ -1894,6 +1897,8 @@ export const themes: Record<ThemeName, ReturnType<typeof createTheme>> = {
           {
             props: { variant: "contained", color: "primary" },
             style: {
+              // Dark text: white on the coral gradient is 3.0:1, dark is 6.4:1 (AA 4.5).
+              color: "#1A0A00",
               backgroundImage: `linear-gradient(135deg, #F03D2F 0%, #FF6035 45%, #FF8C00 100%)`,
               boxShadow: `0 4px 20px ${alpha("#F03D2F", 0.4)}, inset 0 1px 0 rgba(255,255,255,.18)`,
               "&:hover": {
@@ -1943,7 +1948,8 @@ export const themes: Record<ThemeName, ReturnType<typeof createTheme>> = {
             fontWeight: 800,
             textTransform: "uppercase",
             letterSpacing: 0.4,
-            color: alpha("#F03D2F", 0.75),
+            // Its chip red: coral at .75 was 2.79:1 on the head fill.
+            color: "#C4200F",
             backgroundColor: alpha("#F03D2F", 0.04),
             borderBottom: `2px solid ${alpha("#F03D2F", 0.14)}`,
           },
@@ -2163,7 +2169,8 @@ export const themes: Record<ThemeName, ReturnType<typeof createTheme>> = {
             fontWeight: 800,
             textTransform: "uppercase",
             letterSpacing: 0.4,
-            color: alpha("#C2185B", 0.78),
+            // Solid primary: .78 alpha was 4.02:1, under AA 4.5.
+            color: "#C2185B",
             backgroundColor: alpha("#C2185B", 0.04),
             borderBottom: `2px solid ${alpha("#C2185B", 0.15)}`,
           },
@@ -3503,7 +3510,8 @@ export const themes: Record<ThemeName, ReturnType<typeof createTheme>> = {
       body1: { fontFamily: roundedStack, lineHeight: 1.65 },
       button: { fontFamily: roundedStack, fontWeight: 700 },
     },
-    shape: { borderRadius: 12 },
+    // SoftCard uses 4 x shape: 4.5 gives 18px, this theme's own MuiCard radius (12 gave 48px).
+    shape: { borderRadius: 4.5 },
     components: {
       MuiCssBaseline: {
         styleOverrides: {
@@ -3559,6 +3567,8 @@ export const themes: Record<ThemeName, ReturnType<typeof createTheme>> = {
             border: `1px solid ${alpha("#15803D", 0.1)}`,
             boxShadow: `0 2px 12px ${alpha("#0B3D1A", 0.08)}, 0 0 0 1px ${alpha("#15803D", 0.06)}`,
           },
+          // Keeps plain rounded Paper at its previous 12px after the shape change.
+          rounded: { borderRadius: 12 },
         },
       },
       MuiCard: {
@@ -3676,7 +3686,8 @@ export const themes: Record<ThemeName, ReturnType<typeof createTheme>> = {
             fontWeight: 800,
             textTransform: "uppercase",
             letterSpacing: 0.4,
-            color: alpha("#15803D", 0.78),
+            // Its chip green: .78 alpha was 3.25:1, under AA 4.5.
+            color: "#166534",
             backgroundColor: alpha("#15803D", 0.04),
             borderBottom: `2px solid ${alpha("#15803D", 0.14)}`,
           },
@@ -3852,7 +3863,8 @@ export const themes: Record<ThemeName, ReturnType<typeof createTheme>> = {
             style: {
               background: `linear-gradient(135deg, #FBBF24 0%, #D97706 50%, #B45309 100%)`,
               boxShadow: `0 2px 8px ${alpha("#D97706", 0.4)}`,
-              color: "#fff",
+              // Its text colour: white on the amber was 3.19:1, dark is 5.9:1 (AA 4.5).
+              color: "#1A1000",
               "&:hover": {
                 background: `linear-gradient(135deg, #FCD34D 0%, #D97706 50%, #92400E 100%)`,
                 boxShadow: `0 4px 16px ${alpha("#D97706", 0.55)}`,
@@ -4060,7 +4072,8 @@ export const themes: Record<ThemeName, ReturnType<typeof createTheme>> = {
             props: { variant: "contained", color: "primary" },
             style: {
               background: `linear-gradient(135deg, #FDBA74 0%, #F97316 45%, #C2410C 100%)`,
-              color: "#fff",
+              // Its secondary-button text: white on the ember orange was 2.8:1, dark is 6.9:1.
+              color: "#1C0A00",
               boxShadow: `0 2px 10px ${alpha("#F97316", 0.45)}`,
               "&:hover": {
                 background: `linear-gradient(135deg, #FB923C 0%, #EA6007 45%, #9A3412 100%)`,
