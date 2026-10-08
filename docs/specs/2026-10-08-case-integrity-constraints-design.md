@@ -25,9 +25,9 @@ only two-road case is exactly that: a file plus its own hash. The hash link is
 also what makes the file's hash analyzer reports show up on the case
 (`collect_case_targets` reads hashes only through `nonFileIocs`).
 
-So "a file case also has a hash IOC" is a deliberate shape. The prod query Q1
-below must confirm that all 97 prod cases are file + hash; any mail + IOC
-case would be a genuine bug to fix separately.
+So "a file case also has a hash IOC" is a deliberate shape. **Confirmed on
+prod (Q1, 2026-10-08): all 97 two-road cases are file + hash; there is no
+mail + IOC case.**
 
 ## Goals
 - Enforce, in the database, the rules that already hold for every prod row.
@@ -38,8 +38,8 @@ case would be a genuine bug to fix separately.
 ## Non-goals
 - An "exactly one road" constraint on `Case` (it would reject the 97 file +
   hash cases and the 46 empty ones).
-- Reworking `Case.fileOrMail` / `nonFileIocs` into the multi-row relations
-  (phase 3, conditional).
+- Reworking `Case.fileOrMail` / `nonFileIocs` into multi-row relations
+  (not needed, see section 3).
 - Merging `CaseArtifact` with the `CaseHas*` pair (separate spec).
 
 ## Design
@@ -51,9 +51,9 @@ case would be a genuine bug to fix separately.
 | `CaseArtifact` | exactly one of file, hash, url, ip, mail is set | verified |
 | `ObservableGroupArtifact` | exactly one of url, ip, hash, domain is set | verified |
 | `Case` | `observable_group` set implies `fileOrMail` and `nonFileIocs` are null | verified (all 75 group cases are group-only) |
-| `CaseHasFileOrMail` | exactly one of file, mail is set | Q3 |
-| `CaseHasNonFileIocs` | exactly one of url, ip, hash is set | Q3 |
-| allow/deny lists | one row per domain, IP or hash (`UniqueConstraint`) | verified for duplicates; Q4 for NULL targets |
+| `CaseHasFileOrMail` | exactly one of file, mail is set | verified (Q3: 0 violations) |
+| `CaseHasNonFileIocs` | exactly one of url, ip, hash is set | verified (Q3: 0 violations) |
+| allow/deny lists | one row per domain, IP or hash (`UniqueConstraint`) | verified (0 duplicates, Q4: 0 NULL targets) |
 
 Written as `CheckConstraint(condition=...)` with the project's naming
 (`<model>_<rule>_chk`). The sum-of-booleans form, for example
@@ -76,21 +76,16 @@ still creates the case (no behaviour change for users). A test per allowed
 shape and one for the warning. The same helper is the single place the rule
 is written down, and the models guide links to it.
 
-### 3. Conditional: several IOC bundles per case
-`_create_case_has_iocs` creates one `CaseHasNonFileIocs` row per artifact,
-and `case.nonFileIocs` keeps only the last one assigned. A submission with
-both an IP and a hash would leave the first bundle unreachable from
-`collect_case_targets`, so that IOC's analyzer reports would not appear on the
-case. Prod query Q2 counts cases with more than one bundle row.
-
-- If Q2 is 0: nothing to do; the guard in section 2 keeps it that way.
-- If Q2 is above 0: a follow-up spec changes the read path (`collect_case_targets`,
-  `score_process/scoring/collect.py`, the MISP and TheHive connectors) to read
-  the reverse relation (all bundle rows). The constraint on
-  `CaseHasNonFileIocs` stays valid because every row still has exactly one IOC.
+### 3. Several IOC bundles per case: not needed
+`_create_case_has_iocs` creates one `CaseHasNonFileIocs` row per artifact and
+`case.nonFileIocs` keeps only the last, which would hide an earlier bundle
+from `collect_case_targets`. Prod query Q2 found no case with more than one
+bundle row, so this does not happen today; the guard in section 2 keeps it
+that way. If a future submission form accepts several IOCs at once, revisit
+the read path then.
 
 ## Rollout
-1. Run Q1 to Q4 on prod (below) and paste the results.
+1. Prod checks Q1 to Q4 (below): done 2026-10-08, all clean.
 2. Deploy section 2 first (code only, a warning at worst).
 3. Apply the constraint migrations off-peak. `ADD CONSTRAINT CHECK` validates
    every row and may rebuild the table in MariaDB. For the small tables
@@ -128,7 +123,7 @@ UNION ALL SELECT 'allow_ip', COUNT(*) FROM settings_allowlistip WHERE ip_id IS N
 UNION ALL SELECT 'allow_file', COUNT(*) FROM settings_allowlistfile WHERE linked_file_hash_id IS NULL
 UNION ALL SELECT 'campaign_allow', COUNT(*) FROM settings_campaigndomainallowlist WHERE domain_id IS NULL;
 ```
-Dev results for reference: Q1 one case, file + hash; Q2 to Q4 all 0.
+Prod results (2026-10-08): Q1 97 cases, all file + hash; Q2, Q3, Q4 all 0.
 
 ## Testing
 - Each constraint: a test that creates a valid row, then a row that breaks
@@ -149,6 +144,3 @@ Dev results for reference: Q1 one case, file + hash; Q2 to Q4 all 0.
   logged for a few days.
 - **Lock time on large tables** during `ADD CONSTRAINT`. Mitigated by the
   `NOCOPY` test and off-peak timing; `AnalyzerReport` may be skipped.
-- **Q1 shows mail + IOC cases.** Then the guard's warning is the right alert
-  and a separate fix to the submit flow is needed; the constraints in
-  section 1 are unaffected.
