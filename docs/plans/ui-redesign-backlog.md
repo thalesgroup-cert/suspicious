@@ -22,8 +22,4 @@ Use `ways-of-working:start-task` per item; discuss with the user before building
 
 ## From theme review
 Group A (midnight, graphite, slate, light, paper, renee). Each needs a change outside `themes.ts`.
-- `SoftCard` (`features/home/components/SoftCard.tsx`, `shared/components/SoftCard.tsx`, `features/about/components/cards.tsx`) sets `border: alpha(theme.palette.divider, isDark ? 0.28 : 0.9)`. `alpha()` replaces the divider's alpha, so every light theme gets a 90% black card outline and every dark theme a 28% white one, which overrides each theme's `MuiCard` border (renee's gold hairline, paper's soft border). Shows on home and dashboard. Fix: use `edge(theme, …)` or drop the `sx` border.
-- `SoftCard` paints a hardcoded white gradient (`#fff` 0.88 to `grey[50]`) on light themes, so paper and renee cards are white instead of `background.paper` (#FAF7F2, #FBF6EE) and lose paper's grain. Shows on home and dashboard. Fix: use `theme.palette.background.paper`.
-- `AppLayout` sidebar background is a hardcoded white gradient on light themes (`layouts/AppLayout.tsx:160`), so the paper and renee sidebars are white on a cream page. All pages. Same file: `sidebarBorder` has the `alpha(divider, 0.9)` problem above.
-- `AppLayout` root box paints `shellBg` (opaque `background.default`) over `body` (`layouts/AppLayout.tsx:338`), so every theme's `MuiCssBaseline` body texture never shows: paper grain, renee grain, slate grid, midnight glow. This is why midnight's "starfield specks" cannot be added from `themes.ts`. All pages.
 - Card titles in `DashboardCard` are `Typography` body1 with `sx` weight, not a heading variant, so renee's serif-heading rule (h1 to h5) misses them. Home and dashboard. Fix: give the title a heading variant, or accept it.

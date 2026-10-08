@@ -23,6 +23,7 @@ import { Outlet, useLocation, useNavigate } from "react-router";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { getMe, logout, type Me } from "@/api/auth";
 import { getProfile, updatePreferences } from "@/features/profile/api";
+import { edge } from "@/styles/themes";
 import { useThemeMode } from "@/styles/ThemeStore";
 
 import {
@@ -157,17 +158,15 @@ export default function AppLayout() {
   // Sidebar background: fully theme-aware
   const sidebarBg = isDark
     ? `linear-gradient(180deg, ${alpha("#fff", 0.04)} 0%, ${alpha("#fff", 0.02)} 100%)`
-    : `linear-gradient(180deg, ${alpha("#fff", 0.92)} 0%, ${alpha(theme.palette.grey[50], 0.97)} 100%)`;
+    : `linear-gradient(180deg, ${theme.palette.background.paper} 0%, ${alpha(theme.palette.background.paper, 0.97)} 100%)`;
 
   // ── Shell background ─────────────────────────────────────────────────────
   const shellBg = isDark
-    ? `radial-gradient(ellipse 80% 50% at 15% 5%, ${alpha(primary, 0.07)}, transparent 50%),
-       ${theme.palette.background.default}`
-    : `radial-gradient(ellipse 80% 50% at 15% 5%, ${alpha(primary, 0.05)}, transparent 50%),
-       ${theme.palette.background.default}`;
+    ? `radial-gradient(ellipse 80% 50% at 15% 5%, ${alpha(primary, 0.07)}, transparent 50%)`
+    : `radial-gradient(ellipse 80% 50% at 15% 5%, ${alpha(primary, 0.05)}, transparent 50%)`;
 
   // ── Sidebar border ───────────────────────────────────────────────────────
-  const sidebarBorder = `1px solid ${alpha(theme.palette.divider, isDark ? 0.28 : 0.9)}`;
+  const sidebarBorder = edge(theme, isDark ? 0.14 : 0.1);
 
   // ─────────────────────────────────────────────────────────────────────────
   // Drawer content
