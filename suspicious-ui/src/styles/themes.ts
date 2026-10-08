@@ -456,7 +456,6 @@ export const themes: Record<ThemeName, ReturnType<typeof createTheme>> = {
       MuiTableCell: {
         styleOverrides: {
           head: {
-            fontFamily: monoStack,
             fontSize: 11,
             fontWeight: 750,
             textTransform: "uppercase",
@@ -636,7 +635,6 @@ export const themes: Record<ThemeName, ReturnType<typeof createTheme>> = {
       MuiTableCell: {
         styleOverrides: {
           head: {
-            fontFamily: monoStack,
             fontSize: 11,
             fontWeight: 750,
             textTransform: "uppercase",
@@ -702,13 +700,6 @@ export const themes: Record<ThemeName, ReturnType<typeof createTheme>> = {
     warning: "#FBBF24",
     error: "#F87171",
     text: "#D8E8F8",
-    typography: {
-      h1: { fontFamily: monoStack, fontWeight: 850, letterSpacing: -0.7 },
-      h2: { fontFamily: monoStack, fontWeight: 850 },
-      h3: { fontFamily: monoStack, fontWeight: 800 },
-      h4: { fontFamily: monoStack, fontWeight: 750 },
-      button: { fontFamily: monoStack, letterSpacing: 0.5, fontWeight: 800 },
-    },
     components: {
       MuiCssBaseline: {
         styleOverrides: {
@@ -764,8 +755,6 @@ export const themes: Record<ThemeName, ReturnType<typeof createTheme>> = {
           outlined: {
             border: `1px solid ${alpha("#5D9EFF", 0.4)}`,
             color: "#6EC2F5",
-            fontFamily: monoStack,
-            letterSpacing: "0.04em",
             "&:hover": {
               backgroundColor: alpha("#5D9EFF", 0.09),
               borderColor: alpha("#5D9EFF", 0.65),
@@ -773,8 +762,6 @@ export const themes: Record<ThemeName, ReturnType<typeof createTheme>> = {
           },
           text: {
             color: alpha("#6EC2F5", 0.88),
-            fontFamily: monoStack,
-            letterSpacing: "0.04em",
             "&:hover": {
               backgroundColor: alpha("#5D9EFF", 0.08),
             },
@@ -788,8 +775,6 @@ export const themes: Record<ThemeName, ReturnType<typeof createTheme>> = {
               backgroundColor: "#5D9EFF",
               backgroundImage: "none",
               color: "#04090F",
-              fontFamily: monoStack,
-              letterSpacing: "0.05em",
               boxShadow: `0 0 0 1px ${alpha("#5D9EFF", 0.4)}`,
               "&:hover": {
                 backgroundColor: "#6EAAFF",
@@ -802,7 +787,6 @@ export const themes: Record<ThemeName, ReturnType<typeof createTheme>> = {
       MuiOutlinedInput: {
         styleOverrides: {
           root: {
-            fontFamily: monoStack,
             fontSize: 12.5,
             "&:hover .MuiOutlinedInput-notchedOutline": {
               borderColor: alpha("#5D9EFF", 0.45),
@@ -819,7 +803,6 @@ export const themes: Record<ThemeName, ReturnType<typeof createTheme>> = {
         styleOverrides: {
           root: {
             borderRadius: 4,
-            fontFamily: monoStack,
             fontSize: 11,
             fontWeight: 700,
             letterSpacing: "0.05em",
@@ -832,7 +815,6 @@ export const themes: Record<ThemeName, ReturnType<typeof createTheme>> = {
       MuiTableCell: {
         styleOverrides: {
           head: {
-            fontFamily: monoStack,
             fontSize: 11,
             fontWeight: 800,
             textTransform: "uppercase",
@@ -841,7 +823,6 @@ export const themes: Record<ThemeName, ReturnType<typeof createTheme>> = {
             backgroundColor: alpha("#5D9EFF", 0.05),
             borderBottom: `1px solid ${alpha("#5D9EFF", 0.18)}`,
           },
-          root: { fontFamily: monoStack, fontSize: 12.5 },
         },
       },
       MuiTableRow: {
@@ -882,8 +863,6 @@ export const themes: Record<ThemeName, ReturnType<typeof createTheme>> = {
       MuiTab: {
         styleOverrides: {
           root: {
-            fontFamily: monoStack,
-            letterSpacing: "0.04em",
             fontSize: 12,
           },
         },
@@ -891,7 +870,6 @@ export const themes: Record<ThemeName, ReturnType<typeof createTheme>> = {
       MuiTooltip: {
         styleOverrides: {
           tooltip: {
-            fontFamily: monoStack,
             fontSize: 11.5,
             backgroundColor: alpha("#0A1522", 0.98),
             border: `1px solid ${alpha("#5D9EFF", 0.3)}`,
@@ -1032,7 +1010,7 @@ export const themes: Record<ThemeName, ReturnType<typeof createTheme>> = {
             fontWeight: 700,
             textTransform: "uppercase",
             letterSpacing: 0.5,
-            color: alpha("#0B1220", 0.5),
+            color: alpha("#0B1220", 0.7),
             backgroundColor: "rgba(11,18,32,.025)",
             borderBottom: "1px solid rgba(11,18,32,.1)",
           },
@@ -1465,7 +1443,7 @@ export const themes: Record<ThemeName, ReturnType<typeof createTheme>> = {
             fontWeight: 750,
             textTransform: "uppercase",
             letterSpacing: 0.6,
-            color: alpha("#9A6B12", 0.95),
+            color: "#8A5F10",
             backgroundColor: alpha("#C79A2E", 0.08),
             borderBottom: `1px solid ${alpha("#6B4A32", 0.18)}`,
           },
