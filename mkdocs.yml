@@ -81,6 +81,7 @@ nav:
       - Configuration: getting-started/configuration.md
   - User Guide:
       - Submitting: user-guide/submitting.md
+      - SOAR & API integration: user-guide/soar-integration.md
       - Investigations: user-guide/investigations.md
       - Campaigns: user-guide/campaigns.md
       - Dashboard: user-guide/dashboard.md
