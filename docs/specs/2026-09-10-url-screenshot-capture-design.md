@@ -263,15 +263,16 @@ feature is self-gating: without a screenshot analyzer, `screenshot_url` stays
 
 ### Roadmap status
 
-SOC roadmap Lot 1 / P1 "Analyse" item *"Afficher un screenshot de la page
-analysée"* has its plumbing delivered by this branch — capture, storage, the
-serve endpoint, the report inlining and the UI panels are all in place and
-tested. The analyzer config key is now confirmed from the THA-CERT
-`Lookyloo_Screenshot` manifest (`Lookyloo_instance`, def-id
-`Lookyloo_Screenshot_1_0`). One fact remains unverified against a live analyzer:
-the `report_full` screenshot key (`full["screenshot"]` vs `full["raw"]`, top
-level or under `results`) that `lookyloo.extract` guesses. It fails closed
-(wrong key → `None` → no UI change), so nothing can break — but the item is
-"delivered" only once a single real Lookyloo capture is diffed and that key is
-confirmed. Residuals unchanged: the on-demand capture button, `Urlscan.io_Scan`
-enabled in dev, and the screenshot in the TheHive ticket.
+**Delivered and verified (2026-10-08).** SOC roadmap Lot 1 / P1 "Analyse" item
+*"Afficher un screenshot de la page analysée"*: capture, storage, the serve
+endpoint, the report inlining and the UI panels are in place and tested. The
+`report_full` key was checked against real data on the dev stack: all 49
+successful `Lookyloo_Screenshot_1_0` reports carry the base64 PNG at the top-level
+`screenshot` key, which is where `lookyloo.extract` looks first. 34 of the 49 have
+a stored screenshot; the other 15 carry Lookyloo's own answer
+`{"error":"No screenshot available"}` in that field (base64, 48 characters), which
+the extractor correctly refuses because it is not a PNG. That is an analyzer-side
+outcome (nothing to capture), not an extraction fault.
+
+Residuals unchanged: the on-demand capture button, `Urlscan.io_Scan` enabled in
+dev, and the screenshot in the TheHive ticket.
