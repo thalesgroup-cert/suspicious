@@ -109,3 +109,38 @@ class InvestigationGroupApiTests(TestCase):
         r = self.client.get(f"/api/investigations/{case.id}/")
         src = r.json()["observable_group"]["observables"][0]["sources"][0]
         self.assertEqual(src["enrichment"]["as_owner"], "Google LLC")
+
+
+@override_settings(ROOT_URLCONF="suspicious.urls")
+class InvestigationClassificationAndHealthTests(TestCase):
+    def setUp(self):
+        self.user = _make_user("u2")
+        self.client = APIClient()
+        self.client.force_authenticate(self.user)
+        g = ObservableGroup.objects.create()
+        self.ip = IP.objects.create(address="9.9.9.9")
+        ObservableGroupArtifact.objects.create(group=g, artifact_type="IP", ip=self.ip)
+        self.case = Case.objects.create(description="d", reporter=self.user, observable_group=g)
+
+    def _report(self, name, status, enrichment=None, tier=1):
+        a, _ = Analyzer.objects.get_or_create(name=name, defaults={"analyzer_cortex_id": name.lower(), "tier": tier})
+        return AnalyzerReport.objects.create(
+            cortex_job_id=f"j-{name}", type="ip", status=status, analyzer=a, ip=self.ip,
+            level="malicious", confidence=80, score=9, report_summary={}, report_taxonomy={},
+            report_full={}, enrichment=enrichment,
+        )
+
+    def test_detail_exposes_threat_classification_and_failed_analyzers(self):
+        self._report("VT", "Success", {"threat_category": "trojan", "threat_label": "trojan.emotet"})
+        self._report("Shodan", "Failure")
+        body = self.client.get(f"/api/investigations/{self.case.id}/").json()
+        self.assertEqual(body["threat_classification"],
+                         {"label": "trojan.emotet", "category": "trojan", "source": "virustotal"})
+        health = body["analysis_health"]
+        self.assertEqual((health["total"], health["failed"]), (2, 1))
+        self.assertEqual(health["failures"][0]["analyzer"], "Shodan")
+
+    def test_detail_without_data_has_null_classification_and_empty_health(self):
+        body = self.client.get(f"/api/investigations/{self.case.id}/").json()
+        self.assertIsNone(body["threat_classification"])
+        self.assertEqual(body["analysis_health"]["failed"], 0)

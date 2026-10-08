@@ -109,6 +109,9 @@ def _ticket_description(case, ticket, pushed_by=None) -> str:
     lines = [
         f"**Verdict:** {v['result']} (score {v['score']}, confidence {v['confidence']})",
         f"**Classification:** {v['ai_classification']}",
+        *([f"**Threat:** {ticket['threat_classification']['label']}"] if ticket.get("threat_classification") else []),
+        *([f"**Analyzers failed:** {', '.join(sorted({f['analyzer'] for f in ticket['analysis_health']['failures']}))}"]
+          if (ticket.get("analysis_health") or {}).get("failed") else []),
         "",
         "**Why:**",
         *([f"- {r}" for r in v["rationale"]] or ["- (no rationale recorded)"]),

@@ -189,6 +189,26 @@ class SubmissionTicketPushTests(TestCase):
         self.assertEqual((rec.username, rec.outcome, rec.alert_id), (self.user.username, "failed", "~abc"))
         self.assertIn("boom", rec.error)
 
+    def test_ticket_and_alert_description_carry_classification_and_failed_analyzers(self):
+        from cortex_job.models import Analyzer as A, AnalyzerReport as R
+        a, _ = A.objects.get_or_create(name="Shodan", defaults={"analyzer_cortex_id": "sh1", "tier": 2})
+        R.objects.create(cortex_job_id="jf", type="ip", status="Failure", analyzer=a, ip=IP.objects.get(address="1.2.3.4"),
+                         level="info", confidence=1, score=1, report_summary={}, report_taxonomy={}, report_full={})
+        self.case.category_ai = "Classic phishing"
+        self.case.save(update_fields=["category_ai"])
+        ticket = self.client.get(self._url()).json()
+        self.assertEqual(ticket["threat_classification"]["label"], "Classic phishing")
+        self.assertEqual(ticket["analysis_health"]["failed"], 1)
+        with mock.patch("connectors.registry.registry.instantiate") as inst, \
+             mock.patch("connectors.contrib.thehive.phishing.create_new_alert",
+                        return_value={"_id": "~999"}) as cna, \
+             mock.patch("connectors.contrib.thehive.phishing.add_observables_to_item"):
+            inst.return_value.config = self._cfg()
+            self.client.post(self._url())
+        description = cna.call_args.args[2]
+        self.assertIn("**Threat:** Classic phishing", description)
+        self.assertIn("**Analyzers failed:** Shodan", description)
+
     def test_push_requires_investigator(self):
         self.client.force_authenticate(_make_user("plain", investigator=False))
         self.assertEqual(self.client.post(self._url()).status_code, 403)

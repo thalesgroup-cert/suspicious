@@ -270,6 +270,8 @@ class InvestigationDetailsSerializer(InvestigationRowSerializer):
     reporter_note = serializers.SerializerMethodField()
     observable_group = serializers.SerializerMethodField()
     screenshot_url = serializers.SerializerMethodField()
+    threat_classification = serializers.SerializerMethodField()
+    analysis_health = serializers.SerializerMethodField()
 
     class Meta(InvestigationRowSerializer.Meta):
         fields = InvestigationRowSerializer.Meta.fields + [
@@ -278,7 +280,21 @@ class InvestigationDetailsSerializer(InvestigationRowSerializer):
             "reporter_context", "reporter_note", "thehive_alert_id",
             "is_allowlisted", "is_denylisted", "list_reason",
             "observable_group", "screenshot_url",
+            "threat_classification", "analysis_health",
         ]
+
+    def _reports(self) -> list:
+        return list(self.context.get("analyzer_reports_qs") or [])
+
+    def get_threat_classification(self, obj: Case):
+        from score_process.scoring.classification import derive_threat_classification
+
+        return derive_threat_classification(obj, self._reports())
+
+    def get_analysis_health(self, obj: Case) -> dict:
+        from score_process.scoring.health import analysis_health
+
+        return analysis_health(self._reports())
 
     def get_screenshot_url(self, obj: Case) -> str | None:
         from api.utils.analyzer_reports import reports_for_case

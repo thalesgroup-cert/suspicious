@@ -263,6 +263,8 @@ def build_ticket(case) -> dict:
     """The ticket-shaped SOAR payload for a case: verdict, observables with
     their per-IOC verdict, and an analyzer summary."""
     from connectors.contrib.thehive.phishing import THEHIVE_SEVERITY, ticket_observables
+    from score_process.scoring.classification import derive_threat_classification
+    from score_process.scoring.health import analysis_health
     from score_process.scoring.sources import source_verdict_from_report
 
     reports = case_analyzer_reports(case)
@@ -286,11 +288,11 @@ def build_ticket(case) -> dict:
             "severity": THEHIVE_SEVERITY.get(result, 2),
             "tlp": 2,
             "pap": 2,
-            # ponytail: results_ai/category_ai stand-in until roadmap item #2
-            # (Case.threat_classification) lands.
             "ai_classification": case.category_ai or case.results_ai,
             "rationale": list(case.verdict_rationale or []),
         },
+        "threat_classification": derive_threat_classification(case, reports),
+        "analysis_health": analysis_health(reports),
         "observables": ticket_observables(case),
         "analyzer_summary": {
             "total_reports": len(reports),
