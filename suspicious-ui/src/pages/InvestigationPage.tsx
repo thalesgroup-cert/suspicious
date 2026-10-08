@@ -47,6 +47,7 @@ import {
   RestartAltOutlined,
   ReplayOutlined,
   DescriptionOutlined,
+  DownloadOutlined,
   NorthEastOutlined,
 } from "@mui/icons-material";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
@@ -896,6 +897,18 @@ export default function InvestigationPage() {
                         sx={{ textTransform: "none", fontWeight: 800 }}
                       >
                         Full report
+                      </Button>
+                      <Button
+                        startIcon={<DownloadOutlined />}
+                        onClick={() =>
+                          window.open(
+                            `/api/cases/${selectedIdNum}/report.md`,
+                            "_blank",
+                          )
+                        }
+                        sx={{ textTransform: "none", fontWeight: 800 }}
+                      >
+                        Markdown
                       </Button>
                       {theHiveEnabled ? (
                         <Button

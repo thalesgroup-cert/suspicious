@@ -75,7 +75,7 @@ To create or update the matching **TheHive** alert from that payload, send `POST
 
 ## 5. Human-readable report
 
-`GET /api/cases/4521/report/` returns the case report as HTML, for an attachment or a link in the ticket.
+`GET /api/cases/4521/report/` returns the case report as HTML (with screenshots), and `GET /api/cases/4521/report.md` returns the same verdict, explanation and per-indicator evidence as Markdown, for a ticket, a wiki page or a chat message. Both are downloads. In the web UI they are the **Full report** and **Markdown** buttons on a case. Text taken from outside (indicators, analyzer evidence, the reporter's words) is escaped in the Markdown, so it cannot create links or headings.
 
 ## Limits and good practice
 

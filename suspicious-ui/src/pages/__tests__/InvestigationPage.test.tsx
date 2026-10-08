@@ -488,6 +488,16 @@ describe("InvestigationPage", () => {
       openSpy.mockRestore();
     });
 
+    it("downloads the Markdown report", async () => {
+      const user = userEvent.setup();
+      const openSpy = vi.spyOn(window, "open").mockImplementation(() => null);
+      await openDrawer(user);
+
+      await user.click(screen.getByRole("button", { name: /markdown/i }));
+      expect(openSpy).toHaveBeenCalledWith("/api/cases/7/report.md", "_blank");
+      openSpy.mockRestore();
+    });
+
     it("hides the TheHive button when the connector is not enabled", async () => {
       const user = userEvent.setup();
       mockEnabledConnectors.mockResolvedValue([]);
