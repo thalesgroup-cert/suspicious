@@ -20,7 +20,7 @@ Evidence: Playwright captures of all 17 themes on Home, Submissions and Dashboar
 |---|---|---|
 | F1 | No webfont is loaded. Inter, Nunito and IBM Plex Mono are named in the font stacks but nothing ships them, so the OS fallback renders. | No `@font-face`, Fontsource or Google Fonts reference in `src/`, `index.html`, `public/`; screenshots |
 | F2 | Themes differ almost only by palette. Radius, density, elevation and layout are the same in all 17. | Contact sheets |
-| F3 | The welcome header is clipped behind the sidebar in midnight, graphite, high_contrast and the_one. | Contact sheets |
+| F3 | Withdrawn. The apparent header clip was my contact-sheet label drawn over the page; raw screenshots show the header intact. | Raw `high_contrast-home.png` |
 | F4 | Empty states waste space and break themes: the empty donut takes about 250px for "No data", and in summer the empty chart sits in a white box. | Home sheets |
 | F5 | Typography is small and flat: 13px base and one weight family for headings. | `base` in `themes.ts` |
 | F6 | Borders, fills and tooltip colours are hardcoded (`#E5E7EB`, `#0B1220`) in the shared `base`, so Paper, Card, Chip, Divider and Tooltip look the same in every theme. | `themes.ts` |
@@ -56,11 +56,10 @@ Each theme gets a two-line identity written next to its definition (what it repr
 
 Reason: a theme should be recognisable from a cropped screenshot. If a tuning choice has no reason beyond "it looks good", it is dropped.
 
-### 4. Layout and empty states (F3, F4)
-- Find and fix the header clip in `AppLayout` (cause not yet known; first step is to reproduce it at 1440px and check for a fixed sidebar width against the content padding).
+### 4. Empty states (F4)
 - Add one shared `EmptyState` component (icon, one line, optional action) and use it where the dashboard and home charts have no data. It uses theme tokens, so summer's white box goes away.
 
-Reason: two defects seen on the first page of the app, and the fix is one component plus one layout change.
+Reason: the same blank "No data" block is duplicated in `HomePage.tsx` and `ThreatDistributionPanel.tsx`, so one component fixes both.
 
 ### 5. Out of scope in this cycle
 - Moving to `cssVariables` and `colorSchemes`. The MUI docs say it prevents dark-mode flicker and speeds up switching, but the app has 17 themes rather than a light/dark pair and no server rendering. Revisit if theme switching shows a measurable lag.
