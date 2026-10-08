@@ -12,6 +12,7 @@ import {
 } from "recharts";
 
 import { SoftCard } from "./SoftCard";
+import { EmptyState } from "@/shared/components/EmptyState";
 import { useResultColors, useStatusColors } from "@/styles/colorStore";
 import { useThemeMode } from "@/styles/ThemeStore";
 
@@ -113,10 +114,7 @@ export default function ThreatDistributionPanel(props: { dangerCounts: DangerCou
       right={<Chip size="small" label="Monthly" variant="outlined" />}
       fillHeight
     >
-      <Box
-        className={effects.hasHeatEffect ? "sun-orb" : undefined}
-        sx={{ flex: 1, minHeight: 220 }}
-      >
+      <Box sx={{ flex: 1, minHeight: 220 }}>
         {donut.length ? (
           <ResponsiveContainer width="100%" height="100%">
             <PieChart>
@@ -162,9 +160,7 @@ export default function ThreatDistributionPanel(props: { dangerCounts: DangerCou
             </PieChart>
           </ResponsiveContainer>
         ) : (
-          <Stack sx={{ height: "100%", alignItems: "center", justifyContent: "center" }}>
-            <Typography color="text.secondary" variant="body2">No data</Typography>
-          </Stack>
+          <EmptyState title="No submissions this month" hint="Verdicts appear here after your first analysis." />
         )}
       </Box>
 

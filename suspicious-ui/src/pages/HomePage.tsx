@@ -48,6 +48,7 @@ import FeederHealthBadge from "@/shared/components/FeederHealthBadge";
 
 import { DashboardCard } from "@/features/home/components/DashboardCard";
 import { ThemeGreeting } from "@/features/home/components/ThemeGreeting";
+import { EmptyState } from "@/shared/components/EmptyState";
 import { CisoScopeDialog } from "@/features/home/components/CisoScopeDialog";
 import {
   getHomeSummary,
@@ -329,10 +330,7 @@ export default function HomePage() {
                 ) : null
               }
             >
-              <Box
-                sx={{ height: 220 }}
-                className={capabilities.effects.hasHeatEffect ? "sun-orb" : undefined}
-              >
+              <Box sx={{ height: 220 }}>
                 {homeQuery.isLoading ? (
                   <Stack sx={{ height: "100%", alignItems: "center", justifyContent: "center" }}>
                     <CircularProgress size={22} />
@@ -381,11 +379,7 @@ export default function HomePage() {
                     </PieChart>
                   </ResponsiveContainer>
                 ) : (
-                  <Stack sx={{ height: "100%", alignItems: "center", justifyContent: "center" }}>
-                    <Typography color="text.secondary" variant="body2">
-                      No data
-                    </Typography>
-                  </Stack>
+                  <EmptyState title="No submissions this month" hint="Verdicts appear here after your first analysis." />
                 )}
               </Box>
 

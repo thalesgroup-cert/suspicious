@@ -51,6 +51,15 @@ describe("HomePage - Test Suite", () => {
     });
   });
 
+  describe("Empty chart", () => {
+    it("does not show the empty-chart message while the query is loading", async () => {
+      vi.mocked(getDashboardSummary).mockReturnValue(new Promise(() => {}));
+      const { container } = renderWithProviders(<HomePage />, { initialPath: "/" });
+      await waitFor(() => expect(container.firstChild).toBeTruthy());
+      expect(screen.queryByText("No submissions this month")).toBeNull();
+    });
+  });
+
   describe("Management", () => {
     it("renders the home route under a Suspense-friendly tree", async () => {
       const { container } = renderWithProviders(<HomePage />, { initialPath: "/" });
