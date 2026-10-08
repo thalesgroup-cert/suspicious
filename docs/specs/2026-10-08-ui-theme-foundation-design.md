@@ -82,3 +82,8 @@ Before calling the cycle done, state PASS or FAIL with evidence for: any claim w
 
 - Fontsource adds dependencies and bundle size. Mitigation: variable fonts, latin subset, only the families listed above, and a before/after build size check.
 - Token changes touch every themed component. Mitigation: do it behind unchanged component names, run the full suite after each step, and compare contact sheets.
+
+## Amendments after implementation
+
+- Tokens: the planned token object (radius, focusRing) became the `edge()` helper. Because mkDark/mkLight merge `components` one level deep, a theme's own MuiPaper/MuiCard/MuiChip/MuiTooltip/MuiOutlinedInput override replaces the base, so `edge()` in base reaches only themes without those overrides (autumn, summer, the sidebar border). The visible card border fix came from the SoftCard changes. mkLight's three hardcoded #0B1220 entries (MuiOutlinedInput, MuiPaper, MuiCard) intentionally stay.
+- Fonts: the three variable packages ship no latin-only CSS, so `wght.css` is imported (unicode-range limits what browsers download; dist +668 KB). The plan sanctioned this fallback.

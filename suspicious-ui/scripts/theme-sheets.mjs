@@ -2,6 +2,10 @@ import { chromium } from "playwright";
 import fs from "node:fs";
 import path from "node:path";
 
+if (!process.env.UI_USER || !process.env.UI_PASS) {
+  console.error("usage: UI_USER=<user> UI_PASS=<pass> [UI_URL] [CHROMIUM_PATH] node scripts/theme-sheets.mjs [outDir]");
+  process.exit(1);
+}
 const out = path.resolve(process.argv[2] ?? "theme-shots");
 const url = process.env.UI_URL ?? "http://localhost:9021";
 const THEMES = ["midnight","graphite","slate","light","paper","renee","high_contrast","sunrise","valentine","cyber","the_one","metal","winter","spring","summer","autumn","future"];
@@ -16,8 +20,8 @@ const page = await (await browser.newContext({ viewport: { width: 1440, height: 
 
 await page.goto(`${url}/login`);
 await page.getByRole("button", { name: /username and pass/i }).click();
-await page.locator("input").first().fill(process.env.UI_USER ?? "elena.voss@meridian.example");
-await page.locator("input[type=password]").fill(process.env.UI_PASS ?? "MeridianDev!2026");
+await page.locator("input").first().fill(process.env.UI_USER);
+await page.locator("input[type=password]").fill(process.env.UI_PASS);
 await page.keyboard.press("Enter");
 await page.waitForURL((u) => !u.pathname.startsWith("/login"));
 
