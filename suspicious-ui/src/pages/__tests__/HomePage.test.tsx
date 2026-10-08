@@ -23,6 +23,7 @@ vi.mock("@/features/dashboard/api", () => ({
 
 
 import { getMe } from "@/api/auth";
+import { api } from "@/api/client";
 import { getDashboardSummary } from "@/features/dashboard/api";
 import HomePage from "../HomePage";
 
@@ -52,10 +53,15 @@ describe("HomePage - Test Suite", () => {
   });
 
   describe("Empty chart", () => {
-    it("does not show the empty-chart message while the query is loading", async () => {
-      vi.mocked(getDashboardSummary).mockReturnValue(new Promise(() => {}));
-      const { container } = renderWithProviders(<HomePage />, { initialPath: "/" });
-      await waitFor(() => expect(container.firstChild).toBeTruthy());
+    it("shows the spinner, not the empty message, while the home summary is loading", async () => {
+      vi.mocked(api.get).mockImplementation((url: string) =>
+        url === "/home/summary/"
+          ? new Promise(() => {})
+          : Promise.resolve({ data: { count: 0, results: [] } }),
+      );
+      renderWithProviders(<HomePage />, { initialPath: "/" });
+      await screen.findByText("Threat distribution");
+      expect(screen.getAllByRole("progressbar").length).toBeGreaterThan(0);
       expect(screen.queryByText("No submissions this month")).toBeNull();
     });
   });
