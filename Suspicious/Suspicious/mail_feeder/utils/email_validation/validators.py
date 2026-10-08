@@ -5,6 +5,10 @@ from .models import EmailValidationResult, ConfigModel
 class EmailValidatorService:
     def __init__(self, config: ConfigModel):
         self.company_domains = {d.strip().lower() for d in config.company_domains}
+        self.own_domains = {d.strip().lower() for d in config.own_domains if d.strip()}
+
+    def _is_own_domain(self, domain: str) -> bool:
+        return any(domain == d or domain.endswith("." + d) for d in self.own_domains)
 
     def validate_email_syntax(self, email: str) -> EmailValidationResult:
         """
@@ -27,7 +31,7 @@ class EmailValidatorService:
 
         normalized = result.normalized  # type: ignore
         domain = normalized.split("@")[1].lower()
-        if domain in self.company_domains:
+        if domain in self.company_domains or self._is_own_domain(domain):
             return EmailValidationResult(is_valid=True, normalized=normalized)
         else:
             return EmailValidationResult(

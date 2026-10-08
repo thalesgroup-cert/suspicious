@@ -17,8 +17,8 @@ def load_config(config_path: str) -> Dict[str, Any]:
         return json.load(config_file)
 
 
-def initialize_email_validator(company_domains):
-    config = ConfigModel(company_domains=company_domains)
+def initialize_email_validator(company_domains, own_domains=()):
+    config = ConfigModel(company_domains=company_domains, own_domains=list(own_domains))
     return EmailValidatorService(config)
 
 

@@ -15,13 +15,28 @@ def _suspicious_email() -> str:
     return get_section("branding").get("contact_email")
 
 
+def _own_domains() -> list[str]:
+    """The organisation's own domains, from the contact address, the SMTP login
+    and email.content.global_domain. Senders on these (or any subdomain) are
+    company reporters even if Watcher does not list the exact subdomain."""
+    from settings.config import get_section
+
+    email = get_section("email") or {}
+    candidates = [
+        (get_section("branding") or {}).get("contact_email") or "",
+        (email.get("smtp") or {}).get("username") or "",
+        (email.get("content") or {}).get("global_domain") or "",
+    ]
+    return sorted({c.rsplit("@", 1)[-1].strip().lower() for c in candidates if c.strip()})
+
+
 fetch_mail_logger = logging.getLogger("tasp.cron.fetch_and_process_emails")
 
 
 class UserCreationService:
     def __init__(self):
         COMPANY_DOMAINS = WatcherLegitDomain.objects.select_related('domain').values_list('domain__value', flat=True)
-        self.email_validator = initialize_email_validator(COMPANY_DOMAINS)
+        self.email_validator = initialize_email_validator(COMPANY_DOMAINS, _own_domains())
 
     def get_or_create_user(self, username: str) -> User:
         validated = UsernameModel(username=username)
@@ -42,7 +57,10 @@ class UserCreationService:
         if validation_result.is_valid:
             user = self.create_user(validation_result.normalized)
         else:
-            fetch_mail_logger.warning("No User Found, defaulting to suspicious user...")
+            fetch_mail_logger.warning(
+                "Reporter %s is not a company address; attributing the case to the shared user %s",
+                username, _suspicious_email(),
+            )
             user = self.create_default_user()
 
         KpiService.update_kpi_stats(month, year)
