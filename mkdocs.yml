@@ -113,6 +113,7 @@ nav:
       - Backups: operations/backups.md
       - Monitoring: operations/monitoring.md
       - Integrations: operations/integrations.md
+      - Adding an analyzer source: operations/analyzer-sources.md
   - API Reference:
       - REST API: reference/rest-api.md
       - Python Code:
