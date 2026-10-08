@@ -27,6 +27,9 @@ class AllowListDomain(models.Model):
     creation_date = models.DateTimeField(auto_now_add=True)
     last_update = models.DateTimeField(auto_now=True)
 
+    class Meta:
+        constraints = [models.UniqueConstraint(fields=["domain"], name="uniq_allowlistdomain_domain")]
+
     def __str__(self):
         return self.domain.value if self.domain else f"AllowListDomain #{self.id}"
 
@@ -43,6 +46,9 @@ class AllowListIp(models.Model):
     user = models.ForeignKey(settings.AUTH_USER_MODEL, on_delete=models.CASCADE)
     creation_date = models.DateTimeField(auto_now_add=True)
     last_update = models.DateTimeField(auto_now=True)
+
+    class Meta:
+        constraints = [models.UniqueConstraint(fields=["ip"], name="uniq_allowlistip_ip")]
 
     def __str__(self):
         return self.ip.address if self.ip else f"AllowListIp #{self.id}"
@@ -86,6 +92,9 @@ class DenyListDomain(models.Model):
     creation_date = models.DateTimeField(auto_now_add=True)
     last_update = models.DateTimeField(auto_now=True)
 
+    class Meta:
+        constraints = [models.UniqueConstraint(fields=["domain"], name="uniq_denylistdomain_domain")]
+
     def __str__(self):
         return self.domain.value if self.domain else f"DenyListDomain #{self.id}"
 
@@ -128,6 +137,9 @@ class CampaignDomainAllowList(models.Model):
     creation_date = models.DateTimeField(auto_now_add=True)
     last_update = models.DateTimeField(auto_now=True)
 
+    class Meta:
+        constraints = [models.UniqueConstraint(fields=["domain"], name="uniq_campaigndomainallowlist_domain")]
+
     def __str__(self):
         return self.domain.value if self.domain else f"CampaignDomainAllowList #{self.id}"
 
@@ -144,6 +156,9 @@ class AllowListFile(models.Model):
     user = models.ForeignKey(settings.AUTH_USER_MODEL, on_delete=models.CASCADE)
     creation_date = models.DateTimeField(auto_now_add=True)
     last_update = models.DateTimeField(auto_now=True)
+
+    class Meta:
+        constraints = [models.UniqueConstraint(fields=["linked_file_hash"], name="uniq_allowlistfile_hash")]
 
     def __str__(self):
         return self.linked_file_hash.value if self.linked_file_hash else f"AllowListFile #{self.id}"

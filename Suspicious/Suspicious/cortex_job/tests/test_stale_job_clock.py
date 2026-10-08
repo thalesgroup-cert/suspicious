@@ -7,6 +7,7 @@ from django.utils import timezone
 
 from case_handler.models import Case
 from cortex_job.models import Analyzer, AnalyzerReport, CaseAnalyzerJob
+from ip_process.models import IP
 
 
 class StaleJobClockTest(TestCase):
@@ -32,6 +33,7 @@ class StaleJobClockTest(TestCase):
             analyzer=self.analyzer, level="info",
             confidence=0, score=0,
             report_summary={}, report_taxonomy={}, report_full={},
+            ip=IP.objects.get_or_create(address="9.9.9.9")[0],
         )
         AnalyzerReport.objects.filter(pk=report.pk).update(
             creation_date=report_created_at

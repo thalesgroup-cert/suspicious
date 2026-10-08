@@ -70,8 +70,9 @@ class ArtifactValueTests(TestCase):
             analyzer_cortex_id="any", name="any", weight=0.2,
         )
 
-    def _make_report(self, **fk):
-        return AnalyzerReport.objects.create(
+    def _make_report(self, save=True, **fk):
+        make = AnalyzerReport.objects.create if save else AnalyzerReport
+        return make(
             cortex_job_id="job-art",
             type="any",
             status="Success",
@@ -111,7 +112,8 @@ class ArtifactValueTests(TestCase):
         self.assertEqual(CortexJobManager._artifact_value(r), "a@b.com")
 
     def test_orphan_raises(self):
-        r = self._make_report()
+        # A targetless row can no longer be saved (one-target check), so use an unsaved one.
+        r = self._make_report(save=False)
         with self.assertRaises(ValueError):
             CortexJobManager._artifact_value(r)
 

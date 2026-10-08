@@ -6,6 +6,7 @@ from rest_framework.test import APIClient
 
 from case_handler.models import Case
 from cortex_job.models import Analyzer, AnalyzerReport, CaseAnalyzerJob
+from ip_process.models import IP
 
 
 @override_settings(CORTEX_WEBHOOK_SECRET="testsecret")
@@ -34,6 +35,7 @@ class CortexWebhookTest(TestCase):
             report_summary={},
             report_taxonomy={},
             report_full={},
+            ip=IP.objects.create(address="9.9.9.9"),
         )
         self.caj = CaseAnalyzerJob.objects.create(
             case=self.case,

@@ -4,6 +4,7 @@ from django.urls import reverse
 
 from case_handler.models import Case
 from cortex_job.models import Analyzer, AnalyzerReport
+from url_process.models import URL
 
 
 class AdminChangelistTests(TestCase):
@@ -15,6 +16,7 @@ class AdminChangelistTests(TestCase):
             cortex_job_id="j1", type="url", status="Success", analyzer=cls.analyzer,
             level="info", confidence=1, score=1,
             report_summary={}, report_taxonomy=[], report_full={"big": "x"},
+            url=URL.objects.create(address="http://adm.test/"),
         )
         Case.objects.create(description="d", reporter=cls.admin)
 

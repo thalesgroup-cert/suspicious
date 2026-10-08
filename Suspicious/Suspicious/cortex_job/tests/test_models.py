@@ -1,6 +1,7 @@
 from django.test import TestCase
 
 from cortex_job.models import Analyzer, AnalyzerReport
+from ip_process.models import IP
 
 
 class AnalyzerTierTests(TestCase):
@@ -21,6 +22,7 @@ class AnalyzerReportEnrichmentTest(TestCase):
             cortex_job_id="j", type="ip", status="Success", analyzer=a,
             level="safe", confidence=0, score=0,
             report_summary={}, report_taxonomy={}, report_full={},
+            ip=IP.objects.create(address="9.9.9.9"),
         )
         self.assertIsNone(r.enrichment)
         r.enrichment = {"source": "virustotal", "malicious_count": 3}

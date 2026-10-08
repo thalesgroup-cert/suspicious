@@ -14,6 +14,7 @@ from mail_feeder.models import Mail
 from django.utils.translation import gettext_lazy as _
 from django.utils import timezone
 from case_handler.lifecycle import LifecycleState
+from common.constraints import exactly_one_not_null
 import datetime
 
 
@@ -109,6 +110,13 @@ class Case(models.Model):
 
     class Meta:
         ordering = ['-creation_date']
+        constraints = [
+            models.CheckConstraint(
+                condition=models.Q(observable_group__isnull=True)
+                | (models.Q(fileOrMail__isnull=True) & models.Q(nonFileIocs__isnull=True)),
+                name="case_group_excludes_other_roads_chk",
+            ),
+        ]
         indexes = [
             models.Index(fields=['status', '-creation_date'], name='case_status_created_idx'),
         ]
@@ -213,6 +221,10 @@ class CaseHasFileOrMail(models.Model):
 
     class Meta:
         ordering = ['-creation_date']
+        constraints = [models.CheckConstraint(
+            condition=exactly_one_not_null("file", "mail"),
+            name="casehasfileormail_one_target_chk",
+        )]
 
     def get_iocs(self):
         """
@@ -242,6 +254,10 @@ class CaseHasNonFileIocs(models.Model):
 
     class Meta:
         ordering = ['-creation_date']
+        constraints = [models.CheckConstraint(
+            condition=exactly_one_not_null("url", "ip", "hash"),
+            name="casehasnonfileiocs_one_target_chk",
+        )]
 
     def get_iocs(self):
         """
@@ -313,6 +329,10 @@ class CaseArtifact(models.Model):
 
     class Meta:
         ordering = ['-creation_date']
+        constraints = [models.CheckConstraint(
+            condition=exactly_one_not_null("file", "hash", "url", "ip", "mail"),
+            name="caseartifact_one_target_chk",
+        )]
 
     def __str__(self):
         artifact_id = (
@@ -353,6 +373,10 @@ class ObservableGroupArtifact(models.Model):
 
     class Meta:
         ordering = ["creation_date"]
+        constraints = [models.CheckConstraint(
+            condition=exactly_one_not_null("url", "ip", "hash", "domain"),
+            name="observablegroupartifact_one_target_chk",
+        )]
         indexes = [models.Index(fields=["group", "artifact_type"])]
 
     def observable(self):

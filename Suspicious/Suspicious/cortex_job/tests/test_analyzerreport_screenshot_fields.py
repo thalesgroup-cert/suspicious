@@ -1,5 +1,6 @@
 from django.test import TestCase
 from cortex_job.models import Analyzer, AnalyzerReport
+from url_process.models import URL
 
 
 class ScreenshotFieldsTest(TestCase):
@@ -9,6 +10,7 @@ class ScreenshotFieldsTest(TestCase):
             cortex_job_id="j1", type="url", status="Success", analyzer=a,
             level="info", confidence=0, score=0,
             report_summary={}, report_taxonomy={}, report_full={},
+            url=URL.objects.create(address="http://shot.test/"),
         )
         r.refresh_from_db()
         self.assertEqual(r.screenshot_bucket, "")

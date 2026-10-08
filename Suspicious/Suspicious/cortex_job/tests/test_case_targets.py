@@ -21,22 +21,18 @@ class CollectCaseTargetsTest(TestCase):
         self.assertEqual(collect_case_targets(case), [])
 
     def test_non_file_iocs_returns_url_ip_hash(self):
-        case = Case.objects.create(reporter=self.user, description="")
+        # A CaseHasNonFileIocs holds exactly one of url/ip/hash (DB check constraint).
         url = URL.objects.create(address="http://example.com")
         ip = IP.objects.create(address="1.2.3.4")
         h = Hash.objects.create(value="deadbeef")
-        iocs = CaseHasNonFileIocs.objects.create(case=case, url=url, ip=ip, hash=h)
-        case.nonFileIocs = iocs
-        case.save()
+        for data_type, obj in (("url", url), ("ip", ip), ("hash", h)):
+            case = Case.objects.create(reporter=self.user, description="")
+            case.nonFileIocs = CaseHasNonFileIocs.objects.create(case=case, **{data_type: obj})
+            case.save()
 
-        targets = collect_case_targets(case)
+            targets = collect_case_targets(case)
 
-        data_types = sorted(dt for _obj, dt in targets)
-        self.assertEqual(data_types, ["hash", "ip", "url"])
-        by_type = {dt: obj for obj, dt in targets}
-        self.assertEqual(by_type["url"].pk, url.pk)
-        self.assertEqual(by_type["ip"].pk, ip.pk)
-        self.assertEqual(by_type["hash"].pk, h.pk)
+            self.assertEqual([(dt, o.pk) for o, dt in targets], [(data_type, obj.pk)])
 
     def test_non_file_iocs_partial_fields_only_returns_set_ones(self):
         case = Case.objects.create(reporter=self.user, description="")

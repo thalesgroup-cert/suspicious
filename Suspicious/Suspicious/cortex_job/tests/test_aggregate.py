@@ -3,6 +3,7 @@ from django.test import TestCase
 from case_handler.models import Case
 from cortex_job.models import Analyzer, AnalyzerReport, CaseAnalyzerJob
 from cortex_job.cortex_utils.aggregate import aggregate_case
+from ip_process.models import IP
 
 
 class CaseAggregateTest(TestCase):
@@ -23,6 +24,7 @@ class CaseAggregateTest(TestCase):
             report_summary={},
             report_taxonomy={},
             report_full={},
+            ip=IP.objects.get_or_create(address="9.9.9.9")[0],
         )
         return CaseAnalyzerJob.objects.create(
             case=self.case, cortex_job_id=jid, analyzer=self.analyzer,
