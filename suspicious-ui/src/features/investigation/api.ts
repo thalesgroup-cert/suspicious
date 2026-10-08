@@ -93,6 +93,20 @@ export type VerdictExplanationDTO = {
   sources: VerdictSourceLine[];
 };
 
+export type ThreatClassification = {
+  label: string;
+  category: string;
+  /** "ai" for mail cases, "virustotal" otherwise. */
+  source: string;
+};
+
+export type AnalysisHealth = {
+  total: number;
+  failed: number;
+  pending: number;
+  failures: { analyzer: string; target: string; status: string }[];
+};
+
 type InvestigationCaseInfos = {
   id?: number;
   verdict_explanation?: VerdictExplanationDTO | null;
@@ -128,6 +142,8 @@ export type InvestigationDetails = {
   raw?: unknown;
   analyzer_reports: InvestigationAnalyzerReport[];
   case_infos?: InvestigationCaseInfos;
+  threat_classification?: ThreatClassification | null;
+  analysis_health?: AnalysisHealth;
   challenge_proposed_result?: "Safe" | "Dangerous" | "";
   challenge_reason?: string;
   reporter_context?: string;
@@ -299,6 +315,30 @@ function normalizeCaseInfos(value: unknown): InvestigationCaseInfos | undefined 
   return value as InvestigationCaseInfos;
 }
 
+function normalizeThreat(value: unknown): ThreatClassification | null {
+  if (!isObject(value) || !asString(value.label)) return null;
+  return {
+    label: asString(value.label),
+    category: asString(value.category, asString(value.label)),
+    source: asString(value.source),
+  };
+}
+
+function normalizeHealth(value: unknown): AnalysisHealth {
+  const v = isObject(value) ? value : {};
+  const failures = Array.isArray(v.failures) ? v.failures : [];
+  return {
+    total: asNumber(v.total, 0),
+    failed: asNumber(v.failed, 0),
+    pending: asNumber(v.pending, 0),
+    failures: failures.filter(isObject).map((f) => ({
+      analyzer: asString(f.analyzer),
+      target: asString(f.target),
+      status: asString(f.status),
+    })),
+  };
+}
+
 function normalizeDetails(input: unknown): InvestigationDetails {
   const data = isObject(input) ? input : {};
   const artifact = asString(data.artifact);
@@ -322,6 +362,8 @@ function normalizeDetails(input: unknown): InvestigationDetails {
     list_reason: asString(data.list_reason),
     analyzer_reports: analyzerReportsRaw.map(normalizeAnalyzerReport),
     case_infos: normalizeCaseInfos(data.case_infos),
+    threat_classification: normalizeThreat(data.threat_classification),
+    analysis_health: normalizeHealth(data.analysis_health),
     observable_group: parseObservableGroup(data.observable_group),
     raw: data.raw ?? data,
   };

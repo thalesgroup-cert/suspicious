@@ -44,6 +44,9 @@ export function SourceTable({ sources }: { sources: Source[] }) {
             </TableCell>
             <TableCell>
               <Chip size="small" color={VERDICT_COLOR[source.verdict] ?? "default"} label={source.verdict} />
+              {source.failed ? (
+                <Chip size="small" color="error" variant="outlined" label="failed" sx={{ ml: 0.5 }} />
+              ) : null}
             </TableCell>
             <TableCell>{source.evidence}</TableCell>
             <TableCell>

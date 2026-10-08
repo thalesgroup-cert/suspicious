@@ -85,6 +85,8 @@ import { SoftCard } from "@/features/investigation/components/cards";
 import { InvestigationAnalyzerReportCard } from "@/features/investigation/components/InvestigationAnalyzerReportCard";
 import { ObservableGroupPanel } from "@/features/investigation/ObservableGroupPanel";
 import { VerdictExplanation } from "@/features/investigation/VerdictExplanation";
+import { ThreatBadge } from "@/features/investigation/ThreatBadge";
+import { AnalysisHealthBanner } from "@/features/investigation/AnalysisHealthBanner";
 import { CommentThread } from "@/features/comments/CommentThread";
 import { addCaseComment, getCaseComments } from "@/features/comments/api";
 import {
@@ -1163,6 +1165,7 @@ export default function InvestigationPage() {
                           <Chip size="small" label={`Score ${currentScore ?? "—"}/10`} variant="outlined" sx={{ fontWeight: 800 }} />
                         )}
                         <Chip size="small" label={`Confidence ${currentConfidence ?? "—"}%`} variant="outlined" sx={{ fontWeight: 800 }} />
+                        <ThreatBadge value={detailsQuery.data?.threat_classification} />
                       </Stack>
                       <Stack direction="row" spacing={0.75} sx={{ opacity: 0.65, flexWrap: "wrap" }}>
                         <Typography variant="caption" color="text.secondary" sx={{ fontWeight: 700, mr: 0.25 }}>AI:</Typography>
@@ -1234,6 +1237,12 @@ export default function InvestigationPage() {
                       Page screenshot
                     </Typography>
                     <ScreenshotPanel src={detailsQuery.data.screenshot_url} label="Page screenshot" />
+                  </Box>
+                ) : null}
+
+                {detailsQuery.data?.analysis_health ? (
+                  <Box sx={{ px: 2.25, pt: 1.5 }}>
+                    <AnalysisHealthBanner health={detailsQuery.data.analysis_health} />
                   </Box>
                 ) : null}
 
