@@ -4,6 +4,8 @@ from __future__ import annotations
 import hashlib
 import logging
 
+import requests
+
 from case_handler.models import Campaign
 from common.locks import cache_lock
 from connectors.contrib.thehive.campaign_alert import (
@@ -79,6 +81,22 @@ def sync_campaign(campaign: Campaign, client, minio, *, ui_base: str, own_domain
         else:
             _update(client, alert["_id"], content, [m.case_id for m in pending])
             outcome = "updated"
+
+        # Files are file observables already; attach them to the alert too (its
+        # Attachments tab). Best effort: a rejected file must not fail the sync.
+        try:
+            added, present, failed = client.add_attachments(alert["_id"], content.files)
+        except requests.RequestException as exc:
+            added, present, failed = 0, 0, [str(exc)]
+        not_sent = sum(len(m.skipped) for m in loaded if m)
+        logger.info(
+            "Campaign %s: %d file(s) attached to the alert, %d already there, %d failed; "
+            "%d file(s) skipped (too large, empty, duplicate or tracking pixel).",
+            campaign.ref, added, present, len(failed), not_sent,
+        )
+        if failed:
+            logger.warning("Campaign %s: could not attach %d file(s): %s",
+                           campaign.ref, len(failed), "; ".join(failed[:3]))
 
         campaign.external_refs = {**campaign.external_refs, CONNECTOR: alert["_id"]}
         campaign.save(update_fields=["external_refs", "updated_at"])

@@ -21,6 +21,7 @@ class FakeHive:
     def __init__(self):
         self.alerts, self.observables, self.comments, self.next = {}, {}, {}, 1
         self.creates = 0
+        self.attachments = {}
 
     def _id(self):
         self.next += 1
@@ -34,6 +35,7 @@ class FakeHive:
         self.observables[aid] = [dict(o) for o in content.observables] + [
             {"dataType": "file", "name": f.filename, "sha": hashlib.sha256(f.data).hexdigest()} for f in content.files]
         self.comments[aid] = []
+        self.attachments[aid] = {}
         return self.alerts[aid]
 
     def get_alert(self, aid):
@@ -60,6 +62,16 @@ class FakeHive:
 
     def patch_alert(self, aid, fields):
         self.alerts[aid].update(fields)
+
+    def add_attachments(self, aid, parts):
+        added = present = 0
+        for part in parts:
+            if part.filename in self.attachments[aid]:
+                present += 1
+            else:
+                self.attachments[aid][part.filename] = part.data
+                added += 1
+        return added, present, []
 
     def add_comment(self, aid, message):
         self.comments[aid].append(message)
@@ -140,3 +152,23 @@ class SyncTest(TestCase):
         with self.assertRaises(RuntimeError):
             self._sync()
         self.assertFalse(any("thehive" in m.synced for m in self.campaign.members.all()))
+
+
+    def test_files_are_attached_to_the_alert_and_not_duplicated_on_update(self):
+        self._add(1, atts=[Attachment("notice.pdf", b"%PDF-1")])
+        self._sync()
+        alert_id = self.campaign.refresh_from_db() or self.campaign.external_refs["thehive"]
+        self.assertEqual(sorted(self.hive.attachments[alert_id]), ["mail-source-case-%d.eml" % Case.objects.first().id, "notice.pdf"])
+        self._add(2, atts=[Attachment("notice.pdf", b"%PDF-1")])      # same file again
+        self.assertEqual(self._sync(), "updated")
+        names = sorted(self.hive.attachments[alert_id])
+        self.assertEqual(names.count("notice.pdf"), 1)
+        self.assertEqual(len([n for n in names if n.startswith("mail-source-case-")]), 2)
+
+    def test_attachment_failures_are_logged_but_do_not_fail_the_sync(self):
+        self._add(1, atts=[Attachment("notice.pdf", b"%PDF-1")])
+        self.hive.add_attachments = lambda aid, parts: (0, 0, ["notice.pdf: 403 license"])
+        with self.assertLogs("tasp.cron.update_ongoing_case_jobs", "WARNING") as logs:
+            self.assertEqual(self._sync(), "created")
+        self.assertTrue(any("notice.pdf: 403 license" in line for line in logs.output))
+        self.assertTrue(all("thehive" in m.synced for m in self.campaign.members.all()))

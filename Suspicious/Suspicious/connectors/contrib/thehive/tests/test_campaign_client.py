@@ -91,3 +91,43 @@ class ReadWriteTest(SimpleTestCase):
         files = req.call_args.kwargs["files"]
         self.assertEqual(files["attachment"][0:2], ("a.pdf", b"%PDF"))
         self.assertEqual(json.loads(files["_json"][1])["dataType"], "file")
+
+
+class AttachmentsTest(SimpleTestCase):
+    """Files are also attached to the alert itself (its Attachments tab), not
+    only added as file observables. TheHive rejects a name already on the alert."""
+
+    def _fake(self, existing=(), reject=()):
+        posted = []
+
+        def fake(method, url, **kw):
+            if url.endswith("/query"):
+                return _resp([{"name": n} for n in existing])
+            name = kw["files"][0][1][0]
+            if name in reject:
+                raise _http_error(400, f"File {name} already exists")
+            posted.append((url, name, kw["files"][0][1][1]))
+            return _resp({"attachments": [{"name": name}]}, 201)
+        return fake, posted
+
+    def test_attaches_only_files_not_already_on_the_alert(self):
+        fake, posted = self._fake(existing=["notice.pdf"])
+        with patch(REQ, side_effect=fake):
+            added, present, failed = HiveClient("http://hive", "k").add_attachments("~1", _content().files)
+        self.assertEqual((added, present, failed), (1, 1, []))
+        self.assertEqual(posted, [("http://hive/api/v1/alert/~1/attachments", "m.eml", b"From: x")])
+
+    def test_a_rejected_file_is_reported_and_the_others_still_go(self):
+        fake, posted = self._fake(reject=["notice.pdf"])
+        with patch(REQ, side_effect=fake):
+            added, present, failed = HiveClient("http://hive", "k").add_attachments("~1", _content().files)
+        self.assertEqual((added, present), (1, 0))
+        self.assertEqual([name for _u, name, _d in posted], ["m.eml"])
+        self.assertEqual(len(failed), 1)
+        self.assertIn("notice.pdf", failed[0])
+
+    def test_nothing_to_attach_makes_no_upload_call(self):
+        fake, posted = self._fake()
+        with patch(REQ, side_effect=fake):
+            self.assertEqual(HiveClient("http://hive", "k").add_attachments("~1", []), (0, 0, []))
+        self.assertEqual(posted, [])

@@ -93,6 +93,33 @@ class HiveClient:
             "attachment": (part.filename, part.data),
         })
 
+    def list_attachment_names(self, alert_id: str) -> set[str]:
+        found = self._query([{"_name": "getAlert", "idOrName": alert_id}, {"_name": "attachments"}])
+        return {a["name"] for a in found if a.get("name")}
+
+    def add_attachments(self, alert_id: str, parts) -> tuple[int, int, list[str]]:
+        """Attach files to the alert itself (its Attachments tab), one request per
+        file so one rejection does not lose the rest. TheHive rejects a name that is
+        already on the alert, so those are skipped. Returns (added, already there,
+        failures)."""
+        parts = list(parts)
+        if not parts:
+            return 0, 0, []
+        present = self.list_attachment_names(alert_id)
+        added, already, failed = 0, 0, []
+        for part in parts:
+            if part.filename in present:
+                already += 1
+                continue
+            try:
+                self._call("POST", f"/alert/{alert_id}/attachments",
+                           files=[("attachments", (part.filename, part.data))])
+                present.add(part.filename)
+                added += 1
+            except requests.RequestException as exc:
+                failed.append(f"{part.filename}: {exc}")
+        return added, already, failed
+
     def patch_alert(self, alert_id: str, fields: dict) -> None:
         self._call("PATCH", f"/alert/{alert_id}", json=fields)
 
