@@ -690,6 +690,7 @@ export const themes: Record<ThemeName, ReturnType<typeof createTheme>> = {
   }),
 
   // ── 3. SLATE — dark ──────────────────────────────────────────────────
+  // No mono and lighter heading/button weights: slate is a calm neutral; mono is reserved for the terminal themes (spec section 3).
   slate: mkDark({
     bg: "#07101D",
     paper: "#0C1828",

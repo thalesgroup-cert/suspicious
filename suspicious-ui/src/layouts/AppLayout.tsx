@@ -161,12 +161,14 @@ export default function AppLayout() {
     : `linear-gradient(180deg, ${theme.palette.background.paper} 0%, ${alpha(theme.palette.background.paper, 0.97)} 100%)`;
 
   // ── Shell background ─────────────────────────────────────────────────────
-  const shellBg = isDark
+  const shellBg = effects.isAccessibilityTheme
+    ? "none"
+    : isDark
     ? `radial-gradient(ellipse 80% 50% at 15% 5%, ${alpha(primary, 0.07)}, transparent 50%)`
     : `radial-gradient(ellipse 80% 50% at 15% 5%, ${alpha(primary, 0.05)}, transparent 50%)`;
 
   // ── Sidebar border ───────────────────────────────────────────────────────
-  const sidebarBorder = edge(theme, isDark ? 0.14 : 0.1);
+  const sidebarBorder = effects.isAccessibilityTheme ? "2px solid #DADADA" : edge(theme, isDark ? 0.14 : 0.1);
 
   // ─────────────────────────────────────────────────────────────────────────
   // Drawer content

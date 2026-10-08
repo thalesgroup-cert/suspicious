@@ -379,7 +379,7 @@ export default function HomePage() {
                     </PieChart>
                   </ResponsiveContainer>
                 ) : (
-                  <EmptyState title="No submissions this month" hint="Verdicts appear here after your first analysis." />
+                  <EmptyState title="No submissions this month" hint="Verdicts appear here once something is analysed this month." />
                 )}
               </Box>
 
