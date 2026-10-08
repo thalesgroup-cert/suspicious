@@ -1,5 +1,3 @@
-from unittest import mock
-
 from django.contrib.auth.models import User
 from django.test import TestCase
 
@@ -27,30 +25,10 @@ class ThehiveGroupObservablesTests(TestCase):
         self.assertEqual(sorted(o["data"] for o in obs), ["1.1.1.1", "8.8.8.8"])
         self.assertTrue(all(o["dataType"] == "ip" for o in obs))
 
-    def test_on_case_finalised_creates_alert_with_observables(self):
-        case = self._group_case(results="Dangerous")
-        connector = TheHiveConnector({"url": "https://hive", "api_key": "k"})
-        with mock.patch(
-            "connectors.contrib.thehive.phishing.create_new_alert",
-            return_value={"_id": "alert-1"},
-        ) as cna, mock.patch(
-            "connectors.contrib.thehive.phishing.add_observables_to_item"
-        ) as aoi:
-            connector.on_case_finalised(mock.Mock(case_id=case.id))
-        cna.assert_called_once()
-        # severity (4th positional arg) derived from the verdict: Dangerous -> 4
-        self.assertEqual(cna.call_args[0][3], 4)
-        aoi.assert_called_once()
-        _t, _id, sent, _u, _k = aoi.call_args[0]
-        self.assertEqual(_id, "alert-1")
-        self.assertEqual(len(sent), 2)
+    def test_thehive_no_longer_subscribes_to_case_finalised(self):
+        """IOC-group cases no longer get an automatic alert: TheHive only
+        receives them when an analyst presses the push button."""
+        from connectors.registry import registry
 
-    def test_on_case_finalised_skips_non_group_case(self):
-        u = User.objects.create_user("u2", password="p")
-        case = Case.objects.create(description="d", reporter=u)
-        connector = TheHiveConnector({"url": "https://hive", "api_key": "k"})
-        with mock.patch(
-            "connectors.contrib.thehive.phishing.create_new_alert"
-        ) as cna:
-            connector.on_case_finalised(mock.Mock(case_id=case.id))
-        cna.assert_not_called()
+        self.assertNotIn("thehive", registry.subscribers("case_finalised"))
+        self.assertNotIn("on_case_finalised", vars(TheHiveConnector))

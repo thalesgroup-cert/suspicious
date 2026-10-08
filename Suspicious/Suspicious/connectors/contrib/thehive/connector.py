@@ -1,9 +1,11 @@
-"""TheHive connector: config and health for the challenge flow, plus two pushes.
+"""TheHive connector: config and health for the challenge flow, plus campaign alerts.
 
-``case_finalised`` pushes IOC-group cases (Case.observable_group) as one alert
-carrying every observable. ``campaign_updated`` creates or updates the alert of
-a detected phishing campaign (see campaign_sync). Mail and file cases otherwise
-reach TheHive through the challenge flow (tasp/services/challenge.py)."""
+``campaign_updated`` creates or updates the alert of a detected phishing
+campaign (see campaign_sync). Cases reach TheHive through the challenge flow
+(tasp/services/challenge.py) or when an analyst presses the push button
+(``POST /api/submissions/<id>/ticket/``). IOC-group cases no longer get an
+automatic alert on ``case_finalised``: it carried only a one-line summary, and
+the button builds the full ticket."""
 from __future__ import annotations
 
 from case_handler.models import Campaign
@@ -11,7 +13,6 @@ from common.clients import get_s3_client
 from common.http_client import make_session
 from connectors.base import (
     EVENT_CAMPAIGN_UPDATED,
-    EVENT_CASE_FINALISED,
     ConfigField,
     Connector,
     ConnectorManifest,
@@ -42,7 +43,7 @@ def _email_settings() -> tuple[str, tuple[str, ...]]:
 class TheHiveConnector(Connector):
     manifest = ConnectorManifest(
         name="thehive",
-        version="1.1.0",
+        version="1.2.0",
         author="Thales CERT",
         category="Incident Response",
         description="TheHive alerts for challenged cases and phishing campaigns.",
@@ -52,47 +53,8 @@ class TheHiveConnector(Connector):
             ConfigField("certificate_path", "str",
                         help="CA bundle path; empty = system trust store"),
         ),
-        events=(EVENT_CASE_FINALISED, EVENT_CAMPAIGN_UPDATED),
+        events=(EVENT_CAMPAIGN_UPDATED,),
     )
-
-    def on_case_finalised(self, event) -> None:
-        from case_handler.models import Case
-        from connectors.contrib.thehive.phishing import (
-            THEHIVE_SEVERITY,
-            add_observables_to_item,
-            build_group_observables,
-            create_new_alert,
-        )
-
-        case = Case.objects.get(pk=event.case_id)
-        if not case.observable_group_id:
-            return  # isolation — mail/file cases keep the challenge-flow path
-
-        url, key = self.config.get("url"), self.config.get("api_key")
-        if not url or not key:
-            return
-
-        observables = build_group_observables(case)
-        if not observables:
-            return
-
-        severity = THEHIVE_SEVERITY.get(str(case.results), 2)
-
-        alert = create_new_alert(
-            None,
-            f"Suspicious IOC case #{case.id}",
-            f"{len(observables)} indicator(s) — verdict {case.results}",
-            severity, 2, 2, "Suspicious", url, key,
-            [f"suspicious:case:{case.id}"],
-        )
-        alert_id = (alert or {}).get("_id")
-        if alert_id:
-            add_observables_to_item("alert", alert_id, observables, url, key)
-            # record it so a later manual "Push to TheHive" updates this alert
-            # instead of creating a duplicate.
-            if not case.thehive_alert_id:
-                case.thehive_alert_id = alert_id
-                case.save(update_fields=["thehive_alert_id"])
 
     def on_campaign_updated(self, event) -> None:
         url, key = self.config.get("url"), self.config.get("api_key")
