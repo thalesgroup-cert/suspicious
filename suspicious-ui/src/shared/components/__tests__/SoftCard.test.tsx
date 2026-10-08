@@ -34,7 +34,7 @@ describe("SoftCard", () => {
     );
     const card = screen.getByText("paper card").closest(".MuiCard-root") as HTMLElement;
     const cs = getComputedStyle(card);
-    expect(cs.backgroundImage).not.toMatch(/255,\s*255,\s*255/);
+    expect(cs.backgroundImage).toContain('url("data:image/svg+xml');
     expect(cs.borderTopColor).not.toMatch(/0\.9\)/);
   });
 });
