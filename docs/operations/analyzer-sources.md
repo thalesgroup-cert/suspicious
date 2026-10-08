@@ -16,7 +16,7 @@ Suspicious lists Cortex's analyzers on a schedule (`sync_cortex`) and creates a 
 | 2 | Strong | `AI_Mail_Analyzer`, `Yara`, `ThreatGrid`, `CIRCLHashlookup`, `Cuckoo`, `Hybrid` |
 | 3 | Contextual: informs, does not decide | everything else (Shodan, AbuseIPDB, Browserling, …) |
 
-Hybrid Analysis therefore starts at tier 2; Shodan, AbuseIPDB and Browserling start at tier 3. Change a tier or the numeric weight in **Settings → Analyzers** (or with `PATCH /api/settings/analyzers/<id>/` and a body of `{"tier": 2}` and/or `{"weight": 0.4}`), once you have seen how the source behaves. A new source is best left at tier 3 until you have compared it with real cases.
+Hybrid Analysis therefore starts at tier 2; Shodan, AbuseIPDB and Browserling start at tier 3. The numeric weight can be edited in the scoring panel of the **Settings** page. The tier is changed through the API: `PATCH /api/settings/analyzers/<id>/` with a body of `{"tier": 2}`, `{"weight": 0.4}` or both. Do this once you have seen how the source behaves. A new source is best left at tier 3 until you have compared it with real cases.
 
 ## 3. How its result is read
 
@@ -35,6 +35,6 @@ Add `score_process/scoring/cortex_analyzers/contrib/<name>.py` with an `Analyzer
 
 1. Enable the analyzer on a test Cortex, then run it over a few known cases.
 2. Run `python manage.py backtest_scoring` before and after. It replays finalised cases through the engine and reports verdict changes; look closely at any case that moves between Safe and Dangerous.
-3. Enable it in production Cortex, check the new analyzer in **Settings → Analyzers**, and watch the next cases for unexpected failures.
+3. Enable it in production Cortex, check that the new analyzer appears in the Settings scoring panel, and watch the next cases for unexpected failures.
 
 The analyzers listed on the roadmap (Shodan, AbuseIPDB, Hybrid Analysis, Browserling) are not enabled in this repository's development stack because they need accounts or API keys.
