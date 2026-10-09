@@ -249,3 +249,5 @@ class SubmitIndicatorsSerializer(OptionalContextMixin, serializers.Serializer):
 
 class SubmitConfigSerializer(serializers.Serializer):
     suspicious_email = serializers.EmailField()
+    max_file_bytes = serializers.IntegerField()
+    max_indicators = serializers.IntegerField()
