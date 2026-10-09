@@ -215,7 +215,7 @@ export default function HomePage() {
   // Buckets exclude unfinished cases, so the user's own count comes from the server when present.
   const myCount = userItems ?? donutTotal;
   const shareNumerator = isCiso ? scopeCount : myCount;
-  const sharePct = orgCount > 0 ? Math.round((shareNumerator / orgCount) * 100) : 0;
+  const sharePct = orgCount > 0 ? Math.min(100, Math.round((shareNumerator / orgCount) * 100)) : 0;
   const scopeDanger: Required<DangerCounts> | null = home?.scope_danger_counts
     ? {
         safe: home.scope_danger_counts.safe ?? 0,
@@ -642,10 +642,8 @@ export default function HomePage() {
               ) : isPhone ? (
                 <RecentSubmissionsList
                   rows={recent}
-                  onOpen={(id) =>
-                    navigate(
-                      `/submissions?q=${encodeURIComponent(String(id))}&open=${encodeURIComponent(String(id))}`
-                    )
+                  hrefFor={(r) =>
+                    `/submissions?q=${encodeURIComponent(String(r.id))}&open=${encodeURIComponent(String(r.id))}`
                   }
                 />
               ) : (

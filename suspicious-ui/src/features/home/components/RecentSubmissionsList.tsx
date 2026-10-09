@@ -1,3 +1,4 @@
+import { Link as RouterLink } from "react-router";
 import { Box, Button, Stack, Typography } from "@mui/material";
 import { StatusChip } from "@/shared/components/StatusChip";
 import { ResultChip } from "@/shared/components/ResultChip";
@@ -7,10 +8,10 @@ import { fmtDate, short } from "@/features/home/utils";
 /** Phone layout: verdict next to the ID, artifact on one line, meta below. */
 export function RecentSubmissionsList({
   rows,
-  onOpen,
+  hrefFor,
 }: {
   rows: SubmissionRow[];
-  onOpen: (id: number | string) => void;
+  hrefFor: (row: SubmissionRow) => string;
 }) {
   return (
     <Stack component="ul" sx={{ listStyle: "none", m: 0, px: 1.5, pb: 1.5 }}>
@@ -24,7 +25,8 @@ export function RecentSubmissionsList({
             <Button
               size="small"
               variant="contained"
-              onClick={() => onOpen(r.id)}
+              component={RouterLink}
+              to={hrefFor(r)}
               sx={{ borderRadius: 3, textTransform: "none", fontWeight: 950 }}
             >
               {r.id}

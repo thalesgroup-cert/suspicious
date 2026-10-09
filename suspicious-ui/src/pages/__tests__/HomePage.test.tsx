@@ -104,6 +104,13 @@ describe("HomePage - Test Suite", () => {
       expect(screen.getByText(/3% yours/)).toBeInTheDocument();
     });
 
+    it("caps the share text at 100% when snapshots disagree", async () => {
+      mockSummary({ user_items: 120, everyone_items: 100 }, ZERO);
+      renderWithProviders(<HomePage />, { initialPath: "/" });
+      expect(await screen.findByText(/100% yours/)).toBeInTheDocument();
+      expect(screen.queryByText(/120%/)).not.toBeInTheDocument();
+    });
+
     it("all-zero counts show the empty state, no legend rows, and no console errors", async () => {
       const errors = vi.spyOn(console, "error").mockImplementation(() => {});
       mockSummary({ user_items: 0, everyone_items: 182 }, ZERO);
