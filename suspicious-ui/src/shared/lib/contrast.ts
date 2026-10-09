@@ -36,9 +36,22 @@ function fromHsl(h: number, s: number, l: number): string {
 
 /**
  * Moves fg toward black (light bg) or white (dark bg) in HSL lightness steps, keeping hue and saturation,
- * until it reaches `min`:1 on bg (or the extreme). A colour that already passes is returned unchanged.
+ * until it reaches `min`:1 on bg (or the extreme). A colour that already passes is returned unchanged. Inputs must be hex or rgb()/rgba(), not hsl() or color().
  */
 export function ensureContrast(fg: string, bg: string, min = 4.5): string {
+  const key = `${fg}|${bg}|${min}`;
+  const hit = cache.get(key);
+  if (hit) return hit;
+  if (cache.size > 500) cache.clear();
+  const out = adjust(fg, bg, min);
+  cache.set(key, out);
+  return out;
+}
+
+// Chips re-render a lot and the stepping loop is up to 100 iterations; same inputs always give the same output.
+const cache = new Map<string, string>();
+
+function adjust(fg: string, bg: string, min: number): string {
   if (contrastRatio(fg, bg) >= min) return fg;
   const [h, s, l] = toHsl(rgb(fg));
   const dir = lum(rgb(bg)) > 0.179 ? -1 : 1;
@@ -49,4 +62,9 @@ export function ensureContrast(fg: string, bg: string, min = 4.5): string {
     if (contrastRatio(best, bg) >= min || nl === 0 || nl === 1) break;
   }
   return contrastRatio(best, bg) > contrastRatio(fg, bg) ? best : fg;
+}
+
+/** Text colour `fg` for a chip filled with `tint` at `alpha`, readable on that fill over every page background it can sit on. */
+export function readableOnTint(fg: string, tint: string, alpha: number, backgrounds: string[], min = 4.5): string {
+  return backgrounds.reduce((out, bg) => ensureContrast(out, composite(tint, alpha, bg), min), fg);
 }

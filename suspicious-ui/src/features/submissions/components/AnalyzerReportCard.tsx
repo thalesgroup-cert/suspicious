@@ -12,6 +12,7 @@ import {
 } from "@mui/material";
 import { ExpandMoreOutlined } from "@mui/icons-material";
 import { alpha } from "@mui/material/styles";
+import { readableOnTint } from "@/shared/lib/contrast";
 
 import type { SubmissionAnalyzerReport, SubmissionResult } from "@/features/submissions/api";
 import {
@@ -41,7 +42,8 @@ export function RiskChip({ label, tone }: { label: string; tone: "error" | "warn
         const c = theme.palette[tone];
         return {
           flexShrink: 0,
-          color: theme.palette.mode === "dark" ? c.light : c.dark,
+          // The theme's own shade, nudged until it reads at 4.5:1 on the tint over the page.
+          color: readableOnTint(theme.palette.mode === "dark" ? c.light : c.dark, c.main, 0.1, [theme.palette.background.paper, theme.palette.background.default]),
           borderColor: alpha(c.main, 0.5),
           bgcolor: alpha(c.main, 0.1),
         };

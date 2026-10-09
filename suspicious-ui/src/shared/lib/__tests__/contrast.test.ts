@@ -18,4 +18,16 @@ describe("ensureContrast", () => {
       expect(contrastRatio(ensureContrast(fg, bg, 21), bg)).toBeGreaterThanOrEqual(contrastRatio(fg, bg));
   });
   it("composite blends the fill over the background", () => expect(composite("#000000", 0.5, "#ffffff")).toBe("#808080"));
+  it("matches WCAG's well-known grey pair (#777 fails, #767676 passes on white)", () => {
+    expect(contrastRatio("#777777", "#ffffff")).toBeCloseTo(4.48, 2);
+    expect(contrastRatio("#767676", "#ffffff")).toBeCloseTo(4.54, 2);
+    expect(contrastRatio("#000000", "#ffffff")).toBeCloseTo(21, 5);
+    expect(contrastRatio(ensureContrast("#777777", "#ffffff"), "#ffffff")).toBeGreaterThanOrEqual(4.5); // 1% lightness steps land on #747474
+  });
+  it("is memoised without changing results", () => {
+    const first = ensureContrast("#22C55E", "#ffffff");
+    expect(ensureContrast("#22C55E", "#ffffff")).toBe(first);
+    for (let i = 0; i < 600; i++) ensureContrast("#22C55E", `#${(i + 4096).toString(16).padStart(6, "0")}`); // overflow clears the cache
+    expect(ensureContrast("#22C55E", "#ffffff")).toBe(first);
+  });
 });

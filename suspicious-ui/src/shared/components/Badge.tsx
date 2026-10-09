@@ -2,7 +2,7 @@
 import * as React from "react";
 import { Chip } from "@mui/material";
 import { alpha, useTheme } from "@mui/material/styles";
-import { composite, ensureContrast } from "@/shared/lib/contrast";
+import { readableOnTint } from "@/shared/lib/contrast";
 
 type Props = {
   label: string;
@@ -25,7 +25,7 @@ export function Badge({ label, color, muiColor = "default", icon, minWidth = 128
     const bg     = alpha(color, tint);
     const border = alpha(color, isDark ? 0.35 : 0.45);
     // Text and icon keep the colour's hue but are nudged until they read at 4.5:1 on the tinted fill over the page.
-    const text   = ensureContrast(color, composite(color, tint, theme.palette.background.paper));
+    const text   = readableOnTint(color, color, tint, [theme.palette.background.paper, theme.palette.background.default]);
 
     return (
       <Chip
@@ -34,7 +34,7 @@ export function Badge({ label, color, muiColor = "default", icon, minWidth = 128
         label={label}
         variant="outlined"
         sx={{
-          fontWeight: 900,
+          fontWeight: 800,
           minWidth,
           justifyContent: "center",
           bgcolor:     bg,
@@ -56,7 +56,7 @@ export function Badge({ label, color, muiColor = "default", icon, minWidth = 128
       color={muiColor === "default" ? undefined : muiColor}
       variant={muiColor === "default" ? "outlined" : "outlined"}
       sx={{
-        fontWeight: 900,
+        fontWeight: 800,
         minWidth,
         justifyContent: "center",
         "& .MuiChip-label": { width: "100%", textAlign: "center" },

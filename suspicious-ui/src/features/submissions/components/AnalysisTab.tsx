@@ -17,11 +17,11 @@ import { monoStack } from "@/styles/themes";
 
 const plural = (n: number, word: string) => `${n} ${word}${n === 1 ? "" : "s"}`;
 
-function Heading({ title, count }: { title: string; count: string }) {
+function Heading({ title, count }: { title: string; count?: string }) {
   return (
     <Stack direction="row" spacing={1} sx={{ alignItems: "baseline", minWidth: 0 }}>
       <Typography variant="subtitle2" component="h3" color="text.secondary">{title}</Typography>
-      <Typography variant="caption" color="text.secondary">{count}</Typography>
+      {count ? <Typography variant="caption" color="text.secondary">{count}</Typography> : null}
     </Stack>
   );
 }
@@ -71,7 +71,7 @@ export function AnalysisTab({ submissionId, reports, urlArtifacts, isLoading, is
       {hideReports ? null : (
         <Box component="section" sx={{ px: 2.25, pt: 2, pb: 1 }}>
           <Stack direction="row" sx={{ mb: 1, alignItems: "center", justifyContent: "space-between", minHeight: 40 }}>
-            <Heading title="Analysis" count={plural(reports.length, "report")} />
+            <Heading title="Analysis" count={isLoading || isError ? undefined : plural(reports.length, "report")} />
             {groups.length > 0 ? (
               <Stack direction="row">
                 <Tooltip title="Expand all groups">

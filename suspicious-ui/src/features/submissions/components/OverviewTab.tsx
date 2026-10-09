@@ -90,7 +90,7 @@ export function OverviewTab({ row, reports, ci, multi, observableCount, noAnalyz
       ) : null}
 
       {topRisks.length > 0 ? (
-        <Section title="Why this verdict">
+        <Section title="Highest-risk results">
           <Stack component="ul" spacing={1} sx={{ m: 0, p: 0, listStyle: "none" }}>
             {topRisks.map((r) => {
               const tone = getRiskTone(r.score);

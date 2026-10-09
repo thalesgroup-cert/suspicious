@@ -1,3 +1,4 @@
+import * as React from "react";
 import { afterEach, describe, it, expect, vi } from "vitest";
 import { screen, waitFor, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
@@ -125,9 +126,9 @@ describe("SubmissionDrawer - overview", () => {
     expect(screen.getByText("60%")).toBeInTheDocument();
   });
 
-  it("why this verdict: top three by risk, failed skipped, links to Analysis", async () => {
+  it("highest-risk results: top three by risk, failed skipped, links to Analysis", async () => {
     renderWithProviders(<SubmissionDrawer {...multi()} />);
-    const section = (await screen.findByRole("heading", { name: "Why this verdict" })).closest("section")!;
+    const section = (await screen.findByRole("heading", { name: "Highest-risk results" })).closest("section")!;
     const items = within(section).getAllByRole("listitem");
     expect(items.map((li) => li.textContent)).toEqual([
       expect.stringContaining("HighTen"), expect.stringContaining("HighNine"), expect.stringContaining("MediumSix"),
@@ -138,17 +139,17 @@ describe("SubmissionDrawer - overview", () => {
     expect(screen.getByRole("tab", { name: "Analysis (49)" })).toHaveAttribute("aria-selected", "true");
   });
 
-  it("why this verdict is absent with no reports or only low risk", async () => {
+  it("highest-risk results is absent with no reports or only low risk", async () => {
     const { rerender } = renderWithProviders(<SubmissionDrawer {...multi({
       details: { data: { ...multiRow, analyzer_reports: [], case_infos: ci() }, isLoading: false, isError: false } as never,
     })} />);
     await screen.findByText("9/10");
-    expect(screen.queryByText("Why this verdict")).toBeNull();
+    expect(screen.queryByText("Highest-risk results")).toBeNull();
     rerender(<SubmissionDrawer {...multi({
       details: { data: { ...multiRow, analyzer_reports: [rep(1, "A", 1), rep(2, "B", 3)], case_infos: ci() }, isLoading: false, isError: false } as never,
     })} />);
     await screen.findByText("9/10");
-    expect(screen.queryByText("Why this verdict")).toBeNull();
+    expect(screen.queryByText("Highest-risk results")).toBeNull();
   });
 
   it("AI classifier with score 0 and confidence 0 reads Not classified", async () => {
@@ -563,6 +564,7 @@ describe("SubmissionDrawer - accessibility", () => {
   });
   const levels = () => screen.queryAllByRole("heading").map((h) => Number(h.tagName[1]));
 
+  // role, aria-modal and the initial focus come from MUI's temporary Drawer; only aria-labelledby is ours.
   it("is a named modal dialog labelled by the ID heading", async () => {
     renderWithProviders(<SubmissionDrawer {...props()} />);
     const dialog = await screen.findByRole("dialog", { name: /#18/ });
@@ -627,5 +629,32 @@ describe("SubmissionDrawer - accessibility", () => {
       && /Low|High|Medium|Busy|Waits|Blank|Gone|FailedTen/.test(b.textContent ?? "") && !/g\d\.example/.test(b.textContent ?? ""));
     expect(rows.length).toBeGreaterThan(10);
     rows.forEach((r) => expect(r.textContent).toMatch(/risk|Needs attention|Failed|Running|Queued|Expired|Unknown/i));
+  });
+
+  it("Next/Previous at the end of the page hand focus to the other arrow, not the dialog", async () => {
+    const ids = [18, 19, 20];
+    const Stepper = () => {
+      const [i, setI] = React.useState(1);
+      return <SubmissionDrawer {...props()} row={{ ...multiRow, id: ids[i] } as never} submissionId={ids[i]}
+        prevId={ids[i - 1] ?? null} nextId={ids[i + 1] ?? null} onNavigate={(id) => setI(ids.indexOf(Number(id)))} />;
+    };
+    renderWithProviders(<Stepper />);
+    await userEvent.click(await screen.findByRole("button", { name: "Next submission" }));
+    await waitFor(() => expect(screen.getByRole("button", { name: "Next submission" })).toBeDisabled());
+    await waitFor(() => expect(screen.getByRole("button", { name: "Previous submission" })).toHaveFocus());
+    await userEvent.click(screen.getByRole("button", { name: "Previous submission" }));
+    await userEvent.click(screen.getByRole("button", { name: "Previous submission" }));
+    await waitFor(() => expect(screen.getByRole("button", { name: "Previous submission" })).toBeDisabled());
+    await waitFor(() => expect(screen.getByRole("button", { name: "Next submission" })).toHaveFocus());
+  });
+
+  it("the Analysis heading shows no report count while loading or on error", async () => {
+    const { rerender } = renderWithProviders(<SubmissionDrawer {...props()} details={{ data: undefined, isLoading: true, isError: false } as never} />);
+    await userEvent.click(await screen.findByRole("tab", { name: /^Analysis/ }));
+    expect(screen.queryByText(/\d+ reports?/)).toBeNull();
+    rerender(<SubmissionDrawer {...props()} details={{ data: undefined, isLoading: false, isError: true } as never} />);
+    expect(screen.queryByText(/\d+ reports?/)).toBeNull();
+    rerender(<SubmissionDrawer {...props()} />);
+    expect(await screen.findByText("53 reports")).toBeInTheDocument();
   });
 });

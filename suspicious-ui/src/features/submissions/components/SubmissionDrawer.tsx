@@ -48,14 +48,14 @@ function Panel({ value, tab, children }: { value: TabKey; tab: TabKey; children:
   );
 }
 
-function StepButton({ label, target, onNavigate, children }: {
-  label: string; target: number | string | null; onNavigate?: (id: number | string) => void; children: React.ReactNode;
+function StepButton({ label, target, onNavigate, onStep, btnRef, children }: {
+  label: string; onStep: () => void; btnRef: React.Ref<HTMLButtonElement>; target: number | string | null; onNavigate?: (id: number | string) => void; children: React.ReactNode;
 }) {
   return (
     <Tooltip title={label}>
       {/* span: a disabled button can't host the tooltip's listeners */}
       <span>
-        <IconButton size="small" aria-label={label} disabled={target == null} onClick={() => target != null && onNavigate?.(target)}>
+        <IconButton ref={btnRef} size="small" aria-label={label} disabled={target == null} onClick={() => { if (target == null) return; onStep(); onNavigate?.(target); }}>
           {children}
         </IconButton>
       </span>
@@ -119,15 +119,17 @@ export function SubmissionDrawer({
   // The tab belongs to the submission it was picked on: another submission opens on Overview.
   const [tabState, setTabState] = React.useState<{ id?: number; tab: TabKey }>({ tab: "overview" });
   const tab: TabKey = tabState.id === selectedRow?.id ? tabState.tab : "overview";
-  // Opened from a URL there is no opener and the trap lands on the dialog root: name the dialog by focusing its heading.
-  const headingRef = React.useRef<HTMLHeadingElement>(null);
-  const hasRow = !!selectedRow;
+  // After Previous/Next the pressed button may become disabled (end of the page) and drop focus: hand it to the other one.
+  const stepped = React.useRef<"prev" | "next" | null>(null);
+  const prevBtn = React.useRef<HTMLButtonElement>(null);
+  const nextBtn = React.useRef<HTMLButtonElement>(null);
   React.useEffect(() => {
-    if (!open || !hasRow) return;
-    const h = headingRef.current;
-    const paper = h?.closest('[role="dialog"]');
-    if (h && paper && !paper.contains(document.activeElement)) h.focus();
-  }, [open, hasRow]);
+    const s = stepped.current;
+    if (!s) return;
+    stepped.current = null;
+    if (s === "prev" && prevId == null) nextBtn.current?.focus();
+    if (s === "next" && nextId == null) prevBtn.current?.focus();
+  }, [selectedRow?.id, prevId, nextId]);
   const tabLabel = (t: TabKey) =>
     t === "overview" ? "Overview"
     : t === "analysis" ? (detailsQuery.data ? `Analysis (${analyzerReports.length})` : "Analysis")
@@ -140,8 +142,7 @@ export function SubmissionDrawer({
         onClose={onClose}
         slotProps={{
           paper: {
-            role: "dialog",
-            "aria-modal": true,
+            // MUI's temporary Drawer already sets role="dialog", aria-modal and focuses the paper; only the name is ours.
             "aria-labelledby": "submission-drawer-title",
             sx: (theme) => ({
               width: { xs: "100%", sm: 620 },
@@ -166,10 +167,10 @@ export function SubmissionDrawer({
               <Box aria-hidden data-testid="verdict-accent" sx={{ position: "absolute", top: 0, left: 0, right: 0, height: 3, bgcolor: verdictHex ?? "divider" }} />
               <Stack direction="row" spacing={1} sx={{ alignItems: "center", justifyContent: "space-between" }}>
                 <Stack direction="row" spacing={0.5} sx={{ alignItems: "center", minWidth: 0 }}>
-                  <Typography ref={headingRef} id="submission-drawer-title" tabIndex={-1} variant="h2" component="h2" sx={{ outline: "none" }}>#{selectedRow.id}</Typography>
+                  <Typography id="submission-drawer-title" variant="h2" component="h2">#{selectedRow.id}</Typography>
                   <CopyIconButton text={String(selectedRow.id)} title="Copy ID" />
-                  <StepButton label="Previous submission" target={prevId} onNavigate={onNavigate}><ChevronLeft fontSize="small" /></StepButton>
-                  <StepButton label="Next submission" target={nextId} onNavigate={onNavigate}><ChevronRight fontSize="small" /></StepButton>
+                  <StepButton label="Previous submission" target={prevId} onNavigate={onNavigate} btnRef={prevBtn} onStep={() => { stepped.current = "prev"; }}><ChevronLeft fontSize="small" /></StepButton>
+                  <StepButton label="Next submission" target={nextId} onNavigate={onNavigate} btnRef={nextBtn} onStep={() => { stepped.current = "next"; }}><ChevronRight fontSize="small" /></StepButton>
                 </Stack>
                 <Stack direction="row" spacing={isPhone ? 0.5 : 1} sx={{ alignItems: "center", flexShrink: 0 }}>
                   {isPhone ? null : (
