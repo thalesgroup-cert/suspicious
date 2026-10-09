@@ -377,7 +377,7 @@ export default function HomePage() {
                           dominantBaseline="central"
                           fill={donutLabelColor}
                         >
-                          <tspan style={{ fontSize: 12 }}>submissions</tspan>
+                          <tspan style={{ fontSize: 12 }}>verdicts</tspan>
                         </text>
 
                         <RechartsTooltip />
@@ -557,7 +557,7 @@ export default function HomePage() {
                       <Button
                         variant="contained"
                         onClick={() => navigate(home.spotlight!.cta_path)}
-                        sx={{ borderRadius: 3 }}
+                        sx={{ borderRadius: 3, textTransform: "none" }}
                       >
                         {home.spotlight.cta_label}
                       </Button>

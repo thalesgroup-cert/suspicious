@@ -212,6 +212,18 @@ const base: ThemeOptions = {
 
 // Helper factories
 
+// Merge per variant: a theme overriding h2's font must not drop base h2's fontSize
+// (a one-level spread did, and MUI then fell back to its 60px display size).
+function mergeTypography(over: ThemeOptions["typography"]): ThemeOptions["typography"] {
+  const baseT = base.typography as Record<string, unknown>;
+  const out: Record<string, unknown> = { ...baseT };
+  for (const [k, v] of Object.entries(over as Record<string, unknown>)) {
+    const b = baseT[k];
+    out[k] = b && typeof b === "object" && v && typeof v === "object" ? { ...b, ...v } : v;
+  }
+  return out as ThemeOptions["typography"];
+}
+
 function mkDark(opts: {
   bg: string;
   paper: string;
@@ -230,7 +242,7 @@ function mkDark(opts: {
   return createTheme({
     ...base,
     ...(opts.shape ? { shape: opts.shape } : {}),
-    ...(opts.typography ? { typography: { ...base.typography, ...opts.typography } } : {}),
+    ...(opts.typography ? { typography: mergeTypography(opts.typography) } : {}),
     palette: {
       mode: "dark",
       background: { default: opts.bg, paper: opts.paper },
@@ -264,7 +276,7 @@ function mkLight(opts: {
   return createTheme({
     ...base,
     ...(opts.shape ? { shape: opts.shape } : {}),
-    ...(opts.typography ? { typography: { ...base.typography, ...opts.typography } } : {}),
+    ...(opts.typography ? { typography: mergeTypography(opts.typography) } : {}),
     palette: {
       mode: "light",
       background: { default: opts.bg, paper: opts.paper },

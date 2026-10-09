@@ -42,3 +42,25 @@ describe("edge", () => {
     expect(JSON.stringify(resolved)).not.toContain(alpha("#E5E7EB", 0.1));
   });
 });
+
+describe("heading sizes", () => {
+  const px = (v: unknown) => {
+    const s = String(v);
+    return s.endsWith("rem") ? parseFloat(s) * 16 : parseFloat(s);
+  };
+
+  it("no theme falls back to MUI's default display sizes for h1-h5", () => {
+    const tooBig = Object.entries(themes).flatMap(([name, theme]) =>
+      (["h1", "h2", "h3", "h4", "h5"] as const)
+        .filter((v) => px(theme.typography[v].fontSize) > 40)
+        .map((v) => `${name} ${v}`),
+    );
+    expect(tooBig).toEqual([]);
+  });
+
+  it("a theme overriding h1-h5 without a size keeps the base sizes", () => {
+    // paper sets fontFamily/weight/letterSpacing on h1-h5, never fontSize.
+    const t = themes.paper.typography;
+    expect([t.h1, t.h2, t.h3, t.h4, t.h5].map((v) => px(v.fontSize))).toEqual([28, 22, 18, 16, 14]);
+  });
+});

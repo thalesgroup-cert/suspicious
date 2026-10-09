@@ -127,7 +127,20 @@ describe("HomePage - Test Suite", () => {
       mockSummary({ user_items: 3, everyone_items: 182 }, { safe: 1, inconclusive: 0, suspicious: 1, dangerous: 1 });
       renderWithProviders(<HomePage />, { initialPath: "/" });
       expect(await screen.findByText("Dangerous")).toBeInTheDocument();
+      // The centre counts verdicts, not submissions (the share card counts submissions).
+      expect(await screen.findByText("verdicts")).toBeInTheDocument();
       expect(screen.queryByText("No submissions this month")).toBeNull();
+    });
+
+    it("CISO share card uses the scope count and scope wording", async () => {
+      vi.mocked(getMe).mockResolvedValue({ ...fixtureMe, groups: ["CISO"], ciso_scope: "EMEA" });
+      mockSummary({ scope_items: 40, user_items: 5, everyone_items: 182 }, ZERO);
+      renderWithProviders(<HomePage />, { initialPath: "/" });
+      await screen.findByText("Scope health");
+      expect(await screen.findByText("of 182 org submissions this month in scope EMEA")).toBeInTheDocument();
+      expect(screen.getByText("40")).toBeInTheDocument();
+      expect(screen.queryByText("5")).toBeNull();
+      expect(screen.getByText(/22% in scope/)).toBeInTheDocument();
     });
 
     it("has a single primary action: the spotlight CTA", async () => {
