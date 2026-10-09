@@ -2,7 +2,7 @@
 import * as React from "react";
 import { Chip } from "@mui/material";
 import { alpha, useTheme } from "@mui/material/styles";
-import { contrastText } from "@/styles/colorStore";
+import { composite, ensureContrast } from "@/shared/lib/contrast";
 
 type Props = {
   label: string;
@@ -21,9 +21,11 @@ export function Badge({ label, color, muiColor = "default", icon, minWidth = 128
 
   // ── Hex color path (semantic store) ──────────────────────────────────────
   if (color) {
-    const bg     = alpha(color, isDark ? 0.14 : 0.1);
+    const tint   = isDark ? 0.14 : 0.1;
+    const bg     = alpha(color, tint);
     const border = alpha(color, isDark ? 0.35 : 0.45);
-    const text   = color;
+    // Text and icon keep the colour's hue but are nudged until they read at 4.5:1 on the tinted fill over the page.
+    const text   = ensureContrast(color, composite(color, tint, theme.palette.background.paper));
 
     return (
       <Chip
