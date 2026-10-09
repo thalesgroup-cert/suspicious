@@ -105,6 +105,7 @@ test.describe("Case submission flow", () => {
           submission_type: "url",
           result_type: "case",
           case_id: 42,
+          observable_count: 1,
           message: "Submission accepted.",
         }),
       });
@@ -138,7 +139,9 @@ test.describe("Case submission flow", () => {
 
     // Success: either a snackbar or navigation away from submit page
     await expect(
-      page.getByText(/accepted|success|submitted/i)
+      page.locator("#notistack-snackbar", {
+        hasText: "Submitted: 1 indicator(s), case #42",
+      })
     ).toBeVisible({ timeout: 5_000 });
   });
 });
