@@ -114,10 +114,12 @@ export function ResultChip({
   result,
   minWidth,
   size,
+  behind,
 }: {
   result: string;
   minWidth?: number;
   size?: "small" | "medium";
+  behind?: string[];
 }) {
   const meta = metaFor(result);
   const hex = useResultHex(result);
@@ -129,6 +131,7 @@ export function ResultChip({
       icon={meta.icon}
       minWidth={minWidth ?? 128}
       size={size}
+      behind={behind}
     />
   );
 }

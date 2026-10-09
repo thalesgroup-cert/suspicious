@@ -13,9 +13,11 @@ type Props = {
   icon?: React.ReactNode;
   minWidth?: number;
   size?: "small" | "medium";
+  /** Extra opaque backgrounds the chip can sit on (e.g. the tinted top of a sheet header); text must read on all of them. */
+  behind?: string[];
 };
 
-export function Badge({ label, color, muiColor = "default", icon, minWidth = 128, size = "small" }: Props) {
+export function Badge({ label, color, muiColor = "default", icon, minWidth = 128, size = "small", behind = [] }: Props) {
   const theme = useTheme();
   const isDark = theme.palette.mode === "dark";
 
@@ -25,7 +27,7 @@ export function Badge({ label, color, muiColor = "default", icon, minWidth = 128
     const bg     = alpha(color, tint);
     const border = alpha(color, isDark ? 0.35 : 0.45);
     // Text and icon keep the colour's hue but are nudged until they read at 4.5:1 on the tinted fill over the page.
-    const text   = readableOnTint(color, color, tint, [theme.palette.background.paper, theme.palette.background.default]);
+    const text   = readableOnTint(color, color, tint, [theme.palette.background.paper, theme.palette.background.default, ...behind]);
 
     return (
       <Chip

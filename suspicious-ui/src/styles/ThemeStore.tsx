@@ -423,12 +423,10 @@ export function AppThemeProvider({ children }: { children: React.ReactNode }) {
     <ThemeContext.Provider value={value}>
       <ThemeProvider theme={theme}>
         <CssBaseline enableColorScheme />
-        {/* MUI transitions ignore prefers-reduced-motion; this is the one place that honours it. */}
+        {/* MUI's motion setting (themes.ts) covers its own components; this catches the remaining CSS transitions. Keyframe animations are left alone so indeterminate progress and spinners keep moving. */}
         <GlobalStyles styles={{
           "@media (prefers-reduced-motion: reduce)": {
             "*, *::before, *::after": {
-              animationDuration: "0.01ms !important",
-              animationIterationCount: "1 !important",
               transitionDuration: "0.01ms !important",
               scrollBehavior: "auto !important",
             },

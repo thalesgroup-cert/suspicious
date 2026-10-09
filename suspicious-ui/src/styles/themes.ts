@@ -52,6 +52,8 @@ const tintedScanlines = (hex: string, a = 0.04, step = 3) =>
 // Base MUI theme defaults (shared across all themes)
 
 const base: ThemeOptions = {
+  // MUI shortens Collapse/Fade/Slide/Grow and makes progress bars static when the OS asks for reduced motion.
+  motion: { reducedMotion: "system" },
   shape: { borderRadius: 4 },
   typography: {
     fontFamily: sansStack,

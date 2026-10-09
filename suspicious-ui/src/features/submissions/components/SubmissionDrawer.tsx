@@ -14,19 +14,19 @@ import {
   useTheme,
 } from "@mui/material";
 import { ChevronLeft, ChevronRight, DescriptionOutlined } from "@mui/icons-material";
-import { tabLabelColors } from "@/features/submissions/tabColors";
 import type { UseQueryResult } from "@tanstack/react-query";
 import type { SubmissionDetails, SubmissionRow } from "@/features/submissions/api";
 import type { CaseComment } from "@/features/comments/api";
 import { ResultChip, useResultHex } from "@/shared/components/ResultChip";
-import { SheetHeader } from "@/shared/components/SheetHeader";
+import { SheetHeader, headerTint } from "@/shared/components/SheetHeader";
+import { flatten } from "@/shared/lib/contrast";
 import { CopyIconButton } from "@/shared/components/CopyIconButton";
 import { AnalysisTab } from "@/features/submissions/components/AnalysisTab";
 import { DrawerActions } from "@/features/submissions/components/DrawerActions";
 import { OverviewTab } from "@/features/submissions/components/OverviewTab";
 import { CommentThread } from "@/features/comments/CommentThread";
 import { fmtDate, groupReportsByArtifact } from "@/features/submissions/utils";
-
+import { tabLabelColors } from "@/features/submissions/tabColors";
 
 const BADGE_W = 132;
 
@@ -98,7 +98,8 @@ export function SubmissionDrawer({
   nextId = null,
   onNavigate,
 }: SubmissionDrawerProps) {
-  const isPhone = useMediaQuery(useTheme().breakpoints.down("sm"));
+  const theme = useTheme();
+  const isPhone = useMediaQuery(theme.breakpoints.down("sm"));
   const analyzerReports = React.useMemo(
     () => detailsQuery.data?.analyzer_reports ?? [],
     [detailsQuery.data]
@@ -190,7 +191,7 @@ export function SubmissionDrawer({
               </Stack>
 
               <Box sx={{ mt: 1.25 }}>
-                <ResultChip result={selectedRow.result} minWidth={BADGE_W} size="medium" />
+                <ResultChip result={selectedRow.result} minWidth={BADGE_W} size="medium" behind={[flatten(headerTint(theme), theme.palette.background.paper)]} />
               </Box>
               <Typography variant="body2" color="text.secondary" sx={{ mt: 1 }}>
                 {[

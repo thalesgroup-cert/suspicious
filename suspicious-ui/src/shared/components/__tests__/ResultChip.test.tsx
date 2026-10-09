@@ -5,7 +5,8 @@ import { themes, type ThemeName } from "@/styles/themes";
 import { ResultChip } from "../ResultChip";
 import { RiskChip } from "@/features/submissions/components/AnalyzerReportCard";
 import { PRESET_DEFAULT, useColorStore } from "@/styles/colorStore";
-import { composite, contrastRatio } from "@/shared/lib/contrast";
+import { composite, contrastRatio, flatten } from "@/shared/lib/contrast";
+import { headerTint } from "../SheetHeader";
 
 const textOf = (result: string, theme: ThemeName) => {
   const { container } = render(<ThemeProvider theme={themes[theme]}><ResultChip result={result} /></ThemeProvider>);
@@ -40,6 +41,18 @@ describe("ResultChip text contrast", () => {
         const fg = getComputedStyle(container.querySelector(".MuiChip-root")!).color;
         const fill = composite(themes[name].palette[tone].main, 0.1, themes[name].palette.background[bg]);
         expect(contrastRatio(fg, fill), `${tone} in ${name} on ${bg}`).toBeGreaterThanOrEqual(4.5);
+      }
+    });
+  }
+
+  for (const name of Object.keys(themes) as ThemeName[]) {
+    it(`${name}: the drawer header chip also reads on the header's tinted top`, () => {
+      const t = themes[name];
+      const top = flatten(headerTint(t), t.palette.background.paper);
+      for (const [result, hex] of variants) {
+        const { container } = render(<ThemeProvider theme={t}><ResultChip result={result} behind={[top]} /></ThemeProvider>);
+        const fg = getComputedStyle(container.querySelector(".MuiChip-root")!).color;
+        expect(contrastRatio(fg, composite(hex, t.palette.mode === "dark" ? 0.14 : 0.1, top)), `${result} in ${name}`).toBeGreaterThanOrEqual(4.5);
       }
     });
   }
