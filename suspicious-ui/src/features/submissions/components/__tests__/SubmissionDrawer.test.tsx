@@ -4,7 +4,11 @@ import { screen, waitFor, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { useLocation } from "react-router";
 import { renderWithProviders } from "@/test/utils";
+import { tabLabelColors } from "../../tabColors";
 import { SubmissionDrawer, type SubmissionDrawerProps } from "../SubmissionDrawer";
+import { ThemeProvider } from "@mui/material/styles";
+import { themes, type ThemeName } from "@/styles/themes";
+import { contrastRatio } from "@/shared/lib/contrast";
 import { useColorStore } from "@/styles/colorStore";
 
 const row = {
@@ -656,5 +660,27 @@ describe("SubmissionDrawer - accessibility", () => {
     expect(screen.queryByText(/\d+ reports?/)).toBeNull();
     rerender(<SubmissionDrawer {...props()} />);
     expect(await screen.findByText("53 reports")).toBeInTheDocument();
+  });
+});
+
+describe("SubmissionDrawer - tab label contrast", () => {
+  for (const name of Object.keys(themes) as ThemeName[]) {
+    it(`${name}: unselected and selected tab labels read at 4.5:1 on the header`, () => {
+      const c = tabLabelColors(themes[name]);
+      for (const bg of c.backgrounds) {
+        expect(contrastRatio(c.unselected, bg), `unselected on ${bg}`).toBeGreaterThanOrEqual(4.5);
+        expect(contrastRatio(c.selected, bg), `selected on ${bg}`).toBeGreaterThanOrEqual(4.5);
+      }
+    });
+  }
+
+  it("the rendered tabs use those colours", async () => {
+    renderWithProviders(<ThemeProvider theme={themes.metal}><SubmissionDrawer {...base()} /></ThemeProvider>);
+    const sel = await screen.findByRole("tab", { name: /^Overview/ });
+    const un = screen.getByRole("tab", { name: /^Analysis/ });
+    const c = tabLabelColors(themes.metal);
+    const rgbOf = (hex: string) => `rgb(${[1, 3, 5].map((i) => parseInt(hex.slice(i, i + 2), 16)).join(", ")})`;
+    expect(getComputedStyle(sel).color).toBe(rgbOf(c.selected));
+    expect(getComputedStyle(un).color).toBe(rgbOf(c.unselected));
   });
 });

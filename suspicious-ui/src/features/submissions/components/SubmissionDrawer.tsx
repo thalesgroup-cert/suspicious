@@ -14,6 +14,7 @@ import {
   useTheme,
 } from "@mui/material";
 import { ChevronLeft, ChevronRight, DescriptionOutlined } from "@mui/icons-material";
+import { tabLabelColors } from "@/features/submissions/tabColors";
 import type { UseQueryResult } from "@tanstack/react-query";
 import type { SubmissionDetails, SubmissionRow } from "@/features/submissions/api";
 import type { CaseComment } from "@/features/comments/api";
@@ -25,6 +26,7 @@ import { DrawerActions } from "@/features/submissions/components/DrawerActions";
 import { OverviewTab } from "@/features/submissions/components/OverviewTab";
 import { CommentThread } from "@/features/comments/CommentThread";
 import { fmtDate, groupReportsByArtifact } from "@/features/submissions/utils";
+
 
 const BADGE_W = 132;
 
@@ -207,7 +209,14 @@ export function SubmissionDrawer({
                 allowScrollButtonsMobile
                 aria-label="Submission sections"
                 // The header's bottom border is the tab rule; some themes add their own, which would double it.
-                sx={{ mt: 1, minHeight: 40, borderBottom: 0, "& .MuiTab-root": { minHeight: 40, px: 1.5 } }}
+                sx={(theme) => {
+                  const c = tabLabelColors(theme);
+                  return {
+                    mt: 1, minHeight: 40, borderBottom: 0,
+                    "& .MuiTab-root": { minHeight: 40, px: 1.5, color: c.unselected, textShadow: "none" },
+                    "& .MuiTab-root.Mui-selected": { color: c.selected },
+                  };
+                }}
               >
                 {TABS.map((t) => (
                   <Tab key={t} value={t} id={`submission-tab-${t}`} aria-controls={`submission-tabpanel-${t}`}

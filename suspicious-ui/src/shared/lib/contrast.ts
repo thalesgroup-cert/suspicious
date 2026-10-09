@@ -68,3 +68,9 @@ function adjust(fg: string, bg: string, min: number): string {
 export function readableOnTint(fg: string, tint: string, alpha: number, backgrounds: string[], min = 4.5): string {
   return backgrounds.reduce((out, bg) => ensureContrast(out, composite(tint, alpha, bg), min), fg);
 }
+
+/** Any colour (including rgba) laid over an opaque background, as an opaque hex; `extraAlpha` scales its own alpha. */
+export function flatten(color: string, over: string, extraAlpha = 1): string {
+  const v = decomposeColor(color).values;
+  return composite(color, (v[3] ?? 1) * extraAlpha, over);
+}
