@@ -8,6 +8,7 @@ class HomeSummaryQuerySerializer(serializers.Serializer):
 
 class HomeMonthlySerializer(serializers.Serializer):
     everyone_items = serializers.IntegerField()
+    user_items = serializers.IntegerField()
     scope_items = serializers.IntegerField()
     scope_name = serializers.CharField(allow_null=True, required=False)
 

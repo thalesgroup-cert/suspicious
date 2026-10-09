@@ -77,10 +77,12 @@ class HomeSummaryView(APIView):
         if is_ciso and scope_stats is not None:
             primary_danger_counts = self._extract_danger_counts(personal_stats)
             spotlight_total_cases = int(scope_stats["total_cases"])
-        else:
+        elif is_cert:
             primary_danger_counts = self._extract_danger_counts(personal_stats)
             spotlight_total_cases = int(global_stats["total_cases"])
-        
+        else:
+            primary_danger_counts = self._extract_danger_counts(personal_stats)
+            spotlight_total_cases = int(personal_stats["total_cases"])
 
         challenge_cases = 0
         if is_cert:
@@ -90,6 +92,7 @@ class HomeSummaryView(APIView):
             "show_scope_modal": show_scope_modal,
             "monthly": {
                 "everyone_items": int(global_stats["total_cases"]),
+                "user_items": int(personal_stats["total_cases"]),
                 "scope_items": int(scope_stats["total_cases"]) if scope_stats is not None else 0,
                 "scope_name": ciso_scope if is_ciso else None,
             },
