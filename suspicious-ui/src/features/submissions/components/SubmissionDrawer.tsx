@@ -3,11 +3,11 @@ import {
   Alert,
   Box,
   Button,
-  Chip,
   CircularProgress,
-  Divider,
   Drawer,
   Stack,
+  Tab,
+  Tabs,
   Typography,
 } from "@mui/material";
 import { DescriptionOutlined, ExpandMoreOutlined } from "@mui/icons-material";
@@ -15,17 +15,35 @@ import { alpha, useTheme } from "@mui/material/styles";
 import type { UseQueryResult } from "@tanstack/react-query";
 import type { SubmissionDetails, SubmissionRow } from "@/features/submissions/api";
 import type { CaseComment } from "@/features/comments/api";
-import { StatusChip } from "@/shared/components/StatusChip";
-import { ResultChip } from "@/shared/components/ResultChip";
+import { ResultChip, useResultHex } from "@/shared/components/ResultChip";
 import { SheetHeader } from "@/shared/components/SheetHeader";
 import { CopyIconButton } from "@/shared/components/CopyIconButton";
-import MailPreview from "@/shared/components/MailPreview";
 import { AnalyzerReportCard } from "@/features/submissions/components/AnalyzerReportCard";
 import { UrlGroupList } from "@/features/submissions/components/UrlGroupList";
+import { OverviewTab } from "@/features/submissions/components/OverviewTab";
 import { CommentThread } from "@/features/comments/CommentThread";
 import { fmtDate, groupReportsByArtifact, kindLabel } from "@/features/submissions/utils";
 
 const BADGE_W = 132;
+
+const TABS = ["overview", "analysis", "comments"] as const;
+type TabKey = (typeof TABS)[number];
+
+const TYPE_LABELS: Record<string, string> = { FILE: "File", MAIL: "Email", URL: "URL", IP: "IP", HASH: "Hash" };
+
+/** "IN_PROGRESS" -> "In progress". */
+const humanStatus = (s: string) => {
+  const t = String(s ?? "").replace(/_/g, " ").toLowerCase();
+  return t ? t[0].toUpperCase() + t.slice(1) : "Unknown";
+};
+
+function Panel({ value, tab, children }: { value: TabKey; tab: TabKey; children: React.ReactNode }) {
+  return (
+    <div role="tabpanel" hidden={tab !== value} id={`submission-tabpanel-${value}`} aria-labelledby={`submission-tab-${value}`}>
+      {tab === value ? children : null}
+    </div>
+  );
+}
 
 export type SubmissionDrawerProps = {
   open: boolean;
@@ -71,6 +89,19 @@ export function SubmissionDrawer({
     () => groupReportsByArtifact(analyzerReports),
     [analyzerReports]
   );
+  const verdictHex = useResultHex(selectedRow?.result ?? "UNKNOWN");
+  const type = String(selectedRow?.type ?? "").toUpperCase();
+  // ponytail: a mail's reports span body/header/links, so several groups still mean one email, not "Indicators".
+  const multi = type === "UNKNOWN" || (type !== "MAIL" && (reportGroups.length > 1 || urlArtifacts.length > 1));
+  const typeLabel = multi ? "Indicators" : TYPE_LABELS[type] ?? type;
+
+  // The tab belongs to the submission it was picked on: another submission opens on Overview.
+  const [tabState, setTabState] = React.useState<{ id?: number; tab: TabKey }>({ tab: "overview" });
+  const tab: TabKey = tabState.id === selectedRow?.id ? tabState.tab : "overview";
+  const tabLabel = (t: TabKey) =>
+    t === "overview" ? "Overview"
+    : t === "analysis" ? (detailsQuery.data ? `Analysis (${analyzerReports.length})` : "Analysis")
+    : commentsQuery.data ? `Comments (${commentsQuery.data.length})` : "Comments";
 
   return (
       <Drawer
@@ -83,11 +114,8 @@ export function SubmissionDrawer({
               width: { xs: "100%", sm: 620 },
               p: 0,
               borderLeft: `1px solid ${theme.palette.divider}`,
-              background: `linear-gradient(
-                180deg,
-                ${theme.palette.background.paper} 0%,
-                ${alpha(theme.palette.background.default, 0.98)} 100%
-              )`,
+              // Solid paper: the old translucent gradient let the list behind show through on light themes.
+              background: theme.palette.background.paper,
               color: theme.palette.text.primary,
               overflow: "hidden",
             }),
@@ -100,146 +128,70 @@ export function SubmissionDrawer({
           </Box>
         ) : (
           <Stack sx={{ height: "100%" }}>
-            <SheetHeader>
-              <Stack direction="row" spacing={2} sx={{ alignItems: "flex-start", justifyContent: "space-between" }} >
-                <Box>
-                  <Typography variant="overline" color="text.secondary">Submission</Typography>
-                  <Stack direction="row" spacing={1} sx={{ mt: 0.25, alignItems: "center" }}>
-                    <Typography variant="h5" sx={{ fontWeight: 950, lineHeight: 1.1 }} >
-                      #{selectedRow.id}
-                    </Typography>
-                    <CopyIconButton text={String(selectedRow.id)} title="Copy ID" />
-                  </Stack>
-                </Box>
-                <Stack direction="row" spacing={1} sx={{ alignItems: "center" }}>
+            <SheetHeader sx={{ pb: 0 }}>
+              {/* Verdict accent: the one colour cue for the case, in the user's own result colour. */}
+              <Box aria-hidden sx={{ position: "absolute", top: 0, left: 0, right: 0, height: 3, bgcolor: verdictHex ?? "divider" }} />
+              <Stack direction="row" spacing={1} sx={{ alignItems: "center", justifyContent: "space-between" }}>
+                <Stack direction="row" spacing={0.5} sx={{ alignItems: "center", minWidth: 0 }}>
+                  <Typography variant="h2" component="h2">#{selectedRow.id}</Typography>
+                  <CopyIconButton text={String(selectedRow.id)} title="Copy ID" />
+                </Stack>
+                <Stack direction="row" spacing={1} sx={{ alignItems: "center", flexShrink: 0 }}>
                   <Button
                     variant="outlined"
                     startIcon={<DescriptionOutlined />}
-                    onClick={() =>
-                      window.open(`/api/cases/${selectedRow.id}/report/`, "_blank")
-                    }
-                    sx={{ textTransform: "none", borderRadius: 2, fontWeight: 800 }}
+                    onClick={() => window.open(`/api/cases/${selectedRow.id}/report/`, "_blank")}
                   >
                     Full report
                   </Button>
-                  <Button onClick={onClose}
-                    sx={{ textTransform: "none", borderRadius: 2, alignSelf: "flex-start" }}>
-                    Close
-                  </Button>
+                  <Button onClick={onClose}>Close</Button>
                 </Stack>
               </Stack>
 
-              <Stack direction="row" spacing={1} sx={{ mt: 1.5, flexWrap: "wrap" }}>
-                <ResultChip result={selectedRow.result} minWidth={BADGE_W} />
-                <StatusChip status={selectedRow.status} minWidth={96} />
-                <Chip size="small" label={selectedRow.type} variant="outlined"
-                  sx={{ fontWeight: 900, justifyContent: "center" }} />
-                <Chip size="small" label={`${selectedRow.tests_done} tests`} variant="outlined"
-                  sx={{ fontWeight: 900 }} />
-              </Stack>
+              <Box sx={{ mt: 1.25 }}>
+                <ResultChip result={selectedRow.result} minWidth={BADGE_W} size="medium" />
+              </Box>
+              <Typography variant="body2" color="text.secondary" sx={{ mt: 1 }}>
+                {[
+                  humanStatus(selectedRow.status),
+                  typeLabel,
+                  `${selectedRow.tests_done ?? 0} test${selectedRow.tests_done === 1 ? "" : "s"}`,
+                  fmtDate(selectedRow.created_at),
+                ].join(" · ")}
+              </Typography>
+
+              <Tabs
+                value={tab}
+                onChange={(_, v: TabKey) => setTabState({ id: selectedRow.id, tab: v })}
+                variant="scrollable"
+                scrollButtons="auto"
+                allowScrollButtonsMobile
+                aria-label="Submission sections"
+                // The header's bottom border is the tab rule; some themes add their own, which would double it.
+                sx={{ mt: 1, minHeight: 40, borderBottom: 0, "& .MuiTab-root": { minHeight: 40, px: 1.5 } }}
+              >
+                {TABS.map((t) => (
+                  <Tab key={t} value={t} id={`submission-tab-${t}`} aria-controls={`submission-tabpanel-${t}`}
+                    label={tabLabel(t)} />
+                ))}
+              </Tabs>
             </SheetHeader>
 
             <Box sx={{ flex: 1, overflowY: "auto" }}>
-
-              {/* ── Summary strip ──────────────────────────────────────────────── */}
-              <Box
-                sx={{
-                  px: 2.25, py: 1.5,
-                  display: "grid", gridTemplateColumns: "repeat(2, 1fr)", gap: 1,
-                  borderBottom: `1px solid ${alpha(theme.palette.divider, isDark ? 0.18 : 0.55)}`,
-                  background: isDark ? alpha("#fff", 0.015) : alpha(theme.palette.grey[50], 0.6),
-                }}
-              >
-                {[
-                  { label: "Tests run", value: selectedRow.tests_done ?? "—" },
-                  { label: "Submitted", value: fmtDate(selectedRow.created_at) },
-                ].map(({ label, value }) => (
-                  <Box key={label}>
-                    <Typography variant="caption" sx={{ display: "block", color: "text.secondary", mb: 0.2 }}>
-                      {label}
-                    </Typography>
-                    <Typography sx={{ fontWeight: 700, fontSize: 13 }}>{String(value)}</Typography>
-                  </Box>
-                ))}
-              </Box>
-
-              <Stack spacing={0} divider={<Divider sx={{ opacity: isDark ? 0.12 : 0.35 }} />}>
-
-                {/* ── Verdict (read-only) ───────────────────────────────────────── */}
-                {ci ? (
-                  <Box sx={{ px: 2.25, py: 2 }}>
-                    <Typography variant="caption" sx={{ display: "block", color: "text.secondary", mb: 0.75 }}>
-                      Verdict
-                    </Typography>
-                    <Stack spacing={1.25}>
-                      <Stack direction="row" spacing={1} sx={{ alignItems: "center", flexWrap: "wrap" }}>
-                        <ResultChip result={String(ci.classification ?? "UNKNOWN")} minWidth={BADGE_W} />
-                        <Chip size="small" label={`Score ${ci.score ?? "—"}/10`} variant="outlined" />
-                        <Chip size="small" label={`Confidence ${ci.confidence ?? "—"}%`} variant="outlined" />
-                      </Stack>
-                      {[ci.classification_ai, ci.score_ai, ci.confidence_ai, ci.category_ai].some((v) => v != null && v !== "") ? (
-                        <Box>
-                          <Typography variant="caption" sx={{ display: "block", color: "text.secondary", mb: 0.5 }}>
-                            AI classifier
-                          </Typography>
-                          <Stack direction="row" spacing={0.75} sx={{ flexWrap: "wrap", rowGap: 0.75 }}>
-                            {[
-                              ci.classification_ai ? String(ci.classification_ai) : null,
-                              `score ${ci.score_ai ?? "—"}`,
-                              `conf ${ci.confidence_ai ?? "—"}%`,
-                              ci.category_ai ? `cat ${ci.category_ai}` : null,
-                            ].filter(Boolean).map((label) => (
-                              <Chip key={label as string} size="small" label={label as string} variant="outlined"
-                                sx={{ fontSize: theme.typography.caption.fontSize }} />
-                            ))}
-                          </Stack>
-                        </Box>
-                      ) : null}
-                    </Stack>
-                  </Box>
-                ) : null}
-
-                {noAnalyzersRan ? (
-                  <Box sx={{ px: 2.25, py: 1.5 }}>
-                    <Typography variant="body2" color="text.secondary">
-                      No analyzers ran for this submission.
-                    </Typography>
-                  </Box>
-                ) : null}
-
-                {/* ── Artifact ──────────────────────────────────────────────────── */}
-                <Box sx={{ px: 2.25, py: 2 }}>
-                  <Typography sx={{ fontSize: 10, fontWeight: 700, textTransform: "uppercase", letterSpacing: "0.08em", color: "text.disabled", mb: 0.75 }}>
-                    Artifact
-                  </Typography>
-                  <Typography sx={{ wordBreak: "break-all", fontWeight: 700, fontSize: 13.5 }}>
-                    {selectedRow.artifact || "—"}
-                  </Typography>
-                </Box>
-
-                {/* ── Your comments ───────────────────────────────────────────── */}
-                <CommentThread
-                  title="Your comments"
-                  comments={commentsQuery.data ?? []}
-                  isLoading={commentsQuery.isLoading}
-                  onAdd={onAddComment}
-                  isAdding={isAddingComment}
+              <Panel value="overview" tab={tab}>
+                <OverviewTab
+                  row={selectedRow}
+                  reports={analyzerReports}
+                  ci={ci}
+                  multi={multi}
+                  observableCount={reportGroups.length}
+                  noAnalyzersRan={noAnalyzersRan}
+                  verdictHex={verdictHex}
+                  onSeeAll={() => setTabState({ id: selectedRow.id, tab: "analysis" })}
                 />
+              </Panel>
 
-                {/* ── Email preview (only when the case is a mail) ─────────────── */}
-                {selectedRow.mail_preview_url ? (
-                  <Box sx={{ px: 2.25, py: 2 }}>
-                    <Typography sx={{ fontSize: 10, fontWeight: 700, textTransform: "uppercase", letterSpacing: "0.08em", color: "text.disabled", mb: 0.75 }}>
-                      Email preview
-                    </Typography>
-                    <MailPreview
-                      url={selectedRow.mail_preview_url}
-                      variant="full"
-                      alt={`Preview of email for case ${selectedRow.id}`}
-                    />
-                  </Box>
-                ) : null}
-
+              <Panel value="analysis" tab={tab}>
                 {/* Analysis results: grouped by artifact (omitted when nothing ran and nothing reported) */}
                 {noAnalyzersRan && analyzerReports.length === 0 && !detailsQuery.isLoading && !detailsQuery.isError ? null : (
                 <Box sx={{ px: 2.25, pt: 2, pb: 1 }}>
@@ -353,7 +305,17 @@ export function SubmissionDrawer({
                     <UrlGroupList submissionId={selectedIdNum} urls={urlArtifacts} />
                   </Box>
                 )}
-              </Stack>
+              </Panel>
+
+              <Panel value="comments" tab={tab}>
+                <CommentThread
+                  title="Your comments"
+                  comments={commentsQuery.data ?? []}
+                  isLoading={commentsQuery.isLoading}
+                  onAdd={onAddComment}
+                  isAdding={isAddingComment}
+                />
+              </Panel>
             </Box>
           </Stack>
         )}

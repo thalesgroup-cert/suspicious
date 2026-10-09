@@ -12,9 +12,10 @@ type Props = {
   muiColor?: "success" | "warning" | "error" | "info" | "default";
   icon?: React.ReactNode;
   minWidth?: number;
+  size?: "small" | "medium";
 };
 
-export function Badge({ label, color, muiColor = "default", icon, minWidth = 128 }: Props) {
+export function Badge({ label, color, muiColor = "default", icon, minWidth = 128, size = "small" }: Props) {
   const theme = useTheme();
   const isDark = theme.palette.mode === "dark";
 
@@ -26,7 +27,7 @@ export function Badge({ label, color, muiColor = "default", icon, minWidth = 128
 
     return (
       <Chip
-        size="small"
+        size={size}
         icon={icon as any}
         label={label}
         variant="outlined"
@@ -47,7 +48,7 @@ export function Badge({ label, color, muiColor = "default", icon, minWidth = 128
   // ── MUI color fallback ────────────────────────────────────────────────────
   return (
     <Chip
-      size="small"
+      size={size}
       icon={icon as any}
       label={label}
       color={muiColor === "default" ? undefined : muiColor}

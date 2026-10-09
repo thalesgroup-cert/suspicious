@@ -7,7 +7,7 @@ const sansStack = [
   "Roboto", "Arial", "sans-serif",
 ].join(",");
 
-const monoStack = [
+export const monoStack = [
   '"IBM Plex Mono"', "ui-monospace", "SFMono-Regular",
   "Menlo", "Monaco", "Consolas", '"Courier New"', "monospace",
 ].join(",");

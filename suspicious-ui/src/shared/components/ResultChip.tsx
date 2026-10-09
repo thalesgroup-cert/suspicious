@@ -88,28 +88,39 @@ const RESULT_META: Record<string, ResultMeta> = {
   },
 };
 
-export function ResultChip({
-  result,
-  minWidth,
-}: {
-  result: string;
-  minWidth?: number;
-}) {
-  const resultColors = useResultColors();
-  const statusColors  = useStatusColors();
-
-  const key  = (result ?? "UNKNOWN").toUpperCase();
-  const meta = RESULT_META[key] ?? {
+function metaFor(result: string): ResultMeta {
+  const key = (result ?? "UNKNOWN").toUpperCase();
+  return RESULT_META[key] ?? {
     group:    "status",
     storeKey: "unknown",
     label:    key,
     icon:     <HelpOutlineOutlined fontSize="small" />,
   } satisfies ResultMeta;
+}
 
-  const hex =
-    meta.group === "result"
-      ? resultColors[meta.storeKey as ResultKey]?.main
-      : statusColors[meta.storeKey as StatusKey]?.main;
+/** The user's colour for a verdict (same mapping as the chip); the neutral "unknown" colour otherwise. */
+// Kept beside RESULT_META so the chip and the drawer accent can never disagree; costs only fast-refresh of this file.
+// eslint-disable-next-line react-refresh/only-export-components
+export function useResultHex(result: string): string | undefined {
+  const resultColors = useResultColors();
+  const statusColors  = useStatusColors();
+  const meta = metaFor(result);
+  return meta.group === "result"
+    ? resultColors[meta.storeKey as ResultKey]?.main
+    : statusColors[meta.storeKey as StatusKey]?.main;
+}
+
+export function ResultChip({
+  result,
+  minWidth,
+  size,
+}: {
+  result: string;
+  minWidth?: number;
+  size?: "small" | "medium";
+}) {
+  const meta = metaFor(result);
+  const hex = useResultHex(result);
 
   return (
     <Badge
@@ -117,6 +128,7 @@ export function ResultChip({
       color={hex}
       icon={meta.icon}
       minWidth={minWidth ?? 128}
+      size={size}
     />
   );
 }

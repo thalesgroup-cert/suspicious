@@ -141,6 +141,7 @@ describe("SubmissionsPage - Test Suite", () => {
 
       await screen.findByText(/phish@example\.com/i, {}, { timeout: 5000 });
       await user.click(screen.getByText(/phish@example\.com/i));
+      await user.click(await screen.findByRole("tab", { name: /^Comments/ }));
 
       const textarea = await screen.findByPlaceholderText("Add a comment…");
       await user.type(textarea, "checking on this");
@@ -412,6 +413,8 @@ describe("SubmissionsPage - honest detail drawer", () => {
     renderWithProviders(<SubmissionsPage />, { initialPath: "/submissions?open=101" });
     await screen.findByText("Verdict");
   };
+  // The analysis block lives under its tab since the drawer gained tabs.
+  const showAnalysis = async () => userEvent.click(await screen.findByRole("tab", { name: /^Analysis/ }));
 
   it("labels sources, says no analyzers ran, shows the id once, drops the empty report block", async () => {
     await open(0, []);
@@ -419,31 +422,37 @@ describe("SubmissionsPage - honest detail drawer", () => {
     expect(screen.getByText("Verdict")).toBeInTheDocument();
     expect(screen.getByText("No analyzers ran for this submission.")).toBeInTheDocument();
     expect(screen.getAllByText("#101")).toHaveLength(1);
+    // AI score and confidence both 0 read "Not classified" (design ruling), not the zero chips.
+    expect(parseFloat(getComputedStyle(screen.getByText("Not classified")).fontSize)).toBeGreaterThanOrEqual(12);
+    await showAnalysis();
     expect(screen.queryByText(/^Analysis ·/)).not.toBeInTheDocument();
-    expect(parseFloat(getComputedStyle(screen.getByText("conf 0%")).fontSize)).toBeGreaterThanOrEqual(12);
   });
 
   it("with analyses there is no 'no analyzers' line and reports are counted", async () => {
     await open(3, [report(1), report(2)]);
     expect(screen.queryByText(/No analyzers ran/)).not.toBeInTheDocument();
+    await showAnalysis();
     expect(screen.getByText("Analysis · 2 reports")).toBeInTheDocument();
   });
 
   it("DONE with 0 tests but reports present: no 'no analyzers' line", async () => {
     await open(0, [report(1), report(2)]);
     expect(screen.queryByText(/No analyzers ran/)).not.toBeInTheDocument();
+    await showAnalysis();
     expect(screen.getByText("Analysis · 2 reports")).toBeInTheDocument();
   });
 
   it("keeps the 0-reports block when tests ran", async () => {
     await open(3, []);
     expect(screen.queryByText(/No analyzers ran/)).not.toBeInTheDocument();
+    await showAnalysis();
     expect(screen.getByText("Analysis · 0 reports")).toBeInTheDocument();
   });
 
   it.each(["NEW", "IN_PROGRESS", "FAILED"])("%s with 0 tests: no 'no analyzers' line, block kept", async (st) => {
     await open(0, [], st);
     expect(screen.queryByText(/No analyzers ran/)).not.toBeInTheDocument();
+    await showAnalysis();
     expect(await screen.findByText("No analysis reports yet.")).toBeInTheDocument();
   });
 
@@ -463,6 +472,7 @@ describe("SubmissionsPage - honest detail drawer", () => {
     vi.mocked(getSubmissionDetails).mockRejectedValue(new Error("boom"));
     renderWithProviders(<SubmissionsPage />, { initialPath: "/submissions?open=101" });
     expect(await screen.findByText("No analyzers ran for this submission.")).toBeInTheDocument();
+    await showAnalysis();
     expect(await screen.findByText("Could not load analysis details.")).toBeInTheDocument();
   });
 
@@ -474,6 +484,7 @@ describe("SubmissionsPage - honest detail drawer", () => {
     await open(3, [], "DONE", { ...AI, score_ai: 7 });
     expect(screen.getByText("AI classifier")).toBeInTheDocument();
     expect(screen.getByText("score 7")).toBeInTheDocument();
+    expect(parseFloat(getComputedStyle(screen.getByText("score 7")).fontSize)).toBeGreaterThanOrEqual(12);
   });
 });
 
