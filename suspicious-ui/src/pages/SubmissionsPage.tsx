@@ -270,6 +270,8 @@ export default function SubmissionsPage() {
     const urlQ = searchParams.get("q") ?? "";
     if (urlQ) setQ(urlQ);
     const open = searchParams.get("open");
+    // Back removes ?open=; keep the drawer in step (row clicks leave the key unchanged).
+    if (!open) setOpenDrawer(false);
     if (open) {
       const idNum = Number(open);
       if (!Number.isNaN(idNum)) {
@@ -344,6 +346,14 @@ export default function SubmissionsPage() {
   );
 
   const total = filtered.length;
+  // Filters that narrow the fetched rows client-side; q is applied by the server, sort never narrows.
+  const clientFiltered = status !== "ALL" || type !== "ALL" || result !== "ALL" || from !== "" || to !== "";
+  const serverCount = submissionsQuery.data?.count ?? total;
+  const totalLabel = clientFiltered
+    ? serverCount > rows.length
+      ? `${total} match in the first ${rows.length}`
+      : `${total} match`
+    : `${serverCount} ${qDebounced !== "" ? "match" : "total"}`;
   const start = page * pageSize;
   const end = Math.min(total, start + pageSize);
   const pageRows = filtered.slice(start, end);
@@ -352,18 +362,18 @@ export default function SubmissionsPage() {
 
   // ── Derived values and callbacks ────────────────────────────────────────
 
-  const ci = detailsQuery.data?.case_infos;
-  // Only claim "nothing ran" for a finished case; NEW/IN_PROGRESS also have 0 tests while analyzers run.
-  const noAnalyzersRan =
-    !!selectedRow && String(selectedRow.status).toUpperCase() === "DONE" && selectedRow.tests_done === 0;
-
-  const BADGE_W = 132;
-  const DIALOG_RADIUS = 2;
-
   const analyzerReports = React.useMemo(
     () => detailsQuery.data?.analyzer_reports ?? [],
     [detailsQuery.data]
   );
+  const ci = detailsQuery.data?.case_infos;
+  // Only claim "nothing ran" for a finished case; NEW/IN_PROGRESS also have 0 tests while analyzers run.
+  const noAnalyzersRan =
+    !!selectedRow && String(selectedRow.status).toUpperCase() === "DONE" && selectedRow.tests_done === 0 && analyzerReports.length === 0;
+
+  const BADGE_W = 132;
+  const DIALOG_RADIUS = 2;
+
   const urlArtifacts = detailsQuery.data?.url_artifacts ?? [];
   const hasRawDetails = typeof detailsQuery.data?.raw !== "undefined";
 
@@ -436,7 +446,7 @@ export default function SubmissionsPage() {
           </Box>
 
           <Stack direction="row" spacing={1} sx={{ mt: 1, flexWrap: "wrap" }}>
-            <Chip icon={<AssignmentTurnedInOutlined />} label={filtersActive ? `${total} match` : `${total} total`} variant="outlined" />
+            <Chip icon={<AssignmentTurnedInOutlined />} label={totalLabel} variant="outlined" />
             {(submissionsQuery.data?.count ?? 0) > rows.length ? (
               <Chip
                 label={`Loaded ${rows.length} of ${submissionsQuery.data?.count ?? 0}`}
@@ -625,6 +635,7 @@ export default function SubmissionsPage() {
           ) : isPhone ? (
             <RecentSubmissionsList
               rows={pageRows}
+              replace
               hrefFor={(r) =>
                 `/submissions?open=${encodeURIComponent(String(r.id))}`
               }
@@ -777,6 +788,7 @@ export default function SubmissionsPage() {
       </SoftCard>
 
       {/* ponytail: client-side paging over the first 100 fetched rows (page_size: 100) */}
+      {total > 0 ? (
       <TablePagination
         component="div"
         count={total}
@@ -791,6 +803,7 @@ export default function SubmissionsPage() {
           "& .MuiTablePagination-spacer": { display: { xs: "none", sm: "block" } },
         }}
       />
+      ) : null}
 
       <Drawer
         anchor="right"
@@ -874,7 +887,7 @@ export default function SubmissionsPage() {
                   { label: "Submitted", value: fmtDate(selectedRow.created_at) },
                 ].map(({ label, value }) => (
                   <Box key={label}>
-                    <Typography variant="caption" sx={{ display: "block", color: "text.disabled", mb: 0.2 }}>
+                    <Typography variant="caption" sx={{ display: "block", color: "text.secondary", mb: 0.2 }}>
                       {label}
                     </Typography>
                     <Typography sx={{ fontWeight: 700, fontSize: 13 }}>{String(value)}</Typography>
@@ -887,7 +900,7 @@ export default function SubmissionsPage() {
                 {/* ── Verdict (read-only) ───────────────────────────────────────── */}
                 {ci ? (
                   <Box sx={{ px: 2.25, py: 2 }}>
-                    <Typography variant="caption" sx={{ display: "block", color: "text.disabled", mb: 0.75 }}>
+                    <Typography variant="caption" sx={{ display: "block", color: "text.secondary", mb: 0.75 }}>
                       Verdict
                     </Typography>
                     <Stack spacing={1.25}>
@@ -898,7 +911,7 @@ export default function SubmissionsPage() {
                       </Stack>
                       {[ci.classification_ai, ci.score_ai, ci.confidence_ai, ci.category_ai].some((v) => v != null && v !== "") ? (
                         <Box>
-                          <Typography variant="caption" sx={{ display: "block", color: "text.disabled", mb: 0.5 }}>
+                          <Typography variant="caption" sx={{ display: "block", color: "text.secondary", mb: 0.5 }}>
                             AI classifier
                           </Typography>
                           <Stack direction="row" spacing={0.75} sx={{ flexWrap: "wrap", rowGap: 0.75 }}>

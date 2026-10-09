@@ -13,6 +13,7 @@ export function RecentSubmissionsList({
   hrefFor,
   action,
   calmStatus,
+  replace,
 }: {
   rows: SubmissionRow[];
   hrefFor: (row: SubmissionRow) => string;
@@ -20,6 +21,8 @@ export function RecentSubmissionsList({
   action?: (row: SubmissionRow) => React.ReactNode;
   /** Render DONE muted (Submissions page); Home keeps the coloured chip. */
   calmStatus?: boolean;
+  /** Replace the history entry on tap (Submissions drawer links) instead of pushing. */
+  replace?: boolean;
 }) {
   return (
     <Stack component="ul" sx={{ listStyle: "none", m: 0, px: 1.5, pb: 1.5 }}>
@@ -35,6 +38,7 @@ export function RecentSubmissionsList({
               variant="contained"
               component={RouterLink}
               to={hrefFor(r)}
+              replace={replace}
               sx={{ borderRadius: 3, textTransform: "none", fontWeight: 950 }}
             >
               {r.id}

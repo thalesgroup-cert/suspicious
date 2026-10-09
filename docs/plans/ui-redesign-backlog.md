@@ -53,3 +53,17 @@ Group C (sunrise, valentine, the_one, winter, spring, summer, autumn).
 - Duplicate `:not(:first-of-type)` border rules in `features/submit/components/cards.tsx`.
 - e2e: login.spec (4 failures) and investigation.spec (2 failures) fail on main independently of the Submit work.
 - A stray "Request failed." snackbar appears in the submit e2e after navigating to /submissions (unmocked requests).
+
+## From the Submissions page cycle
+
+- Server-side paging: the fetch is page 1 with page_size 100 and filtering/paging happen client-side, so more than 100 matches are unreachable. Move filters and paging to the server.
+- Move `RecentSubmissionsList` to `shared/components` (Home imports it from features/home and it now imports features/submissions/CalmStatusChip).
+- Submissions drawer header uses the coloured StatusChip for DONE while the rows use the muted chip.
+- Submissions dropped the title avatar while Investigation and Settings keep theirs.
+- Nav drawer has no visible Close and its hamburger is covered while open.
+- Focus returns to BODY after a drawer opened by a link closes.
+- Reset shows for a column-header sort while the Filters chip and Sort select do not reflect it.
+- Phone list has no copy buttons or column sort.
+- Investigation drawer header is tall on phones (284px).
+- The matchMedia stub is never unstubbed in SubmissionsPage tests.
+- A malformed `?open=abc` deep link makes closeDrawer reset the search to the URL's q.

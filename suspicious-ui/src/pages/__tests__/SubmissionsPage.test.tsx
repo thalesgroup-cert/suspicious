@@ -1,5 +1,6 @@
 import { describe, it, expect, vi, beforeEach } from "vitest";
 import { screen, waitFor, within } from "@testing-library/react";
+import { useLocation, useNavigate, useNavigationType } from "react-router";
 import userEvent from "@testing-library/user-event";
 import { renderWithProviders } from "@/test/utils";
 import { fixtureMe, fixtureSubmissionsList } from "@/test/fixtures";
@@ -428,6 +429,12 @@ describe("SubmissionsPage - honest detail drawer", () => {
     expect(screen.getByText("Analysis · 2 reports")).toBeInTheDocument();
   });
 
+  it("DONE with 0 tests but reports present: no 'no analyzers' line", async () => {
+    await open(0, [report(1), report(2)]);
+    expect(screen.queryByText(/No analyzers ran/)).not.toBeInTheDocument();
+    expect(screen.getByText("Analysis · 2 reports")).toBeInTheDocument();
+  });
+
   it("keeps the 0-reports block when tests ran", async () => {
     await open(3, []);
     expect(screen.queryByText(/No analyzers ran/)).not.toBeInTheDocument();
@@ -467,5 +474,110 @@ describe("SubmissionsPage - honest detail drawer", () => {
     await open(3, [], "DONE", { ...AI, score_ai: 7 });
     expect(screen.getByText("AI classifier")).toBeInTheDocument();
     expect(screen.getByText("score 7")).toBeInTheDocument();
+  });
+});
+
+function Probe() {
+  const nav = useNavigate();
+  const loc = useLocation();
+  const type = useNavigationType();
+  return (
+    <div>
+      <span data-testid="loc">{loc.pathname + loc.search}</span>
+      <span data-testid="navtype">{type}</span>
+      <button onClick={() => nav("/submissions")}>probe-back</button>
+    </div>
+  );
+}
+const withProbe = () => <><SubmissionsPage /><Probe /></>;
+
+describe("SubmissionsPage - header count honesty", () => {
+  const list = (count: number, n = 100) => ({
+    ...fixtureSubmissionsList,
+    count,
+    results: Array.from({ length: n }, (_, i) => ({
+      ...fixtureSubmissionsList.results[0], id: 1000 + i, artifact: `row-${i}@example.com`, is_challengeable: false,
+    })),
+  });
+  beforeEach(() => {
+    stub(false);
+    vi.mocked(getMe).mockResolvedValue(fixtureMe);
+    vi.mocked(listSubmissions).mockResolvedValue(list(340) as never);
+  });
+
+  it("uses the server count next to the loaded chip", async () => {
+    renderWithProviders(<SubmissionsPage />, { initialPath: "/submissions" });
+    expect(await screen.findByText("340 total")).toBeInTheDocument();
+    expect(screen.getByText("Loaded 100 of 340")).toBeInTheDocument();
+  });
+
+  it("search reports the server count as match", async () => {
+    renderWithProviders(<SubmissionsPage />, { initialPath: "/submissions" });
+    await screen.findByText("340 total");
+    await userEvent.type(screen.getByPlaceholderText(/id, status, artifact/i), "row");
+    expect(await screen.findByText("340 match")).toBeInTheDocument();
+  });
+
+  it("a client-side filter says match in the first N", async () => {
+    renderWithProviders(<SubmissionsPage />, { initialPath: "/submissions" });
+    await userEvent.click(await screen.findByRole("button", { name: /^filters/i }));
+    await userEvent.click(await screen.findByLabelText("Type"));
+    await userEvent.click(await screen.findByRole("option", { name: "MAIL" }));
+    expect(await screen.findByText(/match in the first 100$/)).toBeInTheDocument();
+  });
+
+  it("changing only the sort keeps total", async () => {
+    renderWithProviders(<SubmissionsPage />, { initialPath: "/submissions" });
+    await userEvent.click(await screen.findByRole("button", { name: /^filters/i }));
+    await userEvent.click(await screen.findByLabelText("Sort"));
+    await userEvent.click(await screen.findByRole("option", { name: "ID (high → low)" }));
+    expect(screen.getByText("340 total")).toBeInTheDocument();
+    expect(screen.queryByText(/match/)).toBeNull();
+  });
+
+  it("hides the pager when empty, shows it with rows", async () => {
+    renderWithProviders(<SubmissionsPage />, { initialPath: "/submissions" });
+    await screen.findByRole("table");
+    expect(document.querySelector(".MuiTablePagination-root")).not.toBeNull();
+  });
+
+  it("no pager under the empty state", async () => {
+    vi.mocked(listSubmissions).mockResolvedValue({ ...fixtureSubmissionsList, count: 0, results: [] } as never);
+    renderWithProviders(<SubmissionsPage />, { initialPath: "/submissions" });
+    await screen.findByText("No submissions yet");
+    expect(document.querySelector(".MuiTablePagination-root")).toBeNull();
+  });
+});
+
+describe("SubmissionsPage - drawer and history", () => {
+  beforeEach(() => {
+    vi.mocked(getMe).mockResolvedValue(fixtureMe);
+    vi.mocked(listSubmissions).mockResolvedValue(fixtureSubmissionsList as never);
+  });
+
+  it("the phone ID link replaces the history entry", async () => {
+    stub(true);
+    renderWithProviders(withProbe(), { initialPath: "/submissions" });
+    await userEvent.click(await screen.findByRole("link", { name: "101" }));
+    await screen.findByTestId("sheet-header");
+    expect(screen.getByTestId("navtype")).toHaveTextContent("REPLACE");
+  });
+
+  it("the URL losing ?open= (Back) closes the drawer", async () => {
+    stub(false);
+    renderWithProviders(withProbe(), { initialPath: "/submissions?open=101" });
+    await screen.findByTestId("sheet-header");
+    screen.getByText("probe-back").click(); // behind the modal, so not reachable by role
+    await waitFor(() => expect(screen.queryByTestId("sheet-header")).toBeNull());
+  });
+
+  it("desktop row click still opens and closes the drawer", async () => {
+    stub(false);
+    renderWithProviders(withProbe(), { initialPath: "/submissions" });
+    await userEvent.click(await screen.findByRole("button", { name: "101" }));
+    await screen.findByTestId("sheet-header");
+    expect(screen.getByTestId("loc")).toHaveTextContent("/submissions");
+    await userEvent.click(screen.getAllByRole("button", { name: /close/i })[0]);
+    await waitFor(() => expect(screen.queryByTestId("sheet-header")).toBeNull());
   });
 });
