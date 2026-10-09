@@ -35,3 +35,10 @@ Group C (sunrise, valentine, the_one, winter, spring, summer, autumn).
 - Worst case of the `MuiChip.root` colour item above: sunrise `FeederHealthBadge` "Stale" is coral `#C4200F` on the amber warning fill, 1.85:1. Home.
 - `THEME_CAPABILITIES.valentine.isDark` is `true` but the theme is built with `mkLight` (light palette). Fix: set it to `false` in `ThemeStore.tsx`.
 - In themes.ts but over this group's 8-fix cap: summer `warning` `#D97706` gives MUI's white contrastText at 3.19:1 on the filled "Feeder: Stale" chip. Home. Fix: a darker warning such as `#B45309`.
+
+## From the Home page cycle
+- Mobile app bar title in `AppLayout` uses fontWeight 850 and letterSpacing -0.02em; check it when the layout is next reviewed.
+- After the per-variant typography merge, page titles in paper, renee, high_contrast, sunrise and spring dropped to base sizes (h4 16px). Settings and Home were captured; Profile, About, Campaigns, Investigation and NotFound were not. Check them in the page audits.
+- `themes.test.ts` pins exact heading sizes for paper only; the other themes are covered by a 40px cap.
+- Donut centre counts verdict buckets while the share card counts monthly submissions; the dev stats snapshot has totals without buckets. Decide whether the stats job should fill the buckets.
+- CERT and CISO users no longer have an "Open investigation" shortcut in the Threat card; the sidebar and the spotlight button cover it.
