@@ -12,10 +12,12 @@ import {
   Table,
   TableBody,
   TableCell,
+  TableContainer,
   TableHead,
   TableRow,
   Tooltip,
   Typography,
+  useMediaQuery,
 } from "@mui/material";
 import { alpha } from "@mui/material/styles";
 import {
@@ -54,7 +56,9 @@ import {
   getHomeSummary,
   type DangerCounts,
   type HomeSummary,
+  type SubmissionRow,
 } from "@/features/home/api";
+import { RecentSubmissionsList } from "@/features/home/components/RecentSubmissionsList";
 import {
   DANGER_COLORS,
   DANGER_ORDER,
@@ -65,16 +69,6 @@ import {
 } from "@/features/home/utils";
 
 // Types
-
-type SubmissionRow = {
-  id: number | string;
-  status?: string;
-  artifact?: string;
-  created_at?: string;
-  tests_done?: number;
-  type?: string;
-  result?: string;
-};
 
 type SubmissionsResponse = {
   items?: SubmissionRow[];
@@ -98,6 +92,7 @@ async function getMyRecentSubmissions(): Promise<SubmissionRow[]> {
 export default function HomePage() {
   const navigate = useNavigate();
   const theme = useTheme();
+  const isPhone = useMediaQuery(theme.breakpoints.down("sm"));
   const { capabilities } = useThemeMode();
   const resultColors = useResultColors();
   const statusColors  = useStatusColors();
@@ -688,8 +683,17 @@ export default function HomePage() {
                     </Alert>
                   </Box>
                 )
+              ) : isPhone ? (
+                <RecentSubmissionsList
+                  rows={recent}
+                  onOpen={(id) =>
+                    navigate(
+                      `/submissions?q=${encodeURIComponent(String(id))}&open=${encodeURIComponent(String(id))}`
+                    )
+                  }
+                />
               ) : (
-                <Box sx={{ overflowX: "auto" }}>
+                <TableContainer>
                   <Table sx={{ minWidth: 920 }}>
                     <TableHead>
                       <TableRow>
@@ -705,7 +709,7 @@ export default function HomePage() {
                     <TableBody>
                       {recent.map((r) => (
                         <TableRow key={String(r.id)} hover>
-                          <TableCell>
+                          <TableCell component="th" scope="row">
                             <Stack direction="row" spacing={1} sx={{ alignItems: "center" }} >
                               <Button
                                 size="small"
@@ -777,7 +781,7 @@ export default function HomePage() {
                       ))}
                     </TableBody>
                   </Table>
-                </Box>
+                </TableContainer>
               )}
             </DashboardCard>
           </Grid>

@@ -43,3 +43,13 @@ export async function setCisoScope(input: { scope: string }): Promise<{ scope: s
   const res = await api.patch("/profile/", input);
   return res.data;
 }
+
+export type SubmissionRow = {
+  id: number | string;
+  status?: string;
+  artifact?: string;
+  created_at?: string;
+  tests_done?: number;
+  type?: string;
+  result?: string;
+};
