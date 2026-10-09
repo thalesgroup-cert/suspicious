@@ -116,6 +116,7 @@ export function readType(type?: string) {
   if (t === "mail") return "Email check";
   if (t === "url") return "Link check";
   if (t === "ip") return "IP check";
+  if (t === "domain") return "Domain check";
   return type || "Analyzer";
 }
 

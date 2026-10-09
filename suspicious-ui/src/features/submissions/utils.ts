@@ -21,6 +21,7 @@ export {
   type ReportGroup,
   type ReportLike,
 } from "@/shared/lib/scoreUtils";
+import { getRiskTone } from "@/shared/lib/scoreUtils";
 
 // Submissions-specific helpers
 
@@ -60,6 +61,23 @@ export function toBackendOrdering(
   if (sort === "date_asc") return "created_at";
   if (sort === "id_desc") return "-id";
   return "id";
+}
+
+/** Only a successful run carries a risk signal; failed or unfinished runs have none. */
+export const reportSucceeded = (r: { status?: string | null }) => String(r.status ?? "").toLowerCase() === "success";
+
+/** Label for a run that did not succeed: Cortex also reports InProgress and Waiting, which are not failures. */
+export function unfinishedLabel(status?: string | null) {
+  const s = String(status ?? "").toLowerCase();
+  if (s === "inprogress") return "Running";
+  if (s === "waiting") return "Queued";
+  return "Failed";
+}
+
+/** Theme palette key for a risk tone, so each theme paints risk in its own tuned error/warning/success. */
+export function riskPalette(score?: number | null): "error" | "warning" | "success" {
+  const label = getRiskTone(score).label;
+  return label === "High risk" ? "error" : label === "Needs attention" ? "warning" : "success";
 }
 
 // Constants

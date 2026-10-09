@@ -153,8 +153,6 @@ export default function SubmissionsPage() {
   const [challengeId, setChallengeId] = React.useState<number | null>(null);
   const [proposedResult, setProposedResult] = React.useState<"Safe" | "Dangerous" | null>(null);
   const [challengeReason, setChallengeReason] = React.useState("");
-  const [expandedAnalyzerIds, setExpandedAnalyzerIds] = React.useState<Record<number, boolean>>({});
-  const [expandedGroups, setExpandedGroups] = React.useState<Record<string, boolean>>({});
 
   const meQuery = useQuery<Me>({
     queryKey: ["me"],
@@ -278,29 +276,6 @@ export default function SubmissionsPage() {
     setPage(0);
   }
 
-  const [prevOpenDrawer, setPrevOpenDrawer] = React.useState(openDrawer);
-  if (openDrawer !== prevOpenDrawer) {
-    setPrevOpenDrawer(openDrawer);
-    if (!openDrawer) {
-      setExpandedAnalyzerIds({});
-      setExpandedGroups({});
-    }
-  }
-
-  const [prevSelectedId, setPrevSelectedId] = React.useState(selectedId);
-  if (selectedId !== prevSelectedId) {
-    setPrevSelectedId(selectedId);
-    setExpandedAnalyzerIds({});
-    setExpandedGroups({});
-  }
-
-  const reportsKey = detailsQuery.dataUpdatedAt;
-  const [prevReportsKey, setPrevReportsKey] = React.useState(reportsKey);
-  if (reportsKey !== prevReportsKey) {
-    setPrevReportsKey(reportsKey);
-    setExpandedAnalyzerIds({});
-  }
-
   const rows = React.useMemo(
     () => submissionsQuery.data?.results ?? [],
     [submissionsQuery.data]
@@ -350,34 +325,11 @@ export default function SubmissionsPage() {
   const showChallenge = pageRows.some(canChallenge);
   const selectedRow = selectedId ? rows.find((r) => String(r.id) === String(selectedId)) : undefined;
 
-  // ── Derived values and callbacks ────────────────────────────────────────
-
-  const analyzerReports = React.useMemo(
-    () => detailsQuery.data?.analyzer_reports ?? [],
-    [detailsQuery.data]
-  );
+  // ── Derived values ──────────────────────────────────────────────────────
 
   const BADGE_W = 132;
   const DIALOG_RADIUS = 2;
 
-  const hasRawDetails = typeof detailsQuery.data?.raw !== "undefined";
-
-  const expandAllAnalyzers = React.useCallback(() => {
-    setExpandedAnalyzerIds(Object.fromEntries(analyzerReports.map((r) => [r.id, true])));
-  }, [analyzerReports]);
-
-  const collapseAllAnalyzers = React.useCallback(() => {
-    setExpandedAnalyzerIds({});
-  }, []);
-
-  const invertAnalyzers = React.useCallback(() => {
-    setExpandedAnalyzerIds((prev) =>
-      Object.fromEntries(analyzerReports.map((r) => [r.id, !prev[r.id]]))
-    );
-  }, [analyzerReports]);
-
-  const drawerCardBorder = isDark ? "rgba(255,255,255,.08)" : alpha(theme.palette.divider, 0.6);
-  const drawerCardBg = isDark ? "rgba(255,255,255,.025)" : alpha(theme.palette.background.paper, 0.7);
   const refreshBtnBorder = isDark
     ? "1px solid rgba(255,255,255,.10)"
     : `1px solid ${alpha(theme.palette.divider, 0.6)}`;
@@ -794,10 +746,6 @@ export default function SubmissionsPage() {
         comments={commentsQuery}
         onAddComment={(body) => addCommentMutation.mutateAsync(body)}
         isAddingComment={addCommentMutation.isPending}
-        expandedGroups={expandedGroups}
-        setExpandedGroups={setExpandedGroups}
-        expandedAnalyzerIds={expandedAnalyzerIds}
-        setExpandedAnalyzerIds={setExpandedAnalyzerIds}
       />
 
       <Dialog

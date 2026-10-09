@@ -1,5 +1,5 @@
 import { afterEach, describe, it, expect, vi } from "vitest";
-import { screen, within } from "@testing-library/react";
+import { screen, waitFor, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { renderWithProviders } from "@/test/utils";
 import { SubmissionDrawer, type SubmissionDrawerProps } from "../SubmissionDrawer";
@@ -19,16 +19,12 @@ const base = (over: Partial<SubmissionDrawerProps> = {}): SubmissionDrawerProps 
   comments: { data: [], isLoading: false } as never,
   onAddComment: vi.fn().mockResolvedValue(undefined),
   isAddingComment: false,
-  expandedGroups: {},
-  setExpandedGroups: vi.fn(),
-  expandedAnalyzerIds: {},
-  setExpandedAnalyzerIds: vi.fn(),
   ...over,
 });
 
-const rep = (id: number, analyzer_name: string, score: number, value = "a.example", kind = "DOMAIN", status = "Success") => ({
+const rep = (id: number, analyzer_name: string, score: number, value = "a.example", kind = "DOMAIN", status = "Success", confidence: number | null = null) => ({
   id, cortex_job_id: null, type: "x", status, analyzer_name, analyzer_id: analyzer_name,
-  level: null, confidence: null, score, category: null, categories: [],
+  level: null, confidence, score, category: null, categories: [],
   report_summary: null, report_taxonomy: null, report_full: null,
   target: { kind, id: null, value }, created_at: "2026-09-21T10:00:00Z",
 });
@@ -245,5 +241,132 @@ describe("SubmissionDrawer - fix round 1", () => {
     expect(getComputedStyle(accent).backgroundColor).toBe("rgb(18, 52, 86)");
     const bar = screen.getByRole("progressbar", { name: "Score" }).querySelector(".MuiLinearProgress-bar")!;
     expect(getComputedStyle(bar).backgroundColor).toBe("rgb(18, 52, 86)");
+  });
+});
+
+describe("SubmissionDrawer - analysis tab", () => {
+  // Backend order URL, domain, hash: the tab must reorder by worst risk.
+  const reports3 = [
+    rep(1, "UrlLow", 1, "http://u.example", "URL"),
+    rep(2, "DomFailed", 10, "d.example", "DOMAIN", "Failure"),
+    rep(3, "DomLow", 2, "d.example", "DOMAIN"),
+    rep(4, "HashHigh", 9, "aa11", "HASH", "Success", 90),
+    rep(5, "HashLow", 1, "aa11", "HASH"),
+  ];
+  const urls = [{ id: 1, address: "http://u.example/x", analysis_status: "analyzed", interestingness: 1, canonical_key: "k", analyzed_url_id: null }];
+  const three = (over: Partial<SubmissionDrawerProps> = {}, data: object = {}) =>
+    base({
+      row: multiRow as never,
+      details: { data: { ...multiRow, analyzer_reports: reports3, case_infos: ci(), url_artifacts: urls, ...data }, isLoading: false, isError: false } as never,
+      ...over,
+    });
+  const toAnalysis = async () => userEvent.click(await screen.findByRole("tab", { name: /^Analysis/ }));
+  const region = (name: string) => screen.getByRole("region", { name });
+  const row = (name: string) => screen.getByRole("button", { name: new RegExp(`^${name}`) });
+
+  it("a level-3 Analysis heading with the count as text", async () => {
+    renderWithProviders(<SubmissionDrawer {...three()} />);
+    await toAnalysis();
+    expect(screen.getByRole("heading", { level: 3, name: "Analysis" })).toBeInTheDocument();
+    expect(screen.getByText("5 reports")).toBeInTheDocument();
+  });
+
+  it("groups sorted by worst risk; a failed analyzer neither raises nor lowers it", async () => {
+    renderWithProviders(<SubmissionDrawer {...three()} />);
+    await toAnalysis();
+    // Group sections are named by aria-label; the URL list's accordions add unnamed-attribute regions below.
+    const names = screen.getAllByRole("region").map((r) => r.getAttribute("aria-label")).filter(Boolean);
+    expect(names).toEqual(["Hash aa11", "Domain d.example", "URL http://u.example"]);
+    expect(within(region("Hash aa11")).getByRole("img", { name: "Worst result: High risk" })).toBeInTheDocument();
+    expect(within(region("Domain d.example")).getByRole("img", { name: "Worst result: Low risk" })).toBeInTheDocument();
+  });
+
+  it("only the worst group starts open", async () => {
+    renderWithProviders(<SubmissionDrawer {...three()} />);
+    await toAnalysis();
+    expect(within(region("Hash aa11")).getByText("HashHigh")).toBeInTheDocument();
+    expect(within(region("URL http://u.example")).queryByText("UrlLow")).not.toBeInTheDocument();
+    expect(within(region("Domain d.example")).queryByText("DomFailed")).not.toBeInTheDocument();
+  });
+
+  it("a failed analyzer reads Failed, no risk or confidence; its group says 1 failed", async () => {
+    renderWithProviders(<SubmissionDrawer {...three()} />);
+    await toAnalysis();
+    expect(within(region("Domain d.example")).getByText("1 failed")).toBeInTheDocument();
+    expect(within(region("Hash aa11")).queryByText(/failed/)).not.toBeInTheDocument();
+    await userEvent.click(screen.getByRole("button", { name: "Expand all groups" }));
+    const failed = row("DomFailed");
+    expect(within(failed).getByText("Failed")).toBeInTheDocument();
+    expect(failed.textContent).not.toMatch(/risk|confidence/i);
+    expect(row("DomLow").textContent).toMatch(/Low risk/);
+    // Inside a group the riskiest result leads and runs with no result go last (backend order was DomFailed, DomLow).
+    const rows = within(region("Domain d.example")).getAllByRole("button", { expanded: false }).map((b) => b.textContent);
+    expect(rows[0]).toMatch(/^DomLow/);
+    expect(rows[1]).toMatch(/^DomFailed/);
+  });
+
+  it("confidence only after expanding a row", async () => {
+    renderWithProviders(<SubmissionDrawer {...three()} />);
+    await toAnalysis();
+    expect(row("HashHigh").textContent).toMatch(/High risk/);
+    expect(screen.queryByText(/High confidence/)).not.toBeInTheDocument();
+    await userEvent.click(row("HashHigh"));
+    expect(await screen.findByText(/High confidence/)).toBeInTheDocument();
+    expect(row("HashHigh")).toHaveAttribute("aria-expanded", "true");
+  });
+
+  it("expand all and collapse all icon buttons", async () => {
+    renderWithProviders(<SubmissionDrawer {...three()} />);
+    await toAnalysis();
+    await userEvent.click(screen.getByRole("button", { name: "Expand all groups" }));
+    expect(await screen.findByText("UrlLow")).toBeInTheDocument();
+    expect(screen.getByText("DomLow")).toBeInTheDocument();
+    await userEvent.click(screen.getByRole("button", { name: "Collapse all groups" }));
+    await waitFor(() => {
+      expect(screen.queryByText("HashHigh")).not.toBeInTheDocument();
+      expect(screen.queryByText("UrlLow")).not.toBeInTheDocument();
+    });
+    const btn = screen.getByRole("button", { name: "Collapse all groups" }).getBoundingClientRect();
+    expect(Math.min(btn.width, btn.height)).toBeGreaterThanOrEqual(36);
+  });
+
+  it("another submission and a reopen start from the default again", async () => {
+    const { rerender } = renderWithProviders(<SubmissionDrawer {...three()} />);
+    await toAnalysis();
+    await userEvent.click(screen.getByRole("button", { name: "Expand all groups" }));
+    expect(await screen.findByText("UrlLow")).toBeInTheDocument();
+    const other = { ...multiRow, id: 22 };
+    rerender(<SubmissionDrawer {...three({ row: other as never, submissionId: 22 })} />);
+    await toAnalysis();
+    expect(await screen.findByText("HashHigh")).toBeInTheDocument();
+    expect(screen.queryByText("UrlLow")).not.toBeInTheDocument();
+
+    await userEvent.click(screen.getByRole("button", { name: "Expand all groups" }));
+    expect(await screen.findByText("UrlLow")).toBeInTheDocument();
+    rerender(<SubmissionDrawer {...three({ row: other as never, submissionId: 22, open: false })} />);
+    await waitFor(() => expect(screen.queryByText("UrlLow")).not.toBeInTheDocument());
+    rerender(<SubmissionDrawer {...three({ row: other as never, submissionId: 22 })} />);
+    if (!screen.queryByRole("tab", { name: /^Analysis/, selected: true })) await toAnalysis();
+    expect(await screen.findByText("HashHigh")).toBeInTheDocument();
+    expect(screen.queryByText("UrlLow")).not.toBeInTheDocument();
+  });
+
+  it("loading, error and empty states keep their text", async () => {
+    const { rerender } = renderWithProviders(<SubmissionDrawer {...three({ details: { data: undefined, isLoading: true, isError: false } as never })} />);
+    await toAnalysis();
+    expect(screen.getByText("Loading analysis…")).toBeInTheDocument();
+    rerender(<SubmissionDrawer {...three({ details: { data: undefined, isLoading: false, isError: true } as never })} />);
+    expect(screen.getByText("Could not load analysis details.")).toBeInTheDocument();
+    rerender(<SubmissionDrawer {...three({}, { analyzer_reports: [] })} />);
+    expect(screen.getByText("No analysis reports yet.")).toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: "Expand all groups" })).not.toBeInTheDocument();
+  });
+
+  it("URL artifacts stay under the analysis groups", async () => {
+    renderWithProviders(<SubmissionDrawer {...three()} />);
+    await toAnalysis();
+    expect(screen.getByRole("heading", { level: 3, name: "URLs" })).toBeInTheDocument();
+    expect(screen.getByText("1 artifact")).toBeInTheDocument();
+    expect(screen.getAllByText(/u\.example/).length).toBeGreaterThan(1);
   });
 });

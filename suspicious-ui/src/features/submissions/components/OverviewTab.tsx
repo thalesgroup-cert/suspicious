@@ -2,7 +2,8 @@ import * as React from "react";
 import { Box, Button, Chip, LinearProgress, Stack, Typography } from "@mui/material";
 import { alpha } from "@mui/material/styles";
 import type { SubmissionAnalyzerReport, SubmissionCaseInfos, SubmissionResult, SubmissionRow } from "@/features/submissions/api";
-import { prettyResult } from "@/features/submissions/utils";
+import { prettyResult, reportSucceeded, riskPalette } from "@/features/submissions/utils";
+import { RiskChip } from "@/features/submissions/components/AnalyzerReportCard";
 import { CopyIconButton } from "@/shared/components/CopyIconButton";
 import MailPreview from "@/shared/components/MailPreview";
 import { getRiskTone, normalizeScore } from "@/shared/lib/scoreUtils";
@@ -46,26 +47,6 @@ function Stat({ label, value, pct, hex }: { label: string; value: string | null;
   );
 }
 
-/** Risk label in the theme's error/warning palette (themes restyle Chip colours, so set them explicitly). */
-function RiskChip({ label, tone }: { label: string; tone: "error" | "warning" }) {
-  return (
-    <Chip
-      size="small"
-      variant="outlined"
-      label={label}
-      sx={(theme) => {
-        const c = theme.palette[tone];
-        return {
-          flexShrink: 0,
-          color: theme.palette.mode === "dark" ? c.light : c.dark,
-          borderColor: alpha(c.main, 0.5),
-          bgcolor: alpha(c.main, 0.1),
-        };
-      }}
-    />
-  );
-}
-
 export type OverviewTabProps = {
   row: SubmissionRow;
   reports: SubmissionAnalyzerReport[];
@@ -82,7 +63,7 @@ export function OverviewTab({ row, reports, ci, multi, observableCount, noAnalyz
   const topRisks = React.useMemo(
     () =>
       reports
-        .filter((r) => String(r.status).toLowerCase() === "success" && getRiskTone(r.score).label !== "Low risk")
+        .filter((r) => reportSucceeded(r) && getRiskTone(r.score).label !== "Low risk")
         .sort((a, b) => normalizeScore(b.score) - normalizeScore(a.score))
         .slice(0, 3),
     [reports]
@@ -124,7 +105,7 @@ export function OverviewTab({ row, reports, ci, multi, observableCount, noAnalyz
                       </Typography>
                     ) : null}
                   </Box>
-                  <RiskChip label={tone.label} tone={tone.label === "High risk" ? "error" : "warning"} />
+                  <RiskChip label={tone.label} tone={riskPalette(r.score)} />
                 </Stack>
               );
             })}

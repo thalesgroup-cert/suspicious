@@ -3,26 +3,23 @@ import {
   Alert,
   Box,
   Button,
-  CircularProgress,
   Drawer,
   Stack,
   Tab,
   Tabs,
   Typography,
 } from "@mui/material";
-import { DescriptionOutlined, ExpandMoreOutlined } from "@mui/icons-material";
-import { alpha, useTheme } from "@mui/material/styles";
+import { DescriptionOutlined } from "@mui/icons-material";
 import type { UseQueryResult } from "@tanstack/react-query";
 import type { SubmissionDetails, SubmissionRow } from "@/features/submissions/api";
 import type { CaseComment } from "@/features/comments/api";
 import { ResultChip, useResultHex } from "@/shared/components/ResultChip";
 import { SheetHeader } from "@/shared/components/SheetHeader";
 import { CopyIconButton } from "@/shared/components/CopyIconButton";
-import { AnalyzerReportCard } from "@/features/submissions/components/AnalyzerReportCard";
-import { UrlGroupList } from "@/features/submissions/components/UrlGroupList";
+import { AnalysisTab } from "@/features/submissions/components/AnalysisTab";
 import { OverviewTab } from "@/features/submissions/components/OverviewTab";
 import { CommentThread } from "@/features/comments/CommentThread";
-import { fmtDate, groupReportsByArtifact, kindLabel } from "@/features/submissions/utils";
+import { fmtDate, groupReportsByArtifact } from "@/features/submissions/utils";
 
 const BADGE_W = 132;
 
@@ -55,10 +52,6 @@ export type SubmissionDrawerProps = {
   comments: UseQueryResult<CaseComment[]>;
   onAddComment: (body: string) => Promise<unknown>;
   isAddingComment: boolean;
-  expandedGroups: Record<string, boolean>;
-  setExpandedGroups: React.Dispatch<React.SetStateAction<Record<string, boolean>>>;
-  expandedAnalyzerIds: Record<number, boolean>;
-  setExpandedAnalyzerIds: React.Dispatch<React.SetStateAction<Record<number, boolean>>>;
 };
 
 export function SubmissionDrawer({
@@ -70,13 +63,7 @@ export function SubmissionDrawer({
   comments: commentsQuery,
   onAddComment,
   isAddingComment,
-  expandedGroups,
-  setExpandedGroups,
-  expandedAnalyzerIds,
-  setExpandedAnalyzerIds,
 }: SubmissionDrawerProps) {
-  const theme = useTheme();
-  const isDark = theme.palette.mode === "dark";
   const analyzerReports = React.useMemo(
     () => detailsQuery.data?.analyzer_reports ?? [],
     [detailsQuery.data]
@@ -193,119 +180,15 @@ export function SubmissionDrawer({
               </Panel>
 
               <Panel value="analysis" tab={tab}>
-                {/* Analysis results: grouped by artifact (omitted when nothing ran and nothing reported) */}
-                {noAnalyzersRan && analyzerReports.length === 0 && !detailsQuery.isLoading && !detailsQuery.isError ? null : (
-                <Box sx={{ px: 2.25, pt: 2, pb: 1 }}>
-                  <Stack direction="row" sx={{ mb: 1.25, alignItems: "center", justifyContent: "space-between" }}>
-                    <Typography sx={{ fontSize: 10, fontWeight: 700, textTransform: "uppercase", letterSpacing: "0.08em", color: "text.disabled" }}>
-                      Analysis · {analyzerReports.length} report{analyzerReports.length !== 1 ? "s" : ""}
-                    </Typography>
-                    {reportGroups.length > 0 ? (
-                      <Stack direction="row" spacing={0.5}>
-                        <Button size="small"
-                          onClick={() => setExpandedGroups(Object.fromEntries(reportGroups.map((g) => [g.key, true])))}
-                          sx={{ textTransform: "none", fontWeight: 800, borderRadius: 2, fontSize: 11, py: 0.2, minWidth: 0 }}>
-                          Expand all
-                        </Button>
-                        <Button size="small" onClick={() => setExpandedGroups({})}
-                          sx={{ textTransform: "none", fontWeight: 800, borderRadius: 2, fontSize: 11, py: 0.2, minWidth: 0 }}>
-                          Collapse
-                        </Button>
-                      </Stack>
-                    ) : null}
-                  </Stack>
-
-                  {detailsQuery.isLoading ? (
-                    <Stack direction="row" spacing={1} sx={{ py: 2, alignItems: "center" }}>
-                      <CircularProgress size={16} />
-                      <Typography variant="caption" color="text.secondary">Loading analysis…</Typography>
-                    </Stack>
-                  ) : detailsQuery.isError ? (
-                    <Alert severity="warning" sx={{ mb: 1.5 }}>Could not load analysis details.</Alert>
-                  ) : !reportGroups.length ? (
-                    <Alert severity="info" sx={{ mb: 1.5 }}>No analysis reports yet.</Alert>
-                  ) : (
-                    <Stack spacing={1} sx={{ mb: 1.5 }}>
-                      {reportGroups.map((group) => {
-                        const isGroupOpen = !!expandedGroups[group.key];
-                        return (
-                          <Box key={group.key}
-                            sx={{
-                              borderRadius: 2.5,
-                              border: `1px solid ${alpha(theme.palette.divider, isDark ? 0.18 : 0.55)}`,
-                              background: isDark ? alpha("#fff", 0.02) : alpha(theme.palette.background.paper, 0.5),
-                              overflow: "hidden",
-                            }}
-                          >
-                            <Box
-                              role="button" tabIndex={0}
-                              onClick={() => setExpandedGroups((prev) => ({ ...prev, [group.key]: !prev[group.key] }))}
-                              onKeyDown={(e) => { if (e.key === "Enter" || e.key === " ") { e.preventDefault(); setExpandedGroups((prev) => ({ ...prev, [group.key]: !prev[group.key] })); } }}
-                              sx={{
-                                px: 1.75, py: 1.1,
-                                display: "flex", alignItems: "center", gap: 1.25,
-                                cursor: "pointer", userSelect: "none",
-                                background: isDark ? alpha("#fff", 0.03) : alpha(theme.palette.background.paper, 0.7),
-                                "&:hover": { background: isDark ? alpha("#fff", 0.05) : alpha(theme.palette.primary.main, 0.04) },
-                                transition: "background .15s ease",
-                              }}
-                            >
-                              <Box sx={{
-                                px: 0.9, py: 0.2, borderRadius: 1.25,
-                                fontSize: 10, fontWeight: 800, letterSpacing: "0.05em", textTransform: "uppercase",
-                                bgcolor: isDark ? alpha(theme.palette.primary.main, 0.15) : alpha(theme.palette.primary.main, 0.08),
-                                color: isDark ? alpha(theme.palette.primary.light, 0.9) : theme.palette.primary.main,
-                                border: `1px solid ${alpha(theme.palette.primary.main, isDark ? 0.25 : 0.18)}`,
-                                flexShrink: 0,
-                              }}>
-                                {kindLabel(group.kind)}
-                              </Box>
-                              <Typography variant="body2"
-                                sx={{ flex: 1, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap", fontSize: 12.5, fontWeight: 700 }}
-                                title={group.value}>
-                                {group.value}
-                              </Typography>
-                              <Typography variant="caption" color="text.disabled" sx={{ flexShrink: 0, fontSize: 11 }}>
-                                {group.reports.length} analyzer{group.reports.length !== 1 ? "s" : ""}
-                              </Typography>
-                              <ExpandMoreOutlined sx={{
-                                fontSize: 18, flexShrink: 0, opacity: 0.6,
-                                transform: isGroupOpen ? "rotate(180deg)" : "rotate(0deg)",
-                                transition: "transform .2s ease",
-                              }} />
-                            </Box>
-
-                            {isGroupOpen ? (
-                              <Box sx={{ p: 1.25 }}>
-                                <Stack spacing={0.9}>
-                                  {group.reports.map((report) => (
-                                    <AnalyzerReportCard
-                                      key={report.id}
-                                      report={report}
-                                      expanded={!!expandedAnalyzerIds[report.id]}
-                                      onToggle={() => setExpandedAnalyzerIds((prev) => ({ ...prev, [report.id]: !prev[report.id] }))}
-                                    />
-                                  ))}
-                                </Stack>
-                              </Box>
-                            ) : null}
-                          </Box>
-                        );
-                      })}
-                    </Stack>
-                  )}
-                </Box>
-                )}
-
-                {/* URL artifacts: grouped by domain */}
-                {urlArtifacts.length > 0 && (
-                  <Box sx={{ px: 2.25, pt: 2, pb: 1 }}>
-                    <Typography sx={{ fontSize: 10, fontWeight: 700, textTransform: "uppercase", letterSpacing: "0.08em", color: "text.disabled", mb: 1.25 }}>
-                      URLs · {urlArtifacts.length} artifact{urlArtifacts.length !== 1 ? "s" : ""}
-                    </Typography>
-                    <UrlGroupList submissionId={selectedIdNum} urls={urlArtifacts} />
-                  </Box>
-                )}
+                <AnalysisTab
+                  key={selectedRow.id}
+                  submissionId={selectedIdNum}
+                  reports={analyzerReports}
+                  urlArtifacts={urlArtifacts}
+                  isLoading={detailsQuery.isLoading}
+                  isError={detailsQuery.isError}
+                  hideReports={noAnalyzersRan && !detailsQuery.isLoading && !detailsQuery.isError}
+                />
               </Panel>
 
               <Panel value="comments" tab={tab}>

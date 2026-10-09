@@ -425,28 +425,31 @@ describe("SubmissionsPage - honest detail drawer", () => {
     // AI score and confidence both 0 read "Not classified" (design ruling), not the zero chips.
     expect(parseFloat(getComputedStyle(screen.getByText("Not classified")).fontSize)).toBeGreaterThanOrEqual(12);
     await showAnalysis();
-    expect(screen.queryByText(/^Analysis ·/)).not.toBeInTheDocument();
+    expect(screen.queryByRole("heading", { name: "Analysis" })).not.toBeInTheDocument();
   });
 
   it("with analyses there is no 'no analyzers' line and reports are counted", async () => {
     await open(3, [report(1), report(2)]);
     expect(screen.queryByText(/No analyzers ran/)).not.toBeInTheDocument();
     await showAnalysis();
-    expect(screen.getByText("Analysis · 2 reports")).toBeInTheDocument();
+    expect(screen.getByRole("heading", { level: 3, name: "Analysis" })).toBeInTheDocument();
+    expect(screen.getByText("2 reports")).toBeInTheDocument();
   });
 
   it("DONE with 0 tests but reports present: no 'no analyzers' line", async () => {
     await open(0, [report(1), report(2)]);
     expect(screen.queryByText(/No analyzers ran/)).not.toBeInTheDocument();
     await showAnalysis();
-    expect(screen.getByText("Analysis · 2 reports")).toBeInTheDocument();
+    expect(screen.getByRole("heading", { level: 3, name: "Analysis" })).toBeInTheDocument();
+    expect(screen.getByText("2 reports")).toBeInTheDocument();
   });
 
   it("keeps the 0-reports block when tests ran", async () => {
     await open(3, []);
     expect(screen.queryByText(/No analyzers ran/)).not.toBeInTheDocument();
     await showAnalysis();
-    expect(screen.getByText("Analysis · 0 reports")).toBeInTheDocument();
+    expect(screen.getByRole("heading", { level: 3, name: "Analysis" })).toBeInTheDocument();
+    expect(screen.getByText("0 reports")).toBeInTheDocument();
   });
 
   it.each(["NEW", "IN_PROGRESS", "FAILED"])("%s with 0 tests: no 'no analyzers' line, block kept", async (st) => {
