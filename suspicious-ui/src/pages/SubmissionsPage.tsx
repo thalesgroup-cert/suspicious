@@ -10,6 +10,7 @@ import {
   DialogActions,
   DialogContent,
   DialogTitle,
+  Collapse,
   Divider,
   Drawer,
   FormControl,
@@ -23,6 +24,7 @@ import {
   TableBody,
   TableCell,
   TableHead,
+  TablePagination,
   TableRow,
   TableSortLabel,
   TextField,
@@ -39,6 +41,7 @@ import {
   OpenInNewOutlined,
   ExpandMoreOutlined,
   RestartAltOutlined,
+  FilterList,
   DescriptionOutlined,
 } from "@mui/icons-material";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
@@ -47,8 +50,6 @@ import { useNavigate, useSearchParams } from "react-router";
 import { alpha } from "@mui/material/styles";
 import { useTheme } from "@mui/material/styles";
 import { getMe, type Me } from "@/api/auth";
-import { getProfile } from "@/features/profile/api";
-import { UserAvatar } from "@/features/profile/components/UserAvatar";
 import {
   challengeSubmission,
   getSubmissionDetails,
@@ -140,6 +141,9 @@ export default function SubmissionsPage() {
     sortField !== "created_at" ||
     sortDir !== "desc";
 
+  const activeCount = [status !== "ALL", type !== "ALL", result !== "ALL", from !== "", to !== "", sort !== "date_desc"].filter(Boolean).length;
+  const [filtersOpen, setFiltersOpen] = React.useState(activeCount > 0);
+
   const resetFilters = React.useCallback(() => {
     setQ("");
     setStatus("ALL");
@@ -168,13 +172,6 @@ export default function SubmissionsPage() {
   });
 
   const me: Me | undefined = React.useMemo(() => meQuery.data, [meQuery.data]);
-
-  const profileQuery = useQuery({
-    queryKey: ["profile"],
-    queryFn: getProfile,
-    enabled: !!me,
-    retry: false,
-  });
 
   const backendOrdering = backendOrderingFromSort;
 
@@ -408,25 +405,17 @@ export default function SubmissionsPage() {
         sx={{ mb: 2, justifyContent: "space-between" }}
       >
         <Stack spacing={0.4}>
-          <Stack direction="row" spacing={1.25} sx={{ alignItems: "center" }} >
-            <UserAvatar
-              avatar={profileQuery.data?.avatar}
-              initials={(me.username?.[0] ?? "U").toUpperCase()}
-              sx={{ width: 46, height: 46, fontWeight: 950 }}
-            />
-            <Box>
-              <Typography variant="pageTitle" component="h1">
-                Submissions
-              </Typography>
-              <Typography color="text.secondary">
-                Track your submissions and their analysis results.
-              </Typography>
-            </Box>
-          </Stack>
+          <Box>
+            <Typography variant="pageTitle" component="h1">
+              Submissions
+            </Typography>
+            <Typography color="text.secondary">
+              Track your submissions and their analysis results.
+            </Typography>
+          </Box>
 
           <Stack direction="row" spacing={1} sx={{ mt: 1, flexWrap: "wrap" }}>
-            <Chip icon={<AssignmentTurnedInOutlined />} label={`${total} shown`} variant="outlined" />
-            {qDebounced ? <Chip label={`Search: ${qDebounced}`} variant="outlined" /> : null}
+            <Chip icon={<AssignmentTurnedInOutlined />} label={filtersActive ? `${total} match` : `${total} total`} variant="outlined" />
             {(submissionsQuery.data?.count ?? 0) > rows.length ? (
               <Chip
                 label={`Loaded ${rows.length} of ${submissionsQuery.data?.count ?? 0}`}
@@ -457,7 +446,7 @@ export default function SubmissionsPage() {
       </Stack>
 
       <SoftCard sx={{ mb: 2 }}>
-        <CardContent sx={{ p: { xs: 2.25, md: 3 } }}>
+        <CardContent sx={{ p: { xs: 2, md: 2.5 }, "&:last-child": { pb: { xs: 2, md: 2.5 } } }}>
           <Stack spacing={1.5}>
             <Stack direction={{ xs: "column", md: "row" }} spacing={1.25} sx={{ alignItems: "stretch" }} >
               <TextField
@@ -476,151 +465,119 @@ export default function SubmissionsPage() {
                   },
                 }}
               />
-
-              <FormControl sx={{ minWidth: 180 }} fullWidth>
-                <InputLabel id="status-label">Status</InputLabel>
-                <Select
-                  labelId="status-label"
-                  label="Status"
-                  value={status}
-                  onChange={(e) => setStatus(e.target.value as SubmissionStatus | "ALL")}
+              <Button
+                variant="outlined"
+                color="inherit"
+                aria-expanded={filtersOpen}
+                onClick={() => setFiltersOpen((o) => !o)}
+                startIcon={<FilterList />}
+                sx={{ borderRadius: 2, textTransform: "none", fontWeight: 700, minWidth: 120, flexShrink: 0 }}
+              >
+                Filters
+                {activeCount > 0 ? <Chip size="small" label={activeCount} color="primary" sx={{ ml: 1, height: 20 }} /> : null}
+              </Button>
+              {filtersActive ? (
+                <Button
+                  variant="text"
+                  color="inherit"
+                  onClick={resetFilters}
+                  startIcon={<RestartAltOutlined />}
+                  sx={{ borderRadius: 2, textTransform: "none", fontWeight: 700, flexShrink: 0 }}
                 >
-                  {STATUS_OPTIONS.map((s) => (
-                    <MenuItem key={s} value={s}>{s === "ALL" ? "All" : s}</MenuItem>
-                  ))}
-                </Select>
-              </FormControl>
-
-              <FormControl sx={{ minWidth: 160 }} fullWidth>
-                <InputLabel id="type-label">Type</InputLabel>
-                <Select
-                  labelId="type-label"
-                  label="Type"
-                  value={type}
-                  onChange={(e) => setType(e.target.value as SubmissionType | "ALL")}
-                >
-                  {TYPE_OPTIONS.map((t) => (
-                    <MenuItem key={t} value={t}>{t === "ALL" ? "All" : t}</MenuItem>
-                  ))}
-                </Select>
-              </FormControl>
-
-              <FormControl sx={{ minWidth: 180 }} fullWidth>
-                <InputLabel id="result-label">Result</InputLabel>
-                <Select
-                  labelId="result-label"
-                  label="Result"
-                  value={result}
-                  onChange={(e) => setResult(e.target.value as SubmissionResult | "ALL")}
-                >
-                  {RESULT_OPTIONS.map((r) => (
-                    <MenuItem key={r} value={r}>{r === "ALL" ? "All results" : r}</MenuItem>
-                  ))}
-                </Select>
-              </FormControl>
+                  Reset
+                </Button>
+              ) : null}
             </Stack>
 
-            <Stack direction={{ xs: "column", md: "row" }} spacing={1.25} sx={{ alignItems: "stretch" }} >
-              <TextField
-                label="From"
-                type="date"
-                value={from}
-                onChange={(e) => setFrom(e.target.value)}
-                slotProps={{ inputLabel: { shrink: true } }}
-                fullWidth
-              />
-              <TextField
-                label="To"
-                type="date"
-                value={to}
-                onChange={(e) => setTo(e.target.value)}
-                slotProps={{ inputLabel: { shrink: true } }}
-                fullWidth
-              />
+            <Collapse in={filtersOpen} unmountOnExit>
+              <Stack spacing={1.25} sx={{ pt: 0.5 }}>
+                <Stack direction={{ xs: "column", md: "row" }} spacing={1.25} sx={{ alignItems: "stretch" }} >
+                  <FormControl fullWidth>
+                    <InputLabel id="status-label">Status</InputLabel>
+                    <Select
+                      labelId="status-label"
+                      label="Status"
+                      value={status}
+                      onChange={(e) => setStatus(e.target.value as SubmissionStatus | "ALL")}
+                    >
+                      {STATUS_OPTIONS.map((s) => (
+                        <MenuItem key={s} value={s}>{s === "ALL" ? "All" : s}</MenuItem>
+                      ))}
+                    </Select>
+                  </FormControl>
 
-              <FormControl sx={{ minWidth: 220 }} fullWidth>
-                <InputLabel id="sort-label">Sort</InputLabel>
-                <Select
-                  labelId="sort-label"
-                  label="Sort"
-                  value={sort}
-                  onChange={(e) => {
-                    const v = e.target.value as "date_desc" | "date_asc" | "id_desc" | "id_asc";
-                    setSort(v);
-                    if (v === "date_desc") { setSortField("created_at"); setSortDir("desc"); }
-                    else if (v === "date_asc") { setSortField("created_at"); setSortDir("asc"); }
-                    else if (v === "id_desc") { setSortField("id"); setSortDir("desc"); }
-                    else { setSortField("id"); setSortDir("asc"); }
-                    setPage(0);
-                  }}
-                >
-                  <MenuItem value="date_desc">Date (new → old)</MenuItem>
-                  <MenuItem value="date_asc">Date (old → new)</MenuItem>
-                  <MenuItem value="id_desc">ID (high → low)</MenuItem>
-                  <MenuItem value="id_asc">ID (low → high)</MenuItem>
-                </Select>
-              </FormControl>
+                  <FormControl fullWidth>
+                    <InputLabel id="type-label">Type</InputLabel>
+                    <Select
+                      labelId="type-label"
+                      label="Type"
+                      value={type}
+                      onChange={(e) => setType(e.target.value as SubmissionType | "ALL")}
+                    >
+                      {TYPE_OPTIONS.map((t) => (
+                        <MenuItem key={t} value={t}>{t === "ALL" ? "All" : t}</MenuItem>
+                      ))}
+                    </Select>
+                  </FormControl>
 
-              <Tooltip title={filtersActive ? "Reset filters" : "No filters applied"}>
-                <span>
-                  <Button
-                    variant="outlined"
-                    color="inherit"
-                    disabled={!filtersActive}
-                    onClick={resetFilters}
-                    startIcon={<RestartAltOutlined />}
-                    sx={{ borderRadius: 2, textTransform: "none", fontWeight: 900, minWidth: 140 }}
-                  >
-                    Reset
-                  </Button>
-                </span>
-              </Tooltip>
-            </Stack>
+                  <FormControl fullWidth>
+                    <InputLabel id="result-label">Result</InputLabel>
+                    <Select
+                      labelId="result-label"
+                      label="Result"
+                      value={result}
+                      onChange={(e) => setResult(e.target.value as SubmissionResult | "ALL")}
+                    >
+                      {RESULT_OPTIONS.map((r) => (
+                        <MenuItem key={r} value={r}>{r === "ALL" ? "All results" : r}</MenuItem>
+                      ))}
+                    </Select>
+                  </FormControl>
+                </Stack>
 
-            <Divider sx={{ opacity: 0.25 }} />
+                <Stack direction={{ xs: "column", md: "row" }} spacing={1.25} sx={{ alignItems: "stretch" }} >
+                  <TextField
+                    label="From"
+                    type="date"
+                    value={from}
+                    onChange={(e) => setFrom(e.target.value)}
+                    slotProps={{ inputLabel: { shrink: true } }}
+                    fullWidth
+                  />
+                  <TextField
+                    label="To"
+                    type="date"
+                    value={to}
+                    onChange={(e) => setTo(e.target.value)}
+                    slotProps={{ inputLabel: { shrink: true } }}
+                    fullWidth
+                  />
 
-            <Stack
-              direction={{ xs: "column", md: "row" }}
-              spacing={1}
-              sx={{ justifyContent: "space-between", alignItems: { md: "center" } }}
->
-              <Typography variant="body2" color="text.secondary">
-                {total === 0 ? "No results" : `Showing ${start + 1}-${end} of ${total}`}
-              </Typography>
-
-              <Stack direction="row" spacing={1} sx={{ alignItems: "center" }} >
-                <FormControl sx={{ width: 140 }}>
-                  <InputLabel id="pagesize-label">Rows</InputLabel>
-                  <Select
-                    labelId="pagesize-label"
-                    label="Rows"
-                    value={pageSize}
-                    onChange={(e) => setPageSize(Number(e.target.value))}
-                  >
-                    {[10, 20, 50].map((n) => (
-                      <MenuItem key={n} value={n}>{n}</MenuItem>
-                    ))}
-                  </Select>
-                </FormControl>
-
-                <Button
-                  variant="outlined"
-                  disabled={page === 0}
-                  onClick={() => setPage((p) => Math.max(0, p - 1))}
-                  sx={{ borderRadius: 2, textTransform: "none", fontWeight: 900 }}
-                >
-                  Prev
-                </Button>
-                <Button
-                  variant="outlined"
-                  disabled={end >= total}
-                  onClick={() => setPage((p) => p + 1)}
-                  sx={{ borderRadius: 2, textTransform: "none", fontWeight: 900 }}
-                >
-                  Next
-                </Button>
+                  <FormControl fullWidth>
+                    <InputLabel id="sort-label">Sort</InputLabel>
+                    <Select
+                      labelId="sort-label"
+                      label="Sort"
+                      value={sort}
+                      onChange={(e) => {
+                        const v = e.target.value as "date_desc" | "date_asc" | "id_desc" | "id_asc";
+                        setSort(v);
+                        if (v === "date_desc") { setSortField("created_at"); setSortDir("desc"); }
+                        else if (v === "date_asc") { setSortField("created_at"); setSortDir("asc"); }
+                        else if (v === "id_desc") { setSortField("id"); setSortDir("desc"); }
+                        else { setSortField("id"); setSortDir("asc"); }
+                        setPage(0);
+                      }}
+                    >
+                      <MenuItem value="date_desc">Date (new → old)</MenuItem>
+                      <MenuItem value="date_asc">Date (old → new)</MenuItem>
+                      <MenuItem value="id_desc">ID (high → low)</MenuItem>
+                      <MenuItem value="id_asc">ID (low → high)</MenuItem>
+                    </Select>
+                  </FormControl>
+                </Stack>
               </Stack>
-            </Stack>
+            </Collapse>
           </Stack>
         </CardContent>
       </SoftCard>
@@ -797,6 +754,22 @@ export default function SubmissionsPage() {
           )}
         </CardContent>
       </SoftCard>
+
+      {/* ponytail: client-side paging over the first 100 fetched rows (page_size: 100) */}
+      <TablePagination
+        component="div"
+        count={total}
+        page={page}
+        rowsPerPage={pageSize}
+        rowsPerPageOptions={[10, 25, 50]}
+        onPageChange={(_, p) => setPage(p)}
+        onRowsPerPageChange={(e) => { setPageSize(Number(e.target.value)); setPage(0); }}
+        labelDisplayedRows={({ from: f, to: t, count }) => `${f}–${t} of ${count}`}
+        sx={{
+          "& .MuiTablePagination-toolbar": { flexWrap: "wrap", justifyContent: { xs: "center", sm: "flex-end" }, px: 0 },
+          "& .MuiTablePagination-spacer": { display: { xs: "none", sm: "block" } },
+        }}
+      />
 
       <Drawer
         anchor="right"

@@ -1,5 +1,5 @@
 import { describe, it, expect, vi, beforeEach } from "vitest";
-import { screen, waitFor } from "@testing-library/react";
+import { screen, waitFor, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { renderWithProviders } from "@/test/utils";
 import { fixtureMe, fixtureSubmissionsList } from "@/test/fixtures";
@@ -153,6 +153,7 @@ describe("SubmissionsPage - Test Suite", () => {
 });
 
 describe("SubmissionsPage - detail drawer header", () => {
+  beforeEach(() => stub(false));
   it("is sticky so Close stays reachable while the content scrolls", async () => {
     vi.mocked(getMe).mockResolvedValue(fixtureMe);
     vi.mocked(listSubmissions).mockResolvedValue(fixtureSubmissionsList as never);
@@ -204,5 +205,92 @@ describe("SubmissionsPage - phone layout", () => {
     stub(false);
     renderWithProviders(<SubmissionsPage />, { initialPath: "/submissions" });
     expect(await screen.findByRole("table")).toBeInTheDocument();
+  });
+});
+
+describe("SubmissionsPage - filters, pager, header", () => {
+  const many = (n: number) => ({
+    ...fixtureSubmissionsList,
+    count: n,
+    results: Array.from({ length: n }, (_, i) => ({
+      ...fixtureSubmissionsList.results[0],
+      id: 1000 + i,
+      artifact: `row-${i}@example.com`,
+      is_challengeable: false,
+    })),
+  });
+  beforeEach(() => {
+    stub(false);
+    vi.mocked(getMe).mockResolvedValue(fixtureMe);
+    vi.mocked(listSubmissions).mockResolvedValue(many(99) as never);
+  });
+  const open = async () => {
+    renderWithProviders(<SubmissionsPage />, { initialPath: "/submissions" });
+    return screen.findByRole("button", { name: /^filters/i });
+  };
+
+  it("collapses everything but search behind a Filters button", async () => {
+    const btn = await open();
+    expect(screen.getByPlaceholderText(/id, status, artifact/i)).toBeInTheDocument();
+    expect(screen.queryByLabelText("Status")).toBeNull();
+    await userEvent.click(btn);
+    for (const l of ["Status", "Type", "Result", "From", "To", "Sort"]) {
+      expect(await screen.findByLabelText(l)).toBeInTheDocument();
+    }
+  });
+
+  it("counts active filters on the button; Reset appears and clears", async () => {
+    const btn = await open();
+    expect(screen.queryByRole("button", { name: /reset/i })).toBeNull();
+    await userEvent.click(btn);
+    await userEvent.click(await screen.findByLabelText("Type"));
+    await userEvent.click(await screen.findByRole("option", { name: "MAIL" }));
+    expect(screen.getByRole("button", { name: /^filters/i })).toHaveTextContent("1");
+    await userEvent.click(await screen.findByRole("button", { name: /reset/i }));
+    await waitFor(() => expect(screen.queryByRole("button", { name: /reset/i })).toBeNull());
+    expect(screen.getByRole("button", { name: /^filters/i })).not.toHaveTextContent("1");
+  });
+
+  it("pager sits below the table with 10/25/50 and x-y of N", async () => {
+    await open();
+    const table = await screen.findByRole("table");
+    expect(screen.getByText("1–10 of 99")).toBeInTheDocument();
+    const pager = screen.getByText("1–10 of 99").closest(".MuiTablePagination-root")!;
+    expect(table.compareDocumentPosition(pager) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
+    expect(table.contains(pager)).toBe(false);
+    await userEvent.click(within(pager as HTMLElement).getByRole("combobox"));
+    expect((await screen.findAllByRole("option")).map((o) => o.textContent)).toEqual(["10", "25", "50"]);
+  });
+
+  it("changing rows per page shows 25 rows on page 1", async () => {
+    await open();
+    await screen.findByRole("table");
+    await userEvent.click(screen.getByRole("button", { name: /next page/i }));
+    expect(await screen.findByText("11–20 of 99")).toBeInTheDocument();
+    const pager = screen.getByText("11–20 of 99").closest(".MuiTablePagination-root") as HTMLElement;
+    await userEvent.click(within(pager).getByRole("combobox"));
+    await userEvent.click(await screen.findByRole("option", { name: "25" }));
+    expect(await screen.findByText("1–25 of 99")).toBeInTheDocument();
+    expect(screen.getAllByRole("row")).toHaveLength(26);
+  });
+
+  it("a filter change returns to page 1", async () => {
+    const btn = await open();
+    await screen.findByRole("table");
+    await userEvent.click(screen.getByRole("button", { name: /next page/i }));
+    expect(await screen.findByText("11–20 of 99")).toBeInTheDocument();
+    await userEvent.click(btn);
+    await userEvent.click(await screen.findByLabelText("Type"));
+    await userEvent.click(await screen.findByRole("option", { name: "MAIL" }));
+    expect(await screen.findByText(/^1–10 of/)).toBeInTheDocument();
+  });
+
+  it("header chip says total, then match when searching; no avatar", async () => {
+    await open();
+    expect(await screen.findByText("99 total")).toBeInTheDocument();
+    expect(screen.queryByText("E")).toBeNull();
+    await userEvent.type(screen.getByPlaceholderText(/id, status, artifact/i), "row-1");
+    expect(await screen.findByText(/^\d+ match$/)).toBeInTheDocument();
+    expect(screen.queryByText(/^Search:/)).toBeNull();
   });
 });
