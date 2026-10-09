@@ -1,5 +1,5 @@
 import * as React from "react";
-import { CssBaseline, ThemeProvider } from "@mui/material";
+import { CssBaseline, GlobalStyles, ThemeProvider } from "@mui/material";
 import { themes, type ThemeName, getSeasonalThemeName } from "./themes";
 
 // Storage keys
@@ -423,6 +423,17 @@ export function AppThemeProvider({ children }: { children: React.ReactNode }) {
     <ThemeContext.Provider value={value}>
       <ThemeProvider theme={theme}>
         <CssBaseline enableColorScheme />
+        {/* MUI transitions ignore prefers-reduced-motion; this is the one place that honours it. */}
+        <GlobalStyles styles={{
+          "@media (prefers-reduced-motion: reduce)": {
+            "*, *::before, *::after": {
+              animationDuration: "0.01ms !important",
+              animationIterationCount: "1 !important",
+              transitionDuration: "0.01ms !important",
+              scrollBehavior: "auto !important",
+            },
+          },
+        }} />
         {children}
       </ThemeProvider>
     </ThemeContext.Provider>
