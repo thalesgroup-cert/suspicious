@@ -164,6 +164,15 @@ describe("SubmissionsPage - detail drawer header", () => {
     const header = await screen.findByTestId("sheet-header");
     expect(getComputedStyle(header).position).toBe("sticky");
   });
+
+  it("opened from a URL (no opener) focus lands inside the named dialog", async () => {
+    vi.mocked(getMe).mockResolvedValue(fixtureMe);
+    vi.mocked(listSubmissions).mockResolvedValue(fixtureSubmissionsList as never);
+    const id = (fixtureSubmissionsList as { results: { id: number }[] }).results[0].id;
+    renderWithProviders(<SubmissionsPage />, { initialPath: `/submissions?open=${id}` });
+    const dialog = await screen.findByRole("dialog", { name: new RegExp(`#${id}`) });
+    await waitFor(() => expect(dialog.contains(document.activeElement)).toBe(true));
+  });
 });
 
 describe("SubmissionsPage - phone layout", () => {
@@ -201,6 +210,17 @@ describe("SubmissionsPage - phone layout", () => {
     expect(screen.getByRole("link", { name: "102" })).toBeInTheDocument();
     await userEvent.click(screen.getByRole("link", { name: "101" }));
     expect(await screen.findByTestId("sheet-header")).toBeInTheDocument();
+  });
+
+  it("closing a drawer opened from an ID link returns focus to that link", async () => {
+    stub(true);
+    renderWithProviders(<SubmissionsPage />, { initialPath: "/submissions" });
+    const link = await screen.findByRole("link", { name: "101" });
+    await userEvent.click(link);
+    await screen.findByRole("dialog", { name: /#101/ });
+    await userEvent.click(screen.getAllByRole("button", { name: /close/i })[0]);
+    await waitFor(() => expect(screen.queryByRole("dialog")).toBeNull());
+    await waitFor(() => expect(screen.getByRole("link", { name: "101" })).toHaveFocus());
   });
 
   it("keeps the table on desktop", async () => {

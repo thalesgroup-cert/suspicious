@@ -119,6 +119,15 @@ export function SubmissionDrawer({
   // The tab belongs to the submission it was picked on: another submission opens on Overview.
   const [tabState, setTabState] = React.useState<{ id?: number; tab: TabKey }>({ tab: "overview" });
   const tab: TabKey = tabState.id === selectedRow?.id ? tabState.tab : "overview";
+  // Opened from a URL there is no opener and the trap lands on the dialog root: name the dialog by focusing its heading.
+  const headingRef = React.useRef<HTMLHeadingElement>(null);
+  const hasRow = !!selectedRow;
+  React.useEffect(() => {
+    if (!open || !hasRow) return;
+    const h = headingRef.current;
+    const paper = h?.closest('[role="dialog"]');
+    if (h && paper && !paper.contains(document.activeElement)) h.focus();
+  }, [open, hasRow]);
   const tabLabel = (t: TabKey) =>
     t === "overview" ? "Overview"
     : t === "analysis" ? (detailsQuery.data ? `Analysis (${analyzerReports.length})` : "Analysis")
@@ -131,6 +140,9 @@ export function SubmissionDrawer({
         onClose={onClose}
         slotProps={{
           paper: {
+            role: "dialog",
+            "aria-modal": true,
+            "aria-labelledby": "submission-drawer-title",
             sx: (theme) => ({
               width: { xs: "100%", sm: 620 },
               p: 0,
@@ -154,7 +166,7 @@ export function SubmissionDrawer({
               <Box aria-hidden data-testid="verdict-accent" sx={{ position: "absolute", top: 0, left: 0, right: 0, height: 3, bgcolor: verdictHex ?? "divider" }} />
               <Stack direction="row" spacing={1} sx={{ alignItems: "center", justifyContent: "space-between" }}>
                 <Stack direction="row" spacing={0.5} sx={{ alignItems: "center", minWidth: 0 }}>
-                  <Typography variant="h2" component="h2">#{selectedRow.id}</Typography>
+                  <Typography ref={headingRef} id="submission-drawer-title" tabIndex={-1} variant="h2" component="h2" sx={{ outline: "none" }}>#{selectedRow.id}</Typography>
                   <CopyIconButton text={String(selectedRow.id)} title="Copy ID" />
                   <StepButton label="Previous submission" target={prevId} onNavigate={onNavigate}><ChevronLeft fontSize="small" /></StepButton>
                   <StepButton label="Next submission" target={nextId} onNavigate={onNavigate}><ChevronRight fontSize="small" /></StepButton>
@@ -213,7 +225,11 @@ export function SubmissionDrawer({
                   observableCount={detailsQuery.isLoading ? 0 : reportGroups.length}
                   noAnalyzersRan={noAnalyzersRan}
                   verdictHex={verdictHex}
-                  onSeeAll={() => setTabState({ id: selectedRow.id, tab: "analysis" })}
+                  onSeeAll={() => {
+                    setTabState({ id: selectedRow.id, tab: "analysis" });
+                    // The button that was focused unmounts with the Overview panel; keep focus in the tablist.
+                    requestAnimationFrame(() => document.getElementById("submission-tab-analysis")?.focus());
+                  }}
                 />
               </Panel>
 

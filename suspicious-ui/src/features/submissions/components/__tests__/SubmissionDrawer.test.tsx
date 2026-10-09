@@ -549,3 +549,83 @@ describe("SubmissionDrawer - actions menu and neighbours", () => {
     delete (navigator as { clipboard?: unknown }).clipboard; // back to the prototype's own clipboard
   });
 });
+
+describe("SubmissionDrawer - accessibility", () => {
+  const withStatuses = [
+    ...reports49,
+    rep(90, "Gone", 1, GROUPS[0], "DOMAIN", "Deleted"),
+    rep(91, "Busy", 1, GROUPS[1], "DOMAIN", "InProgress"),
+    rep(92, "Waits", 1, GROUPS[2], "DOMAIN", "Waiting"),
+    rep(93, "Blank", 1, GROUPS[3], "DOMAIN", ""),
+  ];
+  const props = () => multi({
+    details: { data: { ...multiRow, analyzer_reports: withStatuses, case_infos: ci() }, isLoading: false, isError: false } as never,
+  });
+  const levels = () => screen.queryAllByRole("heading").map((h) => Number(h.tagName[1]));
+
+  it("is a named modal dialog labelled by the ID heading", async () => {
+    renderWithProviders(<SubmissionDrawer {...props()} />);
+    const dialog = await screen.findByRole("dialog", { name: /#18/ });
+    expect(dialog).toHaveAttribute("aria-modal", "true");
+    expect(dialog).toHaveAttribute("aria-labelledby", screen.getByRole("heading", { level: 2, name: "#18" }).id);
+  });
+
+  it("heading outline: h2 then h3 on every tab, no skipped levels, no styling-only headings", async () => {
+    renderWithProviders(<SubmissionDrawer {...props()} />);
+    await screen.findByRole("dialog");
+    for (const tab of [/^Overview/, /^Analysis/, /^Comments/]) {
+      await userEvent.click(screen.getByRole("tab", { name: tab }));
+      const ls = levels();
+      expect(ls[0]).toBe(2);
+      ls.forEach((l, i) => i > 0 && expect(l - ls[i - 1]).toBeLessThanOrEqual(1));
+      expect(ls.filter((l) => l < 2 || l > 3)).toEqual([]);
+    }
+    await userEvent.click(screen.getByRole("tab", { name: /^Overview/ }));
+    // Stat values use the h3 look but are not headings.
+    expect(screen.queryByRole("heading", { name: "9/10" })).toBeNull();
+  });
+
+  it("focus moves into the dialog on open", async () => {
+    renderWithProviders(<SubmissionDrawer {...props()} />);
+    const dialog = await screen.findByRole("dialog", { name: /#18/ });
+    await waitFor(() => expect(dialog.contains(document.activeElement)).toBe(true));
+  });
+
+  it("exactly one tab panel is exposed, and the arrow keys move between tabs", async () => {
+    renderWithProviders(<SubmissionDrawer {...props()} />);
+    await screen.findByRole("dialog");
+    expect(screen.getAllByRole("tabpanel")).toHaveLength(1);
+    screen.getByRole("tab", { name: /^Overview/ }).focus();
+    await userEvent.keyboard("{ArrowRight}");
+    expect(screen.getByRole("tab", { name: /^Analysis/ })).toHaveFocus();
+  });
+
+  it("See all in Analysis switches tab and focuses it", async () => {
+    renderWithProviders(<SubmissionDrawer {...props()} />);
+    await userEvent.click(await screen.findByRole("button", { name: /^See all/ }));
+    await waitFor(() => expect(screen.getByRole("tab", { name: /^Analysis/ })).toHaveFocus());
+    expect(screen.getAllByRole("tabpanel")).toHaveLength(1);
+  });
+
+  it("every button in the dialog has an accessible name, on every tab with groups expanded", async () => {
+    renderWithProviders(<SubmissionDrawer {...props()} />);
+    const dialog = await screen.findByRole("dialog");
+    const check = () => within(dialog).getAllByRole("button").forEach((b) => expect(b).toHaveAccessibleName());
+    check();
+    await userEvent.click(screen.getByRole("tab", { name: /^Analysis/ }));
+    await userEvent.click(await screen.findByRole("button", { name: "Expand all groups" }));
+    check();
+    await userEvent.click(screen.getByRole("tab", { name: /^Comments/ }));
+    check();
+  });
+
+  it("every analyzer row says its risk or status in text", async () => {
+    renderWithProviders(<SubmissionDrawer {...props()} />);
+    await userEvent.click(await screen.findByRole("tab", { name: /^Analysis/ }));
+    await userEvent.click(await screen.findByRole("button", { name: "Expand all groups" }));
+    const rows = screen.getAllByRole("button").filter((b) => b.getAttribute("aria-controls")?.length && b.getAttribute("role") !== "tab"
+      && /Low|High|Medium|Busy|Waits|Blank|Gone|FailedTen/.test(b.textContent ?? "") && !/g\d\.example/.test(b.textContent ?? ""));
+    expect(rows.length).toBeGreaterThan(10);
+    rows.forEach((r) => expect(r.textContent).toMatch(/risk|Needs attention|Failed|Running|Queued|Expired|Unknown/i));
+  });
+});
