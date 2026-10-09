@@ -251,7 +251,10 @@ export default function SubmitPage() {
 
   // Handlers
 
+  const emailPending = !suspiciousEmailEnv && configQuery.isPending;
+
   async function copyEmail() {
+    if (emailPending) return;
     try {
       await navigator.clipboard.writeText(suspiciousEmail);
       enqueueSnackbar("Email address copied.", { variant: "info" });
@@ -651,6 +654,7 @@ export default function SubmitPage() {
               <Button
                 variant="outlined"
                 onClick={copyEmail}
+                disabled={emailPending}
                 startIcon={<ContentCopyOutlined />}
                 sx={{
                   mt: 0.5,
@@ -660,7 +664,7 @@ export default function SubmitPage() {
                 }}
                 fullWidth
               >
-                {suspiciousEmail}
+                {emailPending ? "Loading address…" : suspiciousEmail}
               </Button>
             </SidePanel>
           </Stack>

@@ -1,4 +1,4 @@
-import { describe, it, expect, vi, beforeEach } from "vitest";
+import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
 import { screen, waitFor } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { renderWithProviders, mockMe } from "@/test/utils";
@@ -130,6 +130,7 @@ describe("SubmitPage", () => {
     );
   });
   describe("file limit", () => {
+    afterEach(() => vi.unstubAllEnvs());
     const cfg = (max?: number) => ({
       data: { status: "success", data: { suspicious_email: "s@corp.test", ...(max ? { max_file_bytes: max } : {}) } },
     });
@@ -141,7 +142,11 @@ describe("SubmitPage", () => {
       renderSubmit();
       await screen.findByText(/up to 1 KB/);
       await userEvent.setup({ applyAccept: false }).upload(fileInput(), mk(2048, "big.eml"));
-      expect(await screen.findByText("big.eml is 2 KB; the limit is 1 KB.")).toBeInTheDocument();
+      await waitFor(() =>
+        expect(
+          screen.getAllByRole("alert").some((a) => a.textContent === "big.eml is 2 KB; the limit is 1 KB.")
+        ).toBe(true)
+      );
       expect(screen.queryByRole("button", { name: "Remove" })).not.toBeInTheDocument();
     });
 
@@ -168,6 +173,63 @@ describe("SubmitPage", () => {
       expect(screen.queryByText(/undefined/)).not.toBeInTheDocument();
       await userEvent.setup().upload(fileInput(), mk(10 * 1024 * 1024, "huge.eml"));
       expect(await screen.findByText("huge.eml")).toBeInTheDocument();
+    });
+
+    it("rejects 1025 bytes when the limit is 1024", async () => {
+      mockApiGet.mockResolvedValue(cfg(1024) as never);
+      renderSubmit();
+      await screen.findByText(/up to 1 KB/);
+      await userEvent.setup().upload(fileInput(), mk(1025, "over.eml"));
+      expect(await screen.findByText(/over.eml is 1 KB; the limit is 1 KB\./)).toBeInTheDocument();
+      expect(screen.queryByRole("button", { name: "Remove" })).not.toBeInTheDocument();
+    });
+
+    it("clears the rejection on the next good drop and on Remove", async () => {
+      mockApiGet.mockResolvedValue(cfg(1024) as never);
+      renderSubmit();
+      await screen.findByText(/up to 1 KB/);
+      const user = userEvent.setup();
+      await user.upload(fileInput(), mk(2048, "big.eml"));
+      await screen.findByText(/big.eml is 2 KB/);
+      await user.upload(fileInput(), mk(10, "ok.eml"));
+      await screen.findByText("ok.eml");
+      expect(screen.queryByText(/big.eml is/)).not.toBeInTheDocument();
+      await user.upload(fileInput(), mk(2048, "big2.eml"));
+      await screen.findByText(/big2.eml is 2 KB/);
+      await user.click(screen.getByRole("button", { name: "Remove" }));
+      expect(screen.queryByText(/big2.eml is/)).not.toBeInTheDocument();
+    });
+
+    it("with a failing config: dropzone works, no 'undefined', fallback email copyable", async () => {
+      vi.stubEnv("VITE_SUSPICIOUS_EMAIL", ""); // .env sets it; these cases need it unset
+      mockApiGet.mockRejectedValue(new Error("boom") as never);
+      const user = userEvent.setup();
+      const write = vi.spyOn(navigator.clipboard, "writeText").mockResolvedValue();
+      renderSubmit();
+      const btn = await screen.findByRole("button", { name: "suspicious@example.com" });
+      expect(btn).toBeEnabled();
+      expect(screen.queryByText(/undefined/)).not.toBeInTheDocument();
+      await user.upload(fileInput(), mk(3 * 1024 * 1024, "m.eml"));
+      expect(await screen.findByText("m.eml")).toBeInTheDocument();
+      await user.click(btn);
+      expect(write).toHaveBeenCalledWith("suspicious@example.com");
+    });
+
+    it("disables the email copy while config is pending, then copies the resolved address", async () => {
+      vi.stubEnv("VITE_SUSPICIOUS_EMAIL", ""); // .env sets it; these cases need it unset
+      let resolve!: (v: unknown) => void;
+      mockApiGet.mockReturnValue(new Promise((r) => (resolve = r)) as never);
+      const user = userEvent.setup();
+      const write = vi.spyOn(navigator.clipboard, "writeText").mockResolvedValue();
+      renderSubmit();
+      const loading = await screen.findByRole("button", { name: "Loading address…" });
+      expect(loading).toBeDisabled();
+      resolve(cfg(1024).data && cfg(1024));
+      const btn = await screen.findByRole("button", { name: "s@corp.test" });
+      expect(btn).toBeEnabled();
+      await user.click(btn);
+      expect(write).toHaveBeenCalledWith("s@corp.test");
+      expect(write).toHaveBeenCalledTimes(1);
     });
 
     it("shows the limit in the helper text", async () => {
