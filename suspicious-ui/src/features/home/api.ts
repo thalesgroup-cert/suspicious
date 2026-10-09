@@ -11,6 +11,7 @@ export type HomeSummary = {
   show_scope_modal: boolean;
   monthly: {
     everyone_items?: number;
+    user_items?: number;
     scope_items?: number;
     scope_name?: string | null;
   };
