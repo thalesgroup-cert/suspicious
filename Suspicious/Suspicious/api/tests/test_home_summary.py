@@ -55,3 +55,18 @@ class HomeSummaryTests(APITestCase):
         data = self._get(user).data
         self.assertTrue(data["show_scope_modal"])
         self.assertIn("user_items", data["monthly"])
+        self.assertEqual(
+            data["spotlight"]["description"],
+            "Choose your scope to see activity for it.",
+        )
+        self.assertEqual(data["spotlight"]["cta_path"], "/dashboard")
+
+    def test_regular_user_singular(self):
+        user = User.objects.create_user("u5", password="x")
+        UserCasesMonthlyStats.objects.create(
+            user=user, month="10", year="2026", total_cases=1, safe_cases=1
+        )
+        self.assertEqual(
+            self._get(user).data["spotlight"]["description"],
+            "You have submitted 1 item this month.",
+        )
