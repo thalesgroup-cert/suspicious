@@ -42,4 +42,13 @@ describe("parseIndicators", () => {
     expect(parseIndicators("")).toEqual([]);
     expect(parseIndicators(" \n\t ")).toEqual([]);
   });
+  it("requires canonical IPv4 octets", () => {
+    expect(rows("01.2.3.4")).toEqual([["01.2.3.4", null]]);
+    expect(rows("1.2.3.4")).toEqual([["1.2.3.4", "ip"]]);
+  });
+  it("classifies bare IPv6 literals as ip", () => {
+    expect(rows("2001:db8::1")).toEqual([["2001:db8::1", "ip"]]);
+    expect(rows("not:an:address")).toEqual([["not:an:address", null]]);
+    expect(rows("http://host:8080/")).toEqual([["http://host:8080/", "url"]]);
+  });
 });

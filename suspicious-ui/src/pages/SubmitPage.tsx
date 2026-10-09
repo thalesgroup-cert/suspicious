@@ -229,6 +229,8 @@ export default function SubmitPage() {
   const skippedCount = indicatorsPreview.length - validCount;
   const maxIndicators = configQuery.data?.maxIndicators ?? 100;
   const overLimit = validCount > maxIndicators;
+  const hasUrl = indicatorsPreview.some((p) => p.type === "url");
+  // "skipped" counts groups of consecutive unrecognised words, not single words.
 
   const loadingOpen =
     fileMutation.isPending ||
@@ -564,16 +566,25 @@ export default function SubmitPage() {
                   ) : null}
 
                   {indicatorsText.trim() ? (
-                    <Typography
-                      variant="body2"
-                      color={overLimit ? "error" : "text.secondary"}
-                    >
-                      {overLimit
-                        ? `${validCount} indicators; the limit is ${maxIndicators}.`
-                        : validCount === 0
-                          ? "Nothing recognisable yet. Add a URL, domain, IP or hash."
-                          : `${validCount} will be submitted${skippedCount ? ` · ${skippedCount} skipped` : ""}`}
-                    </Typography>
+                    <Stack spacing={0.25}>
+                      <Typography
+                        id="indicators-summary"
+                        role="status"
+                        variant="body2"
+                        color={overLimit ? "error" : "text.secondary"}
+                      >
+                        {overLimit
+                          ? `${validCount} indicators; the limit is ${maxIndicators}.`
+                          : validCount === 0
+                            ? "Nothing recognisable yet. Add a URL, domain, IP or hash."
+                            : `${hasUrl ? "up to " : ""}${validCount} will be submitted${skippedCount ? ` · ${skippedCount} skipped` : ""}`}
+                      </Typography>
+                      {hasUrl && !overLimit && validCount > 0 ? (
+                        <Typography role="status" variant="caption" color="text.secondary">
+                          Links to private or internal addresses are skipped, and wrapped links (SafeLinks, URLDefense) add their real target.
+                        </Typography>
+                      ) : null}
+                    </Stack>
                   ) : null}
 
                   <TextField
@@ -592,6 +603,11 @@ export default function SubmitPage() {
                         validCount === 0 ||
                         overLimit ||
                         indicatorsMutation.isPending
+                      }
+                      aria-describedby={
+                        (overLimit || validCount === 0) && indicatorsText.trim()
+                          ? "indicators-summary"
+                          : undefined
                       }
                       onClick={() => indicatorsMutation.mutate()}
                       sx={{

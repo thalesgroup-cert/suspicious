@@ -277,6 +277,26 @@ describe("SubmitPage", () => {
       expect(screen.getByRole("button", { name: "Submit" })).toBeDisabled();
     });
 
+    it("says 'up to' with a note only when a URL row is present", async () => {
+      const { user, field } = await open();
+      await user.click(field);
+      await user.paste("8.8.8.8");
+      const status = await screen.findByText("1 will be submitted");
+      expect(status).toHaveAttribute("role", "status");
+      expect(screen.queryByText(/Links to private or internal/)).not.toBeInTheDocument();
+      await user.type(field, " http://evil.example/x");
+      expect(await screen.findByText("up to 2 will be submitted")).toBeInTheDocument();
+      expect(screen.getByText(/Links to private or internal addresses are skipped/)).toBeInTheDocument();
+    });
+
+    it("links the disabled Submit to the summary", async () => {
+      const { user, field } = await open();
+      await user.click(field);
+      await user.paste("just words");
+      const status = await screen.findByText(/Nothing recognisable/);
+      expect(screen.getByRole("button", { name: "Submit" })).toHaveAttribute("aria-describedby", status.id);
+    });
+
     it("uses the configured limit and ignores skipped rows when counting", async () => {
       mockApiGet.mockResolvedValue(cfg(2) as never);
       const { user, field } = await open();
