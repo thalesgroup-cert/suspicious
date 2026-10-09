@@ -30,7 +30,6 @@ import {
   TextField,
   ToggleButton,
   ToggleButtonGroup,
-  Tooltip,
   Typography,
   useMediaQuery,
 } from "@mui/material";
@@ -63,9 +62,11 @@ import {
   type SubmissionType,
 } from "@/features/submissions/api";
 import { useDebounced } from "@/shared/hooks/useDebounced";
+import { CalmStatusChip } from "@/features/submissions/components/CalmStatusChip";
 import { StatusChip } from "@/shared/components/StatusChip";
 import { ResultChip } from "@/shared/components/ResultChip";
 import { RecentSubmissionsList } from "@/features/home/components/RecentSubmissionsList";
+import { EmptyState } from "@/shared/components/EmptyState";
 import { SheetHeader } from "@/shared/components/SheetHeader";
 import { CopyIconButton } from "@/shared/components/CopyIconButton";
 import MailPreview from "@/shared/components/MailPreview";
@@ -142,7 +143,7 @@ export default function SubmissionsPage() {
     sortDir !== "desc";
 
   const activeCount = [status !== "ALL", type !== "ALL", result !== "ALL", from !== "", to !== "", sort !== "date_desc"].filter(Boolean).length;
-  const [filtersOpen, setFiltersOpen] = React.useState(activeCount > 0);
+  const [filtersOpen, setFiltersOpen] = React.useState(false);
 
   const resetFilters = React.useCallback(() => {
     setQ("");
@@ -328,10 +329,25 @@ export default function SubmissionsPage() {
     .filter((r) => (result === "ALL" ? true : r.result === result))
     .filter((r) => withinDates(r.created_at, from || undefined, to || undefined));
 
+  const canChallenge = (r: { is_challengeable?: boolean; is_challenged?: boolean }) =>
+    !!r.is_challengeable && !r.is_challenged;
+  const challengeButton = (r: { id: number | string }) => (
+    <Button
+      size="small"
+      variant="outlined"
+      disabled={challengeMutation.isPending}
+      onClick={() => setChallengeId(Number(r.id))}
+      sx={{ borderRadius: 2, textTransform: "none", fontWeight: 700, ml: "auto" }}
+    >
+      Challenge
+    </Button>
+  );
+
   const total = filtered.length;
   const start = page * pageSize;
   const end = Math.min(total, start + pageSize);
   const pageRows = filtered.slice(start, end);
+  const showChallenge = pageRows.some(canChallenge);
   const selectedRow = selectedId ? rows.find((r) => String(r.id) === String(selectedId)) : undefined;
 
   // ── Derived values and callbacks ────────────────────────────────────────
@@ -469,6 +485,7 @@ export default function SubmissionsPage() {
                 variant="outlined"
                 color="inherit"
                 aria-expanded={filtersOpen}
+                aria-controls="submission-filters"
                 onClick={() => setFiltersOpen((o) => !o)}
                 startIcon={<FilterList />}
                 sx={{ borderRadius: 2, textTransform: "none", fontWeight: 700, minWidth: 120, flexShrink: 0 }}
@@ -489,7 +506,7 @@ export default function SubmissionsPage() {
               ) : null}
             </Stack>
 
-            <Collapse in={filtersOpen} unmountOnExit>
+            <Collapse id="submission-filters" in={filtersOpen} unmountOnExit>
               <Stack spacing={1.25} sx={{ pt: 0.5 }}>
                 <Stack direction={{ xs: "column", md: "row" }} spacing={1.25} sx={{ alignItems: "stretch" }} >
                   <FormControl fullWidth>
@@ -585,8 +602,20 @@ export default function SubmissionsPage() {
       <SoftCard>
         <CardContent sx={{ p: 0 }}>
           {total === 0 && !submissionsQuery.isFetching ? (
-            <Box sx={{ p: 3 }}>
-              <Alert severity="info">No submissions match your filters.</Alert>
+            <Box sx={{ p: 4 }}>
+              {filtersActive ? (
+                <EmptyState
+                  title="No submissions match"
+                  hint="Try a different search or clear the filters."
+                  action={<Button onClick={resetFilters} sx={{ textTransform: "none", mt: 1 }}>Clear filters</Button>}
+                />
+              ) : (
+                <EmptyState
+                  title="No submissions yet"
+                  hint="Submit a file, URL or indicators to see them here."
+                  action={<Button variant="contained" onClick={() => navigate("/submit")} sx={{ textTransform: "none", mt: 1 }}>Submit</Button>}
+                />
+              )}
             </Box>
           ) : isPhone ? (
             <RecentSubmissionsList
@@ -594,6 +623,11 @@ export default function SubmissionsPage() {
               hrefFor={(r) =>
                 `/submissions?open=${encodeURIComponent(String(r.id))}`
               }
+              calmStatus
+              action={(r) => {
+                const full = pageRows.find((x) => x.id === r.id);
+                return full && canChallenge(full) ? challengeButton(r) : null;
+              }}
             />
           ) : (
             <Box sx={{ overflowX: "auto" }}>
@@ -642,20 +676,21 @@ export default function SubmissionsPage() {
                         onClick={() => handleColumnSort("type")}
                       >Type</TableSortLabel>
                     </TableCell>
-                    <TableCell sx={{ fontWeight: 950 }}>Challenge</TableCell>
+                    {showChallenge ? <TableCell sx={{ fontWeight: 950 }}>Challenge</TableCell> : null}
                   </TableRow>
                 </TableHead>
 
                 <TableBody>
                   {pageRows.map((r) => {
-                    const canChallenge = !!r.is_challengeable && !r.is_challenged;
-
                     return (
                       <TableRow
                         key={r.id}
                         hover
                         tabIndex={0}
-                        sx={{ cursor: "pointer" }}
+                        sx={{
+                          cursor: "pointer",
+                          "&:hover .copy-artifact, &:focus-within .copy-artifact": { opacity: 1 },
+                        }}
                         onClick={() => { setSelectedId(r.id); setOpenDrawer(true); }}
                         onKeyDown={(e) => {
                           if (e.key === "Enter" || e.key === " ") {
@@ -668,13 +703,13 @@ export default function SubmissionsPage() {
                           <Stack direction="row" spacing={0.5} sx={{ alignItems: "center" }} >
                             <Button
                               size="small"
-                              variant="contained"
+                              variant="outlined"
                               onClick={(e) => {
                                 e.stopPropagation();
                                 setSelectedId(r.id);
                                 setOpenDrawer(true);
                               }}
-                              sx={{ borderRadius: 2, textTransform: "none", fontWeight: 950, minWidth: 0, px: 1.25 }}
+                              sx={{ borderRadius: 2, textTransform: "none", fontWeight: 700, minWidth: 0, px: 1.25, boxShadow: "none" }}
                             >
                               {r.id}
                             </Button>
@@ -687,11 +722,11 @@ export default function SubmissionsPage() {
                         </TableCell>
 
                         <TableCell>
-                          <StatusChip status={r.status} minWidth={96} />
+                          <CalmStatusChip status={r.status} minWidth={96} />
                         </TableCell>
 
-                        <TableCell title={r.artifact}>
-                          <Stack direction="row" spacing={1.25} sx={{ alignItems: "center" }}>
+                        <TableCell sx={{ maxWidth: 420 }}>
+                          <Stack direction="row" spacing={1.25} sx={{ alignItems: "center", minWidth: 0 }}>
                             {r.mail_preview_url ? (
                               <MailPreview
                                 url={r.mail_preview_url}
@@ -699,21 +734,14 @@ export default function SubmissionsPage() {
                                 alt={`Preview of email for case ${r.id}`}
                               />
                             ) : null}
-                            <Tooltip title={r.artifact || ""} arrow placement="top">
-                              <Typography
-                                sx={{
-                                  maxWidth: 520,
-                                  display: "-webkit-box",
-                                  WebkitLineClamp: 2,
-                                  WebkitBoxOrient: "vertical",
-                                  overflow: "hidden",
-                                  wordBreak: "break-word",
-                                  cursor: "help",
-                                }}
-                              >
-                                {r.artifact || "—"}
-                              </Typography>
-                            </Tooltip>
+                            <Typography noWrap title={r.artifact} sx={{ minWidth: 0, flex: "0 1 auto" }}>
+                              {r.artifact || "—"}
+                            </Typography>
+                            {r.artifact ? (
+                              <Box className="copy-artifact" sx={{ display: "inline-flex", flexShrink: 0, opacity: 0, "@media (hover: none)": { opacity: 1 } }}>
+                                <CopyIconButton text={r.artifact} title="Copy artifact" />
+                              </Box>
+                            ) : null}
                           </Stack>
                         </TableCell>
 
@@ -728,23 +756,11 @@ export default function SubmissionsPage() {
                           />
                         </TableCell>
 
-                        <TableCell onClick={(e) => e.stopPropagation()}>
-                          {canChallenge ? (
-                            <Button
-                              size="small"
-                              variant="outlined"
-                              disabled={challengeMutation.isPending}
-                              onClick={() => setChallengeId(r.id)}
-                              sx={{ borderRadius: 2, textTransform: "none", fontWeight: 950 }}
-                            >
-                              Challenge
-                            </Button>
-                          ) : (
-                            <Typography variant="body2" color="text.secondary">
-                              Not available
-                            </Typography>
-                          )}
-                        </TableCell>
+                        {showChallenge ? (
+                          <TableCell onClick={(e) => e.stopPropagation()}>
+                            {canChallenge(r) ? challengeButton(r) : null}
+                          </TableCell>
+                        ) : null}
                       </TableRow>
                     );
                   })}
