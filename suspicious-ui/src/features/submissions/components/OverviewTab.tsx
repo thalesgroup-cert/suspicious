@@ -1,14 +1,12 @@
 import * as React from "react";
 import { Box, Button, Chip, LinearProgress, Stack, Typography } from "@mui/material";
 import { alpha } from "@mui/material/styles";
-import type { SubmissionAnalyzerReport, SubmissionCaseInfos, SubmissionRow } from "@/features/submissions/api";
-import { ResultChip } from "@/shared/components/ResultChip";
+import type { SubmissionAnalyzerReport, SubmissionCaseInfos, SubmissionResult, SubmissionRow } from "@/features/submissions/api";
+import { prettyResult } from "@/features/submissions/utils";
 import { CopyIconButton } from "@/shared/components/CopyIconButton";
 import MailPreview from "@/shared/components/MailPreview";
 import { getRiskTone, normalizeScore } from "@/shared/lib/scoreUtils";
 import { monoStack } from "@/styles/themes";
-
-const BADGE_W = 132;
 
 function SectionTitle({ children }: { children: React.ReactNode }) {
   return (
@@ -91,12 +89,15 @@ export function OverviewTab({ row, reports, ci, multi, observableCount, noAnalyz
   );
   const hasAi = !!ci && [ci.classification_ai, ci.score_ai, ci.confidence_ai, ci.category_ai].some((v) => v != null && v !== "");
   const aiUnclassified = !!ci && ci.score_ai === 0 && ci.confidence_ai === 0;
+  // Nothing ran, so nothing was computed: the API's 0 is a default, not a measurement.
+  const score = noAnalyzersRan ? null : ci?.score;
+  const confidence = noAnalyzersRan ? null : ci?.confidence;
 
   return (
     <Stack>
       <Box sx={{ px: 2.25, pt: 2, display: "grid", gridTemplateColumns: "1fr 1fr", gap: 2.5 }}>
-        <Stat label="Score" value={ci?.score != null ? `${ci.score}/10` : null} pct={normalizeScore(ci?.score)} hex={verdictHex} />
-        <Stat label="Confidence" value={ci?.confidence != null ? `${ci.confidence}%` : null} pct={Math.min(100, ci?.confidence ?? 0)} hex={verdictHex} />
+        <Stat label="Score" value={score != null ? `${score}/10` : null} pct={normalizeScore(score)} hex={verdictHex} />
+        <Stat label="Confidence" value={confidence != null ? `${confidence}%` : null} pct={Math.min(100, confidence ?? 0)} hex={verdictHex} />
       </Box>
 
       {noAnalyzersRan ? (
@@ -139,11 +140,10 @@ export function OverviewTab({ row, reports, ci, multi, observableCount, noAnalyz
           <Stack spacing={1.5}>
             <Box>
               <Typography variant="caption" color="text.secondary" sx={{ display: "block", mb: 0.5 }}>Verdict</Typography>
-              <Stack direction="row" useFlexGap spacing={1} sx={{ alignItems: "center", flexWrap: "wrap" }}>
-                <ResultChip result={String(ci.classification ?? "UNKNOWN")} minWidth={BADGE_W} />
-                <Chip size="small" label={`Score ${ci.score ?? "—"}/10`} variant="outlined" />
-                <Chip size="small" label={`Confidence ${ci.confidence ?? "—"}%`} variant="outlined" />
-              </Stack>
+              {/* Plain text: the header chip and the stat blocks already show the verdict, score and confidence. */}
+              <Typography variant="body2">
+                {prettyResult(String(ci.classification ?? "").toUpperCase() as SubmissionResult)}
+              </Typography>
             </Box>
             {hasAi ? (
               <Box>
@@ -171,9 +171,11 @@ export function OverviewTab({ row, reports, ci, multi, observableCount, noAnalyz
       {multi ? (
         <Section title="Summary">
           <Typography variant="body2">{row.artifact || "—"}</Typography>
-          <Typography variant="caption" color="text.secondary" sx={{ display: "block", mt: 0.5 }}>
-            {observableCount} observable{observableCount !== 1 ? "s" : ""}
-          </Typography>
+          {observableCount > 0 ? (
+            <Typography variant="caption" color="text.secondary" sx={{ display: "block", mt: 0.5 }}>
+              {observableCount} observable{observableCount !== 1 ? "s" : ""}
+            </Typography>
+          ) : null}
         </Section>
       ) : (
         <Section title={String(row.type).toUpperCase() === "MAIL" ? "Subject" : "Artifact"}>

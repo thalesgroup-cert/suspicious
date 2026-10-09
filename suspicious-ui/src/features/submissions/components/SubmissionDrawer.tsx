@@ -29,6 +29,7 @@ const BADGE_W = 132;
 const TABS = ["overview", "analysis", "comments"] as const;
 type TabKey = (typeof TABS)[number];
 
+// Case types, not report target kinds: kindLabel maps targets (there MAIL means "Email address").
 const TYPE_LABELS: Record<string, string> = { FILE: "File", MAIL: "Email", URL: "URL", IP: "IP", HASH: "Hash" };
 
 /** "IN_PROGRESS" -> "In progress". */
@@ -91,8 +92,8 @@ export function SubmissionDrawer({
   );
   const verdictHex = useResultHex(selectedRow?.result ?? "UNKNOWN");
   const type = String(selectedRow?.type ?? "").toUpperCase();
-  // ponytail: a mail's reports span body/header/links, so several groups still mean one email, not "Indicators".
-  const multi = type === "UNKNOWN" || (type !== "MAIL" && (reportGroups.length > 1 || urlArtifacts.length > 1));
+  // The backend types FILE/MAIL/URL/IP/HASH from one primary observable; only IOC-group cases come back UNKNOWN.
+  const multi = type === "UNKNOWN";
   const typeLabel = multi ? "Indicators" : TYPE_LABELS[type] ?? type;
 
   // The tab belongs to the submission it was picked on: another submission opens on Overview.
@@ -130,7 +131,7 @@ export function SubmissionDrawer({
           <Stack sx={{ height: "100%" }}>
             <SheetHeader sx={{ pb: 0 }}>
               {/* Verdict accent: the one colour cue for the case, in the user's own result colour. */}
-              <Box aria-hidden sx={{ position: "absolute", top: 0, left: 0, right: 0, height: 3, bgcolor: verdictHex ?? "divider" }} />
+              <Box aria-hidden data-testid="verdict-accent" sx={{ position: "absolute", top: 0, left: 0, right: 0, height: 3, bgcolor: verdictHex ?? "divider" }} />
               <Stack direction="row" spacing={1} sx={{ alignItems: "center", justifyContent: "space-between" }}>
                 <Stack direction="row" spacing={0.5} sx={{ alignItems: "center", minWidth: 0 }}>
                   <Typography variant="h2" component="h2">#{selectedRow.id}</Typography>
@@ -155,9 +156,9 @@ export function SubmissionDrawer({
                 {[
                   humanStatus(selectedRow.status),
                   typeLabel,
-                  `${selectedRow.tests_done ?? 0} test${selectedRow.tests_done === 1 ? "" : "s"}`,
+                  selectedRow.tests_done == null ? null : `${selectedRow.tests_done} test${selectedRow.tests_done === 1 ? "" : "s"}`,
                   fmtDate(selectedRow.created_at),
-                ].join(" · ")}
+                ].filter(Boolean).join(" · ")}
               </Typography>
 
               <Tabs
@@ -184,7 +185,7 @@ export function SubmissionDrawer({
                   reports={analyzerReports}
                   ci={ci}
                   multi={multi}
-                  observableCount={reportGroups.length}
+                  observableCount={detailsQuery.isLoading ? 0 : reportGroups.length}
                   noAnalyzersRan={noAnalyzersRan}
                   verdictHex={verdictHex}
                   onSeeAll={() => setTabState({ id: selectedRow.id, tab: "analysis" })}

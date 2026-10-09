@@ -1,8 +1,9 @@
-import { describe, it, expect, vi } from "vitest";
+import { afterEach, describe, it, expect, vi } from "vitest";
 import { screen, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { renderWithProviders } from "@/test/utils";
 import { SubmissionDrawer, type SubmissionDrawerProps } from "../SubmissionDrawer";
+import { useColorStore } from "@/styles/colorStore";
 
 const row = {
   id: 18, status: "DONE", artifact: "http://x.example", created_at: "2026-09-21T10:00:00Z",
@@ -181,5 +182,68 @@ describe("SubmissionDrawer - overview", () => {
     expect(await screen.findByRole("heading", { name: "Artifact" })).toBeInTheDocument();
     expect(getComputedStyle(screen.getByText("http://x.example", { selector: "p" })).fontFamily).toContain("IBM Plex Mono");
     expect(screen.getByRole("button", { name: "Copy artifact" })).toBeInTheDocument();
+  });
+});
+
+describe("SubmissionDrawer - fix round 1", () => {
+  afterEach(() => useColorStore.getState().reset());
+
+  const single = (type: string, artifact: string, groups: [string, string][]) => {
+    const r = { ...multiRow, type, artifact };
+    return base({
+      row: r as never,
+      details: { data: { ...r, analyzer_reports: groups.map(([kind, value], i) => rep(i + 1, `A${i}`, 1, value, kind)), case_infos: ci() }, isLoading: false, isError: false } as never,
+    });
+  };
+
+  it.each([
+    ["URL", "URL", "http://u.example/x", [["URL", "http://u.example/x"], ["DOMAIN", "u.example"]]],
+    ["FILE", "File", "sample.exe", [["FILE", "sample.exe"], ["HASH", "abc123"]]],
+  ] as const)("a %s case with two report groups keeps its type, Artifact title and copy", async (type, label, artifact, groups) => {
+    renderWithProviders(<SubmissionDrawer {...single(type, artifact, groups as never)} />);
+    const header = await screen.findByTestId("sheet-header");
+    expect(within(header).getByText(new RegExp(`^Done · ${label} · 49 tests · `))).toBeInTheDocument();
+    expect(screen.getByRole("heading", { name: "Artifact" })).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "Copy artifact" })).toBeInTheDocument();
+    expect(screen.queryByRole("heading", { name: "Summary" })).toBeNull();
+  });
+
+  it("nothing ran: stats show a dash, no 0/10 or 0% anywhere", async () => {
+    const r = { ...multiRow, type: "URL", tests_done: 0 };
+    renderWithProviders(<SubmissionDrawer {...base({
+      row: r as never,
+      details: { data: { ...r, analyzer_reports: [], case_infos: ci({ score: 0, confidence: 0 }) }, isLoading: false, isError: false } as never,
+    })} />);
+    expect(await screen.findByText("No analyzers ran for this submission.")).toBeInTheDocument();
+    expect(screen.getAllByText("—")).toHaveLength(2);
+    expect(screen.queryByText(/0\/10/)).toBeNull();
+    expect(screen.queryByText(/(^|\s)0%/)).toBeNull();
+    expect(screen.queryByRole("progressbar")).toBeNull();
+  });
+
+  it("Sources is plain text: classification label, no score or confidence chips", async () => {
+    renderWithProviders(<SubmissionDrawer {...multi()} />);
+    const section = (await screen.findByRole("heading", { name: "Sources" })).closest("section")!;
+    expect(within(section).getByText("Dangerous")).toBeInTheDocument();
+    expect(within(section).queryByText(/Score|Confidence/)).toBeNull();
+    expect(section.querySelector(".MuiChip-root")).toBeNull();
+  });
+
+  it("no observables line while details load; no tests segment when tests_done is missing", async () => {
+    const r = { ...multiRow, tests_done: undefined };
+    renderWithProviders(<SubmissionDrawer {...base({ row: r as never, details: { data: undefined, isLoading: true, isError: false } as never })} />);
+    const header = await screen.findByTestId("sheet-header");
+    expect(within(header).getByText(/^Done · Indicators · [A-Z]/)).toBeInTheDocument();
+    expect(within(header).queryByText(/tests?/)).toBeNull();
+    expect(screen.queryByText(/observables?$/)).toBeNull();
+  });
+
+  it("accent line and stat bars use the user's verdict colour", async () => {
+    useColorStore.getState().setResultColor("dangerous", "#123456");
+    renderWithProviders(<SubmissionDrawer {...multi()} />);
+    const accent = await screen.findByTestId("verdict-accent");
+    expect(getComputedStyle(accent).backgroundColor).toBe("rgb(18, 52, 86)");
+    const bar = screen.getByRole("progressbar", { name: "Score" }).querySelector(".MuiLinearProgress-bar")!;
+    expect(getComputedStyle(bar).backgroundColor).toBe("rgb(18, 52, 86)");
   });
 });
