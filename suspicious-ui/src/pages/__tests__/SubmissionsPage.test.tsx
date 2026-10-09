@@ -389,30 +389,32 @@ describe("SubmissionsPage - calmer rows", () => {
 });
 
 describe("SubmissionsPage - honest detail drawer", () => {
-  const row = (tests_done: number) => ({ ...fixtureSubmissionsList.results[0], tests_done });
+  const row = (tests_done: number, status = "DONE") => ({ ...fixtureSubmissionsList.results[0], tests_done, status });
+  const AI = { score_ai: null, confidence_ai: null, classification_ai: "", category_ai: null };
   const report = (id: number) => ({
     id, cortex_job_id: null, type: "x", status: "Success", analyzer_name: `an${id}`, analyzer_id: `an${id}`,
     level: null, confidence: null, score: null, category: null, categories: [],
     report_summary: null, report_taxonomy: null, report_full: null,
     target: { kind: "mail", id: null, value: null }, created_at: "2026-05-17T10:00:00Z",
   });
-  const open = async (tests_done: number, reports: unknown[]) => {
+  const open = async (tests_done: number, reports: unknown[], status = "DONE", ai: object | null = null) => {
     stub(false);
     vi.mocked(getMe).mockResolvedValue(fixtureMe);
-    vi.mocked(listSubmissions).mockResolvedValue({ ...fixtureSubmissionsList, results: [row(tests_done)] } as never);
+    vi.mocked(listSubmissions).mockResolvedValue({ ...fixtureSubmissionsList, results: [row(tests_done, status)] } as never);
     vi.mocked(getSubmissionDetails).mockResolvedValue({
-      ...row(tests_done), analyzer_reports: reports,
+      ...row(tests_done, status), analyzer_reports: reports,
       case_infos: {
         score: 0, confidence: 0, classification: "SAFE",
-        score_ai: 0, confidence_ai: 0, classification_ai: "SUSPICIOUS", category_ai: "Uncategorized",
+        ...(ai ?? { score_ai: 0, confidence_ai: 0, classification_ai: "SUSPICIOUS", category_ai: "Uncategorized" }),
       },
     } as never);
     renderWithProviders(<SubmissionsPage />, { initialPath: "/submissions?open=101" });
-    await screen.findByText("AI classifier");
+    await screen.findByText("Verdict");
   };
 
   it("labels sources, says no analyzers ran, shows the id once, drops the empty report block", async () => {
     await open(0, []);
+    expect(await screen.findByText("AI classifier")).toBeInTheDocument();
     expect(screen.getByText("Verdict")).toBeInTheDocument();
     expect(screen.getByText("No analyzers ran for this submission.")).toBeInTheDocument();
     expect(screen.getAllByText("#101")).toHaveLength(1);
@@ -430,5 +432,40 @@ describe("SubmissionsPage - honest detail drawer", () => {
     await open(3, []);
     expect(screen.queryByText(/No analyzers ran/)).not.toBeInTheDocument();
     expect(screen.getByText("Analysis · 0 reports")).toBeInTheDocument();
+  });
+
+  it.each(["NEW", "IN_PROGRESS", "FAILED"])("%s with 0 tests: no 'no analyzers' line, block kept", async (st) => {
+    await open(0, [], st);
+    expect(screen.queryByText(/No analyzers ran/)).not.toBeInTheDocument();
+    expect(await screen.findByText("No analysis reports yet.")).toBeInTheDocument();
+  });
+
+  it("DONE with 0 tests shows the line while details are pending", async () => {
+    stub(false);
+    vi.mocked(getMe).mockResolvedValue(fixtureMe);
+    vi.mocked(listSubmissions).mockResolvedValue({ ...fixtureSubmissionsList, results: [row(0)] } as never);
+    vi.mocked(getSubmissionDetails).mockReturnValue(new Promise(() => {}));
+    renderWithProviders(<SubmissionsPage />, { initialPath: "/submissions?open=101" });
+    expect(await screen.findByText("No analyzers ran for this submission.")).toBeInTheDocument();
+  });
+
+  it("DONE with 0 tests shows the line when details fail", async () => {
+    stub(false);
+    vi.mocked(getMe).mockResolvedValue(fixtureMe);
+    vi.mocked(listSubmissions).mockResolvedValue({ ...fixtureSubmissionsList, results: [row(0)] } as never);
+    vi.mocked(getSubmissionDetails).mockRejectedValue(new Error("boom"));
+    renderWithProviders(<SubmissionsPage />, { initialPath: "/submissions?open=101" });
+    expect(await screen.findByText("No analyzers ran for this submission.")).toBeInTheDocument();
+    expect(await screen.findByText("Could not load analysis details.")).toBeInTheDocument();
+  });
+
+  it("hides the AI caption with no AI data; shows it with only score_ai", async () => {
+    await open(3, [], "DONE", AI);
+    expect(screen.queryByText("AI classifier")).not.toBeInTheDocument();
+  });
+  it("shows the AI caption and chip with only score_ai", async () => {
+    await open(3, [], "DONE", { ...AI, score_ai: 7 });
+    expect(screen.getByText("AI classifier")).toBeInTheDocument();
+    expect(screen.getByText("score 7")).toBeInTheDocument();
   });
 });

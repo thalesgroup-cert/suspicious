@@ -352,6 +352,11 @@ export default function SubmissionsPage() {
 
   // ── Derived values and callbacks ────────────────────────────────────────
 
+  const ci = detailsQuery.data?.case_infos;
+  // Only claim "nothing ran" for a finished case; NEW/IN_PROGRESS also have 0 tests while analyzers run.
+  const noAnalyzersRan =
+    !!selectedRow && String(selectedRow.status).toUpperCase() === "DONE" && selectedRow.tests_done === 0;
+
   const BADGE_W = 132;
   const DIALOG_RADIUS = 2;
 
@@ -880,28 +885,28 @@ export default function SubmissionsPage() {
               <Stack spacing={0} divider={<Divider sx={{ opacity: isDark ? 0.12 : 0.35 }} />}>
 
                 {/* ── Verdict (read-only) ───────────────────────────────────────── */}
-                {detailsQuery.data?.case_infos ? (
+                {ci ? (
                   <Box sx={{ px: 2.25, py: 2 }}>
                     <Typography variant="caption" sx={{ display: "block", color: "text.disabled", mb: 0.75 }}>
                       Verdict
                     </Typography>
                     <Stack spacing={1.25}>
                       <Stack direction="row" spacing={1} sx={{ alignItems: "center", flexWrap: "wrap" }}>
-                        <ResultChip result={String(detailsQuery.data.case_infos.classification ?? "UNKNOWN")} minWidth={BADGE_W} />
-                        <Chip size="small" label={`Score ${detailsQuery.data.case_infos.score ?? "—"}/10`} variant="outlined" />
-                        <Chip size="small" label={`Confidence ${detailsQuery.data.case_infos.confidence ?? "—"}%`} variant="outlined" />
+                        <ResultChip result={String(ci.classification ?? "UNKNOWN")} minWidth={BADGE_W} />
+                        <Chip size="small" label={`Score ${ci.score ?? "—"}/10`} variant="outlined" />
+                        <Chip size="small" label={`Confidence ${ci.confidence ?? "—"}%`} variant="outlined" />
                       </Stack>
-                      {detailsQuery.data.case_infos.classification_ai ? (
+                      {[ci.classification_ai, ci.score_ai, ci.confidence_ai, ci.category_ai].some((v) => v != null && v !== "") ? (
                         <Box>
                           <Typography variant="caption" sx={{ display: "block", color: "text.disabled", mb: 0.5 }}>
                             AI classifier
                           </Typography>
                           <Stack direction="row" spacing={0.75} sx={{ flexWrap: "wrap", rowGap: 0.75 }}>
                             {[
-                              `${detailsQuery.data.case_infos.classification_ai ?? "—"}`,
-                              `score ${detailsQuery.data.case_infos.score_ai ?? "—"}`,
-                              `conf ${detailsQuery.data.case_infos.confidence_ai ?? "—"}%`,
-                              detailsQuery.data.case_infos.category_ai ? `cat ${detailsQuery.data.case_infos.category_ai}` : null,
+                              ci.classification_ai ? String(ci.classification_ai) : null,
+                              `score ${ci.score_ai ?? "—"}`,
+                              `conf ${ci.confidence_ai ?? "—"}%`,
+                              ci.category_ai ? `cat ${ci.category_ai}` : null,
                             ].filter(Boolean).map((label) => (
                               <Chip key={label as string} size="small" label={label as string} variant="outlined"
                                 sx={{ fontSize: theme.typography.caption.fontSize }} />
@@ -909,12 +914,15 @@ export default function SubmissionsPage() {
                           </Stack>
                         </Box>
                       ) : null}
-                      {selectedRow.tests_done === 0 ? (
-                        <Typography variant="body2" color="text.secondary">
-                          No analyzers ran for this submission.
-                        </Typography>
-                      ) : null}
                     </Stack>
+                  </Box>
+                ) : null}
+
+                {noAnalyzersRan ? (
+                  <Box sx={{ px: 2.25, py: 1.5 }}>
+                    <Typography variant="body2" color="text.secondary">
+                      No analyzers ran for this submission.
+                    </Typography>
                   </Box>
                 ) : null}
 
@@ -952,7 +960,7 @@ export default function SubmissionsPage() {
                 ) : null}
 
                 {/* Analysis results: grouped by artifact (omitted when nothing ran and nothing reported) */}
-                {selectedRow.tests_done === 0 && analyzerReports.length === 0 && !detailsQuery.isLoading && !detailsQuery.isError ? null : (
+                {noAnalyzersRan && analyzerReports.length === 0 && !detailsQuery.isLoading && !detailsQuery.isError ? null : (
                 <Box sx={{ px: 2.25, pt: 2, pb: 1 }}>
                   <Stack direction="row" sx={{ mb: 1.25, alignItems: "center", justifyContent: "space-between" }}>
                     <Typography sx={{ fontSize: 10, fontWeight: 700, textTransform: "uppercase", letterSpacing: "0.08em", color: "text.disabled" }}>
