@@ -859,21 +859,20 @@ export default function SubmissionsPage() {
               <Box
                 sx={{
                   px: 2.25, py: 1.5,
-                  display: "grid", gridTemplateColumns: "repeat(3, 1fr)", gap: 1,
+                  display: "grid", gridTemplateColumns: "repeat(2, 1fr)", gap: 1,
                   borderBottom: `1px solid ${alpha(theme.palette.divider, isDark ? 0.18 : 0.55)}`,
                   background: isDark ? alpha("#fff", 0.015) : alpha(theme.palette.grey[50], 0.6),
                 }}
               >
                 {[
-                  { label: "Submission", value: `#${selectedRow.id}` },
                   { label: "Tests run", value: selectedRow.tests_done ?? "—" },
                   { label: "Submitted", value: fmtDate(selectedRow.created_at) },
                 ].map(({ label, value }) => (
                   <Box key={label}>
-                    <Typography sx={{ fontSize: 10, fontWeight: 700, textTransform: "uppercase", letterSpacing: "0.07em", color: "text.disabled", mb: 0.2 }}>
+                    <Typography variant="caption" sx={{ display: "block", color: "text.disabled", mb: 0.2 }}>
                       {label}
                     </Typography>
-                    <Typography sx={{ fontWeight: 900, fontSize: 13 }}>{String(value)}</Typography>
+                    <Typography sx={{ fontWeight: 700, fontSize: 13 }}>{String(value)}</Typography>
                   </Box>
                 ))}
               </Box>
@@ -883,27 +882,38 @@ export default function SubmissionsPage() {
                 {/* ── Verdict (read-only) ───────────────────────────────────────── */}
                 {detailsQuery.data?.case_infos ? (
                   <Box sx={{ px: 2.25, py: 2 }}>
-                    <Typography sx={{ fontSize: 10, fontWeight: 700, textTransform: "uppercase", letterSpacing: "0.08em", color: "text.disabled", mb: 0.75 }}>
+                    <Typography variant="caption" sx={{ display: "block", color: "text.disabled", mb: 0.75 }}>
                       Verdict
                     </Typography>
                     <Stack spacing={1.25}>
                       <Stack direction="row" spacing={1} sx={{ alignItems: "center", flexWrap: "wrap" }}>
                         <ResultChip result={String(detailsQuery.data.case_infos.classification ?? "UNKNOWN")} minWidth={BADGE_W} />
-                        <Chip size="small" label={`Score ${detailsQuery.data.case_infos.score ?? "—"}/10`} variant="outlined" sx={{ fontWeight: 800 }} />
-                        <Chip size="small" label={`Confidence ${detailsQuery.data.case_infos.confidence ?? "—"}%`} variant="outlined" sx={{ fontWeight: 800 }} />
+                        <Chip size="small" label={`Score ${detailsQuery.data.case_infos.score ?? "—"}/10`} variant="outlined" />
+                        <Chip size="small" label={`Confidence ${detailsQuery.data.case_infos.confidence ?? "—"}%`} variant="outlined" />
                       </Stack>
-                      <Stack direction="row" spacing={0.75} sx={{ opacity: 0.65, flexWrap: "wrap" }}>
-                        <Typography variant="caption" color="text.secondary" sx={{ fontWeight: 700, mr: 0.25 }}>AI:</Typography>
-                        {[
-                          `${detailsQuery.data.case_infos.classification_ai ?? "—"}`,
-                          `score ${detailsQuery.data.case_infos.score_ai ?? "—"}`,
-                          `conf ${detailsQuery.data.case_infos.confidence_ai ?? "—"}%`,
-                          detailsQuery.data.case_infos.category_ai ? `cat ${detailsQuery.data.case_infos.category_ai}` : null,
-                        ].filter(Boolean).map((label) => (
-                          <Chip key={label as string} size="small" label={label as string} variant="outlined"
-                            sx={{ height: 18, fontSize: 10, "& .MuiChip-label": { px: 0.75 } }} />
-                        ))}
-                      </Stack>
+                      {detailsQuery.data.case_infos.classification_ai ? (
+                        <Box>
+                          <Typography variant="caption" sx={{ display: "block", color: "text.disabled", mb: 0.5 }}>
+                            AI classifier
+                          </Typography>
+                          <Stack direction="row" spacing={0.75} sx={{ flexWrap: "wrap", rowGap: 0.75 }}>
+                            {[
+                              `${detailsQuery.data.case_infos.classification_ai ?? "—"}`,
+                              `score ${detailsQuery.data.case_infos.score_ai ?? "—"}`,
+                              `conf ${detailsQuery.data.case_infos.confidence_ai ?? "—"}%`,
+                              detailsQuery.data.case_infos.category_ai ? `cat ${detailsQuery.data.case_infos.category_ai}` : null,
+                            ].filter(Boolean).map((label) => (
+                              <Chip key={label as string} size="small" label={label as string} variant="outlined"
+                                sx={{ fontSize: theme.typography.caption.fontSize }} />
+                            ))}
+                          </Stack>
+                        </Box>
+                      ) : null}
+                      {selectedRow.tests_done === 0 ? (
+                        <Typography variant="body2" color="text.secondary">
+                          No analyzers ran for this submission.
+                        </Typography>
+                      ) : null}
                     </Stack>
                   </Box>
                 ) : null}
@@ -941,7 +951,8 @@ export default function SubmissionsPage() {
                   </Box>
                 ) : null}
 
-                {/* Analysis results: grouped by artifact */}
+                {/* Analysis results: grouped by artifact (omitted when nothing ran and nothing reported) */}
+                {selectedRow.tests_done === 0 && analyzerReports.length === 0 && !detailsQuery.isLoading && !detailsQuery.isError ? null : (
                 <Box sx={{ px: 2.25, pt: 2, pb: 1 }}>
                   <Stack direction="row" sx={{ mb: 1.25, alignItems: "center", justifyContent: "space-between" }}>
                     <Typography sx={{ fontSize: 10, fontWeight: 700, textTransform: "uppercase", letterSpacing: "0.08em", color: "text.disabled" }}>
@@ -1042,6 +1053,7 @@ export default function SubmissionsPage() {
                     </Stack>
                   )}
                 </Box>
+                )}
 
                 {/* URL artifacts: grouped by domain */}
                 {urlArtifacts.length > 0 && (

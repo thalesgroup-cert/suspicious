@@ -29,7 +29,7 @@ vi.mock("@/features/comments/api", () => ({
 
 
 import { getMe } from "@/api/auth";
-import { listSubmissions, challengeSubmission } from "@/features/submissions/api";
+import { listSubmissions, challengeSubmission, getSubmissionDetails } from "@/features/submissions/api";
 import { addCaseComment, getCaseComments } from "@/features/comments/api";
 import SubmissionsPage from "../SubmissionsPage";
 
@@ -385,5 +385,50 @@ describe("SubmissionsPage - calmer rows", () => {
     expect(await screen.findByText("No submissions yet")).toBeInTheDocument();
     expect(screen.getByText("Submit a file, URL or indicators to see them here.")).toBeInTheDocument();
     expect(screen.getByRole("button", { name: "Submit" })).toBeInTheDocument();
+  });
+});
+
+describe("SubmissionsPage - honest detail drawer", () => {
+  const row = (tests_done: number) => ({ ...fixtureSubmissionsList.results[0], tests_done });
+  const report = (id: number) => ({
+    id, cortex_job_id: null, type: "x", status: "Success", analyzer_name: `an${id}`, analyzer_id: `an${id}`,
+    level: null, confidence: null, score: null, category: null, categories: [],
+    report_summary: null, report_taxonomy: null, report_full: null,
+    target: { kind: "mail", id: null, value: null }, created_at: "2026-05-17T10:00:00Z",
+  });
+  const open = async (tests_done: number, reports: unknown[]) => {
+    stub(false);
+    vi.mocked(getMe).mockResolvedValue(fixtureMe);
+    vi.mocked(listSubmissions).mockResolvedValue({ ...fixtureSubmissionsList, results: [row(tests_done)] } as never);
+    vi.mocked(getSubmissionDetails).mockResolvedValue({
+      ...row(tests_done), analyzer_reports: reports,
+      case_infos: {
+        score: 0, confidence: 0, classification: "SAFE",
+        score_ai: 0, confidence_ai: 0, classification_ai: "SUSPICIOUS", category_ai: "Uncategorized",
+      },
+    } as never);
+    renderWithProviders(<SubmissionsPage />, { initialPath: "/submissions?open=101" });
+    await screen.findByText("AI classifier");
+  };
+
+  it("labels sources, says no analyzers ran, shows the id once, drops the empty report block", async () => {
+    await open(0, []);
+    expect(screen.getByText("Verdict")).toBeInTheDocument();
+    expect(screen.getByText("No analyzers ran for this submission.")).toBeInTheDocument();
+    expect(screen.getAllByText("#101")).toHaveLength(1);
+    expect(screen.queryByText(/^Analysis ·/)).not.toBeInTheDocument();
+    expect(parseFloat(getComputedStyle(screen.getByText("conf 0%")).fontSize)).toBeGreaterThanOrEqual(12);
+  });
+
+  it("with analyses there is no 'no analyzers' line and reports are counted", async () => {
+    await open(3, [report(1), report(2)]);
+    expect(screen.queryByText(/No analyzers ran/)).not.toBeInTheDocument();
+    expect(screen.getByText("Analysis · 2 reports")).toBeInTheDocument();
+  });
+
+  it("keeps the 0-reports block when tests ran", async () => {
+    await open(3, []);
+    expect(screen.queryByText(/No analyzers ran/)).not.toBeInTheDocument();
+    expect(screen.getByText("Analysis · 0 reports")).toBeInTheDocument();
   });
 });
