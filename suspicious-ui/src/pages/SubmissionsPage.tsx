@@ -324,6 +324,9 @@ export default function SubmissionsPage() {
   const pageRows = filtered.slice(start, end);
   const showChallenge = pageRows.some(canChallenge);
   const selectedRow = selectedId ? rows.find((r) => String(r.id) === String(selectedId)) : undefined;
+  // Previous/next stay within the page being shown, and stop at its ends.
+  const at = pageRows.findIndex((r) => String(r.id) === String(selectedId));
+  const neighbours = { prev: pageRows[at - 1]?.id ?? null, next: pageRows[at + 1]?.id ?? null };
 
   // ── Derived values ──────────────────────────────────────────────────────
 
@@ -746,6 +749,15 @@ export default function SubmissionsPage() {
         comments={commentsQuery}
         onAddComment={(body) => addCommentMutation.mutateAsync(body)}
         isAddingComment={addCommentMutation.isPending}
+        elevated={(me?.groups ?? []).some((g) => ["CISO", "CERT", "Admin"].includes(g))}
+        onChallenge={selectedRow && canChallenge(selectedRow) ? () => setChallengeId(Number(selectedRow.id)) : undefined}
+        prevId={neighbours.prev}
+        nextId={neighbours.next}
+        onNavigate={(id) => {
+          const next = new URLSearchParams(searchParams);
+          next.set("open", String(id));
+          setSearchParams(next, { replace: true });
+        }}
       />
 
       <Dialog

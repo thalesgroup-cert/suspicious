@@ -595,3 +595,43 @@ describe("SubmissionsPage - drawer and history", () => {
     await waitFor(() => expect(screen.queryByTestId("sheet-header")).toBeNull());
   });
 });
+
+describe("SubmissionsPage - drawer neighbours and challenge", () => {
+  const three = (over: object[] = []) => ({
+    ...fixtureSubmissionsList,
+    results: [101, 102, 103].map((id, i) => ({
+      ...fixtureSubmissionsList.results[0], id, artifact: `row-${id}@example.com`, is_challengeable: false, is_challenged: false, ...(over[i] ?? {}),
+    })),
+  });
+  beforeEach(() => {
+    stub(false);
+    vi.mocked(getMe).mockResolvedValue(fixtureMe);
+    vi.mocked(getSubmissionDetails).mockReturnValue(new Promise(() => {}));
+  });
+
+  it("the middle row has both neighbours; Next and Previous move with ?open= and replace", async () => {
+    vi.mocked(listSubmissions).mockResolvedValue(three() as never);
+    renderWithProviders(withProbe(), { initialPath: "/submissions?open=102" });
+    const header = await screen.findByTestId("sheet-header");
+    expect(within(header).getByRole("heading", { level: 2, name: "#102" })).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "Previous submission" })).toBeEnabled();
+    await userEvent.click(screen.getByRole("button", { name: "Next submission" }));
+    await waitFor(() => expect(screen.getByTestId("loc")).toHaveTextContent("/submissions?open=103"));
+    expect(screen.getByTestId("navtype")).toHaveTextContent("REPLACE");
+    expect(await within(screen.getByTestId("sheet-header")).findByRole("heading", { level: 2, name: "#103" })).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "Next submission" })).toBeDisabled();
+    expect(screen.getByRole("tab", { name: "Overview" })).toHaveAttribute("aria-selected", "true");
+  });
+
+  it("the Challenge menu item shows only for an eligible row and opens the challenge dialog", async () => {
+    vi.mocked(listSubmissions).mockResolvedValue(three([{}, { is_challengeable: true }]) as never);
+    const { unmount } = renderWithProviders(<SubmissionsPage />, { initialPath: "/submissions?open=101" });
+    await userEvent.click(await screen.findByRole("button", { name: "More actions" }));
+    expect(screen.queryByRole("menuitem", { name: "Challenge" })).toBeNull();
+    unmount();
+    renderWithProviders(<SubmissionsPage />, { initialPath: "/submissions?open=102" });
+    await userEvent.click(await screen.findByRole("button", { name: "More actions" }));
+    await userEvent.click(screen.getByRole("menuitem", { name: "Challenge" }));
+    expect(await screen.findByRole("dialog", { name: /challenge/i })).toBeInTheDocument();
+  });
+});

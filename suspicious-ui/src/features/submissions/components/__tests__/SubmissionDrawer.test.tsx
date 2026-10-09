@@ -1,6 +1,7 @@
 import { afterEach, describe, it, expect, vi } from "vitest";
 import { screen, waitFor, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
+import { useLocation } from "react-router";
 import { renderWithProviders } from "@/test/utils";
 import { SubmissionDrawer, type SubmissionDrawerProps } from "../SubmissionDrawer";
 import { useColorStore } from "@/styles/colorStore";
@@ -437,5 +438,97 @@ describe("SubmissionDrawer - analysis tab statuses and aria", () => {
     expect(document.getElementById(id)).not.toBeNull();
     await userEvent.click(r);
     expect(await within(document.getElementById(id)!).findByText("What this means")).toBeInTheDocument();
+  });
+});
+
+describe("SubmissionDrawer - actions menu and neighbours", () => {
+  const wide = () =>
+    vi.stubGlobal("matchMedia", (query: string) => ({
+      matches: false, media: query, addEventListener: () => {}, removeEventListener: () => {},
+      addListener: () => {}, removeListener: () => {}, onchange: null, dispatchEvent: () => false,
+    }));
+  const more = () => screen.findByRole("button", { name: "More actions" });
+  const items = async () => {
+    await userEvent.click(await more());
+    return screen.getAllByRole("menuitem").map((m) => m.textContent);
+  };
+  const Loc = () => <span data-testid="loc">{useLocation().pathname + useLocation().search}</span>;
+  afterEach(() => vi.restoreAllMocks());
+
+  it("a reporter gets Markdown report and Copy link only", async () => {
+    wide();
+    renderWithProviders(<SubmissionDrawer {...base()} />);
+    expect(await items()).toEqual(["Markdown report", "Copy link"]);
+  });
+
+  it("an elevated user also gets Open in Investigation", async () => {
+    wide();
+    renderWithProviders(<SubmissionDrawer {...base({ elevated: true })} />);
+    expect(await items()).toEqual(["Markdown report", "Copy link", "Open in Investigation"]);
+  });
+
+  it("Challenge appears only with an onChallenge and calls it after the menu closes", async () => {
+    wide();
+    const onChallenge = vi.fn();
+    renderWithProviders(<SubmissionDrawer {...base({ onChallenge })} />);
+    expect(await items()).toEqual(["Markdown report", "Copy link", "Challenge"]);
+    await userEvent.click(screen.getByRole("menuitem", { name: "Challenge" }));
+    expect(onChallenge).toHaveBeenCalledTimes(1);
+    await waitFor(() => expect(screen.queryByRole("menu")).toBeNull());
+  });
+
+  it("Markdown report opens the markdown URL", async () => {
+    wide();
+    const open = vi.spyOn(window, "open").mockReturnValue(null);
+    renderWithProviders(<SubmissionDrawer {...base()} />);
+    await items();
+    await userEvent.click(screen.getByRole("menuitem", { name: "Markdown report" }));
+    expect(open).toHaveBeenCalledWith("/api/cases/18/report.md", "_blank");
+  });
+
+  it("Copy link writes the submissions URL and says so", async () => {
+    wide();
+    const write = vi.fn().mockResolvedValue(undefined);
+    vi.spyOn(navigator.clipboard, "writeText").mockImplementation(write);
+    renderWithProviders(<SubmissionDrawer {...base()} />);
+    await items();
+    await userEvent.click(screen.getByRole("menuitem", { name: "Copy link" }));
+    expect(write).toHaveBeenCalledWith(`${window.location.origin}/submissions?open=18`);
+    expect(await screen.findByText("Link copied")).toBeInTheDocument();
+  });
+
+  it("Open in Investigation navigates to the case there", async () => {
+    wide();
+    renderWithProviders(<><SubmissionDrawer {...base({ elevated: true })} /><Loc /></>, { initialPath: "/submissions?open=18" });
+    await items();
+    await userEvent.click(screen.getByRole("menuitem", { name: "Open in Investigation" }));
+    expect(screen.getByTestId("loc")).toHaveTextContent("/investigation?open=18");
+  });
+
+  it("More has menu aria and Escape returns focus to it", async () => {
+    wide();
+    renderWithProviders(<SubmissionDrawer {...base()} />);
+    const btn = await more();
+    expect(btn).toHaveAttribute("aria-haspopup", "menu");
+    expect(btn).toHaveAttribute("aria-expanded", "false");
+    await userEvent.click(btn);
+    expect(btn).toHaveAttribute("aria-expanded", "true");
+    await userEvent.keyboard("{Escape}");
+    await waitFor(() => expect(screen.queryByRole("menu")).toBeNull());
+    await waitFor(() => expect(btn).toHaveFocus());
+  });
+
+  it("previous and next are disabled at the ends and call onNavigate", async () => {
+    wide();
+    const onNavigate = vi.fn();
+    const { unmount } = renderWithProviders(<SubmissionDrawer {...base({ prevId: null, nextId: 19, onNavigate })} />);
+    expect(await screen.findByRole("button", { name: "Previous submission" })).toBeDisabled();
+    await userEvent.click(screen.getByRole("button", { name: "Next submission" }));
+    expect(onNavigate).toHaveBeenCalledWith(19);
+    unmount();
+    renderWithProviders(<SubmissionDrawer {...base({ prevId: 17, nextId: null, onNavigate })} />);
+    expect(await screen.findByRole("button", { name: "Next submission" })).toBeDisabled();
+    await userEvent.click(screen.getByRole("button", { name: "Previous submission" }));
+    expect(onNavigate).toHaveBeenCalledWith(17);
   });
 });

@@ -4,12 +4,16 @@ import {
   Box,
   Button,
   Drawer,
+  IconButton,
   Stack,
   Tab,
   Tabs,
+  Tooltip,
   Typography,
+  useMediaQuery,
+  useTheme,
 } from "@mui/material";
-import { DescriptionOutlined } from "@mui/icons-material";
+import { ChevronLeft, ChevronRight, DescriptionOutlined } from "@mui/icons-material";
 import type { UseQueryResult } from "@tanstack/react-query";
 import type { SubmissionDetails, SubmissionRow } from "@/features/submissions/api";
 import type { CaseComment } from "@/features/comments/api";
@@ -17,6 +21,7 @@ import { ResultChip, useResultHex } from "@/shared/components/ResultChip";
 import { SheetHeader } from "@/shared/components/SheetHeader";
 import { CopyIconButton } from "@/shared/components/CopyIconButton";
 import { AnalysisTab } from "@/features/submissions/components/AnalysisTab";
+import { DrawerActions } from "@/features/submissions/components/DrawerActions";
 import { OverviewTab } from "@/features/submissions/components/OverviewTab";
 import { CommentThread } from "@/features/comments/CommentThread";
 import { fmtDate, groupReportsByArtifact } from "@/features/submissions/utils";
@@ -52,6 +57,13 @@ export type SubmissionDrawerProps = {
   comments: UseQueryResult<CaseComment[]>;
   onAddComment: (body: string) => Promise<unknown>;
   isAddingComment: boolean;
+  elevated?: boolean;
+  /** Set only when the row can be challenged. */
+  onChallenge?: () => void;
+  /** Adjacent rows of the current page; null at the ends. */
+  prevId?: number | string | null;
+  nextId?: number | string | null;
+  onNavigate?: (id: number | string) => void;
 };
 
 export function SubmissionDrawer({
@@ -63,7 +75,13 @@ export function SubmissionDrawer({
   comments: commentsQuery,
   onAddComment,
   isAddingComment,
+  elevated,
+  onChallenge,
+  prevId = null,
+  nextId = null,
+  onNavigate,
 }: SubmissionDrawerProps) {
+  const isPhone = useMediaQuery(useTheme().breakpoints.down("sm"));
   const analyzerReports = React.useMemo(
     () => detailsQuery.data?.analyzer_reports ?? [],
     [detailsQuery.data]
@@ -123,15 +141,28 @@ export function SubmissionDrawer({
                 <Stack direction="row" spacing={0.5} sx={{ alignItems: "center", minWidth: 0 }}>
                   <Typography variant="h2" component="h2">#{selectedRow.id}</Typography>
                   <CopyIconButton text={String(selectedRow.id)} title="Copy ID" />
+                  {([["Previous submission", prevId, <ChevronLeft key="l" fontSize="small" />], ["Next submission", nextId, <ChevronRight key="r" fontSize="small" />]] as const).map(([label, target, icon]) => (
+                    <Tooltip key={label} title={label}>
+                      {/* span: a disabled button can't host the tooltip's listeners */}
+                      <span>
+                        <IconButton size="small" aria-label={label} disabled={target == null} onClick={() => target != null && onNavigate?.(target)}>
+                          {icon}
+                        </IconButton>
+                      </span>
+                    </Tooltip>
+                  ))}
                 </Stack>
-                <Stack direction="row" spacing={1} sx={{ alignItems: "center", flexShrink: 0 }}>
-                  <Button
-                    variant="outlined"
-                    startIcon={<DescriptionOutlined />}
-                    onClick={() => window.open(`/api/cases/${selectedRow.id}/report/`, "_blank")}
-                  >
-                    Full report
-                  </Button>
+                <Stack direction="row" spacing={isPhone ? 0.5 : 1} sx={{ alignItems: "center", flexShrink: 0 }}>
+                  {isPhone ? null : (
+                    <Button
+                      variant="outlined"
+                      startIcon={<DescriptionOutlined />}
+                      onClick={() => window.open(`/api/cases/${selectedRow.id}/report/`, "_blank")}
+                    >
+                      Full report
+                    </Button>
+                  )}
+                  <DrawerActions id={selectedRow.id} elevated={elevated} onChallenge={onChallenge} includeFullReport={isPhone} />
                   <Button onClick={onClose}>Close</Button>
                 </Stack>
               </Stack>
