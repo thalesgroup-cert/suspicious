@@ -1,5 +1,5 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
-import { screen, waitFor } from "@testing-library/react";
+import { screen, waitFor, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { renderWithProviders, mockMe } from "@/test/utils";
 
@@ -49,15 +49,64 @@ describe("SubmitPage", () => {
     mockApiGet.mockResolvedValue({ data: "suspicious@corp.test" } as never);
   });
 
-  it("renders the two submission modes", async () => {
-    renderSubmit();
+  describe("mode selector", () => {
+    const group = async () => screen.findByRole("group", { name: "Submission type" });
+    const dropzone = () => screen.queryByText("Drag and drop or click to browse");
 
-    expect(
-      await screen.findByText("Drag and drop or click to browse")
-    ).toBeInTheDocument();
-    // File mode is default; the mode cards show File + Indicators, no third.
-    expect(screen.getAllByText("Indicators").length).toBeGreaterThan(0);
-    expect(screen.queryByText("URL, Domain or Indicator")).not.toBeInTheDocument();
+    it("defaults to Indicators: its panel shows, the file dropzone does not", async () => {
+      renderSubmit();
+      expect(await screen.findByLabelText("Indicators")).toBeInTheDocument();
+      expect(dropzone()).not.toBeInTheDocument();
+    });
+
+    it("is a two-button group, Indicators first and pressed", async () => {
+      renderSubmit();
+      const buttons = within(await group()).getAllByRole("button");
+      expect(buttons).toHaveLength(2);
+      expect(buttons[0]).toHaveTextContent("Indicators");
+      expect(buttons[1]).toHaveTextContent("File");
+      expect(buttons[0]).toHaveAttribute("aria-pressed", "true");
+      expect(buttons[1]).toHaveAttribute("aria-pressed", "false");
+    });
+
+    it("clicking File switches the panel and aria-pressed", async () => {
+      const user = userEvent.setup();
+      renderSubmit();
+      const [ind, file] = within(await group()).getAllByRole("button");
+      await user.click(file);
+      expect(await screen.findByText("Drag and drop or click to browse")).toBeInTheDocument();
+      expect(file).toHaveAttribute("aria-pressed", "true");
+      expect(ind).toHaveAttribute("aria-pressed", "false");
+    });
+
+    it("clicking the active button keeps the selection", async () => {
+      const user = userEvent.setup();
+      renderSubmit();
+      const [ind] = within(await group()).getAllByRole("button");
+      await user.click(ind);
+      expect(ind).toHaveAttribute("aria-pressed", "true");
+      expect(await screen.findByLabelText("Indicators")).toBeInTheDocument();
+    });
+
+    it.each([[" "], ["{Enter}"]])("keyboard: arrow to File and press %j switches", async (key) => {
+      const user = userEvent.setup();
+      renderSubmit();
+      const [ind, file] = within(await group()).getAllByRole("button");
+      ind.focus();
+      expect(ind).toHaveFocus();
+      await user.keyboard("{ArrowRight}"); // roving tabindex: arrows move within the group
+      expect(file).toHaveFocus();
+      await user.keyboard(key);
+      expect(file).toHaveAttribute("aria-pressed", "true");
+      expect(await screen.findByText("Drag and drop or click to browse")).toBeInTheDocument();
+    });
+
+    it("has no Recommended or Selected chips", async () => {
+      renderSubmit();
+      await group();
+      expect(screen.queryByText("Recommended")).not.toBeInTheDocument();
+      expect(screen.queryByText("Selected")).not.toBeInTheDocument();
+    });
   });
 
   it("switches to indicators mode and shows the textarea + IOC upload", async () => {
@@ -134,12 +183,16 @@ describe("SubmitPage", () => {
     const cfg = (max?: number) => ({
       data: { status: "success", data: { suspicious_email: "s@corp.test", ...(max ? { max_file_bytes: max } : {}) } },
     });
+    const renderFile = async () => {
+      renderSubmit();
+      await userEvent.setup().click(await screen.findByRole("button", { name: /^File/ }));
+    };
     const fileInput = () => document.querySelector('input[type="file"]') as HTMLInputElement;
     const mk = (n: number, name = "a.eml") => new File([new Uint8Array(n)], name);
 
     it("rejects an oversized file with the real limit and no chip", async () => {
       mockApiGet.mockResolvedValue(cfg(1024) as never);
-      renderSubmit();
+      await renderFile();
       await screen.findByText(/up to 1 KB/);
       await userEvent.setup({ applyAccept: false }).upload(fileInput(), mk(2048, "big.eml"));
       await waitFor(() =>
@@ -152,7 +205,7 @@ describe("SubmitPage", () => {
 
     it("accepts a file of exactly the limit", async () => {
       mockApiGet.mockResolvedValue(cfg(1024) as never);
-      renderSubmit();
+      await renderFile();
       await screen.findByText(/up to 1 KB/);
       await userEvent.setup().upload(fileInput(), mk(1024, "ok.eml"));
       expect(await screen.findByText("ok.eml")).toBeInTheDocument();
@@ -160,7 +213,7 @@ describe("SubmitPage", () => {
 
     it("accepts a 0-byte file in the dropzone", async () => {
       mockApiGet.mockResolvedValue(cfg(1024) as never);
-      renderSubmit();
+      await renderFile();
       await screen.findByText(/up to 1 KB/);
       await userEvent.setup().upload(fileInput(), mk(0, "empty.eml"));
       expect(await screen.findByText("empty.eml")).toBeInTheDocument();
@@ -168,7 +221,7 @@ describe("SubmitPage", () => {
 
     it("without a loaded limit shows no 'undefined' and still selects a 10 MB file", async () => {
       mockApiGet.mockReturnValue(new Promise(() => {}) as never);
-      renderSubmit();
+      await renderFile();
       await screen.findByText(/One file per submission/);
       expect(screen.queryByText(/undefined/)).not.toBeInTheDocument();
       await userEvent.setup().upload(fileInput(), mk(10 * 1024 * 1024, "huge.eml"));
@@ -177,7 +230,7 @@ describe("SubmitPage", () => {
 
     it("rejects 1025 bytes when the limit is 1024", async () => {
       mockApiGet.mockResolvedValue(cfg(1024) as never);
-      renderSubmit();
+      await renderFile();
       await screen.findByText(/up to 1 KB/);
       await userEvent.setup().upload(fileInput(), mk(1025, "over.eml"));
       expect(await screen.findByText(/over.eml is 1 KB; the limit is 1 KB\./)).toBeInTheDocument();
@@ -186,7 +239,7 @@ describe("SubmitPage", () => {
 
     it("clears the rejection on the next good drop and on Remove", async () => {
       mockApiGet.mockResolvedValue(cfg(1024) as never);
-      renderSubmit();
+      await renderFile();
       await screen.findByText(/up to 1 KB/);
       const user = userEvent.setup();
       await user.upload(fileInput(), mk(2048, "big.eml"));
@@ -205,7 +258,7 @@ describe("SubmitPage", () => {
       mockApiGet.mockRejectedValue(new Error("boom") as never);
       const user = userEvent.setup();
       const write = vi.spyOn(navigator.clipboard, "writeText").mockResolvedValue();
-      renderSubmit();
+      await renderFile();
       const btn = await screen.findByRole("button", { name: "suspicious@example.com" });
       expect(btn).toBeEnabled();
       expect(screen.queryByText(/undefined/)).not.toBeInTheDocument();
@@ -221,7 +274,7 @@ describe("SubmitPage", () => {
       mockApiGet.mockReturnValue(new Promise((r) => (resolve = r)) as never);
       const user = userEvent.setup();
       const write = vi.spyOn(navigator.clipboard, "writeText").mockResolvedValue();
-      renderSubmit();
+      await renderFile();
       const loading = await screen.findByRole("button", { name: "Loading address…" });
       expect(loading).toBeDisabled();
       resolve(cfg(1024).data && cfg(1024));
@@ -234,7 +287,7 @@ describe("SubmitPage", () => {
 
     it("shows the limit in the helper text", async () => {
       mockApiGet.mockResolvedValue(cfg(5242880) as never);
-      renderSubmit();
+      await renderFile();
       expect(await screen.findByText("One file per submission, up to 5 MB.")).toBeInTheDocument();
     });
   });

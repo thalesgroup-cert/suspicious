@@ -47,7 +47,7 @@ import {
 } from "@/features/submit/api";
 import { parseIndicators } from "@/features/submit/parseIndicators";
 import {
-  ModeSelectorCard,
+  ModeToggle,
   SectionHeader,
   SidePanel,
   SoftCard,
@@ -97,7 +97,7 @@ export default function SubmitPage() {
     configQuery.data?.suspiciousEmail ??
     "suspicious@example.com";
 
-  const [mode, setMode] = React.useState<SubmitMode>("file");
+  const [mode, setMode] = React.useState<SubmitMode>("indicators");
   const [selectedFile, setSelectedFile] = React.useState<File | null>(null);
   const [fallbackCta, setFallbackCta] = React.useState(false);
   const [indicatorsText, setIndicatorsText] = React.useState("");
@@ -300,29 +300,24 @@ export default function SubmitPage() {
 
               <Divider sx={{ opacity: 0.25 }} />
 
-              <Box
-                sx={{
-                  display: "grid",
-                  gridTemplateColumns: { xs: "1fr", md: "repeat(2, 1fr)" },
-                  gap: 1.5,
-                }}
-              >
-                <ModeSelectorCard
-                  active={mode === "file"}
-                  title="File"
-                  subtitle="Upload an attachment, sample or email (.eml / .msg) for analysis."
-                  icon={<UploadFileOutlined />}
-                  onClick={() => switchMode("file")}
-                />
-                <ModeSelectorCard
-                  active={mode === "indicators"}
-                  title="Indicators"
-                  subtitle="Paste one or many URLs, IPs, hashes or domains, or upload an IOC-list file. Type is detected automatically; analysed together as one case."
-                  icon={<FormatListBulletedOutlined />}
-                  helper="Recommended"
-                  onClick={() => switchMode("indicators")}
-                />
-              </Box>
+              <ModeToggle
+                value={mode}
+                onChange={switchMode}
+                options={[
+                  {
+                    value: "indicators",
+                    title: "Indicators",
+                    subtitle: "URLs, domains, IPs, hashes, or an IOC-list file",
+                    icon: <FormatListBulletedOutlined />,
+                  },
+                  {
+                    value: "file",
+                    title: "File",
+                    subtitle: "An email (.eml, .msg) or any attachment",
+                    icon: <UploadFileOutlined />,
+                  },
+                ]}
+              />
             </Stack>
           </CardContent>
         </SoftCard>
