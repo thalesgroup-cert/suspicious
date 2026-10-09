@@ -225,6 +225,10 @@ export default function SubmitPage() {
     () => parseIndicators(indicatorsText),
     [indicatorsText]
   );
+  const validCount = indicatorsPreview.filter((p) => p.type).length;
+  const skippedCount = indicatorsPreview.length - validCount;
+  const maxIndicators = configQuery.data?.maxIndicators ?? 100;
+  const overLimit = validCount > maxIndicators;
 
   const loadingOpen =
     fileMutation.isPending ||
@@ -544,24 +548,33 @@ export default function SubmitPage() {
                         >
                           <Typography
                             variant="body2"
+                            color={p.type ? "text.primary" : "text.secondary"}
                             sx={{ fontFamily: "monospace", wordBreak: "break-all" }}
                           >
                             {p.value}
                           </Typography>
                           <Chip
                             size="small"
-                            label={p.type ?? "unrecognised"}
-                            color={p.type ? "default" : "error"}
+                            variant={p.type ? "filled" : "outlined"}
+                            label={p.type ?? "skipped"}
                           />
                         </Stack>
                       ))}
                     </Stack>
                   ) : null}
 
-                  <Typography variant="body2" color="text.secondary">
-                    {indicatorsPreview.filter((p) => p.type).length} indicator(s),{" "}
-                    {indicatorsPreview.filter((p) => !p.type).length} unrecognised
-                  </Typography>
+                  {indicatorsText.trim() ? (
+                    <Typography
+                      variant="body2"
+                      color={overLimit ? "error" : "text.secondary"}
+                    >
+                      {overLimit
+                        ? `${validCount} indicators; the limit is ${maxIndicators}.`
+                        : validCount === 0
+                          ? "Nothing recognisable yet. Add a URL, domain, IP or hash."
+                          : `${validCount} will be submitted${skippedCount ? ` · ${skippedCount} skipped` : ""}`}
+                    </Typography>
+                  ) : null}
 
                   <TextField
                     label="Context (optional)"
@@ -576,7 +589,8 @@ export default function SubmitPage() {
                     <Button
                       variant="contained"
                       disabled={
-                        indicatorsPreview.filter((p) => p.type).length === 0 ||
+                        validCount === 0 ||
+                        overLimit ||
                         indicatorsMutation.isPending
                       }
                       onClick={() => indicatorsMutation.mutate()}

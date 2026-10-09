@@ -238,4 +238,55 @@ describe("SubmitPage", () => {
       expect(await screen.findByText("One file per submission, up to 5 MB.")).toBeInTheDocument();
     });
   });
+
+  describe("indicator summary", () => {
+    const cfg = (max?: number) => ({
+      data: { status: "success", data: { suspicious_email: "s@corp.test", ...(max ? { max_indicators: max } : {}) } },
+    });
+    const open = async () => {
+      const user = userEvent.setup();
+      renderSubmit();
+      await user.click((await screen.findAllByText("Indicators"))[0]);
+      return { user, field: await screen.findByLabelText("Indicators") };
+    };
+    const ips = (n: number) => Array.from({ length: n }, (_, i) => `10.0.${Math.floor(i / 250)}.${(i % 250) + 1}`).join("\n");
+
+    it("states what will be submitted and what is skipped", async () => {
+      const { user, field } = await open();
+      await user.click(field);
+      await user.paste("not a thing  mail.example.org 999.1.1.1");
+      expect(await screen.findByText("1 will be submitted · 2 skipped")).toBeInTheDocument();
+      expect(screen.getAllByText("skipped").length).toBe(2);
+      expect(screen.queryByText("unrecognised")).not.toBeInTheDocument();
+      expect(screen.queryByText(/indicator\(s\)/)).not.toBeInTheDocument();
+    });
+
+    it("explains when nothing is recognisable", async () => {
+      const { user, field } = await open();
+      await user.click(field);
+      await user.paste("just words");
+      expect(await screen.findByText("Nothing recognisable yet. Add a URL, domain, IP or hash.")).toBeInTheDocument();
+      expect(screen.getByRole("button", { name: "Submit" })).toBeDisabled();
+    });
+
+    it("disables Submit above the default limit of 100", async () => {
+      const { user, field } = await open();
+      await user.click(field);
+      await user.paste(ips(101));
+      expect(await screen.findByText("101 indicators; the limit is 100.")).toBeInTheDocument();
+      expect(screen.getByRole("button", { name: "Submit" })).toBeDisabled();
+    });
+
+    it("uses the configured limit and ignores skipped rows when counting", async () => {
+      mockApiGet.mockResolvedValue(cfg(2) as never);
+      const { user, field } = await open();
+      await user.click(field);
+      await user.paste("8.8.8.8 foo 1.1.1.1 bar baz");
+      expect(await screen.findByText("2 will be submitted · 2 skipped")).toBeInTheDocument();
+      expect(screen.getByRole("button", { name: "Submit" })).not.toBeDisabled();
+      await user.type(field, " 9.9.9.9");
+      expect(await screen.findByText("3 indicators; the limit is 2.")).toBeInTheDocument();
+      expect(screen.getByRole("button", { name: "Submit" })).toBeDisabled();
+    });
+  });
 });

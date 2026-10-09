@@ -21,12 +21,27 @@ const classify = (v: string): IndicatorType => {
 export function parseIndicators(text: string): ParsedIndicator[] {
   const seen = new Set<string>();
   const out: ParsedIndicator[] = [];
+  let prose: string[] = [];
+  const flush = () => {
+    if (!prose.length) return;
+    const v = prose.join(" ");
+    out.push({ raw: v, value: v, type: null });
+    prose = [];
+  };
   for (const tok of (text || "").split(/[\s,;]+/)) {
     if (!tok) continue;
     const value = refang(tok);
-    if (!value || seen.has(value.toLowerCase())) continue;
+    if (!value) continue;
+    const type = classify(value);
+    if (!type) {
+      prose.push(value);
+      continue;
+    }
+    flush();
+    if (seen.has(value.toLowerCase())) continue;
     seen.add(value.toLowerCase());
-    out.push({ raw: tok, value, type: classify(value) });
+    out.push({ raw: tok, value, type });
   }
+  flush();
   return out;
 }
