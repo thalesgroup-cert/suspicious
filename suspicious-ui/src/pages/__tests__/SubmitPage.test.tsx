@@ -1,5 +1,5 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
-import { screen, waitFor, within } from "@testing-library/react";
+import { act, screen, waitFor, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { renderWithProviders, mockMe } from "@/test/utils";
 
@@ -143,6 +143,26 @@ describe("SubmitPage", () => {
       await waitFor(() => expect(getComputedStyle(btn).backgroundColor).not.toBe(off)); // bg transitions
     });
 
+    it("a disabled Submit under a gradient theme has no gradient and a muted border", async () => {
+      renderSubmit();
+      const btn = await screen.findByRole("button", { name: "Submit" });
+      act(() => {
+        window.dispatchEvent(new CustomEvent("suspicious:theme-hydrate", { detail: { theme: "sunrise", autoSeasonal: false } }));
+      });
+      expect(btn).toBeDisabled();
+      await waitFor(() => expect(getComputedStyle(btn).backgroundImage).toBe("none"));
+    });
+
+    it("toggle subtitles reset letter-spacing under high_contrast", async () => {
+      renderSubmit();
+      const sub = await screen.findByText("URLs, domains, IPs, hashes, or an IOC-list file");
+      act(() => {
+        window.dispatchEvent(new CustomEvent("suspicious:theme-hydrate", { detail: { theme: "high_contrast", autoSeasonal: false } }));
+      });
+      await waitFor(() => expect(getComputedStyle(sub.closest("button")!).letterSpacing).not.toBe("normal"));
+      expect(getComputedStyle(sub).letterSpacing).toBe("normal");
+    });
+
     it("headings carry no tight letter-spacing or extra-heavy weight", async () => {
       const user = userEvent.setup();
       renderSubmit();
@@ -156,7 +176,7 @@ describe("SubmitPage", () => {
     });
   });
 
-  it("switches to indicators mode and shows the textarea + IOC upload", async () => {
+  it("indicators panel shows the textarea and IOC upload", async () => {
     const user = userEvent.setup();
     renderSubmit();
 
@@ -280,39 +300,61 @@ describe("SubmitPage", () => {
       await renderFile();
       await screen.findByText(/up to 1 KB/);
       await userEvent.setup().upload(fileInput(), mk(1025, "over.eml"));
-      expect(await screen.findByText(/over.eml is 1 KB; the limit is 1 KB\./)).toBeInTheDocument();
+      expect(await screen.findByText(/over.eml is 1,025 bytes; the limit is 1,024 bytes\./)).toBeInTheDocument();
       expect(screen.queryByRole("button", { name: "Remove" })).not.toBeInTheDocument();
     });
 
-    it("clears the rejection on the next good drop and on Remove", async () => {
+    it("keeps kilobyte labels when the size and the limit format differently", async () => {
+      mockApiGet.mockResolvedValue(cfg(1024) as never);
+      await renderFile();
+      await screen.findByText(/up to 1 KB/);
+      await userEvent.setup().upload(fileInput(), mk(2048, "two.eml"));
+      expect(await screen.findByText(/two.eml is 2 KB; the limit is 1 KB\./)).toBeInTheDocument();
+    });
+
+    it("a rejection leaves nothing selected, and the next good drop clears the error", async () => {
       mockApiGet.mockResolvedValue(cfg(1024) as never);
       await renderFile();
       await screen.findByText(/up to 1 KB/);
       const user = userEvent.setup();
       await user.upload(fileInput(), mk(2048, "big.eml"));
       await screen.findByText(/big.eml is 2 KB/);
+      expect(screen.queryByRole("button", { name: "Remove" })).not.toBeInTheDocument();
+      expect(screen.queryByText("File selected")).not.toBeInTheDocument();
+      expect(screen.getByRole("button", { name: "Upload file" })).toBeDisabled();
       await user.upload(fileInput(), mk(10, "ok.eml"));
       await screen.findByText("ok.eml");
       expect(screen.queryByText(/big.eml is/)).not.toBeInTheDocument();
-      await user.upload(fileInput(), mk(2048, "big2.eml"));
-      await screen.findByText(/big2.eml is 2 KB/);
-      await user.click(screen.getByRole("button", { name: "Remove" }));
-      expect(screen.queryByText(/big2.eml is/)).not.toBeInTheDocument();
     });
 
-    it("with a failing config: dropzone works, no 'undefined', fallback email copyable", async () => {
+    it("a rejected drop replaces a previously selected file with nothing", async () => {
+      mockApiGet.mockResolvedValue(cfg(1024) as never);
+      await renderFile();
+      await screen.findByText(/up to 1 KB/);
+      const user = userEvent.setup();
+      await user.upload(fileInput(), mk(10, "ok.eml"));
+      await screen.findByText("ok.eml");
+      expect(screen.getByRole("button", { name: "Upload file" })).toBeEnabled();
+      await user.upload(fileInput(), mk(2048, "big.eml"));
+      await screen.findByText(/big.eml is 2 KB/);
+      expect(screen.queryByText("ok.eml")).not.toBeInTheDocument();
+      expect(screen.queryByRole("button", { name: "Remove" })).not.toBeInTheDocument();
+      expect(screen.getByRole("button", { name: "Upload file" })).toBeDisabled();
+    });
+    // Remove-clears-error can no longer happen: an error and a chip never coexist.
+
+    it("with a failing config: dropzone works, no 'undefined', email copy disabled as unavailable", async () => {
       vi.stubEnv("VITE_SUSPICIOUS_EMAIL", ""); // .env sets it; these cases need it unset
       mockApiGet.mockRejectedValue(new Error("boom") as never);
       const user = userEvent.setup();
       const write = vi.spyOn(navigator.clipboard, "writeText").mockResolvedValue();
       await renderFile();
-      const btn = await screen.findByRole("button", { name: "suspicious@example.com" });
-      expect(btn).toBeEnabled();
+      const btn = await screen.findByRole("button", { name: "Address unavailable" });
+      expect(btn).toBeDisabled();
       expect(screen.queryByText(/undefined/)).not.toBeInTheDocument();
       await user.upload(fileInput(), mk(3 * 1024 * 1024, "m.eml"));
       expect(await screen.findByText("m.eml")).toBeInTheDocument();
-      await user.click(btn);
-      expect(write).toHaveBeenCalledWith("suspicious@example.com");
+      expect(write).not.toHaveBeenCalled(); // disabled: it cannot be clicked
     });
 
     it("disables the email copy while config is pending, then copies the resolved address", async () => {
@@ -377,7 +419,7 @@ describe("SubmitPage", () => {
       expect(screen.getByRole("button", { name: "Submit" })).toBeDisabled();
     });
 
-    it("says 'up to' with a note only when a URL row is present", async () => {
+    it("says 'found' with a note only when a URL row is present", async () => {
       const { user, field } = await open();
       await user.click(field);
       await user.paste("8.8.8.8");
@@ -385,8 +427,19 @@ describe("SubmitPage", () => {
       expect(status).toHaveAttribute("role", "status");
       expect(screen.queryByText(/Links to private or internal/)).not.toBeInTheDocument();
       await user.type(field, " http://evil.example/x");
-      expect(await screen.findByText("up to 2 will be submitted")).toBeInTheDocument();
+      expect(await screen.findByText("2 found")).toBeInTheDocument();
       expect(screen.getByText(/Links to private or internal addresses are skipped/)).toBeInTheDocument();
+    });
+
+    it("keeps an empty status region mounted and links Submit to it only when it has text", async () => {
+      const { user, field } = await open();
+      const status = document.getElementById("indicators-summary") as HTMLElement;
+      expect(status).toHaveAttribute("role", "status");
+      expect(status).toBeEmptyDOMElement();
+      expect(screen.getByRole("button", { name: "Submit" })).not.toHaveAttribute("aria-describedby");
+      await user.click(field);
+      await user.paste("just words");
+      await waitFor(() => expect(status).not.toBeEmptyDOMElement());
     });
 
     it("links the disabled Submit to the summary", async () => {

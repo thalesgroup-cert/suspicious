@@ -61,7 +61,7 @@ export function ModeToggle<T extends string>(props: {
             </Box>
             <Box sx={{ minWidth: 0, flex: 1 }}>
               <Typography sx={{ fontWeight: 700 }}>{o.title}</Typography>
-              <Typography variant="body2" color="text.secondary">
+              <Typography variant="body2" color="text.secondary" sx={{ letterSpacing: "normal" }}>
                 {o.subtitle}
               </Typography>
             </Box>

@@ -75,6 +75,7 @@ const disabledPrimarySx = {
     backgroundColor: "action.disabledBackground",
     color: "action.disabled",
     boxShadow: "none",
+    borderColor: "action.disabledBackground",
   },
 } as const;
 
@@ -103,10 +104,8 @@ export default function SubmitPage() {
   });
 
   const maxFileBytes = configQuery.data?.maxFileBytes;
-  const suspiciousEmail =
-    suspiciousEmailEnv ??
-    configQuery.data?.suspiciousEmail ??
-    "suspicious@example.com";
+  const suspiciousEmail = suspiciousEmailEnv || configQuery.data?.suspiciousEmail || "";
+  const emailKnown = !!suspiciousEmail;
 
   const [mode, setMode] = React.useState<SubmitMode>("indicators");
   const [selectedFile, setSelectedFile] = React.useState<File | null>(null);
@@ -137,9 +136,13 @@ export default function SubmitPage() {
       const r = rejections[0];
       const err = r?.errors[0];
       if (!r || !err) return;
+      setSelectedFile(null);
+      const limit = maxFileBytes ?? 0;
+      const sameLabel = formatBytes(r.file.size) === formatBytes(limit);
+      const show = (n: number) => (sameLabel ? `${n.toLocaleString()} bytes` : formatBytes(n));
       setFileError(
         err.code === "file-too-large"
-          ? `${r.file.name} is ${formatBytes(r.file.size)}; the limit is ${formatBytes(maxFileBytes ?? 0)}.`
+          ? `${r.file.name} is ${show(r.file.size)}; the limit is ${show(limit)}.`
           : err.code === "file-invalid-type"
           ? `${r.file.name} is not an accepted file type.`
           : err.code === "too-many-files"
@@ -268,10 +271,8 @@ export default function SubmitPage() {
 
   // Handlers
 
-  const emailPending = !suspiciousEmailEnv && configQuery.isPending;
-
   async function copyEmail() {
-    if (emailPending) return;
+    if (!emailKnown) return;
     try {
       await navigator.clipboard.writeText(suspiciousEmail);
       enqueueSnackbar("Email address copied.", { variant: "info" });
@@ -571,27 +572,28 @@ export default function SubmitPage() {
                     </Stack>
                   ) : null}
 
-                  {indicatorsText.trim() ? (
-                    <Stack spacing={0.25}>
-                      <Typography
-                        id="indicators-summary"
-                        role="status"
-                        variant="body2"
-                        color={overLimit ? "error" : "text.secondary"}
-                      >
-                        {overLimit
+                  {/* Always mounted so screen readers register the live region; no height or gap while empty. */}
+                  <Stack spacing={0.25} sx={indicatorsText.trim() ? undefined : { "&&&": { m: 0 } }}>
+                    <Typography
+                      id="indicators-summary"
+                      role="status"
+                      variant="body2"
+                      color={overLimit ? "error" : "text.secondary"}
+                    >
+                      {!indicatorsText.trim()
+                        ? null
+                        : overLimit
                           ? `${validCount} indicators; the limit is ${maxIndicators}.`
                           : validCount === 0
                             ? "Nothing recognisable yet. Add a URL, domain, IP or hash."
-                            : `${hasUrl ? "up to " : ""}${validCount} will be submitted${skippedCount ? ` · ${skippedCount} skipped` : ""}`}
+                            : `${validCount} ${hasUrl ? "found" : "will be submitted"}${skippedCount ? ` · ${skippedCount} skipped` : ""}`}
+                    </Typography>
+                    {indicatorsText.trim() && hasUrl && !overLimit && validCount > 0 ? (
+                      <Typography role="status" variant="caption" color="text.secondary">
+                        Links to private or internal addresses are skipped, and wrapped links (SafeLinks, URLDefense) add their real target.
                       </Typography>
-                      {hasUrl && !overLimit && validCount > 0 ? (
-                        <Typography role="status" variant="caption" color="text.secondary">
-                          Links to private or internal addresses are skipped, and wrapped links (SafeLinks, URLDefense) add their real target.
-                        </Typography>
-                      ) : null}
-                    </Stack>
-                  ) : null}
+                    ) : null}
+                  </Stack>
 
                   <Typography variant="caption" color="text.secondary">
                     Related indicators submitted together are correlated as one case.
@@ -684,7 +686,7 @@ export default function SubmitPage() {
               <Button
                 variant="outlined"
                 onClick={copyEmail}
-                disabled={emailPending}
+                disabled={!emailKnown}
                 startIcon={<ContentCopyOutlined />}
                 sx={{
                   mt: 0.5,
@@ -694,7 +696,11 @@ export default function SubmitPage() {
                 }}
                 fullWidth
               >
-                {emailPending ? "Loading address…" : suspiciousEmail}
+                {emailKnown
+                  ? suspiciousEmail
+                  : configQuery.isPending
+                  ? "Loading address…"
+                  : "Address unavailable"}
               </Button>
             </SidePanel>
           </Stack>
