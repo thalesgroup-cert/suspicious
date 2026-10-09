@@ -345,7 +345,7 @@ export default function AppLayout() {
         color="transparent"
         sx={{
           display: { xs: "flex", md: "none" },
-          zIndex: (t) => t.zIndex.drawer + 1,
+          zIndex: (t) => t.zIndex.appBar,
           backdropFilter: "blur(20px)",
           WebkitBackdropFilter: "blur(20px)",
           background: isDark

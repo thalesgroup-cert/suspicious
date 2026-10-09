@@ -136,3 +136,14 @@ describe("SubmissionsPage - Test Suite", () => {
     });
   });
 });
+
+describe("SubmissionsPage - detail drawer header", () => {
+  it("is sticky so Close stays reachable while the content scrolls", async () => {
+    vi.mocked(getMe).mockResolvedValue(fixtureMe);
+    vi.mocked(listSubmissions).mockResolvedValue(fixtureSubmissionsList as never);
+    const id = (fixtureSubmissionsList as { results: { id: number }[] }).results[0].id;
+    renderWithProviders(<SubmissionsPage />, { initialPath: `/submissions?open=${id}` });
+    const header = await screen.findByTestId("sheet-header");
+    expect(getComputedStyle(header).position).toBe("sticky");
+  });
+});

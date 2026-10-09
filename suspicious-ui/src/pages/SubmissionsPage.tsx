@@ -63,6 +63,7 @@ import {
 import { useDebounced } from "@/shared/hooks/useDebounced";
 import { StatusChip } from "@/shared/components/StatusChip";
 import { ResultChip } from "@/shared/components/ResultChip";
+import { SheetHeader } from "@/shared/components/SheetHeader";
 import { CopyIconButton } from "@/shared/components/CopyIconButton";
 import MailPreview from "@/shared/components/MailPreview";
 
@@ -804,14 +805,7 @@ export default function SubmissionsPage() {
           </Box>
         ) : (
           <Stack sx={{ height: "100%" }}>
-            <Box
-              sx={(theme) => ({
-                px: 2.25,
-                py: 1.75,
-                borderBottom: `1px solid ${theme.palette.divider}`,
-                background: `linear-gradient(180deg, ${alpha(theme.palette.action.hover, 0.22)} 0%, ${alpha(theme.palette.background.paper, 0)} 100%)`,
-              })}
-            >
+            <SheetHeader>
               <Stack direction="row" spacing={2} sx={{ alignItems: "flex-start", justifyContent: "space-between" }} >
                 <Box>
                   <Typography variant="overline" color="text.secondary">Submission</Typography>
@@ -848,7 +842,7 @@ export default function SubmissionsPage() {
                 <Chip size="small" label={`${selectedRow.tests_done} tests`} variant="outlined"
                   sx={{ fontWeight: 900 }} />
               </Stack>
-            </Box>
+            </SheetHeader>
 
             <Box sx={{ flex: 1, overflowY: "auto" }}>
 
