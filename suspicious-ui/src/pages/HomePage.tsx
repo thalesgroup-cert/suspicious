@@ -237,7 +237,7 @@ export default function HomePage() {
         >
           <Stack direction="row" spacing={1.5} sx={{ minWidth: 0, alignItems: "flex-start" }}>
             <Box sx={{ minWidth: 0 }}>
-              <Typography variant="h2" sx={{ overflowWrap: "anywhere" }}>
+              <Typography variant="pageTitle" component="h1" sx={{ overflowWrap: "anywhere" }}>
                 Welcome, {displayName}
               </Typography>
               <ThemeGreeting caps={capabilities} name={displayName} />

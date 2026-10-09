@@ -63,4 +63,18 @@ describe("heading sizes", () => {
     const t = themes.paper.typography;
     expect([t.h1, t.h2, t.h3, t.h4, t.h5].map((v) => px(v.fontSize))).toEqual([28, 22, 18, 16, 14]);
   });
+
+  it("every theme has a pageTitle variant: 20-28px, weight <= 800, not tightly tracked", () => {
+    for (const [name, theme] of Object.entries(themes)) {
+      const t = (theme.typography as unknown as Record<string, { fontSize?: unknown; fontWeight?: unknown; letterSpacing?: unknown }>).pageTitle;
+      expect(t, name).toBeDefined();
+      const size = px(t.fontSize);
+      expect(size, name).toBeGreaterThanOrEqual(20);
+      expect(size, name).toBeLessThanOrEqual(28);
+      expect(Number(t.fontWeight), name).toBeLessThanOrEqual(800);
+      const ls = String(t.letterSpacing ?? 0);
+      const lsPx = ls.endsWith("em") ? parseFloat(ls) * size : parseFloat(ls);
+      expect(lsPx, name).toBeGreaterThanOrEqual(-0.01 * size);
+    }
+  });
 });

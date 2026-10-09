@@ -54,6 +54,12 @@ describe("SubmissionsPage - Test Suite", () => {
   });
 
   describe("Display", () => {
+    it("renders the page title as an h1 at page-title size", async () => {
+      renderWithProviders(<SubmissionsPage />, { initialPath: "/submissions" });
+      const h = await screen.findByRole("heading", { level: 1, name: "Submissions" });
+      expect(parseFloat(getComputedStyle(h).fontSize)).toBeGreaterThanOrEqual(20);
+    });
+
     it("shows rows when submissions are returned", async () => {
       renderWithProviders(<SubmissionsPage />, { initialPath: "/submissions" });
       expect(

@@ -73,7 +73,7 @@ export default function AboutPage() {
                 <Stack direction="row" spacing={1.75} sx={{ flex: 1, minWidth: 0, alignItems: "center" }}>
                   <IconBadge icon={<InfoOutlined />} size={52} />
                   <Box>
-                    <Typography variant="h4" sx={{ lineHeight: 1.15, fontWeight: 950, letterSpacing: -0.8 }}>
+                    <Typography variant="pageTitle" component="h1">
                       About Suspicious
                     </Typography>
                     <Typography color="text.secondary" sx={{ mt: 0.35, fontSize: 14 }}>

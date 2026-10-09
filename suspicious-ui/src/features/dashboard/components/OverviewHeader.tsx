@@ -80,10 +80,7 @@ export default function OverviewHeader(props: {
       <Box sx={{ px: { xs: 2, md: 3 }, py: 1.5 }}>
         <Stack direction="row" spacing={2} sx={{ alignItems: "flex-start", justifyContent: "space-between" }} >
           <Box>
-            <Typography
-              variant="h5"
-              sx={{ fontWeight: 950, letterSpacing: -0.4, lineHeight: 1.1 }}
-            >
+            <Typography variant="pageTitle" component="h1">
               {props.title}
             </Typography>
           </Box>

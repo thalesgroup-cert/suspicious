@@ -61,6 +61,7 @@ const base: ThemeOptions = {
     h3: { fontSize: 18, fontWeight: 750, letterSpacing: -0.2 },
     h4: { fontSize: 16, fontWeight: 750 },
     h5: { fontSize: 14, fontWeight: 750 },
+    pageTitle: { fontSize: 22, fontWeight: 750, lineHeight: 1.2, letterSpacing: 0 },
     body1: { fontSize: 13, lineHeight: 1.55 },
     body2: { fontSize: 12.5, lineHeight: 1.5 },
     caption: { fontSize: 12, lineHeight: 1.35 },
@@ -220,6 +221,12 @@ function mergeTypography(over: ThemeOptions["typography"]): ThemeOptions["typogr
   for (const [k, v] of Object.entries(over as Record<string, unknown>)) {
     const b = baseT[k];
     out[k] = b && typeof b === "object" && v && typeof v === "object" ? { ...b, ...v } : v;
+  }
+  // A theme whose headings use their own family gets the same on pageTitle (unless it sets one).
+  const h1 = (over as Record<string, { fontFamily?: string } | undefined>).h1;
+  const pt = (over as Record<string, { fontFamily?: string } | undefined>).pageTitle;
+  if (h1?.fontFamily && !pt?.fontFamily) {
+    out.pageTitle = { ...(out.pageTitle as object), fontFamily: h1.fontFamily };
   }
   return out as ThemeOptions["typography"];
 }
@@ -2863,6 +2870,7 @@ export const themes: Record<ThemeName, ReturnType<typeof createTheme>> = {
       h3: { fontSize: 18, fontWeight: 850, letterSpacing: -0.3, fontFamily: monoStack },
       h4: { fontSize: 16, fontWeight: 800, fontFamily: monoStack },
       h5: { fontSize: 14, fontWeight: 750, fontFamily: monoStack },
+      pageTitle: { fontSize: 22, fontWeight: 750, lineHeight: 1.2, letterSpacing: 0, fontFamily: monoStack },
       body1: { fontSize: 13, lineHeight: 1.6 },
       body2: { fontSize: 12.5, lineHeight: 1.55 },
       caption: { fontSize: 12, lineHeight: 1.35, fontFamily: monoStack },
@@ -4212,6 +4220,7 @@ export const themes: Record<ThemeName, ReturnType<typeof createTheme>> = {
       h3: { fontFamily: monoStack, fontWeight: 850, letterSpacing: -0.2, fontSize: 18 },
       h4: { fontFamily: monoStack, fontWeight: 800, fontSize: 16 },
       h5: { fontFamily: monoStack, fontWeight: 750, fontSize: 14 },
+      pageTitle: { fontFamily: monoStack, fontSize: 22, fontWeight: 750, lineHeight: 1.2, letterSpacing: 0 },
       body1: { fontFamily: sansStack, fontSize: 13, lineHeight: 1.6 },
       body2: { fontFamily: sansStack, fontSize: 12.5, lineHeight: 1.55 },
       caption: { fontFamily: sansStack, fontSize: 12, lineHeight: 1.35 },

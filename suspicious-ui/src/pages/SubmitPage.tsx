@@ -300,7 +300,7 @@ export default function SubmitPage() {
           <CardContent sx={{ p: { xs: 2.25, md: 3 } }}>
             <Stack spacing={2}>
               <Stack spacing={0.6}>
-                <Typography variant="h4" component="h1">
+                <Typography variant="pageTitle" component="h1">
                   Submit
                 </Typography>
                 <Typography variant="body2" color="text.secondary" sx={{ maxWidth: 760 }}>

@@ -248,7 +248,7 @@ export default function CampaignsPage() {
         sx={{ mb: 1.5, justifyContent: "space-between" }}
       >
         <Stack spacing={0.2}>
-          <Typography variant="h5" sx={{ fontWeight: 900, letterSpacing: -0.4 }} >
+          <Typography variant="pageTitle" component="h1">
             Campaign Dashboard
           </Typography>
           <Typography color="text.secondary" sx={{ fontSize: 14 }} >
