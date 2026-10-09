@@ -26,7 +26,7 @@ export function DrawerActions({ id, elevated, onChallenge, includeFullReport }: 
   const navigate = useNavigate();
   const { enqueueSnackbar } = useSnackbar();
   const close = () => setAnchor(null);
-  const run = (fn: () => void) => () => { close(); fn(); };
+  const run = (fn: () => unknown) => () => { close(); void fn(); };
   const icon = (el: React.ReactNode) => <ListItemIcon>{el}</ListItemIcon>;
 
   return (
@@ -51,10 +51,15 @@ export function DrawerActions({ id, elevated, onChallenge, includeFullReport }: 
           {icon(<DownloadOutlined fontSize="small" />)}<ListItemText>Markdown report</ListItemText>
         </MenuItem>
         <MenuItem
-          onClick={run(() => {
-            void navigator.clipboard
-              .writeText(`${window.location.origin}/submissions?open=${id}`)
-              .then(() => enqueueSnackbar("Link copied", { variant: "success" }));
+          onClick={run(async () => {
+            try {
+              // navigator.clipboard is undefined on insecure origins.
+              if (!navigator.clipboard?.writeText) throw new Error("no clipboard");
+              await navigator.clipboard.writeText(`${window.location.origin}/submissions?open=${id}`);
+              enqueueSnackbar("Link copied", { variant: "success" });
+            } catch {
+              enqueueSnackbar("Could not copy the link. Copy it from the address bar.", { variant: "error" });
+            }
           })}
         >
           {icon(<LinkOutlined fontSize="small" />)}<ListItemText>Copy link</ListItemText>

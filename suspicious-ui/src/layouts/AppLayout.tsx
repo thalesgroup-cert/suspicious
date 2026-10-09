@@ -33,6 +33,7 @@ import {
   getPageTitle,
   type NavItemConfig,
 } from "@/layouts/nav";
+import { isElevatedGroups } from "@/layouts/nav";
 import { ACCOUNT_NAV, PRIMARY_NAV, SECTIONS, WORKSPACE_NAV } from "@/layouts/navConfig";
 import { HelpButton, LogoutButton, NavItem, NavSection, UserCard } from "@/layouts/components/navComponents";
 import { HelpTourProvider } from "@/features/help/HelpTourProvider";
@@ -62,7 +63,7 @@ export default function AppLayout() {
     retry: false,
   });
   const groups: string[] = (me as any)?.groups ?? [];
-  const isElevated = groups.includes("CISO") || groups.includes("CERT") || groups.includes("Admin");
+  const isElevated = isElevatedGroups(groups);
 
   const [mobileOpen, setMobileOpen] = React.useState(false);
   const [hovered,    setHovered]    = React.useState(false);

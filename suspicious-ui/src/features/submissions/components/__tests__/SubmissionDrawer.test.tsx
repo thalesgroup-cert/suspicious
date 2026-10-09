@@ -531,4 +531,21 @@ describe("SubmissionDrawer - actions menu and neighbours", () => {
     await userEvent.click(screen.getByRole("button", { name: "Previous submission" }));
     expect(onNavigate).toHaveBeenCalledWith(17);
   });
+
+  it("Copy link says so when there is no clipboard, and when the write is rejected", async () => {
+    wide();
+    Object.defineProperty(navigator, "clipboard", { value: undefined, configurable: true });
+    const { unmount } = renderWithProviders(<SubmissionDrawer {...base()} />);
+    await items();
+    await userEvent.click(screen.getByRole("menuitem", { name: "Copy link" }));
+    expect(await screen.findByText("Could not copy the link. Copy it from the address bar.")).toBeInTheDocument();
+    unmount();
+    Object.defineProperty(navigator, "clipboard", { value: { writeText: vi.fn().mockRejectedValue(new Error("denied")) }, configurable: true });
+    renderWithProviders(<SubmissionDrawer {...base()} />);
+    await items();
+    await userEvent.click(screen.getByRole("menuitem", { name: "Copy link" }));
+    expect((await screen.findAllByText("Could not copy the link. Copy it from the address bar.")).length).toBeGreaterThan(0);
+    expect(screen.queryByText("Link copied")).toBeNull();
+    delete (navigator as { clipboard?: unknown }).clipboard; // back to the prototype's own clipboard
+  });
 });

@@ -48,6 +48,21 @@ function Panel({ value, tab, children }: { value: TabKey; tab: TabKey; children:
   );
 }
 
+function StepButton({ label, target, onNavigate, children }: {
+  label: string; target: number | string | null; onNavigate?: (id: number | string) => void; children: React.ReactNode;
+}) {
+  return (
+    <Tooltip title={label}>
+      {/* span: a disabled button can't host the tooltip's listeners */}
+      <span>
+        <IconButton size="small" aria-label={label} disabled={target == null} onClick={() => target != null && onNavigate?.(target)}>
+          {children}
+        </IconButton>
+      </span>
+    </Tooltip>
+  );
+}
+
 export type SubmissionDrawerProps = {
   open: boolean;
   onClose: () => void;
@@ -141,16 +156,8 @@ export function SubmissionDrawer({
                 <Stack direction="row" spacing={0.5} sx={{ alignItems: "center", minWidth: 0 }}>
                   <Typography variant="h2" component="h2">#{selectedRow.id}</Typography>
                   <CopyIconButton text={String(selectedRow.id)} title="Copy ID" />
-                  {([["Previous submission", prevId, <ChevronLeft key="l" fontSize="small" />], ["Next submission", nextId, <ChevronRight key="r" fontSize="small" />]] as const).map(([label, target, icon]) => (
-                    <Tooltip key={label} title={label}>
-                      {/* span: a disabled button can't host the tooltip's listeners */}
-                      <span>
-                        <IconButton size="small" aria-label={label} disabled={target == null} onClick={() => target != null && onNavigate?.(target)}>
-                          {icon}
-                        </IconButton>
-                      </span>
-                    </Tooltip>
-                  ))}
+                  <StepButton label="Previous submission" target={prevId} onNavigate={onNavigate}><ChevronLeft fontSize="small" /></StepButton>
+                  <StepButton label="Next submission" target={nextId} onNavigate={onNavigate}><ChevronRight fontSize="small" /></StepButton>
                 </Stack>
                 <Stack direction="row" spacing={isPhone ? 0.5 : 1} sx={{ alignItems: "center", flexShrink: 0 }}>
                   {isPhone ? null : (

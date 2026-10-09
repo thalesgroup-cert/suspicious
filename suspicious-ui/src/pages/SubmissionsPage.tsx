@@ -66,6 +66,7 @@ import { CopyIconButton } from "@/shared/components/CopyIconButton";
 import MailPreview from "@/shared/components/MailPreview";
 
 import { SoftCard } from "@/features/submissions/components/cards";
+import { isElevatedGroups } from "@/layouts/nav";
 import { SubmissionDrawer } from "@/features/submissions/components/SubmissionDrawer";
 import { addCaseComment, getCaseComments } from "@/features/comments/api";
 import {
@@ -326,7 +327,8 @@ export default function SubmissionsPage() {
   const selectedRow = selectedId ? rows.find((r) => String(r.id) === String(selectedId)) : undefined;
   // Previous/next stay within the page being shown, and stop at its ends.
   const at = pageRows.findIndex((r) => String(r.id) === String(selectedId));
-  const neighbours = { prev: pageRows[at - 1]?.id ?? null, next: pageRows[at + 1]?.id ?? null };
+  // A row that is not on this page (deep link, filtered out) has no neighbours: at is -1.
+  const neighbours = at < 0 ? { prev: null, next: null } : { prev: pageRows[at - 1]?.id ?? null, next: pageRows[at + 1]?.id ?? null };
 
   // ── Derived values ──────────────────────────────────────────────────────
 
@@ -749,7 +751,7 @@ export default function SubmissionsPage() {
         comments={commentsQuery}
         onAddComment={(body) => addCommentMutation.mutateAsync(body)}
         isAddingComment={addCommentMutation.isPending}
-        elevated={(me?.groups ?? []).some((g) => ["CISO", "CERT", "Admin"].includes(g))}
+        elevated={isElevatedGroups(me?.groups)}
         onChallenge={selectedRow && canChallenge(selectedRow) ? () => setChallengeId(Number(selectedRow.id)) : undefined}
         prevId={neighbours.prev}
         nextId={neighbours.next}

@@ -634,4 +634,54 @@ describe("SubmissionsPage - drawer neighbours and challenge", () => {
     await userEvent.click(screen.getByRole("menuitem", { name: "Challenge" }));
     expect(await screen.findByRole("dialog", { name: /challenge/i })).toBeInTheDocument();
   });
+
+  const prevNext = () => [screen.getByRole("button", { name: "Previous submission" }), screen.getByRole("button", { name: "Next submission" })];
+
+  it("a row that is not on the page has no neighbours: both buttons disabled", async () => {
+    // 100 rows loaded, 10 shown: id 150 is loaded but sits on a later page.
+    const many = Array.from({ length: 100 }, (_, i) => ({ ...fixtureSubmissionsList.results[0], id: 100 + i, artifact: `row-${i}@example.com`, is_challengeable: false }));
+    vi.mocked(listSubmissions).mockResolvedValue({ ...fixtureSubmissionsList, count: 100, results: many } as never);
+    renderWithProviders(<SubmissionsPage />, { initialPath: "/submissions?open=150" });
+    await screen.findByTestId("sheet-header");
+    expect(prevNext().map((b) => (b as HTMLButtonElement).disabled)).toEqual([true, true]);
+  });
+
+  it("first row: Previous disabled, Next goes to the second; last row: Next disabled", async () => {
+    vi.mocked(listSubmissions).mockResolvedValue(three() as never);
+    const { unmount } = renderWithProviders(withProbe(), { initialPath: "/submissions?open=101" });
+    await screen.findByTestId("sheet-header");
+    expect(prevNext().map((b) => (b as HTMLButtonElement).disabled)).toEqual([true, false]);
+    await userEvent.click(screen.getByRole("button", { name: "Next submission" }));
+    await waitFor(() => expect(screen.getByTestId("loc")).toHaveTextContent("open=102"));
+    await userEvent.click(screen.getByRole("button", { name: "Previous submission" }));
+    await waitFor(() => expect(screen.getByTestId("loc")).toHaveTextContent("open=101"));
+    unmount();
+    renderWithProviders(<SubmissionsPage />, { initialPath: "/submissions?open=103" });
+    await screen.findByTestId("sheet-header");
+    expect(prevNext().map((b) => (b as HTMLButtonElement).disabled)).toEqual([false, true]);
+  });
+
+  it("after Next the new submission opens on Overview with analysis groups at their defaults", async () => {
+    const rep = (id: number, value: string) => ({
+      id, cortex_job_id: null, type: "x", status: "Success", analyzer_name: `an${id}`, analyzer_id: `an${id}`,
+      level: null, confidence: null, score: 1, category: null, categories: [],
+      report_summary: null, report_taxonomy: null, report_full: null,
+      target: { kind: "DOMAIN", id: null, value }, created_at: "2026-05-17T10:00:00Z",
+    });
+    vi.mocked(listSubmissions).mockResolvedValue(three() as never);
+    vi.mocked(getSubmissionDetails).mockImplementation((async (id: number) => ({
+      ...fixtureSubmissionsList.results[0], id, analyzer_reports: [rep(id * 10, "a.example"), rep(id * 10 + 1, "b.example")],
+      case_infos: { score: 1, confidence: 1, classification: "SAFE", score_ai: 0, confidence_ai: 0, classification_ai: "SAFE", category_ai: "x" },
+    })) as never);
+    renderWithProviders(<SubmissionsPage />, { initialPath: "/submissions?open=102" });
+    await userEvent.click(await screen.findByRole("tab", { name: /^Analysis/ }));
+    const groupBtn = async () => (await screen.findAllByRole("button", { expanded: false })).find((b) => /b\.example/.test(b.textContent ?? ""))!;
+    await userEvent.click(await groupBtn());
+    expect(screen.getAllByRole("button", { expanded: true }).some((b) => /b\.example/.test(b.textContent ?? ""))).toBe(true);
+    await userEvent.click(screen.getByRole("button", { name: "Next submission" }));
+    await waitFor(() => expect(screen.getByRole("heading", { level: 2, name: "#103" })).toBeInTheDocument());
+    expect(screen.getByRole("tab", { name: "Overview" })).toHaveAttribute("aria-selected", "true");
+    await userEvent.click(await screen.findByRole("tab", { name: /^Analysis/ }));
+    expect((await groupBtn())).toBeInTheDocument(); // b.example is collapsed again
+  });
 });
