@@ -129,4 +129,51 @@ describe("SubmitPage", () => {
       expect((screen.getByLabelText("Indicators") as HTMLTextAreaElement).value).toContain("evil.test")
     );
   });
+  describe("file limit", () => {
+    const cfg = (max?: number) => ({
+      data: { status: "success", data: { suspicious_email: "s@corp.test", ...(max ? { max_file_bytes: max } : {}) } },
+    });
+    const fileInput = () => document.querySelector('input[type="file"]') as HTMLInputElement;
+    const mk = (n: number, name = "a.eml") => new File([new Uint8Array(n)], name);
+
+    it("rejects an oversized file with the real limit and no chip", async () => {
+      mockApiGet.mockResolvedValue(cfg(1024) as never);
+      renderSubmit();
+      await screen.findByText(/up to 1 KB/);
+      await userEvent.setup({ applyAccept: false }).upload(fileInput(), mk(2048, "big.eml"));
+      expect(await screen.findByText("big.eml is 2 KB; the limit is 1 KB.")).toBeInTheDocument();
+      expect(screen.queryByRole("button", { name: "Remove" })).not.toBeInTheDocument();
+    });
+
+    it("accepts a file of exactly the limit", async () => {
+      mockApiGet.mockResolvedValue(cfg(1024) as never);
+      renderSubmit();
+      await screen.findByText(/up to 1 KB/);
+      await userEvent.setup().upload(fileInput(), mk(1024, "ok.eml"));
+      expect(await screen.findByText("ok.eml")).toBeInTheDocument();
+    });
+
+    it("accepts a 0-byte file in the dropzone", async () => {
+      mockApiGet.mockResolvedValue(cfg(1024) as never);
+      renderSubmit();
+      await screen.findByText(/up to 1 KB/);
+      await userEvent.setup().upload(fileInput(), mk(0, "empty.eml"));
+      expect(await screen.findByText("empty.eml")).toBeInTheDocument();
+    });
+
+    it("without a loaded limit shows no 'undefined' and still selects a 10 MB file", async () => {
+      mockApiGet.mockReturnValue(new Promise(() => {}) as never);
+      renderSubmit();
+      await screen.findByText(/One file per submission/);
+      expect(screen.queryByText(/undefined/)).not.toBeInTheDocument();
+      await userEvent.setup().upload(fileInput(), mk(10 * 1024 * 1024, "huge.eml"));
+      expect(await screen.findByText("huge.eml")).toBeInTheDocument();
+    });
+
+    it("shows the limit in the helper text", async () => {
+      mockApiGet.mockResolvedValue(cfg(5242880) as never);
+      renderSubmit();
+      expect(await screen.findByText("One file per submission, up to 5 MB.")).toBeInTheDocument();
+    });
+  });
 });

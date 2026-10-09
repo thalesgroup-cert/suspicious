@@ -61,9 +61,9 @@ import type {
   SubmitMode,
   SubmitSuccessResponse,
 } from "@/features/submit/types";
+import { formatBytes } from "@/features/submit/formatBytes";
 import {
   extractApiErrorMessage,
-  formatBytes,
   resolveId,
 } from "@/features/submit/utils";
 
@@ -88,12 +88,14 @@ export default function SubmitPage() {
     queryKey: ["submitConfig"],
     queryFn: getSubmitConfig,
     retry: false,
-    enabled: !!me && !suspiciousEmailEnv,
-    initialData: suspiciousEmailEnv ?? undefined,
+    enabled: !!me,
   });
 
+  const maxFileBytes = configQuery.data?.maxFileBytes;
   const suspiciousEmail =
-    suspiciousEmailEnv ?? configQuery.data ?? "suspicious@example.com";
+    suspiciousEmailEnv ??
+    configQuery.data?.suspiciousEmail ??
+    "suspicious@example.com";
 
   const [mode, setMode] = React.useState<SubmitMode>("file");
   const [selectedFile, setSelectedFile] = React.useState<File | null>(null);
@@ -107,11 +109,32 @@ export default function SubmitPage() {
     mode: "onChange",
   });
 
+  const [fileError, setFileError] = React.useState<string | null>(null);
+
   const dropzone = useDropzone({
     multiple: false,
+    // undefined until the config loads: the server still enforces the limit
+    maxSize: maxFileBytes,
     onDrop: (files) => {
       const f = files?.[0];
-      if (f) setSelectedFile(f);
+      if (f) {
+        setSelectedFile(f);
+        setFileError(null);
+      }
+    },
+    onDropRejected: (rejections) => {
+      const r = rejections[0];
+      const err = r?.errors[0];
+      if (!r || !err) return;
+      setFileError(
+        err.code === "file-too-large"
+          ? `${r.file.name} is ${formatBytes(r.file.size)}; the limit is ${formatBytes(maxFileBytes ?? 0)}.`
+          : err.code === "file-invalid-type"
+          ? `${r.file.name} is not an accepted file type.`
+          : err.code === "too-many-files"
+          ? "Upload one file at a time."
+          : err.message
+      );
     },
   });
 
@@ -247,7 +270,7 @@ export default function SubmitPage() {
   return (
     <Skeleton
       name="submit-page"
-      loading={meQuery.isPending || configQuery.isPending}
+      loading={meQuery.isPending}
       animate="shimmer"
     >
     <Container data-tour="submit-form" maxWidth="lg" sx={{ py: { xs: 2.5, md: 3.5 }, pb: 8 }}>
@@ -317,11 +340,18 @@ export default function SubmitPage() {
                     sx={{
                       borderRadius: 3,
                       border: `1px dashed ${
-                        dropzone.isDragActive
+                        dropzone.isDragReject
+                          ? theme.palette.error.main
+                          : dropzone.isDragActive
                           ? alpha(theme.palette.primary.main, 0.52)
                           : alpha(theme.palette.divider, 0.9)
                       }`,
-                      background: dropzone.isDragActive
+                      background: dropzone.isDragReject
+                        ? alpha(
+                            theme.palette.error.main,
+                            theme.palette.mode === "dark" ? 0.1 : 0.05
+                          )
+                        : dropzone.isDragActive
                         ? alpha(
                             theme.palette.primary.main,
                             theme.palette.mode === "dark" ? 0.08 : 0.04
@@ -356,7 +386,7 @@ export default function SubmitPage() {
                       </Box>
 
                       <Box>
-                        <Typography sx={{ fontWeight: 850 }} >
+                        <Typography sx={{ fontWeight: 700 }} >
                           {selectedFile
                             ? "File selected"
                             : dropzone.isDragActive
@@ -368,8 +398,9 @@ export default function SubmitPage() {
                           color="text.secondary"
                           sx={{ mt: 0.5 }}
                         >
-                          One file per submission. Limits and acceptance rules
-                          are enforced server-side.
+                          {maxFileBytes
+                            ? `One file per submission, up to ${formatBytes(maxFileBytes)}.`
+                            : "One file per submission."}
                         </Typography>
                       </Box>
 
@@ -391,6 +422,7 @@ export default function SubmitPage() {
                             onClick={(e) => {
                               e.stopPropagation();
                               setSelectedFile(null);
+                              setFileError(null);
                             }}
                             sx={{ textTransform: "none", fontWeight: 700 }}
                           >
@@ -400,6 +432,8 @@ export default function SubmitPage() {
                       ) : null}
                     </Stack>
                   </Box>
+
+                  {fileError ? <Alert severity="error">{fileError}</Alert> : null}
 
                   <TextField
                     label="Context (optional)"
