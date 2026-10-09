@@ -82,3 +82,6 @@ Group C (sunrise, valentine, the_one, winter, spring, summer, autumn).
 - Clipboard test cleanup (`delete navigator.clipboard`) is not in a `finally`.
 - `shared/lib/contrast.ts` mis-decodes `hsl()` / `color()` inputs; no caller passes them today.
 - The Home list "before" screenshots for the chip contrast change were never taken.
+- Theme `future`: rendered backgrounds are lighter than their CSS colours in places (found while measuring the drawer chip); after the sheet header tint fix the verdict chip reads 4.71:1, but other text on that theme may be affected: audit it in the Theme review.
+- Investigation's drawer header lost the grey/white wash toward the top (the shared SheetHeader tint went from a 22% wash to a 4% text-colour tint): check it in the Investigation page audit.
+- The header-tint unit test was written after the fix (no recorded RED run).
