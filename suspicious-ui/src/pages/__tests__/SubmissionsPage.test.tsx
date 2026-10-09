@@ -33,8 +33,23 @@ import { listSubmissions, challengeSubmission } from "@/features/submissions/api
 import { addCaseComment, getCaseComments } from "@/features/comments/api";
 import SubmissionsPage from "../SubmissionsPage";
 
+// Tests run in a real browser whose default viewport is narrow: pin the breakpoint explicitly.
+const stub = (phone: boolean) =>
+  vi.stubGlobal("matchMedia", (query: string) => ({
+    matches: phone && query.includes("max-width"),
+    media: query,
+    addEventListener: () => {},
+    removeEventListener: () => {},
+    addListener: () => {},
+    removeListener: () => {},
+    onchange: null,
+    dispatchEvent: () => false,
+  }));
+
+
 describe("SubmissionsPage - Test Suite", () => {
   beforeEach(() => {
+    stub(false);
     vi.mocked(getMe).mockResolvedValue(fixtureMe);
     vi.mocked(listSubmissions).mockResolvedValue(fixtureSubmissionsList as never);
   });
@@ -145,5 +160,34 @@ describe("SubmissionsPage - detail drawer header", () => {
     renderWithProviders(<SubmissionsPage />, { initialPath: `/submissions?open=${id}` });
     const header = await screen.findByTestId("sheet-header");
     expect(getComputedStyle(header).position).toBe("sticky");
+  });
+});
+
+describe("SubmissionsPage - phone layout", () => {
+  const HASH = "a".repeat(64);
+  beforeEach(() => {
+    vi.mocked(getMe).mockResolvedValue(fixtureMe);
+    vi.mocked(listSubmissions).mockResolvedValue({
+      ...fixtureSubmissionsList,
+      results: [{ ...fixtureSubmissionsList.results[0], artifact: HASH }, fixtureSubmissionsList.results[1]],
+    } as never);
+  });
+  it("renders a stacked list with ID link and verdict, no table, on a phone", async () => {
+    stub(true);
+    renderWithProviders(<SubmissionsPage />, { initialPath: "/submissions" });
+    const link = await screen.findByRole("link", { name: "101" });
+    expect(link).toHaveAttribute("href", "/submissions?q=101&open=101");
+    expect(screen.getAllByRole("listitem").length).toBeGreaterThanOrEqual(2);
+    expect(screen.getByText(/dangerous/i)).toBeInTheDocument();
+    expect(screen.queryByRole("table")).toBeNull();
+    const art = screen.getByTitle(HASH);
+    expect(getComputedStyle(art).textOverflow).toBe("ellipsis");
+    expect(getComputedStyle(art).whiteSpace).toBe("nowrap");
+  });
+
+  it("keeps the table on desktop", async () => {
+    stub(false);
+    renderWithProviders(<SubmissionsPage />, { initialPath: "/submissions" });
+    expect(await screen.findByRole("table")).toBeInTheDocument();
   });
 });

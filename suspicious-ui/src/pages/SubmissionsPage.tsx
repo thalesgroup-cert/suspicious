@@ -30,6 +30,7 @@ import {
   ToggleButtonGroup,
   Tooltip,
   Typography,
+  useMediaQuery,
 } from "@mui/material";
 import {
   AssignmentTurnedInOutlined,
@@ -63,6 +64,7 @@ import {
 import { useDebounced } from "@/shared/hooks/useDebounced";
 import { StatusChip } from "@/shared/components/StatusChip";
 import { ResultChip } from "@/shared/components/ResultChip";
+import { RecentSubmissionsList } from "@/features/home/components/RecentSubmissionsList";
 import { SheetHeader } from "@/shared/components/SheetHeader";
 import { CopyIconButton } from "@/shared/components/CopyIconButton";
 import MailPreview from "@/shared/components/MailPreview";
@@ -90,6 +92,7 @@ export default function SubmissionsPage() {
   const qc = useQueryClient();
   const theme = useTheme();
   const isDark = theme.palette.mode === "dark";
+  const isPhone = useMediaQuery(theme.breakpoints.down("sm"));
 
   const [q, setQ] = React.useState("");
   const qDebounced = useDebounced(q, 200);
@@ -618,6 +621,13 @@ export default function SubmissionsPage() {
             <Box sx={{ p: 3 }}>
               <Alert severity="info">No submissions match your filters.</Alert>
             </Box>
+          ) : isPhone ? (
+            <RecentSubmissionsList
+              rows={pageRows}
+              hrefFor={(r) =>
+                `/submissions?q=${encodeURIComponent(String(r.id))}&open=${encodeURIComponent(String(r.id))}`
+              }
+            />
           ) : (
             <Box sx={{ overflowX: "auto" }}>
               <Table sx={{ minWidth: 1020 }}>
