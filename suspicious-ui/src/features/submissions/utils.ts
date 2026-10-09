@@ -66,12 +66,17 @@ export function toBackendOrdering(
 /** Only a successful run carries a risk signal; failed or unfinished runs have none. */
 export const reportSucceeded = (r: { status?: string | null }) => String(r.status ?? "").toLowerCase() === "success";
 
-/** Label for a run that did not succeed: Cortex also reports InProgress and Waiting, which are not failures. */
-export function unfinishedLabel(status?: string | null) {
+/**
+ * Label for a run that did not succeed. Backend statuses: Waiting, InProgress, Success, Failure, Deleted.
+ * Only Failure is a failure: Deleted means Cortex no longer has the job (it may have succeeded once).
+ */
+export function unfinishedLabel(status?: string | null): "Running" | "Queued" | "Expired" | "Failed" | "Unknown" {
   const s = String(status ?? "").toLowerCase();
   if (s === "inprogress") return "Running";
   if (s === "waiting") return "Queued";
-  return "Failed";
+  if (s === "deleted") return "Expired";
+  if (s === "failure") return "Failed";
+  return "Unknown";
 }
 
 /** Theme palette key for a risk tone, so each theme paints risk in its own tuned error/warning/success. */

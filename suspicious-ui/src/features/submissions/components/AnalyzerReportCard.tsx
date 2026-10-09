@@ -1,3 +1,4 @@
+import * as React from "react";
 import {
   Accordion,
   AccordionDetails,
@@ -75,9 +76,17 @@ export function AnalyzerReportCard({
   const confidencePct = normalizeConfidence(report.confidence);
 
   const readableSummary = prettySummary(report.report_summary);
-  const plainSummary = ok
-    ? summarizeForReading(report)
-    : `${report.analyzer_name || "This analyzer"} did not return a result (status: ${report.status || "unknown"}), so it has no risk score or confidence.`;
+  const name = report.analyzer_name || "This analyzer";
+  const unfinished = unfinishedLabel(report.status);
+  const why = {
+    Running: `${name} has not finished yet`,
+    Queued: `${name} has not finished yet`,
+    Expired: `The result of ${name} is no longer available in Cortex`,
+    Unknown: `${name} has no status reported`,
+    Failed: `${name} did not return a result (status: ${report.status})`,
+  }[unfinished];
+  const plainSummary = ok ? summarizeForReading(report) : `${why}, so it has no risk score or confidence.`;
+  const detailsId = React.useId();
 
   const detailBg = "action.hover";
   const detailBorder = "divider";
@@ -101,6 +110,7 @@ export function AnalyzerReportCard({
         role="button"
         tabIndex={0}
         aria-expanded={expanded}
+        aria-controls={detailsId}
         onClick={onToggle}
         onKeyDown={(e) => {
           if (e.key === "Enter" || e.key === " ") {
@@ -125,10 +135,11 @@ export function AnalyzerReportCard({
             {report.analyzer_name || "Unknown analyzer"}
           </Typography>
           <Typography variant="caption" color="text.secondary" noWrap sx={{ display: "block" }}>
-            {readType(report.type)} · {readStatus(report.status)}
+            {/* The chip already states a non-success status; the caption only repeats it for successes. */}
+            {ok ? `${readType(report.type)} · ${readStatus(report.status)}` : readType(report.type)}
           </Typography>
         </Box>
-        {ok ? <RiskChip label={risk.label} tone={tone} /> : <NoResultChip label={unfinishedLabel(report.status)} />}
+        {ok ? <RiskChip label={risk.label} tone={tone} /> : <NoResultChip label={unfinished} />}
         <ExpandMoreOutlined
           aria-hidden
           sx={{
@@ -140,6 +151,8 @@ export function AnalyzerReportCard({
         />
       </Box>
 
+      {/* Stable target for aria-controls: Collapse unmounts its content when closed. */}
+      <div id={detailsId}>
       <Collapse in={expanded} unmountOnExit>
         <Box sx={{ p: 2, borderTop: 1, borderColor: detailBorder }}>
           <Stack spacing={2}>
@@ -335,6 +348,7 @@ export function AnalyzerReportCard({
           </Stack>
         </Box>
       </Collapse>
+      </div>
     </Box>
   );
 }

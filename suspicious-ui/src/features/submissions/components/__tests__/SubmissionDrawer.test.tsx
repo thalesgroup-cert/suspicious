@@ -261,7 +261,13 @@ describe("SubmissionDrawer - analysis tab", () => {
       ...over,
     });
   const toAnalysis = async () => userEvent.click(await screen.findByRole("tab", { name: /^Analysis/ }));
-  const region = (name: string) => screen.getByRole("region", { name });
+  // One list item per observable group; the header button's text carries its name (no landmark per group).
+  const groupItems = () => within(screen.getByRole("list", { name: "Observables" })).getAllByRole("listitem");
+  const region = (name: string) => {
+    const li = groupItems().find((g) => g.querySelector("[aria-controls]")?.textContent?.includes(name.split(" ").slice(1).join(" ")));
+    if (!li) throw new Error(`no group ${name}`);
+    return li;
+  };
   const row = (name: string) => screen.getByRole("button", { name: new RegExp(`^${name}`) });
 
   it("a level-3 Analysis heading with the count as text", async () => {
@@ -274,9 +280,9 @@ describe("SubmissionDrawer - analysis tab", () => {
   it("groups sorted by worst risk; a failed analyzer neither raises nor lowers it", async () => {
     renderWithProviders(<SubmissionDrawer {...three()} />);
     await toAnalysis();
-    // Group sections are named by aria-label; the URL list's accordions add unnamed-attribute regions below.
-    const names = screen.getAllByRole("region").map((r) => r.getAttribute("aria-label")).filter(Boolean);
-    expect(names).toEqual(["Hash aa11", "Domain d.example", "URL http://u.example"]);
+    const names = groupItems().map((g) => g.querySelector("[aria-controls]")?.textContent);
+    expect(names.map((n) => n?.match(/aa11|d\.example|http:\/\/u\.example/)?.[0])).toEqual(["aa11", "d.example", "http://u.example"]);
+    expect(screen.queryAllByRole("region").filter((r) => r.getAttribute("aria-label"))).toHaveLength(0);
     expect(within(region("Hash aa11")).getByRole("img", { name: "Worst result: High risk" })).toBeInTheDocument();
     expect(within(region("Domain d.example")).getByRole("img", { name: "Worst result: Low risk" })).toBeInTheDocument();
   });
@@ -368,5 +374,68 @@ describe("SubmissionDrawer - analysis tab", () => {
     expect(screen.getByRole("heading", { level: 3, name: "URLs" })).toBeInTheDocument();
     expect(screen.getByText("1 artifact")).toBeInTheDocument();
     expect(screen.getAllByText(/u\.example/).length).toBeGreaterThan(1);
+  });
+});
+
+describe("SubmissionDrawer - analysis tab statuses and aria", () => {
+  // One observable: a success plus every non-success status the backend sets (Waiting, InProgress, Deleted, Failure) and an empty one.
+  const reports = [
+    rep(1, "Gone", 1, "s.example", "DOMAIN", "Deleted"),
+    rep(2, "Ok", 9, "s.example", "DOMAIN", "Success"),
+    rep(3, "Busy", 1, "s.example", "DOMAIN", "InProgress"),
+    rep(4, "Waits", 1, "s.example", "DOMAIN", "Waiting"),
+    rep(5, "Blank", 1, "s.example", "DOMAIN", ""),
+  ];
+  const props = (rs = reports) => base({
+    row: multiRow as never,
+    details: { data: { ...multiRow, analyzer_reports: rs.map((r) => ({ ...r, type: "domain" })), case_infos: ci() }, isLoading: false, isError: false } as never,
+  });
+  const open = async (rs = reports) => {
+    renderWithProviders(<SubmissionDrawer {...props(rs)} />);
+    await userEvent.click(await screen.findByRole("tab", { name: /^Analysis/ }));
+  };
+  const row = (name: string) => screen.getByRole("button", { name: new RegExp(`^${name}`) });
+
+  it.each([
+    ["Busy", "Running", "has not finished yet"],
+    ["Waits", "Queued", "has not finished yet"],
+    ["Gone", "Expired", "is no longer available in Cortex"],
+    ["Blank", "Unknown", "no status reported"],
+  ])("%s reads %s: neutral chip, type-only caption, no risk, honest details", async (name, label, says) => {
+    await open();
+    const r = row(name);
+    expect(r).toHaveTextContent(new RegExp(`^${name}Domain check${label}$`));
+    expect(r.textContent).not.toMatch(/risk|confidence|Failed/i);
+    await userEvent.click(r);
+    expect(await screen.findByText(new RegExp(says))).toBeInTheDocument();
+    expect(screen.queryByText("Risk score")).not.toBeInTheDocument();
+  });
+
+  it("only Failure counts as failed and keeps today's wording; success keeps its status caption", async () => {
+    await open([...reports, rep(6, "Broke", 1, "s.example", "DOMAIN", "Failure")]);
+    expect(screen.getByText("1 failed")).toBeInTheDocument();
+    expect(row("Broke")).toHaveTextContent(/^BrokeDomain checkFailed$/);
+    expect(row("Ok")).toHaveTextContent(/Domain check · Success/);
+    await userEvent.click(row("Broke"));
+    expect(await screen.findByText(/did not return a result \(status: Failure\)/)).toBeInTheDocument();
+  });
+
+  it("a Success next to a Deleted keeps the success as worst risk and shows no failed", async () => {
+    await open([rep(1, "Gone", 1, "s.example", "DOMAIN", "Deleted"), rep(2, "Ok", 9, "s.example", "DOMAIN", "Success")]);
+    expect(screen.getByRole("img", { name: "Worst result: High risk" })).toBeInTheDocument();
+    expect(screen.queryByText(/failed/)).not.toBeInTheDocument();
+  });
+
+  it("group headers and rows point at what they expand with aria-controls", async () => {
+    await open();
+    const header = screen.getByRole("button", { name: /s\.example/, expanded: true });
+    const panel = document.getElementById(header.getAttribute("aria-controls")!);
+    expect(panel).not.toBeNull();
+    expect(within(panel!).getByText("Ok")).toBeInTheDocument();
+    const r = row("Ok");
+    const id = r.getAttribute("aria-controls")!;
+    expect(document.getElementById(id)).not.toBeNull();
+    await userEvent.click(r);
+    expect(await within(document.getElementById(id)!).findByText("What this means")).toBeInTheDocument();
   });
 });

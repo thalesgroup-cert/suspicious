@@ -61,6 +61,7 @@ export function AnalysisTab({ submissionId, reports, urlArtifacts, isLoading, is
     [reports]
   );
   const [openGroups, setOpenGroups] = React.useState<Record<string, boolean>>({});
+  const idBase = React.useId();
   const [openRows, setOpenRows] = React.useState<Record<number, boolean>>({});
   const isOpen = (key: string) => openGroups[key] ?? key === groups[0]?.key;
   const setAll = (open: boolean) => setOpenGroups(Object.fromEntries(groups.map((g) => [g.key, open])));
@@ -93,16 +94,17 @@ export function AnalysisTab({ submissionId, reports, urlArtifacts, isLoading, is
           ) : !groups.length ? (
             <Alert severity="info" sx={{ mb: 1.5 }}>No analysis reports yet.</Alert>
           ) : (
-            <Stack spacing={1} sx={{ mb: 1.5 }}>
-              {groups.map((group) => {
+            <Stack component="ul" aria-label="Observables" spacing={1} sx={{ mt: 0, mb: 1.5, p: 0, listStyle: "none" }}>
+              {groups.map((group, i) => {
+                const panelId = `${idBase}-group-${i}`;
                 const open = isOpen(group.key);
                 const toggle = () => setOpenGroups((prev) => ({ ...prev, [group.key]: !open }));
                 const worstLabel = group.worst ? getRiskTone(group.worst.score).label : "No result";
                 return (
-                  <Box key={group.key} component="section" aria-label={group.label}
+                  <Box key={group.key} component="li"
                     sx={{ borderRadius: 2, border: 1, borderColor: "divider", overflow: "hidden" }}>
                     <Box
-                      role="button" tabIndex={0} aria-expanded={open}
+                      role="button" tabIndex={0} aria-expanded={open} aria-controls={panelId}
                       onClick={toggle}
                       onKeyDown={(e) => { if (e.key === "Enter" || e.key === " ") { e.preventDefault(); toggle(); } }}
                       sx={{
@@ -136,6 +138,7 @@ export function AnalysisTab({ submissionId, reports, urlArtifacts, isLoading, is
                       }} />
                     </Box>
 
+                    <div id={panelId}>
                     <Collapse in={open} unmountOnExit>
                       <Stack spacing={0.75} sx={{ p: 1 }}>
                         {group.reports.map((report) => (
@@ -148,6 +151,7 @@ export function AnalysisTab({ submissionId, reports, urlArtifacts, isLoading, is
                         ))}
                       </Stack>
                     </Collapse>
+                    </div>
                   </Box>
                 );
               })}
