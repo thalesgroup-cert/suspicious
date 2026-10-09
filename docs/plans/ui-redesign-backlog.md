@@ -67,3 +67,18 @@ Group C (sunrise, valentine, the_one, winter, spring, summer, autumn).
 - Investigation drawer header is tall on phones (284px).
 - The matchMedia stub is never unstubbed in SubmissionsPage tests.
 - A malformed `?open=abc` deep link makes closeDrawer reset the search to the URL's q.
+
+## From the submission drawer cycle
+
+- Tab switch resets the Analysis tab's expansion state (groups and rows): lift it to the drawer.
+- `CopyIconButton` (13 call sites) fails silently when the clipboard is unavailable: report it with `useSnackbar`, as Copy link already does.
+- `ProfilePage` and `DashboardPage` carry their own CISO/CERT checks that omit Admin: share one elevated helper.
+- The Profile colour preview (`features/profile/SemanticChips.tsx:80`) shows the raw colour while lists now show the contrast-adjusted text colour.
+- The Sources "Verdict" (`ci.classification`) and the header chip (`row.result`) can differ for challenged cases.
+- The meta line "n tests" and the tab label "Analysis (n)" are different facts (#21 shows 1 test next to Analysis (3)): label them or unify.
+- `BADGE_W` is duplicated between the drawer and other result chips.
+- The Comments title (shared `CommentThread`) is a styled Typography, not a heading, so the Comments tab has only the h2.
+- Status strings are not trimmed in `reportSucceeded` / `unfinishedLabel`.
+- Clipboard test cleanup (`delete navigator.clipboard`) is not in a `finally`.
+- `shared/lib/contrast.ts` mis-decodes `hsl()` / `color()` inputs; no caller passes them today.
+- The Home list "before" screenshots for the chip contrast change were never taken.
