@@ -176,13 +176,28 @@ describe("SubmissionsPage - phone layout", () => {
     stub(true);
     renderWithProviders(<SubmissionsPage />, { initialPath: "/submissions" });
     const link = await screen.findByRole("link", { name: "101" });
-    expect(link).toHaveAttribute("href", "/submissions?q=101&open=101");
+    expect(link).toHaveAttribute("href", "/submissions?open=101");
     expect(screen.getAllByRole("listitem").length).toBeGreaterThanOrEqual(2);
     expect(screen.getByText(/dangerous/i)).toBeInTheDocument();
     expect(screen.queryByRole("table")).toBeNull();
     const art = screen.getByTitle(HASH);
     expect(getComputedStyle(art).textOverflow).toBe("ellipsis");
     expect(getComputedStyle(art).whiteSpace).toBe("nowrap");
+  });
+
+  it("tapping an ID opens the drawer without filtering; reopens after close", async () => {
+    stub(true);
+    renderWithProviders(<SubmissionsPage />, { initialPath: "/submissions" });
+    const link = await screen.findByRole("link", { name: "101" });
+    await userEvent.click(link);
+    await screen.findByTestId("sheet-header");
+    expect(screen.getByPlaceholderText(/id, status, artifact/i)).toHaveValue("");
+    await userEvent.click(screen.getAllByRole("button", { name: /close/i })[0]);
+    await waitFor(() => expect(screen.queryByTestId("sheet-header")).toBeNull());
+    expect(screen.getByPlaceholderText(/id, status, artifact/i)).toHaveValue("");
+    expect(screen.getByRole("link", { name: "102" })).toBeInTheDocument();
+    await userEvent.click(screen.getByRole("link", { name: "101" }));
+    expect(await screen.findByTestId("sheet-header")).toBeInTheDocument();
   });
 
   it("keeps the table on desktop", async () => {

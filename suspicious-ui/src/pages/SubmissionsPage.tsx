@@ -88,7 +88,7 @@ import {
 
 export default function SubmissionsPage() {
   const navigate = useNavigate();
-  const [searchParams] = useSearchParams();
+  const [searchParams, setSearchParams] = useSearchParams();
   const qc = useQueryClient();
   const theme = useTheme();
   const isDark = theme.palette.mode === "dark";
@@ -254,6 +254,16 @@ export default function SubmissionsPage() {
       qc.invalidateQueries({ queryKey: ["caseComments", selectedIdNum] });
     },
   });
+
+  // Drop ?open= on close so tapping the same phone ID link again re-triggers the URL sync.
+  const closeDrawer = () => {
+    setOpenDrawer(false);
+    if (searchParams.has("open")) {
+      const next = new URLSearchParams(searchParams);
+      next.delete("open");
+      setSearchParams(next, { replace: true });
+    }
+  };
 
   const urlSyncKey = `${searchParams.get("q") ?? ""}|${searchParams.get("open") ?? ""}`;
   const [prevUrlSyncKey, setPrevUrlSyncKey] = React.useState<string | null>(null);
@@ -625,7 +635,7 @@ export default function SubmissionsPage() {
             <RecentSubmissionsList
               rows={pageRows}
               hrefFor={(r) =>
-                `/submissions?q=${encodeURIComponent(String(r.id))}&open=${encodeURIComponent(String(r.id))}`
+                `/submissions?open=${encodeURIComponent(String(r.id))}`
               }
             />
           ) : (
@@ -791,7 +801,7 @@ export default function SubmissionsPage() {
       <Drawer
         anchor="right"
         open={openDrawer}
-        onClose={() => setOpenDrawer(false)}
+        onClose={closeDrawer}
         slotProps={{
           paper: {
             sx: (theme) => ({
@@ -837,7 +847,7 @@ export default function SubmissionsPage() {
                   >
                     Full report
                   </Button>
-                  <Button onClick={() => setOpenDrawer(false)}
+                  <Button onClick={closeDrawer}
                     sx={{ textTransform: "none", borderRadius: 2, alignSelf: "flex-start" }}>
                     Close
                   </Button>
