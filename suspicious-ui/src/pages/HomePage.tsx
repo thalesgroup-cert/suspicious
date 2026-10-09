@@ -244,7 +244,7 @@ export default function HomePage() {
         >
           <Stack direction="row" spacing={1.5} sx={{ minWidth: 0, alignItems: "flex-start" }}>
             <Box sx={{ minWidth: 0 }}>
-              <Typography variant="h5" noWrap sx={{ fontWeight: 980, letterSpacing: -0.6 }} >
+              <Typography variant="h5" noWrap>
                 Welcome, {displayName}
               </Typography>
               <ThemeGreeting caps={capabilities} name={displayName} />

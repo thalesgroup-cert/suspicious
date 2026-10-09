@@ -66,6 +66,15 @@ describe("HomePage - Test Suite", () => {
     });
   });
 
+  describe("Greeting heading", () => {
+    it("does not squeeze letters so tightly that the word gap after the comma closes", async () => {
+      renderWithProviders(<HomePage />, { initialPath: "/" });
+      const h = await screen.findByText(/^Welcome,/);
+      // Audit H4: -0.6px at 14px (about -0.043em) at weight 980 closed "Welcome,Elena".
+      expect((parseFloat(getComputedStyle(h).letterSpacing) || 0)).toBeGreaterThanOrEqual(-0.14);
+    });
+  });
+
   describe("Management", () => {
     it("renders the home route under a Suspense-friendly tree", async () => {
       const { container } = renderWithProviders(<HomePage />, { initialPath: "/" });
