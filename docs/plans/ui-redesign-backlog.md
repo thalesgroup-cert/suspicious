@@ -42,3 +42,14 @@ Group C (sunrise, valentine, the_one, winter, spring, summer, autumn).
 - `themes.test.ts` pins exact heading sizes for paper only; the other themes are covered by a 40px cap.
 - Donut centre counts verdict buckets while the share card counts monthly submissions; the dev stats snapshot has totals without buckets. Decide whether the stats job should fill the buckets.
 - CERT and CISO users no longer have an "Open investigation" shortcut in the Threat card; the sidebar and the spotlight button cover it.
+
+## From the Submit page cycle
+
+- S8 page-title scale decision (global): page titles use the base h4 (16px) while panel titles are h5 (14px); side-card titles are subtitle1.
+- Scheme-less URLs such as "evil.example/login.php" are classified as unrecognised on both client and server (the domain regex rejects "/"). Consider classifying host/path as a URL on both sides.
+- The `file-invalid-type` branch in `onDropRejected` is unreachable (no `accept` is set).
+- IPv6 zone ids are skipped by the UI but accepted by the server.
+- The mode ToggleButtonGroup stays horizontal when stacked on phones.
+- Duplicate `:not(:first-of-type)` border rules in `features/submit/components/cards.tsx`.
+- e2e: login.spec (4 failures) and investigation.spec (2 failures) fail on main independently of the Submit work.
+- A stray "Request failed." snackbar appears in the submit e2e after navigating to /submissions (unmocked requests).

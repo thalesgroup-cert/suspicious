@@ -146,6 +146,6 @@ Changes (each with its reason):
 
 ## Self-review
 
-- **Spec coverage:** S1 Task 4; S2 Task 3; S3 Tasks 1 and 2; S4 and S5 and S6 and S7 Task 5; S8 Task 5 item 4 and 5.
+- **Spec coverage:** S1 Task 4; S2 Task 3; S3 Tasks 1 and 2; S4 and S5 and S6 and S7 Task 5. S8 (page title too small) is NOT resolved by this plan: every page title uses the base h4 (16px) and needs a global page-title scale decision.
 - **Placeholders:** none; test fixtures that depend on existing mocking style say to read the file first.
 - **Type consistency:** `getSubmitConfig` returns the same camelCase shape in Tasks 2 and 3; `maxIndicators` default 100 is used only when the config is unknown; `max_file_bytes` and `max_indicators` are named identically in the backend, the types and the tests.
