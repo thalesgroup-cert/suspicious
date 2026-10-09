@@ -78,7 +78,7 @@ export function ModeToggle<T extends string>(props: {
 export function SectionHeader(props: { title: string; subtitle: string }) {
   return (
     <Stack spacing={0.5}>
-      <Typography variant="h5" sx={{ fontWeight: 850, letterSpacing: -0.4 }} >
+      <Typography variant="h5">
         {props.title}
       </Typography>
       <Typography color="text.secondary">{props.subtitle}</Typography>
@@ -95,7 +95,7 @@ export function SidePanel(
         <Stack spacing={1.25}>
           <Stack direction="row" spacing={1} sx={{ alignItems: "center" }} >
             {props.icon}
-            <Typography sx={{ fontWeight: 850 }} >{props.title}</Typography>
+            <Typography variant="subtitle1" component="h2">{props.title}</Typography>
           </Stack>
           {props.children}
         </Stack>

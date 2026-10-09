@@ -109,6 +109,53 @@ describe("SubmitPage", () => {
     });
   });
 
+  describe("layout and honesty", () => {
+    const CORR = /correlated as one case/;
+
+    it("has one 'What to submit' card and no Accepted inputs or Guidance titles", async () => {
+      renderSubmit();
+      await screen.findByLabelText("Indicators");
+      expect(screen.getAllByText("What to submit")).toHaveLength(1);
+      expect(screen.queryByText("Accepted inputs")).not.toBeInTheDocument();
+      expect(screen.queryByText("Guidance")).not.toBeInTheDocument();
+    });
+
+    it("shows the correlation note once, in Indicators mode only", async () => {
+      const user = userEvent.setup();
+      renderSubmit();
+      await screen.findByLabelText("Indicators");
+      expect(screen.getAllByText(CORR)).toHaveLength(1);
+      const [, file] = within(await screen.findByRole("group", { name: "Submission type" })).getAllByRole("button");
+      await user.click(file);
+      await screen.findByText("Drag and drop or click to browse");
+      expect(screen.queryByText(CORR)).not.toBeInTheDocument();
+    });
+
+    it("renders a disabled Submit visibly unlike an enabled one", async () => {
+      const user = userEvent.setup();
+      renderSubmit();
+      const ta = await screen.findByLabelText("Indicators");
+      const btn = screen.getByRole("button", { name: "Submit" });
+      expect(btn).toBeDisabled();
+      const off = getComputedStyle(btn).backgroundColor;
+      await user.type(ta, "8.8.8.8");
+      expect(btn).toBeEnabled();
+      await waitFor(() => expect(getComputedStyle(btn).backgroundColor).not.toBe(off)); // bg transitions
+    });
+
+    it("headings carry no tight letter-spacing or extra-heavy weight", async () => {
+      const user = userEvent.setup();
+      renderSubmit();
+      const [, file] = within(await screen.findByRole("group", { name: "Submission type" })).getAllByRole("button");
+      await user.click(file);
+      const h = await screen.findByText("File upload");
+      const cs = getComputedStyle(h);
+      const ls = cs.letterSpacing;
+      expect(ls === "" || ls === "normal" || parseFloat(ls) >= -0.01 * parseFloat(cs.fontSize || "16")).toBe(true);
+      expect(Number(cs.fontWeight)).toBeLessThanOrEqual(800);
+    });
+  });
+
   it("switches to indicators mode and shows the textarea + IOC upload", async () => {
     const user = userEvent.setup();
     renderSubmit();

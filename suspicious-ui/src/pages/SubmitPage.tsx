@@ -67,6 +67,17 @@ import {
   resolveId,
 } from "@/features/submit/utils";
 
+// Themes style contained buttons with gradients/saturated fills that stay
+// vivid when disabled; force MUI's disabled tokens on this page's primary buttons.
+const disabledPrimarySx = {
+  "&.Mui-disabled": {
+    backgroundImage: "none",
+    backgroundColor: "action.disabledBackground",
+    color: "action.disabled",
+    boxShadow: "none",
+  },
+} as const;
+
 // Page
 
 export default function SubmitPage() {
@@ -288,10 +299,10 @@ export default function SubmitPage() {
           <CardContent sx={{ p: { xs: 2.25, md: 3 } }}>
             <Stack spacing={2}>
               <Stack spacing={0.6}>
-                <Typography variant="h4" sx={{ fontWeight: 900, letterSpacing: -0.6 }} >
+                <Typography variant="h4" component="h1">
                   Submit
                 </Typography>
-                <Typography color="text.secondary" sx={{ maxWidth: 760 }}>
+                <Typography variant="body2" color="text.secondary" sx={{ maxWidth: 760 }}>
                   Upload a file or email, or paste one or many indicators
                   (URL, domain, hash, IP). Types are detected automatically;
                   add short factual context and submit for analysis.
@@ -455,7 +466,7 @@ export default function SubmitPage() {
                           color="inherit"
                           size="small"
                           onClick={() => navigate("/submissions")}
-                          sx={{ fontWeight: 850, textTransform: "none" }}
+                          sx={{ textTransform: "none" }}
                         >
                           View submissions
                         </Button>
@@ -478,8 +489,8 @@ export default function SubmitPage() {
                       sx={{
                         borderRadius: 2,
                         textTransform: "none",
-                        fontWeight: 850,
                         minWidth: 140,
+                        ...disabledPrimarySx,
                       }}
                     >
                       Upload file
@@ -582,6 +593,11 @@ export default function SubmitPage() {
                     </Stack>
                   ) : null}
 
+                  <Typography variant="caption" color="text.secondary">
+                    Related indicators submitted together are correlated as one case.
+                    Keep unrelated artifacts in separate submissions.
+                  </Typography>
+
                   <TextField
                     label="Context (optional)"
                     placeholder="Source, related case, user report…"
@@ -608,8 +624,8 @@ export default function SubmitPage() {
                       sx={{
                         borderRadius: 2,
                         textTransform: "none",
-                        fontWeight: 850,
                         minWidth: 160,
+                        ...disabledPrimarySx,
                       }}
                     >
                       Submit
@@ -621,7 +637,7 @@ export default function SubmitPage() {
           </SoftCard>
 
           <Stack spacing={2}>
-            <SidePanel title="Guidance" icon={<InfoOutlined fontSize="small" />}>
+            <SidePanel title="What to submit" icon={<InfoOutlined fontSize="small" />}>
               <Typography variant="body2" color="text.secondary">
                 Keep context brief and factual. Prefer original artifacts. Do
                 not alter submitted content unless required by policy.
@@ -630,41 +646,30 @@ export default function SubmitPage() {
               <Divider sx={{ opacity: 0.25 }} />
 
               <Stack spacing={1}>
-                <Chip label="URL / domain: include full path if known" variant="outlined" />
-                <Chip label="Hash: specify algorithm if known" variant="outlined" />
-                <Chip label="File: keep original filename" variant="outlined" />
+                {[
+                  [InsertDriveFileOutlined, "Files and attachments"],
+                  [LinkOutlined, "Full URLs and bare domains"],
+                  [FingerprintOutlined, "Hashes and file indicators"],
+                  [PublicOutlined, "IP addresses"],
+                ].map(([Icon, label]) => {
+                  const I = Icon as typeof LinkOutlined;
+                  return (
+                    <Stack key={label as string} direction="row" spacing={1} sx={{ alignItems: "center" }}>
+                      <I fontSize="small" color="action" />
+                      <Typography variant="body2" color="text.secondary">
+                        {label as string}
+                      </Typography>
+                    </Stack>
+                  );
+                })}
               </Stack>
-            </SidePanel>
 
-            <SidePanel
-              title="Accepted inputs"
-              icon={<InsertDriveFileOutlined fontSize="small" />}
-            >
-              <Stack spacing={1}>
-                <Stack direction="row" spacing={1} sx={{ alignItems: "center" }} >
-                  <InsertDriveFileOutlined fontSize="small" color="action" />
-                  <Typography variant="body2" color="text.secondary">
-                    Files and attachments
-                  </Typography>
-                </Stack>
-                <Stack direction="row" spacing={1} sx={{ alignItems: "center" }} >
-                  <LinkOutlined fontSize="small" color="action" />
-                  <Typography variant="body2" color="text.secondary">
-                    Full URLs and bare domains
-                  </Typography>
-                </Stack>
-                <Stack direction="row" spacing={1} sx={{ alignItems: "center" }} >
-                  <FingerprintOutlined fontSize="small" color="action" />
-                  <Typography variant="body2" color="text.secondary">
-                    Hashes and file indicators
-                  </Typography>
-                </Stack>
-                <Stack direction="row" spacing={1} sx={{ alignItems: "center" }} >
-                  <PublicOutlined fontSize="small" color="action" />
-                  <Typography variant="body2" color="text.secondary">
-                    IP addresses
-                  </Typography>
-                </Stack>
+              <Divider sx={{ opacity: 0.25 }} />
+
+              <Stack spacing={0.5}>
+                <Typography variant="body2" color="text.secondary">URL / domain: include full path if known</Typography>
+                <Typography variant="body2" color="text.secondary">Hash: specify algorithm if known</Typography>
+                <Typography variant="body2" color="text.secondary">File: keep original filename</Typography>
               </Stack>
             </SidePanel>
 
@@ -695,17 +700,13 @@ export default function SubmitPage() {
           </Stack>
         </Box>
 
-        <Alert severity="info" sx={{ borderRadius: 3 }}>
-          Related indicators submitted together are correlated as one case.
-          Keep unrelated artifacts in separate submissions.
-        </Alert>
       </Stack>
 
       <Dialog open={loadingOpen} onClose={() => {}} maxWidth="xs" fullWidth>
         <DialogContent sx={{ py: 4 }}>
           <Stack spacing={2} sx={{ alignItems: "center", textAlign: "center" }} >
             <CircularProgress />
-            <Typography sx={{ fontWeight: 850 }} >Processing submission</Typography>
+            <Typography variant="subtitle1">Processing submission</Typography>
             <Typography variant="body2" color="text.secondary">
               Waiting for the backend to validate and queue the artifact.
             </Typography>
