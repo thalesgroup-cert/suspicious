@@ -14,7 +14,7 @@ import { ExpandMoreOutlined } from "@mui/icons-material";
 import { alpha } from "@mui/material/styles";
 import { readableOnTint } from "@/shared/lib/contrast";
 
-import type { SubmissionAnalyzerReport, SubmissionResult } from "@/features/submissions/api";
+import type { SubmissionResult } from "@/features/submissions/api";
 import {
   fmtDate,
   getConfidenceTone,
@@ -60,14 +60,36 @@ function NoResultChip({ label }: { label: string }) {
   );
 }
 
+/** What the card reads: the Submissions and Investigation endpoints both return this shape. */
+export type AnalyzerReportRow = {
+  id: number;
+  cortex_job_id?: string | null;
+  type: string;
+  status: string;
+  analyzer_name: string;
+  analyzer_id?: string;
+  level?: string | null;
+  confidence: number | null;
+  score: number | null;
+  category: string | null;
+  categories: string[];
+  report_summary?: unknown;
+  report_taxonomy?: unknown;
+  target: { kind: string; id?: number | string | null; value: string | null } | null;
+  created_at?: string;
+};
+
 export function AnalyzerReportCard({
   report,
   expanded,
   onToggle,
+  extraDetails,
 }: {
-  report: SubmissionAnalyzerReport;
+  report: AnalyzerReportRow;
   expanded: boolean;
   onToggle: () => void;
+  /** Page-specific technical detail (the Investigation enrichment), shown under the taxonomy. */
+  extraDetails?: React.ReactNode;
 }) {
   const ok = reportSucceeded(report);
   const risk = getRiskTone(report.score);
@@ -240,7 +262,7 @@ export function AnalyzerReportCard({
               </Typography>
 
               <Typography color="text.secondary" variant="body2">Finished</Typography>
-              <Typography variant="body2">{fmtDate(report.created_at)}</Typography>
+              <Typography variant="body2">{report.created_at ? fmtDate(report.created_at) : "—"}</Typography>
             </Box>
 
             <Accordion
@@ -311,6 +333,8 @@ export function AnalyzerReportCard({
                       </AccordionDetails>
                     </Accordion>
                   ) : null}
+
+                  {extraDetails}
 
                   {report.report_summary ? (
                     <Accordion

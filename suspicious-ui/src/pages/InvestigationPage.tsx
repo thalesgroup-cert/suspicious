@@ -147,8 +147,6 @@ export default function InvestigationPage() {
   const [editConfidence, setEditConfidence] = React.useState<string>("");
   const [editClassification, setEditClassification] = React.useState<string>("UNKNOWN");
 
-  const [expandedAnalyzerIds, setExpandedAnalyzerIds] = React.useState<Record<number, boolean>>({});
-  const [expandedGroups, setExpandedGroups] = React.useState<Record<string, boolean>>({});
 
   const meQuery = useQuery<Me>({ queryKey: ["me"], queryFn: getMe, retry: false });
   const me = meQuery.data;
@@ -287,23 +285,11 @@ export default function InvestigationPage() {
   const [prevFilterKey, setPrevFilterKey] = React.useState(filterKey);
   if (filterKey !== prevFilterKey) { setPrevFilterKey(filterKey); setPage(0); }
 
-  const [prevOpenDrawer, setPrevOpenDrawer] = React.useState(openDrawer);
-  if (openDrawer !== prevOpenDrawer) {
-    setPrevOpenDrawer(openDrawer);
-    if (!openDrawer) { setExpandedAnalyzerIds({}); setExpandedGroups({}); }
-  }
-
   const [prevSelectedId, setPrevSelectedId] = React.useState(selectedId);
   if (selectedId !== prevSelectedId) {
     setPrevSelectedId(selectedId);
-    setExpandedAnalyzerIds({});
-    setExpandedGroups({});
     setEditMode(false);
   }
-
-  const reportsKey = detailsQuery.dataUpdatedAt;
-  const [prevReportsKey, setPrevReportsKey] = React.useState(reportsKey);
-  if (reportsKey !== prevReportsKey) { setPrevReportsKey(reportsKey); setExpandedAnalyzerIds({}); }
 
   React.useEffect(() => {
     editMutation.reset();
@@ -756,10 +742,6 @@ export default function InvestigationPage() {
         onRedo={() => setRedoConfirmOpen(true)}
         commentsQuery={commentsQuery}
         addCommentMutation={addCommentMutation}
-        expandedGroups={expandedGroups}
-        setExpandedGroups={setExpandedGroups}
-        expandedAnalyzerIds={expandedAnalyzerIds}
-        setExpandedAnalyzerIds={setExpandedAnalyzerIds}
         siblings={rows.map((r) => r.id)}
         onNavigate={(id) => {
           // ponytail: selects directly and mirrors ?open= (replace); Task 4 owns the rest of the URL sync.

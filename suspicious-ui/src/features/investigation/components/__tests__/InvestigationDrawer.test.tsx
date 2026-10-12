@@ -61,10 +61,6 @@ function props(over: Partial<InvestigationDrawerProps> = {}): InvestigationDrawe
     onRedo: vi.fn(),
     commentsQuery: { data: [], isLoading: false } as never,
     addCommentMutation: idle as never,
-    expandedGroups: {},
-    setExpandedGroups: vi.fn(),
-    expandedAnalyzerIds: {},
-    setExpandedAnalyzerIds: vi.fn(),
     ...over,
   };
 }
@@ -323,5 +319,173 @@ describe("InvestigationDrawer - overview", () => {
     const h = headings();
     expect(h.indexOf("Verdict override")).toBe(h.indexOf("Reporter's context") + 1);
     expect(h.indexOf("Artifact")).toBe(h.indexOf("Verdict override") + 1);
+  });
+});
+
+describe("InvestigationDrawer - analysis tab", () => {
+  const rep = (id: number, name: string, score: number, value: string, kind: string, status = "Success", confidence = 20) => ({
+    id, cortex_job_id: `j${id}`, type: kind.toLowerCase(), status, analyzer_name: name, analyzer_id: name,
+    level: "info", confidence, score, category: null, categories: [], target: { kind, id: null, value },
+  });
+  // Backend order URL, domain, hash: the tab must reorder by worst risk.
+  const reports3 = [
+    rep(1, "UrlLow", 1, "http://u.example", "URL"),
+    rep(2, "DomFailed", 10, "d.example", "DOMAIN", "Failure"),
+    rep(3, "DomLow", 2, "d.example", "DOMAIN"),
+    rep(4, "HashHigh", 9, "aa11", "HASH", "Success", 90),
+    rep(5, "HashLow", 1, "aa11", "HASH"),
+  ];
+  const three = (over: Partial<InvestigationDrawerProps> = {}, data: Record<string, unknown> = {}) =>
+    props({ detailsQuery: loaded(details({ analyzer_reports: reports3, ...data })), ...over });
+  const toAnalysis = async () => userEvent.click(await screen.findByRole("tab", { name: /^Analysis/ }));
+  const groupItems = () => within(screen.getByRole("list", { name: "Observables" })).getAllByRole("listitem");
+  const group = (value: string) => {
+    const li = groupItems().find((g) => g.querySelector("[aria-controls]")?.textContent?.includes(value));
+    if (!li) throw new Error(`no group ${value}`);
+    return li;
+  };
+  const row = (name: string) => screen.getByRole("button", { name: new RegExp(`^${name}`) });
+
+  it("a level-3 Analysis heading with the count as text; no count while loading or on error", async () => {
+    const { rerender } = renderWithProviders(<InvestigationDrawer {...three()} />);
+    await toAnalysis();
+    expect(screen.getByRole("heading", { level: 3, name: "Analysis" })).toBeInTheDocument();
+    expect(screen.getByText("5 reports")).toBeInTheDocument();
+    rerender(<InvestigationDrawer {...three({ detailsQuery: { data: undefined, isLoading: true, isError: false, isFetching: true, isPlaceholderData: false } as never })} />);
+    expect(screen.getByText("Loading analysis…")).toBeInTheDocument();
+    expect(screen.queryByText(/reports?$/)).toBeNull();
+    rerender(<InvestigationDrawer {...three({ detailsQuery: { data: undefined, isLoading: false, isError: true, isFetching: false, isPlaceholderData: false } as never })} />);
+    expect(screen.getByText("Could not load analysis details.")).toBeInTheDocument();
+    expect(screen.queryByText(/reports?$/)).toBeNull();
+    rerender(<InvestigationDrawer {...three({}, { analyzer_reports: [] })} />);
+    expect(screen.getByText("No analysis reports yet.")).toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: "Expand all groups" })).toBeNull();
+  });
+
+  it("groups sorted by worst risk with a worst-risk dot; only the worst starts open", async () => {
+    renderWithProviders(<InvestigationDrawer {...three()} />);
+    await toAnalysis();
+    const names = groupItems().map((g) => g.querySelector("[aria-controls]")?.textContent?.match(/aa11|d\.example|http:\/\/u\.example/)?.[0]);
+    expect(names).toEqual(["aa11", "d.example", "http://u.example"]);
+    expect(within(group("aa11")).getByRole("img", { name: "Worst result: High risk" })).toBeInTheDocument();
+    expect(within(group("d.example")).getByRole("img", { name: "Worst result: Low risk" })).toBeInTheDocument();
+    expect(within(group("aa11")).getByText("2 analyzers")).toBeInTheDocument();
+    expect(within(group("aa11")).getByText("HashHigh")).toBeInTheDocument();
+    expect(within(group("http://u.example")).queryByText("UrlLow")).toBeNull();
+    expect(within(group("d.example")).queryByText("DomFailed")).toBeNull();
+    // aria-controls targets exist.
+    for (const el of document.querySelectorAll("[aria-controls]")) {
+      expect(document.getElementById(el.getAttribute("aria-controls")!)).not.toBeNull();
+    }
+  });
+
+  it("a failed analyzer reads Failed with no risk or confidence; its group says 1 failed", async () => {
+    renderWithProviders(<InvestigationDrawer {...three()} />);
+    await toAnalysis();
+    expect(within(group("d.example")).getByText("1 failed")).toBeInTheDocument();
+    expect(within(group("aa11")).queryByText(/failed/)).toBeNull();
+    await userEvent.click(screen.getByRole("button", { name: "Expand all groups" }));
+    const failed = row("DomFailed");
+    expect(within(failed).getByText("Failed")).toBeInTheDocument();
+    expect(failed.textContent).not.toMatch(/Low risk|Low confidence|risk|confidence/i);
+    expect(row("DomLow").textContent).toMatch(/Low risk/);
+  });
+
+  it("Expired, Running, Queued and Unknown are neutral and never counted as failed", async () => {
+    const odd = [
+      rep(1, "Ok", 2, "x.example", "DOMAIN"),
+      rep(2, "Gone", 9, "x.example", "DOMAIN", "Deleted"),
+      rep(3, "Busy", 0, "y.example", "DOMAIN", "InProgress"),
+      rep(4, "Later", 0, "y.example", "DOMAIN", "Waiting"),
+      rep(5, "Blank", 0, "y.example", "DOMAIN", ""),
+    ];
+    renderWithProviders(<InvestigationDrawer {...three({}, { analyzer_reports: odd })} />);
+    await toAnalysis();
+    // The Success keeps its risk as the worst; a purged job does not raise it.
+    expect(within(group("x.example")).getByRole("img", { name: "Worst result: Low risk" })).toBeInTheDocument();
+    expect(screen.queryByText(/failed/)).toBeNull();
+    await userEvent.click(screen.getByRole("button", { name: "Expand all groups" }));
+    expect(within(row("Gone")).getByText("Expired")).toBeInTheDocument();
+    expect(within(row("Busy")).getByText("Running")).toBeInTheDocument();
+    expect(within(row("Later")).getByText("Queued")).toBeInTheDocument();
+    expect(within(row("Blank")).getByText("Unknown")).toBeInTheDocument();
+    await userEvent.click(row("Gone"));
+    expect(await screen.findByText(/no longer available in Cortex/)).toBeInTheDocument();
+  });
+
+  it("confidence only after expanding a row", async () => {
+    renderWithProviders(<InvestigationDrawer {...three()} />);
+    await toAnalysis();
+    expect(row("HashHigh").textContent).toMatch(/High risk/);
+    expect(screen.queryByText(/High confidence/)).toBeNull();
+    await userEvent.click(row("HashHigh"));
+    expect(await screen.findByText(/High confidence/)).toBeInTheDocument();
+    expect(row("HashHigh")).toHaveAttribute("aria-expanded", "true");
+  });
+
+  it("expand all and collapse all icon buttons", async () => {
+    renderWithProviders(<InvestigationDrawer {...three()} />);
+    await toAnalysis();
+    await userEvent.click(screen.getByRole("button", { name: "Expand all groups" }));
+    expect(await screen.findByText("UrlLow")).toBeInTheDocument();
+    await userEvent.click(screen.getByRole("button", { name: "Collapse all groups" }));
+    await waitFor(() => {
+      expect(screen.queryByText("HashHigh")).toBeNull();
+      expect(screen.queryByText("UrlLow")).toBeNull();
+    });
+  });
+
+  it("another case and a reopen start from the default again", async () => {
+    const { rerender } = renderWithProviders(<InvestigationDrawer {...three()} />);
+    await toAnalysis();
+    await userEvent.click(screen.getByRole("button", { name: "Expand all groups" }));
+    expect(await screen.findByText("UrlLow")).toBeInTheDocument();
+    const r8 = { ...row, id: 8 };
+    rerender(<InvestigationDrawer {...three({ drawerRow: r8 as never, caseId: 8 }, { id: 8 })} />);
+    await toAnalysis();
+    expect(await screen.findByText("HashHigh")).toBeInTheDocument();
+    expect(screen.queryByText("UrlLow")).toBeNull();
+    await userEvent.click(screen.getByRole("button", { name: "Expand all groups" }));
+    expect(await screen.findByText("UrlLow")).toBeInTheDocument();
+    rerender(<InvestigationDrawer {...three({ drawerRow: r8 as never, caseId: 8, open: false }, { id: 8 })} />);
+    await waitFor(() => expect(screen.queryByText("UrlLow")).toBeNull());
+    rerender(<InvestigationDrawer {...three({ drawerRow: r8 as never, caseId: 8 }, { id: 8 })} />);
+    if (!screen.queryByRole("tab", { name: /^Analysis/, selected: true })) await toAnalysis();
+    expect(await screen.findByText("HashHigh")).toBeInTheDocument();
+    expect(screen.queryByText("UrlLow")).toBeNull();
+  });
+
+  it("the IOC observable panel sits above the groups for an IOC case and is absent for a mail case", async () => {
+    const obs = [{ value: "8.8.8.8", type: "ip", verdict: { band: "Safe", confidence: 80, rationale: [] }, sources: [] }];
+    const r = { ...row, type: "IOC" };
+    const { unmount } = renderWithProviders(<InvestigationDrawer {...three({ drawerRow: r as never }, { ...r, observable_group: { observables: obs } })} />);
+    await toAnalysis();
+    const panelText = screen.getByRole("tabpanel").textContent ?? "";
+    expect(panelText).toMatch(/0 \/ 0 sources flagged this/);
+    expect(panelText.indexOf("sources flagged")).toBeLessThan(panelText.indexOf("HashHigh"));
+    unmount();
+    const m = { ...row, type: "MAIL" };
+    renderWithProviders(<InvestigationDrawer {...three({ drawerRow: m as never })} />);
+    await toAnalysis();
+    expect(screen.queryByText(/sources flagged this/)).toBeNull();
+    expect(screen.getByRole("list", { name: "Observables" })).toBeInTheDocument();
+  });
+});
+
+describe("InvestigationDrawer - discussion and raw tabs", () => {
+  it("Discussion shows the thread with the count in the tab label", async () => {
+    const comments = [{ id: 1, body: "Looks like a credential lure.", author_email: "elena@x.test", created_at: "2026-01-01T00:00:00Z" }];
+    renderWithProviders(<InvestigationDrawer {...props({ commentsQuery: { data: comments, isLoading: false } as never })} />);
+    await userEvent.click(screen.getByRole("tab", { name: "Discussion (1)" }));
+    expect(screen.getByText("Looks like a credential lure.")).toBeInTheDocument();
+  });
+
+  it("Raw shows the payload in monospace without an accordion", async () => {
+    renderWithProviders(<InvestigationDrawer {...props({ detailsQuery: loaded(details({ raw: { marker: "raw-marker-42" } })) })} />);
+    await userEvent.click(screen.getByRole("tab", { name: "Raw" }));
+    const pre = screen.getByText(/raw-marker-42/);
+    expect(pre.tagName).toBe("PRE");
+    expect(getComputedStyle(pre).fontFamily).toMatch(/mono/i);
+    expect(within(screen.getByRole("tabpanel")).queryByRole("button")).toBeNull();
   });
 });

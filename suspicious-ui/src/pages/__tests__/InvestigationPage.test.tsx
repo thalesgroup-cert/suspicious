@@ -133,7 +133,7 @@ async function openRow(user: ReturnType<typeof userEvent.setup>) {
   await waitFor(() => expect(mockGetDetails).toHaveBeenCalledWith(7));
 }
 
-/** The raw payload (which names every analyzer) moved to the Raw tab; its accordion mounts the JSON while collapsed. */
+/** The raw payload (which names every analyzer) lives in the Raw tab. */
 async function showRaw(user: ReturnType<typeof userEvent.setup>) {
   await user.click(await screen.findByRole("tab", { name: "Raw" }));
 }
