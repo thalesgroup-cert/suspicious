@@ -105,8 +105,10 @@ export function InvestigationDrawer({
     [analyzerReports]
   );
   const verdictHex = useResultHex(drawerRow?.result ?? "UNKNOWN");
-  // The backend types FILE/MAIL/URL/IP/HASH from one primary observable; only IOC-group cases come back UNKNOWN.
-  const multi = String(drawerRow?.type ?? "").toUpperCase() === "UNKNOWN";
+  // This endpoint (serializers/investigations.py get_case_type) types FILE/MAIL/URL/IP/HASH from one primary observable,
+  // observable-group cases "IOC", and a case with no observable "UNKNOWN" (the Submissions endpoint uses UNKNOWN for IOC groups).
+  const caseType = String(drawerRow?.type ?? "").toUpperCase();
+  const multi = caseType === "IOC" || caseType === "UNKNOWN";
   // Only claim "nothing ran" for a finished case; NEW/IN_PROGRESS also have 0 tests while analyzers run.
   const noAnalyzersRan =
     !!drawerRow && detailsReady && String(drawerRow.status).toUpperCase() === "DONE" && drawerRow.tests_done === 0 && analyzerReports.length === 0;
@@ -144,7 +146,8 @@ export function InvestigationDrawer({
   const startEdit = () => {
     if (!detailsReady || !drawerRow) return;
     setTabState({ id: drawerRow.id, tab: "overview" });
-    if (editMode) return;
+    // Already editing: the form stays as typed; just bring the user back to it.
+    if (editMode) { requestAnimationFrame(() => document.getElementById("investigation-edit-score")?.focus()); return; }
     const score = pickScore(detailsQuery.data);
     const confidence = pickConfidence(detailsQuery.data);
     const classification = pickClassification(detailsQuery.data);
@@ -205,7 +208,8 @@ export function InvestigationDrawer({
               <Typography variant="body2" color="text.secondary" sx={{ mt: 1 }}>
                 {[
                   humanStatus(drawerRow.status),
-                  multi ? "Indicators" : drawerRow.type,
+                  // Analysts read the raw type ("IOC", "MAIL"); only the typeless UNKNOWN gets a word.
+                  caseType === "UNKNOWN" ? "Indicators" : drawerRow.type,
                   drawerRow.tests_done == null ? null : `${drawerRow.tests_done} test${drawerRow.tests_done === 1 ? "" : "s"}`,
                   fmtDate(drawerRow.created_at),
                 ].filter(Boolean).join(" · ")}
@@ -248,7 +252,8 @@ export function InvestigationDrawer({
                   caseId={caseId}
                   detailsQuery={detailsQuery}
                   multi={multi}
-                  observableCount={detailsQuery.isLoading ? 0 : reportGroups.length}
+                  // The group's own list is the real count; report targets are the fallback for cases without one.
+                  observableCount={detailsQuery.isLoading ? 0 : observableGroup?.observables.length ?? reportGroups.length}
                   noAnalyzersRan={noAnalyzersRan}
                   verdictHex={verdictHex}
                   editMutation={editMutation}

@@ -192,7 +192,7 @@ export function InvestigationOverview({
           ) : (
             <Stack spacing={1.5}>
               <Stack direction={{ xs: "column", sm: "row" }} spacing={1.25}>
-                <TextField label="Score (0-10)" value={editScore} autoFocus
+                <TextField id="investigation-edit-score" label="Score (0-10)" value={editScore} autoFocus
                   onChange={(e) => setEditScore(e.target.value)}
                   error={!scoreValid} helperText={scoreValid ? undefined : "Score must be between 0 and 10."}
                   type="number" slotProps={{ htmlInput: { min: 0, max: 10, step: 0.1 } }} size="small" fullWidth />

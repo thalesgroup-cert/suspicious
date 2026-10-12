@@ -1,7 +1,7 @@
 import { afterEach, beforeEach, describe, it, expect, vi } from "vitest";
 import { screen, waitFor, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
-import { renderWithProviders } from "@/test/utils";
+import { createTestQueryClient, renderWithProviders } from "@/test/utils";
 import { InvestigationDrawer, type InvestigationDrawerProps } from "../InvestigationDrawer";
 
 vi.mock("@/features/settings/components/connectors", () => ({
@@ -101,7 +101,7 @@ describe("InvestigationDrawer - header band", () => {
     expect(screen.queryByText("3 tests")).toBeNull();
   });
 
-  it("an IOC group reads Indicators; no tests segment without tests_done", async () => {
+  it("a case with no observable (UNKNOWN) reads Indicators; no tests segment without tests_done", async () => {
     const r = { ...row, type: "UNKNOWN", tests_done: null };
     renderWithProviders(<InvestigationDrawer {...props({ drawerRow: r as never, detailsQuery: loaded(details(r)) })} />);
     const header = await screen.findByTestId("sheet-header");
@@ -148,9 +148,12 @@ describe("InvestigationDrawer - actions", () => {
   afterEach(() => { vi.unstubAllGlobals(); });
 
   it("Edit verdict is primary; Push to TheHive only when the connector is enabled", async () => {
-    const { unmount } = renderWithProviders(<InvestigationDrawer {...props()} />);
+    const queryClient = createTestQueryClient();
+    const { unmount } = renderWithProviders(<InvestigationDrawer {...props()} />, { queryClient });
     expect(screen.getByRole("button", { name: "Edit verdict" })).toBeEnabled();
-    await waitFor(() => expect(mockEnabled).toHaveBeenCalled());
+    // Positive signal first: the connector query has resolved (to "none enabled"), so absence is meaningful.
+    await waitFor(() => expect(queryClient.getQueryState(["enabledConnectors"])?.status).toBe("success"));
+    expect(queryClient.getQueryData(["enabledConnectors"])).toEqual([]);
     expect(screen.queryByRole("button", { name: /push to thehive/i })).toBeNull();
     unmount();
     mockEnabled.mockResolvedValue(["thehive"]);
@@ -179,10 +182,17 @@ describe("InvestigationDrawer - actions", () => {
 
   it("Redo analysis is disabled while the case is not terminal", async () => {
     const r = { ...row, status: "IN_PROGRESS" };
-    renderWithProviders(<InvestigationDrawer {...props({ detailsQuery: loaded(details(r)) })} />);
+    const p = props({ detailsQuery: loaded(details(r)) });
+    renderWithProviders(<InvestigationDrawer {...p} />);
     await userEvent.click(screen.getByRole("button", { name: "More actions" }));
-    expect(screen.getByRole("menuitem", { name: /redo analysis/i })).toHaveAttribute("aria-disabled", "true");
-    expect(screen.getByText("Case is still being analyzed.")).toBeInTheDocument();
+    const item = screen.getByRole("menuitem", { name: /redo analysis/i });
+    expect(item).toHaveAttribute("aria-disabled", "true");
+    const reason = screen.getByText("Case is still being analyzed.");
+    // The only explanation must stay readable: no inherited disabled opacity on the item or the line.
+    expect(getComputedStyle(item).opacity).toBe("1");
+    expect(getComputedStyle(reason).opacity).toBe("1");
+    await userEvent.click(item, { pointerEventsCheck: 0 });
+    expect(p.onRedo).not.toHaveBeenCalled();
   });
 
   it("Copy link writes the investigation URL and says so", async () => {
@@ -254,11 +264,39 @@ describe("InvestigationDrawer - overview", () => {
     expect(screen.getByText("No analyzers ran for this submission.")).toBeInTheDocument();
   });
 
+  // Real shape: this endpoint types observable-group cases "IOC" (serializers/investigations.py get_case_type).
+  const six = ["8.8.8.8", "www.google.com", "203.0.113.77", "a.example", "b.example", "c.example"]
+    .map((value) => ({ value, type: "x", verdict: null, sources: [] }));
+
+  it("an IOC-group case (type IOC) gets the Summary view with its observable count; meta keeps the raw type", () => {
+    const r = { ...row, type: "IOC", tests_done: 49, info: "8.8.8.8, www.google.com, 203.0.113.77 +3 more" };
+    renderWithProviders(<InvestigationDrawer {...props({ drawerRow: r as never, detailsQuery: loaded(details({ ...r, observable_group: { observables: six } })) })} />);
+    expect(screen.getByRole("heading", { name: "Summary" })).toBeInTheDocument();
+    expect(screen.getByText("6 observables")).toBeInTheDocument();
+    expect(screen.queryByRole("heading", { name: "Artifact" })).toBeNull();
+    expect(within(screen.getByTestId("sheet-header")).getByText(/^Done · IOC · 49 tests · /)).toBeInTheDocument();
+  });
+
+  it("a case with no observable (UNKNOWN) keeps the Summary view without crashing", () => {
+    const r = { ...row, type: "UNKNOWN", tests_done: 0, info: "" };
+    renderWithProviders(<InvestigationDrawer {...props({ drawerRow: r as never, detailsQuery: loaded(details({ ...r, analyzer_reports: [] })) })} />);
+    expect(screen.getByRole("heading", { name: "Summary" })).toBeInTheDocument();
+    expect(screen.queryByText(/observables?$/)).toBeNull();
+  });
+
+  it("a URL case with several report groups keeps Artifact with copy", () => {
+    const rep = (id: number, value: string) => ({ ...details().analyzer_reports[0], id, target: { kind: "URL", id: null, value } });
+    renderWithProviders(<InvestigationDrawer {...props({ detailsQuery: loaded(details({ analyzer_reports: [rep(1, "a"), rep(2, "b"), rep(3, "c")] })) })} />);
+    expect(screen.getByRole("heading", { name: "Artifact" })).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "Copy artifact" })).toBeInTheDocument();
+    expect(screen.queryByRole("heading", { name: "Summary" })).toBeNull();
+  });
+
   it("IOC road: no analyst score, the threat badge instead", () => {
-    const r = { ...row, type: "UNKNOWN", tests_done: 49, info: "6 indicators" };
+    const r = { ...row, type: "IOC", tests_done: 49, info: "6 indicators" };
     const d = details({
       ...r,
-      observable_group: { observables: [], summary: {} },
+      observable_group: { observables: six },
       threat_classification: { label: "trojan.emotet", category: "malware", source: "virustotal" },
     });
     renderWithProviders(<InvestigationDrawer {...props({ drawerRow: r as never, detailsQuery: loaded(d) })} />);

@@ -23,6 +23,7 @@ import { useSnackbar } from "notistack";
 
 import { pushSubmissionToTheHive } from "@/features/submissions/api";
 import { getEnabledConnectors } from "@/features/settings/components/connectors";
+import { ensureContrast, flatten } from "@/shared/lib/contrast";
 
 /** The decision actions: Edit verdict and, when the TheHive connector is enabled, Push to TheHive. */
 export function PrimaryActions({ id, detailsReady, onEdit, compact }: {
@@ -99,6 +100,7 @@ export function MoreActions({ id, detailsReady, terminal, onRedo }: {
   const close = () => setAnchor(null);
   const run = (fn: () => unknown) => () => { close(); void fn(); };
   const icon = (el: React.ReactNode) => <ListItemIcon>{el}</ListItemIcon>;
+  const redoBlocked = !detailsReady || !terminal;
 
   return (
     <>
@@ -134,7 +136,16 @@ export function MoreActions({ id, detailsReady, terminal, onRedo }: {
           {icon(<LinkOutlined fontSize="small" />)}<ListItemText>Copy link</ListItemText>
         </MenuItem>
         {/* Same rule as the old button: needs loaded details and a finished case. A disabled item can't host a tooltip, so the reason is its second line. */}
-        <MenuItem disabled={!detailsReady || !terminal} onClick={run(onRedo)}>
+        {/* Disabled without MUI's 0.38 item opacity: the reason line is the only explanation, so it keeps full contrast; the label and icon are greyed by hand. */}
+        <MenuItem
+          disabled={redoBlocked}
+          onClick={run(onRedo)}
+          sx={(t) => ({
+            "&.Mui-disabled": { opacity: 1 },
+            "&.Mui-disabled .MuiListItemIcon-root, &.Mui-disabled .MuiListItemText-primary": { color: t.palette.text.disabled },
+            "& .MuiListItemText-secondary": { color: ensureContrast(flatten(t.palette.text.secondary, t.palette.background.paper), t.palette.background.paper) },
+          })}
+        >
           {icon(<ReplayOutlined fontSize="small" />)}
           <ListItemText secondary={detailsReady && !terminal ? "Case is still being analyzed." : undefined}>Redo analysis</ListItemText>
         </MenuItem>

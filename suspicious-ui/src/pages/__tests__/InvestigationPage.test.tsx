@@ -544,6 +544,22 @@ describe("InvestigationPage", () => {
       await waitFor(() => expect(mockPush).toHaveBeenCalledWith(7));
       expect(await screen.findByText(/created an alert in thehive/i)).toBeInTheDocument();
     });
+
+    it("reports a failed push with the server's message, or a generic one", async () => {
+      const user = userEvent.setup();
+      mockEnabledConnectors.mockResolvedValue(["thehive"]);
+      mockPush.mockRejectedValueOnce({ response: { data: { detail: "TheHive is unreachable." } } });
+      mockPush.mockRejectedValueOnce(new Error("boom"));
+      await openDrawer(user);
+
+      const btn = await screen.findByRole("button", { name: /push to thehive/i });
+      await waitFor(() => expect(btn).toBeEnabled());
+      await user.click(btn);
+      expect(await screen.findByText("TheHive is unreachable.")).toBeInTheDocument();
+      await waitFor(() => expect(btn).toBeEnabled());
+      await user.click(btn);
+      expect(await screen.findByText("Push to TheHive failed.")).toBeInTheDocument();
+    });
   });
 
   describe("Redo analysis", () => {
@@ -709,6 +725,15 @@ describe("InvestigationPage", () => {
       expect(screen.getByRole("button", { name: "Save" })).toBeDisabled();
       expect(screen.getByText("Confidence must be between 0 and 100.")).toBeInTheDocument();
       expect(mockEdit).not.toHaveBeenCalled();
+    });
+
+    it("Edit verdict while already editing puts focus back on Score", async () => {
+      const user = userEvent.setup();
+      await startEdit(user);
+      await user.click(screen.getByLabelText("Confidence (0-100)"));
+      expect(screen.getByLabelText("Score (0-10)")).not.toHaveFocus();
+      await user.click(screen.getByRole("button", { name: "Edit verdict" }));
+      await waitFor(() => expect(screen.getByLabelText("Score (0-10)")).toHaveFocus());
     });
 
     it("Cancel leaves edit mode and restores the saved values", async () => {
