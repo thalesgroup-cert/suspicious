@@ -289,7 +289,8 @@ export function InvestigationDrawer({
                     <Box component="pre" sx={(t) => ({
                       m: 0, p: 1.25, borderRadius: 2, border: 1, borderColor: "divider",
                       bgcolor: "action.hover", color: "text.primary",
-                      overflow: "auto", fontFamily: monoStack, fontSize: t.typography.caption.fontSize, lineHeight: 1.45,
+                      // Wrapped, not side-scrolled: a long payload would otherwise hide its scrollbar at the bottom.
+                      whiteSpace: "pre-wrap", overflowWrap: "anywhere", fontFamily: monoStack, fontSize: t.typography.caption.fontSize, lineHeight: 1.45,
                     })}>
                       {JSON.stringify(detailsQuery.data?.raw ?? detailsQuery.data, null, 2)}
                     </Box>

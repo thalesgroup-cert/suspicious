@@ -11,19 +11,23 @@ import { ExpandMoreOutlined } from "@mui/icons-material";
 
 import type { ObservableGroup, Observable } from "./observableGroup";
 import { SourceTable } from "./SourceTable";
+import { monoStack } from "@/styles/themes";
 import { ScreenshotPanel } from "@/shared/components/ScreenshotPanel";
+import { RiskChip } from "@/features/submissions/components/AnalyzerReportCard";
+import { Heading } from "@/features/submissions/components/AnalyzerGroups";
 
-const BAND_COLOR: Record<string, "error" | "warning" | "success" | "default"> = {
+const BAND_TONE: Record<string, "error" | "warning" | "success"> = {
   Dangerous: "error",
   Suspicious: "warning",
   Safe: "success",
-  Inconclusive: "default",
 };
 
 const BAND_ORDER = ["Dangerous", "Suspicious", "Safe", "Inconclusive"];
 
-function bandColor(band: string) {
-  return BAND_COLOR[band] ?? "default";
+/** Themes restyle Chip's color prop (several paint every colour as the accent), so bands use the risk chip's explicit palette and Inconclusive stays neutral. */
+function BandChip({ band, label = band }: { band: string; label?: string }) {
+  const tone = BAND_TONE[band];
+  return tone ? <RiskChip label={label} tone={tone} /> : <Chip size="small" variant="outlined" label={label} sx={{ flexShrink: 0, color: "text.secondary", borderColor: "divider", bgcolor: "transparent" }} />;
 }
 
 function worstBand(observables: Observable[]): string {
@@ -56,24 +60,16 @@ export function ObservableGroupPanel({ group }: { group: ObservableGroup }) {
   }
 
   return (
-    <Box sx={{ px: 2.25, pt: 2, pb: 1 }}>
-      <Stack direction="row" spacing={1} sx={{ mb: 1.25, alignItems: "center" }}>
-        <Chip
-          color={bandColor(band)}
-          label={
-            worst?.verdict ? `${band} · ${worst.verdict.confidence}%` : band
-          }
-        />
-      </Stack>
-
-      <Stack direction="row" spacing={0.75} sx={{ mb: 1.5, flexWrap: "wrap" }}>
+    <Box component="section" sx={{ px: 2.25, pt: 2, pb: 1 }}>
+      {/* Same heading pattern as the Analysis section below, so the tab reads as two labelled sections. */}
+      <Box sx={{ mb: 1 }}>
+        <Heading title="Observables" count={`${group.observables.length} observable${group.observables.length === 1 ? "" : "s"}`} />
+      </Box>
+      {/* One row: the worst band first, then the count per band. */}
+      <Stack direction="row" useFlexGap sx={{ mb: 1.5, flexWrap: "wrap", gap: 0.75, alignItems: "center" }}>
+        <BandChip band={band} label={worst?.verdict ? `Worst: ${band} · ${worst.verdict.confidence}%` : `Worst: ${band}`} />
         {BAND_ORDER.filter((b) => bandCounts.has(b)).map((b) => (
-          <Chip
-            key={b}
-            size="small"
-            color={bandColor(b)}
-            label={`${b} ${bandCounts.get(b)}`}
-          />
+          <BandChip key={b} band={b} label={`${b} ${bandCounts.get(b)}`} />
         ))}
       </Stack>
 
@@ -84,6 +80,8 @@ export function ObservableGroupPanel({ group }: { group: ObservableGroup }) {
             <Accordion
               key={`${observable.value}-${i}`}
               disableGutters
+              // Each observable sits under the "Observables" h3.
+              slotProps={{ heading: { component: "h4" } }}
               sx={{ "&:before": { display: "none" } }}
             >
               <AccordionSummary expandIcon={<ExpandMoreOutlined />}>
@@ -92,16 +90,10 @@ export function ObservableGroupPanel({ group }: { group: ObservableGroup }) {
                   spacing={1}
                   sx={{ alignItems: "center", flexWrap: "wrap", width: "100%" }}
                 >
-                  <Typography sx={{ fontFamily: "monospace", fontWeight: 700 }}>
+                  <Typography variant="body2" sx={{ fontFamily: monoStack, fontWeight: 600, overflowWrap: "anywhere" }}>
                     {observable.value}
                   </Typography>
-                  {observable.verdict ? (
-                    <Chip
-                      size="small"
-                      color={bandColor(observable.verdict.band)}
-                      label={observable.verdict.band}
-                    />
-                  ) : null}
+                  {observable.verdict ? <BandChip band={observable.verdict.band} /> : null}
                   <Typography variant="caption" color="text.secondary">
                     {flagged} / {total} sources flagged this
                   </Typography>

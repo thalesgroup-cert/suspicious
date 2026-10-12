@@ -460,6 +460,8 @@ describe("InvestigationDrawer - analysis tab", () => {
     const r = { ...row, type: "IOC" };
     const { unmount } = renderWithProviders(<InvestigationDrawer {...three({ drawerRow: r as never }, { ...r, observable_group: { observables: obs } })} />);
     await toAnalysis();
+    expect(screen.getAllByRole("heading", { level: 3 }).map((h) => h.textContent)).toEqual(["Observables", "Analysis"]);
+    expect(screen.getByRole("heading", { level: 4 })).toHaveTextContent(/^8\.8\.8\.8/);
     const panelText = screen.getByRole("tabpanel").textContent ?? "";
     expect(panelText).toMatch(/0 \/ 0 sources flagged this/);
     expect(panelText.indexOf("sources flagged")).toBeLessThan(panelText.indexOf("HashHigh"));
