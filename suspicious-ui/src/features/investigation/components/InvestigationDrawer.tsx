@@ -27,7 +27,7 @@ import { CopyIconButton } from "@/shared/components/CopyIconButton";
 import { flatten } from "@/shared/lib/contrast";
 import { humanStatus } from "@/shared/lib/scoreUtils";
 import { InvestigationAnalyzerReportCard } from "@/features/investigation/components/InvestigationAnalyzerReportCard";
-import { InvestigationActions } from "@/features/investigation/components/InvestigationActions";
+import { MoreActions, PrimaryActions } from "@/features/investigation/components/InvestigationActions";
 import { InvestigationOverview, type EditPayload } from "@/features/investigation/components/InvestigationOverview";
 import { ObservableGroupPanel } from "@/features/investigation/ObservableGroupPanel";
 import { CommentThread } from "@/features/comments/CommentThread";
@@ -181,30 +181,27 @@ export function InvestigationDrawer({
           <Stack sx={{ height: "100%" }}>
             <SheetHeader sx={{ pb: 0 }}>
               <SheetAccent hex={verdictHex} />
-              {/* One row: identity on the left, actions on the right; wraps only when TheHive adds a third button on a phone. */}
-              <Stack direction="row" useFlexGap sx={{ alignItems: "center", justifyContent: "space-between", flexWrap: "wrap", columnGap: 1, rowGap: 1 }}>
+              {/* Row 1: identity on the left; More and Close are utilities and always fit beside it, even at 390px. */}
+              <Stack direction="row" spacing={1} sx={{ alignItems: "center", justifyContent: "space-between" }}>
                 <Stack direction="row" spacing={0.25} sx={{ alignItems: "center", minWidth: 0 }}>
                   <Typography id="investigation-drawer-title" variant="h2" component="h2" sx={{ mr: 0.25 }}>#{drawerRow.id}</Typography>
                   <CopyIconButton text={String(drawerRow.id)} title="Copy ID" />
                   <StepButton label="Previous case" target={prevId} onNavigate={navigate} btnRef={prevBtn} onStep={() => { stepped.current = "prev"; }}><ChevronLeft fontSize="small" /></StepButton>
                   <StepButton label="Next case" target={nextId} onNavigate={navigate} btnRef={nextBtn} onStep={() => { stepped.current = "next"; }}><ChevronRight fontSize="small" /></StepButton>
                 </Stack>
-                <Stack direction="row" spacing={isPhone ? 0.5 : 1} sx={{ alignItems: "center", ml: "auto" }}>
-                  <InvestigationActions
-                    id={caseId}
-                    detailsReady={detailsReady}
-                    terminal={terminal}
-                    onEdit={startEdit}
-                    onRedo={onRedo}
-                    compact={isPhone}
-                  />
-                  <Button size={isPhone ? "small" : "medium"} onClick={onClose}>Close</Button>
+                <Stack direction="row" spacing={0.5} sx={{ alignItems: "center", flexShrink: 0 }}>
+                  <MoreActions id={caseId} detailsReady={detailsReady} terminal={terminal} onRedo={onRedo} />
+                  <Button onClick={onClose}>Close</Button>
                 </Stack>
               </Stack>
 
-              <Box sx={{ mt: 1.25 }}>
+              {/* Row 2: Edit verdict sits beside the verdict it changes. Phones: when the buttons drop below the chip they start at the content edge. */}
+              <Stack direction="row" useFlexGap sx={{ mt: 1.25, alignItems: "center", flexWrap: "wrap", gap: 1 }}>
                 <ResultChip result={drawerRow.result} minWidth={BADGE_W} size="medium" behind={[flatten(headerTint(theme), theme.palette.background.paper)]} />
-              </Box>
+                <Stack direction="row" spacing={1} sx={{ alignItems: "center", ml: isPhone ? 0 : "auto" }}>
+                  <PrimaryActions id={caseId} detailsReady={detailsReady} onEdit={startEdit} compact={isPhone} />
+                </Stack>
+              </Stack>
               <Typography variant="body2" color="text.secondary" sx={{ mt: 1 }}>
                 {[
                   humanStatus(drawerRow.status),
@@ -226,7 +223,8 @@ export function InvestigationDrawer({
                   const c = tabLabelColors(theme);
                   return {
                     mt: 1, minHeight: 40, borderBottom: 0,
-                    "& .MuiTab-root": { minHeight: 40, px: 1.5, color: c.unselected, textShadow: "none" },
+                    // Phones: no 90px tab minimum and narrower padding, so all four tabs fit without a scroll arrow in most themes.
+                    "& .MuiTab-root": { minHeight: 40, minWidth: { xs: 0, sm: 90 }, px: { xs: 1, sm: 1.5 }, color: c.unselected, textShadow: "none" },
                     "& .MuiTab-root.Mui-selected": { color: c.selected },
                   };
                 }}

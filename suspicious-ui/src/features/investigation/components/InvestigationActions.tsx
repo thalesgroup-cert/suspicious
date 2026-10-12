@@ -24,25 +24,16 @@ import { useSnackbar } from "notistack";
 import { pushSubmissionToTheHive } from "@/features/submissions/api";
 import { getEnabledConnectors } from "@/features/settings/components/connectors";
 
-type Props = {
+/** The decision actions: Edit verdict and, when the TheHive connector is enabled, Push to TheHive. */
+export function PrimaryActions({ id, detailsReady, onEdit, compact }: {
   id: number;
-  /** Details loaded without error: the edit, push and redo actions need them. */
+  /** Details loaded without error: editing and pushing need them. */
   detailsReady: boolean;
-  /** DONE or CHALLENGED: redo is refused while analyzers still run. */
-  terminal: boolean;
   onEdit: () => void;
-  onRedo: () => void;
-  /** Phones: smaller buttons so the header row fits. */
+  /** Phones: small buttons so both fit beside the verdict chip more often. */
   compact?: boolean;
-};
-
-/** The case's primary actions (Edit verdict, Push to TheHive) and a More menu for the rest. */
-export function InvestigationActions({ id, detailsReady, terminal, onEdit, onRedo, compact }: Props) {
+}) {
   const { enqueueSnackbar } = useSnackbar();
-  const [anchor, setAnchor] = React.useState<HTMLElement | null>(null);
-  const close = () => setAnchor(null);
-  const run = (fn: () => unknown) => () => { close(); void fn(); };
-  const icon = (el: React.ReactNode) => <ListItemIcon>{el}</ListItemIcon>;
   const size = compact ? "small" : "medium";
 
   const enabledConnectorsQuery = useQuery({
@@ -74,7 +65,7 @@ export function InvestigationActions({ id, detailsReady, terminal, onEdit, onRed
     <>
       <Tooltip title={detailsReady ? "" : "Available once the details load."} disableHoverListener={detailsReady}>
         <span>
-          <Button variant="contained" size={size} startIcon={<EditOutlined />} disabled={!detailsReady} onClick={onEdit}>
+          <Button variant="contained" size={size} startIcon={<EditOutlined />} disabled={!detailsReady} onClick={onEdit} sx={{ whiteSpace: "nowrap" }}>
             Edit verdict
           </Button>
         </span>
@@ -86,13 +77,33 @@ export function InvestigationActions({ id, detailsReady, terminal, onEdit, onRed
           startIcon={pushMutation.isPending ? <CircularProgress size={13} color="inherit" /> : <NorthEastOutlined />}
           disabled={!detailsReady || pushMutation.isPending}
           onClick={() => pushMutation.mutate(id)}
+          sx={{ whiteSpace: "nowrap" }}
         >
           {pushMutation.isPending ? "Pushing…" : "Push to TheHive"}
         </Button>
       ) : null}
+    </>
+  );
+}
+
+/** The rarer actions, out of the way: reports, link, redo. */
+export function MoreActions({ id, detailsReady, terminal, onRedo }: {
+  id: number;
+  detailsReady: boolean;
+  /** DONE or CHALLENGED: redo is refused while analyzers still run. */
+  terminal: boolean;
+  onRedo: () => void;
+}) {
+  const { enqueueSnackbar } = useSnackbar();
+  const [anchor, setAnchor] = React.useState<HTMLElement | null>(null);
+  const close = () => setAnchor(null);
+  const run = (fn: () => unknown) => () => { close(); void fn(); };
+  const icon = (el: React.ReactNode) => <ListItemIcon>{el}</ListItemIcon>;
+
+  return (
+    <>
       <Tooltip title="More actions">
         <IconButton
-          size={size}
           aria-label="More actions"
           aria-haspopup="menu"
           aria-expanded={anchor ? "true" : "false"}
