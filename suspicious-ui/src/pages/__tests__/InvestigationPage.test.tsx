@@ -113,6 +113,7 @@ import {
   redoAnalysis,
 } from "@/features/investigation/api";
 import InvestigationPage from "@/pages/InvestigationPage";
+import { editGlobalCase } from "@/features/investigation/api";
 import { getCaseComments, addCaseComment } from "@/features/comments/api";
 import { pushSubmissionToTheHive } from "@/features/submissions/api";
 import { getEnabledConnectors } from "@/features/settings/components/connectors";
@@ -125,6 +126,21 @@ const mockGetDetails = vi.mocked(getInvestigationDetails);
 const mockGetComments = vi.mocked(getCaseComments);
 const mockAddComment = vi.mocked(addCaseComment);
 const mockRedoAnalysis = vi.mocked(redoAnalysis);
+const mockEdit = vi.mocked(editGlobalCase);
+
+async function openRow(user: ReturnType<typeof userEvent.setup>) {
+  await user.click((await screen.findByText(mockRow.info)).closest("tr")!);
+  await waitFor(() => expect(mockGetDetails).toHaveBeenCalledWith(7));
+}
+
+/** The raw payload (which names every analyzer) moved to the Raw tab; its accordion mounts the JSON while collapsed. */
+async function showRaw(user: ReturnType<typeof userEvent.setup>) {
+  await user.click(await screen.findByRole("tab", { name: "Raw" }));
+}
+
+async function openMore(user: ReturnType<typeof userEvent.setup>) {
+  await user.click(await screen.findByRole("button", { name: "More actions" }));
+}
 
 function renderInvestigation() {
   return renderWithProviders(<InvestigationPage />, { initialPath: "/investigation" });
@@ -199,6 +215,7 @@ describe("InvestigationPage", () => {
     const row = screen.getByText(/phish\.evil\.com|reporter@corp/i).closest("tr") ??
                 screen.getByText(/phish\.evil\.com|reporter@corp/i);
     await user.click(row);
+    await showRaw(user);
 
     await waitFor(() => {
       expect(screen.getByText(/PhishingURLAnalyzer/i)).toBeInTheDocument();
@@ -243,6 +260,7 @@ describe("InvestigationPage", () => {
 
     await waitFor(() => expect(screen.getByText(mockRow.info)).toBeInTheDocument());
     await user.click(screen.getByText(mockRow.info).closest("tr")!);
+    await showRaw(user);
     await waitFor(() => expect(screen.getByText(/PhishingURLAnalyzer/i)).toBeInTheDocument());
 
     await user.click(screen.getByText(rowB.info).closest("tr")!);
@@ -321,7 +339,7 @@ describe("InvestigationPage", () => {
     await user.click(row);
 
     await waitFor(() => {
-      expect(screen.getByText(/PhishingURLAnalyzer/i)).toBeInTheDocument();
+      expect(screen.getByText("Phishing")).toBeInTheDocument(); // the loaded classification
     });
 
     expect(screen.queryByText(/reporter's challenge/i)).not.toBeInTheDocument();
@@ -390,7 +408,7 @@ describe("InvestigationPage", () => {
     await user.click(row);
 
     await waitFor(() => {
-      expect(screen.getByText(/PhishingURLAnalyzer/i)).toBeInTheDocument();
+      expect(screen.getByText("Phishing")).toBeInTheDocument(); // the loaded classification
     });
 
     expect(screen.queryByText(/reporter's context/i)).not.toBeInTheDocument();
@@ -451,6 +469,7 @@ describe("InvestigationPage", () => {
     const row = screen.getByText(/phish\.evil\.com|reporter@corp/i).closest("tr") ??
                 screen.getByText(/phish\.evil\.com|reporter@corp/i);
     await user.click(row);
+    await user.click(await screen.findByRole("tab", { name: "Discussion (1)" }));
 
     await waitFor(() => {
       expect(screen.getByText("please check")).toBeInTheDocument();
@@ -483,7 +502,8 @@ describe("InvestigationPage", () => {
       const openSpy = vi.spyOn(window, "open").mockImplementation(() => null);
       await openDrawer(user);
 
-      await user.click(screen.getByRole("button", { name: /full report/i }));
+      await openMore(user);
+      await user.click(screen.getByRole("menuitem", { name: "Full report" }));
       expect(openSpy).toHaveBeenCalledWith("/api/cases/7/report/", "_blank");
       openSpy.mockRestore();
     });
@@ -493,7 +513,8 @@ describe("InvestigationPage", () => {
       const openSpy = vi.spyOn(window, "open").mockImplementation(() => null);
       await openDrawer(user);
 
-      await user.click(screen.getByRole("button", { name: /markdown/i }));
+      await openMore(user);
+      await user.click(screen.getByRole("menuitem", { name: "Markdown report" }));
       expect(openSpy).toHaveBeenCalledWith("/api/cases/7/report.md", "_blank");
       openSpy.mockRestore();
     });
@@ -538,9 +559,9 @@ describe("InvestigationPage", () => {
                   screen.getByText(/phish\.evil\.com|reporter@corp/i);
       await user.click(row);
 
-      await waitFor(() => {
-        expect(screen.getByRole("button", { name: /redo analysis/i })).toBeDisabled();
-      });
+      await waitFor(() => expect(screen.getByText("Phishing")).toBeInTheDocument());
+      await openMore(user);
+      expect(screen.getByRole("menuitem", { name: /redo analysis/i })).toHaveAttribute("aria-disabled", "true");
     });
 
     it("opens a confirmation dialog before calling the API", async () => {
@@ -554,10 +575,9 @@ describe("InvestigationPage", () => {
                   screen.getByText(/phish\.evil\.com|reporter@corp/i);
       await user.click(row);
 
-      await waitFor(() =>
-        expect(screen.getByRole("button", { name: /redo analysis/i })).toBeEnabled()
-      );
-      await user.click(screen.getByRole("button", { name: /redo analysis/i }));
+      await waitFor(() => expect(screen.getByText("Phishing")).toBeInTheDocument());
+      await openMore(user);
+      await user.click(screen.getByRole("menuitem", { name: "Redo analysis" }));
 
       await waitFor(() => {
         expect(screen.getByText("Redo analysis?")).toBeInTheDocument();
@@ -577,10 +597,9 @@ describe("InvestigationPage", () => {
                   screen.getByText(/phish\.evil\.com|reporter@corp/i);
       await user.click(row);
 
-      await waitFor(() =>
-        expect(screen.getByRole("button", { name: /redo analysis/i })).toBeEnabled()
-      );
-      await user.click(screen.getByRole("button", { name: /redo analysis/i }));
+      await waitFor(() => expect(screen.getByText("Phishing")).toBeInTheDocument());
+      await openMore(user);
+      await user.click(screen.getByRole("menuitem", { name: "Redo analysis" }));
       await waitFor(() => expect(screen.getByText("Redo analysis?")).toBeInTheDocument());
 
       const dialog = screen.getByRole("dialog");
@@ -608,10 +627,9 @@ describe("InvestigationPage", () => {
                   screen.getByText(/phish\.evil\.com|reporter@corp/i);
       await user.click(row);
 
-      await waitFor(() =>
-        expect(screen.getByRole("button", { name: /redo analysis/i })).toBeEnabled()
-      );
-      await user.click(screen.getByRole("button", { name: /redo analysis/i }));
+      await waitFor(() => expect(screen.getByText("Phishing")).toBeInTheDocument());
+      await openMore(user);
+      await user.click(screen.getByRole("menuitem", { name: "Redo analysis" }));
       await waitFor(() => expect(screen.getByText("Redo analysis?")).toBeInTheDocument());
 
       const dialog = screen.getByRole("dialog");
@@ -621,5 +639,109 @@ describe("InvestigationPage", () => {
         expect(screen.getByText("Case is still being analyzed.")).toBeInTheDocument();
       });
     });
+  });
+  describe("Redo analysis dialog", () => {
+    it("Cancel closes it without calling the API", async () => {
+      const user = userEvent.setup();
+      renderInvestigation();
+      await openRow(user);
+      await waitFor(() => expect(screen.getByText("Phishing")).toBeInTheDocument());
+      await openMore(user);
+      await user.click(screen.getByRole("menuitem", { name: "Redo analysis" }));
+      const dialog = await screen.findByRole("dialog", { name: "Redo analysis?" });
+      await user.click(within(dialog).getByRole("button", { name: "Cancel" }));
+      await waitFor(() => expect(screen.queryByText("Redo analysis?")).not.toBeInTheDocument());
+      expect(mockRedoAnalysis).not.toHaveBeenCalled();
+    });
+  });
+
+  describe("Verdict override", () => {
+    async function startEdit(user: ReturnType<typeof userEvent.setup>) {
+      renderInvestigation();
+      await openRow(user);
+      await waitFor(() => expect(screen.getByText("Phishing")).toBeInTheDocument());
+      await user.click(screen.getByRole("button", { name: "Edit verdict" }));
+    }
+
+    it("Edit verdict opens the override form on Overview with the current values, focused", async () => {
+      const user = userEvent.setup();
+      renderInvestigation();
+      await openRow(user);
+      await user.click(await screen.findByRole("tab", { name: "Raw" }));
+      await waitFor(() => expect(screen.getByRole("button", { name: "Edit verdict" })).toBeEnabled());
+      await user.click(screen.getByRole("button", { name: "Edit verdict" }));
+      expect(screen.getByRole("tab", { name: "Overview" })).toHaveAttribute("aria-selected", "true");
+      expect(screen.getByRole("heading", { name: "Verdict override" })).toBeInTheDocument();
+      const score = screen.getByLabelText("Score (0-10)");
+      expect(score).toHaveValue(0.95);
+      expect(screen.getByLabelText("Confidence (0-100)")).toHaveValue(0.95);
+      await waitFor(() => expect(score).toHaveFocus());
+    });
+
+    it("Save sends the same payload as before and leaves edit mode", async () => {
+      const user = userEvent.setup();
+      mockEdit.mockResolvedValue({} as never);
+      await startEdit(user);
+      const score = screen.getByLabelText("Score (0-10)");
+      await user.clear(score);
+      await user.type(score, "8");
+      const conf = screen.getByLabelText("Confidence (0-100)");
+      await user.clear(conf);
+      await user.type(conf, "90");
+      await user.click(screen.getByRole("button", { name: "Save" }));
+      await waitFor(() => expect(mockEdit).toHaveBeenCalledWith(7, 8, 90, "PHISHING"));
+      await waitFor(() => expect(screen.queryByRole("heading", { name: "Verdict override" })).not.toBeInTheDocument());
+    });
+
+    it("out-of-range score or confidence keeps Save disabled", async () => {
+      const user = userEvent.setup();
+      await startEdit(user);
+      const score = screen.getByLabelText("Score (0-10)");
+      await user.clear(score);
+      await user.type(score, "11");
+      expect(screen.getByRole("button", { name: "Save" })).toBeDisabled();
+      expect(screen.getByText("Score must be between 0 and 10.")).toBeInTheDocument();
+      await user.clear(score);
+      await user.type(score, "5");
+      const conf = screen.getByLabelText("Confidence (0-100)");
+      await user.clear(conf);
+      await user.type(conf, "101");
+      expect(screen.getByRole("button", { name: "Save" })).toBeDisabled();
+      expect(screen.getByText("Confidence must be between 0 and 100.")).toBeInTheDocument();
+      expect(mockEdit).not.toHaveBeenCalled();
+    });
+
+    it("Cancel leaves edit mode and restores the saved values", async () => {
+      const user = userEvent.setup();
+      await startEdit(user);
+      const score = screen.getByLabelText("Score (0-10)");
+      await user.clear(score);
+      await user.type(score, "3");
+      await user.click(screen.getByRole("button", { name: "Cancel" }));
+      expect(screen.queryByRole("heading", { name: "Verdict override" })).not.toBeInTheDocument();
+      await user.click(screen.getByRole("button", { name: "Edit verdict" }));
+      expect(screen.getByLabelText("Score (0-10)")).toHaveValue(0.95);
+    });
+  });
+
+  it("previous/next move between the rows of the current page", async () => {
+    const user = userEvent.setup();
+    const rowB = { ...mockRow, id: 8, info: "Other suspicious case" };
+    mockGetAll.mockResolvedValue({ count: 2, next: null, previous: null, results: [mockRow, rowB] } as never);
+    renderInvestigation();
+    await openRow(user);
+    expect(screen.getByRole("button", { name: "Previous case" })).toBeDisabled();
+    await user.click(screen.getByRole("button", { name: "Next case" }));
+    await waitFor(() => expect(mockGetDetails).toHaveBeenCalledWith(8));
+    expect(screen.getByRole("heading", { level: 2, name: "#8" })).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "Next case" })).toBeDisabled();
+  });
+
+  it("a deep-linked case that is not on the page has no previous/next", async () => {
+    mockGetDetails.mockResolvedValue({ ...mockDetails, id: 99 } as never);
+    renderWithProviders(<InvestigationPage />, { initialPath: "/investigation?open=99" });
+    expect(await screen.findByRole("heading", { level: 2, name: "#99" })).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "Previous case" })).toBeDisabled();
+    expect(screen.getByRole("button", { name: "Next case" })).toBeDisabled();
   });
 });

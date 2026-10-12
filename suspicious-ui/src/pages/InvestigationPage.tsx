@@ -1,13 +1,9 @@
 import * as React from "react";
 import {
-  Accordion,
-  AccordionDetails,
-  AccordionSummary,
   Alert,
   LinearProgress,
   Box,
   Button,
-  ButtonGroup,
   CardContent,
   Chip,
   CircularProgress,
@@ -16,7 +12,6 @@ import {
   DialogContent,
   DialogTitle,
   Divider,
-  Drawer,
   FormControl,
   IconButton,
   InputAdornment,
@@ -40,18 +35,10 @@ import {
   RefreshOutlined,
   OpenInNewOutlined,
   ContentCopyOutlined,
-  EditOutlined,
-  SaveOutlined,
-  CloseOutlined,
-  ExpandMoreOutlined,
   RestartAltOutlined,
   ReplayOutlined,
-  DescriptionOutlined,
-  DownloadOutlined,
-  NorthEastOutlined,
 } from "@mui/icons-material";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import { useSnackbar } from "notistack";
 import { Skeleton } from "boneyard-js/react";
 import { useNavigate, useSearchParams } from "react-router";
 import { alpha } from "@mui/material/styles";
@@ -72,8 +59,6 @@ import {
   type InvestigationStatus,
   type InvestigationType,
 } from "@/features/investigation/api";
-import { pushSubmissionToTheHive } from "@/features/submissions/api";
-import { getEnabledConnectors } from "@/features/settings/components/connectors";
 import { useDebounced } from "@/shared/hooks/useDebounced";
 import { StatusChip } from "@/shared/components/StatusChip";
 import { ResultChip } from "@/shared/components/ResultChip";
@@ -85,8 +70,6 @@ import { InvestigationDrawer } from "@/features/investigation/components/Investi
 import { addCaseComment, getCaseComments } from "@/features/comments/api";
 import {
   fmtDate,
-  groupReportsByArtifact,
-  kindLabel,
   pickClassification,
   pickConfidence,
   pickScore,
@@ -97,9 +80,8 @@ import {
 
 export default function InvestigationPage() {
   const navigate = useNavigate();
-  const [searchParams] = useSearchParams();
+  const [searchParams, setSearchParams] = useSearchParams();
   const qc = useQueryClient();
-  const { enqueueSnackbar } = useSnackbar();
   const theme = useTheme();
   const isDark = theme.palette.mode === "dark";
 
@@ -274,32 +256,6 @@ export default function InvestigationPage() {
   });
   const [redoConfirmOpen, setRedoConfirmOpen] = React.useState(false);
 
-  const enabledConnectorsQuery = useQuery({
-    queryKey: ["enabledConnectors"],
-    queryFn: getEnabledConnectors,
-    enabled: !!me,
-    staleTime: 60_000,
-  });
-  const theHiveEnabled = (enabledConnectorsQuery.data ?? []).includes("thehive");
-
-  const pushMutation = useMutation({
-    mutationFn: (caseId: number) => pushSubmissionToTheHive(caseId),
-    onSuccess: (res) => {
-      enqueueSnackbar(
-        res.status === "updated"
-          ? "Updated the existing TheHive alert."
-          : "Created an alert in TheHive.",
-        { variant: "success" },
-      );
-    },
-    onError: (err: unknown) => {
-      const detail =
-        (err as { response?: { data?: { detail?: string } } })?.response?.data
-          ?.detail ?? "Push to TheHive failed.";
-      enqueueSnackbar(detail, { variant: "error" });
-    },
-  });
-
   const commentsQuery = useQuery({
     queryKey: ["caseComments", selectedIdNum],
     queryFn: () => getCaseComments(selectedIdNum),
@@ -379,25 +335,6 @@ export default function InvestigationPage() {
     ? rows.find((r) => String(r.id) === String(selectedId))
     : undefined;
   const drawerRow = selectedRow || detailsQuery.data;
-  const detailsReady = !!detailsQuery.data && !detailsQuery.isLoading && !detailsQuery.isError;
-
-  const analyzerReports = React.useMemo(
-    () => detailsQuery.data?.analyzer_reports ?? [],
-    [detailsQuery.data]
-  );
-
-  const expandAllAnalyzers = React.useCallback(() => {
-    setExpandedAnalyzerIds(Object.fromEntries(analyzerReports.map((r) => [r.id, true])));
-  }, [analyzerReports]);
-
-  const collapseAllAnalyzers = React.useCallback(() => { setExpandedAnalyzerIds({}); }, []);
-
-  const invertAnalyzers = React.useCallback(() => {
-    setExpandedAnalyzerIds((prev) =>
-      Object.fromEntries(analyzerReports.map((r) => [r.id, !prev[r.id]]))
-    );
-  }, [analyzerReports]);
-
   function closeDrawer() { setOpenDrawer(false); setEditMode(false); editMutation.reset(); }
 
   async function copyEmail(email?: string) {
@@ -431,8 +368,6 @@ export default function InvestigationPage() {
 
   const BADGE_W = 132;
 
-  const drawerCardBorder = isDark ? "rgba(255,255,255,.08)" : alpha(theme.palette.divider, 0.6);
-  const drawerCardBg = isDark ? "rgba(255,255,255,.025)" : alpha(theme.palette.background.paper, 0.7);
   const refreshBtnBorder = isDark
     ? "1px solid rgba(255,255,255,.10)"
     : `1px solid ${alpha(theme.palette.divider, 0.6)}`;
@@ -807,12 +742,8 @@ export default function InvestigationPage() {
         open={openDrawer}
         onClose={closeDrawer}
         drawerRow={drawerRow}
-        selectedIdNum={selectedIdNum}
-        hasNumericSelectedId={hasNumericSelectedId}
+        caseId={selectedIdNum}
         detailsQuery={detailsQuery}
-        detailsReady={detailsReady}
-        theHiveEnabled={theHiveEnabled}
-        pushMutation={pushMutation}
         editMutation={editMutation}
         editMode={editMode}
         setEditMode={setEditMode}
@@ -829,7 +760,14 @@ export default function InvestigationPage() {
         setExpandedGroups={setExpandedGroups}
         expandedAnalyzerIds={expandedAnalyzerIds}
         setExpandedAnalyzerIds={setExpandedAnalyzerIds}
-        copyEmail={copyEmail}
+        siblings={rows.map((r) => r.id)}
+        onNavigate={(id) => {
+          // ponytail: selects directly and mirrors ?open= (replace); Task 4 owns the rest of the URL sync.
+          setSelectedId(id);
+          const next = new URLSearchParams(searchParams);
+          next.set("open", String(id));
+          setSearchParams(next, { replace: true });
+        }}
       />
 
       <Dialog open={redoConfirmOpen} onClose={() => setRedoConfirmOpen(false)}>

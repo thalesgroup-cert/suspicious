@@ -6,50 +6,32 @@ import {
   Alert,
   Box,
   Button,
-  ButtonGroup,
-  Chip,
   CircularProgress,
-  Divider,
   Drawer,
-  FormControl,
-  IconButton,
-  InputLabel,
-  MenuItem,
-  Select,
   Stack,
-  TextField,
-  Tooltip,
+  Tab,
+  Tabs,
   Typography,
+  useMediaQuery,
 } from "@mui/material";
-import {
-  ContentCopyOutlined,
-  EditOutlined,
-  SaveOutlined,
-  CloseOutlined,
-  ExpandMoreOutlined,
-  ReplayOutlined,
-  DescriptionOutlined,
-  DownloadOutlined,
-  NorthEastOutlined,
-} from "@mui/icons-material";
+import { ChevronLeft, ChevronRight, ExpandMoreOutlined } from "@mui/icons-material";
 import type { UseMutationResult, UseQueryResult } from "@tanstack/react-query";
 import { Skeleton } from "boneyard-js/react";
 import { alpha, useTheme } from "@mui/material/styles";
 
 import type { InvestigationDetails, InvestigationListResponse } from "@/features/investigation/api";
 import type { CaseComment } from "@/features/comments/api";
-import { StatusChip } from "@/shared/components/StatusChip";
-import { ResultChip } from "@/shared/components/ResultChip";
-import { SheetHeader } from "@/shared/components/SheetHeader";
+import { ResultChip, useResultHex } from "@/shared/components/ResultChip";
+import { SheetAccent, SheetHeader, StepButton, headerTint } from "@/shared/components/SheetHeader";
 import { CopyIconButton } from "@/shared/components/CopyIconButton";
-import MailPreview from "@/shared/components/MailPreview";
-import { ScreenshotPanel } from "@/shared/components/ScreenshotPanel";
+import { flatten } from "@/shared/lib/contrast";
+import { humanStatus } from "@/shared/lib/scoreUtils";
 import { InvestigationAnalyzerReportCard } from "@/features/investigation/components/InvestigationAnalyzerReportCard";
+import { InvestigationActions } from "@/features/investigation/components/InvestigationActions";
+import { InvestigationOverview, type EditPayload } from "@/features/investigation/components/InvestigationOverview";
 import { ObservableGroupPanel } from "@/features/investigation/ObservableGroupPanel";
-import { VerdictExplanation } from "@/features/investigation/VerdictExplanation";
-import { ThreatBadge } from "@/features/investigation/ThreatBadge";
-import { AnalysisHealthBanner } from "@/features/investigation/AnalysisHealthBanner";
 import { CommentThread } from "@/features/comments/CommentThread";
+import { tabLabelColors } from "@/features/submissions/tabColors";
 import {
   fmtDate,
   groupReportsByArtifact,
@@ -60,25 +42,27 @@ import {
 } from "@/features/investigation/utils";
 
 const BADGE_W = 132;
-const DRAWER_RADIUS = 2;
 
-const classificationOptions = [
-  "SAFE", "INCONCLUSIVE", "UNCHALLENGED", "ALLOW_LISTED",
-  "FAILURE", "SUSPICIOUS", "DANGEROUS",
-];
+const TABS = ["overview", "analysis", "discussion", "raw"] as const;
+type TabKey = (typeof TABS)[number];
+
+function Panel({ value, tab, children }: { value: TabKey; tab: TabKey; children: React.ReactNode }) {
+  return (
+    <div role="tabpanel" hidden={tab !== value} id={`investigation-tabpanel-${value}`} aria-labelledby={`investigation-tab-${value}`}>
+      {tab === value ? children : null}
+    </div>
+  );
+}
 
 export type InvestigationDrawerProps = {
   open: boolean;
   onClose: () => void;
   /** List row if present in the current page, else the loaded details. */
   drawerRow: InvestigationListResponse["results"][number] | InvestigationDetails | undefined;
-  selectedIdNum: number;
-  hasNumericSelectedId: boolean;
+  /** The selected case: the target of edit, push and redo. */
+  caseId: number;
   detailsQuery: UseQueryResult<InvestigationDetails>;
-  detailsReady: boolean;
-  theHiveEnabled: boolean;
-  pushMutation: UseMutationResult<unknown, unknown, number>;
-  editMutation: UseMutationResult<unknown, unknown, { caseId: number; score: number; confidence: number; classification: string }>;
+  editMutation: UseMutationResult<unknown, unknown, EditPayload>;
   editMode: boolean;
   setEditMode: React.Dispatch<React.SetStateAction<boolean>>;
   editScore: string;
@@ -94,23 +78,23 @@ export type InvestigationDrawerProps = {
   setExpandedGroups: React.Dispatch<React.SetStateAction<Record<string, boolean>>>;
   expandedAnalyzerIds: Record<number, boolean>;
   setExpandedAnalyzerIds: React.Dispatch<React.SetStateAction<Record<number, boolean>>>;
-  copyEmail: (email?: string) => Promise<void>;
+  /** IDs of the current page's rows, in order: previous/next step through them. */
+  siblings?: number[];
+  onNavigate?: (id: number) => void;
 };
 
 export function InvestigationDrawer({
-  open, onClose, drawerRow, selectedIdNum, hasNumericSelectedId, detailsQuery, detailsReady,
-  theHiveEnabled, pushMutation, editMutation, editMode, setEditMode,
+  open, onClose, drawerRow, caseId, detailsQuery, editMutation, editMode, setEditMode,
   editScore, setEditScore, editConfidence, setEditConfidence, editClassification, setEditClassification,
   onRedo, commentsQuery, addCommentMutation,
-  expandedGroups, setExpandedGroups, expandedAnalyzerIds, setExpandedAnalyzerIds, copyEmail,
+  expandedGroups, setExpandedGroups, expandedAnalyzerIds, setExpandedAnalyzerIds,
+  siblings = [], onNavigate,
 }: InvestigationDrawerProps) {
   const theme = useTheme();
   const isDark = theme.palette.mode === "dark";
+  const isPhone = useMediaQuery(theme.breakpoints.down("sm"));
 
-  const currentScore = pickScore(detailsQuery.data);
-  const currentConfidence = pickConfidence(detailsQuery.data);
-  const currentClassification = pickClassification(detailsQuery.data);
-
+  const detailsReady = !!detailsQuery.data && !detailsQuery.isLoading && !detailsQuery.isError;
   const analyzerReports = React.useMemo(
     () => detailsQuery.data?.analyzer_reports ?? [],
     [detailsQuery.data]
@@ -120,12 +104,56 @@ export function InvestigationDrawer({
     () => groupReportsByArtifact(analyzerReports),
     [analyzerReports]
   );
+  const verdictHex = useResultHex(drawerRow?.result ?? "UNKNOWN");
+  // The backend types FILE/MAIL/URL/IP/HASH from one primary observable; only IOC-group cases come back UNKNOWN.
+  const multi = String(drawerRow?.type ?? "").toUpperCase() === "UNKNOWN";
+  // Only claim "nothing ran" for a finished case; NEW/IN_PROGRESS also have 0 tests while analyzers run.
+  const noAnalyzersRan =
+    !!drawerRow && detailsReady && String(drawerRow.status).toUpperCase() === "DONE" && drawerRow.tests_done === 0 && analyzerReports.length === 0;
+  const status = String(detailsQuery.data?.status ?? "");
+  const terminal = status === "DONE" || status === "CHALLENGED";
 
-  const scoreNum = Number(editScore);
-  const confNum = Number(editConfidence);
-  const scoreValid = Number.isFinite(scoreNum) && scoreNum >= 0 && scoreNum <= 10;
-  const confValid = Number.isFinite(confNum) && confNum >= 0 && confNum <= 100;
-  const canSave = scoreValid && confValid && !!editClassification && !editMutation.isPending;
+  // A case not on the current page (deep link, filtered out) has no neighbours.
+  const at = drawerRow ? siblings.indexOf(drawerRow.id) : -1;
+  const prevId = at < 0 ? null : siblings[at - 1] ?? null;
+  const nextId = at < 0 ? null : siblings[at + 1] ?? null;
+  const navigate = onNavigate ? (id: number | string) => onNavigate(Number(id)) : undefined;
+
+  // The tab belongs to the case it was picked on: another case opens on Overview.
+  const [tabState, setTabState] = React.useState<{ id?: number; tab: TabKey }>({ tab: "overview" });
+  const tab: TabKey = tabState.id === drawerRow?.id ? tabState.tab : "overview";
+  // After Previous/Next the pressed button may become disabled (end of the page) and drop focus: hand it to the other one.
+  const stepped = React.useRef<"prev" | "next" | null>(null);
+  const prevBtn = React.useRef<HTMLButtonElement>(null);
+  const nextBtn = React.useRef<HTMLButtonElement>(null);
+  React.useEffect(() => {
+    const s = stepped.current;
+    if (!s) return;
+    stepped.current = null;
+    if (s === "prev" && prevId == null) nextBtn.current?.focus();
+    if (s === "next" && nextId == null) prevBtn.current?.focus();
+  }, [drawerRow?.id, prevId, nextId]);
+
+  const tabLabel = (t: TabKey) =>
+    t === "overview" ? "Overview"
+    : t === "analysis" ? (detailsQuery.data ? `Analysis (${analyzerReports.length})` : "Analysis")
+    : t === "discussion" ? (commentsQuery.data ? `Discussion (${commentsQuery.data.length})` : "Discussion")
+    : "Raw";
+
+  // Edit verdict: back to Overview, seed the form from the saved values (as the old Edit button did); the Score field autofocuses.
+  const startEdit = () => {
+    if (!detailsReady || !drawerRow) return;
+    setTabState({ id: drawerRow.id, tab: "overview" });
+    if (editMode) return;
+    const score = pickScore(detailsQuery.data);
+    const confidence = pickConfidence(detailsQuery.data);
+    const classification = pickClassification(detailsQuery.data);
+    setEditScore(score == null ? "" : String(score));
+    setEditConfidence(confidence == null ? "" : String(confidence));
+    setEditClassification(String(classification).toUpperCase());
+    editMutation.reset();
+    setEditMode(true);
+  };
 
   return (
       <Drawer
@@ -134,18 +162,15 @@ export function InvestigationDrawer({
         onClose={onClose}
         slotProps={{
           paper: {
+            "aria-labelledby": "investigation-drawer-title",
             sx: (theme) => ({
               width: { xs: "100%", sm: 620 },
               p: 0,
               borderLeft: `1px solid ${theme.palette.divider}`,
-              background: `linear-gradient(
-                180deg,
-                ${theme.palette.background.paper} 0%,
-                ${alpha(theme.palette.background.default, 0.98)} 100%
-              )`,
+              // Solid paper, as in the Submissions sheet: a translucent gradient lets the list show through on light themes.
+              background: theme.palette.background.paper,
               color: theme.palette.text.primary,
               overflow: "hidden",
-              borderRadius: DRAWER_RADIUS,
             }),
           },
         }}
@@ -154,125 +179,62 @@ export function InvestigationDrawer({
           <Box sx={{ p: 2 }}><Alert severity="info">Select a row.</Alert></Box>
         ) : (
           <Stack sx={{ height: "100%" }}>
-            <SheetHeader>
-              <Stack direction="row" spacing={2} sx={{ alignItems: "flex-start", justifyContent: "space-between", flexWrap: "wrap", rowGap: 1 }} >
-                <Box>
-                  <Typography variant="overline" color="text.secondary">Investigation</Typography>
-                  <Stack direction="row" spacing={1} sx={{ mt: 0.25, alignItems: "center" }}>
-                    <Typography variant="h5" sx={{ fontWeight: 950, lineHeight: 1.1 }} >
-                      #{drawerRow.id}
-                    </Typography>
-                    <CopyIconButton text={String(drawerRow.id)} title="Copy ID" />
-                  </Stack>
-                  <Typography variant="body2" color="text.secondary" sx={{ mt: 0.75 }}>
-                    Created {fmtDate(drawerRow.created_at)}
-                  </Typography>
-                </Box>
-
-                <Stack direction="row" spacing={1} sx={{ alignItems: "center", flexWrap: "wrap", rowGap: 1, ml: "auto" }} >
-                  {hasNumericSelectedId ? (
-                    <ButtonGroup variant="outlined" sx={{ borderRadius: 2 }}>
-                      <Button
-                        startIcon={<DescriptionOutlined />}
-                        onClick={() =>
-                          window.open(
-                            `/api/cases/${selectedIdNum}/report/`,
-                            "_blank",
-                          )
-                        }
-                        sx={{ textTransform: "none", fontWeight: 800 }}
-                      >
-                        Full report
-                      </Button>
-                      <Button
-                        startIcon={<DownloadOutlined />}
-                        onClick={() =>
-                          window.open(
-                            `/api/cases/${selectedIdNum}/report.md`,
-                            "_blank",
-                          )
-                        }
-                        sx={{ textTransform: "none", fontWeight: 800 }}
-                      >
-                        Markdown
-                      </Button>
-                      {theHiveEnabled ? (
-                        <Button
-                          startIcon={
-                            pushMutation.isPending ? (
-                              <CircularProgress size={13} color="inherit" />
-                            ) : (
-                              <NorthEastOutlined />
-                            )
-                          }
-                          disabled={!detailsReady || pushMutation.isPending}
-                          onClick={() => pushMutation.mutate(selectedIdNum)}
-                          sx={{ textTransform: "none", fontWeight: 800 }}
-                        >
-                          {pushMutation.isPending ? "Pushing…" : "Push to TheHive"}
-                        </Button>
-                      ) : null}
-                    </ButtonGroup>
-                  ) : null}
-                  <Tooltip
-                    title={detailsReady ? "" : "Load details to edit global override"}
-                    arrow
-                    placement="bottom"
-                    disableHoverListener={detailsReady}
-                  >
-                    <span>
-                      <Button
-                        variant={editMode ? "outlined" : "contained"}
-                        startIcon={editMode ? <CloseOutlined /> : <EditOutlined />}
-                        onClick={() => {
-                          if (!detailsReady) return;
-                          const score = pickScore(detailsQuery.data);
-                          const confidence = pickConfidence(detailsQuery.data);
-                          const classification = pickClassification(detailsQuery.data);
-                          setEditScore(score == null ? "" : String(score));
-                          setEditConfidence(confidence == null ? "" : String(confidence));
-                          setEditClassification(String(classification).toUpperCase());
-                          editMutation.reset();
-                          setEditMode((prev) => !prev);
-                        }}
-                        sx={{ textTransform: "none", borderRadius: 2, fontWeight: 950 }}
-                        disabled={!detailsReady}
-                      >
-                        {editMode ? "Cancel" : "Edit"}
-                      </Button>
-                    </span>
-                  </Tooltip>
-
-                  <Button
-                    onClick={onClose}
-                    sx={{ textTransform: "none", borderRadius: 2, alignSelf: "flex-start" }}
-                  >
-                    Close
-                  </Button>
+            <SheetHeader sx={{ pb: 0 }}>
+              <SheetAccent hex={verdictHex} />
+              {/* One row: identity on the left, actions on the right; wraps only when TheHive adds a third button on a phone. */}
+              <Stack direction="row" useFlexGap sx={{ alignItems: "center", justifyContent: "space-between", flexWrap: "wrap", columnGap: 1, rowGap: 1 }}>
+                <Stack direction="row" spacing={0.25} sx={{ alignItems: "center", minWidth: 0 }}>
+                  <Typography id="investigation-drawer-title" variant="h2" component="h2" sx={{ mr: 0.25 }}>#{drawerRow.id}</Typography>
+                  <CopyIconButton text={String(drawerRow.id)} title="Copy ID" />
+                  <StepButton label="Previous case" target={prevId} onNavigate={navigate} btnRef={prevBtn} onStep={() => { stepped.current = "prev"; }}><ChevronLeft fontSize="small" /></StepButton>
+                  <StepButton label="Next case" target={nextId} onNavigate={navigate} btnRef={nextBtn} onStep={() => { stepped.current = "next"; }}><ChevronRight fontSize="small" /></StepButton>
+                </Stack>
+                <Stack direction="row" spacing={isPhone ? 0.5 : 1} sx={{ alignItems: "center", ml: "auto" }}>
+                  <InvestigationActions
+                    id={caseId}
+                    detailsReady={detailsReady}
+                    terminal={terminal}
+                    onEdit={startEdit}
+                    onRedo={onRedo}
+                    compact={isPhone}
+                  />
+                  <Button size={isPhone ? "small" : "medium"} onClick={onClose}>Close</Button>
                 </Stack>
               </Stack>
 
-              <Stack direction="row" spacing={1} sx={{ mt: 1.75, flexWrap: "wrap" }}>
-                <StatusChip status={drawerRow.status as any} minWidth={BADGE_W} />
-                <Chip
-                  size="small"
-                  label={drawerRow.type}
-                  variant="outlined"
-                  sx={{
-                    fontWeight: 900,
-                    minWidth: BADGE_W,
-                    justifyContent: "center",
-                    "& .MuiChip-label": { width: "100%", textAlign: "center" },
-                  }}
-                />
-                <ResultChip result={drawerRow.result} minWidth={BADGE_W} />
-                <Chip
-                  size="small"
-                  label={`${drawerRow.tests_done} tests`}
-                  variant="outlined"
-                  sx={{ fontWeight: 900 }}
-                />
-              </Stack>
+              <Box sx={{ mt: 1.25 }}>
+                <ResultChip result={drawerRow.result} minWidth={BADGE_W} size="medium" behind={[flatten(headerTint(theme), theme.palette.background.paper)]} />
+              </Box>
+              <Typography variant="body2" color="text.secondary" sx={{ mt: 1 }}>
+                {[
+                  humanStatus(drawerRow.status),
+                  multi ? "Indicators" : drawerRow.type,
+                  drawerRow.tests_done == null ? null : `${drawerRow.tests_done} test${drawerRow.tests_done === 1 ? "" : "s"}`,
+                  fmtDate(drawerRow.created_at),
+                ].filter(Boolean).join(" · ")}
+              </Typography>
+
+              <Tabs
+                value={tab}
+                onChange={(_, v: TabKey) => setTabState({ id: drawerRow.id, tab: v })}
+                variant="scrollable"
+                scrollButtons="auto"
+                allowScrollButtonsMobile
+                aria-label="Investigation sections"
+                // The header's bottom border is the tab rule; some themes add their own, which would double it.
+                sx={(theme) => {
+                  const c = tabLabelColors(theme);
+                  return {
+                    mt: 1, minHeight: 40, borderBottom: 0,
+                    "& .MuiTab-root": { minHeight: 40, px: 1.5, color: c.unselected, textShadow: "none" },
+                    "& .MuiTab-root.Mui-selected": { color: c.selected },
+                  };
+                }}
+              >
+                {TABS.map((t) => (
+                  <Tab key={t} value={t} id={`investigation-tab-${t}`} aria-controls={`investigation-tabpanel-${t}`} label={tabLabel(t)} />
+                ))}
+              </Tabs>
             </SheetHeader>
 
             <Box sx={{ flex: 1, minHeight: 0, overflowY: "auto" }}>
@@ -282,278 +244,29 @@ export function InvestigationDrawer({
               animate="shimmer"
             >
             <Box>
-
-              {/* ── Allow/deny-list banner ────────────────────────────────────── */}
-              {(detailsQuery.data?.is_allowlisted || detailsQuery.data?.is_denylisted) ? (
-                <Box sx={{ px: 2.25, pt: 2 }}>
-                  <Alert severity={detailsQuery.data?.is_denylisted ? "error" : "success"}>
-                    {detailsQuery.data?.is_denylisted ? "This case matched the deny list." : "This case matched the allow list."}
-                    {detailsQuery.data?.list_reason ? ` ${detailsQuery.data.list_reason}` : ""}
-                  </Alert>
-                </Box>
-              ) : null}
-
-              {/* ── Summary strip ──────────────────────────────────────────────── */}
-              <Box
-                sx={{
-                  px: 2.25,
-                  py: 1.5,
-                  display: "grid",
-                  gridTemplateColumns: "repeat(3, 1fr)",
-                  gap: 1,
-                  borderBottom: `1px solid ${alpha(theme.palette.divider, isDark ? 0.18 : 0.55)}`,
-                  background: isDark ? alpha("#fff", 0.015) : alpha(theme.palette.grey[50], 0.6),
-                }}
-              >
-                {[
-                  { label: "Submission", value: `#${drawerRow.id}` },
-                  { label: "Tests run", value: drawerRow.tests_done ?? "—" },
-                  { label: "Submitted", value: fmtDate(drawerRow.created_at) },
-                ].map(({ label, value }) => (
-                  <Box key={label}>
-                    <Typography sx={{ fontSize: 10, fontWeight: 700, textTransform: "uppercase", letterSpacing: "0.07em", color: "text.disabled", mb: 0.2 }}>
-                      {label}
-                    </Typography>
-                    <Typography sx={{ fontWeight: 900, fontSize: 13 }}>{String(value)}</Typography>
-                  </Box>
-                ))}
-              </Box>
-
-              <Stack spacing={0} divider={<Divider sx={{ opacity: isDark ? 0.12 : 0.35 }} />}>
-
-                {/* ── Artifact ──────────────────────────────────────────────────── */}
-                <Box sx={{ px: 2.25, py: 2 }}>
-                  <Typography sx={{ fontSize: 10, fontWeight: 700, textTransform: "uppercase", letterSpacing: "0.08em", color: "text.disabled", mb: 0.75 }}>
-                    Artifact
-                  </Typography>
-                  <Typography sx={{ wordBreak: "break-all", fontWeight: 700, fontSize: 13.5 }}>
-                    {drawerRow.info || "—"}
-                  </Typography>
-                </Box>
-
-                {/* ── Reporter ──────────────────────────────────────────────────── */}
-                <Box sx={{ px: 2.25, py: 2 }}>
-                  <Typography sx={{ fontSize: 10, fontWeight: 700, textTransform: "uppercase", letterSpacing: "0.08em", color: "text.disabled", mb: 0.75 }}>
-                    Reported by
-                  </Typography>
-                  <Stack direction="row" spacing={1} sx={{ alignItems: "center" }} >
-                    <Typography sx={{ fontWeight: 700, fontSize: 13.5 }}>
-                      {drawerRow.reporter_email || "—"}
-                    </Typography>
-                    {drawerRow.reporter_email ? (
-                      <Tooltip title="Copy email">
-                        <IconButton size="small" onClick={() => copyEmail(drawerRow.reporter_email)}
-                          sx={{ opacity: 0.5, "&:hover": { opacity: 1 } }}>
-                          <ContentCopyOutlined sx={{ fontSize: 13 }} />
-                        </IconButton>
-                      </Tooltip>
-                    ) : null}
-                  </Stack>
-                </Box>
-
-                {/* ── Reporter's challenge (proposed verdict) ───────────────────── */}
-                {detailsQuery.data?.challenge_proposed_result ? (
-                  <Box sx={{ px: 2.25, py: 2 }}>
-                    <Typography sx={{ fontSize: 10, fontWeight: 700, textTransform: "uppercase", letterSpacing: "0.08em", color: "text.disabled", mb: 0.75 }}>
-                      Reporter's challenge
-                    </Typography>
-                    <Typography sx={{ fontWeight: 700, fontSize: 13.5 }}>
-                      Proposed verdict: <strong>{detailsQuery.data.challenge_proposed_result}</strong>
-                    </Typography>
-                    {detailsQuery.data.challenge_reason ? (
-                      <Typography variant="body2" color="text.secondary" sx={{ mt: 0.5 }}>
-                        Reason: {detailsQuery.data.challenge_reason}
-                      </Typography>
-                    ) : null}
-                  </Box>
-                ) : null}
-
-                {/* ── Reporter's context / note ─────────────────────────────────── */}
-                {(detailsQuery.data?.reporter_note || detailsQuery.data?.reporter_context) ? (
-                  <Box sx={{ px: 2.25, py: 2 }}>
-                    <Typography sx={{ fontSize: 10, fontWeight: 700, textTransform: "uppercase", letterSpacing: "0.08em", color: "text.disabled", mb: 0.75 }}>
-                      Reporter's context
-                    </Typography>
-                    <Typography variant="body2" color="text.secondary" sx={{ whiteSpace: "pre-wrap" }}>
-                      {detailsQuery.data.reporter_note || detailsQuery.data.reporter_context}
-                    </Typography>
-                  </Box>
-                ) : null}
-
-                {/* ── Comments (reporter's own + analyst notes) ─────────────────── */}
-                <CommentThread
-                  title="Comments"
-                  comments={commentsQuery.data ?? []}
-                  isLoading={commentsQuery.isLoading}
-                  onAdd={(body) => addCommentMutation.mutateAsync(body)}
-                  isAdding={addCommentMutation.isPending}
+              <Panel value="overview" tab={tab}>
+                <InvestigationOverview
+                  row={drawerRow}
+                  caseId={caseId}
+                  detailsQuery={detailsQuery}
+                  multi={multi}
+                  observableCount={detailsQuery.isLoading ? 0 : reportGroups.length}
+                  noAnalyzersRan={noAnalyzersRan}
+                  verdictHex={verdictHex}
+                  editMutation={editMutation}
+                  editMode={editMode}
+                  onCancelEdit={() => { setEditMode(false); editMutation.reset(); }}
+                  editScore={editScore}
+                  setEditScore={setEditScore}
+                  editConfidence={editConfidence}
+                  setEditConfidence={setEditConfidence}
+                  editClassification={editClassification}
+                  setEditClassification={setEditClassification}
                 />
+              </Panel>
 
-                {/* ── Global verdict override ───────────────────────────────────── */}
-                <Box sx={{ px: 2.25, py: 2 }}>
-                  <Stack direction="row" sx={{ mb: 1, alignItems: "center", justifyContent: "space-between" }}>
-                    <Typography sx={{ fontSize: 10, fontWeight: 700, textTransform: "uppercase", letterSpacing: "0.08em", color: "text.disabled" }}>
-                      Verdict override
-                    </Typography>
-                    {detailsReady && !editMode ? (
-                      <Button
-                        size="small"
-                        startIcon={<EditOutlined sx={{ fontSize: "13px !important" }} />}
-                        onClick={() => {
-                          const score = pickScore(detailsQuery.data);
-                          const confidence = pickConfidence(detailsQuery.data);
-                          const classification = pickClassification(detailsQuery.data);
-                          setEditScore(score == null ? "" : String(score));
-                          setEditConfidence(confidence == null ? "" : String(confidence));
-                          setEditClassification(String(classification).toUpperCase());
-                          editMutation.reset();
-                          setEditMode(true);
-                        }}
-                        sx={{ textTransform: "none", fontWeight: 800, borderRadius: 2, fontSize: 12, py: 0.3 }}
-                      >
-                        Edit
-                      </Button>
-                    ) : editMode ? (
-                      <Button
-                        size="small"
-                        startIcon={<CloseOutlined sx={{ fontSize: "13px !important" }} />}
-                        onClick={() => { setEditMode(false); editMutation.reset(); }}
-                        sx={{ textTransform: "none", fontWeight: 800, borderRadius: 2, fontSize: 12, py: 0.3 }}
-                      >
-                        Cancel
-                      </Button>
-                    ) : null}
-                    {detailsReady ? (
-                      <Tooltip
-                        title={
-                          detailsQuery.data?.status === "DONE" || detailsQuery.data?.status === "CHALLENGED"
-                            ? ""
-                            : "Case is still being analyzed."
-                        }
-                      >
-                        <span>
-                          <Button
-                            size="small"
-                            startIcon={<ReplayOutlined sx={{ fontSize: "13px !important" }} />}
-                            disabled={
-                              !(detailsQuery.data?.status === "DONE" || detailsQuery.data?.status === "CHALLENGED")
-                            }
-                            onClick={() => onRedo()}
-                            sx={{ textTransform: "none", fontWeight: 800, borderRadius: 2, fontSize: 12, py: 0.3 }}
-                          >
-                            Redo analysis
-                          </Button>
-                        </span>
-                      </Tooltip>
-                    ) : null}
-                  </Stack>
-
-                  {detailsQuery.isLoading ? (
-                    <Stack direction="row" spacing={1} sx={{ alignItems: "center" }} >
-                      <CircularProgress size={14} />
-                      <Typography variant="caption" color="text.secondary">Loading…</Typography>
-                    </Stack>
-                  ) : detailsQuery.isError ? (
-                    <Alert severity="warning" sx={{ py: 0.5 }}>Could not load details.</Alert>
-                  ) : !editMode ? (
-                    <Stack spacing={1.25}>
-                      <Stack direction="row" spacing={1} sx={{ alignItems: "center", flexWrap: "wrap" }} >
-                        <ResultChip result={String(currentClassification ?? "UNKNOWN")} minWidth={BADGE_W} />
-                        {/* IOC road has no analyst-visible score: the stored band number is not a real 0-10 score. */}
-                        {!observableGroup && (
-                          <Chip size="small" label={`Score ${currentScore ?? "—"}/10`} variant="outlined" sx={{ fontWeight: 800 }} />
-                        )}
-                        <Chip size="small" label={`Confidence ${currentConfidence ?? "—"}%`} variant="outlined" sx={{ fontWeight: 800 }} />
-                        <ThreatBadge value={detailsQuery.data?.threat_classification} />
-                      </Stack>
-                      <Stack direction="row" spacing={0.75} sx={{ opacity: 0.65, flexWrap: "wrap" }}>
-                        <Typography variant="caption" color="text.secondary" sx={{ fontWeight: 700, mr: 0.25 }}>AI:</Typography>
-                        {[
-                          `${detailsQuery.data?.case_infos?.classification_ai ?? "—"}`,
-                          `score ${detailsQuery.data?.case_infos?.score_ai ?? "—"}`,
-                          `conf ${detailsQuery.data?.case_infos?.confidence_ai ?? "—"}%`,
-                          detailsQuery.data?.case_infos?.category_ai ? `cat ${detailsQuery.data.case_infos.category_ai}` : null,
-                        ].filter(Boolean).map((label) => (
-                          <Chip key={label as string} size="small" label={label as string} variant="outlined"
-                            sx={{ height: 18, fontSize: 10, "& .MuiChip-label": { px: 0.75 } }} />
-                        ))}
-                      </Stack>
-                    </Stack>
-                  ) : (
-                    <Stack spacing={1.25}>
-                      <Stack direction={{ xs: "column", sm: "row" }} spacing={1.25}>
-                        <TextField label="Score (0-10)" value={editScore}
-                          onChange={(e) => setEditScore(e.target.value)}
-                          type="number" slotProps={{ htmlInput: { min: 0, max: 10, step: 0.1 } }} size="small" fullWidth />
-                        <TextField label="Confidence (0-100)" value={editConfidence}
-                          onChange={(e) => setEditConfidence(e.target.value)}
-                          type="number" slotProps={{ htmlInput: { min: 0, max: 100, step: 0.1 } }} size="small" fullWidth />
-                      </Stack>
-                      <FormControl fullWidth size="small">
-                        <InputLabel id="classification-label">Classification</InputLabel>
-                        <Select labelId="classification-label" label="Classification"
-                          value={editClassification}
-                          onChange={(e) => setEditClassification(String(e.target.value))}>
-                          {classificationOptions.map((c) => (
-                            <MenuItem key={c} value={c}>{c}</MenuItem>
-                          ))}
-                        </Select>
-                      </FormControl>
-                      <Stack direction="row" spacing={1} sx={{ alignItems: "center" }} >
-                        <Button variant="contained" startIcon={editMutation.isPending ? <CircularProgress size={13} color="inherit" /> : <SaveOutlined />}
-                          disabled={!canSave || !hasNumericSelectedId}
-                          onClick={() => {
-                            if (!hasNumericSelectedId) return;
-                            editMutation.mutate({ caseId: selectedIdNum, score: scoreNum, confidence: confNum, classification: editClassification });
-                          }}
-                          sx={{ textTransform: "none", fontWeight: 950, borderRadius: 2 }}>
-                          {editMutation.isPending ? "Saving…" : "Save"}
-                        </Button>
-                        {editMutation.isError ? <Alert severity="error" sx={{ py: 0.3, flex: 1 }}>Save failed.</Alert> : null}
-                      </Stack>
-                    </Stack>
-                  )}
-                </Box>
-
-                {/* ── Email preview (only when the case is a mail) ──────────────── */}
-                {(detailsQuery.data?.mail_preview_url || drawerRow?.mail_preview_url) ? (
-                  <Box sx={{ px: 2.25, py: 2 }}>
-                    <Typography sx={{ fontSize: 10, fontWeight: 700, textTransform: "uppercase", letterSpacing: "0.08em", color: "text.disabled", mb: 0.75 }}>
-                      Email preview
-                    </Typography>
-                    <MailPreview
-                      url={detailsQuery.data?.mail_preview_url ?? drawerRow?.mail_preview_url ?? null}
-                      variant="full"
-                      alt={`Preview of email for case ${selectedIdNum}`}
-                    />
-                  </Box>
-                ) : null}
-
-                {/* ── Page screenshot captured by the analyzer ─────────────────── */}
-                {detailsQuery.data?.screenshot_url ? (
-                  <Box sx={{ px: 2.25, py: 2 }}>
-                    <Typography sx={{ fontSize: 10, fontWeight: 700, textTransform: "uppercase", letterSpacing: "0.08em", color: "text.disabled", mb: 0.75 }}>
-                      Page screenshot
-                    </Typography>
-                    <ScreenshotPanel src={detailsQuery.data.screenshot_url} label="Page screenshot" />
-                  </Box>
-                ) : null}
-
-                {detailsQuery.data?.analysis_health ? (
-                  <Box sx={{ px: 2.25, pt: 1.5 }}>
-                    <AnalysisHealthBanner health={detailsQuery.data.analysis_health} />
-                  </Box>
-                ) : null}
-
-                {detailsQuery.data?.case_infos?.verdict_explanation ? (
-                  <Box sx={{ px: 2.25, py: 2 }}>
-                    <Typography sx={{ fontSize: 10, fontWeight: 700, textTransform: "uppercase", letterSpacing: "0.08em", color: "text.disabled", mb: 0.75 }}>
-                      Why this verdict
-                    </Typography>
-                    <VerdictExplanation data={detailsQuery.data.case_infos.verdict_explanation} />
-                  </Box>
-                ) : null}
-
+              {/* Analysis, Discussion and Raw keep today's blocks; Task 3 reworks them. */}
+              <Panel value="analysis" tab={tab}>
                 {/* Analysis results: IOC-group cases get the VT-style panel */}
                 {observableGroup ? (
                   <ObservableGroupPanel group={observableGroup} />
@@ -656,7 +369,19 @@ export function InvestigationDrawer({
                   )}
                 </Box>
                 )}
+              </Panel>
 
+              <Panel value="discussion" tab={tab}>
+                <CommentThread
+                  title="Comments"
+                  comments={commentsQuery.data ?? []}
+                  isLoading={commentsQuery.isLoading}
+                  onAdd={(body) => addCommentMutation.mutateAsync(body)}
+                  isAdding={addCommentMutation.isPending}
+                />
+              </Panel>
+
+              <Panel value="raw" tab={tab}>
                 {/* ── Raw details ───────────────────────────────────────────────── */}
                 <Accordion disableGutters sx={{ background: "transparent", "&:before": { display: "none" } }}>
                   <AccordionSummary expandIcon={<ExpandMoreOutlined />} sx={{ px: 2.25, py: 1 }}>
@@ -680,8 +405,7 @@ export function InvestigationDrawer({
                     )}
                   </AccordionDetails>
                 </Accordion>
-
-              </Stack>
+              </Panel>
             </Box>
             </Skeleton>
             </Box>

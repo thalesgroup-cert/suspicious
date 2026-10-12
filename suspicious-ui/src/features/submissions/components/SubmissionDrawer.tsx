@@ -4,11 +4,9 @@ import {
   Box,
   Button,
   Drawer,
-  IconButton,
   Stack,
   Tab,
   Tabs,
-  Tooltip,
   Typography,
   useMediaQuery,
   useTheme,
@@ -18,7 +16,7 @@ import type { UseQueryResult } from "@tanstack/react-query";
 import type { SubmissionDetails, SubmissionRow } from "@/features/submissions/api";
 import type { CaseComment } from "@/features/comments/api";
 import { ResultChip, useResultHex } from "@/shared/components/ResultChip";
-import { SheetHeader, headerTint } from "@/shared/components/SheetHeader";
+import { SheetAccent, SheetHeader, StepButton, headerTint } from "@/shared/components/SheetHeader";
 import { flatten } from "@/shared/lib/contrast";
 import { CopyIconButton } from "@/shared/components/CopyIconButton";
 import { AnalysisTab } from "@/features/submissions/components/AnalysisTab";
@@ -26,6 +24,7 @@ import { DrawerActions } from "@/features/submissions/components/DrawerActions";
 import { OverviewTab } from "@/features/submissions/components/OverviewTab";
 import { CommentThread } from "@/features/comments/CommentThread";
 import { fmtDate, groupReportsByArtifact } from "@/features/submissions/utils";
+import { humanStatus } from "@/shared/lib/scoreUtils";
 import { tabLabelColors } from "@/features/submissions/tabColors";
 
 const BADGE_W = 132;
@@ -36,32 +35,11 @@ type TabKey = (typeof TABS)[number];
 // Case types, not report target kinds: kindLabel maps targets (there MAIL means "Email address").
 const TYPE_LABELS: Record<string, string> = { FILE: "File", MAIL: "Email", URL: "URL", IP: "IP", HASH: "Hash" };
 
-/** "IN_PROGRESS" -> "In progress". */
-const humanStatus = (s: string) => {
-  const t = String(s ?? "").replace(/_/g, " ").toLowerCase();
-  return t ? t[0].toUpperCase() + t.slice(1) : "Unknown";
-};
-
 function Panel({ value, tab, children }: { value: TabKey; tab: TabKey; children: React.ReactNode }) {
   return (
     <div role="tabpanel" hidden={tab !== value} id={`submission-tabpanel-${value}`} aria-labelledby={`submission-tab-${value}`}>
       {tab === value ? children : null}
     </div>
-  );
-}
-
-function StepButton({ label, target, onNavigate, onStep, btnRef, children }: {
-  label: string; onStep: () => void; btnRef: React.Ref<HTMLButtonElement>; target: number | string | null; onNavigate?: (id: number | string) => void; children: React.ReactNode;
-}) {
-  return (
-    <Tooltip title={label}>
-      {/* span: a disabled button can't host the tooltip's listeners */}
-      <span>
-        <IconButton ref={btnRef} size="small" aria-label={label} disabled={target == null} onClick={() => { if (target == null) return; onStep(); onNavigate?.(target); }}>
-          {children}
-        </IconButton>
-      </span>
-    </Tooltip>
   );
 }
 
@@ -166,8 +144,7 @@ export function SubmissionDrawer({
         ) : (
           <Stack sx={{ height: "100%" }}>
             <SheetHeader sx={{ pb: 0 }}>
-              {/* Verdict accent: the one colour cue for the case, in the user's own result colour. */}
-              <Box aria-hidden data-testid="verdict-accent" sx={{ position: "absolute", top: 0, left: 0, right: 0, height: 3, bgcolor: verdictHex ?? "divider" }} />
+              <SheetAccent hex={verdictHex} />
               <Stack direction="row" spacing={1} sx={{ alignItems: "center", justifyContent: "space-between" }}>
                 <Stack direction="row" spacing={0.5} sx={{ alignItems: "center", minWidth: 0 }}>
                   <Typography id="submission-drawer-title" variant="h2" component="h2">#{selectedRow.id}</Typography>

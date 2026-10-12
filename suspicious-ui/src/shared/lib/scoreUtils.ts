@@ -183,3 +183,9 @@ export function groupReportsByArtifact<T extends ReportLike>(reports: T[]): Repo
   }
   return order.map((k) => map[k]);
 }
+
+/** "IN_PROGRESS" -> "In progress". */
+export const humanStatus = (s: string) => {
+  const t = String(s ?? "").replace(/_/g, " ").toLowerCase();
+  return t ? t[0].toUpperCase() + t.slice(1) : "Unknown";
+};

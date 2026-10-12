@@ -1,5 +1,5 @@
-import type { ReactNode } from "react";
-import { Box, type SxProps, type Theme } from "@mui/material";
+import type { ReactNode, Ref } from "react";
+import { Box, IconButton, Tooltip, type SxProps, type Theme } from "@mui/material";
 import { alpha } from "@mui/material/styles";
 
 /**
@@ -28,5 +28,26 @@ export function SheetHeader({ children, sx }: { children: ReactNode; sx?: SxProp
     >
       {children}
     </Box>
+  );
+}
+
+/** Verdict accent: the one colour cue for the case, a 3px line along the top of the header. */
+export function SheetAccent({ hex }: { hex?: string }) {
+  return <Box aria-hidden data-testid="verdict-accent" sx={{ position: "absolute", top: 0, left: 0, right: 0, height: 3, bgcolor: hex ?? "divider" }} />;
+}
+
+/** Previous/next case arrow; disabled when there is no neighbour (`target` null). */
+export function StepButton({ label, target, onNavigate, onStep, btnRef, children }: {
+  label: string; onStep: () => void; btnRef: Ref<HTMLButtonElement>; target: number | string | null; onNavigate?: (id: number | string) => void; children: ReactNode;
+}) {
+  return (
+    <Tooltip title={label}>
+      {/* span: a disabled button can't host the tooltip's listeners */}
+      <span>
+        <IconButton ref={btnRef} size="small" aria-label={label} disabled={target == null} onClick={() => { if (target == null) return; onStep(); onNavigate?.(target); }}>
+          {children}
+        </IconButton>
+      </span>
+    </Tooltip>
   );
 }
