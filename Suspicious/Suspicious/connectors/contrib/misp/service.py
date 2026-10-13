@@ -17,6 +17,7 @@ from mail_feeder.models import Mail
 from .client import MISPClient
 from .config_loader import load_misp_settings
 from .events import MISPEventManager
+from .internal import allow_listed_domains, company_domains, is_company_domain
 from .objects import (
     build_domain_object,
     build_email_object,
@@ -44,10 +45,14 @@ class MISPService:
         config       = settings.suspicious if primary else settings.security
         self.client  = MISPClient(config=config)
         self.primary = primary
+        self._company_domains: frozenset = frozenset()
+        self._allow_listed: frozenset = frozenset()
 
     # ── Case update ───────────────────────────────────────────────────────
 
     def update_misp(self, case: Case) -> None:
+        self._company_domains = company_domains()
+        self._allow_listed = allow_listed_domains()
         mem   = MISPEventManager(self.client)
         event = mem.get_or_create_event(case)
         if not event or not getattr(event, "id", None):
@@ -76,7 +81,7 @@ class MISPService:
             mail = Mail.objects.prefetch_related(*_UPDATE_MISP_PREFETCH).get(
                 pk=case.fileOrMail.mail.pk
             )
-            obj = build_email_object(mail, case.id, case.results)
+            obj = build_email_object(mail, case.id, case.results, self._company_domains)
             if obj:
                 push(self._push, event.id, obj, case.id, case.results, **sec)
             for attachment in mail.mail_attachments.all():
@@ -128,7 +133,9 @@ class MISPService:
             if ioc_type == "url" and isinstance(artifact, URL):
                 return build_url_object(artifact, case_number, detection_level)
             if ioc_type == "domain" and isinstance(artifact, Domain):
-                return build_domain_object(artifact, case_number, detection_level)
+                if self._shareable_domain(artifact):
+                    return build_domain_object(artifact, case_number, detection_level)
+                return None
             if ioc_type == "ip" and isinstance(artifact, IP):
                 return build_ip_object(artifact, case_number, detection_level)
             if ioc_type == "hash" and isinstance(artifact, Hash):
@@ -147,13 +154,24 @@ class MISPService:
         if artifact_type == "hash" and getattr(artifact, "artifactIsHash", None):
             return build_hash_object(artifact.artifactIsHash.hash, case_number, detection_level)
         if artifact_type == "domain" and getattr(artifact, "artifactIsDomain", None):
-            return build_domain_object(artifact.artifactIsDomain.domain, case_number, detection_level)
+            domain = artifact.artifactIsDomain.domain
+            if not self._shareable_domain(domain):
+                return None
+            return build_domain_object(domain, case_number, detection_level)
 
         logger.warning(
             "[MISPHandler] Unsupported artifact_type %r for case %s — skipping.",
             artifact_type, case_number,
         )
         return None
+
+    def _shareable_domain(self, domain: Domain) -> bool:
+        """Allow-listed, legit and company domains are not indicators."""
+        value = (domain.value or "").strip().lower()
+        return (
+            not is_company_domain(value, self._company_domains)
+            and value not in self._allow_listed
+        )
 
     def add_attachment_object(
         self,
