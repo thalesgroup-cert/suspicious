@@ -292,13 +292,76 @@ describe("InvestigationPage", () => {
     await showRaw(user);
     await waitFor(() => expect(screen.getByText(/PhishingURLAnalyzer/i)).toBeInTheDocument());
 
-    await user.click(screen.getByText(rowB.info).closest("tr")!);
-
-    await waitFor(() => {
-      expect(screen.queryByText(/PhishingURLAnalyzer/i)).not.toBeInTheDocument();
-    });
+    await user.click(screen.getByRole("button", { name: "Next case" }));
+    expect(await screen.findByRole("heading", { level: 2, name: "#8" })).toBeInTheDocument();
+    // The tab resets to Overview on a case change: go back to Raw, where #7's payload must not show under #8.
+    await showRaw(user);
+    expect(screen.queryByText(/PhishingURLAnalyzer/i)).not.toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "Edit verdict" })).toBeDisabled();
 
     resolveSecond({ ...mockDetails, id: 8, analyzer_reports: [] });
+    await waitFor(() => expect(screen.getByRole("button", { name: "Edit verdict" })).toBeEnabled());
+    expect(screen.queryByText(/PhishingURLAnalyzer/i)).not.toBeInTheDocument();
+  });
+
+  it("while the next case loads, Edit verdict and Redo are off; then Edit seeds and saves that case's own values", async () => {
+    const user = userEvent.setup();
+    const rowB = { ...mockRow, id: 8, info: "Other suspicious case" };
+    mockGetAll.mockResolvedValue({ count: 2, next: null, previous: null, results: [mockRow, rowB] } as never);
+    let resolveSecond!: (value: unknown) => void;
+    const second = new Promise((resolve) => { resolveSecond = resolve; });
+    mockGetDetails.mockImplementation(((id: number) => (id === 7 ? Promise.resolve(mockDetails) : second)) as never);
+    mockEdit.mockResolvedValue({} as never);
+
+    renderInvestigation();
+    await openRow(user);
+    await waitFor(() => expect(screen.getByRole("button", { name: "Edit verdict" })).toBeEnabled());
+    await user.click(screen.getByRole("button", { name: "Next case" }));
+    expect(await screen.findByRole("heading", { level: 2, name: "#8" })).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "Edit verdict" })).toBeDisabled();
+    expect(screen.getByRole("tab", { name: "Analysis" })).toBeInTheDocument();
+    await openMore(user);
+    expect(screen.getByRole("menuitem", { name: /redo analysis/i })).toHaveAttribute("aria-disabled", "true");
+    await user.keyboard("{Escape}");
+
+    resolveSecond({ ...mockDetails, id: 8, case_infos: { score: 4, confidence: 40, classification: "Spam" } });
+    await waitFor(() => expect(screen.getByRole("button", { name: "Edit verdict" })).toBeEnabled());
+    await user.click(screen.getByRole("button", { name: "Edit verdict" }));
+    expect(screen.getByLabelText("Score (0-10)")).toHaveValue(4);
+    expect(screen.getByLabelText("Confidence (0-100)")).toHaveValue(40);
+    await user.click(screen.getByRole("button", { name: "Save" }));
+    await waitFor(() => expect(mockEdit).toHaveBeenCalledWith(8, 4, 40, "SPAM"));
+  });
+
+  it("a screenshot error on one case does not carry over to the next", async () => {
+    const user = userEvent.setup();
+    const rowB = { ...mockRow, id: 8, info: "Other suspicious case" };
+    // A valid 1x1 PNG for B; A's path does not exist, so its image errors.
+    const png = "data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mNkYAAAAAYAAjCB0C8AAAAASUVORK5CYII=";
+    mockGetAll.mockResolvedValue({ count: 2, next: null, previous: null, results: [mockRow, rowB] } as never);
+    mockGetDetails.mockImplementation(((id: number) => Promise.resolve(
+      id === 7 ? { ...mockDetails, screenshot_url: "/missing-shot.png" } : { ...mockDetails, id: 8, screenshot_url: png },
+    )) as never);
+    renderInvestigation();
+    // Visit B first so its details are cached: the step back to B has no loading phase that would remount the panel.
+    await user.click((await screen.findByText(rowB.info)).closest("tr")!);
+    await screen.findByRole("img", { name: "Page screenshot" });
+    await user.click(screen.getByRole("button", { name: "Previous case" }));
+    expect(await screen.findByText("No screenshot available")).toBeInTheDocument();
+    await user.click(screen.getByRole("button", { name: "Next case" }));
+    expect(await screen.findByRole("heading", { level: 2, name: "#8" })).toBeInTheDocument();
+    expect(screen.queryByText("No screenshot available")).toBeNull();
+  });
+
+  it("closing and reopening the same case lands on Overview", async () => {
+    const user = userEvent.setup();
+    renderInvestigation();
+    await openRow(user);
+    await showRaw(user);
+    await user.click(screen.getAllByRole("button", { name: /close/i })[0]);
+    await waitFor(() => expect(screen.queryByRole("dialog")).toBeNull());
+    await openRow(user);
+    expect(await screen.findByRole("tab", { name: "Overview" })).toHaveAttribute("aria-selected", "true");
   });
 
   it("shows a deny-list banner with reason for a deny-listed case", async () => {
@@ -571,7 +634,7 @@ describe("InvestigationPage", () => {
       await user.click(btn);
 
       await waitFor(() => expect(mockPush).toHaveBeenCalledWith(7));
-      expect(await screen.findByText(/created an alert in thehive/i)).toBeInTheDocument();
+      expect(await screen.findByText("Created an alert in TheHive for #7.")).toBeInTheDocument();
     });
 
     it("reports a failed push with the server's message, or a generic one", async () => {

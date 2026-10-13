@@ -77,7 +77,7 @@ export type InvestigationDrawerProps = {
 };
 
 export function InvestigationDrawer({
-  open, onClose, drawerRow, caseId, detailsQuery, editMutation, editMode, setEditMode,
+  open, onClose, drawerRow, caseId, detailsQuery: rawDetailsQuery, editMutation, editMode, setEditMode,
   editScore, setEditScore, editConfidence, setEditConfidence, editClassification, setEditClassification,
   onRedo, commentsQuery, addCommentMutation,
   siblings = [], onNavigate,
@@ -85,7 +85,13 @@ export function InvestigationDrawer({
   const theme = useTheme();
   const isPhone = useMediaQuery(theme.breakpoints.down("sm"));
 
-  const detailsReady = !!detailsQuery.data && !detailsQuery.isLoading && !detailsQuery.isError;
+  // While the next case loads, the query still holds the previous case's details as placeholder. Nothing below may read them:
+  // edit would seed (and save) the old case's values onto the new one, and Redo, counts and Raw would describe the wrong case.
+  const detailsQuery = React.useMemo(
+    () => (rawDetailsQuery.isPlaceholderData ? ({ ...rawDetailsQuery, data: undefined, isLoading: true } as unknown as typeof rawDetailsQuery) : rawDetailsQuery),
+    [rawDetailsQuery],
+  );
+  const detailsReady = !!detailsQuery.data && !detailsQuery.isPlaceholderData && !detailsQuery.isError;
   const analyzerReports = React.useMemo(
     () => detailsQuery.data?.analyzer_reports ?? [],
     [detailsQuery.data]
@@ -114,6 +120,12 @@ export function InvestigationDrawer({
 
   // The tab belongs to the case it was picked on: another case opens on Overview.
   const [tabState, setTabState] = React.useState<{ id?: number; tab: TabKey }>({ tab: "overview" });
+  // Closing forgets the tab too: reopening the same case starts on Overview.
+  const [prevOpen, setPrevOpen] = React.useState(open);
+  if (open !== prevOpen) {
+    setPrevOpen(open);
+    if (!open) setTabState({ tab: "overview" });
+  }
   const tab: TabKey = tabState.id === drawerRow?.id ? tabState.tab : "overview";
   // After Previous/Next the pressed button may become disabled (end of the page) and drop focus: hand it to the other one.
   const stepped = React.useRef<"prev" | "next" | null>(null);
@@ -195,7 +207,7 @@ export function InvestigationDrawer({
               <Stack direction="row" useFlexGap sx={{ mt: 1.25, alignItems: "center", flexWrap: "wrap", gap: 1 }}>
                 <ResultChip result={drawerRow.result} minWidth={BADGE_W} size="medium" behind={[flatten(headerTint(theme), theme.palette.background.paper)]} />
                 <Stack direction="row" spacing={1} sx={{ alignItems: "center", ml: isPhone ? 0 : "auto" }}>
-                  <PrimaryActions id={caseId} detailsReady={detailsReady} onEdit={startEdit} compact={isPhone} />
+                  <PrimaryActions key={caseId} id={caseId} detailsReady={detailsReady} onEdit={startEdit} compact={isPhone} />
                 </Stack>
               </Stack>
               <Typography variant="body2" color="text.secondary" sx={{ mt: 1 }}>
@@ -239,12 +251,14 @@ export function InvestigationDrawer({
             <Box sx={{ flex: 1, minHeight: 0, overflowY: "auto" }}>
             <Skeleton
               name="investigation-drawer-details"
-              loading={detailsQuery.isFetching && detailsQuery.isPlaceholderData}
+              loading={rawDetailsQuery.isFetching && rawDetailsQuery.isPlaceholderData}
               animate="shimmer"
             >
             <Box>
               <Panel value="overview" tab={tab}>
+                {/* Keyed by case: the mail preview and screenshot keep load/error state that belongs to one case. */}
                 <InvestigationOverview
+                  key={drawerRow.id}
                   row={drawerRow}
                   caseId={caseId}
                   detailsQuery={detailsQuery}
@@ -254,7 +268,8 @@ export function InvestigationDrawer({
                   noAnalyzersRan={noAnalyzersRan}
                   verdictHex={verdictHex}
                   editMutation={editMutation}
-                  editMode={editMode}
+                  // No form (so no Save) without this case's own details: the page also leaves edit mode on a case change.
+                  editMode={editMode && detailsReady}
                   onCancelEdit={() => { setEditMode(false); editMutation.reset(); }}
                   editScore={editScore}
                   setEditScore={setEditScore}

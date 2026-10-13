@@ -68,12 +68,7 @@ import { CisoScopeDialog } from "@/features/home/components/CisoScopeDialog";
 import { SoftCard } from "@/features/investigation/components/cards";
 import { InvestigationDrawer } from "@/features/investigation/components/InvestigationDrawer";
 import { addCaseComment, getCaseComments } from "@/features/comments/api";
-import {
-  fmtDate,
-  pickClassification,
-  pickConfidence,
-  pickScore,
-} from "@/features/investigation/utils";
+import { fmtDate } from "@/features/investigation/utils";
 
 // Page
 
@@ -289,27 +284,14 @@ export default function InvestigationPage() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [selectedId]);
 
-  const editSeedKey = `${openDrawer}|${detailsQuery.dataUpdatedAt}|${editMode}`;
-  const [prevEditSeedKey, setPrevEditSeedKey] = React.useState<string | null>(null);
-  if (editSeedKey !== prevEditSeedKey) {
-    setPrevEditSeedKey(editSeedKey);
-    if (openDrawer && detailsQuery.data && !editMode) {
-      const score = pickScore(detailsQuery.data);
-      const confidence = pickConfidence(detailsQuery.data);
-      const classification = pickClassification(detailsQuery.data);
-      setEditScore(score == null ? "" : String(score));
-      setEditConfidence(confidence == null ? "" : String(confidence));
-      setEditClassification(String(classification).toUpperCase());
-    }
-  }
-
   const rows = investigationsQuery.data?.results ?? [];
   const total = investigationsQuery.data?.count ?? 0;
 
   const selectedRow = selectedId != null
     ? rows.find((r) => String(r.id) === String(selectedId))
     : undefined;
-  const drawerRow = selectedRow || detailsQuery.data;
+  // Placeholder details belong to the previous case: never let them stand in for a case missing from the page.
+  const drawerRow = selectedRow || (detailsQuery.isPlaceholderData ? undefined : detailsQuery.data);
   // Drop ?open= on close so tapping the same phone ID link again re-triggers the URL sync.
   function closeDrawer() {
     setOpenDrawer(false);

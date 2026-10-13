@@ -46,11 +46,12 @@ export function PrimaryActions({ id, detailsReady, onEdit, compact }: {
 
   const pushMutation = useMutation({
     mutationFn: (caseId: number) => pushSubmissionToTheHive(caseId),
-    onSuccess: (res) => {
+    // The pushed case's id, from the mutation itself: the message names the case that was actually sent.
+    onSuccess: (res, caseId) => {
       enqueueSnackbar(
         res.status === "updated"
-          ? "Updated the existing TheHive alert."
-          : "Created an alert in TheHive.",
+          ? `Updated the existing TheHive alert for #${caseId}.`
+          : `Created an alert in TheHive for #${caseId}.`,
         { variant: "success" },
       );
     },
