@@ -39,7 +39,6 @@ export function DashboardEmpty(props: {
   title: string;
   description: string;
   onRefresh: () => void;
-  canAdjust: boolean;
 }) {
   return (
     <Box
@@ -54,9 +53,9 @@ export function DashboardEmpty(props: {
     >
       <Stack direction={{ xs: "column", sm: "row" }} spacing={2} sx={{ alignItems: { xs: "flex-start", sm: "center" }, justifyContent: "space-between" }} >
         <Box>
-          <Typography sx={{ fontWeight: 950 }}>{props.title}</Typography>
+          <Typography variant="subtitle1" component="p">{props.title}</Typography>
           <Typography variant="body2" color="text.secondary" sx={{ mt: 0.25 }}>
-            {props.description} {props.canAdjust ? "" : "Time/scope controls may be restricted for your role."}
+            {props.description}
           </Typography>
         </Box>
         <Button variant="outlined" startIcon={<RefreshOutlined />} onClick={props.onRefresh}>

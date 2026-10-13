@@ -1,54 +1,43 @@
 import * as React from "react";
 import {
   Box,
-  Chip,
   FormControl,
   IconButton,
   InputLabel,
   MenuItem,
-  Popover,
   Select,
-  Skeleton,
   Stack,
   Tooltip,
   Typography,
 } from "@mui/material";
-import { RefreshOutlined, SettingsOutlined } from "@mui/icons-material";
+import { RefreshOutlined } from "@mui/icons-material";
 import { useThemeMode } from "@/styles/ThemeStore";
-
-function monthName(m: number) {
-  return new Date(2000, m - 1, 1).toLocaleString("en", { month: "long" });
-}
+import type { ScopeOption } from "@/features/dashboard/api";
+import ScopePicker from "./ScopePicker";
+import { monthName } from "@/features/dashboard/format";
 
 export default function OverviewHeader(props: {
   title: string;
   subtitle: string;
-
-  isElevated: boolean;
-  isCiso: boolean;
+  /** One-line explanation under the subtitle (e.g. why only Overall is offered). */
+  note?: string;
 
   month: number;
   year: number;
-  scope: string;
-  cisoScope?: string;
-
   onMonthChange: (m: number) => void;
   onYearChange: (y: number) => void;
-  onScopeChange: (s: string) => void;
+
+  /** null while the allowed scopes are loading: the picker appears once known. */
+  scopeOptions: ScopeOption[] | null;
+  scope: string;
+  onScopeChange: (key: string) => void;
 
   onRefresh: () => void;
-  refreshing: boolean;
-
-  trendWindow: number;
-  onTrendWindowChange: (n: number) => void;
 }) {
   const years = React.useMemo(() => {
     const y = new Date().getFullYear();
     return Array.from({ length: 7 }, (_, i) => y - 3 + i);
   }, []);
-
-  const [anchorEl, setAnchorEl] = React.useState<HTMLElement | null>(null);
-  const open = Boolean(anchorEl);
 
   const { capabilities } = useThemeMode();
   const { effects } = capabilities;
@@ -77,133 +66,73 @@ export default function OverviewHeader(props: {
         boxShadow: barGlow,
       }}
     >
-      <Box sx={{ px: { xs: 2, md: 3 }, py: 1.5 }}>
-        <Stack direction="row" spacing={2} sx={{ alignItems: "flex-start", justifyContent: "space-between" }} >
-          <Box>
-            <Typography variant="pageTitle" component="h1">
-              {props.title}
+      <Stack
+        direction={{ xs: "column", md: "row" }}
+        spacing={1.5}
+        sx={{ px: { xs: 2, md: 3 }, py: 1.5, alignItems: { md: "center" }, justifyContent: "space-between" }}
+      >
+        <Box sx={{ minWidth: 0 }}>
+          <Typography variant="pageTitle" component="h1">
+            {props.title}
+          </Typography>
+          <Typography variant="subtitle2" color="text.secondary">
+            {props.subtitle}
+          </Typography>
+          {props.note ? (
+            <Typography variant="caption" color="text.secondary" component="p">
+              {props.note}
             </Typography>
-          </Box>
+          ) : null}
+        </Box>
 
-          <Stack direction="row" spacing={1} sx={{ alignItems: "center" }} >
-            <Tooltip title="Refresh">
-              <span>
-                <IconButton
-                  aria-label="Refresh"
-                  onClick={props.onRefresh}
-                  sx={{ borderRadius: 2, border: "1px solid", borderColor: "divider" }}
-                >
-                  <RefreshOutlined />
-                </IconButton>
-              </span>
-            </Tooltip>
+        <Stack direction="row" useFlexGap spacing={1} sx={{ alignItems: "center", flexWrap: "wrap" }}>
+          {props.scopeOptions ? (
+            <ScopePicker options={props.scopeOptions} value={props.scope} onChange={props.onScopeChange} />
+          ) : null}
 
-            {props.isElevated ? (
-              <>
-                <Tooltip title="Time & scope">
-                  <IconButton
-                    aria-label="Time & scope"
-                    onClick={(e) => setAnchorEl(e.currentTarget)}
-                    sx={{ borderRadius: 2, border: "1px solid", borderColor: "divider" }}
-                  >
-                    <SettingsOutlined />
-                  </IconButton>
-                </Tooltip>
+          <FormControl size="small" sx={{ minWidth: 130 }}>
+            <InputLabel id="dashboard-month-label">Month</InputLabel>
+            <Select
+              labelId="dashboard-month-label"
+              label="Month"
+              value={props.month}
+              onChange={(e) => props.onMonthChange(Number(e.target.value))}
+            >
+              {Array.from({ length: 12 }, (_, i) => i + 1).map((m) => (
+                <MenuItem key={m} value={m}>
+                  {monthName(m)}
+                </MenuItem>
+              ))}
+            </Select>
+          </FormControl>
 
-                <Popover
-                  open={open}
-                  anchorEl={anchorEl}
-                  onClose={() => setAnchorEl(null)}
-                  anchorOrigin={{ vertical: "bottom", horizontal: "right" }}
-                  transformOrigin={{ vertical: "top", horizontal: "right" }}
-                  slotProps={{
-                    paper: {
-                      sx: {
-                        mt: 1,
-                        borderRadius: 3,
-                        border: "1px solid",
-                        borderColor: "divider",
-                        width: 320,
-                        p: 1.5,
-                      },
-                    },
-                  }}
-                >
-                  <Stack spacing={1.5}>
-                    <Typography sx={{ fontWeight: 900, fontSize: 14 }}>Time & scope</Typography>
+          <FormControl size="small" sx={{ minWidth: 96 }}>
+            <InputLabel id="dashboard-year-label">Year</InputLabel>
+            <Select
+              labelId="dashboard-year-label"
+              label="Year"
+              value={props.year}
+              onChange={(e) => props.onYearChange(Number(e.target.value))}
+            >
+              {years.map((y) => (
+                <MenuItem key={y} value={y}>
+                  {y}
+                </MenuItem>
+              ))}
+            </Select>
+          </FormControl>
 
-                    <FormControl fullWidth size="small">
-                      <InputLabel id="month-label">Month</InputLabel>
-                      <Select
-                        labelId="month-label"
-                        label="Month"
-                        value={props.month}
-                        onChange={(e) => props.onMonthChange(Number(e.target.value))}
-                      >
-                        {Array.from({ length: 12 }, (_, i) => i + 1).map((m) => (
-                          <MenuItem key={m} value={m}>
-                            {monthName(m)}
-                          </MenuItem>
-                        ))}
-                      </Select>
-                    </FormControl>
-
-                    <FormControl fullWidth size="small">
-                      <InputLabel id="year-label">Year</InputLabel>
-                      <Select
-                        labelId="year-label"
-                        label="Year"
-                        value={props.year}
-                        onChange={(e) => props.onYearChange(Number(e.target.value))}
-                      >
-                        {years.map((y) => (
-                          <MenuItem key={y} value={y}>
-                            {y}
-                          </MenuItem>
-                        ))}
-                      </Select>
-                    </FormControl>
-
-                    {props.isCiso ? (
-                      <FormControl fullWidth size="small">
-                        <InputLabel id="scope-label">Scope</InputLabel>
-                        <Select
-                          labelId="scope-label"
-                          label="Scope"
-                          value={props.scope}
-                          onChange={(e) => props.onScopeChange(String(e.target.value))}
-                        >
-                          <MenuItem value="ALL">Everyone</MenuItem>
-                          {props.cisoScope ? <MenuItem value={props.cisoScope}>{props.cisoScope}</MenuItem> : null}
-                        </Select>
-                      </FormControl>
-                    ) : null}
-
-                    <FormControl fullWidth size="small">
-                      <InputLabel id="trend-label">Trend window</InputLabel>
-                      <Select
-                        labelId="trend-label"
-                        label="Trend window"
-                        value={props.trendWindow}
-                        onChange={(e) => props.onTrendWindowChange(Number(e.target.value))}
-                      >
-                        <MenuItem value={1}>1 month</MenuItem>
-                        <MenuItem value={3}>3 months</MenuItem>
-                        <MenuItem value={6}>6 months</MenuItem>
-                        <MenuItem value={12}>12 months</MenuItem>
-                      </Select>
-                    </FormControl>
-
-                    <Box sx={{ fontSize: 12, color: "text.secondary" }}>
-                      Changes apply immediately and refetch the summary.
-                    </Box>
-                  </Stack>
-                </Popover>
-              </>
-            ) : null}
-          </Stack>
+          <Tooltip title="Refresh">
+            <IconButton
+              aria-label="Refresh"
+              onClick={props.onRefresh}
+              sx={{ borderRadius: 2, border: "1px solid", borderColor: "divider" }}
+            >
+              <RefreshOutlined />
+            </IconButton>
+          </Tooltip>
         </Stack>
-      </Box>
+      </Stack>
     </Box>
   );
 }

@@ -27,9 +27,28 @@ export const fixtureMeSuperuser: Me = {
 };
 
 export const fixtureDashboardSummary: DashboardSummary = {
-  month: 5,
+  month: 10,
   year: 2026,
-  scope: "ALL",
+  scope: { key: "ALL", label: "Overall" },
+  reports: 512,
+  outcomes: { safe: 200, inconclusive: 80, suspicious: 150, dangerous: 60, failure: 1 },
+  in_progress: 21,
+  by_type: { MAIL: 400, FILE: 50, URL: 40, IP: 10, HASH: 5, IOC: 5, UNKNOWN: 2 },
+  reporters: 128,
+  new_users: 4,
+  previous: {
+    reports: 480,
+    outcomes: { safe: 190, inconclusive: 70, suspicious: 140, dangerous: 55, failure: 2 },
+  },
+  trend: [
+    { week_start: "2026-09-28", reports: 90 },
+    { week_start: "2026-10-05", reports: 130 },
+  ],
+  top_reporters: [
+    { label: "phishing-corp", value: 17 },
+    { label: "spoof-it", value: 9 },
+  ],
+  // Legacy keys, still read by the current panels.
   kpis: {
     new_users: 4,
     total_reporters: 128,

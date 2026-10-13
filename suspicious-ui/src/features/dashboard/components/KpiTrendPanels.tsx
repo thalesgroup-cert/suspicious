@@ -22,8 +22,6 @@ type Spark = {
   submissions: Array<number | null>;
 };
 
-type MetricKey = "newUsers" | "reporters" | "submissions";
-
 // Helpers
 
 function formatNumber(v: unknown) {
@@ -108,11 +106,7 @@ function TrendPanel(props: {
 
 // KpiTrendPanels (default export)
 
-export default function KpiTrendPanels(props: {
-  spark: Spark;
-  trendWindow: number;
-  onOpenTrends?: (metric?: MetricKey) => void;
-}) {
+export default function KpiTrendPanels(props: { spark: Spark }) {
   return (
     <Box
       sx={{
