@@ -1,5 +1,5 @@
 import { describe, it, expect } from "vitest";
-import { screen, within } from "@testing-library/react";
+import { act, screen, within } from "@testing-library/react";
 import { renderWithProviders } from "@/test/utils";
 import { fixtureDashboardSummary } from "@/test/fixtures";
 import { Sparkline } from "../components/Sparkline";
@@ -150,6 +150,15 @@ describe("OutcomesPanel", () => {
   it("shows no allow-listed line when every finished case has an outcome", () => {
     renderWithProviders(<OutcomesPanel outcomes={summary.outcomes} inProgress={21} reports={512} />);
     expect(screen.queryByText(/Allow-listed/)).not.toBeInTheDocument();
+  });
+
+  it("keeps the Dangerous row in its own colours in the future theme (no green contamination glow)", async () => {
+    renderWithProviders(<OutcomesPanel outcomes={summary.outcomes} inProgress={0} reports={512} />);
+    await act(async () => {
+      window.dispatchEvent(new CustomEvent("suspicious:theme-hydrate", { detail: { theme: "future", autoSeasonal: false } }));
+      await new Promise((r) => setTimeout(r, 300));
+    });
+    expect(screen.getByText("Dangerous").closest("li")).not.toHaveClass("contaminated");
   });
 
   it("uses the singular for one case", () => {

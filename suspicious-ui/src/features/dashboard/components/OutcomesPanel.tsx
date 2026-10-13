@@ -5,7 +5,6 @@ import { SoftCard } from "./SoftCard";
 import type { Outcomes } from "@/features/dashboard/api";
 import { onCard, percents, plural } from "@/features/dashboard/format";
 import { useResultColors } from "@/styles/colorStore";
-import { useThemeMode } from "@/styles/ThemeStore";
 
 const ROWS = [
   ["safe", "Safe"],
@@ -19,7 +18,6 @@ export default function OutcomesPanel(props: { outcomes: Outcomes; inProgress: n
   const { outcomes, inProgress, reports } = props;
   const theme = useTheme();
   const result = useResultColors();
-  const { effects } = useThemeMode().capabilities;
 
   const counts = ROWS.map(([k]) => outcomes[k]);
   const finished = counts.reduce((a, b) => a + b, 0);
@@ -62,7 +60,6 @@ export default function OutcomesPanel(props: { outcomes: Outcomes; inProgress: n
                 component="li"
                 direction="row"
                 spacing={1}
-                className={effects.hasContaminationEffect && k === "dangerous" ? "contaminated" : undefined}
                 sx={{ alignItems: "center" }}
               >
                 <Box
