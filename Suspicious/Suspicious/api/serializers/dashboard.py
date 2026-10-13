@@ -29,21 +29,6 @@ class DashboardPrefixSerializer(serializers.Serializer):
     value = serializers.IntegerField(min_value=0)
 
 
-class DashboardKpisSerializer(serializers.Serializer):
-    new_users = serializers.IntegerField(min_value=0)
-    total_reporters = serializers.IntegerField(min_value=0)
-    total_cases = serializers.IntegerField(min_value=0)
-
-
-class DashboardDangerCountsSerializer(serializers.Serializer):
-    failure = serializers.IntegerField(min_value=0)
-    safe = serializers.IntegerField(min_value=0)
-    inconclusive = serializers.IntegerField(min_value=0)
-    suspicious = serializers.IntegerField(min_value=0)
-    dangerous = serializers.IntegerField(min_value=0)
-    malicious = serializers.IntegerField(min_value=0)
-
-
 class DashboardScopeSerializer(serializers.Serializer):
     key = serializers.CharField()
     label = serializers.CharField()
@@ -95,10 +80,6 @@ class DashboardSummaryResponseSerializer(serializers.Serializer):
     previous = DashboardPreviousSerializer()
     trend = DashboardTrendPointSerializer(many=True)
     top_reporters = DashboardPrefixSerializer(many=True, allow_null=True)
-    # Legacy keys read by the current UI, derived from the fields above.
-    kpis = DashboardKpisSerializer()
-    danger_counts = DashboardDangerCountsSerializer()
-    top_prefixes = DashboardPrefixSerializer(many=True)
 
 
 class MonthlyCasesSummaryAggregateSerializer(serializers.Serializer):
@@ -193,19 +174,3 @@ class UserCasesMonthlyStatsSerializer(serializers.ModelSerializer):
             "creation_date",
             "last_update",
         ]
-
-class TopPrefixItemSerializer(serializers.Serializer):
-    prefix = serializers.CharField()
-    total = serializers.IntegerField()
-    safe = serializers.IntegerField()
-    suspicious = serializers.IntegerField()
-    dangerous = serializers.IntegerField()
-    failure = serializers.IntegerField()
-    inconclusive = serializers.IntegerField()
-
-
-class TopPrefixesResponseSerializer(serializers.Serializer):
-    type = serializers.ChoiceField(choices=["user", "group"])
-    month = serializers.CharField(allow_null=True, required=False)
-    year = serializers.CharField(allow_null=True, required=False)
-    data = TopPrefixItemSerializer(many=True)

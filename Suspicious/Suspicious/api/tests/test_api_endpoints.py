@@ -90,5 +90,6 @@ class DashboardEndpointTests(TestCase):
         self.client.force_authenticate(self.user)
         resp = self.client.get(reverse("dashboard-summary"), {"month": 5, "year": 2026})
         self.assertEqual(resp.status_code, 200)
-        self.assertIn("kpis", resp.data)
-        self.assertIn("danger_counts", resp.data)
+        self.assertIn("reports", resp.data)
+        self.assertIn("outcomes", resp.data)
+        self.assertNotIn("kpis", resp.data)

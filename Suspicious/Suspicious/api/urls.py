@@ -21,7 +21,6 @@ from api.views.dashboard import (
     UserCasesMonthlyStatsAggregateView,
     UserCasesMonthlyStatsDetailView,
     UserCasesMonthlyStatsListView,
-    TopPrefixesView,
 )
 from api.views.downloads import DownloadCaseArchiveView
 from api.views.home import HomeSummaryView
@@ -95,7 +94,6 @@ urlpatterns = [
     path("stats/user-cases/", UserCasesMonthlyStatsListView.as_view(), name="user-cases-list"),
     path("stats/user-cases/<int:pk>/", UserCasesMonthlyStatsDetailView.as_view(), name="user-cases-detail"),
     path("stats/user-cases/aggregate/", UserCasesMonthlyStatsAggregateView.as_view(), name="user-cases-aggregate"),
-    path("stats/top-prefixes/", TopPrefixesView.as_view(), name="top-prefixes"),
 
     path("cases/<int:case_id>/download/", DownloadCaseArchiveView.as_view(), name="case-download"),
     path("cases/<int:case_id>/mail-preview.png", MailPreviewView.as_view(), name="case-mail-preview"),

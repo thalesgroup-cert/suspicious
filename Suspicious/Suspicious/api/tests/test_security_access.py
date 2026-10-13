@@ -269,29 +269,9 @@ class MonthlyReporterStatsAccessTests(TestCase):
             self.assertEqual(resp.status_code, 200, f"{name} should stay open")
 
 
-class TopPrefixesAccessTests(TestCase):
-    """Per-user/group case-count ranking is open to every authenticated user,
-    same as the other dashboard aggregates."""
-
-    def setUp(self):
-        self.client = APIClient()
-        self.reporter = _make_user("prefixes_reporter")
-        self.cert = _make_user("prefixes_cert", groups=["CERT"])
-
-    def test_regular_user_allowed(self):
-        self.client.force_authenticate(self.reporter)
-        resp = self.client.get(reverse("top-prefixes"), {"type": "user"})
-        self.assertEqual(resp.status_code, 200)
-
-    def test_cert_user_allowed(self):
-        self.client.force_authenticate(self.cert)
-        resp = self.client.get(reverse("top-prefixes"), {"type": "user"})
-        self.assertEqual(resp.status_code, 200)
-
-
-class DashboardSummaryTopPrefixesTests(TestCase):
-    """DashboardSummaryView embeds top_prefixes in every response, unscrubbed,
-    for every authenticated user."""
+class DashboardSummaryAccessTests(TestCase):
+    """The summary answers every authenticated user; names are gated by role
+    (see test_dashboard_scope)."""
 
     def setUp(self):
         self.client = APIClient()

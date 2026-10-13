@@ -58,7 +58,8 @@ Handles logic for updating or processing existing dashboard.
 `summarise(month, year, group_names, include_names=False)` aggregates `Case` live for one month,
 restricted to reporters in **every** group of `group_names` (country code, region, GBU; `None` = Overall).
 It backs `GET /api/dashboard/summary/` (cached 120 s per month/year/scope) and the nightly
-`DashboardSnapshot` for Overall. The summary no longer reads the monthly stats tables.
+`DashboardSnapshot` for Overall (written by the 02:00 beat task, read by nothing at present). The
+summary no longer reads the monthly stats tables.
 
 - A report counts in the month its case was created, in the server timezone (same bucket as the
   Investigation list's date filter).
@@ -86,8 +87,8 @@ server-side (anything else is a 403):
 by OIDC login only have neither until the LDAP sync fills them, so they get Overall only. A CISO's
 own stored scope string (e.g. `AU`, `AU|Off GBU`, `AU | Off GBU`, compared after split/strip) is
 accepted as an alias of `OWN_SCOPE`. Reporter names (`top_reporters`) go to
-CERT/Admin/superuser, and to a CISO only for `OWN_SCOPE`. `/api/stats/top-prefixes/` returns an
-empty ranking to anyone who is not CERT/Admin/superuser.
+CERT/Admin/superuser, and to a CISO only for `OWN_SCOPE`. The old `/api/stats/top-prefixes/`
+ranking and the summary's legacy `kpis`, `danger_counts` and `top_prefixes` keys are removed.
 
 ---
 

@@ -6,7 +6,6 @@ from rest_framework.exceptions import PermissionDenied
 from rest_framework.test import APITestCase
 
 from api.permissions.dashboard_scope import resolve_scope
-from dashboard.models import UserCasesMonthlyStats
 from dashboard.tests_regional import seed
 from profiles.models import CISOProfile, UserProfile
 
@@ -86,12 +85,9 @@ class DashboardScopeTests(APITestCase):
         self.assertEqual(data["reports"], 6)
         self.assertEqual(data["outcomes"]["dangerous"], 1)
         self.assertIsNone(data["top_reporters"])
-        # Legacy keys stay populated for the current UI, without names.
-        self.assertEqual(data["kpis"]["total_cases"], 6)
-        self.assertEqual(data["kpis"]["total_reporters"], 2)
-        self.assertEqual(data["danger_counts"]["dangerous"], 1)
-        self.assertEqual(data["danger_counts"]["malicious"], 1)
-        self.assertEqual(data["top_prefixes"], [])
+        # Legacy keys the old UI read are gone.
+        for key in ("kpis", "danger_counts", "top_prefixes", "malicious"):
+            self.assertNotIn(key, data)
 
     def test_summary_plain_user_overall(self):
         data = self._get(self.au1, SUMMARY, scope="ALL").data
@@ -107,7 +103,6 @@ class DashboardScopeTests(APITestCase):
     def test_summary_cert_sees_names(self):
         data = self._get(self.cert, SUMMARY, scope="COUNTRY:AU").data
         self.assertEqual(data["top_reporters"][0], {"label": "au1", "value": 4})
-        self.assertEqual(data["top_prefixes"], data["top_reporters"])
 
     def test_summary_ciso_scope_and_names(self):
         data = self._get(self.ciso, SUMMARY).data
@@ -192,7 +187,6 @@ class DashboardScopeHardeningTests(APITestCase):
     def test_ciso_overall_has_no_names(self):
         data = self._get(self.ciso, SUMMARY, scope="ALL").data
         self.assertIsNone(data["top_reporters"])
-        self.assertEqual(data["top_prefixes"], [])
         self.assertIsNotNone(self._get(self.ciso, SUMMARY, scope="OWN_SCOPE").data["top_reporters"])
 
     # I-3: the cache never hands names to a plain user.
@@ -201,20 +195,13 @@ class DashboardScopeHardeningTests(APITestCase):
         self.assertIsNotNone(self._get(self.cert, SUMMARY, scope="COUNTRY:AU").data["top_reporters"])
         data = self._get(self.au1, SUMMARY, scope="OWN_COUNTRY").data
         self.assertIsNone(data["top_reporters"])
-        self.assertEqual(data["top_prefixes"], [])
 
-    # I-4: top-prefixes ranks names only for CERT/Admin/superuser.
+    # The legacy top-prefixes ranking endpoint is removed (the UI reads summary.top_reporters).
 
-    def test_top_prefixes_empty_for_non_elevated(self):
-        UserCasesMonthlyStats.objects.create(user=self.au1, month="10", year="2026", total_cases=3)
-        for user in (self.au1, self.ciso):
-            self.client.force_authenticate(user)
-            resp = self.client.get("/api/stats/top-prefixes/", {"month": 10, "year": 2026})
-            self.assertEqual(resp.status_code, 200)
-            self.assertEqual(resp.data["data"], [])
+    def test_top_prefixes_endpoint_is_gone(self):
         self.client.force_authenticate(self.cert)
         resp = self.client.get("/api/stats/top-prefixes/", {"month": 10, "year": 2026})
-        self.assertEqual(resp.data["data"][0]["prefix"], "au1")
+        self.assertEqual(resp.status_code, 404)
 
     # M-5: cache keys never collide.
 

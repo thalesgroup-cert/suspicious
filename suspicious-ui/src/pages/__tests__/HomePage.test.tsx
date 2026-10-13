@@ -1,7 +1,7 @@
 import { describe, it, expect, vi, beforeEach } from "vitest";
 import { screen, waitFor } from "@testing-library/react";
 import { renderWithProviders } from "@/test/utils";
-import { fixtureMe, fixtureDashboardSummary } from "@/test/fixtures";
+import { fixtureMe } from "@/test/fixtures";
 
 vi.mock("@/api/auth", () => ({
   getMe: vi.fn(),
@@ -17,14 +17,9 @@ vi.mock("@/api/client", () => ({
   },
 }));
 
-vi.mock("@/features/dashboard/api", () => ({
-  getDashboardSummary: vi.fn(),
-}));
-
 
 import { getMe } from "@/api/auth";
 import { api } from "@/api/client";
-import { getDashboardSummary } from "@/features/dashboard/api";
 import HomePage from "../HomePage";
 
 type Counts = { safe: number; inconclusive: number; suspicious: number; dangerous: number };
@@ -53,7 +48,6 @@ function mockSummary(monthly: Record<string, number>, danger_counts: Counts) {
 describe("HomePage - Test Suite", () => {
   beforeEach(() => {
     vi.mocked(getMe).mockResolvedValue(fixtureMe);
-    vi.mocked(getDashboardSummary).mockResolvedValue(fixtureDashboardSummary);
   });
 
   describe("Page Navigation and Access", () => {

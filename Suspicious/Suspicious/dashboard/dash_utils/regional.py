@@ -26,10 +26,6 @@ OUTCOMES = {
     "dangerous": Result.DANGEROUS,
     "failure": Result.FAILURE,
 }
-# AI sub-classifications counted as "malicious" by the legacy danger_counts
-# (stored capitalised by cortex get_sub_class, with "_" or " ").
-MALICIOUS_CATEGORIES = ("Classic_phishing", "Classic phishing", "Clone", "Blackmail", "Whaling")
-
 _NO_FILE_OR_MAIL = Q(fileOrMail__file_id__isnull=True, fileOrMail__mail_id__isnull=True)
 _NO_SINGLE_IOC = Q(
     nonFileIocs__url_id__isnull=True,
@@ -72,7 +68,6 @@ def _counts(cases) -> dict:
         reports=Count("pk"),
         in_progress=Count("pk", filter=Q(status__in=RUNNING)),
         reporters=Count("reporter", distinct=True),
-        malicious=Count("pk", filter=Q(status__in=FINISHED, category_ai__in=MALICIOUS_CATEGORIES)),
         **{f"o_{k}": Count("pk", filter=Q(status__in=FINISHED, results=v)) for k, v in OUTCOMES.items()},
         **{f"t_{k}": Count("pk", filter=q) for k, q in BY_TYPE.items()},
     )
@@ -82,7 +77,6 @@ def _counts(cases) -> dict:
         "in_progress": agg["in_progress"],
         "by_type": {k: agg[f"t_{k}"] for k in BY_TYPE},
         "reporters": agg["reporters"],
-        "malicious": agg["malicious"],
     }
 
 
