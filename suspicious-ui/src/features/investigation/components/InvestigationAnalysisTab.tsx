@@ -38,7 +38,7 @@ export function InvestigationAnalysisTab({ reports, observableGroup, isLoading, 
     <>
       {/* IOC-group cases: the per-observable view first (what each indicator is), then the analyzer runs behind it. */}
       {observableGroup ? <ObservableGroupPanel group={observableGroup} /> : null}
-      <AnalyzerGroups reports={reports} isLoading={isLoading} isError={isError} extraDetails={enrichmentDetails} />
+      <AnalyzerGroups reports={reports} isLoading={isLoading} isError={isError} extraDetails={enrichmentDetails} listLabel="Analyzed items" />
     </>
   );
 }

@@ -28,11 +28,14 @@ export function Heading({ title, count }: { title: string; count?: string }) {
  * The analyzer groups (heading, states, groups, rows). Shared by the Submissions and Investigation drawers.
  * Expansion state lives here: each drawer keys its tab by case and unmounts it on close, which resets it.
  */
-export function AnalyzerGroups<R extends AnalyzerReportRow>({ reports, isLoading, isError, extraDetails }: {
+export function AnalyzerGroups<R extends AnalyzerReportRow>({ reports, isLoading, isError, extraDetails, listLabel = "Observables" }: {
   reports: R[];
   isLoading: boolean;
   isError: boolean;
+  /** Built only for an expanded row: it may parse the report (Investigation enrichment). */
   extraDetails?: (report: R) => React.ReactNode;
+  /** Accessible name of the group list; Investigation renames it so it does not repeat its "Observables" heading. */
+  listLabel?: string;
 }) {
   // Worst risk first: the reporter lands on the dangerous finding. A run with no result has no risk (-1).
   const groups = React.useMemo(
@@ -88,7 +91,7 @@ export function AnalyzerGroups<R extends AnalyzerReportRow>({ reports, isLoading
       ) : !groups.length ? (
         <Alert severity="info" sx={{ mb: 1.5 }}>No analysis reports yet.</Alert>
       ) : (
-        <Stack component="ul" aria-label="Observables" spacing={1} sx={{ mt: 0, mb: 1.5, p: 0, listStyle: "none" }}>
+        <Stack component="ul" aria-label={listLabel} spacing={1} sx={{ mt: 0, mb: 1.5, p: 0, listStyle: "none" }}>
           {groups.map((group, i) => {
             const panelId = `${idBase}-group-${i}`;
             const open = isOpen(group.key);
@@ -141,7 +144,7 @@ export function AnalyzerGroups<R extends AnalyzerReportRow>({ reports, isLoading
                         report={report}
                         expanded={!!openRows[report.id]}
                         onToggle={() => setOpenRows((prev) => ({ ...prev, [report.id]: !prev[report.id] }))}
-                        extraDetails={extraDetails?.(report)}
+                        extraDetails={openRows[report.id] ? extraDetails?.(report) : undefined}
                       />
                     ))}
                   </Stack>

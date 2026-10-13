@@ -14,6 +14,7 @@ export function RecentSubmissionsList({
   action,
   calmStatus,
   replace,
+  secondary,
 }: {
   rows: SubmissionRow[];
   hrefFor: (row: SubmissionRow) => string;
@@ -23,6 +24,8 @@ export function RecentSubmissionsList({
   calmStatus?: boolean;
   /** Replace the history entry on tap (Submissions drawer links) instead of pushing. */
   replace?: boolean;
+  /** Optional second meta line (Investigation: the reporter's mail). */
+  secondary?: (row: SubmissionRow) => React.ReactNode;
 }) {
   return (
     <Stack component="ul" sx={{ listStyle: "none", m: 0, px: 1.5, pb: 1.5 }}>
@@ -59,6 +62,11 @@ export function RecentSubmissionsList({
             </Typography>
             {action?.(r)}
           </Stack>
+          {secondary ? (
+            <Typography variant="body2" color="text.secondary" noWrap sx={{ minWidth: 0, mt: 0.5 }}>
+              {secondary(r)}
+            </Typography>
+          ) : null}
         </Box>
       ))}
     </Stack>

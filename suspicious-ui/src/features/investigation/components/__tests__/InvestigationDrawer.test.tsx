@@ -338,13 +338,13 @@ describe("InvestigationDrawer - analysis tab", () => {
   const three = (over: Partial<InvestigationDrawerProps> = {}, data: Record<string, unknown> = {}) =>
     props({ detailsQuery: loaded(details({ analyzer_reports: reports3, ...data })), ...over });
   const toAnalysis = async () => userEvent.click(await screen.findByRole("tab", { name: /^Analysis/ }));
-  const groupItems = () => within(screen.getByRole("list", { name: "Observables" })).getAllByRole("listitem");
+  const groupItems = () => within(screen.getByRole("list", { name: "Analyzed items" })).getAllByRole("listitem");
   const group = (value: string) => {
     const li = groupItems().find((g) => g.querySelector("[aria-controls]")?.textContent?.includes(value));
     if (!li) throw new Error(`no group ${value}`);
     return li;
   };
-  const row = (name: string) => screen.getByRole("button", { name: new RegExp(`^${name}`) });
+  const analyzerRow = (name: string) => screen.getByRole("button", { name: new RegExp(`^${name}`) });
 
   it("a level-3 Analysis heading with the count as text; no count while loading or on error", async () => {
     const { rerender } = renderWithProviders(<InvestigationDrawer {...three()} />);
@@ -385,10 +385,10 @@ describe("InvestigationDrawer - analysis tab", () => {
     expect(within(group("d.example")).getByText("1 failed")).toBeInTheDocument();
     expect(within(group("aa11")).queryByText(/failed/)).toBeNull();
     await userEvent.click(screen.getByRole("button", { name: "Expand all groups" }));
-    const failed = row("DomFailed");
+    const failed = analyzerRow("DomFailed");
     expect(within(failed).getByText("Failed")).toBeInTheDocument();
     expect(failed.textContent).not.toMatch(/Low risk|Low confidence|risk|confidence/i);
-    expect(row("DomLow").textContent).toMatch(/Low risk/);
+    expect(analyzerRow("DomLow").textContent).toMatch(/Low risk/);
   });
 
   it("Expired, Running, Queued and Unknown are neutral and never counted as failed", async () => {
@@ -405,22 +405,22 @@ describe("InvestigationDrawer - analysis tab", () => {
     expect(within(group("x.example")).getByRole("img", { name: "Worst result: Low risk" })).toBeInTheDocument();
     expect(screen.queryByText(/failed/)).toBeNull();
     await userEvent.click(screen.getByRole("button", { name: "Expand all groups" }));
-    expect(within(row("Gone")).getByText("Expired")).toBeInTheDocument();
-    expect(within(row("Busy")).getByText("Running")).toBeInTheDocument();
-    expect(within(row("Later")).getByText("Queued")).toBeInTheDocument();
-    expect(within(row("Blank")).getByText("Unknown")).toBeInTheDocument();
-    await userEvent.click(row("Gone"));
+    expect(within(analyzerRow("Gone")).getByText("Expired")).toBeInTheDocument();
+    expect(within(analyzerRow("Busy")).getByText("Running")).toBeInTheDocument();
+    expect(within(analyzerRow("Later")).getByText("Queued")).toBeInTheDocument();
+    expect(within(analyzerRow("Blank")).getByText("Unknown")).toBeInTheDocument();
+    await userEvent.click(analyzerRow("Gone"));
     expect(await screen.findByText(/no longer available in Cortex/)).toBeInTheDocument();
   });
 
   it("confidence only after expanding a row", async () => {
     renderWithProviders(<InvestigationDrawer {...three()} />);
     await toAnalysis();
-    expect(row("HashHigh").textContent).toMatch(/High risk/);
+    expect(analyzerRow("HashHigh").textContent).toMatch(/High risk/);
     expect(screen.queryByText(/High confidence/)).toBeNull();
-    await userEvent.click(row("HashHigh"));
+    await userEvent.click(analyzerRow("HashHigh"));
     expect(await screen.findByText(/High confidence/)).toBeInTheDocument();
-    expect(row("HashHigh")).toHaveAttribute("aria-expanded", "true");
+    expect(analyzerRow("HashHigh")).toHaveAttribute("aria-expanded", "true");
   });
 
   it("expand all and collapse all icon buttons", async () => {
@@ -466,11 +466,12 @@ describe("InvestigationDrawer - analysis tab", () => {
     expect(panelText).toMatch(/0 \/ 0 sources flagged this/);
     expect(panelText.indexOf("sources flagged")).toBeLessThan(panelText.indexOf("HashHigh"));
     unmount();
-    const m = { ...row, type: "MAIL" };
-    renderWithProviders(<InvestigationDrawer {...three({ drawerRow: m as never })} />);
+    const m = { ...row, type: "MAIL", info: "Invoice overdue" };
+    renderWithProviders(<InvestigationDrawer {...three({ drawerRow: m as never }, m)} />);
     await toAnalysis();
     expect(screen.queryByText(/sources flagged this/)).toBeNull();
-    expect(screen.getByRole("list", { name: "Observables" })).toBeInTheDocument();
+    expect(screen.getAllByRole("heading", { level: 3 }).map((h) => h.textContent)).toEqual(["Analysis"]);
+    expect(screen.getByRole("list", { name: "Analyzed items" })).toBeInTheDocument();
   });
 });
 

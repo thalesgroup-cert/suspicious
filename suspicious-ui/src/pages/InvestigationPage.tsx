@@ -7,11 +7,11 @@ import {
   CardContent,
   Chip,
   CircularProgress,
+  Collapse,
   Dialog,
   DialogActions,
   DialogContent,
   DialogTitle,
-  Divider,
   FormControl,
   IconButton,
   InputAdornment,
@@ -23,20 +23,21 @@ import {
   TableBody,
   TableCell,
   TableHead,
+  TablePagination,
   TableRow,
   TableSortLabel,
   TextField,
   Tooltip,
   Typography,
+  useMediaQuery,
 } from "@mui/material";
 import {
   AssignmentTurnedInOutlined,
   SearchOutlined,
   RefreshOutlined,
-  OpenInNewOutlined,
-  ContentCopyOutlined,
   RestartAltOutlined,
   ReplayOutlined,
+  FilterList,
 } from "@mui/icons-material";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { Skeleton } from "boneyard-js/react";
@@ -45,8 +46,6 @@ import { alpha } from "@mui/material/styles";
 import { useTheme } from "@mui/material/styles";
 
 import { getMe, type Me } from "@/api/auth";
-import { getProfile } from "@/features/profile/api";
-import { UserAvatar } from "@/features/profile/components/UserAvatar";
 import {
   getAllInvestigations,
   getInvestigationDetails,
@@ -60,7 +59,9 @@ import {
   type InvestigationType,
 } from "@/features/investigation/api";
 import { useDebounced } from "@/shared/hooks/useDebounced";
-import { StatusChip } from "@/shared/components/StatusChip";
+import { CalmStatusChip } from "@/features/submissions/components/CalmStatusChip";
+import { EmptyState } from "@/shared/components/EmptyState";
+import { RecentSubmissionsList } from "@/features/home/components/RecentSubmissionsList";
 import { ResultChip } from "@/shared/components/ResultChip";
 import { CopyIconButton } from "@/shared/components/CopyIconButton";
 
@@ -73,7 +74,6 @@ import {
   pickClassification,
   pickConfidence,
   pickScore,
-  short,
 } from "@/features/investigation/utils";
 
 // Page
@@ -84,6 +84,7 @@ export default function InvestigationPage() {
   const qc = useQueryClient();
   const theme = useTheme();
   const isDark = theme.palette.mode === "dark";
+  const isPhone = useMediaQuery(theme.breakpoints.down("sm"));
 
   const [q, setQ] = React.useState("");
   const qDebounced = useDebounced(q, 250);
@@ -113,19 +114,15 @@ export default function InvestigationPage() {
   }
   const [page, setPage] = React.useState(0);
 
+  // Narrowing (search or a filter) makes the server count a match count; sort never narrows.
   const anyFilterActive =
     !!qDebounced || status !== "ALL" || type !== "ALL" || result !== "ALL" || !!from || !!to;
   const [pageSize, setPageSize] = React.useState(10);
 
-  const filtersActive =
-    q !== "" ||
-    status !== "ALL" ||
-    type !== "ALL" ||
-    result !== "ALL" ||
-    from !== "" ||
-    to !== "" ||
-    sortField !== "creation_date" ||
-    sortDir !== "desc";
+  const sortActive = sortField !== "creation_date" || sortDir !== "desc";
+  const activeCount = [status !== "ALL", type !== "ALL", result !== "ALL", from !== "", to !== "", sortActive].filter(Boolean).length;
+  const filtersActive = q !== "" || activeCount > 0;
+  const [filtersOpen, setFiltersOpen] = React.useState(false);
 
   const resetFilters = React.useCallback(() => {
     setQ("");
@@ -150,13 +147,6 @@ export default function InvestigationPage() {
 
   const meQuery = useQuery<Me>({ queryKey: ["me"], queryFn: getMe, retry: false });
   const me = meQuery.data;
-
-  const profileQuery = useQuery({
-    queryKey: ["profile"],
-    queryFn: getProfile,
-    enabled: !!me,
-    retry: false,
-  });
 
   const groups = React.useMemo(() => me?.groups ?? [], [me]);
   const isElevated = React.useMemo(
@@ -275,6 +265,8 @@ export default function InvestigationPage() {
     const urlQ = searchParams.get("q") ?? "";
     if (urlQ) setQ(urlQ);
     const open = searchParams.get("open");
+    // Back removes ?open=; keep the drawer in step (row clicks leave the key unchanged).
+    if (!open) setOpenDrawer(false);
     if (open) {
       const idNum = Number(open);
       if (Number.isFinite(idNum)) { setSelectedId(idNum); setOpenDrawer(true); }
@@ -314,18 +306,21 @@ export default function InvestigationPage() {
 
   const rows = investigationsQuery.data?.results ?? [];
   const total = investigationsQuery.data?.count ?? 0;
-  const start = total === 0 ? 0 : page * pageSize;
-  const end = Math.min(total, start + rows.length);
 
   const selectedRow = selectedId != null
     ? rows.find((r) => String(r.id) === String(selectedId))
     : undefined;
   const drawerRow = selectedRow || detailsQuery.data;
-  function closeDrawer() { setOpenDrawer(false); setEditMode(false); editMutation.reset(); }
-
-  async function copyEmail(email?: string) {
-    if (!email) return;
-    try { await navigator.clipboard.writeText(email); } catch { /* ignore */ }
+  // Drop ?open= on close so tapping the same phone ID link again re-triggers the URL sync.
+  function closeDrawer() {
+    setOpenDrawer(false);
+    setEditMode(false);
+    editMutation.reset();
+    if (searchParams.has("open")) {
+      const next = new URLSearchParams(searchParams);
+      next.delete("open");
+      setSearchParams(next, { replace: true });
+    }
   }
 
   if (meQuery.isLoading) {
@@ -371,25 +366,17 @@ export default function InvestigationPage() {
         sx={{ mb: 2, justifyContent: "space-between" }}
       >
         <Stack spacing={0.4}>
-          <Stack direction="row" spacing={1.25} sx={{ alignItems: "center" }} >
-            <UserAvatar
-              avatar={profileQuery.data?.avatar}
-              initials={(me.username?.[0] ?? "A").toUpperCase()}
-              sx={{ width: 46, height: 46, fontWeight: 950 }}
-            />
-            <Box>
-              <Typography variant="pageTitle" component="h1">
-                Investigation
-              </Typography>
-              <Typography color="text.secondary">
-                Browse every case and open one to inspect its analysis.
-              </Typography>
-            </Box>
-          </Stack>
+          <Box>
+            <Typography variant="pageTitle" component="h1">
+              Investigation
+            </Typography>
+            <Typography color="text.secondary">
+              Browse every case and open one to inspect its analysis.
+            </Typography>
+          </Box>
 
           <Stack direction="row" spacing={1} sx={{ mt: 1, flexWrap: "wrap" }}>
-            <Chip icon={<AssignmentTurnedInOutlined />} label={`${total} shown`} variant="outlined" />
-            {qDebounced ? <Chip label={`Search: ${qDebounced}`} variant="outlined" /> : null}
+            <Chip icon={<AssignmentTurnedInOutlined />} label={`${total} ${anyFilterActive ? "match" : "total"}`} variant="outlined" />
           </Stack>
         </Stack>
 
@@ -397,7 +384,7 @@ export default function InvestigationPage() {
           <Button
             variant="contained"
             onClick={() => navigate("/submit")}
-            sx={{ borderRadius: 2, textTransform: "none", fontWeight: 900 }}
+            sx={{ borderRadius: 2, textTransform: "none" }}
           >
             New submission
           </Button>
@@ -413,7 +400,7 @@ export default function InvestigationPage() {
       </Stack>
 
       <SoftCard sx={{ mb: 2 }}>
-        <CardContent sx={{ p: { xs: 2.25, md: 3 } }}>
+        <CardContent sx={{ p: { xs: 2, md: 2.5 }, "&:last-child": { pb: { xs: 2, md: 2.5 } } }}>
           <Stack spacing={1.5}>
             <Stack direction={{ xs: "column", md: "row" }} spacing={1.25} sx={{ alignItems: "stretch" }} >
               <TextField
@@ -432,153 +419,122 @@ export default function InvestigationPage() {
                   },
                 }}
               />
-
-              <FormControl sx={{ minWidth: 180 }} fullWidth>
-                <InputLabel id="status-label">Status</InputLabel>
-                <Select
-                  labelId="status-label"
-                  label="Status"
-                  value={status}
-                  onChange={(e) => setStatus(e.target.value as InvestigationStatus | "ALL")}
+              <Button
+                variant="outlined"
+                color="inherit"
+                aria-expanded={filtersOpen}
+                aria-controls="investigation-filters"
+                onClick={() => setFiltersOpen((o) => !o)}
+                startIcon={<FilterList />}
+                sx={{ borderRadius: 2, textTransform: "none", fontWeight: 700, minWidth: 120, flexShrink: 0 }}
+              >
+                Filters
+                {activeCount > 0 ? <Chip size="small" label={activeCount} color="primary" sx={{ ml: 1, height: 20 }} /> : null}
+              </Button>
+              {filtersActive ? (
+                <Button
+                  variant="text"
+                  color="inherit"
+                  onClick={resetFilters}
+                  startIcon={<RestartAltOutlined />}
+                  sx={{ borderRadius: 2, textTransform: "none", fontWeight: 700, flexShrink: 0 }}
                 >
-                  <MenuItem value="ALL">All</MenuItem>
-                  {(["NEW", "IN_PROGRESS", "DONE", "CHALLENGED", "UNKNOWN"] as const).map((s) => (
-                    <MenuItem key={s} value={s}>{s}</MenuItem>
-                  ))}
-                </Select>
-              </FormControl>
-
-              <FormControl sx={{ minWidth: 160 }} fullWidth>
-                <InputLabel id="type-label">Type</InputLabel>
-                <Select
-                  labelId="type-label"
-                  label="Type"
-                  value={type}
-                  onChange={(e) => setType(e.target.value as InvestigationType | "ALL")}
-                >
-                  <MenuItem value="ALL">All</MenuItem>
-                  {(["FILE", "MAIL", "URL", "IP", "HASH", "IOC", "UNKNOWN"] as const).map((t) => (
-                    <MenuItem key={t} value={t}>{t}</MenuItem>
-                  ))}
-                </Select>
-              </FormControl>
-
-              <FormControl sx={{ minWidth: 180 }} fullWidth>
-                <InputLabel id="result-label">Result</InputLabel>
-                <Select
-                  labelId="result-label"
-                  label="Result"
-                  value={result}
-                  onChange={(e) => setResult(e.target.value as InvestigationResult | "ALL")}
-                >
-                  <MenuItem value="ALL">All results</MenuItem>
-                  {(["DANGEROUS", "SUSPICIOUS", "INCONCLUSIVE", "SAFE", "FAILURE", "UNCHALLENGED", "ALLOW_LISTED", "UNKNOWN"] as const).map((r) => (
-                    <MenuItem key={r} value={r}>{r}</MenuItem>
-                  ))}
-                </Select>
-              </FormControl>
+                  Reset
+                </Button>
+              ) : null}
             </Stack>
 
-            <Stack direction={{ xs: "column", md: "row" }} spacing={1.25} sx={{ alignItems: "stretch" }} >
-              <TextField
-                label="From"
-                type="date"
-                value={from}
-                onChange={(e) => setFrom(e.target.value)}
-                slotProps={{ inputLabel: { shrink: true } }}
-                fullWidth
-              />
-              <TextField
-                label="To"
-                type="date"
-                value={to}
-                onChange={(e) => setTo(e.target.value)}
-                slotProps={{ inputLabel: { shrink: true } }}
-                fullWidth
-              />
+            <Collapse id="investigation-filters" in={filtersOpen} unmountOnExit>
+              <Stack spacing={1.25} sx={{ pt: 0.5 }}>
+                <Stack direction={{ xs: "column", md: "row" }} spacing={1.25} sx={{ alignItems: "stretch" }} >
+                  <FormControl fullWidth>
+                    <InputLabel id="status-label">Status</InputLabel>
+                    <Select
+                      labelId="status-label"
+                      label="Status"
+                      value={status}
+                      onChange={(e) => setStatus(e.target.value as InvestigationStatus | "ALL")}
+                    >
+                      <MenuItem value="ALL">All</MenuItem>
+                      {(["NEW", "IN_PROGRESS", "DONE", "CHALLENGED", "UNKNOWN"] as const).map((s) => (
+                        <MenuItem key={s} value={s}>{s}</MenuItem>
+                      ))}
+                    </Select>
+                  </FormControl>
 
-              <FormControl sx={{ minWidth: 220 }} fullWidth>
-                <InputLabel id="sort-label">Sort</InputLabel>
-                <Select
-                  labelId="sort-label"
-                  label="Sort"
-                  value={sort}
-                  onChange={(e) => {
-                    const v = e.target.value as "date_desc" | "date_asc" | "id_desc" | "id_asc";
-                    if (v === "date_desc") { setSortField("creation_date"); setSortDir("desc"); }
-                    else if (v === "date_asc") { setSortField("creation_date"); setSortDir("asc"); }
-                    else if (v === "id_desc") { setSortField("id"); setSortDir("desc"); }
-                    else { setSortField("id"); setSortDir("asc"); }
-                    setPage(0);
-                  }}
-                >
-                  <MenuItem value="date_desc">Date (new → old)</MenuItem>
-                  <MenuItem value="date_asc">Date (old → new)</MenuItem>
-                  <MenuItem value="id_desc">ID (high → low)</MenuItem>
-                  <MenuItem value="id_asc">ID (low → high)</MenuItem>
-                </Select>
-              </FormControl>
+                  <FormControl fullWidth>
+                    <InputLabel id="type-label">Type</InputLabel>
+                    <Select
+                      labelId="type-label"
+                      label="Type"
+                      value={type}
+                      onChange={(e) => setType(e.target.value as InvestigationType | "ALL")}
+                    >
+                      <MenuItem value="ALL">All</MenuItem>
+                      {(["FILE", "MAIL", "URL", "IP", "HASH", "IOC", "UNKNOWN"] as const).map((t) => (
+                        <MenuItem key={t} value={t}>{t}</MenuItem>
+                      ))}
+                    </Select>
+                  </FormControl>
 
-              <Tooltip title={filtersActive ? "Reset filters" : "No filters applied"}>
-                <span>
-                  <Button
-                    variant="outlined"
-                    color="inherit"
-                    disabled={!filtersActive}
-                    onClick={resetFilters}
-                    startIcon={<RestartAltOutlined />}
-                    sx={{ borderRadius: 2, textTransform: "none", fontWeight: 900, minWidth: 140 }}
-                  >
-                    Reset
-                  </Button>
-                </span>
-              </Tooltip>
-            </Stack>
+                  <FormControl fullWidth>
+                    <InputLabel id="result-label">Result</InputLabel>
+                    <Select
+                      labelId="result-label"
+                      label="Result"
+                      value={result}
+                      onChange={(e) => setResult(e.target.value as InvestigationResult | "ALL")}
+                    >
+                      <MenuItem value="ALL">All results</MenuItem>
+                      {(["DANGEROUS", "SUSPICIOUS", "INCONCLUSIVE", "SAFE", "FAILURE", "UNCHALLENGED", "ALLOW_LISTED", "UNKNOWN"] as const).map((r) => (
+                        <MenuItem key={r} value={r}>{r}</MenuItem>
+                      ))}
+                    </Select>
+                  </FormControl>
+                </Stack>
 
-            <Divider sx={{ opacity: 0.25 }} />
+                <Stack direction={{ xs: "column", md: "row" }} spacing={1.25} sx={{ alignItems: "stretch" }} >
+                  <TextField
+                    label="From"
+                    type="date"
+                    value={from}
+                    onChange={(e) => setFrom(e.target.value)}
+                    slotProps={{ inputLabel: { shrink: true } }}
+                    fullWidth
+                  />
+                  <TextField
+                    label="To"
+                    type="date"
+                    value={to}
+                    onChange={(e) => setTo(e.target.value)}
+                    slotProps={{ inputLabel: { shrink: true } }}
+                    fullWidth
+                  />
 
-            <Stack
-              direction={{ xs: "column", md: "row" }}
-              spacing={1}
-              sx={{ justifyContent: "space-between", alignItems: { md: "center" } }}
->
-              <Typography variant="body2" color="text.secondary">
-                {total === 0 ? "No results" : `Showing ${start + 1}-${end} of ${total}`}
-              </Typography>
-
-              <Stack direction="row" spacing={1} sx={{ alignItems: "center" }} >
-                <FormControl sx={{ width: 140 }}>
-                  <InputLabel id="pagesize-label">Rows</InputLabel>
-                  <Select
-                    labelId="pagesize-label"
-                    label="Rows"
-                    value={pageSize}
-                    onChange={(e) => setPageSize(Number(e.target.value))}
-                  >
-                    {[10, 20, 50].map((n) => (
-                      <MenuItem key={n} value={n}>{n}</MenuItem>
-                    ))}
-                  </Select>
-                </FormControl>
-
-                <Button
-                  variant="outlined"
-                  disabled={page === 0 || investigationsQuery.isFetching}
-                  onClick={() => setPage((p) => Math.max(0, p - 1))}
-                  sx={{ borderRadius: 2, textTransform: "none", fontWeight: 900 }}
-                >
-                  Prev
-                </Button>
-                <Button
-                  variant="outlined"
-                  disabled={!investigationsQuery.data?.next || investigationsQuery.isFetching}
-                  onClick={() => setPage((p) => p + 1)}
-                  sx={{ borderRadius: 2, textTransform: "none", fontWeight: 900 }}
-                >
-                  Next
-                </Button>
+                  <FormControl fullWidth>
+                    <InputLabel id="sort-label">Sort</InputLabel>
+                    <Select
+                      labelId="sort-label"
+                      label="Sort"
+                      value={sort}
+                      onChange={(e) => {
+                        const v = e.target.value as "date_desc" | "date_asc" | "id_desc" | "id_asc";
+                        if (v === "date_desc") { setSortField("creation_date"); setSortDir("desc"); }
+                        else if (v === "date_asc") { setSortField("creation_date"); setSortDir("asc"); }
+                        else if (v === "id_desc") { setSortField("id"); setSortDir("desc"); }
+                        else { setSortField("id"); setSortDir("asc"); }
+                        setPage(0);
+                      }}
+                    >
+                      <MenuItem value="date_desc">Date (new → old)</MenuItem>
+                      <MenuItem value="date_asc">Date (old → new)</MenuItem>
+                      <MenuItem value="id_desc">ID (high → low)</MenuItem>
+                      <MenuItem value="id_asc">ID (low → high)</MenuItem>
+                    </Select>
+                  </FormControl>
+                </Stack>
               </Stack>
-            </Stack>
+            </Collapse>
           </Stack>
         </CardContent>
       </SoftCard>
@@ -588,51 +544,66 @@ export default function InvestigationPage() {
           {investigationsQuery.isFetching ? <LinearProgress /> : null}
 
           {total === 0 ? (
-            <Box sx={{ p: 3 }}>
-              <Alert severity="info">
-                {anyFilterActive
-                  ? "No investigations match your filters."
-                  : me.ciso_scope
+            <Box sx={{ p: 4 }}>
+              {filtersActive ? (
+                <EmptyState
+                  title="No cases match"
+                  hint="Try a different search or clear the filters."
+                  action={<Button onClick={resetFilters} sx={{ textTransform: "none", mt: 1 }}>Clear filters</Button>}
+                />
+              ) : (
+                <EmptyState
+                  title="No cases yet"
+                  hint={me.ciso_scope
                     ? `No submissions have been sent within your scope (${me.ciso_scope}).`
-                    : "No investigations yet."}
-              </Alert>
+                    : "Submitted cases appear here."}
+                />
+              )}
             </Box>
+          ) : isPhone ? (
+            <RecentSubmissionsList
+              rows={rows.map((r) => ({ ...r, artifact: r.info }))}
+              replace
+              hrefFor={(r) => `/investigation?open=${encodeURIComponent(String(r.id))}`}
+              calmStatus
+              secondary={(r) => rows.find((x) => x.id === r.id)?.reporter_email ?? "—"}
+            />
           ) : (
             <Box sx={{ overflowX: "auto" }}>
               <Table sx={{ minWidth: 1060 }}>
                 <TableHead>
                   <TableRow>
-                    <TableCell sx={{ fontWeight: 950, width: 120 }}>
+                    <TableCell sx={{ fontWeight: 700, width: 140 }}>
                       <TableSortLabel
                         active={sortField === "id"}
                         direction={sortField === "id" ? sortDir : "desc"}
                         onClick={() => handleColumnSort("id")}
                       >ID</TableSortLabel>
                     </TableCell>
-                    <TableCell sx={{ fontWeight: 950 }}>
+                    <TableCell sx={{ fontWeight: 700 }}>
                       <TableSortLabel
                         active={sortField === "result"}
                         direction={sortField === "result" ? sortDir : "desc"}
                         onClick={() => handleColumnSort("result")}
                       >Result</TableSortLabel>
                     </TableCell>
-                    <TableCell sx={{ fontWeight: 950, width: 130 }}>
+                    <TableCell sx={{ fontWeight: 700, width: 130 }}>
                       <TableSortLabel
                         active={sortField === "status"}
                         direction={sortField === "status" ? sortDir : "desc"}
                         onClick={() => handleColumnSort("status")}
                       >Status</TableSortLabel>
                     </TableCell>
-                    <TableCell sx={{ fontWeight: 950 }}>Artifact</TableCell>
-                    <TableCell sx={{ fontWeight: 950, width: 130 }}>
+                    <TableCell sx={{ fontWeight: 700 }}>Artifact</TableCell>
+                    <TableCell sx={{ fontWeight: 700, width: 130 }}>
                       <TableSortLabel
                         active={sortField === "creation_date"}
                         direction={sortField === "creation_date" ? sortDir : "desc"}
                         onClick={() => handleColumnSort("creation_date")}
                       >Date</TableSortLabel>
                     </TableCell>
-                    <TableCell sx={{ fontWeight: 950, width: 80 }}>Type</TableCell>
-                    <TableCell sx={{ fontWeight: 950 }}>User mail</TableCell>
+                    <TableCell sx={{ fontWeight: 700, width: 80 }}>Type</TableCell>
+                    <TableCell sx={{ fontWeight: 700 }}>User mail</TableCell>
                   </TableRow>
                 </TableHead>
 
@@ -642,7 +613,12 @@ export default function InvestigationPage() {
                       key={r.id}
                       hover
                       tabIndex={0}
-                      sx={{ cursor: "pointer" }}
+                      sx={{
+                        cursor: "pointer",
+                        // Copy icons stay out of the scan until the row is pointed at or focused; touch has no hover.
+                        "& .copy-reveal": { opacity: 0, "@media (hover: none)": { opacity: 1 } },
+                        "&:hover .copy-reveal, &:focus-within .copy-reveal": { opacity: 1 },
+                      }}
                       onClick={() => { setSelectedId(r.id); setOpenDrawer(true); }}
                       onKeyDown={(e) => {
                         if (e.key === "Enter" || e.key === " ") {
@@ -656,13 +632,15 @@ export default function InvestigationPage() {
                         <Stack direction="row" spacing={0.5} sx={{ alignItems: "center" }} >
                           <Button
                             size="small"
-                            variant="contained"
+                            variant="outlined"
                             onClick={(e) => { e.stopPropagation(); setSelectedId(r.id); setOpenDrawer(true); }}
-                            sx={{ borderRadius: 2, textTransform: "none", fontWeight: 950, minWidth: 0, px: 1.25 }}
+                            sx={{ borderRadius: 2, textTransform: "none", fontWeight: 700, minWidth: 0, px: 1.25, boxShadow: "none" }}
                           >
                             {r.id}
                           </Button>
-                          <CopyIconButton text={String(r.id)} title="Copy ID" />
+                          <Box className="copy-reveal" sx={{ display: "inline-flex" }}>
+                            <CopyIconButton text={String(r.id)} title="Copy ID" />
+                          </Box>
                         </Stack>
                       </TableCell>
 
@@ -671,47 +649,30 @@ export default function InvestigationPage() {
                       </TableCell>
 
                       <TableCell>
-                        <StatusChip status={r.status as any} minWidth={96} />
+                        <CalmStatusChip status={String(r.status ?? "UNKNOWN")} minWidth={96} />
                       </TableCell>
 
-                      <TableCell title={r.info}>
-                        <Tooltip title={r.info || ""} arrow placement="top">
-                          <Typography
-                            sx={{
-                              maxWidth: 320,
-                              whiteSpace: "nowrap",
-                              overflow: "hidden",
-                              textOverflow: "ellipsis",
-                              cursor: "help",
-                            }}
-                          >
-                            {short(r.info, 60)}
-                          </Typography>
-                        </Tooltip>
+                      <TableCell sx={{ maxWidth: 360 }}>
+                        <Typography noWrap title={r.info || undefined} sx={{ minWidth: 0 }}>
+                          {r.info || "—"}
+                        </Typography>
                       </TableCell>
 
                       <TableCell sx={{ whiteSpace: "nowrap" }}>{fmtDate(r.created_at)}</TableCell>
 
                       <TableCell>
-                        <Chip
-                          label={r.type}
-                          size="small"
-                          variant="outlined"
-                          sx={{ fontWeight: 900, fontSize: 11 }}
-                        />
+                        <Chip label={r.type} size="small" variant="outlined" sx={{ fontSize: 11 }} />
                       </TableCell>
 
-                      <TableCell onClick={(e) => e.stopPropagation()}>
-                        <Stack direction="row" spacing={0.5} sx={{ alignItems: "center" }} >
-                          <Typography variant="body2" sx={{ fontWeight: 700 }}>
+                      <TableCell sx={{ maxWidth: 280 }}>
+                        <Stack direction="row" spacing={0.5} sx={{ alignItems: "center", minWidth: 0 }} >
+                          <Typography variant="body2" noWrap title={r.reporter_email || undefined} sx={{ minWidth: 0 }}>
                             {r.reporter_email ?? "—"}
                           </Typography>
                           {r.reporter_email ? (
-                            <Tooltip title="Copy email">
-                              <IconButton size="small" onClick={() => copyEmail(r.reporter_email)}>
-                                <ContentCopyOutlined fontSize="small" />
-                              </IconButton>
-                            </Tooltip>
+                            <Box className="copy-reveal" sx={{ display: "inline-flex", flexShrink: 0 }}>
+                              <CopyIconButton text={r.reporter_email} title="Copy email" />
+                            </Box>
                           ) : null}
                         </Stack>
                       </TableCell>
@@ -723,6 +684,24 @@ export default function InvestigationPage() {
           )}
         </CardContent>
       </SoftCard>
+
+      {/* Server-side paging: count is the server total, the page is fetched on change. */}
+      {total > 0 ? (
+        <TablePagination
+          component="div"
+          count={total}
+          page={page}
+          rowsPerPage={pageSize}
+          rowsPerPageOptions={[10, 25, 50]}
+          onPageChange={(_, p) => setPage(p)}
+          onRowsPerPageChange={(e) => { setPageSize(Number(e.target.value)); setPage(0); }}
+          labelDisplayedRows={({ from: f, to: t, count }) => `${f}–${t} of ${count}`}
+          sx={{
+            "& .MuiTablePagination-toolbar": { flexWrap: "wrap", justifyContent: { xs: "center", sm: "flex-end" }, px: 0 },
+            "& .MuiTablePagination-spacer": { display: { xs: "none", sm: "block" } },
+          }}
+        />
+      ) : null}
 
       <InvestigationDrawer
         open={openDrawer}
@@ -744,8 +723,7 @@ export default function InvestigationPage() {
         addCommentMutation={addCommentMutation}
         siblings={rows.map((r) => r.id)}
         onNavigate={(id) => {
-          // ponytail: selects directly and mirrors ?open= (replace); Task 4 owns the rest of the URL sync.
-          setSelectedId(id);
+          // The URL sync selects the case; replace keeps prev/next out of the history.
           const next = new URLSearchParams(searchParams);
           next.set("open", String(id));
           setSearchParams(next, { replace: true });
