@@ -20,7 +20,7 @@ Date: 2026-10-13. Branch: `design/campaigns-page`. Status: awaiting user review.
 
 - Keep CISO access; the page says "Organisation-wide" (per-country filtering needs reporter data in the store: not checked, backlog).
 - Show four classifications as stored (Safe, Unwanted, Suspicious, Dangerous): the counts endpoint stops folding Suspicious into Unwanted.
-- Extract the Dashboard's layout code into one shared implementation used by both pages.
+- Drag/resize customisation is dropped on this page (see layout section); no shared layout extraction is needed for Campaigns.
 - Add `three`, `@react-three/fiber` (v9 pairs with React 19) and `@react-three/drei` (OrbitControls only), loaded lazily; measure the bundle in Task 3 and fall back to plain `three` + its OrbitControls if the chunk is heavy.
 
 ## Research that shaped the design
@@ -50,7 +50,7 @@ Date: 2026-10-13. Branch: `design/campaigns-page`. Status: awaiting user review.
 
 ### Rest of the page
 
-- Shared layout (extracted from the Dashboard): width measured after mount, layouts saved only on drag/resize stop, drag/resize only for `(pointer: fine)` at >= md, stacked on touch/phones, real "Reset layout" button shown only when changed. Fixes #185 on resize.
+- Layout: fixed, content-sized panels (see the layout section); no react-grid-layout, which removes the #185 resize crash.
 - Per-panel loading/error/empty states (a slow PCA does not block counts and volume); plain error copy; empty state when the store has no data.
 - Header: remove "Live"; subtitle "Organisation-wide, from the message store"; refresh button; theme tokens for text.
 - Classification bars and the volume chart use result-palette colours, a legend for the areas, text summary for each chart (`role="img"` + `aria-label` and a "View as table" option), full campaign names in an accessible list with the note "Campaign windows are inferred from shared source references."
@@ -73,9 +73,39 @@ Date: 2026-10-13. Branch: `design/campaigns-page`. Status: awaiting user review.
 4. Keyboard-only user can rotate, zoom, reset, select a point (Tab to the point list/table) and open the investigation link; screen reader gets counts and the table.
 5. Reduced motion, all 17 themes (point and cloud colours, labels, fog colour from theme background), phone width (touch rotate/pinch, no page scroll hijack: `touch-action` handled, a way to leave the canvas).
 
+## New indicators, layout and redesign (added 2026-10-13, user: "come up with new indicators, change layout, enhance the rest of the page")
+
+A campaign here = the set of messages sharing identical `sourceRefs` (a heuristic from the API itself). Everything below is computed from fields the message store already holds (classification, sent date, case id, subject, source refs, embedding); nothing is invented.
+
+### Backend: one scan, one new endpoint
+
+`GET /api/campaigns/summary/?days=7|15|30|90` (same `StatsReadPermission`, cached 120 s, one pass over `iter_metadata_dicts`) returns, for the period and the previous period of equal length:
+
+- `messages` (total in store with a date in the period) and `dangerous_share` (dangerous / messages) with the previous period's values.
+- `peak_day {date, count}`.
+- `campaigns[]`: per source-ref group inside the period: `name`, `first_seen`, `last_seen`, `messages`, `dangerous`, `dangerous_share`, `sample_subject`, `case_ids` (up to 20), `active` (last seen within 48 h of now: a stated constant). `active_campaigns` and `largest_campaign` are derived from it.
+- `mix`: counts per classification (four buckets) for the period.
+- Existing endpoints stay; `mail-volume` gains `days` (default 15, max 90) so the chart follows the selector; PCA points gain an additive `date` (UTC date or null).
+
+Embedding-space indicators (own task, bounded to the PCA sample, chunked numpy cosine similarity, never an n x n matrix in memory) in `GET /api/campaigns/neighbours/?limit`:
+
+- `near_known_bad`: non-dangerous messages whose k=10 nearest neighbours are >= 60 % Dangerous (k and threshold are named constants and returned in the payload), with case id, subject, share and nearest dangerous case: "review these".
+- `novel`: messages in the last 7 days whose nearest-neighbour distance exceeds the 95th percentile of the sample (possible new campaigns), with the same fields. Both lists capped at 20 and labelled as heuristics.
+
+### Page layout (replaces the 3-panel grid)
+
+1. Header: title, "Organisation-wide, from the message store", period selector (7/15/30/90 days), refresh. No "Live" chip.
+2. KPI strip (cards size to content, 3 columns desktop / stacked phone): Messages (delta vs previous period), Dangerous share (delta in points), Active campaigns (of N in period), Largest campaign (messages), Peak day. Deltas show "no data" when the previous period is empty.
+3. Main row: 3D embedding map (about 2/3 width) beside a detail side panel: selected point (subject, case link, nearest neighbours) or, when nothing is selected, the "Near known bad" and "Novel" lists (each row selects its point in the map and focuses it).
+4. Map colour modes (segmented control, `aria-pressed`): By category (default) | By campaign (top 6 campaigns coloured, the rest grey) | By age (recency ramp, legend with dates). A date range slider (from PCA `date`) filters visible points; no auto-play animation.
+5. Volume row: stacked area chart (Dangerous vs Other) with campaign bands and a legend, beside the classification mix as a horizontal stacked bar with counts and percentages (text rows carry the meaning).
+6. Campaigns table: sortable (first seen, last seen, messages, dangerous share), `Active`/`Ended` status as text, sample subject, "Open cases" (links to the investigations list filtered by the case ids when the list supports it, otherwise first case) and a row action "Show in map" (sets By campaign and selects its points). Mobile: card list.
+7. Drag/resize layout customisation is dropped on this page (the panels are fixed and content-sized): fewer moving parts, no saved layouts to migrate, and the shared-grid extraction is only needed for the Dashboard. (Supersedes the earlier "share the layout code" decision for Campaigns; the #185 crash disappears with the grid.)
+
 ## Tasks (to be detailed in the plan)
 
-1. Backend: third component, four classification buckets, tests (incl. degenerate inputs).
-2. Shared layout extraction (Dashboard + Campaigns), Campaigns page foundation: header, states, copy, theme tokens, 2D chart fixes, tables/legends; #185 regression test.
-3. 3D map: helpers (unit-tested), `EmbeddingMap3D`, fallbacks, accessibility, bundle measurement; captures in 5 themes with real data.
-4. Polish: volume/classification charts, a11y and contrast sweep (7 themes + Campaigns chips), final verification, backlog.
+1. Backend A: PCA third component + `date`, four classification buckets, `mail-volume?days`, `summary` endpoint with campaign aggregates; tests incl. degenerate inputs.
+2. Backend B: `neighbours` endpoint (near known bad, novel) with bounded memory and tests (fixtures with synthetic embeddings, constant thresholds asserted).
+3. Page foundation: new header/period selector, KPI strip, per-panel states, volume + mix charts with legends and text summaries, campaigns table, phone layout; remove the grid and "Live"; theme tokens and contrast.
+4. 3D map: helpers (unit-tested), `EmbeddingMap3D` with colour modes, date filter, side panel lists, fallbacks, accessibility, bundle measurement.
+5. Polish and verification: contrast sweep (7 themes), captures with real data, a11y, backlog.
