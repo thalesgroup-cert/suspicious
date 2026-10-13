@@ -13,9 +13,41 @@ from api.serializers.campaigns import (
     CampaignMailVolumeResponseSerializer,
     CampaignPcaQuerySerializer,
     CampaignPcaResponseSerializer,
+    CampaignPeriodQuerySerializer,
+    CampaignSummaryResponseSerializer,
 )
 from api.services.campaigns import CampaignQueryService
-from api.services.campaigns.service import DEFAULT_PCA_LIMIT, MAX_PCA_LIMIT
+from api.services.campaigns.service import (
+    DEFAULT_PCA_LIMIT,
+    DEFAULT_PERIOD_DAYS,
+    MAX_PCA_LIMIT,
+    MAX_PERIOD_DAYS,
+    MIN_PERIOD_DAYS,
+)
+from api.services.campaigns.summary import (
+    ACTIVE_WINDOW_HOURS,
+    CACHE_TTL_SECONDS,
+    get_campaign_summary,
+)
+
+
+DAYS_PARAMETER = OpenApiParameter(
+    name="days",
+    type=int,
+    location=OpenApiParameter.QUERY,
+    required=False,
+    description=(
+        "Period length in UTC days, today included. "
+        f"Default: {DEFAULT_PERIOD_DAYS}. Range: {MIN_PERIOD_DAYS}-{MAX_PERIOD_DAYS}; "
+        "values outside the range return 400."
+    ),
+)
+
+
+def _period_days(request) -> int:
+    params = CampaignPeriodQuerySerializer(data=request.query_params)
+    params.is_valid(raise_exception=True)
+    return int(params.validated_data["days"])
 
 
 def _validated_response(serializer_cls, payload):
@@ -39,11 +71,11 @@ class CampaignClassificationCountsView(APIView):
             "**Label semantics**\n"
             "- `SAFE`: benign content.\n"
             "- `UNWANTED`: unwanted but not dangerous content.\n"
+            "- `SUSPICIOUS`: suspicious content.\n"
             "- `DANGEROUS`: confirmed dangerous content.\n\n"
             "**Aggregation rule**\n"
-            "- Records labeled `SUSPICIOUS` are folded into `UNWANTED` for this endpoint.\n"
-            "- This is intentional to preserve the existing frontend contract, which expects "
-            "three buckets only: `SAFE`, `UNWANTED`, and `DANGEROUS`.\n\n"
+            "- The four labels are counted as stored (no folding). Records with any other "
+            "or no `classification` are not counted.\n\n"
             "**Implementation note**\n"
             "- Counts are computed by scanning metadata and normalizing the `classification` "
             "field rather than issuing multiple per-label queries."
@@ -51,10 +83,7 @@ class CampaignClassificationCountsView(APIView):
         responses={
             200: OpenApiResponse(
                 response=CampaignClassificationCountsSerializer,
-                description=(
-                    "Three-bucket classification counts. `SUSPICIOUS` is aggregated into "
-                    "`UNWANTED`."
-                ),
+                description="Four-bucket classification counts, as stored.",
             ),
         },
         examples=[
@@ -62,7 +91,8 @@ class CampaignClassificationCountsView(APIView):
                 "Classification counts",
                 value={
                     "SAFE": 128,
-                    "UNWANTED": 41,
+                    "UNWANTED": 30,
+                    "SUSPICIOUS": 11,
                     "DANGEROUS": 9,
                 },
                 response_only=True,
@@ -82,9 +112,9 @@ class CampaignPcaView(APIView):
 
     @extend_schema(
         operation_id="campaign_pca",
-        summary="Get a 2D PCA projection of sampled embeddings",
+        summary="Get a 3D PCA projection of sampled embeddings",
         description=(
-            "Return a two-dimensional PCA projection of a deterministic sample of embeddings "
+            "Return a three-dimensional PCA projection of a deterministic sample of embeddings "
             "from the current Chroma collection.\n\n"
             "**Label semantics**\n"
             "- Point `label` is the normalized uppercase value of the metadata "
@@ -100,8 +130,13 @@ class CampaignPcaView(APIView):
             "only on the largest dimension bucket to avoid mixing incompatible embeddings.\n\n"
             "**Numerical behavior**\n"
             "- PCA is computed with centered vectors and SVD in float64.\n"
-            "- `explained_variance` contains the variance ratios for PC1 and PC2.\n"
-            "- If only one usable dimension exists, PC2 is returned as zero."
+            "- `explained_variance` contains the variance ratios for PC1, PC2 and PC3 "
+            "(always 3 values from this server; clients should also accept 2).\n"
+            "- Missing components (one vector, 1-dimensional vectors, two vectors, zero "
+            "variance) are returned as zero coordinates and zero ratios, never NaN.\n\n"
+            "**Point date**\n"
+            "- `date` is the UTC sent date (`YYYY-MM-DD`) extracted like the mail-volume "
+            "endpoint does, or `null` when the record carries no usable date."
         ),
         parameters=[
             OpenApiParameter(
@@ -118,28 +153,32 @@ class CampaignPcaView(APIView):
         responses={
             200: OpenApiResponse(
                 response=CampaignPcaResponseSerializer,
-                description="PCA projection points and explained variance ratios for PC1 and PC2.",
+                description="PCA projection points and explained variance ratios for PC1-PC3.",
             ),
         },
         examples=[
             OpenApiExample(
                 "PCA response",
                 value={
-                    "explained_variance": [0.37, 0.18],
+                    "explained_variance": [0.37, 0.18, 0.09],
                     "points": [
                         {
                             "x": -2.14,
                             "y": 0.88,
+                            "z": 0.31,
                             "label": "SAFE",
                             "suspicious_case_id": "1234",
                             "sourceRefs": ["sender-domain-a", "subject-cluster-1"],
+                            "date": "2026-03-02",
                         },
                         {
                             "x": 1.27,
                             "y": -0.42,
+                            "z": -0.05,
                             "label": "SUSPICIOUS",
                             "suspicious_case_id": "1250",
                             "sourceRefs": ["sender-domain-b"],
+                            "date": None,
                         },
                     ],
                 },
@@ -164,9 +203,10 @@ class CampaignMailVolumeView(APIView):
 
     @extend_schema(
         operation_id="campaign_mail_volume",
-        summary="Get mail volume for the last 15 days with inferred campaign windows",
+        summary="Get mail volume for the last `days` days with inferred campaign windows",
         description=(
-            "Return daily mail volume for the last 15 UTC days and inferred campaign date bands.\n\n"
+            "Return daily mail volume for the last `days` UTC days (today included) and "
+            "inferred campaign date bands clamped to that window.\n\n"
             "**Label semantics**\n"
             "- `dangerous` counts only records whose normalized `classification` is `DANGEROUS`.\n"
             "- `non_danger` counts every other classified or unclassified record that has a usable date.\n\n"
@@ -183,6 +223,7 @@ class CampaignMailVolumeView(APIView):
             "- This is a heuristic, not a guaranteed campaign identifier. Reused or noisy "
             "`sourceRefs` may merge unrelated messages into the same displayed band."
         ),
+        parameters=[DAYS_PARAMETER],
         responses={
             200: OpenApiResponse(
                 response=CampaignMailVolumeResponseSerializer,
@@ -215,5 +256,86 @@ class CampaignMailVolumeView(APIView):
         ],
     )
     def get(self, request):
-        payload = CampaignQueryService().get_mail_volume()
+        payload = CampaignQueryService().get_mail_volume(_period_days(request))
         return _validated_response(CampaignMailVolumeResponseSerializer, payload)
+
+
+@extend_schema(
+    tags=["Campaigns"],
+)
+class CampaignSummaryView(APIView):
+    permission_classes = [StatsReadPermission]
+
+    @extend_schema(
+        operation_id="campaign_summary",
+        summary="Get period KPIs and campaigns from the message store",
+        description=(
+            "Return indicators for the last `days` UTC days (today included) and the "
+            "preceding period of the same length, computed in one scan of the message "
+            "store metadata. Organisation-wide; records without a usable date are skipped.\n\n"
+            "**Fields**\n"
+            "- `messages` / `previous_messages`, `dangerous` / `previous_dangerous`, and "
+            "`dangerous_share` (dangerous / messages, `0.0` when the period is empty: read "
+            "`messages == 0` as no data).\n"
+            "- `peak_day`: the day with most messages in the period (earliest on ties), "
+            "`null` when empty.\n"
+            "- `mix`: four-bucket classification counts for the period, as stored.\n"
+            "- `campaigns`: one entry per group of messages in the period, sorted by "
+            "message count. `case_ids` lists up to 20 case ids in chronological order; "
+            "`sample_subject` is the subject of the earliest message that has one.\n"
+            f"- `active`: `last_seen` within `active_window_hours` ({ACTIVE_WINDOW_HOURS}) "
+            "of now; `active_campaigns` counts them; `largest_campaign` is the first entry.\n\n"
+            "**Campaign grouping heuristic**\n"
+            "- A campaign is the set of messages whose normalized `sourceRefs` are identical. "
+            "Messages without `sourceRefs` belong to no campaign. This is a heuristic, not a "
+            "guaranteed campaign identifier.\n\n"
+            f"Responses are cached for {CACHE_TTL_SECONDS} seconds per `days` value."
+        ),
+        parameters=[DAYS_PARAMETER],
+        responses={
+            200: OpenApiResponse(
+                response=CampaignSummaryResponseSerializer,
+                description="Period KPIs, classification mix and campaigns.",
+            ),
+        },
+        examples=[
+            OpenApiExample(
+                "Campaign summary",
+                value={
+                    "days": 15,
+                    "period": {"start": "2026-09-29", "end": "2026-10-13"},
+                    "messages": 42,
+                    "previous_messages": 30,
+                    "dangerous": 6,
+                    "previous_dangerous": 3,
+                    "dangerous_share": 0.142857,
+                    "previous_dangerous_share": 0.1,
+                    "peak_day": {"date": "2026-10-08", "count": 9},
+                    "mix": {"SAFE": 20, "UNWANTED": 10, "SUSPICIOUS": 6, "DANGEROUS": 6},
+                    "campaigns": [
+                        {
+                            "name": "sender-domain-a, subject-cluster-1",
+                            "first_seen": "2026-10-07T08:12:00Z",
+                            "last_seen": "2026-10-12T16:40:00Z",
+                            "messages": 7,
+                            "dangerous": 4,
+                            "dangerous_share": 0.571429,
+                            "sample_subject": "Invoice overdue",
+                            "case_ids": ["1201", "1207"],
+                            "active": True,
+                        }
+                    ],
+                    "active_campaigns": 1,
+                    "active_window_hours": ACTIVE_WINDOW_HOURS,
+                    "largest_campaign": {
+                        "name": "sender-domain-a, subject-cluster-1",
+                        "messages": 7,
+                    },
+                },
+                response_only=True,
+            ),
+        ],
+    )
+    def get(self, request):
+        payload = get_campaign_summary(_period_days(request))
+        return _validated_response(CampaignSummaryResponseSerializer, payload)

@@ -19,8 +19,7 @@ from .chroma import (
 )
 from .metadata import (
     CLASSIFICATION_DANGEROUS,
-    CLASSIFICATION_SAFE,
-    CLASSIFICATION_UNWANTED,
+    COUNT_BUCKETS,
     classification_bucket_for_counts,
     coerce_dict,
     extract_case_id,
@@ -34,20 +33,20 @@ logger = logging.getLogger(__name__)
 
 DEFAULT_PCA_LIMIT = 1500
 MAX_PCA_LIMIT = 5000
+PCA_COMPONENTS = 3
+DEFAULT_PERIOD_DAYS = 15
+MIN_PERIOD_DAYS = 7
+MAX_PERIOD_DAYS = 90
 
 
 def empty_counts_payload() -> Dict[str, int]:
-    return {
-        CLASSIFICATION_SAFE: 0,
-        CLASSIFICATION_UNWANTED: 0,
-        CLASSIFICATION_DANGEROUS: 0,
-    }
+    return {bucket: 0 for bucket in COUNT_BUCKETS}
 
 
 def empty_pca_payload() -> Dict[str, Any]:
     return {
         "points": [],
-        "explained_variance": [0.0, 0.0],
+        "explained_variance": [0.0] * PCA_COMPONENTS,
     }
 
 
@@ -147,58 +146,45 @@ class CampaignQueryService:
             vectors = [item[1] for item in selected]
             metas = [item[2] for item in selected]
 
-            if len(vectors) == 1:
-                meta = metas[0]
-                return {
-                    "points": [{
-                        "x": 0.0,
-                        "y": 0.0,
-                        "label": normalize_classification(meta.get("classification")),
-                        "suspicious_case_id": extract_case_id(meta),
-                        "sourceRefs": list(parse_source_refs(meta.get("sourceRefs"))),
-                    }],
-                    "explained_variance": [0.0, 0.0],
-                }
-
+            # One SVD path covers the degenerate inputs too: a single vector or
+            # identical vectors centre to zeros (denom 0 -> zero ratios), 1-dim
+            # vectors yield one component, 2 vectors at most two; missing
+            # components are padded with 0.0 so x/y/z and 3 ratios always exist.
             X = np.stack(vectors, axis=0)
             X_centered = X - X.mean(axis=0, keepdims=True)
 
-            if X_centered.shape[1] == 1:
-                xs = X_centered[:, 0]
-                ys = np.zeros_like(xs)
-                denom = float(np.sum(np.square(xs)))
-                ratios = [1.0 if denom > 0.0 else 0.0, 0.0]
-            else:
-                try:
-                    _, singular_values, vt = np.linalg.svd(X_centered, full_matrices=False)
-                except Exception as exc:
-                    logger.error("PCA SVD failed: %s", exc, exc_info=True)
-                    return empty_pca_payload()
+            try:
+                _, singular_values, vt = np.linalg.svd(X_centered, full_matrices=False)
+            except Exception as exc:
+                logger.error("PCA SVD failed: %s", exc, exc_info=True)
+                return empty_pca_payload()
 
-                components = vt[:2]
-                scores = X_centered @ components.T
-                xs = scores[:, 0]
-                ys = scores[:, 1] if scores.shape[1] > 1 else np.zeros(X_centered.shape[0])
+            scores = np.zeros((X_centered.shape[0], PCA_COMPONENTS))
+            projected = X_centered @ vt[:PCA_COMPONENTS].T
+            scores[:, :projected.shape[1]] = projected
 
-                eigenvalue_numerators = np.square(singular_values)
-                denom = float(eigenvalue_numerators.sum()) if eigenvalue_numerators.size else 0.0
-                if denom > 0.0:
-                    ratios = [
-                        float(eigenvalue_numerators[0] / denom),
-                        float(eigenvalue_numerators[1] / denom) if eigenvalue_numerators.size > 1 else 0.0,
-                    ]
-                else:
-                    ratios = [0.0, 0.0]
+            eigenvalue_numerators = np.square(singular_values)
+            denom = float(eigenvalue_numerators.sum())
+            ratios = [0.0] * PCA_COMPONENTS
+            if denom > 0.0:
+                for i, value in enumerate(eigenvalue_numerators[:PCA_COMPONENTS]):
+                    ratios[i] = float(value / denom)
 
             points = []
             for idx, meta in enumerate(metas):
+                sent_dt = extract_metadata_datetime(meta)
                 points.append({
-                    "x": float(xs[idx]),
-                    "y": float(ys[idx]),
+                    "x": float(scores[idx, 0]),
+                    "y": float(scores[idx, 1]),
+                    "z": float(scores[idx, 2]),
                     "label": normalize_classification(meta.get("classification")),
                     "suspicious_case_id": extract_case_id(meta),
                     "mail_subject": extract_mail_subject(meta),
                     "sourceRefs": list(parse_source_refs(meta.get("sourceRefs"))),
+                    "date": (
+                        sent_dt.astimezone(dt_timezone.utc).date().isoformat()
+                        if sent_dt is not None else None
+                    ),
                 })
 
             logger.debug(
@@ -218,10 +204,10 @@ class CampaignQueryService:
             logger.error("Error computing PCA points: %s", exc, exc_info=True)
             return empty_pca_payload()
 
-    def get_mail_volume(self) -> Dict[str, Any]:
+    def get_mail_volume(self, days: int = DEFAULT_PERIOD_DAYS) -> Dict[str, Any]:
         today_utc = datetime.now(dt_timezone.utc).date()
-        start_utc = today_utc - timedelta(days=14)
-        all_days = [start_utc + timedelta(days=i) for i in range(15)]
+        start_utc = today_utc - timedelta(days=days - 1)
+        all_days = [start_utc + timedelta(days=i) for i in range(days)]
         day_index = {day: idx for idx, day in enumerate(all_days)}
 
         collection = get_chroma_collection()

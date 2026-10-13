@@ -302,7 +302,12 @@ class CampaignAccessTests(TestCase):
 
     def test_regular_user_forbidden_from_all_campaign_endpoints(self):
         self.client.force_authenticate(self.reporter)
-        for name in ("campaign-classification-counts", "campaign-pca", "campaign-mail-volume"):
+        for name in (
+            "campaign-classification-counts",
+            "campaign-pca",
+            "campaign-mail-volume",
+            "campaign-summary",
+        ):
             resp = self.client.get(reverse(name))
             self.assertEqual(resp.status_code, 403, f"{name} must be forbidden for a reporter")
 
