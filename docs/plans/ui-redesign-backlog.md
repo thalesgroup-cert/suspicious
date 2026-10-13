@@ -85,3 +85,17 @@ Group C (sunrise, valentine, the_one, winter, spring, summer, autumn).
 - Theme `future`: rendered backgrounds are lighter than their CSS colours in places (found while measuring the drawer chip); after the sheet header tint fix the verdict chip reads 4.71:1, but other text on that theme may be affected: audit it in the Theme review.
 - Investigation's drawer header lost the grey/white wash toward the top (the shared SheetHeader tint went from a 22% wash to a 4% text-colour tint): check it in the Investigation page audit.
 - The header-tint unit test was written after the fix (no recorded RED run).
+
+## Investigation page cycle (2026-10-13)
+
+Shipped on `design/investigation-page`: case-sheet header, More menu, decision-first Overview, Analysis/Discussion/Raw tabs, list with collapsible filters, bottom pager and phone list, stale-details guard on case switch.
+
+Deferred:
+- `?q=` is re-applied from the URL on Close/Next because `urlSyncKey` combines `q` and `open` (only hand-typed URLs hit it): sync `q` separately.
+- `Heading` lives in Submissions `AnalyzerGroups.tsx`; move to `shared/components/SheetSection.tsx` (duplicates `SectionTitle`). The two drawers still duplicate Panel, tab `sx`, meta line and prev/next focus effect. `short` in `investigation/utils.ts` has no production caller.
+- Header count chip shows "…" on every page change, not just while a search loads.
+- Refetch details when the selected row's status changes (header can say Done while Redo reads "still being analyzed").
+- IOC-road override form shows the stored band score the Overview hides: product decision.
+- `screenshot_url` for #18/#22 answers 404 (backend data/file mismatch): hide section on image error.
+- Midnight contained primary buttons are 3.1:1 (theme change). 17 theme/shared-component contrast entries: `docs/plans/investigation-contrast-2026-10.tsv`.
+- Analysis expansion resets on tab switch; first analyzer group and observable panel can name different "worst"; "Result" row shows raw category text ("1 hi"); cyber table sticks out of its card by 12px at 1440 (scrolls inside).
