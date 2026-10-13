@@ -31,7 +31,7 @@ import { useThemeMode } from "@/styles/ThemeStore";
 
 import OverviewHeader from "@/features/dashboard/components/OverviewHeader";
 import { monthName, scopeLabel, scopeName } from "@/features/dashboard/format";
-import TopPrefixesPanel from "@/features/dashboard/components/TopPrefixesPanel";
+import TopReportersPanel from "@/features/dashboard/components/TopReportersPanel";
 import { DashboardLoading } from "@/features/dashboard/components/StatePanels";
 import KpiTrendPanels from "@/features/dashboard/components/KpiTrendPanels";
 import OutcomesPanel from "@/features/dashboard/components/OutcomesPanel";
@@ -422,11 +422,11 @@ export default function DashboardPage() {
   const panels: Array<[string, React.ReactNode]> = data
     ? [
         [PANEL_KEYS.KPI_TRENDS, <KpiTrendPanels summary={data} />],
-        [PANEL_KEYS.OUTCOMES, <OutcomesPanel outcomes={data.outcomes} inProgress={data.in_progress} />],
+        [PANEL_KEYS.OUTCOMES, <OutcomesPanel outcomes={data.outcomes} inProgress={data.in_progress} reports={data.reports} />],
         [PANEL_KEYS.BY_TYPE, <ByTypePanel byType={data.by_type} />],
         // Names reach the page only for elevated users; null means no panel at all.
         ...(data.top_reporters
-          ? [[PANEL_KEYS.TOP_REPORTERS, <TopPrefixesPanel reporters={data.top_reporters} />] as [string, React.ReactNode]]
+          ? [[PANEL_KEYS.TOP_REPORTERS, <TopReportersPanel reporters={data.top_reporters} />] as [string, React.ReactNode]]
           : []),
       ]
     : [];

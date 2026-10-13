@@ -87,7 +87,7 @@ def _counts(cases) -> dict:
 
 
 def _trend(cases, month, year) -> list[dict]:
-    """Reports per ISO week (Monday start) touching the month; [] when empty."""
+    """Reports per ISO week (Monday start) touching the month, up to today; [] when empty."""
     per_week = {
         row["week"].date(): row["n"]
         for row in cases.annotate(week=TruncWeek("creation_date")).values("week").annotate(n=Count("pk"))
@@ -96,7 +96,9 @@ def _trend(cases, month, year) -> list[dict]:
         return []
     start, end = month_bounds(month, year)
     first = start.date() - timedelta(days=start.weekday())
-    last = (end - timedelta(days=1)).date()
+    # Stop at today (server timezone, like month_bounds): weeks that have not
+    # started are not zero-report weeks. Past months are unaffected.
+    last = min((end - timedelta(days=1)).date(), timezone.localdate())
     weeks = []
     while first <= last:
         weeks.append({"week_start": first.isoformat(), "reports": per_week.get(first, 0)})

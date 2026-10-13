@@ -1,6 +1,7 @@
 """Live regional summary (dashboard/dash_utils/regional.py) and the B1
 reporter-count regression."""
 from datetime import date, datetime, timezone as dt_tz
+from unittest import mock
 
 from django.contrib.auth.models import Group, User
 from django.test import TestCase, override_settings
@@ -144,7 +145,9 @@ class SummariseTests(TestCase):
         self.assertEqual(s["reporters"], 4)
         self.assertEqual(s["new_users"], 1)
 
-    def test_trend_weekly(self):
+    @mock.patch("dashboard.dash_utils.regional.timezone.localdate", return_value=date(2026, 11, 15))
+    def test_trend_weekly(self, _today):
+        # A past month: every week touching it, zeros included.
         self.assertEqual(
             summarise(10, 2026, ["AU"])["trend"],
             [
@@ -153,6 +156,18 @@ class SummariseTests(TestCase):
                 {"week_start": "2026-10-12", "reports": 0},
                 {"week_start": "2026-10-19", "reports": 1},
                 {"week_start": "2026-10-26", "reports": 0},
+            ],
+        )
+
+    @mock.patch("dashboard.dash_utils.regional.timezone.localdate", return_value=date(2026, 10, 14))
+    def test_trend_stops_at_the_current_week(self, _today):
+        # The current month: weeks that have not started yet are not zeros, they do not exist.
+        self.assertEqual(
+            summarise(10, 2026, ["AU"])["trend"],
+            [
+                {"week_start": "2026-09-28", "reports": 0},
+                {"week_start": "2026-10-05", "reports": 5},
+                {"week_start": "2026-10-12", "reports": 0},
             ],
         )
 

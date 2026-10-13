@@ -5,8 +5,11 @@ import { useTheme } from "@mui/material/styles";
 import { SoftCard } from "./SoftCard";
 import { Sparkline } from "./Sparkline";
 import type { DashboardSummary } from "@/features/dashboard/api";
-import { monthName, onCard, percents } from "@/features/dashboard/format";
+import { monthName, onCard, percents, plural } from "@/features/dashboard/format";
 import { useResultColors } from "@/styles/colorStore";
+
+// Weeks are Monday-based and cut at the month's edges (and at today), so the ends can be short.
+const SPARK_LABEL = "Reports per week (first and last weeks may be partial)";
 
 const sum = (o: Record<string, number>) => Object.values(o).reduce((a, b) => a + b, 0);
 
@@ -71,21 +74,21 @@ export default function KpiTrendPanels({ summary: s }: { summary: DashboardSumma
           // The visible caption names the line; the SVG's own label carries the values.
           <Stack direction="row" spacing={1.5} sx={{ alignItems: "flex-end", pt: 0.5 }}>
             <Box sx={{ color: onCard(theme.palette.primary.main, theme.palette, 3), lineHeight: 0 }}>
-              <Sparkline values={s.trend.map((p) => p.reports)} label="Reports per week" />
+              <Sparkline values={s.trend.map((p) => p.reports)} label={SPARK_LABEL} />
             </Box>
             <Typography variant="caption" color="text.secondary">
-              per week
+              per week, first and last weeks may be partial
             </Typography>
           </Stack>
         ) : (
-          <Sparkline values={s.trend.map((p) => p.reports)} label="Reports per week" />
+          <Sparkline values={s.trend.map((p) => p.reports)} label={SPARK_LABEL} />
         )}
       </Kpi>
 
       <Kpi title="Dangerous" value={s.outcomes.dangerous} marker={onCard(result.dangerous.main, theme.palette, 3)}>
         {finished > 0 ? (
           <Line>
-            {o.dangerous > 0 && dangerousPct === 0 ? "<1" : dangerousPct}% of {finished.toLocaleString()} finished cases
+            {o.dangerous > 0 && dangerousPct === 0 ? "<1" : dangerousPct}% of {plural(finished, "case")} with a verdict
           </Line>
         ) : null}
         <Line>{delta(prevMonth, s.outcomes.dangerous, s.previous.outcomes.dangerous, prevFinished > 0)}</Line>
@@ -94,7 +97,7 @@ export default function KpiTrendPanels({ summary: s }: { summary: DashboardSumma
       <Kpi title="Reporters" value={s.reporters}>
         {s.new_users > 0 ? (
           <Line>
-            {s.new_users.toLocaleString()} new {s.new_users === 1 ? "user" : "users"} in {monthName(s.month)}
+            {plural(s.new_users, "account")} created in {monthName(s.month)}
           </Line>
         ) : null}
       </Kpi>

@@ -36,7 +36,10 @@ describe("KpiTrendPanels", () => {
     const reports = screen.getByRole("region", { name: "Reports" });
     expect(within(reports).getByText("512")).toBeInTheDocument();
     expect(within(reports).getByText("vs September: +32 (+7%) from 480")).toBeInTheDocument();
-    expect(within(reports).getByRole("img", { name: "Reports per week: 90, 130" })).toBeInTheDocument();
+    expect(
+      within(reports).getByRole("img", { name: "Reports per week (first and last weeks may be partial): 90, 130" })
+    ).toBeInTheDocument();
+    expect(within(reports).getByText("per week, first and last weeks may be partial")).toBeInTheDocument();
   });
 
   it("says no data, with no arrow, when the previous month has no reports", () => {
@@ -47,11 +50,11 @@ describe("KpiTrendPanels", () => {
     expect(document.querySelector('[data-testid^="Trending"]')).toBeNull();
   });
 
-  it("shows dangerous cases, their share of finished cases and the delta", () => {
+  it("shows dangerous cases, their share of cases with a verdict and the delta", () => {
     renderWithProviders(<KpiTrendPanels summary={summary} />);
     const card = screen.getByRole("region", { name: "Dangerous" });
     expect(within(card).getByText("60")).toBeInTheDocument();
-    expect(within(card).getByText("12% of 491 finished cases")).toBeInTheDocument();
+    expect(within(card).getByText("12% of 491 cases with a verdict")).toBeInTheDocument();
     expect(within(card).getByText("vs September: +5 (+9%) from 55")).toBeInTheDocument();
     // No weekly series exists for dangerous cases: no sparkline is invented.
     expect(within(card).queryByRole("img")).not.toBeInTheDocument();
@@ -63,10 +66,10 @@ describe("KpiTrendPanels", () => {
     renderWithProviders(
       <>
         <KpiTrendPanels summary={{ ...summary, outcomes }} />
-        <OutcomesPanel outcomes={outcomes} inProgress={0} />
+        <OutcomesPanel outcomes={outcomes} inProgress={0} reports={35} />
       </>
     );
-    expect(screen.getByText("48% of 35 finished cases")).toBeInTheDocument();
+    expect(screen.getByText("48% of 35 cases with a verdict")).toBeInTheDocument();
     expect(screen.getAllByRole("listitem")[3]).toHaveTextContent("Dangerous1748%");
   });
 
@@ -75,20 +78,23 @@ describe("KpiTrendPanels", () => {
     expect(screen.getByText("vs December: +32 (+7%) from 480")).toBeInTheDocument();
   });
 
-  it("shows reporters and new users only when there are some", () => {
+  it("shows reporters, and accounts created only when there are some", () => {
     const { unmount } = renderWithProviders(<KpiTrendPanels summary={summary} />);
     const card = screen.getByRole("region", { name: "Reporters" });
     expect(within(card).getByText("128")).toBeInTheDocument();
-    expect(within(card).getByText("4 new users in October")).toBeInTheDocument();
+    expect(within(card).getByText("4 accounts created in October")).toBeInTheDocument();
     unmount();
+    const second = renderWithProviders(<KpiTrendPanels summary={{ ...summary, new_users: 1 }} />);
+    expect(screen.getByText("1 account created in October")).toBeInTheDocument();
+    second.unmount();
     renderWithProviders(<KpiTrendPanels summary={{ ...summary, new_users: 0 }} />);
-    expect(screen.queryByText(/new users/)).not.toBeInTheDocument();
+    expect(screen.queryByText(/created in/)).not.toBeInTheDocument();
   });
 });
 
 describe("OutcomesPanel", () => {
   it("lists five outcomes with counts and percentages that sum to 100", () => {
-    renderWithProviders(<OutcomesPanel outcomes={summary.outcomes} inProgress={21} />);
+    renderWithProviders(<OutcomesPanel outcomes={summary.outcomes} inProgress={21} reports={512} />);
     const panel = screen.getByRole("region", { name: "Outcomes" });
     const rows = within(panel).getAllByRole("listitem");
     expect(rows.map((r) => r.textContent)).toEqual([
@@ -102,18 +108,18 @@ describe("OutcomesPanel", () => {
       .map((r) => r.lastElementChild!.textContent!.match(/^(\d+)%$/)?.[1])
       .reduce((sum, p) => sum + Number(p ?? 0), 0);
     expect(total).toBe(100);
-    expect(within(panel).getByRole("img", { name: /^Outcomes of 491 finished cases/ })).toBeInTheDocument();
+    expect(within(panel).getByRole("img", { name: /^Outcomes of 491 cases with a verdict/ })).toBeInTheDocument();
   });
 
   it("shows in-progress cases on their own line, outside the outcomes", () => {
-    renderWithProviders(<OutcomesPanel outcomes={summary.outcomes} inProgress={21} />);
+    renderWithProviders(<OutcomesPanel outcomes={summary.outcomes} inProgress={21} reports={512} />);
     expect(screen.getByText("In progress: 21")).toBeInTheDocument();
     expect(screen.getByText(/not counted in the outcomes/)).toBeInTheDocument();
     expect(screen.getAllByRole("listitem").map((r) => r.textContent)).not.toContain(expect.stringMatching(/progress/i));
   });
 
   it("marks Failure with a neutral pattern, not the Dangerous colour", () => {
-    renderWithProviders(<OutcomesPanel outcomes={summary.outcomes} inProgress={0} />);
+    renderWithProviders(<OutcomesPanel outcomes={summary.outcomes} inProgress={0} reports={491} />);
     const dangerous = getComputedStyle(document.querySelector('[data-outcome-marker="dangerous"]')!);
     const failure = getComputedStyle(document.querySelector('[data-outcome-marker="failure"]')!);
     const red = dangerous.backgroundColor;
@@ -124,11 +130,32 @@ describe("OutcomesPanel", () => {
     expect(failure.borderTopColor).not.toBe(red);
   });
 
-  it("hides percentages when nothing has finished", () => {
+  it("says no finished cases yet, instead of five zero rows, when only cases in progress exist", () => {
     const zero = { safe: 0, inconclusive: 0, suspicious: 0, dangerous: 0, failure: 0 };
-    renderWithProviders(<OutcomesPanel outcomes={zero} inProgress={3} />);
+    renderWithProviders(<OutcomesPanel outcomes={zero} inProgress={3} reports={3} />);
+    expect(screen.getByText("No finished cases yet")).toBeInTheDocument();
+    expect(screen.queryAllByRole("listitem")).toEqual([]);
     expect(screen.queryByText(/%/)).not.toBeInTheDocument();
     expect(screen.getByText("In progress: 3")).toBeInTheDocument();
+  });
+
+  it("counts finished cases without one of the five outcomes on their own line", () => {
+    const outcomes = { safe: 3, inconclusive: 1, suspicious: 1, dangerous: 1, failure: 1 };
+    renderWithProviders(<OutcomesPanel outcomes={outcomes} inProgress={1} reports={10} />);
+    expect(screen.getByText("7 cases with a verdict")).toBeInTheDocument();
+    expect(screen.getByText("Allow-listed / other: 2 (not counted in the outcomes)")).toBeInTheDocument();
+    expect(screen.getAllByRole("listitem").map((r) => r.textContent)).not.toContain(expect.stringMatching(/other/i));
+  });
+
+  it("shows no allow-listed line when every finished case has an outcome", () => {
+    renderWithProviders(<OutcomesPanel outcomes={summary.outcomes} inProgress={21} reports={512} />);
+    expect(screen.queryByText(/Allow-listed/)).not.toBeInTheDocument();
+  });
+
+  it("uses the singular for one case", () => {
+    const one = { safe: 1, inconclusive: 0, suspicious: 0, dangerous: 0, failure: 0 };
+    renderWithProviders(<OutcomesPanel outcomes={one} inProgress={0} reports={1} />);
+    expect(screen.getByText("1 case with a verdict")).toBeInTheDocument();
   });
 });
 
@@ -147,6 +174,11 @@ describe("ByTypePanel", () => {
     ]);
     expect(within(panel).queryByText("URLs")).not.toBeInTheDocument();
     expect(within(panel).queryByText("Hashes")).not.toBeInTheDocument();
+  });
+
+  it("uses the singular for one report", () => {
+    renderWithProviders(<ByTypePanel byType={{ MAIL: 1, FILE: 0, URL: 0, IP: 0, HASH: 0, IOC: 0, UNKNOWN: 0 }} />);
+    expect(screen.getByText("Share of 1 report")).toBeInTheDocument();
   });
 
   it("renders nothing when every type is zero", () => {

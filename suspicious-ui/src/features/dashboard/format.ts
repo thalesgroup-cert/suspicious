@@ -51,3 +51,8 @@ export function percents(counts: number[]): number[] {
   for (let k = 0; k < missing; k++) out[order[k][1]] += 1;
   return out;
 }
+
+/** "1 case", "3 cases"; `many` defaults to `one` + "s". */
+export function plural(n: number, one: string, many = `${one}s`): string {
+  return `${n.toLocaleString()} ${n === 1 ? one : many}`;
+}

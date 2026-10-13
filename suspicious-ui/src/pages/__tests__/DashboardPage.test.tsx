@@ -315,6 +315,24 @@ describe("DashboardPage - Test Suite", () => {
       expect(screen.queryByTestId("dashboard-grid")).not.toBeInTheDocument();
     });
 
+    it("shows the panels, not the empty state, when cases exist but none has finished", async () => {
+      vi.mocked(getDashboardSummary).mockImplementation((p) =>
+        summaryFor(p).then((d) => ({
+          ...d,
+          reports: 2,
+          in_progress: 2,
+          outcomes: { safe: 0, inconclusive: 0, suspicious: 0, dangerous: 0, failure: 0 },
+          by_type: { MAIL: 2, FILE: 0, URL: 0, IP: 0, HASH: 0, IOC: 0, UNKNOWN: 0 },
+        }))
+      );
+      renderWithProviders(<DashboardPage />, { initialPath: "/dashboard" });
+      const outcomes = await screen.findByRole("region", { name: "Outcomes" }, { timeout: 5000 });
+      expect(within(outcomes).getByText("No finished cases yet")).toBeInTheDocument();
+      expect(within(outcomes).getByText("In progress: 2")).toBeInTheDocument();
+      expect(screen.queryByText("No reports in this period")).not.toBeInTheDocument();
+      expect(within(screen.getByRole("region", { name: "What was reported" })).getByText("Share of 2 reports")).toBeInTheDocument();
+    });
+
     it("hides the reporters panel, and every reporter name, when top_reporters is null", async () => {
       vi.mocked(getDashboardSummary).mockResolvedValue({ ...fixtureDashboardSummary, top_reporters: null });
       renderWithProviders(<DashboardPage />, { initialPath: "/dashboard" });
