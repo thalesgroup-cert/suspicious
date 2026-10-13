@@ -104,6 +104,18 @@ def select_dominant_dim_vectors(
     return selected, skipped_empty, skipped_invalid
 
 
+def fetch_dominant_sample(collection, limit: int):
+    """The deterministic sample shared by PCA and neighbours:
+    (sampled_ids, dominant-dimension vectors, skipped_empty, skipped_invalid)."""
+    sampled_ids = select_deterministic_sample_ids(collection, min(limit, MAX_PCA_LIMIT))
+    if not sampled_ids:
+        return [], [], 0, 0
+    selected, skipped_empty, skipped_invalid = select_dominant_dim_vectors(
+        fetch_records_for_ids(collection, sampled_ids)
+    )
+    return sampled_ids, selected, skipped_empty, skipped_invalid
+
+
 class CampaignQueryService:
     """Encapsulates the queries that back the campaigns endpoints."""
 
@@ -138,13 +150,12 @@ class CampaignQueryService:
             return empty_pca_payload()
 
         try:
-            sampled_ids = select_deterministic_sample_ids(collection, min(limit, MAX_PCA_LIMIT))
+            sampled_ids, selected, skipped_empty, skipped_invalid = fetch_dominant_sample(
+                collection, limit
+            )
             if not sampled_ids:
                 return empty_pca_payload()
 
-            records = fetch_records_for_ids(collection, sampled_ids)
-
-            selected, skipped_empty, skipped_invalid = select_dominant_dim_vectors(records)
             if not selected:
                 logger.warning(
                     "PCA sampling yielded no valid embeddings. sampled_ids=%s skipped_empty=%s skipped_invalid=%s",

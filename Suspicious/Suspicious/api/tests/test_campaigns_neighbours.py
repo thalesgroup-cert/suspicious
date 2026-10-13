@@ -123,6 +123,24 @@ class NeighboursServiceTests(APITestCase):
             {f"case-i{n}" for n in range(0, 14, 3)},
         )
 
+    def test_isolated_point_is_novel_not_near_known_bad(self):
+        # far from everything, but its weak nearest neighbours are all Dangerous
+        rows = planted_rows() + [row("iso", axis(6) + axis(0, 0.15), "SAFE", days_ago=0)]
+        payload = self.run_on(rows)
+        bad_ids = {i["suspicious_case_id"] for i in payload["near_known_bad"]}
+        self.assertEqual(bad_ids, {"case-p0", "case-p1", "case-p2"})
+        self.assertIn("case-iso", {i["suspicious_case_id"] for i in payload["novel"]})
+        with mock.patch.object(neighbours, "CHUNK_ROWS", 2):
+            self.assertEqual(self.run_on(rows), payload)
+
+    def test_equal_nn_distances_exclude_nothing(self):
+        # two groups of identical vectors: every NN distance equals the percentile
+        rows = [row(f"a{i}", axis(0), "DANGEROUS") for i in range(9)]
+        rows += [row(f"f{i}", axis(0), "SAFE") for i in range(3)]
+        rows += [row(f"b{i}", axis(1), "SAFE") for i in range(12)]
+        bad = self.run_on(rows)["near_known_bad"]
+        self.assertEqual({i["suspicious_case_id"] for i in bad}, {f"case-f{i}" for i in range(3)})
+
     def test_lists_capped_at_twenty(self):
         rng = np.random.default_rng(1)
         rows = [row(f"d{i}", axis(0) + rng.normal(0, 0.05, DIM), "DANGEROUS") for i in range(200)]
@@ -134,7 +152,7 @@ class NeighboursServiceTests(APITestCase):
 
     def test_missing_case_id_gives_null_nearest_dangerous(self):
         rows = [row(f"d{i}", axis(0) + 0.01 * i * axis(1), "DANGEROUS", case="") for i in range(12)]
-        rows.append(row("p", axis(0) + 0.05 * axis(2), "SAFE"))
+        rows.append(row("p", axis(0) + 0.055 * axis(1), "SAFE"))  # inside the line, not isolated
         bad = self.run_on(rows)["near_known_bad"]
         self.assertEqual(len(bad), 1)
         self.assertIsNone(bad[0]["nearest_dangerous_case_id"])
@@ -195,7 +213,7 @@ class NeighboursEndpointTests(APITestCase):
 
     def test_failure_mid_scan_empty_not_cached(self):
         with self.patch_collection(FakeCollection(planted_rows())), mock.patch(
-            "api.services.campaigns.neighbours.fetch_records_for_ids",
+            "api.services.campaigns.service.fetch_records_for_ids",
             side_effect=RuntimeError("chroma went away"),
         ):
             resp = self.client.get(URL)

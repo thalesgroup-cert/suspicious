@@ -5,7 +5,11 @@ Both are heuristics: closeness in embedding space is a hint, not proof of the
 same campaign.
 
 - near_known_bad: non-dangerous messages whose K nearest neighbours (cosine
-  similarity, self excluded) are at least BAD_SHARE_THRESHOLD Dangerous;
+  similarity, self excluded) are at least BAD_SHARE_THRESHOLD Dangerous and
+  which are themselves "near": their nearest-neighbour distance is within the
+  NOVELTY_PERCENTILE percentile of the sample's nearest-neighbour distances
+  (<=, so equal spacing excludes nothing). An isolated message is novel, not
+  near known bad, even when its distant neighbours are Dangerous.
   score = that share.
 - novel: messages dated within the last NOVEL_WINDOW_DAYS UTC days (today
   included) whose nearest-neighbour cosine distance exceeds the
@@ -29,7 +33,7 @@ from typing import Any, Dict, List
 import numpy as np
 from django.core.cache import cache
 
-from .chroma import fetch_records_for_ids, get_chroma_collection, select_deterministic_sample_ids
+from .chroma import get_chroma_collection
 from .metadata import (
     CLASSIFICATION_DANGEROUS,
     extract_case_id,
@@ -37,7 +41,7 @@ from .metadata import (
     extract_metadata_datetime,
     normalize_classification,
 )
-from .service import MAX_PCA_LIMIT, select_dominant_dim_vectors
+from .service import fetch_dominant_sample
 from .summary import _now
 
 logger = logging.getLogger(__name__)
@@ -134,10 +138,11 @@ def compute_neighbours(selected) -> Dict[str, Any]:
 
     near_bad, novel = [], []
     for i in range(len(metas)):
-        if not dangerous[i] and shares[i] >= BAD_SHARE_THRESHOLD:
+        isolated = distances[i] > novelty_cut
+        if not dangerous[i] and shares[i] >= BAD_SHARE_THRESHOLD and not isolated:
             j = next(j for j in nn_idx[i] if dangerous[j])  # most similar dangerous
             near_bad.append(item(i, shares[i], extract_case_id(metas[j])))
-        if dates[i] and window_start <= dates[i] <= today and distances[i] > novelty_cut:
+        if isolated and dates[i] and window_start <= dates[i] <= today:
             novel.append(item(i, distances[i]))
 
     payload["near_known_bad"] = _ranked(near_bad)
@@ -156,10 +161,9 @@ def get_campaign_neighbours(limit: int) -> Dict[str, Any]:
         return empty_neighbours_payload()
 
     try:
-        sampled_ids = select_deterministic_sample_ids(collection, min(limit, MAX_PCA_LIMIT))
+        sampled_ids, selected, _, _ = fetch_dominant_sample(collection, limit)
         if not sampled_ids:
             return empty_neighbours_payload()
-        selected, _, _ = select_dominant_dim_vectors(fetch_records_for_ids(collection, sampled_ids))
         payload = compute_neighbours(selected)
     except Exception as exc:
         logger.error("Error computing campaign neighbours: %s", exc, exc_info=True)
