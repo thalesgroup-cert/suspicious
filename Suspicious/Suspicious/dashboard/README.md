@@ -54,6 +54,33 @@ Includes helper functions to programmatically generate and initialize new dashbo
 ### `dash_utils/dashboard.py`
 Handles logic for updating or processing existing dashboard.
 
+### `dash_utils/regional.py` (live summary)
+`summarise(month, year, group_names, include_names=False)` aggregates `Case` live for one month,
+restricted to reporters in **every** group of `group_names` (country code, region, GBU; `None` = Overall).
+It backs `GET /api/dashboard/summary/` (cached 120 s per month/year/scope) and the nightly
+`DashboardSnapshot` for Overall. The summary no longer reads the monthly stats tables.
+
+- A report counts in the month its case was created, in the server timezone (same bucket as the
+  Investigation list's date filter).
+- `outcomes` (safe, inconclusive, suspicious, dangerous, failure) count only cases with status
+  Done or Challenged; `in_progress` counts To Do and On Going (a running case's default
+  `Inconclusive` is not an outcome).
+- `by_type` uses the Investigation type vocabulary (MAIL, FILE, URL, IP, HASH, IOC, UNKNOWN).
+- `previous` holds `reports` and `outcomes` of the preceding month; `trend` lists reports per
+  ISO week (Monday start, so the first week can start in the previous month), `[]` when empty.
+- `top_reporters` is filled only for CERT/Admin/CISO callers, `null` otherwise.
+
+### Scopes (`api/permissions/dashboard_scope.py`)
+`GET /api/dashboard/scopes/` lists what the caller may request; `resolve_scope` enforces it
+server-side (anything else is a 403):
+
+| Key | Who |
+|---|---|
+| `ALL` (Overall) | everyone |
+| `OWN_COUNTRY` | anyone whose profile has a country (default for them) |
+| `OWN_SCOPE` | CISO with a scope set on their CISOProfile (their default) |
+| `COUNTRY:<CC>`, `REGION:<NAME>` | CERT, Admin, superuser (options list profile countries/regions) |
+
 ---
 
 ## 🧪 Testing

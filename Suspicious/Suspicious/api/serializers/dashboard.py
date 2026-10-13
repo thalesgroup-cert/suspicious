@@ -12,7 +12,6 @@ class DashboardSummaryQuerySerializer(serializers.Serializer):
     year = serializers.IntegerField(min_value=1)
     scope = serializers.CharField(
         required=False,
-        default="ALL",
         allow_blank=False,
         trim_whitespace=True,
         max_length=64,
@@ -39,10 +38,58 @@ class DashboardDangerCountsSerializer(serializers.Serializer):
     malicious = serializers.IntegerField(min_value=0)
 
 
+class DashboardScopeSerializer(serializers.Serializer):
+    key = serializers.CharField()
+    label = serializers.CharField()
+
+
+class DashboardScopesResponseSerializer(serializers.Serializer):
+    default = serializers.CharField()
+    options = DashboardScopeSerializer(many=True)
+
+
+class DashboardOutcomesSerializer(serializers.Serializer):
+    safe = serializers.IntegerField(min_value=0)
+    inconclusive = serializers.IntegerField(min_value=0)
+    suspicious = serializers.IntegerField(min_value=0)
+    dangerous = serializers.IntegerField(min_value=0)
+    failure = serializers.IntegerField(min_value=0)
+
+
+class DashboardByTypeSerializer(serializers.Serializer):
+    MAIL = serializers.IntegerField(min_value=0)
+    FILE = serializers.IntegerField(min_value=0)
+    URL = serializers.IntegerField(min_value=0)
+    IP = serializers.IntegerField(min_value=0)
+    HASH = serializers.IntegerField(min_value=0)
+    IOC = serializers.IntegerField(min_value=0)
+    UNKNOWN = serializers.IntegerField(min_value=0)
+
+
+class DashboardPreviousSerializer(serializers.Serializer):
+    reports = serializers.IntegerField(min_value=0)
+    outcomes = DashboardOutcomesSerializer()
+
+
+class DashboardTrendPointSerializer(serializers.Serializer):
+    week_start = serializers.CharField()
+    reports = serializers.IntegerField(min_value=0)
+
+
 class DashboardSummaryResponseSerializer(serializers.Serializer):
     month = serializers.IntegerField(min_value=1, max_value=12)
     year = serializers.IntegerField(min_value=1)
-    scope = serializers.CharField()
+    scope = DashboardScopeSerializer()
+    reports = serializers.IntegerField(min_value=0)
+    outcomes = DashboardOutcomesSerializer()
+    in_progress = serializers.IntegerField(min_value=0)
+    by_type = DashboardByTypeSerializer()
+    reporters = serializers.IntegerField(min_value=0)
+    new_users = serializers.IntegerField(min_value=0)
+    previous = DashboardPreviousSerializer()
+    trend = DashboardTrendPointSerializer(many=True)
+    top_reporters = DashboardPrefixSerializer(many=True, allow_null=True)
+    # Legacy keys read by the current UI, derived from the fields above.
     kpis = DashboardKpisSerializer()
     danger_counts = DashboardDangerCountsSerializer()
     top_prefixes = DashboardPrefixSerializer(many=True)

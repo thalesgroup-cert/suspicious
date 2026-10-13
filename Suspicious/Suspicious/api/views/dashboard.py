@@ -1,3 +1,4 @@
+from urllib.parse import quote
 
 import django_filters
 from django.core.cache import cache
@@ -11,6 +12,7 @@ from rest_framework.permissions import IsAuthenticated
 from rest_framework.response import Response
 from rest_framework.views import APIView
 
+from api.permissions.dashboard_scope import may_see_names, resolve_scope, scope_options
 from api.permissions.settings import IsAdminOrCERT
 
 from dashboard.models import (
@@ -20,9 +22,10 @@ from dashboard.models import (
     TotalCasesStats,
     UserCasesMonthlyStats,
 )
-from dashboard.snapshot import build_dashboard_payload, get_snapshot
+from dashboard.dash_utils.regional import summarise
 from api.serializers.dashboard import (
     DashboardSummaryQuerySerializer,
+    DashboardScopesResponseSerializer,
     DashboardSummaryResponseSerializer,
     MonthlyCasesSummaryAggregateSerializer,
     MonthlyCasesSummarySerializer,
@@ -61,8 +64,6 @@ class UserCasesMonthlyStatsFilter(django_filters.FilterSet):
 class DashboardSummaryView(APIView):
     permission_classes = [IsAuthenticated]
 
-    DEFAULT_TOP_PREFIXES_LIMIT = 10
-
     @extend_schema(
         parameters=[
             OpenApiParameter("month", int, OpenApiParameter.QUERY, required=True),
@@ -73,13 +74,15 @@ class DashboardSummaryView(APIView):
                 OpenApiParameter.QUERY,
                 required=False,
                 description=(
-                    "Dashboard scope. Currently echoed for UI compatibility. "
-                    "Data is not scope-filtered unless backend scope support is implemented."
+                    "Dashboard scope: ALL, OWN_COUNTRY, OWN_SCOPE (CISO), COUNTRY:<CC> or "
+                    "REGION:<NAME>. Defaults to the caller's default from /api/dashboard/scopes/. "
+                    "Data is filtered to cases whose reporter is in the scope; a scope outside "
+                    "the caller's role returns 403."
                 ),
             ),
         ],
         responses=DashboardSummaryResponseSerializer,
-        description="Return the dashboard summary for a given month and year.",
+        description="Return the live dashboard summary for a month, year and scope.",
     )
     def get(self, request):
         query = DashboardSummaryQuerySerializer(data=request.query_params)
@@ -87,31 +90,47 @@ class DashboardSummaryView(APIView):
 
         month = query.validated_data["month"]
         year = query.validated_data["year"]
-        requested_scope = query.validated_data.get("scope", "ALL")
-        scope = self._resolve_scope(requested_scope=requested_scope)
+        scope = resolve_scope(request.user, query.validated_data.get("scope"))
+        include_names = may_see_names(request.user)
 
-        snap = get_snapshot(month, year)
-        if snap is not None:
-            payload = {**snap, "scope": scope}
-            return Response(
-                DashboardSummaryResponseSerializer(instance=self._scrub(payload)).data
-            )
+        groups_key = "ALL" if scope.groups is None else quote("|".join(scope.groups), safe="")
+        cache_key = f"dashboard:summary:v2:{year}:{month}:{groups_key}:{int(include_names)}"
+        summary = cache.get(cache_key)
+        if summary is None:
+            summary = summarise(month, year, scope.groups, include_names=include_names)
+            cache.set(cache_key, summary, DASHBOARD_CACHE_TTL)
 
-        cache_key = f"dashboard:summary:{year}:{month}:{scope}"
-        payload = cache.get(cache_key)
-        if payload is None:
-            payload = build_dashboard_payload(month=month, year=year, scope=scope)
-            cache.set(cache_key, payload, DASHBOARD_CACHE_TTL)
+        payload = {
+            "month": month,
+            "year": year,
+            "scope": {"key": scope.key, "label": scope.label},
+            **summary,
+            # ponytail: legacy keys for the current UI; drop once Task 2 reads the new ones.
+            "kpis": {
+                "new_users": summary["new_users"],
+                "total_reporters": summary["reporters"],
+                "total_cases": summary["reports"],
+            },
+            "danger_counts": {**summary["outcomes"], "malicious": summary["malicious"]},
+            "top_prefixes": summary["top_reporters"] or [],
+        }
+        return Response(DashboardSummaryResponseSerializer(instance=payload).data)
 
-        return Response(DashboardSummaryResponseSerializer(instance=self._scrub(payload)).data)
 
-    def _resolve_scope(self, requested_scope: str) -> str:
-        if not self.request.user.groups.filter(name="CISO").exists():
-            return "ALL"
-        return requested_scope
+class DashboardScopesView(APIView):
+    permission_classes = [IsAuthenticated]
 
-    def _scrub(self, payload: dict) -> dict:
-        return payload
+    @extend_schema(
+        responses=DashboardScopesResponseSerializer,
+        description="Dashboard scopes the caller may request, and their default.",
+    )
+    def get(self, request):
+        default, options = scope_options(request.user)
+        payload = {
+            "default": default,
+            "options": [{"key": o.key, "label": o.label} for o in options],
+        }
+        return Response(DashboardScopesResponseSerializer(instance=payload).data)
 
 
 class MonthlyCasesSummaryListView(generics.ListAPIView):

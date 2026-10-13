@@ -12,6 +12,7 @@ from api.views.case_screenshot import CaseScreenshotView
 from api.views.challenge import CaseChallengeTokenView
 from api.views.comments import CaseCommentListCreateView
 from api.views.dashboard import (
+    DashboardScopesView,
     DashboardSummaryView,
     MonthlyCasesSummaryAggregateView,
     MonthlyCasesSummaryListView,
@@ -106,6 +107,7 @@ urlpatterns = [
     path("cases/<int:case_id>/report.md", CaseReportMarkdownView.as_view(), name="case-report-markdown"),
 
     path("dashboard/summary/", DashboardSummaryView.as_view(), name="dashboard-summary"),
+    path("dashboard/scopes/", DashboardScopesView.as_view(), name="dashboard-scopes"),
 
     path("campaigns/classification-counts/", CampaignClassificationCountsView.as_view(), name="campaign-classification-counts"),
     path("campaigns/pca/", CampaignPcaView.as_view(), name="campaign-pca"),
