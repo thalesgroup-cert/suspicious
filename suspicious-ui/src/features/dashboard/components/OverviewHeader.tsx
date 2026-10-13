@@ -14,7 +14,8 @@ import { RefreshOutlined } from "@mui/icons-material";
 import { useThemeMode } from "@/styles/ThemeStore";
 import type { ScopeOption } from "@/features/dashboard/api";
 import ScopePicker from "./ScopePicker";
-import { monthName } from "@/features/dashboard/format";
+import { fieldLabelSx, monthName } from "@/features/dashboard/format";
+import { useTheme } from "@mui/material/styles";
 
 export default function OverviewHeader(props: {
   title: string;
@@ -39,6 +40,8 @@ export default function OverviewHeader(props: {
     return Array.from({ length: 7 }, (_, i) => y - 3 + i);
   }, []);
 
+  const theme = useTheme();
+  const labelSx = fieldLabelSx(theme.palette);
   const { capabilities } = useThemeMode();
   const { effects } = capabilities;
 
@@ -92,7 +95,7 @@ export default function OverviewHeader(props: {
           ) : null}
 
           <FormControl size="small" sx={{ minWidth: 130 }}>
-            <InputLabel id="dashboard-month-label">Month</InputLabel>
+            <InputLabel id="dashboard-month-label" sx={labelSx}>Month</InputLabel>
             <Select
               labelId="dashboard-month-label"
               label="Month"
@@ -108,7 +111,7 @@ export default function OverviewHeader(props: {
           </FormControl>
 
           <FormControl size="small" sx={{ minWidth: 96 }}>
-            <InputLabel id="dashboard-year-label">Year</InputLabel>
+            <InputLabel id="dashboard-year-label" sx={labelSx}>Year</InputLabel>
             <Select
               labelId="dashboard-year-label"
               label="Year"

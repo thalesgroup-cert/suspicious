@@ -56,3 +56,15 @@ export function percents(counts: number[]): number[] {
 export function plural(n: number, one: string, many = `${one}s`): string {
   return `${n.toLocaleString()} ${n === 1 ? one : many}`;
 }
+
+/**
+ * InputLabel colours for the header pickers. The theme's text.secondary (rest)
+ * and primary (focused) fell to 4.0-4.3:1 on the real page background in
+ * metal/light/paper (Task 4 sweep): 5:1 against both paper and page leaves room.
+ */
+export function fieldLabelSx(palette: { text: { secondary: string }; primary: { main: string }; background: { paper: string; default: string } }) {
+  return {
+    color: onCard(palette.text.secondary, palette, 5),
+    "&.Mui-focused": { color: onCard(palette.primary.main, palette, 5) },
+  };
+}

@@ -151,7 +151,8 @@ export default function AppLayout() {
 
   async function handleLogout() {
     try { await logout(); } finally {
-      queryClient.removeQueries({ queryKey: ["me"] });
+      // Every cached query belongs to this user (dashboard names, scopes...): drop them all.
+      queryClient.clear();
       navigate("/login", { replace: true });
     }
   }

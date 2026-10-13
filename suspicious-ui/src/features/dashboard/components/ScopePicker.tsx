@@ -1,15 +1,17 @@
 import { FormControl, InputLabel, MenuItem, Select } from "@mui/material";
+import { useTheme } from "@mui/material/styles";
 import type { ScopeOption } from "@/features/dashboard/api";
-import { scopeLabel } from "@/features/dashboard/format";
+import { fieldLabelSx, scopeLabel } from "@/features/dashboard/format";
 
 export default function ScopePicker(props: {
   options: ScopeOption[];
   value: string;
   onChange: (key: string) => void;
 }) {
+  const theme = useTheme();
   return (
     <FormControl size="small" sx={{ minWidth: 200 }}>
-      <InputLabel id="dashboard-scope-label">Scope</InputLabel>
+      <InputLabel id="dashboard-scope-label" sx={fieldLabelSx(theme.palette)}>Scope</InputLabel>
       <Select
         labelId="dashboard-scope-label"
         label="Scope"

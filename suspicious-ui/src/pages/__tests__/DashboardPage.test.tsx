@@ -409,7 +409,7 @@ describe("DashboardPage - Test Suite", () => {
         JSON.stringify({
           lg: [
             { i: "kpi-trends", x: 0, y: 0, w: 12, h: 6 },
-            { i: "top-prefixes", x: 0, y: 6, w: 8, h: 14 },
+            { i: "top-reporters", x: 0, y: 6, w: 8, h: 14 },
             { i: "threat-distribution", x: 8, y: 6, w: 4, h: 14 },
           ],
         })
