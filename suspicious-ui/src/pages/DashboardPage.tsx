@@ -1,5 +1,5 @@
 import * as React from "react";
-import { Alert, Box, Button, Container, Stack } from "@mui/material";
+import { Alert, Box, Button, Container, LinearProgress, Stack } from "@mui/material";
 import { useTheme } from "@mui/material/styles";
 import { alpha } from "@mui/material/styles";
 import { keepPreviousData, useQuery } from "@tanstack/react-query";
@@ -60,6 +60,8 @@ function httpStatus(error: unknown): number | undefined {
 function DashboardGrid(props: {
   layouts: ResponsiveLayouts;
   onUserLayout: (breakpoint: string, layout: Layout) => void;
+  /** Placeholder data from the previous scope/period is showing. */
+  busy: boolean;
   children: React.ReactNode;
 }) {
   const { width, containerRef, mounted } = useContainerWidth({ measureBeforeMount: true });
@@ -70,7 +72,12 @@ function DashboardGrid(props: {
   );
 
   return (
-    <div ref={containerRef} data-testid="dashboard-grid">
+    <div
+      ref={containerRef}
+      data-testid="dashboard-grid"
+      aria-busy={props.busy}
+      style={{ opacity: props.busy ? 0.6 : 1, transition: "opacity .2s ease" }}
+    >
       {mounted ? (
         <Responsive
           className="dashboard-layout"
@@ -385,6 +392,8 @@ export default function DashboardPage() {
   }, [data, month, year]);
 
   const isEmpty = data !== undefined && data.reports === 0;
+  // keepPreviousData shows the old numbers while the new request runs: say so.
+  const switching = summaryQuery.isFetching && summaryQuery.isPlaceholderData;
   const isInitialLoading = meQuery.isLoading || scopesQuery.isPending || summaryQuery.isLoading;
 
   const persistLayout = React.useCallback(
@@ -421,6 +430,13 @@ export default function DashboardPage() {
         onScopeChange={changeScope}
         onRefresh={() => summaryQuery.refetch()}
       />
+
+      {switching ? (
+        <LinearProgress
+          aria-label={`Loading ${scopeLabel(optionFor(scopeKey).label, scopeKey)}`}
+          sx={{ height: 2 }}
+        />
+      ) : null}
 
       {refusedScope ? (
         <Container maxWidth="xl" sx={{ pt: 2 }}>
@@ -482,7 +498,7 @@ export default function DashboardPage() {
                 </Box>
               </Stack>
 
-              <DashboardGrid layouts={layouts} onUserLayout={persistLayout}>
+              <DashboardGrid layouts={layouts} onUserLayout={persistLayout} busy={switching}>
                 <Box
                   key={PANEL_KEYS.KPI_TRENDS}
                   className="dashboard-draggable-panel"

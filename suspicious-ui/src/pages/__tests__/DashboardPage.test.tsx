@@ -170,6 +170,26 @@ describe("DashboardPage - Test Suite", () => {
       expect(screen.getByTestId("dashboard-grid")).toBe(grid);
     });
 
+    it("shows a loading cue while a new scope loads, then the new scope", async () => {
+      const user = userEvent.setup();
+      renderWithProviders(<DashboardPage />, { initialPath: "/dashboard" });
+      await screen.findByText("October 2026 · Australia", {}, { timeout: 5000 });
+      expect(await screen.findByTestId("dashboard-grid")).toHaveAttribute("aria-busy", "false");
+      let release!: () => void;
+      vi.mocked(getDashboardSummary).mockImplementation(
+        (p) => new Promise((r) => { release = () => r(summaryFor(p)); })
+      );
+      const list = await openSelect(user, "Scope");
+      await user.click(within(list).getByRole("option", { name: "Overall" }));
+      expect(await screen.findByRole("progressbar", { name: "Loading Overall" })).toBeInTheDocument();
+      expect(screen.getByTestId("dashboard-grid")).toHaveAttribute("aria-busy", "true");
+      expect(screen.getByText("October 2026 · Australia")).toBeInTheDocument();
+      await act(async () => release());
+      expect(await screen.findByText("October 2026 · Overall")).toBeInTheDocument();
+      expect(screen.queryByRole("progressbar", { name: /^Loading/ })).not.toBeInTheDocument();
+      expect(screen.getByTestId("dashboard-grid")).toHaveAttribute("aria-busy", "false");
+    });
+
     it("lets a plain user change the month and year", async () => {
       const user = userEvent.setup();
       renderWithProviders(<DashboardPage />, { initialPath: "/dashboard" });
