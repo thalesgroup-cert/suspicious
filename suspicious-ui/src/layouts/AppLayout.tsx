@@ -150,7 +150,7 @@ export default function AppLayout() {
   const drawerW = isDesktop ? (isSlim ? DRAWER_SLIM : DRAWER_WIDE) : DRAWER_WIDE;
 
   async function handleLogout() {
-    try { await logout(); } finally {
+    try { await logout(); } catch { /* offline or session already gone: still leave */ } finally {
       // Every cached query belongs to this user (dashboard names, scopes...): drop them all.
       queryClient.clear();
       navigate("/login", { replace: true });
