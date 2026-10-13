@@ -52,22 +52,33 @@ async function openSelect(user: ReturnType<typeof userEvent.setup>, name: string
   return screen.findByRole("listbox");
 }
 
-// Tests run in a real browser whose default viewport is narrow: pin the breakpoint explicitly.
-const stubViewport = (phone: boolean) =>
-  vi.stubGlobal("matchMedia", (query: string) => ({
-    matches: phone && query.includes("max-width"),
-    media: query,
-    addEventListener: () => {},
-    removeEventListener: () => {},
-    addListener: () => {},
-    removeListener: () => {},
-    onchange: null,
-    dispatchEvent: () => false,
-  }));
+// Tests run in a real browser whose default viewport is narrow: pin the
+// viewport and the pointer explicitly. Unknown queries do not match.
+const stubViewport = ({ wide, fine }: { wide: boolean; fine: boolean }) =>
+  vi.stubGlobal("matchMedia", (query: string) => {
+    const conditions = [
+      query.includes("min-width") ? wide : null,
+      query.includes("max-width") ? !wide : null,
+      query.includes("pointer: fine") ? fine : null,
+    ].filter((c): c is boolean => c !== null);
+    return {
+      matches: conditions.length > 0 && conditions.every(Boolean),
+      media: query,
+      addEventListener: () => {},
+      removeEventListener: () => {},
+      addListener: () => {},
+      removeListener: () => {},
+      onchange: null,
+      dispatchEvent: () => false,
+    };
+  });
+
+const DESKTOP = { wide: true, fine: true };
+const layoutKey = ([k]: unknown[]) => String(k).startsWith("dashboard:layouts");
 
 describe("DashboardPage - Test Suite", () => {
   beforeEach(() => {
-    stubViewport(false);
+    stubViewport(DESKTOP);
     localStorage.clear();
     vi.mocked(getMe).mockResolvedValue(plainUser);
     vi.mocked(getDashboardScopes).mockResolvedValue(AU_SCOPES);
@@ -207,6 +218,29 @@ describe("DashboardPage - Test Suite", () => {
       expect(screen.getByTestId("dashboard-grid")).toHaveAttribute("aria-busy", "false");
     });
 
+    it("operates the scope, month and year pickers with the keyboard alone", async () => {
+      const user = userEvent.setup();
+      renderWithProviders(<DashboardPage />, { initialPath: "/dashboard" });
+      const scopeBox = await screen.findByRole("combobox", { name: "Scope" }, { timeout: 5000 });
+      scopeBox.focus();
+      await user.keyboard("{Enter}");
+      await screen.findByRole("listbox");
+      await user.keyboard("{ArrowDown}{Enter}");
+      await waitFor(() => expect(lastSummaryCall()).toMatchObject({ scope: "ALL" }));
+
+      screen.getByRole("combobox", { name: "Month" }).focus();
+      await user.keyboard("{ArrowDown}");
+      await screen.findByRole("listbox");
+      await user.keyboard("{ArrowUp}{Enter}");
+      await waitFor(() => expect(lastSummaryCall()).toMatchObject({ month: 9 }));
+
+      screen.getByRole("combobox", { name: "Year" }).focus();
+      await user.keyboard(" ");
+      await screen.findByRole("listbox");
+      await user.keyboard("{ArrowUp}{Enter}");
+      await waitFor(() => expect(lastSummaryCall()).toMatchObject({ month: 9, year: new Date().getFullYear() - 1 }));
+    });
+
     it("lets a plain user change the month and year", async () => {
       const user = userEvent.setup();
       renderWithProviders(<DashboardPage />, { initialPath: "/dashboard" });
@@ -280,9 +314,15 @@ describe("DashboardPage - Test Suite", () => {
   });
 
   describe("Display", () => {
-    it("shows the Overview section once data resolves", async () => {
+    it("outlines the page as h1 Dashboard then one h2 per panel, with no Overview heading", async () => {
       renderWithProviders(<DashboardPage />, { initialPath: "/dashboard" });
-      expect(await screen.findByText(/overview/i, {}, { timeout: 5000 })).toBeInTheDocument();
+      await screen.findByRole("region", { name: "Top reporters" }, { timeout: 5000 });
+      const headings = screen.getAllByRole("heading");
+      expect(headings.map((h) => Number(h.tagName.slice(1)))).toEqual([1, 2, 2, 2, 2, 2, 2]);
+      expect(headings[0]).toHaveTextContent("Dashboard");
+      expect(screen.queryByText(/overview/i)).not.toBeInTheDocument();
+      const names = screen.getAllByRole("region").map((r) => r.getAttribute("aria-labelledby"));
+      expect(new Set(names).size).toBe(names.length);
     });
 
     it("says no data, with no arrow, when the previous month has no reports", async () => {
@@ -382,9 +422,9 @@ describe("DashboardPage - Test Suite", () => {
     });
   });
 
-  describe("Phone", () => {
-    it("stacks the panels in one column with no grid, handles or saved layouts", async () => {
-      stubViewport(true);
+  describe("Phone and touch", () => {
+    async function expectStackedWithoutStorage(viewport: { wide: boolean; fine: boolean }) {
+      stubViewport(viewport);
       const getItem = vi.spyOn(Storage.prototype, "getItem");
       const setItem = vi.spyOn(Storage.prototype, "setItem");
       renderWithProviders(<DashboardPage />, { initialPath: "/dashboard" });
@@ -398,9 +438,52 @@ describe("DashboardPage - Test Suite", () => {
       expect(document.querySelector(".react-resizable-handle")).toBeNull();
       expect(document.querySelector(".dashboard-panel-drag-handle")).toBeNull();
       expect(screen.queryByRole("button", { name: "Reset layout" })).not.toBeInTheDocument();
-      const layoutKey = ([k]: unknown[]) => String(k).startsWith("dashboard:layouts");
       expect(getItem.mock.calls.filter(layoutKey)).toEqual([]);
       expect(setItem.mock.calls.filter(layoutKey)).toEqual([]);
+    }
+
+    it("stacks the panels in one column on a phone, with no grid, handles or saved layouts", async () => {
+      await expectStackedWithoutStorage({ wide: false, fine: false });
+    });
+
+    it("stacks the panels on a wide touch screen (coarse pointer): no drag or resize there", async () => {
+      await expectStackedWithoutStorage({ wide: true, fine: false });
+    });
+
+    it("stacks the panels in a narrow desktop window (below md)", async () => {
+      await expectStackedWithoutStorage({ wide: false, fine: true });
+    });
+  });
+
+  describe("Layout reset", () => {
+    const moved = (bp: string) =>
+      [
+        { i: "kpi-trends", x: 0, y: 0, w: 12, h: 5 },
+        { i: "outcomes", x: 6, y: 5, w: 6, h: 8 },
+        { i: "by-type", x: 0, y: 5, w: 6, h: 8 },
+        { i: "top-reporters", x: 0, y: 13, w: 12, h: 7 },
+      ].map((it) => (bp === "lg" || bp === "md" ? it : { ...it, x: 0, w: bp === "sm" ? 6 : 1 }));
+
+    it("shows no Reset layout button while the layout is the default", async () => {
+      renderWithProviders(<DashboardPage />, { initialPath: "/dashboard" });
+      await waitFor(() => expect(document.querySelectorAll(".react-grid-item").length).toBe(4), { timeout: 5000 });
+      expect(screen.queryByRole("button", { name: "Reset layout" })).not.toBeInTheDocument();
+    });
+
+    it("offers a real Reset layout button for a saved layout, which restores the default and forgets it", async () => {
+      vi.mocked(getMe).mockResolvedValue({ ...plainUser, id: 1 });
+      localStorage.setItem(
+        "dashboard:layouts:1",
+        JSON.stringify({ lg: moved("lg"), md: moved("md"), sm: moved("sm"), xs: moved("xs") })
+      );
+      const user = userEvent.setup();
+      renderWithProviders(<DashboardPage />, { initialPath: "/dashboard" });
+      const reset = await screen.findByRole("button", { name: "Reset layout" }, { timeout: 5000 });
+      expect(reset.tagName).toBe("BUTTON");
+      await user.click(reset);
+      await waitFor(() => expect(screen.queryByRole("button", { name: "Reset layout" })).not.toBeInTheDocument());
+      expect(localStorage.getItem("dashboard:layouts:1")).toBeNull();
+      expect(document.querySelectorAll(".react-grid-item").length).toBe(4);
     });
   });
 

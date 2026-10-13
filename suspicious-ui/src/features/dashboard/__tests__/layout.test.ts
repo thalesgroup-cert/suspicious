@@ -1,5 +1,5 @@
 import { describe, it, expect, beforeEach, vi } from "vitest";
-import { DEFAULT_LAYOUTS, PANEL_KEYS, layoutStorageKey, loadLayouts, saveLayouts } from "../layout";
+import { DEFAULT_LAYOUTS, PANEL_KEYS, isDefaultLayout, layoutStorageKey, loadLayouts, saveLayouts } from "../layout";
 
 const KEY = layoutStorageKey(7);
 
@@ -86,5 +86,12 @@ describe("dashboard layout storage", () => {
     });
     expect(() => saveLayouts(KEY, DEFAULT_LAYOUTS)).not.toThrow();
     expect(loadLayouts(KEY)).toBe(DEFAULT_LAYOUTS);
+  });
+
+  it("tells a moved layout from the default, ignoring panels the layout lacks", () => {
+    expect(isDefaultLayout(DEFAULT_LAYOUTS)).toBe(true);
+    const lg = DEFAULT_LAYOUTS.lg!;
+    expect(isDefaultLayout({ lg: lg.filter((it) => it.i !== PANEL_KEYS.TOP_REPORTERS) })).toBe(true);
+    expect(isDefaultLayout({ ...DEFAULT_LAYOUTS, lg: lg.map((it) => (it.i === PANEL_KEYS.OUTCOMES ? { ...it, x: 6 } : it)) })).toBe(false);
   });
 });

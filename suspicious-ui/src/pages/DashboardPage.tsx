@@ -22,6 +22,8 @@ import {
   DEFAULT_LAYOUTS,
   PANEL_KEYS,
   ROW_HEIGHT,
+  clearLayouts,
+  isDefaultLayout,
   layoutStorageKey,
   loadLayouts,
   saveLayouts,
@@ -56,7 +58,6 @@ function httpStatus(error: unknown): number | undefined {
 function DashboardGrid(props: {
   /** Saved layouts live here, so the phone layout (which never mounts this) never reads or writes them. */
   storageKey: string;
-  subtitle: string;
   /** Placeholder data from the previous scope/period is showing. */
   busy: boolean;
   children: React.ReactNode;
@@ -81,35 +82,19 @@ function DashboardGrid(props: {
 
   const resetLayouts = () => {
     setLayouts(DEFAULT_LAYOUTS);
-    saveLayouts(storageKey, DEFAULT_LAYOUTS);
+    clearLayouts(storageKey);
   };
 
   return (
     <>
     <GridStyles />
-    <Stack direction="row" sx={{ mb: 1, alignItems: "center", justifyContent: "space-between" }}>
-      <Box>
-        <Box sx={{ fontWeight: 700, fontSize: 14 }}>Overview</Box>
-        <Box sx={{ color: "text.secondary", fontSize: 12 }}>{props.subtitle}</Box>
-      </Box>
-
-      <Box
-        component="button"
-        type="button"
-        onClick={resetLayouts}
-        sx={{
-          border: 0,
-          background: "transparent",
-          color: "text.secondary",
-          fontSize: 12,
-          fontWeight: 700,
-          cursor: "pointer",
-          textDecoration: "underline",
-        }}
-      >
-        Reset layout
-      </Box>
-    </Stack>
+    {isDefaultLayout(layouts) ? null : (
+      <Stack direction="row" sx={{ mb: 1, justifyContent: "flex-end" }}>
+        <Button size="small" variant="text" onClick={resetLayouts}>
+          Reset layout
+        </Button>
+      </Stack>
+    )}
     <div
       ref={containerRef}
       data-testid="dashboard-grid"
@@ -378,8 +363,12 @@ export default function DashboardPage() {
     scopes.options.find((o) => o.key === key) ?? { key, label: key };
 
   const theme = useTheme();
-  // noSsr: the first render already knows it is a phone, so no grid (and no saved-layout read) flashes in.
-  const isPhone = useMediaQuery(theme.breakpoints.down("sm"), { noSsr: true });
+  // Drag/resize needs a mouse-class pointer and room (md+); phones, touch
+  // tablets and narrow windows get the fixed stack. noSsr: the first render
+  // already knows, so no grid (and no saved-layout read) flashes in.
+  const isWide = useMediaQuery(theme.breakpoints.up("md"), { noSsr: true });
+  const finePointer = useMediaQuery("(pointer: fine)", { noSsr: true });
+  const canArrange = isWide && finePointer;
   const storageKey = layoutStorageKey(meQuery.data?.id);
 
   const summaryQuery = useQuery<DashboardSummary>({
@@ -488,18 +477,14 @@ export default function DashboardPage() {
                   hint={`Nothing was reported in ${scopeName(shownScope)} in ${monthName(data.month)} ${data.year}.`}
                 />
               </Box>
-            ) : isPhone ? (
+            ) : !canArrange ? (
               <Stack spacing={2} data-testid="dashboard-stack" aria-busy={switching} sx={{ opacity: switching ? 0.6 : 1 }}>
                 {panels.map(([key, node]) => (
                   <Box key={key}>{node}</Box>
                 ))}
               </Stack>
             ) : (
-              <DashboardGrid
-                storageKey={storageKey}
-                subtitle={`KPI evolution for ${monthName(data?.month ?? month)} ${data?.year ?? year}`}
-                busy={switching}
-              >
+              <DashboardGrid storageKey={storageKey} busy={switching}>
                 {panels.map(([key, node]) => (
                   <Box
                     key={key}

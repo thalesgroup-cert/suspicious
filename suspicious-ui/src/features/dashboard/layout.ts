@@ -78,6 +78,24 @@ export function loadLayouts(key: string): ResponsiveLayouts {
   }
 }
 
+/** True when every position in `layouts` matches the default (panels missing from it count as default). */
+export function isDefaultLayout(layouts: ResponsiveLayouts): boolean {
+  return Object.entries(layouts).every(([bp, items]) =>
+    (items ?? []).every((it) => {
+      const d = DEFAULT_LAYOUTS[bp]?.find((x) => x.i === it.i);
+      return !d || (d.x === it.x && d.y === it.y && d.w === it.w && d.h === it.h);
+    })
+  );
+}
+
+export function clearLayouts(key: string) {
+  try {
+    window.localStorage.removeItem(key);
+  } catch {
+    /* blocked storage: nothing was saved either */
+  }
+}
+
 /** Only call from a user action (drag/resize stop, reset): never from onLayoutChange. */
 export function saveLayouts(key: string, layouts: ResponsiveLayouts) {
   try {

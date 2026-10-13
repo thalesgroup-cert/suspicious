@@ -75,7 +75,8 @@ export default function OverviewHeader(props: {
           <Typography variant="pageTitle" component="h1">
             {props.title}
           </Typography>
-          <Typography variant="subtitle2" color="text.secondary">
+          {/* component="p": subtitle2 maps to h6, which put a stray heading in the outline */}
+          <Typography variant="subtitle2" color="text.secondary" component="p">
             {props.subtitle}
           </Typography>
           {props.note ? (
