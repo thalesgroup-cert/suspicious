@@ -53,7 +53,9 @@ NOVEL_WINDOW_DAYS = 7
 MAX_ITEMS = 20
 CHUNK_ROWS = 512
 CACHE_TTL_SECONDS = 120
-SCORE_DECIMALS = 6  # chunk shape may change float32 matmul in the last bits
+# float32 noise (chunk shape, exact duplicates at 0.99999994) is rounded away
+# before the percentile and every comparison, not only in the output
+SCORE_DECIMALS = 6
 
 
 def empty_neighbours_payload() -> Dict[str, Any]:
@@ -78,6 +80,8 @@ def _nearest(X: np.ndarray):
         np.clip(sim, -1.0, 1.0, out=sim)
         rows = np.arange(sim.shape[0])
         sim[rows, start + rows] = -np.inf
+        # ponytail: among exactly tied similarities at the k boundary (duplicates) the
+        # pick is arbitrary, deterministic for a fixed input order; break ties by id if it matters
         part = np.argpartition(sim, n - K, axis=1)[:, n - K:]
         part_sim = np.take_along_axis(sim, part, axis=1)
         order = np.argsort(-part_sim, axis=1, kind="stable")
@@ -121,12 +125,12 @@ def compute_neighbours(selected) -> Dict[str, Any]:
 
     nn_idx, nn_sim = _nearest(X)
     shares = dangerous[nn_idx].sum(axis=1) / K
-    distances = 1.0 - nn_sim[:, 0].astype(np.float64)
+    distances = np.round(1.0 - nn_sim[:, 0].astype(np.float64), SCORE_DECIMALS)
     novelty_cut = float(np.percentile(distances, NOVELTY_PERCENTILE))
     today = _now().date()
     window_start = today - timedelta(days=NOVEL_WINDOW_DAYS - 1)
 
-    def item(i, score, nearest_dangerous=None):
+    def item(i, score, nearest_dangerous=None, nearest_similarity=None):
         return {
             "suspicious_case_id": extract_case_id(metas[i]),
             "mail_subject": extract_mail_subject(metas[i]),
@@ -134,14 +138,18 @@ def compute_neighbours(selected) -> Dict[str, Any]:
             "date": dates[i],
             "score": round(float(score), SCORE_DECIMALS),
             "nearest_dangerous_case_id": nearest_dangerous,
+            "nearest_dangerous_similarity": nearest_similarity,
         }
 
     near_bad, novel = [], []
     for i in range(len(metas)):
         isolated = distances[i] > novelty_cut
         if not dangerous[i] and shares[i] >= BAD_SHARE_THRESHOLD and not isolated:
-            j = next(j for j in nn_idx[i] if dangerous[j])  # most similar dangerous
-            near_bad.append(item(i, shares[i], extract_case_id(metas[j])))
+            pos = next(p for p, j in enumerate(nn_idx[i]) if dangerous[j])  # most similar
+            near_bad.append(item(
+                i, shares[i], extract_case_id(metas[nn_idx[i][pos]]),
+                round(float(nn_sim[i, pos]), SCORE_DECIMALS),
+            ))
         if isolated and dates[i] and window_start <= dates[i] <= today:
             novel.append(item(i, distances[i]))
 

@@ -141,6 +141,48 @@ class NeighboursServiceTests(APITestCase):
         bad = self.run_on(rows)["near_known_bad"]
         self.assertEqual({i["suspicious_case_id"] for i in bad}, {f"case-f{i}" for i in range(3)})
 
+    def test_duplicates_are_not_novel(self):
+        # float32 dot of a vector with its exact duplicate is not always exactly 1
+        # seed 2 with 25 pairs reproduces it: a16/b16 came out "novel" with score 0.0
+        rng = np.random.default_rng(2)
+        rows = []
+        for i in range(25):
+            v = rng.normal(size=DIM)
+            rows += [row(f"a{i}", v, "SAFE", days_ago=0), row(f"b{i}", v, "SAFE", days_ago=0)]
+        rows.append(row("out", rng.normal(size=DIM), "SAFE", days_ago=0))
+        novel = self.run_on(rows)["novel"]
+        self.assertEqual([i["suspicious_case_id"] for i in novel], ["case-out"])
+        self.assertGreater(novel[0]["score"], 0.0)
+        with mock.patch.object(neighbours, "CHUNK_ROWS", 2):
+            self.assertEqual(self.run_on(rows)["novel"], novel)
+
+    def boundary_rows(self, n_dangerous):
+        # P at e0; ten neighbours at strictly decreasing similarity along e1
+        rows = [row("P", axis(0), "SAFE")]
+        for j in range(10):
+            label = "DANGEROUS" if 1 <= j <= n_dangerous else "SAFE"
+            rows.append(row(f"n{j}", axis(0) + axis(1, 0.1 * (j + 1)), label))
+        # far, sparse fillers so P's nearest-neighbour distance is typical
+        rows += [row(f"f{j}", axis(3) + axis(4, 0.3 * j), "SAFE") for j in range(10)]
+        return rows
+
+    def test_share_boundary_is_inclusive(self):
+        bad = {i["suspicious_case_id"]: i for i in self.run_on(self.boundary_rows(6))["near_known_bad"]}
+        self.assertIn("case-P", bad)
+        self.assertEqual(bad["case-P"]["score"], 0.6)
+        self.assertEqual(bad["case-P"]["nearest_dangerous_case_id"], "case-n1")
+        self.assertEqual(bad["case-P"]["nearest_dangerous_similarity"], round(1 / math.sqrt(1.04), 6))
+        bad5 = self.run_on(self.boundary_rows(5))["near_known_bad"]
+        self.assertNotIn("case-P", {i["suspicious_case_id"] for i in bad5})
+
+    def test_nearest_dangerous_similarity_on_both_lists(self):
+        payload = self.run_on(planted_rows())
+        for item in payload["near_known_bad"]:
+            self.assertGreater(item["nearest_dangerous_similarity"], 0.9)
+            self.assertLessEqual(item["nearest_dangerous_similarity"], 1.0)
+        for item in payload["novel"]:
+            self.assertIsNone(item["nearest_dangerous_similarity"])
+
     def test_lists_capped_at_twenty(self):
         rng = np.random.default_rng(1)
         rows = [row(f"d{i}", axis(0) + rng.normal(0, 0.05, DIM), "DANGEROUS") for i in range(200)]
@@ -187,7 +229,7 @@ class NeighboursEndpointTests(APITestCase):
         self.assertEqual(
             set(item),
             {"suspicious_case_id", "mail_subject", "label", "date", "score",
-             "nearest_dangerous_case_id"},
+             "nearest_dangerous_case_id", "nearest_dangerous_similarity"},
         )
         self.assertEqual(item["date"], "2026-10-12")
         self.assertEqual(data["novel"][0]["suspicious_case_id"], "case-new-out")

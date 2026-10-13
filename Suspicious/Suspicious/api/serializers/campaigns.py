@@ -106,6 +106,7 @@ class CampaignNeighbourItemSerializer(serializers.Serializer):
     date = serializers.DateField(format="%Y-%m-%d", allow_null=True)
     score = serializers.FloatField()
     nearest_dangerous_case_id = serializers.CharField(allow_null=True)
+    nearest_dangerous_similarity = serializers.FloatField(allow_null=True)
 
 
 class CampaignNeighboursResponseSerializer(serializers.Serializer):

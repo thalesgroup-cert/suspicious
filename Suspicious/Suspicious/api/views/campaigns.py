@@ -389,13 +389,16 @@ class CampaignNeighboursView(APIView):
             "distance (nearest-neighbour distance at or below the `novelty_percentile` "
             "percentile). An isolated message is novel, not near known bad.\n"
             "- `score` is that Dangerous share; `nearest_dangerous_case_id` is the case of "
-            "the most similar Dangerous neighbour (`null` when it has no case id).\n\n"
+            "the most similar Dangerous neighbour (`null` when it has no case id) and "
+            "`nearest_dangerous_similarity` its cosine similarity (6 decimals).\n\n"
             "**novel**\n"
             "- Messages dated within the last `novel_window_days` UTC days (today included) "
             "whose nearest-neighbour cosine distance (1 - similarity) exceeds the "
             "`novelty_percentile` percentile of the sample's nearest-neighbour distances: "
             "possible new campaigns. `score` is that distance; "
-            "`nearest_dangerous_case_id` is always `null`.\n\n"
+            "`nearest_dangerous_case_id` and `nearest_dangerous_similarity` are always "
+            "`null`.\n- Distances and similarities are rounded to 6 decimals before the "
+            "percentile and every comparison, so float noise on exact duplicates is ignored.\n\n"
             "**Behaviour**\n"
             "- Each list is sorted by `score` descending (then date, newest first, then case "
             f"id) and capped at {nb.MAX_ITEMS}.\n"
@@ -428,6 +431,7 @@ class CampaignNeighboursView(APIView):
                             "date": "2026-10-12",
                             "score": 0.8,
                             "nearest_dangerous_case_id": "1207",
+                            "nearest_dangerous_similarity": 0.62,
                         }
                     ],
                     "novel": [
@@ -438,6 +442,7 @@ class CampaignNeighboursView(APIView):
                             "date": "2026-10-13",
                             "score": 0.41,
                             "nearest_dangerous_case_id": None,
+                            "nearest_dangerous_similarity": None,
                         }
                     ],
                 },
