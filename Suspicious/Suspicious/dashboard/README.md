@@ -68,7 +68,7 @@ It backs `GET /api/dashboard/summary/` (cached 120 s per month/year/scope) and t
 - `by_type` uses the Investigation type vocabulary (MAIL, FILE, URL, IP, HASH, IOC, UNKNOWN).
 - `previous` holds `reports` and `outcomes` of the preceding month; `trend` lists reports per
   ISO week (Monday start, so the first week can start in the previous month), `[]` when empty.
-- `top_reporters` is filled only for CERT/Admin/CISO callers, `null` otherwise.
+- `top_reporters` is filled only when the caller passes `include_names` (see Scopes), `null` otherwise.
 
 ### Scopes (`api/permissions/dashboard_scope.py`)
 `GET /api/dashboard/scopes/` lists what the caller may request; `resolve_scope` enforces it
@@ -80,6 +80,12 @@ server-side (anything else is a 403):
 | `OWN_COUNTRY` | anyone whose profile has a country (default for them) |
 | `OWN_SCOPE` | CISO with a scope set on their CISOProfile (their default) |
 | `COUNTRY:<CC>`, `REGION:<NAME>` | CERT, Admin, superuser (options list profile countries/regions) |
+
+`OWN_COUNTRY` requires the profile country to match a Django group of that name (profile
+`country`/`region`/`gbu` are read-only in the API; LDAP sets them). A CISO's stored scope string
+(e.g. `AU|Off GBU`) is accepted as an alias of `OWN_SCOPE`. Reporter names (`top_reporters`) go to
+CERT/Admin/superuser, and to a CISO only for `OWN_SCOPE`. `/api/stats/top-prefixes/` returns an
+empty ranking to anyone who is not CERT/Admin/superuser.
 
 ---
 

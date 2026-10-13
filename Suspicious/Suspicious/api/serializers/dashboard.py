@@ -9,13 +9,19 @@ from dashboard.models import (
 
 class DashboardSummaryQuerySerializer(serializers.Serializer):
     month = serializers.IntegerField(min_value=1, max_value=12)
-    year = serializers.IntegerField(min_value=1)
+    year = serializers.IntegerField(min_value=2000, max_value=2100)
     scope = serializers.CharField(
         required=False,
         allow_blank=False,
         trim_whitespace=True,
         max_length=64,
     )
+
+    def validate(self, attrs):
+        # DRF maps a blank optional query param to "absent"; reject it instead.
+        if "scope" in self.initial_data and not attrs.get("scope"):
+            raise serializers.ValidationError({"scope": "This field may not be blank."})
+        return attrs
 
 
 class DashboardPrefixSerializer(serializers.Serializer):

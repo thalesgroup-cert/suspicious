@@ -16,7 +16,8 @@ from case_handler.models import (
 )
 from dashboard.dash_utils.dashboard import update_monthly_reporter_stats
 from dashboard.dash_utils.regional import summarise
-from dashboard.models import Kpi
+from dashboard.models import DashboardSnapshot, Kpi
+from dashboard.snapshot import materialise_snapshot
 from hash_process.models import Hash
 from ip_process.models import IP
 from mail_feeder.models import Mail
@@ -110,7 +111,14 @@ class SummariseTests(TestCase):
         )
 
     def test_previous_month_wraps_year(self):
-        self.assertEqual(summarise(1, 2027, None)["previous"]["reports"], 0)
+        make_case(User.objects.get(username="us1@meridian.example"), utc(2026, 12, 15, 10))
+        self.assertEqual(summarise(1, 2027, None)["previous"]["reports"], 1)
+
+    def test_snapshot_carries_no_names(self):
+        materialise_snapshot(10, 2026)
+        payload = DashboardSnapshot.objects.get(month=10, year=2026).payload
+        self.assertEqual(payload["reports"], 8)
+        self.assertIsNone(payload["top_reporters"])
 
     def test_by_type_vocabulary(self):
         self.assertEqual(

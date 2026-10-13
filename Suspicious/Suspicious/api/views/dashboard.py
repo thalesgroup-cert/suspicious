@@ -12,7 +12,7 @@ from rest_framework.permissions import IsAuthenticated
 from rest_framework.response import Response
 from rest_framework.views import APIView
 
-from api.permissions.dashboard_scope import may_see_names, resolve_scope, scope_options
+from api.permissions.dashboard_scope import is_elevated, may_see_names, resolve_scope, scope_options
 from api.permissions.settings import IsAdminOrCERT
 
 from dashboard.models import (
@@ -61,6 +61,12 @@ class UserCasesMonthlyStatsFilter(django_filters.FilterSet):
         fields = ["user", "month", "year"]
 
 
+def summary_cache_key(month, year, groups, include_names) -> str:
+    # Each group is quoted, so "," / "|" inside a name cannot collide with the separator.
+    groups_key = "ALL" if groups is None else ",".join(quote(g, safe="") for g in groups)
+    return f"dashboard:summary:v2:{year}:{month}:{groups_key}:{int(include_names)}"
+
+
 class DashboardSummaryView(APIView):
     permission_classes = [IsAuthenticated]
 
@@ -91,10 +97,9 @@ class DashboardSummaryView(APIView):
         month = query.validated_data["month"]
         year = query.validated_data["year"]
         scope = resolve_scope(request.user, query.validated_data.get("scope"))
-        include_names = may_see_names(request.user)
+        include_names = may_see_names(request.user, scope)
 
-        groups_key = "ALL" if scope.groups is None else quote("|".join(scope.groups), safe="")
-        cache_key = f"dashboard:summary:v2:{year}:{month}:{groups_key}:{int(include_names)}"
+        cache_key = summary_cache_key(month, year, scope.groups, include_names)
         summary = cache.get(cache_key)
         if summary is None:
             summary = summarise(month, year, scope.groups, include_names=include_names)
@@ -328,6 +333,15 @@ class TopPrefixesView(APIView):
             )
 
         limit = max(1, min(limit, self.MAX_LIMIT))
+
+        # ponytail: names only for CERT/Admin/superuser; others get an empty
+        # ranking (not an error: the current UI panel calls this for everyone).
+        if not is_elevated(request.user):
+            return Response(
+                TopPrefixesResponseSerializer(
+                    {"type": ranking_type, "month": month, "year": year, "data": []}
+                ).data
+            )
 
         cache_key = f"dashboard:top-prefixes:{ranking_type}:{year}:{month}:{limit}"
         cached = cache.get(cache_key)

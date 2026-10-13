@@ -6,6 +6,7 @@ from rest_framework.exceptions import PermissionDenied
 from rest_framework.test import APITestCase
 
 from api.permissions.dashboard_scope import resolve_scope
+from dashboard.models import UserCasesMonthlyStats
 from dashboard.tests_regional import seed
 from profiles.models import CISOProfile, UserProfile
 
@@ -136,3 +137,116 @@ class DashboardScopeTests(APITestCase):
         for key in ("ALL", "COUNTRY:AU", "COUNTRY:NZ", "COUNTRY:US", "REGION:APAC", "REGION:NORAM"):
             self.assertIn(key, keys)
         self.assertEqual(len(keys), len(set(keys)))
+
+
+class DashboardScopeHardeningTests(APITestCase):
+    """Fix round 1: authorization hardening."""
+
+    @classmethod
+    def setUpTestData(cls):
+        cls.au1, cls.au2, cls.nz1, cls.us1 = seed()
+        profile(cls.au1, "AU", "APAC")
+        cls.cert = User.objects.create_user("cert@meridian.example", password="x")
+        in_group(cls.cert, "CERT")
+        cls.ciso = User.objects.create_user("ciso@meridian.example", password="x")
+        in_group(cls.ciso, "CISO")
+        CISOProfile.objects.create(
+            user=cls.ciso, function="", gbu="Off GBU", country="AU", region="APAC", scope="AU|Off GBU"
+        )
+
+    def setUp(self):
+        cache.clear()
+
+    def _get(self, user, url, **params):
+        self.client.force_authenticate(user)
+        return self.client.get(url, {"month": 10, "year": 2026, **params})
+
+    # C1: country/region/gbu come from LDAP, never from the client.
+
+    def test_plain_user_cannot_patch_country(self):
+        self.client.force_authenticate(self.au1)
+        self.client.patch("/api/profile/", {"country": "NZ", "region": "NORAM", "gbu": "X"}, format="json")
+        p = UserProfile.objects.get(user=self.au1)
+        self.assertEqual((p.country, p.region, p.gbu), ("AU", "APAC", "Off GBU"))
+        self.assertEqual(self._get(self.au1, SUMMARY, scope="COUNTRY:NZ").status_code, 403)
+        self.assertEqual(resolve_scope(self.au1, "OWN_COUNTRY").groups, ["AU"])
+
+    def test_profile_country_without_matching_group_is_ignored(self):
+        user = User.objects.create_user("stale@meridian.example", password="x")
+        profile(user, "AU", "APAC")  # profile says AU, but no AU group
+        data = self._get(user, SCOPES).data
+        self.assertEqual(data, {"default": "ALL", "options": [{"key": "ALL", "label": "Overall"}]})
+        with self.assertRaises(PermissionDenied):
+            resolve_scope(user, "OWN_COUNTRY")
+
+    def test_ciso_cannot_widen_scope_by_patching_country(self):
+        self.client.force_authenticate(self.ciso)
+        resp = self.client.patch("/api/profile/", {"country": "NZ", "scope": "NZ"}, format="json")
+        self.assertEqual(resp.status_code, 400)
+        self.client.patch("/api/profile/", {"country": "NZ"}, format="json")
+        p = CISOProfile.objects.get(user=self.ciso)
+        self.assertEqual((p.country, p.scope), ("AU", "AU|Off GBU"))
+
+    # I-2: CISO names only inside their own scope.
+
+    def test_ciso_overall_has_no_names(self):
+        data = self._get(self.ciso, SUMMARY, scope="ALL").data
+        self.assertIsNone(data["top_reporters"])
+        self.assertEqual(data["top_prefixes"], [])
+        self.assertIsNotNone(self._get(self.ciso, SUMMARY, scope="OWN_SCOPE").data["top_reporters"])
+
+    # I-3: the cache never hands names to a plain user.
+
+    def test_cached_names_not_served_to_plain_user(self):
+        self.assertIsNotNone(self._get(self.cert, SUMMARY, scope="COUNTRY:AU").data["top_reporters"])
+        data = self._get(self.au1, SUMMARY, scope="OWN_COUNTRY").data
+        self.assertIsNone(data["top_reporters"])
+        self.assertEqual(data["top_prefixes"], [])
+
+    # I-4: top-prefixes ranks names only for CERT/Admin/superuser.
+
+    def test_top_prefixes_empty_for_non_elevated(self):
+        UserCasesMonthlyStats.objects.create(user=self.au1, month="10", year="2026", total_cases=3)
+        for user in (self.au1, self.ciso):
+            self.client.force_authenticate(user)
+            resp = self.client.get("/api/stats/top-prefixes/", {"month": 10, "year": 2026})
+            self.assertEqual(resp.status_code, 200)
+            self.assertEqual(resp.data["data"], [])
+        self.client.force_authenticate(self.cert)
+        resp = self.client.get("/api/stats/top-prefixes/", {"month": 10, "year": 2026})
+        self.assertEqual(resp.data["data"][0]["prefix"], "au1")
+
+    # M-5: cache keys never collide.
+
+    def test_cache_key_does_not_collide(self):
+        from api.views.dashboard import summary_cache_key
+
+        self.assertNotEqual(
+            summary_cache_key(10, 2026, ["A|B"], False), summary_cache_key(10, 2026, ["A", "B"], False)
+        )
+        self.assertNotEqual(
+            summary_cache_key(10, 2026, ["A,B"], False), summary_cache_key(10, 2026, ["A", "B"], False)
+        )
+
+    # M-6 / M-9: input validation.
+
+    def test_year_out_of_range_is_400(self):
+        self.assertEqual(self._get(self.au1, SUMMARY, year=1).status_code, 400)
+
+    def test_blank_scope_is_400(self):
+        self.assertEqual(self._get(self.au1, SUMMARY, scope="").status_code, 400)
+
+    def test_malformed_scopes_are_403(self):
+        for requested in ("COUNTRY:", "COUNTRY:AU|NZ", "all", " COUNTRY:NZ "):
+            self.assertEqual(
+                self._get(self.au1, SUMMARY, scope=requested).status_code, 403, msg=requested
+            )
+        self.assertEqual(self._get(self.cert, SUMMARY, scope="COUNTRY:").status_code, 403)
+
+    # M-7: the CISO's stored scope string is an alias for OWN_SCOPE.
+
+    def test_ciso_stored_scope_alias(self):
+        scope = resolve_scope(self.ciso, "AU|Off GBU")
+        self.assertEqual((scope.key, scope.groups), ("OWN_SCOPE", ["AU", "Off GBU"]))
+        with self.assertRaises(PermissionDenied):
+            resolve_scope(self.au1, "AU|Off GBU")

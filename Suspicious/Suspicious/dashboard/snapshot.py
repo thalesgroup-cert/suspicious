@@ -10,7 +10,7 @@ from dashboard.models import DashboardSnapshot
 
 
 def materialise_snapshot(month: int, year: int) -> None:
-    payload = summarise(month, year, None, include_names=True)
+    payload = summarise(month, year, None)
     DashboardSnapshot.objects.update_or_create(
         month=month,
         year=year,

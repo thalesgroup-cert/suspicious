@@ -5,8 +5,11 @@ Scope keys: ``ALL``, ``OWN_COUNTRY``, ``OWN_SCOPE`` (CISO profile scope),
 after their country code and region (profiles_utils/ldap.py), so a scope
 resolves to the group names a case's reporter must all belong to.
 
-- every user: ``ALL``, and ``OWN_COUNTRY`` when their profile has a country;
-- CISO: also ``OWN_SCOPE`` (their CISOProfile scope);
+- every user: ``ALL``, and ``OWN_COUNTRY`` when their profile has a country
+  backed by the Django group of that name (profile fields are read-only in
+  the API, the group check is defence in depth);
+- CISO: also ``OWN_SCOPE`` (their CISOProfile scope; the stored scope
+  string, e.g. ``AU|Off GBU``, is accepted as an alias);
 - CERT/Admin/superuser: also any ``COUNTRY:`` / ``REGION:``.
 Anything else raises PermissionDenied (403), never data.
 """
@@ -29,15 +32,16 @@ class Scope(NamedTuple):
 OVERALL = Scope("ALL", "Overall", None)
 
 
-def _is_elevated(user) -> bool:
+def is_elevated(user) -> bool:
     return user.is_superuser or user.groups.filter(name__in=ELEVATED_GROUPS).exists()
 
 
 def _own_country(user) -> str | None:
+    """Profile country, trusted only when backed by the LDAP-set group of that name."""
     for model in (UserProfile, CISOProfile):
         country = clean_scope(model.objects.filter(user=user).values_list("country", flat=True).first())
         if country:
-            return country
+            return country if user.groups.filter(name=country).exists() else None
     return None
 
 
@@ -51,13 +55,14 @@ def _ciso_scope(user) -> Scope | None:
     return Scope("OWN_SCOPE", " | ".join(groups), groups)
 
 
-def may_see_names(user) -> bool:
-    return _is_elevated(user) or user.groups.filter(name="CISO").exists()
+def may_see_names(user, scope: Scope) -> bool:
+    """Reporter names: CERT/Admin/superuser anywhere, a CISO only inside their own scope."""
+    return is_elevated(user) or scope.key == "OWN_SCOPE"
 
 
 def scope_options(user) -> tuple[str, list[Scope]]:
     """(default key, scopes the caller may use)."""
-    elevated = _is_elevated(user)
+    elevated = is_elevated(user)
     country = _own_country(user)
     ciso = _ciso_scope(user)
     options = []
@@ -94,14 +99,15 @@ def resolve_scope(user, requested: str | None) -> Scope:
         country = _own_country(user)
         if country:
             return Scope(requested, f"My country ({country})", [country])
-    elif requested == "OWN_SCOPE":
+    elif requested == "OWN_SCOPE" or "|" in requested:
+        # The stored "AU|Off GBU" string is an alias (the pre-Task-2 UI sends it).
         ciso = _ciso_scope(user)
-        if ciso:
+        if ciso and requested in ("OWN_SCOPE", "|".join(ciso.groups)):
             return ciso
     else:
         kind, _, value = requested.partition(":")
         value = value.strip()
         if kind in ("COUNTRY", "REGION") and value:
-            if _is_elevated(user) or (kind == "COUNTRY" and value == _own_country(user)):
+            if is_elevated(user) or (kind == "COUNTRY" and value == _own_country(user)):
                 return Scope(requested, value, [value])
     raise PermissionDenied("This dashboard scope is not available to you.")
