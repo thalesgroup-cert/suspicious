@@ -3,7 +3,6 @@ import { endpoints } from "@/api/endpoints";
 
 const OUTCOME_KEYS = ["safe", "inconclusive", "suspicious", "dangerous", "failure"] as const;
 const TYPE_KEYS = ["MAIL", "FILE", "URL", "IP", "HASH", "IOC", "UNKNOWN"] as const;
-const DANGER_KEYS = [...OUTCOME_KEYS, "malicious"] as const;
 
 export type Outcomes = Record<(typeof OUTCOME_KEYS)[number], number>;
 export type ByType = Record<(typeof TYPE_KEYS)[number], number>;
@@ -26,10 +25,6 @@ export type DashboardSummary = {
   trend: Array<{ week_start: string; reports: number }>;
   /** Reporter names: only for CERT/Admin/CISO, null for everyone else. */
   top_reporters: LabelValue[] | null;
-  // Legacy keys, read by the current panels until Task 3 replaces them.
-  kpis?: { new_users: number; total_reporters: number; total_cases: number };
-  danger_counts?: Record<(typeof DANGER_KEYS)[number], number>;
-  top_prefixes?: LabelValue[];
 };
 
 export type DashboardScopes = { default: string; options: ScopeOption[] };
@@ -84,9 +79,6 @@ function normalizeDashboardSummary(data: Raw): DashboardSummary {
       .filter((p) => typeof p?.week_start === "string")
       .map((p) => ({ week_start: p.week_start as string, reports: num(p.reports) })),
     top_reporters: Array.isArray(d.top_reporters) ? labelValues(d.top_reporters) : null,
-    kpis: counts(["new_users", "total_reporters", "total_cases"] as const, d.kpis),
-    danger_counts: counts(DANGER_KEYS, d.danger_counts),
-    top_prefixes: labelValues(d.top_prefixes),
   };
 }
 

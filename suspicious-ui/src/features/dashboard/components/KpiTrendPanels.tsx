@@ -1,136 +1,90 @@
 import * as React from "react";
 import { Box, Stack, Typography } from "@mui/material";
 import { useTheme } from "@mui/material/styles";
-import {
-  GroupsOutlined,
-  Inventory2Outlined,
-  PersonAddAltOutlined,
-  TrendingDownOutlined,
-  TrendingFlatOutlined,
-  TrendingUpOutlined,
-} from "@mui/icons-material";
 
 import { SoftCard } from "./SoftCard";
-import { useStatusColors } from "@/styles/colorStore";
+import { Sparkline } from "./Sparkline";
+import type { DashboardSummary } from "@/features/dashboard/api";
+import { monthName, onCard } from "@/features/dashboard/format";
+import { useResultColors } from "@/styles/colorStore";
 
-// Types
+const sum = (o: Record<string, number>) => Object.values(o).reduce((a, b) => a + b, 0);
 
-type Spark = {
-  labels: string[];
-  newUsers: Array<number | null>;
-  reporters: Array<number | null>;
-  submissions: Array<number | null>;
-};
-
-// Helpers
-
-function formatNumber(v: unknown) {
-  return typeof v === "number" ? v.toLocaleString() : "—";
+/** "vs September: +32 (+7%) from 480"; "no data" when the previous month has nothing to compare with. */
+function delta(prevMonth: string, current: number, previous: number, hasPrevious: boolean) {
+  if (!hasPrevious) return `vs ${prevMonth}: no data`;
+  const d = current - previous;
+  const sign = d > 0 ? "+" : "";
+  const pct = previous > 0 ? ` (${sign}${Math.round((d / previous) * 100)}%)` : "";
+  return `vs ${prevMonth}: ${sign}${d.toLocaleString()}${pct} from ${previous.toLocaleString()}`;
 }
 
-function lastTwoNumbers(values: Array<number | null>) {
-  let last: number | null = null;
-  let prev: number | null = null;
-
-  for (let i = values.length - 1; i >= 0; i--) {
-    const v = values[i];
-    if (typeof v !== "number") continue;
-    if (last == null) last = v;
-    else { prev = v; break; }
-  }
-
-  return { prev, last };
-}
-
-// TrendIcon
-
-function TrendIcon(props: { values: Array<number | null> }) {
-  const theme = useTheme();
-
-  const statusColors = useStatusColors();
-
-  const { prev, last } = React.useMemo(
-    () => lastTwoNumbers(props.values),
-    [props.values]
-  );
-
-  let icon: React.ReactNode;
-  let color: string = theme.palette.text.disabled;
-
-  if (typeof prev !== "number" || typeof last !== "number") {
-    icon = <TrendingFlatOutlined sx={{ fontSize: 100, opacity: 0.45 }} />;
-  } else {
-    const d = last - prev;
-    if (d > 0) {
-      icon = <TrendingUpOutlined sx={{ fontSize: 60 }} />;
-      color = statusColors.done.main;       // positive → "done" semantic
-    } else if (d < 0) {
-      icon = <TrendingDownOutlined sx={{ fontSize: 60 }} />;
-      color = statusColors.failure.main;    // negative → "failure" semantic
-    } else {
-      icon = <TrendingFlatOutlined sx={{ fontSize: 60 }} />;
-      color = theme.palette.text.secondary as string;
-    }
-  }
-
+function Kpi(props: { title: string; value: number; marker?: string; children?: React.ReactNode }) {
   return (
-    <Stack
-      spacing={1}
-      sx={{ flex: 1, minHeight: 0, color, alignItems: "center", justifyContent: "center" }}
-    >
-      <Box sx={{ display: "grid", placeItems: "center", lineHeight: 1 }}>
-        {icon}
-      </Box>
-      <Typography
-        sx={{ fontSize: 30, fontWeight: 950, lineHeight: 1, color: "text.primary" }}
-      >
-        {formatNumber(last)}
-      </Typography>
-    </Stack>
-  );
-}
-
-// TrendPanel
-
-function TrendPanel(props: {
-  title: string;
-  icon: React.ReactNode;
-  values: Array<number | null>;
-}) {
-  return (
-    <SoftCard title={props.title} icon={props.icon} fillHeight>
-      <TrendIcon values={props.values} />
+    <SoftCard title={props.title}>
+      <Stack spacing={0.5} sx={{ alignItems: "flex-start" }}>
+        <Stack direction="row" spacing={1} sx={{ alignItems: "center" }}>
+          {props.marker ? (
+            <Box aria-hidden sx={{ width: 10, height: 10, borderRadius: "50%", bgcolor: props.marker }} />
+          ) : null}
+          <Typography variant="h1" component="p">
+            {props.value.toLocaleString()}
+          </Typography>
+        </Stack>
+        {props.children}
+      </Stack>
     </SoftCard>
   );
 }
 
-// KpiTrendPanels (default export)
+function Line({ children }: { children: React.ReactNode }) {
+  return (
+    <Typography variant="body2" color="text.secondary">
+      {children}
+    </Typography>
+  );
+}
 
-export default function KpiTrendPanels(props: { spark: Spark }) {
+export default function KpiTrendPanels({ summary: s }: { summary: DashboardSummary }) {
+  const theme = useTheme();
+  const result = useResultColors();
+  const prevMonth = monthName(s.month === 1 ? 12 : s.month - 1);
+  const finished = sum(s.outcomes);
+  const prevFinished = sum(s.previous.outcomes);
+
   return (
     <Box
       sx={{
         display: "grid",
-        gridTemplateColumns: { xs: "1fr", md: "repeat(3, 1fr)" },
+        // Columns follow the panel's own width, which the user can resize.
+        gridTemplateColumns: "repeat(auto-fit, minmax(220px, 1fr))",
         gap: 2,
         height: "100%",
       }}
     >
-      <TrendPanel
-        title="New users"
-        icon={<PersonAddAltOutlined fontSize="small" />}
-        values={props.spark.newUsers}
-      />
-      <TrendPanel
-        title="Total reporters"
-        icon={<GroupsOutlined fontSize="small" />}
-        values={props.spark.reporters}
-      />
-      <TrendPanel
-        title="Total submissions"
-        icon={<Inventory2Outlined fontSize="small" />}
-        values={props.spark.submissions}
-      />
+      <Kpi title="Reports" value={s.reports}>
+        <Line>{delta(prevMonth, s.reports, s.previous.reports, s.previous.reports > 0)}</Line>
+        <Box sx={{ color: onCard(theme.palette.primary.main, theme.palette, 3), pt: 0.5 }}>
+          <Sparkline values={s.trend.map((p) => p.reports)} label="Reports per week" />
+        </Box>
+      </Kpi>
+
+      <Kpi title="Dangerous" value={s.outcomes.dangerous} marker={onCard(result.dangerous.main, theme.palette, 3)}>
+        {finished > 0 ? (
+          <Line>
+            {Math.round((s.outcomes.dangerous / finished) * 100)}% of {finished.toLocaleString()} finished cases
+          </Line>
+        ) : null}
+        <Line>{delta(prevMonth, s.outcomes.dangerous, s.previous.outcomes.dangerous, prevFinished > 0)}</Line>
+      </Kpi>
+
+      <Kpi title="Reporters" value={s.reporters}>
+        {s.new_users > 0 ? (
+          <Line>
+            {s.new_users.toLocaleString()} new {s.new_users === 1 ? "user" : "users"} in {monthName(s.month)}
+          </Line>
+        ) : null}
+      </Kpi>
     </Box>
   );
 }

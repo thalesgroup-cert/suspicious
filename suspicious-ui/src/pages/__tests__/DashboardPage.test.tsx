@@ -52,15 +52,32 @@ async function openSelect(user: ReturnType<typeof userEvent.setup>, name: string
   return screen.findByRole("listbox");
 }
 
+// Tests run in a real browser whose default viewport is narrow: pin the breakpoint explicitly.
+const stubViewport = (phone: boolean) =>
+  vi.stubGlobal("matchMedia", (query: string) => ({
+    matches: phone && query.includes("max-width"),
+    media: query,
+    addEventListener: () => {},
+    removeEventListener: () => {},
+    addListener: () => {},
+    removeListener: () => {},
+    onchange: null,
+    dispatchEvent: () => false,
+  }));
+
 describe("DashboardPage - Test Suite", () => {
   beforeEach(() => {
+    stubViewport(false);
     localStorage.clear();
     vi.mocked(getMe).mockResolvedValue(plainUser);
     vi.mocked(getDashboardScopes).mockResolvedValue(AU_SCOPES);
     vi.mocked(getDashboardSummary).mockReset().mockImplementation(summaryFor);
   });
 
-  afterEach(() => vi.restoreAllMocks());
+  afterEach(() => {
+    vi.restoreAllMocks();
+    vi.unstubAllGlobals();
+  });
 
   describe("Page Navigation and Access", () => {
     it("renders the dashboard title", async () => {
@@ -268,33 +285,104 @@ describe("DashboardPage - Test Suite", () => {
       expect(await screen.findByText(/overview/i, {}, { timeout: 5000 })).toBeInTheDocument();
     });
 
-    it("shows no up arrow for reports when the previous month has no reports", async () => {
+    it("says no data, with no arrow, when the previous month has no reports", async () => {
       vi.mocked(getDashboardSummary).mockImplementation((p) =>
         summaryFor(p).then((d) => ({ ...d, previous: { ...d.previous, reports: 0 } }))
       );
       renderWithProviders(<DashboardPage />, { initialPath: "/dashboard" });
-      await screen.findByText("Total submissions", {}, { timeout: 5000 });
-      expect(document.querySelector('[data-testid="TrendingUpOutlinedIcon"]')).toBeNull();
+      const reports = await screen.findByRole("region", { name: "Reports" }, { timeout: 5000 });
+      expect(within(reports).getByText("vs September: no data")).toBeInTheDocument();
+      expect(document.querySelector('[data-testid^="Trending"]')).toBeNull();
     });
 
-    it("names the scope and period in the empty state", async () => {
-      vi.mocked(getDashboardSummary).mockImplementation((p) => summaryFor(p).then((d) => ({ ...d, reports: 0 })));
+    it("shows only the empty state, naming scope and period, when nothing was reported", async () => {
+      vi.mocked(getDashboardSummary).mockImplementation((p) =>
+        summaryFor(p).then((d) => ({
+          ...d,
+          reports: 0,
+          in_progress: 0,
+          outcomes: { safe: 0, inconclusive: 0, suspicious: 0, dangerous: 0, failure: 0 },
+          by_type: { MAIL: 0, FILE: 0, URL: 0, IP: 0, HASH: 0, IOC: 0, UNKNOWN: 0 },
+          reporters: 0,
+          trend: [],
+          top_reporters: [],
+        }))
+      );
       renderWithProviders(<DashboardPage />, { initialPath: "/dashboard" });
-      expect(
-        await screen.findByText("Nothing was reported in Australia in October 2026.", {}, { timeout: 5000 })
-      ).toBeInTheDocument();
+      expect(await screen.findByText("No reports in this period", {}, { timeout: 5000 })).toBeInTheDocument();
+      expect(screen.getByText("Nothing was reported in Australia in October 2026.")).toBeInTheDocument();
+      expect(screen.queryAllByRole("region")).toEqual([]);
+      expect(screen.queryByTestId("dashboard-grid")).not.toBeInTheDocument();
     });
 
-    it("renders the new payload with top_reporters null and empty legacy arrays", async () => {
-      vi.mocked(getDashboardSummary).mockResolvedValue({
-        ...fixtureDashboardSummary,
-        top_reporters: null,
-        top_prefixes: [],
-        danger_counts: { failure: 0, safe: 0, inconclusive: 0, suspicious: 0, dangerous: 0, malicious: 0 },
+    it("hides the reporters panel, and every reporter name, when top_reporters is null", async () => {
+      vi.mocked(getDashboardSummary).mockResolvedValue({ ...fixtureDashboardSummary, top_reporters: null });
+      renderWithProviders(<DashboardPage />, { initialPath: "/dashboard" });
+      await screen.findByRole("region", { name: "Outcomes" }, { timeout: 5000 });
+      await waitFor(() => expect(document.querySelectorAll(".react-grid-item").length).toBe(3));
+      expect(screen.queryByRole("region", { name: "Top reporters" })).not.toBeInTheDocument();
+      expect(screen.queryByText(/top reporters/i)).not.toBeInTheDocument();
+      expect(screen.queryByText("phishing-corp")).not.toBeInTheDocument();
+    });
+
+    it("shows the top reporters to an elevated user", async () => {
+      renderWithProviders(<DashboardPage />, { initialPath: "/dashboard" });
+      const panel = await screen.findByRole("region", { name: "Top reporters" }, { timeout: 5000 });
+      expect(within(panel).getAllByRole("listitem").map((r) => r.textContent)).toEqual([
+        "phishing-corp17",
+        "spoof-it9",
+      ]);
+    });
+
+    it("renders every panel as a region named by its h2", async () => {
+      renderWithProviders(<DashboardPage />, { initialPath: "/dashboard" });
+      await screen.findByRole("region", { name: "Outcomes" }, { timeout: 5000 });
+      const names = screen.getAllByRole("region").map((r) => {
+        const heading = document.getElementById(r.getAttribute("aria-labelledby")!)!;
+        expect(heading.tagName).toBe("H2");
+        return heading.textContent;
       });
+      expect(names).toEqual(["Reports", "Dangerous", "Reporters", "Outcomes", "What was reported", "Top reporters"]);
+    });
+
+    it("still renders every panel from an older saved layout that lacks the new panels", async () => {
+      localStorage.setItem(
+        "dashboard:layouts:1",
+        JSON.stringify({
+          lg: [
+            { i: "kpi-trends", x: 0, y: 0, w: 12, h: 6 },
+            { i: "top-prefixes", x: 0, y: 6, w: 8, h: 14 },
+            { i: "threat-distribution", x: 8, y: 6, w: 4, h: 14 },
+          ],
+        })
+      );
+      vi.mocked(getMe).mockResolvedValue({ ...plainUser, id: 1 });
       renderWithProviders(<DashboardPage />, { initialPath: "/dashboard" });
-      expect(await screen.findByText(/overview/i, {}, { timeout: 5000 })).toBeInTheDocument();
-      expect(document.querySelectorAll(".react-grid-item").length).toBe(3);
+      await screen.findByRole("region", { name: "Outcomes" }, { timeout: 5000 });
+      await waitFor(() => expect(document.querySelectorAll(".react-grid-item").length).toBe(4));
+      expect(screen.getByRole("region", { name: "What was reported" })).toBeInTheDocument();
+    });
+  });
+
+  describe("Phone", () => {
+    it("stacks the panels in one column with no grid, handles or saved layouts", async () => {
+      stubViewport(true);
+      const getItem = vi.spyOn(Storage.prototype, "getItem");
+      const setItem = vi.spyOn(Storage.prototype, "setItem");
+      renderWithProviders(<DashboardPage />, { initialPath: "/dashboard" });
+      await screen.findByRole("region", { name: "Outcomes" }, { timeout: 5000 });
+      const stack = screen.getByTestId("dashboard-stack");
+      const order = screen.getAllByRole("region").map((r) => document.getElementById(r.getAttribute("aria-labelledby")!)!.textContent);
+      expect(order).toEqual(["Reports", "Dangerous", "Reporters", "Outcomes", "What was reported", "Top reporters"]);
+      expect(stack).toBeInTheDocument();
+      expect(screen.queryByTestId("dashboard-grid")).not.toBeInTheDocument();
+      expect(document.querySelector(".react-grid-item")).toBeNull();
+      expect(document.querySelector(".react-resizable-handle")).toBeNull();
+      expect(document.querySelector(".dashboard-panel-drag-handle")).toBeNull();
+      expect(screen.queryByRole("button", { name: "Reset layout" })).not.toBeInTheDocument();
+      const layoutKey = ([k]: unknown[]) => String(k).startsWith("dashboard:layouts");
+      expect(getItem.mock.calls.filter(layoutKey)).toEqual([]);
+      expect(setItem.mock.calls.filter(layoutKey)).toEqual([]);
     });
   });
 
@@ -303,7 +391,7 @@ describe("DashboardPage - Test Suite", () => {
       const setItem = vi.spyOn(Storage.prototype, "setItem");
       const consoleError = vi.spyOn(console, "error");
       renderWithProviders(<DashboardPage />, { initialPath: "/dashboard" });
-      await waitFor(() => expect(document.querySelectorAll(".react-grid-item").length).toBe(3), { timeout: 5000 });
+      await waitFor(() => expect(document.querySelectorAll(".react-grid-item").length).toBe(4), { timeout: 5000 });
       await act(async () => {
         window.dispatchEvent(
           new CustomEvent("suspicious:theme-hydrate", { detail: { theme: "paper", autoSeasonal: false } })

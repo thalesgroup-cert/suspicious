@@ -1,4 +1,5 @@
 import type { ScopeOption } from "@/features/dashboard/api";
+import { ensureContrast } from "@/shared/lib/contrast";
 
 export function monthName(m: number) {
   return new Date(2000, m - 1, 1).toLocaleString("en", { month: "long" });
@@ -29,4 +30,24 @@ export function scopeLabel(label: string, key: string): string {
 export function scopeName(scope: ScopeOption): string {
   const own = /^My country \((.+)\)$/.exec(scope.label);
   return scopeLabel(own && scope.key === "OWN_COUNTRY" ? own[1] : scope.label, scope.key);
+}
+
+/**
+ * `fg` raised to `min`:1 against both card surfaces: the paper colour, and the
+ * page background that shows through the dark-mode card gradient.
+ */
+export function onCard(fg: string, palette: { background: { paper: string; default: string } }, min = 4.5): string {
+  return [palette.background.paper, palette.background.default].reduce((c, bg) => ensureContrast(c, bg, min), fg);
+}
+
+/** Integer percentages of `counts` that add up to exactly 100 (largest remainder). */
+export function percents(counts: number[]): number[] {
+  const total = counts.reduce((a, b) => a + b, 0);
+  if (total === 0) return counts.map(() => 0);
+  const raw = counts.map((c) => (c * 100) / total);
+  const out = raw.map(Math.floor);
+  const order = raw.map((r, i) => [r - out[i], i]).sort((a, b) => b[0] - a[0]);
+  const missing = 100 - out.reduce((a, b) => a + b, 0);
+  for (let k = 0; k < missing; k++) out[order[k][1]] += 1;
+  return out;
 }

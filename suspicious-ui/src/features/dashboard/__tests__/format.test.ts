@@ -1,5 +1,5 @@
 import { describe, it, expect } from "vitest";
-import { scopeLabel, scopeName } from "../format";
+import { percents, scopeLabel, scopeName } from "../format";
 
 describe("scope labels", () => {
   it("maps country codes only for own-country and country scopes", () => {
@@ -18,5 +18,13 @@ describe("scope labels", () => {
     expect(scopeName({ key: "OWN_SCOPE", label: "IT | Off GBU" })).toBe("IT | Off GBU");
     expect(scopeName({ key: "REGION:APAC", label: "APAC" })).toBe("APAC");
     expect(scopeName({ key: "ALL", label: "Overall" })).toBe("Overall");
+  });
+});
+
+describe("percents", () => {
+  it("adds up to exactly 100 and is all zeros for no data", () => {
+    expect(percents([200, 80, 150, 60, 1])).toEqual([41, 16, 31, 12, 0]);
+    expect(percents([1, 1, 1])).toEqual([34, 33, 33]);
+    expect(percents([0, 0])).toEqual([0, 0]);
   });
 });

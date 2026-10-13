@@ -1,13 +1,14 @@
 import * as React from "react";
 import { Box, Card, CardContent, Divider, Stack, Typography } from "@mui/material";
-import { alpha } from "@mui/material/styles";
-import { useTheme } from "@mui/material/styles";
+import { alpha, useTheme } from "@mui/material/styles";
 import { useThemeMode } from "@/styles/ThemeStore";
 
 
 export type SoftCardProps = React.PropsWithChildren<{
   title: string;
   icon?: React.ReactNode;
+  /** Short line under the title. */
+  caption?: React.ReactNode;
   right?: React.ReactNode;
   /** Extra sx forwarded to the root Card */
   sx?: object;
@@ -20,6 +21,7 @@ export type SoftCardProps = React.PropsWithChildren<{
 export function SoftCard({
   title,
   icon,
+  caption,
   right,
   sx,
   contentSx,
@@ -28,6 +30,7 @@ export function SoftCard({
 }: SoftCardProps) {
   const theme = useTheme();
   const isDark = theme.palette.mode === "dark";
+  const titleId = React.useId();
   const { capabilities } = useThemeMode();
   const { effects } = capabilities;
 
@@ -60,6 +63,8 @@ export function SoftCard({
 
   return (
     <Card
+      role="region"
+      aria-labelledby={titleId}
       onMouseEnter={isMetal ? () => setHovered(true) : undefined}
       onMouseLeave={isMetal ? () => setHovered(false) : undefined}
       sx={{
@@ -107,7 +112,7 @@ export function SoftCard({
               </Box>
             ) : null}
 
-            <Typography sx={{ fontWeight: 900, fontSize: 15 }} >
+            <Typography variant="subtitle2" component="h2" id={titleId}>
               {title}
             </Typography>
             {showExcl && (
@@ -117,7 +122,7 @@ export function SoftCard({
                 sx={{
                   display: "inline-flex", alignItems: "center", justifyContent: "center",
                   width: 18, height: 18, borderRadius: "3px",
-                  fontSize: 11, fontWeight: 900, fontFamily: '"IBM Plex Mono", monospace',
+                  fontSize: 11, fontWeight: 700, fontFamily: '"IBM Plex Mono", monospace',
                   backgroundColor: "var(--mgs-alert, #E1061B)", color: "#fff",
                   ml: 0.75, flexShrink: 0,
                   animation: "exclamation 300ms cubic-bezier(.34,1.56,.64,1) both",
@@ -128,6 +133,11 @@ export function SoftCard({
 
           {right ?? null}
         </Stack>
+        {caption ? (
+          <Typography variant="caption" color="text.secondary" sx={{ mt: -0.75, mb: 1 }}>
+            {caption}
+          </Typography>
+        ) : null}
 
         <Divider sx={{ opacity: 0.25, mb: 1.5, flexShrink: 0 }} />
 

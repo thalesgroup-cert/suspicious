@@ -1,6 +1,5 @@
 import * as React from "react";
-import { Box, Button, Container, Skeleton, Stack, Typography } from "@mui/material";
-import { RefreshOutlined } from "@mui/icons-material";
+import { Box, Container, Skeleton } from "@mui/material";
 
 export function DashboardLoading() {
   return (
@@ -32,36 +31,5 @@ export function DashboardLoading() {
         <Skeleton sx={{ borderRadius: 3 }} height={420} />
       </Box>
     </Container>
-  );
-}
-
-export function DashboardEmpty(props: {
-  title: string;
-  description: string;
-  onRefresh: () => void;
-}) {
-  return (
-    <Box
-      sx={{
-        borderRadius: 3,
-        border: "1px solid",
-        borderColor: "divider",
-        bgcolor: "background.paper",
-        p: 2,
-        mb: 2,
-      }}
-    >
-      <Stack direction={{ xs: "column", sm: "row" }} spacing={2} sx={{ alignItems: { xs: "flex-start", sm: "center" }, justifyContent: "space-between" }} >
-        <Box>
-          <Typography variant="subtitle1" component="p">{props.title}</Typography>
-          <Typography variant="body2" color="text.secondary" sx={{ mt: 0.25 }}>
-            {props.description}
-          </Typography>
-        </Box>
-        <Button variant="outlined" startIcon={<RefreshOutlined />} onClick={props.onRefresh}>
-          Refresh
-        </Button>
-      </Stack>
-    </Box>
   );
 }

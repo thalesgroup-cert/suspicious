@@ -48,24 +48,6 @@ export const fixtureDashboardSummary: DashboardSummary = {
     { label: "phishing-corp", value: 17 },
     { label: "spoof-it", value: 9 },
   ],
-  // Legacy keys, still read by the current panels.
-  kpis: {
-    new_users: 4,
-    total_reporters: 128,
-    total_cases: 512,
-  },
-  danger_counts: {
-    failure: 1,
-    safe: 200,
-    inconclusive: 80,
-    suspicious: 150,
-    dangerous: 60,
-    malicious: 21,
-  },
-  top_prefixes: [
-    { label: "phishing-corp", value: 17 },
-    { label: "spoof-it", value: 9 },
-  ],
 };
 
 export const fixtureClassificationCounts: ClassificationCounts = {
