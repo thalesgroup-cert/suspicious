@@ -16,13 +16,24 @@ const LABELS: Record<keyof ByType, string> = {
 };
 
 /** Label, count and a thin bar of `value / scale`; the count carries the meaning, the bar only the proportion. */
-export function BarList({ rows, scale, ordered }: { rows: LabelValue[]; scale: number; ordered?: boolean }) {
+export function BarList(props: { rows: LabelValue[]; scale: number; ordered?: boolean; wideColumns?: boolean }) {
+  const { rows, scale, ordered } = props;
   const theme = useTheme();
   const bar = onCard(theme.palette.primary.main, theme.palette, 3);
   return (
-    <Stack component={ordered ? "ol" : "ul"} spacing={1.25} sx={{ m: 0, p: 0, listStyle: "none" }}>
+    <Box sx={{ containerType: "inline-size" }}>
+    <Box
+      component={ordered ? "ol" : "ul"}
+      sx={{
+        m: 0,
+        p: 0,
+        listStyle: "none",
+        // A long list in a wide panel splits into two columns, so each count stays near its label.
+        ...(props.wideColumns ? { "@container (min-width: 640px)": { columns: 2, columnGap: 6 } } : {}),
+      }}
+    >
       {rows.map((r) => (
-        <li key={r.label}>
+        <Box component="li" key={r.label} sx={{ breakInside: "avoid", pb: 1.25, "&:last-child": { pb: 0 } }}>
           <Stack direction="row" spacing={1} sx={{ alignItems: "baseline" }}>
             <Typography variant="body2" sx={{ flex: 1, minWidth: 0, overflowWrap: "anywhere" }}>
               {r.label}
@@ -34,9 +45,10 @@ export function BarList({ rows, scale, ordered }: { rows: LabelValue[]; scale: n
           <Box aria-hidden sx={{ mt: 0.5, height: 4, borderRadius: 2, bgcolor: "action.hover" }}>
             <Box sx={{ height: "100%", borderRadius: 2, bgcolor: bar, width: `${scale > 0 ? (r.value / scale) * 100 : 0}%` }} />
           </Box>
-        </li>
+        </Box>
       ))}
-    </Stack>
+    </Box>
+    </Box>
   );
 }
 

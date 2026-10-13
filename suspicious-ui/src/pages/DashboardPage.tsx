@@ -481,7 +481,8 @@ export default function DashboardPage() {
         <Skeleton name="dashboard-page" loading={isInitialLoading} fallback={<DashboardLoading />} animate="shimmer">
           <Container maxWidth="xl" sx={{ py: 2.5 }}>
             {isEmpty ? (
-              <Box sx={{ py: 8 }}>
+              // Dimmed like the panels while another period loads, so the old message reads as old.
+              <Box aria-busy={switching} sx={{ py: 8, opacity: switching ? 0.6 : 1 }}>
                 <EmptyState
                   title="No reports in this period"
                   hint={`Nothing was reported in ${scopeName(shownScope)} in ${monthName(data.month)} ${data.year}.`}

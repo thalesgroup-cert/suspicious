@@ -47,7 +47,8 @@ export default function OutcomesPanel({ outcomes, inProgress }: { outcomes: Outc
         </Box>
       ) : null}
 
-      <Stack component="ul" spacing={0.75} sx={{ m: 0, p: 0, listStyle: "none" }}>
+      {/* Capped width: in a wide panel the counts stay close to their labels. */}
+      <Stack component="ul" spacing={0.75} sx={{ m: 0, p: 0, listStyle: "none", maxWidth: 420 }}>
         {ROWS.map(([k, label], i) => (
           <Stack
             key={k}

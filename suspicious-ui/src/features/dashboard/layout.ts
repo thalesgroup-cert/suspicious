@@ -14,10 +14,12 @@ export const COLS = { lg: 12, md: 12, sm: 6, xs: 1 };
 export const ROW_HEIGHT = 32;
 
 // Heights in rows (32px + 16px margin) fit the content of each panel: KPI cards
-// ~180px, outcomes and by-type ~330px, ten reporters ~420px.
+// ~180px, outcomes and by-type ~330px, ten reporters ~420px in one column and
+// ~250px in the two columns a full-width panel gets.
 const KPI_H = 5;
 const MID_H = 8;
 const REPORTERS_H = 10;
+const REPORTERS_WIDE_H = 7;
 
 function stacked(cols: number): Layout {
   return [
@@ -34,7 +36,7 @@ const WIDE: Layout = [
   { i: PANEL_KEYS.KPI_TRENDS, x: 0, y: 0, w: 12, h: KPI_H, minW: 6, minH: 4 },
   { i: PANEL_KEYS.OUTCOMES, x: 0, y: KPI_H, w: 6, h: MID_H, minW: 4, minH: 6 },
   { i: PANEL_KEYS.BY_TYPE, x: 6, y: KPI_H, w: 6, h: MID_H, minW: 4, minH: 4 },
-  { i: PANEL_KEYS.TOP_REPORTERS, x: 0, y: KPI_H + MID_H, w: 12, h: REPORTERS_H, minW: 4, minH: 4 },
+  { i: PANEL_KEYS.TOP_REPORTERS, x: 0, y: KPI_H + MID_H, w: 12, h: REPORTERS_WIDE_H, minW: 4, minH: 4 },
 ];
 
 export const DEFAULT_LAYOUTS: ResponsiveLayouts = { lg: WIDE, md: WIDE, sm: stacked(6), xs: stacked(1) };

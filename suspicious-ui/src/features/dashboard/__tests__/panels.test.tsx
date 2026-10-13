@@ -57,6 +57,19 @@ describe("KpiTrendPanels", () => {
     expect(within(card).queryByRole("img")).not.toBeInTheDocument();
   });
 
+  it("rounds the dangerous share the same way as the Outcomes panel", () => {
+    // 17 / 35 = 48.57: plain rounding says 49, the Outcomes rows (summing to 100) say 48.
+    const outcomes = { safe: 10, inconclusive: 5, suspicious: 2, dangerous: 17, failure: 1 };
+    renderWithProviders(
+      <>
+        <KpiTrendPanels summary={{ ...summary, outcomes }} />
+        <OutcomesPanel outcomes={outcomes} inProgress={0} />
+      </>
+    );
+    expect(screen.getByText("48% of 35 finished cases")).toBeInTheDocument();
+    expect(screen.getAllByRole("listitem")[3]).toHaveTextContent("Dangerous1748%");
+  });
+
   it("names the previous month across a year boundary", () => {
     renderWithProviders(<KpiTrendPanels summary={{ ...summary, month: 1, year: 2027 }} />);
     expect(screen.getByText("vs December: +32 (+7%) from 480")).toBeInTheDocument();

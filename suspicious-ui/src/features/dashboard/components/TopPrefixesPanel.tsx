@@ -8,7 +8,7 @@ export default function TopPrefixesPanel({ reporters }: { reporters: LabelValue[
   return (
     <SoftCard title="Top reporters" caption="Reports per person in this period">
       {reporters.length > 0 ? (
-        <BarList rows={reporters} scale={reporters[0].value} ordered />
+        <BarList rows={reporters} scale={reporters[0].value} ordered wideColumns />
       ) : (
         <EmptyState title="No named reporters in this period" />
       )}
