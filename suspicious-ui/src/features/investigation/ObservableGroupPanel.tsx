@@ -15,6 +15,7 @@ import { monoStack } from "@/styles/themes";
 import { ScreenshotPanel } from "@/shared/components/ScreenshotPanel";
 import { RiskChip } from "@/features/submissions/components/AnalyzerReportCard";
 import { Heading } from "@/features/submissions/components/AnalyzerGroups";
+import { ensureContrast } from "@/shared/lib/contrast";
 
 const BAND_TONE: Record<string, "error" | "warning" | "success"> = {
   Dangerous: "error",
@@ -105,7 +106,8 @@ export function ObservableGroupPanel({ group }: { group: ObservableGroup }) {
                     />
                   )}
                   {observable.escalation_note && (
-                    <Typography variant="caption" color="warning.main">
+                    // warning.main is under 4.5:1 on light papers: darkened toward the text colour until it reads on the accordion.
+                    <Typography variant="caption" sx={(t) => ({ color: ensureContrast(t.palette.warning.main, t.palette.background.paper) })}>
                       {observable.escalation_note}
                     </Typography>
                   )}

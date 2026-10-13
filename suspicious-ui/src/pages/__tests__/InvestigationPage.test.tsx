@@ -854,6 +854,16 @@ describe("InvestigationPage", () => {
       expect(screen.queryByText(/^Search:/)).toBeNull();
     });
 
+    it("while a new search loads, the chip shows no number instead of the old count as match", async () => {
+      mockGetAll.mockImplementation(((p: { page: number; pageSize: number; search?: string }) =>
+        p.search ? new Promise(() => {}) : pageOf(340)(p)) as never);
+      renderInvestigation();
+      expect(await screen.findByText("340 total")).toBeInTheDocument();
+      await userEvent.type(search(), "row");
+      expect(await screen.findByText("…")).toBeInTheDocument();
+      expect(screen.queryByText(/match/)).toBeNull();
+    });
+
     it("a filter also says match; changing only the sort keeps total", async () => {
       renderInvestigation();
       await userEvent.click(await filtersBtn());
@@ -961,6 +971,31 @@ describe("InvestigationPage", () => {
       expect(within(item).getByText("SUSPICIOUS")).toBeInTheDocument();
       expect(within(item).getByText("reporter@corp.test")).toBeInTheDocument();
       expect(screen.queryByRole("table")).toBeNull();
+    });
+
+    it("Enter on a row's copy button copies; the drawer stays closed", async () => {
+      const write = vi.spyOn(navigator.clipboard, "writeText").mockResolvedValue();
+      const user = userEvent.setup();
+      renderInvestigation();
+      await screen.findByRole("table");
+      screen.getByRole("button", { name: "Copy ID" }).focus();
+      await user.keyboard("{Enter}");
+      await waitFor(() => expect(write).toHaveBeenCalledWith("7"));
+      expect(screen.queryByRole("dialog")).toBeNull();
+      write.mockRestore();
+    });
+
+    it("keyboard: Enter on a row opens the dialog named by its h2 with focus inside; Close returns focus to the row", async () => {
+      const user = userEvent.setup();
+      renderInvestigation();
+      const row = (await screen.findByText(mockRow.info)).closest("tr")!;
+      row.focus();
+      await user.keyboard("{Enter}");
+      const dialog = await screen.findByRole("dialog", { name: "#7" });
+      await waitFor(() => expect(dialog.contains(document.activeElement)).toBe(true));
+      await user.click(within(dialog).getByRole("button", { name: "Close" }));
+      await waitFor(() => expect(screen.queryByRole("dialog")).toBeNull());
+      expect(document.activeElement).toBe(row);
     });
   });
 

@@ -8,7 +8,7 @@ import type { SubmissionRow } from "@/features/home/api";
 import { fmtDate, short } from "@/features/home/utils";
 
 /** Phone layout: verdict next to the ID, artifact on one line, meta below. */
-export function RecentSubmissionsList({
+export function RecentSubmissionsList<R extends SubmissionRow>({
   rows,
   hrefFor,
   action,
@@ -16,16 +16,16 @@ export function RecentSubmissionsList({
   replace,
   secondary,
 }: {
-  rows: SubmissionRow[];
-  hrefFor: (row: SubmissionRow) => string;
+  rows: R[];
+  hrefFor: (row: R) => string;
   /** Optional trailing action on the meta line (e.g. Challenge). */
-  action?: (row: SubmissionRow) => React.ReactNode;
+  action?: (row: R) => React.ReactNode;
   /** Render DONE muted (Submissions page); Home keeps the coloured chip. */
   calmStatus?: boolean;
   /** Replace the history entry on tap (Submissions drawer links) instead of pushing. */
   replace?: boolean;
   /** Optional second meta line (Investigation: the reporter's mail). */
-  secondary?: (row: SubmissionRow) => React.ReactNode;
+  secondary?: (row: R) => React.ReactNode;
 }) {
   return (
     <Stack component="ul" sx={{ listStyle: "none", m: 0, px: 1.5, pb: 1.5 }}>

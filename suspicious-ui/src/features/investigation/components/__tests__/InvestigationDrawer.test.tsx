@@ -489,6 +489,56 @@ describe("InvestigationDrawer - discussion and raw tabs", () => {
     const pre = screen.getByText(/raw-marker-42/);
     expect(pre.tagName).toBe("PRE");
     expect(getComputedStyle(pre).fontFamily).toMatch(/mono/i);
-    expect(within(screen.getByRole("tabpanel")).queryByRole("button")).toBeNull();
+    // No accordion toggle: the only button copies the payload.
+    const write = vi.spyOn(navigator.clipboard, "writeText").mockResolvedValue();
+    expect(within(screen.getByRole("tabpanel")).getAllByRole("button").map((x) => x.getAttribute("aria-label"))).toEqual(["Copy payload"]);
+    await userEvent.click(screen.getByRole("button", { name: "Copy payload" }));
+    expect(write).toHaveBeenCalledWith(expect.stringContaining('"marker": "raw-marker-42"'));
+    write.mockRestore();
+  });
+});
+
+describe("InvestigationDrawer - accessibility", () => {
+  beforeEach(() => { mockEnabled.mockResolvedValue([]); });
+
+  it("a modal dialog named by its h2", () => {
+    renderWithProviders(<InvestigationDrawer {...props()} />);
+    const dialog = screen.getByRole("dialog", { name: "#7" });
+    expect(dialog).toHaveAttribute("aria-labelledby", screen.getByRole("heading", { level: 2 }).id);
+  });
+
+  it("every button in the drawer has a name, on every tab", async () => {
+    renderWithProviders(<InvestigationDrawer {...props()} />);
+    for (const t of ["Overview", /^Analysis/, /^Discussion/, "Raw"]) {
+      await userEvent.click(screen.getByRole("tab", { name: t }));
+      for (const b of within(screen.getByRole("dialog")).getAllByRole("button")) {
+        expect(b).toHaveAccessibleName();
+      }
+    }
+  });
+
+  it("More: Enter opens on the first item, Escape closes and focus returns to More; Enter runs an item", async () => {
+    const p = props();
+    const user = userEvent.setup();
+    renderWithProviders(<InvestigationDrawer {...p} />);
+    const more = screen.getByRole("button", { name: "More actions" });
+    more.focus();
+    await user.keyboard("{Enter}");
+    await waitFor(() => expect(screen.getByRole("menuitem", { name: "Full report" })).toHaveFocus());
+    expect(more).toHaveAttribute("aria-expanded", "true");
+    await user.keyboard("{Escape}");
+    await waitFor(() => expect(screen.queryByRole("menu")).toBeNull());
+    expect(more).toHaveFocus();
+    await user.keyboard("{Enter}");
+    await waitFor(() => expect(screen.getByRole("menuitem", { name: "Full report" })).toHaveFocus());
+    await user.keyboard("{ArrowUp}{Enter}");
+    expect(p.onRedo).toHaveBeenCalledTimes(1);
+  });
+
+  it("verdict and status are words, not colour alone", () => {
+    renderWithProviders(<InvestigationDrawer {...props()} />);
+    const header = screen.getByTestId("sheet-header");
+    expect(within(header).getByText("SUSPICIOUS")).toBeVisible();
+    expect(within(header).getByText(/^Done · /)).toBeVisible();
   });
 });

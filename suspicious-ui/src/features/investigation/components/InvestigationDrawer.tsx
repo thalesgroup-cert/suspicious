@@ -22,6 +22,7 @@ import type { CaseComment } from "@/features/comments/api";
 import { ResultChip, useResultHex } from "@/shared/components/ResultChip";
 import { SheetAccent, SheetHeader, StepButton, headerTint } from "@/shared/components/SheetHeader";
 import { CopyIconButton } from "@/shared/components/CopyIconButton";
+import { Heading } from "@/features/submissions/components/AnalyzerGroups";
 import { flatten } from "@/shared/lib/contrast";
 import { humanStatus } from "@/shared/lib/scoreUtils";
 import { InvestigationAnalysisTab } from "@/features/investigation/components/InvestigationAnalysisTab";
@@ -126,6 +127,8 @@ export function InvestigationDrawer({
     if (s === "next" && nextId == null) prevBtn.current?.focus();
   }, [drawerRow?.id, prevId, nextId]);
 
+  const rawJson = JSON.stringify(detailsQuery.data?.raw ?? detailsQuery.data, null, 2);
+
   const tabLabel = (t: TabKey) =>
     t === "overview" ? "Overview"
     : t === "analysis" ? (detailsQuery.data ? `Analysis (${analyzerReports.length})` : "Analysis")
@@ -217,8 +220,12 @@ export function InvestigationDrawer({
                   const c = tabLabelColors(theme);
                   return {
                     mt: 1, minHeight: 40, borderBottom: 0,
-                    // Phones: no 90px tab minimum and narrower padding, so all four tabs fit without a scroll arrow in most themes.
-                    "& .MuiTab-root": { minHeight: 40, minWidth: { xs: 0, sm: 90 }, px: { xs: 1, sm: 1.5 }, color: c.unselected, textShadow: "none" },
+                    // Phones: no 90px tab minimum, narrower padding, and no theme capitals or tracking (they widened "Discussion" past 390px), so all four labels fit.
+                    "& .MuiTab-root": {
+                      minHeight: 40, minWidth: { xs: 0, sm: 90 }, color: c.unselected, textShadow: "none",
+                      px: 1.5,
+                      [theme.breakpoints.down("sm")]: { paddingInline: theme.spacing(1.25), textTransform: "none", letterSpacing: "normal" },
+                    },
                     "& .MuiTab-root.Mui-selected": { color: c.selected },
                   };
                 }}
@@ -282,7 +289,10 @@ export function InvestigationDrawer({
               <Panel value="raw" tab={tab}>
                 {/* The tab isolates the payload, so no accordion and no inner scroll box: the panel scrolls. */}
                 <Box component="section" sx={{ px: 2.25, pt: 2, pb: 2 }}>
-                  <Typography variant="subtitle2" component="h3" color="text.secondary" sx={{ mb: 1 }}>Raw API payload</Typography>
+                  <Stack direction="row" spacing={0.5} sx={{ alignItems: "center", mb: 1 }}>
+                    <Heading title="Raw API payload" />
+                    {detailsQuery.data ? <CopyIconButton text={rawJson} title="Copy payload" /> : null}
+                  </Stack>
                   {detailsQuery.isLoading ? <CircularProgress size={16} /> : detailsQuery.isError ? (
                     <Alert severity="warning">Could not load.</Alert>
                   ) : (
@@ -292,7 +302,7 @@ export function InvestigationDrawer({
                       // Wrapped, not side-scrolled: a long payload would otherwise hide its scrollbar at the bottom.
                       whiteSpace: "pre-wrap", overflowWrap: "anywhere", fontFamily: monoStack, fontSize: t.typography.caption.fontSize, lineHeight: 1.45,
                     })}>
-                      {JSON.stringify(detailsQuery.data?.raw ?? detailsQuery.data, null, 2)}
+                      {rawJson}
                     </Box>
                   )}
                 </Box>

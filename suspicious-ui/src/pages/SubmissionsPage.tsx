@@ -315,7 +315,8 @@ export default function SubmissionsPage() {
   // Filters that narrow the fetched rows client-side; q is applied by the server, sort never narrows.
   const clientFiltered = status !== "ALL" || type !== "ALL" || result !== "ALL" || from !== "" || to !== "";
   const serverCount = submissionsQuery.data?.count ?? total;
-  const totalLabel = clientFiltered
+  // The placeholder is an empty page, not this search's answer: no number until the server replies.
+  const totalLabel = submissionsQuery.isPlaceholderData ? "…" : clientFiltered
     ? serverCount > rows.length
       ? `${total} match in the first ${rows.length}`
       : `${total} match`

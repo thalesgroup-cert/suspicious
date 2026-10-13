@@ -552,6 +552,17 @@ describe("SubmissionsPage - header count honesty", () => {
     expect(await screen.findByText("340 match")).toBeInTheDocument();
   });
 
+  // The empty placeholder puts the page on its spinner, so no count (old or 0) is ever labelled match while a search loads.
+  it("while a new search loads, no count is shown as match", async () => {
+    vi.mocked(listSubmissions).mockImplementation(((p: { search?: string }) =>
+      p.search ? new Promise(() => {}) : Promise.resolve(list(340))) as never);
+    renderWithProviders(<SubmissionsPage />, { initialPath: "/submissions" });
+    await screen.findByText("340 total");
+    await userEvent.type(screen.getByPlaceholderText(/id, status, artifact/i), "row");
+    expect(await screen.findByRole("progressbar")).toBeInTheDocument();
+    expect(screen.queryByText(/match/)).toBeNull();
+  });
+
   it("a client-side filter says match in the first N", async () => {
     renderWithProviders(<SubmissionsPage />, { initialPath: "/submissions" });
     await userEvent.click(await screen.findByRole("button", { name: /^filters/i }));

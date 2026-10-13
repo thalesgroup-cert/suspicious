@@ -27,7 +27,6 @@ import {
   TableRow,
   TableSortLabel,
   TextField,
-  Tooltip,
   Typography,
   useMediaQuery,
 } from "@mui/material";
@@ -376,7 +375,8 @@ export default function InvestigationPage() {
           </Box>
 
           <Stack direction="row" spacing={1} sx={{ mt: 1, flexWrap: "wrap" }}>
-            <Chip icon={<AssignmentTurnedInOutlined />} label={`${total} ${anyFilterActive ? "match" : "total"}`} variant="outlined" />
+            {/* While a new search loads, the count on screen belongs to the previous one: show no number rather than a wrong "match". */}
+            <Chip icon={<AssignmentTurnedInOutlined />} label={investigationsQuery.isPlaceholderData ? "…" : `${total} ${anyFilterActive ? "match" : "total"}`} variant="outlined" />
           </Stack>
         </Stack>
 
@@ -545,7 +545,7 @@ export default function InvestigationPage() {
 
           {total === 0 ? (
             <Box sx={{ p: 4 }}>
-              {filtersActive ? (
+              {anyFilterActive ? (
                 <EmptyState
                   title="No cases match"
                   hint="Try a different search or clear the filters."
@@ -566,7 +566,7 @@ export default function InvestigationPage() {
               replace
               hrefFor={(r) => `/investigation?open=${encodeURIComponent(String(r.id))}`}
               calmStatus
-              secondary={(r) => rows.find((x) => x.id === r.id)?.reporter_email ?? "—"}
+              secondary={(r) => r.reporter_email ?? "—"}
             />
           ) : (
             <Box sx={{ overflowX: "auto" }}>
@@ -621,6 +621,8 @@ export default function InvestigationPage() {
                       }}
                       onClick={() => { setSelectedId(r.id); setOpenDrawer(true); }}
                       onKeyDown={(e) => {
+                        // Keys on the row's own controls (ID, copy buttons) are theirs: Enter on Copy copies.
+                        if (e.target !== e.currentTarget) return;
                         if (e.key === "Enter" || e.key === " ") {
                           e.preventDefault();
                           setSelectedId(r.id);

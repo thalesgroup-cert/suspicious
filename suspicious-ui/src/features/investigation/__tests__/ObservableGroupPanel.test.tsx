@@ -2,6 +2,9 @@ import { render, screen } from "@testing-library/react";
 import { describe, it, expect } from "vitest";
 import { ObservableGroupPanel } from "../ObservableGroupPanel";
 import { parseObservableGroup } from "../observableGroup";
+import { ThemeProvider } from "@mui/material/styles";
+import { contrastRatio } from "@/shared/lib/contrast";
+import { themes } from "@/styles/themes";
 
 const group = {
   observables: [{
@@ -78,5 +81,18 @@ describe("ObservableGroupPanel", () => {
     render(<ObservableGroupPanel group={groupWithDerived} />);
     expect(screen.getByText(/extracted from/i)).toBeInTheDocument();
     expect(screen.getByText(/Escalated to Dangerous/)).toBeInTheDocument();
+  });
+
+  it("the escalation note reads at 4.5:1 on a light paper (sunrise: plain warning.main is 3.2:1)", () => {
+    const group = { observables: [{
+      value: "https://tinyurl.com/x", type: "url", verdict: { band: "Dangerous", confidence: 80, rationale: [] },
+      sources: [], derived_from: null, escalation_note: "Escalated to Dangerous.",
+    }] };
+    render(<ThemeProvider theme={themes.sunrise}><ObservableGroupPanel group={group} /></ThemeProvider>);
+    const color = getComputedStyle(screen.getByText("Escalated to Dangerous.")).color;
+    // Still the warning hue (orange: red channel well above blue), not the body text colour.
+    const [r, , b] = color.match(/\d+/g)!.map(Number);
+    expect(r - b).toBeGreaterThan(100);
+    expect(contrastRatio(color, themes.sunrise.palette.background.paper)).toBeGreaterThanOrEqual(4.5);
   });
 });
