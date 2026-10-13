@@ -69,6 +69,41 @@ def format_campaign_name(source_refs: Tuple[str, ...], fallback_index: int) -> s
     return ", ".join(source_refs[:3]) + "…"
 
 
+def select_dominant_dim_vectors(
+    records: Sequence[Tuple[str, Any, Dict[str, Any]]],
+) -> Tuple[List[Tuple[str, np.ndarray, Dict[str, Any]]], int, int]:
+    """Finite float64 vectors of the most common dimension (larger dim on ties),
+    sorted by stable id score; plus (skipped_empty, skipped_invalid) counts."""
+    dim_buckets: Dict[int, List[Tuple[str, np.ndarray, Dict[str, Any]]]] = {}
+    skipped_empty = 0
+    skipped_invalid = 0
+
+    for row_id, embedding, metadata in records:
+        if embedding is None:
+            skipped_empty += 1
+            continue
+
+        try:
+            vector = np.asarray(embedding, dtype=np.float64).reshape(-1)
+        except Exception:
+            skipped_invalid += 1
+            continue
+
+        if vector.size == 0 or not np.all(np.isfinite(vector)):
+            skipped_invalid += 1
+            continue
+
+        dim_buckets.setdefault(int(vector.size), []).append((row_id, vector, metadata))
+
+    if not dim_buckets:
+        return [], skipped_empty, skipped_invalid
+
+    chosen_dim = max(dim_buckets.keys(), key=lambda dim: (len(dim_buckets[dim]), dim))
+    selected = dim_buckets[chosen_dim]
+    selected.sort(key=lambda item: stable_id_score(item[0]))
+    return selected, skipped_empty, skipped_invalid
+
+
 class CampaignQueryService:
     """Encapsulates the queries that back the campaigns endpoints."""
 
@@ -109,30 +144,8 @@ class CampaignQueryService:
 
             records = fetch_records_for_ids(collection, sampled_ids)
 
-            dim_buckets: Dict[int, List[Tuple[str, np.ndarray, Dict[str, Any]]]] = {}
-            skipped_empty = 0
-            skipped_invalid = 0
-
-            for row_id, embedding, metadata in records:
-                if embedding is None:
-                    skipped_empty += 1
-                    continue
-
-                try:
-                    vector = np.asarray(embedding, dtype=np.float64).reshape(-1)
-                except Exception:
-                    skipped_invalid += 1
-                    continue
-
-                if vector.size == 0 or not np.all(np.isfinite(vector)):
-                    skipped_invalid += 1
-                    continue
-
-                dim_buckets.setdefault(int(vector.size), []).append(
-                    (row_id, vector, metadata)
-                )
-
-            if not dim_buckets:
+            selected, skipped_empty, skipped_invalid = select_dominant_dim_vectors(records)
+            if not selected:
                 logger.warning(
                     "PCA sampling yielded no valid embeddings. sampled_ids=%s skipped_empty=%s skipped_invalid=%s",
                     len(sampled_ids),
@@ -140,10 +153,7 @@ class CampaignQueryService:
                     skipped_invalid,
                 )
                 return empty_pca_payload()
-
-            chosen_dim = max(dim_buckets.keys(), key=lambda dim: (len(dim_buckets[dim]), dim))
-            selected = dim_buckets[chosen_dim]
-            selected.sort(key=lambda item: stable_id_score(item[0]))
+            chosen_dim = selected[0][1].size
 
             vectors = [item[1] for item in selected]
             metas = [item[2] for item in selected]

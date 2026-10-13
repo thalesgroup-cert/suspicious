@@ -307,6 +307,7 @@ class CampaignAccessTests(TestCase):
             "campaign-pca",
             "campaign-mail-volume",
             "campaign-summary",
+            "campaign-neighbours",
         ):
             resp = self.client.get(reverse(name))
             self.assertEqual(resp.status_code, 403, f"{name} must be forbidden for a reporter")

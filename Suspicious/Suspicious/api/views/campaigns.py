@@ -11,6 +11,7 @@ from api.permissions.dashboard import StatsReadPermission
 from api.serializers.campaigns import (
     CampaignClassificationCountsSerializer,
     CampaignMailVolumeResponseSerializer,
+    CampaignNeighboursResponseSerializer,
     CampaignPcaQuerySerializer,
     CampaignPcaResponseSerializer,
     CampaignPeriodQuerySerializer,
@@ -25,6 +26,7 @@ from api.services.campaigns.service import (
     MAX_PERIOD_DAYS,
     MIN_PERIOD_DAYS,
 )
+from api.services.campaigns import neighbours as nb
 from api.services.campaigns.summary import (
     ACTIVE_WINDOW_HOURS,
     CACHE_TTL_SECONDS,
@@ -43,6 +45,24 @@ DAYS_PARAMETER = OpenApiParameter(
         "values outside the range return 400."
     ),
 )
+
+
+LIMIT_PARAMETER = OpenApiParameter(
+    name="limit",
+    type=int,
+    location=OpenApiParameter.QUERY,
+    required=False,
+    description=(
+        "Maximum number of records to sample. "
+        f"Default: {DEFAULT_PCA_LIMIT}. Range: 1-{MAX_PCA_LIMIT}; values outside return 400."
+    ),
+)
+
+
+def _pca_limit(request) -> int:
+    params = CampaignPcaQuerySerializer(data=request.query_params)
+    params.is_valid(raise_exception=True)
+    return int(params.validated_data.get("limit", DEFAULT_PCA_LIMIT))
 
 
 def _period_days(request) -> int:
@@ -189,11 +209,7 @@ class CampaignPcaView(APIView):
         ],
     )
     def get(self, request):
-        params = CampaignPcaQuerySerializer(data=request.query_params)
-        params.is_valid(raise_exception=True)
-        limit = int(params.validated_data.get("limit", DEFAULT_PCA_LIMIT))
-
-        payload = CampaignQueryService().get_pca(limit)
+        payload = CampaignQueryService().get_pca(_pca_limit(request))
         return _validated_response(CampaignPcaResponseSerializer, payload)
 
 
@@ -351,3 +367,81 @@ class CampaignSummaryView(APIView):
     def get(self, request):
         payload = get_campaign_summary(_period_days(request))
         return _validated_response(CampaignSummaryResponseSerializer, payload)
+
+
+@extend_schema(
+    tags=["Campaigns"],
+)
+class CampaignNeighboursView(APIView):
+    permission_classes = [StatsReadPermission]
+
+    @extend_schema(
+        operation_id="campaign_neighbours",
+        summary="Get near-known-bad and novel messages (embedding-space heuristics)",
+        description=(
+            "Return two short lists computed on the same deterministic sample as the PCA "
+            "endpoint (same `limit`, dominant embedding dimension). Both are heuristics: "
+            "closeness in embedding space is a hint, not proof of the same campaign.\n\n"
+            "**near_known_bad**\n"
+            "- Messages not labelled `DANGEROUS` whose `k` nearest neighbours (cosine "
+            "similarity, self excluded) are at least `bad_share_threshold` Dangerous.\n"
+            "- `score` is that Dangerous share; `nearest_dangerous_case_id` is the case of "
+            "the most similar Dangerous neighbour (`null` when it has no case id).\n\n"
+            "**novel**\n"
+            "- Messages dated within the last `novel_window_days` UTC days (today included) "
+            "whose nearest-neighbour cosine distance (1 - similarity) exceeds the "
+            "`novelty_percentile` percentile of the sample's nearest-neighbour distances: "
+            "possible new campaigns. `score` is that distance; "
+            "`nearest_dangerous_case_id` is always `null`.\n\n"
+            "**Behaviour**\n"
+            "- Each list is sorted by `score` descending (then date, newest first, then case "
+            f"id) and capped at {nb.MAX_ITEMS}.\n"
+            "- Zero vectors are ignored; fewer than `k + 1` usable vectors yields empty lists.\n"
+            f"- Similarity is computed in chunks of at most {nb.CHUNK_ROWS} rows, never as a "
+            "full n x n matrix.\n\n"
+            f"Responses are cached for {nb.CACHE_TTL_SECONDS} seconds per `limit` value "
+            "(not when the message store is unavailable or the computation fails)."
+        ),
+        parameters=[LIMIT_PARAMETER],
+        responses={
+            200: OpenApiResponse(
+                response=CampaignNeighboursResponseSerializer,
+                description="Heuristic near-known-bad and novel message lists.",
+            ),
+        },
+        examples=[
+            OpenApiExample(
+                "Neighbours response",
+                value={
+                    "k": 10,
+                    "bad_share_threshold": 0.6,
+                    "novelty_percentile": 95,
+                    "novel_window_days": 7,
+                    "near_known_bad": [
+                        {
+                            "suspicious_case_id": "1290",
+                            "mail_subject": "Your parcel is on hold",
+                            "label": "SAFE",
+                            "date": "2026-10-12",
+                            "score": 0.8,
+                            "nearest_dangerous_case_id": "1207",
+                        }
+                    ],
+                    "novel": [
+                        {
+                            "suspicious_case_id": "1301",
+                            "mail_subject": "Payroll portal migration",
+                            "label": "SUSPICIOUS",
+                            "date": "2026-10-13",
+                            "score": 0.41,
+                            "nearest_dangerous_case_id": None,
+                        }
+                    ],
+                },
+                response_only=True,
+            ),
+        ],
+    )
+    def get(self, request):
+        payload = nb.get_campaign_neighbours(_pca_limit(request))
+        return _validated_response(CampaignNeighboursResponseSerializer, payload)

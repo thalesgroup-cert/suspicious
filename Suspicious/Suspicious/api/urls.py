@@ -5,6 +5,7 @@ from api.views.auth import LoginView, LogoutView, MeView
 from api.views.campaigns import (
     CampaignClassificationCountsView,
     CampaignMailVolumeView,
+    CampaignNeighboursView,
     CampaignPcaView,
     CampaignSummaryView,
 )
@@ -112,6 +113,7 @@ urlpatterns = [
     path("campaigns/pca/", CampaignPcaView.as_view(), name="campaign-pca"),
     path("campaigns/mail-volume/", CampaignMailVolumeView.as_view(), name="campaign-mail-volume"),
     path("campaigns/summary/", CampaignSummaryView.as_view(), name="campaign-summary"),
+    path("campaigns/neighbours/", CampaignNeighboursView.as_view(), name="campaign-neighbours"),
 
     path("profile/",              ProfileView.as_view(),             name="profile"),
     path("profile/appearance/",   AppearanceView.as_view(),          name="profile-appearance"),

@@ -97,3 +97,21 @@ class CampaignSummaryResponseSerializer(serializers.Serializer):
     active_campaigns = serializers.IntegerField(min_value=0)
     active_window_hours = serializers.IntegerField()
     largest_campaign = CampaignSummaryLargestSerializer(allow_null=True)
+
+
+class CampaignNeighbourItemSerializer(serializers.Serializer):
+    suspicious_case_id = serializers.CharField(allow_null=True)
+    mail_subject = serializers.CharField(allow_null=True)
+    label = serializers.CharField()
+    date = serializers.DateField(format="%Y-%m-%d", allow_null=True)
+    score = serializers.FloatField()
+    nearest_dangerous_case_id = serializers.CharField(allow_null=True)
+
+
+class CampaignNeighboursResponseSerializer(serializers.Serializer):
+    k = serializers.IntegerField()
+    bad_share_threshold = serializers.FloatField()
+    novelty_percentile = serializers.IntegerField()
+    novel_window_days = serializers.IntegerField()
+    near_known_bad = CampaignNeighbourItemSerializer(many=True)
+    novel = CampaignNeighbourItemSerializer(many=True)
