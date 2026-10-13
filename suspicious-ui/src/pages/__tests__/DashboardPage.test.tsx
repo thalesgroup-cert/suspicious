@@ -115,17 +115,59 @@ describe("DashboardPage - Test Suite", () => {
       expect(await screen.findByText("October 2026 · Overall")).toBeInTheDocument();
     });
 
-    it("explains that no country is set when only Overall is available", async () => {
+    it("explains why when Overall is the only scope", async () => {
       vi.mocked(getDashboardScopes).mockResolvedValue(OVERALL_ONLY);
       renderWithProviders(<DashboardPage />, { initialPath: "/dashboard" });
-      expect(await screen.findByText("No country is set on your profile.", {}, { timeout: 5000 })).toBeInTheDocument();
+      expect(await screen.findByText("Only Overall is available: your profile has no country that can be used as a scope.", {}, { timeout: 5000 })).toBeInTheDocument();
       expect(screen.getByRole("combobox", { name: "Scope" })).toHaveTextContent("Overall");
     });
 
     it("does not show the explanation when the user's country is available", async () => {
       renderWithProviders(<DashboardPage />, { initialPath: "/dashboard" });
       await screen.findByText("October 2026 · Australia", {}, { timeout: 5000 });
-      expect(screen.queryByText("No country is set on your profile.")).not.toBeInTheDocument();
+      expect(screen.queryByText("Only Overall is available: your profile has no country that can be used as a scope.")).not.toBeInTheDocument();
+    });
+
+    it("does not show the explanation to a CERT user with several scopes but no own country", async () => {
+      vi.mocked(getMe).mockResolvedValue(fixtureMe);
+      vi.mocked(getDashboardScopes).mockResolvedValue({
+        default: "ALL",
+        options: [
+          { key: "ALL", label: "Overall" },
+          { key: "COUNTRY:NZ", label: "NZ" },
+          { key: "REGION:APAC", label: "APAC" },
+        ],
+      });
+      renderWithProviders(<DashboardPage />, { initialPath: "/dashboard" });
+      await screen.findByText("October 2026 · Overall", {}, { timeout: 5000 });
+      expect(screen.queryByText(/only overall is available/i)).not.toBeInTheDocument();
+    });
+
+    it("says so when the scopes cannot be loaded and shows Overall", async () => {
+      vi.mocked(getDashboardScopes).mockRejectedValue({ isAxiosError: true, response: { status: 500 } });
+      renderWithProviders(<DashboardPage />, { initialPath: "/dashboard" });
+      expect(
+        await screen.findByText("Scopes could not be loaded; showing Overall.", {}, { timeout: 5000 })
+      ).toBeInTheDocument();
+      expect(lastSummaryCall()).toMatchObject({ scope: "ALL" });
+      expect(screen.queryByText(/only overall is available/i)).not.toBeInTheDocument();
+    });
+
+    it("keeps the grid mounted while a new scope loads", async () => {
+      const user = userEvent.setup();
+      renderWithProviders(<DashboardPage />, { initialPath: "/dashboard" });
+      const grid = await screen.findByTestId("dashboard-grid", {}, { timeout: 5000 });
+      let release!: () => void;
+      vi.mocked(getDashboardSummary).mockImplementation(
+        (p) => new Promise((r) => { release = () => r(summaryFor(p)); })
+      );
+      const list = await openSelect(user, "Scope");
+      await user.click(within(list).getByRole("option", { name: "Overall" }));
+      await waitFor(() => expect(lastSummaryCall()).toMatchObject({ scope: "ALL" }));
+      expect(screen.getByTestId("dashboard-grid")).toBe(grid);
+      await act(async () => release());
+      expect(await screen.findByText("October 2026 · Overall")).toBeInTheDocument();
+      expect(screen.getByTestId("dashboard-grid")).toBe(grid);
     });
 
     it("lets a plain user change the month and year", async () => {
@@ -160,6 +202,30 @@ describe("DashboardPage - Test Suite", () => {
   });
 
   describe("Errors", () => {
+    it("shows the error with Retry, not a fallback, for a 400 on a chosen scope", async () => {
+      vi.mocked(getDashboardSummary).mockImplementation((p) =>
+        p.scope === "ALL" ? Promise.reject({ isAxiosError: true, response: { status: 400 } }) : summaryFor(p)
+      );
+      const user = userEvent.setup();
+      renderWithProviders(<DashboardPage />, { initialPath: "/dashboard" });
+      const list = await openSelect(user, "Scope");
+      await user.click(within(list).getByRole("option", { name: "Overall" }));
+      expect(await screen.findByRole("button", { name: "Retry" }, { timeout: 5000 })).toBeInTheDocument();
+      expect(screen.queryByText(/is not available to you/i)).not.toBeInTheDocument();
+      expect(lastSummaryCall()).toMatchObject({ scope: "ALL" });
+    });
+
+    it("lands on the error with Retry when the default scope itself is refused (no loop)", async () => {
+      vi.mocked(getDashboardSummary).mockRejectedValue({ isAxiosError: true, response: { status: 403 } });
+      renderWithProviders(<DashboardPage />, { initialPath: "/dashboard" });
+      expect(await screen.findByRole("button", { name: "Retry" }, { timeout: 5000 })).toBeInTheDocument();
+      const calls = vi.mocked(getDashboardSummary).mock.calls.length;
+      await new Promise((r) => setTimeout(r, 300));
+      expect(vi.mocked(getDashboardSummary).mock.calls.length).toBe(calls);
+      expect(calls).toBe(1);
+      expect(screen.queryByText(/is not available to you/i)).not.toBeInTheDocument();
+    });
+
     it("offers a real Retry button that refetches", async () => {
       vi.mocked(getDashboardSummary).mockRejectedValue({ isAxiosError: true, response: { status: 500 } });
       const user = userEvent.setup();
@@ -180,6 +246,23 @@ describe("DashboardPage - Test Suite", () => {
     it("shows the Overview section once data resolves", async () => {
       renderWithProviders(<DashboardPage />, { initialPath: "/dashboard" });
       expect(await screen.findByText(/overview/i, {}, { timeout: 5000 })).toBeInTheDocument();
+    });
+
+    it("shows no up arrow for reports when the previous month has no reports", async () => {
+      vi.mocked(getDashboardSummary).mockImplementation((p) =>
+        summaryFor(p).then((d) => ({ ...d, previous: { ...d.previous, reports: 0 } }))
+      );
+      renderWithProviders(<DashboardPage />, { initialPath: "/dashboard" });
+      await screen.findByText("Total submissions", {}, { timeout: 5000 });
+      expect(document.querySelector('[data-testid="TrendingUpOutlinedIcon"]')).toBeNull();
+    });
+
+    it("names the scope and period in the empty state", async () => {
+      vi.mocked(getDashboardSummary).mockImplementation((p) => summaryFor(p).then((d) => ({ ...d, reports: 0 })));
+      renderWithProviders(<DashboardPage />, { initialPath: "/dashboard" });
+      expect(
+        await screen.findByText("Nothing was reported in Australia in October 2026.", {}, { timeout: 5000 })
+      ).toBeInTheDocument();
     });
 
     it("renders the new payload with top_reporters null and empty legacy arrays", async () => {

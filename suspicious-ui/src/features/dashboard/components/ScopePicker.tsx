@@ -18,7 +18,7 @@ export default function ScopePicker(props: {
       >
         {props.options.map((o) => (
           <MenuItem key={o.key} value={o.key}>
-            {scopeLabel(o.label)}
+            {scopeLabel(o.label, o.key)}
           </MenuItem>
         ))}
       </Select>

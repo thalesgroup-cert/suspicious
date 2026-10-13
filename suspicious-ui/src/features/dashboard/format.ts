@@ -16,13 +16,17 @@ export function countryName(code: string): string {
   }
 }
 
-/** Backend labels carry country codes ("My country (AU)", "AU | Off GBU"): show names. */
-export function scopeLabel(label: string): string {
-  return label.replace(/\b[A-Z]{2}\b/g, countryName);
+/**
+ * Own-country and country labels carry a country code ("My country (AU)",
+ * "AU"): show the name. Other scopes (CISO scope, regions) are free text
+ * where a two-letter token may be a GBU ("HR", "IT"), so they stay as sent.
+ */
+export function scopeLabel(label: string, key: string): string {
+  return key === "OWN_COUNTRY" || key.startsWith("COUNTRY:") ? label.replace(/\b[A-Z]{2}\b/g, countryName) : label;
 }
 
 /** The scope as the subtitle names it: "Australia", "Overall", "APAC". */
 export function scopeName(scope: ScopeOption): string {
   const own = /^My country \((.+)\)$/.exec(scope.label);
-  return scopeLabel(own ? own[1] : scope.label);
+  return scopeLabel(own && scope.key === "OWN_COUNTRY" ? own[1] : scope.label, scope.key);
 }

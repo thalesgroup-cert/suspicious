@@ -2,7 +2,7 @@ import * as React from "react";
 import { Alert, Box, Button, Container, Stack } from "@mui/material";
 import { useTheme } from "@mui/material/styles";
 import { alpha } from "@mui/material/styles";
-import { useQuery } from "@tanstack/react-query";
+import { keepPreviousData, useQuery } from "@tanstack/react-query";
 import { Skeleton } from "boneyard-js/react";
 import { Responsive, type Layout } from "react-grid-layout/legacy";
 import { getBreakpointFromWidth, useContainerWidth } from "react-grid-layout";
@@ -42,6 +42,7 @@ function monthNameShort(m: number) {
 }
 
 const OVERALL_ONLY: DashboardScopes = { default: "ALL", options: [{ key: "ALL", label: "Overall" }] };
+const EMPTY_DANGER = { failure: 0, safe: 0, inconclusive: 0, suspicious: 0, dangerous: 0, malicious: 0 };
 const GRID_MARGIN: [number, number] = [16, 16];
 const GRID_PADDING: [number, number] = [0, 0];
 
@@ -69,7 +70,7 @@ function DashboardGrid(props: {
   );
 
   return (
-    <div ref={containerRef}>
+    <div ref={containerRef} data-testid="dashboard-grid">
       {mounted ? (
         <Responsive
           className="dashboard-layout"
@@ -324,7 +325,8 @@ export default function DashboardPage() {
   });
 
   const scopes = scopesQuery.data ?? OVERALL_ONLY;
-  const scopeKey = scope ?? scopes.default;
+  // A selection the (refreshed) options no longer offer falls back to the default.
+  const scopeKey = scope !== null && scopes.options.some((o) => o.key === scope) ? scope : scopes.default;
   const optionFor = (key: string) =>
     scopes.options.find((o) => o.key === key) ?? { key, label: key };
 
@@ -342,12 +344,14 @@ export default function DashboardPage() {
     queryFn: () => getDashboardSummary({ month, year, scope: scopeKey }),
     enabled: !scopesQuery.isPending,
     retry: false,
+    // Keep the panels (and the grid) mounted while a new scope/month loads.
+    placeholderData: keepPreviousData,
   });
 
-  // A scope the backend refuses (403) or no longer understands (400) falls
-  // back to the default with a message, never a blank page.
+  // A chosen scope the backend refuses (403) falls back to the default with a
+  // message. Anything else, or a refused default, lands on the error + Retry.
   const status = httpStatus(summaryQuery.error);
-  if (summaryQuery.isError && (status === 403 || status === 400) && scope !== null && scope !== scopes.default) {
+  if (summaryQuery.isError && status === 403 && scope !== null && scope !== scopes.default) {
     setRefusedScope(scope);
     setScope(null);
   }
@@ -360,7 +364,11 @@ export default function DashboardPage() {
   const data = summaryQuery.data;
   const shownScope = data?.scope ?? optionFor(scopeKey);
   const pageSubtitle = `${monthName(data?.month ?? month)} ${data?.year ?? year} · ${scopeName(shownScope)}`;
-  const noCountry = scopesQuery.isSuccess && !scopes.options.some((o) => o.key === "OWN_COUNTRY");
+  const scopeNote = scopesQuery.isError
+    ? "Scopes could not be loaded; showing Overall."
+    : scopesQuery.isSuccess && scopes.options.length === 1
+      ? "Only Overall is available: your profile has no country that can be used as a scope."
+      : undefined;
 
   const kpiSpark = React.useMemo(() => {
     const m = data?.month ?? month;
@@ -369,7 +377,8 @@ export default function DashboardPage() {
     return {
       labels: [`${monthNameShort(pm)} ${String(py).slice(-2)}`, `${monthNameShort(m)} ${String(y).slice(-2)}`],
       // Only reports have a previous-month figure in the summary.
-      submissions: [data ? data.previous.reports : null, data ? data.reports : null],
+      // No previous reports = no previous value (never an up arrow from 0).
+      submissions: [data && data.previous.reports > 0 ? data.previous.reports : null, data ? data.reports : null],
       reporters: [null, data ? data.reporters : null],
       newUsers: [null, data ? data.new_users : null],
     };
@@ -402,7 +411,7 @@ export default function DashboardPage() {
       <OverviewHeader
         title="Dashboard"
         subtitle={pageSubtitle}
-        note={noCountry ? "No country is set on your profile." : undefined}
+        note={scopeNote}
         month={month}
         year={year}
         onMonthChange={setMonth}
@@ -416,8 +425,8 @@ export default function DashboardPage() {
       {refusedScope ? (
         <Container maxWidth="xl" sx={{ pt: 2 }}>
           <Alert severity="warning" onClose={() => setRefusedScope(null)}>
-            {scopeLabel(optionFor(refusedScope).label)} is not available to you. Showing{" "}
-            {scopeLabel(optionFor(scopes.default).label)} instead.
+            {scopeLabel(optionFor(refusedScope).label, refusedScope)} is not available to you. Showing{" "}
+            {scopeLabel(optionFor(scopes.default).label, scopes.default)} instead.
           </Alert>
         </Container>
       ) : null}
@@ -441,7 +450,7 @@ export default function DashboardPage() {
             {isEmpty ? (
               <DashboardEmpty
                 title="No reports in this period"
-                description={`Nothing was reported in ${pageSubtitle}. Try another month or scope.`}
+                description={`Nothing was reported in ${scopeName(shownScope)} in ${monthName(data?.month ?? month)} ${data?.year ?? year}.`}
                 onRefresh={() => summaryQuery.refetch()}
               />
             ) : null}
@@ -511,5 +520,3 @@ export default function DashboardPage() {
     </Box>
   );
 }
-
-const EMPTY_DANGER = { failure: 0, safe: 0, inconclusive: 0, suspicious: 0, dangerous: 0, malicious: 0 };
