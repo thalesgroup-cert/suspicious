@@ -4,6 +4,8 @@ import math
 from datetime import datetime, timedelta, timezone
 from unittest import mock
 
+import numpy as np
+
 from django.contrib.auth.models import Group, User
 from django.core.cache import cache
 from rest_framework.test import APITestCase
@@ -66,6 +68,35 @@ class CampaignPcaTests(APITestCase):
         undated = [p for p in payload["points"] if p["label"] == "DANGEROUS"]
         self.assertEqual(undated[0]["date"], None)
         self.assertIn("2026-10-01", [p["date"] for p in payload["points"]])
+
+    def test_third_component_is_the_third(self):
+        # axes with known variances 18 > 8 > 2 (sum of squares), centred at 0
+        coords = [(3, 0, 0), (-3, 0, 0), (0, 2, 0), (0, -2, 0), (0, 0, 1), (0, 0, -1)]
+        rows = [(f"k{i}", [float(v) for v in c], {}) for i, c in enumerate(coords)]
+        payload = self._pca(rows)
+        r = payload["explained_variance"]
+        self.assertGreaterEqual(r[0], r[1])
+        self.assertGreaterEqual(r[1], r[2])
+        for axis, expected in (("x", 18 / 28), ("y", 8 / 28), ("z", 2 / 28)):
+            share = sum(p[axis] ** 2 for p in payload["points"]) / 28
+            self.assertAlmostEqual(share, expected)
+        self.assertAlmostEqual(r[2], 2 / 28)
+
+    def test_component_signs_are_deterministic(self):
+        rows = [
+            (f"s{i}", [float(i), float(i * i % 7), float((i * 3) % 5), float(i % 2)], {})
+            for i in range(8)
+        ]
+        baseline = self._pca(rows)
+        real_svd = np.linalg.svd
+
+        def flipped_svd(*args, **kwargs):
+            u, s, vt = real_svd(*args, **kwargs)
+            return -u, s, -vt
+
+        with mock.patch("api.services.campaigns.service.np.linalg.svd", flipped_svd):
+            flipped = self._pca(rows)
+        self.assertEqual(baseline, flipped)
 
     def test_single_vector(self):
         payload = self._pca([("a", [1.0, 2.0, 3.0], {"classification": "safe", "subject": "Hi"})])
@@ -156,3 +187,23 @@ class CampaignEndpointTests(APITestCase):
         self.assertEqual(sum(resp.data["non_danger"]), 1)
         band = resp.data["campaigns"][0]
         self.assertTrue(band["start"].startswith(resp.data["dates"][0]))
+
+    def test_mail_volume_cached_per_days_not_on_failure(self):
+        with patch_collection(FakeCollection([])) as getter:
+            self.client.get("/api/campaigns/mail-volume/")
+            self.client.get("/api/campaigns/mail-volume/")
+            self.client.get("/api/campaigns/mail-volume/", {"days": 30})
+        self.assertEqual(getter.call_count, 2)
+
+        cache.clear()
+
+        def exploding(_collection):
+            yield {"sent_date": datetime.now(timezone.utc).isoformat()}
+            raise RuntimeError("chroma went away")
+
+        with patch_collection(FakeCollection([])), mock.patch(
+            "api.services.campaigns.service.iter_metadata_dicts", exploding
+        ):
+            resp = self.client.get("/api/campaigns/mail-volume/")
+        self.assertEqual(sum(resp.data["non_danger"]), 0)
+        self.assertIsNone(cache.get("campaigns:mail-volume:15"))

@@ -20,6 +20,7 @@ from api.services.campaigns import CampaignQueryService
 from api.services.campaigns.service import (
     DEFAULT_PCA_LIMIT,
     DEFAULT_PERIOD_DAYS,
+    MAIL_VOLUME_CACHE_TTL_SECONDS,
     MAX_PCA_LIMIT,
     MAX_PERIOD_DAYS,
     MIN_PERIOD_DAYS,
@@ -119,8 +120,7 @@ class CampaignPcaView(APIView):
             "**Label semantics**\n"
             "- Point `label` is the normalized uppercase value of the metadata "
             "`classification` field.\n"
-            "- Unlike the counts endpoint, this endpoint does **not** fold `SUSPICIOUS` into "
-            "`UNWANTED`; labels are exposed as stored after normalization.\n\n"
+            "- Labels are exposed as stored after normalization, like the counts endpoint.\n\n"
             "**Sampling behavior**\n"
             "- The endpoint does **not** fetch all embeddings first.\n"
             "- It first walks collection IDs, then selects a deterministic subset up to `limit` "
@@ -132,6 +132,8 @@ class CampaignPcaView(APIView):
             "- PCA is computed with centered vectors and SVD in float64.\n"
             "- `explained_variance` contains the variance ratios for PC1, PC2 and PC3 "
             "(always 3 values from this server; clients should also accept 2).\n"
+            "- Each component's sign is normalised (largest-magnitude loading positive) so "
+            "the projection does not mirror between refreshes.\n"
             "- Missing components (one vector, 1-dimensional vectors, two vectors, zero "
             "variance) are returned as zero coordinates and zero ratios, never NaN.\n\n"
             "**Point date**\n"
@@ -221,7 +223,11 @@ class CampaignMailVolumeView(APIView):
             "- `sourceRefs` are parsed defensively from arrays or string-encoded lists, de-duplicated, "
             "sorted, and then used as the grouping key.\n"
             "- This is a heuristic, not a guaranteed campaign identifier. Reused or noisy "
-            "`sourceRefs` may merge unrelated messages into the same displayed band."
+            "`sourceRefs` may merge unrelated messages into the same displayed band.\n"
+            "- Band start/end use every dated record of the group, future-dated ones "
+            "included, then are clamped to the window (the summary endpoint skips "
+            "future-dated records).\n\n"
+            f"Responses are cached for {MAIL_VOLUME_CACHE_TTL_SECONDS} seconds per `days` value."
         ),
         parameters=[DAYS_PARAMETER],
         responses={
@@ -272,17 +278,22 @@ class CampaignSummaryView(APIView):
         description=(
             "Return indicators for the last `days` UTC days (today included) and the "
             "preceding period of the same length, computed in one scan of the message "
-            "store metadata. Organisation-wide; records without a usable date are skipped.\n\n"
+            "store metadata. Organisation-wide; records without a usable date and "
+            "future-dated records are skipped.\n\n"
             "**Fields**\n"
             "- `messages` / `previous_messages`, `dangerous` / `previous_dangerous`, and "
-            "`dangerous_share` (dangerous / messages, `0.0` when the period is empty: read "
-            "`messages == 0` as no data).\n"
+            "`dangerous_share` / `previous_dangerous_share` (dangerous / messages, `null` "
+            "when that period has no messages).\n"
             "- `peak_day`: the day with most messages in the period (earliest on ties), "
             "`null` when empty.\n"
             "- `mix`: four-bucket classification counts for the period, as stored.\n"
+            "- `unclassified`: messages in the period whose label is none of the four "
+            "(e.g. `NONE`, `UNKNOWN`, empty); `messages = sum(mix) + unclassified`.\n"
             "- `campaigns`: one entry per group of messages in the period, sorted by "
-            "message count. `case_ids` lists up to 20 case ids in chronological order; "
-            "`sample_subject` is the subject of the earliest message that has one.\n"
+            "message count. `first_seen` / `last_seen` are the first and last message of "
+            "the group seen within the period. `case_ids` lists the 20 most recent case "
+            "ids, newest first; `sample_subject` is the subject of the earliest message "
+            "in the period that has one.\n"
             f"- `active`: `last_seen` within `active_window_hours` ({ACTIVE_WINDOW_HOURS}) "
             "of now; `active_campaigns` counts them; `largest_campaign` is the first entry.\n\n"
             "**Campaign grouping heuristic**\n"
@@ -311,7 +322,8 @@ class CampaignSummaryView(APIView):
                     "dangerous_share": 0.142857,
                     "previous_dangerous_share": 0.1,
                     "peak_day": {"date": "2026-10-08", "count": 9},
-                    "mix": {"SAFE": 20, "UNWANTED": 10, "SUSPICIOUS": 6, "DANGEROUS": 6},
+                    "mix": {"SAFE": 18, "UNWANTED": 10, "SUSPICIOUS": 6, "DANGEROUS": 6},
+                    "unclassified": 2,
                     "campaigns": [
                         {
                             "name": "sender-domain-a, subject-cluster-1",
@@ -321,7 +333,7 @@ class CampaignSummaryView(APIView):
                             "dangerous": 4,
                             "dangerous_share": 0.571429,
                             "sample_subject": "Invoice overdue",
-                            "case_ids": ["1201", "1207"],
+                            "case_ids": ["1207", "1201"],
                             "active": True,
                         }
                     ],

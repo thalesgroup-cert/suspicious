@@ -9,6 +9,7 @@ from datetime import date, datetime, time, timedelta, timezone as dt_timezone
 from typing import Any, Dict, List, Sequence, Tuple
 
 import numpy as np
+from django.core.cache import cache
 
 from .chroma import (
     fetch_records_for_ids,
@@ -37,6 +38,7 @@ PCA_COMPONENTS = 3
 DEFAULT_PERIOD_DAYS = 15
 MIN_PERIOD_DAYS = 7
 MAX_PERIOD_DAYS = 90
+MAIL_VOLUME_CACHE_TTL_SECONDS = 120
 
 
 def empty_counts_payload() -> Dict[str, int]:
@@ -159,8 +161,15 @@ class CampaignQueryService:
                 logger.error("PCA SVD failed: %s", exc, exc_info=True)
                 return empty_pca_payload()
 
+            # SVD signs are arbitrary: make each component's largest-magnitude
+            # loading positive so the map does not mirror between refreshes.
+            components = vt[:PCA_COMPONENTS].copy()
+            for row in components:
+                if row[np.argmax(np.abs(row))] < 0:
+                    row *= -1.0
+
             scores = np.zeros((X_centered.shape[0], PCA_COMPONENTS))
-            projected = X_centered @ vt[:PCA_COMPONENTS].T
+            projected = X_centered @ components.T
             scores[:, :projected.shape[1]] = projected
 
             eigenvalue_numerators = np.square(singular_values)
@@ -205,6 +214,11 @@ class CampaignQueryService:
             return empty_pca_payload()
 
     def get_mail_volume(self, days: int = DEFAULT_PERIOD_DAYS) -> Dict[str, Any]:
+        key = f"campaigns:mail-volume:{days}"
+        cached = cache.get(key)
+        if cached is not None:
+            return cached
+
         today_utc = datetime.now(dt_timezone.utc).date()
         start_utc = today_utc - timedelta(days=days - 1)
         all_days = [start_utc + timedelta(days=i) for i in range(days)]
@@ -306,9 +320,11 @@ class CampaignQueryService:
                 "end": clamped_end,
             })
 
-        return {
+        payload = {
             "dates": all_days,
             "non_danger": non_danger,
             "dangerous": dangerous,
             "campaigns": campaigns_out,
         }
+        cache.set(key, payload, MAIL_VOLUME_CACHE_TTL_SECONDS)
+        return payload

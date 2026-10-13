@@ -6,7 +6,7 @@ identical. Messages without source refs belong to no campaign.
 """
 import logging
 from datetime import datetime, timedelta, timezone as dt_timezone
-from typing import Any, Dict, List
+from typing import Any, Dict, List, Optional
 
 from django.core.cache import cache
 
@@ -33,9 +33,29 @@ def _now() -> datetime:
     return datetime.now(dt_timezone.utc)
 
 
-def _share(part: int, whole: int) -> float:
-    # ponytail: 0.0 for an empty period; clients read `messages == 0` as "no data"
-    return part / whole if whole else 0.0
+def _share(part: int, whole: int) -> Optional[float]:
+    # None = no messages, so no share (the UI shows "no data")
+    return part / whole if whole else None
+
+
+def _empty_payload(days, start, end) -> Dict[str, Any]:
+    return {
+        "days": days,
+        "period": {"start": start, "end": end},
+        "messages": 0,
+        "previous_messages": 0,
+        "dangerous": 0,
+        "previous_dangerous": 0,
+        "dangerous_share": None,
+        "previous_dangerous_share": None,
+        "peak_day": None,
+        "mix": empty_counts_payload(),
+        "unclassified": 0,
+        "campaigns": [],
+        "active_campaigns": 0,
+        "active_window_hours": ACTIVE_WINDOW_HOURS,
+        "largest_campaign": None,
+    }
 
 
 def get_campaign_summary(days: int) -> Dict[str, Any]:
@@ -48,23 +68,7 @@ def get_campaign_summary(days: int) -> Dict[str, Any]:
     end = now.date()
     start = end - timedelta(days=days - 1)
     prev_start = start - timedelta(days=days)
-
-    payload: Dict[str, Any] = {
-        "days": days,
-        "period": {"start": start, "end": end},
-        "messages": 0,
-        "previous_messages": 0,
-        "dangerous": 0,
-        "previous_dangerous": 0,
-        "dangerous_share": 0.0,
-        "previous_dangerous_share": 0.0,
-        "peak_day": None,
-        "mix": empty_counts_payload(),
-        "campaigns": [],
-        "active_campaigns": 0,
-        "active_window_hours": ACTIVE_WINDOW_HOURS,
-        "largest_campaign": None,
-    }
+    payload = _empty_payload(days, start, end)
 
     collection = get_chroma_collection()
     if collection is None:
@@ -109,7 +113,9 @@ def get_campaign_summary(days: int) -> Dict[str, Any]:
                 group["subject"] = (sent_dt, subject)
     except Exception as exc:
         logger.error("Error computing campaign summary: %s", exc, exc_info=True)
-        return payload
+        return _empty_payload(days, start, end)  # never the half-filled one, never cached
+
+    payload["unclassified"] = payload["messages"] - sum(payload["mix"].values())
 
     payload["dangerous_share"] = _share(payload["dangerous"], payload["messages"])
     payload["previous_dangerous_share"] = _share(
@@ -124,7 +130,8 @@ def get_campaign_summary(days: int) -> Dict[str, Any]:
     for refs, group in groups.items():
         seen = sorted(group["seen"], key=lambda item: item[0])
         case_ids: List[str] = []
-        for _, case_id in seen:
+        # most recent 20, newest first; (date, id) makes ties stable
+        for _, case_id in sorted(seen, key=lambda item: (item[0], item[1] or ""), reverse=True):
             if case_id and case_id not in case_ids:
                 case_ids.append(case_id)
                 if len(case_ids) == MAX_CASE_IDS:

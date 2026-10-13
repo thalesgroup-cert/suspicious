@@ -47,7 +47,9 @@ class SummaryServiceTests(APITestCase):
             msg(5, "2026-10-09T10:00:00Z", "SUSPICIOUS"),
             msg(6, "2026-10-09T11:00:00Z", "UNWANTED"),
             msg(7, "2026-10-07T05:00:00Z", "SAFE"),
-            msg(8, "2026-10-13T11:00:00Z", "weird"),
+            msg(8, "2026-10-13T11:00:00Z", "NONE"),
+            msg(9, "2026-10-07T01:00:00+02:00", "SAFE"),       # 10-06 23:00 UTC: previous
+            msg(10, "2026-10-14T00:00:00Z", "DANGEROUS"),      # future-dated: skipped
             ("nodate", None, {"classification": "DANGEROUS"}),
         ]
         s = self.summary(rows)
@@ -55,11 +57,12 @@ class SummaryServiceTests(APITestCase):
         self.assertEqual(str(s["period"]["start"]), "2026-10-07")
         self.assertEqual(str(s["period"]["end"]), "2026-10-13")
         self.assertEqual(s["messages"], 5)
-        self.assertEqual(s["previous_messages"], 2)
+        self.assertEqual(s["previous_messages"], 3)
+        self.assertEqual(s["unclassified"], 1)
         self.assertEqual(s["dangerous"], 1)
         self.assertEqual(s["previous_dangerous"], 1)
         self.assertAlmostEqual(s["dangerous_share"], 0.2)
-        self.assertAlmostEqual(s["previous_dangerous_share"], 0.5)
+        self.assertAlmostEqual(s["previous_dangerous_share"], 1 / 3)
         # 10-07 and 10-09 both have 2: earliest wins
         self.assertEqual(str(s["peak_day"]["date"]), "2026-10-07")
         self.assertEqual(s["peak_day"]["count"], 2)
@@ -83,7 +86,7 @@ class SummaryServiceTests(APITestCase):
         self.assertEqual(ab["messages"], 3)
         self.assertEqual(ab["dangerous"], 1)
         self.assertAlmostEqual(ab["dangerous_share"], 1 / 3)
-        self.assertEqual(ab["case_ids"], ["10", "11", "12"])
+        self.assertEqual(ab["case_ids"], ["12", "11", "10"])  # most recent first
         self.assertEqual(ab["sample_subject"], "Invoice")
         self.assertEqual(ab["first_seen"], datetime(2026, 10, 8, 8, tzinfo=timezone.utc))
         self.assertEqual(ab["last_seen"], datetime(2026, 10, 12, 13, tzinfo=timezone.utc))
@@ -92,20 +95,47 @@ class SummaryServiceTests(APITestCase):
         self.assertEqual(s["active_campaigns"], 1)
         self.assertEqual(s["largest_campaign"], {"name": "a.example, b.example", "messages": 3})
 
-    def test_case_ids_capped_at_20(self):
+    def test_case_ids_keep_most_recent_20(self):
         rows = [
-            msg(i, f"2026-10-10T{i % 24:02d}:00:00Z", refs=["x"], case=str(100 + i))
+            msg(i, f"2026-10-{8 + i // 24:02d}T{i % 24:02d}:00:00Z", refs=["x"], case=str(100 + i))
             for i in range(30)
         ]
         s = self.summary(rows)
         self.assertEqual(s["campaigns"][0]["messages"], 30)
-        self.assertEqual(len(s["campaigns"][0]["case_ids"]), 20)
+        self.assertEqual(s["campaigns"][0]["case_ids"], [str(100 + i) for i in range(29, 9, -1)])
+
+    def test_active_boundary_is_inclusive(self):
+        rows = [
+            msg(1, "2026-10-11T12:00:00Z", refs=["edge"]),     # exactly 48 h before NOW
+            msg(2, "2026-10-11T11:59:59Z", refs=["stale"]),
+        ]
+        s = self.summary(rows)
+        active = {c["name"]: c["active"] for c in s["campaigns"]}
+        self.assertEqual(active, {"edge": True, "stale": False})
+
+    def test_scan_failure_returns_empty_and_is_not_cached(self):
+        def exploding(_collection):
+            yield {"sent_date": "2026-10-10T10:00:00Z", "classification": "DANGEROUS",
+                   "sourceRefs": ["x"]}
+            raise RuntimeError("chroma went away")
+
+        with mock.patch(
+            "api.services.campaigns.summary.get_chroma_collection",
+            return_value=FakeCollection([]),
+        ), mock.patch("api.services.campaigns.summary.iter_metadata_dicts", exploding):
+            s = get_campaign_summary(7)
+        self.assertEqual((s["messages"], s["dangerous"], s["unclassified"]), (0, 0, 0))
+        self.assertEqual(s["campaigns"], [])
+        self.assertIsNone(s["dangerous_share"])
+        self.assertIsNone(cache.get("campaigns:summary:7"))
 
     def test_empty_store(self):
         s = self.summary(None)
         self.assertEqual(s["messages"], 0)
         self.assertEqual(s["previous_messages"], 0)
-        self.assertEqual(s["dangerous_share"], 0.0)
+        self.assertIsNone(s["dangerous_share"])
+        self.assertIsNone(s["previous_dangerous_share"])
+        self.assertEqual(s["unclassified"], 0)
         self.assertIsNone(s["peak_day"])
         self.assertEqual(s["campaigns"], [])
         self.assertEqual(s["active_campaigns"], 0)
@@ -139,6 +169,13 @@ class SummaryEndpointTests(APITestCase):
             self.client.get(URL)
             self.client.get(URL, {"days": 7})
         self.assertEqual(getter.call_count, 2)
+
+    def test_default_days_is_15(self):
+        self.client.force_authenticate(self.cert)
+        with mock.patch("api.services.campaigns.summary.get_chroma_collection", return_value=None):
+            resp = self.client.get(URL)
+        self.assertEqual(resp.data["days"], 15)
+        self.assertIsNone(resp.data["dangerous_share"])
 
     def test_days_validation(self):
         self.client.force_authenticate(self.cert)
