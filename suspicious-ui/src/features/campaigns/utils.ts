@@ -1,139 +1,80 @@
-import { type Layout } from "react-grid-layout/legacy";
-import type { PcaPoint } from "@/features/campaigns/api";
+import * as React from "react";
+import { useTheme } from "@mui/material/styles";
+import { onCard } from "@/features/dashboard/format";
+import { useResultColors, useStatusColors } from "@/styles/colorStore";
 
-// Constants
+/** The four classifications the message store holds, in severity order, with their display names. */
+export const CLASSES = [
+  ["SAFE", "Safe"],
+  ["UNWANTED", "Unwanted"],
+  ["SUSPICIOUS", "Suspicious"],
+  ["DANGEROUS", "Dangerous"],
+] as const;
 
-export const CLASS_COLORS: Record<string, string> = {
-  SAFE: "#22C55E",
-  UNWANTED: "#F59E0B",
-  SUSPICIOUS: "#38BDF8",
-  DANGEROUS: "#EF4444",
-  UNKNOWN: "#94A3B8",
-};
-
-export const PCA_LABELS = ["SAFE", "UNWANTED", "SUSPICIOUS", "DANGEROUS"];
-
-export const PANEL_KEYS = {
-  CLASSIFICATION: "classification",
-  PCA: "pca",
-  VOLUME: "volume",
-} as const;
-
-export const BREAKPOINTS = { lg: 1200, md: 900, sm: 600, xs: 0 };
-export const COLS = { lg: 12, md: 12, sm: 6, xs: 1 };
-export const ROW_HEIGHT = 32;
-
-export const DEFAULT_LAYOUTS: Partial<Record<string, Layout>> = {
-  lg: [
-    { i: PANEL_KEYS.CLASSIFICATION, x: 0, y: 0, w: 4, h: 14, minW: 3, minH: 8 },
-    { i: PANEL_KEYS.PCA, x: 4, y: 0, w: 8, h: 14, minW: 4, minH: 8 },
-    { i: PANEL_KEYS.VOLUME, x: 0, y: 14, w: 12, h: 12, minW: 6, minH: 8 },
-  ],
-  md: [
-    { i: PANEL_KEYS.CLASSIFICATION, x: 0, y: 0, w: 5, h: 14, minW: 3, minH: 8 },
-    { i: PANEL_KEYS.PCA, x: 5, y: 0, w: 7, h: 14, minW: 4, minH: 8 },
-    { i: PANEL_KEYS.VOLUME, x: 0, y: 14, w: 12, h: 12, minW: 6, minH: 8 },
-  ],
-  sm: [
-    { i: PANEL_KEYS.CLASSIFICATION, x: 0, y: 0, w: 6, h: 14, minH: 8 },
-    { i: PANEL_KEYS.PCA, x: 0, y: 14, w: 6, h: 14, minH: 8 },
-    { i: PANEL_KEYS.VOLUME, x: 0, y: 28, w: 6, h: 12, minH: 8 },
-  ],
-  xs: [
-    { i: PANEL_KEYS.CLASSIFICATION, x: 0, y: 0, w: 1, h: 14, minH: 8 },
-    { i: PANEL_KEYS.PCA, x: 0, y: 14, w: 1, h: 14, minH: 8 },
-    { i: PANEL_KEYS.VOLUME, x: 0, y: 28, w: 1, h: 12, minH: 8 },
-  ],
-};
-
-export const STORAGE_KEY = "campaigns:layouts";
-
-// Layout persistence
-
-export function loadLayouts(): Partial<Record<string, Layout>> {
-  if (typeof window === "undefined") return DEFAULT_LAYOUTS;
-  try {
-    const raw = window.localStorage.getItem(STORAGE_KEY);
-    if (!raw) return DEFAULT_LAYOUTS;
-    const parsed = JSON.parse(raw);
-    return parsed && typeof parsed === "object" && !Array.isArray(parsed)
-      ? parsed
-      : DEFAULT_LAYOUTS;
-  } catch {
-    return DEFAULT_LAYOUTS;
-  }
-}
-
-export function saveLayouts(layouts: Partial<Record<string, Layout>>) {
-  if (typeof window === "undefined") return;
-  try {
-    window.localStorage.setItem(STORAGE_KEY, JSON.stringify(layouts));
-  } catch {
-    /* ignore */
-  }
-}
-
-// Helpers
-
-export function compactLabel(text: string, max = 22) {
-  return text.length > max ? `${text.slice(0, max - 1)}…` : text;
-}
-
-export function classColor(label: string) {
-  return (
-    CLASS_COLORS[(label || "UNKNOWN").toUpperCase()] ?? CLASS_COLORS.UNKNOWN
-  );
-}
+export type ClassKey = (typeof CLASSES)[number][0];
 
 export function normalizeLabel(label: string) {
   return (label || "UNKNOWN").toUpperCase();
 }
 
-export function dateOnly(iso: string) {
-  return iso ? iso.slice(0, 10) : "";
+export function classLabel(label: string): string {
+  const key = normalizeLabel(label);
+  return CLASSES.find(([k]) => k === key)?.[1] ?? "Unknown";
 }
 
-export function toIndexMap(dates: string[]) {
-  const map = new Map<string, number>();
-  dates.forEach((d, i) => map.set(d, i));
-  return map;
+/**
+ * Class -> mark colour (3:1 on the card). Mapping: Safe=safe, Unwanted=inconclusive,
+ * Suspicious=suspicious, Dangerous=dangerous; useResultHex folds Unwanted into suspicious,
+ * which would draw two adjacent segments in one colour, so Unwanted takes the neutral verdict colour.
+ */
+export function useClassColors(): Record<ClassKey | "UNKNOWN", string> {
+  const theme = useTheme();
+  const result = useResultColors();
+  const status = useStatusColors();
+  const c = (hex: string) => onCard(hex, theme.palette, 3);
+  return {
+    SAFE: c(result.safe.main),
+    UNWANTED: c(result.inconclusive.main),
+    SUSPICIOUS: c(result.suspicious.main),
+    DANGEROUS: c(result.dangerous.main),
+    UNKNOWN: c(status.unknown.main),
+  };
 }
 
-export function computeCampaignRects(points: PcaPoint[]) {
-  const map = new Map<
-    string,
-    { name: string; minX: number; maxX: number; minY: number; maxY: number }
-  >();
+/** "12 Oct" for a date or a datetime, read in UTC like the backend's days. */
+export function formatDay(iso: string): string {
+  if (!iso) return "—";
+  const d = new Date(iso.length === 10 ? `${iso}T00:00:00Z` : iso);
+  if (Number.isNaN(d.getTime())) return "—";
+  return d.toLocaleDateString("en-GB", { day: "numeric", month: "short", timeZone: "UTC" });
+}
 
-  for (const p of points) {
-    const refs = Array.isArray(p.sourceRefs)
-      ? p.sourceRefs.filter(Boolean)
-      : [];
-    if (!refs.length) continue;
-    const key = refs.slice().sort().join(" | ");
-    const name =
-      refs.length <= 3 ? refs.join(", ") : `${refs.slice(0, 3).join(", ")}…`;
-    const current = map.get(key);
-    if (!current) {
-      map.set(key, { name, minX: p.x, maxX: p.x, minY: p.y, maxY: p.y });
-    } else {
-      current.minX = Math.min(current.minX, p.x);
-      current.maxX = Math.max(current.maxX, p.x);
-      current.minY = Math.min(current.minY, p.y);
-      current.maxY = Math.max(current.maxY, p.y);
-    }
-  }
+/** "12 Oct, 09:00 UTC". */
+export function formatSeen(iso: string): string {
+  const d = new Date(iso);
+  if (!iso || Number.isNaN(d.getTime())) return "—";
+  const time = d.toLocaleTimeString("en-GB", { hour: "2-digit", minute: "2-digit", timeZone: "UTC" });
+  return `${formatDay(iso)}, ${time} UTC`;
+}
 
-  return Array.from(map.values()).map((b, idx) => {
-    const padX = Math.max(0.2, (b.maxX - b.minX) * 0.1);
-    const padY = Math.max(0.2, (b.maxY - b.minY) * 0.1);
-    return {
-      id: idx,
-      name: b.name,
-      x1: b.minX - padX,
-      x2: b.maxX + padX,
-      y1: b.minY - padY,
-      y2: b.maxY + padY,
-    };
+export type SortDir = "asc" | "desc";
+
+/** A sorted copy; null/undefined keys always last. Strings compare case-insensitively, digits by value. */
+export function sortRows<T>(rows: T[], key: (row: T) => string | number | null | undefined, dir: SortDir): T[] {
+  const sign = dir === "asc" ? 1 : -1;
+  return [...rows].sort((a, b) => {
+    const x = key(a);
+    const y = key(b);
+    if (x == null || y == null) return x == null ? (y == null ? 0 : 1) : -1;
+    const cmp = typeof x === "string" && typeof y === "string" ? x.localeCompare(y, undefined, { sensitivity: "base", numeric: true }) : Number(x) - Number(y);
+    return cmp * sign;
   });
+}
+
+/** Column sort state: a new column starts at `firstDir(key)`, the same column flips. */
+export function useSort<K extends string>(initial: { key: K; dir: SortDir }, firstDir: (key: K) => SortDir) {
+  const [sort, setSort] = React.useState(initial);
+  const onSort = (key: K) =>
+    setSort((s) => (s.key === key ? { key, dir: s.dir === "asc" ? "desc" : "asc" } : { key, dir: firstDir(key) }));
+  return { sort, onSort };
 }

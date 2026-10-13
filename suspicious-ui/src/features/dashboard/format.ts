@@ -68,3 +68,12 @@ export function fieldLabelSx(palette: { text: { secondary: string }; primary: { 
     "&.Mui-focused": { color: onCard(palette.primary.main, palette, 5) },
   };
 }
+
+/** "vs September: +32 (+7%) from 480"; "no data" when the previous period has nothing to compare with. */
+export function delta(prevLabel: string, current: number, previous: number, hasPrevious: boolean) {
+  if (!hasPrevious) return `vs ${prevLabel}: no data`;
+  const d = current - previous;
+  const sign = d > 0 ? "+" : "";
+  const pct = previous > 0 ? ` (${sign}${Math.round((d / previous) * 100)}%)` : "";
+  return `vs ${prevLabel}: ${sign}${d.toLocaleString()}${pct} from ${previous.toLocaleString()}`;
+}

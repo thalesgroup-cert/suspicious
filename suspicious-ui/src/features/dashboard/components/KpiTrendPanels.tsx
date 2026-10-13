@@ -5,7 +5,7 @@ import { useTheme } from "@mui/material/styles";
 import { SoftCard } from "./SoftCard";
 import { Sparkline } from "./Sparkline";
 import type { DashboardSummary } from "@/features/dashboard/api";
-import { monthName, onCard, percents, plural } from "@/features/dashboard/format";
+import { delta, monthName, onCard, percents, plural } from "@/features/dashboard/format";
 import { useResultColors } from "@/styles/colorStore";
 
 // Weeks are Monday-based and cut at the month's edges (and at today), so the ends can be short.
@@ -13,16 +13,7 @@ const SPARK_LABEL = "Reports per week (first and last weeks may be partial)";
 
 const sum = (o: Record<string, number>) => Object.values(o).reduce((a, b) => a + b, 0);
 
-/** "vs September: +32 (+7%) from 480"; "no data" when the previous month has nothing to compare with. */
-function delta(prevMonth: string, current: number, previous: number, hasPrevious: boolean) {
-  if (!hasPrevious) return `vs ${prevMonth}: no data`;
-  const d = current - previous;
-  const sign = d > 0 ? "+" : "";
-  const pct = previous > 0 ? ` (${sign}${Math.round((d / previous) * 100)}%)` : "";
-  return `vs ${prevMonth}: ${sign}${d.toLocaleString()}${pct} from ${previous.toLocaleString()}`;
-}
-
-function Kpi(props: { title: string; value: number; marker?: string; children?: React.ReactNode }) {
+export function Kpi(props: { title: string; value: number | string; marker?: string; children?: React.ReactNode }) {
   return (
     <SoftCard title={props.title}>
       <Stack spacing={0.5} sx={{ alignItems: "flex-start" }}>
@@ -40,7 +31,7 @@ function Kpi(props: { title: string; value: number; marker?: string; children?: 
   );
 }
 
-function Line({ children }: { children: React.ReactNode }) {
+export function Line({ children }: { children: React.ReactNode }) {
   return (
     <Typography variant="body2" color="text.secondary">
       {children}
