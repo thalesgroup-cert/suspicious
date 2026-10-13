@@ -99,3 +99,20 @@ Deferred:
 - `screenshot_url` for #18/#22 answers 404 (backend data/file mismatch): hide section on image error.
 - Midnight contained primary buttons are 3.1:1 (theme change). 17 theme/shared-component contrast entries: `docs/plans/investigation-contrast-2026-10.tsv`.
 - Analysis expansion resets on tab switch; first analyzer group and observable panel can name different "worst"; "Result" row shows raw category text ("1 hi"); cyber table sticks out of its card by 12px at 1440 (scrolls inside).
+
+## Dashboard cycle (2026-10-13)
+
+Shipped on `design/dashboard-page`: live country/region/Overall summary (analysts see their own country, CERT/Admin/CISO scope rules, reporter names only for elevated), scope picker, KPI cards with weekly sparkline, outcomes and by-type panels, stable first paint, desktop-only drag/resize, stacked phone layout; backend fixes: stuck `total_reporters`, stale monthly tables, profile `country/region/gbu` read-only, user-cases aggregate locked to CERT/Admin, query cache cleared on logout/login.
+
+Accepted deviations from the spec: CHALLENGED cases count as finished; sparkline only on the Reports card; the D1 test guards the defects found (layout saved on width/theme change, first paint at 1280px) because React #185 never reproduced in 69 runs; contrast swept in 7 of 17 themes (`docs/plans/dashboard-contrast-2026-10.tsv`).
+
+Deferred:
+- Default month uses the browser clock, bucketing uses the server timezone: have `/scopes/` return the server's current month.
+- Home still reads the cron-fed tables while the Dashboard is live, so the two can differ for the same month; Home scope counts ignore the new CISO group check (`api/views/home.py`, `scoped_case_queryset`).
+- LDAP never removes old country groups, so a reporter who moves AU to FR counts in both.
+- Weekly dangerous series and sparklines on the other KPI cards; country/region ranking for elevated users (replaces the dropped Groups toggle).
+- Campaigns throws React #185 on window resize (also on main, 2 of 4 runs each): apply the "persist layout only on drag/resize stop" fix.
+- `materialise_dashboard_snapshots` still runs nightly (02:00) but nothing reads the snapshot: remove or wire a reader.
+- Saved layout drops the reporters panel position when `top_reporters` is null; KPI cards leave ~40px empty space (fixed grid row height).
+- Contrast in shared components: Campaigns status chips (2.1 to 3.8:1), metal outlined labels (4.05:1), other themes not yet swept (10 of 17).
+- Minor backend: stored CISO scope "AU|AU" refuses the "AU" alias; service-mailbox exclusion depends on DB collation and on `SUSPICIOUS_EMAIL` being set; reporter labels differing only in case are not disambiguated.
