@@ -8,6 +8,7 @@ from rest_framework.test import APITestCase
 from api.permissions.dashboard_scope import resolve_scope
 from dashboard.tests_regional import seed
 from profiles.models import CISOProfile, UserProfile
+from profiles.profiles_utils.scope import parse_scope_groups
 
 SUMMARY = "/api/dashboard/summary/"
 SCOPES = "/api/dashboard/scopes/"
@@ -32,7 +33,8 @@ class DashboardScopeTests(APITestCase):
         cls.cert = User.objects.create_user("cert@meridian.example", password="x")
         in_group(cls.cert, "CERT")
         cls.ciso = User.objects.create_user("ciso@meridian.example", password="x")
-        in_group(cls.ciso, "CISO")
+        for name in ("CISO", "AU", "Off GBU"):  # LDAP puts a CISO in their scope's groups
+            in_group(cls.ciso, name)
         CISOProfile.objects.create(
             user=cls.ciso, function="", gbu="Off GBU", country="AU", region="APAC", scope="AU|Off GBU"
         )
@@ -144,7 +146,8 @@ class DashboardScopeHardeningTests(APITestCase):
         cls.cert = User.objects.create_user("cert@meridian.example", password="x")
         in_group(cls.cert, "CERT")
         cls.ciso = User.objects.create_user("ciso@meridian.example", password="x")
-        in_group(cls.ciso, "CISO")
+        for name in ("CISO", "AU", "Off GBU"):  # LDAP puts a CISO in their scope's groups
+            in_group(cls.ciso, name)
         CISOProfile.objects.create(
             user=cls.ciso, function="", gbu="Off GBU", country="AU", region="APAC", scope="AU|Off GBU"
         )
@@ -252,7 +255,8 @@ class FixRound2Tests(APITestCase):
 
     def _ciso(self, username, scope):
         user = User.objects.create_user(username, password="x")
-        in_group(user, "CISO")
+        for name in ["CISO", *parse_scope_groups(scope)]:
+            in_group(user, name)
         CISOProfile.objects.create(
             user=user, function="", gbu="Off GBU", country="AU", region="APAC", scope=scope
         )
@@ -293,3 +297,65 @@ class FixRound2Tests(APITestCase):
         self.client.force_authenticate(self.au1)
         resp = self.client.get(SUMMARY, {"month": 10, "year": 2101})
         self.assertEqual(resp.status_code, 400)
+
+
+class FinalWaveTests(APITestCase):
+    """Whole-branch review: CISO scope backed by groups, order-insensitive alias, option limits."""
+
+    @classmethod
+    def setUpTestData(cls):
+        cls.au1, cls.au2, cls.nz1, cls.us1 = seed()
+        profile(cls.au1, "AU", "APAC")
+        cls.cert = User.objects.create_user("cert@meridian.example", password="x")
+        in_group(cls.cert, "CERT")
+
+    def setUp(self):
+        cache.clear()
+
+    def _ciso(self, username, scope, groups):
+        user = User.objects.create_user(username, password="x")
+        for name in ["CISO", *groups]:
+            in_group(user, name)
+        CISOProfile.objects.create(user=user, function="", gbu="Off GBU", country="AU", region="APAC", scope=scope)
+        return user
+
+    # I2: a stored scope naming a group the CISO is not in grants nothing.
+
+    def test_ciso_scope_not_backed_by_groups_is_refused(self):
+        ciso = self._ciso("stale@meridian.example", "AU|Off GBU", ["AU"])
+        for requested in ("OWN_SCOPE", "AU|Off GBU"):
+            with self.assertRaises(PermissionDenied, msg=requested):
+                resolve_scope(ciso, requested)
+        self.client.force_authenticate(ciso)
+        scopes = self.client.get(SCOPES).data
+        self.assertNotIn("OWN_SCOPE", [o["key"] for o in scopes["options"]])
+        self.assertNotEqual(scopes["default"], "OWN_SCOPE")
+        data = self.client.get(SUMMARY, {"month": 10, "year": 2026}).data
+        self.assertIsNone(data["top_reporters"])
+        self.assertEqual(self.client.get(SUMMARY, {"month": 10, "year": 2026, "scope": "OWN_SCOPE"}).status_code, 403)
+
+    # M-6: the alias compares group sets, not their order.
+
+    def test_ciso_alias_is_order_insensitive(self):
+        ciso = self._ciso("order@meridian.example", "AU|Off GBU", ["AU", "Off GBU"])
+        scope = resolve_scope(ciso, "Off GBU|AU")
+        self.assertEqual(scope.key, "OWN_SCOPE")
+        for requested in ("Off GBU|NZ", "NZ|AU"):
+            with self.assertRaises(PermissionDenied, msg=requested):
+                resolve_scope(ciso, requested)
+
+    # M-2: options stay within the 64-char scope limit; CISO-only countries are listed.
+
+    def test_options_skip_overlong_keys_and_include_ciso_countries(self):
+        long_region = "R" * 70
+        profile(self.nz1, "NZ", long_region)
+        self._ciso("fiji@meridian.example", "FJ", ["FJ"])
+        CISOProfile.objects.filter(user__username="fiji@meridian.example").update(country="FJ")
+        self.client.force_authenticate(self.cert)
+        keys = [o["key"] for o in self.client.get(SCOPES).data["options"]]
+        self.assertTrue(all(len(k) <= 64 for k in keys), keys)
+        self.assertNotIn(f"REGION:{long_region}", keys)
+        self.assertIn("COUNTRY:FJ", keys)
+        for key in keys:
+            self.assertEqual(self.client.get(SUMMARY, {"month": 10, "year": 2026, "scope": key}).status_code, 200, key)
+

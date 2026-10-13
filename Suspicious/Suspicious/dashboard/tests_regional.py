@@ -16,7 +16,7 @@ from case_handler.models import (
     Status,
 )
 from dashboard.dash_utils.dashboard import update_monthly_reporter_stats
-from dashboard.dash_utils.regional import summarise
+from dashboard.dash_utils.regional import _trend, summarise
 from dashboard.models import DashboardSnapshot, Kpi
 from dashboard.snapshot import materialise_snapshot
 from hash_process.models import Hash
@@ -187,6 +187,40 @@ class SummariseTests(TestCase):
             summarise(10, 2026, ["AU"], include_names=True)["top_reporters"],
             [{"label": "au1", "value": 4}, {"label": "au2", "value": 2}],
         )
+
+
+class FinalWaveRegionalTests(TestCase):
+    # M-1: TruncWeek gives NULL on MariaDB without time-zone tables; those rows are skipped.
+    @mock.patch("dashboard.dash_utils.regional.timezone.localdate", return_value=date(2026, 11, 15))
+    def test_trend_skips_null_weeks(self, _today):
+        rows = [{"week": None, "n": 3}, {"week": datetime(2026, 10, 5), "n": 2}]
+        cases = mock.MagicMock()
+        cases.annotate.return_value.values.return_value.annotate.return_value = rows
+        trend = _trend(cases, 10, 2026)
+        self.assertEqual(trend[1], {"week_start": "2026-10-05", "reports": 2})
+        self.assertEqual(sum(w["reports"] for w in trend), 2)
+
+    # M-3: one entry per user, not per local part; the service mailbox is never a reporter.
+    @override_settings(SUSPICIOUS_EMAIL="suspicious@meridian.example")
+    def test_top_reporters_per_user_and_service_account_excluded(self):
+        oct5 = utc(2026, 10, 5, 10)
+        a = make_user("john@a.example", [])
+        b = make_user("john@b.example", [])
+        solo = make_user("mary@a.example", [])
+        service = make_user("suspicious@meridian.example", [])
+        for user, n in ((a, 2), (b, 1), (solo, 1), (service, 5)):
+            for _ in range(n):
+                make_case(user, oct5)
+        s = summarise(10, 2026, None, include_names=True)
+        self.assertEqual(
+            s["top_reporters"],
+            [
+                {"label": "john@a.example", "value": 2},
+                {"label": "john@b.example", "value": 1},
+                {"label": "mary", "value": 1},
+            ],
+        )
+        self.assertEqual(s["reporters"], 3)
 
 
 class MonthBoundaryTests(TestCase):

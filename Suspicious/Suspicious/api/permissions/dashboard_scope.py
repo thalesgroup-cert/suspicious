@@ -21,6 +21,7 @@ from profiles.models import CISOProfile, UserProfile
 from profiles.profiles_utils.scope import clean_scope, parse_scope_groups
 
 ELEVATED_GROUPS = {"CERT", "Admin"}
+SCOPE_MAX_LENGTH = 64  # DashboardSummaryQuerySerializer.scope max_length
 
 
 class Scope(NamedTuple):
@@ -52,6 +53,9 @@ def _ciso_scope(user) -> Scope | None:
     groups = parse_scope_groups(raw)
     if not groups:  # None ("ALL") is plain Overall; [] is unset
         return None
+    # Like _own_country: the stored scope counts only when the LDAP-set groups back it.
+    if user.groups.filter(name__in=groups).values("name").distinct().count() != len(set(groups)):
+        return None
     return Scope("OWN_SCOPE", " | ".join(groups), groups)
 
 
@@ -74,6 +78,8 @@ def scope_options(user) -> tuple[str, list[Scope]]:
     if elevated:
         options += [Scope(f"COUNTRY:{c}", c, [c]) for c in _distinct("country")]
         options += [Scope(f"REGION:{r}", r, [r]) for r in _distinct("region")]
+        # The summary's scope parameter is capped at 64 characters.
+        options = [o for o in options if len(o.key) <= SCOPE_MAX_LENGTH]
     if ciso and not elevated:
         default = ciso.key
     elif country:
@@ -84,9 +90,11 @@ def scope_options(user) -> tuple[str, list[Scope]]:
 
 
 def _distinct(field):
-    """Values actually present on user profiles."""
-    values = UserProfile.objects.order_by(field).values_list(field, flat=True).distinct()
-    return [v for v in values if clean_scope(v)]
+    """Values actually present on user and CISO profiles."""
+    values = set(UserProfile.objects.values_list(field, flat=True)) | set(
+        CISOProfile.objects.values_list(field, flat=True)
+    )
+    return sorted(v for v in values if clean_scope(v))
 
 
 def resolve_scope(user, requested: str | None) -> Scope:
@@ -101,9 +109,9 @@ def resolve_scope(user, requested: str | None) -> Scope:
             return Scope(requested, f"My country ({country})", [country])
     # The CISO's own stored scope string ("AU", "AU|Off GBU", "AU | Off GBU")
     # is an alias of OWN_SCOPE (the pre-Task-2 UI sends it). Compared after the
-    # same split/strip, against the caller's own scope only.
+    # same split/strip, as a set, against the caller's own scope only.
     ciso = _ciso_scope(user)
-    if ciso and (requested == "OWN_SCOPE" or parse_scope_groups(requested) == ciso.groups):
+    if ciso and (requested == "OWN_SCOPE" or sorted(parse_scope_groups(requested) or []) == sorted(ciso.groups)):
         return ciso
     kind, _, value = requested.partition(":")
     value = value.strip()

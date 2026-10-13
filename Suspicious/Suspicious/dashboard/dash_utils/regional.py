@@ -67,7 +67,7 @@ def _counts(cases) -> dict:
     agg = cases.aggregate(
         reports=Count("pk"),
         in_progress=Count("pk", filter=Q(status__in=RUNNING)),
-        reporters=Count("reporter", distinct=True),
+        reporters=Count("reporter", distinct=True, filter=_not_service_account()),
         **{f"o_{k}": Count("pk", filter=Q(status__in=FINISHED, results=v)) for k, v in OUTCOMES.items()},
         **{f"t_{k}": Count("pk", filter=q) for k, q in BY_TYPE.items()},
     )
@@ -85,6 +85,8 @@ def _trend(cases, month, year) -> list[dict]:
     per_week = {
         row["week"].date(): row["n"]
         for row in cases.annotate(week=TruncWeek("creation_date")).values("week").annotate(n=Count("pk"))
+        # NULL when MariaDB lacks time-zone tables: those rows cannot be placed in a week.
+        if row["week"] is not None
     }
     if not per_week:
         return []
@@ -100,16 +102,27 @@ def _trend(cases, month, year) -> list[dict]:
     return weeks
 
 
+def _not_service_account() -> Q:
+    """The SUSPICIOUS_EMAIL mailbox submits on behalf of others: never a reporter."""
+    service = getattr(settings, "SUSPICIOUS_EMAIL", None)
+    return ~Q(reporter__username=service) if service else Q()
+
+
 def _top_reporters(cases) -> list[dict]:
-    rows = cases.values_list("reporter__username").annotate(n=Count("pk"))
-    suspicious_email = getattr(settings, "SUSPICIOUS_EMAIL", None)
-    totals: dict[str, int] = defaultdict(int)
-    for username, n in rows:
-        if not username or username == suspicious_email:
-            continue
-        local, sep, _ = username.strip().partition("@")
-        totals[local if sep else username.strip()] += n
-    ranked = sorted(totals.items(), key=lambda item: (-item[1], item[0]))[:TOP_REPORTERS_LIMIT]
+    """One entry per user, labelled by email local part; the full username only where local parts collide."""
+    rows = (
+        cases.filter(_not_service_account(), reporter__isnull=False)
+        .values_list("reporter_id", "reporter__username")
+        .annotate(n=Count("pk"))
+        .order_by("-n", "reporter__username")
+    )
+    rows = [(username.strip(), n) for _, username, n in rows if username and username.strip()]
+    local = [u.partition("@")[0] or u for u, _ in rows]
+    taken = defaultdict(int)
+    for name in local:
+        taken[name] += 1
+    labelled = [(name if taken[name] == 1 else u, n) for (u, n), name in zip(rows, local)]
+    ranked = sorted(labelled, key=lambda item: (-item[1], item[0]))[:TOP_REPORTERS_LIMIT]
     return [{"label": label, "value": value} for label, value in ranked]
 
 
