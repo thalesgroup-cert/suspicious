@@ -233,7 +233,8 @@ class MonthlyCasesSummaryAggregateView(MonthYearQueryMixin, APIView):
 
 
 class UserCasesMonthlyStatsAggregateView(MonthYearQueryMixin, APIView):
-    permission_classes = [IsAuthenticated]
+    # Per-user rows name reporters: Admin/CERT only, like the list/detail views.
+    permission_classes = [IsAdminOrCERT]
 
     @extend_schema(
         parameters=[

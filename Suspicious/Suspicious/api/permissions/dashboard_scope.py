@@ -8,8 +8,8 @@ resolves to the group names a case's reporter must all belong to.
 - every user: ``ALL``, and ``OWN_COUNTRY`` when their profile has a country
   backed by the Django group of that name (profile fields are read-only in
   the API, the group check is defence in depth);
-- CISO: also ``OWN_SCOPE`` (their CISOProfile scope; the stored scope
-  string, e.g. ``AU|Off GBU``, is accepted as an alias);
+- CISO: also ``OWN_SCOPE`` (their CISOProfile scope; their own stored scope
+  string, e.g. ``AU`` or ``AU | Off GBU``, is accepted as an alias);
 - CERT/Admin/superuser: also any ``COUNTRY:`` / ``REGION:``.
 Anything else raises PermissionDenied (403), never data.
 """
@@ -99,15 +99,15 @@ def resolve_scope(user, requested: str | None) -> Scope:
         country = _own_country(user)
         if country:
             return Scope(requested, f"My country ({country})", [country])
-    elif requested == "OWN_SCOPE" or "|" in requested:
-        # The stored "AU|Off GBU" string is an alias (the pre-Task-2 UI sends it).
-        ciso = _ciso_scope(user)
-        if ciso and requested in ("OWN_SCOPE", "|".join(ciso.groups)):
-            return ciso
-    else:
-        kind, _, value = requested.partition(":")
-        value = value.strip()
-        if kind in ("COUNTRY", "REGION") and value:
-            if is_elevated(user) or (kind == "COUNTRY" and value == _own_country(user)):
-                return Scope(requested, value, [value])
+    # The CISO's own stored scope string ("AU", "AU|Off GBU", "AU | Off GBU")
+    # is an alias of OWN_SCOPE (the pre-Task-2 UI sends it). Compared after the
+    # same split/strip, against the caller's own scope only.
+    ciso = _ciso_scope(user)
+    if ciso and (requested == "OWN_SCOPE" or parse_scope_groups(requested) == ciso.groups):
+        return ciso
+    kind, _, value = requested.partition(":")
+    value = value.strip()
+    if kind in ("COUNTRY", "REGION") and value:
+        if is_elevated(user) or (kind == "COUNTRY" and value == _own_country(user)):
+            return Scope(requested, value, [value])
     raise PermissionDenied("This dashboard scope is not available to you.")

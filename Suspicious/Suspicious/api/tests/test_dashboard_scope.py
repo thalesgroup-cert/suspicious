@@ -250,3 +250,59 @@ class DashboardScopeHardeningTests(APITestCase):
         self.assertEqual((scope.key, scope.groups), ("OWN_SCOPE", ["AU", "Off GBU"]))
         with self.assertRaises(PermissionDenied):
             resolve_scope(self.au1, "AU|Off GBU")
+
+
+class FixRound2Tests(APITestCase):
+    @classmethod
+    def setUpTestData(cls):
+        cls.au1, cls.au2, cls.nz1, cls.us1 = seed()
+        profile(cls.au1, "AU", "APAC")
+        cls.cert = User.objects.create_user("cert@meridian.example", password="x")
+        in_group(cls.cert, "CERT")
+
+    def setUp(self):
+        cache.clear()
+
+    def _ciso(self, username, scope):
+        user = User.objects.create_user(username, password="x")
+        in_group(user, "CISO")
+        CISOProfile.objects.create(
+            user=user, function="", gbu="Off GBU", country="AU", region="APAC", scope=scope
+        )
+        return user
+
+    # I-5: per-user aggregate names reporters: CERT/Admin only.
+
+    def test_user_cases_aggregate_locked(self):
+        url = "/api/stats/user-cases/aggregate/"
+        params = {"month": 10, "year": 2026}
+        self.client.force_authenticate(self.au1)
+        self.assertEqual(self.client.get(url, params).status_code, 403)
+        self.client.force_authenticate(self.cert)
+        self.assertEqual(self.client.get(url, params).status_code, 200)
+
+    # M-a: the CISO's own stored scope, in any spacing, is an OWN_SCOPE alias.
+
+    def test_single_unit_stored_scope_alias(self):
+        ciso = self._ciso("c1@meridian.example", "AU")
+        scope = resolve_scope(ciso, "AU")
+        self.assertEqual((scope.key, scope.groups), ("OWN_SCOPE", ["AU"]))
+
+    def test_spaced_stored_scope_alias(self):
+        ciso = self._ciso("c2@meridian.example", "AU | Off GBU")
+        for requested in ("AU | Off GBU", "AU|Off GBU"):
+            scope = resolve_scope(ciso, requested)
+            self.assertEqual((scope.key, scope.groups), ("OWN_SCOPE", ["AU", "Off GBU"]))
+
+    def test_other_scope_string_is_403(self):
+        ciso = self._ciso("c3@meridian.example", "AU|Off GBU")
+        for requested in ("NZ|Off GBU", "AU", "Off GBU|AU|NZ", "NZ"):
+            with self.assertRaises(PermissionDenied, msg=requested):
+                resolve_scope(ciso, requested)
+
+    # M-b
+
+    def test_year_upper_bound_is_400(self):
+        self.client.force_authenticate(self.au1)
+        resp = self.client.get(SUMMARY, {"month": 10, "year": 2101})
+        self.assertEqual(resp.status_code, 400)

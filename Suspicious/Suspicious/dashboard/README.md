@@ -81,9 +81,11 @@ server-side (anything else is a 403):
 | `OWN_SCOPE` | CISO with a scope set on their CISOProfile (their default) |
 | `COUNTRY:<CC>`, `REGION:<NAME>` | CERT, Admin, superuser (options list profile countries/regions) |
 
-`OWN_COUNTRY` requires the profile country to match a Django group of that name (profile
-`country`/`region`/`gbu` are read-only in the API; LDAP sets them). A CISO's stored scope string
-(e.g. `AU|Off GBU`) is accepted as an alias of `OWN_SCOPE`. Reporter names (`top_reporters`) go to
+`OWN_COUNTRY` requires both the LDAP-synced profile country and the Django group of that name
+(profile `country`/`region`/`gbu` are read-only in the API; the LDAP sync sets both). Users created
+by OIDC login only have neither until the LDAP sync fills them, so they get Overall only. A CISO's
+own stored scope string (e.g. `AU`, `AU|Off GBU`, `AU | Off GBU`, compared after split/strip) is
+accepted as an alias of `OWN_SCOPE`. Reporter names (`top_reporters`) go to
 CERT/Admin/superuser, and to a CISO only for `OWN_SCOPE`. `/api/stats/top-prefixes/` returns an
 empty ranking to anyone who is not CERT/Admin/superuser.
 
