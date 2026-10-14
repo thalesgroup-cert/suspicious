@@ -389,7 +389,7 @@ class ObservableGroupArtifact(models.Model):
 
 
 def _new_campaign_ref() -> str:
-    return "CAMP-" + datetime.datetime.now().strftime("%y%m%d") + "-" + secrets.token_hex(3)[:5]
+    return datetime.datetime.now().strftime("%y%m%d") + "-" + secrets.token_hex(3)[:5]
 
 
 class Campaign(models.Model):

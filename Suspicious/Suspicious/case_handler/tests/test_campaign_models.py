@@ -13,7 +13,7 @@ def _case():
 class CampaignModelTest(TestCase):
     def test_ref_is_generated_and_unique(self):
         a, b = Campaign.objects.create(title="a"), Campaign.objects.create(title="b")
-        self.assertTrue(a.ref.startswith("CAMP-"))
+        self.assertRegex(a.ref, r"^\d{6}-[0-9a-f]{5}$")
         self.assertNotEqual(a.ref, b.ref)
 
     def test_external_refs_and_synced_default_empty(self):

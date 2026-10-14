@@ -14,6 +14,8 @@ from connectors.contrib.thehive.campaign_alert import CampaignContent, FilePart
 from connectors.contrib.thehive.phishing import _thehive_request
 
 _TIMEOUT = 120
+_ALERT_TYPE = "Suspicious"
+_ALERT_SOURCE = "suspicious"
 
 
 def _request(method: str, url: str, **kwargs) -> requests.Response:
@@ -48,7 +50,7 @@ class HiveClient:
             observables.append(_file_observable(part, f"file{i}", content.tlp, content.pap))
             files[f"file{i}"] = (part.filename, part.data)
         alert = {
-            "type": "Suspicious", "source": "suspicious", "sourceRef": content.source_ref,
+            "type": _ALERT_TYPE, "source": _ALERT_SOURCE, "sourceRef": content.source_ref,
             "title": content.title, "description": content.description,
             "severity": content.severity, "tlp": content.tlp, "pap": content.pap,
             "tags": content.tags, "customFields": {"tha-id": content.source_ref},
@@ -66,8 +68,12 @@ class HiveClient:
             raise
 
     def find_by_source_ref(self, ref: str) -> dict | None:
+        # Match on (type, source, sourceRef), the alert's uniqueness key: case alerts
+        # use the same ref format, so the ref alone could select one of those.
         found = self._query([
             {"_name": "listAlert"},
+            {"_name": "filter", "_eq": {"_field": "type", "_value": _ALERT_TYPE}},
+            {"_name": "filter", "_eq": {"_field": "source", "_value": _ALERT_SOURCE}},
             {"_name": "filter", "_eq": {"_field": "sourceRef", "_value": ref}},
         ])
         return found[0] if found else None
