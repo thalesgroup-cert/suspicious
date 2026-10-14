@@ -2,7 +2,7 @@ from unittest import mock
 
 from django.test import SimpleTestCase
 
-from connectors.contrib.ai_narration.providers import anthropic, gemini, ollama, openai
+from connectors.contrib.ai_narration.providers import anthropic, gemini, ollama, openai, openai_compatible
 
 
 class OllamaProviderTest(SimpleTestCase):
@@ -73,3 +73,88 @@ class GeminiProviderTest(SimpleTestCase):
         self.assertIn("gemini-2.5-flash", url[0])
         self.assertEqual(kwargs["headers"]["x-goog-api-key"], "gk-test")
         self.assertEqual(kwargs["json"]["contents"][0]["parts"][0]["text"], "a prompt")
+
+
+def _ok_response(content="hello from compat"):
+    response = mock.Mock(json=lambda: {"choices": [{"message": {"content": content}}]})
+    response.raise_for_status = lambda: None
+    return response
+
+
+class OpenAICompatibleProviderTest(SimpleTestCase):
+    _CONFIG = {
+        "openai_compatible_base_url": "https://gw.internal/v1",
+        "openai_compatible_model": "my-model",
+    }
+
+    @mock.patch("connectors.contrib.ai_narration.providers.openai_compatible.requests.post")
+    def test_generate_posts_expected_shape_and_parses_response(self, mock_post):
+        mock_post.return_value = _ok_response()
+        text = openai_compatible.generate("a prompt", self._CONFIG)
+        self.assertEqual(text, "hello from compat")
+        url, kwargs = mock_post.call_args
+        self.assertEqual(url[0], "https://gw.internal/v1/chat/completions")
+        self.assertEqual(kwargs["json"]["model"], "my-model")
+        self.assertEqual(kwargs["json"]["messages"][0]["content"], "a prompt")
+
+    @mock.patch("connectors.contrib.ai_narration.providers.openai_compatible.requests.post")
+    def test_trailing_slash_on_base_url_does_not_double_up(self, mock_post):
+        mock_post.return_value = _ok_response()
+        openai_compatible.generate(
+            "p", {**self._CONFIG, "openai_compatible_base_url": "https://gw.internal/v1/"},
+        )
+        self.assertEqual(mock_post.call_args[0][0], "https://gw.internal/v1/chat/completions")
+
+    @mock.patch("connectors.contrib.ai_narration.providers.openai_compatible.requests.post")
+    def test_non_v1_version_prefix_is_preserved(self, mock_post):
+        mock_post.return_value = _ok_response()
+        openai_compatible.generate(
+            "p", {**self._CONFIG, "openai_compatible_base_url": "https://open.bigmodel.cn/api/paas/v4"},
+        )
+        self.assertEqual(
+            mock_post.call_args[0][0], "https://open.bigmodel.cn/api/paas/v4/chat/completions",
+        )
+
+    @mock.patch("connectors.contrib.ai_narration.providers.openai_compatible.requests.post")
+    def test_authorization_header_present_with_key(self, mock_post):
+        mock_post.return_value = _ok_response()
+        openai_compatible.generate("p", {**self._CONFIG, "openai_compatible_api_key": "k-test"})
+        self.assertEqual(mock_post.call_args[1]["headers"]["Authorization"], "Bearer k-test")
+
+    @mock.patch("connectors.contrib.ai_narration.providers.openai_compatible.requests.post")
+    def test_authorization_header_absent_without_key(self, mock_post):
+        mock_post.return_value = _ok_response()
+        openai_compatible.generate("p", self._CONFIG)
+        self.assertNotIn("Authorization", mock_post.call_args[1]["headers"])
+        openai_compatible.generate("p", {**self._CONFIG, "openai_compatible_api_key": ""})
+        self.assertNotIn("Authorization", mock_post.call_args[1]["headers"])
+
+    @mock.patch("connectors.contrib.ai_narration.providers.openai_compatible.requests.post")
+    def test_missing_base_url_raises_without_calling_endpoint(self, mock_post):
+        for config in ({"openai_compatible_model": "m"}, {**self._CONFIG, "openai_compatible_base_url": "  "}):
+            with self.assertRaises(ValueError):
+                openai_compatible.generate("p", config)
+        mock_post.assert_not_called()
+
+    @mock.patch("connectors.contrib.ai_narration.providers.openai_compatible.requests.post")
+    def test_non_http_base_url_raises(self, mock_post):
+        with self.assertRaises(ValueError):
+            openai_compatible.generate(
+                "p", {**self._CONFIG, "openai_compatible_base_url": "ftp://gw.internal/v1"},
+            )
+        mock_post.assert_not_called()
+
+    @mock.patch("connectors.contrib.ai_narration.providers.openai_compatible.requests.post")
+    def test_missing_model_raises(self, mock_post):
+        with self.assertRaises(ValueError):
+            openai_compatible.generate(
+                "p", {"openai_compatible_base_url": "https://gw.internal/v1"},
+            )
+        mock_post.assert_not_called()
+
+    @mock.patch("connectors.contrib.ai_narration.providers.openai_compatible.requests.post")
+    def test_empty_content_raises(self, mock_post):
+        for content in ("", None):
+            mock_post.return_value = _ok_response(content)
+            with self.assertRaises(ValueError):
+                openai_compatible.generate("p", self._CONFIG)
