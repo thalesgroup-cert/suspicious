@@ -16,6 +16,7 @@ for secret fields) rather than static `settings.json` blocks, though a
 | MISP | `integrations.misp` | Share indicators with MISP |
 | Watcher | `integrations.watcher` | Reconcile allow/deny domain lists against the Watcher service |
 | `ai_narration` | `integrations.ai_narration` | Plain-language case narration. Fires automatically via Ollama (default) or an operator-declared OpenAI-compatible endpoint (`narration_provider = openai_compatible`); OpenAI/Anthropic/Gemini are manual-only |
+| `elastic_siem` | `integrations.elastic_siem` | Forward cases at or above `min_verdict` to Elasticsearch as ECS documents for Elastic Security. Off by default; needs `url` and an `api_key`. See the connectors README |
 | LDAP / OIDC | `authentication.ldap` / `authentication.oidc` | Single sign-on |
 | Elasticsearch | (service) | Search and indexing |
 | SMTP | `email.smtp` | Outbound reporter notifications |

@@ -9,4 +9,5 @@ BUILTIN_CONNECTOR_PATHS: tuple[str, ...] = (
     "connectors.contrib.chromadb.connector:ChromaDBConnector",
     "connectors.contrib.ai_narration.connector:AiNarrationConnector",
     "connectors.contrib.case_search.connector:CaseSearchConnector",
+    "connectors.contrib.elastic_siem.connector:ElasticSiemConnector",
 )
