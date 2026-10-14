@@ -66,6 +66,13 @@ class CreateAlertTest(SimpleTestCase):
         with patch(REQ, side_effect=fake):
             self.assertEqual(HiveClient("http://hive", "k").create_alert(_content())["_id"], "~9")
 
+    def test_lookup_is_scoped_to_campaign_alerts(self):
+        with patch(REQ, return_value=_resp([])) as req:
+            HiveClient("http://hive", "k").find_by_source_ref("260101-aaaaa")
+        filters = {s["_eq"]["_field"]: s["_eq"]["_value"]
+                   for s in req.call_args.kwargs["json"]["query"] if s["_name"] == "filter"}
+        self.assertEqual(filters, {"type": "Suspicious", "source": "suspicious", "sourceRef": "260101-aaaaa"})
+
     def test_other_errors_propagate(self):
         with patch(REQ, side_effect=_http_error(403, "no permission")):
             with self.assertRaises(requests.HTTPError):
