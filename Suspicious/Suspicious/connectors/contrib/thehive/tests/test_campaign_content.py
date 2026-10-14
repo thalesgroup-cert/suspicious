@@ -39,7 +39,7 @@ def member(case_id, *, reporter="a@meridian.example", verdict="Dangerous", atts=
 
 
 def campaign():
-    return SimpleNamespace(ref="CAMP-261007-abc12", title="Verify payroll")
+    return SimpleNamespace(ref="261007-abc12", title="Verify payroll")
 
 
 class ObservablesTest(SimpleTestCase):
@@ -80,15 +80,15 @@ class ContentTest(SimpleTestCase):
         c = self._content([member(1), member(2, reporter="b@meridian.example")])
         self.assertEqual(c.title, "Potential phishing campaign: Verify payroll")
         self.assertEqual((c.tlp, c.pap), (2, 2))
-        self.assertIn("CAMP-261007-abc12", c.tags)
-        self.assertEqual(c.source_ref, "CAMP-261007-abc12")
+        self.assertIn("261007-abc12", c.tags)
+        self.assertEqual(c.source_ref, "261007-abc12")
 
     def test_description_has_the_facts_an_analyst_needs(self):
         pdf = Attachment("Notice.pdf", b"%PDF-1")
         c = self._content([member(1, atts=[pdf, Attachment("empty.dat", b"")]),
                            member(2, reporter="b@meridian.example", minute=15)])
         d = c.description
-        for needle in ("CAMP-261007-abc12", "2 mails", "2 reporters", "Dangerous", "spf=fail",
+        for needle in ("261007-abc12", "2 mails", "2 reporters", "Dangerous", "spf=fail",
                        "portal.example", "evil1.example", "Notice.pdf", "empty", "10:10", "10:15",
                        "https://sus.example/investigation?open=1", "Verify payroll"):
             self.assertIn(needle, d)
