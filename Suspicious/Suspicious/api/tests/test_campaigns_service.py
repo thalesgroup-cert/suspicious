@@ -174,7 +174,10 @@ class CampaignEndpointTests(APITestCase):
 
     def test_mail_volume_counts_and_clamps_to_period(self):
         now = datetime.now(timezone.utc)
-        iso = lambda d: (now - timedelta(days=d)).isoformat()
+
+        def iso(d):
+            return (now - timedelta(days=d)).isoformat()
+
         rows = [
             ("a", None, {"sent_date": iso(0), "classification": "DANGEROUS", "sourceRefs": ["x"]}),
             ("b", None, {"sent_date": iso(5), "classification": "SAFE", "sourceRefs": ["x"]}),
