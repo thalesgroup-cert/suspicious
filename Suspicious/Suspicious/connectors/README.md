@@ -128,6 +128,7 @@ connectors/
 | `misp` | Threat Intelligence | `case_finalised` | off | Pushes an MISP event |
 | `smtp_notify` | Notifications | `case_created`, `case_finalised`, `case_modified` | **on** | Emails the reporter: acknowledgement on creation, review mail when an analyst changes the verdict, final result on completion. A failed send raises and the framework retries it. Challenge-workflow notifications are separate and wired directly (`tasp/services/challenge.py`), not through this connector |
 | `chromadb` | Maintenance | scheduled (daily) | **on** | Vector-store cleanup, not case-event-driven |
+| `elastic_siem` | SIEM | `case_finalised`, `case_modified` | off | Indexes one ECS document per case (verdict, score, mail subject/sender, IOCs) into an operator-supplied Elasticsearch; see `elastic_siem` below |
 | `watcher` | Threat Intelligence | scheduled (every 300s) | off | Reconciles the allow/deny domain lists against the Watcher service — moved here from `tasp`; see `tasp/README.md` |
 | `ai_narration` | AI | `case_finalised` | off | See below — the one connector with an extra, hardcoded data-governance restriction |
 | `template` | — | — | — | Not a real connector; copy this directory to start a new one |
@@ -203,6 +204,39 @@ Only cases whose latest ledger row is `failed`/`skipped` (and older than `--min-
 default 300s) are re-emitted; connectors deduplicate, so repeating it is safe.
 
 ---
+
+### `elastic_siem`
+
+Forwards cases to Elasticsearch as ECS documents so Elastic Security detection
+rules, dashboards and Cases can work from them. Design:
+`docs/specs/2026-10-14-elastic-siem-connector-design.md`.
+
+- **What is sent.** One document per case, `_id` = case id, so retries and
+  replays overwrite the same document: verdict, score, confidence, decisive
+  rule, case status, the mail's subject / sender / recipients, and IOCs
+  (`url.original`, `file.name`, `file.hash.*`, `related.ip|hash|hosts`).
+  Never sent: mail bodies, headers, attachment content, analyzer reports, the
+  reporter's identity.
+- **Which cases.** Those at or above `min_verdict` (default `Suspicious`:
+  `Safe` < `Inconclusive` < `Suspicious` < `Dangerous`; `AllowListed` ranks with
+  `Safe`; `Unchallenged` and `Failure` are never sent). An unknown `min_verdict`
+  is a configuration error, not "send everything".
+- **Analyst changes.** On `case_modified`, a case still at or above the
+  threshold is re-sent; a case downgraded below it only updates an existing
+  document (a 404 is ignored), so the SIEM never keeps a stale `Dangerous` and a
+  downgrade never creates a document that was never sent.
+- **Setup.** Set `url` and `api_key` (the base64 `encoded` value of an
+  Elasticsearch API key), enable the connector, then backfill with
+  `manage.py reindex_siem [--since YYYY-MM-DD] [--min-verdict V] [--dry-run]`.
+  The index (default `suspicious-cases-siem`) is created with ECS mappings on
+  first use; set `create_index` to false if you manage index templates.
+  TLS verification is on; for an internal CA set `REQUESTS_CA_BUNDLE` in the
+  backend environment.
+- **API key privileges.** On the target index: `create_index`, `index`, `write`,
+  `view_index_metadata`. Cluster: `monitor` (for the health check).
+- **Data governance.** Sender and recipient addresses and the subject are
+  personal data. Enabling the connector declares the target cluster trusted at
+  the same level as your TheHive and MISP instances.
 
 ## 📄 License
 

@@ -117,6 +117,16 @@
                     "ssl_ca_certs": "/etc/ssl/certs/ca-certificates.crt"
                 }
             }
+        },
+        "elastic_siem": {
+            "url": "https://siem.meridian.example:9200",
+            "api_key": "",
+            "index": "suspicious-cases-siem",
+            "min_verdict": "Suspicious",
+            "verify_tls": true,
+            "timeout_seconds": 10,
+            "create_index": true,
+            "ui_base_url": "https://suspicious.meridian.example"
         }
     },
     "authentication": {
