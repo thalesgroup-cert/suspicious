@@ -53,6 +53,11 @@ class SelectProviderTest(SimpleTestCase):
             name, _ = select_provider({"narration_provider": value, "openai_api_key": "sk-x"})
             self.assertEqual(name, "openai")
 
+    def test_non_string_narration_provider_is_ignored_not_raised(self):
+        for value in (5, ["openai_compatible"], {"a": 1}):
+            name, _ = select_provider({"narration_provider": value, "openai_api_key": "sk-x"})
+            self.assertEqual(name, "openai")
+
 
 class SelectAutoProviderTest(SimpleTestCase):
     def test_unset_blank_or_ollama_selects_ollama(self):
@@ -82,3 +87,13 @@ class SelectAutoProviderTest(SimpleTestCase):
         self.assertEqual(name, "ollama")
         name, _ = select_auto_provider({**keys, "narration_provider": "openai_compatible"})
         self.assertEqual(name, "openai_compatible")
+
+    def test_non_string_narration_provider_raises_value_error(self):
+        for value in (5, ["openai_compatible"], {"a": 1}):
+            with self.assertRaises(ValueError):
+                select_auto_provider({"narration_provider": value})
+
+    def test_falsy_non_string_narration_provider_selects_ollama(self):
+        for value in (0, [], {}, False):
+            name, _ = select_auto_provider({"narration_provider": value})
+            self.assertEqual(name, "ollama")

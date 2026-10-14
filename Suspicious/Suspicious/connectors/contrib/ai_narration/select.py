@@ -30,12 +30,20 @@ PROVIDERS: dict[str, Callable[[str, dict], str]] = {
 }
 
 
+def _narration_provider(config: dict) -> str:
+    """The configured ``narration_provider`` as a stripped string. The config
+    endpoint only type-checks int/bool fields, so an int or list can be
+    persisted here; stringify it so it is rejected as an unknown name (or
+    ignored by select_provider) instead of raising AttributeError."""
+    return str(config.get("narration_provider") or "").strip()
+
+
 def select_provider(config: dict) -> tuple[str, Callable[[str, dict], str]]:
     """An explicit ``narration_provider`` naming a known provider wins.
     Otherwise the first external provider (in _EXTERNAL_PRIORITY order) with a
     non-empty API key wins; otherwise Ollama. Ollama's own reachability is
     proven by health_check, not by this selection."""
-    explicit = (config.get("narration_provider") or "").strip()
+    explicit = _narration_provider(config)
     if explicit in PROVIDERS:
         return explicit, PROVIDERS[explicit]
     for name in _EXTERNAL_PRIORITY:
@@ -48,7 +56,7 @@ def select_auto_provider(config: dict) -> tuple[str, Callable[[str, dict], str]]
     """Provider for the event-driven path. Allowlist only; never auto-detected.
     A disallowed or unknown name raises so the failure lands in the delivery
     ledger instead of silently falling back to a different provider."""
-    name = (config.get("narration_provider") or "").strip() or "ollama"
+    name = _narration_provider(config) or "ollama"
     if name not in AUTO_PROVIDERS:
         raise ValueError(
             f"narration_provider {name!r} is not allowed on the automatic path "

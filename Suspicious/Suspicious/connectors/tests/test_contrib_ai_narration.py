@@ -83,6 +83,16 @@ def _response(status_code):
     return response
 
 
+class AiNarrationMalformedProviderHealthCheckTest(SimpleTestCase):
+    @mock.patch("connectors.contrib.ai_narration.connector.requests.get")
+    def test_non_string_narration_provider_does_not_raise(self, mock_get):
+        mock_get.return_value = _response(200)
+        for value in (5, ["openai_compatible"]):
+            status = AiNarrationConnector({"narration_provider": value}).health_check()
+            self.assertTrue(status.ok)
+            self.assertIn("ollama", status.detail)
+
+
 class AiNarrationOpenAICompatibleHealthCheckTest(SimpleTestCase):
     _CONFIG = {
         "narration_provider": "openai_compatible",
