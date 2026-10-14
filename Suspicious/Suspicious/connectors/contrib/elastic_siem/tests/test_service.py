@@ -12,9 +12,10 @@ from case_handler.models import (
 )
 from connectors.contrib.elastic_siem import service
 from domain_process.models import Domain
+from file_process.models import File
 from hash_process.models import Hash
 from ip_process.models import IP
-from mail_feeder.models import Mail
+from mail_feeder.models import ArtifactIsHash, Mail, MailArtifact, MailAttachment
 from url_process.models import URL
 
 NOW = timezone.now()
@@ -198,6 +199,46 @@ class BuildDocumentTests(TestCase):
         self.assertEqual(doc["file"]["hash"]["sha256"], ["a" * 64])
         self.assertEqual(doc["file"]["hash"]["md5"], ["b" * 32])
         self.assertEqual(doc["file"]["hash"]["sha1"], ["c" * 40])
+
+    def test_attachment_name_and_its_own_hash_are_sent(self):
+        case = self._mail_case()
+        attachment_hash = Hash.objects.create(value="E" * 64, hashtype="sha256 hash")
+        attachment = File.objects.create(linked_hash=attachment_hash, file_path="files/sub/invoice.pdf",
+                                         tmp_path="/tmp/x", other_names="")
+        MailAttachment.objects.create(mail=case.fileOrMail.mail, file=attachment)
+
+        doc = service.build_document(_reload(case), "case_finalised", now=NOW)
+
+        self.assertEqual(doc["file"]["name"], ["invoice.pdf"])
+        self.assertEqual(doc["file"]["hash"]["sha256"], ["e" * 64])
+        self.assertEqual(doc["related"]["hash"], ["e" * 64])
+
+    def test_uploaded_file_hash_is_sent(self):
+        case = _case(self.user, results="Suspicious")
+        upload = File.objects.create(linked_hash=Hash.objects.create(value="f" * 40, hashtype="SHA-1"),
+                                     file_path="files/dropper.exe", tmp_path="/tmp/y", other_names="")
+        case.fileOrMail = CaseHasFileOrMail.objects.create(case=case, file=upload)
+        case.save()
+
+        doc = service.build_document(_reload(case), "case_finalised", now=NOW)
+
+        self.assertEqual(doc["file"]["name"], ["dropper.exe"])
+        self.assertEqual(doc["file"]["hash"]["sha1"], ["f" * 40])
+        self.assertEqual(doc["related"]["hash"], ["f" * 40])
+
+    def test_same_hash_as_ioc_and_attachment_is_not_duplicated(self):
+        case = self._mail_case()
+        shared = Hash.objects.create(value="a" * 64, hashtype="sha256 hash")
+        attachment = File.objects.create(linked_hash=shared, file_path="files/a.bin", tmp_path="/t", other_names="")
+        MailAttachment.objects.create(mail=case.fileOrMail.mail, file=attachment)
+        artifact = MailArtifact.objects.create(mail=case.fileOrMail.mail, artifact_type="Hash")
+        artifact.artifactIsHash = ArtifactIsHash.objects.create(artifact=artifact, hash=shared)
+        artifact.save()
+
+        doc = service.build_document(_reload(case), "case_finalised", now=NOW)
+
+        self.assertEqual(doc["related"]["hash"], ["a" * 64])
+        self.assertEqual(doc["file"]["hash"]["sha256"], ["a" * 64])
 
     def test_ip_in_url_host_goes_to_related_ip_not_hosts(self):
         case = _case(self.user, results="Suspicious")

@@ -130,6 +130,13 @@ def _iocs(case) -> dict:
     hashes: list[str] = []
     by_algorithm: dict[str, list[str]] = {"md5": [], "sha1": [], "sha256": []}
 
+    def add_hash(hash_row) -> None:
+        value = (hash_row.value or "").lower()
+        hashes.append(value)
+        algorithm = _hash_algorithm(hash_row.hashtype)
+        if algorithm:
+            by_algorithm[algorithm].append(value)
+
     for instance, data_type in collect_case_targets(case):
         if data_type == "url":
             urls.append(_cap(instance.address))
@@ -140,13 +147,10 @@ def _iocs(case) -> dict:
         elif data_type == "domain":
             hosts.append((instance.value or "").lower())
         elif data_type == "hash":
-            value = (instance.value or "").lower()
-            hashes.append(value)
-            algorithm = _hash_algorithm(instance.hashtype)
-            if algorithm:
-                by_algorithm[algorithm].append(value)
+            add_hash(instance)
         elif data_type == "file":
             files.append(os.path.basename(instance.file_path.name))
+            add_hash(instance.linked_hash)  # the file's own hash: the strongest IOC on the case
 
     return {
         "url": {"original": _dedupe(urls)},

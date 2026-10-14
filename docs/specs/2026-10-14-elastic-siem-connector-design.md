@@ -122,7 +122,7 @@ One document per case, `_id` = case id. Built from the case, its mail and
 | `email.subject`, `email.from.address`, `email.to.address` | the case's mail |
 | `url.original` | URL IOCs |
 | `file.name` | attachment and uploaded file names |
-| `file.hash.md5` / `.sha1` / `.sha256` | hash IOCs, by `Hash.hashtype` when recognisable |
+| `file.hash.md5` / `.sha1` / `.sha256` | hash IOCs and the hash of each attachment or uploaded file, by `Hash.hashtype` when recognisable |
 | `related.ip`, `related.hash`, `related.hosts` | IP, hash, and domain/URL-host IOCs, for pivoting |
 
 Values are capped at 512 characters, lists are de-duplicated, and empty fields
