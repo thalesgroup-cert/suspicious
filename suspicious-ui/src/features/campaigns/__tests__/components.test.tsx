@@ -48,7 +48,7 @@ describe("VolumeChart", () => {
   it("says when campaign windows are shaded", () => {
     stub(false);
     renderWithProviders(<VolumeChart volume={fixtureMailVolume} campaigns={fixtureCampaignSummary.campaigns} />);
-    expect(screen.getByText(/Shaded bands: first to last day seen for 1 campaign/)).toBeInTheDocument();
+    expect(screen.getByText(/Campaign windows: first to last day seen for 1 campaign/)).toBeInTheDocument();
   });
 });
 

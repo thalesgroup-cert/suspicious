@@ -143,7 +143,7 @@ export default function CampaignsPage() {
               {(s) => <CampaignKpis summary={s} />}
             </PanelState>
 
-            <Box sx={{ display: "grid", gridTemplateColumns: { xs: "1fr", md: "2fr 1fr" }, gap: 2, alignItems: "start" }}>
+            <Box sx={{ display: "grid", gridTemplateColumns: { xs: "1fr", md: "2fr 1fr" }, gap: 2 }}>
               <Box ref={mapRef} sx={{ minWidth: 0, scrollMarginTop: 96 }}>
                 <SoftCard title="Embedding map" caption={varianceCaption}>
                   <PanelState query={pcaQuery} what="the embedding map" height={360}>
@@ -159,9 +159,21 @@ export default function CampaignsPage() {
                   </PanelState>
                 </SoftCard>
               </Box>
-              <SoftCard title="Messages to review" sx={{ minWidth: 0 }}>
+              <SoftCard title="Messages to review" sx={{ minWidth: 0 }} fillHeight>
                 <PanelState query={neighboursQuery} what="the review lists" height={240}>
-                  {(n) => <SidePanel neighbours={n} onSelectCases={showInMap} />}
+                  {(n) => (
+                    // On desktop the map sets the row height and the lists scroll inside it, instead of
+                    // stretching the row and leaving a hole under the map. Focusable so the keyboard can scroll it.
+                    <Box sx={{ position: { md: "relative" }, flex: 1, minHeight: { md: 240 } }}>
+                      <Box
+                        tabIndex={0}
+                        aria-label="Review lists"
+                        sx={{ position: { md: "absolute" }, inset: 0, overflowY: { md: "auto" }, pr: { md: 1 } }}
+                      >
+                        <SidePanel neighbours={n} onSelectCases={showInMap} />
+                      </Box>
+                    </Box>
+                  )}
                 </PanelState>
               </SoftCard>
             </Box>

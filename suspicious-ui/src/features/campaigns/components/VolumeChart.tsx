@@ -13,16 +13,19 @@ import {
   Typography,
   useMediaQuery,
 } from "@mui/material";
-import { alpha, useTheme } from "@mui/material/styles";
-import { Area, AreaChart, CartesianGrid, ReferenceArea, ResponsiveContainer, Tooltip, XAxis, YAxis } from "recharts";
+import { useTheme } from "@mui/material/styles";
+import { Area, AreaChart, CartesianGrid, ResponsiveContainer, Tooltip, XAxis, YAxis } from "recharts";
 
 import { onCard, plural } from "@/features/dashboard/format";
 import { useResultColors } from "@/styles/colorStore";
 import type { CampaignRow, MailVolumeResponse } from "@/features/campaigns/api";
 import { formatDay } from "@/features/campaigns/utils";
 
-// Bands beyond the largest few overlap into one grey wash that says nothing.
+// More windows than this turn the strip into a list nobody reads; the table below has them all.
 const MAX_BANDS = 5;
+// Fixed plot insets, so the campaign strip below lines up with the chart's x axis.
+const Y_AXIS_WIDTH = 40;
+const RIGHT_MARGIN = 24;
 
 type Row = { idx: number; date: string; other: number; dangerous: number };
 
@@ -72,7 +75,8 @@ export default function VolumeChart({ volume, campaigns }: { volume: MailVolumeR
   // Dangerous takes the verdict colour; Other mixes four classes, so it gets the neutral text tone, not a verdict colour.
   const dangerColor = onCard(result.dangerous.main, theme.palette, 3);
   const otherColor = onCard(theme.palette.text.secondary, theme.palette, 3);
-  const bandFill = alpha(theme.palette.text.primary, 0.06);
+  // Campaign windows are not message counts: the theme accent keeps them apart from both areas.
+  const barColor = onCard(theme.palette.primary.main, theme.palette, 3);
 
   const index = new Map(volume.dates.map((d, i) => [d, i]));
   const last = rows.length - 1;
@@ -133,7 +137,7 @@ export default function VolumeChart({ volume, campaigns }: { volume: MailVolumeR
       ) : (
         <Box role="img" aria-label={summary} sx={{ height: 240 }}>
           <ResponsiveContainer width="100%" height="100%">
-            <AreaChart data={rows} margin={{ top: 8, right: 24, bottom: 0, left: -8 }}>
+            <AreaChart data={rows} margin={{ top: 8, right: RIGHT_MARGIN, bottom: 0, left: 0 }}>
               <CartesianGrid strokeDasharray="3 3" stroke={theme.palette.divider} vertical={false} />
               <XAxis
                 type="number"
@@ -145,21 +149,11 @@ export default function VolumeChart({ volume, campaigns }: { volume: MailVolumeR
                 stroke={theme.palette.divider}
               />
               <YAxis
+                width={Y_AXIS_WIDTH}
                 allowDecimals={false}
                 tick={{ fill: theme.palette.text.secondary, fontSize: theme.typography.caption.fontSize }}
                 stroke={theme.palette.divider}
               />
-              {bands.map((b) => (
-                <ReferenceArea
-                  key={b.name}
-                  x1={Math.max(0, b.s - 0.5)}
-                  x2={Math.min(last, b.e + 0.5)}
-                  ifOverflow="hidden"
-                  fill={bandFill}
-                  fillOpacity={1}
-                  stroke="none"
-                />
-              ))}
               <Tooltip content={<VolumeTooltip />} cursor={{ stroke: theme.palette.divider }} />
               <Area
                 type="linear"
@@ -187,10 +181,34 @@ export default function VolumeChart({ volume, campaigns }: { volume: MailVolumeR
       )}
 
       {bands.length > 0 && !asTable ? (
-        <Typography variant="caption" color="text.secondary" component="p" sx={{ mt: 1 }}>
-          Shaded bands: first to last day seen for{" "}
-          {campaigns.length > MAX_BANDS ? `the ${MAX_BANDS} largest of ${campaigns.length} campaigns` : plural(bands.length, "campaign")}.
-        </Typography>
+        // Named windows under the axis instead of shaded areas: overlapping shades washed the whole plot grey and named nothing.
+        <Box sx={{ mt: 1.5, pl: `${Y_AXIS_WIDTH}px`, pr: `${RIGHT_MARGIN}px` }}>
+          <Typography variant="caption" color="text.secondary" component="p" sx={{ mb: 0.5 }}>
+            Campaign windows: first to last day seen for{" "}
+            {campaigns.length > MAX_BANDS ? `the ${MAX_BANDS} largest of ${campaigns.length} campaigns` : plural(bands.length, "campaign")}.
+          </Typography>
+          <Stack component="ul" spacing={0.75} sx={{ m: 0, p: 0, listStyle: "none" }}>
+            {bands.map((b) => {
+              const span = Math.max(last, 1);
+              const left = (Math.max(0, b.s - 0.5) / span) * 100;
+              const right = (Math.min(last, b.e + 0.5) / span) * 100;
+              return (
+                <Box component="li" key={b.name}>
+                  <Typography variant="caption" component="p" sx={{ overflowWrap: "anywhere" }}>
+                    {b.name} · {formatDay(rows[b.s].date)}
+                    {b.e !== b.s ? ` to ${formatDay(rows[b.e].date)}` : ""}
+                  </Typography>
+                  <Box sx={{ position: "relative", height: 6 }}>
+                    <Box
+                      aria-hidden
+                      sx={{ position: "absolute", top: 0, bottom: 0, left: `${left}%`, width: `max(4px, ${right - left}%)`, borderRadius: 1, bgcolor: barColor }}
+                    />
+                  </Box>
+                </Box>
+              );
+            })}
+          </Stack>
+        </Box>
       ) : null}
     </>
   );

@@ -20,6 +20,9 @@ function fit(values: number[]): [number, number] {
   return [lo - pad, hi + pad];
 }
 
+/** Five evenly spaced ticks across the fitted domain: recharts' own picks crowded the last two labels together. */
+const ticks = ([lo, hi]: [number, number]) => Array.from({ length: 5 }, (_, i) => lo + ((hi - lo) * i) / 4);
+
 function PointTooltip({ active, payload }: { active?: boolean; payload?: Array<{ payload?: PcaPoint }> }) {
   const p = payload?.[0]?.payload;
   if (!active || !p) return null;
@@ -51,6 +54,8 @@ export default function Embedding2D({ points, selectedCaseIds }: { points: PcaPo
     byClass.set(k, [...(byClass.get(k) ?? []), p]);
   }
   const visible = points.filter((p) => !hidden.includes(normalizeLabel(p.label) as ClassKey));
+  const xDomain = fit(visible.map((p) => p.x));
+  const yDomain = fit(visible.map((p) => p.y));
   const backgrounds = [theme.palette.background.paper, theme.palette.background.default];
   const tick = { fill: theme.palette.text.secondary, fontSize: theme.typography.caption.fontSize };
   const counts = CLASSES.map(([k, l]) => `${l} ${byClass.get(k)?.length ?? 0}`).join(", ");
@@ -87,8 +92,8 @@ export default function Embedding2D({ points, selectedCaseIds }: { points: PcaPo
         <ResponsiveContainer width="100%" height="100%">
           <ScatterChart margin={{ top: 8, right: 16, bottom: 0, left: -8 }}>
             <CartesianGrid strokeDasharray="3 3" stroke={theme.palette.divider} />
-            <XAxis type="number" dataKey="x" name="PC1" domain={fit(visible.map((p) => p.x))} tickFormatter={(v: number) => v.toFixed(2)} tick={tick} stroke={theme.palette.divider} />
-            <YAxis type="number" dataKey="y" name="PC2" domain={fit(visible.map((p) => p.y))} tickFormatter={(v: number) => v.toFixed(2)} tick={tick} stroke={theme.palette.divider} />
+            <XAxis type="number" dataKey="x" name="PC1" domain={xDomain} ticks={ticks(xDomain)} tickFormatter={(v: number) => v.toFixed(1)} tick={tick} stroke={theme.palette.divider} />
+            <YAxis type="number" dataKey="y" name="PC2" domain={yDomain} ticks={ticks(yDomain)} tickFormatter={(v: number) => v.toFixed(1)} tick={tick} stroke={theme.palette.divider} />
             <Tooltip content={<PointTooltip />} cursor={{ stroke: theme.palette.divider }} />
             {CLASSES.filter(([k]) => !hidden.includes(k)).map(([k]) => (
               <Scatter

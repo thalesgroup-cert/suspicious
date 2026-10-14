@@ -33,9 +33,10 @@ function share(c: CampaignRow) {
   return `${c.dangerous.toLocaleString()} (${Math.round(c.dangerous_share * 100)}%)`;
 }
 
-function Actions({ c, onSelectCases }: { c: CampaignRow; onSelectCases: (ids: string[]) => void }) {
+function Actions({ c, onSelectCases, stacked = false }: { c: CampaignRow; onSelectCases: (ids: string[]) => void; stacked?: boolean }) {
   return (
-    <Stack direction="row" useFlexGap spacing={1} sx={{ alignItems: "center", flexWrap: "wrap" }}>
+    // Stacked in the table so the column stays one control wide; side by side on the phone cards.
+    <Stack direction={stacked ? "column" : "row"} useFlexGap spacing={stacked ? 0.5 : 1} sx={{ alignItems: stacked ? "flex-start" : "center", flexWrap: "wrap" }}>
       {c.case_ids.length ? (
         // The investigation page opens one case: the most recent one, not a filtered list.
         <Link component={RouterLink} to={`/investigation?open=${encodeURIComponent(c.case_ids[0])}`} variant="body2">
@@ -147,7 +148,7 @@ export default function CampaignTable(props: { campaigns: CampaignRow[]; onSelec
             {rows.map((c) => (
               <TableRow key={c.name}>
                 {/* Full name, wrapped: truncating it hides the only thing that tells campaigns apart. */}
-                <TableCell sx={{ overflowWrap: "anywhere", minWidth: 180 }}>{c.name}</TableCell>
+                <TableCell sx={{ overflowWrap: "anywhere", minWidth: 200 }}>{c.name}</TableCell>
                 <TableCell>
                   <Status active={c.active} />
                 </TableCell>
@@ -159,7 +160,7 @@ export default function CampaignTable(props: { campaigns: CampaignRow[]; onSelec
                 <TableCell align="right" sx={{ fontVariantNumeric: "tabular-nums", whiteSpace: "nowrap" }}>
                   {share(c)}
                 </TableCell>
-                <TableCell sx={{ maxWidth: 220 }}>
+                <TableCell sx={{ maxWidth: 180 }}>
                   <Typography
                     variant="body2"
                     title={c.sample_subject ?? undefined}
@@ -168,8 +169,8 @@ export default function CampaignTable(props: { campaigns: CampaignRow[]; onSelec
                     {c.sample_subject ?? "—"}
                   </Typography>
                 </TableCell>
-                <TableCell>
-                  <Actions c={c} onSelectCases={props.onSelectCases} />
+                <TableCell sx={{ whiteSpace: "nowrap" }}>
+                  <Actions c={c} onSelectCases={props.onSelectCases} stacked />
                 </TableCell>
               </TableRow>
             ))}
