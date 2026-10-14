@@ -15,7 +15,7 @@ for secret fields) rather than static `settings.json` blocks, though a
 | TheHive | `integrations.thehive` | Push cases to TheHive |
 | MISP | `integrations.misp` | Share indicators with MISP |
 | Watcher | `integrations.watcher` | Reconcile allow/deny domain lists against the Watcher service |
-| `ai_narration` | `integrations.ai_narration` | Plain-language case narration (Ollama or an external LLM on the manual path; Ollama-only when it fires automatically) |
+| `ai_narration` | `integrations.ai_narration` | Plain-language case narration. Fires automatically via Ollama (default) or an operator-declared OpenAI-compatible endpoint (`narration_provider = openai_compatible`); OpenAI/Anthropic/Gemini are manual-only |
 | LDAP / OIDC | `authentication.ldap` / `authentication.oidc` | Single sign-on |
 | Elasticsearch | (service) | Search and indexing |
 | SMTP | `email.smtp` | Outbound reporter notifications |

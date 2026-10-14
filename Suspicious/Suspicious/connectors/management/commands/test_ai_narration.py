@@ -1,6 +1,7 @@
 """Manually drive the ai_narration connector against a real case or a
-fixture -- the only way to reach a non-Ollama provider; the connector
-also fires automatically via `on_case_finalised` (Ollama-only)."""
+fixture -- the only way to reach the OpenAI/Anthropic/Gemini vendors; the
+connector also fires automatically via `on_case_finalised`, limited to
+select.AUTO_PROVIDERS (Ollama or an OpenAI-compatible endpoint)."""
 import json
 from pathlib import Path
 
