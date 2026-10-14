@@ -34,7 +34,7 @@ class ManifestTests(SimpleTestCase):
         self.assertEqual(fields["min_verdict"].default, "Suspicious")
         self.assertIs(fields["verify_tls"].default, True)
         self.assertIs(fields["create_index"].default, True)
-        self.assertEqual(fields["index"].default, "suspicious-cases-siem")
+        self.assertEqual(fields["index"].default, "logs-suspicious.case")
         self.assertFalse(fields["ui_base_url"].required)
 
     def test_registered_as_a_builtin(self):

@@ -1,3 +1,4 @@
+import fnmatch
 import json
 from types import SimpleNamespace
 from unittest import mock
@@ -24,6 +25,18 @@ def fake_response(status=200, body=None, text=None):
     response.json.return_value = body if body is not None else {}
     response.text = text if text is not None else json.dumps(body or {})
     return response
+
+
+class DefaultIndexNameTests(SimpleTestCase):
+    """The default index must be visible to Elastic Security's default data view
+    (`logs-*`) without a Kibana change, yet must not match the built-in
+    `logs-*-*` data-stream template, which rejects overwrite-by-id writes."""
+
+    def test_matches_security_default_pattern(self):
+        self.assertTrue(fnmatch.fnmatchcase(service.DEFAULT_INDEX, "logs-*"))
+
+    def test_does_not_match_the_logs_data_stream_template(self):
+        self.assertFalse(fnmatch.fnmatchcase(service.DEFAULT_INDEX, "logs-*-*"))
 
 
 class VerdictFilterTests(SimpleTestCase):

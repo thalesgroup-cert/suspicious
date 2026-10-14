@@ -56,7 +56,7 @@ ConfigField("url", type="url", required=True,
             help="Elasticsearch base URL, e.g. https://siem.internal:9200"),
 ConfigField("api_key", type="secret", required=True,
             help="Elasticsearch API key (the base64 'encoded' value)."),
-ConfigField("index", type="str", default="suspicious-cases-siem"),
+ConfigField("index", type="str", default="logs-suspicious.case"),
 ConfigField("min_verdict", type="str", default="Suspicious",
             help="Lowest verdict forwarded: Safe, Inconclusive, Suspicious or Dangerous."),
 ConfigField("verify_tls", type="bool", default=True),
@@ -139,6 +139,28 @@ settings, so it also works on managed and serverless Elastic. An operator who
 manages index templates sets `create_index` to false and owns the mapping.
 Concurrent first deliveries that both try to create the index treat the
 "already exists" response as success.
+
+### Visibility in Elastic Security
+
+Detection rules read the index patterns in `securitySolution:defaultIndex`
+(`apm-*-transaction*`, `auditbeat-*`, `endgame-*`, `filebeat-*`, `logs-*`,
+`packetbeat-*`, `winlogbeat-*`). The default index is therefore named
+`logs-suspicious.case`: it matches `logs-*` and the documents are visible to
+rules and the default Security data view with no Kibana change. A custom
+`index` must be added to that setting, or to the rule's data view, by the
+operator.
+
+The name must not match `logs-*-*` (two dashes). That pattern is the built-in
+`logs` data-stream template. Creating the index explicitly, as `create_index`
+does, still yields a plain index, but with `create_index` false and no
+pre-created index the first write would auto-create a data stream, which
+accepts only `op_type=create` and rejects overwrite-by-id. A unit test pins the
+default against both patterns, and the docs say so.
+
+Documents become alerts only through a detection rule. The README ships a
+sample custom-query rule, `event.dataset : "suspicious.case" and
+suspicious.verdict : "Dangerous"`. Shipping or creating rules through the
+Kibana API stays a non-goal.
 
 ### `health_check`
 

@@ -121,7 +121,7 @@
         "elastic_siem": {
             "url": "https://siem.meridian.example:9200",
             "api_key": "",
-            "index": "suspicious-cases-siem",
+            "index": "logs-suspicious.case",
             "min_verdict": "Suspicious",
             "verify_tls": true,
             "timeout_seconds": 10,

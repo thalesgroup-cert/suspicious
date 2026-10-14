@@ -228,10 +228,20 @@ rules, dashboards and Cases can work from them. Design:
 - **Setup.** Set `url` and `api_key` (the base64 `encoded` value of an
   Elasticsearch API key), enable the connector, then backfill with
   `manage.py reindex_siem [--since YYYY-MM-DD] [--min-verdict V] [--dry-run]`.
-  The index (default `suspicious-cases-siem`) is created with ECS mappings on
+  The index (default `logs-suspicious.case`) is created with ECS mappings on
   first use; set `create_index` to false if you manage index templates.
   TLS verification is on; for an internal CA set `REQUESTS_CA_BUNDLE` in the
   backend environment.
+- **Seeing it in Elastic Security.** Detection rules read the index patterns in
+  `securitySolution:defaultIndex` (`logs-*` among them), so the default name
+  needs no Kibana change. A custom `index` must be added to that setting or to
+  your rule's data view. Documents become alerts only through a detection rule,
+  for example a custom query rule on
+  `event.dataset : "suspicious.case" and suspicious.verdict : "Dangerous"`.
+  Do not pick a name with two dashes under `logs-` (e.g. `logs-foo-bar`): it
+  matches Elasticsearch's built-in `logs-*-*` data-stream template, and if the
+  index does not exist yet (`create_index` false) the first write would create a
+  data stream, which rejects the overwrite-by-id writes this connector uses.
 - **API key privileges.** On the target index: `create_index`, `index`, `write`,
   `view_index_metadata`. Cluster: `monitor` (for the health check).
 - **Data governance.** Sender and recipient addresses and the subject are

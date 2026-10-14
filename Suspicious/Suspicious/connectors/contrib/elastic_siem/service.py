@@ -20,7 +20,7 @@ from cortex_job.cortex_utils.case_targets import collect_case_targets
 
 logger = logging.getLogger("connectors.contrib.elastic_siem")
 
-DEFAULT_INDEX = "suspicious-cases-siem"
+DEFAULT_INDEX = "logs-suspicious.case"
 DEFAULT_MIN_VERDICT = "Suspicious"
 DEFAULT_TIMEOUT = 10
 HEALTH_TIMEOUT = 5
