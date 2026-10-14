@@ -1,5 +1,6 @@
 import { describe, it, expect, vi, beforeEach } from "vitest";
-import { screen, waitFor } from "@testing-library/react";
+import { screen, waitFor, within } from "@testing-library/react";
+import { useLocation, useNavigate, useNavigationType } from "react-router";
 import userEvent from "@testing-library/user-event";
 import { renderWithProviders } from "@/test/utils";
 import { fixtureMe, fixtureSubmissionsList } from "@/test/fixtures";
@@ -29,12 +30,27 @@ vi.mock("@/features/comments/api", () => ({
 
 
 import { getMe } from "@/api/auth";
-import { listSubmissions, challengeSubmission } from "@/features/submissions/api";
+import { listSubmissions, challengeSubmission, getSubmissionDetails } from "@/features/submissions/api";
 import { addCaseComment, getCaseComments } from "@/features/comments/api";
 import SubmissionsPage from "../SubmissionsPage";
 
+// Tests run in a real browser whose default viewport is narrow: pin the breakpoint explicitly.
+const stub = (phone: boolean) =>
+  vi.stubGlobal("matchMedia", (query: string) => ({
+    matches: phone && query.includes("max-width"),
+    media: query,
+    addEventListener: () => {},
+    removeEventListener: () => {},
+    addListener: () => {},
+    removeListener: () => {},
+    onchange: null,
+    dispatchEvent: () => false,
+  }));
+
+
 describe("SubmissionsPage - Test Suite", () => {
   beforeEach(() => {
+    stub(false);
     vi.mocked(getMe).mockResolvedValue(fixtureMe);
     vi.mocked(listSubmissions).mockResolvedValue(fixtureSubmissionsList as never);
   });
@@ -54,6 +70,12 @@ describe("SubmissionsPage - Test Suite", () => {
   });
 
   describe("Display", () => {
+    it("renders the page title as an h1 at page-title size", async () => {
+      renderWithProviders(<SubmissionsPage />, { initialPath: "/submissions" });
+      const h = await screen.findByRole("heading", { level: 1, name: "Submissions" });
+      expect(parseFloat(getComputedStyle(h).fontSize)).toBeGreaterThanOrEqual(20);
+    });
+
     it("shows rows when submissions are returned", async () => {
       renderWithProviders(<SubmissionsPage />, { initialPath: "/submissions" });
       expect(
@@ -119,6 +141,7 @@ describe("SubmissionsPage - Test Suite", () => {
 
       await screen.findByText(/phish@example\.com/i, {}, { timeout: 5000 });
       await user.click(screen.getByText(/phish@example\.com/i));
+      await user.click(await screen.findByRole("tab", { name: /^Comments/ }));
 
       const textarea = await screen.findByPlaceholderText("Add a comment…");
       await user.type(textarea, "checking on this");
@@ -128,5 +151,568 @@ describe("SubmissionsPage - Test Suite", () => {
         expect(addCaseComment).toHaveBeenCalledWith(101, "checking on this")
       );
     });
+  });
+});
+
+describe("SubmissionsPage - detail drawer header", () => {
+  beforeEach(() => stub(false));
+  it("is sticky so Close stays reachable while the content scrolls", async () => {
+    vi.mocked(getMe).mockResolvedValue(fixtureMe);
+    vi.mocked(listSubmissions).mockResolvedValue(fixtureSubmissionsList as never);
+    const id = (fixtureSubmissionsList as { results: { id: number }[] }).results[0].id;
+    renderWithProviders(<SubmissionsPage />, { initialPath: `/submissions?open=${id}` });
+    const header = await screen.findByTestId("sheet-header");
+    expect(getComputedStyle(header).position).toBe("sticky");
+  });
+
+  it("opened from a URL (no opener) focus lands inside the named dialog", async () => {
+    vi.mocked(getMe).mockResolvedValue(fixtureMe);
+    vi.mocked(listSubmissions).mockResolvedValue(fixtureSubmissionsList as never);
+    const id = (fixtureSubmissionsList as { results: { id: number }[] }).results[0].id;
+    renderWithProviders(<SubmissionsPage />, { initialPath: `/submissions?open=${id}` });
+    const dialog = await screen.findByRole("dialog", { name: new RegExp(`#${id}`) });
+    await waitFor(() => expect(dialog.contains(document.activeElement)).toBe(true));
+  });
+});
+
+describe("SubmissionsPage - phone layout", () => {
+  const HASH = "a".repeat(64);
+  beforeEach(() => {
+    vi.mocked(getMe).mockResolvedValue(fixtureMe);
+    vi.mocked(listSubmissions).mockResolvedValue({
+      ...fixtureSubmissionsList,
+      results: [{ ...fixtureSubmissionsList.results[0], artifact: HASH }, fixtureSubmissionsList.results[1]],
+    } as never);
+  });
+  it("renders a stacked list with ID link and verdict, no table, on a phone", async () => {
+    stub(true);
+    renderWithProviders(<SubmissionsPage />, { initialPath: "/submissions" });
+    const link = await screen.findByRole("link", { name: "101" });
+    expect(link).toHaveAttribute("href", "/submissions?open=101");
+    expect(screen.getAllByRole("listitem").length).toBeGreaterThanOrEqual(2);
+    expect(screen.getByText(/dangerous/i)).toBeInTheDocument();
+    expect(screen.queryByRole("table")).toBeNull();
+    const art = screen.getByTitle(HASH);
+    expect(getComputedStyle(art).textOverflow).toBe("ellipsis");
+    expect(getComputedStyle(art).whiteSpace).toBe("nowrap");
+  });
+
+  it("tapping an ID opens the drawer without filtering; reopens after close", async () => {
+    stub(true);
+    renderWithProviders(<SubmissionsPage />, { initialPath: "/submissions" });
+    const link = await screen.findByRole("link", { name: "101" });
+    await userEvent.click(link);
+    await screen.findByTestId("sheet-header");
+    expect(screen.getByPlaceholderText(/id, status, artifact/i)).toHaveValue("");
+    await userEvent.click(screen.getAllByRole("button", { name: /close/i })[0]);
+    await waitFor(() => expect(screen.queryByTestId("sheet-header")).toBeNull());
+    expect(screen.getByPlaceholderText(/id, status, artifact/i)).toHaveValue("");
+    expect(screen.getByRole("link", { name: "102" })).toBeInTheDocument();
+    await userEvent.click(screen.getByRole("link", { name: "101" }));
+    expect(await screen.findByTestId("sheet-header")).toBeInTheDocument();
+  });
+
+  it("closing a drawer opened from an ID link returns focus to that link", async () => {
+    stub(true);
+    renderWithProviders(<SubmissionsPage />, { initialPath: "/submissions" });
+    const link = await screen.findByRole("link", { name: "101" });
+    await userEvent.click(link);
+    await screen.findByRole("dialog", { name: /#101/ });
+    await userEvent.click(screen.getAllByRole("button", { name: /close/i })[0]);
+    await waitFor(() => expect(screen.queryByRole("dialog")).toBeNull());
+    await waitFor(() => expect(screen.getByRole("link", { name: "101" })).toHaveFocus());
+  });
+
+  it("keeps the table on desktop", async () => {
+    stub(false);
+    renderWithProviders(<SubmissionsPage />, { initialPath: "/submissions" });
+    expect(await screen.findByRole("table")).toBeInTheDocument();
+  });
+});
+
+describe("SubmissionsPage - filters, pager, header", () => {
+  const many = (n: number) => ({
+    ...fixtureSubmissionsList,
+    count: n,
+    results: Array.from({ length: n }, (_, i) => ({
+      ...fixtureSubmissionsList.results[0],
+      id: 1000 + i,
+      artifact: `row-${i}@example.com`,
+      is_challengeable: false,
+    })),
+  });
+  beforeEach(() => {
+    stub(false);
+    vi.mocked(getMe).mockResolvedValue(fixtureMe);
+    vi.mocked(listSubmissions).mockResolvedValue(many(99) as never);
+  });
+  const open = async () => {
+    renderWithProviders(<SubmissionsPage />, { initialPath: "/submissions" });
+    return screen.findByRole("button", { name: /^filters/i });
+  };
+
+  it("collapses everything but search behind a Filters button", async () => {
+    const btn = await open();
+    expect(screen.getByPlaceholderText(/id, status, artifact/i)).toBeInTheDocument();
+    expect(screen.queryByLabelText("Status")).toBeNull();
+    await userEvent.click(btn);
+    for (const l of ["Status", "Type", "Result", "From", "To", "Sort"]) {
+      expect(await screen.findByLabelText(l)).toBeInTheDocument();
+    }
+  });
+
+  it("counts active filters on the button; Reset appears and clears", async () => {
+    const btn = await open();
+    expect(screen.queryByRole("button", { name: /reset/i })).toBeNull();
+    await userEvent.click(btn);
+    await userEvent.click(await screen.findByLabelText("Type"));
+    await userEvent.click(await screen.findByRole("option", { name: "MAIL" }));
+    expect(screen.getByRole("button", { name: /^filters/i })).toHaveTextContent(/^Filters1$/);
+    await userEvent.click(await screen.findByRole("button", { name: /reset/i }));
+    await waitFor(() => expect(screen.queryByRole("button", { name: /reset/i })).toBeNull());
+    expect(screen.getByRole("button", { name: /^filters/i })).toHaveTextContent(/^Filters$/);
+  });
+
+  it("pager sits below the table with 10/25/50 and x-y of N", async () => {
+    await open();
+    const table = await screen.findByRole("table");
+    expect(screen.getByText("1–10 of 99")).toBeInTheDocument();
+    const pager = screen.getByText("1–10 of 99").closest(".MuiTablePagination-root")!;
+    expect(table.compareDocumentPosition(pager) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
+    expect(table.contains(pager)).toBe(false);
+    await userEvent.click(within(pager as HTMLElement).getByRole("combobox"));
+    expect((await screen.findAllByRole("option")).map((o) => o.textContent)).toEqual(["10", "25", "50"]);
+  });
+
+  it("changing rows per page shows 25 rows on page 1", async () => {
+    await open();
+    await screen.findByRole("table");
+    await userEvent.click(screen.getByRole("button", { name: /next page/i }));
+    expect(await screen.findByText("11–20 of 99")).toBeInTheDocument();
+    const pager = screen.getByText("11–20 of 99").closest(".MuiTablePagination-root") as HTMLElement;
+    await userEvent.click(within(pager).getByRole("combobox"));
+    await userEvent.click(await screen.findByRole("option", { name: "25" }));
+    expect(await screen.findByText("1–25 of 99")).toBeInTheDocument();
+    expect(screen.getAllByRole("row")).toHaveLength(26);
+  });
+
+  it("a filter change returns to page 1", async () => {
+    const btn = await open();
+    await screen.findByRole("table");
+    await userEvent.click(screen.getByRole("button", { name: /next page/i }));
+    expect(await screen.findByText("11–20 of 99")).toBeInTheDocument();
+    await userEvent.click(btn);
+    await userEvent.click(await screen.findByLabelText("Type"));
+    await userEvent.click(await screen.findByRole("option", { name: "MAIL" }));
+    expect(await screen.findByText(/^1–10 of/)).toBeInTheDocument();
+  });
+
+  it("header chip says total, then match when searching; no avatar", async () => {
+    await open();
+    expect(await screen.findByText("99 total")).toBeInTheDocument();
+    expect(document.querySelector(".MuiAvatar-root")).toBeNull();
+    await userEvent.type(screen.getByPlaceholderText(/id, status, artifact/i), "row-1");
+    expect(await screen.findByText(/^\d+ match$/)).toBeInTheDocument();
+    expect(screen.queryByText(/^Search:/)).toBeNull();
+  });
+});
+
+describe("SubmissionsPage - calmer rows", () => {
+  const rowsWith = (over: object[]) => ({
+    ...fixtureSubmissionsList,
+    results: fixtureSubmissionsList.results.map((r, i) => ({ ...r, ...(over[i] ?? {}) })),
+  });
+  beforeEach(() => {
+    stub(false);
+    vi.mocked(getMe).mockResolvedValue(fixtureMe);
+  });
+
+  it("omits the Challenge column when no row on the page is eligible", async () => {
+    vi.mocked(listSubmissions).mockResolvedValue(fixtureSubmissionsList as never);
+    renderWithProviders(<SubmissionsPage />, { initialPath: "/submissions" });
+    await screen.findByRole("table");
+    expect(screen.queryByRole("columnheader", { name: "Challenge" })).toBeNull();
+    expect(screen.queryByText("Not available")).toBeNull();
+  });
+
+  it("shows the Challenge column and button when a row is eligible", async () => {
+    vi.mocked(listSubmissions).mockResolvedValue(rowsWith([{ is_challengeable: true }]) as never);
+    renderWithProviders(<SubmissionsPage />, { initialPath: "/submissions" });
+    await screen.findByRole("table");
+    expect(screen.getByRole("columnheader", { name: "Challenge" })).toBeInTheDocument();
+    expect(screen.getAllByRole("button", { name: "Challenge" })).toHaveLength(1);
+    expect(screen.queryByText("Not available")).toBeNull();
+  });
+
+  it("phone list offers Challenge for the eligible row only", async () => {
+    stub(true);
+    vi.mocked(listSubmissions).mockResolvedValue(rowsWith([{ is_challengeable: true }]) as never);
+    renderWithProviders(<SubmissionsPage />, { initialPath: "/submissions" });
+    await screen.findByRole("link", { name: "101" });
+    const items = screen.getAllByRole("listitem");
+    expect(within(items[0]).getByRole("button", { name: "Challenge" })).toBeInTheDocument();
+    expect(within(items[1]).queryByRole("button", { name: "Challenge" })).toBeNull();
+    await userEvent.click(within(items[0]).getByRole("button", { name: "Challenge" }));
+    expect(await screen.findByRole("button", { name: /confirm/i })).toBeInTheDocument();
+  });
+
+  it("artifact is one ellipsised line with the full value in title", async () => {
+    const HASH = "b".repeat(64);
+    vi.mocked(listSubmissions).mockResolvedValue(rowsWith([{ artifact: HASH }]) as never);
+    renderWithProviders(<SubmissionsPage />, { initialPath: "/submissions" });
+    const el = await screen.findByTitle(HASH);
+    expect(getComputedStyle(el).textOverflow).toBe("ellipsis");
+    expect(getComputedStyle(el).whiteSpace).toBe("nowrap");
+    expect(getComputedStyle(el).minWidth).toBe("0px");
+    expect(screen.getAllByRole("button", { name: "Copy artifact" })[0]).toBeInTheDocument();
+  });
+
+  it("mutes DONE while the SAFE verdict keeps its colour", async () => {
+    vi.mocked(listSubmissions).mockResolvedValue(rowsWith([{ result: "SAFE" }]) as never);
+    renderWithProviders(<SubmissionsPage />, { initialPath: "/submissions" });
+    await screen.findByRole("table");
+    const done = screen.getByText("DONE").closest(".MuiChip-root")!;
+    const safe = screen.getByText(/^safe$/i).closest(".MuiChip-root")!;
+    expect(getComputedStyle(done).color).not.toBe(getComputedStyle(safe).color);
+    expect(getComputedStyle(done).backgroundColor).toBe("rgba(0, 0, 0, 0)");
+  });
+
+  it("filter toggle controls the collapse by id", async () => {
+    vi.mocked(listSubmissions).mockResolvedValue(fixtureSubmissionsList as never);
+    renderWithProviders(<SubmissionsPage />, { initialPath: "/submissions" });
+    const btn = await screen.findByRole("button", { name: /^filters/i });
+    await userEvent.click(btn);
+    const id = btn.getAttribute("aria-controls")!;
+    expect(id).toBeTruthy();
+    expect(document.getElementById(id)).toContainElement(await screen.findByLabelText("Status"));
+  });
+
+  it("filtered empty state offers Clear filters, which resets", async () => {
+    vi.mocked(listSubmissions).mockResolvedValue(fixtureSubmissionsList as never);
+    renderWithProviders(<SubmissionsPage />, { initialPath: "/submissions" });
+    await screen.findByRole("table");
+    vi.mocked(listSubmissions).mockImplementation(async (p) =>
+      (p?.search ? { ...fixtureSubmissionsList, count: 0, results: [] } : fixtureSubmissionsList) as never);
+    await userEvent.type(screen.getByPlaceholderText(/id, status, artifact/i), "zzzz");
+    expect(await screen.findByText("No submissions match")).toBeInTheDocument();
+    expect(screen.getByText("Try a different search or clear the filters.")).toBeInTheDocument();
+    await userEvent.click(screen.getByRole("button", { name: "Clear filters" }));
+    expect(await screen.findByRole("table")).toBeInTheDocument();
+    expect(screen.getByPlaceholderText(/id, status, artifact/i)).toHaveValue("");
+  });
+
+  it("empty account shows No submissions yet with a Submit action", async () => {
+    vi.mocked(listSubmissions).mockResolvedValue({ ...fixtureSubmissionsList, count: 0, results: [] } as never);
+    renderWithProviders(<SubmissionsPage />, { initialPath: "/submissions" });
+    expect(await screen.findByText("No submissions yet")).toBeInTheDocument();
+    expect(screen.getByText("Submit a file, URL or indicators to see them here.")).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "Submit" })).toBeInTheDocument();
+  });
+});
+
+describe("SubmissionsPage - honest detail drawer", () => {
+  const row = (tests_done: number, status = "DONE") => ({ ...fixtureSubmissionsList.results[0], tests_done, status });
+  const AI = { score_ai: null, confidence_ai: null, classification_ai: "", category_ai: null };
+  const report = (id: number) => ({
+    id, cortex_job_id: null, type: "x", status: "Success", analyzer_name: `an${id}`, analyzer_id: `an${id}`,
+    level: null, confidence: null, score: null, category: null, categories: [],
+    report_summary: null, report_taxonomy: null, report_full: null,
+    target: { kind: "mail", id: null, value: null }, created_at: "2026-05-17T10:00:00Z",
+  });
+  const open = async (tests_done: number, reports: unknown[], status = "DONE", ai: object | null = null) => {
+    stub(false);
+    vi.mocked(getMe).mockResolvedValue(fixtureMe);
+    vi.mocked(listSubmissions).mockResolvedValue({ ...fixtureSubmissionsList, results: [row(tests_done, status)] } as never);
+    vi.mocked(getSubmissionDetails).mockResolvedValue({
+      ...row(tests_done, status), analyzer_reports: reports,
+      case_infos: {
+        score: 0, confidence: 0, classification: "SAFE",
+        ...(ai ?? { score_ai: 0, confidence_ai: 0, classification_ai: "SUSPICIOUS", category_ai: "Uncategorized" }),
+      },
+    } as never);
+    renderWithProviders(<SubmissionsPage />, { initialPath: "/submissions?open=101" });
+    await screen.findByText("Verdict");
+  };
+  // The analysis block lives under its tab since the drawer gained tabs.
+  const showAnalysis = async () => userEvent.click(await screen.findByRole("tab", { name: /^Analysis/ }));
+
+  it("labels sources, says no analyzers ran, shows the id once, drops the empty report block", async () => {
+    await open(0, []);
+    expect(await screen.findByText("AI classifier")).toBeInTheDocument();
+    expect(screen.getByText("Verdict")).toBeInTheDocument();
+    expect(screen.getByText("No analyzers ran for this submission.")).toBeInTheDocument();
+    expect(screen.getAllByText("#101")).toHaveLength(1);
+    // AI score and confidence both 0 read "Not classified" (design ruling), not the zero chips.
+    expect(parseFloat(getComputedStyle(screen.getByText("Not classified")).fontSize)).toBeGreaterThanOrEqual(12);
+    await showAnalysis();
+    expect(screen.queryByRole("heading", { name: "Analysis" })).not.toBeInTheDocument();
+  });
+
+  it("with analyses there is no 'no analyzers' line and reports are counted", async () => {
+    await open(3, [report(1), report(2)]);
+    expect(screen.queryByText(/No analyzers ran/)).not.toBeInTheDocument();
+    await showAnalysis();
+    expect(screen.getByRole("heading", { level: 3, name: "Analysis" })).toBeInTheDocument();
+    expect(screen.getByText("2 reports")).toBeInTheDocument();
+  });
+
+  it("DONE with 0 tests but reports present: no 'no analyzers' line", async () => {
+    await open(0, [report(1), report(2)]);
+    expect(screen.queryByText(/No analyzers ran/)).not.toBeInTheDocument();
+    await showAnalysis();
+    expect(screen.getByRole("heading", { level: 3, name: "Analysis" })).toBeInTheDocument();
+    expect(screen.getByText("2 reports")).toBeInTheDocument();
+  });
+
+  it("keeps the 0-reports block when tests ran", async () => {
+    await open(3, []);
+    expect(screen.queryByText(/No analyzers ran/)).not.toBeInTheDocument();
+    await showAnalysis();
+    expect(screen.getByRole("heading", { level: 3, name: "Analysis" })).toBeInTheDocument();
+    expect(screen.getByText("0 reports")).toBeInTheDocument();
+  });
+
+  it.each(["NEW", "IN_PROGRESS", "FAILED"])("%s with 0 tests: no 'no analyzers' line, block kept", async (st) => {
+    await open(0, [], st);
+    expect(screen.queryByText(/No analyzers ran/)).not.toBeInTheDocument();
+    await showAnalysis();
+    expect(await screen.findByText("No analysis reports yet.")).toBeInTheDocument();
+  });
+
+  it("DONE with 0 tests shows the line while details are pending", async () => {
+    stub(false);
+    vi.mocked(getMe).mockResolvedValue(fixtureMe);
+    vi.mocked(listSubmissions).mockResolvedValue({ ...fixtureSubmissionsList, results: [row(0)] } as never);
+    vi.mocked(getSubmissionDetails).mockReturnValue(new Promise(() => {}));
+    renderWithProviders(<SubmissionsPage />, { initialPath: "/submissions?open=101" });
+    expect(await screen.findByText("No analyzers ran for this submission.")).toBeInTheDocument();
+  });
+
+  it("DONE with 0 tests shows the line when details fail", async () => {
+    stub(false);
+    vi.mocked(getMe).mockResolvedValue(fixtureMe);
+    vi.mocked(listSubmissions).mockResolvedValue({ ...fixtureSubmissionsList, results: [row(0)] } as never);
+    vi.mocked(getSubmissionDetails).mockRejectedValue(new Error("boom"));
+    renderWithProviders(<SubmissionsPage />, { initialPath: "/submissions?open=101" });
+    expect(await screen.findByText("No analyzers ran for this submission.")).toBeInTheDocument();
+    await showAnalysis();
+    expect(await screen.findByText("Could not load analysis details.")).toBeInTheDocument();
+  });
+
+  it("hides the AI caption with no AI data; shows it with only score_ai", async () => {
+    await open(3, [], "DONE", AI);
+    expect(screen.queryByText("AI classifier")).not.toBeInTheDocument();
+  });
+  it("shows the AI caption and chip with only score_ai", async () => {
+    await open(3, [], "DONE", { ...AI, score_ai: 7 });
+    expect(screen.getByText("AI classifier")).toBeInTheDocument();
+    expect(screen.getByText("score 7")).toBeInTheDocument();
+    expect(parseFloat(getComputedStyle(screen.getByText("score 7")).fontSize)).toBeGreaterThanOrEqual(12);
+  });
+});
+
+function Probe() {
+  const nav = useNavigate();
+  const loc = useLocation();
+  const type = useNavigationType();
+  return (
+    <div>
+      <span data-testid="loc">{loc.pathname + loc.search}</span>
+      <span data-testid="navtype">{type}</span>
+      <button onClick={() => nav("/submissions")}>probe-back</button>
+    </div>
+  );
+}
+const withProbe = () => <><SubmissionsPage /><Probe /></>;
+
+describe("SubmissionsPage - header count honesty", () => {
+  const list = (count: number, n = 100) => ({
+    ...fixtureSubmissionsList,
+    count,
+    results: Array.from({ length: n }, (_, i) => ({
+      ...fixtureSubmissionsList.results[0], id: 1000 + i, artifact: `row-${i}@example.com`, is_challengeable: false,
+    })),
+  });
+  beforeEach(() => {
+    stub(false);
+    vi.mocked(getMe).mockResolvedValue(fixtureMe);
+    vi.mocked(listSubmissions).mockResolvedValue(list(340) as never);
+  });
+
+  it("uses the server count next to the loaded chip", async () => {
+    renderWithProviders(<SubmissionsPage />, { initialPath: "/submissions" });
+    expect(await screen.findByText("340 total")).toBeInTheDocument();
+    expect(screen.getByText("Loaded 100 of 340")).toBeInTheDocument();
+  });
+
+  it("search reports the server count as match", async () => {
+    renderWithProviders(<SubmissionsPage />, { initialPath: "/submissions" });
+    await screen.findByText("340 total");
+    await userEvent.type(screen.getByPlaceholderText(/id, status, artifact/i), "row");
+    expect(await screen.findByText("340 match")).toBeInTheDocument();
+  });
+
+  // The empty placeholder puts the page on its spinner, so no count (old or 0) is ever labelled match while a search loads.
+  it("while a new search loads, no count is shown as match", async () => {
+    vi.mocked(listSubmissions).mockImplementation(((p: { search?: string }) =>
+      p.search ? new Promise(() => {}) : Promise.resolve(list(340))) as never);
+    renderWithProviders(<SubmissionsPage />, { initialPath: "/submissions" });
+    await screen.findByText("340 total");
+    await userEvent.type(screen.getByPlaceholderText(/id, status, artifact/i), "row");
+    expect(await screen.findByRole("progressbar")).toBeInTheDocument();
+    expect(screen.queryByText(/match/)).toBeNull();
+  });
+
+  it("a client-side filter says match in the first N", async () => {
+    renderWithProviders(<SubmissionsPage />, { initialPath: "/submissions" });
+    await userEvent.click(await screen.findByRole("button", { name: /^filters/i }));
+    await userEvent.click(await screen.findByLabelText("Type"));
+    await userEvent.click(await screen.findByRole("option", { name: "MAIL" }));
+    expect(await screen.findByText(/match in the first 100$/)).toBeInTheDocument();
+  });
+
+  it("changing only the sort keeps total", async () => {
+    renderWithProviders(<SubmissionsPage />, { initialPath: "/submissions" });
+    await userEvent.click(await screen.findByRole("button", { name: /^filters/i }));
+    await userEvent.click(await screen.findByLabelText("Sort"));
+    await userEvent.click(await screen.findByRole("option", { name: "ID (high → low)" }));
+    expect(screen.getByText("340 total")).toBeInTheDocument();
+    expect(screen.queryByText(/match/)).toBeNull();
+  });
+
+  it("hides the pager when empty, shows it with rows", async () => {
+    renderWithProviders(<SubmissionsPage />, { initialPath: "/submissions" });
+    await screen.findByRole("table");
+    expect(document.querySelector(".MuiTablePagination-root")).not.toBeNull();
+  });
+
+  it("no pager under the empty state", async () => {
+    vi.mocked(listSubmissions).mockResolvedValue({ ...fixtureSubmissionsList, count: 0, results: [] } as never);
+    renderWithProviders(<SubmissionsPage />, { initialPath: "/submissions" });
+    await screen.findByText("No submissions yet");
+    expect(document.querySelector(".MuiTablePagination-root")).toBeNull();
+  });
+});
+
+describe("SubmissionsPage - drawer and history", () => {
+  beforeEach(() => {
+    vi.mocked(getMe).mockResolvedValue(fixtureMe);
+    vi.mocked(listSubmissions).mockResolvedValue(fixtureSubmissionsList as never);
+  });
+
+  it("the phone ID link replaces the history entry", async () => {
+    stub(true);
+    renderWithProviders(withProbe(), { initialPath: "/submissions" });
+    await userEvent.click(await screen.findByRole("link", { name: "101" }));
+    await screen.findByTestId("sheet-header");
+    expect(screen.getByTestId("navtype")).toHaveTextContent("REPLACE");
+  });
+
+  it("the URL losing ?open= (Back) closes the drawer", async () => {
+    stub(false);
+    renderWithProviders(withProbe(), { initialPath: "/submissions?open=101" });
+    await screen.findByTestId("sheet-header");
+    screen.getByText("probe-back").click(); // behind the modal, so not reachable by role
+    await waitFor(() => expect(screen.queryByTestId("sheet-header")).toBeNull());
+  });
+
+  it("desktop row click still opens and closes the drawer", async () => {
+    stub(false);
+    renderWithProviders(withProbe(), { initialPath: "/submissions" });
+    await userEvent.click(await screen.findByRole("button", { name: "101" }));
+    await screen.findByTestId("sheet-header");
+    expect(screen.getByTestId("loc")).toHaveTextContent("/submissions");
+    await userEvent.click(screen.getAllByRole("button", { name: /close/i })[0]);
+    await waitFor(() => expect(screen.queryByTestId("sheet-header")).toBeNull());
+  });
+});
+
+describe("SubmissionsPage - drawer neighbours and challenge", () => {
+  const three = (over: object[] = []) => ({
+    ...fixtureSubmissionsList,
+    results: [101, 102, 103].map((id, i) => ({
+      ...fixtureSubmissionsList.results[0], id, artifact: `row-${id}@example.com`, is_challengeable: false, is_challenged: false, ...(over[i] ?? {}),
+    })),
+  });
+  beforeEach(() => {
+    stub(false);
+    vi.mocked(getMe).mockResolvedValue(fixtureMe);
+    vi.mocked(getSubmissionDetails).mockReturnValue(new Promise(() => {}));
+  });
+
+  it("the middle row has both neighbours; Next and Previous move with ?open= and replace", async () => {
+    vi.mocked(listSubmissions).mockResolvedValue(three() as never);
+    renderWithProviders(withProbe(), { initialPath: "/submissions?open=102" });
+    const header = await screen.findByTestId("sheet-header");
+    expect(within(header).getByRole("heading", { level: 2, name: "#102" })).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "Previous submission" })).toBeEnabled();
+    await userEvent.click(screen.getByRole("button", { name: "Next submission" }));
+    await waitFor(() => expect(screen.getByTestId("loc")).toHaveTextContent("/submissions?open=103"));
+    expect(screen.getByTestId("navtype")).toHaveTextContent("REPLACE");
+    expect(await within(screen.getByTestId("sheet-header")).findByRole("heading", { level: 2, name: "#103" })).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "Next submission" })).toBeDisabled();
+    expect(screen.getByRole("tab", { name: "Overview" })).toHaveAttribute("aria-selected", "true");
+  });
+
+  it("the Challenge menu item shows only for an eligible row and opens the challenge dialog", async () => {
+    vi.mocked(listSubmissions).mockResolvedValue(three([{}, { is_challengeable: true }]) as never);
+    const { unmount } = renderWithProviders(<SubmissionsPage />, { initialPath: "/submissions?open=101" });
+    await userEvent.click(await screen.findByRole("button", { name: "More actions" }));
+    expect(screen.queryByRole("menuitem", { name: "Challenge" })).toBeNull();
+    unmount();
+    renderWithProviders(<SubmissionsPage />, { initialPath: "/submissions?open=102" });
+    await userEvent.click(await screen.findByRole("button", { name: "More actions" }));
+    await userEvent.click(screen.getByRole("menuitem", { name: "Challenge" }));
+    expect(await screen.findByRole("dialog", { name: /challenge/i })).toBeInTheDocument();
+  });
+
+  const prevNext = () => [screen.getByRole("button", { name: "Previous submission" }), screen.getByRole("button", { name: "Next submission" })];
+
+  it("a row that is not on the page has no neighbours: both buttons disabled", async () => {
+    // 100 rows loaded, 10 shown: id 150 is loaded but sits on a later page.
+    const many = Array.from({ length: 100 }, (_, i) => ({ ...fixtureSubmissionsList.results[0], id: 100 + i, artifact: `row-${i}@example.com`, is_challengeable: false }));
+    vi.mocked(listSubmissions).mockResolvedValue({ ...fixtureSubmissionsList, count: 100, results: many } as never);
+    renderWithProviders(<SubmissionsPage />, { initialPath: "/submissions?open=150" });
+    await screen.findByTestId("sheet-header");
+    expect(prevNext().map((b) => (b as HTMLButtonElement).disabled)).toEqual([true, true]);
+  });
+
+  it("first row: Previous disabled, Next goes to the second; last row: Next disabled", async () => {
+    vi.mocked(listSubmissions).mockResolvedValue(three() as never);
+    const { unmount } = renderWithProviders(withProbe(), { initialPath: "/submissions?open=101" });
+    await screen.findByTestId("sheet-header");
+    expect(prevNext().map((b) => (b as HTMLButtonElement).disabled)).toEqual([true, false]);
+    await userEvent.click(screen.getByRole("button", { name: "Next submission" }));
+    await waitFor(() => expect(screen.getByTestId("loc")).toHaveTextContent("open=102"));
+    await userEvent.click(screen.getByRole("button", { name: "Previous submission" }));
+    await waitFor(() => expect(screen.getByTestId("loc")).toHaveTextContent("open=101"));
+    unmount();
+    renderWithProviders(<SubmissionsPage />, { initialPath: "/submissions?open=103" });
+    await screen.findByTestId("sheet-header");
+    expect(prevNext().map((b) => (b as HTMLButtonElement).disabled)).toEqual([false, true]);
+  });
+
+  it("after Next the new submission opens on Overview with analysis groups at their defaults", async () => {
+    const rep = (id: number, value: string) => ({
+      id, cortex_job_id: null, type: "x", status: "Success", analyzer_name: `an${id}`, analyzer_id: `an${id}`,
+      level: null, confidence: null, score: 1, category: null, categories: [],
+      report_summary: null, report_taxonomy: null, report_full: null,
+      target: { kind: "DOMAIN", id: null, value }, created_at: "2026-05-17T10:00:00Z",
+    });
+    vi.mocked(listSubmissions).mockResolvedValue(three() as never);
+    vi.mocked(getSubmissionDetails).mockImplementation((async (id: number) => ({
+      ...fixtureSubmissionsList.results[0], id, analyzer_reports: [rep(id * 10, "a.example"), rep(id * 10 + 1, "b.example")],
+      case_infos: { score: 1, confidence: 1, classification: "SAFE", score_ai: 0, confidence_ai: 0, classification_ai: "SAFE", category_ai: "x" },
+    })) as never);
+    renderWithProviders(<SubmissionsPage />, { initialPath: "/submissions?open=102" });
+    await userEvent.click(await screen.findByRole("tab", { name: /^Analysis/ }));
+    const groupBtn = async () => (await screen.findAllByRole("button", { expanded: false })).find((b) => /b\.example/.test(b.textContent ?? ""))!;
+    await userEvent.click(await groupBtn());
+    expect(screen.getAllByRole("button", { expanded: true }).some((b) => /b\.example/.test(b.textContent ?? ""))).toBe(true);
+    await userEvent.click(screen.getByRole("button", { name: "Next submission" }));
+    await waitFor(() => expect(screen.getByRole("heading", { level: 2, name: "#103" })).toBeInTheDocument());
+    expect(screen.getByRole("tab", { name: "Overview" })).toHaveAttribute("aria-selected", "true");
+    await userEvent.click(await screen.findByRole("tab", { name: /^Analysis/ }));
+    expect((await groupBtn())).toBeInTheDocument(); // b.example is collapsed again
   });
 });

@@ -696,7 +696,7 @@ export default function ProfilePage() {
               </Box>
 
               <Box sx={{ minWidth: 0 }}>
-                <Typography variant="h4" noWrap sx={{ lineHeight: 1.15, fontWeight: 950, letterSpacing: -0.6 }}>
+                <Typography variant="pageTitle" component="h1" noWrap>
                   {displayName}
                 </Typography>
                 <Stack direction="row" spacing={0.75} sx={{ mt: 1, flexWrap: "wrap" }}>

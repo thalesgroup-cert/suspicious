@@ -1,33 +1,34 @@
+from urllib.parse import quote
 
 import django_filters
 from django.core.cache import cache
-from django.db.models import Sum, Value, CharField, F, Case, When
-from django.db.models.functions import Coalesce, Lower, StrIndex, Substr
+from django.db.models import Sum
+from django.db.models.functions import Coalesce
 from django_filters.rest_framework import DjangoFilterBackend
 from drf_spectacular.utils import OpenApiParameter, extend_schema
-from rest_framework import generics, status
+from rest_framework import generics
 from rest_framework.pagination import LimitOffsetPagination
 from rest_framework.permissions import IsAuthenticated
 from rest_framework.response import Response
 from rest_framework.views import APIView
 
+from api.permissions.dashboard_scope import may_see_names, resolve_scope, scope_options
 from api.permissions.settings import IsAdminOrCERT
 
 from dashboard.models import (
-    GroupMonthlyStats,
     MonthlyCasesSummary,
     MonthlyReporterStats,
     TotalCasesStats,
     UserCasesMonthlyStats,
 )
-from dashboard.snapshot import build_dashboard_payload, get_snapshot
+from dashboard.dash_utils.regional import summarise
 from api.serializers.dashboard import (
     DashboardSummaryQuerySerializer,
+    DashboardScopesResponseSerializer,
     DashboardSummaryResponseSerializer,
     MonthlyCasesSummaryAggregateSerializer,
     MonthlyCasesSummarySerializer,
     MonthlyReporterStatsSerializer,
-    TopPrefixesResponseSerializer,
     TotalCasesStatsSerializer,
     UserCasesMonthlyStatsAggregateRowSerializer,
     UserCasesMonthlyStatsSerializer,
@@ -40,7 +41,6 @@ from api.views.filters import (
 from api.views.mixins import MonthYearQueryMixin
 
 DASHBOARD_CACHE_TTL = 120
-TOP_PREFIXES_CACHE_TTL = 120
 
 
 class DashboardLimitOffsetPagination(LimitOffsetPagination):
@@ -58,10 +58,14 @@ class UserCasesMonthlyStatsFilter(django_filters.FilterSet):
         fields = ["user", "month", "year"]
 
 
+def summary_cache_key(month, year, groups, include_names) -> str:
+    # Each group is quoted, so "," / "|" inside a name cannot collide with the separator.
+    groups_key = "ALL" if groups is None else ",".join(quote(g, safe="") for g in groups)
+    return f"dashboard:summary:v2:{year}:{month}:{groups_key}:{int(include_names)}"
+
+
 class DashboardSummaryView(APIView):
     permission_classes = [IsAuthenticated]
-
-    DEFAULT_TOP_PREFIXES_LIMIT = 10
 
     @extend_schema(
         parameters=[
@@ -73,13 +77,15 @@ class DashboardSummaryView(APIView):
                 OpenApiParameter.QUERY,
                 required=False,
                 description=(
-                    "Dashboard scope. Currently echoed for UI compatibility. "
-                    "Data is not scope-filtered unless backend scope support is implemented."
+                    "Dashboard scope: ALL, OWN_COUNTRY, OWN_SCOPE (CISO), COUNTRY:<CC> or "
+                    "REGION:<NAME>. Defaults to the caller's default from /api/dashboard/scopes/. "
+                    "Data is filtered to cases whose reporter is in the scope; a scope outside "
+                    "the caller's role returns 403."
                 ),
             ),
         ],
         responses=DashboardSummaryResponseSerializer,
-        description="Return the dashboard summary for a given month and year.",
+        description="Return the live dashboard summary for a month, year and scope.",
     )
     def get(self, request):
         query = DashboardSummaryQuerySerializer(data=request.query_params)
@@ -87,31 +93,38 @@ class DashboardSummaryView(APIView):
 
         month = query.validated_data["month"]
         year = query.validated_data["year"]
-        requested_scope = query.validated_data.get("scope", "ALL")
-        scope = self._resolve_scope(requested_scope=requested_scope)
+        scope = resolve_scope(request.user, query.validated_data.get("scope"))
+        include_names = may_see_names(request.user, scope)
 
-        snap = get_snapshot(month, year)
-        if snap is not None:
-            payload = {**snap, "scope": scope}
-            return Response(
-                DashboardSummaryResponseSerializer(instance=self._scrub(payload)).data
-            )
+        cache_key = summary_cache_key(month, year, scope.groups, include_names)
+        summary = cache.get(cache_key)
+        if summary is None:
+            summary = summarise(month, year, scope.groups, include_names=include_names)
+            cache.set(cache_key, summary, DASHBOARD_CACHE_TTL)
 
-        cache_key = f"dashboard:summary:{year}:{month}:{scope}"
-        payload = cache.get(cache_key)
-        if payload is None:
-            payload = build_dashboard_payload(month=month, year=year, scope=scope)
-            cache.set(cache_key, payload, DASHBOARD_CACHE_TTL)
+        payload = {
+            "month": month,
+            "year": year,
+            "scope": {"key": scope.key, "label": scope.label},
+            **summary,
+        }
+        return Response(DashboardSummaryResponseSerializer(instance=payload).data)
 
-        return Response(DashboardSummaryResponseSerializer(instance=self._scrub(payload)).data)
 
-    def _resolve_scope(self, requested_scope: str) -> str:
-        if not self.request.user.groups.filter(name="CISO").exists():
-            return "ALL"
-        return requested_scope
+class DashboardScopesView(APIView):
+    permission_classes = [IsAuthenticated]
 
-    def _scrub(self, payload: dict) -> dict:
-        return payload
+    @extend_schema(
+        responses=DashboardScopesResponseSerializer,
+        description="Dashboard scopes the caller may request, and their default.",
+    )
+    def get(self, request):
+        default, options = scope_options(request.user)
+        payload = {
+            "default": default,
+            "options": [{"key": o.key, "label": o.label} for o in options],
+        }
+        return Response(DashboardScopesResponseSerializer(instance=payload).data)
 
 
 class MonthlyCasesSummaryListView(generics.ListAPIView):
@@ -209,7 +222,8 @@ class MonthlyCasesSummaryAggregateView(MonthYearQueryMixin, APIView):
 
 
 class UserCasesMonthlyStatsAggregateView(MonthYearQueryMixin, APIView):
-    permission_classes = [IsAuthenticated]
+    # Per-user rows name reporters: Admin/CERT only, like the list/detail views.
+    permission_classes = [IsAdminOrCERT]
 
     @extend_schema(
         parameters=[
@@ -284,126 +298,3 @@ class UserCasesMonthlyStatsAggregateView(MonthYearQueryMixin, APIView):
         cache.set(cache_key, payload, DASHBOARD_CACHE_TTL)
         serializer = UserCasesMonthlyStatsAggregateRowSerializer(instance=payload, many=True)
         return Response(serializer.data)
-
-
-class TopPrefixesView(APIView):
-    permission_classes = [IsAuthenticated]
-
-    DEFAULT_LIMIT = 10
-    MAX_LIMIT = 50
-
-    def get(self, request, *args, **kwargs):
-        ranking_type = request.query_params.get("type", "user")
-        month = request.query_params.get("month")
-        year = request.query_params.get("year")
-
-        try:
-            limit = int(request.query_params.get("limit", self.DEFAULT_LIMIT))
-        except (TypeError, ValueError):
-            return Response({"detail": "Invalid limit."}, status=status.HTTP_400_BAD_REQUEST)
-
-        if ranking_type not in {"user", "group"}:
-            return Response(
-                {"detail": "type must be either 'user' or 'group'."},
-                status=status.HTTP_400_BAD_REQUEST,
-            )
-
-        limit = max(1, min(limit, self.MAX_LIMIT))
-
-        cache_key = f"dashboard:top-prefixes:{ranking_type}:{year}:{month}:{limit}"
-        cached = cache.get(cache_key)
-        if cached is not None:
-            return Response(TopPrefixesResponseSerializer(cached).data)
-
-        if ranking_type == "user":
-            rows = self._query_user_prefixes(month=month, year=year, limit=limit)
-        else:
-            rows = self._query_group_prefixes(month=month, year=year, limit=limit)
-
-        payload = {
-            "type": ranking_type,
-            "month": month,
-            "year": year,
-            "data": list(rows),
-        }
-        cache.set(cache_key, payload, TOP_PREFIXES_CACHE_TTL)
-        return Response(TopPrefixesResponseSerializer(payload).data)
-
-    def _query_user_prefixes(self, month=None, year=None, limit=10):
-        qs = UserCasesMonthlyStats.objects.select_related("user")
-
-        if month:
-            qs = qs.filter(month=str(month).zfill(2))
-        if year:
-            qs = qs.filter(year=str(year))
-
-        username_expr = Lower(Coalesce(F("user__username"), Value("")))
-        at_pos = StrIndex(username_expr, Value("@"))
-
-        qs = qs.annotate(
-            prefix=Case(
-                When(
-                    user__username__contains="@",
-                    then=Substr(
-                        username_expr,
-                        1,
-                        Case(
-                            When(pk__isnull=False, then=at_pos - 1),
-                            default=Value(0),
-                        ),
-                    ),
-                ),
-                default=username_expr,
-                output_field=CharField(),
-            )
-        )
-
-        return (
-            qs.exclude(prefix="")
-            .values("prefix")
-            .annotate(
-                total=Coalesce(Sum("total_cases"), 0),
-                safe=Coalesce(Sum("safe_cases"), 0),
-                suspicious=Coalesce(Sum("suspicious_cases"), 0),
-                dangerous=Coalesce(Sum("dangerous_cases"), 0),
-                failure=Coalesce(Sum("failure_cases"), 0),
-                inconclusive=Coalesce(Sum("inconclusive_cases"), 0),
-            )
-            .order_by("-total")[:limit]
-        )
-
-    def _query_group_prefixes(self, month=None, year=None, limit=10):
-        qs = GroupMonthlyStats.objects.all()
-
-        if month:
-            qs = qs.filter(month=str(month).zfill(2))
-        if year:
-            qs = qs.filter(year=str(year))
-
-        group_expr = Lower(Coalesce(F("group_name"), Value("")))
-        space_pos = StrIndex(group_expr, Value(" "))
-
-        qs = qs.annotate(
-            prefix=Case(
-                When(
-                    group_name__contains=" ",
-                    then=Substr(group_expr, 1, space_pos - 1),
-                ),
-                default=group_expr,
-                output_field=CharField(),
-            )
-        )
-
-        return (
-            qs.exclude(prefix="")
-            .values("prefix")
-            .annotate(
-                total=Coalesce(Sum("total_cases"), 0),
-                safe=Coalesce(Sum("safe_cases"), 0),
-                suspicious=Coalesce(Sum("suspicious_cases"), 0),
-                dangerous=Coalesce(Sum("dangerous_cases"), 0),
-                failure=Coalesce(Sum("failure_cases"), 0),
-                inconclusive=Coalesce(Sum("inconclusive_cases"), 0),
-            )
-            .order_by("-total")[:limit]
-        )

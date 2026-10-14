@@ -180,7 +180,8 @@ class UserProfileSerializer(serializers.ModelSerializer):
             "creation_date",
             "last_update",
         ]
-        read_only_fields = ["id", "creation_date", "last_update"]
+        # Org units come from LDAP and drive dashboard/CISO scope authorization.
+        read_only_fields = ["id", "gbu", "country", "region", "creation_date", "last_update"]
 
     def validate_theme(self, value):
         valid = {choice[0] for choice in Theme.choices}
@@ -225,7 +226,8 @@ class CISOProfileSerializer(serializers.ModelSerializer):
             "creation_date",
             "last_update",
         ]
-        read_only_fields = ["id", "creation_date", "last_update"]
+        # Org units come from LDAP and drive dashboard/CISO scope authorization.
+        read_only_fields = ["id", "gbu", "country", "region", "creation_date", "last_update"]
 
     def validate_scope(self, value):
         """A CISO may only scope themselves to a pipe-joined subset of their

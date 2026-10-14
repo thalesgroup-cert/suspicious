@@ -8,6 +8,12 @@ import { queryClient } from "@/app/queryClient";
 import { AppThemeProvider } from "@/styles/ThemeStore";
 import { SnackbarProvider } from "notistack";
 
+import "@fontsource-variable/inter/wght.css";
+import "@fontsource-variable/nunito/wght.css";
+import "@fontsource-variable/source-serif-4/wght.css";
+import "@fontsource/ibm-plex-mono/latin-400.css";
+import "@fontsource/ibm-plex-mono/latin-600.css";
+import "@fontsource/ibm-plex-mono/latin-700.css";
 import "@/bones/registry";
 import { env } from "@/lib/runtimeEnv";
 

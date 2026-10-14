@@ -57,8 +57,15 @@ def scoped_case_queryset(queryset, user):
         return queryset
     if not groups:
         return queryset.none()
-    # AND across dimensions: chained .filter() on a reverse M2M requires the
-    # reporter to be in *all* of the named groups.
+    return restrict_to_groups(queryset, groups)
+
+
+def restrict_to_groups(queryset, groups, lookup="reporter__groups__name"):
+    """Keep rows whose user is in *every* group of ``groups`` (AND).
+
+    Chained .filter() on a reverse M2M requires membership of all the named
+    groups; distinct() drops the duplicate rows the joins can produce.
+    """
     for name in groups:
-        queryset = queryset.filter(reporter__groups__name=name)
+        queryset = queryset.filter(**{lookup: name})
     return queryset.distinct()

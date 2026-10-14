@@ -1,6 +1,7 @@
 import React, { lazy, Suspense } from "react";
 import { createBrowserRouter } from "react-router";
 import AppLayout from "@/layouts/AppLayout";
+import { ELEVATED_GROUPS } from "@/layouts/nav";
 import ProtectedRoute from "@/app/ProtectedRoute";
 import PublicOnlyRoute from "@/app/PublicOnlyRoute";
 import PageLoader from "@/styles/components/PageLoader";
@@ -18,7 +19,7 @@ const InvestigationPage = lazy(() => import("@/pages/InvestigationPage"));
 const AboutPage        = lazy(() => import("@/pages/AboutPage"));
 const NotFound         = lazy(() => import("@/pages/NotFound"));
 
-const ELEVATED = ["Admin", "CISO", "CERT"];
+const ELEVATED = ELEVATED_GROUPS;
 const ADMIN    = ["Admin", "CERT"];
 
 const fallback = <PageLoader />;

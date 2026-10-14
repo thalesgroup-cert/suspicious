@@ -199,6 +199,7 @@ services:
     environment:
       BACKEND_URL: "${BACKEND_URL:-}"
       FEEDER_API_TOKEN: "${FEEDER_API_TOKEN:-}"
+      REQUESTS_CA_BUNDLE: "${FEEDER_CA_BUNDLE:-/etc/private/rootcafile.pem}"
       LOG_LEVEL: "${LOG_LEVEL:-INFO}"
     volumes:
       - "${FEEDER_PATH}/logs:/app/log"

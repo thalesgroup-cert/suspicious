@@ -9,14 +9,19 @@ from dashboard.models import (
 
 class DashboardSummaryQuerySerializer(serializers.Serializer):
     month = serializers.IntegerField(min_value=1, max_value=12)
-    year = serializers.IntegerField(min_value=1)
+    year = serializers.IntegerField(min_value=2000, max_value=2100)
     scope = serializers.CharField(
         required=False,
-        default="ALL",
         allow_blank=False,
         trim_whitespace=True,
         max_length=64,
     )
+
+    def validate(self, attrs):
+        # DRF maps a blank optional query param to "absent"; reject it instead.
+        if "scope" in self.initial_data and not attrs.get("scope"):
+            raise serializers.ValidationError({"scope": "This field may not be blank."})
+        return attrs
 
 
 class DashboardPrefixSerializer(serializers.Serializer):
@@ -24,28 +29,57 @@ class DashboardPrefixSerializer(serializers.Serializer):
     value = serializers.IntegerField(min_value=0)
 
 
-class DashboardKpisSerializer(serializers.Serializer):
-    new_users = serializers.IntegerField(min_value=0)
-    total_reporters = serializers.IntegerField(min_value=0)
-    total_cases = serializers.IntegerField(min_value=0)
+class DashboardScopeSerializer(serializers.Serializer):
+    key = serializers.CharField()
+    label = serializers.CharField()
 
 
-class DashboardDangerCountsSerializer(serializers.Serializer):
-    failure = serializers.IntegerField(min_value=0)
+class DashboardScopesResponseSerializer(serializers.Serializer):
+    default = serializers.CharField()
+    options = DashboardScopeSerializer(many=True)
+
+
+class DashboardOutcomesSerializer(serializers.Serializer):
     safe = serializers.IntegerField(min_value=0)
     inconclusive = serializers.IntegerField(min_value=0)
     suspicious = serializers.IntegerField(min_value=0)
     dangerous = serializers.IntegerField(min_value=0)
-    malicious = serializers.IntegerField(min_value=0)
+    failure = serializers.IntegerField(min_value=0)
+
+
+class DashboardByTypeSerializer(serializers.Serializer):
+    MAIL = serializers.IntegerField(min_value=0)
+    FILE = serializers.IntegerField(min_value=0)
+    URL = serializers.IntegerField(min_value=0)
+    IP = serializers.IntegerField(min_value=0)
+    HASH = serializers.IntegerField(min_value=0)
+    IOC = serializers.IntegerField(min_value=0)
+    UNKNOWN = serializers.IntegerField(min_value=0)
+
+
+class DashboardPreviousSerializer(serializers.Serializer):
+    reports = serializers.IntegerField(min_value=0)
+    outcomes = DashboardOutcomesSerializer()
+
+
+class DashboardTrendPointSerializer(serializers.Serializer):
+    week_start = serializers.CharField()
+    reports = serializers.IntegerField(min_value=0)
 
 
 class DashboardSummaryResponseSerializer(serializers.Serializer):
     month = serializers.IntegerField(min_value=1, max_value=12)
     year = serializers.IntegerField(min_value=1)
-    scope = serializers.CharField()
-    kpis = DashboardKpisSerializer()
-    danger_counts = DashboardDangerCountsSerializer()
-    top_prefixes = DashboardPrefixSerializer(many=True)
+    scope = DashboardScopeSerializer()
+    reports = serializers.IntegerField(min_value=0)
+    outcomes = DashboardOutcomesSerializer()
+    in_progress = serializers.IntegerField(min_value=0)
+    by_type = DashboardByTypeSerializer()
+    reporters = serializers.IntegerField(min_value=0)
+    new_users = serializers.IntegerField(min_value=0)
+    previous = DashboardPreviousSerializer()
+    trend = DashboardTrendPointSerializer(many=True)
+    top_reporters = DashboardPrefixSerializer(many=True, allow_null=True)
 
 
 class MonthlyCasesSummaryAggregateSerializer(serializers.Serializer):
@@ -140,19 +174,3 @@ class UserCasesMonthlyStatsSerializer(serializers.ModelSerializer):
             "creation_date",
             "last_update",
         ]
-
-class TopPrefixItemSerializer(serializers.Serializer):
-    prefix = serializers.CharField()
-    total = serializers.IntegerField()
-    safe = serializers.IntegerField()
-    suspicious = serializers.IntegerField()
-    dangerous = serializers.IntegerField()
-    failure = serializers.IntegerField()
-    inconclusive = serializers.IntegerField()
-
-
-class TopPrefixesResponseSerializer(serializers.Serializer):
-    type = serializers.ChoiceField(choices=["user", "group"])
-    month = serializers.CharField(allow_null=True, required=False)
-    year = serializers.CharField(allow_null=True, required=False)
-    data = TopPrefixItemSerializer(many=True)

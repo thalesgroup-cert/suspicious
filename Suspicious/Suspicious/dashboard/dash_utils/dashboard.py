@@ -28,6 +28,7 @@ def update_monthly_reporter_stats(kpi, current_month: int, current_year: int) ->
         )
     else:
         kpi.monthly_reporter_stats.new_reporters = new_reporters_count
+        kpi.monthly_reporter_stats.total_reporters = total_reporters_count
         kpi.monthly_reporter_stats.save()
 
 def update_group_monthly_stats(current_month: int, current_year: int) -> None:

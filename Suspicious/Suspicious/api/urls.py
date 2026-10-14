@@ -5,13 +5,16 @@ from api.views.auth import LoginView, LogoutView, MeView
 from api.views.campaigns import (
     CampaignClassificationCountsView,
     CampaignMailVolumeView,
+    CampaignNeighboursView,
     CampaignPcaView,
+    CampaignSummaryView,
 )
 from api.views.case_report import CaseReportMarkdownView, CaseReportView
 from api.views.case_screenshot import CaseScreenshotView
 from api.views.challenge import CaseChallengeTokenView
 from api.views.comments import CaseCommentListCreateView
 from api.views.dashboard import (
+    DashboardScopesView,
     DashboardSummaryView,
     MonthlyCasesSummaryAggregateView,
     MonthlyCasesSummaryListView,
@@ -20,7 +23,6 @@ from api.views.dashboard import (
     UserCasesMonthlyStatsAggregateView,
     UserCasesMonthlyStatsDetailView,
     UserCasesMonthlyStatsListView,
-    TopPrefixesView,
 )
 from api.views.downloads import DownloadCaseArchiveView
 from api.views.home import HomeSummaryView
@@ -94,7 +96,6 @@ urlpatterns = [
     path("stats/user-cases/", UserCasesMonthlyStatsListView.as_view(), name="user-cases-list"),
     path("stats/user-cases/<int:pk>/", UserCasesMonthlyStatsDetailView.as_view(), name="user-cases-detail"),
     path("stats/user-cases/aggregate/", UserCasesMonthlyStatsAggregateView.as_view(), name="user-cases-aggregate"),
-    path("stats/top-prefixes/", TopPrefixesView.as_view(), name="top-prefixes"),
 
     path("cases/<int:case_id>/download/", DownloadCaseArchiveView.as_view(), name="case-download"),
     path("cases/<int:case_id>/mail-preview.png", MailPreviewView.as_view(), name="case-mail-preview"),
@@ -106,10 +107,13 @@ urlpatterns = [
     path("cases/<int:case_id>/report.md", CaseReportMarkdownView.as_view(), name="case-report-markdown"),
 
     path("dashboard/summary/", DashboardSummaryView.as_view(), name="dashboard-summary"),
+    path("dashboard/scopes/", DashboardScopesView.as_view(), name="dashboard-scopes"),
 
     path("campaigns/classification-counts/", CampaignClassificationCountsView.as_view(), name="campaign-classification-counts"),
     path("campaigns/pca/", CampaignPcaView.as_view(), name="campaign-pca"),
     path("campaigns/mail-volume/", CampaignMailVolumeView.as_view(), name="campaign-mail-volume"),
+    path("campaigns/summary/", CampaignSummaryView.as_view(), name="campaign-summary"),
+    path("campaigns/neighbours/", CampaignNeighboursView.as_view(), name="campaign-neighbours"),
 
     path("profile/",              ProfileView.as_view(),             name="profile"),
     path("profile/appearance/",   AppearanceView.as_view(),          name="profile-appearance"),

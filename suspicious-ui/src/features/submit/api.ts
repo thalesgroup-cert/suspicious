@@ -55,7 +55,16 @@ export async function extractIocsFromFile(file: File): Promise<ExtractIocsRespon
   return res.data;
 }
 
-export async function getSubmitConfig(): Promise<string> {
+export async function getSubmitConfig(): Promise<{
+  suspiciousEmail?: string;
+  maxFileBytes?: number;
+  maxIndicators?: number;
+}> {
   const res = await api.get<SubmitConfigResponse>("/submit/config/");
-  return res.data.data.suspicious_email;
+  const d = res.data?.data; // tolerate older/mocked shapes without limits
+  return {
+    suspiciousEmail: d?.suspicious_email,
+    maxFileBytes: d?.max_file_bytes,
+    maxIndicators: d?.max_indicators,
+  };
 }

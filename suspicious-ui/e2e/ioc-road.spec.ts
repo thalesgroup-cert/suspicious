@@ -62,13 +62,15 @@ test("bulk indicator submission creates one case and navigates to submissions", 
 
   await page.goto("/submit");
 
-  await page.getByRole("button", { name: /indicators/i }).click();
+  await page.getByRole("button", { name: /^indicators/i }).click();
 
   const textarea = page.getByRole("textbox").first();
   await textarea.fill("8.8.8.8\n1.1.1.1\nhttp://example.test");
 
-  // Live preview counts the three parsed indicators.
-  await expect(page.getByText(/3 indicator/i)).toBeVisible();
+  // Live preview counts the three parsed indicators ("found": one is a URL).
+  await expect(page.locator("#indicators-summary")).toHaveText(
+    /3 found/i
+  );
 
   await page.getByRole("button", { name: /^submit$/i }).click();
 

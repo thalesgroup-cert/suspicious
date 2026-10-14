@@ -13,13 +13,18 @@ from hash_process.models import Hash
 from domain_process.models import Domain
 from score_process.scoring.header_parser import parse_email_headers
 from .dedup import has_object
+from .internal import external_addresses
 
 logger = logging.getLogger(__name__)
 
 _SUPPORTED_HASH_TYPES = frozenset({"md5", "sha1", "sha256"})
 
 
-def build_email_object(mail, case_number, detection_level: str) -> Optional[MISPObject]:
+def build_email_object(
+    mail, case_number, detection_level: str, company_domains=frozenset()
+) -> Optional[MISPObject]:
+    """Recipients (to, cc) on company domains are left out and display names of
+    recipients are never sent: they are staff, not indicators."""
     logger.debug("[MISPHandler] Building email object for case %s.", case_number)
     try:
         header_value  = getattr(getattr(mail, "mail_header", None), "header_value", None) or ""
@@ -32,9 +37,10 @@ def build_email_object(mail, case_number, detection_level: str) -> Optional[MISP
 
         obj.add_attribute("from",              value=parsed.get("from",              ""))
         obj.add_attribute("from-display-name", value=parsed.get("from_display_name", ""))
-        obj.add_attribute("to",                value=parsed.get("to",                ""))
-        obj.add_attribute("to-display-name",   value=parsed.get("to_display_name",   ""))
-        obj.add_attribute("cc",                value=parsed.get("cc",                ""))
+        for relation in ("to", "cc"):
+            external = external_addresses(parsed.get(relation), company_domains)
+            if external:
+                obj.add_attribute(relation, value=external)
         obj.add_attribute("subject",           value=clean_sub)
         obj.add_attribute("reply-to",          value=parsed.get("reply_to",          ""))
         obj.add_attribute("return-path",       value=parsed.get("return_path",       ""))

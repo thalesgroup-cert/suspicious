@@ -1,128 +1,136 @@
 import * as React from "react";
-import { Alert, Box, Container, Stack } from "@mui/material";
-import { useTheme } from "@mui/material/styles";
-import { alpha } from "@mui/material/styles";
-import { useQueries, useQuery } from "@tanstack/react-query";
+import { Alert, Box, Button, Container, LinearProgress, Stack, useMediaQuery } from "@mui/material";
+import { alpha, useTheme } from "@mui/material/styles";
+import { keepPreviousData, useQuery } from "@tanstack/react-query";
 import { Skeleton } from "boneyard-js/react";
-import { Responsive, WidthProvider, type Layout } from "react-grid-layout/legacy";
+import { Responsive, type Layout } from "react-grid-layout/legacy";
+import { getBreakpointFromWidth, useContainerWidth } from "react-grid-layout";
 
 import "react-grid-layout/css/styles.css";
 import "react-resizable/css/styles.css";
 
 import { getMe } from "@/api/auth";
-import { getDashboardSummary, type DashboardSummary } from "@/features/dashboard/api";
+import {
+  getDashboardScopes,
+  getDashboardSummary,
+  type DashboardScopes,
+  type DashboardSummary,
+} from "@/features/dashboard/api";
+import {
+  BREAKPOINTS,
+  COLS,
+  DEFAULT_LAYOUTS,
+  PANEL_KEYS,
+  ROW_HEIGHT,
+  clearLayouts,
+  isDefaultLayout,
+  layoutStorageKey,
+  loadLayouts,
+  saveLayouts,
+  type ResponsiveLayouts,
+} from "@/features/dashboard/layout";
 import { useThemeMode } from "@/styles/ThemeStore";
 
 import OverviewHeader from "@/features/dashboard/components/OverviewHeader";
-import ThreatDistributionPanel from "@/features/dashboard/components/ThreatDistributionPanel";
-import TopPrefixesPanel from "@/features/dashboard/components/TopPrefixesPanel";
-import { DashboardEmpty, DashboardLoading } from "@/features/dashboard/components/StatePanels";
+import { monthName, scopeLabel, scopeName } from "@/features/dashboard/format";
+import TopReportersPanel from "@/features/dashboard/components/TopReportersPanel";
+import { DashboardLoading } from "@/features/dashboard/components/StatePanels";
 import KpiTrendPanels from "@/features/dashboard/components/KpiTrendPanels";
+import OutcomesPanel from "@/features/dashboard/components/OutcomesPanel";
+import ByTypePanel from "@/features/dashboard/components/ByTypePanel";
+import { EmptyState } from "@/shared/components/EmptyState";
 
-// Helpers
+const OVERALL_ONLY: DashboardScopes = { default: "ALL", options: [{ key: "ALL", label: "Overall" }] };
+const GRID_MARGIN: [number, number] = [16, 16];
+const GRID_PADDING: [number, number] = [0, 0];
 
-function monthName(m: number) {
-  return new Date(2000, m - 1, 1).toLocaleString("en", { month: "long" });
+function httpStatus(error: unknown): number | undefined {
+  return (error as { response?: { status?: number } } | null)?.response?.status;
 }
 
-function monthNameShort(m: number) {
-  return new Date(2000, m - 1, 1).toLocaleString("en", { month: "short" });
-}
-
-function getMonthWindow(month: number, year: number, windowSize: number) {
-  const out: Array<{ month: number; year: number }> = [];
-  let m = month;
-  let y = year;
-  for (let i = 0; i < windowSize; i++) {
-    out.push({ month: m, year: y });
-    m -= 1;
-    if (m <= 0) { m = 12; y -= 1; }
+/**
+ * Grid shell. D1: the grid mounts only once its container is measured (no
+ * first paint at the library's 1280px default), and layouts are persisted
+ * only from a user drag/resize stop. onLayoutChange is deliberately not
+ * wired: it also fires for width/breakpoint/theme changes, and feeding it
+ * back into state and storage is what wrote layouts nobody chose.
+ */
+function DashboardGrid(props: {
+  /** Saved layouts live here, so the phone layout (which never mounts this) never reads or writes them. */
+  storageKey: string;
+  /** Placeholder data from the previous scope/period is showing. */
+  busy: boolean;
+  children: React.ReactNode;
+}) {
+  const { storageKey } = props;
+  const [layouts, setLayouts] = React.useState<ResponsiveLayouts>(() => loadLayouts(storageKey));
+  const [prevStorageKey, setPrevStorageKey] = React.useState(storageKey);
+  if (storageKey !== prevStorageKey) {
+    setPrevStorageKey(storageKey);
+    setLayouts(loadLayouts(storageKey));
   }
-  return out.reverse();
-}
 
-// Constants
+  const { width, containerRef, mounted } = useContainerWidth({ measureBeforeMount: true });
+  const onStop = React.useCallback(
+    (layout: Layout) => {
+      const next = { ...layouts, [getBreakpointFromWidth(BREAKPOINTS, width)]: layout };
+      setLayouts(next);
+      saveLayouts(storageKey, next);
+    },
+    [layouts, storageKey, width]
+  );
 
-const EMPTY_SUMMARY: DashboardSummary = {
-  month: 1,
-  year: 1970,
-  scope: "ALL",
-  kpis: { new_users: 0, total_reporters: 0, total_cases: 0 },
-  danger_counts: {
-    failure: 0, safe: 0, inconclusive: 0, suspicious: 0, dangerous: 0, malicious: 0,
-  },
-  top_prefixes: [],
-};
+  const resetLayouts = () => {
+    setLayouts(DEFAULT_LAYOUTS);
+    clearLayouts(storageKey);
+  };
 
-const DASHBOARD_PANEL_KEYS = {
-  KPI_TRENDS: "kpi-trends",
-  TOP_PREFIXES: "top-prefixes",
-  THREAT_DISTRIBUTION: "threat-distribution",
-} as const;
-
-const DASHBOARD_BREAKPOINTS = { lg: 1200, md: 900, sm: 600, xs: 0 };
-const DASHBOARD_COLS = { lg: 12, md: 12, sm: 6, xs: 1 };
-
-const ROW_HEIGHT = 32;
-
-const BOTTOM_H = 14;
-const BOTTOM_MIN_H = 10;
-
-type ResponsiveLayouts = Partial<Record<string, Layout>>;
-
-const DEFAULT_DASHBOARD_LAYOUTS: ResponsiveLayouts = {
-  lg: [
-    { i: DASHBOARD_PANEL_KEYS.KPI_TRENDS,          x: 0,  y: 0,          w: 12, h: 6,       minW: 6,  minH: 4 },
-    { i: DASHBOARD_PANEL_KEYS.TOP_PREFIXES,         x: 0,  y: 6,          w: 8,  h: BOTTOM_H, minW: 4, minH: BOTTOM_MIN_H },
-    { i: DASHBOARD_PANEL_KEYS.THREAT_DISTRIBUTION,  x: 8,  y: 6,          w: 4,  h: BOTTOM_H, minW: 4, minH: BOTTOM_MIN_H },
-  ],
-  md: [
-    { i: DASHBOARD_PANEL_KEYS.KPI_TRENDS,          x: 0,  y: 0,          w: 12, h: 6,       minW: 6,  minH: 4 },
-    { i: DASHBOARD_PANEL_KEYS.TOP_PREFIXES,         x: 0,  y: 6,          w: 7,  h: BOTTOM_H, minW: 4, minH: BOTTOM_MIN_H },
-    { i: DASHBOARD_PANEL_KEYS.THREAT_DISTRIBUTION,  x: 7,  y: 6,          w: 5,  h: BOTTOM_H, minW: 4, minH: BOTTOM_MIN_H },
-  ],
-  sm: [
-    { i: DASHBOARD_PANEL_KEYS.KPI_TRENDS,          x: 0,  y: 0,                   w: 6, h: 6,       minH: 4 },
-    { i: DASHBOARD_PANEL_KEYS.TOP_PREFIXES,         x: 0,  y: 6,                   w: 6, h: BOTTOM_H, minH: BOTTOM_MIN_H },
-    { i: DASHBOARD_PANEL_KEYS.THREAT_DISTRIBUTION,  x: 0,  y: 6 + BOTTOM_H,        w: 6, h: BOTTOM_H, minH: BOTTOM_MIN_H },
-  ],
-  xs: [
-    { i: DASHBOARD_PANEL_KEYS.KPI_TRENDS,          x: 0,  y: 0,                          w: 1, h: 6,       minH: 4 },
-    { i: DASHBOARD_PANEL_KEYS.TOP_PREFIXES,         x: 0,  y: 6,                          w: 1, h: BOTTOM_H, minH: BOTTOM_MIN_H },
-    { i: DASHBOARD_PANEL_KEYS.THREAT_DISTRIBUTION,  x: 0,  y: 6 + BOTTOM_H,               w: 1, h: BOTTOM_H, minH: BOTTOM_MIN_H },
-  ],
-};
-
-const ResponsiveGridLayout = WidthProvider(Responsive);
-
-function isValidLayouts(value: unknown): value is ResponsiveLayouts {
-  return !!value && typeof value === "object" && !Array.isArray(value);
-}
-
-function getStorageKey(userId?: string | number) {
-  return `dashboard:layouts:${userId ?? "anonymous"}`;
-}
-
-function loadLayoutsFromStorage(storageKey: string): ResponsiveLayouts {
-  if (typeof window === "undefined") return DEFAULT_DASHBOARD_LAYOUTS;
-  try {
-    const raw = window.localStorage.getItem(storageKey);
-    if (!raw) return DEFAULT_DASHBOARD_LAYOUTS;
-    const parsed = JSON.parse(raw);
-    return isValidLayouts(parsed) ? parsed : DEFAULT_DASHBOARD_LAYOUTS;
-  } catch {
-    return DEFAULT_DASHBOARD_LAYOUTS;
-  }
-}
-
-function saveLayoutsToStorage(storageKey: string, layouts: ResponsiveLayouts) {
-  if (typeof window === "undefined") return;
-  try { window.localStorage.setItem(storageKey, JSON.stringify(layouts)); } catch { /* ignore */ }
+  return (
+    <>
+    <GridStyles />
+    {isDefaultLayout(layouts) ? null : (
+      <Stack direction="row" sx={{ mb: 1, justifyContent: "flex-end" }}>
+        <Button size="small" variant="text" onClick={resetLayouts}>
+          Reset layout
+        </Button>
+      </Stack>
+    )}
+    <div
+      ref={containerRef}
+      data-testid="dashboard-grid"
+      aria-busy={props.busy}
+      style={{ opacity: props.busy ? 0.6 : 1, transition: "opacity .2s ease" }}
+    >
+      {mounted ? (
+        <Responsive
+          className="dashboard-layout"
+          width={width}
+          layouts={layouts}
+          breakpoints={BREAKPOINTS}
+          cols={COLS}
+          rowHeight={ROW_HEIGHT}
+          margin={GRID_MARGIN}
+          containerPadding={GRID_PADDING}
+          compactType="vertical"
+          preventCollision={false}
+          isDraggable
+          isResizable
+          useCSSTransforms
+          draggableHandle=".dashboard-panel-drag-handle"
+          onDragStop={onStop}
+          onResizeStop={onStop}
+        >
+          {props.children}
+        </Responsive>
+      ) : null}
+    </div>
+    </>
+  );
 }
 
 // DashboardPanelShell: drag handle + visible affordances
 
-type DashboardPanelShellProps = { title: string; children: React.ReactNode };
+type DashboardPanelShellProps = { children: React.ReactNode };
 
 const DashboardPanelShell = React.memo(function DashboardPanelShell({
   children,
@@ -146,7 +154,8 @@ const DashboardPanelShell = React.memo(function DashboardPanelShell({
     >
       <DragHandle />
 
-      <Box sx={{ flex: 1, minHeight: 0, overflow: "hidden" }}>
+      {/* auto, not hidden: a panel resized smaller than its content scrolls instead of clipping it */}
+      <Box sx={{ flex: 1, minHeight: 0, overflow: "auto" }}>
         {children}
       </Box>
     </Box>
@@ -333,260 +342,163 @@ function GridStyles() {
 export default function DashboardPage() {
   const now = new Date();
 
-  const [openKpiTrends, setOpenKpiTrends] = React.useState(false);
-  const [selectedMetric, setSelectedMetric] = React.useState<string | undefined>(undefined);
-
   const [month, setMonth] = React.useState(now.getMonth() + 1);
   const [year, setYear] = React.useState(now.getFullYear());
-  const [scope, setScope] = React.useState<string>("ALL");
-  const [trendWindow, setTrendWindow] = React.useState<number>(6);
+  // null = the backend's default for this user (from /scopes/).
+  const [scope, setScope] = React.useState<string | null>(null);
+  const [refusedScope, setRefusedScope] = React.useState<string | null>(null);
 
   const meQuery = useQuery({ queryKey: ["me"], queryFn: getMe, retry: false });
+  const scopesQuery = useQuery({
+    queryKey: ["dashboardScopes"],
+    queryFn: getDashboardScopes,
+    retry: false,
+    staleTime: 5 * 60_000,
+  });
 
-  const groups: string[] = (meQuery.data as any)?.groups ?? [];
-  const isCiso = groups.includes("CISO");
-  const isElevated = groups.includes("CISO") || groups.includes("CERT");
-  const cisoScope: string | undefined = (meQuery.data as any)?.ciso_scope;
-  const effectiveScope = isCiso ? scope : "ALL";
-  const userId = (meQuery.data as any)?.id;
+  const scopes = scopesQuery.data ?? OVERALL_ONLY;
+  // A selection the (refreshed) options no longer offer falls back to the default.
+  const scopeKey = scope !== null && scopes.options.some((o) => o.key === scope) ? scope : scopes.default;
+  const optionFor = (key: string) =>
+    scopes.options.find((o) => o.key === key) ?? { key, label: key };
 
-  const storageKey = React.useMemo(() => getStorageKey(userId), [userId]);
-
-  const [layouts, setLayouts] = React.useState<ResponsiveLayouts>(() =>
-    loadLayoutsFromStorage(storageKey)
-  );
-
-  const [prevStorageKey, setPrevStorageKey] = React.useState(storageKey);
-  if (storageKey !== prevStorageKey) {
-    setPrevStorageKey(storageKey);
-    setLayouts(loadLayoutsFromStorage(storageKey));
-  }
+  const theme = useTheme();
+  // Drag/resize needs a mouse-class pointer and room (md+); phones, touch
+  // tablets and narrow windows get the fixed stack. noSsr: the first render
+  // already knows, so no grid (and no saved-layout read) flashes in.
+  const isWide = useMediaQuery(theme.breakpoints.up("md"), { noSsr: true });
+  const finePointer = useMediaQuery("(pointer: fine)", { noSsr: true });
+  const canArrange = isWide && finePointer;
+  const storageKey = layoutStorageKey(meQuery.data?.id);
 
   const summaryQuery = useQuery<DashboardSummary>({
-    queryKey: ["dashboardSummary", month, year, effectiveScope],
-    queryFn: async () => getDashboardSummary({ month, year, scope: effectiveScope }),
+    queryKey: ["dashboardSummary", month, year, scopeKey],
+    queryFn: () => getDashboardSummary({ month, year, scope: scopeKey }),
+    enabled: !scopesQuery.isPending,
     retry: false,
+    // Keep the panels (and the grid) mounted while a new scope/month loads.
+    placeholderData: keepPreviousData,
   });
 
-  const data: DashboardSummary = summaryQuery.data ?? {
-    ...EMPTY_SUMMARY, month, year, scope: effectiveScope,
-  };
-
-  const historyParams = React.useMemo(
-    () => getMonthWindow(month, year, Math.max(1, trendWindow)),
-    [month, year, trendWindow]
-  );
-
-  const historyQueries = useQueries({
-    queries: historyParams.map(({ month: hm, year: hy }) => ({
-      queryKey: ["dashboardSummary", hm, hy, effectiveScope, "history"],
-      queryFn: async () => getDashboardSummary({ month: hm, year: hy, scope: effectiveScope }),
-      retry: false,
-      staleTime: 30_000,
-    })),
-  });
-
-  const pageSubtitle = React.useMemo(() => {
-    return `${monthName(data.month)} ${data.year}${isCiso ? ` • Scope: ${data.scope}` : ""}`;
-  }, [data.month, data.year, data.scope, isCiso]);
-
-  const kpiSpark = React.useMemo(() => {
-    const labels = historyParams.map(
-      (p) => `${monthNameShort(p.month)} ${String(p.year).slice(-2)}`
-    );
-    const toNumOrNull = (v: unknown) => (typeof v === "number" ? v : null);
-    const series = historyQueries.map((q) => q.data?.kpis);
-
-    return {
-      labels,
-      newUsers: series.map((k) => toNumOrNull(k?.new_users)),
-      reporters: series.map((k) => toNumOrNull(k?.total_reporters)),
-      submissions: series.map((k) => toNumOrNull(k?.total_cases)),
-    };
-  }, [historyParams, historyQueries]);
-
-  const isEmpty = React.useMemo(() => {
-    const k = data.kpis;
-    const noKpis =
-      (k?.new_users ?? 0) === 0 &&
-      (k?.total_reporters ?? 0) === 0 &&
-      (k?.total_cases ?? 0) === 0;
-    const noPrefixes = (data.top_prefixes?.length ?? 0) === 0;
-    const counts = Object.values(data.danger_counts ?? {});
-    const noCounts = counts.length === 0 || counts.every((v) => (v ?? 0) === 0);
-    return noKpis && noPrefixes && noCounts;
-  }, [data.kpis, data.top_prefixes, data.danger_counts]);
-
-  const isInitialLoading = meQuery.isLoading || summaryQuery.isLoading;
-
-  const openTrends = React.useCallback((metric?: string) => {
-    setSelectedMetric(metric);
-    setOpenKpiTrends(true);
-  }, [setSelectedMetric, setOpenKpiTrends]);
-
-  const handleLayoutsChange = React.useCallback(
-    (_currentLayout: Layout, allLayouts: Partial<Record<string, Layout>>) => {
-      const nextLayouts: ResponsiveLayouts = allLayouts;
-      setLayouts(nextLayouts);
-      saveLayoutsToStorage(storageKey, nextLayouts);
-    },
-    [storageKey]
-  );
-
-  const resetLayouts = React.useCallback(() => {
-    setLayouts(DEFAULT_DASHBOARD_LAYOUTS);
-    saveLayoutsToStorage(storageKey, DEFAULT_DASHBOARD_LAYOUTS);
-  }, [storageKey]);
-
-  const strMonth = String(month).padStart(2, "0");
-  const strYear = String(year);
-
-  void openKpiTrends;
-  void selectedMetric;
-
-  if (summaryQuery.isError) {
-    return (
-      <Container maxWidth="xl" sx={{ py: 3 }}>
-        <Alert
-          severity="error"
-          action={
-            <Box
-              component="span"
-              sx={{ cursor: "pointer", textDecoration: "underline" }}
-              onClick={() => summaryQuery.refetch()}
-            >
-              Retry
-            </Box>
-          }
-        >
-          Dashboard data unavailable.
-        </Alert>
-      </Container>
-    );
+  // A chosen scope the backend refuses (403) falls back to the default with a
+  // message. Anything else, or a refused default, lands on the error + Retry.
+  const status = httpStatus(summaryQuery.error);
+  if (summaryQuery.isError && status === 403 && scope !== null && scope !== scopes.default) {
+    setRefusedScope(scope);
+    setScope(null);
   }
 
+  const changeScope = (key: string) => {
+    setRefusedScope(null);
+    setScope(key);
+  };
+
+  const data = summaryQuery.data;
+  const shownScope = data?.scope ?? optionFor(scopeKey);
+  const pageSubtitle = `${monthName(data?.month ?? month)} ${data?.year ?? year} · ${scopeName(shownScope)}`;
+  const scopeNote = scopesQuery.isError
+    ? "Scopes could not be loaded; showing Overall."
+    : scopesQuery.isSuccess && scopes.options.length === 1
+      ? "Only Overall is available: your profile has no country that can be used as a scope."
+      : undefined;
+
+  // Nothing reported and nothing running: say so instead of drawing zero-filled panels.
+  const isEmpty = data !== undefined && data.reports === 0 && data.in_progress === 0;
+  // keepPreviousData shows the old numbers while the new request runs: say so.
+  const switching = summaryQuery.isFetching && summaryQuery.isPlaceholderData;
+  const isInitialLoading = meQuery.isLoading || scopesQuery.isPending || summaryQuery.isLoading;
+
+  const panels: Array<[string, React.ReactNode]> = data
+    ? [
+        [PANEL_KEYS.KPI_TRENDS, <KpiTrendPanels summary={data} />],
+        [PANEL_KEYS.OUTCOMES, <OutcomesPanel outcomes={data.outcomes} inProgress={data.in_progress} reports={data.reports} />],
+        [PANEL_KEYS.BY_TYPE, <ByTypePanel byType={data.by_type} />],
+        // Names reach the page only for elevated users; null means no panel at all.
+        ...(data.top_reporters
+          ? [[PANEL_KEYS.TOP_REPORTERS, <TopReportersPanel reporters={data.top_reporters} />] as [string, React.ReactNode]]
+          : []),
+      ]
+    : [];
+
   return (
-    <Skeleton
-      name="dashboard-page"
-      loading={isInitialLoading}
-      fallback={<DashboardLoading />}
-      animate="shimmer"
-    >
     <Box>
-      <GridStyles />
 
       <OverviewHeader
         title="Dashboard"
         subtitle={pageSubtitle}
-        isElevated={isElevated}
-        isCiso={isCiso}
+        note={scopeNote}
         month={month}
         year={year}
-        scope={scope}
-        cisoScope={cisoScope}
         onMonthChange={setMonth}
         onYearChange={setYear}
-        onScopeChange={setScope}
+        scopeOptions={scopesQuery.isPending ? null : scopes.options}
+        scope={scopeKey}
+        onScopeChange={changeScope}
         onRefresh={() => summaryQuery.refetch()}
-        refreshing={summaryQuery.isFetching}
-        trendWindow={trendWindow}
-        onTrendWindowChange={setTrendWindow}
       />
 
-      <Container maxWidth="xl" sx={{ py: 2.5 }}>
-        {isEmpty ? (
-          <DashboardEmpty
-            title="No signals for this period"
-            description="Try a different month/year (or scope if available)."
-            onRefresh={() => summaryQuery.refetch()}
-            canAdjust={isElevated}
-          />
-        ) : null}
+      {switching ? (
+        <LinearProgress
+          aria-label={`Loading ${scopeLabel(optionFor(scopeKey).label, scopeKey)}`}
+          sx={{ height: 2 }}
+        />
+      ) : null}
 
-        <Box sx={{ opacity: isEmpty ? 0.5 : 1, pointerEvents: isEmpty ? "none" : "auto" }}>
-          <Stack
-            direction="row"
-            sx={{ mb: 1, alignItems: "center", justifyContent: "space-between" }}
+      {refusedScope ? (
+        <Container maxWidth="xl" sx={{ pt: 2 }}>
+          <Alert severity="warning" onClose={() => setRefusedScope(null)}>
+            {scopeLabel(optionFor(refusedScope).label, refusedScope)} is not available to you. Showing{" "}
+            {scopeLabel(optionFor(scopes.default).label, scopes.default)} instead.
+          </Alert>
+        </Container>
+      ) : null}
+
+      {summaryQuery.isError ? (
+        <Container maxWidth="xl" sx={{ py: 3 }}>
+          <Alert
+            severity="error"
+            action={
+              <Button color="inherit" size="small" onClick={() => summaryQuery.refetch()}>
+                Retry
+              </Button>
+            }
           >
-            <Box>
-              <Box sx={{ fontWeight: 900, fontSize: 14 }}>Overview</Box>
-              <Box sx={{ color: "text.secondary", fontSize: 12 }}>
-                KPI evolution for {monthName(data.month)} {data.year}
-              </Box>
-            </Box>
-
-            <Box
-              component="button"
-              type="button"
-              onClick={resetLayouts}
-              sx={{
-                border: 0,
-                background: "transparent",
-                color: "text.secondary",
-                fontSize: 12,
-                fontWeight: 700,
-                cursor: "pointer",
-                textDecoration: "underline",
-              }}
-            >
-              Reset layout
-            </Box>
-          </Stack>
-
-          <ResponsiveGridLayout
-            className="dashboard-layout"
-            layouts={layouts}
-            breakpoints={DASHBOARD_BREAKPOINTS}
-            cols={DASHBOARD_COLS}
-            rowHeight={ROW_HEIGHT}
-            margin={[16, 16]}
-            containerPadding={[0, 0]}
-            compactType="vertical"
-            preventCollision={false}
-            isDraggable
-            isResizable
-            useCSSTransforms
-            measureBeforeMount={false}
-            draggableHandle=".dashboard-panel-drag-handle"
-            onLayoutChange={handleLayoutsChange}
-          >
-            <Box
-              key={DASHBOARD_PANEL_KEYS.KPI_TRENDS}
-              className="dashboard-draggable-panel"
-              sx={{ height: "100%", minHeight: 0, overflow: "hidden" }}
-            >
-              <DashboardPanelShell title="KPI Trends">
-                <KpiTrendPanels
-                  spark={kpiSpark}
-                  trendWindow={trendWindow}
-                  onOpenTrends={openTrends}
+            Dashboard data unavailable.
+          </Alert>
+        </Container>
+      ) : (
+        <Skeleton name="dashboard-page" loading={isInitialLoading} fallback={<DashboardLoading />} animate="shimmer">
+          <Container maxWidth="xl" sx={{ py: 2.5 }}>
+            {isEmpty ? (
+              // Dimmed like the panels while another period loads, so the old message reads as old.
+              <Box aria-busy={switching} sx={{ py: 8, opacity: switching ? 0.6 : 1 }}>
+                <EmptyState
+                  title="No reports in this period"
+                  hint={`Nothing was reported in ${scopeName(shownScope)} in ${monthName(data.month)} ${data.year}.`}
                 />
-              </DashboardPanelShell>
-            </Box>
-
-            <Box
-              key={DASHBOARD_PANEL_KEYS.TOP_PREFIXES}
-              className="dashboard-draggable-panel"
-              sx={{ height: "100%", minHeight: 0, overflow: "hidden" }}
-            >
-              <DashboardPanelShell title="Top Prefixes">
-                <TopPrefixesPanel month={strMonth} year={strYear} limit={5} />
-              </DashboardPanelShell>
-            </Box>
-
-            <Box
-              key={DASHBOARD_PANEL_KEYS.THREAT_DISTRIBUTION}
-              className="dashboard-draggable-panel"
-              sx={{ height: "100%", minHeight: 0, overflow: "hidden" }}
-            >
-              <DashboardPanelShell title="Threat Distribution">
-                <ThreatDistributionPanel dangerCounts={data.danger_counts} />
-              </DashboardPanelShell>
-            </Box>
-          </ResponsiveGridLayout>
-        </Box>
-      </Container>
+              </Box>
+            ) : !canArrange ? (
+              <Stack spacing={2} data-testid="dashboard-stack" aria-busy={switching} sx={{ opacity: switching ? 0.6 : 1 }}>
+                {panels.map(([key, node]) => (
+                  <Box key={key}>{node}</Box>
+                ))}
+              </Stack>
+            ) : (
+              <DashboardGrid storageKey={storageKey} busy={switching}>
+                {panels.map(([key, node]) => (
+                  <Box
+                    key={key}
+                    className="dashboard-draggable-panel"
+                    sx={{ height: "100%", minHeight: 0, overflow: "hidden" }}
+                  >
+                    <DashboardPanelShell>{node}</DashboardPanelShell>
+                  </Box>
+                ))}
+              </DashboardGrid>
+            )}
+          </Container>
+        </Skeleton>
+      )}
     </Box>
-    </Skeleton>
   );
 }

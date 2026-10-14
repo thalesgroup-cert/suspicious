@@ -1,5 +1,5 @@
 import * as React from "react";
-import { CssBaseline, ThemeProvider } from "@mui/material";
+import { CssBaseline, GlobalStyles, ThemeProvider } from "@mui/material";
 import { themes, type ThemeName, getSeasonalThemeName } from "./themes";
 
 // Storage keys
@@ -423,6 +423,15 @@ export function AppThemeProvider({ children }: { children: React.ReactNode }) {
     <ThemeContext.Provider value={value}>
       <ThemeProvider theme={theme}>
         <CssBaseline enableColorScheme />
+        {/* MUI's motion setting (themes.ts) covers its own components; this catches the remaining CSS transitions. Keyframe animations are left alone so indeterminate progress and spinners keep moving. */}
+        <GlobalStyles styles={{
+          "@media (prefers-reduced-motion: reduce)": {
+            "*, *::before, *::after": {
+              transitionDuration: "0.01ms !important",
+              scrollBehavior: "auto !important",
+            },
+          },
+        }} />
         {children}
       </ThemeProvider>
     </ThemeContext.Provider>

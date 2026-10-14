@@ -12,7 +12,7 @@ REQ = "connectors.contrib.thehive.campaign_client._request"
 
 def _content():
     return CampaignContent(
-        title="T", description="D", severity=3, tlp=2, pap=2, tags=["a"], source_ref="CAMP-1",
+        title="T", description="D", severity=3, tlp=2, pap=2, tags=["a"], source_ref="260101-aaaaa",
         observables=[{"dataType": "url", "data": "https://x.example", "message": "m", "tags": [], "tlp": 2,
                       "pap": 2, "ioc": True, "sighted": True}],
         files=[FilePart("notice.pdf", b"%PDF", "an attachment", ["attachment"]),
@@ -42,7 +42,7 @@ class CreateAlertTest(SimpleTestCase):
         files = req.call_args.kwargs["files"]
         meta = json.loads(files["_json"][1])
         self.assertEqual((meta["sourceRef"], meta["type"], meta["source"], meta["severity"]),
-                         ("CAMP-1", "Suspicious", "suspicious", 3))
+                         ("260101-aaaaa", "Suspicious", "suspicious", 3))
         file_obs = [o for o in meta["observables"] if o["dataType"] == "file"]
         self.assertEqual([o["attachment"] for o in file_obs], ["file0", "file1"])
         self.assertEqual(files["file0"][0], "notice.pdf")
@@ -55,7 +55,7 @@ class CreateAlertTest(SimpleTestCase):
         self.assertEqual(req.call_args.kwargs["verify"], "/etc/private/rootcafile.pem")
 
     def test_an_already_created_alert_is_reused(self):
-        calls = iter([_http_error(400, "already exists"), _resp([{"_id": "~9", "sourceRef": "CAMP-1"}])])
+        calls = iter([_http_error(400, "already exists"), _resp([{"_id": "~9", "sourceRef": "260101-aaaaa"}])])
 
         def fake(method, url, **kw):
             result = next(calls)
@@ -65,6 +65,13 @@ class CreateAlertTest(SimpleTestCase):
 
         with patch(REQ, side_effect=fake):
             self.assertEqual(HiveClient("http://hive", "k").create_alert(_content())["_id"], "~9")
+
+    def test_lookup_is_scoped_to_campaign_alerts(self):
+        with patch(REQ, return_value=_resp([])) as req:
+            HiveClient("http://hive", "k").find_by_source_ref("260101-aaaaa")
+        filters = {s["_eq"]["_field"]: s["_eq"]["_value"]
+                   for s in req.call_args.kwargs["json"]["query"] if s["_name"] == "filter"}
+        self.assertEqual(filters, {"type": "Suspicious", "source": "suspicious", "sourceRef": "260101-aaaaa"})
 
     def test_other_errors_propagate(self):
         with patch(REQ, side_effect=_http_error(403, "no permission")):

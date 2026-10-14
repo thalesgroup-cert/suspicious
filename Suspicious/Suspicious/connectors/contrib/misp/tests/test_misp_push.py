@@ -7,6 +7,7 @@ from connectors.contrib.misp.connector import MISPConnector
 from connectors.contrib.misp.events import MISPEventManager
 from connectors.contrib.misp.objects import build_hash_object
 from connectors.contrib.misp.service import MISPService
+from domain_process.models import Domain
 
 
 def _manager(search_result, created=None):
@@ -96,3 +97,55 @@ class EventLockTest(SimpleTestCase):
                     pass
         with _event_lock("t", wait=0.3):  # released after the first block
             pass
+
+
+class CompanyDomainsStayOutOfMispTest(SimpleTestCase):
+    COMPANY = frozenset({"corp.example"})
+
+    def _email(self, headers):
+        from connectors.contrib.misp.objects import build_email_object
+        mail = SimpleNamespace(mail_header=SimpleNamespace(header_value=headers), subject="s")
+        obj = build_email_object(mail, 1, "Dangerous", self.COMPANY)
+        return {a.object_relation: a.value for a in obj.attributes}
+
+    def test_company_recipients_are_left_out(self):
+        attrs = self._email({"from": "evil@bad.test", "to": "Jane Doe <jane@corp.example>",
+                             "cc": "bob@eu.corp.example"})
+        for relation in ("to", "cc", "to-display-name"):
+            self.assertNotIn(relation, attrs)
+        self.assertEqual(attrs["from"], "evil@bad.test")
+
+    def test_external_recipients_are_kept_and_company_ones_dropped(self):
+        attrs = self._email({"from": "evil@bad.test",
+                             "to": "jane@corp.example, partner@ext.test"})
+        self.assertEqual(attrs["to"], "partner@ext.test")
+        self.assertNotIn("to-display-name", attrs)
+
+    def test_lookalike_domain_is_not_a_company_domain(self):
+        attrs = self._email({"from": "evil@bad.test", "to": "x@notcorp.example"})
+        self.assertEqual(attrs["to"], "x@notcorp.example")
+
+
+class CompanyDomainObjectsTest(SimpleTestCase):
+    def _svc(self):
+        svc = MISPService.__new__(MISPService)
+        svc._company_domains = frozenset({"corp.example"})
+        svc._allow_listed = frozenset({"good.test"})
+        return svc
+
+    def test_company_subdomain_allow_listed_and_plain_domains(self):
+        svc = self._svc()
+        build = lambda v: svc._build_artifact_object(  # noqa: E731
+            Domain(value=v), 1, "Dangerous", "domain")
+        self.assertIsNone(build("corp.example"))
+        self.assertIsNone(build("mail.corp.example"))
+        self.assertIsNone(build("good.test"))
+        self.assertIsNotNone(build("evil.test"))
+
+    def test_mail_artifact_domains_are_filtered_too(self):
+        svc = self._svc()
+        art = lambda v: SimpleNamespace(  # noqa: E731
+            artifact_type="Domain",
+            artifactIsDomain=SimpleNamespace(domain=Domain(value=v)))
+        self.assertIsNone(svc._build_artifact_object(art("corp.example"), 1, "Dangerous", None))
+        self.assertIsNotNone(svc._build_artifact_object(art("evil.test"), 1, "Dangerous", None))

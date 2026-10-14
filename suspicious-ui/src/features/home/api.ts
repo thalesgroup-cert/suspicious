@@ -11,6 +11,7 @@ export type HomeSummary = {
   show_scope_modal: boolean;
   monthly: {
     everyone_items?: number;
+    user_items?: number;
     scope_items?: number;
     scope_name?: string | null;
   };
@@ -43,3 +44,13 @@ export async function setCisoScope(input: { scope: string }): Promise<{ scope: s
   const res = await api.patch("/profile/", input);
   return res.data;
 }
+
+export type SubmissionRow = {
+  id: number | string;
+  status?: string;
+  artifact?: string;
+  created_at?: string;
+  tests_done?: number;
+  type?: string;
+  result?: string;
+};

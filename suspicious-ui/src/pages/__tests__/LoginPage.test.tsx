@@ -1,6 +1,7 @@
 import { describe, it, expect, vi, beforeEach } from "vitest";
 import { screen, waitFor } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
+import { QueryClient } from "@tanstack/react-query";
 import { renderWithProviders } from "@/test/utils";
 import { mockMe } from "@/test/utils";
 
@@ -100,6 +101,22 @@ describe("LoginPage", () => {
     await waitFor(() =>
       expect(mockLogin).toHaveBeenCalledWith("alice", "secret")
     );
+  });
+
+  it("clears the previous user's cached queries on a successful login", async () => {
+    const user = userEvent.setup();
+    mockLogin.mockResolvedValue({ expiry: "2099-01-01T00:00:00Z" } as never);
+    const qc = new QueryClient({ defaultOptions: { queries: { retry: false, gcTime: Infinity } } });
+    qc.setQueryData(["dashboardSummary", 10, 2026, "ALL"], { top_reporters: [{ label: "someone", value: 3 }] });
+    qc.setQueryData(["dashboardScopes"], { default: "OWN_SCOPE", options: [] });
+    renderWithProviders(<LoginPage />, { initialPath: "/login", queryClient: qc });
+    await revealPasswordForm(user);
+    await user.type(screen.getByLabelText(/username/i), "alice");
+    await user.type(screen.getByLabelText(/^password/i), "secret");
+    await user.click(screen.getByRole("button", { name: "Sign in" }));
+    await waitFor(() => expect(mockLogin).toHaveBeenCalled());
+    await waitFor(() => expect(qc.getQueryData(["dashboardScopes"])).toBeUndefined());
+    expect(qc.getQueryData(["dashboardSummary", 10, 2026, "ALL"])).toBeUndefined();
   });
 
   it("shows an error message on failed login", async () => {

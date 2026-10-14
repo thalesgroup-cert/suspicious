@@ -24,7 +24,7 @@ import {
   HubOutlined,
 } from "@mui/icons-material";
 import { useNavigate } from "react-router";
-import { useQuery } from "@tanstack/react-query";
+import { useQuery, useQueryClient } from "@tanstack/react-query";
 import {
   motion,
   AnimatePresence,
@@ -91,6 +91,7 @@ export default function LoginPage() {
     }
   };
 
+  const queryClient = useQueryClient();
   const { data: me, isLoading: meLoading } = useQuery({
     queryKey: ["me"],
     queryFn: getMe,
@@ -111,6 +112,8 @@ export default function LoginPage() {
 
     window.history.replaceState({}, "", "/login");
     hydrateColorsAfterSso().finally(() => {
+      // A new session: nothing cached for the previous user may be shown.
+      queryClient.clear();
       navigate("/", { replace: true });
       setSsoLoading(false);
     });
@@ -132,6 +135,8 @@ export default function LoginPage() {
     setLoading(true);
     try {
       await login(username, password);
+      // A new session: nothing cached for the previous user may be shown.
+      queryClient.clear();
       navigate("/", { replace: true });
     } catch (err: any) {
       const upstream =

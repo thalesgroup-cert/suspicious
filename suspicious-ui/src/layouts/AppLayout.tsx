@@ -23,6 +23,7 @@ import { Outlet, useLocation, useNavigate } from "react-router";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { getMe, logout, type Me } from "@/api/auth";
 import { getProfile, updatePreferences } from "@/features/profile/api";
+import { edge } from "@/styles/themes";
 import { useThemeMode } from "@/styles/ThemeStore";
 
 import {
@@ -32,6 +33,7 @@ import {
   getPageTitle,
   type NavItemConfig,
 } from "@/layouts/nav";
+import { isElevatedGroups } from "@/layouts/nav";
 import { ACCOUNT_NAV, PRIMARY_NAV, SECTIONS, WORKSPACE_NAV } from "@/layouts/navConfig";
 import { HelpButton, LogoutButton, NavItem, NavSection, UserCard } from "@/layouts/components/navComponents";
 import { HelpTourProvider } from "@/features/help/HelpTourProvider";
@@ -61,7 +63,7 @@ export default function AppLayout() {
     retry: false,
   });
   const groups: string[] = (me as any)?.groups ?? [];
-  const isElevated = groups.includes("CISO") || groups.includes("CERT") || groups.includes("Admin");
+  const isElevated = isElevatedGroups(groups);
 
   const [mobileOpen, setMobileOpen] = React.useState(false);
   const [hovered,    setHovered]    = React.useState(false);
@@ -148,8 +150,9 @@ export default function AppLayout() {
   const drawerW = isDesktop ? (isSlim ? DRAWER_SLIM : DRAWER_WIDE) : DRAWER_WIDE;
 
   async function handleLogout() {
-    try { await logout(); } finally {
-      queryClient.removeQueries({ queryKey: ["me"] });
+    try { await logout(); } catch { /* offline or session already gone: still leave */ } finally {
+      // Every cached query belongs to this user (dashboard names, scopes...): drop them all.
+      queryClient.clear();
       navigate("/login", { replace: true });
     }
   }
@@ -157,17 +160,17 @@ export default function AppLayout() {
   // Sidebar background: fully theme-aware
   const sidebarBg = isDark
     ? `linear-gradient(180deg, ${alpha("#fff", 0.04)} 0%, ${alpha("#fff", 0.02)} 100%)`
-    : `linear-gradient(180deg, ${alpha("#fff", 0.92)} 0%, ${alpha(theme.palette.grey[50], 0.97)} 100%)`;
+    : `linear-gradient(180deg, ${theme.palette.background.paper} 0%, ${alpha(theme.palette.background.paper, 0.97)} 100%)`;
 
   // ── Shell background ─────────────────────────────────────────────────────
-  const shellBg = isDark
-    ? `radial-gradient(ellipse 80% 50% at 15% 5%, ${alpha(primary, 0.07)}, transparent 50%),
-       ${theme.palette.background.default}`
-    : `radial-gradient(ellipse 80% 50% at 15% 5%, ${alpha(primary, 0.05)}, transparent 50%),
-       ${theme.palette.background.default}`;
+  const shellBg = effects.isAccessibilityTheme
+    ? "none"
+    : isDark
+    ? `radial-gradient(ellipse 80% 50% at 15% 5%, ${alpha(primary, 0.07)}, transparent 50%)`
+    : `radial-gradient(ellipse 80% 50% at 15% 5%, ${alpha(primary, 0.05)}, transparent 50%)`;
 
   // ── Sidebar border ───────────────────────────────────────────────────────
-  const sidebarBorder = `1px solid ${alpha(theme.palette.divider, isDark ? 0.28 : 0.9)}`;
+  const sidebarBorder = effects.isAccessibilityTheme ? "2px solid #DADADA" : edge(theme, isDark ? 0.14 : 0.1);
 
   // ─────────────────────────────────────────────────────────────────────────
   // Drawer content
@@ -344,7 +347,7 @@ export default function AppLayout() {
         color="transparent"
         sx={{
           display: { xs: "flex", md: "none" },
-          zIndex: (t) => t.zIndex.drawer + 1,
+          zIndex: (t) => t.zIndex.appBar,
           backdropFilter: "blur(20px)",
           WebkitBackdropFilter: "blur(20px)",
           background: isDark

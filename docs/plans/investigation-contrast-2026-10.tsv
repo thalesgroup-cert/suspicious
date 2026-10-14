@@ -1,0 +1,18 @@
+theme	ratio	css_ratio	measured	size	views	text	class
+cyber	4.42	4.89	px bg=46,23,27	11px	list,list+filters	"DANGEROUS"	MuiChip-label
+future	3.99	4.75	px bg=49,34,22	11px	list,list+filters	"Type"	MuiTableCell-root MuiTableCell-head MuiTableCell-s
+future	3.99	4.75	px bg=49,34,22	11px	list,list+filters	"User mail"	MuiTableCell-root MuiTableCell-head MuiTableCell-s
+future	4.06	4.75	px bg=58,32,28	11px	list,list+filters	"DANGEROUS"	MuiChip-label
+future	4.14	4.75	px bg=40,32,24	11px	list,list+filters	"ID"	MuiButtonBase-root MuiTableSortLabel-root MuiTable
+future	4.16	4.75	px bg=41,31,23	11px	list,list+filters	"Artifact"	MuiTableCell-root MuiTableCell-head MuiTableCell-s
+future	4.19	4.75	px bg=41,30,23	11px	list,list+filters	"Result"	MuiButtonBase-root MuiTableSortLabel-root MuiTable
+future	4.3	4.75	px bg=36,28,19	11px	list,list+filters	"Status"	MuiButtonBase-root MuiTableSortLabel-root MuiTable
+metal	4.27	4.74	px bg=49,27,30	11px	list,list+filters	"DANGEROUS"	MuiChip-label
+metal	4.48	4.51	px bg=11,16,22	12px	#18 overview,#324 overview,#232 overview	"Overview"	MuiButtonBase-root MuiTab-root MuiTab-textColorPri
+metal	4.48	4.51	px bg=11,16,22	12px	#18 analysis	"Analysis (49)"	MuiButtonBase-root MuiTab-root MuiTab-textColorPri
+metal	4.48	4.51	px bg=11,16,22	12px	#324 analysis	"Analysis (15)"	MuiButtonBase-root MuiTab-root MuiTab-textColorPri
+metal	4.48	4.51	px bg=11,16,22	12px	#232 analysis	"Analysis (0)"	MuiButtonBase-root MuiTab-root MuiTab-textColorPri
+midnight	3.01	3.14	px bg=83,148,250	13px	list,list+filters	"New submission"	MuiButtonBase-root MuiButton-root MuiButton-contai
+midnight	3.01	3.14	px bg=83,148,250	13px	#18 overview,#18 analysis,#324 overview,#324 analysis,#232 overview,#232 analysis	"Edit verdict"	MuiButtonBase-root MuiButton-root MuiButton-contai
+midnight	4.37	4.84	px bg=46,25,32	12.0714px	list,list+filters	"DANGEROUS"	MuiChip-label
+paper	3.54	8.3	px bg=209,129,120	12.5357px	#18 analysis	"Dangerous"	MuiChip-label

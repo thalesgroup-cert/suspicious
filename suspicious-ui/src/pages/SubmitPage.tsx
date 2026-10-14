@@ -47,7 +47,7 @@ import {
 } from "@/features/submit/api";
 import { parseIndicators } from "@/features/submit/parseIndicators";
 import {
-  ModeSelectorCard,
+  ModeToggle,
   SectionHeader,
   SidePanel,
   SoftCard,
@@ -61,11 +61,23 @@ import type {
   SubmitMode,
   SubmitSuccessResponse,
 } from "@/features/submit/types";
+import { formatBytes } from "@/features/submit/formatBytes";
 import {
   extractApiErrorMessage,
-  formatBytes,
   resolveId,
 } from "@/features/submit/utils";
+
+// Themes style contained buttons with gradients/saturated fills that stay
+// vivid when disabled; force MUI's disabled tokens on this page's primary buttons.
+const disabledPrimarySx = {
+  "&.Mui-disabled": {
+    backgroundImage: "none",
+    backgroundColor: "action.disabledBackground",
+    color: "action.disabled",
+    boxShadow: "none",
+    borderColor: "action.disabledBackground",
+  },
+} as const;
 
 // Page
 
@@ -88,14 +100,14 @@ export default function SubmitPage() {
     queryKey: ["submitConfig"],
     queryFn: getSubmitConfig,
     retry: false,
-    enabled: !!me && !suspiciousEmailEnv,
-    initialData: suspiciousEmailEnv ?? undefined,
+    enabled: !!me,
   });
 
-  const suspiciousEmail =
-    suspiciousEmailEnv ?? configQuery.data ?? "suspicious@example.com";
+  const maxFileBytes = configQuery.data?.maxFileBytes;
+  const suspiciousEmail = suspiciousEmailEnv || configQuery.data?.suspiciousEmail || "";
+  const emailKnown = !!suspiciousEmail;
 
-  const [mode, setMode] = React.useState<SubmitMode>("file");
+  const [mode, setMode] = React.useState<SubmitMode>("indicators");
   const [selectedFile, setSelectedFile] = React.useState<File | null>(null);
   const [fallbackCta, setFallbackCta] = React.useState(false);
   const [indicatorsText, setIndicatorsText] = React.useState("");
@@ -107,11 +119,36 @@ export default function SubmitPage() {
     mode: "onChange",
   });
 
+  const [fileError, setFileError] = React.useState<string | null>(null);
+
   const dropzone = useDropzone({
     multiple: false,
+    // undefined until the config loads: the server still enforces the limit
+    maxSize: maxFileBytes,
     onDrop: (files) => {
       const f = files?.[0];
-      if (f) setSelectedFile(f);
+      if (f) {
+        setSelectedFile(f);
+        setFileError(null);
+      }
+    },
+    onDropRejected: (rejections) => {
+      const r = rejections[0];
+      const err = r?.errors[0];
+      if (!r || !err) return;
+      setSelectedFile(null);
+      const limit = maxFileBytes ?? 0;
+      const sameLabel = formatBytes(r.file.size) === formatBytes(limit);
+      const show = (n: number) => (sameLabel ? `${n.toLocaleString()} bytes` : formatBytes(n));
+      setFileError(
+        err.code === "file-too-large"
+          ? `${r.file.name} is ${show(r.file.size)}; the limit is ${show(limit)}.`
+          : err.code === "file-invalid-type"
+          ? `${r.file.name} is not an accepted file type.`
+          : err.code === "too-many-files"
+          ? "Upload one file at a time."
+          : err.message
+      );
     },
   });
 
@@ -202,6 +239,12 @@ export default function SubmitPage() {
     () => parseIndicators(indicatorsText),
     [indicatorsText]
   );
+  const validCount = indicatorsPreview.filter((p) => p.type).length;
+  const skippedCount = indicatorsPreview.length - validCount;
+  const maxIndicators = configQuery.data?.maxIndicators ?? 100;
+  const overLimit = validCount > maxIndicators;
+  const hasUrl = indicatorsPreview.some((p) => p.type === "url");
+  // "skipped" counts groups of consecutive unrecognised words, not single words.
 
   const loadingOpen =
     fileMutation.isPending ||
@@ -229,6 +272,7 @@ export default function SubmitPage() {
   // Handlers
 
   async function copyEmail() {
+    if (!emailKnown) return;
     try {
       await navigator.clipboard.writeText(suspiciousEmail);
       enqueueSnackbar("Email address copied.", { variant: "info" });
@@ -247,7 +291,7 @@ export default function SubmitPage() {
   return (
     <Skeleton
       name="submit-page"
-      loading={meQuery.isPending || configQuery.isPending}
+      loading={meQuery.isPending}
       animate="shimmer"
     >
     <Container data-tour="submit-form" maxWidth="lg" sx={{ py: { xs: 2.5, md: 3.5 }, pb: 8 }}>
@@ -256,10 +300,10 @@ export default function SubmitPage() {
           <CardContent sx={{ p: { xs: 2.25, md: 3 } }}>
             <Stack spacing={2}>
               <Stack spacing={0.6}>
-                <Typography variant="h4" sx={{ fontWeight: 900, letterSpacing: -0.6 }} >
+                <Typography variant="pageTitle" component="h1">
                   Submit
                 </Typography>
-                <Typography color="text.secondary" sx={{ maxWidth: 760 }}>
+                <Typography variant="body2" color="text.secondary" sx={{ maxWidth: 760 }}>
                   Upload a file or email, or paste one or many indicators
                   (URL, domain, hash, IP). Types are detected automatically;
                   add short factual context and submit for analysis.
@@ -268,29 +312,24 @@ export default function SubmitPage() {
 
               <Divider sx={{ opacity: 0.25 }} />
 
-              <Box
-                sx={{
-                  display: "grid",
-                  gridTemplateColumns: { xs: "1fr", md: "repeat(2, 1fr)" },
-                  gap: 1.5,
-                }}
-              >
-                <ModeSelectorCard
-                  active={mode === "file"}
-                  title="File"
-                  subtitle="Upload an attachment, sample or email (.eml / .msg) for analysis."
-                  icon={<UploadFileOutlined />}
-                  onClick={() => switchMode("file")}
-                />
-                <ModeSelectorCard
-                  active={mode === "indicators"}
-                  title="Indicators"
-                  subtitle="Paste one or many URLs, IPs, hashes or domains, or upload an IOC-list file. Type is detected automatically; analysed together as one case."
-                  icon={<FormatListBulletedOutlined />}
-                  helper="Recommended"
-                  onClick={() => switchMode("indicators")}
-                />
-              </Box>
+              <ModeToggle
+                value={mode}
+                onChange={switchMode}
+                options={[
+                  {
+                    value: "indicators",
+                    title: "Indicators",
+                    subtitle: "URLs, domains, IPs, hashes, or an IOC-list file",
+                    icon: <FormatListBulletedOutlined />,
+                  },
+                  {
+                    value: "file",
+                    title: "File",
+                    subtitle: "An email (.eml, .msg) or any attachment",
+                    icon: <UploadFileOutlined />,
+                  },
+                ]}
+              />
             </Stack>
           </CardContent>
         </SoftCard>
@@ -317,11 +356,18 @@ export default function SubmitPage() {
                     sx={{
                       borderRadius: 3,
                       border: `1px dashed ${
-                        dropzone.isDragActive
+                        dropzone.isDragReject
+                          ? theme.palette.error.main
+                          : dropzone.isDragActive
                           ? alpha(theme.palette.primary.main, 0.52)
                           : alpha(theme.palette.divider, 0.9)
                       }`,
-                      background: dropzone.isDragActive
+                      background: dropzone.isDragReject
+                        ? alpha(
+                            theme.palette.error.main,
+                            theme.palette.mode === "dark" ? 0.1 : 0.05
+                          )
+                        : dropzone.isDragActive
                         ? alpha(
                             theme.palette.primary.main,
                             theme.palette.mode === "dark" ? 0.08 : 0.04
@@ -356,7 +402,7 @@ export default function SubmitPage() {
                       </Box>
 
                       <Box>
-                        <Typography sx={{ fontWeight: 850 }} >
+                        <Typography sx={{ fontWeight: 700 }} >
                           {selectedFile
                             ? "File selected"
                             : dropzone.isDragActive
@@ -368,8 +414,9 @@ export default function SubmitPage() {
                           color="text.secondary"
                           sx={{ mt: 0.5 }}
                         >
-                          One file per submission. Limits and acceptance rules
-                          are enforced server-side.
+                          {maxFileBytes
+                            ? `One file per submission, up to ${formatBytes(maxFileBytes)}.`
+                            : "One file per submission."}
                         </Typography>
                       </Box>
 
@@ -391,6 +438,7 @@ export default function SubmitPage() {
                             onClick={(e) => {
                               e.stopPropagation();
                               setSelectedFile(null);
+                              setFileError(null);
                             }}
                             sx={{ textTransform: "none", fontWeight: 700 }}
                           >
@@ -400,6 +448,8 @@ export default function SubmitPage() {
                       ) : null}
                     </Stack>
                   </Box>
+
+                  {fileError ? <Alert severity="error">{fileError}</Alert> : null}
 
                   <TextField
                     label="Context (optional)"
@@ -417,7 +467,7 @@ export default function SubmitPage() {
                           color="inherit"
                           size="small"
                           onClick={() => navigate("/submissions")}
-                          sx={{ fontWeight: 850, textTransform: "none" }}
+                          sx={{ textTransform: "none" }}
                         >
                           View submissions
                         </Button>
@@ -440,8 +490,8 @@ export default function SubmitPage() {
                       sx={{
                         borderRadius: 2,
                         textTransform: "none",
-                        fontWeight: 850,
                         minWidth: 140,
+                        ...disabledPrimarySx,
                       }}
                     >
                       Upload file
@@ -507,23 +557,47 @@ export default function SubmitPage() {
                         >
                           <Typography
                             variant="body2"
+                            color={p.type ? "text.primary" : "text.secondary"}
                             sx={{ fontFamily: "monospace", wordBreak: "break-all" }}
                           >
                             {p.value}
                           </Typography>
                           <Chip
                             size="small"
-                            label={p.type ?? "unrecognised"}
-                            color={p.type ? "default" : "error"}
+                            variant={p.type ? "filled" : "outlined"}
+                            label={p.type ?? "skipped"}
                           />
                         </Stack>
                       ))}
                     </Stack>
                   ) : null}
 
-                  <Typography variant="body2" color="text.secondary">
-                    {indicatorsPreview.filter((p) => p.type).length} indicator(s),{" "}
-                    {indicatorsPreview.filter((p) => !p.type).length} unrecognised
+                  {/* Always mounted so screen readers register the live region; no height or gap while empty. */}
+                  <Stack spacing={0.25} sx={indicatorsText.trim() ? undefined : { "&&&": { m: 0 } }}>
+                    <Typography
+                      id="indicators-summary"
+                      role="status"
+                      variant="body2"
+                      color={overLimit ? "error" : "text.secondary"}
+                    >
+                      {!indicatorsText.trim()
+                        ? null
+                        : overLimit
+                          ? `${validCount} indicators; the limit is ${maxIndicators}.`
+                          : validCount === 0
+                            ? "Nothing recognisable yet. Add a URL, domain, IP or hash."
+                            : `${validCount} ${hasUrl ? "found" : "will be submitted"}${skippedCount ? ` · ${skippedCount} skipped` : ""}`}
+                    </Typography>
+                    {indicatorsText.trim() && hasUrl && !overLimit && validCount > 0 ? (
+                      <Typography role="status" variant="caption" color="text.secondary">
+                        Links to private or internal addresses are skipped, and wrapped links (SafeLinks, URLDefense) add their real target.
+                      </Typography>
+                    ) : null}
+                  </Stack>
+
+                  <Typography variant="caption" color="text.secondary">
+                    Related indicators submitted together are correlated as one case.
+                    Keep unrelated artifacts in separate submissions.
                   </Typography>
 
                   <TextField
@@ -539,15 +613,21 @@ export default function SubmitPage() {
                     <Button
                       variant="contained"
                       disabled={
-                        indicatorsPreview.filter((p) => p.type).length === 0 ||
+                        validCount === 0 ||
+                        overLimit ||
                         indicatorsMutation.isPending
+                      }
+                      aria-describedby={
+                        (overLimit || validCount === 0) && indicatorsText.trim()
+                          ? "indicators-summary"
+                          : undefined
                       }
                       onClick={() => indicatorsMutation.mutate()}
                       sx={{
                         borderRadius: 2,
                         textTransform: "none",
-                        fontWeight: 850,
                         minWidth: 160,
+                        ...disabledPrimarySx,
                       }}
                     >
                       Submit
@@ -559,7 +639,7 @@ export default function SubmitPage() {
           </SoftCard>
 
           <Stack spacing={2}>
-            <SidePanel title="Guidance" icon={<InfoOutlined fontSize="small" />}>
+            <SidePanel title="What to submit" icon={<InfoOutlined fontSize="small" />}>
               <Typography variant="body2" color="text.secondary">
                 Keep context brief and factual. Prefer original artifacts. Do
                 not alter submitted content unless required by policy.
@@ -568,41 +648,30 @@ export default function SubmitPage() {
               <Divider sx={{ opacity: 0.25 }} />
 
               <Stack spacing={1}>
-                <Chip label="URL / domain: include full path if known" variant="outlined" />
-                <Chip label="Hash: specify algorithm if known" variant="outlined" />
-                <Chip label="File: keep original filename" variant="outlined" />
+                {[
+                  [InsertDriveFileOutlined, "Files and attachments"],
+                  [LinkOutlined, "Full URLs and bare domains"],
+                  [FingerprintOutlined, "Hashes and file indicators"],
+                  [PublicOutlined, "IP addresses"],
+                ].map(([Icon, label]) => {
+                  const I = Icon as typeof LinkOutlined;
+                  return (
+                    <Stack key={label as string} direction="row" spacing={1} sx={{ alignItems: "center" }}>
+                      <I fontSize="small" color="action" />
+                      <Typography variant="body2" color="text.secondary">
+                        {label as string}
+                      </Typography>
+                    </Stack>
+                  );
+                })}
               </Stack>
-            </SidePanel>
 
-            <SidePanel
-              title="Accepted inputs"
-              icon={<InsertDriveFileOutlined fontSize="small" />}
-            >
-              <Stack spacing={1}>
-                <Stack direction="row" spacing={1} sx={{ alignItems: "center" }} >
-                  <InsertDriveFileOutlined fontSize="small" color="action" />
-                  <Typography variant="body2" color="text.secondary">
-                    Files and attachments
-                  </Typography>
-                </Stack>
-                <Stack direction="row" spacing={1} sx={{ alignItems: "center" }} >
-                  <LinkOutlined fontSize="small" color="action" />
-                  <Typography variant="body2" color="text.secondary">
-                    Full URLs and bare domains
-                  </Typography>
-                </Stack>
-                <Stack direction="row" spacing={1} sx={{ alignItems: "center" }} >
-                  <FingerprintOutlined fontSize="small" color="action" />
-                  <Typography variant="body2" color="text.secondary">
-                    Hashes and file indicators
-                  </Typography>
-                </Stack>
-                <Stack direction="row" spacing={1} sx={{ alignItems: "center" }} >
-                  <PublicOutlined fontSize="small" color="action" />
-                  <Typography variant="body2" color="text.secondary">
-                    IP addresses
-                  </Typography>
-                </Stack>
+              <Divider sx={{ opacity: 0.25 }} />
+
+              <Stack spacing={0.5}>
+                <Typography variant="body2" color="text.secondary">URL / domain: include full path if known</Typography>
+                <Typography variant="body2" color="text.secondary">Hash: specify algorithm if known</Typography>
+                <Typography variant="body2" color="text.secondary">File: keep original filename</Typography>
               </Stack>
             </SidePanel>
 
@@ -617,6 +686,7 @@ export default function SubmitPage() {
               <Button
                 variant="outlined"
                 onClick={copyEmail}
+                disabled={!emailKnown}
                 startIcon={<ContentCopyOutlined />}
                 sx={{
                   mt: 0.5,
@@ -626,23 +696,23 @@ export default function SubmitPage() {
                 }}
                 fullWidth
               >
-                {suspiciousEmail}
+                {emailKnown
+                  ? suspiciousEmail
+                  : configQuery.isPending
+                  ? "Loading address…"
+                  : "Address unavailable"}
               </Button>
             </SidePanel>
           </Stack>
         </Box>
 
-        <Alert severity="info" sx={{ borderRadius: 3 }}>
-          Related indicators submitted together are correlated as one case.
-          Keep unrelated artifacts in separate submissions.
-        </Alert>
       </Stack>
 
       <Dialog open={loadingOpen} onClose={() => {}} maxWidth="xs" fullWidth>
         <DialogContent sx={{ py: 4 }}>
           <Stack spacing={2} sx={{ alignItems: "center", textAlign: "center" }} >
             <CircularProgress />
-            <Typography sx={{ fontWeight: 850 }} >Processing submission</Typography>
+            <Typography variant="subtitle1">Processing submission</Typography>
             <Typography variant="body2" color="text.secondary">
               Waiting for the backend to validate and queue the artifact.
             </Typography>

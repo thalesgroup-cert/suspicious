@@ -82,7 +82,7 @@ export default function SettingsPage() {
               sx={{ width: 46, height: 46, fontWeight: 950 }}
             />
             <Box>
-              <Typography variant="h4" sx={{ fontWeight: 950, letterSpacing: -0.5 }} >
+              <Typography variant="pageTitle" component="h1">
                 Settings
               </Typography>
               <Typography color="text.secondary">
