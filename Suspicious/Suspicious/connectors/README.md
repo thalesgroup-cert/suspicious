@@ -129,29 +129,53 @@ connectors/
 | `smtp_notify` | Notifications | `case_created`, `case_finalised`, `case_modified` | **on** | Emails the reporter: acknowledgement on creation, review mail when an analyst changes the verdict, final result on completion. A failed send raises and the framework retries it. Challenge-workflow notifications are separate and wired directly (`tasp/services/challenge.py`), not through this connector |
 | `chromadb` | Maintenance | scheduled (daily) | **on** | Vector-store cleanup, not case-event-driven |
 | `watcher` | Threat Intelligence | scheduled (every 300s) | off | Reconciles the allow/deny domain lists against the Watcher service — moved here from `tasp`; see `tasp/README.md` |
-| `ai_narration` | AI | `case_finalised` | off | See below — the one connector with an extra, hardcoded data-governance restriction |
+| `ai_narration` | AI | `case_finalised` | off | See below — the one connector with an extra, hardcoded data-governance allowlist on its automatic path |
 | `template` | — | — | — | Not a real connector; copy this directory to start a new one |
 
-### `ai_narration`'s Ollama-only restriction
+### `ai_narration`'s automatic-path allowlist
 
 Every other connector's `config_schema` is the operator's business: point
 `thehive` or `misp` at whatever instance you want, no framework-level
 restriction. `ai_narration` is deliberately different. It generates a
 plain-language case narration via an LLM and can be configured to use a local
-Ollama instance *or* an external provider (OpenAI/Anthropic/Gemini) — but only
-on its **manual** trigger (`manage.py test_ai_narration`, a human explicitly
-choosing to run it against one case). Its **automatic** `on_case_finalised`
-hook hardcodes local Ollama and never imports or calls the provider
-auto-selection logic (`connectors/contrib/ai_narration/select.py`) at all —
-there is no code path from an automatic case-finalisation event to an
-external LLM provider. This is a deliberate data-governance decision (real
-case content, e.g. a phishing email's own text, must never reach an external
-service without a human choosing that specific run) — see
-`docs/specs/2026-09-21-ai-narration-event-wiring-design.md` for the full
-reasoning. Generated narration is currently observable only via an INFO log
-line (`connectors.contrib.ai_narration`); no report/email/UI rendering exists
-yet, pending resolution of the same prompt-injection concern for a
-reader-facing surface.
+Ollama instance, an operator-declared OpenAI-compatible endpoint, *or* an
+external vendor provider (OpenAI/Anthropic/Gemini) — but the vendors only on
+its **manual** trigger (`manage.py test_ai_narration`, a human explicitly
+choosing to run it against one case).
+
+Its **automatic** `on_case_finalised` hook picks its provider with
+`select_auto_provider` (`connectors/contrib/ai_narration/select.py`), which
+accepts exactly two names (`AUTO_PROVIDERS`), enforced in code:
+
+| `narration_provider` | Behaviour |
+|---|---|
+| unset / blank / `ollama` | Local Ollama at `ollama_url`. The default; unchanged for existing deployments |
+| `openai_compatible` | `POST {openai_compatible_base_url}/chat/completions` with `openai_compatible_model`; `openai_compatible_api_key` is optional |
+| anything else (`openai`, `anthropic`, `gemini`, a typo) | Raises `ValueError`; the framework records a failed `ConnectorDelivery` and retries. Never falls back to another provider |
+
+The vendor providers are never chosen by API-key presence on this path.
+
+**`openai_compatible` setup.** The base URL includes the version prefix
+(`https://gw.internal/v1`, `https://open.bigmodel.cn/api/paas/v4`); the
+connector appends `/chat/completions`. It has no default URL and no default
+model, so a half-finished config is an error, not a fallback. TLS verification
+stays on; for an internal CA set `REQUESTS_CA_BUNDLE` in the backend
+environment. `health_check` probes `GET {base}/models` (404 counts as
+reachable, 401/403 as an authentication failure).
+
+**Data governance.** Switching to `openai_compatible` is an explicit admin act
+(`narration_provider` plus a base URL that has no default) and never happens
+by upgrade, API-key presence, or a partial config. Real case content, e.g. a
+phishing email's own text, is sent to whatever URL you configure: the URL is
+admin-only configuration at the same trust level as `ollama_url`, and setting
+it declares that endpoint trusted. Pointing it at a vendor-hosted endpoint
+is a deliberate decision to send case content to that vendor. See
+`docs/specs/2026-10-14-ai-narration-openai-compatible-design.md` (and
+`2026-09-21-ai-narration-event-wiring-design.md`) for the full reasoning.
+Generated narration is currently observable only via an INFO log line
+(`connectors.contrib.ai_narration`, which carries `provider=<name>`); no
+report/email/UI rendering exists yet, pending resolution of the same
+prompt-injection concern for a reader-facing surface.
 
 ---
 

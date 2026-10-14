@@ -1,5 +1,9 @@
 # AI Narration Event Wiring: Design
 
+> Amended by `docs/specs/2026-10-14-ai-narration-openai-compatible-design.md`:
+> the automatic path is no longer Ollama-only; it accepts an explicit
+> allowlist of Ollama or an operator-declared OpenAI-compatible endpoint.
+
 ## Context
 
 `docs/specs/2026-09-21-ai-narration-connector-design.md` shipped the
