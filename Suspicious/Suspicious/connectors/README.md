@@ -213,7 +213,7 @@ rules, dashboards and Cases can work from them. Design:
 
 - **What is sent.** One document per case, `_id` = case id, so retries and
   replays overwrite the same document: verdict, score, confidence, decisive
-  rule, case status, the mail's subject / sender / recipients, and IOCs
+  rule, case status, the mail's subject / Message-ID / sender / To / CC, and IOCs
   (`url.original`, `file.name`, `file.hash.*`, `related.ip|hash|hosts`).
   Never sent: mail bodies, headers, attachment content, analyzer reports, the
   reporter's identity.
@@ -244,7 +244,7 @@ rules, dashboards and Cases can work from them. Design:
   data stream, which rejects the overwrite-by-id writes this connector uses.
 - **API key privileges.** On the target index: `create_index`, `index`, `write`,
   `view_index_metadata`. Cluster: `monitor` (for the health check).
-- **Data governance.** Sender and recipient addresses and the subject are
+- **Data governance.** Sender, To and CC addresses, the Message-ID and the subject are
   personal data. Enabling the connector declares the target cluster trusted at
   the same level as your TheHive and MISP instances.
 

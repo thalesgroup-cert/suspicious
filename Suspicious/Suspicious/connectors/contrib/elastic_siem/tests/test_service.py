@@ -104,8 +104,9 @@ class BuildDocumentTests(TestCase):
     def _mail_case(self, **mail_kw):
         case = _case(self.user, results="Dangerous", final_score=9.2, final_confidence=88,
                      verdict_explanation={"decisive_rule": "embedded-ioc-escalation"})
-        fields = dict(subject="Your invoice", reportedBy="r", date=NOW, mail_id="m1",
-                      mail_from="Bad Guy <bad@evil.test>", to="victim@corp.test, other@corp.test")
+        fields = dict(subject="Your invoice", reportedBy="r", date=NOW, mail_id="<m1@evil.test>",
+                      mail_from="Bad Guy <bad@evil.test>", to="victim@corp.test, other@corp.test",
+                      cc="Boss <boss@corp.test>, victim@corp.test")
         fields.update(mail_kw)
         mail = Mail.objects.create(**fields)
         case.fileOrMail = CaseHasFileOrMail.objects.create(case=case, mail=mail)
@@ -138,6 +139,20 @@ class BuildDocumentTests(TestCase):
         self.assertEqual(doc["email"]["subject"], "Your invoice")
         self.assertEqual(doc["email"]["from"]["address"], ["bad@evil.test"])
         self.assertEqual(doc["email"]["to"]["address"], ["victim@corp.test", "other@corp.test"])
+
+    def test_cc_recipients_and_message_id(self):
+        doc = service.build_document(self._mail_case(), "case_finalised", now=NOW)
+        self.assertEqual(doc["email"]["cc"]["address"], ["boss@corp.test", "victim@corp.test"])
+        self.assertEqual(doc["email"]["message_id"], "<m1@evil.test>")
+
+    def test_empty_cc_and_message_id_are_omitted(self):
+        doc = service.build_document(self._mail_case(cc="", mail_id=""), "case_finalised", now=NOW)
+        self.assertNotIn("cc", doc["email"])
+        self.assertNotIn("message_id", doc["email"])
+
+    def test_message_id_is_capped(self):
+        doc = service.build_document(self._mail_case(mail_id="<" + "a" * 2000 + ">"), "case_finalised", now=NOW)
+        self.assertEqual(len(doc["email"]["message_id"]), 512)
 
     def test_no_reporter_identity_anywhere(self):
         doc = json.dumps(service.build_document(self._mail_case(), "case_finalised", now=NOW))
@@ -394,6 +409,11 @@ class SiemClientTests(SimpleTestCase):
         self.assertEqual(props["related"]["properties"]["ip"]["type"], "ip")
         self.assertEqual(props["@timestamp"]["type"], "date")
         self.assertIs(props["suspicious"]["dynamic"], False)
+
+    def test_mapping_types_the_mail_fields(self):
+        email = service.index_body()["mappings"]["properties"]["email"]["properties"]
+        self.assertEqual(email["cc"]["properties"]["address"]["type"], "keyword")
+        self.assertEqual(email["message_id"]["type"], "keyword")
 
     def test_ensure_index_already_exists_race_is_success(self):
         client, session = self._client()

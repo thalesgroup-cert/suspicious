@@ -131,6 +131,8 @@ class FullCaseCompletenessTests(TestCase):
         self.assertEqual(doc["email"]["subject"], "Urgent: invoice 4411 overdue")
         self.assertEqual(doc["email"]["from"]["address"], ["billing@acme-pay.test"])
         self.assertEqual(doc["email"]["to"]["address"], ["victim@meridian.example", "finance@meridian.example"])
+        self.assertEqual(doc["email"]["cc"]["address"], ["boss@meridian.example"])
+        self.assertEqual(doc["email"]["message_id"], "<4411.abc@acme-pay.test>")
         # IOCs: every URL / IP / domain / hash the database holds for this mail
         self.assertEqual(sorted(doc["url"]["original"]), sorted([self.url_a.address, self.url_b.address]))
         self.assertEqual(sorted(doc["related"]["ip"]), ["198.51.100.23", "203.0.113.50"])

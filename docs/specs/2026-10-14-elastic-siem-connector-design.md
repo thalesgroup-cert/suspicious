@@ -119,7 +119,7 @@ One document per case, `_id` = case id. Built from the case, its mail and
 | `suspicious.case_id`, `.verdict`, `.score`, `.confidence`, `.status` | case |
 | `suspicious.decisive_rule` | `verdict_explanation.decisive_rule` |
 | `suspicious.url` | `ui_base_url` + case path, when `ui_base_url` is set |
-| `email.subject`, `email.from.address`, `email.to.address` | the case's mail |
+| `email.subject`, `email.from.address`, `email.to.address`, `email.cc.address`, `email.message_id` | the case's mail |
 | `url.original` | URL IOCs |
 | `file.name` | attachment and uploaded file names |
 | `file.hash.md5` / `.sha1` / `.sha256` | hash IOCs and the hash of each attachment or uploaded file, by `Hash.hashtype` when recognisable |
@@ -186,7 +186,7 @@ or unconfigured.
 ## Data governance
 
 - Only summaries and IOCs leave the platform: verdict, score, confidence,
-  decisive rule, mail subject, sender and recipient addresses, and IOC values.
+  decisive rule, mail subject, Message-ID, sender, To and CC addresses, and IOC values.
   Mail bodies, headers, attachments' content, analyzer reports and the reporter's
   identity are never sent.
 - Sender and recipient addresses and the subject are personal data in the

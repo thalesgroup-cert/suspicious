@@ -211,6 +211,8 @@ def build_document(case, action: str, ui_base_url: str = "", now=None) -> dict:
             "subject": _cap(mail.subject),
             "from": {"address": _addresses(mail.mail_from)},
             "to": {"address": _addresses(mail.to)},
+            "cc": {"address": _addresses(mail.cc)},
+            "message_id": _cap(mail.mail_id),
         }
     return _prune(doc)
 
@@ -249,6 +251,8 @@ def index_body() -> dict:
                     "subject": {"type": "keyword", "ignore_above": 1024, **text_sub},
                     "from": {"properties": {"address": keyword}},
                     "to": {"properties": {"address": keyword}},
+                    "cc": {"properties": {"address": keyword}},
+                    "message_id": keyword,
                 }},
                 "url": {"properties": {
                     "original": {"type": "keyword", "ignore_above": 2048, **text_sub},
