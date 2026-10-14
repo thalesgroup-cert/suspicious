@@ -2,6 +2,8 @@ export type SubmitConfigResponse = {
   status: "success";
   data: {
     suspicious_email: string;
+    max_file_bytes?: number;
+    max_indicators?: number;
   };
 };
 

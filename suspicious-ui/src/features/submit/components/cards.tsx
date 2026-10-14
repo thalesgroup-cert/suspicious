@@ -1,117 +1,84 @@
 import * as React from "react";
-import { Box, CardContent, Chip, Stack, Typography } from "@mui/material";
+import { Box, CardContent, Stack, ToggleButton, ToggleButtonGroup, Typography } from "@mui/material";
 import { CheckCircleOutlined } from "@mui/icons-material";
-import { alpha, useTheme } from "@mui/material/styles";
+import { alpha } from "@mui/material/styles";
 
 import { SoftCard } from "@/shared/components/SoftCard";
 
 export { SoftCard };
 
-export function ModeSelectorCard(props: {
-  active: boolean;
+export type ModeOption<T extends string> = {
+  value: T;
   title: string;
   subtitle: string;
   icon: React.ReactNode;
-  helper?: string;
-  onClick: () => void;
-}) {
-  const theme = useTheme();
+};
 
+export function ModeToggle<T extends string>(props: {
+  value: T;
+  options: ModeOption<T>[];
+  onChange: (next: T) => void;
+}) {
   return (
-    <Box
-      role="button"
-      tabIndex={0}
-      onClick={props.onClick}
-      onKeyDown={(e) => {
-        if (e.key === "Enter" || e.key === " ") {
-          e.preventDefault();
-          props.onClick();
-        }
-      }}
+    <ToggleButtonGroup
+      exclusive
+      fullWidth
+      aria-label="Submission type"
+      value={props.value}
+      // null = the active button was clicked again: keep the current mode.
+      onChange={(_, next: T | null) => next && props.onChange(next)}
       sx={{
-        cursor: "pointer",
-        borderRadius: 3,
-        p: 2,
-        border: `1px solid ${
-          props.active
-            ? alpha(theme.palette.primary.main, 0.42)
-            : alpha(theme.palette.divider, 0.9)
-        }`,
-        background: props.active
-          ? alpha(
-              theme.palette.primary.main,
-              theme.palette.mode === "dark" ? 0.1 : 0.06
-            )
-          : "rgba(255,255,255,.02)",
-        transition: "all .16s ease",
-        "&:hover": {
-          borderColor: alpha(theme.palette.primary.main, 0.35),
-          background: alpha(
-            theme.palette.primary.main,
-            theme.palette.mode === "dark" ? 0.08 : 0.045
-          ),
+        flexDirection: { xs: "column", md: "row" },
+        gap: 1.5,
+        "& .MuiToggleButtonGroup-grouped": {
+          m: 0,
+          borderRadius: 3,
+          border: 1,
+          borderColor: "divider",
+          "&.Mui-selected": {
+            borderColor: "primary.main",
+            bgcolor: (t) => alpha(t.palette.primary.main, 0.1),
+          },
+          "&.Mui-selected:hover": {
+            bgcolor: (t) => alpha(t.palette.primary.main, 0.16),
+          },
         },
+        "& .MuiToggleButtonGroup-grouped:not(:first-of-type), & .MuiToggleButtonGroup-grouped:not(:last-of-type)":
+          { borderRadius: 3, border: 1, borderColor: "divider" },
+        "& .MuiToggleButtonGroup-grouped.Mui-selected:not(:first-of-type), & .MuiToggleButtonGroup-grouped.Mui-selected:not(:last-of-type)":
+          { borderColor: "primary.main" },
       }}
     >
-      <Stack direction="row" spacing={1.5} sx={{ alignItems: "flex-start" }} >
-        <Box
-          sx={{
-            width: 42,
-            height: 42,
-            borderRadius: 2,
-            display: "grid",
-            placeItems: "center",
-            border: "1px solid rgba(255,255,255,.10)",
-            background:
-              "linear-gradient(135deg, rgba(56,189,248,.14), rgba(120,119,198,.12))",
-            flexShrink: 0,
-          }}
+      {props.options.map((o) => (
+        <ToggleButton
+          key={o.value}
+          value={o.value}
+          sx={{ p: 2, textTransform: "none", color: "text.primary", justifyContent: "flex-start", textAlign: "left" }}
         >
-          {props.icon}
-        </Box>
-
-        <Box sx={{ minWidth: 0, flex: 1 }}>
-          <Stack
-            direction="row"
-            spacing={1}
-            useFlexGap
-            sx={{ alignItems: "center", flexWrap: "wrap" }}
->
-            <Typography sx={{ fontWeight: 850 }} >{props.title}</Typography>
-
-            {props.helper ? (
-              <Chip
-                size="small"
-                label={props.helper}
-                variant="outlined"
-                sx={{ height: 24, "& .MuiChip-label": { px: 1, fontWeight: 700 } }}
-              />
-            ) : null}
-
-            {props.active ? (
-              <Chip
-                size="small"
-                icon={<CheckCircleOutlined sx={{ fontSize: 16 }} />}
-                label="Selected"
-                variant="outlined"
-                sx={{ height: 24, "& .MuiChip-label": { px: 1, fontWeight: 700 } }}
-              />
+          <Stack direction="row" spacing={1.5} sx={{ alignItems: "flex-start", width: "100%" }}>
+            <Box sx={{ display: "grid", placeItems: "center", width: 40, height: 40, flexShrink: 0, color: "primary.main" }}>
+              {o.icon}
+            </Box>
+            <Box sx={{ minWidth: 0, flex: 1 }}>
+              <Typography sx={{ fontWeight: 700 }}>{o.title}</Typography>
+              <Typography variant="body2" color="text.secondary" sx={{ letterSpacing: "normal" }}>
+                {o.subtitle}
+              </Typography>
+            </Box>
+            {props.value === o.value ? (
+              <CheckCircleOutlined color="primary" aria-hidden sx={{ flexShrink: 0 }} />
             ) : null}
           </Stack>
-
-          <Typography variant="body2" color="text.secondary" sx={{ mt: 0.5 }}>
-            {props.subtitle}
-          </Typography>
-        </Box>
-      </Stack>
-    </Box>
+        </ToggleButton>
+      ))}
+    </ToggleButtonGroup>
   );
 }
 
 export function SectionHeader(props: { title: string; subtitle: string }) {
   return (
     <Stack spacing={0.5}>
-      <Typography variant="h5" sx={{ fontWeight: 850, letterSpacing: -0.4 }} >
+      <Typography variant="h5">
         {props.title}
       </Typography>
       <Typography color="text.secondary">{props.subtitle}</Typography>
@@ -128,7 +95,7 @@ export function SidePanel(
         <Stack spacing={1.25}>
           <Stack direction="row" spacing={1} sx={{ alignItems: "center" }} >
             {props.icon}
-            <Typography sx={{ fontWeight: 850 }} >{props.title}</Typography>
+            <Typography variant="subtitle1" component="h2">{props.title}</Typography>
           </Stack>
           {props.children}
         </Stack>

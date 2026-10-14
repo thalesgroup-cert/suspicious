@@ -7,6 +7,7 @@ from rest_framework.response import Response
 from rest_framework.views import APIView
 
 from api.serializers.submit import (
+    DEFAULT_UPLOAD_MAX_BYTES,
     SubmitConfigSerializer,
     SubmitFileSerializer,
     SubmitIndicatorsSerializer,
@@ -147,7 +148,15 @@ class SubmitConfigView(APIView):
 
     def get(self, request):
         suspicious_email = getattr(settings, "SUSPICIOUS_EMAIL", "suspicious@example.com")
-        serializer = SubmitConfigSerializer({"suspicious_email": suspicious_email})
+        serializer = SubmitConfigSerializer(
+            {
+                "suspicious_email": suspicious_email,
+                "max_file_bytes": getattr(
+                    settings, "SUBMIT_FILE_MAX_BYTES", DEFAULT_UPLOAD_MAX_BYTES
+                ),
+                "max_indicators": IOC_GROUP_MAX,
+            }
+        )
         return Response(
             {
                 "status": "success",

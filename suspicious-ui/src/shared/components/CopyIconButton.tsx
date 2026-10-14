@@ -9,7 +9,11 @@ export function CopyIconButton({ text, title = "Copy" }: { text: string; title?:
         size="small"
         onClick={async (e) => {
           e.stopPropagation();
-          await navigator.clipboard.writeText(text);
+          try {
+            await navigator.clipboard.writeText(text);
+          } catch {
+            // Insecure origin or denied permission: nothing was copied and there is no snackbar here to say so; don't throw.
+          }
         }}
       >
         <ContentCopyOutlined fontSize="small" />

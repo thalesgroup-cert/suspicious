@@ -53,21 +53,30 @@ test.describe("Case submission flow", () => {
   test("submit page renders both submission modes", async ({ page }) => {
     await page.goto("/submit");
 
-    // Both mode selectors should be visible
-    await expect(page.getByText(/file|email/i).first()).toBeVisible();
-    await expect(page.getByText(/url|artifact|indicator/i).first()).toBeVisible();
+    const group = page.getByRole("group", { name: "Submission type" });
+    await expect(group.getByRole("button", { name: /^Indicators/ })).toBeVisible();
+    await expect(group.getByRole("button", { name: /^File/ })).toBeVisible();
   });
 
-  test("file mode shows a drop zone by default", async ({ page }) => {
+  test("indicators mode is the default", async ({ page }) => {
     await page.goto("/submit");
-    await expect(page.getByText(/drop|drag|upload|choose|select/i).first()).toBeVisible();
+    await expect(page.getByRole("button", { name: /^Indicators/ })).toHaveAttribute("aria-pressed", "true");
+    await expect(page.getByRole("textbox").first()).toBeVisible();
+    await expect(page.getByText("Drag and drop or click to browse")).toHaveCount(0);
+  });
+
+  test("switching to file mode shows a drop zone", async ({ page }) => {
+    await page.goto("/submit");
+    await page.getByRole("button", { name: /^File/ }).click();
+    await expect(page.getByText("Drag and drop or click to browse")).toBeVisible();
   });
 
   test("switching to artifact mode shows text input", async ({ page }) => {
     await page.goto("/submit");
 
-    // Click the artifact / URL mode button
-    await page.getByText(/url|artifact|indicator/i).first().click();
+    // Indicators is the default; switch away and back to exercise the toggle
+    await page.getByRole("button", { name: /^File/ }).click();
+    await page.getByRole("button", { name: /^Indicators/ }).click();
 
     // A text input should appear
     const input = page.getByRole("textbox").first();
@@ -76,7 +85,6 @@ test.describe("Case submission flow", () => {
 
   test("submit button disabled when artifact input is empty", async ({ page }) => {
     await page.goto("/submit");
-    await page.getByText(/url|artifact|indicator/i).first().click();
 
     const submitBtn = page.getByRole("button", { name: /submit|analyze|send/i });
     await expect(submitBtn).toBeDisabled();
@@ -97,6 +105,7 @@ test.describe("Case submission flow", () => {
           submission_type: "url",
           result_type: "case",
           case_id: 42,
+          observable_count: 1,
           message: "Submission accepted.",
         }),
       });
@@ -119,7 +128,6 @@ test.describe("Case submission flow", () => {
     });
 
     await page.goto("/submit");
-    await page.getByText(/url|artifact|indicator/i).first().click();
 
     const input = page.getByRole("textbox").first();
     await expect(input).toBeVisible();
@@ -131,7 +139,9 @@ test.describe("Case submission flow", () => {
 
     // Success: either a snackbar or navigation away from submit page
     await expect(
-      page.getByText(/accepted|success|submitted/i)
+      page.locator("#notistack-snackbar", {
+        hasText: "Submitted: 1 indicator(s), case #42",
+      })
     ).toBeVisible({ timeout: 5_000 });
   });
 });

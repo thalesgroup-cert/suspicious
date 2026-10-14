@@ -1,5 +1,5 @@
-import { describe, it, expect, vi, beforeEach } from "vitest";
-import { screen, waitFor } from "@testing-library/react";
+import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
+import { act, screen, waitFor, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { renderWithProviders, mockMe } from "@/test/utils";
 
@@ -49,18 +49,134 @@ describe("SubmitPage", () => {
     mockApiGet.mockResolvedValue({ data: "suspicious@corp.test" } as never);
   });
 
-  it("renders the two submission modes", async () => {
-    renderSubmit();
+  describe("mode selector", () => {
+    const group = async () => screen.findByRole("group", { name: "Submission type" });
+    const dropzone = () => screen.queryByText("Drag and drop or click to browse");
 
-    expect(
-      await screen.findByText("Drag and drop or click to browse")
-    ).toBeInTheDocument();
-    // File mode is default; the mode cards show File + Indicators, no third.
-    expect(screen.getAllByText("Indicators").length).toBeGreaterThan(0);
-    expect(screen.queryByText("URL, Domain or Indicator")).not.toBeInTheDocument();
+    it("defaults to Indicators: its panel shows, the file dropzone does not", async () => {
+      renderSubmit();
+      expect(await screen.findByLabelText("Indicators")).toBeInTheDocument();
+      expect(dropzone()).not.toBeInTheDocument();
+    });
+
+    it("is a two-button group, Indicators first and pressed", async () => {
+      renderSubmit();
+      const buttons = within(await group()).getAllByRole("button");
+      expect(buttons).toHaveLength(2);
+      expect(buttons[0]).toHaveTextContent("Indicators");
+      expect(buttons[1]).toHaveTextContent("File");
+      expect(buttons[0]).toHaveAttribute("aria-pressed", "true");
+      expect(buttons[1]).toHaveAttribute("aria-pressed", "false");
+    });
+
+    it("clicking File switches the panel and aria-pressed", async () => {
+      const user = userEvent.setup();
+      renderSubmit();
+      const [ind, file] = within(await group()).getAllByRole("button");
+      await user.click(file);
+      expect(await screen.findByText("Drag and drop or click to browse")).toBeInTheDocument();
+      expect(file).toHaveAttribute("aria-pressed", "true");
+      expect(ind).toHaveAttribute("aria-pressed", "false");
+    });
+
+    it("clicking the active button keeps the selection", async () => {
+      const user = userEvent.setup();
+      renderSubmit();
+      const [ind] = within(await group()).getAllByRole("button");
+      await user.click(ind);
+      expect(ind).toHaveAttribute("aria-pressed", "true");
+      expect(await screen.findByLabelText("Indicators")).toBeInTheDocument();
+    });
+
+    it.each([[" "], ["{Enter}"]])("keyboard: arrow to File and press %j switches", async (key) => {
+      const user = userEvent.setup();
+      renderSubmit();
+      const [ind, file] = within(await group()).getAllByRole("button");
+      ind.focus();
+      expect(ind).toHaveFocus();
+      await user.keyboard("{ArrowRight}"); // roving tabindex: arrows move within the group
+      expect(file).toHaveFocus();
+      await user.keyboard(key);
+      expect(file).toHaveAttribute("aria-pressed", "true");
+      expect(await screen.findByText("Drag and drop or click to browse")).toBeInTheDocument();
+    });
+
+    it("has no Recommended or Selected chips", async () => {
+      renderSubmit();
+      await group();
+      expect(screen.queryByText("Recommended")).not.toBeInTheDocument();
+      expect(screen.queryByText("Selected")).not.toBeInTheDocument();
+    });
   });
 
-  it("switches to indicators mode and shows the textarea + IOC upload", async () => {
+  describe("layout and honesty", () => {
+    const CORR = /correlated as one case/;
+
+    it("has one 'What to submit' card and no Accepted inputs or Guidance titles", async () => {
+      renderSubmit();
+      await screen.findByLabelText("Indicators");
+      expect(screen.getAllByText("What to submit")).toHaveLength(1);
+      expect(screen.queryByText("Accepted inputs")).not.toBeInTheDocument();
+      expect(screen.queryByText("Guidance")).not.toBeInTheDocument();
+    });
+
+    it("shows the correlation note once, in Indicators mode only", async () => {
+      const user = userEvent.setup();
+      renderSubmit();
+      await screen.findByLabelText("Indicators");
+      expect(screen.getAllByText(CORR)).toHaveLength(1);
+      const [, file] = within(await screen.findByRole("group", { name: "Submission type" })).getAllByRole("button");
+      await user.click(file);
+      await screen.findByText("Drag and drop or click to browse");
+      expect(screen.queryByText(CORR)).not.toBeInTheDocument();
+    });
+
+    it("renders a disabled Submit visibly unlike an enabled one", async () => {
+      const user = userEvent.setup();
+      renderSubmit();
+      const ta = await screen.findByLabelText("Indicators");
+      const btn = screen.getByRole("button", { name: "Submit" });
+      expect(btn).toBeDisabled();
+      const off = getComputedStyle(btn).backgroundColor;
+      await user.type(ta, "8.8.8.8");
+      expect(btn).toBeEnabled();
+      await waitFor(() => expect(getComputedStyle(btn).backgroundColor).not.toBe(off)); // bg transitions
+    });
+
+    it("a disabled Submit under a gradient theme has no gradient and a muted border", async () => {
+      renderSubmit();
+      const btn = await screen.findByRole("button", { name: "Submit" });
+      act(() => {
+        window.dispatchEvent(new CustomEvent("suspicious:theme-hydrate", { detail: { theme: "sunrise", autoSeasonal: false } }));
+      });
+      expect(btn).toBeDisabled();
+      await waitFor(() => expect(getComputedStyle(btn).backgroundImage).toBe("none"));
+    });
+
+    it("toggle subtitles reset letter-spacing under high_contrast", async () => {
+      renderSubmit();
+      const sub = await screen.findByText("URLs, domains, IPs, hashes, or an IOC-list file");
+      act(() => {
+        window.dispatchEvent(new CustomEvent("suspicious:theme-hydrate", { detail: { theme: "high_contrast", autoSeasonal: false } }));
+      });
+      await waitFor(() => expect(getComputedStyle(sub.closest("button")!).letterSpacing).not.toBe("normal"));
+      expect(getComputedStyle(sub).letterSpacing).toBe("normal");
+    });
+
+    it("headings carry no tight letter-spacing or extra-heavy weight", async () => {
+      const user = userEvent.setup();
+      renderSubmit();
+      const [, file] = within(await screen.findByRole("group", { name: "Submission type" })).getAllByRole("button");
+      await user.click(file);
+      const h = await screen.findByText("File upload");
+      const cs = getComputedStyle(h);
+      const ls = cs.letterSpacing;
+      expect(ls === "" || ls === "normal" || parseFloat(ls) >= -0.01 * parseFloat(cs.fontSize || "16")).toBe(true);
+      expect(Number(cs.fontWeight)).toBeLessThanOrEqual(800);
+    });
+  });
+
+  it("indicators panel shows the textarea and IOC upload", async () => {
     const user = userEvent.setup();
     renderSubmit();
 
@@ -128,5 +244,222 @@ describe("SubmitPage", () => {
     await waitFor(() =>
       expect((screen.getByLabelText("Indicators") as HTMLTextAreaElement).value).toContain("evil.test")
     );
+  });
+  describe("file limit", () => {
+    afterEach(() => vi.unstubAllEnvs());
+    const cfg = (max?: number) => ({
+      data: { status: "success", data: { suspicious_email: "s@corp.test", ...(max ? { max_file_bytes: max } : {}) } },
+    });
+    const renderFile = async () => {
+      renderSubmit();
+      await userEvent.setup().click(await screen.findByRole("button", { name: /^File/ }));
+    };
+    const fileInput = () => document.querySelector('input[type="file"]') as HTMLInputElement;
+    const mk = (n: number, name = "a.eml") => new File([new Uint8Array(n)], name);
+
+    it("rejects an oversized file with the real limit and no chip", async () => {
+      mockApiGet.mockResolvedValue(cfg(1024) as never);
+      await renderFile();
+      await screen.findByText(/up to 1 KB/);
+      await userEvent.setup({ applyAccept: false }).upload(fileInput(), mk(2048, "big.eml"));
+      await waitFor(() =>
+        expect(
+          screen.getAllByRole("alert").some((a) => a.textContent === "big.eml is 2 KB; the limit is 1 KB.")
+        ).toBe(true)
+      );
+      expect(screen.queryByRole("button", { name: "Remove" })).not.toBeInTheDocument();
+    });
+
+    it("accepts a file of exactly the limit", async () => {
+      mockApiGet.mockResolvedValue(cfg(1024) as never);
+      await renderFile();
+      await screen.findByText(/up to 1 KB/);
+      await userEvent.setup().upload(fileInput(), mk(1024, "ok.eml"));
+      expect(await screen.findByText("ok.eml")).toBeInTheDocument();
+    });
+
+    it("accepts a 0-byte file in the dropzone", async () => {
+      mockApiGet.mockResolvedValue(cfg(1024) as never);
+      await renderFile();
+      await screen.findByText(/up to 1 KB/);
+      await userEvent.setup().upload(fileInput(), mk(0, "empty.eml"));
+      expect(await screen.findByText("empty.eml")).toBeInTheDocument();
+    });
+
+    it("without a loaded limit shows no 'undefined' and still selects a 10 MB file", async () => {
+      mockApiGet.mockReturnValue(new Promise(() => {}) as never);
+      await renderFile();
+      await screen.findByText(/One file per submission/);
+      expect(screen.queryByText(/undefined/)).not.toBeInTheDocument();
+      await userEvent.setup().upload(fileInput(), mk(10 * 1024 * 1024, "huge.eml"));
+      expect(await screen.findByText("huge.eml")).toBeInTheDocument();
+    });
+
+    it("rejects 1025 bytes when the limit is 1024", async () => {
+      mockApiGet.mockResolvedValue(cfg(1024) as never);
+      await renderFile();
+      await screen.findByText(/up to 1 KB/);
+      await userEvent.setup().upload(fileInput(), mk(1025, "over.eml"));
+      expect(await screen.findByText(/over.eml is 1,025 bytes; the limit is 1,024 bytes\./)).toBeInTheDocument();
+      expect(screen.queryByRole("button", { name: "Remove" })).not.toBeInTheDocument();
+    });
+
+    it("keeps kilobyte labels when the size and the limit format differently", async () => {
+      mockApiGet.mockResolvedValue(cfg(1024) as never);
+      await renderFile();
+      await screen.findByText(/up to 1 KB/);
+      await userEvent.setup().upload(fileInput(), mk(2048, "two.eml"));
+      expect(await screen.findByText(/two.eml is 2 KB; the limit is 1 KB\./)).toBeInTheDocument();
+    });
+
+    it("a rejection leaves nothing selected, and the next good drop clears the error", async () => {
+      mockApiGet.mockResolvedValue(cfg(1024) as never);
+      await renderFile();
+      await screen.findByText(/up to 1 KB/);
+      const user = userEvent.setup();
+      await user.upload(fileInput(), mk(2048, "big.eml"));
+      await screen.findByText(/big.eml is 2 KB/);
+      expect(screen.queryByRole("button", { name: "Remove" })).not.toBeInTheDocument();
+      expect(screen.queryByText("File selected")).not.toBeInTheDocument();
+      expect(screen.getByRole("button", { name: "Upload file" })).toBeDisabled();
+      await user.upload(fileInput(), mk(10, "ok.eml"));
+      await screen.findByText("ok.eml");
+      expect(screen.queryByText(/big.eml is/)).not.toBeInTheDocument();
+    });
+
+    it("a rejected drop replaces a previously selected file with nothing", async () => {
+      mockApiGet.mockResolvedValue(cfg(1024) as never);
+      await renderFile();
+      await screen.findByText(/up to 1 KB/);
+      const user = userEvent.setup();
+      await user.upload(fileInput(), mk(10, "ok.eml"));
+      await screen.findByText("ok.eml");
+      expect(screen.getByRole("button", { name: "Upload file" })).toBeEnabled();
+      await user.upload(fileInput(), mk(2048, "big.eml"));
+      await screen.findByText(/big.eml is 2 KB/);
+      expect(screen.queryByText("ok.eml")).not.toBeInTheDocument();
+      expect(screen.queryByRole("button", { name: "Remove" })).not.toBeInTheDocument();
+      expect(screen.getByRole("button", { name: "Upload file" })).toBeDisabled();
+    });
+    // Remove-clears-error can no longer happen: an error and a chip never coexist.
+
+    it("with a failing config: dropzone works, no 'undefined', email copy disabled as unavailable", async () => {
+      vi.stubEnv("VITE_SUSPICIOUS_EMAIL", ""); // .env sets it; these cases need it unset
+      mockApiGet.mockRejectedValue(new Error("boom") as never);
+      const user = userEvent.setup();
+      const write = vi.spyOn(navigator.clipboard, "writeText").mockResolvedValue();
+      await renderFile();
+      const btn = await screen.findByRole("button", { name: "Address unavailable" });
+      expect(btn).toBeDisabled();
+      expect(screen.queryByText(/undefined/)).not.toBeInTheDocument();
+      await user.upload(fileInput(), mk(3 * 1024 * 1024, "m.eml"));
+      expect(await screen.findByText("m.eml")).toBeInTheDocument();
+      expect(write).not.toHaveBeenCalled(); // disabled: it cannot be clicked
+    });
+
+    it("disables the email copy while config is pending, then copies the resolved address", async () => {
+      vi.stubEnv("VITE_SUSPICIOUS_EMAIL", ""); // .env sets it; these cases need it unset
+      let resolve!: (v: unknown) => void;
+      mockApiGet.mockReturnValue(new Promise((r) => (resolve = r)) as never);
+      const user = userEvent.setup();
+      const write = vi.spyOn(navigator.clipboard, "writeText").mockResolvedValue();
+      await renderFile();
+      const loading = await screen.findByRole("button", { name: "Loading address…" });
+      expect(loading).toBeDisabled();
+      resolve(cfg(1024).data && cfg(1024));
+      const btn = await screen.findByRole("button", { name: "s@corp.test" });
+      expect(btn).toBeEnabled();
+      await user.click(btn);
+      expect(write).toHaveBeenCalledWith("s@corp.test");
+      expect(write).toHaveBeenCalledTimes(1);
+    });
+
+    it("shows the limit in the helper text", async () => {
+      mockApiGet.mockResolvedValue(cfg(5242880) as never);
+      await renderFile();
+      expect(await screen.findByText("One file per submission, up to 5 MB.")).toBeInTheDocument();
+    });
+  });
+
+  describe("indicator summary", () => {
+    const cfg = (max?: number) => ({
+      data: { status: "success", data: { suspicious_email: "s@corp.test", ...(max ? { max_indicators: max } : {}) } },
+    });
+    const open = async () => {
+      const user = userEvent.setup();
+      renderSubmit();
+      await user.click((await screen.findAllByText("Indicators"))[0]);
+      return { user, field: await screen.findByLabelText("Indicators") };
+    };
+    const ips = (n: number) => Array.from({ length: n }, (_, i) => `10.0.${Math.floor(i / 250)}.${(i % 250) + 1}`).join("\n");
+
+    it("states what will be submitted and what is skipped", async () => {
+      const { user, field } = await open();
+      await user.click(field);
+      await user.paste("not a thing  mail.example.org 999.1.1.1");
+      expect(await screen.findByText("1 will be submitted · 2 skipped")).toBeInTheDocument();
+      expect(screen.getAllByText("skipped").length).toBe(2);
+      expect(screen.queryByText("unrecognised")).not.toBeInTheDocument();
+      expect(screen.queryByText(/indicator\(s\)/)).not.toBeInTheDocument();
+    });
+
+    it("explains when nothing is recognisable", async () => {
+      const { user, field } = await open();
+      await user.click(field);
+      await user.paste("just words");
+      expect(await screen.findByText("Nothing recognisable yet. Add a URL, domain, IP or hash.")).toBeInTheDocument();
+      expect(screen.getByRole("button", { name: "Submit" })).toBeDisabled();
+    });
+
+    it("disables Submit above the default limit of 100", async () => {
+      const { user, field } = await open();
+      await user.click(field);
+      await user.paste(ips(101));
+      expect(await screen.findByText("101 indicators; the limit is 100.")).toBeInTheDocument();
+      expect(screen.getByRole("button", { name: "Submit" })).toBeDisabled();
+    });
+
+    it("says 'found' with a note only when a URL row is present", async () => {
+      const { user, field } = await open();
+      await user.click(field);
+      await user.paste("8.8.8.8");
+      const status = await screen.findByText("1 will be submitted");
+      expect(status).toHaveAttribute("role", "status");
+      expect(screen.queryByText(/Links to private or internal/)).not.toBeInTheDocument();
+      await user.type(field, " http://evil.example/x");
+      expect(await screen.findByText("2 found")).toBeInTheDocument();
+      expect(screen.getByText(/Links to private or internal addresses are skipped/)).toBeInTheDocument();
+    });
+
+    it("keeps an empty status region mounted and links Submit to it only when it has text", async () => {
+      const { user, field } = await open();
+      const status = document.getElementById("indicators-summary") as HTMLElement;
+      expect(status).toHaveAttribute("role", "status");
+      expect(status).toBeEmptyDOMElement();
+      expect(screen.getByRole("button", { name: "Submit" })).not.toHaveAttribute("aria-describedby");
+      await user.click(field);
+      await user.paste("just words");
+      await waitFor(() => expect(status).not.toBeEmptyDOMElement());
+    });
+
+    it("links the disabled Submit to the summary", async () => {
+      const { user, field } = await open();
+      await user.click(field);
+      await user.paste("just words");
+      const status = await screen.findByText(/Nothing recognisable/);
+      expect(screen.getByRole("button", { name: "Submit" })).toHaveAttribute("aria-describedby", status.id);
+    });
+
+    it("uses the configured limit and ignores skipped rows when counting", async () => {
+      mockApiGet.mockResolvedValue(cfg(2) as never);
+      const { user, field } = await open();
+      await user.click(field);
+      await user.paste("8.8.8.8 foo 1.1.1.1 bar baz");
+      expect(await screen.findByText("2 will be submitted · 2 skipped")).toBeInTheDocument();
+      expect(screen.getByRole("button", { name: "Submit" })).not.toBeDisabled();
+      await user.type(field, " 9.9.9.9");
+      expect(await screen.findByText("3 indicators; the limit is 2.")).toBeInTheDocument();
+      expect(screen.getByRole("button", { name: "Submit" })).toBeDisabled();
+    });
   });
 });

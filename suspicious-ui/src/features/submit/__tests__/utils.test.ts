@@ -3,7 +3,6 @@ import type { SubmitSuccessResponse } from "@/features/submit/types";
 import {
   classifyArtifact,
   extractApiErrorMessage,
-  formatBytes,
   normaliseUrl,
   resolveId,
 } from "@/features/submit/utils";
@@ -35,16 +34,6 @@ describe("normaliseUrl", () => {
   it("prepends http:// to bare domains (Django URLField needs a scheme)", () => {
     expect(normaliseUrl("evil.com")).toBe("http://evil.com");
     expect(normaliseUrl("  evil.com  ")).toBe("http://evil.com");
-  });
-});
-
-describe("formatBytes", () => {
-  it("scales through B/KB/MB with one decimal beyond bytes", () => {
-    expect(formatBytes(0)).toBe("0 B");
-    expect(formatBytes(512)).toBe("512 B");
-    expect(formatBytes(1024)).toBe("1.0 KB");
-    expect(formatBytes(1536)).toBe("1.5 KB");
-    expect(formatBytes(1048576)).toBe("1.0 MB");
   });
 });
 

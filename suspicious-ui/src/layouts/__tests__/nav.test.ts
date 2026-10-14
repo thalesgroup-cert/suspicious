@@ -1,5 +1,5 @@
 import { describe, it, expect } from "vitest";
-import { filterItems, getPageTitle, type NavItemConfig } from "@/layouts/nav";
+import { filterItems, getPageTitle, isElevatedGroups, type NavItemConfig } from "@/layouts/nav";
 
 const item = (to: string, label: string, elevatedOnly?: boolean): NavItemConfig =>
   ({ to, label, elevatedOnly, icon: null as unknown as NavItemConfig["icon"] });
@@ -32,5 +32,16 @@ describe("getPageTitle", () => {
 
   it("matches the root route exactly", () => {
     expect(getPageTitle("/", items)).toBe("Home");
+  });
+});
+
+describe("isElevatedGroups", () => {
+  it("is true for CISO, CERT and Admin", () => {
+    for (const g of ["CISO", "CERT", "Admin"]) expect(isElevatedGroups([g])).toBe(true);
+  });
+  it("is false for nothing or a plain reporter", () => {
+    expect(isElevatedGroups(undefined)).toBe(false);
+    expect(isElevatedGroups([])).toBe(false);
+    expect(isElevatedGroups(["Reporter"])).toBe(false);
   });
 });

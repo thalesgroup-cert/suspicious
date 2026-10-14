@@ -22,6 +22,8 @@ export default mergeConfig(
         "react/jsx-dev-runtime",
         "axios",
         "react-joyride",
+        "react-grid-layout",
+        "react-grid-layout/legacy",
         "@mui/icons-material/BlockOutlined",
         "@mui/icons-material/CheckCircleOutlined",
         "@mui/icons-material/EmailOutlined",

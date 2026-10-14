@@ -2,7 +2,7 @@
 import * as React from "react";
 import { Chip } from "@mui/material";
 import { alpha, useTheme } from "@mui/material/styles";
-import { contrastText } from "@/styles/colorStore";
+import { readableOnTint } from "@/shared/lib/contrast";
 
 type Props = {
   label: string;
@@ -12,26 +12,31 @@ type Props = {
   muiColor?: "success" | "warning" | "error" | "info" | "default";
   icon?: React.ReactNode;
   minWidth?: number;
+  size?: "small" | "medium";
+  /** Extra opaque backgrounds the chip can sit on (e.g. the tinted top of a sheet header); text must read on all of them. */
+  behind?: string[];
 };
 
-export function Badge({ label, color, muiColor = "default", icon, minWidth = 128 }: Props) {
+export function Badge({ label, color, muiColor = "default", icon, minWidth = 128, size = "small", behind = [] }: Props) {
   const theme = useTheme();
   const isDark = theme.palette.mode === "dark";
 
   // ── Hex color path (semantic store) ──────────────────────────────────────
   if (color) {
-    const bg     = alpha(color, isDark ? 0.14 : 0.1);
+    const tint   = isDark ? 0.14 : 0.1;
+    const bg     = alpha(color, tint);
     const border = alpha(color, isDark ? 0.35 : 0.45);
-    const text   = color;
+    // Text and icon keep the colour's hue but are nudged until they read at 4.5:1 on the tinted fill over the page.
+    const text   = readableOnTint(color, color, tint, [theme.palette.background.paper, theme.palette.background.default, ...behind]);
 
     return (
       <Chip
-        size="small"
+        size={size}
         icon={icon as any}
         label={label}
         variant="outlined"
         sx={{
-          fontWeight: 900,
+          fontWeight: 800,
           minWidth,
           justifyContent: "center",
           bgcolor:     bg,
@@ -47,13 +52,13 @@ export function Badge({ label, color, muiColor = "default", icon, minWidth = 128
   // ── MUI color fallback ────────────────────────────────────────────────────
   return (
     <Chip
-      size="small"
+      size={size}
       icon={icon as any}
       label={label}
       color={muiColor === "default" ? undefined : muiColor}
       variant={muiColor === "default" ? "outlined" : "outlined"}
       sx={{
-        fontWeight: 900,
+        fontWeight: 800,
         minWidth,
         justifyContent: "center",
         "& .MuiChip-label": { width: "100%", textAlign: "center" },

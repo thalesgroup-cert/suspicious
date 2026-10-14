@@ -3,5 +3,6 @@ export const endpoints = {
   logout: "/auth/logout/",
   me: "/auth/me/",
   dashboardSummary: "/dashboard/summary/",
+  dashboardScopes: "/dashboard/scopes/",
   connectors: "/connectors/",
 };

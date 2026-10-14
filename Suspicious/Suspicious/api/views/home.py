@@ -74,13 +74,13 @@ class HomeSummaryView(APIView):
         country = self._clean_profile_value(getattr(active_profile, "country", None))
         gbu = self._clean_profile_value(getattr(active_profile, "gbu", None))
 
+        primary_danger_counts = self._extract_danger_counts(personal_stats)
         if is_ciso and scope_stats is not None:
-            primary_danger_counts = self._extract_danger_counts(personal_stats)
             spotlight_total_cases = int(scope_stats["total_cases"])
-        else:
-            primary_danger_counts = self._extract_danger_counts(personal_stats)
+        elif is_cert:
             spotlight_total_cases = int(global_stats["total_cases"])
-        
+        else:
+            spotlight_total_cases = int(personal_stats["total_cases"])
 
         challenge_cases = 0
         if is_cert:
@@ -90,6 +90,7 @@ class HomeSummaryView(APIView):
             "show_scope_modal": show_scope_modal,
             "monthly": {
                 "everyone_items": int(global_stats["total_cases"]),
+                "user_items": int(personal_stats["total_cases"]),
                 "scope_items": int(scope_stats["total_cases"]) if scope_stats is not None else 0,
                 "scope_name": ciso_scope if is_ciso else None,
             },
@@ -106,6 +107,7 @@ class HomeSummaryView(APIView):
                 is_ciso=is_ciso,
                 is_cert=is_cert,
                 total_cases=spotlight_total_cases,
+                scoped=scope_stats is not None,
                 challenge_cases=challenge_cases,
             ),
         }
@@ -181,14 +183,18 @@ class HomeSummaryView(APIView):
         return normalized or None
 
     @staticmethod
-    def _build_spotlight(is_ciso: bool, is_cert: bool, total_cases: int, challenge_cases: int):
+    def _build_spotlight(is_ciso: bool, is_cert: bool, total_cases: int, challenge_cases: int, scoped: bool = True):
         if is_ciso:
+            # An unscoped CISO's total_cases is personal: never present it as a scope count.
+            description = (
+                f"There are {total_cases} items in your current scope this month. "
+                "Use the dashboard to review broader activity and trends."
+                if scoped
+                else "Choose your scope to see activity for it."
+            )
             return {
                 "title": "CISO overview",
-                "description": (
-                    f"There are {total_cases} items in your current scope this month. "
-                    "Use the dashboard to review broader activity and trends."
-                ),
+                "description": description,
                 "cta_label": "Open dashboard",
                 "cta_path": "/dashboard",
             }

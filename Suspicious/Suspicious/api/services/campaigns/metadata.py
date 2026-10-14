@@ -81,15 +81,18 @@ def normalize_classification(value: Any) -> str:
     return text
 
 
+COUNT_BUCKETS = (
+    CLASSIFICATION_SAFE,
+    CLASSIFICATION_UNWANTED,
+    CLASSIFICATION_SUSPICIOUS,
+    CLASSIFICATION_DANGEROUS,
+)
+
+
 def classification_bucket_for_counts(value: Any) -> Optional[str]:
+    """Four buckets as stored; anything else (UNKNOWN, odd labels) is not counted."""
     label = normalize_classification(value)
-    if label == CLASSIFICATION_SAFE:
-        return CLASSIFICATION_SAFE
-    if label in (CLASSIFICATION_UNWANTED, CLASSIFICATION_SUSPICIOUS):
-        return CLASSIFICATION_UNWANTED
-    if label == CLASSIFICATION_DANGEROUS:
-        return CLASSIFICATION_DANGEROUS
-    return None
+    return label if label in COUNT_BUCKETS else None
 
 
 def parse_source_refs(raw: Any) -> Tuple[str, ...]:

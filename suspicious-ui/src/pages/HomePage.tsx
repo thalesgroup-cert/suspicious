@@ -12,18 +12,17 @@ import {
   Table,
   TableBody,
   TableCell,
+  TableContainer,
   TableHead,
   TableRow,
   Tooltip,
   Typography,
+  useMediaQuery,
 } from "@mui/material";
 import { alpha } from "@mui/material/styles";
 import {
-  ManageSearchOutlined,
   OpenInNewOutlined,
-  RocketLaunchOutlined,
   LeaderboardOutlined,
-  UploadFileOutlined,
   DonutLargeOutlined,
   HistoryOutlined,
 } from "@mui/icons-material";
@@ -48,12 +47,15 @@ import FeederHealthBadge from "@/shared/components/FeederHealthBadge";
 
 import { DashboardCard } from "@/features/home/components/DashboardCard";
 import { ThemeGreeting } from "@/features/home/components/ThemeGreeting";
+import { EmptyState } from "@/shared/components/EmptyState";
 import { CisoScopeDialog } from "@/features/home/components/CisoScopeDialog";
 import {
   getHomeSummary,
   type DangerCounts,
   type HomeSummary,
+  type SubmissionRow,
 } from "@/features/home/api";
+import { RecentSubmissionsList } from "@/features/home/components/RecentSubmissionsList";
 import {
   DANGER_COLORS,
   DANGER_ORDER,
@@ -64,16 +66,6 @@ import {
 } from "@/features/home/utils";
 
 // Types
-
-type SubmissionRow = {
-  id: number | string;
-  status?: string;
-  artifact?: string;
-  created_at?: string;
-  tests_done?: number;
-  type?: string;
-  result?: string;
-};
 
 type SubmissionsResponse = {
   items?: SubmissionRow[];
@@ -97,6 +89,7 @@ async function getMyRecentSubmissions(): Promise<SubmissionRow[]> {
 export default function HomePage() {
   const navigate = useNavigate();
   const theme = useTheme();
+  const isPhone = useMediaQuery(theme.breakpoints.down("sm"));
   const { capabilities } = useThemeMode();
   const resultColors = useResultColors();
   const statusColors  = useStatusColors();
@@ -130,7 +123,6 @@ export default function HomePage() {
   const me = meQuery.data;
   const groups = me?.groups ?? [];
   const isCiso = groups.includes("CISO");
-  const isElevated = isCiso || groups.includes("CERT");
 
   const homeQuery = useQuery<HomeSummary>({
     queryKey: ["homeSummary", currentMonth, currentYear],
@@ -219,9 +211,11 @@ export default function HomePage() {
   const recent = recentQuery.data ?? [];
 
   const orgCount = everyoneCount;
-  const myCount = donutTotal;
+  const userItems = home?.monthly?.user_items;
+  // Buckets exclude unfinished cases, so the user's own count comes from the server when present.
+  const myCount = userItems ?? donutTotal;
   const shareNumerator = isCiso ? scopeCount : myCount;
-  const sharePct = orgCount > 0 ? Math.round((shareNumerator / orgCount) * 100) : 0;
+  const sharePct = orgCount > 0 ? Math.min(100, Math.round((shareNumerator / orgCount) * 100)) : 0;
   const scopeDanger: Required<DangerCounts> | null = home?.scope_danger_counts
     ? {
         safe: home.scope_danger_counts.safe ?? 0,
@@ -243,7 +237,7 @@ export default function HomePage() {
         >
           <Stack direction="row" spacing={1.5} sx={{ minWidth: 0, alignItems: "flex-start" }}>
             <Box sx={{ minWidth: 0 }}>
-              <Typography variant="h5" noWrap sx={{ fontWeight: 980, letterSpacing: -0.6 }} >
+              <Typography variant="pageTitle" component="h1" sx={{ overflowWrap: "anywhere" }}>
                 Welcome, {displayName}
               </Typography>
               <ThemeGreeting caps={capabilities} name={displayName} />
@@ -281,6 +275,8 @@ export default function HomePage() {
               }
               right={<Chip size="small" label="Monthly" variant="outlined" />}
               className={cardClass}
+              // Column flex so the empty state centres in the height the share card gives this row.
+              contentSx={{ height: "100%", display: "flex", flexDirection: "column" }}
               titleBadge={
                 capabilities.effects.hasAlertStates && danger.dangerous > 0 ? (
                   <Box
@@ -329,124 +325,103 @@ export default function HomePage() {
                 ) : null
               }
             >
-              <Box
-                sx={{ height: 220 }}
-                className={capabilities.effects.hasHeatEffect ? "sun-orb" : undefined}
-              >
-                {homeQuery.isLoading ? (
-                  <Stack sx={{ height: "100%", alignItems: "center", justifyContent: "center" }}>
-                    <CircularProgress size={22} />
-                  </Stack>
-                ) : donut.length ? (
-                  <ResponsiveContainer width="100%" height="100%">
-                    <PieChart>
-                      <Pie
-                        data={donut}
-                        dataKey="value"
-                        nameKey="name"
-                        innerRadius={62}
-                        outerRadius={86}
-                        isAnimationActive={false}
-                        stroke="rgba(255,255,255,.10)"
-                        strokeWidth={1}
-                      >
-                        {donut.map((entry) => (
-                          <Cell
-                            key={entry.name}
-                            fill={dangerColors[entry.name as DangerLabel]}
+              {homeQuery.isLoading ? (
+                <Stack sx={{ height: 220, alignItems: "center", justifyContent: "center" }}>
+                  <CircularProgress size={22} />
+                </Stack>
+              ) : !donut.length ? (
+                <Box sx={{ minHeight: 120, flexGrow: 1 }}>
+                  {(userItems ?? 0) > 0 ? (
+                    <EmptyState title="No verdicts yet this month" hint="Verdicts appear here once your submissions are analysed." />
+                  ) : (
+                    <EmptyState title="No submissions this month" hint="Verdicts appear here once something is analysed this month." />
+                  )}
+                </Box>
+              ) : (
+                <>
+                  <Box sx={{ height: 220 }}>
+                    <ResponsiveContainer width="100%" height="100%">
+                      <PieChart>
+                        <Pie
+                          data={donut}
+                          dataKey="value"
+                          nameKey="name"
+                          innerRadius={62}
+                          outerRadius={86}
+                          paddingAngle={2}
+                          cornerRadius={4}
+                          stroke="rgba(255,255,255,.10)"
+                          strokeWidth={1}
+                        >
+                          {donut.map((entry) => (
+                            <Cell
+                              key={entry.name}
+                              fill={dangerColors[entry.name as DangerLabel]}
+                            />
+                          ))}
+                        </Pie>
+
+                        <text
+                          x="50%"
+                          y="48%"
+                          textAnchor="middle"
+                          dominantBaseline="central"
+                          fill={donutTotalColor}
+                        >
+                          <tspan style={{ fontWeight: 750, fontSize: 22 }}>{donutTotal}</tspan>
+                        </text>
+                        <text
+                          x="50%"
+                          y="60%"
+                          textAnchor="middle"
+                          dominantBaseline="central"
+                          fill={donutLabelColor}
+                        >
+                          <tspan style={{ fontSize: 12 }}>verdicts</tspan>
+                        </text>
+
+                        <RechartsTooltip />
+                      </PieChart>
+                    </ResponsiveContainer>
+                  </Box>
+
+                <Stack spacing={0.6} sx={{ mt: 1 }}>
+                  {(DANGER_ORDER as readonly DangerLabel[]).map((label) => {
+                    const key = label.toLowerCase() as keyof DangerCounts;
+                    const value = (danger[key] ?? 0) as number;
+
+                    return (
+                      <Stack
+                        key={label}
+                        direction="row"
+                        sx={{ justifyContent: "space-between", alignItems: "center" }}
+  >
+                        <Stack direction="row" spacing={1} sx={{ alignItems: "center" }} >
+                          <Box
+                            aria-hidden
+                            sx={{
+                              width: 10,
+                              height: 10,
+                              borderRadius: 99,
+                              backgroundColor: dangerColors[label],
+                              border: "1px solid rgba(255,255,255,.18)",
+                            }}
                           />
-                        ))}
-                      </Pie>
+                          <Typography variant="body2" color="text.secondary">
+                            {label}
+                          </Typography>
+                        </Stack>
 
-                      <text
-                        x="50%"
-                        y="48%"
-                        textAnchor="middle"
-                        dominantBaseline="central"
-                        fill={donutTotalColor}
-                      >
-                        <tspan style={{ fontWeight: 950, fontSize: 22 }}>{donutTotal}</tspan>
-                      </text>
-                      <text
-                        x="50%"
-                        y="60%"
-                        textAnchor="middle"
-                        dominantBaseline="central"
-                        fill={donutLabelColor}
-                      >
-                        <tspan style={{ fontSize: 12 }}>submissions</tspan>
-                      </text>
-
-                      <RechartsTooltip />
-                    </PieChart>
-                  </ResponsiveContainer>
-                ) : (
-                  <Stack sx={{ height: "100%", alignItems: "center", justifyContent: "center" }}>
-                    <Typography color="text.secondary" variant="body2">
-                      No data
-                    </Typography>
-                  </Stack>
-                )}
-              </Box>
-
-              <Stack spacing={0.6} sx={{ mt: 1 }}>
-                {(DANGER_ORDER as readonly DangerLabel[]).map((label) => {
-                  const key = label.toLowerCase() as keyof DangerCounts;
-                  const value = (danger[key] ?? 0) as number;
-
-                  return (
-                    <Stack
-                      key={label}
-                      direction="row"
-                      sx={{ justifyContent: "space-between", alignItems: "center" }}
->
-                      <Stack direction="row" spacing={1} sx={{ alignItems: "center" }} >
-                        <Box
-                          aria-hidden
-                          sx={{
-                            width: 10,
-                            height: 10,
-                            borderRadius: 99,
-                            backgroundColor: dangerColors[label],
-                            border: "1px solid rgba(255,255,255,.18)",
-                          }}
-                        />
-                        <Typography variant="body2" color="text.secondary">
-                          {label}
+                        <Typography variant="body2" sx={{ fontWeight: 800 }} >
+                          {value}
                         </Typography>
                       </Stack>
+                    );
+                  })}
+                </Stack>
 
-                      <Typography variant="body2" sx={{ fontWeight: 800 }} >
-                        {value}
-                      </Typography>
-                    </Stack>
-                  );
-                })}
-              </Stack>
-
-              <Divider sx={{ my: 2, opacity: 0.25 }} />
-
-              <Stack direction="row" spacing={1} sx={{ flexWrap: "wrap" }}>
-                <Button
-                  variant="contained"
-                  startIcon={<UploadFileOutlined />}
-                  onClick={() => navigate("/submit")}
-                  sx={{ borderRadius: 3, textTransform: "none", fontWeight: 950 }}
-                >
-                  Submit
-                </Button>
-
-                {isElevated ? (
-                  <Button
-                    variant="outlined"
-                    startIcon={<ManageSearchOutlined />}
-                    onClick={() => navigate("/investigation")}
-                    sx={{ borderRadius: 3, textTransform: "none", fontWeight: 900 }}
-                  >
-                    Open investigation
-                  </Button>
-                ) : null}
-              </Stack>
+                </>
+              )}
             </DashboardCard>
           </Grid>
 
@@ -470,35 +445,16 @@ export default function HomePage() {
                   Month-to-date share
                 </Typography>
 
-                {isCiso ? (
-                  <Typography color="text.secondary">
-                    Scope{" "}
-                    <Typography component="span" color="text.primary" sx={{ fontWeight: 950 }} >
-                      ({scopeLabel ?? "N/A"})
-                    </Typography>{" "}
-                    ran{" "}
-                    <Typography component="span" color="text.primary" sx={{ fontWeight: 950 }} >
-                      {scopeCount}
-                    </Typography>{" "}
-                    of{" "}
-                    <Typography component="span" color="text.primary" sx={{ fontWeight: 950 }} >
-                      {orgCount}
-                    </Typography>{" "}
-                    org cases.
+                <Stack direction="row" spacing={1} sx={{ alignItems: "baseline", flexWrap: "wrap" }}>
+                  <Typography variant="h3" component="p">
+                    {isCiso ? scopeCount : myCount}
                   </Typography>
-                ) : (
                   <Typography color="text.secondary">
-                    You ran{" "}
-                    <Typography component="span" color="text.primary" sx={{ fontWeight: 950 }} >
-                      {myCount}
-                    </Typography>{" "}
-                    of{" "}
-                    <Typography component="span" color="text.primary" sx={{ fontWeight: 950 }} >
-                      {orgCount}
-                    </Typography>{" "}
-                    org cases.
+                    {isCiso
+                      ? `of ${orgCount} org submissions this month in scope ${scopeLabel ?? "N/A"}`
+                      : `of ${orgCount} org submissions this month`}
                   </Typography>
-                )}
+                </Stack>
 
                 <Box>
                   <Box
@@ -526,7 +482,7 @@ export default function HomePage() {
                     direction="row"
                     sx={{ justifyContent: "space-between", mt: 0.5 }}
                   >
-                    <Typography variant="caption" sx={{ fontWeight: 800 }}>
+                    <Typography variant="caption" sx={{ fontWeight: 700 }}>
                       {sharePct}% {isCiso ? "in scope" : "yours"}
                     </Typography>
                     <Typography variant="caption" color="text.secondary">
@@ -578,7 +534,7 @@ export default function HomePage() {
                           <Typography variant="caption" color="text.secondary">
                             {label}
                           </Typography>
-                          <Typography variant="caption" sx={{ fontWeight: 900 }}>
+                          <Typography variant="caption" sx={{ fontWeight: 700 }}>
                             {value}
                           </Typography>
                         </Stack>
@@ -593,26 +549,15 @@ export default function HomePage() {
                   <Divider sx={{ opacity: 0.25, my: 1.5 }} />
 
                   <Stack spacing={1}>
-                    <Stack direction="row" spacing={1} sx={{ alignItems: "center" }} >
-                      <RocketLaunchOutlined fontSize="small" />
-                      <Typography sx={{ fontWeight: 900, fontSize: 15 }} >
-                        Spotlight
-                      </Typography>
-                    </Stack>
-
-                    <Typography variant="h6" sx={{ fontWeight: 950, letterSpacing: -0.2 }} >
-                      {home.spotlight.title}
-                    </Typography>
-
                     <Typography color="text.secondary" variant="body2">
                       {home.spotlight.description}
                     </Typography>
 
                     <Box>
                       <Button
-                        variant="outlined"
+                        variant="contained"
                         onClick={() => navigate(home.spotlight!.cta_path)}
-                        sx={{ borderRadius: 3, textTransform: "none", fontWeight: 900 }}
+                        sx={{ borderRadius: 3, textTransform: "none" }}
                       >
                         {home.spotlight.cta_label}
                       </Button>
@@ -694,8 +639,15 @@ export default function HomePage() {
                     </Alert>
                   </Box>
                 )
+              ) : isPhone ? (
+                <RecentSubmissionsList
+                  rows={recent}
+                  hrefFor={(r) =>
+                    `/submissions?q=${encodeURIComponent(String(r.id))}&open=${encodeURIComponent(String(r.id))}`
+                  }
+                />
               ) : (
-                <Box sx={{ overflowX: "auto" }}>
+                <TableContainer>
                   <Table sx={{ minWidth: 920 }}>
                     <TableHead>
                       <TableRow>
@@ -711,7 +663,7 @@ export default function HomePage() {
                     <TableBody>
                       {recent.map((r) => (
                         <TableRow key={String(r.id)} hover>
-                          <TableCell>
+                          <TableCell component="th" scope="row">
                             <Stack direction="row" spacing={1} sx={{ alignItems: "center" }} >
                               <Button
                                 size="small"
@@ -783,7 +735,7 @@ export default function HomePage() {
                       ))}
                     </TableBody>
                   </Table>
-                </Box>
+                </TableContainer>
               )}
             </DashboardCard>
           </Grid>

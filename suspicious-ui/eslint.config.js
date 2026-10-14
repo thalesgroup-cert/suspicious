@@ -73,6 +73,14 @@ export default [
     },
   },
 
+  // Dev scripts: node at top level, browser inside page.evaluate.
+  {
+    files: ["scripts/**/*.mjs"],
+    languageOptions: {
+      globals: { ...globals.node, ...globals.browser },
+    },
+  },
+
   // Modules that intentionally export more than components (route table;
   // theme provider + hooks + constants), so the fast-refresh "component-only
   // file" rule doesn't apply.
