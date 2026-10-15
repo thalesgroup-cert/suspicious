@@ -16,6 +16,7 @@ files, URLs, IPs, and file hashes.
 
 ## Where to start
 
+- **See it:** [Product demo](demo.md), a 100-second video tour
 - **Run it:** [Getting Started](getting-started/quick-start.md)
 - **Use it:** [User Guide](user-guide/submitting.md)
 - **Understand it:** [Architecture](architecture.md)

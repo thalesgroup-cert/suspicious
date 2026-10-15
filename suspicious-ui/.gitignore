@@ -2,3 +2,6 @@
 test-results/
 playwright-report/
 theme-shots/
+
+# Raw demo recordings (encoded output is committed under docs/assets/demo/)
+demo/out/

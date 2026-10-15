@@ -1,0 +1,52 @@
+WEBVTT
+
+00:00:01.083 --> 00:00:04.493
+Suspicious: AI-powered phishing and threat analysis, built by Thales Group CERT.
+
+00:00:04.493 --> 00:00:08.189
+Employees sign in with SSO, or with a local account.
+
+00:00:18.854 --> 00:00:22.526
+Home shows this month's verdicts across the whole organisation…
+
+00:00:22.526 --> 00:00:26.654
+…and your latest submissions, one click from the full report.
+
+00:00:26.873 --> 00:00:30.762
+Anyone can report something suspicious in seconds: a file, an email, or pasted indicators.
+
+00:00:30.762 --> 00:00:34.746
+Types are detected automatically, defanged links included.
+
+00:00:39.129 --> 00:00:42.878
+Related indicators are correlated into a single case.
+
+00:00:42.878 --> 00:00:47.962
+The new case opens at once. Analyzers run in parallel: YARA, ML, sandbox and reputation.
+
+00:00:47.962 --> 00:00:52.247
+Each analyzer reports its own verdict, confidence and evidence.
+
+00:00:52.247 --> 00:00:56.847
+Reporters follow every submission, and its final verdict, in one place.
+
+00:00:57.428 --> 00:01:01.028
+CERT analysts get a full investigation workspace…
+
+00:01:01.296 --> 00:01:06.096
+…with an explained verdict: which sources agreed, and why.
+
+00:01:12.591 --> 00:01:16.197
+The dashboard tracks volumes, outcomes and top reporters, month over month.
+
+00:01:20.675 --> 00:01:24.094
+Campaign detection clusters similar messages with ML embeddings…
+
+00:01:24.094 --> 00:01:27.790
+…so a coordinated wave is spotted before it spreads.
+
+00:01:30.871 --> 00:01:33.885
+Open source, self-hosted, and deployed with Docker Compose.
+
+00:01:33.885 --> 00:01:37.901
+github.com/thalesgroup-cert/suspicious
