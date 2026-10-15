@@ -1,6 +1,7 @@
 import * as React from "react";
 import { CssBaseline, GlobalStyles, ThemeProvider } from "@mui/material";
 import { themes, type ThemeName, getSeasonalThemeName } from "./themes";
+import { GlyphSmokeBackground } from "./effects/glyphSmoke/GlyphSmokeBackground";
 
 // Storage keys
 
@@ -39,6 +40,8 @@ type ThemeEffects = {
   hasEmberEffect?: boolean;
   /** Solar radiance and gold-shimmer crown glow (the_one / Escanor). */
   hasSolarEffect?: boolean;
+  /** Canvas backdrop of drifting glyph smoke; clicks ripple out as the Suspicious logo (lure). */
+  hasGlyphSmokeEffect?: boolean;
   /** High-contrast / WCAG AAA mode with forced-colors passthrough. */
   isAccessibilityTheme?: boolean;
 };
@@ -197,6 +200,15 @@ export const THEME_CAPABILITIES: Record<ThemeName, ThemeCapabilities> = {
   },
 
   // ── Character themes ───────────────────────────────────────────────────────
+
+  lure: {
+    label:       "Lure",
+    description: "Drifting glyph smoke on near-black; glyphs light under the cursor, clicks ripple out as the Suspicious logo.",
+    isDark: true,
+    utilityClasses: [],
+    cssVars:        [],
+    effects:        { hasGlassEffect: true, hasGlyphSmokeEffect: true },
+  },
 
   cyber: {
     label:       "Cyber",
@@ -432,6 +444,7 @@ export function AppThemeProvider({ children }: { children: React.ReactNode }) {
             },
           },
         }} />
+        {capabilities.effects.hasGlyphSmokeEffect && <GlyphSmokeBackground />}
         {children}
       </ThemeProvider>
     </ThemeContext.Provider>

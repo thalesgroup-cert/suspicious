@@ -11,6 +11,12 @@ from url_process.models import URL
 
 class IngestTests(TestCase):
     def setUp(self):
+        # Keep the SSRF check real but offline: a slow resolver would time out the
+        # first lookup (child dropped) and let the second call attach it.
+        dns = patch("api.serializers.submit.socket.getaddrinfo",
+                    return_value=[(2, 1, 6, "", ("93.184.216.34", 0))])
+        dns.start()
+        self.addCleanup(dns.stop)
         reporter = get_user_model().objects.create_user(username="r", password="x")
         self.group = ObservableGroup.objects.create(label="g")
         self.case = Case.objects.create(
