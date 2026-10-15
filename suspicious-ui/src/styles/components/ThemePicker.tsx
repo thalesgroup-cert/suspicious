@@ -44,7 +44,8 @@ const ORDER: ThemeName[] = [
   "spring",
   "summer",
   "autumn",
-  "future"
+  "future",
+  "lure",
 ];
 
 const META: Partial<Record<ThemeName, ThemeMeta>> = {
@@ -65,6 +66,7 @@ const META: Partial<Record<ThemeName, ThemeMeta>> = {
   summer:        { label: "Summer",        description: "Bright sky blue with sun amber.",               group: "Seasonal", emoji: "🌞" },
   autumn:        { label: "Autumn",        description: "Terracotta warmth with olive depth.",           group: "Seasonal", emoji: "🍂" },
   future:        { label: "Future",        description: "What the f..bzt ? A Visiteur du Futur theme...",   group: "Special", emoji: "🦊" },
+  lure:          { label: "Lure",          description: "Glyph smoke that reacts to the cursor; clicks ripple as the logo.", group: "Special", emoji: "🎣" },
 
 };
 

@@ -340,7 +340,8 @@ export type ThemeName =
   | "autumn"
   | "metal"
   | "future"
-  | "renee";
+  | "renee"
+  | "lure";
 
 export function getSeasonalThemeName(date = new Date()): ThemeName {
   const m = date.getMonth();
@@ -4885,6 +4886,107 @@ export const themes: Record<ThemeName, ReturnType<typeof createTheme>> = {
           colorError: {
             backgroundColor: "#C42B0A",
             boxShadow: `0 0 8px ${alpha("#C42B0A", 0.5)}`,
+          },
+        },
+      },
+    },
+  }),
+
+  // ── LURE — dark, animated backdrop (see GlyphSmokeBackground) ────────
+  // Surfaces are translucent so the glyph smoke shows through; popups stay near-opaque for legibility.
+  lure: mkDark({
+    bg: "#151515",
+    paper: "#1C1D1F",
+    primary: "#5AA2FF",
+    secondary: "#8BB2B7",
+    info: "#68A6C8",
+    success: "#3DDC97",
+    warning: "#F08A24", // the bug on the logo's envelope
+    error: "#F56565",
+    text: "#E8ECEF",
+    components: {
+      MuiCssBaseline: {
+        styleOverrides: {
+          body: {
+            backgroundColor: "#151515",
+            scrollbarWidth: "thin",
+            scrollbarColor: `${alpha("#5AA2FF", 0.4)} transparent`,
+            "&::-webkit-scrollbar": { width: 8, height: 8 },
+            "&::-webkit-scrollbar-thumb": {
+              borderRadius: 4,
+              backgroundColor: alpha("#5AA2FF", 0.32),
+              border: "2px solid transparent",
+              backgroundClip: "padding-box",
+              "&:hover": { backgroundColor: alpha("#5AA2FF", 0.52) },
+            },
+            "&::-webkit-scrollbar-track": { backgroundColor: "transparent" },
+            "::selection": { backgroundColor: alpha("#5AA2FF", 0.4), color: "#FFFFFF" },
+          },
+        },
+      },
+      MuiPaper: {
+        styleOverrides: {
+          root: {
+            backgroundColor: alpha("#1C1D1F", 0.8),
+            backdropFilter: "blur(10px)",
+            border: `1px solid ${alpha("#8BB2B7", 0.16)}`,
+            "&.MuiPopover-paper, &.MuiDialog-paper, &.MuiDrawer-paper, &.MuiAutocomplete-paper": {
+              backgroundColor: alpha("#1C1D1F", 0.97),
+            },
+          },
+        },
+      },
+      MuiCard: {
+        styleOverrides: {
+          root: {
+            backgroundColor: alpha("#1C1D1F", 0.8),
+            backdropFilter: "blur(10px)",
+            border: `1px solid ${alpha("#8BB2B7", 0.18)}`,
+          },
+        },
+      },
+      MuiButton: {
+        variants: [
+          {
+            props: { variant: "contained", color: "primary" },
+            style: {
+              color: "#071019",
+              boxShadow: `0 0 18px ${alpha("#5AA2FF", 0.28)}`,
+              "&:hover": { boxShadow: `0 0 26px ${alpha("#5AA2FF", 0.45)}` },
+            },
+          },
+        ],
+      },
+      MuiOutlinedInput: {
+        styleOverrides: {
+          root: {
+            "&:hover .MuiOutlinedInput-notchedOutline": { borderColor: alpha("#5AA2FF", 0.5) },
+            "&.Mui-focused .MuiOutlinedInput-notchedOutline": {
+              borderColor: "#5AA2FF",
+              boxShadow: `0 0 0 3px ${alpha("#5AA2FF", 0.16)}`,
+            },
+          },
+        },
+      },
+      MuiTableCell: {
+        styleOverrides: {
+          head: {
+            fontSize: 11,
+            fontWeight: 750,
+            textTransform: "uppercase",
+            letterSpacing: 0.7,
+            color: alpha("#8BB2B7", 0.95),
+            backgroundColor: alpha("#5AA2FF", 0.06),
+            borderBottom: `1px solid ${alpha("#5AA2FF", 0.16)}`,
+          },
+        },
+      },
+      MuiTooltip: {
+        styleOverrides: {
+          tooltip: {
+            backgroundColor: alpha("#1C1D1F", 0.97),
+            border: `1px solid ${alpha("#5AA2FF", 0.28)}`,
+            color: "#E8ECEF",
           },
         },
       },

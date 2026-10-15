@@ -313,6 +313,23 @@ THEME_PALETTES: dict[str, dict[str, str]] = {
         "cta_text":    "#FBF1F6",
         "footer_text": "#F1E8DC",
     },
+
+    # ── 18. LURE ──────────────────────────────────────────────────────────
+    "lure": {
+        "bg":          "#151515",
+        "surface":     "#1C1D1F",
+        "header_bg":   "#101113",
+        "header_text": "#E8ECEF",
+        "accent":      "#5AA2FF",
+        "accent_text": "#071019",
+        "body_text":   "#E8ECEF",
+        "muted":       "#8A9199",
+        "border":      "#2A2D31",
+        "link":        "#5AA2FF",
+        "cta_bg":      "#5AA2FF",
+        "cta_text":    "#071019",
+        "footer_text": "#8A9199",
+    },
 }
 
 _DEFAULT_PALETTE = THEME_PALETTES["graphite"]
