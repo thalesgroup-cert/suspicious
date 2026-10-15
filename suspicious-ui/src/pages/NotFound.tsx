@@ -3,6 +3,7 @@ import { Box, Button, Stack, Typography } from "@mui/material";
 import { alpha, useTheme } from "@mui/material/styles";
 import { HomeOutlined, ArrowBackOutlined, SearchOffOutlined } from "@mui/icons-material";
 import { useNavigate, useLocation } from "react-router";
+import { useThemeMode } from "@/styles/ThemeStore";
 
 type Props = {
   /**
@@ -17,6 +18,7 @@ export default function NotFound({ standalone = false }: Props) {
   const navigate = useNavigate();
   const location = useLocation();
   const theme = useTheme();
+  const { capabilities } = useThemeMode();
   const isDark = theme.palette.mode === "dark";
   const p = theme.palette.primary.main;
 
@@ -139,7 +141,8 @@ export default function NotFound({ standalone = false }: Props) {
           display: "flex",
           alignItems: "center",
           justifyContent: "center",
-          bgcolor: "background.default",
+          // lure paints a canvas behind the app; an opaque page would hide it.
+          bgcolor: capabilities.effects.hasGlyphSmokeEffect ? "transparent" : "background.default",
           position: "relative",
           overflow: "hidden",
         }}

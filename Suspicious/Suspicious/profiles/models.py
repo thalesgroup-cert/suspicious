@@ -76,6 +76,7 @@ class Theme(models.TextChoices):
     SPRING = "spring", _("Spring")
     AUTUMN = "autumn", _("Autumn")
     RENEE = "renee", _("Renée")
+    LURE = "lure", _("Lure")
 
 class UserProfile(SemanticColorsMixin, models.Model):
     def default_semantic_colors():

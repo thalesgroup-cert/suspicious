@@ -4,12 +4,14 @@ import { BoltOutlined, HubOutlined, ShieldOutlined } from "@mui/icons-material";
 import { motion, useReducedMotion, type Variants } from "framer-motion";
 
 import { COMPANY_NAME } from "@/features/login/config";
+import { useThemeMode } from "@/styles/ThemeStore";
 
 const MotionBox = motion(Box);
 
 // ─── Background: drifting mesh gradient + grain + vignette ────────────────
 export function Background() {
   const theme = useTheme();
+  const { capabilities } = useThemeMode();
   const isDark = theme.palette.mode === "dark";
   const reduce = useReducedMotion();
 
@@ -24,6 +26,9 @@ export function Background() {
     { color: success, size: 640, x: "50%",  y: "85%",  dx: 40,  dy: -50, d: 8  },
     { color: info,    size: 480, x: "20%",  y: "60%",  dx: -40, dy: -40, d: 12 },
   ];
+
+  // The theme paints its own backdrop (a canvas behind the whole app); this one would cover it.
+  if (capabilities.effects.hasGlyphSmokeEffect) return null;
 
   return (
     <Box

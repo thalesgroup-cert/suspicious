@@ -118,3 +118,41 @@ describe("Renée theme", () => {
     expect(localStorage.getItem(STORAGE_KEY)).toBe("renee");
   });
 });
+
+describe("Lure theme", () => {
+  beforeEach(() => {
+    localStorage.clear();
+  });
+
+  it("is a dark theme with translucent surfaces and the logo's orange as warning", () => {
+    expect(themes.lure.palette.mode).toBe("dark");
+    expect(themes.lure.palette.background.default.toLowerCase()).toBe("#151515");
+    expect(themes.lure.palette.warning.main.toUpperCase()).toBe("#F08A24");
+  });
+
+  it("is the only theme with the glyph-smoke backdrop", () => {
+    expect(THEME_CAPABILITIES.lure.effects.hasGlyphSmokeEffect).toBe(true);
+    const others = Object.entries(THEME_CAPABILITIES).filter(([k, v]) => k !== "lure" && v.effects.hasGlyphSmokeEffect);
+    expect(others).toEqual([]);
+  });
+
+  it("mounts the backdrop only while lure is active", () => {
+    function Switch() {
+      const { setThemeName } = useThemeMode();
+      return (
+        <>
+          <button type="button" onClick={() => setThemeName("lure")}>lure</button>
+          <button type="button" onClick={() => setThemeName("graphite")}>graphite</button>
+        </>
+      );
+    }
+    localStorage.setItem(STORAGE_KEY, "graphite");
+    localStorage.setItem(STORAGE_KEY_AUTO, "0");
+    render(<AppThemeProvider><Switch /></AppThemeProvider>);
+    expect(screen.queryByTestId("glyph-smoke")).toBeNull();
+    act(() => { hydrateThemeFromServer("lure", false); });
+    expect(screen.getByTestId("glyph-smoke")).toBeInTheDocument();
+    act(() => { hydrateThemeFromServer("graphite", false); });
+    expect(screen.queryByTestId("glyph-smoke")).toBeNull();
+  });
+});
