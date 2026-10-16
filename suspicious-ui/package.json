@@ -18,7 +18,13 @@
     "lint:fix": "eslint . --fix",
     "test": "vitest",
     "test:ui": "vitest --ui",
-    "test:e2e": "playwright test"
+    "test:e2e": "playwright test",
+    "demo:record": "playwright test -c playwright.demo.config.ts demo/suspicious.demo",
+    "demo:build": "bash demo/build.sh",
+    "demo": "pnpm demo:record && pnpm demo:build",
+    "demo:gifs:record": "playwright test -c playwright.demo.config.ts demo/pages.demo",
+    "demo:gifs:build": "bash demo/build-gifs.sh",
+    "demo:gifs": "pnpm demo:gifs:record && pnpm demo:gifs:build"
   },
   "dependencies": {
     "@dicebear/collection": "^9.4.3",

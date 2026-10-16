@@ -27,6 +27,19 @@ class RenderHeightCapTests(SimpleTestCase):
         _, kwargs = mocked.call_args
         self.assertEqual(kwargs["options"]["height"], str(_MAX_RENDER_HEIGHT_PX))
 
+    def test_crop_options_bound_the_output(self):
+        # --height alone only sets the viewport; the PNG still grows to the
+        # full content height (923 MB seen in production). --crop-h is the cap.
+        renderer = Eml2PngRenderer()
+        renderer._imgkit_available = True
+        with mock.patch("imgkit.from_string", return_value=b"PNGDATA") as mocked:
+            renderer._render_html_to_png("<p>hi</p>")
+        options = mocked.call_args.kwargs["options"]
+        self.assertEqual(options["crop-h"], str(_MAX_RENDER_HEIGHT_PX))
+        self.assertEqual(options["crop-x"], "0")
+        self.assertEqual(options["crop-y"], "0")
+        self.assertEqual(options["crop-w"], options["width"])
+
     def test_oversized_render_is_dropped_not_stored(self):
         renderer = Eml2PngRenderer()
         renderer._imgkit_available = True

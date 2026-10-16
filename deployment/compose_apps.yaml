@@ -61,7 +61,15 @@ services:
   suspicious_celery:
     init: true
     restart: always
-    command: celery -A suspicious worker --loglevel=info
+    # Default prefork concurrency is the host CPU count (8 on a 8-vCPU VM),
+    # and one wkhtmltoimage render alone peaks near 600 MB. Cap the pool,
+    # recycle children that outgrow --max-memory-per-child (KiB), and bound
+    # the container so a runaway cannot push the host into swap.
+    command: >
+      celery -A suspicious worker --loglevel=info
+        --concurrency=${CELERY_CONCURRENCY:-4}
+        --max-memory-per-child=${CELERY_MAX_MEMORY_PER_CHILD_KB:-1000000}
+    mem_limit: ${CELERY_MEM_LIMIT:-8g}
     volumes:
       - "${CA_PATH}/certfile.pem:/etc/private/certfile.pem:ro"
       - "${CA_PATH}/keyfile.pem:/etc/private/keyfile.pem:ro"

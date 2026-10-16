@@ -75,11 +75,13 @@ markdown_extensions:
 
 nav:
   - Home: index.md
+  - Demo: demo.md
   - Getting Started:
       - Quick Start: getting-started/quick-start.md
       - Installation: getting-started/installation.md
       - Configuration: getting-started/configuration.md
   - User Guide:
+      - UI tour: user-guide/tour.md
       - Submitting: user-guide/submitting.md
       - SOAR & API integration: user-guide/soar-integration.md
       - Investigations: user-guide/investigations.md
