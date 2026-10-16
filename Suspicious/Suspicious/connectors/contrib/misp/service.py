@@ -17,7 +17,13 @@ from mail_feeder.models import Mail
 from .client import MISPClient
 from .config_loader import load_misp_settings
 from .events import MISPEventManager
-from .internal import allow_listed_domains, company_domains, is_company_domain
+from .internal import (
+    allow_listed_domains,
+    company_domains,
+    is_allow_listed,
+    is_company_domain,
+    url_host,
+)
 from .objects import (
     build_domain_object,
     build_email_object,
@@ -131,7 +137,9 @@ class MISPService:
     ) -> Optional[MISPObject]:
         if ioc_type:
             if ioc_type == "url" and isinstance(artifact, URL):
-                return build_url_object(artifact, case_number, detection_level)
+                if self._shareable_url(artifact):
+                    return build_url_object(artifact, case_number, detection_level)
+                return None
             if ioc_type == "domain" and isinstance(artifact, Domain):
                 if self._shareable_domain(artifact):
                     return build_domain_object(artifact, case_number, detection_level)
@@ -148,7 +156,10 @@ class MISPService:
 
         artifact_type = (getattr(artifact, "artifact_type", None) or "").lower()
         if artifact_type == "url" and getattr(artifact, "artifactIsUrl", None):
-            return build_url_object(artifact.artifactIsUrl.url, case_number, detection_level)
+            url = artifact.artifactIsUrl.url
+            if not self._shareable_url(url):
+                return None
+            return build_url_object(url, case_number, detection_level)
         if artifact_type == "ip" and getattr(artifact, "artifactIsIp", None):
             return build_ip_object(artifact.artifactIsIp.ip, case_number, detection_level)
         if artifact_type == "hash" and getattr(artifact, "artifactIsHash", None):
@@ -166,12 +177,16 @@ class MISPService:
         return None
 
     def _shareable_domain(self, domain: Domain) -> bool:
-        """Allow-listed, legit and company domains are not indicators."""
+        """Allow-listed, legit and company domains (and their subdomains) are not indicators."""
         value = (domain.value or "").strip().lower()
         return (
             not is_company_domain(value, self._company_domains)
-            and value not in self._allow_listed
+            and not is_allow_listed(value, self._allow_listed)
         )
+
+    def _shareable_url(self, url: URL) -> bool:
+        """A link on a company domain points at the victim, not at the attacker."""
+        return not is_company_domain(url_host(url.address), self._company_domains)
 
     def add_attachment_object(
         self,
