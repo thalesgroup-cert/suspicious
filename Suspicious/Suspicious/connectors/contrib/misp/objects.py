@@ -23,8 +23,9 @@ _SUPPORTED_HASH_TYPES = frozenset({"md5", "sha1", "sha256"})
 def build_email_object(
     mail, case_number, detection_level: str, company_domains=frozenset()
 ) -> Optional[MISPObject]:
-    """Recipients (to, cc) on company domains are left out and display names of
-    recipients are never sent: they are staff, not indicators."""
+    """Addresses on company domains (from, to, cc, reply-to, return-path) are
+    left out, the sender's display name with them when the sender is one, and
+    display names of recipients are never sent: they are staff, not indicators."""
     logger.debug("[MISPHandler] Building email object for case %s.", case_number)
     try:
         header_value  = getattr(getattr(mail, "mail_header", None), "header_value", None) or ""
@@ -35,15 +36,19 @@ def build_email_object(
         obj         = MISPObject("email")
         obj.comment = "Case: %s, Detection level: %s" % (case_number, detection_level)
 
-        obj.add_attribute("from",              value=parsed.get("from",              ""))
-        obj.add_attribute("from-display-name", value=parsed.get("from_display_name", ""))
+        sender = external_addresses(parsed.get("from"), company_domains)
+        if sender:
+            obj.add_attribute("from",              value=sender)
+            obj.add_attribute("from-display-name", value=parsed.get("from_display_name", ""))
         for relation in ("to", "cc"):
             external = external_addresses(parsed.get(relation), company_domains)
             if external:
                 obj.add_attribute(relation, value=external)
         obj.add_attribute("subject",           value=clean_sub)
-        obj.add_attribute("reply-to",          value=parsed.get("reply_to",          ""))
-        obj.add_attribute("return-path",       value=parsed.get("return_path",       ""))
+        for relation, header in (("reply-to", "reply_to"), ("return-path", "return_path")):
+            external = external_addresses(parsed.get(header), company_domains)
+            if external:
+                obj.add_attribute(relation, value=external)
         obj.add_attribute("user-agent",        value=parsed.get("user_agent",        ""))
         obj.add_attribute("send-date",         value=parsed.get("send_date",         ""))
         return obj

@@ -8,6 +8,7 @@ from connectors.contrib.misp.events import MISPEventManager
 from connectors.contrib.misp.objects import build_hash_object
 from connectors.contrib.misp.service import MISPService
 from domain_process.models import Domain
+from url_process.models import URL
 
 
 def _manager(search_result, created=None):
@@ -125,6 +126,36 @@ class CompanyDomainsStayOutOfMispTest(SimpleTestCase):
         attrs = self._email({"from": "evil@bad.test", "to": "x@notcorp.example"})
         self.assertEqual(attrs["to"], "x@notcorp.example")
 
+    def test_spoofed_company_sender_is_left_out_with_its_display_name(self):
+        attrs = self._email({"from": "Jane CEO <ceo@corp.example>", "to": "x@ext.test"})
+        self.assertNotIn("from", attrs)
+        self.assertNotIn("from-display-name", attrs)
+        self.assertEqual(attrs["to"], "x@ext.test")
+
+    def test_external_sender_keeps_its_display_name(self):
+        attrs = self._email({"from": "Jane CEO <evil@bad.test>"})
+        self.assertEqual(attrs["from"], "evil@bad.test")
+        self.assertEqual(attrs["from-display-name"], "Jane CEO")
+
+    def test_company_reply_to_and_return_path_are_left_out(self):
+        attrs = self._email({"from": "evil@bad.test", "reply-to": "boss@corp.example",
+                             "return-path": "<bounce@mail.corp.example>"})
+        self.assertNotIn("reply-to", attrs)
+        self.assertNotIn("return-path", attrs)
+
+    def test_external_reply_to_and_return_path_are_kept(self):
+        attrs = self._email({"from": "evil@bad.test", "reply-to": "<drop@bad.test>",
+                             "return-path": "<bounce@bad.test>"})
+        self.assertEqual(attrs["reply-to"], "drop@bad.test")
+        self.assertEqual(attrs["return-path"], "bounce@bad.test")
+
+    def test_repeated_header_values_are_filtered_too(self):
+        from connectors.contrib.misp.internal import external_addresses
+        self.assertEqual(
+            external_addresses(["jane@corp.example", "partner@ext.test"], self.COMPANY),
+            "partner@ext.test",
+        )
+
 
 class CompanyDomainObjectsTest(SimpleTestCase):
     def _svc(self):
@@ -149,3 +180,43 @@ class CompanyDomainObjectsTest(SimpleTestCase):
             artifactIsDomain=SimpleNamespace(domain=Domain(value=v)))
         self.assertIsNone(svc._build_artifact_object(art("corp.example"), 1, "Dangerous", None))
         self.assertIsNotNone(svc._build_artifact_object(art("evil.test"), 1, "Dangerous", None))
+
+    def test_allow_listed_subdomains_are_skipped_too(self):
+        svc = self._svc()
+        build = lambda v: svc._build_artifact_object(  # noqa: E731
+            Domain(value=v), 1, "Dangerous", "domain")
+        self.assertIsNone(build("cdn.good.test"))
+        self.assertIsNotNone(build("notgood.test"))
+
+
+class CompanyUrlsStayOutOfMispTest(SimpleTestCase):
+    def _svc(self):
+        svc = MISPService.__new__(MISPService)
+        svc._company_domains = frozenset({"corp.example"})
+        svc._allow_listed = frozenset()
+        return svc
+
+    def test_urls_on_company_hosts_are_skipped(self):
+        svc = self._svc()
+        build = lambda a: svc._build_artifact_object(  # noqa: E731
+            URL(address=a), 1, "Dangerous", "url")
+        self.assertIsNone(build("https://corp.example/login"))
+        self.assertIsNone(build("https://portal.corp.example:8443/a?b=c"))
+        self.assertIsNone(build("HTTPS://Portal.Corp.Example./a"))
+        self.assertIsNotNone(build("https://evil.test/login"))
+
+    def test_lookalike_and_embedded_company_names_are_kept(self):
+        svc = self._svc()
+        build = lambda a: svc._build_artifact_object(  # noqa: E731
+            URL(address=a), 1, "Dangerous", "url")
+        self.assertIsNotNone(build("https://notcorp.example/x"))
+        self.assertIsNotNone(build("https://corp.example.evil.test/x"))
+        self.assertIsNotNone(build("https://evil.test/?next=https://corp.example/"))
+        self.assertIsNotNone(build("https://corp.example@evil.test/x"))
+
+    def test_mail_artifact_urls_are_filtered_too(self):
+        svc = self._svc()
+        art = lambda a: SimpleNamespace(  # noqa: E731
+            artifact_type="URL", artifactIsUrl=SimpleNamespace(url=URL(address=a)))
+        self.assertIsNone(svc._build_artifact_object(art("https://corp.example/x"), 1, "Dangerous", None))
+        self.assertIsNotNone(svc._build_artifact_object(art("https://evil.test/x"), 1, "Dangerous", None))
