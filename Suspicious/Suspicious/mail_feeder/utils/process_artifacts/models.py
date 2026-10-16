@@ -16,10 +16,6 @@ class URLDecodeResult(BaseModel):
     decoded_url: Optional[HttpUrl] = None
 
 
-class ConfigModel(BaseModel):
-    company_domains: Optional[list[str]] = None
-
-
 class EmailValidationResult(BaseModel):
     normalized: Optional[EmailStr]
     is_valid: bool = False

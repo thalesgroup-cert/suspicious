@@ -2,7 +2,7 @@ import logging
 from django.db import transaction
 from typing import List
 
-from .models import ArtifactModel, ConfigModel
+from .models import ArtifactModel
 from .utils import extract_url_info
 from url_process.url_utils.url_unwrap import unwrap_url
 
@@ -10,7 +10,6 @@ from mail_feeder.models import (
     ArtifactIsDomain, ArtifactIsHash, ArtifactIsIp,
     ArtifactIsMailAddress, ArtifactIsUrl, MailArtifact
 )
-from settings.models import WatcherLegitDomain
 
 from domain_process.domain_utils.domain_handler import DomainHandler
 from email_process.email_utils.email_handler import MailAddressHandler
@@ -18,15 +17,11 @@ from hash_process.hash_utils.hash_handler import HashHandler
 from ip_process.ip_utils.ip_handler import IPHandler
 from url_process.url_utils.url_handler import URLHandler
 from hash_process.models import Hash
-from mail_feeder.utils.email_validation.validators import EmailValidatorService
 from mail_feeder.utils.user_creation.creation import UserCreationService
 
 logger = logging.getLogger("tasp.cron.fetch_and_process_emails")
 
 class ArtifactService:
-    def __init__(self):
-        self.company_config = WatcherLegitDomain.objects.select_related('domain').values_list('domain__value', flat=True)
-
     # --- Dispatcher ---
     def handle_artifacts(self, artifacts: List[ArtifactModel], mail_instance) -> None:
         handlers = {
@@ -75,10 +70,12 @@ class ArtifactService:
 
         with transaction.atomic():
             mail_artifact = MailArtifact.objects.create(mail=mail_instance, artifact_type="MailAddress")
-            validator = EmailValidatorService(ConfigModel(company_domains=self.company_config))
-            valid_email = validator.is_company_email(data_value)
+            # The service's own validator knows the Watcher list and the
+            # organisation's own domains (and their subdomains).
+            users = UserCreationService()
+            valid_email = users.email_validator.is_company_email(data_value)
             if valid_email.is_valid:
-                UserCreationService().get_or_create_user(valid_email.normalized)
+                users.get_or_create_user(valid_email.normalized)
             else:
                 artifact_mail = ArtifactIsMailAddress.objects.get_or_create(
                     mail_address=artifact, artifact=mail_artifact
