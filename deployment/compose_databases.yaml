@@ -19,6 +19,7 @@ services:
       --log-bin=mysql-bin \
       --binlog-format=ROW \
       --default-authentication-plugin=mysql_native_password \
+      --max-allowed-packet=${DB_MAX_ALLOWED_PACKET:-128M} \
       --innodb-buffer-pool-size=${INNODB_BUFFER_POOL_SIZE:-2048M} \
       --innodb-change-buffering=${INNODB_CHANGE_BUFFERING:-none} \
       --innodb-io-capacity=${INNODB_IO_CAPACITY:-1000} \
@@ -56,6 +57,7 @@ services:
       --log-bin=mysql-bin \
       --binlog-format=ROW \
       --default-authentication-plugin=mysql_native_password \
+      --max-allowed-packet=${DB_MAX_ALLOWED_PACKET:-128M} \
       --innodb-buffer-pool-size=${INNODB_BUFFER_POOL_SIZE:-2048M} \
       --innodb-log-file-size=${INNODB_LOG_FILE_SIZE:-600M}"
     volumes:
