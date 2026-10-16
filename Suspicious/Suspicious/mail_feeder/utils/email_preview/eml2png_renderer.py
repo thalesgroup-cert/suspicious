@@ -280,6 +280,13 @@ class Eml2PngRenderer:
             "encoding": "utf-8",
             "width": str(_RENDER_WIDTH_PX),
             "height": str(_MAX_RENDER_HEIGHT_PX),
+            # `--height` only sets the *viewport*: wkhtmltoimage still grows the
+            # image to the full content height (observed: 923 MB PNGs, ~600 MB
+            # RSS per render). `--crop-*` is what actually bounds the output.
+            "crop-x": "0",
+            "crop-y": "0",
+            "crop-w": str(_RENDER_WIDTH_PX),
+            "crop-h": str(_MAX_RENDER_HEIGHT_PX),
             "quiet": "",
             "no-images": "",
             "disable-javascript": "",

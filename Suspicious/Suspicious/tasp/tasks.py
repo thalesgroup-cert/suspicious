@@ -141,6 +141,13 @@ def fail_stale_jobs(self):
         raise self.retry(exc=exc, countdown=60 * 2 ** self.request.retries)
 
 
+_PREVIEW_COOLDOWN_TTL = 24 * 3600  # a preview that cannot be rendered is not retried for a day
+
+
+def _preview_cooldown_key(mail_id: int) -> str:
+    return f"preview_render_cooldown:{mail_id}"
+
+
 @shared_task(bind=True, **_RETRY)
 def render_mail_preview(self, mail_id: int):
     """Render + store one mail's .eml->PNG preview from its MinIO archive.
@@ -149,6 +156,11 @@ def render_mail_preview(self, mail_id: int):
     it runs on the worker pool independent of the request that created the
     mail. No-op when the mail or its fetchable archive is gone; retries on
     transient MinIO / render errors.
+
+    A mail that ends "skipped" (no fetchable .eml) or exhausts its retries
+    gets a cooldown key: its preview_object_key stays empty, so without it
+    the sweeper would re-pick the same rows every run and re-render them
+    (wkhtmltoimage, hundreds of MB each) indefinitely.
     """
     from mail_feeder.models import Mail
     from mail_feeder.utils.email_preview.eml2png_renderer import Eml2PngRenderer
@@ -157,6 +169,10 @@ def render_mail_preview(self, mail_id: int):
         fetch_eml_bytes,
         regenerate_mail_preview,
     )
+
+    if cache.get(_preview_cooldown_key(mail_id)):
+        logger.info("render_mail_preview: mail %s in cooldown, skipping", mail_id)
+        return
 
     try:
         mail = Mail.objects.filter(pk=mail_id).first()
@@ -173,8 +189,16 @@ def render_mail_preview(self, mail_id: int):
         )
         if outcome == "failed":
             raise RuntimeError(f"preview render failed for mail {mail_id}")
+        if outcome == "skipped":
+            cache.set(_preview_cooldown_key(mail_id), 1, _PREVIEW_COOLDOWN_TTL)
         logger.info("render_mail_preview: mail %s -> %s", mail_id, outcome)
     except Exception as exc:
+        if self.request.retries >= self.max_retries:
+            cache.set(_preview_cooldown_key(mail_id), 1, _PREVIEW_COOLDOWN_TTL)
+            logger.error(
+                "render_mail_preview: mail %s failed %d times, cooling down %ds",
+                mail_id, self.request.retries + 1, _PREVIEW_COOLDOWN_TTL,
+            )
         raise self.retry(exc=exc, countdown=30 * 2 ** self.request.retries)
 
 
@@ -186,20 +210,30 @@ def sweep_missing_mail_previews(self, limit: int = 200):
     state: each run enqueues `render_mail_preview` for rows that (a) have
     no preview yet and (b) own a MinIO archive with a non-empty bucket
     (i.e. are fetchable). Bucket-less submissions are excluded so they are
-    not re-enqueued every run.
+    not re-enqueued every run. Rows in render cooldown (see
+    `render_mail_preview`) are skipped, so permanently unrenderable mails
+    cannot occupy the head of the pk-ordered queue and starve newer ones.
     """
     from mail_feeder.models import Mail
 
     try:
-        pks = list(
+        candidates = list(
             Mail.objects.filter(
                 preview_object_key="",
                 mail_archive__bucket_name__gt="",
             )
             .order_by("pk")
             .values_list("pk", flat=True)
-            .distinct()[:limit]
+            .distinct()
         )
+        pks = []
+        for start in range(0, len(candidates), 500):
+            chunk = candidates[start:start + 500]
+            cooling = cache.get_many([_preview_cooldown_key(pk) for pk in chunk])
+            pks.extend(pk for pk in chunk if _preview_cooldown_key(pk) not in cooling)
+            if len(pks) >= limit:
+                break
+        pks = pks[:limit]
         for pk in pks:
             render_mail_preview.delay(pk)
         if pks:
