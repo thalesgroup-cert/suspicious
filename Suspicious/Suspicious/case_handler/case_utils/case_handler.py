@@ -21,6 +21,10 @@ from settings.models import (
 
 logger = logging.getLogger(__name__)
 
+_ARTIFACT_KEYS = (
+    "file_instance", "mail_instance", "ip_instance", "url_instance", "hash_instance",
+)
+
 TAG_STATUS_TODO = "To Do_User"
 TAG_KEY_STATUS = "Status"
 TAG_RESEND = "to_resend"
@@ -191,6 +195,12 @@ class CaseHandler:
             allow_reason=allow_reason,
         )
         logger.debug("Creating case with: %s", ctx)
+        # Nothing was produced (e.g. the mail could not be stored). A Case with no
+        # artifact has no type, gets no analyzers and ends up "Failure", so report
+        # the submission as failed instead of leaving that phantom case behind.
+        if not any(ctx[k] for k in _ARTIFACT_KEYS):
+            logger.error("No artifact produced for this submission; not creating a case")
+            return None
         description = ""
         if self.file_form.is_valid():
             description = self.file_form.cleaned_data.get("context") or description
