@@ -4,6 +4,8 @@ Submit an email, file, URL, IP, or hash for analysis. Submissions come from the
 web UI, the REST API, or the email feeder's IMAP polling. Each submission
 creates a `Case` and dispatches Cortex analyzers automatically.
 
+![Submitting indicators: paste URLs, IPs and hashes, review the detected types, submit, and the new case opens with its analysis](../assets/gifs/submit.gif)
+
 ## What you can submit
 
 | Type | Notes |

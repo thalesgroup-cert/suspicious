@@ -2,6 +2,8 @@
 
 Browse, filter, and read the verdict and reports for a case.
 
+![Investigation workspace: open a case, read the explained verdict, expand the source breakdown and the per-analyzer reports](../assets/gifs/investigation.gif)
+
 ## Why this verdict
 
 Every scored case shows a plain-language explanation of its verdict, not just

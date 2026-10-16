@@ -5,7 +5,7 @@
 set -euo pipefail
 
 cd "$(dirname "$0")/.."
-RAW=$(ls -t demo/out/raw/*/video.webm | head -n1)
+RAW=$(ls -t demo/out/raw/suspicious.demo.ts-*/video.webm | head -n1)
 DEST=../docs/assets/demo
 mkdir -p "$DEST"
 

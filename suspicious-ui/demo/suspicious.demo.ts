@@ -11,13 +11,13 @@
 import { test, expect } from "@playwright/test";
 import { mkdirSync, writeFileSync } from "node:fs";
 import { Director, toSrt, toVtt } from "./director";
-import { installMocks, type DemoState } from "./fixtures";
+import { installMocks, newState } from "./fixtures";
 
 const OUT = "demo/out";
 const SHOTS = !!process.env.DEMO_SHOTS;
 
 test("Suspicious product walkthrough", async ({ page }) => {
-  const state: DemoState = { authenticated: false, submitted: false };
+  const state = newState();
   await installMocks(page, state);
   const d = new Director(page);
   await d.prepare();

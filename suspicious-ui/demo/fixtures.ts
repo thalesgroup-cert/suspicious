@@ -23,11 +23,19 @@ const USER = {
 
 const PROFILE = {
   ...USER,
+  function: "CERT analyst",
   region: "EMEA",
   country: "FR",
   gbu: "Security",
+  scope: "ALL",
+  wants_acknowledgement: true,
+  wants_results: true,
+  theme: "light",
+  auto_seasonal: false,
+  sidebar_pinned: false,
   photo_url: null,
-  ciso_scope: "ALL",
+  creation_date: "2025-03-04T09:00:00Z",
+  last_update: "2026-10-01T08:30:00Z",
   tour_completed: true, // otherwise the onboarding tour overlays the recording
 };
 
@@ -266,6 +274,22 @@ const detailFor = (r: Row) => {
   };
 };
 
+const ANALYZERS = [
+  ["AIMailAnalyzer", 1.0],
+  ["UrlReputation", 0.9],
+  ["YaraRules", 0.7],
+  ["MailHeaderInspector", 0.6],
+  ["Sandbox", 0.5],
+  ["IpReputation", 0.5],
+  ["HashLookup", 0.8],
+].map(([name, weight], i) => ({
+  id: i + 1,
+  name,
+  weight,
+  analyzer_cortex_id: `${name}_1_0`,
+  is_active: true,
+}));
+
 // ─── Dashboard ──────────────────────────────────────────────────────────────
 
 const now = new Date();
@@ -400,9 +424,36 @@ const CAMPAIGN_SUMMARY = {
 const json = (route: Route, body: unknown, status = 200) =>
   route.fulfill({ status, contentType: "application/json", body: JSON.stringify(body) });
 
+const matches = (r: Row, q: string) =>
+  [String(r.id), r.artifact, r.type, r.result, r.reporter_email].some((v) => v.toLowerCase().includes(q));
+
+/** Honour ?search= so typing in the list's search box visibly filters rows. */
+const filtered = (rows: Row[], url: URL) => {
+  const q = (url.searchParams.get("search") ?? url.searchParams.get("q") ?? "").trim().toLowerCase();
+  return q ? rows.filter((r) => matches(r, q)) : rows;
+};
+
 const page_ = (results: unknown[]) => ({ count: results.length, next: null, previous: null, results });
 
-export type DemoState = { authenticated: boolean; submitted: boolean };
+export type DemoState = {
+  authenticated: boolean;
+  submitted: boolean;
+  /** Editable allow/deny lists of the Settings page, keyed by section. */
+  lists: Record<string, Array<{ id: string; value: string; created_at?: string }>>;
+};
+
+export const newState = (over: Partial<DemoState> = {}): DemoState => ({
+  authenticated: false,
+  submitted: false,
+  lists: {
+    domains_allow: [
+      { id: "a1", value: "meridian.example" },
+      { id: "a2", value: "hr-portal.meridian.example" },
+    ],
+    domains_deny: [{ id: "d1", value: "meridian-sso-verify.example" }],
+  },
+  ...over,
+});
 
 export async function installMocks(page: Page, state: DemoState) {
   // Per-deployment branding. index.html loads /env-config.js, which assigns
@@ -440,7 +491,35 @@ export async function installMocks(page: Page, state: DemoState) {
       state.authenticated = false;
       return json(route, {});
     }
-    if (path === "/profile/") return json(route, PROFILE);
+    if (path.startsWith("/profile/")) {
+      // Echo writes back so toggles and pickers keep their new value.
+      const body = method === "GET" ? {} : JSON.parse(req.postData() ?? "{}");
+      return json(route, { ...PROFILE, ...body });
+    }
+
+    // ── settings (admin console)
+    const list = path.match(/^\/settings\/list\/([a-z_]+)\/(?:([^/]+)\/)?$/);
+    if (list) {
+      const [, section, id] = list;
+      const items = (state.lists[section] ??= []);
+      if (method === "POST") {
+        const { values = [] } = JSON.parse(req.postData() ?? "{}") as { values?: string[] };
+        const created = values.map((value) => {
+          const item = { id: String(Date.now() + Math.random()), value, created_at: new Date().toISOString() };
+          items.unshift(item);
+          return item.id;
+        });
+        return json(route, { created, duplicates: [], watcher_conflicts: [] }, 201);
+      }
+      if (method === "DELETE") {
+        state.lists[section] = items.filter((i) => i.id !== id);
+        return json(route, {});
+      }
+      return json(route, page_(items));
+    }
+    if (path === "/settings/email-feeder/") return json(route, { enabled: true });
+    if (path === "/settings/analyzers/") return json(route, page_(ANALYZERS));
+    if (/^\/settings\/analyzers\/\d+\/$/.test(path)) return json(route, {});
     if (path === "/feeder/health/") {
       return json(route, {
         online: true,
@@ -501,7 +580,7 @@ export async function installMocks(page: Page, state: DemoState) {
     }
     if (path === "/submissions/") {
       const rows = state.submitted ? [NEW_ROW, ...ROWS] : ROWS;
-      return json(route, page_(rows));
+      return json(route, page_(filtered(rows, url)));
     }
 
     // ── investigations (CERT view)
@@ -513,7 +592,7 @@ export async function installMocks(page: Page, state: DemoState) {
     }
     if (path === "/investigations/") {
       const rows = state.submitted ? [NEW_ROW, ...ROWS] : ROWS;
-      return json(route, page_(rows));
+      return json(route, page_(filtered(rows, url)));
     }
     if (path.startsWith("/cases/") && path.endsWith("/comments/")) return json(route, []);
 
