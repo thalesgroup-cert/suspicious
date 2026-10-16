@@ -50,11 +50,21 @@ def url_host(address: str | None) -> str:
     return (host or "").lower().rstrip(".")
 
 
+def _split_addresses(value, domains) -> tuple[list[str], list[str]]:
+    if isinstance(value, (list, tuple)):
+        value = ", ".join(str(v) for v in value)
+    company, external = [], []
+    for m in _ADDRESS.finditer(value or ""):
+        (company if is_company_domain(m.group(1), domains) else external).append(m.group(0))
+    return company, external
+
+
 def external_addresses(value, domains) -> str:
     """The addresses in a header value that are not on a company domain,
     comma-separated; "" when none are left."""
-    if isinstance(value, (list, tuple)):
-        value = ", ".join(str(v) for v in value)
-    kept = [m.group(0) for m in _ADDRESS.finditer(value or "")
-            if not is_company_domain(m.group(1), domains)]
-    return ", ".join(dict.fromkeys(kept))
+    return ", ".join(dict.fromkeys(_split_addresses(value, domains)[1]))
+
+
+def company_addresses(value, domains) -> list[str]:
+    """The addresses in a header value that are on a company domain."""
+    return list(dict.fromkeys(_split_addresses(value, domains)[0]))
