@@ -44,6 +44,8 @@ and the result is deterministic.
 | `suspicious-ui/demo/fixtures.ts` | Mocked API responses (the fictional data) |
 | `suspicious-ui/demo/director.ts` | Burned-in subtitles, visible cursor, `.vtt`/`.srt` export |
 | `suspicious-ui/demo/build.sh` | ffmpeg: MP4, poster, README teaser GIF |
+| `suspicious-ui/demo/pages.demo.ts` | Caption-free clip per page, used by the [UI tour](user-guide/tour.md) and README |
+| `suspicious-ui/demo/build-gifs.sh` | ffmpeg: per-page clips to optimised GIFs in `docs/assets/gifs/` |
 
 To regenerate (needs `ffmpeg` on the `PATH`):
 
@@ -53,6 +55,8 @@ pnpm install
 pnpm exec playwright install chromium   # first time only
 pnpm demo                               # record, then encode into docs/assets/demo/
 ```
+
+The per-page GIFs have their own pair of commands, `pnpm demo:gifs` (see the [UI tour](user-guide/tour.md#regenerating-these-clips)).
 
 Edit the `say("…")` calls in `suspicious.demo.ts` to change the subtitles, or
 add a scene by driving the page the same way the existing ones do. Set
