@@ -1,3 +1,5 @@
+import ast
+import json
 import os
 import logging
 import hashlib
@@ -7,6 +9,44 @@ from file_process.models import File, HashFromFile
 from hash_process.models import Hash
 
 logger = logging.getLogger(__name__)
+
+# File.other_names is a small alias list (the other names a file was reported
+# under). Bound it: it is rewritten on every re-submission of the same file.
+MAX_OTHER_NAMES = 100
+MAX_OTHER_NAMES_CHARS = 8192  # a longer value is corrupt, never a real list
+
+
+def parse_other_names(raw) -> list[str]:
+    """Read File.other_names into a clean, de-duplicated list of names.
+
+    Reads the JSON written by ``format_other_names`` and the ``str(list)`` form
+    older versions wrote. The older code re-split that text on commas, which
+    wrapped every name in one more layer of quotes and escapes per update, so a
+    file reported again under another name doubled its ``other_names`` each
+    time until a single UPDATE passed MariaDB's ``max_allowed_packet``. Those
+    damaged values are cleaned up here, or dropped when beyond repair.
+    """
+    if not raw or not isinstance(raw, str) or len(raw) > MAX_OTHER_NAMES_CHARS:
+        return []
+    try:
+        values = ast.literal_eval(raw)
+    except (ValueError, SyntaxError, MemoryError, RecursionError):
+        return []
+    if not isinstance(values, (list, tuple)):
+        return []
+    names: list[str] = []
+    for value in values:
+        if not isinstance(value, str):
+            continue
+        name = value.strip("'\"\\ ")
+        if name and len(name) <= 255 and name not in names:
+            names.append(name)
+    return names[:MAX_OTHER_NAMES]
+
+
+def format_other_names(names: list[str]) -> str:
+    return json.dumps(names, ensure_ascii=False) if names else ""
+
 
 class FileHandler:
 
@@ -141,20 +181,28 @@ class FileHandler:
             if hasattr(existing_name, 'name'):
                 existing_name = existing_name.name
 
-            if file_path and existing_name != file_path:
-                other_names = file_instance.other_names
-                if not other_names:
-                    other_names = []
-                elif isinstance(other_names, str):
-                    other_names = [name.strip() for name in other_names.strip('[]').split(',') if name.strip()]
-                if file_path not in other_names:
-                    other_names.append(file_path)
-                file_instance.other_names = str(other_names)
+            raw_names = file_instance.other_names
+            names = parse_other_names(raw_names)
+            alias = str(file_path) if file_path else ""
+            if (
+                alias
+                and existing_name != file_path
+                and alias not in names
+                and len(names) < MAX_OTHER_NAMES
+            ):
+                names.append(alias)
+            other_names = format_other_names(names)
 
             file_instance.tmp_path = tmp_path
             file_instance.size = size
             file_instance.times_sent = F('times_sent') + 1
-            file_instance.save()
+            # Write only what changed: save() would otherwise send every column,
+            # including an unchanged (possibly huge, legacy) other_names.
+            update_fields = ["tmp_path", "size", "times_sent", "last_update"]
+            if other_names != (raw_names or ""):
+                file_instance.other_names = other_names
+                update_fields.append("other_names")
+            file_instance.save(update_fields=update_fields)
             logger.info("Updated file instance for %s", file_path)
             return file_instance
         except Exception as e:
