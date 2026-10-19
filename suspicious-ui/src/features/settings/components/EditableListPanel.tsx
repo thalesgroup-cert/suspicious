@@ -140,10 +140,13 @@ function AddBar({
   onAdd,
   placeholder,
   loading,
+  title,
 }: {
   onAdd: (values: string[]) => void;
   placeholder: string;
   loading: boolean;
+  /** Names the field: a placeholder is not an accessible name. */
+  title: string;
 }) {
   const [input, setInput] = React.useState("");
   const hintId = React.useId();
@@ -178,6 +181,7 @@ function AddBar({
         multiline
         maxRows={3}
         fullWidth
+        slotProps={{ htmlInput: { "aria-label": `Add values to ${title}` } }}
         helperText="Enter, comma or space separated. Ctrl+Enter to submit"
         sx={{
           "& .MuiFormHelperText-root": { fontSize: 11, mt: 0.4 },
@@ -292,6 +296,8 @@ export function EditableListPanel({
   const [bulkStatus, setBulkStatus] = React.useState<string | null>(null);
   // Snackbar keys already being undone: a fast double click must not re-add twice.
   const undoing = React.useRef(new Set<SnackbarKey>());
+  const fileInput = React.useRef<HTMLInputElement>(null);
+  const filterInput = React.useRef<HTMLInputElement>(null);
 
   const refresh = () => qc.invalidateQueries({ queryKey: ["settings", "list", section] });
 
@@ -450,6 +456,12 @@ export function EditableListPanel({
     setDeletingId(null);
     setBulkRunning(false);
     await refresh();
+    // The Delete button this run started from is disabled, then gone, and the dialog's own button leaves with its fade: without
+    // this focus falls to <body>. Never steal it from a control the user has since moved to.
+    const now = document.activeElement as HTMLElement | null;
+    if (!now || now === document.body || (now as HTMLButtonElement).disabled || now.closest('[role="dialog"]')) {
+      filterInput.current?.focus();
+    }
   }
 
   return (
@@ -457,6 +469,7 @@ export function EditableListPanel({
       {purpose ? <Typography variant="body2" color="text.secondary">{purpose}</Typography> : null}
 
       <AddBar
+        title={title}
         placeholder={placeholder}
         onAdd={(values) => addMutation.mutate(values)}
         loading={addMutation.isPending}
@@ -470,7 +483,7 @@ export function EditableListPanel({
           onChange={(e) => setFilter(e.target.value)}
           sx={{ flex: "1 1 220px" }}
           slotProps={{
-            htmlInput: { "aria-label": `Search ${title}` },
+            htmlInput: { "aria-label": `Search ${title}`, ref: filterInput },
             input: {
               startAdornment: (
                 <InputAdornment position="start">
@@ -484,7 +497,8 @@ export function EditableListPanel({
         <Button
           size="small"
           variant="outlined"
-          component="label"
+          // A real button that clicks the hidden input: a label styled as a button does nothing on Enter or Space.
+          onClick={() => fileInput.current?.click()}
           startIcon={importMutation.isPending ? <CircularProgress size={13} /> : <FileUploadOutlined />}
           disabled={importMutation.isPending}
           sx={{ borderRadius: 2.5, textTransform: "none", fontWeight: 600 }}
@@ -492,6 +506,7 @@ export function EditableListPanel({
           Import file
           <input
             hidden
+            ref={fileInput}
             type="file"
             accept={fileAccept}
             onChange={(e) => {
