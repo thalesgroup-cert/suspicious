@@ -4,6 +4,9 @@ import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { Alert, AlertTitle, Box, Button, Chip, CircularProgress, IconButton, Stack, Tab, Tabs, Typography } from "@mui/material";
 import ArrowBackOutlined from "@mui/icons-material/ArrowBackOutlined";
 
+import { useTheme } from "@mui/material/styles";
+import { ensureContrast, flatten } from "@/shared/lib/contrast";
+import { ActionBar } from "@/features/settings/components/PanelSection";
 import { useReportUnsaved } from "@/features/settings/unsaved";
 import { relativeTime } from "@/features/settings/connectorConfig";
 import { InnerCard } from "@/features/settings/components/cards";
@@ -51,6 +54,7 @@ export function ConnectorDetail({
   onDirtyChange?: (dirty: boolean) => void;
 }) {
   const queryClient = useQueryClient();
+  const theme = useTheme();
   const [params, setParams] = useSearchParams();
   const tab = parseTab(params.get("tab"));
   const ids = useId();
@@ -122,9 +126,17 @@ export function ConnectorDetail({
     .map((f) => f.key);
 
   const status = connectorStatus(connector);
-    const checked = connector.last_health_at
-    ? `Last checked ${relativeTime(connector.last_health_at, new Date())}${connector.last_health_detail ? `: ${connector.last_health_detail}` : ""}`
-    : "Not checked yet";
+  const since = relativeTime(connector.last_health_at, new Date());
+  // relativeTime says "not checked yet" for a missing or unparsable timestamp; never print that after "Last checked".
+  const checked =
+    since === "not checked yet"
+      ? "Not checked yet"
+      : `Last checked ${since}${connector.last_health_detail ? `: ${connector.last_health_detail}` : ""}`;
+
+  // The theme's disabled contained button keeps the brand fill, which leaves the label unreadable; a neutral fill with text pushed to 4.5:1.
+  const paper = theme.palette.background.paper;
+  const disabledFill = flatten(theme.palette.action.disabledBackground, paper);
+  const disabledText = ensureContrast(flatten(theme.palette.text.secondary, disabledFill), disabledFill, 4.5);
 
   const tabId = (v: TabValue) => `${ids}-tab-${v}`;
   const panelId = (v: TabValue) => `${ids}-panel-${v}`;
@@ -185,6 +197,8 @@ export function ConnectorDetail({
           id={panelId(t.value)}
           aria-labelledby={tabId(t.value)}
           hidden={tab !== t.value}
+          // APG: a panel whose first content cannot take focus is itself a tab stop. Configuration's first field can, once loaded.
+          tabIndex={t.value === "configuration" && configLoaded ? undefined : 0}
         >
           {tab === t.value && t.value === "overview" && <ConnectorOverview connector={connector} />}
 
@@ -207,19 +221,7 @@ export function ConnectorDetail({
                     }}
                   />
 
-                  <Box
-                    data-panel-actions
-                    sx={{
-                      position: "sticky",
-                      bottom: 0,
-                      zIndex: 2,
-                      mt: 3,
-                      py: 1.5,
-                      bgcolor: "background.paper",
-                      borderTop: 1,
-                      borderColor: "divider",
-                    }}
-                  >
+                  <ActionBar sx={{ display: "block", mt: 3 }}>
                     {/* Inside the bar, not below it: a result under a sticky bar would sit off screen. */}
                     {testAlert && (
                       <Alert sx={{ mb: 1.5 }} severity={testAlert.severity} onClose={() => setTestAlert(null)}>
@@ -235,8 +237,7 @@ export function ConnectorDetail({
                     <Stack direction="row" spacing={1} sx={{ alignItems: "center", flexWrap: "wrap", rowGap: 1 }}>
                       <Button
                         variant="contained"
-                        // The theme's disabled contained button keeps the brand fill, which makes the label unreadable.
-                        sx={{ "&.Mui-disabled": { bgcolor: "action.disabledBackground", color: "text.disabled", background: "none" } }}
+                        sx={{ "&.Mui-disabled": { bgcolor: disabledFill, color: disabledText, backgroundImage: "none" } }}
                         disabled={!draft || save.isPending}
                         aria-describedby={draft ? undefined : hintId}
                         onClick={() => draft && save.mutate(stripUnchangedSecrets(draft, secretKeys))}
@@ -262,7 +263,7 @@ export function ConnectorDetail({
                         </Typography>
                       )}
                     </Stack>
-                  </Box>
+                  </ActionBar>
                 </>
               )}
             </>

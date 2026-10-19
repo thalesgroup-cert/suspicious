@@ -2,7 +2,7 @@ import { describe, expect, it } from "vitest";
 import { screen } from "@testing-library/react";
 
 import { renderWithProviders } from "@/test/utils";
-import { PanelSection } from "../PanelSection";
+import { ActionBar, PanelSection } from "../PanelSection";
 
 describe("PanelSection", () => {
   it("renders one h2 title, the purpose, the toolbar, the content and the actions slot", () => {
@@ -45,5 +45,12 @@ describe("PanelSection", () => {
   it("labels the section by its heading", () => {
     renderWithProviders(<PanelSection title="Scoring">x</PanelSection>);
     expect(screen.getByRole("region", { name: "Scoring" })).toBeInTheDocument();
+  });
+
+  it("exports the same sticky bar for panels that build their own frame", () => {
+    renderWithProviders(<ActionBar><button>Save</button></ActionBar>);
+    const bar = screen.getByRole("button", { name: "Save" }).parentElement!;
+    expect(bar).toHaveAttribute("data-panel-actions");
+    expect(getComputedStyle(bar).position).toBe("sticky");
   });
 });

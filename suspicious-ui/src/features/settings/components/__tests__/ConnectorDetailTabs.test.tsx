@@ -1,9 +1,11 @@
 import { screen, waitFor, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
-import { beforeEach, describe, expect, it, vi } from "vitest";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { page } from "@vitest/browser/context";
 
 import { renderWithProviders } from "@/test/utils";
+import { themes } from "@/styles/themes";
+import { contrastRatio, flatten } from "@/shared/lib/contrast";
 import { ConnectorDetail } from "../ConnectorDetail";
 import type { ConfigField, Connector, ConnectorDelivery } from "../connectors";
 
@@ -91,6 +93,29 @@ describe("header", () => {
   it("lets Unhealthy win in the status label", () => {
     renderDetail("overview", { ...CONNECTOR, last_health_ok: false });
     expect(screen.getAllByText("Unhealthy").length).toBeGreaterThan(0);
+  });
+});
+
+describe("header edge cases", () => {
+  it("never writes 'Last checked not checked yet' for an unparsable timestamp", () => {
+    renderDetail("overview", { ...CONNECTOR, last_health_at: "garbage" });
+    expect(screen.queryByText(/Last checked/)).not.toBeInTheDocument();
+    expect(screen.getAllByText("Not checked yet").length).toBeGreaterThan(0);
+  });
+});
+
+describe("tab panels", () => {
+  it("puts a focus stop on the Overview and Deliveries panels, which start with no focusable content", async () => {
+    renderDetail("overview");
+    expect(screen.getByRole("tabpanel")).toHaveAttribute("tabindex", "0");
+    await userEvent.click(screen.getByRole("tab", { name: "Deliveries" }));
+    expect(screen.getByRole("tabpanel")).toHaveAttribute("tabindex", "0");
+  });
+
+  it("leaves the Configuration panel out of the tab order once its first field can take focus", async () => {
+    renderDetail("configuration");
+    await screen.findByLabelText(/^URL/);
+    expect(screen.getByRole("tabpanel")).not.toHaveAttribute("tabindex");
   });
 });
 
@@ -294,6 +319,26 @@ describe("configuration", () => {
     expect(result).toHaveTextContent("Tested the saved configuration");
     expect(result).toHaveTextContent("OK: reachable");
     expect(bar).toContainElement(result);
+  });
+});
+
+describe("disabled Save changes", () => {
+  afterEach(() => localStorage.removeItem("suspicious.theme"));
+
+  it.each(["light", "midnight"] as const)("keeps a visible neutral fill and 4.5:1 text on %s", async (theme) => {
+    localStorage.setItem("suspicious.theme", theme);
+    renderDetail("configuration");
+    const save = await screen.findByRole("button", { name: "Save changes" });
+    expect(save).toBeDisabled();
+    // The reason stays linked while it is disabled.
+    expect(save).toHaveAccessibleDescription("No changes to save");
+    const cs = getComputedStyle(save);
+    const paper = themes[theme].palette.background.paper;
+    const fill = flatten(cs.backgroundColor, paper);
+    expect(cs.backgroundColor).not.toBe("rgba(0, 0, 0, 0)");
+    expect(cs.backgroundImage).toBe("none");
+    expect(fill).not.toBe(flatten("rgba(0,0,0,0)", paper));
+    expect(contrastRatio(flatten(cs.color, fill), fill)).toBeGreaterThanOrEqual(4.5);
   });
 });
 

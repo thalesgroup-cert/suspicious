@@ -49,7 +49,8 @@ describe("ConnectorsPanel", () => {
 
   it("renders discovered connectors in the list with version and toggle", async () => {
     renderWithProviders(<ConnectorsPanel />);
-    await waitFor(() => expect(screen.getByText("misp")).toBeInTheDocument());
+    // The connector is selected on first render now (from the URL or the first one), so its name is in the list and the detail header.
+    await waitFor(() => expect(screen.getAllByText("misp").length).toBeGreaterThan(0));
     // Version chip lives in ConnectorDetail, which mounts only after the
     // auto-select effect fires — an extra render pass after "misp" is
     // already visible in the list, so this needs an async find, not getBy.
@@ -74,7 +75,8 @@ describe("ConnectorsPanel", () => {
 
   it("does not render KPI count tiles", async () => {
     renderWithProviders(<ConnectorsPanel />);
-    await waitFor(() => expect(screen.getByText("misp")).toBeInTheDocument());
+    // The connector is selected on first render now (from the URL or the first one), so its name is in the list and the detail header.
+    await waitFor(() => expect(screen.getAllByText("misp").length).toBeGreaterThan(0));
     // Don't assert "Connected" is absent — on desktop the auto-selected
     // connector's own ConnectorDetail status label legitimately renders
     // that word (this fixture's connector has status: "connected"). The

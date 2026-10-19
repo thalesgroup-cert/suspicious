@@ -1,4 +1,5 @@
-import { useCallback, useEffect, useMemo, useState } from "react";
+import { useCallback, useMemo, useState } from "react";
+import { useSearchParams } from "react-router";
 import { useQuery } from "@tanstack/react-query";
 import { Alert, CircularProgress, Grid, useMediaQuery } from "@mui/material";
 import { useTheme } from "@mui/material/styles";
@@ -19,7 +20,7 @@ export function ConnectorsPanel() {
   });
 
   const connectors = useMemo(() => data?.connectors ?? [], [data]);
-  const [selected, setSelected] = useState<string | null>(null);
+  const [params, setParams] = useSearchParams();
   const [dirty, setDirty] = useState(false);
   // Where the user asked to go while a draft exists; `null` is a valid target (mobile back).
   // `from` and `open` are kept so the title stays correct while the dialog fades out.
@@ -27,18 +28,26 @@ export function ConnectorsPanel() {
     null,
   );
 
+  // The selection lives in the URL (?connector=) so a link or refresh reopens it. A missing or unknown name falls back to the
+  // first connector on desktop and to the list on a phone, where nothing is "open" until the user picks one.
+  const named = params.get("connector");
+  const selected =
+    connectors.find((c) => c.name === named)?.name ?? (isDesktop ? (connectors[0]?.name ?? null) : null);
+
+  const setSelected = (to: string | null) => {
+    const next = new URLSearchParams(params);
+    if (to === null) next.delete("connector");
+    else next.set("connector", to);
+    // replace: picking a row is not a page the Back button should walk through.
+    setParams(next, { replace: true });
+  };
+
   const requestSelect = (to: string | null) => {
     if (to === selected) return;
     if (dirty) setPending({ to, from: selected, open: true });
     else setSelected(to);
   };
   const onDirtyChange = useCallback((d: boolean) => setDirty(d), []);
-
-  useEffect(() => {
-    if (isDesktop && !selected && connectors.length > 0) {
-      setSelected(connectors[0].name);
-    }
-  }, [isDesktop, selected, connectors]);
 
   if (isLoading) return <CircularProgress size={24} />;
   if (error) return <Alert severity="error">Failed to load connectors.</Alert>;

@@ -57,6 +57,7 @@ export function ConfigFieldInput({
         fullWidth
         type="password"
         label={label}
+        required={field.required}
         value={typeof value === "string" && value !== SECRET_MASK ? value : ""}
         placeholder={SECRET_MASK}
         error={Boolean(error)}

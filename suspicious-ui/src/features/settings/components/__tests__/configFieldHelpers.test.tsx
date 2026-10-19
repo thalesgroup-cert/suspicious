@@ -153,4 +153,12 @@ describe("ConfigFieldInput", () => {
     expect(input).toBeInvalid();
     expect(input).toHaveAccessibleDescription(/is required/);
   });
+
+  it("marks a required secret as required, and an optional one not", () => {
+    const secret = { key: "api_key", type: "secret", default: null, help: "" } as const;
+    const { rerender } = render(<ConfigFieldInput field={{ ...secret, required: true }} value="" onChange={vi.fn()} />);
+    expect(screen.getByLabelText(/^API Key/)).toBeRequired();
+    rerender(<ConfigFieldInput field={{ ...secret, required: false }} value="" onChange={vi.fn()} />);
+    expect(screen.getByLabelText("API Key")).not.toBeRequired();
+  });
 });
