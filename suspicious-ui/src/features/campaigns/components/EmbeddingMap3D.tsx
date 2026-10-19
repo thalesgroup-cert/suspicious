@@ -1,6 +1,6 @@
 import * as React from "react";
 import { Box, Button, Stack, ToggleButton, ToggleButtonGroup, Typography, useMediaQuery } from "@mui/material";
-import { alpha, useTheme } from "@mui/material/styles";
+import { alpha, useTheme, type Theme } from "@mui/material/styles";
 import { RestartAltOutlined } from "@mui/icons-material";
 import { Canvas } from "@react-three/fiber";
 
@@ -309,7 +309,7 @@ export default function EmbeddingMap3D({ points, explainedVariance, campaigns, s
           overflow: "hidden",
           clip: "rect(0 0 0 0)",
           whiteSpace: "nowrap",
-          color: "primary.main",
+          color: (t: Theme) => `var(--campaigns-link, ${t.palette.primary.main})`,
           "&:focus": { position: "static", width: "auto", height: "auto", m: 0, clip: "auto", overflow: "visible", display: "inline-block", mb: 0.5 },
         }}
       >

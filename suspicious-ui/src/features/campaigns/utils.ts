@@ -1,6 +1,7 @@
 import * as React from "react";
 import { useTheme } from "@mui/material/styles";
 import { onCard } from "@/features/dashboard/format";
+import { ensureContrast } from "@/shared/lib/contrast";
 import { useResultColors, useStatusColors } from "@/styles/colorStore";
 
 /** The four classifications the message store holds, in severity order, with their display names. */
@@ -49,6 +50,15 @@ export function useClassColors(): Record<SeriesKey, string> {
     DANGEROUS: c(result.dangerous.main),
     UNKNOWN: c(status.unknown.main),
   };
+}
+
+/**
+ * The theme's accent as text colour: unchanged where it already reads at 4.5:1 on the card and on the page, else the nearest
+ * shade that does (sunrise, summer and metal accents sit near 3:1). Links and text buttons on this page use it.
+ */
+export function useLinkColor(): string {
+  const { palette } = useTheme();
+  return [palette.background.paper, palette.background.default].reduce((c, bg) => ensureContrast(c, bg, 4.5), palette.primary.main);
 }
 
 /** Height of the 3D canvas; its loading placeholder is the same size so nothing jumps when it arrives. */

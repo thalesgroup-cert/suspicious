@@ -33,8 +33,8 @@ export default function ScrollRegion({ label, sx, children }: { label: string; s
       tabIndex={0}
       onScroll={measure}
       sx={[
-        // An inset shadow keeps the focus outline intact, which a fade mask would clip.
-        (theme) => ({ boxShadow: more ? `inset 0 -12px 10px -10px ${alpha(theme.palette.text.primary, 0.35)}` : "none" }),
+        // An inset shadow keeps the focus outline intact, which a fade mask would clip. Dark ink on a light card reads heavier than light on dark, hence the lower alpha.
+        (theme) => ({ boxShadow: more ? `inset 0 -12px 10px -10px ${alpha(theme.palette.text.primary, theme.palette.mode === "dark" ? 0.35 : 0.2)}` : "none" }),
         ...(Array.isArray(sx) ? sx : [sx]),
       ]}
     >

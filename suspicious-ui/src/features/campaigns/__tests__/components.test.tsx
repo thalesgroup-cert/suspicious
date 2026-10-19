@@ -271,16 +271,22 @@ describe("PointTable: selecting a message", () => {
     expect(onSelect).toHaveBeenCalledExactlyOnceWith(["9"]);
   });
 
-  it("disables the button for a message without a case id, and says why", () => {
+  it("keeps the button for a message without a case id focusable, inert, and describes why", async () => {
+    const user = userEvent.setup();
     const onSelect = vi.fn();
     renderWithProviders(<PointTable points={rows} selectedCaseIds={[]} onSelectCases={onSelect} />);
     const orphan = screen.getByRole("button", { name: "Select Orphan" });
-    expect(orphan).toBeDisabled();
-    expect(orphan).toHaveAttribute("title", "This message has no case id, so it cannot be selected.");
-    // a disabled button gets no pointer events, so the reason is also on the element a mouse can reach
-    expect(orphan.parentElement).toHaveAttribute("title", "This message has no case id, so it cannot be selected.");
-    fireEvent.click(orphan);
+    // aria-disabled, not disabled: a disabled button leaves the tab order, and with it the reason.
+    expect(orphan).toHaveAttribute("aria-disabled", "true");
+    expect(orphan).not.toBeDisabled();
+    expect(orphan).toHaveAccessibleDescription("This message has no case id, so it cannot be selected.");
+    orphan.focus();
+    expect(orphan).toHaveFocus();
+    await user.click(orphan);
+    await user.keyboard("{Enter}");
     expect(onSelect).not.toHaveBeenCalled();
+    // an ordinary row is not marked
+    expect(screen.getByRole("button", { name: "Select Bonjour" })).not.toHaveAttribute("aria-disabled");
   });
 
   it("has no Select column when nothing can be selected", () => {

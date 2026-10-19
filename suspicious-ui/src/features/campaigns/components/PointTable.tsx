@@ -1,3 +1,4 @@
+import * as React from "react";
 import { Box, Button, Link, Table, TableBody, TableCell, TableContainer, TableHead, TableRow, Typography } from "@mui/material";
 import { Link as RouterLink } from "react-router";
 
@@ -7,6 +8,9 @@ import { SortCell } from "./PanelState";
 
 // Thousands of DOM rows make the page sluggish; the map holds the rest.
 const MAX_ROWS = 200;
+// In sx a bare 1 is 100%, so the size is spelled in px.
+const visuallyHidden = { position: "absolute", width: "1px", height: "1px", overflow: "hidden", clip: "rect(0 0 0 0)", whiteSpace: "nowrap" } as const;
+const NO_CASE = "This message has no case id, so it cannot be selected.";
 
 type Key = "subject" | "case" | "label" | "x" | "y" | "z";
 const KEYS: Record<Key, (p: PcaPoint) => string | number | null> = {
@@ -21,24 +25,30 @@ const KEYS: Record<Key, (p: PcaPoint) => string | number | null> = {
 function SelectButton({ point: p, selected, onSelectCases }: { point: PcaPoint; selected: string[]; onSelectCases: (caseIds: string[]) => void }) {
   const id = p.suspicious_case_id;
   const pressed = !!id && selected.includes(id);
-  const why = id ? undefined : "This message has no case id, so it cannot be selected.";
+  const whyId = React.useId();
   return (
-    // A disabled button gets no pointer events, so the span carries the reason for a mouse user; the button's own title is for assistive tech.
-    <Box component="span" title={why} sx={{ display: "inline-block" }}>
+    <>
+      {/* aria-disabled instead of disabled: the button stays in the tab order, so a keyboard user can reach the reason. */}
       <Button
         size="small"
         variant={pressed ? "outlined" : "text"}
         aria-pressed={pressed}
         aria-label={`Select ${p.mail_subject ?? (id ? `case ${id}` : "message")}`}
-        disabled={!id}
-        title={why}
+        aria-disabled={id ? undefined : true}
+        aria-describedby={id ? undefined : whyId}
+        title={id ? undefined : NO_CASE}
         // A second press takes this case out of the selection; selecting replaces it, like a click in the map.
         onClick={() => id && onSelectCases(pressed ? selected.filter((x) => x !== id) : [id])}
-        sx={{ minWidth: 0 }}
+        sx={{ minWidth: 0, ...(id ? {} : { color: "text.secondary", opacity: 0.7, cursor: "default", "&:hover": { bgcolor: "transparent" } }) }}
       >
         Select
       </Button>
-    </Box>
+      {id ? null : (
+        <Box component="span" id={whyId} sx={visuallyHidden}>
+          {NO_CASE}
+        </Box>
+      )}
+    </>
   );
 }
 

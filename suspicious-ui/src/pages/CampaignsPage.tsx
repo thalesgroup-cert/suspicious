@@ -22,6 +22,7 @@ import {
   getNeighbours,
   getPca,
 } from "@/features/campaigns/api";
+import { useLinkColor } from "@/features/campaigns/utils";
 import { SoftCard } from "@/features/dashboard/components/SoftCard";
 import { fieldLabelSx } from "@/features/dashboard/format";
 import { EmptyState } from "@/shared/components/EmptyState";
@@ -40,6 +41,7 @@ const SAMPLE = 1500;
 
 export default function CampaignsPage() {
   const theme = useTheme();
+  const linkColor = useLinkColor();
   const [days, setDays] = React.useState<number>(15);
   const [selectedCaseIds, setSelectedCaseIds] = React.useState<string[]>([]);
   const mapRef = React.useRef<HTMLDivElement>(null);
@@ -85,7 +87,14 @@ export default function CampaignsPage() {
   const isEmpty = summaryQuery.data?.messages === 0;
 
   return (
-    <Box>
+    // The accent is a variable so the skip link (inside the map) reads it too; links and text buttons take it directly.
+    <Box
+      sx={{
+        "--campaigns-link": linkColor,
+        "& .MuiLink-root, & .MuiButton-text.MuiButton-colorPrimary, & .MuiButton-outlined.MuiButton-colorPrimary": { color: "var(--campaigns-link)" },
+        "& .MuiButton-outlined.MuiButton-colorPrimary": { borderColor: "var(--campaigns-link)" },
+      }}
+    >
       <Box sx={{ position: "sticky", top: 0, zIndex: 20, borderBottom: "1px solid", borderColor: "divider", backdropFilter: "blur(14px)" }}>
         <Stack
           direction={{ xs: "column", md: "row" }}
