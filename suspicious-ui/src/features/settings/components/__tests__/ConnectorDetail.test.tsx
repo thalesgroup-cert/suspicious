@@ -159,6 +159,36 @@ describe("ConnectorDetail", () => {
       expect(await screen.findByRole("alert")).toHaveTextContent("Connection test failed.");
     });
 
+    it("adds the HTTP status to the generic failure message when there is one", async () => {
+      const { testConnector } = await import("../connectors");
+      vi.mocked(testConnector).mockRejectedValueOnce({ response: { status: 502, data: {} } });
+      renderWithProviders(<ConnectorDetail connector={CONNECTOR} />);
+      await userEvent.click(await screen.findByRole("button", { name: "Test connection" }));
+      expect(await screen.findByRole("alert")).toHaveTextContent("Connection test failed (HTTP 502).");
+    });
+
+    it("says the test checks the saved configuration while a draft exists", async () => {
+      renderWithProviders(<ConnectorDetail connector={CONNECTOR} />);
+      const input = await screen.findByLabelText("API Key");
+      const hint = "Test connection checks the saved configuration, not your unsaved changes.";
+      expect(screen.queryByText(hint)).not.toBeInTheDocument();
+      await userEvent.type(input, "x");
+      expect(screen.getByText(hint)).toBeVisible();
+      expect(screen.getByRole("button", { name: "Test connection" })).toHaveAccessibleDescription(hint);
+    });
+
+    it("clears the previous result as soon as a new test starts", async () => {
+      const { testConnector } = await import("../connectors");
+      vi.mocked(testConnector).mockRejectedValueOnce(new Error("x"));
+      renderWithProviders(<ConnectorDetail connector={CONNECTOR} />);
+      const button = await screen.findByRole("button", { name: "Test connection" });
+      await userEvent.click(button);
+      await screen.findByText("Connection test failed.");
+      vi.mocked(testConnector).mockReturnValueOnce(new Promise(() => undefined));
+      await userEvent.click(button);
+      await waitFor(() => expect(screen.queryByText("Connection test failed.")).not.toBeInTheDocument());
+    });
+
     it("keeps showing OK and Failed results from the server", async () => {
       const { testConnector } = await import("../connectors");
       vi.mocked(testConnector).mockResolvedValueOnce({ ok: false, detail: "401 from MISP" });
@@ -193,6 +223,21 @@ describe("ConnectorDetail", () => {
       expect(await screen.findByText("api_key: too short")).toBeInTheDocument();
       expect(input.value).toBe("abc");
       expect(screen.getByRole("button", { name: "Save" })).toBeEnabled();
+    });
+
+    it("shows the saved value at once instead of falling back to the old one", async () => {
+      const { putConnectorConfig, getConnectorConfig } = await import("../connectors");
+      vi.mocked(putConnectorConfig).mockResolvedValueOnce({ api_key: "saved-value" });
+      vi.mocked(getConnectorConfig)
+        .mockResolvedValueOnce({ api_key: "" })
+        // The refetch after save never lands, so only the cache write can supply the value.
+        .mockReturnValueOnce(new Promise(() => undefined));
+      renderWithProviders(<ConnectorDetail connector={CONNECTOR} />);
+      await userEvent.type(await screen.findByLabelText("API Key"), "x");
+      await userEvent.click(screen.getByRole("button", { name: "Save" }));
+      await waitFor(() =>
+        expect((screen.getByLabelText("API Key") as HTMLInputElement).value).toBe("saved-value"),
+      );
     });
 
     it("states why Save is disabled until something changes", async () => {
@@ -262,7 +307,9 @@ describe("ConnectorDetail", () => {
       </>,
     );
     await screen.findByLabelText("API Key");
+    await screen.findByText(/case_finalised/);
     const levels = screen.getAllByRole("heading").map((h) => [Number(h.tagName[1]), h.textContent]);
+    expect(screen.queryByLabelText(/delivery status/)).not.toBeInTheDocument();
     expect(levels).toEqual([
       [2, "Connectors"],
       [3, "misp"],
@@ -299,8 +346,9 @@ describe("ConnectorDetail", () => {
       vi.mocked(putConnectorConfig).mockResolvedValueOnce({ api_key: "x" });
       setup();
       await userEvent.type(await screen.findByLabelText("API Key"), "x");
+      await waitFor(() => expect(screen.getByTestId("keys")).toHaveTextContent("connectors"));
       await userEvent.click(screen.getByRole("button", { name: "Save" }));
-      await waitFor(() => expect(screen.getByTestId("keys")).toHaveTextContent(""));
+      await waitFor(() => expect(screen.getByTestId("keys")).toHaveTextContent(/^$/));
     });
 
     it("asks before leaving with a draft and stays when cancelled", async () => {

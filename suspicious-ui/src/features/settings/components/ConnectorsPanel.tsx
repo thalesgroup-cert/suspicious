@@ -22,11 +22,14 @@ export function ConnectorsPanel() {
   const [selected, setSelected] = useState<string | null>(null);
   const [dirty, setDirty] = useState(false);
   // Where the user asked to go while a draft exists; `null` is a valid target (mobile back).
-  const [pending, setPending] = useState<{ to: string | null } | null>(null);
+  // `from` and `open` are kept so the title stays correct while the dialog fades out.
+  const [pending, setPending] = useState<{ to: string | null; from: string | null; open: boolean } | null>(
+    null,
+  );
 
   const requestSelect = (to: string | null) => {
     if (to === selected) return;
-    if (dirty) setPending({ to });
+    if (dirty) setPending({ to, from: selected, open: true });
     else setSelected(to);
   };
   const onDirtyChange = useCallback((d: boolean) => setDirty(d), []);
@@ -44,16 +47,16 @@ export function ConnectorsPanel() {
 
   const discardDialog = (
     <ConfirmDialog
-      open={pending !== null}
-      title={`Discard unsaved changes to ${selected}?`}
+      open={pending?.open ?? false}
+      title={`Discard unsaved changes to ${pending?.from}?`}
       body="Your edits to this connector have not been saved and will be lost."
       confirmLabel="Discard"
       destructive
       onConfirm={() => {
         if (pending) setSelected(pending.to);
-        setPending(null);
+        setPending((p) => p && { ...p, open: false });
       }}
-      onCancel={() => setPending(null)}
+      onCancel={() => setPending((p) => p && { ...p, open: false })}
     />
   );
 

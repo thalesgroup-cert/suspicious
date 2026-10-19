@@ -47,9 +47,11 @@ import {
 const DELIVERY_LIMIT = 10;
 
 function testFailureMessage(err: unknown): string {
-  const data = (err as { response?: { data?: { detail?: unknown; error?: unknown } } }).response?.data;
-  const message = data?.detail ?? data?.error;
-  return typeof message === "string" && message ? message : "Connection test failed.";
+  const response = (err as { response?: { status?: number; data?: { detail?: unknown; error?: unknown } } })
+    .response;
+  const message = response?.data?.detail ?? response?.data?.error;
+  if (typeof message === "string" && message) return message;
+  return response?.status ? `Connection test failed (HTTP ${response.status}).` : "Connection test failed.";
 }
 
 export function ConnectorDetail({
@@ -71,6 +73,7 @@ export function ConnectorDetail({
     null,
   );
   const hintId = useId();
+  const testHintId = useId();
   const [saveError, setSaveError] = useState<string | null>(null);
 
   const configQuery = useQuery({
@@ -85,7 +88,9 @@ export function ConnectorDetail({
 
   const save = useMutation({
     mutationFn: (config: Record<string, unknown>) => putConnectorConfig(connector.name, config),
-    onSuccess: () => {
+    onSuccess: (saved) => {
+      // Write the saved config before dropping the draft, or the form flashes the old values until the refetch lands.
+      queryClient.setQueryData(["connector-config", connector.name], saved);
       setDraft(null);
       setSaveError(null);
       queryClient.invalidateQueries({ queryKey: ["connector-config", connector.name] });
@@ -103,7 +108,10 @@ export function ConnectorDetail({
   });
 
   const test = useMutation({
-    mutationFn: () => testConnector(connector.name),
+    mutationFn: () => {
+      setTestAlert(null);
+      return testConnector(connector.name);
+    },
     onSuccess: (result) =>
       setTestAlert(
         result.ok
@@ -202,12 +210,22 @@ export function ConnectorDetail({
             >
               Save
             </Button>
-            <Button size="small" onClick={() => test.mutate()} disabled={test.isPending}>
+            <Button
+              size="small"
+              onClick={() => test.mutate()}
+              disabled={test.isPending}
+              aria-describedby={draft ? testHintId : undefined}
+            >
               Test connection
             </Button>
             {!draft && (
               <Typography id={hintId} variant="caption" color="text.secondary">
                 No changes to save
+              </Typography>
+            )}
+            {draft && (
+              <Typography id={testHintId} variant="caption" color="text.secondary">
+                Test connection checks the saved configuration, not your unsaved changes.
               </Typography>
             )}
           </Stack>
@@ -248,7 +266,7 @@ export function ConnectorDetail({
         {deliveries.map((delivery) => (
           <Stack key={delivery.id} direction="row" spacing={1} sx={{ alignItems: "center" }}>
             <Box
-              aria-label={`delivery status: ${delivery.status}`}
+              aria-hidden
               sx={{
                 width: 7,
                 height: 7,

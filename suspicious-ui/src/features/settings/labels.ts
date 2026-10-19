@@ -13,8 +13,9 @@ export function fieldLabel(field: Pick<ConfigField, "key"> & { label?: string })
 }
 
 // Descriptions end with an internal "See docs/..." pointer that means nothing to an operator.
-// Anchored to a sentence start so a "See" that points elsewhere is left alone.
-const DOCS_POINTER = /(?<=^|[.!?]\s+)See\s+(?:also\s+)?docs\/\S+?\.?(?=\s|$)\s*/g;
+// The pointer must be a whole sentence (path, then a period before whitespace/end), or text
+// such as "See docs/x.md for details." would be cut in half.
+const DOCS_POINTER = /(?<=^|[.!?]\s+)See\s+(?:also\s+)?docs\/\S+?\.(?=\s|$)\s*/g;
 
 export function cleanDescription(text: string): string {
   return text.replace(DOCS_POINTER, "").trimEnd();

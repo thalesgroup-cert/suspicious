@@ -60,14 +60,23 @@ describe("ConnectorsPanel with an unsaved draft", () => {
   });
 
   it("asks before switching connector and keeps the draft when cancelled", async () => {
-    const input = await draftOnMisp();
+    await draftOnMisp();
     await userEvent.click(screen.getByText("thehive"));
     const dialog = await screen.findByRole("dialog");
     expect(within(dialog).getByText("Discard unsaved changes to misp?")).toBeInTheDocument();
     await userEvent.click(within(dialog).getByRole("button", { name: "Cancel" }));
     await waitFor(() => expect(screen.queryByRole("dialog")).not.toBeInTheDocument());
     expect(screen.getByRole("heading", { level: 3, name: "misp" })).toBeInTheDocument();
-    expect(input.value).toBe("abc");
+    expect(((await screen.findByLabelText("API Key")) as HTMLInputElement).value).toBe("abc");
+  });
+
+  it("keeps the dialog title on the connector being left while it fades out", async () => {
+    await draftOnMisp();
+    await userEvent.click(screen.getByText("thehive"));
+    const dialog = await screen.findByRole("dialog");
+    await userEvent.click(within(dialog).getByRole("button", { name: "Discard" }));
+    // No awaiting in between: the title must be right while the dialog is still fading out.
+    expect(screen.queryByText("Discard unsaved changes to thehive?")).not.toBeInTheDocument();
   });
 
   it("switches and drops the draft on Discard, without carrying it to the next connector", async () => {
