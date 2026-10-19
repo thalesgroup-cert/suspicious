@@ -84,11 +84,13 @@ function UserCards({ users }: { users: CisoUser[] }) {
           key={u.id}
           sx={{ border: 1, borderColor: "divider", borderRadius: 2, p: 1.5, display: "grid", gap: 1 }}
         >
-          <Stack direction="row" spacing={1} sx={{ justifyContent: "space-between", alignItems: "flex-start" }}>
-            <Box sx={{ minWidth: 0 }}><Identity user={u} /></Box>
-            <Box sx={{ flexShrink: 0 }}><Scope scope={u.scope} /></Box>
-          </Stack>
+          <Box><Identity user={u} /></Box>
           <Box component="dl" sx={{ m: 0, display: "grid", gridTemplateColumns: "repeat(2, minmax(0, 1fr))", gap: 1 }}>
+            {/* Scope gets its own full-width row so a long email keeps the whole card width. */}
+            <Box sx={{ gridColumn: "1 / -1" }}>
+              <Typography component="dt" variant="caption" color="text.secondary">Scope</Typography>
+              <Box component="dd" sx={{ m: 0 }}><Scope scope={u.scope} /></Box>
+            </Box>
             {([["Function", u.function], ["GBU", u.gbu], ["Country", u.country], ["Region", u.region]] as const).map(([k, v]) => (
               <Box key={k}>
                 <Typography component="dt" variant="caption" color="text.secondary">{k}</Typography>

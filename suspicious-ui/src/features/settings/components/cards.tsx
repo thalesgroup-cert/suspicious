@@ -52,7 +52,6 @@ export function NavIcon({ icon, isDark }: { icon: React.ReactNode; isDark: boole
 }
 
 export function EmptyList({ message }: { message: string }) {
-  const theme = useTheme();
   return (
     <Stack spacing={1} sx={{ py: 5, alignItems: "center", justifyContent: "center" }}>
       <Box
@@ -62,8 +61,10 @@ export function EmptyList({ message }: { message: string }) {
           borderRadius: 3,
           display: "grid",
           placeItems: "center",
-          background: alpha(theme.palette.action.hover, 0.5),
-          "& svg": { fontSize: 26, opacity: 0.4 },
+          // Passing the string token, not alpha(): action.hover is a CSS variable here and alpha() turned it into 50% black.
+          bgcolor: "action.hover",
+          color: "text.secondary",
+          "& svg": { fontSize: 26 },
         }}
       >
         <SearchOutlined />

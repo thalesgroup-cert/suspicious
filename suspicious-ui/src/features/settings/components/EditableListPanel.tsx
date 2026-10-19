@@ -23,6 +23,8 @@ import { alpha, useTheme } from "@mui/material/styles";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useSnackbar, type SnackbarKey } from "notistack";
 
+import { ensureContrast, flatten } from "@/shared/lib/contrast";
+
 import {
   addFromFile,
   addItems,
@@ -62,9 +64,15 @@ function ListItemRow({
     <Box
       component="li"
       sx={{
-        display: "flex",
+        // Date sits beside the value on wide screens and under it on phones, so long lists stay dense.
+        display: "grid",
         alignItems: "center",
-        gap: 0.5,
+        columnGap: 0.5,
+        gridTemplateColumns: { xs: "auto minmax(0, 1fr) auto auto", sm: "auto minmax(0, 1fr) auto auto auto" },
+        gridTemplateAreas: {
+          xs: '"check value copy del" ". date date date"',
+          sm: '"check value date copy del"',
+        },
         pl: 0.5,
         pr: 1,
         py: 0.25,
@@ -77,27 +85,27 @@ function ListItemRow({
     >
       <Checkbox
         size="small"
+        sx={{ gridArea: "check" }}
         checked={selected}
         onChange={onToggleSelect}
         slotProps={{ input: { "aria-label": `Select ${item.value}` } }}
       />
 
-      <Box sx={{ flex: 1, minWidth: 0, py: 0.5 }}>
-        <Typography
-          component="span"
-          sx={{ display: "block", fontFamily: "monospace", fontWeight: 600, fontSize: 13.5, overflowWrap: "anywhere" }}
-        >
-          {item.value}
+      <Typography
+        component="span"
+        sx={{ gridArea: "value", py: 0.75, fontFamily: "monospace", fontWeight: 600, fontSize: 13.5, overflowWrap: "anywhere" }}
+      >
+        {item.value}
+      </Typography>
+      {item.created_at ? (
+        <Typography variant="caption" color="text.secondary" sx={{ gridArea: "date", pb: { xs: 0.5, sm: 0 }, pr: { sm: 1 }, whiteSpace: "nowrap" }}>
+          Added {new Date(item.created_at).toLocaleDateString()}
         </Typography>
-        {item.created_at ? (
-          <Typography variant="caption" color="text.secondary">
-            Added {new Date(item.created_at).toLocaleDateString()}
-          </Typography>
-        ) : null}
-      </Box>
+      ) : null}
 
       <IconButton
         size="small"
+        sx={{ gridArea: "copy" }}
         title="Copy value"
         aria-label={`Copy ${item.value}`}
         onClick={async () => {
@@ -116,7 +124,7 @@ function ListItemRow({
         aria-label={`Delete ${item.value}`}
         onClick={onDelete}
         disabled={deleting || deleteDisabled}
-        sx={{ color: "error.main", "&:hover": { background: alpha(theme.palette.error.main, 0.1) } }}
+        sx={{ gridArea: "del", color: "error.main", "&:hover": { background: alpha(theme.palette.error.main, 0.1) } }}
       >
         {deleting
           ? <CircularProgress size={16} color="error" />
@@ -137,6 +145,10 @@ function AddBar({
 }) {
   const [input, setInput] = React.useState("");
   const hintId = React.useId();
+  const theme = useTheme();
+  // The theme's disabled contained button keeps the brand fill and loses the label; same neutral fill as the connector Save button.
+  const disabledFill = flatten(theme.palette.action.disabledBackground, theme.palette.background.paper);
+  const disabledText = ensureContrast(flatten(theme.palette.text.secondary, disabledFill), disabledFill, 4.5);
   // Hidden while loading: the field is already cleared then, and "enter a value" would be the wrong reason.
   const showHint = !input.trim() && !loading;
 
@@ -182,6 +194,7 @@ function AddBar({
           minWidth: 90,
           mt: 0.25,
           whiteSpace: "nowrap",
+          "&.Mui-disabled": { bgcolor: disabledFill, color: disabledText, backgroundImage: "none" },
         }}
       >
         Add

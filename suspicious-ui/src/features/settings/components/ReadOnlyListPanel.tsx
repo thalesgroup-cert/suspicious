@@ -98,7 +98,7 @@ export function ReadOnlyListPanel({
           </IconButton>
         </Stack>
 
-        <Collapse in={showItems}>
+        <Collapse in={showItems} unmountOnExit>
           {listQuery.isLoading ? (
             <Box sx={{ py: 3, display: "grid", placeItems: "center" }}><CircularProgress size={20} /></Box>
           ) : listQuery.isError ? (
