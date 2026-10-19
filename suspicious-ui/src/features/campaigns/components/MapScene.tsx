@@ -45,6 +45,8 @@ const SCENE_RADIUS = Math.sqrt(3); // the corner of the box -1..1
 const MAX_FOG = 0.45;
 // A hidden point shrinks to nothing visible but keeps a non-degenerate matrix, so the ray test never meets a singular one.
 const HIDDEN = 1e-5;
+// Constant on purpose (see SceneFog): the real colour and range are set on the object, from the theme and the camera.
+const FOG_ARGS: [string, number, number] = ["#000000", 1, 20];
 const FOCUS_MS = 260;
 const SELECTED = 2.6;
 const NEIGHBOUR = 1.6;
@@ -69,10 +71,13 @@ function Points({ positions, colours, visible, selected, neighbours, hovered, pa
   const radius = pointRadius(n);
   const detail = sphereDetail(n);
   // Reused between updates: allocating per point on every camera move would make the garbage collector the bottleneck.
-  const scratchRef = React.useRef<{ m: Matrix4; c: Color; dist: Float32Array } | null>(null);
+  const scratchRef = React.useRef<{ m: Matrix4; c: Color; dist: Float32Array; scale: Float32Array } | null>(null);
   const scratch = () => {
-    const s = (scratchRef.current ??= { m: new Matrix4(), c: new Color(), dist: new Float32Array(n) });
-    if (s.dist.length !== n) s.dist = new Float32Array(n);
+    const s = (scratchRef.current ??= { m: new Matrix4(), c: new Color(), dist: new Float32Array(n), scale: new Float32Array(n) });
+    if (s.dist.length !== n) {
+      s.dist = new Float32Array(n);
+      s.scale = new Float32Array(n);
+    }
     return s;
   };
 
@@ -120,7 +125,7 @@ function Points({ positions, colours, visible, selected, neighbours, hovered, pa
   const applyMatrices = React.useCallback(() => {
     const m = main.current;
     if (!m) return;
-    const { m: matrix, dist } = scratch();
+    const { m: matrix, dist, scale: scaleOf } = scratch();
     const cam = camera.position;
     let near = Infinity;
     let far = -Infinity;
@@ -134,7 +139,6 @@ function Points({ positions, colours, visible, selected, neighbours, hovered, pa
     }
     // Zooming in grows the marks, but only by the square root, so they neither vanish zoomed out nor swamp the view zoomed in.
     const zoom = Math.min(1.8, Math.max(0.55, Math.sqrt((controls ? cam.distanceTo(controls.target) : FIT_DISTANCE) / FIT_DISTANCE)));
-    const scaleOf: number[] = new Array(n);
     for (let i = 0; i < n; i++) {
       const s = visible[i] ? radius * zoom * depthScale(far > near ? (dist[i] - near) / (far - near) : 0) * boosts[i] : HIDDEN;
       scaleOf[i] = s;
@@ -146,8 +150,9 @@ function Points({ positions, colours, visible, selected, neighbours, hovered, pa
     const p = picks.current;
     if (p) {
       const fov = (camera as PerspectiveCamera).fov;
+      const reach = pickPixels(); // asked once per update, not once per point
       for (let i = 0; i < n; i++) {
-        const s = visible[i] ? Math.max(scaleOf[i], pixelRadius(pickPixels(), dist[i], fov, height)) : HIDDEN;
+        const s = visible[i] ? Math.max(scaleOf[i], pixelRadius(reach, dist[i], fov, height)) : HIDDEN;
         const q = positions[i];
         p.setMatrixAt(i, matrix.makeScale(s, s, s).setPosition(q[0], q[1], q[2]));
       }
@@ -272,11 +277,21 @@ function Axes({ axes, paint, labelRefs }: Pick<SceneProps, "axes" | "paint" | "l
   );
 }
 
-/** Scene fog in the canvas background colour; its range follows the distance to the cloud, so the nearest point stays clear at any zoom. */
+/**
+ * Scene fog in the canvas background colour; its range follows the distance to the cloud, so the nearest point stays clear at any zoom.
+ * The Fog object is created once and only its colour is changed with the theme: react-three-fiber builds a new object when the `args` change,
+ * and the listener below would go on updating the old one.
+ */
 function SceneFog({ background }: { background: string }) {
   const camera = useThree((s) => s.camera);
+  const invalidate = useThree((s) => s.invalidate);
   const controls = useThree((s) => s.controls) as (EventTarget & { target: Vector3 }) | null;
   const fog = React.useRef<Fog>(null);
+
+  React.useLayoutEffect(() => {
+    fog.current?.color.set(background);
+    invalidate();
+  }, [background, invalidate]);
 
   React.useEffect(() => {
     const f = fog.current;
@@ -291,7 +306,7 @@ function SceneFog({ background }: { background: string }) {
     return () => controls.removeEventListener("change", update);
   }, [camera, controls]);
 
-  return <fog ref={fog} attach="fog" args={[background, 1, 20]} />;
+  return <fog ref={fog} attach="fog" args={FOG_ARGS} />;
 }
 
 /** Camera and controls: starting view, reset, keyboard steps, focus on a selection, fog that follows the zoom, resolution that drops under load. */
@@ -335,6 +350,7 @@ function Rig({ focus, consumeSkip, apiRef, reducedMotion, fitKey }: Pick<ScenePr
       rotate(dTheta, dPhi) {
         const c = controls.current;
         if (!c) return;
+        moved.current = true;
         camera.position.set(...orbitBy(vec(camera.position), vec(c.target), dTheta, dPhi));
         c.update();
         invalidate();
@@ -342,12 +358,14 @@ function Rig({ focus, consumeSkip, apiRef, reducedMotion, fitKey }: Pick<ScenePr
       zoom(factor) {
         const c = controls.current;
         if (!c) return;
+        moved.current = true;
         camera.position.set(...zoomBy(vec(camera.position), vec(c.target), factor, c.minDistance, c.maxDistance));
         c.update();
         invalidate();
       },
       reset() {
         controls.current?.reset();
+        moved.current = false; // back at the fitted view: a resize may refit again
         invalidate();
       },
     };
