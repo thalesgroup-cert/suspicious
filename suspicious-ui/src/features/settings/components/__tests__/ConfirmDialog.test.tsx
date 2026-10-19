@@ -1,6 +1,6 @@
 import * as React from "react";
 import { describe, expect, it, vi } from "vitest";
-import { screen, waitFor } from "@testing-library/react";
+import { screen, waitFor, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { Button } from "@mui/material";
 
@@ -46,6 +46,7 @@ describe("ConfirmDialog", () => {
     await user.click(screen.getByRole("button", { name: "Open" }));
     const dialog = await screen.findByRole("dialog", { name: "Delete 3 entries?" });
     expect(dialog).toHaveAccessibleDescription("This cannot be undone.");
+    expect(within(dialog).queryAllByRole("heading")).toHaveLength(0);
     await waitFor(() => expect(screen.getByRole("button", { name: "Cancel" })).toHaveFocus());
   });
 

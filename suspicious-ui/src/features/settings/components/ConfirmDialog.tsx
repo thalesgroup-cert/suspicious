@@ -23,7 +23,8 @@ export function ConfirmDialog({
   const id = React.useId();
   return (
     <Dialog open={open} onClose={onCancel} aria-labelledby={`${id}-title`} aria-describedby={`${id}-body`}>
-      <DialogTitle id={`${id}-title`}>{title}</DialogTitle>
+      {/* div, not the default h2: a modal title must not add a second h2 to the page outline. */}
+      <DialogTitle id={`${id}-title`} component="div">{title}</DialogTitle>
       <DialogContent>
         <DialogContentText id={`${id}-body`} component="div">
           {body}

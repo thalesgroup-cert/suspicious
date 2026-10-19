@@ -54,6 +54,7 @@ function Cell({
   );
 }
 
+// "Enabled" is the config toggle, not process state: the health chip beside it says whether the feeder is actually up.
 /** Facts the page already fetches. Each cell loads on its own so one outage never blanks the strip. */
 export function StatusStrip() {
   const feeder = useQuery({ queryKey: ["settings", "email_feeder"], queryFn: getFeederStatus, retry: false });
@@ -72,7 +73,7 @@ export function StatusStrip() {
         label="Email feeder"
         loading={feeder.isPending}
         failed={feeder.isError}
-        value={feeder.data?.enabled ? "Running" : "Stopped"}
+        value={feeder.data?.enabled ? "Enabled" : "Disabled"}
         extra={<FeederHealthBadge label="Health" />}
       />
       <Cell

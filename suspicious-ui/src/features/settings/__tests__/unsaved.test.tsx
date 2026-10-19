@@ -1,3 +1,4 @@
+import * as React from "react";
 import { describe, expect, it } from "vitest";
 import { screen, waitFor } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
@@ -34,9 +35,28 @@ function fireBeforeUnload() {
 
 describe("unsaved", () => {
   it("reports the dirty key and clears it when the panel unmounts", async () => {
-    const { unmount } = setup(true);
-    await waitFor(() => expect(screen.getByTestId("keys")).toHaveTextContent("scoring"));
-    unmount();
+    const user = userEvent.setup();
+    function Reader() {
+      return <output data-testid="set">{[...useUnsavedKeys()].join(",")}</output>;
+    }
+    function Dirty() {
+      useReportUnsaved("scoring", true);
+      return null;
+    }
+    function Host() {
+      const [shown, setShown] = React.useState(true);
+      return (
+        <UnsavedProvider>
+          <Reader />
+          {shown && <Dirty />}
+          <button onClick={() => setShown(false)}>Hide panel</button>
+        </UnsavedProvider>
+      );
+    }
+    renderWithProviders(<Host />, { routePath: "*", initialPath: "/here" });
+    await waitFor(() => expect(screen.getByTestId("set")).toHaveTextContent("scoring"));
+    await user.click(screen.getByRole("button", { name: "Hide panel" }));
+    await waitFor(() => expect(screen.getByTestId("set")).toBeEmptyDOMElement());
   });
 
   it("only guards beforeunload while something is dirty", async () => {

@@ -80,8 +80,10 @@ describe("SettingsPage - Test Suite", () => {
   });
 
   describe("Sections by URL", () => {
-    it("opens the first section at /settings", async () => {
-      open("/settings");
+    it("redirects bare /settings to the first section without adding a history entry", async () => {
+      const { router } = open("/settings");
+      await waitFor(() => expect(router!.state.location.pathname).toBe("/settings/domains_allow"));
+      expect(router!.state.historyAction).toBe("REPLACE");
       expect(await screen.findByRole("heading", { level: 2, name: "Domains allowlist" })).toBeInTheDocument();
     });
 
@@ -169,12 +171,13 @@ describe("SettingsPage - Test Suite", () => {
       expect(hit(["connectors"])).toBe(true);
       expect(hit(["connector-config", "misp"])).toBe(true);
       expect(hit(["connector-deliveries", "misp"])).toBe(true);
+      expect(hit(["feeder", "health"])).toBe(true);
       expect(hit(["me"])).toBe(false);
     });
 
     it("shows the status strip", async () => {
       open("/settings");
-      expect(await screen.findByText("Running")).toBeInTheDocument();
+      expect(await screen.findByText("Enabled")).toBeInTheDocument();
     });
   });
 

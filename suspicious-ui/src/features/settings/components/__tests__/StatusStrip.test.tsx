@@ -37,17 +37,17 @@ describe("StatusStrip", () => {
 
   it("renders the three facts, each linking to its section", async () => {
     renderWithProviders(<StatusStrip />);
-    expect(await screen.findByText("Running")).toBeInTheDocument();
+    expect(await screen.findByText("Enabled")).toBeInTheDocument();
     expect(await screen.findByText("2 of 3 enabled, 1 unhealthy")).toBeInTheDocument();
     expect(await screen.findByText("2 of 3 active")).toBeInTheDocument();
     const hrefs = screen.getAllByRole("link").map((a) => a.getAttribute("href"));
     expect(hrefs).toEqual(["/settings/email_feeder", "/settings/connectors", "/settings/scoring"]);
   });
 
-  it("says stopped when the feeder is disabled", async () => {
+  it("says disabled when the feeder is disabled", async () => {
     vi.mocked(getFeederStatus).mockResolvedValue({ enabled: false });
     renderWithProviders(<StatusStrip />);
-    expect(await screen.findByText("Stopped")).toBeInTheDocument();
+    expect(await screen.findByText("Disabled")).toBeInTheDocument();
   });
 
   it("shows 'unavailable' for one failed cell while the others render", async () => {

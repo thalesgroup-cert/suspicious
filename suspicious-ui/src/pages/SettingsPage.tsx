@@ -12,8 +12,8 @@ import { StatusStrip } from "@/features/settings/components/StatusStrip";
 import { SECTIONS, SectionContent, parseSection } from "@/features/settings/components/sections";
 import { UnsavedProvider, useUnsavedKeys } from "@/features/settings/unsaved";
 
-// Query roots the header Refresh covers: lists and scoring live under "settings".
-const REFRESH_ROOTS = new Set(["settings", "connectors", "connector-config", "connector-deliveries"]);
+// Query roots the header Refresh covers: lists and scoring live under "settings", the feeder health chip under "feeder".
+const REFRESH_ROOTS = new Set(["settings", "connectors", "connector-config", "connector-deliveries", "feeder"]);
 
 function SettingsBody() {
   const qc = useQueryClient();
@@ -44,10 +44,11 @@ function SettingsBody() {
   }
 
   const active = parseSection(section);
-  if (section !== undefined && active === null) {
+  // Bare /settings redirects too, so the first nav item is a real URL and clicking it is not a navigation.
+  if (active === null) {
     return <Navigate to={`/settings/${SECTIONS[0].key}`} replace />;
   }
-  const activeMeta = SECTIONS.find((s) => s.key === (active ?? SECTIONS[0].key))!;
+  const activeMeta = SECTIONS.find((s) => s.key === active)!;
 
   return (
     <Skeleton name="settings-page" loading={meQuery.isPending} animate="shimmer">
