@@ -98,11 +98,11 @@ export function FeederPanel() {
         />
 
         <Stack
-          direction={{ xs: "column", sm: "row" }}
+          direction="row"
           spacing={2}
-          sx={{ p: 2.5, pb: 1.5, alignItems: { sm: "center" }, justifyContent: "space-between" }}
+          sx={{ p: 2.5, pb: 1.5, alignItems: "center", justifyContent: "space-between" }}
         >
-          <Stack direction="row" spacing={1.75} sx={{ alignItems: "center" }} >
+          <Stack direction="row" spacing={1.75} sx={{ alignItems: "center", minWidth: 0 }} >
             <Box
               sx={{
                 width: 48,
@@ -135,6 +135,7 @@ export function FeederPanel() {
             onChange={(e) => (e.target.checked ? toggleMutation.mutate(true) : setConfirmOff(true))}
             disabled={pending}
             color="success"
+            sx={{ flexShrink: 0 }}
             slotProps={{ input: { "aria-label": "Email feeder", ref: switchInput } }}
           />
         </Stack>
