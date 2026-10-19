@@ -67,9 +67,10 @@ export function FeederPanel() {
                 borderRadius: 3,
                 display: "grid",
                 placeItems: "center",
+                // action.hover is already translucent: alpha() on it would replace its alpha and paint a solid dark block.
                 background: enabled
                   ? alpha(safe, 0.12)
-                  : alpha(theme.palette.action.hover, 0.5),
+                  : theme.palette.action.hover,
                 border: `1px solid ${enabled ? alpha(safe, 0.3) : alpha(theme.palette.divider, isDark ? 0.18 : 0.5)}`,
                 transition: "all .3s ease",
                 "& svg": { fontSize: 24, color: enabled ? onTint : undefined, transition: "color .3s ease" },
@@ -96,7 +97,7 @@ export function FeederPanel() {
                 fontWeight: 700,
                 bgcolor: enabled
                   ? alpha(safe, 0.12)
-                  : alpha(theme.palette.action.hover, 0.6),
+                  : theme.palette.action.hover,
                 color: enabled ? onTint : "text.secondary",
                 border: `1px solid ${enabled ? alpha(safe, 0.3) : alpha(theme.palette.divider, 0.4)}`,
                 transition: "all .3s ease",

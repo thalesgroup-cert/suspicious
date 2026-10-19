@@ -210,7 +210,7 @@ function AddBar({
       </Button>
     </Stack>
     {showHint ? (
-      <Typography id={hintId} variant="caption" color="text.secondary" sx={{ display: "block", mt: 0.5 }}>
+      <Typography id={hintId} variant="caption" color="text.secondary" sx={{ display: "block", mt: 0.5, ml: 1.75 }}>
         Enter at least one value
       </Typography>
     ) : null}
@@ -391,10 +391,11 @@ export function EditableListPanel({
       setSelectedIds((prev) => { const next = new Set(prev); next.delete(item.id); return next; });
       setDeletingId(null);
       // No confirm for one entry: undo is cheaper than a dialog on every click.
+      // The Undo colour is set via sx because the theme's text-button colour beats color="inherit" and is unreadable on the snackbar blue.
       enqueueSnackbar(`Removed ${item.value}.`, {
         variant: "info",
         action: (key) => (
-          <Button color="inherit" size="small" onClick={() => undoRemove(item.value, key)}>
+          <Button size="small" sx={{ color: "inherit", fontWeight: 700 }} onClick={() => undoRemove(item.value, key)}>
             Undo
           </Button>
         ),
