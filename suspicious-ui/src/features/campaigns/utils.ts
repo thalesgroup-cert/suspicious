@@ -52,13 +52,16 @@ export function useClassColors(): Record<SeriesKey, string> {
   };
 }
 
+// Above the 4.5:1 text minimum: a theme can tint a button's own background (metal's outlined buttons), which takes some of it back.
+const LINK_CONTRAST = 4.8;
+
 /**
- * The theme's accent as text colour: unchanged where it already reads at 4.5:1 on the card and on the page, else the nearest
+ * The theme's accent as text colour: unchanged where it already reads on the card and on the page, else the nearest
  * shade that does (sunrise, summer and metal accents sit near 3:1). Links and text buttons on this page use it.
  */
 export function useLinkColor(): string {
   const { palette } = useTheme();
-  return [palette.background.paper, palette.background.default].reduce((c, bg) => ensureContrast(c, bg, 4.5), palette.primary.main);
+  return [palette.background.paper, palette.background.default].reduce((c, bg) => ensureContrast(c, bg, LINK_CONTRAST), palette.primary.main);
 }
 
 /** Height of the 3D canvas; its loading placeholder is the same size so nothing jumps when it arrives. */
