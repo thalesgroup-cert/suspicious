@@ -1,14 +1,14 @@
 import * as React from "react";
 import { Box, Skeleton, Stack, ToggleButton, ToggleButtonGroup, Button, Typography } from "@mui/material";
 
-import type { CampaignNeighbours, CampaignRow, PcaPoint } from "@/features/campaigns/api";
+import type { CampaignRow, PcaPoint } from "@/features/campaigns/api";
 import { MAP_HEIGHT } from "@/features/campaigns/utils";
 import { mapCaption } from "@/features/campaigns/mapModel";
 import { detectWebGL } from "@/features/campaigns/mapSupport";
 import Embedding2D from "./Embedding2D";
 import PointTable from "./PointTable";
 
-// three.js, react-three-fiber and drei are about 300 kB gzip: fetched only when this page draws the 3D map.
+// three.js, react-three-fiber and drei are about 250 kB gzip: fetched only when this page draws the 3D map.
 const EmbeddingMap3D = React.lazy(() => import("./EmbeddingMap3D"));
 
 export type EmbeddingMapProps = {
@@ -16,8 +16,6 @@ export type EmbeddingMapProps = {
   explainedVariance: number[];
   /** The period's campaigns, for the map's campaign colours. */
   campaigns?: CampaignRow[];
-  /** For Task 4 (highlighting the review lists in the 3D map); unused by the 2D map. */
-  neighbours?: CampaignNeighbours;
   /** The sample size asked of the backend, for the caption. */
   sampleLimit?: number;
   selectedCaseIds: string[];
@@ -111,7 +109,7 @@ export default function EmbeddingMap({ points, explainedVariance, campaigns, sam
         </Typography>
       ) : null}
       {asTable ? (
-        <PointTable points={points} />
+        <PointTable points={points} selectedCaseIds={selectedCaseIds} onSelectCases={onSelectCases} />
       ) : use3D ? (
         <Boundary onError={() => setFailed(true)}>
           <React.Suspense fallback={<Loading />}>

@@ -107,5 +107,5 @@ export function mapDescription(points: PcaPoint[]): string {
   for (const p of points) counts.set(classKey(p.label), (counts.get(classKey(p.label)) ?? 0) + 1);
   const by = SERIES.filter(([k]) => counts.has(k)).map(([k]) => `${classLabel(k)} ${counts.get(k)}`);
   const head = points.length ? `${plural(points.length, "message")}: ${by.join(", ")}.` : "0 messages.";
-  return `${head} Rotate with the arrow keys, zoom with + and -, reset with 0.`;
+  return `${head} Rotate with the arrow keys, zoom with + and -, reset with 0, clear the selection with Escape.`;
 }

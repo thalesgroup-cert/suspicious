@@ -41,7 +41,6 @@ export function normalise(points: XYZ[]): Normalisation {
 }
 
 export const toScene = (p: Vec3, n: Normalisation): Vec3 => [(p[0] - n.offset[0]) * n.scale, (p[1] - n.offset[1]) * n.scale, (p[2] - n.offset[2]) * n.scale];
-export const toData = (s: Vec3, n: Normalisation): Vec3 => [s[0] / n.scale + n.offset[0], s[1] / n.scale + n.offset[1], s[2] / n.scale + n.offset[2]];
 
 // ---------------------------------------------------------------- category clouds
 
@@ -122,6 +121,9 @@ export function categoryEllipsoid(points: XYZ[]): Ellipsoid | null {
 // ---------------------------------------------------------------- neighbours
 
 export type Near = { index: number; distance: number };
+
+/** How many nearest messages the map highlights and the side panel lists: one number, so the two always agree. */
+export const NEAREST = 8;
 
 /** The k points closest to `points[index]` in the three components (not the full embedding), nearest first; ties go to the lower index; never the point itself. */
 export function nearest(points: XYZ[], index: number, k: number): Near[] {

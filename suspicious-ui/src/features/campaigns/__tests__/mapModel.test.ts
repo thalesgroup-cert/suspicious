@@ -124,8 +124,8 @@ describe("mapCaption", () => {
 describe("mapDescription", () => {
   it("counts the messages per class (only classes present) and tells the keys", () => {
     expect(mapDescription([pt("SAFE", "1", null), pt("SAFE", "2", null), pt("DANGEROUS", "3", null), pt("x", null, null)])).toBe(
-      "4 messages: Safe 2, Dangerous 1, Unclassified 1. Rotate with the arrow keys, zoom with + and -, reset with 0."
+      "4 messages: Safe 2, Dangerous 1, Unclassified 1. Rotate with the arrow keys, zoom with + and -, reset with 0, clear the selection with Escape."
     );
-    expect(mapDescription([pt("SAFE", "1", null)])).toBe("1 message: Safe 1. Rotate with the arrow keys, zoom with + and -, reset with 0.");
+    expect(mapDescription([pt("SAFE", "1", null)])).toBe("1 message: Safe 1. Rotate with the arrow keys, zoom with + and -, reset with 0, clear the selection with Escape.");
   });
 });

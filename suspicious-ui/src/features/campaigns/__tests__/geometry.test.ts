@@ -17,7 +17,6 @@ import {
   pointRadius,
   sphereDetail,
   recencyRamp,
-  toData,
   toScene,
   topCampaigns,
   zoomBy,
@@ -54,17 +53,10 @@ describe("bounds", () => {
 });
 
 describe("normalise", () => {
-  it("fits the points in the box -1..1 with one scale for all axes, and round-trips", () => {
+  it("fits the points in the box -1..1 with one scale for all axes", () => {
     const pts = [P(0, 0, 0), P(10, 2, -1), P(4, -2, 1)];
     const n = normalise(pts);
-    for (const p of pts) {
-      const s = toScene([p.x, p.y, p.z], n);
-      expect(s.every((v) => Math.abs(v) <= 1 + 1e-9)).toBe(true);
-      const back = toData(s, n);
-      expect(back[0]).toBeCloseTo(p.x, 9);
-      expect(back[1]).toBeCloseTo(p.y, 9);
-      expect(back[2]).toBeCloseTo(p.z, 9);
-    }
+    for (const p of pts) expect(toScene([p.x, p.y, p.z], n).every((v) => Math.abs(v) <= 1 + 1e-9)).toBe(true);
     // the widest axis (x, 10 wide) touches the box; the others keep their proportion
     expect(toScene([0, 0, 0], n)[0]).toBeCloseTo(-1, 9);
     expect(toScene([10, 0, 0], n)[0]).toBeCloseTo(1, 9);

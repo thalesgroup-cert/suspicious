@@ -3,11 +3,10 @@ import { Box, ButtonBase, Link, Stack, Typography } from "@mui/material";
 import { Link as RouterLink } from "react-router";
 
 import type { CampaignNeighbours, CampaignRow, NeighbourItem, PcaPoint } from "@/features/campaigns/api";
-import { caseIdToCampaign, nearest } from "@/features/campaigns/geometry";
+import { NEAREST, caseIdToCampaign, nearest } from "@/features/campaigns/geometry";
 import { classKey, classLabel, formatDay, formatFullDay } from "@/features/campaigns/utils";
 import ClassChip from "./ClassChip";
 
-const NEAREST = 8;
 
 function Row({ item, detail, onSelectCases }: { item: NeighbourItem; detail: string; onSelectCases: (ids: string[]) => void }) {
   const id = item.suspicious_case_id;

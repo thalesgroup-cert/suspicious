@@ -39,7 +39,7 @@ export default defineConfig({
           // three.js and react-three-fiber/drei are only reached from the lazy 3D map on /campaigns.
           // Left out of the shared "vendor" chunk, which the entry loads on every page, the bundler
           // keeps them in the chunk(s) that import() pulls in.
-          if (/[\\/]node_modules[\\/](three|three-stdlib|@react-three|react-reconciler|its-fine|suspend-react|react-use-measure|debounce|meshline|maath|camera-controls|stats-gl|stats\.js|detect-gpu|hls\.js|@monogrid|three-mesh-bvh|troika-[^\\/]+|bidi-js|webgl-sdf-generator|potpack|fflate|draco3d|zustand-traditional)[\\/]/.test(id)) return;
+          if (/[\\/]node_modules[\\/](three|three-stdlib|@react-three|react-reconciler|its-fine|suspend-react|react-use-measure|debounce|meshline|maath|camera-controls|stats-gl|stats\.js|detect-gpu|hls\.js|@monogrid|three-mesh-bvh|troika-[^\\/]+|bidi-js|webgl-sdf-generator|potpack|fflate|draco3d)[\\/]/.test(id)) return;
           if (
             id.includes("/react/") ||
             id.includes("/react-dom/") ||

@@ -66,14 +66,24 @@ describe("detectWebGL", () => {
   beforeEach(() => resetWebGLDetection());
   afterEach(() => vi.restoreAllMocks());
 
-  it("is true when webgl2 is available", () => {
-    stubCanvas((t) => (t === "webgl2" ? { getExtension: () => null } : null));
+  it("is true when webgl2 is available, and asks for nothing else", () => {
+    const asked: string[] = [];
+    stubCanvas((t) => {
+      asked.push(t);
+      return t === "webgl2" ? { getExtension: () => null } : null;
+    });
     expect(detectWebGL()).toBe(true);
+    expect(asked).toEqual(["webgl2"]);
   });
 
-  it("falls back to webgl 1", () => {
-    stubCanvas((t) => (t === "webgl" ? { getExtension: () => null } : null));
-    expect(detectWebGL()).toBe(true);
+  it("is false with only WebGL 1: three.js 0.186 draws with WebGL 2, so 3D would fail where this said yes", () => {
+    const asked: string[] = [];
+    stubCanvas((t) => {
+      asked.push(t);
+      return t === "webgl" ? { getExtension: () => null } : null;
+    });
+    expect(detectWebGL()).toBe(false);
+    expect(asked).not.toContain("webgl");
   });
 
   it("is false when no context can be made", () => {

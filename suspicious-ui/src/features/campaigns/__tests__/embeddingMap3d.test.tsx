@@ -52,7 +52,7 @@ describe("EmbeddingMap3D: accessible wrapper", () => {
     expect(g).toHaveAttribute("tabindex", "0");
     expect(within(g).getByTestId("gl-canvas")).toBeInTheDocument();
     const description = document.getElementById(g.getAttribute("aria-describedby")!)!;
-    expect(description).toHaveTextContent("5 messages: Safe 2, Unwanted 1, Dangerous 2. Rotate with the arrow keys, zoom with + and -, reset with 0.");
+    expect(description).toHaveTextContent("5 messages: Safe 2, Unwanted 1, Dangerous 2. Rotate with the arrow keys, zoom with + and -, reset with 0, clear the selection with Escape.");
     // visible text, not hidden from sighted keyboard users
     expect(description).toBeVisible();
   });
@@ -70,11 +70,14 @@ describe("EmbeddingMap3D: accessible wrapper", () => {
 
   it("puts the canvas inside a margin the page can still be scrolled from on touch", () => {
     renderMap();
-    // The canvas is the only element that stops the browser scrolling; the group around it pads it by at least 24px.
-    const pad = getComputedStyle(group());
-    expect(parseFloat(pad.paddingLeft)).toBeGreaterThanOrEqual(24);
-    expect(parseFloat(pad.paddingRight)).toBeGreaterThanOrEqual(24);
-    expect(pad.touchAction).not.toBe("none");
+    const g = group();
+    // Only the canvas box stops the browser scrolling; the group around it pads it by at least 24px each side and does not.
+    const canvasBox = within(g).getByTestId("gl-canvas").parentElement as HTMLElement;
+    expect(canvasBox).toBe(g.firstElementChild);
+    expect(getComputedStyle(canvasBox).touchAction).toBe("none");
+    expect(getComputedStyle(g).touchAction).not.toBe("none");
+    expect(parseFloat(getComputedStyle(g).paddingLeft)).toBeGreaterThanOrEqual(24);
+    expect(parseFloat(getComputedStyle(g).paddingRight)).toBeGreaterThanOrEqual(24);
     expect(screen.getByText(/Scroll the page from the margins/)).toBeInTheDocument();
   });
 
@@ -92,12 +95,6 @@ describe("EmbeddingMap3D: accessible wrapper", () => {
   it("states the real range of each axis as text, since the canvas shows a normalised box", () => {
     renderMap();
     expect(screen.getByText("Axis ranges: PC1 1.00 to 5.00, PC2 0.50 to 2.50, PC3 -1.67 to -0.33.")).toBeInTheDocument();
-  });
-
-  it("has a Reset view button that is safe before the scene exists", async () => {
-    const user = userEvent.setup();
-    renderMap();
-    await user.click(screen.getByRole("button", { name: "Reset view" }));
   });
 });
 
@@ -207,7 +204,8 @@ describe("EmbeddingMap3D: colour modes", () => {
     const legend = screen.getByRole("list", { name: "Campaigns" });
     const items = within(legend).getAllByRole("listitem");
     expect(items[0]).toHaveTextContent("invoice-relay.example, cdn-pay.example, login-portal.example");
-    expect(items[0]).toHaveTextContent("12 messages");
+    // both of its listed case ids (3 and 4) are in the sample: "coloured", not "in the campaign"
+    expect(items[0]).toHaveTextContent("12 messages, 2 coloured in the map");
     expect(items[1]).toHaveTextContent("newsletter.example");
     expect(items[2]).toHaveTextContent("Not in a listed campaign");
     expect(screen.getByText(/Colours cover the case ids the summary lists, up to 20 per campaign/)).toBeInTheDocument();

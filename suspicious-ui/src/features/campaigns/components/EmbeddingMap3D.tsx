@@ -9,6 +9,7 @@ import type { CampaignRow, PcaPoint } from "@/features/campaigns/api";
 import {
   INITIAL_POSITION,
   MIN_CLOUD_POINTS,
+  NEAREST,
   axisSegments,
   bounds,
   caseIdToCampaign,
@@ -44,11 +45,35 @@ export type EmbeddingMap3DProps = {
   onSelectCases: (caseIds: string[]) => void;
 };
 
-const NEAREST = 8;
 // Reddish purple from the same colour-blind-safe set as the campaign colours: unlike the age ramp's blue-greys it cannot be mistaken for "oldest".
 const NO_DATE_COLOUR = "#CC79A7";
 
 const clamp = (v: number, lo: number, hi: number) => Math.min(hi, Math.max(lo, v));
+
+/** One end of the date range: label, slider over the days present, and the chosen day in text. Three cells of the parent's grid. */
+function RangeRow({ id, label, max, value, day, onChange }: { id: string; label: string; max: number; value: number; day: string; onChange: (position: number) => void }) {
+  const accent = useTheme().palette.primary.main;
+  return (
+    <>
+      <Typography component="label" htmlFor={id} variant="caption" color="text.secondary">
+        {label}
+      </Typography>
+      <Box
+        component="input"
+        id={id}
+        type="range"
+        min={0}
+        max={max}
+        step={1}
+        value={value}
+        aria-valuetext={day}
+        onChange={(e: React.ChangeEvent<HTMLInputElement>) => onChange(Number(e.target.value))}
+        sx={{ accentColor: accent, flex: 1, minWidth: 0, m: 0 }}
+      />
+      <Typography variant="caption">{day}</Typography>
+    </>
+  );
+}
 
 /**
  * The 3D map: an R3F canvas plus every control and piece of text that must exist outside it, because a canvas
@@ -219,7 +244,6 @@ export default function EmbeddingMap3D({ points, explainedVariance, campaigns, s
   const setTo = (v: number) => setSpan([lo, Math.max(v, lo)]);
 
   const hovered = hover ? points[hover.index] : undefined;
-  const slider = { accentColor: theme.palette.primary.main, flex: 1, minWidth: 0, m: 0 } as const;
 
   return (
     <Box>
@@ -246,38 +270,8 @@ export default function EmbeddingMap3D({ points, explainedVariance, campaigns, s
       <Box sx={{ mb: 1 }}>
         {dates.length > 1 ? (
           <Box sx={{ display: "grid", gridTemplateColumns: "auto minmax(80px, 1fr) 7.5em", columnGap: 1, rowGap: 0.25, alignItems: "center" }}>
-            <Typography component="label" htmlFor={ids.from} variant="caption" color="text.secondary">
-              From
-            </Typography>
-            <Box
-              component="input"
-              id={ids.from}
-              type="range"
-              min={0}
-              max={last}
-              step={1}
-              value={lo}
-              aria-valuetext={formatFullDay(dates[lo])}
-              onChange={(e: React.ChangeEvent<HTMLInputElement>) => setFrom(Number(e.target.value))}
-              sx={slider}
-            />
-            <Typography variant="caption">{formatFullDay(dates[lo])}</Typography>
-            <Typography component="label" htmlFor={ids.to} variant="caption" color="text.secondary">
-              To
-            </Typography>
-            <Box
-              component="input"
-              id={ids.to}
-              type="range"
-              min={0}
-              max={last}
-              step={1}
-              value={hi}
-              aria-valuetext={formatFullDay(dates[hi])}
-              onChange={(e: React.ChangeEvent<HTMLInputElement>) => setTo(Number(e.target.value))}
-              sx={slider}
-            />
-            <Typography variant="caption">{formatFullDay(dates[hi])}</Typography>
+            <RangeRow id={ids.from} label="From" max={last} value={lo} day={formatFullDay(dates[lo])} onChange={setFrom} />
+            <RangeRow id={ids.to} label="To" max={last} value={hi} day={formatFullDay(dates[hi])} onChange={setTo} />
           </Box>
         ) : points.length ? (
           <Typography variant="caption" color="text.secondary" component="p">

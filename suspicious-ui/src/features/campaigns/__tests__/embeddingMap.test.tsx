@@ -118,6 +118,20 @@ describe("EmbeddingMap: 2D or 3D", () => {
     expect(await screen.findByTestId("map3d")).toBeInTheDocument();
   });
 
+  it("lets a row of the table select its message, and shows it selected", async () => {
+    const user = userEvent.setup();
+    const onSelectCases = vi.fn();
+    const { rerender } = renderMap({ onSelectCases });
+    await screen.findByTestId("map3d");
+    await user.click(screen.getByRole("button", { name: "Table view" }));
+    expect(screen.getByRole("button", { name: "Select Mail 1" })).toHaveAttribute("aria-pressed", "false");
+    await user.click(screen.getByRole("button", { name: "Select Mail 1" }));
+    expect(onSelectCases).toHaveBeenCalledExactlyOnceWith(["1"]);
+
+    rerender(<EmbeddingMap points={points} explainedVariance={[0.24, 0.15, 0.09]} sampleLimit={1500} selectedCaseIds={["1"]} onSelectCases={onSelectCases} />);
+    expect(screen.getByRole("button", { name: "Select Mail 1" })).toHaveAttribute("aria-pressed", "true");
+  });
+
   it("still says so when there are no messages", () => {
     renderMap({ points: [] });
     expect(screen.getByText("No messages with an embedding in the store.")).toBeInTheDocument();

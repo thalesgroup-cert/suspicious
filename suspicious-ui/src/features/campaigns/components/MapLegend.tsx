@@ -24,7 +24,7 @@ export function CampaignLegend({ campaigns, colours, neutral, inMap }: { campaig
             <Typography variant="body2" sx={{ overflowWrap: "anywhere" }}>
               {c.name}
               <Typography component="span" variant="caption" color="text.secondary">
-                {` · ${c.messages.toLocaleString()} messages, ${inMap[i]} in the map`}
+                {` · ${c.messages.toLocaleString()} messages, ${inMap[i]} coloured in the map`}
               </Typography>
             </Typography>
           </Stack>

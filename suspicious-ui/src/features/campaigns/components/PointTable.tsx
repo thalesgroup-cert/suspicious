@@ -1,4 +1,4 @@
-import { Link, Table, TableBody, TableCell, TableContainer, TableHead, TableRow, Typography } from "@mui/material";
+import { Box, Button, Link, Table, TableBody, TableCell, TableContainer, TableHead, TableRow, Typography } from "@mui/material";
 import { Link as RouterLink } from "react-router";
 
 import type { PcaPoint } from "@/features/campaigns/api";
@@ -18,8 +18,43 @@ const KEYS: Record<Key, (p: PcaPoint) => string | number | null> = {
   z: (p) => p.z,
 };
 
-/** The map as text: every sampled message with its coordinates. */
-export default function PointTable({ points }: { points: PcaPoint[] }) {
+function SelectButton({ point: p, selected, onSelectCases }: { point: PcaPoint; selected: string[]; onSelectCases: (caseIds: string[]) => void }) {
+  const id = p.suspicious_case_id;
+  const pressed = !!id && selected.includes(id);
+  const why = id ? undefined : "This message has no case id, so it cannot be selected.";
+  return (
+    // A disabled button gets no pointer events, so the span carries the reason for a mouse user; the button's own title is for assistive tech.
+    <Box component="span" title={why} sx={{ display: "inline-block" }}>
+      <Button
+        size="small"
+        variant={pressed ? "outlined" : "text"}
+        aria-pressed={pressed}
+        aria-label={`Select ${p.mail_subject ?? (id ? `case ${id}` : "message")}`}
+        disabled={!id}
+        title={why}
+        // A second press takes this case out of the selection; selecting replaces it, like a click in the map.
+        onClick={() => id && onSelectCases(pressed ? selected.filter((x) => x !== id) : [id])}
+        sx={{ minWidth: 0 }}
+      >
+        Select
+      </Button>
+    </Box>
+  );
+}
+
+/**
+ * The map as text: every sampled message with its coordinates. Given `onSelectCases`, each row has a Select button, so the
+ * table is also the keyboard way to pick a message (the canvas can only be picked with a pointer).
+ */
+export default function PointTable({
+  points,
+  selectedCaseIds = [],
+  onSelectCases,
+}: {
+  points: PcaPoint[];
+  selectedCaseIds?: string[];
+  onSelectCases?: (caseIds: string[]) => void;
+}) {
   const { sort, onSort } = useSort<Key>({ key: "label", dir: "asc" }, () => "asc");
   const rows = sortRows(points, KEYS[sort.key], sort.dir).slice(0, MAX_ROWS);
   const cell = (k: Key, label: string, align?: "right") => (
@@ -46,11 +81,13 @@ export default function PointTable({ points }: { points: PcaPoint[] }) {
               {cell("x", "PC1", "right")}
               {cell("y", "PC2", "right")}
               {cell("z", "PC3", "right")}
+              {onSelectCases ? <TableCell>Select</TableCell> : null}
             </TableRow>
           </TableHead>
           <TableBody>
             {rows.map((p, i) => (
-              <TableRow key={`${p.suspicious_case_id ?? "none"}-${i}`}>
+              // The row shows what aria-pressed says: a state carried only by a button's attribute is invisible to a sighted user.
+              <TableRow key={`${p.suspicious_case_id ?? "none"}-${i}`} selected={!!onSelectCases && !!p.suspicious_case_id && selectedCaseIds.includes(p.suspicious_case_id)}>
                 <TableCell sx={{ maxWidth: 260, overflowWrap: "anywhere" }}>{p.mail_subject ?? "—"}</TableCell>
                 <TableCell>
                   {p.suspicious_case_id ? (
@@ -67,6 +104,11 @@ export default function PointTable({ points }: { points: PcaPoint[] }) {
                     {v.toFixed(3)}
                   </TableCell>
                 ))}
+                {onSelectCases ? (
+                  <TableCell>
+                    <SelectButton point={p} selected={selectedCaseIds} onSelectCases={onSelectCases} />
+                  </TableCell>
+                ) : null}
               </TableRow>
             ))}
           </TableBody>

@@ -1,6 +1,6 @@
 import { describe, it, expect, vi, afterEach } from "vitest";
 import { useClassColors } from "@/features/campaigns/utils";
-import { screen, within } from "@testing-library/react";
+import { fireEvent, screen, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { renderWithProviders } from "@/test/utils";
 import { stubMatchMedia } from "@/test/matchMedia";
@@ -236,6 +236,57 @@ describe("PointTable", () => {
     expect(pc1).toHaveAttribute("aria-sort", "descending");
     const firstRow = screen.getAllByRole("row")[1];
     expect(within(firstRow).getByRole("link", { name: "249" })).toHaveAttribute("href", "/investigation?open=249");
+  });
+});
+
+describe("PointTable: selecting a message", () => {
+  const row = (id: string | null, subject: string | null): PcaPoint => ({ x: 1, y: 2, z: 3, label: "SAFE", suspicious_case_id: id, mail_subject: subject, sourceRefs: [], date: null });
+  const rows = [row("7", "Bonjour"), row(null, "Orphan"), row("9", null)];
+
+  it("has a Select button on every row that selects that case", async () => {
+    const user = userEvent.setup();
+    const onSelect = vi.fn();
+    renderWithProviders(<PointTable points={rows} selectedCaseIds={[]} onSelectCases={onSelect} />);
+    expect(screen.getByRole("columnheader", { name: "Select" })).toBeInTheDocument();
+    expect(screen.getAllByRole("button", { name: /^Select / })).toHaveLength(3);
+    await user.click(screen.getByRole("button", { name: "Select Bonjour" }));
+    expect(onSelect).toHaveBeenCalledExactlyOnceWith(["7"]);
+    // a message with no subject is still named: by its case
+    await user.click(screen.getByRole("button", { name: "Select case 9" }));
+    expect(onSelect).toHaveBeenLastCalledWith(["9"]);
+  });
+
+  it("shows which rows are selected with aria-pressed, and a second press takes that case out of the selection", async () => {
+    const user = userEvent.setup();
+    const onSelect = vi.fn();
+    renderWithProviders(<PointTable points={rows} selectedCaseIds={["7", "9"]} onSelectCases={onSelect} />);
+    expect(screen.getByRole("button", { name: "Select Bonjour" })).toHaveAttribute("aria-pressed", "true");
+    expect(screen.getByRole("button", { name: "Select case 9" })).toHaveAttribute("aria-pressed", "true");
+    expect(screen.getByRole("button", { name: "Select Orphan" })).toHaveAttribute("aria-pressed", "false");
+    // the rows say so too, not only the buttons' attribute
+    const rowOf = (name: string) => screen.getByRole("button", { name }).closest("tr")!;
+    expect(rowOf("Select Bonjour")).toHaveClass("Mui-selected");
+    expect(rowOf("Select Orphan")).not.toHaveClass("Mui-selected");
+    await user.click(screen.getByRole("button", { name: "Select Bonjour" }));
+    expect(onSelect).toHaveBeenCalledExactlyOnceWith(["9"]);
+  });
+
+  it("disables the button for a message without a case id, and says why", () => {
+    const onSelect = vi.fn();
+    renderWithProviders(<PointTable points={rows} selectedCaseIds={[]} onSelectCases={onSelect} />);
+    const orphan = screen.getByRole("button", { name: "Select Orphan" });
+    expect(orphan).toBeDisabled();
+    expect(orphan).toHaveAttribute("title", "This message has no case id, so it cannot be selected.");
+    // a disabled button gets no pointer events, so the reason is also on the element a mouse can reach
+    expect(orphan.parentElement).toHaveAttribute("title", "This message has no case id, so it cannot be selected.");
+    fireEvent.click(orphan);
+    expect(onSelect).not.toHaveBeenCalled();
+  });
+
+  it("has no Select column when nothing can be selected", () => {
+    renderWithProviders(<PointTable points={rows} />);
+    expect(screen.queryByRole("columnheader", { name: "Select" })).not.toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: /^Select / })).not.toBeInTheDocument();
   });
 });
 

@@ -152,7 +152,6 @@ export default function CampaignsPage() {
                         points={pca.points}
                         explainedVariance={pca.explained_variance}
                         campaigns={summaryQuery.data?.campaigns}
-                        neighbours={neighboursQuery.data}
                         sampleLimit={SAMPLE}
                         selectedCaseIds={selectedCaseIds}
                         onSelectCases={setSelectedCaseIds}

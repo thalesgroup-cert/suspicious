@@ -54,12 +54,15 @@ export function handleMapKey(e: KeyEvent, api: MapControlsApi): boolean {
 
 let webgl: boolean | undefined;
 
-/** Whether this browser can make a WebGL context. Asked once; the test context is given straight back. */
+/**
+ * Whether this browser can make a WebGL 2 context, which is what three.js (r163 and later) draws with: a browser that only has
+ * WebGL 1 gets the 2D map, not a 3D one that fails to start. Asked once; the test context is given straight back.
+ */
 export function detectWebGL(): boolean {
   if (webgl !== undefined) return webgl;
   try {
     const canvas = document.createElement("canvas");
-    const gl = (canvas.getContext("webgl2") ?? canvas.getContext("webgl")) as WebGLRenderingContext | null;
+    const gl = canvas.getContext("webgl2");
     webgl = !!gl;
     // Browsers allow about 16 live contexts: do not spend one on a question.
     gl?.getExtension("WEBGL_lose_context")?.loseContext();
