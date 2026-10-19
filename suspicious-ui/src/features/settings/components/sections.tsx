@@ -17,7 +17,7 @@ import { CisoUsersPanel } from "@/features/settings/components/CisoUsersPanel";
 import { DomainPairPanel } from "@/features/settings/components/ReadOnlyListPanel";
 import { EditableListPanel } from "@/features/settings/components/EditableListPanel";
 import { FeederPanel } from "@/features/settings/components/FeederPanel";
-import { ScoringPanel } from "@/features/settings/components/ScoringPanel";
+import { ScoringTable } from "@/features/settings/components/ScoringTable";
 
 export type SectionKind = "list" | "toggle" | "scoring" | "ciso_users" | "domain_pair" | "connectors";
 
@@ -56,7 +56,7 @@ export function SectionContent({ section }: { section: SectionMeta }) {
     case "toggle":
       return <FeederPanel />;
     case "scoring":
-      return <ScoringPanel />;
+      return <ScoringTable />;
     case "ciso_users":
       return <CisoUsersPanel />;
     case "connectors":

@@ -92,7 +92,8 @@ function SettingsBody() {
           </Grid>
 
           <Grid size={{ xs: 12, md: 8.5, lg: 9 }}>
-            <SoftCard>
+            {/* Card clips overflow by default, which would stop the scoring action bar from sticking. */}
+            <SoftCard sx={{ overflow: "visible" }}>
               <CardContent sx={{ p: { xs: 2, md: 3 } }}>
                 <Stack direction="row" spacing={1.5} sx={{ mb: 2.5, alignItems: "center" }}>
                   <Box
