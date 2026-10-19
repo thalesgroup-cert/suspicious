@@ -5,6 +5,7 @@ import { StatusLabel, connectorStatus } from "@/features/settings/components/Sta
 import type { Connector } from "@/features/settings/components/connectors";
 import { cleanDescription } from "@/features/settings/labels";
 import { scheduleText } from "@/features/settings/connectorConfig";
+import { useAccent } from "@/features/settings/useAccent";
 
 const visuallyHidden = {
   position: "absolute", width: "1px", height: "1px", overflow: "hidden", clip: "rect(0 0 0 0)", whiteSpace: "nowrap",
@@ -28,6 +29,7 @@ function health(c: Connector) {
 }
 
 export function ConnectorOverview({ connector }: { connector: Connector }) {
+  const accent = useAccent();
   const status = connectorStatus(connector);
   const h = health(connector);
   const docs = safeHttpUrl(connector.docs_url);
@@ -58,7 +60,7 @@ export function ConnectorOverview({ connector }: { connector: Connector }) {
     {
       key: "Documentation",
       value: docs ? (
-        <Link href={docs} target="_blank" rel="noopener noreferrer" underline="always">
+        <Link href={docs} target="_blank" rel="noopener noreferrer" underline="always" sx={{ color: accent.text }}>
           {docs}
           <Box component="span" sx={visuallyHidden}>{" "}(opens in a new tab)</Box>
         </Link>

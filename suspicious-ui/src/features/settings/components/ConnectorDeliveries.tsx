@@ -18,6 +18,7 @@ import {
 import { Link as RouterLink } from "react-router";
 
 import { StatusLabel, type StatusTone } from "@/features/settings/components/StatusLabel";
+import { useAccent } from "@/features/settings/useAccent";
 import { listDeliveries, type ConnectorDelivery } from "@/features/settings/components/connectors";
 import { DELIVERY_STATUS_LABEL } from "@/features/settings/labels";
 
@@ -31,14 +32,15 @@ const hidden = {
 
 const TONE: Record<ConnectorDelivery["status"], StatusTone> = { success: "ok", failed: "danger", skipped: "neutral" };
 
-const caseLink = (d: ConnectorDelivery) =>
+const caseLink = (d: ConnectorDelivery, color: string) =>
   d.case_id != null ? (
-    <Link component={RouterLink} to={`/investigation?open=${encodeURIComponent(String(d.case_id))}`} underline="always">
+    <Link component={RouterLink} to={`/investigation?open=${encodeURIComponent(String(d.case_id))}`} underline="always" sx={{ color }}>
       {`Case #${d.case_id}`}
     </Link>
   ) : null;
 
 export function ConnectorDeliveries({ name }: { name: string }) {
+  const accent = useAccent();
   const [failedOnly, setFailedOnly] = useState(false);
   const query = useQuery({
     queryKey: ["connector-deliveries", name],
@@ -101,10 +103,10 @@ export function ConnectorDeliveries({ name }: { name: string }) {
                     <Typography variant="caption" color="text.secondary" sx={{ display: { xs: "block", md: "none" } }}>
                       {when(d)}
                     </Typography>
-                    <Box sx={{ display: { xs: "block", md: "none" } }}>{caseLink(d)}</Box>
+                    <Box sx={{ display: { xs: "block", md: "none" } }}>{caseLink(d, accent.text)}</Box>
                   </TableCell>
                   <TableCell sx={{ whiteSpace: "nowrap", ...wideOnly }}>
-                    {caseLink(d) ?? <Typography variant="body2" color="text.secondary">None</Typography>}
+                    {caseLink(d, accent.text) ?? <Typography variant="body2" color="text.secondary">None</Typography>}
                   </TableCell>
                   <TableCell>
                     <StatusLabel size="small" tone={TONE[d.status] ?? "neutral"} label={DELIVERY_STATUS_LABEL[d.status] ?? d.status} />

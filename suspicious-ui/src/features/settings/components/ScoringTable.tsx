@@ -26,6 +26,7 @@ import { listAnalyzers, updateAnalyzerWeight, type Analyzer } from "@/features/s
 import { runBatch, summarise } from "@/features/settings/batch";
 import { ActionBar } from "@/features/settings/components/PanelSection";
 import { useReportUnsaved } from "@/features/settings/unsaved";
+import { useAccent } from "@/features/settings/useAccent";
 import {
   clampWeight,
   formatShare,
@@ -126,6 +127,7 @@ function WeightInput({ name, value, onChange }: { name: string; value: number; o
 
 export function ScoringTable() {
   const qc = useQueryClient();
+  const accent = useAccent();
   const captionId = React.useId();
   const query = useQuery<Analyzer[]>({
     queryKey: ["settings", "scoring"],
@@ -333,7 +335,7 @@ export function ScoringTable() {
                         onChange={(_, v) => setWeight(a.id, clampWeight(Number(v)))}
                         aria-label={`${a.name} weight`}
                         getAriaValueText={(v) => valueText(v, shareById.get(a.id) ?? 0)}
-                        sx={{ minWidth: 80, flex: 1 }}
+                        sx={{ minWidth: 80, flex: 1, color: accent.mark }}
                       />
                       <WeightInput name={a.name} value={weight} onChange={(v) => setWeight(a.id, v)} />
                     </Stack>
@@ -351,7 +353,7 @@ export function ScoringTable() {
                       <Stack direction="row" spacing={0.75} sx={{ alignItems: "center" }}>
                         <Box
                           aria-hidden
-                          sx={{ width: 8, height: 8, borderRadius: "50%", bgcolor: "primary.main", flexShrink: 0 }}
+                          sx={{ width: 8, height: 8, borderRadius: "50%", bgcolor: accent.mark, flexShrink: 0 }}
                         />
                         <Typography variant="body2">Modified</Typography>
                       </Stack>

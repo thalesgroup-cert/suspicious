@@ -1,5 +1,6 @@
 import { Box, InputAdornment, Stack, Switch, TextField, Typography } from "@mui/material";
 import { fieldLabel } from "@/features/settings/labels";
+import { useAccent } from "@/features/settings/useAccent";
 import { StatusLabel } from "./StatusLabel";
 import type { ConfigField } from "./connectors";
 
@@ -17,7 +18,7 @@ function Help({ text, fieldKey, error }: { text?: string; fieldKey: string; erro
 }
 
 // Label above the box (Carbon forms pattern): the floating label shrinks to about 9px, too small to read.
-const topLabelSx = {
+const topLabelSx = (focused: string) => ({
   "& .MuiInputLabel-root": {
     position: "static",
     transform: "none",
@@ -25,11 +26,11 @@ const topLabelSx = {
     mb: 0.75,
     typography: "body2",
     color: "text.primary",
-    "&.Mui-focused": { color: "primary.main" },
+    "&.Mui-focused": { color: focused },
     "&.Mui-error": { color: "error.main" },
   },
   "& .MuiOutlinedInput-notchedOutline": { top: 0, "& legend": { display: "none" } },
-} as const;
+}) as const;
 
 /** The config API returns this mask for a stored secret instead of the value. */
 export const SECRET_MASK = "********";
@@ -49,6 +50,7 @@ export function ConfigFieldInput({
   secretIsSet?: boolean;
 }) {
   const label = fieldLabel(field);
+  const accent = useAccent();
   if (field.type === "secret") {
     const isSet = secretIsSet ?? value === SECRET_MASK;
     return (
@@ -64,7 +66,7 @@ export function ConfigFieldInput({
         helperText={<Help text="Leave blank to keep the current secret" fieldKey={field.key} error={error} />}
         autoComplete="new-password"
         onChange={(e) => onChange(e.target.value)}
-        sx={topLabelSx}
+        sx={topLabelSx(accent.text)}
         slotProps={{
           inputLabel: { shrink: true },
           input: {
@@ -106,7 +108,7 @@ export function ConfigFieldInput({
       value={value ?? ""}
       error={Boolean(error)}
       helperText={<Help text={field.help} fieldKey={field.key} error={error} />}
-      sx={topLabelSx}
+      sx={topLabelSx(accent.text)}
       slotProps={{ inputLabel: { shrink: true } }}
       onChange={(e) =>
         onChange(field.type === "int" ? Number(e.target.value) : e.target.value)

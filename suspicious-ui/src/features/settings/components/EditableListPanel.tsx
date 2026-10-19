@@ -35,6 +35,7 @@ import {
 } from "@/features/settings/api";
 import { runBatch, summarise } from "@/features/settings/batch";
 import { EmptyList } from "@/features/settings/components/cards";
+import { useAccent } from "@/features/settings/useAccent";
 import { EntryDate } from "@/features/settings/components/EntryDate";
 import { ConfirmDialog } from "@/features/settings/components/ConfirmDialog";
 
@@ -60,6 +61,7 @@ const ListItemRow = React.memo(function ListItemRow({
   deleteDisabled: boolean;
 }) {
   const theme = useTheme();
+  const accent = useAccent();
   const { enqueueSnackbar } = useSnackbar();
 
   return (
@@ -87,7 +89,7 @@ const ListItemRow = React.memo(function ListItemRow({
     >
       <Checkbox
         size="small"
-        sx={{ gridArea: "check" }}
+        sx={{ gridArea: "check", "&.Mui-checked": { color: accent.mark } }}
         checked={selected}
         onChange={() => onToggleSelect(item.id)}
         slotProps={{ input: { "aria-label": `Select ${item.value}` } }}
@@ -234,6 +236,7 @@ function BulkToolbar({
   const someSelected = selected > 0 && !allSelected;
   // The bar is a translucent hover tint, so the theme's accent and error colours lose contrast on it.
   const theme = useTheme();
+  const accent = useAccent();
   const bar = flatten(theme.palette.action.hover, theme.palette.background.paper);
   const onBar = (c: string) => ensureContrast(flatten(c, bar), bar, 4.5);
 
@@ -243,6 +246,7 @@ function BulkToolbar({
         size="small"
         checked={allSelected}
         indeterminate={someSelected}
+        sx={{ "&.Mui-checked, &.MuiCheckbox-indeterminate": { color: accent.mark } }}
         onChange={allSelected ? onClearSelection : onSelectAll}
         slotProps={{ input: { "aria-label": allSelected ? "Deselect all" : "Select all" } }}
       />

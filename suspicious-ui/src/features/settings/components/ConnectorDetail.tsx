@@ -8,6 +8,7 @@ import { useTheme } from "@mui/material/styles";
 import { ensureContrast, flatten } from "@/shared/lib/contrast";
 import { ActionBar } from "@/features/settings/components/PanelSection";
 import { useReportUnsaved } from "@/features/settings/unsaved";
+import { useAccent } from "@/features/settings/useAccent";
 import { relativeTime } from "@/features/settings/connectorConfig";
 import { InnerCard } from "@/features/settings/components/cards";
 import { ConnectorConfigForm } from "@/features/settings/components/ConnectorConfigForm";
@@ -58,6 +59,7 @@ export function ConnectorDetail({
 }) {
   const queryClient = useQueryClient();
   const theme = useTheme();
+  const accent = useAccent();
   const [params, setParams] = useSearchParams();
   const tab = parseTab(params.get("tab"));
   const ids = useId();
@@ -147,6 +149,8 @@ export function ConnectorDetail({
   const disabledFill = flatten(theme.palette.action.disabledBackground, paper);
   const disabledText = ensureContrast(flatten(theme.palette.text.secondary, disabledFill), disabledFill, 4.5);
 
+  // Unselected tabs use the secondary text colour, which is under 4.5:1 on paper in a few themes.
+  const tabText = ensureContrast(flatten(theme.palette.text.secondary, paper), paper, 4.5);
   const tabId = (v: TabValue) => `${ids}-tab-${v}`;
   const panelId = (v: TabValue) => `${ids}-panel-${v}`;
 
@@ -192,7 +196,14 @@ export function ConnectorDetail({
         scrollButtons="auto"
         aria-label="Connector sections"
         // Tighter padding on a phone so all three labels fit; swiping still works if a theme or font makes them wider.
-        sx={{ borderBottom: 1, borderColor: "divider", mb: 2.5, "& .MuiTab-root": { minWidth: 0, px: { xs: 1, sm: 2 } } }}
+        sx={{
+          borderBottom: 1,
+          borderColor: "divider",
+          mb: 2.5,
+          "& .MuiTab-root": { minWidth: 0, px: { xs: 1, sm: 2 }, color: tabText },
+          "& .MuiTab-root.Mui-selected": { color: accent.text },
+          "& .MuiTabs-indicator": { backgroundColor: accent.mark },
+        }}
       >
         {TABS.map((t) => (
           <Tab key={t.value} value={t.value} label={t.label} id={tabId(t.value)} aria-controls={panelId(t.value)} />

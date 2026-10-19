@@ -20,6 +20,7 @@ import {
 import { useQuery } from "@tanstack/react-query";
 
 import { listItems, type ListItem } from "@/features/settings/api";
+import { useAccent } from "@/features/settings/useAccent";
 import { EntryDate } from "@/features/settings/components/EntryDate";
 import { EmptyList } from "@/features/settings/components/cards";
 import { EditableListPanel } from "@/features/settings/components/EditableListPanel";
@@ -38,6 +39,7 @@ export function ReadOnlyListPanel({
   const regionId = React.useId();
   const [filter, setFilter] = React.useState("");
   const [showItems, setShowItems] = React.useState(false);
+  const accent = useAccent();
 
   const listQuery = useQuery<ListItem[]>({
     queryKey: ["settings", "list", section],
@@ -96,7 +98,7 @@ export function ReadOnlyListPanel({
             aria-expanded={showItems}
             aria-controls={regionId}
             aria-label={showItems ? "Hide list" : "Show list"}
-            sx={{ border: 1, borderColor: "divider", borderRadius: 2, color: showItems ? "primary.main" : undefined }}
+            sx={{ border: 1, borderColor: "divider", borderRadius: 2, color: showItems ? accent.mark : undefined }}
           >
             {showItems ? <VisibilityOffOutlined fontSize="small" /> : <VisibilityOutlined fontSize="small" />}
           </IconButton>
