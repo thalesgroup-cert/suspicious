@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+from django.db.models import Sum
 from rest_framework import generics, status
 from rest_framework.exceptions import ValidationError
 from rest_framework.pagination import PageNumberPagination
@@ -148,6 +149,20 @@ class AnalyzerSettingsDetailView(generics.UpdateAPIView):
         analyzer = self.get_object()
         serializer = self.get_serializer(data=request.data)
         serializer.is_valid(raise_exception=True)
+
+        # Scoring divides by the summed weight of the analyzers that ran, so an
+        # all-zero active set would raise ValueError on every case. Inactive
+        # analyzers are never scheduled and so cannot hold the sum up.
+        if "weight" in serializer.validated_data and analyzer.is_active:
+            others = (
+                Analyzer.objects.filter(is_active=True)
+                .exclude(pk=analyzer.pk)
+                .aggregate(total=Sum("weight"))["total"]
+            ) or 0
+            if others + float(serializer.validated_data["weight"]) <= 0:
+                raise ValidationError(
+                    {"weight": ["At least one active analyzer must keep a weight above 0."]}
+                )
 
         update_fields = ["last_update"]
         for field in ("weight", "tier"):

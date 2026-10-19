@@ -16,7 +16,7 @@ Suspicious lists Cortex's analyzers on a schedule (`sync_cortex`) and creates a 
 | 2 | Strong | `AI_Mail_Analyzer`, `Yara`, `ThreatGrid`, `CIRCLHashlookup`, `Cuckoo`, `Hybrid` |
 | 3 | Contextual: informs, does not decide | everything else (Shodan, AbuseIPDB, Browserling, …) |
 
-Hybrid Analysis therefore starts at tier 2; Shodan, AbuseIPDB and Browserling start at tier 3. The numeric weight can be edited in the scoring panel of the **Settings** page. The tier is changed through the API: `PATCH /api/settings/analyzers/<id>/` with a body of `{"tier": 2}`, `{"weight": 0.4}` or both. Do this once you have seen how the source behaves. A new source is best left at tier 3 until you have compared it with real cases.
+Hybrid Analysis therefore starts at tier 2; Shodan, AbuseIPDB and Browserling start at tier 3. The numeric weight can be edited in the scoring panel of the **Settings** page. The tier is changed through the API: `PATCH /api/settings/analyzers/<id>/` with a body of `{"tier": 2}`, `{"weight": 0.4}` or both. Do this once you have seen how the source behaves. A weight update that would leave every active analyzer at 0 is rejected with a 400 on `weight`, because the case score is a weighted average and divides by the summed weight. A new source is best left at tier 3 until you have compared it with real cases.
 
 ## 3. How its result is read
 
