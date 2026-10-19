@@ -6,12 +6,12 @@ import { Navigate, useNavigate, useParams } from "react-router";
 import { Skeleton } from "boneyard-js/react";
 
 import { getMe, type Me } from "@/api/auth";
-import { composite, ensureContrast, flatten } from "@/shared/lib/contrast";
 import { SoftCard } from "@/features/settings/components/cards";
 import { SettingsNav } from "@/features/settings/components/SettingsNav";
 import { StatusStrip } from "@/features/settings/components/StatusStrip";
 import { SECTIONS, SectionContent, parseSection } from "@/features/settings/components/sections";
 import { UnsavedProvider, useUnsavedKeys } from "@/features/settings/unsaved";
+import { useAccent } from "@/features/settings/useAccent";
 
 // Query roots the header Refresh covers: lists and scoring live under "settings", the feeder health chip under "feeder".
 const REFRESH_ROOTS = new Set(["settings", "connectors", "connector-config", "connector-deliveries", "feeder"]);
@@ -22,10 +22,8 @@ function SettingsBody() {
   const navigate = useNavigate();
   const unsaved = useUnsavedKeys();
   const { section } = useParams();
-  // Refresh sits on the bare shell, whose primary glow (AppLayout, up to 7%) darkens the page colour under it.
-  const page = theme.palette.background.default;
-  const accent = flatten(theme.palette.primary.main, page);
-  const refreshColor = ensureContrast(accent, composite(accent, 0.07, page), 4.5);
+  // Refresh sits on the bare shell, and some themes (metal) tint an outlined button's own fill on top of it.
+  const refreshColor = useAccent().text;
 
   const meQuery = useQuery<Me>({ queryKey: ["me"], queryFn: getMe, retry: false });
   const me = meQuery.data;
