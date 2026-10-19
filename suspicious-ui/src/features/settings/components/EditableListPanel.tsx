@@ -34,14 +34,15 @@ import {
   type ListItem,
 } from "@/features/settings/api";
 import { runBatch, summarise } from "@/features/settings/batch";
-import { EmptyList, InnerCard } from "@/features/settings/components/cards";
+import { EmptyList } from "@/features/settings/components/cards";
+import { EntryDate } from "@/features/settings/components/EntryDate";
 import { ConfirmDialog } from "@/features/settings/components/ConfirmDialog";
 
 function parseMulti(input: string) {
   return input.split(/[\n,; ]+/g).map((s) => s.trim()).filter(Boolean);
 }
 
-function ListItemRow({
+const ListItemRow = React.memo(function ListItemRow({
   item,
   selected,
   onToggleSelect,
@@ -51,8 +52,9 @@ function ListItemRow({
 }: {
   item: ListItem;
   selected: boolean;
-  onToggleSelect: () => void;
-  onDelete: () => void;
+  /** Stable across renders so memo skips rows a selection change did not touch. */
+  onToggleSelect: (id: string) => void;
+  onDelete: (item: ListItem) => void;
   deleting: boolean;
   /** True while any removal or bulk run is in flight, so they never overlap. */
   deleteDisabled: boolean;
@@ -87,7 +89,7 @@ function ListItemRow({
         size="small"
         sx={{ gridArea: "check" }}
         checked={selected}
-        onChange={onToggleSelect}
+        onChange={() => onToggleSelect(item.id)}
         slotProps={{ input: { "aria-label": `Select ${item.value}` } }}
       />
 
@@ -97,11 +99,11 @@ function ListItemRow({
       >
         {item.value}
       </Typography>
-      {item.created_at ? (
-        <Typography variant="caption" color="text.secondary" sx={{ gridArea: "date", pb: { xs: 0.5, sm: 0 }, pr: { sm: 1 }, whiteSpace: "nowrap" }}>
-          Added {new Date(item.created_at).toLocaleDateString()}
-        </Typography>
-      ) : null}
+      <EntryDate
+        iso={item.created_at}
+        label="Added"
+        sx={{ gridArea: "date", pb: { xs: 0.5, sm: 0 }, pr: { sm: 1 }, whiteSpace: "nowrap" }}
+      />
 
       <IconButton
         size="small"
@@ -122,7 +124,7 @@ function ListItemRow({
         size="small"
         title="Delete"
         aria-label={`Delete ${item.value}`}
-        onClick={onDelete}
+        onClick={() => onDelete(item)}
         disabled={deleting || deleteDisabled}
         sx={{ gridArea: "del", color: "error.main", "&:hover": { background: alpha(theme.palette.error.main, 0.1) } }}
       >
@@ -132,7 +134,7 @@ function ListItemRow({
       </IconButton>
     </Box>
   );
-}
+});
 
 function AddBar({
   onAdd,
@@ -238,7 +240,7 @@ function BulkToolbar({
       />
 
       <Typography variant="body2" sx={{ flex: 1, fontWeight: 600 }}>
-        {selected > 0 ? `${selected} selected` : `${total} item${total !== 1 ? "s" : ""}`}
+        {selected > 0 ? `${selected} selected` : `${total} ${total === 1 ? "entry" : "entries"}`}
       </Typography>
 
       {selected > 0 ? (
@@ -405,6 +407,22 @@ export function EditableListPanel({
   const selectedCount = allVisibleIds.filter((id) => selectedIds.has(id)).length;
 
   // Any selection change makes the last bulk result stale.
+  const toggleSelect = React.useCallback((id: string) => {
+    setBulkStatus(null);
+    setSelectedIds((prev) => {
+      const next = new Set(prev);
+      if (next.has(id)) next.delete(id); else next.add(id);
+      return next;
+    });
+  }, []);
+
+  // mutate is referentially stable in TanStack Query, so rows keep the same callback across renders.
+  const { mutate: removeMutate } = removeMutation;
+  const deleteOne = React.useCallback((item: ListItem) => {
+    setDeletingId(item.id);
+    removeMutate(item);
+  }, [removeMutate]);
+
   function handleSelectAll() {
     setBulkStatus(null);
     setSelectedIds(new Set(allVisibleIds));
@@ -447,7 +465,7 @@ export function EditableListPanel({
       <Stack direction="row" spacing={1} sx={{ alignItems: "center", flexWrap: "wrap", rowGap: 1 }}>
         <TextField
           size="small"
-          placeholder="Filter items…"
+          placeholder="Filter entries…"
           value={filter}
           onChange={(e) => setFilter(e.target.value)}
           sx={{ flex: "1 1 220px" }}
@@ -487,8 +505,16 @@ export function EditableListPanel({
         <Chip size="small" label={`${items.length} total`} variant="outlined" />
       </Stack>
 
-      {/* Mounted before any result exists so screen readers announce the text when it lands. */}
-      <Typography role="status" variant="body2" color="text.secondary" sx={{ "&:empty": { display: "none" } }}>
+      {/* Mounted before any result exists so screen readers announce the text when it lands. Empty it is visually hidden and out of
+          flow, never display:none, which would drop the live region from the accessibility tree. */}
+      <Typography
+        role="status"
+        variant="body2"
+        color="text.secondary"
+        sx={{
+          "&:empty": { position: "absolute", width: "1px", height: "1px", m: 0, overflow: "hidden", clip: "rect(0 0 0 0)" },
+        }}
+      >
         {bulkStatus}
       </Typography>
 
@@ -499,7 +525,7 @@ export function EditableListPanel({
       ) : listQuery.isError ? (
         <Alert severity="error">Failed to load list.</Alert>
       ) : filtered.length === 0 ? (
-        <EmptyList message={filter ? `No items matching "${filter}"` : "No entries yet. Paste values above or import a file."} />
+        <EmptyList message={filter ? `No entries matching "${filter}"` : "No entries yet. Paste values above or import a file."} />
       ) : (
         <Box sx={{ border: 1, borderColor: "divider", borderRadius: 2, overflow: "hidden" }}>
           <BulkToolbar
@@ -523,15 +549,8 @@ export function EditableListPanel({
                   key={it.id}
                   item={it}
                   selected={selectedIds.has(it.id)}
-                  onToggleSelect={() => { setBulkStatus(null); setSelectedIds((prev) => {
-                    const next = new Set(prev);
-                    if (next.has(it.id)) next.delete(it.id); else next.add(it.id);
-                    return next;
-                  }); }}
-                  onDelete={() => {
-                    setDeletingId(it.id);
-                    removeMutation.mutate(it);
-                  }}
+                  onToggleSelect={toggleSelect}
+                  onDelete={deleteOne}
                   deleting={deletingId === it.id && (removeMutation.isPending || bulkRunning)}
                   deleteDisabled={bulkRunning || removeMutation.isPending}
                 />

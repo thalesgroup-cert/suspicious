@@ -44,14 +44,24 @@ describe("CisoUsersPanel", () => {
     vi.mocked(listItems).mockResolvedValue(USERS as never);
     renderWithProviders(<CisoUsersPanel />);
     const row = (await screen.findByRole("row", { name: /adaeze/ }));
+    const head = within(row).getByRole("rowheader");
+    expect(head).toHaveTextContent("adaeze");
+    expect(head).toHaveTextContent("a@x.io");
     const cells = within(row).getAllByRole("cell");
-    expect(cells[0]).toHaveTextContent("adaeze");
-    expect(cells[0]).toHaveTextContent("a@x.io");
-    expect(cells[1]).toHaveTextContent("CISO");
-    expect(cells[2]).toHaveTextContent("EMEA");
-    expect(cells[3]).toHaveTextContent("Cyber");
-    expect(cells[4]).toHaveTextContent("GB");
-    expect(cells[5]).toHaveTextContent("EMEA");
+    expect(cells[0]).toHaveTextContent("CISO");
+    expect(cells[1]).toHaveTextContent("EMEA");
+    expect(cells[2]).toHaveTextContent("Cyber");
+    expect(cells[3]).toHaveTextContent("GB");
+    expect(cells[4]).toHaveTextContent("EMEA");
+    // The chip may be narrow; the full scope stays reachable.
+    expect(within(row).getByTitle("EMEA")).toBeInTheDocument();
+  });
+
+  it("breaks a long username instead of overflowing the row header", async () => {
+    vi.mocked(listItems).mockResolvedValue(USERS as never);
+    renderWithProviders(<CisoUsersPanel />);
+    const head = within(await screen.findByRole("row", { name: /adaeze/ })).getByRole("rowheader");
+    expect(getComputedStyle(head.querySelector("p, span, div")!).overflowWrap).toBe("anywhere");
   });
 
   it("says No scope in words when a user has none", async () => {
@@ -131,6 +141,7 @@ describe("DomainPairPanel", () => {
 
     await user.click(await screen.findByRole("button", { name: "Show list" }));
     expect(await screen.findByText("watched.example")).toBeInTheDocument();
+    expect(screen.getByText(`First synced ${new Date("2026-03-04T10:00:00Z").toLocaleDateString()}`)).toBeInTheDocument();
     // Only the editable list's row offers deletion, and the block itself has no edit controls.
     expect(await screen.findAllByRole("button", { name: /^Delete / })).toHaveLength(1);
     const block = screen.getByRole("region", { name: "Synced from Watcher (read-only)" });
@@ -144,5 +155,34 @@ describe("DomainPairPanel", () => {
     renderWithProviders(<DomainPairPanel editableSection="domains_allow" title="Domains allowlist" />);
     await user.click(await screen.findByRole("button", { name: "Show list" }));
     expect(await screen.findByText("No synced entries yet.")).toBeInTheDocument();
+  });
+
+  it("renders no date for an invalid synced timestamp", async () => {
+    const user = userEvent.setup();
+    mockLists([{ id: "w1", value: "watched.example", created_at: "garbage" }]);
+    renderWithProviders(<DomainPairPanel editableSection="domains_deny" title="Domains denylist" />);
+    await user.click(await screen.findByRole("button", { name: "Show list" }));
+    await screen.findByText("watched.example");
+    expect(screen.queryByText(/synced \d|Invalid Date/i)).not.toBeInTheDocument();
+  });
+
+  it("points the toggle at the list region and names the region naturally", async () => {
+    const user = userEvent.setup();
+    mockLists([{ id: "w1", value: "watched.example" }]);
+    renderWithProviders(<DomainPairPanel editableSection="domains_deny" title="Domains denylist" />);
+    const toggle = await screen.findByRole("button", { name: "Show list" });
+    expect(document.getElementById(toggle.getAttribute("aria-controls")!)).not.toBeNull();
+    await user.click(toggle);
+    const region = await screen.findByRole("region", { name: "Watcher monitored domains" });
+    expect(document.getElementById(toggle.getAttribute("aria-controls")!)).toContainElement(region);
+  });
+
+  it("hints how many matches are hidden while the block is collapsed and a search is set", async () => {
+    const user = userEvent.setup();
+    mockLists([{ id: "w1", value: "watched.example" }, { id: "w2", value: "other.example" }]);
+    renderWithProviders(<DomainPairPanel editableSection="domains_deny" title="Domains denylist" />);
+    await screen.findByText("2 synced");
+    await user.type(screen.getByRole("textbox", { name: "Search Watcher monitored domains" }), "watched");
+    expect(screen.getByText("Expand to see 1 match")).toBeInTheDocument();
   });
 });

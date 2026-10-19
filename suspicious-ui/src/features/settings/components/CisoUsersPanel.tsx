@@ -29,7 +29,7 @@ const hidden = {
 function Scope({ scope }: { scope?: string }) {
   // Text in both branches: the shield chip is decoration, "No scope" is spelled out.
   return scope
-    ? <Chip size="small" icon={<ShieldOutlined />} label={scope} variant="outlined" />
+    ? <Chip size="small" icon={<ShieldOutlined />} label={scope} title={scope} variant="outlined" />
     : <Typography variant="body2" color="text.secondary">No scope</Typography>;
 }
 
@@ -38,7 +38,7 @@ const NotSet = () => <Typography component="span" variant="body2" color="text.se
 function Identity({ user }: { user: CisoUser }) {
   return (
     <>
-      <Typography variant="body2" sx={{ fontWeight: 600 }}>{user.username}</Typography>
+      <Typography variant="body2" sx={{ fontWeight: 600, overflowWrap: "anywhere" }}>{user.username}</Typography>
       <Typography variant="caption" color="text.secondary" sx={{ display: "block", overflowWrap: "anywhere" }}>
         {user.email || "No email"}
       </Typography>
@@ -61,7 +61,7 @@ function UserTable({ users }: { users: CisoUser[] }) {
         <TableBody>
           {users.map((u) => (
             <TableRow key={u.id} hover>
-              <TableCell sx={{ minWidth: 200 }}><Identity user={u} /></TableCell>
+              <TableCell component="th" scope="row" sx={{ minWidth: 200, fontWeight: "inherit" }}><Identity user={u} /></TableCell>
               <TableCell>{u.function || <NotSet />}</TableCell>
               <TableCell><Scope scope={u.scope} /></TableCell>
               <TableCell>{u.gbu || <NotSet />}</TableCell>
@@ -106,7 +106,7 @@ function UserCards({ users }: { users: CisoUser[] }) {
 
 export function CisoUsersPanel() {
   const theme = useTheme();
-  const isDesktop = useMediaQuery(theme.breakpoints.up("md"));
+  const isDesktop = useMediaQuery(theme.breakpoints.up("md"), { noSsr: true });
   const [filter, setFilter] = React.useState("");
 
   const query = useQuery<CisoUser[]>({

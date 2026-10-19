@@ -274,7 +274,7 @@ describe("EditableListPanel", () => {
       );
       await screen.findByText("a.com");
       for (const b of rowSelects()) await user.click(b);
-        await user.type(screen.getByPlaceholderText("Filter items…"), "a.com");
+      await user.type(screen.getByPlaceholderText("Filter entries…"), "a.com");
 
       await user.click(screen.getByRole("button", { name: "Delete 1" }));
       expect(await screen.findByRole("dialog")).toHaveTextContent("Delete 1 entry from Domains denylist?");
@@ -282,7 +282,7 @@ describe("EditableListPanel", () => {
       await waitFor(() => expect(mockRemove).toHaveBeenCalledTimes(1));
       expect(mockRemove).toHaveBeenCalledWith("domains_deny", "1");
 
-      await user.clear(screen.getByPlaceholderText("Filter items…"));
+      await user.clear(screen.getByPlaceholderText("Filter entries…"));
       expect(await screen.findByText("2 selected")).toBeInTheDocument();
     });
 
@@ -356,7 +356,7 @@ describe("EditableListPanel", () => {
       expect(screen.queryByText("Listed domains are treated as safe.")).not.toBeInTheDocument();
     });
 
-    it("shows the added date when created_at exists and omits it otherwise", async () => {
+    it("shows the added date in a time element when created_at exists and omits it otherwise", async () => {
       const iso = "2026-03-04T10:00:00Z";
       mockList.mockResolvedValue([
         { id: "1", value: "dated.com", created_at: iso },
@@ -368,6 +368,42 @@ describe("EditableListPanel", () => {
       await screen.findByText("dated.com");
       expect(screen.getByText(`Added ${new Date(iso).toLocaleDateString()}`)).toBeInTheDocument();
       expect(screen.getAllByText(/^Added /)).toHaveLength(1);
+      const time = document.querySelector("time")!;
+      expect(time).toHaveAttribute("datetime", iso);
+      expect(time).toHaveAttribute("title", new Date(iso).toLocaleString());
+    });
+
+    it("renders nothing for an invalid created_at instead of Invalid Date", async () => {
+      mockList.mockResolvedValue([{ id: "1", value: "odd.com", created_at: "not-a-date" }]);
+      renderWithProviders(
+        <EditableListPanel section="domains_allow" title="Domains allowlist" placeholder="Add domains" />
+      );
+      await screen.findByText("odd.com");
+      expect(screen.queryByText(/Added/)).not.toBeInTheDocument();
+      expect(screen.queryByText(/Invalid Date/)).not.toBeInTheDocument();
+      expect(document.querySelector("time")).toBeNull();
+    });
+
+    it("keeps the empty bulk status in the accessibility tree before any result", async () => {
+      renderWithProviders(
+        <EditableListPanel section="domains_allow" title="Domains allowlist" placeholder="Add domains" />
+      );
+      await screen.findByText("evil.com");
+      // getByRole skips display:none nodes, so finding it is itself the check; assert the style too.
+      const status = screen.getByRole("status");
+      expect(status).toBeEmptyDOMElement();
+      expect(getComputedStyle(status).display).not.toBe("none");
+    });
+
+    it("filters rows by the typed text and shows only the matches", async () => {
+      const user = userEvent.setup();
+      renderWithProviders(
+        <EditableListPanel section="domains_allow" title="Domains allowlist" placeholder="Add domains" />
+      );
+      await screen.findByText("evil.com");
+      await user.type(screen.getByPlaceholderText("Filter entries…"), "phish");
+      expect(screen.getByText("phish.net")).toBeInTheDocument();
+      expect(screen.queryByText("evil.com")).not.toBeInTheDocument();
     });
 
     it("names each row control after its value so the accessible names are unique", async () => {
@@ -385,7 +421,7 @@ describe("EditableListPanel", () => {
         <EditableListPanel section="domains_allow" title="Domains allowlist" placeholder="Add domains" />
       );
       await screen.findByText("evil.com");
-      expect(screen.getByPlaceholderText("Filter items…")).toBeVisible();
+      expect(screen.getByPlaceholderText("Filter entries…")).toBeVisible();
       expect(screen.getByText("Import file")).toBeInTheDocument();
       expect(screen.getByText("2 total")).toBeInTheDocument();
     });
@@ -410,7 +446,7 @@ describe("EditableListPanel", () => {
       <EditableListPanel section="domains_allow" title="Domains allowlist" placeholder="Add domains" />
     );
     await screen.findByText("evil.com");
-    await user.type(screen.getByPlaceholderText("Filter items…"), "zzz");
-    expect(await screen.findByText('No items matching "zzz"')).toBeInTheDocument();
+    await user.type(screen.getByPlaceholderText("Filter entries…"), "zzz");
+    expect(await screen.findByText('No entries matching "zzz"')).toBeInTheDocument();
   });
 });

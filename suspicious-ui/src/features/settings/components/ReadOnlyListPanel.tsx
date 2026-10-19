@@ -20,6 +20,7 @@ import {
 import { useQuery } from "@tanstack/react-query";
 
 import { listItems, type ListItem } from "@/features/settings/api";
+import { EntryDate } from "@/features/settings/components/EntryDate";
 import { EmptyList } from "@/features/settings/components/cards";
 import { EditableListPanel } from "@/features/settings/components/EditableListPanel";
 
@@ -34,6 +35,7 @@ export function ReadOnlyListPanel({
   subtitle: string;
 }) {
   const headingId = React.useId();
+  const regionId = React.useId();
   const [filter, setFilter] = React.useState("");
   const [showItems, setShowItems] = React.useState(false);
 
@@ -55,7 +57,8 @@ export function ReadOnlyListPanel({
       aria-labelledby={headingId}
       sx={{ border: 1, borderColor: "divider", borderRadius: 2, p: 2 }}
     >
-      <Stack spacing={1.5}>
+      {/* No Stack spacing: the collapsed list must add no gap, so the spacing lives inside the parts that collapse. */}
+      <Stack>
         <Stack direction="row" spacing={1} sx={{ alignItems: "flex-start", justifyContent: "space-between" }}>
           <Box>
             <Stack direction="row" spacing={0.75} sx={{ alignItems: "center" }}>
@@ -69,7 +72,7 @@ export function ReadOnlyListPanel({
           <Chip size="small" label={`${items.length} synced`} variant="outlined" />
         </Stack>
 
-        <Stack direction="row" spacing={1}>
+        <Stack direction="row" spacing={1} sx={{ mt: 1.5 }}>
           <TextField
             size="small"
             placeholder="Search synced domains…"
@@ -91,6 +94,7 @@ export function ReadOnlyListPanel({
             size="small"
             onClick={() => setShowItems((v) => !v)}
             aria-expanded={showItems}
+            aria-controls={regionId}
             aria-label={showItems ? "Hide list" : "Show list"}
             sx={{ border: 1, borderColor: "divider", borderRadius: 2, color: showItems ? "primary.main" : undefined }}
           >
@@ -98,18 +102,25 @@ export function ReadOnlyListPanel({
           </IconButton>
         </Stack>
 
-        <Collapse in={showItems} unmountOnExit>
+        {!showItems && filter.trim() ? (
+          <Typography variant="caption" color="text.secondary" sx={{ mt: 0.5 }}>
+            Expand to see {filtered.length} {filtered.length === 1 ? "match" : "matches"}
+          </Typography>
+        ) : null}
+
+        <Collapse in={showItems} id={regionId}>
+          <Box sx={{ pt: 1.5 }}>
           {listQuery.isLoading ? (
             <Box sx={{ py: 3, display: "grid", placeItems: "center" }}><CircularProgress size={20} /></Box>
           ) : listQuery.isError ? (
             <Alert severity="error">Failed to load.</Alert>
           ) : filtered.length === 0 ? (
-            <EmptyList message={filter ? `No items matching "${filter}"` : "No synced entries yet."} />
+            <EmptyList message={filter ? `No entries matching "${filter}"` : "No synced entries yet."} />
           ) : (
             <Box
               role="region"
               tabIndex={0}
-              aria-label={`${title} entries`}
+              aria-label={title}
               sx={{ maxHeight: 320, overflowY: "auto", border: 1, borderColor: "divider", borderRadius: 2 }}
             >
               <Box component="ul" sx={{ listStyle: "none", m: 0, p: 0 }}>
@@ -122,16 +133,14 @@ export function ReadOnlyListPanel({
                     <Typography component="span" sx={{ display: "block", fontFamily: "monospace", fontWeight: 600, fontSize: 13, overflowWrap: "anywhere" }}>
                       {it.value}
                     </Typography>
-                    {it.created_at ? (
-                      <Typography variant="caption" color="text.secondary">
-                        Synced {new Date(it.created_at).toLocaleDateString()}
-                      </Typography>
-                    ) : null}
+                    {/* created_at is the row's creation_date: when Suspicious first saw the domain, not Watcher's own date. */}
+                    <EntryDate iso={it.created_at} label="First synced" sx={{ display: "block" }} />
                   </Box>
                 ))}
               </Box>
             </Box>
           )}
+          </Box>
         </Collapse>
       </Stack>
     </Box>
