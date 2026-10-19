@@ -90,4 +90,23 @@ describe("ConnectorList", () => {
     resolveMutation({ ...CONNECTOR, enabled: false });
     await waitFor(() => expect(toggle).not.toBeDisabled());
   });
+
+  it("writes the status as text beside the dot", () => {
+    renderList({
+      connectors: [
+        CONNECTOR,
+        { ...CONNECTOR, name: "thehive", status: "partial" },
+        { ...CONNECTOR, name: "watcher", status: "disabled", enabled: false },
+      ],
+    });
+    expect(screen.getByText("Connected")).toBeInTheDocument();
+    expect(screen.getByText("Incomplete")).toBeInTheDocument();
+    expect(screen.getByText("Disabled")).toBeInTheDocument();
+  });
+
+  it("keeps the Enable <name> toggle names", () => {
+    renderList({ connectors: [CONNECTOR, { ...CONNECTOR, name: "thehive" }] });
+    expect(screen.getByRole("switch", { name: "Enable misp" })).toBeInTheDocument();
+    expect(screen.getByRole("switch", { name: "Enable thehive" })).toBeInTheDocument();
+  });
 });

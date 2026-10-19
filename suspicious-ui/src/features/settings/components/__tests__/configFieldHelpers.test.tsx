@@ -50,7 +50,7 @@ describe("ConfigFieldInput", () => {
         onChange={vi.fn()}
       />,
     );
-    const input = screen.getByLabelText("api_key") as HTMLInputElement;
+    const input = screen.getByLabelText("API Key") as HTMLInputElement;
     expect(input.type).toBe("password");
     expect(input.placeholder).toBe("********");
   });
@@ -76,8 +76,44 @@ describe("ConfigFieldInput", () => {
     );
     // required: false chosen to test plain str field rendering without the asterisk decoration,
     // which would break exact label matching in getByLabelText
-    const input = screen.getByLabelText("url") as HTMLInputElement;
+    const input = screen.getByLabelText("URL") as HTMLInputElement;
     expect(input.value).toBe("https://example.test");
     expect(screen.getByText("Base URL")).toBeInTheDocument();
+  });
+
+  it("shows the raw key beside the help text so it can still be matched to the config file", () => {
+    render(
+      <ConfigFieldInput
+        field={{ key: "ollama_url", type: "str", required: false, default: null, help: "Base URL" }}
+        value=""
+        onChange={vi.fn()}
+      />,
+    );
+    const input = screen.getByLabelText("Ollama URL");
+    expect(input).toHaveAccessibleDescription("Base URL ollama_url");
+  });
+
+  it("keeps the secret helper and adds the raw key", () => {
+    render(
+      <ConfigFieldInput
+        field={{ key: "api_key", type: "secret", required: false, default: null, help: "" }}
+        value=""
+        onChange={vi.fn()}
+      />,
+    );
+    expect(screen.getByLabelText("API Key")).toHaveAccessibleDescription(
+      "Leave blank to keep the current secret api_key",
+    );
+  });
+
+  it("gives a bool switch a readable accessible name", () => {
+    render(
+      <ConfigFieldInput
+        field={{ key: "verify_ssl", type: "bool", required: false, default: false, help: "" }}
+        value={false}
+        onChange={vi.fn()}
+      />,
+    );
+    expect(screen.getByRole("switch", { name: "Verify SSL" })).toBeInTheDocument();
   });
 });

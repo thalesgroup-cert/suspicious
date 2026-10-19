@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useEffect, useId, useState } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import {
   Alert,
@@ -15,6 +15,12 @@ import ArrowBackOutlined from "@mui/icons-material/ArrowBackOutlined";
 
 import { Badge } from "@/shared/components/Badge";
 import { useResultColors } from "@/styles/colorStore";
+import { useReportUnsaved } from "@/features/settings/unsaved";
+import {
+  CONNECTOR_STATUS_LABEL,
+  DELIVERY_STATUS_LABEL,
+  cleanDescription,
+} from "@/features/settings/labels";
 import { InnerCard, NavIcon } from "@/features/settings/components/cards";
 import { ConfigFieldInput } from "@/features/settings/components/configFieldHelpers";
 import {
@@ -38,25 +44,33 @@ import {
   testConnector,
 } from "@/features/settings/components/connectors";
 
-const STATUS_LABEL: Record<Connector["status"], string> = {
-  connected: "Connected",
-  partial: "Incomplete",
-  disabled: "Disabled",
-};
+const DELIVERY_LIMIT = 10;
+
+function testFailureMessage(err: unknown): string {
+  const data = (err as { response?: { data?: { detail?: unknown; error?: unknown } } }).response?.data;
+  const message = data?.detail ?? data?.error;
+  return typeof message === "string" && message ? message : "Connection test failed.";
+}
 
 export function ConnectorDetail({
   connector,
   onBack,
+  onDirtyChange,
 }: {
   connector: Connector;
   onBack?: () => void;
+  /** Lets the parent guard switching connector, which would otherwise drop the draft. */
+  onDirtyChange?: (dirty: boolean) => void;
 }) {
   const theme = useTheme();
   const isDark = theme.palette.mode === "dark";
   const queryClient = useQueryClient();
   const resultColors = useResultColors();
   const [draft, setDraft] = useState<Record<string, unknown> | null>(null);
-  const [testResult, setTestResult] = useState<string | null>(null);
+  const [testAlert, setTestAlert] = useState<{ severity: "success" | "error"; text: string } | null>(
+    null,
+  );
+  const hintId = useId();
   const [saveError, setSaveError] = useState<string | null>(null);
 
   const configQuery = useQuery({
@@ -66,7 +80,7 @@ export function ConnectorDetail({
 
   const deliveriesQuery = useQuery({
     queryKey: ["connector-deliveries", connector.name],
-    queryFn: () => listDeliveries(connector.name, 5),
+    queryFn: () => listDeliveries(connector.name, DELIVERY_LIMIT),
   });
 
   const save = useMutation({
@@ -91,8 +105,21 @@ export function ConnectorDetail({
   const test = useMutation({
     mutationFn: () => testConnector(connector.name),
     onSuccess: (result) =>
-      setTestResult(result.ok ? `OK: ${result.detail}` : `Failed: ${result.detail}`),
+      setTestAlert(
+        result.ok
+          ? { severity: "success", text: `OK: ${result.detail}` }
+          : { severity: "error", text: `Failed: ${result.detail}` },
+      ),
+    // A rejected request (4xx/5xx, network) must not vanish: say what went wrong.
+    onError: (err) => setTestAlert({ severity: "error", text: testFailureMessage(err) }),
   });
+
+  const hasDraft = draft !== null;
+  useReportUnsaved("connectors", hasDraft);
+  useEffect(() => {
+    onDirtyChange?.(hasDraft);
+    return () => onDirtyChange?.(false);
+  }, [hasDraft, onDirtyChange]);
 
   const config = draft ?? configQuery.data ?? {};
   const secretKeys = connector.config_schema
@@ -113,12 +140,12 @@ export function ConnectorDetail({
         <NavIcon icon={<Icon fontSize="small" />} isDark={isDark} />
         <Box sx={{ minWidth: 0, flex: 1 }}>
           <Stack direction="row" spacing={1} sx={{ alignItems: "center", flexWrap: "wrap" }}>
-            <Typography variant="h6" sx={{ fontWeight: 950 }}>
+            <Typography variant="h6" component="h3" sx={{ fontWeight: 700 }}>
               {connector.name}
             </Typography>
             <Chip size="small" label={connector.version} variant="outlined" />
             <Badge
-              label={STATUS_LABEL[connector.status]}
+              label={CONNECTOR_STATUS_LABEL[connector.status]}
               color={getConnectorStatusColor(connector.status, resultColors)}
             />
             {connector.last_health_ok !== null && (
@@ -129,12 +156,17 @@ export function ConnectorDetail({
             )}
           </Stack>
           <Typography variant="body2" color="text.secondary">
-            {connector.description}
+            {cleanDescription(connector.description)}
           </Typography>
         </Box>
       </Stack>
 
-      <Typography variant="overline" color="text.secondary" sx={{ display: "block", mb: 1 }}>
+      <Typography
+        variant="overline"
+        component="h4"
+        color="text.secondary"
+        sx={{ display: "block", mb: 1 }}
+      >
         Configuration
       </Typography>
       {configQuery.isError && (
@@ -160,11 +192,12 @@ export function ConnectorDetail({
             ))}
           </Stack>
 
-          <Stack direction="row" spacing={1} sx={{ mb: 2 }}>
+          <Stack direction="row" spacing={1} sx={{ mb: 2, alignItems: "center", flexWrap: "wrap" }}>
             <Button
               size="small"
               variant="contained"
               disabled={!draft || save.isPending}
+              aria-describedby={draft ? undefined : hintId}
               onClick={() => draft && save.mutate(stripUnchangedSecrets(draft, secretKeys))}
             >
               Save
@@ -172,17 +205,18 @@ export function ConnectorDetail({
             <Button size="small" onClick={() => test.mutate()} disabled={test.isPending}>
               Test connection
             </Button>
+            {!draft && (
+              <Typography id={hintId} variant="caption" color="text.secondary">
+                No changes to save
+              </Typography>
+            )}
           </Stack>
         </>
       )}
 
-      {testResult && (
-        <Alert
-          sx={{ mb: 1.5 }}
-          severity={testResult.startsWith("OK") ? "success" : "error"}
-          onClose={() => setTestResult(null)}
-        >
-          {testResult}
+      {testAlert && (
+        <Alert sx={{ mb: 1.5 }} severity={testAlert.severity} onClose={() => setTestAlert(null)}>
+          {testAlert.text}
         </Alert>
       )}
       {saveError && (
@@ -191,7 +225,12 @@ export function ConnectorDetail({
         </Alert>
       )}
 
-      <Typography variant="overline" color="text.secondary" sx={{ display: "block", mb: 1 }}>
+      <Typography
+        variant="overline"
+        component="h4"
+        color="text.secondary"
+        sx={{ display: "block", mb: 1 }}
+      >
         Recent deliveries
       </Typography>
       {deliveriesQuery.isError && (
@@ -218,6 +257,9 @@ export function ConnectorDetail({
                 flexShrink: 0,
               }}
             />
+            <Typography variant="caption" sx={{ fontWeight: 700 }}>
+              {DELIVERY_STATUS_LABEL[delivery.status] ?? delivery.status}
+            </Typography>
             <Typography variant="caption" sx={{ flex: 1 }}>
               {delivery.event}
               {delivery.case_id ? ` · case #${delivery.case_id}` : ""}
@@ -228,6 +270,11 @@ export function ConnectorDetail({
           </Stack>
         ))}
       </Stack>
+      {deliveries.length === DELIVERY_LIMIT && (
+        <Typography variant="caption" color="text.secondary" sx={{ display: "block", mt: 1 }}>
+          Showing the last {DELIVERY_LIMIT}
+        </Typography>
+      )}
     </InnerCard>
   );
 }

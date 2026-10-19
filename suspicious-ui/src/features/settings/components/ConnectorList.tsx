@@ -18,6 +18,7 @@ import {
   CONNECTOR_ICONS,
   DEFAULT_CONNECTOR_ICON,
 } from "@/features/settings/components/connectorIcons";
+import { CONNECTOR_STATUS_LABEL } from "@/features/settings/labels";
 import { getConnectorStatusColor } from "@/features/settings/components/connectorColors";
 import { setConnectorEnabled, type Connector } from "@/features/settings/components/connectors";
 
@@ -85,7 +86,7 @@ export function ConnectorList({
           <Typography
             variant="overline"
             color="text.secondary"
-            sx={{ display: "block", mb: 0.5, px: 1, letterSpacing: "0.08em", fontSize: 11 }}
+            sx={{ display: "block", mb: 0.5, px: 1, fontSize: 11 }}
           >
             {category}
           </Typography>
@@ -117,20 +118,19 @@ export function ConnectorList({
                     primary={connector.name}
                     sx={{ ml: 1.25 }}
                     slotProps={{
-                      primary: { sx: { fontWeight: isSelected ? 950 : 800, fontSize: 13.5 } },
+                      primary: { sx: { fontWeight: isSelected ? 700 : 600, fontSize: 13.5 } },
                     }}
                   />
-                  <Box
-                    aria-label={`${connector.name} status: ${connector.status}`}
-                    sx={{
-                      width: 8,
-                      height: 8,
-                      borderRadius: "50%",
-                      background: dotColor,
-                      flexShrink: 0,
-                      mr: 1,
-                    }}
-                  />
+                  {/* Colour alone is not a status: the word carries it, the dot is decoration. */}
+                  <Stack direction="row" spacing={0.75} sx={{ alignItems: "center", mr: 0.5, flexShrink: 0 }}>
+                    <Box
+                      aria-hidden
+                      sx={{ width: 8, height: 8, borderRadius: "50%", background: dotColor }}
+                    />
+                    <Typography variant="caption" color="text.secondary">
+                      {CONNECTOR_STATUS_LABEL[connector.status]}
+                    </Typography>
+                  </Stack>
                   <Switch
                     size="small"
                     checked={connector.enabled}

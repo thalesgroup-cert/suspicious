@@ -63,7 +63,7 @@ describe("ConnectorsPanel", () => {
 
   it("auto-selects the first connector on desktop and shows its editable fields", async () => {
     renderWithProviders(<ConnectorsPanel />);
-    const input = (await screen.findByLabelText("api_key")) as HTMLInputElement;
+    const input = (await screen.findByLabelText("API Key")) as HTMLInputElement;
     expect(input).not.toBeDisabled();
     expect(input.type).toBe("password");
   });
