@@ -1,5 +1,5 @@
 import * as React from "react";
-import { Box, Paper, Stack, Typography } from "@mui/material";
+import { Box, Stack } from "@mui/material";
 import { useTheme } from "@mui/material/styles";
 import { CartesianGrid, ResponsiveContainer, Scatter, ScatterChart, Tooltip, XAxis, YAxis } from "recharts";
 
@@ -7,6 +7,7 @@ import { plural } from "@/features/dashboard/format";
 import type { PcaPoint } from "@/features/campaigns/api";
 import { SERIES, classKey, classLabel, useClassColors, type SeriesKey } from "@/features/campaigns/utils";
 import ClassChip from "./ClassChip";
+import MapTooltip from "./MapTooltip";
 
 const R = 3;
 
@@ -27,23 +28,10 @@ const decimals = ([lo, hi]: [number, number]) => Math.min(6, Math.max(0, 1 - Mat
 
 function PointTooltip({ active, payload }: { active?: boolean; payload?: Array<{ payload?: PcaPoint }> }) {
   const p = payload?.[0]?.payload;
-  if (!active || !p) return null;
-  return (
-    <Paper variant="outlined" sx={{ px: 1.25, py: 1, maxWidth: 280 }}>
-      <Typography variant="subtitle2" component="p">
-        {classLabel(p.label)}
-      </Typography>
-      {p.mail_subject ? <Typography variant="body2">{p.mail_subject}</Typography> : null}
-      {p.suspicious_case_id ? (
-        <Typography variant="caption" color="text.secondary">
-          Case {p.suspicious_case_id}
-        </Typography>
-      ) : null}
-    </Paper>
-  );
+  return active && p ? <MapTooltip point={p} /> : null;
 }
 
-/** 2D scatter of the first two components (Task 4 puts the 3D map in front of it). */
+/** 2D scatter of the first two components: the fallback when there is no WebGL or no third component, or when the user prefers it. */
 export default function Embedding2D({ points, selectedCaseIds }: { points: PcaPoint[]; selectedCaseIds: string[] }) {
   const theme = useTheme();
   const colors = useClassColors();

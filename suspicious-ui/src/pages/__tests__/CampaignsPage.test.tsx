@@ -11,6 +11,8 @@ import {
   fixturePca,
 } from "@/test/fixtures";
 import pageSource from "../CampaignsPage.tsx?raw";
+import { detectWebGL } from "@/features/campaigns/mapSupport";
+import EmbeddingMap3D from "@/features/campaigns/components/EmbeddingMap3D";
 
 vi.mock("@/api/auth", () => ({
   getMe: vi.fn(),
@@ -24,6 +26,14 @@ vi.mock("@/features/campaigns/api", () => ({
   getNeighbours: vi.fn(),
   getPca: vi.fn(),
 }));
+
+// The page is tested against a stub 3D map: what it passes in is what matters here (embeddingMap3d.test.tsx
+// covers the map itself, the real renderer is in embeddingMap3d.gl.test.tsx).
+vi.mock("@/features/campaigns/mapSupport", async (original) => ({
+  ...(await original<typeof import("@/features/campaigns/mapSupport")>()),
+  detectWebGL: vi.fn(),
+}));
+vi.mock("@/features/campaigns/components/EmbeddingMap3D", () => ({ default: vi.fn() }));
 
 import { getMe } from "@/api/auth";
 import {
@@ -45,6 +55,10 @@ describe("CampaignsPage", () => {
     vi.mocked(getMailVolume).mockReset().mockResolvedValue(fixtureMailVolume);
     vi.mocked(getNeighbours).mockReset().mockResolvedValue(fixtureNeighbours);
     vi.mocked(getPca).mockReset().mockResolvedValue(fixturePca);
+    vi.mocked(detectWebGL).mockReturnValue(true);
+    vi.mocked(EmbeddingMap3D)
+      .mockReset()
+      .mockImplementation((() => <div data-testid="map3d" />) as never);
   });
 
   afterEach(() => vi.unstubAllGlobals());
@@ -219,7 +233,21 @@ describe("CampaignsPage", () => {
       scroll.mockRestore();
     });
 
-    it("explains the variance of the two plotted components and what the sample is", async () => {
+    it("explains the variance of the three plotted components and what the sample is", async () => {
+      vi.mocked(getPca).mockResolvedValue({ ...fixturePca, explained_variance: [0.25, 0.1, 0.05] });
+      renderWithProviders(<CampaignsPage />, { initialPath: "/campaigns" });
+      expect(
+        await screen.findByText(
+          `PC1 25% + PC2 10% + PC3 5% of the variance. Sample of up to ${(1500).toLocaleString()} messages from the whole store, not limited to the selected period. Closeness is not proof of a campaign.`,
+          {},
+          T
+        )
+      ).toBeInTheDocument();
+      expect(await screen.findByTestId("map3d", {}, T)).toBeInTheDocument();
+    });
+
+    it("explains the two plotted components when it has to draw the 2D map", async () => {
+      vi.mocked(detectWebGL).mockReturnValue(false);
       vi.mocked(getPca).mockResolvedValue({ ...fixturePca, explained_variance: [0.25, 0.1, 0.05] });
       renderWithProviders(<CampaignsPage />, { initialPath: "/campaigns" });
       expect(
@@ -229,7 +257,7 @@ describe("CampaignsPage", () => {
           T
         )
       ).toBeInTheDocument();
-      expect(screen.queryByText(/Components explain/)).not.toBeInTheDocument();
+      expect(screen.getByText("3D view unavailable, showing the 2D map.")).toBeInTheDocument();
     });
 
     it("does not mention PC3 when the backend sent two components", async () => {
@@ -237,6 +265,38 @@ describe("CampaignsPage", () => {
       renderWithProviders(<CampaignsPage />, { initialPath: "/campaigns" });
       expect(await screen.findByText(/^PC1 30% \+ PC2 20% of the variance\. Sample of up to/, {}, T)).toBeInTheDocument();
       expect(screen.queryByText(/PC3/)).not.toBeInTheDocument();
+    });
+
+    it("gives the 3D map the points, the period's campaigns and the selection", async () => {
+      const user = userEvent.setup();
+      renderWithProviders(<CampaignsPage />, { initialPath: "/campaigns" });
+      await screen.findByTestId("map3d", {}, T);
+      const first = vi.mocked(EmbeddingMap3D).mock.calls.at(-1)![0];
+      expect(first.points).toEqual(fixturePca.points);
+      expect(first.campaigns).toEqual(fixtureCampaignSummary.campaigns);
+      expect(first.selectedCaseIds).toEqual([]);
+
+      const table = await region("Campaigns in this period");
+      const row = (await within(table).findByText(fixtureCampaignSummary.campaigns[0].name, {}, T)).closest("tr")!;
+      await user.click(within(row as HTMLElement).getByRole("button", { name: "Show in map" }));
+      await waitFor(() => expect(vi.mocked(EmbeddingMap3D).mock.calls.at(-1)![0].selectedCaseIds).toEqual(["41", "40"]));
+    });
+
+    it("shows the selected message and its nearest neighbours in the review panel when a list row is chosen", async () => {
+      const user = userEvent.setup();
+      const sample = [
+        { ...fixturePca.points[0], suspicious_case_id: "17", mail_subject: "Reset your password" },
+        { ...fixturePca.points[1], mail_subject: "URGENT" },
+      ];
+      vi.mocked(getPca).mockResolvedValue({ ...fixturePca, points: sample });
+      renderWithProviders(<CampaignsPage />, { initialPath: "/campaigns" });
+      const side = await region("Review lists");
+      expect(within(side).queryByRole("region", { name: "Selected message" })).not.toBeInTheDocument();
+      await user.click(await within(side).findByRole("button", { name: /Reset your password/ }, T));
+      const selected = await within(side).findByRole("region", { name: "Selected message" }, T);
+      expect(within(selected).getByRole("link", { name: "Case 17" })).toHaveAttribute("href", "/investigation?open=17");
+      expect(within(side).getByRole("heading", { name: "Nearest in this 3D view" })).toBeInTheDocument();
+      expect(within(side).getByRole("list", { name: "Nearest messages" })).toHaveTextContent("URGENT");
     });
 
     it("keeps the review lists in a named, focusable region", async () => {

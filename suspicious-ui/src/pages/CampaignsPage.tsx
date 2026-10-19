@@ -83,18 +83,6 @@ export default function CampaignsPage() {
   const switching =
     (summaryQuery.isFetching && summaryQuery.isPlaceholderData) || (volumeQuery.isFetching && volumeQuery.isPlaceholderData);
   const isEmpty = summaryQuery.data?.messages === 0;
-  const variance = pcaQuery.data?.explained_variance ?? [];
-  const pct = (v: number) => `${Math.round(v * 100)}%`;
-  // Only what was plotted is explained: the first two components, whatever the backend sent beyond them.
-  const varianceCaption = pcaQuery.data
-    ? [
-        variance.length >= 2 ? `PC1 ${pct(variance[0])} + PC2 ${pct(variance[1])} of the variance${variance.length > 2 ? " (PC3 not shown)" : ""}.` : null,
-        `Sample of up to ${SAMPLE.toLocaleString()} messages from the whole store, not limited to the selected period.`,
-        "Closeness is not proof of a campaign.",
-      ]
-        .filter(Boolean)
-        .join(" ")
-    : undefined;
 
   return (
     <Box>
@@ -157,13 +145,15 @@ export default function CampaignsPage() {
 
             <Box sx={{ display: "grid", gridTemplateColumns: { xs: "1fr", md: "2fr 1fr" }, gap: 2 }}>
               <Box ref={mapRef} sx={{ minWidth: 0, scrollMarginTop: 96 }}>
-                <SoftCard title="Embedding map" caption={varianceCaption}>
+                <SoftCard title="Embedding map">
                   <PanelState query={pcaQuery} what="the embedding map" height={360}>
                     {(pca) => (
                       <EmbeddingMap
                         points={pca.points}
                         explainedVariance={pca.explained_variance}
+                        campaigns={summaryQuery.data?.campaigns}
                         neighbours={neighboursQuery.data}
+                        sampleLimit={SAMPLE}
                         selectedCaseIds={selectedCaseIds}
                         onSelectCases={setSelectedCaseIds}
                       />
@@ -178,7 +168,13 @@ export default function CampaignsPage() {
                     // stretching the row and leaving a hole under the map.
                     <Box sx={{ position: { md: "relative" }, flex: 1, minHeight: { md: 240 } }}>
                       <ScrollRegion label="Review lists" sx={{ position: { md: "absolute" }, inset: 0, overflowY: { md: "auto" }, pr: { md: 1 } }}>
-                        <SidePanel neighbours={n} onSelectCases={showInMap} />
+                        <SidePanel
+                          neighbours={n}
+                          onSelectCases={showInMap}
+                          points={pcaQuery.data?.points}
+                          selectedCaseIds={selectedCaseIds}
+                          campaigns={summaryQuery.data?.campaigns}
+                        />
                       </ScrollRegion>
                     </Box>
                   )}

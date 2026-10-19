@@ -51,12 +51,22 @@ export function useClassColors(): Record<SeriesKey, string> {
   };
 }
 
+/** Height of the 3D canvas; its loading placeholder is the same size so nothing jumps when it arrives. */
+export const MAP_HEIGHT = { xs: 340, md: 460 };
+
 /** "12 Oct" for a date or a datetime, read in UTC like the backend's days. */
 export function formatDay(iso: string): string {
   if (!iso) return "—";
   const d = new Date(iso.length === 10 ? `${iso}T00:00:00Z` : iso);
   if (Number.isNaN(d.getTime())) return "—";
   return d.toLocaleDateString("en-GB", { day: "numeric", month: "short", timeZone: "UTC" });
+}
+
+/** "12 Oct 2026" for a date or a datetime, read in UTC: the map's date range spans months, so the year is shown. */
+export function formatFullDay(iso: string): string {
+  const d = new Date(iso.length === 10 ? `${iso}T00:00:00Z` : iso);
+  if (!iso || Number.isNaN(d.getTime())) return "—";
+  return d.toLocaleDateString("en-GB", { day: "numeric", month: "short", year: "numeric", timeZone: "UTC" });
 }
 
 /** "12 Oct, 09:00 UTC". */
