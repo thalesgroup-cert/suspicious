@@ -2,7 +2,7 @@
 
 > **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:subagent-driven-development to implement this plan task-by-task. Steps use checkbox (`- [ ]`) syntax.
 
-**Goal:** Make the Settings console findable (grouped, deep-linkable sections, one header, a status strip), safe (confirmations, undo, honest bulk results, unsaved-changes guard, a weight-sum guard) and readable (analyzer scoring as a searchable table with shares, connector labels and delivery statuses, theme-safe colours, accessible controls).
+**Goal:** (amended 2026-10-19: every panel is also redesigned around a shared pattern, and connectors get their own logos) Make the Settings console findable (grouped, deep-linkable sections, one header, a status strip), safe (confirmations, undo, honest bulk results, unsaved-changes guard, a weight-sum guard) and readable (analyzer scoring as a searchable table with shares, connector labels and delivery statuses, theme-safe colours, accessible controls).
 
 **Architecture:** Frontend-only restructuring of `pages/SettingsPage.tsx` and `features/settings/*` around a route `settings/:section?`, a grouped nav, a status strip built from queries the page already runs, and three small shared pieces (`ConfirmDialog`, `runBatch`, an unsaved-changes registry). One additive backend check refuses a weight update that would make the total weight of active analyzers zero.
 
@@ -18,6 +18,8 @@
 - Destructive actions: single-entry removal is reversible (Undo re-adds the value through `addItems`); bulk delete, feeder off and discarding unsaved changes ask for confirmation stating the consequence and the count.
 - Frontend: reuse `SoftCard`/`InnerCard`, `EmptyList`, `useResultColors`/`ensureContrast`/`readableOnTint`, theme typography (`pageTitle`, `subtitle2`, `caption`); no literal colours (`#22C55E`, `#F59E0B`, `#EF4444` go), no inline `fontWeight` above 700 or `letterSpacing`, no text below the theme caption size; text 4.5:1, marks 3:1 in every theme; no em dashes in UI copy.
 - Accessibility: h1 page, h2 per panel, h3 sub-sections; unique region names; nav items `aria-current="page"`; sliders named and with `aria-valuetext`; dialogs trap and return focus; reduced motion respected; state never by colour alone.
+- Logos (amendment): bundled assets only, never fetched at runtime; every file recorded in `src/features/settings/logos/LOGOS.md` (source URL, licence, retrieval date); fixed-size neutral tile with a divider border, decorative `alt=""`, nothing recoloured; PNGs resized to 128 px, each file at most 20 kB; SVGs cleaned of scripts and external references; fallback to a neutral MUI icon tile when no logo exists or it fails to load; the user confirms brand usage before the final merge.
+- Status labels: icon + word + palette colour (never colour alone), marks 3:1, left-aligned before the label; key/value facts use a description list.
 - Conventional Commits, trailer `Co-Authored-By: Claude Sonnet 5.5 <noreply@anthropic.com>`; nothing pushed; never stage `deployment/compose_apps.yaml`; no `git stash`.
 - Gates: `npx vitest run`, `npx tsc -b`, `npx eslint .` (0 errors; 4 pre-existing warnings), e2e submit + ioc-road 7/7 (`e2e/investigation.spec.ts` keeps only main's 2 known failures); backend `ww test backend api dashboard` green. Host `node` is v18: `export PATH=$CLAUDE_JOB_DIR/tmp/bin:$PATH` (node 24); pnpm is not on PATH (use `npx`). Rebuild the Docker UI/`suspicious` images before live captures.
 
@@ -80,7 +82,45 @@
 - [ ] **Step 2: Run, verify fail. Step 3: Implement** in `ConnectorDetail.tsx`, `ConnectorList.tsx`, `configFieldHelpers.tsx`, `labels.ts`; `testConnector` gets `onError`; deliveries limit 10.
 - [ ] **Step 4: Gates; commit** `fix(ui): settings connectors readable labels, delivery statuses and handled test failures`.
 
-### Task 5: Polish and verification
+### Task 5: Shared panel pattern, status labels and connector logos
+
+**Interfaces (produces)** in `suspicious-ui/src/features/settings/components/`:
+- `PanelSection` props `{ title: string; purpose?: string; toolbar?: ReactNode; actions?: ReactNode; children }` (h2 title, one-line purpose, toolbar row, content, optional sticky bottom action bar slot `actions`); the page's content card already supplies the section title today: `SettingsPage` stops rendering it and each panel renders its own `PanelSection` (the section meta still provides title and subtitle through `SectionContent`).
+- `FactList` props `{ items: { key: string; value: ReactNode; action?: { label: string; hiddenName: string; onClick(): void } }[] }` rendered as a `dl` (`dt`/`dd`), row actions with visually hidden text naming the key.
+- `StatusLabel` props `{ tone: "ok" | "warning" | "danger" | "neutral" | "info"; label: string; size?: "small" | "medium" }`: icon (check, warning, error, remove, info) + word, colours from `useResultColors` through `ensureContrast` (text 4.5:1, icon 3:1), left aligned; `connectorStatus(connector): { tone, label }` maps `status`/`last_health_ok` to Connected, Incomplete, Disabled, Unhealthy (unhealthy wins over connected).
+- `ConnectorLogo` props `{ name: string; size?: number }`: fixed tile (default 40) with the bundled logo or the neutral icon fallback; `logos.ts`: `CONNECTOR_LOGOS: Record<string, { src: string; brand: string }>`; `LOGOS.md` provenance table.
+- Assets (fetch once, commit): MISP `INSTALL/logos/misp-logo.svg` from github.com/MISP/MISP; Chroma `docs/mintlify/images/favicon.svg` from github.com/chroma-core/chroma; Elasticsearch from the `simple-icons` data (CC0) for `case_search`; TheHive `images/thehive-logo.png` from TheHive-Project/TheHive; Watcher `Watcher/frontend/static/img/round-logo-fav.png` from thalesgroup-cert/Watcher. Download with `gh api`/`curl` from the raw URLs, view each, optimise (SVG: strip scripts/metadata, keep viewBox; PNG: resize to 128 px), record in `LOGOS.md`.
+
+- [ ] **Step 1: Failing tests:** `PanelSection` renders one h2, the purpose, the toolbar and the actions slot; `FactList` renders `dl`/`dt`/`dd`, an action link's accessible name is "<label> <hiddenName>"; `StatusLabel` shows icon and word for every tone (`getByText` + an `svg` present), contrast of text and icon against the page paper in light and midnight (>= 4.5 and >= 3), `connectorStatus` truth table (connected, partial, disabled, unhealthy wins, `last_health_ok` null ignored); `ConnectorLogo` renders an `img` with `alt=""` for known connectors (thehive, misp, chromadb, watcher, case_search), the fallback tile for `smtp_notify`, `ai_narration` and an unknown name, falls back after an image `error` event, tile size fixed; every `src` in `CONNECTOR_LOGOS` exists on disk and every file is listed in `LOGOS.md` (a node-side check reading the folder).
+- [ ] **Step 2: Run, verify fail. Step 3: Implement** the components and fetch/optimise the assets (view every asset after optimisation).
+- [ ] **Step 4: Gates; commit** `feat(ui): settings panel pattern, status labels and bundled connector logos`.
+
+### Task 6: Connectors redesign
+
+**Interfaces (consumes):** Task 5 components, `useReportUnsaved`, `ConfirmDialog`, `fieldLabel`, `cleanDescription`; `Connector` and `ConfigField` types (`events`, `schedules`, `docs_url`, `author`, `last_health_at`, `last_health_detail`), the config API (`********` marks a set secret).
+- Pure helpers `features/settings/connectorConfig.ts`: `groupFields(schema: ConfigField[]): { key: string; label: string; required: ConfigField[]; optional: ConfigField[] }[]` (group = leading token of the key before the first `_` or `.` when at least two fields share it, else "General"; groups ordered by first appearance, "General" first; label via `fieldLabel`-style title with the acronym map); `scheduleText(intervalSeconds: number): string` ("every 5 min", "every 2 h", "every 45 s"); `relativeTime(iso: string | null, now: Date): string` ("just now", "5 min ago", "3 h ago", "2 d ago", "not checked yet").
+- UI: list rows (logo, name, cleaned description clamp to 2 lines, `StatusLabel`, enable switch); detail header; MUI Tabs Overview / Configuration / Deliveries (`aria-controls`, roving focus, tab kept in the URL query `?tab=`); Configuration with fieldset+legend groups, "Show optional settings (N)" disclosure, secret "Set"/"Not set" text, sticky action bar (Save changes, Test connection) with the Task 4 draft/unsaved/discard behaviour intact, test result block ("Tested the saved configuration"); Deliveries table with `Failed only` toggle (`aria-pressed`), status word, error text, "Showing the last 10".
+
+- [ ] **Step 1: Failing tests:** `groupFields` (ai_narration-like schema gives Ollama, OpenAI, Anthropic, Gemini groups; a single-field prefix goes to General; required before optional; dotted keys; empty schema), `scheduleText`, `relativeTime`; list row shows logo + status word for each state and Unhealthy wins; detail header shows "Last checked 5 min ago: <detail>" and "Not checked yet"; Overview `FactList` shows events, schedules, author, version and a docs link (opens safely: `rel="noopener noreferrer"`, only http(s) `docs_url`); tabs keyboard (arrows, Home/End), URL query restores the tab, unknown tab falls back to Overview; secrets show "Set" when the value is `********` and "Not set" when empty; optional fields hidden until disclosure opened, a required field error stays visible; Save/Test behaviour from Task 4 still passes (draft, discard confirm, failure keeps values, stale-value fix); Deliveries toggle filters failed rows, error text shown; phone drill-in and Back with a draft asks to discard; heading outline h2 > h3 (connector) > h4 (groups); all tests of the old panels updated, not deleted.
+- [ ] **Step 2: Run, verify fail. Step 3: Implement. Step 4: Gates; capture the Connectors section in light and midnight at 1440 and 390 (each tab) and view them. Step 5: Commit** `feat(ui): connectors redesign with logos, grouped configuration, overview facts and delivery table`.
+
+### Task 7: Lists and CISO redesign
+
+**Interfaces (consumes):** Task 5 components; Task 2 behaviours stay intact (undo, bulk confirm, honest batches).
+- Lists: `PanelSection` per panel with the section purpose; toolbar (search, Add, Import file, count); rows show value, "Added <date>" when `created_at` is present, Delete; empty state names what the list does and how to add; Watcher synced block titled "Synced from Watcher (read-only)" with the sync count and no edit controls.
+- CISO: table on desktop (User with email, Function, Scope as text chip, GBU, Country, Region), cards on phone; "No scope" as text; search unchanged.
+
+- [ ] **Step 1: Failing tests:** purpose line per list; added date formatting and absence; Watcher block has no Delete/Add, labelled read-only; empty state copy per list; all Task 2 tests still pass (undo, bulk confirm, partial failure); CISO table headers and cells, phone card layout (matchMedia stub), "No scope" text, search filter, `h3` per user card removed in favour of table semantics (outline h2 > table caption).
+- [ ] **Step 2: Run, verify fail. Step 3: Implement. Step 4: Gates; captures (denylist with entries, CISO table, phone). Step 5: Commit** `feat(ui): settings lists and CISO users redesign`.
+
+### Task 8: Feeder and scoring polish
+
+- Feeder: one status card (`StatusLabel` + health badge, "Last checked" from the health data when it carries a timestamp, a paragraph on what the feeder does, the existing switch and confirm); scoring: a neutral share bar per row (decorative `aria-hidden` bar, percentage stays the text), panel moved onto `PanelSection` with the unsaved bar in the `actions` slot.
+
+- [ ] **Step 1: Failing tests:** feeder state shown as icon + word; "Last checked" shown only when a timestamp exists; confirm flow unchanged; scoring share bar width equals the share and is `aria-hidden`; all Task 3 tests still pass (save order, roles, guard, drafts).
+- [ ] **Step 2: Run, verify fail. Step 3: Implement. Step 4: Gates; captures. Step 5: Commit** `feat(ui): settings feeder status card and scoring share bars`.
+
+### Task 9: Polish and verification
 
 - [ ] **Step 1: Failing tests** for what the keyboard-only and heading-outline pass finds: one h1, h2 per panel, no skipped level; unique region names; the table has a name; tab order nav -> status strip -> panel; confirm dialog focus return in each flow; reduced motion (no transitions when `prefers-reduced-motion`); every interactive control has an accessible name (axe-like assertions over the rendered page, as in `CampaignsPage.a11y.test.tsx`).
 - [ ] **Step 2: Contrast sweep** (Playwright, all themes the app offers, 1440 and 390, every visible text node of every section; marks 3:1); reuse the Campaigns sweep script from `$CLAUDE_JOB_DIR/tmp` if present; fix page-owned failures with `ensureContrast`; list shared failures without changing them; save the table under the sdd directory and copy a summary to `docs/plans/settings-contrast-2026-10.tsv` (columns: theme, viewport, section, element, fg, bg, ratio, required, owner(page|shared), status; one counting rule on every summary row).
@@ -88,7 +128,7 @@
 
 ## Self-review
 
-- Spec coverage: navigation, header, status strip (Task 1); confirmations, undo, batch honesty, unsaved guard, feeder (Tasks 1-2); scoring table, shares, explanation, zero guard UI + API (Task 3); connector labels, deliveries, test failures, description copy (Task 4); contrast sweep, a11y, verification (Task 5).
+- Spec coverage (amendment): panel pattern, status labels and logos (Task 5); connectors redesign (Task 6); lists and CISO (Task 7); feeder and scoring polish (Task 8); original: navigation, header, status strip (Task 1); confirmations, undo, batch honesty, unsaved guard, feeder (Tasks 1-2); scoring table, shares, explanation, zero guard UI + API (Task 3); connector labels, deliveries, test failures, description copy (Task 4); contrast sweep, a11y, verification (Task 5).
 - Placeholders: none; each task lists its assertions and interfaces name signatures.
 - Type consistency: `SectionKey`, `useReportUnsaved`, `runBatch`, `ConfirmDialog`, `shares/wouldZeroTotal` named identically wherever used.
 - Open question for Task 3 ruled here: shares are computed over all listed analyzers (the page cannot know which analyzers ran on a case), the zero guard over active analyzers only (inactive ones are not scheduled).

@@ -1,6 +1,6 @@
 # Settings page: audit and redesign (spec)
 
-Date: 2026-10-19. Branch: `design/settings-page`. Status: awaiting user review.
+Date: 2026-10-19. Branch: `design/settings-page`. Status: approved (user, 2026-10-19); amended the same day with the panel redesign below.
 
 ## Why
 
@@ -86,6 +86,49 @@ Not found online: an official Material 3 settings page pattern (the searches ret
 
 - Every colour from the theme or result palette via `useResultColors` / `ensureContrast`; contrast sweep over all themes at 1440 and 390 (the campaigns sweep script is reused; table copied to `docs/plans/settings-contrast-2026-10.tsv`); shared failures are listed, not changed.
 - `prefers-reduced-motion`: no transition animations beyond the existing theme defaults.
+
+## Amendment: full panel redesign and connector logos (user, 2026-10-19)
+
+User: "for each panel in settings redo the full design, especially connectors which are really difficult to read; learn from the best official web apps; and use the logo of each app instead of icons in connectors."
+
+### Research (official design systems and open-source code)
+
+- **IBM Carbon, status indicators** (carbondesignsystem.com/patterns/status-indicator-pattern): status is icon + shape + word, never colour alone; marks at 3:1; left-aligned beside the label; a consolidated status takes the highest-attention colour; plain text when nothing needs action.
+- **IBM Carbon, forms** (carbondesignsystem.com/patterns/forms-pattern): top-aligned labels, one column, section headings, field widths matched to content, short visible helper text (essential information never in tooltips), validation on blur with specific errors, no disabled Save on long forms, primary action at the bottom and left-aligned, side panel or page above 5 inputs, progressive disclosure for optional fields.
+- **GOV.UK summary list and question pages**: key/value rows with row actions whose hidden text names the key; one-sentence hints; "(optional)" on the minority of fields, no asterisks; fieldset + legend for related inputs.
+- **Grafana data source docs** (grafana.com/docs/plugins/.../configure): Name, then Connection, then Authentication, then "Save & test"; a stored token is not returned to the browser.
+- **Shopify Polaris app settings layout** (search summary only; the page itself redirected): description on the left, settings grouped into cards on the right.
+- Not found online: citable teardowns of Linear, Vercel, Stripe or PostHog; nothing here claims anything about them.
+
+### What is hard to read today (connectors)
+
+One ungrouped run of 9+ fields (ai_narration mixes Ollama, OpenAI, Anthropic and Gemini keys); facts the API already returns but the page hides: `last_health_at` and `last_health_detail`, `events`, `schedules`, `docs_url`, `author`, and whether each secret is set (the config API returns `********` for a set secret); status and health as separate chips plus a dot; deliveries as a bare list.
+
+### Design
+
+**Shared panel pattern** (`PanelSection` and friends): every panel is title (h2) + one-line purpose + optional toolbar + content + optional sticky bottom action bar; key/value lists use `FactList` (a description list: key, value, optional action with hidden text); statuses use `StatusLabel` (icon + word, palette colours through `ensureContrast`, marks 3:1, left-aligned before the label).
+
+**Connectors (master-detail):**
+- List: rows grouped by category; row = logo tile, name, one-line cleaned description, `StatusLabel` (Connected, Incomplete, Disabled; Unhealthy when `last_health_ok === false`), enable switch at the row end (instant save).
+- Detail header: logo tile, name, version, `StatusLabel`, "Last checked <relative time>: <health detail>" (hidden when `last_health_at` is null: "Not checked yet").
+- Tabs (MUI Tabs with proper roles; the active tab is in the URL hash or query so it survives a refresh): **Overview** (`FactList`: Status, Health, Events, Schedules as "every 15 min", Author, Version, Documentation link), **Configuration**, **Deliveries**.
+- Configuration: fields grouped by key prefix: a group is the leading token of the key (`ollama_url`, `ollama_model` -> "Ollama") when at least two fields share it, else "General"; group = fieldset + legend (h4 heading style), required fields first, optional ones inside a "Show optional settings" disclosure (hidden count in the label); a secret shows "Set" or "Not set" (from `********`) beside the field; helper text one short sentence plus the raw key; a sticky bottom bar (Save changes, Test connection) that is never disabled without a stated reason; the test result is a block under the bar saying what was tested (saved configuration).
+- Deliveries: a table (Event, Case link, Status word, Time, Error), `Failed only` toggle, 10 rows with a "Showing the last 10" note; empty and error states.
+- Phone: the list becomes a drill-in with Back (existing behaviour), tabs scroll horizontally.
+
+**Logos** (frontend assets only, nothing fetched at runtime so air-gapped installs work): bundled in `src/features/settings/logos/` with `logos.ts` mapping connector name -> `{ src, brand, source }` and `LOGOS.md` recording the source URL, licence and retrieval date of every file. Sources: MISP `INSTALL/logos/misp-logo.svg` (MISP/MISP, AGPL-3.0), Chroma `docs/mintlify/images/favicon.svg` (chroma-core/chroma, Apache-2.0), Elasticsearch from Simple Icons (CC0 icon data; the mark remains the owner's trademark) for `case_search`, TheHive `images/thehive-logo.png` (TheHive-Project/TheHive, AGPL-3.0, archived), Watcher `Watcher/frontend/static/img/round-logo-fav.png` or the 196 px favicon (thalesgroup-cert/Watcher, AGPL-3.0). `smtp_notify` and `ai_narration` have no single brand, so they keep a neutral MUI icon in the same tile. PNGs are resized to 128 px and optimised (each file at most 20 kB); SVGs are cleaned (no scripts, no external references, `viewBox` kept). Logos render in a fixed-size tile with a neutral surface (`background.paper`) and a 1 px divider border so any logo stays legible in every theme; decorative (`alt=""`) because the name is always beside it; nothing is recoloured. A missing or failing logo falls back to the neutral icon tile. Brand marks are used only to identify the integration; this is recorded in `LOGOS.md`, and the user is asked to confirm brand usage for the final merge.
+
+**Lists** (domains allow/deny, campaign domains, files, filetypes): purpose line from the section meta; toolbar (search, Add, Import file) and a count; rows = value, added date (`created_at` when present), Delete; empty state that says what the list does and how to add; Watcher synced lists as a separate, clearly read-only block ("Synced from Watcher, read-only").
+
+**CISO users:** a table on desktop (User, Function, Scope, GBU, Country, Region) and cards on phone; search stays; "No scope" is text, not only colour.
+
+**Email feeder:** one status card (`StatusLabel` for the state and the health badge, "Last checked" when the health query carries a timestamp, a paragraph on what the feeder does); the switch keeps the confirm.
+
+**Scoring:** the table stays; each row gains a neutral share bar (decorative, `aria-hidden`, the percentage is the text).
+
+### Tasks affected
+
+Plan tasks 5-8 (panel pattern + logos, connectors, lists + CISO, feeder + scoring polish) are inserted before polish; the old Task 5 is now Task 9.
 
 ## Global constraints
 
