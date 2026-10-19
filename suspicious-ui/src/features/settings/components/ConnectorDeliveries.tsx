@@ -23,11 +23,20 @@ import { DELIVERY_STATUS_LABEL } from "@/features/settings/labels";
 
 export const DELIVERY_LIMIT = 10;
 const LONG_ERROR = 80;
+const wideOnly = { display: { xs: "none", md: "table-cell" } } as const;
+const when = (d: ConnectorDelivery) => new Date(d.created_at).toLocaleString([], { dateStyle: "medium", timeStyle: "short" });
 const hidden = {
   position: "absolute", width: "1px", height: "1px", overflow: "hidden", clip: "rect(0 0 0 0)", whiteSpace: "nowrap",
 } as const;
 
 const TONE: Record<ConnectorDelivery["status"], StatusTone> = { success: "ok", failed: "danger", skipped: "neutral" };
+
+const caseLink = (d: ConnectorDelivery) =>
+  d.case_id != null ? (
+    <Link component={RouterLink} to={`/investigation?open=${encodeURIComponent(String(d.case_id))}`} underline="always">
+      {`Case #${d.case_id}`}
+    </Link>
+  ) : null;
 
 export function ConnectorDeliveries({ name }: { name: string }) {
   const [failedOnly, setFailedOnly] = useState(false);
@@ -74,32 +83,33 @@ export function ConnectorDeliveries({ name }: { name: string }) {
       ) : (
         // Focusable so a keyboard user can scroll the table sideways on a phone.
         <TableContainer tabIndex={0} role="region" aria-label="Deliveries table" sx={{ overflowX: "auto" }}>
-          <Table size="small" sx={{ minWidth: 560 }}>
+          <Table size="small" sx={{ "& th, & td": { px: { xs: 0.75, sm: 2 } } }}>
             <Box component="caption" sx={hidden}>Recent deliveries</Box>
             <TableHead>
               <TableRow>
                 {["Event", "Case", "Status", "Time", "Error"].map((h) => (
-                  <TableCell key={h} component="th" scope="col">{h}</TableCell>
+                  // On a phone Time and Case fold into the Event cell: five columns would need sideways scrolling to reach Status and Error.
+                  <TableCell key={h} component="th" scope="col" sx={h === "Time" || h === "Case" ? wideOnly : undefined}>{h}</TableCell>
                 ))}
               </TableRow>
             </TableHead>
             <TableBody>
               {rows.map((d) => (
                 <TableRow key={d.id}>
-                  <TableCell>{d.event}</TableCell>
-                  <TableCell>
-                    {d.case_id != null ? (
-                      <Link component={RouterLink} to={`/investigation?open=${encodeURIComponent(String(d.case_id))}`} underline="always">
-                        {`Case #${d.case_id}`}
-                      </Link>
-                    ) : (
-                      <Typography variant="body2" color="text.secondary">None</Typography>
-                    )}
+                  <TableCell sx={{ whiteSpace: "nowrap" }}>
+                    {d.event}
+                    <Typography variant="caption" color="text.secondary" sx={{ display: { xs: "block", md: "none" } }}>
+                      {when(d)}
+                    </Typography>
+                    <Box sx={{ display: { xs: "block", md: "none" } }}>{caseLink(d)}</Box>
+                  </TableCell>
+                  <TableCell sx={{ whiteSpace: "nowrap", ...wideOnly }}>
+                    {caseLink(d) ?? <Typography variant="body2" color="text.secondary">None</Typography>}
                   </TableCell>
                   <TableCell>
                     <StatusLabel size="small" tone={TONE[d.status] ?? "neutral"} label={DELIVERY_STATUS_LABEL[d.status] ?? d.status} />
                   </TableCell>
-                  <TableCell sx={{ whiteSpace: "nowrap" }}>{new Date(d.created_at).toLocaleString()}</TableCell>
+                  <TableCell sx={{ whiteSpace: "nowrap", ...wideOnly }}>{when(d)}</TableCell>
                   <TableCell sx={{ maxWidth: 280 }}>
                     {d.error && (
                       // The text stays whole in the DOM (assistive tech reads it all); only the view is clamped.

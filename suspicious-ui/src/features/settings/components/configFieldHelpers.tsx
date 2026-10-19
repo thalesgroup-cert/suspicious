@@ -16,6 +16,21 @@ function Help({ text, fieldKey, error }: { text?: string; fieldKey: string; erro
   );
 }
 
+// Label above the box (Carbon forms pattern): the floating label shrinks to about 9px, too small to read.
+const topLabelSx = {
+  "& .MuiInputLabel-root": {
+    position: "static",
+    transform: "none",
+    maxWidth: "100%",
+    mb: 0.75,
+    typography: "body2",
+    color: "text.primary",
+    "&.Mui-focused": { color: "primary.main" },
+    "&.Mui-error": { color: "error.main" },
+  },
+  "& .MuiOutlinedInput-notchedOutline": { top: 0, "& legend": { display: "none" } },
+} as const;
+
 /** The config API returns this mask for a stored secret instead of the value. */
 export const SECRET_MASK = "********";
 
@@ -48,7 +63,9 @@ export function ConfigFieldInput({
         helperText={<Help text="Leave blank to keep the current secret" fieldKey={field.key} error={error} />}
         autoComplete="new-password"
         onChange={(e) => onChange(e.target.value)}
+        sx={topLabelSx}
         slotProps={{
+          inputLabel: { shrink: true },
           input: {
             // Beside the box, not in the helper text, so a screen reader meets it with the field.
             endAdornment: (
@@ -88,6 +105,8 @@ export function ConfigFieldInput({
       value={value ?? ""}
       error={Boolean(error)}
       helperText={<Help text={field.help} fieldKey={field.key} error={error} />}
+      sx={topLabelSx}
+      slotProps={{ inputLabel: { shrink: true } }}
       onChange={(e) =>
         onChange(field.type === "int" ? Number(e.target.value) : e.target.value)
       }

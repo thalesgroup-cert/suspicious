@@ -5,7 +5,6 @@ import { Alert, AlertTitle, Box, Button, Chip, CircularProgress, IconButton, Sta
 import ArrowBackOutlined from "@mui/icons-material/ArrowBackOutlined";
 
 import { useReportUnsaved } from "@/features/settings/unsaved";
-import { cleanDescription } from "@/features/settings/labels";
 import { relativeTime } from "@/features/settings/connectorConfig";
 import { InnerCard } from "@/features/settings/components/cards";
 import { ConnectorConfigForm } from "@/features/settings/components/ConnectorConfigForm";
@@ -123,8 +122,7 @@ export function ConnectorDetail({
     .map((f) => f.key);
 
   const status = connectorStatus(connector);
-  const description = cleanDescription(connector.description);
-  const checked = connector.last_health_at
+    const checked = connector.last_health_at
     ? `Last checked ${relativeTime(connector.last_health_at, new Date())}${connector.last_health_detail ? `: ${connector.last_health_detail}` : ""}`
     : "Not checked yet";
 
@@ -134,7 +132,7 @@ export function ConnectorDetail({
   const configLoaded = !configQuery.isLoading && !configQuery.isError;
 
   return (
-    <InnerCard sx={{ p: { xs: 2, md: 2.5 } }}>
+    <InnerCard sx={{ p: { xs: 1.5, md: 2.5 } }}>
       <Stack direction="row" spacing={1.5} sx={{ alignItems: "flex-start", mb: 1 }}>
         {onBack && (
           <IconButton size="small" aria-label="Back to connector list" onClick={onBack} sx={{ mt: 1 }}>
@@ -150,11 +148,6 @@ export function ConnectorDetail({
             <Chip size="small" label={connector.version} variant="outlined" />
             <StatusLabel tone={status.tone} label={status.label} />
           </Stack>
-          {description && (
-            <Typography variant="body2" color="text.secondary">
-              {description}
-            </Typography>
-          )}
           <Typography variant="caption" color="text.secondary" sx={{ display: "block", mt: 0.25 }}>
             {checked}
           </Typography>
@@ -176,9 +169,9 @@ export function ConnectorDetail({
         }}
         variant="scrollable"
         scrollButtons="auto"
-        allowScrollButtonsMobile
         aria-label="Connector sections"
-        sx={{ borderBottom: 1, borderColor: "divider", mb: 2.5 }}
+        // Tighter padding on a phone so all three labels fit; swiping still works if a theme or font makes them wider.
+        sx={{ borderBottom: 1, borderColor: "divider", mb: 2.5, "& .MuiTab-root": { minWidth: 0, px: { xs: 1, sm: 2 } } }}
       >
         {TABS.map((t) => (
           <Tab key={t.value} value={t.value} label={t.label} id={tabId(t.value)} aria-controls={panelId(t.value)} />
@@ -242,6 +235,8 @@ export function ConnectorDetail({
                     <Stack direction="row" spacing={1} sx={{ alignItems: "center", flexWrap: "wrap", rowGap: 1 }}>
                       <Button
                         variant="contained"
+                        // The theme's disabled contained button keeps the brand fill, which makes the label unreadable.
+                        sx={{ "&.Mui-disabled": { bgcolor: "action.disabledBackground", color: "text.disabled", background: "none" } }}
                         disabled={!draft || save.isPending}
                         aria-describedby={draft ? undefined : hintId}
                         onClick={() => draft && save.mutate(stripUnchangedSecrets(draft, secretKeys))}

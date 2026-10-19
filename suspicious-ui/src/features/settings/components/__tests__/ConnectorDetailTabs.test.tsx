@@ -1,6 +1,7 @@
 import { screen, waitFor, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
-import { describe, expect, it, vi } from "vitest";
+import { beforeEach, describe, expect, it, vi } from "vitest";
+import { page } from "@vitest/browser/context";
 
 import { renderWithProviders } from "@/test/utils";
 import { ConnectorDetail } from "../ConnectorDetail";
@@ -297,6 +298,11 @@ describe("configuration", () => {
 });
 
 describe("deliveries", () => {
+  // Below md the Time column folds into the Event cell, so the five-column table needs a desktop viewport.
+  beforeEach(async () => {
+    await page.viewport(1280, 800);
+  });
+
   it("filters to failed deliveries with a pressed toggle and shows the error", async () => {
     const { listDeliveries } = await import("../connectors");
     vi.mocked(listDeliveries).mockResolvedValueOnce([

@@ -3,6 +3,7 @@ import { Box, Link, Typography } from "@mui/material";
 import { FactList, type Fact } from "@/features/settings/components/FactList";
 import { StatusLabel, connectorStatus } from "@/features/settings/components/StatusLabel";
 import type { Connector } from "@/features/settings/components/connectors";
+import { cleanDescription } from "@/features/settings/labels";
 import { scheduleText } from "@/features/settings/connectorConfig";
 
 const visuallyHidden = {
@@ -30,7 +31,9 @@ export function ConnectorOverview({ connector }: { connector: Connector }) {
   const status = connectorStatus(connector);
   const h = health(connector);
   const docs = safeHttpUrl(connector.docs_url);
+  const description = cleanDescription(connector.description);
   const items: Fact[] = [
+    ...(description ? [{ key: "Description", value: description }] : []),
     { key: "Status", value: <StatusLabel tone={status.tone} label={status.label} /> },
     {
       key: "Health",
