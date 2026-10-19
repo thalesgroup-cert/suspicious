@@ -1,6 +1,7 @@
 import { describe, it, expect, vi, afterEach } from "vitest";
 import { act, fireEvent, screen, waitFor } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
+import * as React from "react";
 import { BufferGeometry } from "three";
 import { renderWithProviders } from "@/test/utils";
 import { stubMatchMedia } from "@/test/matchMedia";
@@ -8,6 +9,19 @@ import type { PcaPoint } from "@/features/campaigns/api";
 import EmbeddingMap from "../components/EmbeddingMap";
 import EmbeddingMap3D from "../components/EmbeddingMap3D";
 import { detectWebGL } from "../mapSupport";
+
+// Records what the scene asks of the orbit controls, passing everything through to the real ones.
+const controlProps = vi.hoisted(() => [] as Record<string, unknown>[]);
+vi.mock("@react-three/drei", async (original) => {
+  const drei = await original<typeof import("@react-three/drei")>();
+  return {
+    ...drei,
+    OrbitControls: React.forwardRef<unknown, Record<string, unknown>>((props, ref) => {
+      controlProps.push(props);
+      return <drei.OrbitControls ref={ref as never} {...props} />;
+    }),
+  };
+});
 
 // The one test file that lets react-three-fiber draw for real, in the test browser's own WebGL. It is skipped where
 // that browser has none: everything else about the map is covered with a stub canvas in embeddingMap3d.test.tsx.
@@ -79,8 +93,10 @@ describe.skipIf(!detectWebGL())("EmbeddingMap3D with a real WebGL canvas", () =>
   it("hands over to the 2D map, with a message, when the WebGL context is lost", async () => {
     stubMatchMedia();
     vi.spyOn(console, "error").mockImplementation(() => {});
+    controlProps.length = 0;
     renderWithProviders(<EmbeddingMap points={sample(30)} explainedVariance={[0.3, 0.2, 0.1]} sampleLimit={1500} selectedCaseIds={[]} onSelectCases={() => {}} />);
-    await waitFor(() => expect(document.querySelector("canvas")).not.toBeNull());
+    // the scene (and the context-loss listener, added when the canvas is created) is there once the controls have rendered
+    await waitFor(() => expect(controlProps.length).toBeGreaterThan(0));
     await frames();
     act(() => {
       document.querySelector("canvas")!.dispatchEvent(new Event("webglcontextlost", { cancelable: true }));
@@ -88,5 +104,20 @@ describe.skipIf(!detectWebGL())("EmbeddingMap3D with a real WebGL canvas", () =>
     expect(await screen.findByText("3D view unavailable, showing the 2D map.")).toBeInTheDocument();
     expect(screen.getByRole("img", { name: /Embedding map/ })).toBeInTheDocument();
     expect(document.querySelector("canvas")).toBeNull();
+  });
+
+  it.each([
+    [false, true],
+    [true, false],
+  ])("prefers-reduced-motion %s: damping %s, and the camera never turns by itself", async (reducedMotion, damping) => {
+    stubMatchMedia({ reducedMotion });
+    controlProps.length = 0;
+    renderWithProviders(<EmbeddingMap3D {...props} points={sample(20)} />);
+    await waitFor(() => expect(document.querySelector("canvas")).not.toBeNull());
+    await frames();
+    await waitFor(() => expect(controlProps.length).toBeGreaterThan(0));
+    const controls = controlProps.at(-1)!;
+    expect(controls.enableDamping).toBe(damping);
+    expect(controls.autoRotate ?? false).toBe(false);
   });
 });
