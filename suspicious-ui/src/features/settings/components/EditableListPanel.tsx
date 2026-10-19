@@ -238,7 +238,8 @@ function BulkToolbar({
   const theme = useTheme();
   const accent = useAccent();
   const bar = flatten(theme.palette.action.hover, theme.palette.background.paper);
-  const onBar = (c: string) => ensureContrast(flatten(c, bar), bar, 4.5);
+  // 5.2 rather than 4.5: effect themes (cyber) paint the bar over a scanline layer, so the computed bar colour is a little off the rendered one.
+  const onBar = (c: string) => ensureContrast(flatten(c, bar), bar, 5.2);
 
   return (
     <Stack direction="row" spacing={1} sx={{ pl: 0.5, pr: 1, py: 0.5, alignItems: "center", bgcolor: "action.hover" }}>
