@@ -1,0 +1,201 @@
+theme	viewport	element	fg	bg	ratio	required	owner	status
+midnight	1440	all 175 visible text nodes (page min ratio 6.18, 0 below required)			6.18		page	summary
+graphite	1440	all 175 visible text nodes (page min ratio 4.62, 0 below required)			4.62		page	summary
+slate	1440	all 175 visible text nodes (page min ratio 5.97, 0 below required)			5.97		page	summary
+light	1440	E 14px MuiAvatar-root.MuiAvatar-circular (gradient bg)	#1b5fff	#d8e2f7	3.92	4.5	shared	FAIL
+light	1440	all 175 visible text nodes (page min ratio 4.61, 1 below required)			4.61		page	summary
+light	1440	[campaign] "E" 14px MuiAvatar-root.MuiAvatar-circular (gradient bg)	#1b5fff	#d8e2f7	3.92	4.5	shared	FAIL
+light	1440	[age] "E" 14px MuiAvatar-root.MuiAvatar-circular (gradient bg)	#1b5fff	#d8e2f7	3.92	4.5	shared	FAIL
+paper	1440	E 14px MuiAvatar-root.MuiAvatar-circular (gradient bg)	#0f4cff	#d2d5e3	4.1	4.5	shared	FAIL
+paper	1440	all 175 visible text nodes (page min ratio 4.54, 1 below required)			4.54		page	summary
+paper	1440	[campaign] "E" 14px MuiAvatar-root.MuiAvatar-circular (gradient bg)	#0f4cff	#d2d5e3	4.1	4.5	shared	FAIL
+paper	1440	[age] "E" 14px MuiAvatar-root.MuiAvatar-circular (gradient bg)	#0f4cff	#d2d5e3	4.1	4.5	shared	FAIL
+high_contrast	1440	all 175 visible text nodes (page min ratio 10.2, 0 below required)			10.2		page	summary
+sunrise	1440	E 14px MuiAvatar-root.MuiAvatar-circular (gradient bg)	#f03d2f	#fddad2	2.98	4.5	shared	FAIL
+sunrise	1440	all 175 visible text nodes (page min ratio 4.6, 1 below required)			4.6		page	summary
+sunrise	1440	[campaign] "E" 14px MuiAvatar-root.MuiAvatar-circular (gradient bg)	#f03d2f	#fddad2	2.98	4.5	shared	FAIL
+sunrise	1440	[age] "E" 14px MuiAvatar-root.MuiAvatar-circular (gradient bg)	#f03d2f	#fddad2	2.98	4.5	shared	FAIL
+valentine	1440	E 14px MuiAvatar-root.MuiAvatar-circular (gradient bg)	#c2185b	#f4d6e1	4.35	4.5	shared	FAIL
+valentine	1440	all 175 visible text nodes (page min ratio 4.6, 1 below required)			4.6		page	summary
+valentine	1440	[campaign] "E" 14px MuiAvatar-root.MuiAvatar-circular (gradient bg)	#c2185b	#f4d6e1	4.35	4.5	shared	FAIL
+valentine	1440	[age] "E" 14px MuiAvatar-root.MuiAvatar-circular (gradient bg)	#c2185b	#f4d6e1	4.35	4.5	shared	FAIL
+cyber	1440	all 175 visible text nodes (page min ratio 8.66, 0 below required)			8.66		page	summary
+the_one	1440	all 175 visible text nodes (page min ratio 7.01, 0 below required)			7.01		page	summary
+winter	1440	all 175 visible text nodes (page min ratio 8.19, 0 below required)			8.19		page	summary
+spring	1440	E 14px MuiAvatar-root.MuiAvatar-circular (gradient bg)	#15803d	#d6eedd	4.1	4.5	shared	FAIL
+spring	1440	all 175 visible text nodes (page min ratio 4.61, 1 below required)			4.61		page	summary
+spring	1440	[campaign] "E" 14px MuiAvatar-root.MuiAvatar-circular (gradient bg)	#15803d	#d6eedd	4.1	4.5	shared	FAIL
+spring	1440	[age] "E" 14px MuiAvatar-root.MuiAvatar-circular (gradient bg)	#15803d	#d6eedd	4.1	4.5	shared	FAIL
+summer	1440	E 14px MuiAvatar-root.MuiAvatar-circular (gradient bg)	#d97706	#faeacf	2.7	4.5	shared	FAIL
+summer	1440	all 175 visible text nodes (page min ratio 4.61, 1 below required)			4.61		page	summary
+summer	1440	[campaign] "E" 14px MuiAvatar-root.MuiAvatar-circular (gradient bg)	#d97706	#faeacf	2.7	4.5	shared	FAIL
+summer	1440	[age] "E" 14px MuiAvatar-root.MuiAvatar-circular (gradient bg)	#d97706	#faeacf	2.7	4.5	shared	FAIL
+autumn	1440	all 175 visible text nodes (page min ratio 7.12, 0 below required)			7.12		page	summary
+metal	1440	E 14px MuiAvatar-root.MuiAvatar-circular (gradient bg)	#e1061b	#2e080f	3.67	4.5	shared	FAIL
+metal	1440	Show in map 12.0714px MuiButtonBase-root.MuiButton-root (gradient bg) (metal theme's outlined-button background; page text colour already 4.5:1 on the card)	#f5071d	#091315	4.43	4.5	shared	FAIL
+metal	1440	all 175 visible text nodes (page min ratio 4.43, 4 below required)			4.43		page	summary
+metal	1440	[campaign] "E" 14px MuiAvatar-root.MuiAvatar-circular (gradient bg)	#e1061b	#2e080f	3.67	4.5	shared	FAIL
+metal	1440	[campaign] "Show in map" 12.0714px MuiButtonBase-root.MuiButton-root (gradient bg) (metal theme's outlined-button background; page text colour already 4.5:1 on the card)	#f5071d	#091315	4.43	4.5	shared	FAIL
+metal	1440	[age] "E" 14px MuiAvatar-root.MuiAvatar-circular (gradient bg)	#e1061b	#2e080f	3.67	4.5	shared	FAIL
+metal	1440	[age] "Show in map" 12.0714px MuiButtonBase-root.MuiButton-root (gradient bg) (metal theme's outlined-button background; page text colour already 4.5:1 on the card)	#f5071d	#091315	4.43	4.5	shared	FAIL
+future	1440	all 175 visible text nodes (page min ratio 4.75, 0 below required)			4.75		page	summary
+renee	1440	E 14px MuiAvatar-root.MuiAvatar-circular (gradient bg)	#9b2fa8	#e7d2d5	4.32	4.5	shared	FAIL
+renee	1440	all 175 visible text nodes (page min ratio 4.53, 1 below required)			4.53		page	summary
+renee	1440	[campaign] "E" 14px MuiAvatar-root.MuiAvatar-circular (gradient bg)	#9b2fa8	#e7d2d5	4.32	4.5	shared	FAIL
+renee	1440	[age] "E" 14px MuiAvatar-root.MuiAvatar-circular (gradient bg)	#9b2fa8	#e7d2d5	4.32	4.5	shared	FAIL
+midnight	390	all 172 visible text nodes (page min ratio 6.18, 0 below required)			6.18		page	summary
+graphite	390	all 172 visible text nodes (page min ratio 8.53, 0 below required)			8.53		page	summary
+slate	390	all 172 visible text nodes (page min ratio 7.09, 0 below required)			7.09		page	summary
+light	390	all 172 visible text nodes (page min ratio 4.61, 0 below required)			4.61		page	summary
+paper	390	all 172 visible text nodes (page min ratio 4.54, 0 below required)			4.54		page	summary
+high_contrast	390	all 172 visible text nodes (page min ratio 10.2, 0 below required)			10.2		page	summary
+sunrise	390	all 172 visible text nodes (page min ratio 4.6, 0 below required)			4.6		page	summary
+valentine	390	all 172 visible text nodes (page min ratio 4.6, 0 below required)			4.6		page	summary
+cyber	390	all 172 visible text nodes (page min ratio 8.66, 0 below required)			8.66		page	summary
+the_one	390	all 172 visible text nodes (page min ratio 8.41, 0 below required)			8.41		page	summary
+winter	390	all 172 visible text nodes (page min ratio 8.9, 0 below required)			8.9		page	summary
+spring	390	all 172 visible text nodes (page min ratio 4.61, 0 below required)			4.61		page	summary
+summer	390	all 172 visible text nodes (page min ratio 4.61, 0 below required)			4.61		page	summary
+autumn	390	all 172 visible text nodes (page min ratio 7.12, 0 below required)			7.12		page	summary
+metal	390	Show in map 12.0714px MuiButtonBase-root.MuiButton-root (gradient bg) (metal theme's outlined-button background; page text colour already 4.5:1 on the card)	#f5071d	#091315	4.43	4.5	shared	FAIL
+metal	390	all 172 visible text nodes (page min ratio 4.43, 3 below required)			4.43		page	summary
+metal	390	[campaign] "Show in map" 12.0714px MuiButtonBase-root.MuiButton-root (gradient bg) (metal theme's outlined-button background; page text colour already 4.5:1 on the card)	#f5071d	#091315	4.43	4.5	shared	FAIL
+metal	390	[age] "Show in map" 12.0714px MuiButtonBase-root.MuiButton-root (gradient bg) (metal theme's outlined-button background; page text colour already 4.5:1 on the card)	#f5071d	#091315	4.43	4.5	shared	FAIL
+future	390	all 172 visible text nodes (page min ratio 6.18, 0 below required)			6.18		page	summary
+renee	390	all 172 visible text nodes (page min ratio 4.53, 0 below required)			4.53		page	summary
+midnight	3D canvas	3D cloud wireframe, 14% opacity: Safe	#072018	#03050d	1.19	3	page	below 3:1, decorative (the points carry the data)
+midnight	3D canvas	3D cloud fill, 8% opacity: Safe	#051413	#03050d	1.08	3	page	below 3:1, decorative (the points carry the data)
+midnight	3D canvas	3D cloud wireframe, 14% opacity: Unwanted	#171b25	#03050d	1.18	3	page	below 3:1, decorative (the points carry the data)
+midnight	3D canvas	3D cloud fill, 8% opacity: Unwanted	#0f121b	#03050d	1.09	3	page	below 3:1, decorative (the points carry the data)
+midnight	3D canvas	3D cloud wireframe, 14% opacity: Suspicious	#251a0d	#03050d	1.19	3	page	below 3:1, decorative (the points carry the data)
+midnight	3D canvas	3D cloud fill, 8% opacity: Suspicious	#16110d	#03050d	1.09	3	page	below 3:1, decorative (the points carry the data)
+midnight	3D canvas	3D cloud wireframe, 14% opacity: Dangerous	#240e15	#03050d	1.11	3	page	below 3:1, decorative (the points carry the data)
+midnight	3D canvas	3D cloud fill, 8% opacity: Dangerous	#160a11	#03050d	1.05	3	page	below 3:1, decorative (the points carry the data)
+graphite	3D canvas	3D cloud wireframe, 14% opacity: Safe	#0d261b	#0a0c10	1.22	3	page	below 3:1, decorative (the points carry the data)
+graphite	3D canvas	3D cloud fill, 8% opacity: Safe	#0c1b16	#0a0c10	1.10	3	page	below 3:1, decorative (the points carry the data)
+graphite	3D canvas	3D cloud wireframe, 14% opacity: Unwanted	#1d2128	#0a0c10	1.21	3	page	below 3:1, decorative (the points carry the data)
+graphite	3D canvas	3D cloud fill, 8% opacity: Unwanted	#15181d	#0a0c10	1.10	3	page	below 3:1, decorative (the points carry the data)
+graphite	3D canvas	3D cloud wireframe, 14% opacity: Suspicious	#2b200f	#0a0c10	1.23	3	page	below 3:1, decorative (the points carry the data)
+graphite	3D canvas	3D cloud fill, 8% opacity: Suspicious	#1d1810	#0a0c10	1.11	3	page	below 3:1, decorative (the points carry the data)
+graphite	3D canvas	3D cloud wireframe, 14% opacity: Dangerous	#2a1417	#0a0c10	1.13	3	page	below 3:1, decorative (the points carry the data)
+graphite	3D canvas	3D cloud fill, 8% opacity: Dangerous	#1c1014	#0a0c10	1.06	3	page	below 3:1, decorative (the points carry the data)
+slate	3D canvas	3D cloud wireframe, 14% opacity: Safe	#0b2926	#07101d	1.23	3	page	below 3:1, decorative (the points carry the data)
+slate	3D canvas	3D cloud fill, 8% opacity: Safe	#091e22	#07101d	1.11	3	page	below 3:1, decorative (the points carry the data)
+slate	3D canvas	3D cloud wireframe, 14% opacity: Unwanted	#1b2533	#07101d	1.23	3	page	below 3:1, decorative (the points carry the data)
+slate	3D canvas	3D cloud fill, 8% opacity: Unwanted	#121c29	#07101d	1.11	3	page	below 3:1, decorative (the points carry the data)
+slate	3D canvas	3D cloud wireframe, 14% opacity: Suspicious	#28241a	#07101d	1.23	3	page	below 3:1, decorative (the points carry the data)
+slate	3D canvas	3D cloud fill, 8% opacity: Suspicious	#1a1b1c	#07101d	1.11	3	page	below 3:1, decorative (the points carry the data)
+slate	3D canvas	3D cloud wireframe, 14% opacity: Dangerous	#271722	#07101d	1.12	3	page	below 3:1, decorative (the points carry the data)
+slate	3D canvas	3D cloud fill, 8% opacity: Dangerous	#1a1420	#07101d	1.06	3	page	below 3:1, decorative (the points carry the data)
+light	3D canvas	3D cloud wireframe, 14% opacity: Safe	#dff2e6	#ffffff	1.17	3	page	below 3:1, decorative (the points carry the data)
+light	3D canvas	3D cloud fill, 8% opacity: Safe	#edf8f1	#ffffff	1.09	3	page	below 3:1, decorative (the points carry the data)
+light	3D canvas	3D cloud wireframe, 14% opacity: Unwanted	#edeff3	#ffffff	1.15	3	page	below 3:1, decorative (the points carry the data)
+light	3D canvas	3D cloud fill, 8% opacity: Unwanted	#f5f6f8	#ffffff	1.08	3	page	below 3:1, decorative (the points carry the data)
+light	3D canvas	3D cloud wireframe, 14% opacity: Suspicious	#f6eddc	#ffffff	1.16	3	page	below 3:1, decorative (the points carry the data)
+light	3D canvas	3D cloud fill, 8% opacity: Suspicious	#faf5eb	#ffffff	1.09	3	page	below 3:1, decorative (the points carry the data)
+light	3D canvas	3D cloud wireframe, 14% opacity: Dangerous	#fde5e5	#ffffff	1.20	3	page	below 3:1, decorative (the points carry the data)
+light	3D canvas	3D cloud fill, 8% opacity: Dangerous	#fef0f0	#ffffff	1.11	3	page	below 3:1, decorative (the points carry the data)
+paper	3D canvas	3D cloud wireframe, 14% opacity: Safe	#dbeada	#faf7f2	1.17	3	page	below 3:1, decorative (the points carry the data)
+paper	3D canvas	3D cloud fill, 8% opacity: Safe	#e8efe4	#faf7f2	1.10	3	page	below 3:1, decorative (the points carry the data)
+paper	3D canvas	3D cloud wireframe, 14% opacity: Unwanted	#e7e7e7	#faf7f2	1.16	3	page	below 3:1, decorative (the points carry the data)
+paper	3D canvas	3D cloud fill, 8% opacity: Unwanted	#efeeec	#faf7f2	1.09	3	page	below 3:1, decorative (the points carry the data)
+paper	3D canvas	3D cloud wireframe, 14% opacity: Suspicious	#f0e5d1	#faf7f2	1.17	3	page	below 3:1, decorative (the points carry the data)
+paper	3D canvas	3D cloud fill, 8% opacity: Suspicious	#f5eddf	#faf7f2	1.09	3	page	below 3:1, decorative (the points carry the data)
+paper	3D canvas	3D cloud wireframe, 14% opacity: Dangerous	#f8deda	#faf7f2	1.19	3	page	below 3:1, decorative (the points carry the data)
+paper	3D canvas	3D cloud fill, 8% opacity: Dangerous	#f9e9e4	#faf7f2	1.10	3	page	below 3:1, decorative (the points carry the data)
+high_contrast	3D canvas	3D cloud wireframe, 14% opacity: Safe	#051c0d	#000000	1.18	3	page	below 3:1, decorative (the points carry the data)
+high_contrast	3D canvas	3D cloud fill, 8% opacity: Safe	#031008	#000000	1.08	3	page	below 3:1, decorative (the points carry the data)
+high_contrast	3D canvas	3D cloud wireframe, 14% opacity: Unwanted	#15171a	#000000	1.17	3	page	below 3:1, decorative (the points carry the data)
+high_contrast	3D canvas	3D cloud fill, 8% opacity: Unwanted	#0c0d0f	#000000	1.08	3	page	below 3:1, decorative (the points carry the data)
+high_contrast	3D canvas	3D cloud wireframe, 14% opacity: Suspicious	#221602	#000000	1.18	3	page	below 3:1, decorative (the points carry the data)
+high_contrast	3D canvas	3D cloud fill, 8% opacity: Suspicious	#140d01	#000000	1.09	3	page	below 3:1, decorative (the points carry the data)
+high_contrast	3D canvas	3D cloud wireframe, 14% opacity: Dangerous	#210a0a	#000000	1.11	3	page	below 3:1, decorative (the points carry the data)
+high_contrast	3D canvas	3D cloud fill, 8% opacity: Dangerous	#130505	#000000	1.05	3	page	below 3:1, decorative (the points carry the data)
+sunrise	3D canvas	3D cloud wireframe, 14% opacity: Safe	#dff1e5	#fffefe	1.17	3	page	below 3:1, decorative (the points carry the data)
+sunrise	3D canvas	3D cloud fill, 8% opacity: Safe	#edf6f0	#fffefe	1.10	3	page	below 3:1, decorative (the points carry the data)
+sunrise	3D canvas	3D cloud wireframe, 14% opacity: Unwanted	#edeef2	#fffefe	1.15	3	page	below 3:1, decorative (the points carry the data)
+sunrise	3D canvas	3D cloud fill, 8% opacity: Unwanted	#f5f5f7	#fffefe	1.08	3	page	below 3:1, decorative (the points carry the data)
+sunrise	3D canvas	3D cloud wireframe, 14% opacity: Suspicious	#f6ecdc	#fffefe	1.16	3	page	below 3:1, decorative (the points carry the data)
+sunrise	3D canvas	3D cloud fill, 8% opacity: Suspicious	#faf4ea	#fffefe	1.09	3	page	below 3:1, decorative (the points carry the data)
+sunrise	3D canvas	3D cloud wireframe, 14% opacity: Dangerous	#fde4e4	#fffefe	1.20	3	page	below 3:1, decorative (the points carry the data)
+sunrise	3D canvas	3D cloud fill, 8% opacity: Dangerous	#feefef	#fffefe	1.11	3	page	below 3:1, decorative (the points carry the data)
+valentine	3D canvas	3D cloud wireframe, 14% opacity: Safe	#dff1e5	#fffefe	1.17	3	page	below 3:1, decorative (the points carry the data)
+valentine	3D canvas	3D cloud fill, 8% opacity: Safe	#edf6f0	#fffefe	1.10	3	page	below 3:1, decorative (the points carry the data)
+valentine	3D canvas	3D cloud wireframe, 14% opacity: Unwanted	#eceef2	#fffefe	1.15	3	page	below 3:1, decorative (the points carry the data)
+valentine	3D canvas	3D cloud fill, 8% opacity: Unwanted	#f4f5f7	#fffefe	1.08	3	page	below 3:1, decorative (the points carry the data)
+valentine	3D canvas	3D cloud wireframe, 14% opacity: Suspicious	#f6ecdc	#fffefe	1.16	3	page	below 3:1, decorative (the points carry the data)
+valentine	3D canvas	3D cloud fill, 8% opacity: Suspicious	#faf4ea	#fffefe	1.09	3	page	below 3:1, decorative (the points carry the data)
+valentine	3D canvas	3D cloud wireframe, 14% opacity: Dangerous	#fde4e4	#fffefe	1.20	3	page	below 3:1, decorative (the points carry the data)
+valentine	3D canvas	3D cloud fill, 8% opacity: Dangerous	#feefef	#fffefe	1.11	3	page	below 3:1, decorative (the points carry the data)
+cyber	3D canvas	3D cloud wireframe, 14% opacity: Safe	#061f14	#020408	1.19	3	page	below 3:1, decorative (the points carry the data)
+cyber	3D canvas	3D cloud fill, 8% opacity: Safe	#05130f	#020408	1.08	3	page	below 3:1, decorative (the points carry the data)
+cyber	3D canvas	3D cloud wireframe, 14% opacity: Unwanted	#161a21	#020408	1.18	3	page	below 3:1, decorative (the points carry the data)
+cyber	3D canvas	3D cloud fill, 8% opacity: Unwanted	#0e1116	#020408	1.08	3	page	below 3:1, decorative (the points carry the data)
+cyber	3D canvas	3D cloud wireframe, 14% opacity: Suspicious	#241a08	#020408	1.20	3	page	below 3:1, decorative (the points carry the data)
+cyber	3D canvas	3D cloud fill, 8% opacity: Suspicious	#151008	#020408	1.08	3	page	below 3:1, decorative (the points carry the data)
+cyber	3D canvas	3D cloud wireframe, 14% opacity: Dangerous	#230d10	#020408	1.11	3	page	below 3:1, decorative (the points carry the data)
+cyber	3D canvas	3D cloud fill, 8% opacity: Dangerous	#15090d	#020408	1.05	3	page	below 3:1, decorative (the points carry the data)
+the_one	3D canvas	3D cloud wireframe, 14% opacity: Safe	#0a2112	#060606	1.20	3	page	below 3:1, decorative (the points carry the data)
+the_one	3D canvas	3D cloud fill, 8% opacity: Safe	#08150d	#060606	1.08	3	page	below 3:1, decorative (the points carry the data)
+the_one	3D canvas	3D cloud wireframe, 14% opacity: Unwanted	#1a1c1f	#060606	1.19	3	page	below 3:1, decorative (the points carry the data)
+the_one	3D canvas	3D cloud fill, 8% opacity: Unwanted	#111314	#060606	1.09	3	page	below 3:1, decorative (the points carry the data)
+the_one	3D canvas	3D cloud wireframe, 14% opacity: Suspicious	#271b07	#060606	1.20	3	page	below 3:1, decorative (the points carry the data)
+the_one	3D canvas	3D cloud fill, 8% opacity: Suspicious	#191206	#060606	1.09	3	page	below 3:1, decorative (the points carry the data)
+the_one	3D canvas	3D cloud wireframe, 14% opacity: Dangerous	#270f0f	#060606	1.12	3	page	below 3:1, decorative (the points carry the data)
+the_one	3D canvas	3D cloud fill, 8% opacity: Dangerous	#190b0b	#060606	1.06	3	page	below 3:1, decorative (the points carry the data)
+winter	3D canvas	3D cloud wireframe, 14% opacity: Safe	#092324	#05091a	1.20	3	page	below 3:1, decorative (the points carry the data)
+winter	3D canvas	3D cloud fill, 8% opacity: Safe	#07181f	#05091a	1.09	3	page	below 3:1, decorative (the points carry the data)
+winter	3D canvas	3D cloud wireframe, 14% opacity: Unwanted	#191f30	#05091a	1.21	3	page	below 3:1, decorative (the points carry the data)
+winter	3D canvas	3D cloud fill, 8% opacity: Unwanted	#101527	#05091a	1.09	3	page	below 3:1, decorative (the points carry the data)
+winter	3D canvas	3D cloud wireframe, 14% opacity: Suspicious	#271e18	#05091a	1.21	3	page	below 3:1, decorative (the points carry the data)
+winter	3D canvas	3D cloud fill, 8% opacity: Suspicious	#181519	#05091a	1.09	3	page	below 3:1, decorative (the points carry the data)
+winter	3D canvas	3D cloud wireframe, 14% opacity: Dangerous	#261120	#05091a	1.12	3	page	below 3:1, decorative (the points carry the data)
+winter	3D canvas	3D cloud fill, 8% opacity: Dangerous	#180e1d	#05091a	1.06	3	page	below 3:1, decorative (the points carry the data)
+spring	3D canvas	3D cloud wireframe, 14% opacity: Safe	#def2e6	#feffff	1.17	3	page	below 3:1, decorative (the points carry the data)
+spring	3D canvas	3D cloud fill, 8% opacity: Safe	#ecf8f1	#feffff	1.09	3	page	below 3:1, decorative (the points carry the data)
+spring	3D canvas	3D cloud wireframe, 14% opacity: Unwanted	#ecf0f3	#feffff	1.14	3	page	below 3:1, decorative (the points carry the data)
+spring	3D canvas	3D cloud fill, 8% opacity: Unwanted	#f4f6f8	#feffff	1.08	3	page	below 3:1, decorative (the points carry the data)
+spring	3D canvas	3D cloud wireframe, 14% opacity: Suspicious	#f6eddc	#feffff	1.16	3	page	below 3:1, decorative (the points carry the data)
+spring	3D canvas	3D cloud fill, 8% opacity: Suspicious	#f9f5eb	#feffff	1.09	3	page	below 3:1, decorative (the points carry the data)
+spring	3D canvas	3D cloud wireframe, 14% opacity: Dangerous	#fce5e5	#feffff	1.20	3	page	below 3:1, decorative (the points carry the data)
+spring	3D canvas	3D cloud fill, 8% opacity: Dangerous	#fdf0f0	#feffff	1.11	3	page	below 3:1, decorative (the points carry the data)
+summer	3D canvas	3D cloud wireframe, 14% opacity: Safe	#dff3e6	#ffffff	1.16	3	page	below 3:1, decorative (the points carry the data)
+summer	3D canvas	3D cloud fill, 8% opacity: Safe	#edf8f1	#ffffff	1.09	3	page	below 3:1, decorative (the points carry the data)
+summer	3D canvas	3D cloud wireframe, 14% opacity: Unwanted	#eef0f3	#ffffff	1.14	3	page	below 3:1, decorative (the points carry the data)
+summer	3D canvas	3D cloud fill, 8% opacity: Unwanted	#f5f6f8	#ffffff	1.08	3	page	below 3:1, decorative (the points carry the data)
+summer	3D canvas	3D cloud wireframe, 14% opacity: Suspicious	#f8eedc	#ffffff	1.15	3	page	below 3:1, decorative (the points carry the data)
+summer	3D canvas	3D cloud fill, 8% opacity: Suspicious	#fbf5eb	#ffffff	1.08	3	page	below 3:1, decorative (the points carry the data)
+summer	3D canvas	3D cloud wireframe, 14% opacity: Dangerous	#fde5e5	#ffffff	1.20	3	page	below 3:1, decorative (the points carry the data)
+summer	3D canvas	3D cloud fill, 8% opacity: Dangerous	#fef0f0	#ffffff	1.11	3	page	below 3:1, decorative (the points carry the data)
+autumn	3D canvas	3D cloud wireframe, 14% opacity: Safe	#0f2211	#0c0805	1.19	3	page	below 3:1, decorative (the points carry the data)
+autumn	3D canvas	3D cloud fill, 8% opacity: Safe	#0e170c	#0c0805	1.09	3	page	below 3:1, decorative (the points carry the data)
+autumn	3D canvas	3D cloud wireframe, 14% opacity: Unwanted	#1f1e1e	#0c0805	1.20	3	page	below 3:1, decorative (the points carry the data)
+autumn	3D canvas	3D cloud fill, 8% opacity: Unwanted	#171413	#0c0805	1.09	3	page	below 3:1, decorative (the points carry the data)
+autumn	3D canvas	3D cloud wireframe, 14% opacity: Suspicious	#2d1d06	#0c0805	1.23	3	page	below 3:1, decorative (the points carry the data)
+autumn	3D canvas	3D cloud fill, 8% opacity: Suspicious	#1f1405	#0c0805	1.10	3	page	below 3:1, decorative (the points carry the data)
+autumn	3D canvas	3D cloud wireframe, 14% opacity: Dangerous	#2c100e	#0c0805	1.13	3	page	below 3:1, decorative (the points carry the data)
+autumn	3D canvas	3D cloud fill, 8% opacity: Dangerous	#1e0d0a	#0c0805	1.06	3	page	below 3:1, decorative (the points carry the data)
+metal	3D canvas	3D cloud wireframe, 14% opacity: Safe	#0a2217	#06080c	1.20	3	page	below 3:1, decorative (the points carry the data)
+metal	3D canvas	3D cloud fill, 8% opacity: Safe	#081713	#06080c	1.09	3	page	below 3:1, decorative (the points carry the data)
+metal	3D canvas	3D cloud wireframe, 14% opacity: Unwanted	#1a1e24	#06080c	1.20	3	page	below 3:1, decorative (the points carry the data)
+metal	3D canvas	3D cloud fill, 8% opacity: Unwanted	#11141a	#06080c	1.09	3	page	below 3:1, decorative (the points carry the data)
+metal	3D canvas	3D cloud wireframe, 14% opacity: Suspicious	#271d0c	#06080c	1.21	3	page	below 3:1, decorative (the points carry the data)
+metal	3D canvas	3D cloud fill, 8% opacity: Suspicious	#19140c	#06080c	1.09	3	page	below 3:1, decorative (the points carry the data)
+metal	3D canvas	3D cloud wireframe, 14% opacity: Dangerous	#271014	#06080c	1.12	3	page	below 3:1, decorative (the points carry the data)
+metal	3D canvas	3D cloud fill, 8% opacity: Dangerous	#190d10	#06080c	1.06	3	page	below 3:1, decorative (the points carry the data)
+future	3D canvas	3D cloud wireframe, 14% opacity: Safe	#102311	#0d0905	1.20	3	page	below 3:1, decorative (the points carry the data)
+future	3D canvas	3D cloud fill, 8% opacity: Safe	#0f180c	#0d0905	1.09	3	page	below 3:1, decorative (the points carry the data)
+future	3D canvas	3D cloud wireframe, 14% opacity: Unwanted	#201f1e	#0d0905	1.21	3	page	below 3:1, decorative (the points carry the data)
+future	3D canvas	3D cloud fill, 8% opacity: Unwanted	#181513	#0d0905	1.09	3	page	below 3:1, decorative (the points carry the data)
+future	3D canvas	3D cloud wireframe, 14% opacity: Suspicious	#2d1e06	#0d0905	1.23	3	page	below 3:1, decorative (the points carry the data)
+future	3D canvas	3D cloud fill, 8% opacity: Suspicious	#201505	#0d0905	1.11	3	page	below 3:1, decorative (the points carry the data)
+future	3D canvas	3D cloud wireframe, 14% opacity: Dangerous	#2d110e	#0d0905	1.13	3	page	below 3:1, decorative (the points carry the data)
+future	3D canvas	3D cloud fill, 8% opacity: Dangerous	#1f0e0a	#0d0905	1.06	3	page	below 3:1, decorative (the points carry the data)
+renee	3D canvas	3D cloud wireframe, 14% opacity: Safe	#dce9d7	#fbf6ee	1.17	3	page	below 3:1, decorative (the points carry the data)
+renee	3D canvas	3D cloud fill, 8% opacity: Safe	#e9efe1	#fbf6ee	1.09	3	page	below 3:1, decorative (the points carry the data)
+renee	3D canvas	3D cloud wireframe, 14% opacity: Unwanted	#e8e6e3	#fbf6ee	1.16	3	page	below 3:1, decorative (the points carry the data)
+renee	3D canvas	3D cloud fill, 8% opacity: Unwanted	#f0ede8	#fbf6ee	1.09	3	page	below 3:1, decorative (the points carry the data)
+renee	3D canvas	3D cloud wireframe, 14% opacity: Suspicious	#f1e4ce	#fbf6ee	1.17	3	page	below 3:1, decorative (the points carry the data)
+renee	3D canvas	3D cloud fill, 8% opacity: Suspicious	#f5ecdc	#fbf6ee	1.09	3	page	below 3:1, decorative (the points carry the data)
+renee	3D canvas	3D cloud wireframe, 14% opacity: Dangerous	#f9ddd6	#fbf6ee	1.19	3	page	below 3:1, decorative (the points carry the data)
+renee	3D canvas	3D cloud fill, 8% opacity: Dangerous	#fae8e0	#fbf6ee	1.10	3	page	below 3:1, decorative (the points carry the data)

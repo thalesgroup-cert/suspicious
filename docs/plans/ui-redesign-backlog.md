@@ -116,3 +116,21 @@ Deferred:
 - Saved layout drops the reporters panel position when `top_reporters` is null; KPI cards leave ~40px empty space (fixed grid row height).
 - Contrast in shared components: Campaigns status chips (2.1 to 3.8:1), metal outlined labels (4.05:1), other themes not yet swept (10 of 17).
 - Minor backend: stored CISO scope "AU|AU" refuses the "AU" alias; service-mailbox exclusion depends on DB collation and on `SUSPICIOUS_EMAIL` being set; reporter labels differing only in case are not disambiguated.
+
+## Campaigns page cycle (2026-10-19)
+
+Shipped on `design/campaigns-page`: header and period selector, KPI strip with deltas, messages per day with campaign windows, classification mix, sortable campaigns table (cards on a phone), lazy 3D embedding map (category, campaign and age colours, date range, clouds, keyboard controls, 2D and table fallbacks), near-known-bad and novel review lists, `GET /api/campaigns/summary/` and `/neighbours/`. Contrast swept in 17 themes at 1440 and 390: `docs/plans/campaigns-contrast-2026-10.tsv` (failures and summaries; the full table is not kept in the repo). The old resize crash noted under the Dashboard cycle belonged to the replaced grid layout, which is gone.
+
+Deferred:
+- Per-country scoping of campaigns needs reporter metadata (country, region) in the message store; today every figure is organisation-wide and the header says so.
+- Live refresh (Refresh button only), and a campaign detail page (the table links to the latest case and selects the campaign's cases in the map).
+- Chroma sample cache shared by the PCA and neighbours endpoints (each reads the same sample, about 30 MB per 1,500 messages).
+- Header glow parity with `OverviewHeader`; the Mix card does not stretch to the height of the volume card.
+- The empty state hides the map, which is not period-scoped and could still be shown.
+- vite `manualChunks` size guard: nothing fails the build if three/R3F/drei ever land in `vendor` again (the 3D chunk is about 253 kB gzip).
+- Map state (colour mode, filters, camera) is lost on the 2D/3D toggle.
+- One cloud per category is a single mean and covariance: a multimodal category (a campaign plus background mail) gets one oversized ellipsoid. Per-cluster or per-campaign clouds would fix it.
+- Weekly dangerous series and country/region ranking for elevated users (as on the Dashboard); first and last seen in the campaigns table are within the selected period, not over the campaign's life.
+- `materialise_dashboard_snapshots` is still unread by this page too.
+- Unclassified and Unwanted use two blue-greys that differ mainly in lightness (about 1.4:1 between them in light); both are always labelled, but a point-shape or pattern cue in the map would separate them.
+- Contrast in shared components: the sidebar avatar initial is 2.7 to 4.35:1 in 8 themes; themed hairline dividers are decorative gradients.
