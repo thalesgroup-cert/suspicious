@@ -49,6 +49,7 @@ function ListItemRow({
   onToggleSelect,
   onDelete,
   deleting,
+  deleteDisabled,
   selectionMode,
 }: {
   item: ListItem;
@@ -56,6 +57,8 @@ function ListItemRow({
   onToggleSelect: () => void;
   onDelete: () => void;
   deleting: boolean;
+  /** True while any removal or bulk run is in flight, so they never overlap. */
+  deleteDisabled: boolean;
   selectionMode: boolean;
 }) {
   const theme = useTheme();
@@ -131,7 +134,7 @@ function ListItemRow({
             size="small"
             aria-label="Delete"
             onClick={onDelete}
-            disabled={deleting}
+            disabled={deleting || deleteDisabled}
             sx={{
               color: theme.palette.error.main,
               opacity: 0.55,
@@ -225,7 +228,6 @@ function BulkToolbar({
   onClearSelection,
   onDeleteSelected,
   deleting,
-  status,
 }: {
   total: number;
   selected: number;
@@ -233,7 +235,6 @@ function BulkToolbar({
   onClearSelection: () => void;
   onDeleteSelected: () => void;
   deleting: boolean;
-  status: string | null;
 }) {
   const theme = useTheme();
   const allSelected = selected > 0 && selected === total;
@@ -259,11 +260,6 @@ function BulkToolbar({
 
       <Typography variant="body2" sx={{ flex: 1, fontWeight: 700 }}>
         {selected > 0 ? `${selected} selected` : `${total} item${total !== 1 ? "s" : ""}`}
-      </Typography>
-
-      {/* Always mounted so the live region exists before the result text lands in it. */}
-      <Typography role="status" variant="body2" color="text.secondary">
-        {status}
       </Typography>
 
       {selected > 0 ? (
@@ -305,7 +301,7 @@ export function EditableListPanel({
   fileAccept?: string;
 }) {
   const qc = useQueryClient();
-  const { enqueueSnackbar } = useSnackbar();
+  const { enqueueSnackbar, closeSnackbar } = useSnackbar();
   const theme = useTheme();
   const isDark = theme.palette.mode === "dark";
 
@@ -317,7 +313,8 @@ export function EditableListPanel({
   const [confirmBulk, setConfirmBulk] = React.useState<number | null>(null);
   const [bulkRunning, setBulkRunning] = React.useState(false);
   const [bulkStatus, setBulkStatus] = React.useState<string | null>(null);
-  const { closeSnackbar } = useSnackbar();
+  // Snackbar keys already being undone: a fast double click must not re-add twice.
+  const undoing = React.useRef(new Set<SnackbarKey>());
 
   const refresh = () => qc.invalidateQueries({ queryKey: ["settings", "list", section] });
 
@@ -373,10 +370,17 @@ export function EditableListPanel({
   });
 
   async function undoRemove(value: string, key: SnackbarKey) {
+    if (undoing.current.has(key)) return;
+    undoing.current.add(key);
     closeSnackbar(key);
     try {
-      await addItems(section, [value]);
-      enqueueSnackbar(`Restored ${value}.`, { variant: "success" });
+      const res = await addItems(section, [value]);
+      // A 2xx with nothing created means the value was already back (or is in the Watcher list): not a restore.
+      if ((res?.created ?? []).length > 0) {
+        enqueueSnackbar(`Restored ${value}.`, { variant: "success" });
+      } else {
+        enqueueSnackbar(`${value} was not restored (already in the list or in the Watcher list)`, { variant: "warning" });
+      }
     } catch {
       enqueueSnackbar(`Could not restore ${value}`, { variant: "error" });
     } finally {
@@ -389,11 +393,14 @@ export function EditableListPanel({
     onSuccess: (_res, item) => {
       refresh();
       setSelectedIds((prev) => { const next = new Set(prev); next.delete(item.id); return next; });
+      setBulkStatus(null);
       setDeletingId(null);
       // No confirm for one entry: undo is cheaper than a dialog on every click.
       // The Undo colour is set via sx because the theme's text-button colour beats color="inherit" and is unreadable on the snackbar blue.
       enqueueSnackbar(`Removed ${item.value}.`, {
         variant: "info",
+        // Longer than the app's 3 s default: the user has to read, aim and click Undo.
+        autoHideDuration: 8000,
         action: (key) => (
           <Button size="small" sx={{ color: "inherit", fontWeight: 700 }} onClick={() => undoRemove(item.value, key)}>
             Undo
@@ -422,11 +429,14 @@ export function EditableListPanel({
   const allVisibleIds = filtered.map((it) => it.id);
   const selectedCount = allVisibleIds.filter((id) => selectedIds.has(id)).length;
 
+  // Any selection change makes the last bulk result stale.
   function handleSelectAll() {
+    setBulkStatus(null);
     setSelectedIds(new Set(allVisibleIds));
   }
 
   function handleClear() {
+    setBulkStatus(null);
     setSelectedIds(new Set());
   }
 
@@ -439,11 +449,11 @@ export function EditableListPanel({
       setDeletingId(it.id);
       await removeItem(section, it.id);
     });
-    const text = summarise(ok, failed, "deleted");
-    setBulkStatus(text);
-    enqueueSnackbar(text, { variant: failed.length ? "warning" : "success" });
-    // Failed rows stay selected so the user can retry exactly those.
-    setSelectedIds(new Set(failed.map((f) => f.item.id)));
+    // Inline only: the status region is mounted even when the list ends up empty, and a snackbar would be announced twice.
+    setBulkStatus(summarise(ok, failed, "deleted"));
+    // Drop only what was deleted: failed rows stay selected for a retry, and selected rows a filter hides stay too.
+    const deleted = new Set(ok.map((it) => it.id));
+    setSelectedIds((prev) => new Set([...prev].filter((id) => !deleted.has(id))));
     setDeletingId(null);
     setBulkRunning(false);
     await refresh();
@@ -539,9 +549,13 @@ export function EditableListPanel({
               onClearSelection={handleClear}
               onDeleteSelected={() => setConfirmBulk(selectedCount)}
               deleting={removeMutation.isPending || bulkRunning}
-              status={bulkStatus}
             />
           ) : null}
+
+          {/* Mounted before any result exists so screen readers announce the text when it lands. */}
+          <Typography role="status" variant="body2" color="text.secondary">
+            {bulkStatus}
+          </Typography>
 
           {filtered.length === 0 ? (
             <EmptyList message={filter ? `No items matching "${filter}"` : "No items yet."} />
@@ -564,16 +578,17 @@ export function EditableListPanel({
                   key={it.id}
                   item={it}
                   selected={selectedIds.has(it.id)}
-                  onToggleSelect={() => setSelectedIds((prev) => {
+                  onToggleSelect={() => { setBulkStatus(null); setSelectedIds((prev) => {
                     const next = new Set(prev);
                     next.has(it.id) ? next.delete(it.id) : next.add(it.id);
                     return next;
-                  })}
+                  }); }}
                   onDelete={() => {
                     setDeletingId(it.id);
                     removeMutation.mutate(it);
                   }}
                   deleting={deletingId === it.id && (removeMutation.isPending || bulkRunning)}
+                  deleteDisabled={bulkRunning || removeMutation.isPending}
                   selectionMode={selectionMode}
                 />
               ))}

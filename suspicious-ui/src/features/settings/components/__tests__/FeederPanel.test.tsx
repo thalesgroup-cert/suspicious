@@ -54,6 +54,22 @@ describe("FeederPanel", () => {
     await waitFor(() => expect(setFeederStatus).toHaveBeenCalledWith(false));
   });
 
+  it("returns focus to the switch once turning off has settled", async () => {
+    const user = userEvent.setup();
+    vi.mocked(getFeederStatus).mockResolvedValue({ enabled: true } as never);
+    vi.mocked(setFeederStatus).mockImplementation(
+      () => new Promise((r) => setTimeout(() => r({ enabled: false } as never), 150))
+    );
+    renderWithProviders(<FeederPanel />);
+    const sw = await screen.findByRole("switch", { name: "Email feeder" });
+    await waitFor(() => expect(sw).toBeChecked());
+
+    await user.click(sw);
+    await user.click(await screen.findByRole("button", { name: "Turn off" }));
+    await waitFor(() => expect(setFeederStatus).toHaveBeenCalledWith(false));
+    await waitFor(() => expect(sw).toHaveFocus(), { timeout: 2000 });
+  });
+
   it("turns the feeder on without a dialog", async () => {
     const user = userEvent.setup();
     vi.mocked(getFeederStatus).mockResolvedValue({ enabled: false } as never);

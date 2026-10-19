@@ -131,6 +131,69 @@ describe("EditableListPanel", () => {
     });
   });
 
+  describe("undo outcome", () => {
+    async function removeThenUndo(user: ReturnType<typeof userEvent.setup>) {
+      mockRemove.mockResolvedValue(undefined);
+      renderWithProviders(
+        <EditableListPanel section="domains_allow" title="Domains allowlist" placeholder="Add domains" />
+      );
+      await screen.findByText("evil.com");
+      await user.click(screen.getAllByRole("button", { name: "Delete" })[0]);
+      await user.click(await screen.findByRole("button", { name: "Undo" }));
+    }
+
+    it("does not say Restored when nothing was created because it is already in the list", async () => {
+      const user = userEvent.setup();
+      mockAdd.mockResolvedValue({ created: [], duplicates: ["evil.com"], watcher_conflicts: [] });
+      await removeThenUndo(user);
+      expect(
+        await screen.findByText("evil.com was not restored (already in the list or in the Watcher list)")
+      ).toBeInTheDocument();
+      expect(screen.queryByText("Restored evil.com.")).not.toBeInTheDocument();
+    });
+
+    it("does not say Restored when the value is in the Watcher list", async () => {
+      const user = userEvent.setup();
+      mockAdd.mockResolvedValue({ created: [], duplicates: [], watcher_conflicts: ["evil.com"] });
+      await removeThenUndo(user);
+      expect(
+        await screen.findByText("evil.com was not restored (already in the list or in the Watcher list)")
+      ).toBeInTheDocument();
+    });
+
+    it("calls addItems once and reports once on a fast double click", async () => {
+      const user = userEvent.setup();
+      mockAdd.mockImplementation(
+        () => new Promise((r) => setTimeout(() => r({ created: ["9"], duplicates: [], watcher_conflicts: [] }), 150))
+      );
+      mockRemove.mockResolvedValue(undefined);
+      renderWithProviders(
+        <EditableListPanel section="domains_allow" title="Domains allowlist" placeholder="Add domains" />
+      );
+      await screen.findByText("evil.com");
+      await user.click(screen.getAllByRole("button", { name: "Delete" })[0]);
+      const undo = await screen.findByRole("button", { name: "Undo" });
+      await user.dblClick(undo);
+      await screen.findByText("Restored evil.com.");
+      await new Promise((r) => setTimeout(r, 300));
+      expect(mockAdd).toHaveBeenCalledTimes(1);
+      expect(screen.getAllByText("Restored evil.com.")).toHaveLength(1);
+    });
+
+    it("keeps the Undo snackbar past notistack's 5 s default (the app default is 3 s)", async () => {
+      const user = userEvent.setup();
+      mockRemove.mockResolvedValue(undefined);
+      renderWithProviders(
+        <EditableListPanel section="domains_allow" title="Domains allowlist" placeholder="Add domains" />
+      );
+      await screen.findByText("evil.com");
+      await user.click(screen.getAllByRole("button", { name: "Delete" })[0]);
+      await screen.findByRole("button", { name: "Undo" });
+      await new Promise((r) => setTimeout(r, 5600));
+      expect(screen.getByRole("button", { name: "Undo" })).toBeInTheDocument();
+    });
+  });
+
   describe("bulk delete", () => {
     beforeEach(() => {
       mockList.mockResolvedValue([
@@ -187,6 +250,92 @@ describe("EditableListPanel", () => {
       } finally {
         window.removeEventListener("unhandledrejection", onRejection);
       }
+    });
+  });
+
+  describe("bulk delete bookkeeping", () => {
+    beforeEach(() => {
+      mockList.mockResolvedValue([
+        { id: "1", value: "a.com" },
+        { id: "2", value: "b.com" },
+        { id: "3", value: "c.com" },
+      ]);
+    });
+
+    it("keeps selected ids that the filter hides after a bulk run", async () => {
+      const user = userEvent.setup();
+      mockRemove.mockResolvedValue(undefined);
+      renderWithProviders(
+        <EditableListPanel section="domains_deny" title="Domains denylist" placeholder="Add domains" />
+      );
+      await screen.findByText("a.com");
+      for (const b of screen.getAllByRole("button", { name: "Select" })) await user.click(b);
+      await user.click(screen.getByRole("button", { name: "Search items" }));
+      await user.type(screen.getByPlaceholderText("Filter items…"), "a.com");
+
+      await user.click(screen.getByRole("button", { name: "Delete 1" }));
+      expect(await screen.findByRole("dialog")).toHaveTextContent("Delete 1 entry from Domains denylist?");
+      await user.click(screen.getByRole("button", { name: "Delete" }));
+      await waitFor(() => expect(mockRemove).toHaveBeenCalledTimes(1));
+      expect(mockRemove).toHaveBeenCalledWith("domains_deny", "1");
+
+      await user.clear(screen.getByPlaceholderText("Filter items…"));
+      expect(await screen.findByText("2 selected")).toBeInTheDocument();
+    });
+
+    it("shows the bulk result once, inline, even when the list ends up empty", async () => {
+      const user = userEvent.setup();
+      mockRemove.mockResolvedValue(undefined);
+      renderWithProviders(
+        <EditableListPanel section="domains_deny" title="Domains denylist" placeholder="Add domains" />
+      );
+      await screen.findByText("a.com");
+      for (const b of screen.getAllByRole("button", { name: "Select" })) await user.click(b);
+      mockList.mockResolvedValue([]);
+      await user.click(screen.getByRole("button", { name: "Delete 3" }));
+      await user.click(await screen.findByRole("button", { name: "Delete" }));
+
+      await screen.findByText("No items yet.");
+      expect(screen.getAllByText("3 of 3 deleted")).toHaveLength(1);
+      // The closing dialog keeps the page aria-hidden for a moment, so wait for the region to be reachable.
+      expect(await screen.findByRole("status")).toHaveTextContent("3 of 3 deleted");
+    });
+
+    it("clears a stale bulk result when the selection changes", async () => {
+      const user = userEvent.setup();
+      mockRemove.mockImplementation(async (_s, id) => { if (id === "2") throw new Error("x"); });
+      renderWithProviders(
+        <EditableListPanel section="domains_deny" title="Domains denylist" placeholder="Add domains" />
+      );
+      await screen.findByText("a.com");
+      for (const b of screen.getAllByRole("button", { name: "Select" })) await user.click(b);
+      await user.click(screen.getByRole("button", { name: "Delete 3" }));
+      await user.click(await screen.findByRole("button", { name: "Delete" }));
+      expect(await screen.findByText("2 of 3 deleted, 1 failed")).toBeInTheDocument();
+
+      await user.click(await screen.findByRole("button", { name: "Clear" }));
+      expect(screen.queryByText("2 of 3 deleted, 1 failed")).not.toBeInTheDocument();
+    });
+
+    it("disables every row Delete while a bulk run is in progress", async () => {
+      const user = userEvent.setup();
+      let release!: () => void;
+      mockRemove.mockImplementation(() => new Promise<void>((r) => { release = r; }));
+      renderWithProviders(
+        <EditableListPanel section="domains_deny" title="Domains denylist" placeholder="Add domains" />
+      );
+      await screen.findByText("a.com");
+      // Select only the first row so the other two rows are idle during the run.
+      await user.click(screen.getAllByRole("button", { name: "Select" })[0]);
+      await user.click(screen.getByRole("button", { name: "Delete 1" }));
+      await user.click(await screen.findByRole("button", { name: "Delete" }));
+
+      await waitFor(() => expect(mockRemove).toHaveBeenCalledTimes(1));
+      await waitFor(() => expect(screen.getAllByRole("button", { name: "Delete" })).toHaveLength(3));
+      for (const b of screen.getAllByRole("button", { name: "Delete" })) expect(b).toBeDisabled();
+
+      release();
+      await screen.findByText("1 of 1 deleted");
     });
   });
 

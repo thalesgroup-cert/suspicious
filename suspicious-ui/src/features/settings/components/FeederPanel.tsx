@@ -19,6 +19,8 @@ export function FeederPanel() {
   const isDark = theme.palette.mode === "dark";
   const safe = useResultColors().safe.main;
   const [confirmOff, setConfirmOff] = React.useState(false);
+  const switchInput = React.useRef<HTMLInputElement>(null);
+  const refocus = React.useRef(false);
 
   const statusQuery = useQuery({
     queryKey: ["settings", "email_feeder"],
@@ -40,6 +42,14 @@ export function FeederPanel() {
 
   const enabled = statusQuery.data?.enabled ?? false;
   const pending = statusQuery.isLoading || toggleMutation.isPending;
+
+  // The switch is disabled while the request runs, which drops focus to <body>; give it back once it settles.
+  React.useEffect(() => {
+    if (!pending && refocus.current) {
+      refocus.current = false;
+      switchInput.current?.focus();
+    }
+  }, [pending]);
   // Text on the 12% tint must stay readable on either page background; the raw brand colour does not in light mode.
   const onTint = readableOnTint(safe, safe, 0.12, [theme.palette.background.paper, theme.palette.background.default]);
 
@@ -108,7 +118,7 @@ export function FeederPanel() {
               onChange={(e) => (e.target.checked ? toggleMutation.mutate(true) : setConfirmOff(true))}
               disabled={pending}
               color="success"
-              slotProps={{ input: { "aria-label": "Email feeder" } }}
+              slotProps={{ input: { "aria-label": "Email feeder", ref: switchInput } }}
             />
           </Stack>
         </Stack>
@@ -130,6 +140,7 @@ export function FeederPanel() {
         destructive
         onConfirm={() => {
           setConfirmOff(false);
+          refocus.current = true;
           toggleMutation.mutate(false);
         }}
         onCancel={() => setConfirmOff(false)}
