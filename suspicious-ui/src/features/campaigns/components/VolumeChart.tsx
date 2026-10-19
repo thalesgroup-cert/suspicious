@@ -29,6 +29,12 @@ const RIGHT_MARGIN = 24;
 
 type Row = { idx: number; date: string; other: number; dangerous: number };
 
+/** The UTC day of a datetime ("YYYY-MM-DD"), like the backend's days: an offset time may fall on another day in UTC. */
+const utcDay = (iso: string) => {
+  const d = new Date(iso);
+  return Number.isNaN(d.getTime()) ? "" : d.toISOString().slice(0, 10);
+};
+
 /** Evenly spaced tick indices that always end on the last day (never clipped: the chart keeps a right margin). */
 function tickIndices(n: number, max: number): number[] {
   if (n <= max) return Array.from({ length: n }, (_, i) => i);
@@ -82,8 +88,8 @@ export default function VolumeChart({ volume, campaigns }: { volume: MailVolumeR
   const last = rows.length - 1;
   const bands = campaigns
     .slice(0, MAX_BANDS)
-    .map((c) => ({ name: c.name, s: index.get(c.first_seen.slice(0, 10)), e: index.get(c.last_seen.slice(0, 10)) }))
-    .filter((b): b is { name: string; s: number; e: number } => b.s !== undefined && b.e !== undefined);
+    .map((c, i) => ({ key: `${c.first_seen}|${c.name}|${i}`, name: c.name, s: index.get(utcDay(c.first_seen)), e: index.get(utcDay(c.last_seen)) }))
+    .filter((b): b is { key: string; name: string; s: number; e: number } => b.s !== undefined && b.e !== undefined);
 
   const summary =
     total === 0
@@ -109,7 +115,7 @@ export default function VolumeChart({ volume, campaigns }: { volume: MailVolumeR
       <Stack direction="row" useFlexGap spacing={1} sx={{ mb: 1, alignItems: "center", justifyContent: "space-between", flexWrap: "wrap" }}>
         {asTable ? <span /> : legend}
         <Button size="small" onClick={() => setAsTable((v) => !v)} aria-pressed={asTable}>
-          {asTable ? "View as chart" : "View as table"}
+          Table view
         </Button>
       </Stack>
 
@@ -193,7 +199,7 @@ export default function VolumeChart({ volume, campaigns }: { volume: MailVolumeR
               const left = (Math.max(0, b.s - 0.5) / span) * 100;
               const right = (Math.min(last, b.e + 0.5) / span) * 100;
               return (
-                <Box component="li" key={b.name}>
+                <Box component="li" key={b.key}>
                   <Typography variant="caption" component="p" sx={{ overflowWrap: "anywhere" }}>
                     {b.name} · {formatDay(rows[b.s].date)}
                     {b.e !== b.s ? ` to ${formatDay(rows[b.e].date)}` : ""}

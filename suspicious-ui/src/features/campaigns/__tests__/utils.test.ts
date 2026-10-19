@@ -1,10 +1,19 @@
 import { describe, it, expect } from "vitest";
-import { formatDay, normalizeLabel, sortRows } from "@/features/campaigns/utils";
+import { classKey, classLabel, formatDay, normalizeLabel, sortRows } from "@/features/campaigns/utils";
 
 describe("campaign helpers", () => {
   it("normalizeLabel upper-cases and defaults to UNKNOWN", () => {
     expect(normalizeLabel("safe")).toBe("SAFE");
     expect(normalizeLabel("")).toBe("UNKNOWN");
+  });
+
+  it("classKey keeps the four classes and puts everything else in UNKNOWN, named Unclassified", () => {
+    expect(classKey("dangerous")).toBe("DANGEROUS");
+    expect(classKey("UNKNOWN")).toBe("UNKNOWN");
+    expect(classKey("")).toBe("UNKNOWN");
+    expect(classKey("odd")).toBe("UNKNOWN");
+    expect(classLabel("unwanted")).toBe("Unwanted");
+    expect(classLabel("UNKNOWN")).toBe("Unclassified");
   });
 
   it("formatDay shows the UTC day of a date or datetime", () => {

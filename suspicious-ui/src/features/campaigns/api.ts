@@ -27,13 +27,10 @@ export type PcaResponse = {
   explained_variance: number[];
 };
 
-type MailVolumeCampaign = { name: string; start: string; end: string };
-
 export type MailVolumeResponse = {
   dates: string[];
   non_danger: number[];
   dangerous: number[];
-  campaigns: MailVolumeCampaign[];
 };
 
 export type CampaignRow = {
@@ -103,11 +100,6 @@ function counts(data: any): ClassificationCounts {
   };
 }
 
-export async function getClassificationCounts(): Promise<ClassificationCounts> {
-  const res = await api.get("/campaigns/classification-counts/");
-  return counts(res.data);
-}
-
 export async function getPca(limit = 1500): Promise<PcaResponse> {
   const res = await api.get("/campaigns/pca/", { params: { limit } });
   const data = res.data ?? {};
@@ -133,9 +125,6 @@ export async function getMailVolume(days = 15): Promise<MailVolumeResponse> {
     dates: strings(data.dates),
     non_danger: list(data.non_danger).map((v) => num(v)),
     dangerous: list(data.dangerous).map((v) => num(v)),
-    campaigns: list(data.campaigns)
-      .map((c) => ({ name: str(c?.name, "Campaign"), start: str(c?.start), end: str(c?.end) }))
-      .filter((c) => c.start && c.end),
   };
 }
 

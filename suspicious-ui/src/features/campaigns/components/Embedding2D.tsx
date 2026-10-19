@@ -1,15 +1,14 @@
 import * as React from "react";
-import { Box, Chip, Paper, Stack, Typography } from "@mui/material";
-import { alpha, useTheme } from "@mui/material/styles";
+import { Box, Paper, Stack, Typography } from "@mui/material";
+import { useTheme } from "@mui/material/styles";
 import { CartesianGrid, ResponsiveContainer, Scatter, ScatterChart, Tooltip, XAxis, YAxis } from "recharts";
 
 import { plural } from "@/features/dashboard/format";
-import { readableOnTint } from "@/shared/lib/contrast";
 import type { PcaPoint } from "@/features/campaigns/api";
-import { CLASSES, classLabel, normalizeLabel, useClassColors, type ClassKey } from "@/features/campaigns/utils";
+import { SERIES, classKey, classLabel, useClassColors, type SeriesKey } from "@/features/campaigns/utils";
+import ClassChip from "./ClassChip";
 
 const R = 3;
-const CHIP_TINT = 0.18;
 
 /** [min, max] of the values, padded 5% (or ±1 when they are all equal), so every point sits inside the axes. */
 function fit(values: number[]): [number, number] {
@@ -22,6 +21,9 @@ function fit(values: number[]): [number, number] {
 
 /** Five evenly spaced ticks across the fitted domain: recharts' own picks crowded the last two labels together. */
 const ticks = ([lo, hi]: [number, number]) => Array.from({ length: 5 }, (_, i) => lo + ((hi - lo) * i) / 4);
+
+/** Decimals that keep the five labels distinct: two significant digits of the step between ticks. */
+const decimals = ([lo, hi]: [number, number]) => Math.min(6, Math.max(0, 1 - Math.floor(Math.log10((hi - lo) / 4))));
 
 function PointTooltip({ active, payload }: { active?: boolean; payload?: Array<{ payload?: PcaPoint }> }) {
   const p = payload?.[0]?.payload;
@@ -45,57 +47,69 @@ function PointTooltip({ active, payload }: { active?: boolean; payload?: Array<{
 export default function Embedding2D({ points, selectedCaseIds }: { points: PcaPoint[]; selectedCaseIds: string[] }) {
   const theme = useTheme();
   const colors = useClassColors();
-  const [hidden, setHidden] = React.useState<ClassKey[]>([]);
-  const selected = new Set(selectedCaseIds);
+  const [hidden, setHidden] = React.useState<SeriesKey[]>([]);
+  const selected = React.useMemo(() => new Set(selectedCaseIds), [selectedCaseIds]);
 
-  const byClass = new Map<string, PcaPoint[]>();
-  for (const p of points) {
-    const k = normalizeLabel(p.label);
-    byClass.set(k, [...(byClass.get(k) ?? []), p]);
-  }
-  const visible = points.filter((p) => !hidden.includes(normalizeLabel(p.label) as ClassKey));
-  const xDomain = fit(visible.map((p) => p.x));
-  const yDomain = fit(visible.map((p) => p.y));
-  const backgrounds = [theme.palette.background.paper, theme.palette.background.default];
+  const byClass = React.useMemo(() => {
+    const m = new Map<SeriesKey, PcaPoint[]>();
+    for (const p of points) {
+      const k = classKey(p.label);
+      const list = m.get(k);
+      if (list) list.push(p);
+      else m.set(k, [p]);
+    }
+    return m;
+  }, [points]);
+  // The four classes are always listed; "Unclassified" only when the sample holds such messages.
+  const series = SERIES.filter(([k]) => k !== "UNKNOWN" || byClass.has("UNKNOWN"));
+  const drawn = series.filter(([k]) => !hidden.includes(k));
+  // The axes follow exactly what is drawn.
+  const { xDomain, yDomain } = React.useMemo(() => {
+    const visible = [...byClass].filter(([k]) => !hidden.includes(k)).flatMap(([, list]) => list);
+    return { xDomain: fit(visible.map((p) => p.x)), yDomain: fit(visible.map((p) => p.y)) };
+  }, [byClass, hidden]);
   const tick = { fill: theme.palette.text.secondary, fontSize: theme.typography.caption.fontSize };
-  const counts = CLASSES.map(([k, l]) => `${l} ${byClass.get(k)?.length ?? 0}`).join(", ");
+  const counts = series.map(([k, l]) => `${l} ${byClass.get(k)?.length ?? 0}`).join(", ");
 
-  const toggle = (k: ClassKey) => setHidden((h) => (h.includes(k) ? h.filter((x) => x !== k) : [...h, k]));
+  const toggle = (k: SeriesKey) => setHidden((h) => (h.includes(k) ? h.filter((x) => x !== k) : [...h, k]));
 
   return (
     <>
       <Stack direction="row" useFlexGap spacing={0.75} sx={{ flexWrap: "wrap", mb: 1 }}>
-        {CLASSES.map(([k, label]) => {
-          const on = !hidden.includes(k);
-          return (
-            <Chip
-              key={k}
-              size="small"
-              clickable
-              aria-pressed={on}
-              onClick={() => toggle(k)}
-              icon={<Box component="span" aria-hidden sx={{ width: 8, height: 8, borderRadius: "50%", bgcolor: colors[k], ml: "6px !important" }} />}
-              label={`${label} ${byClass.get(k)?.length ?? 0}`}
-              variant="outlined"
-              sx={{
-                borderColor: on ? colors[k] : "divider",
-                // Tinted, not filled: white on orange/cyan fell to about 2:1 (audit C7).
-                bgcolor: on ? alpha(colors[k], CHIP_TINT) : "transparent",
-                color: on ? readableOnTint(theme.palette.text.primary, colors[k], CHIP_TINT, backgrounds) : "text.secondary",
-                textDecoration: on ? "none" : "line-through",
-              }}
-            />
-          );
-        })}
+        {series.map(([k, label]) => (
+          <ClassChip key={k} k={k} label={`${label} ${byClass.get(k)?.length ?? 0}`} on={!hidden.includes(k)} clickable aria-pressed={!hidden.includes(k)} onClick={() => toggle(k)} />
+        ))}
       </Stack>
       <Box role="img" aria-label={`Embedding map, first two components, ${plural(points.length, "message")}: ${counts}`} sx={{ height: 360 }}>
         <ResponsiveContainer width="100%" height="100%">
-          <ScatterChart margin={{ top: 8, right: 16, bottom: 0, left: -8 }}>
+          <ScatterChart margin={{ top: 8, right: 16, bottom: 0, left: 0 }}>
             <CartesianGrid strokeDasharray="3 3" stroke={theme.palette.divider} />
-            <XAxis type="number" dataKey="x" name="PC1" domain={xDomain} ticks={ticks(xDomain)} tickFormatter={(v: number) => v.toFixed(1)} tick={tick} stroke={theme.palette.divider} />
-            <YAxis type="number" dataKey="y" name="PC2" domain={yDomain} ticks={ticks(yDomain)} tickFormatter={(v: number) => v.toFixed(1)} tick={tick} stroke={theme.palette.divider} />
+            <XAxis
+              type="number"
+              dataKey="x"
+              name="PC1"
+              domain={xDomain}
+              ticks={ticks(xDomain)}
+              tickFormatter={(v: number) => v.toFixed(decimals(xDomain))}
+              tick={tick}
+              stroke={theme.palette.divider}
+              height={44}
+              label={{ value: "PC1", position: "insideBottom", offset: 0, ...tick }}
+            />
+            <YAxis
+              type="number"
+              dataKey="y"
+              name="PC2"
+              domain={yDomain}
+              ticks={ticks(yDomain)}
+              tickFormatter={(v: number) => v.toFixed(decimals(yDomain))}
+              tick={tick}
+              stroke={theme.palette.divider}
+              width={64}
+              label={{ value: "PC2", angle: -90, position: "insideLeft", offset: 8, style: { textAnchor: "middle" }, ...tick }}
+            />
             <Tooltip content={<PointTooltip />} cursor={{ stroke: theme.palette.divider }} />
-            {CLASSES.filter(([k]) => !hidden.includes(k)).map(([k]) => (
+            {drawn.map(([k]) => (
               <Scatter
                 key={k}
                 name={k}

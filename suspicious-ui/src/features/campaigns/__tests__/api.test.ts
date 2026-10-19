@@ -1,6 +1,6 @@
 import { describe, it, expect, vi, beforeEach } from "vitest";
 import { api } from "@/api/client";
-import { getCampaignSummary, getClassificationCounts, getMailVolume, getNeighbours, getPca } from "../api";
+import { getCampaignSummary, getMailVolume, getNeighbours, getPca } from "../api";
 
 vi.mock("@/api/client", () => ({ api: { get: vi.fn() } }));
 
@@ -35,11 +35,6 @@ describe("campaigns api", () => {
     expect(s.mix).toEqual({ SAFE: 2, UNWANTED: 0, SUSPICIOUS: 0, DANGEROUS: 0 });
     expect(s.active_window_hours).toBe(0);
     expect(s.campaigns[0]).toMatchObject({ name: "a.example", messages: 0, active: false, sample_subject: null, case_ids: ["1"] });
-  });
-
-  it("normalises four classification buckets", async () => {
-    vi.mocked(api.get).mockResolvedValue({ data: { SAFE: 1, SUSPICIOUS: 4 } });
-    expect(await getClassificationCounts()).toEqual({ SAFE: 1, UNWANTED: 0, SUSPICIOUS: 4, DANGEROUS: 0 });
   });
 
   it("keeps z, date and three variance ratios on PCA", async () => {

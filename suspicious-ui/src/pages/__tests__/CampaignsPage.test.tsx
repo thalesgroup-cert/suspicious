@@ -2,10 +2,10 @@ import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
 import { screen, waitFor, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { renderWithProviders } from "@/test/utils";
+import { stubMatchMedia } from "@/test/matchMedia";
 import {
   fixtureMe,
   fixtureCampaignSummary,
-  fixtureClassificationCounts,
   fixtureMailVolume,
   fixtureNeighbours,
   fixturePca,
@@ -20,7 +20,6 @@ vi.mock("@/api/auth", () => ({
 
 vi.mock("@/features/campaigns/api", () => ({
   getCampaignSummary: vi.fn(),
-  getClassificationCounts: vi.fn(),
   getMailVolume: vi.fn(),
   getNeighbours: vi.fn(),
   getPca: vi.fn(),
@@ -29,35 +28,20 @@ vi.mock("@/features/campaigns/api", () => ({
 import { getMe } from "@/api/auth";
 import {
   getCampaignSummary,
-  getClassificationCounts,
   getMailVolume,
   getNeighbours,
   getPca,
 } from "@/features/campaigns/api";
 import CampaignsPage from "../CampaignsPage";
 
-// Tests run in a real browser whose default viewport is narrow: pin the breakpoint explicitly.
-const stub = (phone: boolean) =>
-  vi.stubGlobal("matchMedia", (query: string) => ({
-    matches: phone ? query.includes("max-width") : query.includes("min-width"),
-    media: query,
-    addEventListener: () => {},
-    removeEventListener: () => {},
-    addListener: () => {},
-    removeListener: () => {},
-    onchange: null,
-    dispatchEvent: () => false,
-  }));
-
 const T = { timeout: 5000 };
 const region = (name: string) => screen.findByRole("region", { name }, T);
 
 describe("CampaignsPage", () => {
   beforeEach(() => {
-    stub(false);
+    stubMatchMedia();
     vi.mocked(getMe).mockResolvedValue(fixtureMe);
     vi.mocked(getCampaignSummary).mockReset().mockResolvedValue(fixtureCampaignSummary);
-    vi.mocked(getClassificationCounts).mockResolvedValue(fixtureClassificationCounts);
     vi.mocked(getMailVolume).mockReset().mockResolvedValue(fixtureMailVolume);
     vi.mocked(getNeighbours).mockReset().mockResolvedValue(fixtureNeighbours);
     vi.mocked(getPca).mockReset().mockResolvedValue(fixturePca);
@@ -127,6 +111,7 @@ describe("CampaignsPage", () => {
       expect(within(active).getByText("active = seen in the last 48 hours")).toBeInTheDocument();
       const largest = await region("Largest campaign");
       expect(within(largest).getByText("12")).toBeInTheDocument();
+      expect(within(largest).getByText("messages")).toBeInTheDocument();
       expect(within(largest).getByText(fixtureCampaignSummary.largest_campaign!.name)).toBeInTheDocument();
       const peak = await region("Peak day");
       expect(within(peak).getByText("15")).toBeInTheDocument();
@@ -181,19 +166,82 @@ describe("CampaignsPage", () => {
     });
   });
 
+  describe("changing the period", () => {
+    it("keeps the previous numbers on screen and says it is loading the new period", async () => {
+      const user = userEvent.setup();
+      let resolve!: (v: typeof fixtureCampaignSummary) => void;
+      renderWithProviders(<CampaignsPage />, { initialPath: "/campaigns" });
+      expect(await within(await region("Messages")).findByText("34", {}, T)).toBeInTheDocument();
+      expect(screen.queryByRole("progressbar")).not.toBeInTheDocument();
+      expect(document.querySelector('[aria-busy="true"]')).toBeNull();
+
+      vi.mocked(getCampaignSummary).mockReturnValueOnce(new Promise((r) => (resolve = r)));
+      await user.click(await screen.findByRole("combobox", { name: "Period" }, T));
+      await user.click(await screen.findByRole("option", { name: "Last 30 days" }));
+
+      expect(await screen.findByRole("progressbar", { name: "Loading the last 30 days" }, T)).toBeInTheDocument();
+      expect(document.querySelector('[aria-busy="true"]')).not.toBeNull();
+      // The 15-day numbers stay until the 30-day ones arrive.
+      expect(within(screen.getByRole("region", { name: "Messages" })).getByText("34")).toBeInTheDocument();
+
+      resolve({ ...fixtureCampaignSummary, days: 30, messages: 80 });
+      expect(await within(await region("Messages")).findByText("80", {}, T)).toBeInTheDocument();
+      await waitFor(() => expect(screen.queryByRole("progressbar")).not.toBeInTheDocument());
+      expect(document.querySelector('[aria-busy="true"]')).toBeNull();
+    });
+  });
+
   describe("campaigns and map", () => {
-    it("Show in map selects the campaign's cases in the map", async () => {
+    it("Show in map selects the campaign's cases in the map and says how many the sample holds", async () => {
       const user = userEvent.setup();
       renderWithProviders(<CampaignsPage />, { initialPath: "/campaigns" });
       const table = await region("Campaigns in this period");
       const row = (await within(table).findByText(fixtureCampaignSummary.campaigns[0].name, {}, T)).closest("tr")!;
       await user.click(within(row as HTMLElement).getByRole("button", { name: "Show in map" }));
-      expect(within(await region("Embedding map")).getByText("2 selected")).toBeInTheDocument();
+      const map = await region("Embedding map");
+      expect(within(map).getByText("2 selected")).toBeInTheDocument();
+      // The sample holds cases 1 and 2; the campaign's are 41 and 40.
+      expect(within(map).getByText("0 in the map sample")).toBeInTheDocument();
     });
 
-    it("shows the variance caption on the map", async () => {
+    it.each([
+      [false, "smooth"],
+      [true, "auto"],
+    ])("scrolls the map into view (reduced motion: %s -> %s)", async (reducedMotion, behavior) => {
+      stubMatchMedia({ reducedMotion });
+      const scroll = vi.spyOn(Element.prototype, "scrollIntoView").mockImplementation(() => {});
+      const user = userEvent.setup();
       renderWithProviders(<CampaignsPage />, { initialPath: "/campaigns" });
-      expect(await screen.findByText(/Components explain 48% of the variance\./, {}, T)).toBeInTheDocument();
+      const table = await region("Campaigns in this period");
+      const row = (await within(table).findByText(fixtureCampaignSummary.campaigns[0].name, {}, T)).closest("tr")!;
+      await user.click(within(row as HTMLElement).getByRole("button", { name: "Show in map" }));
+      expect(scroll).toHaveBeenCalledWith({ behavior, block: "start" });
+      scroll.mockRestore();
+    });
+
+    it("explains the variance of the two plotted components and what the sample is", async () => {
+      vi.mocked(getPca).mockResolvedValue({ ...fixturePca, explained_variance: [0.25, 0.1, 0.05] });
+      renderWithProviders(<CampaignsPage />, { initialPath: "/campaigns" });
+      expect(
+        await screen.findByText(
+          `PC1 25% + PC2 10% of the variance (PC3 not shown). Sample of up to ${(1500).toLocaleString()} messages from the whole store, not limited to the selected period. Closeness is not proof of a campaign.`,
+          {},
+          T
+        )
+      ).toBeInTheDocument();
+      expect(screen.queryByText(/Components explain/)).not.toBeInTheDocument();
+    });
+
+    it("does not mention PC3 when the backend sent two components", async () => {
+      vi.mocked(getPca).mockResolvedValue({ ...fixturePca, explained_variance: [0.3, 0.2] });
+      renderWithProviders(<CampaignsPage />, { initialPath: "/campaigns" });
+      expect(await screen.findByText(/^PC1 30% \+ PC2 20% of the variance\. Sample of up to/, {}, T)).toBeInTheDocument();
+      expect(screen.queryByText(/PC3/)).not.toBeInTheDocument();
+    });
+
+    it("keeps the review lists in a named, focusable region", async () => {
+      renderWithProviders(<CampaignsPage />, { initialPath: "/campaigns" });
+      expect(await screen.findByRole("region", { name: "Review lists" }, T)).toHaveAttribute("tabindex", "0");
     });
   });
 });

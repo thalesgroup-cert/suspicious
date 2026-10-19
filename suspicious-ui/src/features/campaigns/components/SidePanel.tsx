@@ -1,9 +1,9 @@
 import { Box, ButtonBase, Link, Stack, Typography } from "@mui/material";
 import { Link as RouterLink } from "react-router";
 
-import { ResultChip } from "@/shared/components/ResultChip";
 import type { CampaignNeighbours, NeighbourItem } from "@/features/campaigns/api";
-import { formatDay } from "@/features/campaigns/utils";
+import { classKey, classLabel, formatDay } from "@/features/campaigns/utils";
+import ClassChip from "./ClassChip";
 
 function Row({ item, detail, onSelectCases }: { item: NeighbourItem; detail: string; onSelectCases: (ids: string[]) => void }) {
   const id = item.suspicious_case_id;
@@ -23,7 +23,7 @@ function Row({ item, detail, onSelectCases }: { item: NeighbourItem; detail: str
         </Typography>
       </ButtonBase>
       <Stack direction="row" spacing={1} sx={{ mt: 0.5, alignItems: "center" }}>
-        <ResultChip result={item.label} size="small" />
+        <ClassChip k={classKey(item.label)} label={classLabel(item.label)} />
         {id ? (
           <Link component={RouterLink} to={`/investigation?open=${encodeURIComponent(id)}`} variant="body2">
             Case {id}

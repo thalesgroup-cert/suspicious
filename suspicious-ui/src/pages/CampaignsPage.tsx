@@ -31,6 +31,7 @@ import CampaignTable from "@/features/campaigns/components/CampaignTable";
 import EmbeddingMap from "@/features/campaigns/components/EmbeddingMap";
 import MixBar from "@/features/campaigns/components/MixBar";
 import SidePanel from "@/features/campaigns/components/SidePanel";
+import ScrollRegion from "@/features/campaigns/components/ScrollRegion";
 import VolumeChart from "@/features/campaigns/components/VolumeChart";
 
 const PERIODS = [7, 15, 30, 90] as const;
@@ -72,7 +73,10 @@ export default function CampaignsPage() {
 
   const showInMap = (ids: string[]) => {
     setSelectedCaseIds(ids);
-    if (ids.length) mapRef.current?.scrollIntoView?.({ behavior: "smooth", block: "start" });
+    if (ids.length) {
+      const reduceMotion = window.matchMedia?.("(prefers-reduced-motion: reduce)").matches;
+      mapRef.current?.scrollIntoView?.({ behavior: reduceMotion ? "auto" : "smooth", block: "start" });
+    }
   };
 
   // keepPreviousData shows the old period while the new one loads: say so.
@@ -80,8 +84,16 @@ export default function CampaignsPage() {
     (summaryQuery.isFetching && summaryQuery.isPlaceholderData) || (volumeQuery.isFetching && volumeQuery.isPlaceholderData);
   const isEmpty = summaryQuery.data?.messages === 0;
   const variance = pcaQuery.data?.explained_variance ?? [];
-  const varianceCaption = variance.length
-    ? `Components explain ${Math.round(variance.reduce((a, b) => a + b, 0) * 100)}% of the variance. The map shows the first two.`
+  const pct = (v: number) => `${Math.round(v * 100)}%`;
+  // Only what was plotted is explained: the first two components, whatever the backend sent beyond them.
+  const varianceCaption = pcaQuery.data
+    ? [
+        variance.length >= 2 ? `PC1 ${pct(variance[0])} + PC2 ${pct(variance[1])} of the variance${variance.length > 2 ? " (PC3 not shown)" : ""}.` : null,
+        `Sample of up to ${SAMPLE.toLocaleString()} messages from the whole store, not limited to the selected period.`,
+        "Closeness is not proof of a campaign.",
+      ]
+        .filter(Boolean)
+        .join(" ")
     : undefined;
 
   return (
@@ -163,15 +175,11 @@ export default function CampaignsPage() {
                 <PanelState query={neighboursQuery} what="the review lists" height={240}>
                   {(n) => (
                     // On desktop the map sets the row height and the lists scroll inside it, instead of
-                    // stretching the row and leaving a hole under the map. Focusable so the keyboard can scroll it.
+                    // stretching the row and leaving a hole under the map.
                     <Box sx={{ position: { md: "relative" }, flex: 1, minHeight: { md: 240 } }}>
-                      <Box
-                        tabIndex={0}
-                        aria-label="Review lists"
-                        sx={{ position: { md: "absolute" }, inset: 0, overflowY: { md: "auto" }, pr: { md: 1 } }}
-                      >
+                      <ScrollRegion label="Review lists" sx={{ position: { md: "absolute" }, inset: 0, overflowY: { md: "auto" }, pr: { md: 1 } }}>
                         <SidePanel neighbours={n} onSelectCases={showInMap} />
-                      </Box>
+                      </ScrollRegion>
                     </Box>
                   )}
                 </PanelState>

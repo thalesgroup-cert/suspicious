@@ -27,7 +27,13 @@ const KEYS: Record<Key, (c: CampaignRow) => string | number> = {
   dangerous_share: (c) => c.dangerous_share,
 };
 
+// Thousands of DOM rows make the page sluggish; the sort puts the ones worth looking at first.
+const MAX_ROWS = 100;
+
 const NOTE = "Campaigns are inferred from shared source references; first and last seen are within the selected period.";
+
+// Names are cut to their first source references, so two campaigns can share one.
+const rowKey = (c: CampaignRow, i: number) => `${c.first_seen}|${c.name}|${i}`;
 
 function share(c: CampaignRow) {
   return `${c.dangerous.toLocaleString()} (${Math.round(c.dangerous_share * 100)}%)`;
@@ -67,7 +73,7 @@ export default function CampaignTable(props: { campaigns: CampaignRow[]; onSelec
   const phone = useMediaQuery(theme.breakpoints.down("sm"), { noSsr: true });
   // Dates and counts start descending: the newest and largest campaigns are the ones to look at first.
   const { sort, onSort } = useSort<Key>({ key: "last_seen", dir: "desc" }, () => "desc");
-  const rows = sortRows(props.campaigns, KEYS[sort.key], sort.dir);
+  const rows = sortRows(props.campaigns, KEYS[sort.key], sort.dir).slice(0, MAX_ROWS);
 
   if (!rows.length) {
     return (
@@ -82,16 +88,23 @@ export default function CampaignTable(props: { campaigns: CampaignRow[]; onSelec
       {NOTE}
     </Typography>
   );
+  const capped =
+    props.campaigns.length > MAX_ROWS ? (
+      <Typography variant="caption" color="text.secondary" component="p" sx={{ mb: 1 }}>
+        Showing {MAX_ROWS} of {props.campaigns.length.toLocaleString()} campaigns
+      </Typography>
+    ) : null;
 
   if (phone) {
     // A table of eight columns cannot fit 390px without scrolling sideways: one card per campaign instead.
     return (
       <>
+        {capped}
         <Stack component="ul" spacing={1.5} sx={{ m: 0, p: 0, listStyle: "none" }}>
-          {rows.map((c) => (
+          {rows.map((c, i) => (
             <Box
               component="li"
-              key={c.name}
+              key={rowKey(c, i)}
               sx={{ border: "1px solid", borderColor: "divider", borderRadius: 2, p: 1.5 }}
             >
               <Typography variant="body2" sx={{ fontWeight: 600, overflowWrap: "anywhere" }}>
@@ -122,6 +135,7 @@ export default function CampaignTable(props: { campaigns: CampaignRow[]; onSelec
 
   return (
     <>
+      {capped}
       <TableContainer>
         <Table size="small" aria-label="Campaigns in this period">
           <TableHead>
@@ -145,8 +159,8 @@ export default function CampaignTable(props: { campaigns: CampaignRow[]; onSelec
             </TableRow>
           </TableHead>
           <TableBody>
-            {rows.map((c) => (
-              <TableRow key={c.name}>
+            {rows.map((c, i) => (
+              <TableRow key={rowKey(c, i)}>
                 {/* Full name, wrapped: truncating it hides the only thing that tells campaigns apart. */}
                 <TableCell sx={{ overflowWrap: "anywhere", minWidth: 200 }}>{c.name}</TableCell>
                 <TableCell>

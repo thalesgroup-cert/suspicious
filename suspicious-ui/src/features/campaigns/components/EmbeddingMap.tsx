@@ -33,21 +33,24 @@ export default function EmbeddingMap({ points, selectedCaseIds, onSelectCases }:
   return (
     <>
       <Stack direction="row" useFlexGap spacing={1} sx={{ mb: 1, alignItems: "center", justifyContent: "flex-end", flexWrap: "wrap" }}>
-        {shown ? (
-          <>
-            <Stack direction="row" spacing={0.75} sx={{ mr: "auto", alignItems: "baseline" }}>
+        {/* Always mounted so a screen reader announces the count when it appears. */}
+        <Stack role="status" aria-live="polite" direction="row" spacing={0.75} sx={{ mr: "auto", alignItems: "baseline" }}>
+          {shown ? (
+            <>
               <Typography variant="body2">{shown} selected</Typography>
               <Typography variant="body2" color="text.secondary">
                 {inSample === shown ? "" : `${inSample} in the map sample`}
               </Typography>
-            </Stack>
-            <Button size="small" onClick={() => onSelectCases([])}>
-              Clear selection
-            </Button>
-          </>
+            </>
+          ) : null}
+        </Stack>
+        {shown ? (
+          <Button size="small" onClick={() => onSelectCases([])}>
+            Clear selection
+          </Button>
         ) : null}
         <Button size="small" onClick={() => setAsTable((v) => !v)} aria-pressed={asTable}>
-          {asTable ? "View as map" : "View as table"}
+          Table view
         </Button>
       </Stack>
       {asTable ? <PointTable points={points} /> : <Embedding2D points={points} selectedCaseIds={selectedCaseIds} />}

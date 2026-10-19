@@ -12,14 +12,24 @@ export const CLASSES = [
 ] as const;
 
 export type ClassKey = (typeof CLASSES)[number][0];
+/** The four classes plus UNKNOWN: a message the store holds without one of them. */
+export type SeriesKey = ClassKey | "UNKNOWN";
+
+export const SERIES: readonly (readonly [SeriesKey, string])[] = [...CLASSES, ["UNKNOWN", "Unclassified"]];
 
 export function normalizeLabel(label: string) {
   return (label || "UNKNOWN").toUpperCase();
 }
 
+/** The series a label belongs to: one of the four classes, else UNKNOWN (like the summary's "unclassified"). */
+export function classKey(label: string): SeriesKey {
+  const k = normalizeLabel(label);
+  return CLASSES.some(([c]) => c === k) ? (k as ClassKey) : "UNKNOWN";
+}
+
 export function classLabel(label: string): string {
-  const key = normalizeLabel(label);
-  return CLASSES.find(([k]) => k === key)?.[1] ?? "Unknown";
+  const key = classKey(label);
+  return SERIES.find(([k]) => k === key)![1];
 }
 
 /**
@@ -27,7 +37,7 @@ export function classLabel(label: string): string {
  * Suspicious=suspicious, Dangerous=dangerous; useResultHex folds Unwanted into suspicious,
  * which would draw two adjacent segments in one colour, so Unwanted takes the neutral verdict colour.
  */
-export function useClassColors(): Record<ClassKey | "UNKNOWN", string> {
+export function useClassColors(): Record<SeriesKey, string> {
   const theme = useTheme();
   const result = useResultColors();
   const status = useStatusColors();

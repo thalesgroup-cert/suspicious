@@ -59,10 +59,13 @@ export default function CampaignKpis({ summary: s }: { summary: CampaignSummary 
 
       <Kpi title="Largest campaign" value={s.largest_campaign ? s.largest_campaign.messages : "—"}>
         {s.largest_campaign ? (
-          // Full name: it is the campaign's only identity; wrap rather than truncate.
-          <Typography variant="body2" color="text.secondary" sx={{ overflowWrap: "anywhere" }}>
-            {s.largest_campaign.name}
-          </Typography>
+          <>
+            <Line>messages</Line>
+            {/* Full name: it is the campaign's only identity; wrap rather than truncate. */}
+            <Typography variant="body2" color="text.secondary" sx={{ overflowWrap: "anywhere" }}>
+              {s.largest_campaign.name}
+            </Typography>
+          </>
         ) : (
           <Line>No campaigns in this period</Line>
         )}

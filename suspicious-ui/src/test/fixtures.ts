@@ -3,7 +3,6 @@ import type { DashboardSummary } from "@/features/dashboard/api";
 import type {
   CampaignNeighbours,
   CampaignSummary,
-  ClassificationCounts,
   PcaResponse,
   MailVolumeResponse,
 } from "@/features/campaigns/api";
@@ -52,13 +51,6 @@ export const fixtureDashboardSummary: DashboardSummary = {
   ],
 };
 
-export const fixtureClassificationCounts: ClassificationCounts = {
-  SAFE: 200,
-  UNWANTED: 50,
-  SUSPICIOUS: 20,
-  DANGEROUS: 30,
-};
-
 export const fixturePca: PcaResponse = {
   explained_variance: [0.24, 0.15, 0.09],
   points: [
@@ -71,7 +63,6 @@ export const fixtureMailVolume: MailVolumeResponse = {
   dates: ["2026-10-11", "2026-10-12", "2026-10-13"],
   non_danger: [10, 12, 8],
   dangerous: [1, 3, 0],
-  campaigns: [{ name: "Test campaign", start: "2026-10-11T08:00:00Z", end: "2026-10-12T09:00:00Z" }],
 };
 
 export const fixtureCampaignSummary: CampaignSummary = {
