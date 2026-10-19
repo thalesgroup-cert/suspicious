@@ -291,6 +291,39 @@ describe("SettingsPage: structure for assistive technology", () => {
     expect(screen.getByRole("textbox", { name: /add/i })).toBeInTheDocument();
   });
 
+  describe("on a phone the connector list and detail swap places, so focus follows", () => {
+    async function phone() {
+      await page.viewport(390, 800);
+      stubMatchMedia({ phone: true });
+      await open("connectors");
+    }
+
+    it("opening a connector from the list moves focus to its heading", async () => {
+      const user = userEvent.setup();
+      await phone();
+      await user.click(screen.getByRole("button", { name: /misp/ }));
+      const heading = await screen.findByRole("heading", { level: 3, name: "misp" });
+      await waitFor(() => expect(heading).toHaveFocus(), T);
+    });
+
+    it("Back to the list moves focus to the connector that was open", async () => {
+      const user = userEvent.setup();
+      await phone();
+      await user.click(screen.getByRole("button", { name: /misp/ }));
+      await user.click(await screen.findByRole("button", { name: "Back to connector list" }));
+      const row = await screen.findByRole("button", { name: /misp/ });
+      await waitFor(() => expect(row).toHaveFocus(), T);
+    });
+
+    it("a deep link to a connector does not grab focus on load", async () => {
+      await page.viewport(390, 800);
+      stubMatchMedia({ phone: true });
+      await open("connectors?connector=misp");
+      await screen.findByRole("heading", { level: 3, name: "misp" });
+      expect(document.activeElement).toBe(document.body);
+    });
+  });
+
   // The Refresh button sits straight on the shell, whose glow is up to 7% primary over the page colour.
   it.each(Object.keys(themes) as (keyof typeof themes)[])("keeps Refresh readable on the shell in the %s theme", async (theme) => {
     localStorage.setItem("suspicious.theme", theme);

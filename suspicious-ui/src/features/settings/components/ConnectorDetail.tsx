@@ -1,4 +1,4 @@
-import { useEffect, useId, useState } from "react";
+import { useEffect, useId, useRef, useState } from "react";
 import { useSearchParams } from "react-router";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { Alert, AlertTitle, Box, Button, Chip, CircularProgress, IconButton, Stack, Tab, Tabs, Typography } from "@mui/material";
@@ -47,9 +47,12 @@ export function ConnectorDetail({
   connector,
   onBack,
   onDirtyChange,
+  focusHeading = false,
 }: {
   connector: Connector;
   onBack?: () => void;
+  /** On a phone the detail replaces the list: land on the heading so the change is announced. */
+  focusHeading?: boolean;
   /** Lets the parent guard switching connector, which would otherwise drop the draft. */
   onDirtyChange?: (dirty: boolean) => void;
 }) {
@@ -64,6 +67,12 @@ export function ConnectorDetail({
   );
   const hintId = useId();
   const testHintId = useId();
+  const heading = useRef<HTMLHeadingElement>(null);
+  useEffect(() => {
+    if (focusHeading) heading.current?.focus();
+    // Once, on arrival from the list.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
   const [saveError, setSaveError] = useState<string | null>(null);
   const [fieldErrors, setFieldErrors] = useState<Record<string, string>>({});
 
@@ -154,7 +163,7 @@ export function ConnectorDetail({
         <ConnectorLogo name={connector.name} size={48} />
         <Box sx={{ minWidth: 0, flex: 1 }}>
           <Stack direction="row" spacing={1} sx={{ alignItems: "center", flexWrap: "wrap", rowGap: 0.5 }}>
-            <Typography variant="h6" component="h3">
+            <Typography variant="h6" component="h3" ref={heading} tabIndex={-1} sx={{ outline: "none" }}>
               {connector.name}
             </Typography>
             <Chip size="small" label={connector.version} variant="outlined" />

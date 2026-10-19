@@ -34,7 +34,11 @@ export function ConnectorsPanel() {
   const selected =
     connectors.find((c) => c.name === named)?.name ?? (isDesktop ? (connectors[0]?.name ?? null) : null);
 
+  // Phone only: the list and the detail swap places, so focus has to follow the swap (see ConnectorList and ConnectorDetail).
+  const [swapFocus, setSwapFocus] = useState<{ heading: boolean; row: string | null }>({ heading: false, row: null });
+
   const setSelected = (to: string | null) => {
+    if (!isDesktop) setSwapFocus(to === null ? { heading: false, row: selected } : { heading: true, row: null });
     const next = new URLSearchParams(params);
     if (to === null) next.delete("connector");
     else next.set("connector", to);
@@ -77,6 +81,7 @@ export function ConnectorsPanel() {
           connector={selectedConnector}
           onBack={() => requestSelect(null)}
           onDirtyChange={onDirtyChange}
+          focusHeading={swapFocus.heading}
         />
         {discardDialog}
       </>
@@ -91,6 +96,7 @@ export function ConnectorsPanel() {
           loadErrors={data?.load_errors ?? {}}
           selected={selected}
           onSelect={requestSelect}
+          focusRow={swapFocus.row}
         />
       </Grid>
       {isDesktop && (

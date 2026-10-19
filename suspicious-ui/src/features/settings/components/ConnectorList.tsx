@@ -1,3 +1,4 @@
+import { useEffect, useRef } from "react";
 import { useMutation, useQueryClient } from "@tanstack/react-query";
 import { Alert, Box, List, ListItem, ListItemButton, Stack, Switch, Typography } from "@mui/material";
 import { alpha, useTheme } from "@mui/material/styles";
@@ -14,12 +15,22 @@ export function ConnectorList({
   loadErrors,
   selected,
   onSelect,
+  focusRow = null,
 }: {
   connectors: Connector[];
   loadErrors: Record<string, string>;
   selected: string | null;
   onSelect: (name: string) => void;
+  /** On a phone the list replaces the detail: Back hands focus to the row that was open. */
+  focusRow?: string | null;
 }) {
+  const root = useRef<HTMLDivElement>(null);
+  useEffect(() => {
+    if (focusRow) root.current?.querySelector<HTMLElement>(`[data-connector="${CSS.escape(focusRow)}"]`)?.focus();
+    // Once, when the list comes back; later renders must not pull focus again.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
   const theme = useTheme();
   const isDark = theme.palette.mode === "dark";
   const queryClient = useQueryClient();
@@ -62,7 +73,7 @@ export function ConnectorList({
   const categories = [...byCategory.keys()].sort((a, b) => a.localeCompare(b));
 
   return (
-    <Stack spacing={2}>
+    <Stack spacing={2} ref={root}>
       {loadAlerts}
       {categories.map((category) => (
         <Box key={category}>
@@ -92,6 +103,7 @@ export function ConnectorList({
                 >
                   <ListItemButton
                     selected={isSelected}
+                    data-connector={connector.name}
                     aria-current={isSelected ? "true" : undefined}
                     onClick={() => onSelect(connector.name)}
                     sx={{
