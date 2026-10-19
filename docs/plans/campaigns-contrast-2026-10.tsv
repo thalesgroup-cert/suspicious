@@ -1,68 +1,62 @@
 theme	viewport	element	fg	bg	ratio	required	owner	status
-midnight	1440	all 175 visible text nodes (page min ratio 6.18, 0 below required)			6.18		page	summary
-graphite	1440	all 175 visible text nodes (page min ratio 4.62, 0 below required)			4.62		page	summary
-slate	1440	all 175 visible text nodes (page min ratio 5.97, 0 below required)			5.97		page	summary
+midnight	1440	text nodes, page only (inside the page root): 173 measured, min ratio 6.18, 0 below required; shared (sidebar and shell, outside it): 2 measured, 0 below required			6.18		page	summary
+graphite	1440	text nodes, page only (inside the page root): 173 measured, min ratio 4.62, 0 below required; shared (sidebar and shell, outside it): 2 measured, 0 below required			4.62		page	summary
+slate	1440	text nodes, page only (inside the page root): 173 measured, min ratio 5.97, 0 below required; shared (sidebar and shell, outside it): 2 measured, 0 below required			5.97		page	summary
 light	1440	E 14px MuiAvatar-root.MuiAvatar-circular (gradient bg)	#1b5fff	#d8e2f7	3.92	4.5	shared	FAIL
-light	1440	all 175 visible text nodes (page min ratio 4.61, 1 below required)			4.61		page	summary
+light	1440	text nodes, page only (inside the page root): 173 measured, min ratio 4.61, 0 below required; shared (sidebar and shell, outside it): 2 measured, 1 below required			4.61		page	summary
 light	1440	[campaign] "E" 14px MuiAvatar-root.MuiAvatar-circular (gradient bg)	#1b5fff	#d8e2f7	3.92	4.5	shared	FAIL
 light	1440	[age] "E" 14px MuiAvatar-root.MuiAvatar-circular (gradient bg)	#1b5fff	#d8e2f7	3.92	4.5	shared	FAIL
 paper	1440	E 14px MuiAvatar-root.MuiAvatar-circular (gradient bg)	#0f4cff	#d2d5e3	4.1	4.5	shared	FAIL
-paper	1440	all 175 visible text nodes (page min ratio 4.54, 1 below required)			4.54		page	summary
+paper	1440	text nodes, page only (inside the page root): 173 measured, min ratio 4.54, 0 below required; shared (sidebar and shell, outside it): 2 measured, 1 below required			4.54		page	summary
 paper	1440	[campaign] "E" 14px MuiAvatar-root.MuiAvatar-circular (gradient bg)	#0f4cff	#d2d5e3	4.1	4.5	shared	FAIL
 paper	1440	[age] "E" 14px MuiAvatar-root.MuiAvatar-circular (gradient bg)	#0f4cff	#d2d5e3	4.1	4.5	shared	FAIL
-high_contrast	1440	all 175 visible text nodes (page min ratio 10.2, 0 below required)			10.2		page	summary
+high_contrast	1440	text nodes, page only (inside the page root): 173 measured, min ratio 10.2, 0 below required; shared (sidebar and shell, outside it): 2 measured, 0 below required			10.2		page	summary
 sunrise	1440	E 14px MuiAvatar-root.MuiAvatar-circular (gradient bg)	#f03d2f	#fddad2	2.98	4.5	shared	FAIL
-sunrise	1440	all 175 visible text nodes (page min ratio 4.6, 1 below required)			4.6		page	summary
+sunrise	1440	text nodes, page only (inside the page root): 173 measured, min ratio 4.6, 0 below required; shared (sidebar and shell, outside it): 2 measured, 1 below required			4.6		page	summary
 sunrise	1440	[campaign] "E" 14px MuiAvatar-root.MuiAvatar-circular (gradient bg)	#f03d2f	#fddad2	2.98	4.5	shared	FAIL
 sunrise	1440	[age] "E" 14px MuiAvatar-root.MuiAvatar-circular (gradient bg)	#f03d2f	#fddad2	2.98	4.5	shared	FAIL
 valentine	1440	E 14px MuiAvatar-root.MuiAvatar-circular (gradient bg)	#c2185b	#f4d6e1	4.35	4.5	shared	FAIL
-valentine	1440	all 175 visible text nodes (page min ratio 4.6, 1 below required)			4.6		page	summary
+valentine	1440	text nodes, page only (inside the page root): 173 measured, min ratio 4.6, 0 below required; shared (sidebar and shell, outside it): 2 measured, 1 below required			4.6		page	summary
 valentine	1440	[campaign] "E" 14px MuiAvatar-root.MuiAvatar-circular (gradient bg)	#c2185b	#f4d6e1	4.35	4.5	shared	FAIL
 valentine	1440	[age] "E" 14px MuiAvatar-root.MuiAvatar-circular (gradient bg)	#c2185b	#f4d6e1	4.35	4.5	shared	FAIL
-cyber	1440	all 175 visible text nodes (page min ratio 8.66, 0 below required)			8.66		page	summary
-the_one	1440	all 175 visible text nodes (page min ratio 7.01, 0 below required)			7.01		page	summary
-winter	1440	all 175 visible text nodes (page min ratio 8.19, 0 below required)			8.19		page	summary
+cyber	1440	text nodes, page only (inside the page root): 173 measured, min ratio 8.66, 0 below required; shared (sidebar and shell, outside it): 2 measured, 0 below required			8.66		page	summary
+the_one	1440	text nodes, page only (inside the page root): 173 measured, min ratio 7.01, 0 below required; shared (sidebar and shell, outside it): 2 measured, 0 below required			7.01		page	summary
+winter	1440	text nodes, page only (inside the page root): 173 measured, min ratio 8.19, 0 below required; shared (sidebar and shell, outside it): 2 measured, 0 below required			8.19		page	summary
 spring	1440	E 14px MuiAvatar-root.MuiAvatar-circular (gradient bg)	#15803d	#d6eedd	4.1	4.5	shared	FAIL
-spring	1440	all 175 visible text nodes (page min ratio 4.61, 1 below required)			4.61		page	summary
+spring	1440	text nodes, page only (inside the page root): 173 measured, min ratio 4.61, 0 below required; shared (sidebar and shell, outside it): 2 measured, 1 below required			4.61		page	summary
 spring	1440	[campaign] "E" 14px MuiAvatar-root.MuiAvatar-circular (gradient bg)	#15803d	#d6eedd	4.1	4.5	shared	FAIL
 spring	1440	[age] "E" 14px MuiAvatar-root.MuiAvatar-circular (gradient bg)	#15803d	#d6eedd	4.1	4.5	shared	FAIL
 summer	1440	E 14px MuiAvatar-root.MuiAvatar-circular (gradient bg)	#d97706	#faeacf	2.7	4.5	shared	FAIL
-summer	1440	all 175 visible text nodes (page min ratio 4.61, 1 below required)			4.61		page	summary
+summer	1440	text nodes, page only (inside the page root): 173 measured, min ratio 4.61, 0 below required; shared (sidebar and shell, outside it): 2 measured, 1 below required			4.61		page	summary
 summer	1440	[campaign] "E" 14px MuiAvatar-root.MuiAvatar-circular (gradient bg)	#d97706	#faeacf	2.7	4.5	shared	FAIL
 summer	1440	[age] "E" 14px MuiAvatar-root.MuiAvatar-circular (gradient bg)	#d97706	#faeacf	2.7	4.5	shared	FAIL
-autumn	1440	all 175 visible text nodes (page min ratio 7.12, 0 below required)			7.12		page	summary
+autumn	1440	text nodes, page only (inside the page root): 173 measured, min ratio 7.12, 0 below required; shared (sidebar and shell, outside it): 2 measured, 0 below required			7.12		page	summary
 metal	1440	E 14px MuiAvatar-root.MuiAvatar-circular (gradient bg)	#e1061b	#2e080f	3.67	4.5	shared	FAIL
-metal	1440	Show in map 12.0714px MuiButtonBase-root.MuiButton-root (gradient bg) (metal theme's outlined-button background; page text colour already 4.5:1 on the card)	#f5071d	#091315	4.43	4.5	shared	FAIL
-metal	1440	all 175 visible text nodes (page min ratio 4.43, 4 below required)			4.43		page	summary
+metal	1440	text nodes, page only (inside the page root): 173 measured, min ratio 4.76, 0 below required; shared (sidebar and shell, outside it): 2 measured, 1 below required			4.76		page	summary
 metal	1440	[campaign] "E" 14px MuiAvatar-root.MuiAvatar-circular (gradient bg)	#e1061b	#2e080f	3.67	4.5	shared	FAIL
-metal	1440	[campaign] "Show in map" 12.0714px MuiButtonBase-root.MuiButton-root (gradient bg) (metal theme's outlined-button background; page text colour already 4.5:1 on the card)	#f5071d	#091315	4.43	4.5	shared	FAIL
 metal	1440	[age] "E" 14px MuiAvatar-root.MuiAvatar-circular (gradient bg)	#e1061b	#2e080f	3.67	4.5	shared	FAIL
-metal	1440	[age] "Show in map" 12.0714px MuiButtonBase-root.MuiButton-root (gradient bg) (metal theme's outlined-button background; page text colour already 4.5:1 on the card)	#f5071d	#091315	4.43	4.5	shared	FAIL
-future	1440	all 175 visible text nodes (page min ratio 4.75, 0 below required)			4.75		page	summary
+future	1440	text nodes, page only (inside the page root): 173 measured, min ratio 4.75, 0 below required; shared (sidebar and shell, outside it): 2 measured, 0 below required			4.75		page	summary
 renee	1440	E 14px MuiAvatar-root.MuiAvatar-circular (gradient bg)	#9b2fa8	#e7d2d5	4.32	4.5	shared	FAIL
-renee	1440	all 175 visible text nodes (page min ratio 4.53, 1 below required)			4.53		page	summary
+renee	1440	text nodes, page only (inside the page root): 173 measured, min ratio 4.53, 0 below required; shared (sidebar and shell, outside it): 2 measured, 1 below required			4.53		page	summary
 renee	1440	[campaign] "E" 14px MuiAvatar-root.MuiAvatar-circular (gradient bg)	#9b2fa8	#e7d2d5	4.32	4.5	shared	FAIL
 renee	1440	[age] "E" 14px MuiAvatar-root.MuiAvatar-circular (gradient bg)	#9b2fa8	#e7d2d5	4.32	4.5	shared	FAIL
-midnight	390	all 172 visible text nodes (page min ratio 6.18, 0 below required)			6.18		page	summary
-graphite	390	all 172 visible text nodes (page min ratio 8.53, 0 below required)			8.53		page	summary
-slate	390	all 172 visible text nodes (page min ratio 7.09, 0 below required)			7.09		page	summary
-light	390	all 172 visible text nodes (page min ratio 4.61, 0 below required)			4.61		page	summary
-paper	390	all 172 visible text nodes (page min ratio 4.54, 0 below required)			4.54		page	summary
-high_contrast	390	all 172 visible text nodes (page min ratio 10.2, 0 below required)			10.2		page	summary
-sunrise	390	all 172 visible text nodes (page min ratio 4.6, 0 below required)			4.6		page	summary
-valentine	390	all 172 visible text nodes (page min ratio 4.6, 0 below required)			4.6		page	summary
-cyber	390	all 172 visible text nodes (page min ratio 8.66, 0 below required)			8.66		page	summary
-the_one	390	all 172 visible text nodes (page min ratio 8.41, 0 below required)			8.41		page	summary
-winter	390	all 172 visible text nodes (page min ratio 8.9, 0 below required)			8.9		page	summary
-spring	390	all 172 visible text nodes (page min ratio 4.61, 0 below required)			4.61		page	summary
-summer	390	all 172 visible text nodes (page min ratio 4.61, 0 below required)			4.61		page	summary
-autumn	390	all 172 visible text nodes (page min ratio 7.12, 0 below required)			7.12		page	summary
-metal	390	Show in map 12.0714px MuiButtonBase-root.MuiButton-root (gradient bg) (metal theme's outlined-button background; page text colour already 4.5:1 on the card)	#f5071d	#091315	4.43	4.5	shared	FAIL
-metal	390	all 172 visible text nodes (page min ratio 4.43, 3 below required)			4.43		page	summary
-metal	390	[campaign] "Show in map" 12.0714px MuiButtonBase-root.MuiButton-root (gradient bg) (metal theme's outlined-button background; page text colour already 4.5:1 on the card)	#f5071d	#091315	4.43	4.5	shared	FAIL
-metal	390	[age] "Show in map" 12.0714px MuiButtonBase-root.MuiButton-root (gradient bg) (metal theme's outlined-button background; page text colour already 4.5:1 on the card)	#f5071d	#091315	4.43	4.5	shared	FAIL
-future	390	all 172 visible text nodes (page min ratio 6.18, 0 below required)			6.18		page	summary
-renee	390	all 172 visible text nodes (page min ratio 4.53, 0 below required)			4.53		page	summary
+midnight	390	text nodes, page only (inside the page root): 170 measured, min ratio 6.18, 0 below required; shared (sidebar and shell, outside it): 2 measured, 0 below required			6.18		page	summary
+graphite	390	text nodes, page only (inside the page root): 170 measured, min ratio 8.53, 0 below required; shared (sidebar and shell, outside it): 2 measured, 0 below required			8.53		page	summary
+slate	390	text nodes, page only (inside the page root): 170 measured, min ratio 7.09, 0 below required; shared (sidebar and shell, outside it): 2 measured, 0 below required			7.09		page	summary
+light	390	text nodes, page only (inside the page root): 170 measured, min ratio 4.61, 0 below required; shared (sidebar and shell, outside it): 2 measured, 0 below required			4.61		page	summary
+paper	390	text nodes, page only (inside the page root): 170 measured, min ratio 4.54, 0 below required; shared (sidebar and shell, outside it): 2 measured, 0 below required			4.54		page	summary
+high_contrast	390	text nodes, page only (inside the page root): 170 measured, min ratio 10.2, 0 below required; shared (sidebar and shell, outside it): 2 measured, 0 below required			10.2		page	summary
+sunrise	390	text nodes, page only (inside the page root): 170 measured, min ratio 4.6, 0 below required; shared (sidebar and shell, outside it): 2 measured, 0 below required			4.6		page	summary
+valentine	390	text nodes, page only (inside the page root): 170 measured, min ratio 4.6, 0 below required; shared (sidebar and shell, outside it): 2 measured, 0 below required			4.6		page	summary
+cyber	390	text nodes, page only (inside the page root): 170 measured, min ratio 8.66, 0 below required; shared (sidebar and shell, outside it): 2 measured, 0 below required			8.66		page	summary
+the_one	390	text nodes, page only (inside the page root): 170 measured, min ratio 8.41, 0 below required; shared (sidebar and shell, outside it): 2 measured, 0 below required			8.41		page	summary
+winter	390	text nodes, page only (inside the page root): 170 measured, min ratio 8.9, 0 below required; shared (sidebar and shell, outside it): 2 measured, 0 below required			8.9		page	summary
+spring	390	text nodes, page only (inside the page root): 170 measured, min ratio 4.61, 0 below required; shared (sidebar and shell, outside it): 2 measured, 0 below required			4.61		page	summary
+summer	390	text nodes, page only (inside the page root): 170 measured, min ratio 4.61, 0 below required; shared (sidebar and shell, outside it): 2 measured, 0 below required			4.61		page	summary
+autumn	390	text nodes, page only (inside the page root): 170 measured, min ratio 7.12, 0 below required; shared (sidebar and shell, outside it): 2 measured, 0 below required			7.12		page	summary
+metal	390	text nodes, page only (inside the page root): 170 measured, min ratio 4.76, 0 below required; shared (sidebar and shell, outside it): 2 measured, 0 below required			4.76		page	summary
+future	390	text nodes, page only (inside the page root): 170 measured, min ratio 6.18, 0 below required; shared (sidebar and shell, outside it): 2 measured, 0 below required			6.18		page	summary
+renee	390	text nodes, page only (inside the page root): 170 measured, min ratio 4.53, 0 below required; shared (sidebar and shell, outside it): 2 measured, 0 below required			4.53		page	summary
 midnight	3D canvas	3D cloud wireframe, 14% opacity: Safe	#072018	#03050d	1.19	3	page	below 3:1, decorative (the points carry the data)
 midnight	3D canvas	3D cloud fill, 8% opacity: Safe	#051413	#03050d	1.08	3	page	below 3:1, decorative (the points carry the data)
 midnight	3D canvas	3D cloud wireframe, 14% opacity: Unwanted	#171b25	#03050d	1.18	3	page	below 3:1, decorative (the points carry the data)

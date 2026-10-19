@@ -111,15 +111,15 @@ Deferred:
 - Home still reads the cron-fed tables while the Dashboard is live, so the two can differ for the same month; Home scope counts ignore the new CISO group check (`api/views/home.py`, `scoped_case_queryset`).
 - LDAP never removes old country groups, so a reporter who moves AU to FR counts in both.
 - Weekly dangerous series and sparklines on the other KPI cards; country/region ranking for elevated users (replaces the dropped Groups toggle).
-- Campaigns throws React #185 on window resize (also on main, 2 of 4 runs each): apply the "persist layout only on drag/resize stop" fix.
+- The old Campaigns page threw React #185 on window resize (also on main, 2 of 4 runs each). That page was replaced by the Campaigns cycle below, which has no react-grid-layout; whether the crash is gone was not re-tested, it is only expected from the removed layout code.
 - `materialise_dashboard_snapshots` still runs nightly (02:00) but nothing reads the snapshot: remove or wire a reader.
 - Saved layout drops the reporters panel position when `top_reporters` is null; KPI cards leave ~40px empty space (fixed grid row height).
-- Contrast in shared components: Campaigns status chips (2.1 to 3.8:1), metal outlined labels (4.05:1), other themes not yet swept (10 of 17).
+- Contrast in shared components: the Dashboard itself was swept in 7 of 17 themes, the other 10 are not. The old Campaigns status chips (2.1 to 3.8:1) and metal's outlined labels (4.05:1) were measured on the replaced Campaigns page; the new page was swept in all 17 themes (see the Campaigns cycle).
 - Minor backend: stored CISO scope "AU|AU" refuses the "AU" alias; service-mailbox exclusion depends on DB collation and on `SUSPICIOUS_EMAIL` being set; reporter labels differing only in case are not disambiguated.
 
 ## Campaigns page cycle (2026-10-19)
 
-Shipped on `design/campaigns-page`: header and period selector, KPI strip with deltas, messages per day with campaign windows, classification mix, sortable campaigns table (cards on a phone), lazy 3D embedding map (category, campaign and age colours, date range, clouds, keyboard controls, 2D and table fallbacks), near-known-bad and novel review lists, `GET /api/campaigns/summary/` and `/neighbours/`. Contrast swept in 17 themes at 1440 and 390: `docs/plans/campaigns-contrast-2026-10.tsv` (failures and summaries; the full table is not kept in the repo). The old resize crash noted under the Dashboard cycle belonged to the replaced grid layout, which is gone.
+Shipped on `design/campaigns-page`: header and period selector, KPI strip with deltas, messages per day with campaign windows, classification mix, sortable campaigns table (cards on a phone), lazy 3D embedding map (category, campaign and age colours, date range, clouds, keyboard controls, 2D and table fallbacks), near-known-bad and novel review lists, `GET /api/campaigns/summary/` and `/neighbours/`. Contrast swept in 17 themes at 1440 and 390: `docs/plans/campaigns-contrast-2026-10.tsv` (failures, per-theme summaries and the 3D cloud rows; one row per check is in the sweep's full table, kept with the task reports). The resize crash noted under the Dashboard cycle was on the replaced grid layout; the new page has none of that code, but the crash was not re-tested there.
 
 Deferred:
 - Per-country scoping of campaigns needs reporter metadata (country, region) in the message store; today every figure is organisation-wide and the header says so.
@@ -134,3 +134,11 @@ Deferred:
 - `materialise_dashboard_snapshots` is still unread by this page too.
 - Unclassified and Unwanted use two blue-greys that differ mainly in lightness (about 1.4:1 between them in light); both are always labelled, but a point-shape or pattern cue in the map would separate them.
 - Contrast in shared components: the sidebar avatar initial is 2.7 to 4.35:1 in 8 themes; themed hairline dividers are decorative gradients.
+- Keyboard users reach only the first 200 messages in the point table (the cap keeps the DOM small): add a text filter or pagination.
+- `embeddingMap3d.gl.test.tsx` skips silently where the browser has no WebGL 2; CI should assert that it ran.
+- `mail-volume` still computes campaign bands that this page no longer reads (kept for old clients): keep them or stop computing them.
+- drei brings about 45 transitive packages for `OrbitControls` and `PerformanceMonitor`; `three` with its own `OrbitControls` would be lighter.
+- PCA is not cached, and neighbours is cached per exact `limit` (up to 5,000 distinct keys; about 30 MB per limit by the earlier estimate).
+- Query bounds (case id limit, limit ranges) are written in both the serializers and the service: one source.
+- Task 4 minors still open: the fog's initial `#000000` (overwritten from the theme before the first frame). The disabled point-table Select's reason is now reachable by keyboard and its colour is 4.5:1.
+- Chroma reads: every paged scan now fails closed (summary, volume, counts, PCA and neighbours return their empty, uncached payload when a page read fails); a retry or a partial-result marker for the PCA sample was not built.
