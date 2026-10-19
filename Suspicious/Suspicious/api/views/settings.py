@@ -1,6 +1,7 @@
 from __future__ import annotations
 
-from django.db.models import Sum
+from django.db import transaction
+from django.db.models import Q
 from rest_framework import generics, status
 from rest_framework.exceptions import ValidationError
 from rest_framework.pagination import PageNumberPagination
@@ -152,23 +153,30 @@ class AnalyzerSettingsDetailView(generics.UpdateAPIView):
 
         # Scoring divides by the summed weight of the analyzers that ran, so an
         # all-zero active set would raise ValueError on every case. Inactive
-        # analyzers are never scheduled and so cannot hold the sum up.
-        if "weight" in serializer.validated_data and analyzer.is_active:
-            others = (
-                Analyzer.objects.filter(is_active=True)
-                .exclude(pk=analyzer.pk)
-                .aggregate(total=Sum("weight"))["total"]
-            ) or 0
-            if others + float(serializer.validated_data["weight"]) <= 0:
-                raise ValidationError(
-                    {"weight": ["At least one active analyzer must keep a weight above 0."]}
+        # analyzers are never scheduled and so cannot hold the sum up. The active
+        # rows are locked in pk order (one query, own row included, so two
+        # concurrent updates serialise instead of deadlocking) and the check and
+        # the save share one transaction, so two requests cannot each see the
+        # other's old weight and together zero the sum.
+        with transaction.atomic():
+            if "weight" in serializer.validated_data and analyzer.is_active:
+                locked = (
+                    Analyzer.objects.select_for_update()
+                    .filter(Q(is_active=True) | Q(pk=analyzer.pk))
+                    .order_by("pk")
+                    .values_list("pk", "weight", "is_active")
                 )
+                others = sum(w for pk, w, active in locked if active and pk != analyzer.pk)
+                if others + float(serializer.validated_data["weight"]) <= 0:
+                    raise ValidationError(
+                        {"weight": ["At least one active analyzer must keep a weight above 0."]}
+                    )
 
-        update_fields = ["last_update"]
-        for field in ("weight", "tier"):
-            if field in serializer.validated_data:
-                setattr(analyzer, field, serializer.validated_data[field])
-                update_fields.append(field)
-        analyzer.save(update_fields=update_fields)
+            update_fields = ["last_update"]
+            for field in ("weight", "tier"):
+                if field in serializer.validated_data:
+                    setattr(analyzer, field, serializer.validated_data[field])
+                    update_fields.append(field)
+            analyzer.save(update_fields=update_fields)
 
         return Response(AnalyzerSettingsSerializer(analyzer).data)

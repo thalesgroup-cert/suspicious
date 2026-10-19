@@ -10,7 +10,7 @@ Date: 2026-10-19. Branch: `design/settings-page`. Status: awaiting user review.
 ## What is true today (verified in code and captures)
 
 - `pages/SettingsPage.tsx`: Admin/CERT only (`IsAdminOrCERT` on every settings view). Nine sections in one flat list (`features/settings/components/sections.tsx`); the active section is `useState("domains_allow")`.
-- Panels: `EditableListPanel` (4 lists + `DomainPairPanel` with read-only Watcher lists), `CisoUsersPanel` (read-only), `FeederPanel` (switch), `ScoringPanel` (26 analyzers), `ConnectorsPanel` (list + detail).
+- Panels: `EditableListPanel` (4 lists + `DomainPairPanel` with read-only Watcher lists), `CisoUsersPanel` (read-only), `FeederPanel` (switch), `ScoringTable` (26 analyzers; replaced the old card-based `ScoringPanel`), `ConnectorsPanel` (list + detail).
 - Analyzer weights are relative shares: `score_process/scoring/processing.py:61-67` computes `sum(score * weight over non-failed reports) / sum(weight over all reports of the case)`; a total of zero raises `ValueError` ("cannot compute scores"). A failed analyzer lowers the score because its weight stays in the denominator.
 
 ## Findings

@@ -51,6 +51,23 @@ const shareSx = {
   "&::before": { content: '"Share of total: "', display: { xs: "inline", sm: "none" }, color: "text.secondary", typography: "body2" },
 };
 
+/** First message in a DRF error body ({weight: [..]}, {detail: ..}), or nothing. */
+function serverMessage(error: unknown): string {
+  const data = (error as { response?: { data?: unknown } })?.response?.data;
+  if (typeof data === "string") return data;
+  if (data && typeof data === "object") {
+    for (const v of Object.values(data)) {
+      const first = Array.isArray(v) ? v[0] : v;
+      if (typeof first === "string") return first;
+    }
+  }
+  return "";
+}
+
+const visuallyHidden = {
+  position: "absolute", width: 1, height: 1, overflow: "hidden", clip: "rect(0 0 0 0)", whiteSpace: "nowrap",
+} as const;
+
 const ZERO_TOTAL_MESSAGE =
   "At least one active analyzer needs a weight above 0, otherwise no case can be scored.";
 
@@ -82,6 +99,7 @@ function WeightInput({ name, value, onChange }: { name: string; value: number; o
 
 export function ScoringTable() {
   const qc = useQueryClient();
+  const captionId = React.useId();
   const query = useQuery<Analyzer[]>({
     queryKey: ["settings", "scoring"],
     queryFn: listAnalyzers,
@@ -161,12 +179,21 @@ export function ScoringTable() {
     }
     setSaving(true);
     try {
-      const result = await runBatch(modified, (a) => updateAnalyzerWeight(a.id, weightOf(a)));
-      setStatus(summarise(result.ok, result.failed, "saved"));
+      // Raises go first: the server rejects any step that would leave the active sum at 0,
+      // so a swap (A 0.5 to 0, B 0 to 0.5) only passes when B is saved before A.
+      const sent = new Map(modified.map((a) => [a.id, weightOf(a)]));
+      const ordered = [...modified].sort((a, b) => sent.get(b.id)! - sent.get(a.id)! || a.name.localeCompare(b.name));
+      const result = await runBatch(ordered, (a) => updateAnalyzerWeight(a.id, sent.get(a.id)!));
+      const summary = summarise(result.ok, result.failed, "saved");
+      const reason = result.failed.length === 1 ? serverMessage(result.failed[0].error) : "";
+      setStatus(reason ? `${summary}: ${reason}` : summary);
       await qc.invalidateQueries({ queryKey: ["settings", "scoring"] });
-      // Failed rows keep their draft so nothing typed is lost; saved ones now match the server.
+      // Failed rows keep their draft so nothing typed is lost. A saved row's draft goes only if it
+      // still holds the value that was sent, so an edit made while saving survives.
       const saved = new Set(result.ok.map((a) => a.id));
-      setDrafts((prev) => Object.fromEntries(Object.entries(prev).filter(([id]) => !saved.has(Number(id)))));
+      setDrafts((prev) =>
+        Object.fromEntries(Object.entries(prev).filter(([id, v]) => !(saved.has(Number(id)) && v === sent.get(Number(id))))),
+      );
     } finally {
       setSaving(false);
     }
@@ -181,8 +208,9 @@ export function ScoringTable() {
 
   const sortHeader = (key: SortKey, label: string) => (
     <TableCell
+      role="columnheader"
       sortDirection={sort.key === key ? sort.dir : false}
-      aria-sort={sort.key === key ? (sort.dir === "asc" ? "ascending" : "descending") : "none"}
+      {...(sort.key === key ? {} : { "aria-sort": "none" as const })}
     >
       <TableSortLabel
         active={sort.key === key}
@@ -232,21 +260,21 @@ export function ScoringTable() {
       </Stack>
 
       <TableContainer sx={{ maxWidth: "100%" }}>
-        <Table size="small" aria-label="Analyzer weights" sx={{ display: { xs: "block", sm: "table" } }}>
-          <caption style={{ captionSide: "top", textAlign: "left" }}>Analyzer weights</caption>
-          <TableHead sx={{ display: { xs: "block", sm: "table-header-group" } }}>
+        <Table size="small" role="table" aria-labelledby={captionId} sx={{ display: { xs: "block", sm: "table" } }}>
+          <caption id={captionId} style={visuallyHidden}>Analyzer weights</caption>
+          <TableHead role="rowgroup" sx={{ display: { xs: "block", sm: "table-header-group" } }}>
             {/* Phone: rows stack as small cards, so the header becomes a wrapping row of sort buttons. */}
-            <TableRow sx={{ display: { xs: "flex", sm: "table-row" }, flexWrap: "wrap" }}>
+            <TableRow role="row" sx={{ display: { xs: "flex", sm: "table-row" }, flexWrap: "wrap" }}>
               {sortHeader("name", "Analyzer")}
               {sortHeader("weight", "Weight")}
               {sortHeader("share", "Share of total")}
-              <TableCell sx={{ display: { xs: "none", sm: "table-cell" } }}>State</TableCell>
+              <TableCell role="columnheader" sx={{ display: { xs: "none", sm: "table-cell" } }}>State</TableCell>
             </TableRow>
           </TableHead>
-          <TableBody sx={{ display: { xs: "block", sm: "table-row-group" } }}>
+          <TableBody role="rowgroup" sx={{ display: { xs: "block", sm: "table-row-group" } }}>
             {visible.length === 0 ? (
-              <TableRow>
-                <TableCell colSpan={4}>
+              <TableRow role="row">
+                <TableCell role="cell" colSpan={4}>
                   <Typography variant="body2" color="text.secondary">
                     {analyzers.length === 0 ? "No analyzers found." : "No analyzers match."}
                   </Typography>
@@ -257,8 +285,8 @@ export function ScoringTable() {
               const weight = weightOf(a);
               const share = shareById.get(a.id) ?? 0;
               return (
-                <TableRow key={a.id} hover sx={rowSx}>
-                  <TableCell sx={{ minWidth: { xs: 0, sm: 150 }, gridColumn: 1, gridRow: 1 }}>
+                <TableRow key={a.id} hover role="row" sx={rowSx}>
+                  <TableCell role="cell" sx={{ minWidth: { xs: 0, sm: 150 }, gridColumn: 1, gridRow: 1 }}>
                     <Stack direction="row" spacing={0.75} sx={{ alignItems: "center" }}>
                       <Typography variant="body2" sx={{ fontWeight: 700 }}>{a.name}</Typography>
                       {!a.is_active ? <Chip size="small" variant="outlined" label="Inactive" /> : null}
@@ -267,7 +295,7 @@ export function ScoringTable() {
                       {a.analyzer_cortex_id}
                     </Typography>
                   </TableCell>
-                  <TableCell sx={{ minWidth: { sm: 220 }, gridColumn: "1 / -1" }}>
+                  <TableCell role="cell" sx={{ minWidth: { sm: 220 }, gridColumn: "1 / -1" }}>
                     <Stack direction="row" spacing={2} sx={{ alignItems: "center" }}>
                       <Slider
                         size="small"
@@ -283,12 +311,12 @@ export function ScoringTable() {
                       <WeightInput name={a.name} value={weight} onChange={(v) => setWeight(a.id, v)} />
                     </Stack>
                   </TableCell>
-                  <TableCell sx={shareSx}>
+                  <TableCell role="cell" sx={shareSx}>
                     <Typography variant="body2" color="text.secondary" component="span">
                       {formatShare(share, total)}
                     </Typography>
                   </TableCell>
-                  <TableCell sx={{ gridColumn: 2, gridRow: 1 }}>
+                  <TableCell role="cell" sx={{ gridColumn: 2, gridRow: 1 }}>
                     {modifiedIds.has(a.id) ? (
                       <Stack direction="row" spacing={0.75} sx={{ alignItems: "center" }}>
                         <Box

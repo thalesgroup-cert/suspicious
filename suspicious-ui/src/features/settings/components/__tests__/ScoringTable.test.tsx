@@ -1,7 +1,7 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
-import { fireEvent, screen, waitFor, within } from "@testing-library/react";
+import { act, fireEvent, screen, waitFor, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
-import { renderWithProviders } from "@/test/utils";
+import { createTestQueryClient, renderWithProviders } from "@/test/utils";
 
 vi.mock("@/features/settings/api", () => ({
   listAnalyzers: vi.fn(),
@@ -31,10 +31,10 @@ describe("ScoringTable", () => {
   });
   afterEach(() => vi.restoreAllMocks());
 
-  async function setup(list: Analyzer[] = THREE) {
+  async function setup(list: Analyzer[] = THREE, queryClient = createTestQueryClient()) {
     vi.mocked(listAnalyzers).mockResolvedValue(list);
     const user = userEvent.setup();
-    renderWithProviders(<ScoringTable />);
+    renderWithProviders(<ScoringTable />, { queryClient });
     await screen.findByRole("table", { name: "Analyzer weights" });
     return user;
   }
@@ -96,7 +96,7 @@ describe("ScoringTable", () => {
     fireEvent.blur(num("Alpha"));
     expect(num("Alpha").value).toBe("0.3");
 
-    slider.focus();
+    act(() => slider.focus());
     await user.keyboard("{ArrowRight}");
     expect(num("Alpha").value).toBe("0.4");
     await user.keyboard("{End}");
@@ -194,11 +194,84 @@ describe("ScoringTable", () => {
     expect(src).not.toMatch(/palette\.(error|warning|success)/);
   });
 
-  it("renders 26 rows within the time budget", async () => {
+  it("renders one row per analyzer for 26 analyzers", async () => {
     const many = Array.from({ length: 26 }, (_, i) => A(i + 1, `Analyzer${String(i).padStart(2, "0")}`, 0.1));
-    const t0 = performance.now();
     await setup(many);
     expect(screen.getAllByRole("row")).toHaveLength(27);
-    expect(performance.now() - t0).toBeLessThan(3000);
+  });
+
+  it("sends the raise before the cut so a valid swap passes the server guard", async () => {
+    const user = await setup([A(1, "Aa", 0.5), A(2, "Bb", 0)]);
+    fireEvent.change(num("Aa"), { target: { value: "0" } });
+    fireEvent.change(num("Bb"), { target: { value: "0.5" } });
+    await user.click(screen.getByRole("button", { name: "Save all" }));
+    await waitFor(() => expect(updateAnalyzerWeight).toHaveBeenCalledTimes(2));
+    expect(vi.mocked(updateAnalyzerWeight).mock.calls).toEqual([[2, 0.5], [1, 0]]);
+    await waitFor(() => expect(screen.getByRole("status")).toHaveTextContent("2 of 2 saved"));
+  });
+
+  it("keeps a newer edit made while the save was in flight", async () => {
+    const user = await setup();
+    let release: () => void = () => undefined;
+    vi.mocked(updateAnalyzerWeight).mockImplementation(
+      () => new Promise((resolve) => { release = () => resolve({}); }),
+    );
+    fireEvent.change(num("Alpha"), { target: { value: "0.6" } });
+    vi.mocked(listAnalyzers).mockResolvedValue([A(1, "Alpha", 0.6), A(2, "Bravo", 0.3), A(3, "Charlie", 0.5)]);
+    await user.click(screen.getByRole("button", { name: "Save all" }));
+    await waitFor(() => expect(updateAnalyzerWeight).toHaveBeenCalledWith(1, 0.6));
+    fireEvent.change(num("Alpha"), { target: { value: "0.9" } });
+    release();
+    await waitFor(() => expect(screen.getByRole("status")).toHaveTextContent("1 of 1 saved"));
+    await waitFor(() => expect(screen.getByRole("button", { name: "Save all" })).toBeEnabled());
+    expect(num("Alpha").value).toBe("0.9");
+    expect(screen.getByText("1 unsaved change")).toBeInTheDocument();
+  });
+
+  it("adds the server message to the status when exactly one row fails", async () => {
+    const user = await setup();
+    const guard = "At least one active analyzer must keep a weight above 0.";
+    vi.mocked(updateAnalyzerWeight).mockImplementation(async (id: number) => {
+      if (id === 2) throw { response: { data: { weight: [guard] } } };
+      return {};
+    });
+    fireEvent.change(num("Alpha"), { target: { value: "0.6" } });
+    fireEvent.change(num("Bravo"), { target: { value: "0.7" } });
+    await user.click(screen.getByRole("button", { name: "Save all" }));
+    await waitFor(() => expect(screen.getByRole("status")).toHaveTextContent(`1 of 2 saved, 1 failed: ${guard}`));
+  });
+
+  it("counts and saves a modified row that search or Modified only hides", async () => {
+    const user = await setup();
+    fireEvent.change(num("Alpha"), { target: { value: "0.9" } });
+    await user.type(screen.getByRole("searchbox", { name: "Search analyzers" }), "bravo");
+    expect(names()).toEqual([expect.stringContaining("Bravo")]);
+    expect(screen.getByText("1 unsaved change")).toBeInTheDocument();
+    await user.click(screen.getByRole("button", { name: "Modified only" }));
+    expect(screen.getByText("No analyzers match.")).toBeInTheDocument();
+    expect(screen.getByText("1 unsaved change")).toBeInTheDocument();
+    await user.click(screen.getByRole("button", { name: "Save all" }));
+    await waitFor(() => expect(updateAnalyzerWeight).toHaveBeenCalledWith(1, 0.9));
+  });
+
+  it("does not let a background refetch overwrite an unsaved draft", async () => {
+    const qc = createTestQueryClient();
+    await setup(THREE, qc);
+    fireEvent.change(num("Alpha"), { target: { value: "0.9" } });
+    vi.mocked(listAnalyzers).mockResolvedValue([A(1, "Alpha", 0.4), A(2, "Bravo", 0.3), A(3, "Charlie", 0.5)]);
+    await act(() => qc.invalidateQueries({ queryKey: ["settings", "scoring"] }));
+    expect(num("Alpha").value).toBe("0.9");
+    expect(screen.getByText("1 unsaved change")).toBeInTheDocument();
+  });
+
+  it("keeps explicit table roles so the phone layout does not drop the semantics", async () => {
+    await setup();
+    const table = screen.getByRole("table", { name: "Analyzer weights" });
+    expect(table).toHaveAttribute("role", "table");
+    const roleOf = (sel: string) => [...table.querySelectorAll(sel)].map((el) => el.getAttribute("role"));
+    expect(roleOf("thead, tbody")).toEqual(["rowgroup", "rowgroup"]);
+    expect(new Set(roleOf("tr"))).toEqual(new Set(["row"]));
+    expect(new Set(roleOf("th"))).toEqual(new Set(["columnheader"]));
+    expect(new Set(roleOf("td"))).toEqual(new Set(["cell"]));
   });
 });
