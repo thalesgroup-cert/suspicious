@@ -41,6 +41,8 @@ export type EmbeddingMap3DProps = {
   points: PcaPoint[];
   explainedVariance: number[];
   campaigns: CampaignRow[];
+  /** How many case ids the summary lists per campaign, for the legend's wording (0 when unknown). */
+  maxCaseIds?: number;
   selectedCaseIds: string[];
   onSelectCases: (caseIds: string[]) => void;
 };
@@ -79,7 +81,7 @@ function RangeRow({ id, label, max, value, day, onChange }: { id: string; label:
  * The 3D map: an R3F canvas plus every control and piece of text that must exist outside it, because a canvas
  * is invisible to assistive technology (WCAG 1.1.1, 2.1.1): a named and described group, key controls, chips, the date range and the legends.
  */
-export default function EmbeddingMap3D({ points, explainedVariance, campaigns, selectedCaseIds, onSelectCases }: EmbeddingMap3DProps) {
+export default function EmbeddingMap3D({ points, explainedVariance, campaigns, maxCaseIds = 0, selectedCaseIds, onSelectCases }: EmbeddingMap3DProps) {
   const theme = useTheme();
   const classColors = useClassColors();
   const reducedMotion = useMediaQuery("(prefers-reduced-motion: reduce)", { noSsr: true });
@@ -388,7 +390,7 @@ export default function EmbeddingMap3D({ points, explainedVariance, campaigns, s
       </Box>
 
       <Box ref={keyRegion} id={ids.key} role="group" aria-label="Map key" tabIndex={-1} sx={{ mt: 1 }}>
-        {mode === "campaign" ? <CampaignLegend campaigns={ranked} colours={campaignColours} neutral={neutral} inMap={inMap} /> : null}
+        {mode === "campaign" ? <CampaignLegend campaigns={ranked} colours={campaignColours} neutral={neutral} inMap={inMap} maxCaseIds={maxCaseIds} /> : null}
         {mode === "age" ? <AgeLegend oldest={dates[0] ?? null} newest={dates[last] ?? null} from={ends.old} to={ends.newest} none={noDate} hasUndated={undated > 0} /> : null}
         {clouds.length ? (
           <Typography variant="caption" color="text.secondary" component="p" sx={{ mt: 0.5 }}>

@@ -1,6 +1,9 @@
 import * as React from "react";
 import { Box, Button, Link, Table, TableBody, TableCell, TableContainer, TableHead, TableRow, Typography } from "@mui/material";
+import { useTheme } from "@mui/material/styles";
 import { Link as RouterLink } from "react-router";
+
+import { ensureContrast, flatten } from "@/shared/lib/contrast";
 
 import type { PcaPoint } from "@/features/campaigns/api";
 import { classLabel, sortRows, useSort } from "@/features/campaigns/utils";
@@ -26,6 +29,9 @@ function SelectButton({ point: p, selected, onSelectCases }: { point: PcaPoint; 
   const id = p.suspicious_case_id;
   const pressed = !!id && selected.includes(id);
   const whyId = React.useId();
+  const { palette } = useTheme();
+  // Muted by colour, not opacity (a faded text colour falls under 4.5:1): the muted text colour, kept at 4.5:1 on the card.
+  const inert = ensureContrast(flatten(palette.text.secondary, palette.background.paper), palette.background.paper, 4.5);
   return (
     <>
       {/* aria-disabled instead of disabled: the button stays in the tab order, so a keyboard user can reach the reason. */}
@@ -39,7 +45,7 @@ function SelectButton({ point: p, selected, onSelectCases }: { point: PcaPoint; 
         title={id ? undefined : NO_CASE}
         // A second press takes this case out of the selection; selecting replaces it, like a click in the map.
         onClick={() => id && onSelectCases(pressed ? selected.filter((x) => x !== id) : [id])}
-        sx={{ minWidth: 0, ...(id ? {} : { color: "text.secondary", opacity: 0.7, cursor: "default", "&:hover": { bgcolor: "transparent" } }) }}
+        sx={{ minWidth: 0, ...(id ? {} : { color: inert, cursor: "default", "&:hover": { bgcolor: "transparent" } }) }}
       >
         Select
       </Button>

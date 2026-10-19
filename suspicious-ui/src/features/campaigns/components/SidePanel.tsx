@@ -134,25 +134,26 @@ function Section(props: { title: string; caption: string; items: NeighbourItem[]
   );
 }
 
-/** Near-known-bad and novel lists; every number and threshold in the copy comes from the payload. */
-export default function SidePanel({
-  neighbours: n,
-  onSelectCases,
-  points = [],
-  selectedCaseIds = [],
+/** The one message picked in the map, when exactly one is and the sample holds it. It needs only the map's sample, not the review lists. */
+export function SelectedPanel({
+  points,
+  selectedCaseIds,
   campaigns = [],
+  onSelectCases,
 }: {
-  neighbours: CampaignNeighbours;
-  onSelectCases: (ids: string[]) => void;
-  /** The map's sample, to describe the one selected message and find its neighbours. */
-  points?: PcaPoint[];
-  selectedCaseIds?: string[];
+  points: PcaPoint[];
+  selectedCaseIds: string[];
   campaigns?: CampaignRow[];
+  onSelectCases: (ids: string[]) => void;
 }) {
   const selected = selectedCaseIds.length === 1 ? points.find((p) => p.suspicious_case_id === selectedCaseIds[0]) : undefined;
+  return selected ? <SelectedMessage point={selected} points={points} campaigns={campaigns} onSelectCases={onSelectCases} /> : null;
+}
+
+/** Near-known-bad and novel lists; every number and threshold in the copy comes from the payload. */
+export default function SidePanel({ neighbours: n, onSelectCases }: { neighbours: CampaignNeighbours; onSelectCases: (ids: string[]) => void }) {
   return (
     <>
-      {selected ? <SelectedMessage point={selected} points={points} campaigns={campaigns} onSelectCases={onSelectCases} /> : null}
       <Typography variant="body2" color="text.secondary" sx={{ mb: 1.5 }}>
         Closeness in the embedding space is a hint, not proof of a campaign.
       </Typography>

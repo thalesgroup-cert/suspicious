@@ -16,6 +16,8 @@ export type EmbeddingMapProps = {
   explainedVariance: number[];
   /** The period's campaigns, for the map's campaign colours. */
   campaigns?: CampaignRow[];
+  /** Case ids the summary lists per campaign at most. */
+  maxCaseIds?: number;
   /** The sample size asked of the backend, for the caption. */
   sampleLimit?: number;
   selectedCaseIds: string[];
@@ -48,7 +50,7 @@ function Loading() {
 }
 
 /** The map slot: the 3D map when the browser can draw it, else the 2D scatter, with a table as the text alternative. */
-export default function EmbeddingMap({ points, explainedVariance, campaigns, sampleLimit, selectedCaseIds, onSelectCases }: EmbeddingMapProps) {
+export default function EmbeddingMap({ points, explainedVariance, campaigns, maxCaseIds, sampleLimit, selectedCaseIds, onSelectCases }: EmbeddingMapProps) {
   const [asTable, setAsTable] = React.useState(false);
   const [view, setView] = React.useState<"2d" | "3d">("3d");
   const [failed, setFailed] = React.useState(false);
@@ -117,6 +119,7 @@ export default function EmbeddingMap({ points, explainedVariance, campaigns, sam
               points={points}
               explainedVariance={explainedVariance}
               campaigns={campaigns ?? []}
+              maxCaseIds={maxCaseIds}
               selectedCaseIds={selectedCaseIds}
               onSelectCases={onSelectCases}
             />

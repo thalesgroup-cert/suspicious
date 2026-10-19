@@ -34,7 +34,17 @@ describe("campaigns api", () => {
     expect(s.largest_campaign).toBeNull();
     expect(s.mix).toEqual({ SAFE: 2, UNWANTED: 0, SUSPICIOUS: 0, DANGEROUS: 0 });
     expect(s.active_window_hours).toBe(0);
+    // not sent: what the list holds is all that is known, and no case-id limit is claimed
+    expect(s.campaigns_total).toBe(1);
+    expect(s.max_case_ids).toBe(0);
     expect(s.campaigns[0]).toMatchObject({ name: "a.example", messages: 0, active: false, sample_subject: null, case_ids: ["1"] });
+  });
+
+  it("keeps the campaign count before the backend's cut and the case-id limit", async () => {
+    vi.mocked(api.get).mockResolvedValue({ data: { campaigns: [{ name: "a" }], campaigns_total: 412, max_case_ids: 20 } });
+    const s = await getCampaignSummary(15);
+    expect(s.campaigns_total).toBe(412);
+    expect(s.max_case_ids).toBe(20);
   });
 
   it("keeps z, date and three variance ratios on PCA", async () => {

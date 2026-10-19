@@ -24,6 +24,10 @@ export default mergeConfig(
         "react-joyride",
         "react-grid-layout",
         "react-grid-layout/legacy",
+        // The 3D map suites are the only ones that import these.
+        "three",
+        "@react-three/fiber",
+        "@react-three/drei",
         "@mui/icons-material/BlockOutlined",
         "@mui/icons-material/CheckCircleOutlined",
         "@mui/icons-material/EmailOutlined",

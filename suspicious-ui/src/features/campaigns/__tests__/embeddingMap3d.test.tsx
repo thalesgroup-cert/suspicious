@@ -197,7 +197,7 @@ describe("EmbeddingMap3D: colour modes", () => {
 
   it("Campaign: lists each coloured campaign by its full name, and what the grey means", async () => {
     const user = userEvent.setup();
-    renderMap();
+    renderMap({ maxCaseIds: 7 });
     await user.click(mode("Campaign"));
     expect(mode("Campaign")).toHaveAttribute("aria-pressed", "true");
     expect(mode("Category")).toHaveAttribute("aria-pressed", "false");
@@ -208,7 +208,25 @@ describe("EmbeddingMap3D: colour modes", () => {
     expect(items[0]).toHaveTextContent("12 messages, 2 coloured in the map");
     expect(items[1]).toHaveTextContent("newsletter.example");
     expect(items[2]).toHaveTextContent("Not in a listed campaign");
-    expect(screen.getByText(/Colours cover the case ids the summary lists, up to 20 per campaign/)).toBeInTheDocument();
+    expect(screen.getByText(/Colours cover the case ids the summary lists, up to 7 per campaign/)).toBeInTheDocument();
+  });
+
+  it("Campaign: names no case-id limit when the summary did not say one", async () => {
+    const user = userEvent.setup();
+    renderMap();
+    await user.click(mode("Campaign"));
+    expect(screen.getByText(/Colours cover the case ids the summary lists; other messages are grey/)).toBeInTheDocument();
+  });
+
+  it("Campaign: two campaigns with the same shown name both get a row, without a duplicate-key warning", async () => {
+    const user = userEvent.setup();
+    const warn = vi.spyOn(console, "error").mockImplementation(() => {});
+    // names are cut to three source refs, so two different groups can read the same
+    renderMap({ campaigns: [row({ name: "a.example, b.example, c.example…", first_seen: "2026-10-01T00:00:00Z", messages: 9, case_ids: ["1"] }), row({ name: "a.example, b.example, c.example…", first_seen: "2026-10-02T00:00:00Z", messages: 8, case_ids: ["2"] })] });
+    await user.click(mode("Campaign"));
+    expect(within(screen.getByRole("list", { name: "Campaigns" })).getAllByRole("listitem")).toHaveLength(3);
+    expect(warn.mock.calls.flat().join(" ")).not.toMatch(/same key/);
+    warn.mockRestore();
   });
 
   it("Campaign: caps the colours at the six largest campaigns", async () => {

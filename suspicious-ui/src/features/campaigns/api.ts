@@ -42,7 +42,7 @@ export type CampaignRow = {
   dangerous: number;
   dangerous_share: number;
   sample_subject: string | null;
-  /** Up to 20, most recent first. */
+  /** Up to the summary's `max_case_ids`, most recent first. */
   case_ids: string[];
   active: boolean;
 };
@@ -59,7 +59,11 @@ export type CampaignSummary = {
   peak_day: { date: string; count: number } | null;
   mix: ClassificationCounts;
   unclassified: number;
+  /** The largest campaigns only: the backend cuts the list; `campaigns_total` counts them all. */
   campaigns: CampaignRow[];
+  campaigns_total: number;
+  /** How many case ids each campaign lists at most (0 when the backend did not say). */
+  max_case_ids: number;
   active_window_hours: number;
   active_campaigns: number;
   largest_campaign: { name: string; messages: number } | null;
@@ -159,6 +163,8 @@ export async function getCampaignSummary(days = 15): Promise<CampaignSummary> {
       case_ids: strings(c?.case_ids),
       active: c?.active === true,
     })),
+    campaigns_total: num(d.campaigns_total, list(d.campaigns).length),
+    max_case_ids: num(d.max_case_ids),
     active_window_hours: num(d.active_window_hours),
     active_campaigns: num(d.active_campaigns),
     largest_campaign: largest,

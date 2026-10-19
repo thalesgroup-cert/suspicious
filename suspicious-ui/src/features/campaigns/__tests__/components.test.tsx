@@ -9,8 +9,11 @@ import type { CampaignRow, PcaPoint } from "@/features/campaigns/api";
 import VolumeChart from "../components/VolumeChart";
 import MixBar from "../components/MixBar";
 import CampaignTable from "../components/CampaignTable";
-import SidePanel from "../components/SidePanel";
+import SidePanel, { SelectedPanel } from "../components/SidePanel";
 import PointTable from "../components/PointTable";
+import { ThemeProvider } from "@mui/material/styles";
+import { themes } from "@/styles/themes";
+import { contrastRatio, flatten } from "@/shared/lib/contrast";
 
 const stub = (phone: boolean) => stubMatchMedia({ phone });
 
@@ -289,6 +292,18 @@ describe("PointTable: selecting a message", () => {
     expect(screen.getByRole("button", { name: "Select Bonjour" })).not.toHaveAttribute("aria-disabled");
   });
 
+  it.each(["light", "midnight"] as const)("draws the inert Select in a colour that reads at 4.5:1 on the card in %s, without fading it", (name) => {
+    renderWithProviders(
+      <ThemeProvider theme={themes[name]}>
+        <PointTable points={rows} selectedCaseIds={[]} onSelectCases={() => {}} />
+      </ThemeProvider>
+    );
+    const orphan = screen.getByRole("button", { name: "Select Orphan" });
+    const paper = themes[name].palette.background.paper;
+    expect(getComputedStyle(orphan).opacity).toBe("1");
+    expect(contrastRatio(flatten(getComputedStyle(orphan).color, paper), paper)).toBeGreaterThanOrEqual(4.5);
+  });
+
   it("has no Select column when nothing can be selected", () => {
     renderWithProviders(<PointTable points={rows} />);
     expect(screen.queryByRole("columnheader", { name: "Select" })).not.toBeInTheDocument();
@@ -296,18 +311,18 @@ describe("PointTable: selecting a message", () => {
   });
 });
 
-describe("SidePanel: selected message", () => {
+describe("SelectedPanel", () => {
   const at = (x: number, id: string | null, label = "SAFE", subject: string | null = `Mail ${id}`): PcaPoint => ({
     x, y: 0, z: 0, label, suspicious_case_id: id, mail_subject: subject, sourceRefs: [], date: "2026-10-05",
   });
   // The selected message is at the origin; the others sit 1, 2, ... 9 away on PC1.
   const sample = [at(0, "3", "DANGEROUS", "URGENT: pay now"), ...Array.from({ length: 9 }, (_, i) => at(i + 1, i === 0 ? null : `1${i}`))];
   const camp = (name: string, messages: number, case_ids: string[]) => ({ ...fixtureCampaignSummary.campaigns[0], name, messages, case_ids });
-  const base = { neighbours: fixtureNeighbours, points: sample, campaigns: [camp("small.example", 2, ["3"]), camp("invoice-relay.example", 9, ["3", "11"])] };
+  const base = { points: sample, campaigns: [camp("small.example", 2, ["3"]), camp("invoice-relay.example", 9, ["3", "11"])] };
   const block = () => screen.getByRole("region", { name: "Selected message" });
 
   it("shows the subject, case link, class, day and campaign of the one selected message", () => {
-    renderWithProviders(<SidePanel {...base} selectedCaseIds={["3"]} onSelectCases={() => {}} />);
+    renderWithProviders(<SelectedPanel {...base} selectedCaseIds={["3"]} onSelectCases={() => {}} />);
     expect(within(block()).getByRole("heading", { name: "Selected message" })).toBeInTheDocument();
     expect(within(block()).getByText("URGENT: pay now")).toBeInTheDocument();
     expect(within(block()).getByRole("link", { name: "Case 3" })).toHaveAttribute("href", "/investigation?open=3");
@@ -320,13 +335,13 @@ describe("SidePanel: selected message", () => {
 
   it("encodes the case id in the link and omits the campaign line when there is none", () => {
     const odd = [at(0, "a b/1", "SAFE", "Odd"), at(1, "2")];
-    renderWithProviders(<SidePanel neighbours={fixtureNeighbours} points={odd} campaigns={[]} selectedCaseIds={["a b/1"]} onSelectCases={() => {}} />);
+    renderWithProviders(<SelectedPanel points={odd} campaigns={[]} selectedCaseIds={["a b/1"]} onSelectCases={() => {}} />);
     expect(within(block()).getByRole("link", { name: "Case a b/1" })).toHaveAttribute("href", "/investigation?open=a%20b%2F1");
     expect(within(block()).queryByText(/^Campaign:/)).not.toBeInTheDocument();
   });
 
   it("lists the 8 nearest in the 3-component view with their distances, nearest first, and says what the distance is", () => {
-    renderWithProviders(<SidePanel {...base} selectedCaseIds={["3"]} onSelectCases={() => {}} />);
+    renderWithProviders(<SelectedPanel {...base} selectedCaseIds={["3"]} onSelectCases={() => {}} />);
     const heading = screen.getByRole("heading", { name: "Nearest in this 3D view" });
     expect(heading).toBeInTheDocument();
     expect(screen.getByText("Distance in the 3-component view, not the full embedding.")).toBeInTheDocument();
@@ -342,7 +357,7 @@ describe("SidePanel: selected message", () => {
   it("selects a neighbour on click, and cannot select one without a case id", async () => {
     const user = userEvent.setup();
     const onSelect = vi.fn();
-    renderWithProviders(<SidePanel {...base} selectedCaseIds={["3"]} onSelectCases={onSelect} />);
+    renderWithProviders(<SelectedPanel {...base} selectedCaseIds={["3"]} onSelectCases={onSelect} />);
     const list = screen.getByRole("list", { name: "Nearest messages" });
     await user.click(within(list).getByRole("button", { name: /Mail 11/ }));
     expect(onSelect).toHaveBeenCalledWith(["11"]);
@@ -354,16 +369,14 @@ describe("SidePanel: selected message", () => {
     ["nothing is selected", []],
     ["several messages are selected", ["3", "11"]],
     ["the selected case is not in the sample", ["404"]],
-  ])("shows no block when %s, and still shows the review lists", (_n, ids) => {
-    renderWithProviders(<SidePanel {...base} selectedCaseIds={ids} onSelectCases={() => {}} />);
+  ])("shows no block when %s", (_n, ids) => {
+    renderWithProviders(<SelectedPanel {...base} selectedCaseIds={ids} onSelectCases={() => {}} />);
     expect(screen.queryByRole("region", { name: "Selected message" })).not.toBeInTheDocument();
     expect(screen.queryByRole("heading", { name: "Nearest in this 3D view" })).not.toBeInTheDocument();
-    expect(screen.getByRole("heading", { name: "Near known bad" })).toBeInTheDocument();
-    expect(screen.getByRole("heading", { name: "Novel" })).toBeInTheDocument();
   });
 
   it("says when the sample is too small for neighbours", () => {
-    renderWithProviders(<SidePanel {...base} points={[sample[0]]} selectedCaseIds={["3"]} onSelectCases={() => {}} />);
+    renderWithProviders(<SelectedPanel {...base} points={[sample[0]]} selectedCaseIds={["3"]} onSelectCases={() => {}} />);
     expect(screen.getByText("No other message in the sample.")).toBeInTheDocument();
   });
 });

@@ -49,7 +49,7 @@ export default function CampaignKpis({ summary: s }: { summary: CampaignSummary 
       </Kpi>
 
       <Kpi title="Active campaigns" value={s.active_campaigns}>
-        <Line>of {s.campaigns.length.toLocaleString()} in this period</Line>
+        <Line>of {s.campaigns_total.toLocaleString()} in this period</Line>
         {s.active_window_hours > 0 ? (
           <Typography variant="caption" color="text.secondary">
             active = seen in the last {s.active_window_hours} hours

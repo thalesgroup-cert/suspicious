@@ -31,7 +31,7 @@ import CampaignKpis from "@/features/campaigns/components/CampaignKpis";
 import CampaignTable from "@/features/campaigns/components/CampaignTable";
 import EmbeddingMap from "@/features/campaigns/components/EmbeddingMap";
 import MixBar from "@/features/campaigns/components/MixBar";
-import SidePanel from "@/features/campaigns/components/SidePanel";
+import SidePanel, { SelectedPanel } from "@/features/campaigns/components/SidePanel";
 import ScrollRegion from "@/features/campaigns/components/ScrollRegion";
 import VolumeChart from "@/features/campaigns/components/VolumeChart";
 
@@ -85,14 +85,17 @@ export default function CampaignsPage() {
   const switching =
     (summaryQuery.isFetching && summaryQuery.isPlaceholderData) || (volumeQuery.isFetching && volumeQuery.isPlaceholderData);
   const isEmpty = summaryQuery.data?.messages === 0;
+  // The empty state describes the data on screen, which is the old period while a new one loads.
+  const shownDays = summaryQuery.data?.days ?? days;
 
   return (
     // The accent is a variable so the skip link (inside the map) reads it too; links and text buttons take it directly.
     <Box
       sx={{
         "--campaigns-link": linkColor,
-        "& .MuiLink-root, & .MuiButton-text.MuiButton-colorPrimary, & .MuiButton-outlined.MuiButton-colorPrimary": { color: "var(--campaigns-link)" },
-        "& .MuiButton-outlined.MuiButton-colorPrimary": { borderColor: "var(--campaigns-link)" },
+        // :not(.Mui-disabled): these selectors out-specify MUI's own disabled colour, which would otherwise draw a disabled button as enabled.
+        "& .MuiLink-root, & .MuiButton-text.MuiButton-colorPrimary:not(.Mui-disabled), & .MuiButton-outlined.MuiButton-colorPrimary:not(.Mui-disabled)": { color: "var(--campaigns-link)" },
+        "& .MuiButton-outlined.MuiButton-colorPrimary:not(.Mui-disabled)": { borderColor: "var(--campaigns-link)" },
       }}
     >
       <Box sx={{ position: "sticky", top: 0, zIndex: 20, borderBottom: "1px solid", borderColor: "divider", backdropFilter: "blur(14px)" }}>
@@ -144,7 +147,7 @@ export default function CampaignsPage() {
       <Container maxWidth="xl" sx={{ py: 2.5 }}>
         {isEmpty ? (
           <Box aria-busy={switching} sx={{ py: 8, opacity: switching ? 0.6 : 1 }}>
-            <EmptyState title="No messages in this period." hint={`The message store has no mail dated in the last ${days} days.`} />
+            <EmptyState title="No messages in this period." hint={`The message store has no mail dated in the last ${shownDays} days.`} />
           </Box>
         ) : (
           <Stack spacing={2} aria-busy={switching} sx={{ opacity: switching ? 0.6 : 1, transition: "opacity .2s ease" }}>
@@ -161,6 +164,7 @@ export default function CampaignsPage() {
                         points={pca.points}
                         explainedVariance={pca.explained_variance}
                         campaigns={summaryQuery.data?.campaigns}
+                        maxCaseIds={summaryQuery.data?.max_case_ids}
                         sampleLimit={SAMPLE}
                         selectedCaseIds={selectedCaseIds}
                         onSelectCases={setSelectedCaseIds}
@@ -170,23 +174,22 @@ export default function CampaignsPage() {
                 </SoftCard>
               </Box>
               <SoftCard title="Messages to review" sx={{ minWidth: 0 }} fillHeight>
-                <PanelState query={neighboursQuery} what="the review lists" height={240}>
-                  {(n) => (
-                    // On desktop the map sets the row height and the lists scroll inside it, instead of
-                    // stretching the row and leaving a hole under the map.
-                    <Box sx={{ position: { md: "relative" }, flex: 1, minHeight: { md: 240 } }}>
-                      <ScrollRegion label="Review lists" sx={{ position: { md: "absolute" }, inset: 0, overflowY: { md: "auto" }, pr: { md: 1 } }}>
-                        <SidePanel
-                          neighbours={n}
-                          onSelectCases={showInMap}
-                          points={pcaQuery.data?.points}
-                          selectedCaseIds={selectedCaseIds}
-                          campaigns={summaryQuery.data?.campaigns}
-                        />
-                      </ScrollRegion>
-                    </Box>
-                  )}
-                </PanelState>
+                {/* On desktop the map sets the row height and the lists scroll inside it, instead of
+                    stretching the row and leaving a hole under the map. */}
+                <Box sx={{ position: { md: "relative" }, flex: 1, minHeight: { md: 240 } }}>
+                  <ScrollRegion label="Review lists" sx={{ position: { md: "absolute" }, inset: 0, overflowY: { md: "auto" }, pr: { md: 1 } }}>
+                    {/* The picked message needs only the map's sample, so it shows while the lists load or when they fail. */}
+                    <SelectedPanel
+                      points={pcaQuery.data?.points ?? []}
+                      selectedCaseIds={selectedCaseIds}
+                      campaigns={summaryQuery.data?.campaigns}
+                      onSelectCases={showInMap}
+                    />
+                    <PanelState query={neighboursQuery} what="the review lists" height={240}>
+                      {(n) => <SidePanel neighbours={n} onSelectCases={showInMap} />}
+                    </PanelState>
+                  </ScrollRegion>
+                </Box>
               </SoftCard>
             </Box>
 

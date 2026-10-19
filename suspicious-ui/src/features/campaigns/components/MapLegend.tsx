@@ -7,7 +7,7 @@ import { formatFullDay } from "@/features/campaigns/utils";
 const dot = (colour: string) => <Box component="span" aria-hidden sx={{ width: 10, height: 10, borderRadius: "50%", bgcolor: colour, flexShrink: 0, mt: "5px" }} />;
 
 /** The campaigns that have a colour, their names in full, and what the grey means. */
-export function CampaignLegend({ campaigns, colours, neutral, inMap }: { campaigns: CampaignRow[]; colours: string[]; neutral: string; inMap: number[] }) {
+export function CampaignLegend({ campaigns, colours, neutral, inMap, maxCaseIds }: { campaigns: CampaignRow[]; colours: string[]; neutral: string; inMap: number[]; maxCaseIds: number }) {
   if (!campaigns.length) {
     return (
       <Typography variant="body2" color="text.secondary">
@@ -19,7 +19,8 @@ export function CampaignLegend({ campaigns, colours, neutral, inMap }: { campaig
     <>
       <Box component="ul" aria-label="Campaigns" sx={{ m: 0, p: 0, listStyle: "none" }}>
         {campaigns.map((c, i) => (
-          <Stack component="li" key={c.name} direction="row" spacing={1} sx={{ py: 0.25 }}>
+          // The name is cut to three source references, so two campaigns can read the same.
+          <Stack component="li" key={`${c.first_seen}-${i}`} direction="row" spacing={1} sx={{ py: 0.25 }}>
             {dot(colours[i])}
             <Typography variant="body2" sx={{ overflowWrap: "anywhere" }}>
               {c.name}
@@ -35,7 +36,7 @@ export function CampaignLegend({ campaigns, colours, neutral, inMap }: { campaig
         </Stack>
       </Box>
       <Typography variant="caption" color="text.secondary" component="p" sx={{ mt: 0.5 }}>
-        Colours cover the case ids the summary lists, up to 20 per campaign; other messages are grey. A campaign is messages sharing the same source references (inferred).
+        Colours cover the case ids the summary lists{maxCaseIds > 0 ? `, up to ${maxCaseIds} per campaign` : ""}; other messages are grey. A campaign is messages sharing the same source references (inferred).
       </Typography>
     </>
   );

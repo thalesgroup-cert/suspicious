@@ -1,5 +1,5 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
-import { screen, waitFor, within } from "@testing-library/react";
+import { act, screen, waitFor, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { renderWithProviders } from "@/test/utils";
 import { stubMatchMedia } from "@/test/matchMedia";
@@ -132,6 +132,12 @@ describe("CampaignsPage", () => {
       expect(within(peak).getByText("12 Oct")).toBeInTheDocument();
     });
 
+    it("says how many campaigns the period has from the count before the backend's cut, not from the list it got", async () => {
+      vi.mocked(getCampaignSummary).mockResolvedValue({ ...fixtureCampaignSummary, campaigns_total: 412, active_campaigns: 3 });
+      renderWithProviders(<CampaignsPage />, { initialPath: "/campaigns" });
+      expect(within(await region("Active campaigns")).getByText("of 412 in this period")).toBeInTheDocument();
+    });
+
     it("shows — for a null share and no peak day", async () => {
       vi.mocked(getCampaignSummary).mockResolvedValue({
         ...fixtureCampaignSummary,
@@ -180,7 +186,49 @@ describe("CampaignsPage", () => {
     });
   });
 
+  describe("a selection when the review lists are not available", () => {
+    const sample = () => [
+      { ...fixturePca.points[0], suspicious_case_id: "17", mail_subject: "Reset your password" },
+      { ...fixturePca.points[1], mail_subject: "URGENT" },
+    ];
+    const pick = async (id: string) => {
+      await screen.findByTestId("map3d", {}, T);
+      act(() => vi.mocked(EmbeddingMap3D).mock.calls.at(-1)![0].onSelectCases([id]));
+    };
+
+    it.each([
+      ["the request failed", () => vi.mocked(getNeighbours).mockRejectedValue(new Error("boom"))],
+      ["the request is still pending", () => vi.mocked(getNeighbours).mockReturnValue(new Promise(() => {}))],
+    ])("still shows the selected message and its case link when %s", async (_n, arrange) => {
+      arrange();
+      vi.mocked(getPca).mockResolvedValue({ ...fixturePca, points: sample() });
+      renderWithProviders(<CampaignsPage />, { initialPath: "/campaigns" });
+      await pick("17");
+      const side = await region("Review lists");
+      const selected = await within(side).findByRole("region", { name: "Selected message" }, T);
+      expect(within(selected).getByRole("link", { name: "Case 17" })).toHaveAttribute("href", "/investigation?open=17");
+      expect(within(side).getByRole("heading", { name: "Nearest in this 3D view" })).toBeInTheDocument();
+      // the lists themselves are what is missing, and say so
+      expect(within(side).queryByRole("heading", { name: "Near known bad" })).not.toBeInTheDocument();
+    });
+  });
+
   describe("changing the period", () => {
+    it("words the empty state with the period of the data on screen while a new one loads", async () => {
+      const user = userEvent.setup();
+      vi.mocked(getCampaignSummary).mockResolvedValueOnce({ ...fixtureCampaignSummary, messages: 0, campaigns: [], campaigns_total: 0, active_campaigns: 0, largest_campaign: null, peak_day: null, dangerous_share: null });
+      renderWithProviders(<CampaignsPage />, { initialPath: "/campaigns" });
+      expect(await screen.findByText("The message store has no mail dated in the last 15 days.", {}, T)).toBeInTheDocument();
+
+      vi.mocked(getCampaignSummary).mockReturnValueOnce(new Promise(() => {}));
+      await user.click(await screen.findByRole("combobox", { name: "Period" }, T));
+      await user.click(await screen.findByRole("option", { name: "Last 30 days" }));
+      expect(await screen.findByRole("progressbar", { name: "Loading the last 30 days" }, T)).toBeInTheDocument();
+      // still the 15-day data, so still the 15-day wording
+      expect(screen.getByText("The message store has no mail dated in the last 15 days.")).toBeInTheDocument();
+      expect(screen.queryByText(/last 30 days\./)).not.toBeInTheDocument();
+    });
+
     it("keeps the previous numbers on screen and says it is loading the new period", async () => {
       const user = userEvent.setup();
       let resolve!: (v: typeof fixtureCampaignSummary) => void;
@@ -216,6 +264,17 @@ describe("CampaignsPage", () => {
       expect(within(map).getByText("2 selected")).toBeInTheDocument();
       // The sample holds cases 1 and 2; the campaign's are 41 and 40.
       expect(within(map).getByText("0 in the map sample")).toBeInTheDocument();
+    });
+
+    it("draws Show in map as disabled for a campaign with no case ids, not in the accent the page gives the others", async () => {
+      renderWithProviders(<CampaignsPage />, { initialPath: "/campaigns" });
+      const table = await region("Campaigns in this period");
+      const buttons = await within(table).findAllByRole("button", { name: "Show in map" }, T);
+      const off = buttons.find((b) => (b as HTMLButtonElement).disabled)!;
+      const on = buttons.find((b) => !(b as HTMLButtonElement).disabled)!;
+      expect(off).toBeDefined();
+      expect(getComputedStyle(off).color).not.toBe(getComputedStyle(on).color);
+      expect(getComputedStyle(off).borderColor).not.toBe(getComputedStyle(on).borderColor);
     });
 
     it.each([

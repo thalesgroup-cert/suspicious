@@ -101,6 +101,8 @@ export const fixtureCampaignSummary: CampaignSummary = {
       active: false,
     },
   ],
+  campaigns_total: 2,
+  max_case_ids: 20,
   active_window_hours: 48,
   active_campaigns: 1,
   largest_campaign: { name: "invoice-relay.example, cdn-pay.example, login-portal.example", messages: 12 },
