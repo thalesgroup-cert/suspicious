@@ -1,26 +1,13 @@
 import { useMutation, useQueryClient } from "@tanstack/react-query";
-import {
-  Alert,
-  Box,
-  List,
-  ListItemButton,
-  ListItemText,
-  Stack,
-  Switch,
-  Typography,
-} from "@mui/material";
+import { Alert, Box, List, ListItem, ListItemButton, Stack, Switch, Typography } from "@mui/material";
 import { alpha, useTheme } from "@mui/material/styles";
 import { useSnackbar } from "notistack";
 
-import { useResultColors } from "@/styles/colorStore";
-import { EmptyList, NavIcon } from "@/features/settings/components/cards";
-import {
-  CONNECTOR_ICONS,
-  DEFAULT_CONNECTOR_ICON,
-} from "@/features/settings/components/connectorIcons";
-import { CONNECTOR_STATUS_LABEL } from "@/features/settings/labels";
-import { getConnectorStatusColor } from "@/features/settings/components/connectorColors";
+import { EmptyList } from "@/features/settings/components/cards";
+import { ConnectorLogo } from "@/features/settings/components/ConnectorLogo";
+import { StatusLabel, connectorStatus } from "@/features/settings/components/StatusLabel";
 import { setConnectorEnabled, type Connector } from "@/features/settings/components/connectors";
+import { cleanDescription } from "@/features/settings/labels";
 
 export function ConnectorList({
   connectors,
@@ -37,7 +24,6 @@ export function ConnectorList({
   const isDark = theme.palette.mode === "dark";
   const queryClient = useQueryClient();
   const { enqueueSnackbar } = useSnackbar();
-  const resultColors = useResultColors();
 
   const toggle = useMutation({
     mutationFn: ({ name, enabled }: { name: string; enabled: boolean }) =>
@@ -53,15 +39,16 @@ export function ConnectorList({
   });
 
   const errorEntries = Object.entries(loadErrors);
+  const loadAlerts = errorEntries.map(([name, message]) => (
+    <Alert key={name} severity="warning">
+      Connector {name} failed to load: {message}
+    </Alert>
+  ));
 
   if (connectors.length === 0) {
     return (
       <Stack spacing={1.5}>
-        {errorEntries.map(([name, message]) => (
-          <Alert key={name} severity="warning">
-            Connector {name} failed to load: {message}
-          </Alert>
-        ))}
+        {loadAlerts}
         <EmptyList message="No connectors discovered." />
       </Stack>
     );
@@ -75,74 +62,77 @@ export function ConnectorList({
   const categories = [...byCategory.keys()].sort((a, b) => a.localeCompare(b));
 
   return (
-    <Stack spacing={1.5}>
-      {errorEntries.map(([name, message]) => (
-        <Alert key={name} severity="warning">
-          Connector {name} failed to load: {message}
-        </Alert>
-      ))}
+    <Stack spacing={2}>
+      {loadAlerts}
       {categories.map((category) => (
         <Box key={category}>
-          <Typography
-            variant="overline"
-            color="text.secondary"
-            sx={{ display: "block", mb: 0.5, px: 1, fontSize: 11 }}
-          >
+          <Typography variant="overline" color="text.secondary" sx={{ display: "block", mb: 0.5, px: 1 }}>
             {category}
           </Typography>
-          <List dense disablePadding>
+          <List disablePadding>
             {(byCategory.get(category) ?? []).map((connector) => {
               const isSelected = selected === connector.name;
-              const Icon = CONNECTOR_ICONS[connector.name] ?? DEFAULT_CONNECTOR_ICON;
-              const dotColor = getConnectorStatusColor(connector.status, resultColors);
+              const status = connectorStatus(connector);
+              const description = cleanDescription(connector.description);
               return (
-                <ListItemButton
+                // The switch sits beside the row button, not inside it: a control nested in a button is invalid and unreliable for assistive tech.
+                <ListItem
                   key={connector.name}
-                  selected={isSelected}
-                  onClick={() => onSelect(connector.name)}
-                  sx={{
-                    borderRadius: 2.5,
-                    mb: 0.5,
-                    py: 0.75,
-                    px: 1,
-                    "&.Mui-selected": {
-                      background: alpha(theme.palette.primary.main, isDark ? 0.12 : 0.08),
-                      "&:hover": {
-                        background: alpha(theme.palette.primary.main, isDark ? 0.16 : 0.11),
-                      },
-                    },
-                  }}
-                >
-                  <NavIcon icon={<Icon fontSize="small" />} isDark={isDark} />
-                  <ListItemText
-                    primary={connector.name}
-                    sx={{ ml: 1.25 }}
-                    slotProps={{
-                      primary: { sx: { fontWeight: isSelected ? 700 : 600, fontSize: 13.5 } },
-                    }}
-                  />
-                  {/* Colour alone is not a status: the word carries it, the dot is decoration. */}
-                  <Stack direction="row" spacing={0.75} sx={{ alignItems: "center", mr: 0.5, flexShrink: 0 }}>
-                    <Box
-                      aria-hidden
-                      sx={{ width: 8, height: 8, borderRadius: "50%", background: dotColor }}
+                  disablePadding
+                  sx={{ mb: 0.5 }}
+                  secondaryAction={
+                    <Switch
+                      size="small"
+                      checked={connector.enabled}
+                      disabled={toggle.isPending}
+                      onChange={(e) => toggle.mutate({ name: connector.name, enabled: e.target.checked })}
+                      slotProps={{ input: { "aria-label": `Enable ${connector.name}` } }}
                     />
-                    <Typography variant="caption" color="text.secondary">
-                      {CONNECTOR_STATUS_LABEL[connector.status]}
-                    </Typography>
-                  </Stack>
-                  <Switch
-                    size="small"
-                    checked={connector.enabled}
-                    disabled={toggle.isPending}
-                    onChange={(e) => {
-                      e.stopPropagation();
-                      toggle.mutate({ name: connector.name, enabled: e.target.checked });
+                  }
+                >
+                  <ListItemButton
+                    selected={isSelected}
+                    aria-current={isSelected ? "true" : undefined}
+                    onClick={() => onSelect(connector.name)}
+                    sx={{
+                      alignItems: "flex-start",
+                      gap: 1.5,
+                      borderRadius: 2,
+                      py: 1,
+                      pl: 1,
+                      // Room for the switch, which is positioned over the row end.
+                      pr: 8,
+                      "&.Mui-selected": {
+                        background: alpha(theme.palette.primary.main, isDark ? 0.16 : 0.08),
+                        "&:hover": { background: alpha(theme.palette.primary.main, isDark ? 0.2 : 0.12) },
+                      },
                     }}
-                    onClick={(e) => e.stopPropagation()}
-                    slotProps={{ input: { "aria-label": `Enable ${connector.name}` } }}
-                  />
-                </ListItemButton>
+                  >
+                    <ConnectorLogo name={connector.name} size={40} />
+                    <Box sx={{ minWidth: 0, flex: 1 }}>
+                      <Typography variant="subtitle2" component="span" sx={{ display: "block", overflowWrap: "anywhere" }}>
+                        {connector.name}
+                      </Typography>
+                      {description && (
+                        <Typography
+                          variant="caption"
+                          color="text.secondary"
+                          sx={{
+                            display: "-webkit-box",
+                            WebkitLineClamp: 2,
+                            WebkitBoxOrient: "vertical",
+                            overflow: "hidden",
+                          }}
+                        >
+                          {description}
+                        </Typography>
+                      )}
+                      <Box sx={{ mt: 0.5 }}>
+                        <StatusLabel size="small" tone={status.tone} label={status.label} />
+                      </Box>
+                    </Box>
+                  </ListItemButton>
+                </ListItem>
               );
             })}
           </List>

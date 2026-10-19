@@ -49,30 +49,39 @@ const CONNECTOR: Connector = {
   last_health_at: null,
 };
 
+type Tab = "overview" | "configuration" | "deliveries";
+
+// The active tab lives in the URL, so a test picks its tab by path.
+function renderDetail(tab: Tab, props: Partial<React.ComponentProps<typeof ConnectorDetail>> = {}) {
+  return renderWithProviders(<ConnectorDetail connector={CONNECTOR} {...props} />, {
+    initialPath: `/settings/connectors?tab=${tab}`,
+  });
+}
+
 describe("ConnectorDetail", () => {
   it("renders connector identity and config fields", async () => {
-    renderWithProviders(<ConnectorDetail connector={CONNECTOR} />);
-    expect(screen.getByText("misp")).toBeInTheDocument();
+    renderDetail("configuration");
+    expect(screen.getByRole("heading", { level: 3, name: "misp" })).toBeInTheDocument();
     expect(await screen.findByLabelText("API Key")).toBeInTheDocument();
   });
 
   it("renders recent deliveries", async () => {
-    renderWithProviders(<ConnectorDetail connector={CONNECTOR} />);
+    renderDetail("deliveries");
     expect(await screen.findByText(/case_finalised/)).toBeInTheDocument();
-    expect(screen.getByText(/case #42/)).toBeInTheDocument();
+    expect(screen.getByRole("link", { name: "Case #42" })).toHaveAttribute("href", "/investigation?open=42");
   });
 
   it("shows the empty deliveries message when there are none", async () => {
     const { listDeliveries } = await import("../connectors");
     vi.mocked(listDeliveries).mockResolvedValueOnce([]);
-    renderWithProviders(<ConnectorDetail connector={CONNECTOR} />);
+    renderDetail("deliveries");
     expect(await screen.findByText("No deliveries yet.")).toBeInTheDocument();
   });
 
   it("shows error alert when deliveries query fails", async () => {
     const { listDeliveries } = await import("../connectors");
     vi.mocked(listDeliveries).mockRejectedValueOnce(new Error("network error"));
-    renderWithProviders(<ConnectorDetail connector={CONNECTOR} />);
+    renderDetail("deliveries");
     expect(await screen.findByText("Failed to load recent deliveries.")).toBeInTheDocument();
     expect(screen.queryByText("No deliveries yet.")).not.toBeInTheDocument();
   });
@@ -80,54 +89,50 @@ describe("ConnectorDetail", () => {
   it("shows error alert when config query fails, without rendering stale fields", async () => {
     const { getConnectorConfig } = await import("../connectors");
     vi.mocked(getConnectorConfig).mockRejectedValueOnce(new Error("network error"));
-    renderWithProviders(<ConnectorDetail connector={CONNECTOR} />);
+    renderDetail("configuration");
     expect(await screen.findByText("Failed to load configuration.")).toBeInTheDocument();
     expect(screen.queryByLabelText("API Key")).not.toBeInTheDocument();
   });
 
   it("shows a back button only when onBack is provided", () => {
-    renderWithProviders(<ConnectorDetail connector={CONNECTOR} onBack={vi.fn()} />);
+    renderDetail("overview", { onBack: vi.fn() });
     expect(screen.getByLabelText("Back to connector list")).toBeInTheDocument();
   });
 
   it("omits the back button when onBack is not provided", () => {
-    renderWithProviders(<ConnectorDetail connector={CONNECTOR} />);
+    renderDetail("overview");
     expect(screen.queryByLabelText("Back to connector list")).not.toBeInTheDocument();
   });
 
   it("enables Save only after a field is edited", async () => {
-    renderWithProviders(<ConnectorDetail connector={CONNECTOR} />);
+    renderDetail("configuration");
     const input = await screen.findByLabelText("API Key");
-    expect(screen.getByRole("button", { name: "Save" })).toBeDisabled();
+    expect(screen.getByRole("button", { name: "Save changes" })).toBeDisabled();
     await userEvent.type(input, "secret-value");
-    expect(screen.getByRole("button", { name: "Save" })).toBeEnabled();
+    expect(screen.getByRole("button", { name: "Save changes" })).toBeEnabled();
   });
 
   it("labels fields readably and keeps the raw key as helper text beside the help", async () => {
-    renderWithProviders(
-      <ConnectorDetail
-        connector={{
-          ...CONNECTOR,
-          config_schema: [
-            { key: "ollama_url", type: "url", required: false, default: null, help: "Where Ollama listens" },
-          ],
-        }}
-      />,
-    );
+    renderDetail("configuration", {
+      connector: {
+        ...CONNECTOR,
+        config_schema: [
+          { key: "ollama_url", type: "url", required: false, default: null, help: "Where Ollama listens" },
+        ],
+      },
+    });
     const input = await screen.findByLabelText("Ollama URL");
     expect(input).toHaveAccessibleDescription(/Where Ollama listens/);
     expect(input).toHaveAccessibleDescription(/ollama_url/);
   });
 
   it("drops the internal docs pointer from the description but keeps the rest", () => {
-    renderWithProviders(
-      <ConnectorDetail
-        connector={{
-          ...CONNECTOR,
-          description: "Narrates verdicts. See docs/specs/2026-09-21-ai-narration-event-wiring-design.md.",
-        }}
-      />,
-    );
+    renderDetail("overview", {
+      connector: {
+        ...CONNECTOR,
+        description: "Narrates verdicts. See docs/specs/2026-09-21-ai-narration-event-wiring-design.md.",
+      },
+    });
     expect(screen.getByText("Narrates verdicts.")).toBeInTheDocument();
     expect(screen.queryByText(/docs\/specs/)).not.toBeInTheDocument();
   });
@@ -138,7 +143,7 @@ describe("ConnectorDetail", () => {
       vi.mocked(testConnector).mockRejectedValueOnce({
         response: { data: { detail: "Connection refused by host" } },
       });
-      renderWithProviders(<ConnectorDetail connector={CONNECTOR} />);
+      renderDetail("configuration");
       await userEvent.click(await screen.findByRole("button", { name: "Test connection" }));
       expect(await screen.findByRole("alert")).toHaveTextContent("Connection refused by host");
     });
@@ -146,7 +151,7 @@ describe("ConnectorDetail", () => {
     it("reads the detail from an `error` field too", async () => {
       const { testConnector } = await import("../connectors");
       vi.mocked(testConnector).mockRejectedValueOnce({ response: { data: { error: "Bad token" } } });
-      renderWithProviders(<ConnectorDetail connector={CONNECTOR} />);
+      renderDetail("configuration");
       await userEvent.click(await screen.findByRole("button", { name: "Test connection" }));
       expect(await screen.findByRole("alert")).toHaveTextContent("Bad token");
     });
@@ -154,7 +159,7 @@ describe("ConnectorDetail", () => {
     it("falls back to a generic message when a thrown error carries no detail", async () => {
       const { testConnector } = await import("../connectors");
       vi.mocked(testConnector).mockRejectedValueOnce(new Error("Network Error"));
-      renderWithProviders(<ConnectorDetail connector={CONNECTOR} />);
+      renderDetail("configuration");
       await userEvent.click(await screen.findByRole("button", { name: "Test connection" }));
       expect(await screen.findByRole("alert")).toHaveTextContent("Connection test failed.");
     });
@@ -162,13 +167,13 @@ describe("ConnectorDetail", () => {
     it("adds the HTTP status to the generic failure message when there is one", async () => {
       const { testConnector } = await import("../connectors");
       vi.mocked(testConnector).mockRejectedValueOnce({ response: { status: 502, data: {} } });
-      renderWithProviders(<ConnectorDetail connector={CONNECTOR} />);
+      renderDetail("configuration");
       await userEvent.click(await screen.findByRole("button", { name: "Test connection" }));
       expect(await screen.findByRole("alert")).toHaveTextContent("Connection test failed (HTTP 502).");
     });
 
     it("says the test checks the saved configuration while a draft exists", async () => {
-      renderWithProviders(<ConnectorDetail connector={CONNECTOR} />);
+      renderDetail("configuration");
       const input = await screen.findByLabelText("API Key");
       const hint = "Test connection checks the saved configuration, not your unsaved changes.";
       expect(screen.queryByText(hint)).not.toBeInTheDocument();
@@ -180,7 +185,7 @@ describe("ConnectorDetail", () => {
     it("clears the previous result as soon as a new test starts", async () => {
       const { testConnector } = await import("../connectors");
       vi.mocked(testConnector).mockRejectedValueOnce(new Error("x"));
-      renderWithProviders(<ConnectorDetail connector={CONNECTOR} />);
+      renderDetail("configuration");
       const button = await screen.findByRole("button", { name: "Test connection" });
       await userEvent.click(button);
       await screen.findByText("Connection test failed.");
@@ -192,7 +197,7 @@ describe("ConnectorDetail", () => {
     it("keeps showing OK and Failed results from the server", async () => {
       const { testConnector } = await import("../connectors");
       vi.mocked(testConnector).mockResolvedValueOnce({ ok: false, detail: "401 from MISP" });
-      renderWithProviders(<ConnectorDetail connector={CONNECTOR} />);
+      renderDetail("configuration");
       await userEvent.click(await screen.findByRole("button", { name: "Test connection" }));
       expect(await screen.findByRole("alert")).toHaveTextContent("Failed: 401 from MISP");
     });
@@ -200,7 +205,7 @@ describe("ConnectorDetail", () => {
     it("clears an earlier failure when the next test succeeds", async () => {
       const { testConnector } = await import("../connectors");
       vi.mocked(testConnector).mockRejectedValueOnce(new Error("x"));
-      renderWithProviders(<ConnectorDetail connector={CONNECTOR} />);
+      renderDetail("configuration");
       const button = await screen.findByRole("button", { name: "Test connection" });
       await userEvent.click(button);
       await screen.findByText("Connection test failed.");
@@ -216,13 +221,13 @@ describe("ConnectorDetail", () => {
       vi.mocked(putConnectorConfig).mockRejectedValueOnce({
         response: { data: { errors: { api_key: "too short" } } },
       });
-      renderWithProviders(<ConnectorDetail connector={CONNECTOR} />);
+      renderDetail("configuration");
       const input = (await screen.findByLabelText("API Key")) as HTMLInputElement;
       await userEvent.type(input, "abc");
-      await userEvent.click(screen.getByRole("button", { name: "Save" }));
+      await userEvent.click(screen.getByRole("button", { name: "Save changes" }));
       expect(await screen.findByText("api_key: too short")).toBeInTheDocument();
       expect(input.value).toBe("abc");
-      expect(screen.getByRole("button", { name: "Save" })).toBeEnabled();
+      expect(screen.getByRole("button", { name: "Save changes" })).toBeEnabled();
     });
 
     it("shows the saved value at once instead of falling back to the old one", async () => {
@@ -232,17 +237,17 @@ describe("ConnectorDetail", () => {
         .mockResolvedValueOnce({ api_key: "" })
         // The refetch after save never lands, so only the cache write can supply the value.
         .mockReturnValueOnce(new Promise(() => undefined));
-      renderWithProviders(<ConnectorDetail connector={CONNECTOR} />);
+      renderDetail("configuration");
       await userEvent.type(await screen.findByLabelText("API Key"), "x");
-      await userEvent.click(screen.getByRole("button", { name: "Save" }));
+      await userEvent.click(screen.getByRole("button", { name: "Save changes" }));
       await waitFor(() =>
         expect((screen.getByLabelText("API Key") as HTMLInputElement).value).toBe("saved-value"),
       );
     });
 
     it("states why Save is disabled until something changes", async () => {
-      renderWithProviders(<ConnectorDetail connector={CONNECTOR} />);
-      const save = await screen.findByRole("button", { name: "Save" });
+      renderDetail("configuration");
+      const save = await screen.findByRole("button", { name: "Save changes" });
       expect(save).toBeDisabled();
       expect(save).toHaveAccessibleDescription("No changes to save");
       expect(screen.getByText("No changes to save")).toBeVisible();
@@ -266,7 +271,7 @@ describe("ConnectorDetail", () => {
 
     it("asks for the last 10 deliveries", async () => {
       const { listDeliveries } = await import("../connectors");
-      renderWithProviders(<ConnectorDetail connector={CONNECTOR} />);
+      renderDetail("deliveries");
       await screen.findByText(/case_finalised/);
       expect(listDeliveries).toHaveBeenLastCalledWith("misp", 10);
     });
@@ -278,7 +283,7 @@ describe("ConnectorDetail", () => {
         delivery(2, "failed"),
         delivery(3, "skipped"),
       ]);
-      renderWithProviders(<ConnectorDetail connector={CONNECTOR} />);
+      renderDetail("deliveries");
       expect(await screen.findByText("Delivered")).toBeInTheDocument();
       expect(screen.getByText("Failed")).toBeInTheDocument();
       expect(screen.getByText("Skipped")).toBeInTheDocument();
@@ -289,33 +294,39 @@ describe("ConnectorDetail", () => {
       vi.mocked(listDeliveries).mockResolvedValueOnce(
         Array.from({ length: 10 }, (_, i) => delivery(i + 1, "success")),
       );
-      const first = renderWithProviders(<ConnectorDetail connector={CONNECTOR} />);
+      const first = renderDetail("deliveries");
       expect(await screen.findByText("Showing the last 10")).toBeInTheDocument();
       first.unmount();
 
-      renderWithProviders(<ConnectorDetail connector={CONNECTOR} />);
-      await screen.findByText(/case #42/);
+      renderDetail("deliveries");
+      await screen.findByRole("link", { name: "Case #42" });
       expect(screen.queryByText("Showing the last 10")).not.toBeInTheDocument();
     });
   });
 
-  it("has a heading outline without skipped levels: name h3, sections h4", async () => {
+  it("has a heading outline without skipped levels: the connector name is the only h3, groups are legends", async () => {
     renderWithProviders(
       <>
         <h2>Connectors</h2>
-        <ConnectorDetail connector={CONNECTOR} />
+        <ConnectorDetail
+          connector={{
+            ...CONNECTOR,
+            config_schema: [
+              { key: "ollama_url", type: "url", required: false, default: null, help: "" },
+              { key: "ollama_model", type: "str", required: false, default: null, help: "" },
+            ],
+          }}
+        />
       </>,
+      { initialPath: "/settings/connectors?tab=configuration" },
     );
-    await screen.findByLabelText("API Key");
-    await screen.findByText(/case_finalised/);
+    await screen.findByLabelText("Ollama URL");
     const levels = screen.getAllByRole("heading").map((h) => [Number(h.tagName[1]), h.textContent]);
-    expect(screen.queryByLabelText(/delivery status/)).not.toBeInTheDocument();
     expect(levels).toEqual([
       [2, "Connectors"],
       [3, "misp"],
-      [4, "Configuration"],
-      [4, "Recent deliveries"],
     ]);
+    expect(screen.getByRole("group", { name: "Ollama" })).toBeInTheDocument();
   });
 
   describe("unsaved draft", () => {
@@ -329,7 +340,7 @@ describe("ConnectorDetail", () => {
           <Link to="/elsewhere">Leave</Link>
           <ConnectorDetail connector={CONNECTOR} />
         </UnsavedProvider>,
-        { routePath: "*", initialPath: "/settings/connectors" },
+        { routePath: "*", initialPath: "/settings/connectors?tab=configuration" },
       );
     }
 
@@ -347,7 +358,7 @@ describe("ConnectorDetail", () => {
       setup();
       await userEvent.type(await screen.findByLabelText("API Key"), "x");
       await waitFor(() => expect(screen.getByTestId("keys")).toHaveTextContent("connectors"));
-      await userEvent.click(screen.getByRole("button", { name: "Save" }));
+      await userEvent.click(screen.getByRole("button", { name: "Save changes" }));
       await waitFor(() => expect(screen.getByTestId("keys")).toHaveTextContent(/^$/));
     });
 

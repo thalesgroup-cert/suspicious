@@ -34,6 +34,7 @@ export default mergeConfig(
         "@mui/icons-material/CheckCircleOutlined",
         "@mui/icons-material/EmailOutlined",
         "@mui/icons-material/ErrorOutlined",
+        "@mui/icons-material/ExpandMore",
         "@mui/icons-material/ExtensionOutlined",
         "@mui/icons-material/HubOutlined",
         "@mui/icons-material/InfoOutlined",

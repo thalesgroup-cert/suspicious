@@ -3,9 +3,6 @@ import type { ConfigField } from "./components/connectors";
 
 export type FieldGroup = { key: string; label: string; required: ConfigField[]; optional: ConfigField[] };
 
-// Brand casing that title-casing the token cannot guess.
-const BRANDS: Record<string, string> = { openai: "OpenAI", misp: "MISP", thehive: "TheHive", smtp: "SMTP" };
-
 const GENERAL = "general";
 
 const prefixOf = (key: string) => key.split(/[._]/)[0];
@@ -26,7 +23,7 @@ export function groupFields(schema: ConfigField[]): FieldGroup[] {
   };
   for (const f of schema) {
     const token = prefixOf(f.key);
-    if ((counts.get(token) ?? 0) >= 2) add(token, BRANDS[token] ?? fieldLabel({ key: token }), f);
+    if ((counts.get(token) ?? 0) >= 2) add(token, fieldLabel({ key: token }), f);
     else add(GENERAL, "General", f);
   }
   const general = groups.get(GENERAL);

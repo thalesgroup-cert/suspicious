@@ -45,14 +45,14 @@ describe("ConnectorsPanel with an unsaved draft", () => {
   });
 
   async function draftOnMisp() {
-    renderWithProviders(<ConnectorsPanel />);
+    renderWithProviders(<ConnectorsPanel />, { initialPath: "/settings/connectors?tab=configuration" });
     const input = (await screen.findByLabelText("API Key")) as HTMLInputElement;
     await userEvent.type(input, "abc");
     return input;
   }
 
   it("switches straight away when there is no draft", async () => {
-    renderWithProviders(<ConnectorsPanel />);
+    renderWithProviders(<ConnectorsPanel />, { initialPath: "/settings/connectors?tab=configuration" });
     await screen.findByLabelText("API Key");
     await userEvent.click(screen.getByText("thehive"));
     expect(screen.queryByRole("dialog")).not.toBeInTheDocument();
@@ -85,5 +85,32 @@ describe("ConnectorsPanel with an unsaved draft", () => {
     await userEvent.click(within(await screen.findByRole("dialog")).getByRole("button", { name: "Discard" }));
     expect(await screen.findByRole("heading", { level: 3, name: "thehive" })).toBeInTheDocument();
     expect(((await screen.findByLabelText("API Key")) as HTMLInputElement).value).toBe("");
+  });
+
+  it("asks before going back to the list on a phone and keeps the draft when cancelled", async () => {
+    await page.viewport(390, 844);
+    // Phone starts on the list, so pick the connector first.
+    renderWithProviders(<ConnectorsPanel />, { initialPath: "/settings/connectors?tab=configuration" });
+    await userEvent.click(await screen.findByRole("button", { name: /^misp/ }));
+    const input = (await screen.findByLabelText("API Key")) as HTMLInputElement;
+    await userEvent.type(input, "abc");
+    await userEvent.click(screen.getByRole("button", { name: "Back to connector list" }));
+    const dialog = await screen.findByRole("dialog");
+    expect(within(dialog).getByText("Discard unsaved changes to misp?")).toBeInTheDocument();
+    await userEvent.click(within(dialog).getByRole("button", { name: "Cancel" }));
+    await waitFor(() => expect(screen.queryByRole("dialog")).not.toBeInTheDocument());
+    expect(((await screen.findByLabelText("API Key")) as HTMLInputElement).value).toBe("abc");
+    await userEvent.click(screen.getByRole("button", { name: "Back to connector list" }));
+    await userEvent.click(within(await screen.findByRole("dialog")).getByRole("button", { name: "Discard" }));
+    expect(await screen.findByRole("button", { name: /^thehive/ })).toBeInTheDocument();
+  });
+
+  it("goes back to the list on a phone straight away when there is no draft", async () => {
+    await page.viewport(390, 844);
+    renderWithProviders(<ConnectorsPanel />);
+    await userEvent.click(await screen.findByRole("button", { name: /^misp/ }));
+    await userEvent.click(await screen.findByRole("button", { name: "Back to connector list" }));
+    expect(screen.queryByRole("dialog")).not.toBeInTheDocument();
+    expect(await screen.findByRole("button", { name: /^misp/ })).toBeInTheDocument();
   });
 });

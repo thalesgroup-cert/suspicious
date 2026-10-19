@@ -21,6 +21,11 @@ describe("fieldLabel", () => {
     expect(fieldLabel(field("source_ip"))).toBe("Source IP");
   });
 
+  it("uses brand casing for known vendors", () => {
+    expect(fieldLabel(field("openai_api_key"))).toBe("OpenAI API Key");
+    expect(fieldLabel(field("misp_url"))).toBe("MISP URL");
+  });
+
   it("handles several words and a single word", () => {
     expect(fieldLabel(field("max_retry_count"))).toBe("Max Retry Count");
     expect(fieldLabel(field("timeout"))).toBe("Timeout");

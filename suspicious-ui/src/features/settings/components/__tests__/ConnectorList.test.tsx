@@ -104,6 +104,42 @@ describe("ConnectorList", () => {
     expect(screen.getByText("Disabled")).toBeInTheDocument();
   });
 
+  it("shows a logo tile, the name and the cleaned description on every row", () => {
+    renderList({
+      connectors: [
+        { ...CONNECTOR, description: "Push cases. See docs/specs/x.md." },
+        { ...CONNECTOR, name: "thehive" },
+      ],
+    });
+    expect(screen.getAllByTestId("connector-logo")).toHaveLength(2);
+    expect(screen.getByText("Push cases.")).toBeInTheDocument();
+    expect(screen.queryByText(/docs\/specs/)).not.toBeInTheDocument();
+  });
+
+  it("lets Unhealthy win over Connected but not over Disabled", () => {
+    renderList({
+      connectors: [
+        { ...CONNECTOR, last_health_ok: false },
+        { ...CONNECTOR, name: "watcher", status: "disabled", enabled: false, last_health_ok: false },
+      ],
+    });
+    expect(screen.getByText("Unhealthy")).toBeInTheDocument();
+    expect(screen.queryByText("Connected")).not.toBeInTheDocument();
+    expect(screen.getByText("Disabled")).toBeInTheDocument();
+  });
+
+  it("marks only the selected row as current", () => {
+    renderList({ connectors: [CONNECTOR, { ...CONNECTOR, name: "thehive" }], selected: "thehive" });
+    expect(screen.getByRole("button", { name: /thehive/ })).toHaveAttribute("aria-current", "true");
+    expect(screen.getByRole("button", { name: /^misp/ })).not.toHaveAttribute("aria-current");
+  });
+
+  it("does not nest the switch inside the row button", () => {
+    renderList();
+    const row = screen.getByRole("button", { name: /^misp/ });
+    expect(row).not.toContainElement(screen.getByRole("switch", { name: "Enable misp" }));
+  });
+
   it("keeps the Enable <name> toggle names", () => {
     renderList({ connectors: [CONNECTOR, { ...CONNECTOR, name: "thehive" }] });
     expect(screen.getByRole("switch", { name: "Enable misp" })).toBeInTheDocument();

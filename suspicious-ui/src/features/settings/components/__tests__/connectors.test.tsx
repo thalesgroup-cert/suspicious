@@ -1,4 +1,5 @@
 import { screen, waitFor } from "@testing-library/react";
+import userEvent from "@testing-library/user-event";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import { page } from "@vitest/browser/context";
 
@@ -52,7 +53,8 @@ describe("ConnectorsPanel", () => {
     // Version chip lives in ConnectorDetail, which mounts only after the
     // auto-select effect fires — an extra render pass after "misp" is
     // already visible in the list, so this needs an async find, not getBy.
-    expect(await screen.findByText(/1\.0\.0/)).toBeInTheDocument();
+    expect((await screen.findAllByText(/1\.0\.0/)).length).toBeGreaterThan(0);
+    expect(screen.getAllByTestId("connector-logo").length).toBeGreaterThan(0);
     expect(screen.getByRole("switch", { name: "Enable misp" })).toBeChecked();
   });
 
@@ -62,7 +64,9 @@ describe("ConnectorsPanel", () => {
   });
 
   it("auto-selects the first connector on desktop and shows its editable fields", async () => {
-    renderWithProviders(<ConnectorsPanel />);
+    renderWithProviders(<ConnectorsPanel />, { initialPath: "/settings/connectors?tab=configuration" });
+    // The API key is optional in this fixture, so it sits behind the group's disclosure.
+    await userEvent.click(await screen.findByRole("button", { name: "Show optional settings (1)" }));
     const input = (await screen.findByLabelText("API Key")) as HTMLInputElement;
     expect(input).not.toBeDisabled();
     expect(input.type).toBe("password");
@@ -72,7 +76,7 @@ describe("ConnectorsPanel", () => {
     renderWithProviders(<ConnectorsPanel />);
     await waitFor(() => expect(screen.getByText("misp")).toBeInTheDocument());
     // Don't assert "Connected" is absent — on desktop the auto-selected
-    // connector's own ConnectorDetail status Badge legitimately renders
+    // connector's own ConnectorDetail status label legitimately renders
     // that word (this fixture's connector has status: "connected"). The
     // fixture has exactly one connector and it's connected, so "Incomplete"
     // and "Disabled" (which a real KPI tile would render regardless of

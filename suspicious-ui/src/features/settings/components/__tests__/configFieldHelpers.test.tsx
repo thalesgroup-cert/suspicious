@@ -116,4 +116,41 @@ describe("ConfigFieldInput", () => {
     );
     expect(screen.getByRole("switch", { name: "Verify SSL" })).toBeInTheDocument();
   });
+
+  it("says Set for a stored secret and Not set for an empty one", () => {
+    const secret = { key: "api_key", type: "secret", required: false, default: null, help: "" } as const;
+    const { rerender } = render(<ConfigFieldInput field={secret} value="********" onChange={vi.fn()} />);
+    expect(screen.getByText("Set")).toBeInTheDocument();
+    expect((screen.getByLabelText("API Key") as HTMLInputElement).value).toBe("");
+    rerender(<ConfigFieldInput field={secret} value="" onChange={vi.fn()} />);
+    expect(screen.getByText("Not set")).toBeInTheDocument();
+    rerender(<ConfigFieldInput field={secret} value={undefined} onChange={vi.fn()} />);
+    expect(screen.getByText("Not set")).toBeInTheDocument();
+  });
+
+  it("lets the caller say a secret is stored even while the box holds a new value", () => {
+    render(
+      <ConfigFieldInput
+        field={{ key: "api_key", type: "secret", required: false, default: null, help: "" }}
+        value="typed"
+        secretIsSet
+        onChange={vi.fn()}
+      />,
+    );
+    expect(screen.getByText("Set")).toBeInTheDocument();
+  });
+
+  it("shows an error on the field and in its description", () => {
+    render(
+      <ConfigFieldInput
+        field={{ key: "url", type: "str", required: false, default: null, help: "Base URL" }}
+        value=""
+        error="is required"
+        onChange={vi.fn()}
+      />,
+    );
+    const input = screen.getByLabelText("URL");
+    expect(input).toBeInvalid();
+    expect(input).toHaveAccessibleDescription(/is required/);
+  });
 });
