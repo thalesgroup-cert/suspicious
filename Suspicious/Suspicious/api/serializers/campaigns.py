@@ -94,6 +94,8 @@ class CampaignSummaryResponseSerializer(serializers.Serializer):
     mix = CampaignClassificationCountsSerializer()
     unclassified = serializers.IntegerField(min_value=0)
     campaigns = CampaignSummaryCampaignSerializer(many=True)
+    campaigns_total = serializers.IntegerField(min_value=0)
+    max_case_ids = serializers.IntegerField(min_value=1)
     active_campaigns = serializers.IntegerField(min_value=0)
     active_window_hours = serializers.IntegerField()
     largest_campaign = CampaignSummaryLargestSerializer(allow_null=True)

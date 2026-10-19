@@ -30,6 +30,8 @@ from api.services.campaigns import neighbours as nb
 from api.services.campaigns.summary import (
     ACTIVE_WINDOW_HOURS,
     CACHE_TTL_SECONDS,
+    MAX_CAMPAIGNS,
+    MAX_CASE_IDS,
     get_campaign_summary,
 )
 
@@ -305,11 +307,14 @@ class CampaignSummaryView(APIView):
             "- `mix`: four-bucket classification counts for the period, as stored.\n"
             "- `unclassified`: messages in the period whose label is none of the four "
             "(e.g. `NONE`, `UNKNOWN`, empty); `messages = sum(mix) + unclassified`.\n"
-            "- `campaigns`: one entry per group of messages in the period, sorted by "
-            "message count. `first_seen` / `last_seen` are the first and last message of "
-            "the group seen within the period. `case_ids` lists the 20 most recent case "
-            "ids, newest first; `sample_subject` is the subject of the earliest message "
-            "in the period that has one.\n"
+            f"- `campaigns`: one entry per group of messages in the period, sorted by "
+            f"message count (ties: most recently seen, then name) and cut to the {MAX_CAMPAIGNS} "
+            "largest. `campaigns_total` is the number of groups before the cut, and "
+            "`active_campaigns` and `largest_campaign` are computed before it too. "
+            "`first_seen` / `last_seen` are the first and last message of the group seen "
+            "within the period. `case_ids` lists the `max_case_ids` most recent case ids, "
+            "newest first; `sample_subject` is the subject of the earliest message in the "
+            "period that has one.\n"
             f"- `active`: `last_seen` within `active_window_hours` ({ACTIVE_WINDOW_HOURS}) "
             "of now; `active_campaigns` counts them; `largest_campaign` is the first entry.\n\n"
             "**Campaign grouping heuristic**\n"
@@ -340,6 +345,8 @@ class CampaignSummaryView(APIView):
                     "peak_day": {"date": "2026-10-08", "count": 9},
                     "mix": {"SAFE": 18, "UNWANTED": 10, "SUSPICIOUS": 6, "DANGEROUS": 6},
                     "unclassified": 2,
+                    "campaigns_total": 1,
+                    "max_case_ids": MAX_CASE_IDS,
                     "campaigns": [
                         {
                             "name": "sender-domain-a, subject-cluster-1",

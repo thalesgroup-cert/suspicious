@@ -26,6 +26,7 @@ logger = logging.getLogger(__name__)
 
 ACTIVE_WINDOW_HOURS = 48
 MAX_CASE_IDS = 20
+MAX_CAMPAIGNS = 200
 CACHE_TTL_SECONDS = 120
 
 
@@ -52,6 +53,8 @@ def _empty_payload(days, start, end) -> Dict[str, Any]:
         "mix": empty_counts_payload(),
         "unclassified": 0,
         "campaigns": [],
+        "campaigns_total": 0,
+        "max_case_ids": MAX_CASE_IDS,
         "active_campaigns": 0,
         "active_window_hours": ACTIVE_WINDOW_HOURS,
         "largest_campaign": None,
@@ -148,14 +151,18 @@ def get_campaign_summary(days: int) -> Dict[str, Any]:
             "case_ids": case_ids,
             "active": seen[-1][0] >= active_since,
         })
-    campaigns.sort(key=lambda c: (-c["messages"], c["first_seen"], c["name"]))
+    # largest first; ties: the most recently seen, then the name (a stable order for the cut below)
+    campaigns.sort(key=lambda c: (-c["messages"], -c["last_seen"].timestamp(), c["name"]))
 
-    payload["campaigns"] = campaigns
+    # Counted over every campaign; only the list is cut, so one message per distinct source-ref set cannot
+    # grow the cached, re-validated payload without bound.
+    payload["campaigns_total"] = len(campaigns)
     payload["active_campaigns"] = sum(c["active"] for c in campaigns)
     if campaigns:
         payload["largest_campaign"] = {
             "name": campaigns[0]["name"], "messages": campaigns[0]["messages"]
         }
+    payload["campaigns"] = campaigns[:MAX_CAMPAIGNS]
 
     cache.set(key, payload, CACHE_TTL_SECONDS)
     return payload

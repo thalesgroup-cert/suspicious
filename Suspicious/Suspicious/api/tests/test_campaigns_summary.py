@@ -6,7 +6,7 @@ from django.contrib.auth.models import Group, User
 from django.core.cache import cache
 from rest_framework.test import APITestCase
 
-from api.services.campaigns.summary import ACTIVE_WINDOW_HOURS, get_campaign_summary
+from api.services.campaigns.summary import ACTIVE_WINDOW_HOURS, MAX_CAMPAIGNS, MAX_CASE_IDS, get_campaign_summary
 from api.tests.test_campaigns_service import FakeCollection
 
 NOW = datetime(2026, 10, 13, 12, 0, tzinfo=timezone.utc)
@@ -95,6 +95,28 @@ class SummaryServiceTests(APITestCase):
         self.assertEqual(s["active_campaigns"], 1)
         self.assertEqual(s["largest_campaign"], {"name": "a.example, b.example", "messages": 3})
 
+    def test_payload_is_bounded_but_the_counts_cover_every_campaign(self):
+        # 200 stale campaigns of 2 messages, then 50 recent ones of 1: the cut drops all of the active ones.
+        rows = []
+        for g in range(MAX_CAMPAIGNS):
+            rows += [msg(f"{g}a", "2026-10-08T10:00:00Z", refs=[f"stale-{g:03d}"]), msg(f"{g}b", "2026-10-08T11:00:00Z", refs=[f"stale-{g:03d}"])]
+        rows += [msg(f"r{g}", "2026-10-13T11:00:00Z", refs=[f"recent-{g:03d}"]) for g in range(50)]
+        s = self.summary(rows)
+        self.assertEqual(len(s["campaigns"]), MAX_CAMPAIGNS)
+        self.assertEqual(s["campaigns_total"], MAX_CAMPAIGNS + 50)
+        self.assertEqual(s["active_campaigns"], 50)
+        self.assertEqual(s["largest_campaign"], {"name": "stale-000", "messages": 2})
+        self.assertTrue(all(c["messages"] == 2 for c in s["campaigns"]))
+        self.assertEqual(s["max_case_ids"], MAX_CASE_IDS)
+
+    def test_ties_on_messages_go_to_the_latest_then_the_name(self):
+        rows = [
+            msg(1, "2026-10-08T10:00:00Z", refs=["b"]),
+            msg(2, "2026-10-08T10:00:00Z", refs=["a"]),
+            msg(3, "2026-10-09T10:00:00Z", refs=["z"]),
+        ]
+        self.assertEqual([c["name"] for c in self.summary(rows)["campaigns"]], ["z", "a", "b"])
+
     def test_case_ids_keep_most_recent_20(self):
         rows = [
             msg(i, f"2026-10-{8 + i // 24:02d}T{i % 24:02d}:00:00Z", refs=["x"], case=str(100 + i))
@@ -157,6 +179,7 @@ class SummaryEndpointTests(APITestCase):
         self.assertEqual(resp.status_code, 200)
         self.assertEqual(resp.data["days"], 30)
         self.assertEqual(resp.data["campaigns"], [])
+        self.assertEqual((resp.data["campaigns_total"], resp.data["max_case_ids"]), (0, 20))
         self.assertIsNone(resp.data["peak_day"])
 
     def test_cached_per_days(self):

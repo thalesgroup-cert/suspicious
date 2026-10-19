@@ -56,6 +56,9 @@ def iter_collection_pages(
     include: Optional[List[str]] = None,
     page_size: int = CHROMA_PAGE_SIZE,
 ) -> Iterator[Dict[str, Any]]:
+    """Every page of the collection. A failed page read raises: ending the scan early would hand the caller a
+    prefix of the store that looks complete (and the summary and volume views cache their answers).
+    Every caller has an error path that returns an empty, uncached payload."""
     offset = 0
 
     while True:
@@ -79,13 +82,9 @@ def iter_collection_pages(
             if isinstance(page, dict):
                 yield page
             return
-        except Exception as exc:
-            logger.error("Chroma paged read failed at offset %s: %s", offset, exc, exc_info=True)
-            return
 
         if not isinstance(page, dict):
-            logger.warning("Unexpected Chroma page type at offset %s: %r", offset, type(page))
-            return
+            raise TypeError(f"Unexpected Chroma page type at offset {offset}: {type(page).__name__}")
 
         ids = coerce_list(page.get("ids"))
         if not ids:

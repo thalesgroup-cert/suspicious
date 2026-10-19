@@ -83,7 +83,7 @@ A campaign here = the set of messages sharing identical `sourceRefs` (a heuristi
 
 - `messages` (total in store with a date in the period) and `dangerous_share` (dangerous / messages) with the previous period's values.
 - `peak_day {date, count}`.
-- `campaigns[]`: per source-ref group inside the period: `name`, `first_seen`, `last_seen`, `messages`, `dangerous`, `dangerous_share`, `sample_subject`, `case_ids` (up to 20), `active` (last seen within 48 h of now: a stated constant). `active_campaigns` and `largest_campaign` are derived from it.
+- `campaigns[]`: per source-ref group inside the period: `name`, `first_seen`, `last_seen`, `messages`, `dangerous`, `dangerous_share`, `sample_subject`, `case_ids` (up to `max_case_ids`, 20), `active` (last seen within 48 h of now: a stated constant). The list is the 200 largest (ties: most recently seen, then name); `campaigns_total` is the count before that cut, and `active_campaigns` and `largest_campaign` are computed before it. A Chroma page read that fails part-way makes the whole scan fail (empty, uncached payload) instead of returning a prefix as complete.
 - `mix`: counts per classification (four buckets) for the period.
 - Existing endpoints stay; `mail-volume` gains `days` (default 15, max 90) so the chart follows the selector; PCA points gain an additive `date` (UTC date or null).
 
