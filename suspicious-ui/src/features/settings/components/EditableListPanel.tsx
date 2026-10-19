@@ -232,6 +232,10 @@ function BulkToolbar({
 }) {
   const allSelected = selected > 0 && selected === total;
   const someSelected = selected > 0 && !allSelected;
+  // The bar is a translucent hover tint, so the theme's accent and error colours lose contrast on it.
+  const theme = useTheme();
+  const bar = flatten(theme.palette.action.hover, theme.palette.background.paper);
+  const onBar = (c: string) => ensureContrast(flatten(c, bar), bar, 4.5);
 
   return (
     <Stack direction="row" spacing={1} sx={{ pl: 0.5, pr: 1, py: 0.5, alignItems: "center", bgcolor: "action.hover" }}>
@@ -249,7 +253,7 @@ function BulkToolbar({
 
       {selected > 0 ? (
         <>
-          <Button size="small" onClick={onClearSelection} sx={{ textTransform: "none", fontWeight: 600 }}>
+          <Button size="small" onClick={onClearSelection} sx={{ textTransform: "none", fontWeight: 600, color: onBar(theme.palette.primary.main) }}>
             Clear
           </Button>
           <Button
@@ -259,7 +263,7 @@ function BulkToolbar({
             startIcon={deleting ? <CircularProgress size={12} color="error" /> : <DeleteOutlined />}
             disabled={deleting}
             onClick={onDeleteSelected}
-            sx={{ textTransform: "none", fontWeight: 600, borderRadius: 2 }}
+            sx={{ textTransform: "none", fontWeight: 600, borderRadius: 2, color: onBar(theme.palette.error.main) }}
           >
             Delete {selected}
           </Button>

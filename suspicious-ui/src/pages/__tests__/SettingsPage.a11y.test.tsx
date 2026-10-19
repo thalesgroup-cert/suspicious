@@ -3,6 +3,8 @@ import { screen, waitFor, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { page } from "vitest/browser";
 import { renderWithProviders } from "@/test/utils";
+import { themes } from "@/styles/themes";
+import { composite, contrastRatio, flatten } from "@/shared/lib/contrast";
 import { stubMatchMedia } from "@/test/matchMedia";
 import { fixtureMeSuperuser, fixtureAnalyzers, fixtureFeederStatus } from "@/test/fixtures";
 
@@ -287,6 +289,20 @@ describe("SettingsPage: structure for assistive technology", () => {
   it("names the add field of a list", async () => {
     await open("campaign_domains_allow");
     expect(screen.getByRole("textbox", { name: /add/i })).toBeInTheDocument();
+  });
+
+  // The Refresh button sits straight on the shell, whose glow is up to 7% primary over the page colour.
+  it.each(Object.keys(themes) as (keyof typeof themes)[])("keeps Refresh readable on the shell in the %s theme", async (theme) => {
+    localStorage.setItem("suspicious.theme", theme);
+    try {
+      const { palette } = themes[theme];
+      await open("domains_allow");
+      const shell = composite(flatten(palette.primary.main, palette.background.default), 0.07, palette.background.default);
+      const color = getComputedStyle(screen.getByRole("button", { name: "Refresh" })).color;
+      expect(contrastRatio(color, shell)).toBeGreaterThanOrEqual(4.5);
+    } finally {
+      localStorage.removeItem("suspicious.theme");
+    }
   });
 
   it("turns every CSS transition off under prefers-reduced-motion", async () => {

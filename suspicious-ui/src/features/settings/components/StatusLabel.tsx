@@ -8,7 +8,7 @@ import { Box } from "@mui/material";
 import type { SvgIconProps } from "@mui/material";
 import { useTheme } from "@mui/material/styles";
 
-import { ensureContrast, flatten } from "@/shared/lib/contrast";
+import { composite, ensureContrast, flatten } from "@/shared/lib/contrast";
 import { useResultColors } from "@/styles/colorStore";
 import { CONNECTOR_STATUS_LABEL } from "../labels";
 import type { Connector } from "./connectors";
@@ -23,28 +23,36 @@ const ICONS: Record<StatusTone, ComponentType<SvgIconProps>> = {
   info: InfoOutlined,
 };
 
-/** Icon + word, never colour alone. Palette colours are pushed to 4.5:1 (text) and 3:1 (icon) on the page paper. */
+/** Icon + word, never colour alone. Palette colours are pushed to 4.5:1 (text) and 3:1 (icon) on every surface the label sits on. */
 export function StatusLabel({ tone, label, size = "medium" }: { tone: StatusTone; label: string; size?: "small" | "medium" }) {
   const theme = useTheme();
   const result = useResultColors();
   const paper = theme.palette.background.paper;
+  const primary = flatten(theme.palette.primary.main, paper);
+  // Paper, a hovered selected connector row (primary tint, AppLayout/ConnectorList) and the bare shell (AppLayout's primary glow over the page colour).
+  const surfaces = [
+    paper,
+    composite(primary, theme.palette.mode === "dark" ? 0.2 : 0.12, paper),
+    composite(primary, 0.07, theme.palette.background.default),
+  ];
+  const readable = (color: string, min: number) => surfaces.reduce((out, bg) => ensureContrast(out, bg, min), color);
   const base = {
     ok: result.safe.main,
     warning: result.suspicious.main,
     danger: result.dangerous.main,
     // text.secondary and primary can be translucent or non-hex; flattening gives the opaque colour the user sees.
     neutral: flatten(theme.palette.text.secondary, paper),
-    info: flatten(theme.palette.primary.main, paper),
+    info: primary,
   }[tone];
   const Icon = ICONS[tone];
   const small = size === "small";
   return (
     <Box sx={{ display: "inline-flex", alignItems: "center", gap: 0.5, minWidth: 0 }}>
-      <Icon data-tone={tone} sx={{ fontSize: small ? 16 : 20, color: ensureContrast(base, paper, 3), flexShrink: 0 }} />
+      <Icon data-tone={tone} sx={{ fontSize: small ? 16 : 20, color: readable(base, 3), flexShrink: 0 }} />
       <Box
         component="span"
         sx={{
-          color: ensureContrast(base, paper, 4.5),
+          color: readable(base, 4.5),
           typography: small ? "caption" : "body2",
         }}
       >

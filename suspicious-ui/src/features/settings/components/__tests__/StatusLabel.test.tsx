@@ -3,7 +3,7 @@ import { screen } from "@testing-library/react";
 
 import { renderWithProviders } from "@/test/utils";
 import { themes } from "@/styles/themes";
-import { contrastRatio } from "@/shared/lib/contrast";
+import { composite, contrastRatio, flatten } from "@/shared/lib/contrast";
 import { StatusLabel, connectorStatus } from "../StatusLabel";
 import type { Connector } from "../connectors";
 
@@ -36,6 +36,30 @@ describe("StatusLabel", () => {
       const icon = word.parentElement!.querySelector("svg")!;
       expect(contrastRatio(getComputedStyle(word).color, paper), `${t} text`).toBeGreaterThanOrEqual(4.5);
       expect(contrastRatio(getComputedStyle(icon).color, paper), `${t} icon`).toBeGreaterThanOrEqual(3);
+    }
+  });
+
+  // The label also sits on a hovered selected connector row (primary tint 12% light, 20% dark) and straight on the shell (primary glow up to 7% over the page colour).
+  it.each(Object.keys(themes) as (keyof typeof themes)[])("stays readable on a selected row and on the shell in the %s theme", (theme) => {
+    localStorage.setItem("suspicious.theme", theme);
+    const { palette } = themes[theme];
+    const primary = flatten(palette.primary.main, palette.background.paper);
+    const backgrounds = {
+      row: composite(primary, palette.mode === "dark" ? 0.2 : 0.12, palette.background.paper),
+      shell: composite(primary, 0.07, palette.background.default),
+    };
+    renderWithProviders(
+      <>
+        {TONES.map((t) => <StatusLabel key={t} tone={t} label={`w-${t}`} />)}
+      </>,
+    );
+    for (const [where, bg] of Object.entries(backgrounds)) {
+      for (const t of TONES) {
+        const word = screen.getByText(`w-${t}`);
+        const icon = word.parentElement!.querySelector("svg")!;
+        expect(contrastRatio(getComputedStyle(word).color, bg), `${theme} ${where} ${t} text`).toBeGreaterThanOrEqual(4.5);
+        expect(contrastRatio(getComputedStyle(icon).color, bg), `${theme} ${where} ${t} icon`).toBeGreaterThanOrEqual(3);
+      }
     }
   });
 
