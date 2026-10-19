@@ -36,6 +36,19 @@ export type SectionMeta = {
   badge?: number;
 };
 
+/**
+ * One sentence per list on what it does, taken from the backend: allow_list.py and case_handler.py
+ * (allowlists skip analysis), artifacts.py (denylist marks a domain dangerous), campaigns.py (campaign
+ * domains skip campaign detection). Absent key means the repo does not document the effect.
+ */
+const LIST_PURPOSE: Partial<Record<SectionKey, string>> = {
+  domains_allow: "URLs on these domains are treated as safe and skip analysis.",
+  domains_deny: "A domain on this list is marked dangerous when it appears in a submitted email.",
+  campaign_domains_allow: "Mails sent from these domains are skipped by phishing campaign detection.",
+  emails_files_allow: "Files with these hashes are treated as safe and skip analysis.",
+  filetypes_allow: "Files of these types are treated as safe and skip analysis.",
+};
+
 export function SectionContent({ section }: { section: SectionMeta }) {
   switch (section.kind) {
     case "domain_pair":
@@ -43,6 +56,7 @@ export function SectionContent({ section }: { section: SectionMeta }) {
         <DomainPairPanel
           editableSection={section.key as "domains_allow" | "domains_deny"}
           title={section.title}
+          purpose={LIST_PURPOSE[section.key]}
         />
       );
     case "list":
@@ -51,6 +65,7 @@ export function SectionContent({ section }: { section: SectionMeta }) {
           section={section.key as EditableListSection}
           title={section.title}
           placeholder="Paste values, one per line or comma-separated…"
+          purpose={LIST_PURPOSE[section.key]}
         />
       );
     case "toggle":

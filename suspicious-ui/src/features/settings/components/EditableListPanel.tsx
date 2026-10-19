@@ -4,23 +4,19 @@ import {
   Box,
   Button,
   Chip,
+  Checkbox,
   CircularProgress,
-  Collapse,
   IconButton,
   InputAdornment,
   Stack,
   TextField,
-  Tooltip,
   Typography,
 } from "@mui/material";
 import {
   AddOutlined,
-  CheckBoxOutlineBlank,
-  CheckBoxOutlined,
   ContentCopyOutlined,
   DeleteOutlined,
   FileUploadOutlined,
-  IndeterminateCheckBoxOutlined,
   SearchOutlined,
 } from "@mui/icons-material";
 import { alpha, useTheme } from "@mui/material/styles";
@@ -50,7 +46,6 @@ function ListItemRow({
   onDelete,
   deleting,
   deleteDisabled,
-  selectionMode,
 }: {
   item: ListItem;
   selected: boolean;
@@ -59,95 +54,75 @@ function ListItemRow({
   deleting: boolean;
   /** True while any removal or bulk run is in flight, so they never overlap. */
   deleteDisabled: boolean;
-  selectionMode: boolean;
 }) {
   const theme = useTheme();
-  const isDark = theme.palette.mode === "dark";
   const { enqueueSnackbar } = useSnackbar();
 
   return (
-    <InnerCard
-      hover
+    <Box
+      component="li"
       sx={{
-        px: 1.5,
-        py: 1,
         display: "flex",
         alignItems: "center",
-        gap: 1.25,
-        borderColor: selected
-          ? alpha(theme.palette.primary.main, isDark ? 0.45 : 0.5)
-          : undefined,
-        background: selected
-          ? alpha(theme.palette.primary.main, isDark ? 0.08 : 0.05)
-          : undefined,
-        transition: "all .14s ease",
+        gap: 0.5,
+        pl: 0.5,
+        pr: 1,
+        py: 0.25,
+        borderTop: 1,
+        borderColor: "divider",
+        // The checked box carries the state; the tint only supports it.
+        bgcolor: selected ? alpha(theme.palette.primary.main, 0.08) : undefined,
+        "&:hover": { bgcolor: selected ? undefined : "action.hover" },
       }}
     >
-      <IconButton
+      <Checkbox
         size="small"
-        onClick={onToggleSelect}
-        sx={{ opacity: selectionMode || selected ? 1 : 0, transition: "opacity .14s", p: 0.25 }}
-        aria-label={selected ? "Deselect" : "Select"}
-      >
-        {selected
-          ? <CheckBoxOutlined fontSize="small" color="primary" />
-          : <CheckBoxOutlineBlank fontSize="small" />}
-      </IconButton>
+        checked={selected}
+        onChange={onToggleSelect}
+        slotProps={{ input: { "aria-label": `Select ${item.value}` } }}
+      />
 
-      <Box sx={{ flex: 1, minWidth: 0 }}>
+      <Box sx={{ flex: 1, minWidth: 0, py: 0.5 }}>
         <Typography
-          sx={{
-            fontWeight: 700,
-            overflow: "hidden",
-            textOverflow: "ellipsis",
-            whiteSpace: "nowrap",
-            fontSize: 13.5,
-          }}
+          component="span"
+          sx={{ display: "block", fontFamily: "monospace", fontWeight: 600, fontSize: 13.5, overflowWrap: "anywhere" }}
         >
           {item.value}
         </Typography>
         {item.created_at ? (
-          <Typography variant="caption" color="text.disabled" sx={{ fontSize: 11 }}>
-            Added {new Date(item.created_at).toLocaleString()}
+          <Typography variant="caption" color="text.secondary">
+            Added {new Date(item.created_at).toLocaleDateString()}
           </Typography>
         ) : null}
       </Box>
 
-      <Stack direction="row" spacing={0.5}>
-        <Tooltip title="Copy value">
-          <IconButton
-            size="small"
-            onClick={async () => {
-              try {
-                await navigator.clipboard.writeText(item.value);
-                enqueueSnackbar("Copied.", { variant: "info" });
-              } catch { /* ignore */ }
-            }}
-            sx={{ opacity: 0.55, "&:hover": { opacity: 1 } }}
-          >
-            <ContentCopyOutlined sx={{ fontSize: 14 }} />
-          </IconButton>
-        </Tooltip>
+      <IconButton
+        size="small"
+        title="Copy value"
+        aria-label={`Copy ${item.value}`}
+        onClick={async () => {
+          try {
+            await navigator.clipboard.writeText(item.value);
+            enqueueSnackbar("Copied.", { variant: "info" });
+          } catch { /* ignore */ }
+        }}
+      >
+        <ContentCopyOutlined sx={{ fontSize: 16 }} />
+      </IconButton>
 
-        <Tooltip title="Delete">
-          <IconButton
-            size="small"
-            aria-label="Delete"
-            onClick={onDelete}
-            disabled={deleting || deleteDisabled}
-            sx={{
-              color: theme.palette.error.main,
-              opacity: 0.55,
-              "&:hover": { opacity: 1, background: alpha(theme.palette.error.main, 0.1) },
-            }}
-          >
-            {deleting
-              ? <CircularProgress size={13} color="error" />
-              : <DeleteOutlined sx={{ fontSize: 14 }} />}
-          </IconButton>
-        </Tooltip>
-      </Stack>
-    </InnerCard>
+      <IconButton
+        size="small"
+        title="Delete"
+        aria-label={`Delete ${item.value}`}
+        onClick={onDelete}
+        disabled={deleting || deleteDisabled}
+        sx={{ color: "error.main", "&:hover": { background: alpha(theme.palette.error.main, 0.1) } }}
+      >
+        {deleting
+          ? <CircularProgress size={16} color="error" />
+          : <DeleteOutlined sx={{ fontSize: 16 }} />}
+      </IconButton>
+    </Box>
   );
 }
 
@@ -236,39 +211,26 @@ function BulkToolbar({
   onDeleteSelected: () => void;
   deleting: boolean;
 }) {
-  const theme = useTheme();
   const allSelected = selected > 0 && selected === total;
   const someSelected = selected > 0 && !allSelected;
 
   return (
-    <Stack
-      direction="row"
-      spacing={1}
-      sx={{ px: 1.25,
-        py: 0.75,
-        borderRadius: 2,
-        background: alpha(theme.palette.primary.main, 0.07),
-        border: `1px solid ${alpha(theme.palette.primary.main, 0.2)}`, alignItems: "center" }}
-    >
-      <IconButton size="small" onClick={allSelected ? onClearSelection : onSelectAll} sx={{ p: 0.25 }}>
-        {allSelected
-          ? <CheckBoxOutlined fontSize="small" color="primary" />
-          : someSelected
-          ? <IndeterminateCheckBoxOutlined fontSize="small" color="primary" />
-          : <CheckBoxOutlineBlank fontSize="small" />}
-      </IconButton>
+    <Stack direction="row" spacing={1} sx={{ pl: 0.5, pr: 1, py: 0.5, alignItems: "center", bgcolor: "action.hover" }}>
+      <Checkbox
+        size="small"
+        checked={allSelected}
+        indeterminate={someSelected}
+        onChange={allSelected ? onClearSelection : onSelectAll}
+        slotProps={{ input: { "aria-label": allSelected ? "Deselect all" : "Select all" } }}
+      />
 
-      <Typography variant="body2" sx={{ flex: 1, fontWeight: 700 }}>
+      <Typography variant="body2" sx={{ flex: 1, fontWeight: 600 }}>
         {selected > 0 ? `${selected} selected` : `${total} item${total !== 1 ? "s" : ""}`}
       </Typography>
 
       {selected > 0 ? (
         <>
-          <Button
-            size="small"
-            onClick={onClearSelection}
-            sx={{ textTransform: "none", fontWeight: 700 }}
-          >
+          <Button size="small" onClick={onClearSelection} sx={{ textTransform: "none", fontWeight: 600 }}>
             Clear
           </Button>
           <Button
@@ -278,7 +240,7 @@ function BulkToolbar({
             startIcon={deleting ? <CircularProgress size={12} color="error" /> : <DeleteOutlined />}
             disabled={deleting}
             onClick={onDeleteSelected}
-            sx={{ textTransform: "none", fontWeight: 700, borderRadius: 2 }}
+            sx={{ textTransform: "none", fontWeight: 600, borderRadius: 2 }}
           >
             Delete {selected}
           </Button>
@@ -292,22 +254,22 @@ export function EditableListPanel({
   section,
   title,
   placeholder,
+  purpose,
   fileAccept = ".txt,.csv,.json",
 }: {
   section: EditableListSection;
   /** Names the list in the bulk-delete confirmation. */
   title: string;
   placeholder: string;
+  /** One documented sentence on what the list does; omitted when the repo does not say. */
+  purpose?: string;
   fileAccept?: string;
 }) {
   const qc = useQueryClient();
   const { enqueueSnackbar, closeSnackbar } = useSnackbar();
-  const theme = useTheme();
-  const isDark = theme.palette.mode === "dark";
 
   const [filter, setFilter] = React.useState("");
   const [selectedIds, setSelectedIds] = React.useState<Set<string>>(new Set());
-  const [showFilter, setShowFilter] = React.useState(false);
   const [deletingId, setDeletingId] = React.useState<string | null>(null);
   // Count captured when the dialog opens so its text does not change while it fades out.
   const [confirmBulk, setConfirmBulk] = React.useState<number | null>(null);
@@ -459,24 +421,42 @@ export function EditableListPanel({
     await refresh();
   }
 
-  const selectionMode = selectedIds.size > 0;
-
   return (
     <Stack spacing={2}>
+      {purpose ? <Typography variant="body2" color="text.secondary">{purpose}</Typography> : null}
+
       <AddBar
         placeholder={placeholder}
         onAdd={(values) => addMutation.mutate(values)}
         loading={addMutation.isPending}
       />
 
-      <Stack direction="row" spacing={1} sx={{ alignItems: "center", flexWrap: "wrap" }} >
+      <Stack direction="row" spacing={1} sx={{ alignItems: "center", flexWrap: "wrap", rowGap: 1 }}>
+        <TextField
+          size="small"
+          placeholder="Filter items…"
+          value={filter}
+          onChange={(e) => setFilter(e.target.value)}
+          sx={{ flex: "1 1 220px" }}
+          slotProps={{
+            htmlInput: { "aria-label": `Search ${title}` },
+            input: {
+              startAdornment: (
+                <InputAdornment position="start">
+                  <SearchOutlined fontSize="small" />
+                </InputAdornment>
+              ),
+            },
+          }}
+        />
+
         <Button
           size="small"
           variant="outlined"
           component="label"
           startIcon={importMutation.isPending ? <CircularProgress size={13} /> : <FileUploadOutlined />}
           disabled={importMutation.isPending}
-          sx={{ borderRadius: 2.5, textTransform: "none", fontWeight: 700 }}
+          sx={{ borderRadius: 2.5, textTransform: "none", fontWeight: 600 }}
         >
           Import file
           <input
@@ -491,47 +471,13 @@ export function EditableListPanel({
           />
         </Button>
 
-        <Tooltip title={showFilter ? "Hide search" : "Search items"}>
-          <IconButton
-            size="small"
-            onClick={() => setShowFilter((v) => !v)}
-            sx={{
-              border: `1px solid ${alpha(theme.palette.divider, isDark ? 0.22 : 0.6)}`,
-              borderRadius: 2,
-              color: showFilter ? theme.palette.primary.main : undefined,
-            }}
-          >
-            <SearchOutlined fontSize="small" />
-          </IconButton>
-        </Tooltip>
-
-        <Chip
-          size="small"
-          label={`${items.length} total`}
-          variant="outlined"
-          sx={{ ml: "auto" }}
-        />
+        <Chip size="small" label={`${items.length} total`} variant="outlined" />
       </Stack>
 
-      <Collapse in={showFilter}>
-        <TextField
-          size="small"
-          placeholder="Filter items…"
-          value={filter}
-          onChange={(e) => setFilter(e.target.value)}
-          autoFocus
-          fullWidth
-          slotProps={{
-            input: {
-              startAdornment: (
-                <InputAdornment position="start">
-                  <SearchOutlined fontSize="small" />
-                </InputAdornment>
-              ),
-            },
-          }}
-        />
-      </Collapse>
+      {/* Mounted before any result exists so screen readers announce the text when it lands. */}
+      <Typography role="status" variant="body2" color="text.secondary" sx={{ "&:empty": { display: "none" } }}>
+        {bulkStatus}
+      </Typography>
 
       {listQuery.isLoading ? (
         <Box sx={{ py: 4, display: "grid", placeItems: "center" }}>
@@ -539,40 +485,26 @@ export function EditableListPanel({
         </Box>
       ) : listQuery.isError ? (
         <Alert severity="error">Failed to load list.</Alert>
+      ) : filtered.length === 0 ? (
+        <EmptyList message={filter ? `No items matching "${filter}"` : "No entries yet. Paste values above or import a file."} />
       ) : (
-        <Stack spacing={1}>
-          {filtered.length > 0 ? (
-            <BulkToolbar
-              total={filtered.length}
-              selected={selectedCount}
-              onSelectAll={handleSelectAll}
-              onClearSelection={handleClear}
-              onDeleteSelected={() => setConfirmBulk(selectedCount)}
-              deleting={removeMutation.isPending || bulkRunning}
-            />
-          ) : null}
-
-          {/* Mounted before any result exists so screen readers announce the text when it lands. */}
-          <Typography role="status" variant="body2" color="text.secondary">
-            {bulkStatus}
-          </Typography>
-
-          {filtered.length === 0 ? (
-            <EmptyList message={filter ? `No items matching "${filter}"` : "No items yet."} />
-          ) : (
-            <Stack
-              spacing={0.6}
-              sx={{
-                maxHeight: 400,
-                overflowY: "auto",
-                pr: 0.5,
-                "&::-webkit-scrollbar": { width: 4 },
-                "&::-webkit-scrollbar-thumb": {
-                  borderRadius: 999,
-                  background: alpha(theme.palette.divider, 0.5),
-                },
-              }}
-            >
+        <Box sx={{ border: 1, borderColor: "divider", borderRadius: 2, overflow: "hidden" }}>
+          <BulkToolbar
+            total={filtered.length}
+            selected={selectedCount}
+            onSelectAll={handleSelectAll}
+            onClearSelection={handleClear}
+            onDeleteSelected={() => setConfirmBulk(selectedCount)}
+            deleting={removeMutation.isPending || bulkRunning}
+          />
+          {/* Focusable so keyboard users can scroll a long list. */}
+          <Box
+            role="region"
+            tabIndex={0}
+            aria-label={`${title} entries`}
+            sx={{ maxHeight: 440, overflowY: "auto" }}
+          >
+            <Box component="ul" sx={{ listStyle: "none", m: 0, p: 0 }}>
               {filtered.map((it) => (
                 <ListItemRow
                   key={it.id}
@@ -580,7 +512,7 @@ export function EditableListPanel({
                   selected={selectedIds.has(it.id)}
                   onToggleSelect={() => { setBulkStatus(null); setSelectedIds((prev) => {
                     const next = new Set(prev);
-                    next.has(it.id) ? next.delete(it.id) : next.add(it.id);
+                    if (next.has(it.id)) next.delete(it.id); else next.add(it.id);
                     return next;
                   }); }}
                   onDelete={() => {
@@ -589,12 +521,11 @@ export function EditableListPanel({
                   }}
                   deleting={deletingId === it.id && (removeMutation.isPending || bulkRunning)}
                   deleteDisabled={bulkRunning || removeMutation.isPending}
-                  selectionMode={selectionMode}
                 />
               ))}
-            </Stack>
-          )}
-        </Stack>
+            </Box>
+          </Box>
+        </Box>
       )}
 
       <ConfirmDialog

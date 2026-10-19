@@ -68,7 +68,8 @@ export function EmptyList({ message }: { message: string }) {
       >
         <SearchOutlined />
       </Box>
-      <Typography variant="body2" color="text.disabled" sx={{ fontWeight: 600 }}>
+      {/* text.secondary: the message tells the user how to add entries, so it must meet text contrast. */}
+      <Typography variant="body2" color="text.secondary" sx={{ fontWeight: 600, textAlign: "center" }}>
         {message}
       </Typography>
     </Stack>

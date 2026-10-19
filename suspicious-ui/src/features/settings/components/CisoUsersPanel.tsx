@@ -4,22 +4,107 @@ import {
   Box,
   Chip,
   CircularProgress,
-  Divider,
   InputAdornment,
   Stack,
+  Table,
+  TableBody,
+  TableCell,
+  TableHead,
+  TableRow,
   TextField,
   Typography,
+  useMediaQuery,
 } from "@mui/material";
+import { useTheme } from "@mui/material/styles";
 import { SearchOutlined, ShieldOutlined } from "@mui/icons-material";
-import { alpha, useTheme } from "@mui/material/styles";
 import { useQuery } from "@tanstack/react-query";
 
 import { listItems, type CisoUser } from "@/features/settings/api";
-import { EmptyList, InnerCard } from "@/features/settings/components/cards";
+import { EmptyList } from "@/features/settings/components/cards";
+
+const hidden = {
+  position: "absolute", width: "1px", height: "1px", overflow: "hidden", clip: "rect(0 0 0 0)", whiteSpace: "nowrap",
+} as const;
+
+function Scope({ scope }: { scope?: string }) {
+  // Text in both branches: the shield chip is decoration, "No scope" is spelled out.
+  return scope
+    ? <Chip size="small" icon={<ShieldOutlined />} label={scope} variant="outlined" />
+    : <Typography variant="body2" color="text.secondary">No scope</Typography>;
+}
+
+const NotSet = () => <Typography component="span" variant="body2" color="text.secondary">Not set</Typography>;
+
+function Identity({ user }: { user: CisoUser }) {
+  return (
+    <>
+      <Typography variant="body2" sx={{ fontWeight: 600 }}>{user.username}</Typography>
+      <Typography variant="caption" color="text.secondary" sx={{ display: "block", overflowWrap: "anywhere" }}>
+        {user.email || "No email"}
+      </Typography>
+    </>
+  );
+}
+
+function UserTable({ users }: { users: CisoUser[] }) {
+  const columns = ["Function", "Scope", "GBU", "Country", "Region"];
+  return (
+    <Box sx={{ border: 1, borderColor: "divider", borderRadius: 2, overflowX: "auto" }}>
+      <Table size="small">
+        <Box component="caption" sx={hidden}>CISO users</Box>
+        <TableHead>
+          <TableRow>
+            <TableCell scope="col">User</TableCell>
+            {columns.map((c) => <TableCell key={c} scope="col">{c}</TableCell>)}
+          </TableRow>
+        </TableHead>
+        <TableBody>
+          {users.map((u) => (
+            <TableRow key={u.id} hover>
+              <TableCell sx={{ minWidth: 200 }}><Identity user={u} /></TableCell>
+              <TableCell>{u.function || <NotSet />}</TableCell>
+              <TableCell><Scope scope={u.scope} /></TableCell>
+              <TableCell>{u.gbu || <NotSet />}</TableCell>
+              <TableCell>{u.country || <NotSet />}</TableCell>
+              <TableCell>{u.region || <NotSet />}</TableCell>
+            </TableRow>
+          ))}
+        </TableBody>
+      </Table>
+    </Box>
+  );
+}
+
+function UserCards({ users }: { users: CisoUser[] }) {
+  return (
+    <Box component="ul" aria-label="CISO users" sx={{ listStyle: "none", m: 0, p: 0, display: "grid", gap: 1 }}>
+      {users.map((u) => (
+        <Box
+          component="li"
+          key={u.id}
+          sx={{ border: 1, borderColor: "divider", borderRadius: 2, p: 1.5, display: "grid", gap: 1 }}
+        >
+          <Stack direction="row" spacing={1} sx={{ justifyContent: "space-between", alignItems: "flex-start" }}>
+            <Box sx={{ minWidth: 0 }}><Identity user={u} /></Box>
+            <Box sx={{ flexShrink: 0 }}><Scope scope={u.scope} /></Box>
+          </Stack>
+          <Box component="dl" sx={{ m: 0, display: "grid", gridTemplateColumns: "repeat(2, minmax(0, 1fr))", gap: 1 }}>
+            {([["Function", u.function], ["GBU", u.gbu], ["Country", u.country], ["Region", u.region]] as const).map(([k, v]) => (
+              <Box key={k}>
+                <Typography component="dt" variant="caption" color="text.secondary">{k}</Typography>
+                <Typography component="dd" variant="body2" sx={{ m: 0 }}>{v || <NotSet />}</Typography>
+              </Box>
+            ))}
+          </Box>
+        </Box>
+      ))}
+    </Box>
+  );
+}
 
 export function CisoUsersPanel() {
   const theme = useTheme();
-  const isDark = theme.palette.mode === "dark";
+  const isDesktop = useMediaQuery(theme.breakpoints.up("md"));
   const [filter, setFilter] = React.useState("");
 
   const query = useQuery<CisoUser[]>({
@@ -40,7 +125,7 @@ export function CisoUsersPanel() {
 
   return (
     <Stack spacing={2}>
-      <Stack direction="row" spacing={1} sx={{ alignItems: "center" }} >
+      <Stack direction="row" spacing={1} sx={{ alignItems: "center" }}>
         <TextField
           size="small"
           placeholder="Search by username, email, scope, region…"
@@ -48,6 +133,7 @@ export function CisoUsersPanel() {
           onChange={(e) => setFilter(e.target.value)}
           fullWidth
           slotProps={{
+            htmlInput: { "aria-label": "Search CISO users" },
             input: {
               startAdornment: (
                 <InputAdornment position="start"><SearchOutlined fontSize="small" /></InputAdornment>
@@ -64,76 +150,10 @@ export function CisoUsersPanel() {
         <Alert severity="error">Failed to load CISO users.</Alert>
       ) : filtered.length === 0 ? (
         <EmptyList message={filter ? `No users matching "${filter}"` : "No CISO users."} />
+      ) : isDesktop ? (
+        <UserTable users={filtered} />
       ) : (
-        <Stack spacing={1}>
-          {filtered.map((user) => (
-            <InnerCard key={user.id} hover sx={{ p: 2 }}>
-              <Stack spacing={1.25}>
-                <Stack direction={{ xs: "column", sm: "row" }} spacing={1} sx={{ justifyContent: "space-between", alignItems: { sm: "center" } }} >
-                  <Stack direction="row" spacing={1.25} sx={{ alignItems: "center" }} >
-                    <Box
-                      sx={{
-                        width: 40,
-                        height: 40,
-                        borderRadius: 2.5,
-                        display: "grid",
-                        placeItems: "center",
-                        background: alpha(theme.palette.primary.main, 0.1),
-                        border: `1px solid ${alpha(theme.palette.primary.main, 0.2)}`,
-                      }}
-                    >
-                      <Typography color="primary" sx={{ fontWeight: 700, fontSize: 15 }} >
-                        {(user.username?.[0] ?? "?").toUpperCase()}
-                      </Typography>
-                    </Box>
-                    <Box>
-                      <Typography component="h3" sx={{ fontWeight: 700, fontSize: 14 }} >{user.username}</Typography>
-                      <Typography variant="caption" color="text.secondary">{user.email || "No email"}</Typography>
-                    </Box>
-                  </Stack>
-
-                  {user.scope ? (
-                    <Chip
-                      size="small"
-                      icon={<ShieldOutlined />}
-                      label={user.scope}
-                      variant="outlined"
-                      color="primary"
-                    />
-                  ) : (
-                    <Chip size="small" label="No scope" variant="outlined" />
-                  )}
-                </Stack>
-
-                <Divider sx={{ opacity: isDark ? 0.12 : 0.35 }} />
-
-                <Box
-                  sx={{
-                    display: "grid",
-                    gridTemplateColumns: { xs: "1fr", sm: "repeat(2, 1fr)", md: "repeat(4, 1fr)" },
-                    gap: 1,
-                  }}
-                >
-                  {[
-                    ["Function", user.function],
-                    ["GBU", user.gbu],
-                    ["Country", user.country],
-                    ["Region", user.region],
-                  ].map(([label, value]) => (
-                    <Box key={label}>
-                      <Typography variant="caption" color="text.disabled" sx={{ fontWeight: 700, fontSize: 10, textTransform: "uppercase" }}>
-                        {label}
-                      </Typography>
-                      <Typography variant="body2" sx={{ fontSize: 13, fontWeight: 700 }}>
-                        {value || "—"}
-                      </Typography>
-                    </Box>
-                  ))}
-                </Box>
-              </Stack>
-            </InnerCard>
-          ))}
-        </Stack>
+        <UserCards users={filtered} />
       )}
     </Stack>
   );

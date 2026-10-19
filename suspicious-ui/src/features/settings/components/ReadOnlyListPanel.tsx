@@ -9,7 +9,6 @@ import {
   InputAdornment,
   Stack,
   TextField,
-  Tooltip,
   Typography,
 } from "@mui/material";
 import {
@@ -18,11 +17,10 @@ import {
   VisibilityOffOutlined,
   VisibilityOutlined,
 } from "@mui/icons-material";
-import { alpha, useTheme } from "@mui/material/styles";
 import { useQuery } from "@tanstack/react-query";
 
 import { listItems, type ListItem } from "@/features/settings/api";
-import { EmptyList, InnerCard } from "@/features/settings/components/cards";
+import { EmptyList } from "@/features/settings/components/cards";
 import { EditableListPanel } from "@/features/settings/components/EditableListPanel";
 
 export function ReadOnlyListPanel({
@@ -31,11 +29,11 @@ export function ReadOnlyListPanel({
   subtitle,
 }: {
   section: "watcher_legit_domains" | "watcher_monitored_domains";
+  /** Which Watcher list this is; the block heading itself is fixed. */
   title: string;
   subtitle: string;
 }) {
-  const theme = useTheme();
-  const isDark = theme.palette.mode === "dark";
+  const headingId = React.useId();
   const [filter, setFilter] = React.useState("");
   const [showItems, setShowItems] = React.useState(false);
 
@@ -52,20 +50,23 @@ export function ReadOnlyListPanel({
   }, [items, filter]);
 
   return (
-    <InnerCard sx={{ p: 2 }}>
+    <Box
+      component="section"
+      aria-labelledby={headingId}
+      sx={{ border: 1, borderColor: "divider", borderRadius: 2, p: 2 }}
+    >
       <Stack spacing={1.5}>
-        <Stack direction="row" spacing={1} sx={{ alignItems: "flex-start", justifyContent: "space-between" }} >
+        <Stack direction="row" spacing={1} sx={{ alignItems: "flex-start", justifyContent: "space-between" }}>
           <Box>
-            <Stack direction="row" spacing={0.75} sx={{ alignItems: "center" }} >
-              <LockOutlined sx={{ fontSize: 14, opacity: 0.55 }} />
-              <Typography sx={{ fontWeight: 700, fontSize: 14 }} >{title}</Typography>
+            <Stack direction="row" spacing={0.75} sx={{ alignItems: "center" }}>
+              <LockOutlined aria-hidden sx={{ fontSize: 16, color: "text.secondary" }} />
+              <Typography id={headingId} variant="subtitle1" component="h3" sx={{ fontWeight: 600 }}>
+                Synced from Watcher (read-only)
+              </Typography>
             </Stack>
-            <Typography variant="caption" color="text.secondary">{subtitle}</Typography>
+            <Typography variant="body2" color="text.secondary">{title}. {subtitle}</Typography>
           </Box>
-          <Stack direction="row" spacing={0.75} sx={{ alignItems: "center" }} >
-            <Chip size="small" label="Watcher sync" color="info" variant="outlined" />
-            <Chip size="small" label={`${items.length}`} variant="outlined" />
-          </Stack>
+          <Chip size="small" label={`${items.length} synced`} variant="outlined" />
         </Stack>
 
         <Stack direction="row" spacing={1}>
@@ -76,6 +77,7 @@ export function ReadOnlyListPanel({
             onChange={(e) => setFilter(e.target.value)}
             fullWidth
             slotProps={{
+              htmlInput: { "aria-label": `Search ${title}` },
               input: {
                 startAdornment: (
                   <InputAdornment position="start">
@@ -85,19 +87,15 @@ export function ReadOnlyListPanel({
               },
             }}
           />
-          <Tooltip title={showItems ? "Hide list" : "Show list"}>
-            <IconButton
-              size="small"
-              onClick={() => setShowItems((v) => !v)}
-              sx={{
-                border: `1px solid ${alpha(theme.palette.divider, isDark ? 0.22 : 0.6)}`,
-                borderRadius: 2,
-                color: showItems ? theme.palette.primary.main : undefined,
-              }}
-            >
-              {showItems ? <VisibilityOffOutlined fontSize="small" /> : <VisibilityOutlined fontSize="small" />}
-            </IconButton>
-          </Tooltip>
+          <IconButton
+            size="small"
+            onClick={() => setShowItems((v) => !v)}
+            aria-expanded={showItems}
+            aria-label={showItems ? "Hide list" : "Show list"}
+            sx={{ border: 1, borderColor: "divider", borderRadius: 2, color: showItems ? "primary.main" : undefined }}
+          >
+            {showItems ? <VisibilityOffOutlined fontSize="small" /> : <VisibilityOutlined fontSize="small" />}
+          </IconButton>
         </Stack>
 
         <Collapse in={showItems}>
@@ -106,52 +104,63 @@ export function ReadOnlyListPanel({
           ) : listQuery.isError ? (
             <Alert severity="error">Failed to load.</Alert>
           ) : filtered.length === 0 ? (
-            <EmptyList message={filter ? `No items matching "${filter}"` : "No synced items."} />
+            <EmptyList message={filter ? `No items matching "${filter}"` : "No synced entries yet."} />
           ) : (
-            <Stack
-              spacing={0.5}
-              sx={{
-                maxHeight: 320,
-                overflowY: "auto",
-                pr: 0.25,
-                "&::-webkit-scrollbar": { width: 4 },
-                "&::-webkit-scrollbar-thumb": { borderRadius: 999, background: alpha(theme.palette.divider, 0.5) },
-              }}
+            <Box
+              role="region"
+              tabIndex={0}
+              aria-label={`${title} entries`}
+              sx={{ maxHeight: 320, overflowY: "auto", border: 1, borderColor: "divider", borderRadius: 2 }}
             >
-              {filtered.map((it) => (
-                <InnerCard key={it.id} sx={{ px: 1.5, py: 0.9 }}>
-                  <Typography sx={{ fontWeight: 700, fontSize: 13, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
-                    {it.value}
-                  </Typography>
-                  {it.created_at ? (
-                    <Typography variant="caption" color="text.disabled" sx={{ fontSize: 11 }}>
-                      {new Date(it.created_at).toLocaleString()}
+              <Box component="ul" sx={{ listStyle: "none", m: 0, p: 0 }}>
+                {filtered.map((it) => (
+                  <Box
+                    component="li"
+                    key={it.id}
+                    sx={{ px: 1.5, py: 0.75, borderTop: 1, borderColor: "divider", "&:first-of-type": { borderTop: 0 } }}
+                  >
+                    <Typography component="span" sx={{ display: "block", fontFamily: "monospace", fontWeight: 600, fontSize: 13, overflowWrap: "anywhere" }}>
+                      {it.value}
                     </Typography>
-                  ) : null}
-                </InnerCard>
-              ))}
-            </Stack>
+                    {it.created_at ? (
+                      <Typography variant="caption" color="text.secondary">
+                        Synced {new Date(it.created_at).toLocaleDateString()}
+                      </Typography>
+                    ) : null}
+                  </Box>
+                ))}
+              </Box>
+            </Box>
           )}
         </Collapse>
       </Stack>
-    </InnerCard>
+    </Box>
   );
 }
 
-export function DomainPairPanel({ editableSection, title }: { editableSection: "domains_allow" | "domains_deny"; title: string }) {
+export function DomainPairPanel({
+  editableSection,
+  title,
+  purpose,
+}: {
+  editableSection: "domains_allow" | "domains_deny";
+  title: string;
+  purpose?: string;
+}) {
   const isAllow = editableSection === "domains_allow";
 
   return (
-    <Stack spacing={2}>
+    <Stack spacing={2.5}>
       <EditableListPanel
         section={editableSection}
         title={title}
         placeholder="Paste domains, one per line or comma-separated…"
+        purpose={purpose}
       />
       <ReadOnlyListPanel
         section={isAllow ? "watcher_legit_domains" : "watcher_monitored_domains"}
         title={isAllow ? "Watcher legit domains" : "Watcher monitored domains"}
-        subtitle="Read-only: synchronized from Watcher automatically."
+        subtitle="Synchronized from Watcher automatically."
       />
     </Stack>
   );

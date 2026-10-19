@@ -17,6 +17,10 @@ const mockList = vi.mocked(listItems);
 const mockAdd = vi.mocked(addItems);
 const mockRemove = vi.mocked(removeItem);
 
+// Row controls carry the value in their name; the bulk bar's "Delete 3" and select-all are not rows.
+const rowDeletes = () => screen.getAllByRole("button", { name: /^Delete (?!\d+$)\S/ });
+const rowSelects = () => screen.getAllByRole("checkbox", { name: /^Select (?!all$)/ });
+
 describe("EditableListPanel", () => {
   beforeEach(() => {
     vi.clearAllMocks();
@@ -42,7 +46,7 @@ describe("EditableListPanel", () => {
       <EditableListPanel section="domains_allow" title="Domains allowlist" placeholder="Add domains" />
     );
 
-    expect(await screen.findByText("No items yet.")).toBeInTheDocument();
+    expect(await screen.findByText("No entries yet. Paste values above or import a file.")).toBeInTheDocument();
   });
 
   it("parses multi-value input and submits it through addItems", async () => {
@@ -99,7 +103,7 @@ describe("EditableListPanel", () => {
       await screen.findByText("evil.com");
       mockList.mockClear();
 
-      await user.click(screen.getAllByRole("button", { name: "Delete" })[0]);
+      await user.click(rowDeletes()[0]);
 
       expect(screen.queryByRole("dialog")).not.toBeInTheDocument();
       await waitFor(() => expect(mockRemove).toHaveBeenCalledWith("domains_allow", "1"));
@@ -123,7 +127,7 @@ describe("EditableListPanel", () => {
       );
       await screen.findByText("evil.com");
 
-      await user.click(screen.getAllByRole("button", { name: "Delete" })[0]);
+      await user.click(rowDeletes()[0]);
       await user.click(await screen.findByRole("button", { name: "Undo" }));
 
       expect(await screen.findByText("Could not restore evil.com")).toBeInTheDocument();
@@ -138,7 +142,7 @@ describe("EditableListPanel", () => {
         <EditableListPanel section="domains_allow" title="Domains allowlist" placeholder="Add domains" />
       );
       await screen.findByText("evil.com");
-      await user.click(screen.getAllByRole("button", { name: "Delete" })[0]);
+      await user.click(rowDeletes()[0]);
       await user.click(await screen.findByRole("button", { name: "Undo" }));
     }
 
@@ -171,7 +175,7 @@ describe("EditableListPanel", () => {
         <EditableListPanel section="domains_allow" title="Domains allowlist" placeholder="Add domains" />
       );
       await screen.findByText("evil.com");
-      await user.click(screen.getAllByRole("button", { name: "Delete" })[0]);
+      await user.click(rowDeletes()[0]);
       const undo = await screen.findByRole("button", { name: "Undo" });
       await user.dblClick(undo);
       await screen.findByText("Restored evil.com.");
@@ -187,7 +191,7 @@ describe("EditableListPanel", () => {
         <EditableListPanel section="domains_allow" title="Domains allowlist" placeholder="Add domains" />
       );
       await screen.findByText("evil.com");
-      await user.click(screen.getAllByRole("button", { name: "Delete" })[0]);
+      await user.click(rowDeletes()[0]);
       await screen.findByRole("button", { name: "Undo" });
       await new Promise((r) => setTimeout(r, 5600));
       expect(screen.getByRole("button", { name: "Undo" })).toBeInTheDocument();
@@ -205,7 +209,7 @@ describe("EditableListPanel", () => {
 
     async function selectAll(user: ReturnType<typeof userEvent.setup>) {
       await screen.findByText("a.com");
-      for (const b of screen.getAllByRole("button", { name: "Select" })) await user.click(b);
+      for (const b of rowSelects()) await user.click(b);
     }
 
     it("asks with the selected count and list title, and Cancel does nothing", async () => {
@@ -269,9 +273,8 @@ describe("EditableListPanel", () => {
         <EditableListPanel section="domains_deny" title="Domains denylist" placeholder="Add domains" />
       );
       await screen.findByText("a.com");
-      for (const b of screen.getAllByRole("button", { name: "Select" })) await user.click(b);
-      await user.click(screen.getByRole("button", { name: "Search items" }));
-      await user.type(screen.getByPlaceholderText("Filter items…"), "a.com");
+      for (const b of rowSelects()) await user.click(b);
+        await user.type(screen.getByPlaceholderText("Filter items…"), "a.com");
 
       await user.click(screen.getByRole("button", { name: "Delete 1" }));
       expect(await screen.findByRole("dialog")).toHaveTextContent("Delete 1 entry from Domains denylist?");
@@ -290,12 +293,12 @@ describe("EditableListPanel", () => {
         <EditableListPanel section="domains_deny" title="Domains denylist" placeholder="Add domains" />
       );
       await screen.findByText("a.com");
-      for (const b of screen.getAllByRole("button", { name: "Select" })) await user.click(b);
+      for (const b of rowSelects()) await user.click(b);
       mockList.mockResolvedValue([]);
       await user.click(screen.getByRole("button", { name: "Delete 3" }));
       await user.click(await screen.findByRole("button", { name: "Delete" }));
 
-      await screen.findByText("No items yet.");
+      await screen.findByText("No entries yet. Paste values above or import a file.");
       expect(screen.getAllByText("3 of 3 deleted")).toHaveLength(1);
       // The closing dialog keeps the page aria-hidden for a moment, so wait for the region to be reachable.
       expect(await screen.findByRole("status")).toHaveTextContent("3 of 3 deleted");
@@ -308,7 +311,7 @@ describe("EditableListPanel", () => {
         <EditableListPanel section="domains_deny" title="Domains denylist" placeholder="Add domains" />
       );
       await screen.findByText("a.com");
-      for (const b of screen.getAllByRole("button", { name: "Select" })) await user.click(b);
+      for (const b of rowSelects()) await user.click(b);
       await user.click(screen.getByRole("button", { name: "Delete 3" }));
       await user.click(await screen.findByRole("button", { name: "Delete" }));
       expect(await screen.findByText("2 of 3 deleted, 1 failed")).toBeInTheDocument();
@@ -326,16 +329,78 @@ describe("EditableListPanel", () => {
       );
       await screen.findByText("a.com");
       // Select only the first row so the other two rows are idle during the run.
-      await user.click(screen.getAllByRole("button", { name: "Select" })[0]);
+      await user.click(rowSelects()[0]);
       await user.click(screen.getByRole("button", { name: "Delete 1" }));
       await user.click(await screen.findByRole("button", { name: "Delete" }));
 
       await waitFor(() => expect(mockRemove).toHaveBeenCalledTimes(1));
-      await waitFor(() => expect(screen.getAllByRole("button", { name: "Delete" })).toHaveLength(3));
-      for (const b of screen.getAllByRole("button", { name: "Delete" })) expect(b).toBeDisabled();
+      await waitFor(() => expect(rowDeletes()).toHaveLength(3));
+      for (const b of rowDeletes()) expect(b).toBeDisabled();
 
       release();
       await screen.findByText("1 of 1 deleted");
+    });
+  });
+
+  describe("redesigned rows and toolbar", () => {
+    it("shows the purpose sentence only when one is given", async () => {
+      const { unmount } = renderWithProviders(
+        <EditableListPanel section="domains_allow" title="Domains allowlist" placeholder="Add domains" purpose="Listed domains are treated as safe." />
+      );
+      expect(await screen.findByText("Listed domains are treated as safe.")).toBeInTheDocument();
+      unmount();
+      renderWithProviders(
+        <EditableListPanel section="domains_allow" title="Domains allowlist" placeholder="Add domains" />
+      );
+      await screen.findByText("evil.com");
+      expect(screen.queryByText("Listed domains are treated as safe.")).not.toBeInTheDocument();
+    });
+
+    it("shows the added date when created_at exists and omits it otherwise", async () => {
+      const iso = "2026-03-04T10:00:00Z";
+      mockList.mockResolvedValue([
+        { id: "1", value: "dated.com", created_at: iso },
+        { id: "2", value: "plain.com" },
+      ]);
+      renderWithProviders(
+        <EditableListPanel section="domains_allow" title="Domains allowlist" placeholder="Add domains" />
+      );
+      await screen.findByText("dated.com");
+      expect(screen.getByText(`Added ${new Date(iso).toLocaleDateString()}`)).toBeInTheDocument();
+      expect(screen.getAllByText(/^Added /)).toHaveLength(1);
+    });
+
+    it("names each row control after its value so the accessible names are unique", async () => {
+      renderWithProviders(
+        <EditableListPanel section="domains_allow" title="Domains allowlist" placeholder="Add domains" />
+      );
+      await screen.findByText("evil.com");
+      expect(screen.getByRole("button", { name: "Delete evil.com" })).toBeInTheDocument();
+      expect(screen.getByRole("button", { name: "Delete phish.net" })).toBeInTheDocument();
+      expect(screen.getByRole("checkbox", { name: "Select evil.com" })).not.toBeChecked();
+    });
+
+    it("keeps the search field, Import file and the count in the toolbar without a toggle", async () => {
+      renderWithProviders(
+        <EditableListPanel section="domains_allow" title="Domains allowlist" placeholder="Add domains" />
+      );
+      await screen.findByText("evil.com");
+      expect(screen.getByPlaceholderText("Filter items…")).toBeVisible();
+      expect(screen.getByText("Import file")).toBeInTheDocument();
+      expect(screen.getByText("2 total")).toBeInTheDocument();
+    });
+
+    it("select-all checks every row and the same control clears it", async () => {
+      const user = userEvent.setup();
+      renderWithProviders(
+        <EditableListPanel section="domains_allow" title="Domains allowlist" placeholder="Add domains" />
+      );
+      await screen.findByText("evil.com");
+      await user.click(screen.getByRole("checkbox", { name: "Select all" }));
+      for (const c of rowSelects()) expect(c).toBeChecked();
+      expect(screen.getByText("2 selected")).toBeInTheDocument();
+      await user.click(screen.getByRole("checkbox", { name: "Deselect all" }));
+      for (const c of rowSelects()) expect(c).not.toBeChecked();
     });
   });
 
@@ -345,7 +410,6 @@ describe("EditableListPanel", () => {
       <EditableListPanel section="domains_allow" title="Domains allowlist" placeholder="Add domains" />
     );
     await screen.findByText("evil.com");
-    await user.click(screen.getByRole("button", { name: "Search items" }));
     await user.type(screen.getByPlaceholderText("Filter items…"), "zzz");
     expect(await screen.findByText('No items matching "zzz"')).toBeInTheDocument();
   });
