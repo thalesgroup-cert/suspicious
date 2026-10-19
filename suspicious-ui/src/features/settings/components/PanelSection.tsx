@@ -1,4 +1,4 @@
-import type { ReactNode } from "react";
+import { useId, type ReactNode } from "react";
 import { Box, Stack, Typography } from "@mui/material";
 
 type Props = {
@@ -12,10 +12,11 @@ type Props = {
 
 /** Shared panel frame: h2 title, one-line purpose, toolbar, content, optional sticky action bar. */
 export function PanelSection({ title, purpose, toolbar, actions, children }: Props) {
+  const titleId = useId();
   return (
-    <Stack component="section" spacing={2}>
+    <Stack component="section" aria-labelledby={titleId} spacing={2}>
       <Box>
-        <Typography variant="h6" component="h2">{title}</Typography>
+        <Typography id={titleId} variant="h6" component="h2">{title}</Typography>
         {purpose && (
           <Typography variant="body2" color="text.secondary" sx={{ mt: 0.5 }}>{purpose}</Typography>
         )}

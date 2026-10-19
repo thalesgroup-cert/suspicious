@@ -10,6 +10,7 @@ import { useTheme } from "@mui/material/styles";
 
 import { ensureContrast, flatten } from "@/shared/lib/contrast";
 import { useResultColors } from "@/styles/colorStore";
+import { CONNECTOR_STATUS_LABEL } from "../labels";
 import type { Connector } from "./connectors";
 
 export type StatusTone = "ok" | "warning" | "danger" | "neutral" | "info";
@@ -59,7 +60,8 @@ export function StatusLabel({ tone, label, size = "medium" }: { tone: StatusTone
  */
 // eslint-disable-next-line react-refresh/only-export-components
 export function connectorStatus(c: Pick<Connector, "status" | "last_health_ok">): { tone: StatusTone; label: string } {
-  if (c.status === "disabled") return { tone: "neutral", label: "Disabled" };
+  const label = CONNECTOR_STATUS_LABEL[c.status];
+  if (c.status === "disabled") return { tone: "neutral", label };
   if (c.last_health_ok === false) return { tone: "danger", label: "Unhealthy" };
-  return c.status === "connected" ? { tone: "ok", label: "Connected" } : { tone: "warning", label: "Incomplete" };
+  return { tone: c.status === "connected" ? "ok" : "warning", label };
 }

@@ -41,4 +41,9 @@ describe("PanelSection", () => {
     expect(Number(cs.fontWeight)).toBeLessThanOrEqual(700);
     expect(["normal", "0px"]).toContain(cs.letterSpacing);
   });
+
+  it("labels the section by its heading", () => {
+    renderWithProviders(<PanelSection title="Scoring">x</PanelSection>);
+    expect(screen.getByRole("region", { name: "Scoring" })).toBeInTheDocument();
+  });
 });

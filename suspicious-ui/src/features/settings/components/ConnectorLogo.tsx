@@ -9,12 +9,15 @@ import { CONNECTOR_ICONS, DEFAULT_CONNECTOR_ICON } from "./connectorIcons";
 const FALLBACK_ICONS = { ...CONNECTOR_ICONS, ai_narration: AutoAwesomeOutlined };
 
 /**
- * Fixed square tile on the paper surface so any logo stays legible in every theme.
+ * Fixed square tile. A bundled logo sits on white in every theme (brand marks are drawn for light
+ * backgrounds, e.g. MISP's grey wordmark or a dark Elasticsearch mark); the neutral icon fallback sits on the paper surface.
  * Decorative (alt ""): the connector name is always printed beside it. Never recoloured.
  */
 export function ConnectorLogo({ name, size = 40 }: { name: string; size?: number }) {
   const logo = CONNECTOR_LOGOS[name];
-  const [failed, setFailed] = useState(false);
+  // Keyed by name so a tile reused for another connector does not stay on the fallback.
+  const [failedFor, setFailedFor] = useState<string | null>(null);
+  const failed = failedFor === name;
   const Icon = FALLBACK_ICONS[name as keyof typeof FALLBACK_ICONS] ?? DEFAULT_CONNECTOR_ICON;
   return (
     <Box
@@ -27,7 +30,7 @@ export function ConnectorLogo({ name, size = 40 }: { name: string; size?: number
         display: "grid",
         placeItems: "center",
         p: `${Math.round(size * 0.15)}px`,
-        bgcolor: "background.paper",
+        bgcolor: logo && !failed ? "common.white" : "background.paper",
         border: 1,
         borderColor: "divider",
         borderRadius: 1,
@@ -39,7 +42,7 @@ export function ConnectorLogo({ name, size = 40 }: { name: string; size?: number
           component="img"
           src={logo.src}
           alt=""
-          onError={() => setFailed(true)}
+          onError={() => setFailedFor(name)}
           sx={{ width: "100%", height: "100%", objectFit: "contain", display: "block" }}
         />
       ) : (

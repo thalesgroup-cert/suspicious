@@ -1,8 +1,11 @@
-import { describe, expect, it } from "vitest";
+import { afterEach, describe, expect, it } from "vitest";
 import { fireEvent, screen } from "@testing-library/react";
 
 import { renderWithProviders } from "@/test/utils";
+import { themes } from "@/styles/themes";
 import { ConnectorLogo } from "../ConnectorLogo";
+
+afterEach(() => localStorage.removeItem("suspicious.theme"));
 
 const tile = () => screen.getByTestId("connector-logo");
 
@@ -54,5 +57,28 @@ describe("ConnectorLogo", () => {
   it("keeps the mark off the border with padding", () => {
     renderWithProviders(<ConnectorLogo name="misp" />);
     expect(parseFloat(getComputedStyle(tile()).paddingTop)).toBeGreaterThan(0);
+  });
+
+  it("puts a logo on white even on midnight, and the fallback and a failed image on the paper surface", () => {
+    localStorage.setItem("suspicious.theme", "midnight");
+    const paper = themes.midnight.palette.background.paper;
+    const toRgb = (hex: string) => {
+      const n = parseInt(hex.slice(1), 16);
+      return `rgb(${n >> 16}, ${(n >> 8) & 255}, ${n & 255})`;
+    };
+    renderWithProviders(<><ConnectorLogo name="misp" /><ConnectorLogo name="smtp_notify" /><ConnectorLogo name="thehive" /></>);
+    const [logo, fallback, broken] = screen.getAllByTestId("connector-logo");
+    expect(getComputedStyle(logo).backgroundColor).toBe("rgb(255, 255, 255)");
+    expect(getComputedStyle(fallback).backgroundColor).toBe(toRgb(paper));
+    fireEvent.error(broken.querySelector("img")!);
+    expect(getComputedStyle(broken).backgroundColor).toBe(toRgb(paper));
+  });
+
+  it("shows the new logo when the name changes after an image error", () => {
+    const { rerender } = renderWithProviders(<ConnectorLogo name="misp" />);
+    fireEvent.error(tile().querySelector("img")!);
+    expect(tile().querySelector("img")).toBeNull();
+    rerender(<ConnectorLogo name="thehive" />);
+    expect(tile().querySelector("img")).not.toBeNull();
   });
 });

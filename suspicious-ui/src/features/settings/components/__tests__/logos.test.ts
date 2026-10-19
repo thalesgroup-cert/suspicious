@@ -24,6 +24,13 @@ describe("bundled connector logos", () => {
     expect(provenance).toMatch(/\| File \| Brand \| Source URL \| Licence \| Retrieved \| Modification \|/);
   });
 
+  it("has no stale LOGOS.md rows: every row names an existing file", () => {
+    const names = new Set(Object.keys(files).map((p) => p.split("/").pop()));
+    const rows = [...provenance.matchAll(/^\| `([^`]+)` \|/gm)].map((m) => m[1]);
+    expect(rows.length).toBe(names.size);
+    for (const r of rows) expect(names.has(r), r).toBe(true);
+  });
+
   it("keeps every file at most 20 kB", async () => {
     for (const url of Object.values(files)) {
       const buf = await (await fetch(url)).arrayBuffer();
@@ -34,7 +41,7 @@ describe("bundled connector logos", () => {
   it("has no scripts or external references in the SVGs", async () => {
     for (const [path, url] of Object.entries(files).filter(([p]) => p.endsWith(".svg"))) {
       const text = await (await fetch(url)).text();
-      expect(text, path).not.toMatch(/<script|href=["']https?:|on\w+=|<image|<metadata/i);
+      expect(text, path).not.toMatch(/<script|<foreignObject|<use[\s>]|<image|<metadata|xlink:href|href\s*=\s*["']?https?:|url\(\s*["']?https?:|\son\w+\s*=|javascript:/i);
       expect(text, path).toMatch(/viewBox=/);
     }
   });
