@@ -24,6 +24,7 @@ import { useQuery, useQueryClient } from "@tanstack/react-query";
 
 import { listAnalyzers, updateAnalyzerWeight, type Analyzer } from "@/features/settings/api";
 import { runBatch, summarise } from "@/features/settings/batch";
+import { ActionBar } from "@/features/settings/components/PanelSection";
 import { useReportUnsaved } from "@/features/settings/unsaved";
 import {
   clampWeight,
@@ -50,6 +51,31 @@ const shareSx = {
   gridColumn: "1 / -1",
   "&::before": { content: '"Share of total: "', display: { xs: "inline", sm: "none" }, color: "text.secondary", typography: "body2" },
 };
+
+/**
+ * Decorative: the percentage next to it is the accessible value. The fill width is an inline style, not sx,
+ * so dragging a slider across 26 rows does not mint a new emotion class per frame.
+ */
+const ShareBar = React.memo(function ShareBar({ share, active }: { share: number; active: boolean }) {
+  return (
+    <Box
+      aria-hidden
+      data-share-bar
+      sx={{ width: { xs: 96, sm: 120 }, height: 6, borderRadius: 3, bgcolor: "divider", overflow: "hidden", flexShrink: 0 }}
+    >
+      <Box
+        style={{ width: `${Math.round(share * 10000) / 100}%` }}
+        sx={{
+          height: 1,
+          borderRadius: 3,
+          bgcolor: active ? "primary.main" : "action.disabled",
+          transition: "width .2s ease",
+          "@media (prefers-reduced-motion: reduce)": { transition: "none" },
+        }}
+      />
+    </Box>
+  );
+});
 
 /** First message in a DRF error body ({weight: [..]}, {detail: ..}), or nothing. */
 function serverMessage(error: unknown): string {
@@ -312,9 +338,12 @@ export function ScoringTable() {
                     </Stack>
                   </TableCell>
                   <TableCell role="cell" sx={shareSx}>
-                    <Typography variant="body2" color="text.secondary" component="span">
-                      {formatShare(share, total)}
-                    </Typography>
+                    <Stack direction="row" spacing={1.5} sx={{ display: "inline-flex", verticalAlign: "middle", alignItems: "center" }}>
+                      <Typography variant="body2" color="text.secondary" component="span" sx={{ minWidth: "4ch" }}>
+                        {formatShare(share, total)}
+                      </Typography>
+                      <ShareBar share={share} active={a.is_active} />
+                    </Stack>
                   </TableCell>
                   <TableCell role="cell" sx={{ gridColumn: 2, gridRow: 1 }}>
                     {modifiedIds.has(a.id) ? (
@@ -339,21 +368,7 @@ export function ScoringTable() {
       {/* Mounted before any result exists so screen readers announce the text when it lands. */}
       <Typography role="status" variant="body2" color="text.secondary">{status}</Typography>
 
-      <Stack
-        direction="row"
-        spacing={1.5}
-        sx={{
-          position: "sticky",
-          bottom: 0,
-          zIndex: 1,
-          alignItems: "center",
-          py: 1.25,
-          px: 2,
-          bgcolor: "background.paper",
-          borderTop: 1,
-          borderColor: modified.length ? "primary.main" : "divider",
-        }}
-      >
+      <ActionBar sx={{ alignItems: "center", px: 2, borderColor: modified.length ? "primary.main" : "divider" }}>
         <Typography variant="body2" sx={{ flex: 1, fontWeight: 700 }}>
           {modified.length
             ? `${modified.length} unsaved change${modified.length === 1 ? "" : "s"}`
@@ -374,7 +389,7 @@ export function ScoringTable() {
         >
           Save all
         </Button>
-      </Stack>
+      </ActionBar>
     </Stack>
   );
 }

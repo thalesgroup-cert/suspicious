@@ -274,4 +274,54 @@ describe("ScoringTable", () => {
     expect(new Set(roleOf("th"))).toEqual(new Set(["columnheader"]));
     expect(new Set(roleOf("td"))).toEqual(new Set(["cell"]));
   });
+
+  describe("share bars", () => {
+    const rowOf = (name: string) => screen.getByText(name).closest("tr") as HTMLElement;
+    const bar = (name: string) => rowOf(name).querySelector("[data-share-bar]") as HTMLElement;
+    const fill = (name: string) => bar(name).firstElementChild as HTMLElement;
+
+    it("draws a decorative bar per row whose fill width equals the share", async () => {
+      await setup();
+      for (const [name, pct] of [["Alpha", 20], ["Bravo", 30], ["Charlie", 50]] as const) {
+        expect(bar(name)).toHaveAttribute("aria-hidden", "true");
+        expect(fill(name).style.width).toBe(`${pct}%`);
+        // The percentage text stays the accessible value.
+        expect(within(rowOf(name)).getByText(`${pct}%`)).toBeInTheDocument();
+      }
+    });
+
+    it("follows the draft weight live, for every row", async () => {
+      await setup();
+      fireEvent.change(num("Alpha"), { target: { value: "0.8" } });
+      // 0.8 / (0.8 + 0.3 + 0.5) = 50%, Charlie falls to 31.25%.
+      expect(fill("Alpha").style.width).toBe("50%");
+      expect(fill("Charlie").style.width).toBe("31.25%");
+    });
+
+    it("is empty when every weight is zero", async () => {
+      await setup([A(1, "Alpha", 0), A(2, "Bravo", 0)]);
+      expect(fill("Alpha").style.width).toBe("0%");
+    });
+
+    it("mutes the bar of an inactive analyzer but keeps it", async () => {
+      await setup([A(1, "Alpha", 0.5), A(2, "Bravo", 0.5, false)]);
+      expect(bar("Bravo")).toBeInTheDocument();
+      expect(getComputedStyle(fill("Bravo")).backgroundColor).not.toBe(getComputedStyle(fill("Alpha")).backgroundColor);
+      expect(fill("Bravo").style.width).toBe("50%");
+    });
+
+    it("switches the fill's width transition off under prefers-reduced-motion", async () => {
+      await setup();
+      const el = fill("Alpha");
+      const hit = [...document.styleSheets].some((sheet) =>
+        [...sheet.cssRules].some(
+          (r) =>
+            r instanceof CSSMediaRule &&
+            r.conditionText.includes("prefers-reduced-motion") &&
+            [...r.cssRules].some((c) => c instanceof CSSStyleRule && el.matches(c.selectorText) && c.style.transition === "none"),
+        ),
+      );
+      expect(hit).toBe(true);
+    });
+  });
 });

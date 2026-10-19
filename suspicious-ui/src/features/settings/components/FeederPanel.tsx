@@ -1,16 +1,26 @@
 import * as React from "react";
-import { Box, Chip, Stack, Switch, Typography } from "@mui/material";
+import { Box, Stack, Switch, Typography } from "@mui/material";
 import { PowerSettingsNewOutlined } from "@mui/icons-material";
 import { alpha, useTheme } from "@mui/material/styles";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useSnackbar } from "notistack";
 
 import { getFeederStatus, setFeederStatus } from "@/features/settings/api";
-import FeederHealthBadge from "@/shared/components/FeederHealthBadge";
+import { feederTone, useFeederHealth, type FeederTone } from "@/features/settings/useFeederHealth";
+import { relativeTime } from "@/features/settings/connectorConfig";
+import { FactList, type Fact } from "@/features/settings/components/FactList";
+import { StatusLabel, type StatusTone } from "@/features/settings/components/StatusLabel";
 import { InnerCard } from "@/features/settings/components/cards";
 import { ConfirmDialog } from "@/features/settings/components/ConfirmDialog";
 import { readableOnTint } from "@/shared/lib/contrast";
 import { useResultColors } from "@/styles/colorStore";
+
+const HEALTH_LABEL: Record<FeederTone, { tone: StatusTone; label: string }> = {
+  online: { tone: "ok", label: "Online" },
+  stale: { tone: "warning", label: "Stale" },
+  offline: { tone: "danger", label: "Offline" },
+  loading: { tone: "neutral", label: "Checking" },
+};
 
 export function FeederPanel() {
   const qc = useQueryClient();
@@ -40,6 +50,29 @@ export function FeederPanel() {
     onError: () => enqueueSnackbar("Failed to update feeder status.", { variant: "error" }),
   });
 
+  const healthQuery = useFeederHealth();
+  const health = healthQuery.data;
+  const healthLabel = healthQuery.isError ? { tone: "neutral" as const, label: "Status unavailable" } : HEALTH_LABEL[feederTone(health)];
+
+  // Only what the payload carries: an unreachable feeder is reported with zeroed counters that are not real readings.
+  const facts: Fact[] = [];
+  if (health?.last_successful_poll) {
+    const d = new Date(health.last_successful_poll * 1000);
+    facts.push({
+      key: "Last poll",
+      value: (
+        <time dateTime={d.toISOString()} title={d.toLocaleString()}>
+          {relativeTime(d.toISOString(), new Date())}
+        </time>
+      ),
+    });
+  }
+  if (health?.online) {
+    if (typeof health.emails_processed_total === "number") facts.push({ key: "Emails processed", value: health.emails_processed_total });
+    if (typeof health.errors_total === "number") facts.push({ key: "Errors", value: health.errors_total });
+  }
+  if (!health?.online && health?.error) facts.push({ key: "Reason", value: health.error });
+
   const enabled = statusQuery.data?.enabled ?? false;
   const pending = statusQuery.isLoading || toggleMutation.isPending;
 
@@ -67,7 +100,7 @@ export function FeederPanel() {
         <Stack
           direction={{ xs: "column", sm: "row" }}
           spacing={2}
-          sx={{ p: 2.5, alignItems: { sm: "center" }, justifyContent: "space-between" }}
+          sx={{ p: 2.5, pb: 1.5, alignItems: { sm: "center" }, justifyContent: "space-between" }}
         >
           <Stack direction="row" spacing={1.75} sx={{ alignItems: "center" }} >
             <Box
@@ -97,35 +130,30 @@ export function FeederPanel() {
             </Box>
           </Stack>
 
-          <Stack direction="row" spacing={1.5} sx={{ alignItems: "center", flexWrap: "wrap" }} >
-            <FeederHealthBadge />
-            {/* Text, not just colour: the state must read without seeing the tint. */}
-            <Chip
-              size="small"
-              label={statusQuery.isLoading ? "…" : enabled ? "Enabled" : "Disabled"}
-              sx={{
-                fontWeight: 700,
-                bgcolor: enabled
-                  ? alpha(safe, 0.12)
-                  : theme.palette.action.hover,
-                color: enabled ? onTint : "text.secondary",
-                border: `1px solid ${enabled ? alpha(safe, 0.3) : alpha(theme.palette.divider, 0.4)}`,
-                transition: "all .3s ease",
-              }}
-            />
-            <Switch
-              checked={enabled}
-              onChange={(e) => (e.target.checked ? toggleMutation.mutate(true) : setConfirmOff(true))}
-              disabled={pending}
-              color="success"
-              slotProps={{ input: { "aria-label": "Email feeder", ref: switchInput } }}
-            />
-          </Stack>
+          <Switch
+            checked={enabled}
+            onChange={(e) => (e.target.checked ? toggleMutation.mutate(true) : setConfirmOff(true))}
+            disabled={pending}
+            color="success"
+            slotProps={{ input: { "aria-label": "Email feeder", ref: switchInput } }}
+          />
         </Stack>
-      </InnerCard>
 
-      <InnerCard sx={{ p: 2 }}>
-        <Typography variant="body2" color="text.secondary" sx={{ fontSize: 13 }}>
+        <Stack direction="row" sx={{ px: 2.5, pb: 2, columnGap: 3, rowGap: 0.5, flexWrap: "wrap" }}>
+          <StatusLabel
+            tone={statusQuery.isLoading ? "neutral" : enabled ? "ok" : "neutral"}
+            label={statusQuery.isLoading ? "Loading" : enabled ? "Enabled" : "Disabled"}
+          />
+          <StatusLabel tone={healthLabel.tone} label={healthLabel.label} />
+        </Stack>
+
+        {facts.length > 0 && (
+          <Box sx={{ px: 2.5, borderTop: 1, borderColor: "divider" }}>
+            <FactList items={facts} />
+          </Box>
+        )}
+
+        <Typography variant="body2" color="text.secondary" sx={{ px: 2.5, py: 2, borderTop: 1, borderColor: "divider" }}>
           When enabled, the feeder polls the configured mailbox and automatically creates
           new analysis cases for each suspicious message. Disabling it will stop ingestion
           immediately. Existing cases are unaffected.

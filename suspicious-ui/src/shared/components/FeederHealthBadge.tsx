@@ -14,10 +14,8 @@
  */
 import { Chip, Tooltip, Stack, Typography, Box, type ChipProps } from "@mui/material";
 import CircleIcon from "@mui/icons-material/Circle";
-import { useQuery } from "@tanstack/react-query";
-import { getFeederHealth, type FeederHealth } from "@/features/settings/api";
-
-type Tone = "online" | "stale" | "offline" | "loading";
+import type { FeederHealth } from "@/features/settings/api";
+import { feederTone, useFeederHealth, type FeederTone as Tone } from "@/features/settings/useFeederHealth";
 
 const TONE_TO_COLOR: Record<Tone, ChipProps["color"]> = {
   online: "success",
@@ -32,13 +30,6 @@ const TONE_TO_LABEL: Record<Tone, string> = {
   offline: "Offline",
   loading: "Loading…",
 };
-
-function classify(h: FeederHealth | undefined): Tone {
-  if (!h) return "loading";
-  if (!h.online) return "offline";
-  if (h.stale) return "stale";
-  return "online";
-}
 
 function fmtUnix(ts: number | null): string {
   if (!ts) return "never";
@@ -69,19 +60,11 @@ export default function FeederHealthBadge({
   label = "Feeder",
   size = "small",
 }: FeederHealthBadgeProps) {
-  const query = useQuery<FeederHealth>({
-    queryKey: ["feeder", "health"],
-    queryFn: getFeederHealth,
-    enabled,
-    refetchInterval: 30_000,
-    refetchOnWindowFocus: true,
-    retry: false,
-    staleTime: 15_000,
-  });
+  const query = useFeederHealth(enabled);
 
   if (!enabled) return null;
 
-  const tone = classify(query.data);
+  const tone = feederTone(query.data);
   const health = query.data;
 
   const tooltipBody = (
