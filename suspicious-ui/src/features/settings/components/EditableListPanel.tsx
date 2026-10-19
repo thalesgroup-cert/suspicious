@@ -25,7 +25,7 @@ import {
 } from "@mui/icons-material";
 import { alpha, useTheme } from "@mui/material/styles";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import { useSnackbar } from "notistack";
+import { useSnackbar, type SnackbarKey } from "notistack";
 
 import {
   addFromFile,
@@ -35,7 +35,9 @@ import {
   type EditableListSection,
   type ListItem,
 } from "@/features/settings/api";
+import { runBatch, summarise } from "@/features/settings/batch";
 import { EmptyList, InnerCard } from "@/features/settings/components/cards";
+import { ConfirmDialog } from "@/features/settings/components/ConfirmDialog";
 
 function parseMulti(input: string) {
   return input.split(/[\n,; ]+/g).map((s) => s.trim()).filter(Boolean);
@@ -127,6 +129,7 @@ function ListItemRow({
         <Tooltip title="Delete">
           <IconButton
             size="small"
+            aria-label="Delete"
             onClick={onDelete}
             disabled={deleting}
             sx={{
@@ -155,6 +158,9 @@ function AddBar({
   loading: boolean;
 }) {
   const [input, setInput] = React.useState("");
+  const hintId = React.useId();
+  // Hidden while loading: the field is already cleared then, and "enter a value" would be the wrong reason.
+  const showHint = !input.trim() && !loading;
 
   const submit = () => {
     const values = parseMulti(input);
@@ -164,6 +170,7 @@ function AddBar({
   };
 
   return (
+    <Box>
     <Stack direction="row" spacing={1} sx={{ alignItems: "flex-start" }} >
       <TextField
         size="small"
@@ -188,11 +195,12 @@ function AddBar({
         variant="contained"
         onClick={submit}
         disabled={!input.trim() || loading}
+        aria-describedby={showHint ? hintId : undefined}
         startIcon={loading ? <CircularProgress size={14} color="inherit" /> : <AddOutlined />}
         sx={{
           borderRadius: 2.5,
           textTransform: "none",
-          fontWeight: 900,
+          fontWeight: 700,
           minWidth: 90,
           mt: 0.25,
           whiteSpace: "nowrap",
@@ -201,6 +209,12 @@ function AddBar({
         Add
       </Button>
     </Stack>
+    {showHint ? (
+      <Typography id={hintId} variant="caption" color="text.secondary" sx={{ display: "block", mt: 0.5 }}>
+        Enter at least one value
+      </Typography>
+    ) : null}
+    </Box>
   );
 }
 
@@ -211,6 +225,7 @@ function BulkToolbar({
   onClearSelection,
   onDeleteSelected,
   deleting,
+  status,
 }: {
   total: number;
   selected: number;
@@ -218,6 +233,7 @@ function BulkToolbar({
   onClearSelection: () => void;
   onDeleteSelected: () => void;
   deleting: boolean;
+  status: string | null;
 }) {
   const theme = useTheme();
   const allSelected = selected > 0 && selected === total;
@@ -245,6 +261,11 @@ function BulkToolbar({
         {selected > 0 ? `${selected} selected` : `${total} item${total !== 1 ? "s" : ""}`}
       </Typography>
 
+      {/* Always mounted so the live region exists before the result text lands in it. */}
+      <Typography role="status" variant="body2" color="text.secondary">
+        {status}
+      </Typography>
+
       {selected > 0 ? (
         <>
           <Button
@@ -261,7 +282,7 @@ function BulkToolbar({
             startIcon={deleting ? <CircularProgress size={12} color="error" /> : <DeleteOutlined />}
             disabled={deleting}
             onClick={onDeleteSelected}
-            sx={{ textTransform: "none", fontWeight: 900, borderRadius: 2 }}
+            sx={{ textTransform: "none", fontWeight: 700, borderRadius: 2 }}
           >
             Delete {selected}
           </Button>
@@ -273,10 +294,13 @@ function BulkToolbar({
 
 export function EditableListPanel({
   section,
+  title,
   placeholder,
   fileAccept = ".txt,.csv,.json",
 }: {
   section: EditableListSection;
+  /** Names the list in the bulk-delete confirmation. */
+  title: string;
   placeholder: string;
   fileAccept?: string;
 }) {
@@ -289,6 +313,13 @@ export function EditableListPanel({
   const [selectedIds, setSelectedIds] = React.useState<Set<string>>(new Set());
   const [showFilter, setShowFilter] = React.useState(false);
   const [deletingId, setDeletingId] = React.useState<string | null>(null);
+  // Count captured when the dialog opens so its text does not change while it fades out.
+  const [confirmBulk, setConfirmBulk] = React.useState<number | null>(null);
+  const [bulkRunning, setBulkRunning] = React.useState(false);
+  const [bulkStatus, setBulkStatus] = React.useState<string | null>(null);
+  const { closeSnackbar } = useSnackbar();
+
+  const refresh = () => qc.invalidateQueries({ queryKey: ["settings", "list", section] });
 
   const listQuery = useQuery<ListItem[]>({
     queryKey: ["settings", "list", section],
@@ -341,12 +372,33 @@ export function EditableListPanel({
     onError: () => enqueueSnackbar("Failed to add values.", { variant: "error" }),
   });
 
+  async function undoRemove(value: string, key: SnackbarKey) {
+    closeSnackbar(key);
+    try {
+      await addItems(section, [value]);
+      enqueueSnackbar(`Restored ${value}.`, { variant: "success" });
+    } catch {
+      enqueueSnackbar(`Could not restore ${value}`, { variant: "error" });
+    } finally {
+      refresh();
+    }
+  }
+
   const removeMutation = useMutation({
-    mutationFn: (id: string) => removeItem(section, id),
-    onSuccess: () => {
-      qc.invalidateQueries({ queryKey: ["settings", "list", section] });
-      setSelectedIds((prev) => { const next = new Set(prev); next.delete(deletingId!); return next; });
+    mutationFn: (item: ListItem) => removeItem(section, item.id),
+    onSuccess: (_res, item) => {
+      refresh();
+      setSelectedIds((prev) => { const next = new Set(prev); next.delete(item.id); return next; });
       setDeletingId(null);
+      // No confirm for one entry: undo is cheaper than a dialog on every click.
+      enqueueSnackbar(`Removed ${item.value}.`, {
+        variant: "info",
+        action: (key) => (
+          <Button color="inherit" size="small" onClick={() => undoRemove(item.value, key)}>
+            Undo
+          </Button>
+        ),
+      });
     },
     onError: () => { enqueueSnackbar("Failed to remove item.", { variant: "error" }); setDeletingId(null); },
   });
@@ -377,16 +429,23 @@ export function EditableListPanel({
     setSelectedIds(new Set());
   }
 
-  async function handleBulkDelete() {
-    const toDelete = allVisibleIds.filter((id) => selectedIds.has(id));
-    for (const id of toDelete) {
-      setDeletingId(id);
-      await removeItem(section, id);
-    }
-    qc.invalidateQueries({ queryKey: ["settings", "list", section] });
-    setSelectedIds(new Set());
+  async function runBulkDelete() {
+    setConfirmBulk(null);
+    const toDelete = filtered.filter((it) => selectedIds.has(it.id));
+    setBulkRunning(true);
+    setBulkStatus(null);
+    const { ok, failed } = await runBatch(toDelete, async (it) => {
+      setDeletingId(it.id);
+      await removeItem(section, it.id);
+    });
+    const text = summarise(ok, failed, "deleted");
+    setBulkStatus(text);
+    enqueueSnackbar(text, { variant: failed.length ? "warning" : "success" });
+    // Failed rows stay selected so the user can retry exactly those.
+    setSelectedIds(new Set(failed.map((f) => f.item.id)));
     setDeletingId(null);
-    enqueueSnackbar(`${toDelete.length} item${toDelete.length !== 1 ? "s" : ""} deleted.`, { variant: "success" });
+    setBulkRunning(false);
+    await refresh();
   }
 
   const selectionMode = selectedIds.size > 0;
@@ -406,7 +465,7 @@ export function EditableListPanel({
           component="label"
           startIcon={importMutation.isPending ? <CircularProgress size={13} /> : <FileUploadOutlined />}
           disabled={importMutation.isPending}
-          sx={{ borderRadius: 2.5, textTransform: "none", fontWeight: 900 }}
+          sx={{ borderRadius: 2.5, textTransform: "none", fontWeight: 700 }}
         >
           Import file
           <input
@@ -477,8 +536,9 @@ export function EditableListPanel({
               selected={selectedCount}
               onSelectAll={handleSelectAll}
               onClearSelection={handleClear}
-              onDeleteSelected={handleBulkDelete}
-              deleting={removeMutation.isPending}
+              onDeleteSelected={() => setConfirmBulk(selectedCount)}
+              deleting={removeMutation.isPending || bulkRunning}
+              status={bulkStatus}
             />
           ) : null}
 
@@ -510,9 +570,9 @@ export function EditableListPanel({
                   })}
                   onDelete={() => {
                     setDeletingId(it.id);
-                    removeMutation.mutate(it.id);
+                    removeMutation.mutate(it);
                   }}
-                  deleting={deletingId === it.id && removeMutation.isPending}
+                  deleting={deletingId === it.id && (removeMutation.isPending || bulkRunning)}
                   selectionMode={selectionMode}
                 />
               ))}
@@ -520,6 +580,16 @@ export function EditableListPanel({
           )}
         </Stack>
       )}
+
+      <ConfirmDialog
+        open={confirmBulk !== null}
+        title="Delete entries"
+        body={`Delete ${confirmBulk} ${confirmBulk === 1 ? "entry" : "entries"} from ${title}? This cannot be undone.`}
+        confirmLabel="Delete"
+        destructive
+        onConfirm={runBulkDelete}
+        onCancel={() => setConfirmBulk(null)}
+      />
     </Stack>
   );
 }

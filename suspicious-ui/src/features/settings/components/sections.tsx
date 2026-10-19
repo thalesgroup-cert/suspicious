@@ -42,12 +42,14 @@ export function SectionContent({ section }: { section: SectionMeta }) {
       return (
         <DomainPairPanel
           editableSection={section.key as "domains_allow" | "domains_deny"}
+          title={section.title}
         />
       );
     case "list":
       return (
         <EditableListPanel
           section={section.key as EditableListSection}
+          title={section.title}
           placeholder="Paste values, one per line or comma-separated…"
         />
       );

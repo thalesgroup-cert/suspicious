@@ -58,7 +58,7 @@ export function ReadOnlyListPanel({
           <Box>
             <Stack direction="row" spacing={0.75} sx={{ alignItems: "center" }} >
               <LockOutlined sx={{ fontSize: 14, opacity: 0.55 }} />
-              <Typography sx={{ fontWeight: 950, fontSize: 14 }} >{title}</Typography>
+              <Typography sx={{ fontWeight: 700, fontSize: 14 }} >{title}</Typography>
             </Stack>
             <Typography variant="caption" color="text.secondary">{subtitle}</Typography>
           </Box>
@@ -138,13 +138,14 @@ export function ReadOnlyListPanel({
   );
 }
 
-export function DomainPairPanel({ editableSection }: { editableSection: "domains_allow" | "domains_deny" }) {
+export function DomainPairPanel({ editableSection, title }: { editableSection: "domains_allow" | "domains_deny"; title: string }) {
   const isAllow = editableSection === "domains_allow";
 
   return (
     <Stack spacing={2}>
       <EditableListPanel
         section={editableSection}
+        title={title}
         placeholder="Paste domains, one per line or comma-separated…"
       />
       <ReadOnlyListPanel

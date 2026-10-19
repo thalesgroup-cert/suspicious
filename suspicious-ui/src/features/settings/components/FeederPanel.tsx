@@ -1,3 +1,4 @@
+import * as React from "react";
 import { Box, Chip, Stack, Switch, Typography } from "@mui/material";
 import { PowerSettingsNewOutlined } from "@mui/icons-material";
 import { alpha, useTheme } from "@mui/material/styles";
@@ -7,12 +8,17 @@ import { useSnackbar } from "notistack";
 import { getFeederStatus, setFeederStatus } from "@/features/settings/api";
 import FeederHealthBadge from "@/shared/components/FeederHealthBadge";
 import { InnerCard } from "@/features/settings/components/cards";
+import { ConfirmDialog } from "@/features/settings/components/ConfirmDialog";
+import { readableOnTint } from "@/shared/lib/contrast";
+import { useResultColors } from "@/styles/colorStore";
 
 export function FeederPanel() {
   const qc = useQueryClient();
   const { enqueueSnackbar } = useSnackbar();
   const theme = useTheme();
   const isDark = theme.palette.mode === "dark";
+  const safe = useResultColors().safe.main;
+  const [confirmOff, setConfirmOff] = React.useState(false);
 
   const statusQuery = useQuery({
     queryKey: ["settings", "email_feeder"],
@@ -34,6 +40,8 @@ export function FeederPanel() {
 
   const enabled = statusQuery.data?.enabled ?? false;
   const pending = statusQuery.isLoading || toggleMutation.isPending;
+  // Text on the 12% tint must stay readable on either page background; the raw brand colour does not in light mode.
+  const onTint = readableOnTint(safe, safe, 0.12, [theme.palette.background.paper, theme.palette.background.default]);
 
   return (
     <Stack spacing={2}>
@@ -41,9 +49,7 @@ export function FeederPanel() {
         <Box
           sx={{
             height: 4,
-            background: enabled
-              ? "linear-gradient(90deg, #22C55E, #16A34A)"
-              : alpha(theme.palette.divider, 0.4),
+            background: enabled ? safe : alpha(theme.palette.divider, 0.4),
             transition: "background .4s ease",
           }}
         />
@@ -62,18 +68,18 @@ export function FeederPanel() {
                 display: "grid",
                 placeItems: "center",
                 background: enabled
-                  ? alpha("#22C55E", 0.12)
+                  ? alpha(safe, 0.12)
                   : alpha(theme.palette.action.hover, 0.5),
-                border: `1px solid ${enabled ? alpha("#22C55E", 0.3) : alpha(theme.palette.divider, isDark ? 0.18 : 0.5)}`,
+                border: `1px solid ${enabled ? alpha(safe, 0.3) : alpha(theme.palette.divider, isDark ? 0.18 : 0.5)}`,
                 transition: "all .3s ease",
-                "& svg": { fontSize: 24, color: enabled ? "#22C55E" : undefined, transition: "color .3s ease" },
+                "& svg": { fontSize: 24, color: enabled ? onTint : undefined, transition: "color .3s ease" },
               }}
             >
               <PowerSettingsNewOutlined />
             </Box>
 
             <Box>
-              <Typography sx={{ fontWeight: 950, fontSize: 15 }} >Email feeder</Typography>
+              <Typography sx={{ fontWeight: 700, fontSize: 15 }} >Email feeder</Typography>
               <Typography variant="body2" color="text.secondary">
                 Automatically ingest suspicious emails and create cases.
               </Typography>
@@ -82,24 +88,26 @@ export function FeederPanel() {
 
           <Stack direction="row" spacing={1.5} sx={{ alignItems: "center", flexWrap: "wrap" }} >
             <FeederHealthBadge />
+            {/* Text, not just colour: the state must read without seeing the tint. */}
             <Chip
               size="small"
-              label={pending ? "…" : enabled ? "Running" : "Stopped"}
+              label={statusQuery.isLoading ? "…" : enabled ? "Enabled" : "Disabled"}
               sx={{
-                fontWeight: 900,
+                fontWeight: 700,
                 bgcolor: enabled
-                  ? alpha("#22C55E", 0.12)
+                  ? alpha(safe, 0.12)
                   : alpha(theme.palette.action.hover, 0.6),
-                color: enabled ? "#22C55E" : "text.secondary",
-                border: `1px solid ${enabled ? alpha("#22C55E", 0.3) : alpha(theme.palette.divider, 0.4)}`,
+                color: enabled ? onTint : "text.secondary",
+                border: `1px solid ${enabled ? alpha(safe, 0.3) : alpha(theme.palette.divider, 0.4)}`,
                 transition: "all .3s ease",
               }}
             />
             <Switch
               checked={enabled}
-              onChange={(e) => toggleMutation.mutate(e.target.checked)}
+              onChange={(e) => (e.target.checked ? toggleMutation.mutate(true) : setConfirmOff(true))}
               disabled={pending}
               color="success"
+              slotProps={{ input: { "aria-label": "Email feeder" } }}
             />
           </Stack>
         </Stack>
@@ -112,6 +120,19 @@ export function FeederPanel() {
           immediately. Existing cases are unaffected.
         </Typography>
       </InnerCard>
+
+      <ConfirmDialog
+        open={confirmOff}
+        title="Turn off the email feeder?"
+        body="The feeder stops ingesting mail immediately. Existing cases are unaffected."
+        confirmLabel="Turn off"
+        destructive
+        onConfirm={() => {
+          setConfirmOff(false);
+          toggleMutation.mutate(false);
+        }}
+        onCancel={() => setConfirmOff(false)}
+      />
     </Stack>
   );
 }

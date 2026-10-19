@@ -82,12 +82,12 @@ export function CisoUsersPanel() {
                         border: `1px solid ${alpha(theme.palette.primary.main, 0.2)}`,
                       }}
                     >
-                      <Typography color="primary" sx={{ fontWeight: 950, fontSize: 15 }} >
+                      <Typography color="primary" sx={{ fontWeight: 700, fontSize: 15 }} >
                         {(user.username?.[0] ?? "?").toUpperCase()}
                       </Typography>
                     </Box>
                     <Box>
-                      <Typography sx={{ fontWeight: 950, fontSize: 14 }} >{user.username}</Typography>
+                      <Typography component="h3" sx={{ fontWeight: 700, fontSize: 14 }} >{user.username}</Typography>
                       <Typography variant="caption" color="text.secondary">{user.email || "No email"}</Typography>
                     </Box>
                   </Stack>
@@ -121,7 +121,7 @@ export function CisoUsersPanel() {
                     ["Region", user.region],
                   ].map(([label, value]) => (
                     <Box key={label}>
-                      <Typography variant="caption" color="text.disabled" sx={{ fontWeight: 700, fontSize: 10, textTransform: "uppercase", letterSpacing: 0.5 }}>
+                      <Typography variant="caption" color="text.disabled" sx={{ fontWeight: 700, fontSize: 10, textTransform: "uppercase" }}>
                         {label}
                       </Typography>
                       <Typography variant="body2" sx={{ fontSize: 13, fontWeight: 700 }}>
