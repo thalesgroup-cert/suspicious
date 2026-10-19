@@ -6,21 +6,14 @@ import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useSnackbar } from "notistack";
 
 import { getFeederStatus, setFeederStatus } from "@/features/settings/api";
-import { feederTone, useFeederHealth, type FeederTone } from "@/features/settings/useFeederHealth";
+import { feederHealthStatus, useFeederHealth } from "@/features/settings/useFeederHealth";
 import { relativeTime } from "@/features/settings/connectorConfig";
 import { FactList, type Fact } from "@/features/settings/components/FactList";
-import { StatusLabel, type StatusTone } from "@/features/settings/components/StatusLabel";
+import { StatusLabel } from "@/features/settings/components/StatusLabel";
 import { InnerCard } from "@/features/settings/components/cards";
 import { ConfirmDialog } from "@/features/settings/components/ConfirmDialog";
 import { readableOnTint } from "@/shared/lib/contrast";
 import { useResultColors } from "@/styles/colorStore";
-
-const HEALTH_LABEL: Record<FeederTone, { tone: StatusTone; label: string }> = {
-  online: { tone: "ok", label: "Online" },
-  stale: { tone: "warning", label: "Stale" },
-  offline: { tone: "danger", label: "Offline" },
-  loading: { tone: "neutral", label: "Checking" },
-};
 
 export function FeederPanel() {
   const qc = useQueryClient();
@@ -52,12 +45,14 @@ export function FeederPanel() {
 
   const healthQuery = useFeederHealth();
   const health = healthQuery.data;
-  const healthLabel = healthQuery.isError ? { tone: "neutral" as const, label: "Status unavailable" } : HEALTH_LABEL[feederTone(health)];
+  const healthLabel = feederHealthStatus(healthQuery);
 
   // Only what the payload carries: an unreachable feeder is reported with zeroed counters that are not real readings.
   const facts: Fact[] = [];
-  if (health?.last_successful_poll) {
-    const d = new Date(health.last_successful_poll * 1000);
+  const polled = health?.last_successful_poll ? new Date(health.last_successful_poll * 1000) : null;
+  // An absurd epoch gives an Invalid Date whose toISOString throws; leave the row out instead.
+  if (polled && Number.isFinite(polled.getTime())) {
+    const d = polled;
     facts.push({
       key: "Last poll",
       value: (

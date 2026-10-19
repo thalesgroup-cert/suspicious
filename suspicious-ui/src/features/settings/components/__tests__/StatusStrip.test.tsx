@@ -2,6 +2,7 @@ import { beforeEach, describe, expect, it, vi } from "vitest";
 import { screen, within } from "@testing-library/react";
 
 import { renderWithProviders } from "@/test/utils";
+import type { FeederHealth } from "@/features/settings/api";
 import { StatusStrip } from "../StatusStrip";
 
 vi.mock("@/features/settings/api", () => ({
@@ -22,6 +23,7 @@ const conn = (name: string, enabled: boolean, ok: boolean | null) => ({
 
 describe("StatusStrip", () => {
   beforeEach(() => {
+    vi.mocked(getFeederHealth).mockClear();
     vi.mocked(getFeederStatus).mockResolvedValue({ enabled: true });
     vi.mocked(getFeederHealth).mockResolvedValue({ online: true, last_successful_poll: null, emails_processed_total: 0, errors_total: 0, stale_seconds: 0, stale: false, checked_at: 0, error: null });
     vi.mocked(listConnectors).mockResolvedValue({
@@ -57,5 +59,33 @@ describe("StatusStrip", () => {
     const cell = screen.getByRole("link", { name: /connectors/i });
     expect(await within(cell).findByText("unavailable")).toBeInTheDocument();
     expect(screen.getAllByText("unavailable")).toHaveLength(1);
+  });
+
+  const base: FeederHealth = { online: true, last_successful_poll: null, emails_processed_total: 0, errors_total: 0, stale_seconds: 0, stale: false, checked_at: 0, error: null };
+  it.each([
+    ["Online", "ok", base],
+    ["Stale", "warning", { ...base, stale: true }],
+    ["Offline", "danger", { ...base, online: false, error: "http_500" }],
+  ] as const)("shows health %s as an icon and word with tone %s, not a chip", async (word, tone, payload) => {
+    vi.mocked(getFeederHealth).mockResolvedValue({ ...payload });
+    renderWithProviders(<StatusStrip />);
+    const label = await screen.findByText(word);
+    expect(label.closest(".MuiChip-root")).toBeNull();
+    expect(label.parentElement!.querySelector("svg")).toHaveAttribute("data-tone", tone);
+    expect(screen.getByText("Enabled")).toBeInTheDocument();
+  });
+
+  it("says Checking while the health loads and keeps the cell alive when it fails", async () => {
+    vi.mocked(getFeederHealth).mockRejectedValue(new Error("boom"));
+    renderWithProviders(<StatusStrip />);
+    expect(await screen.findByText("Status unavailable")).toBeInTheDocument();
+    expect(screen.getByText("Enabled")).toBeInTheDocument();
+    expect(screen.queryByText("unavailable")).toBeNull();
+  });
+
+  it("makes one health request", async () => {
+    renderWithProviders(<StatusStrip />);
+    await screen.findByText("Online");
+    expect(getFeederHealth).toHaveBeenCalledTimes(1);
   });
 });

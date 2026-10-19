@@ -7,7 +7,8 @@ import { Link } from "react-router";
 import { getFeederStatus, listAnalyzers } from "@/features/settings/api";
 import { listConnectors } from "@/features/settings/components/connectors";
 import type { SectionKey } from "@/features/settings/components/sections";
-import FeederHealthBadge from "@/shared/components/FeederHealthBadge";
+import { feederHealthStatus, useFeederHealth } from "@/features/settings/useFeederHealth";
+import { StatusLabel } from "@/features/settings/components/StatusLabel";
 
 function Cell({
   to,
@@ -54,10 +55,12 @@ function Cell({
   );
 }
 
-// "Enabled" is the config toggle, not process state: the health chip beside it says whether the feeder is actually up.
+// "Enabled" is the config toggle, not process state: the health label beside it says whether the feeder is actually up.
 /** Facts the page already fetches. Each cell loads on its own so one outage never blanks the strip. */
 export function StatusStrip() {
   const feeder = useQuery({ queryKey: ["settings", "email_feeder"], queryFn: getFeederStatus, retry: false });
+  const health = useFeederHealth();
+  const healthStatus = feederHealthStatus(health);
   const connectors = useQuery({ queryKey: ["connectors"], queryFn: listConnectors, retry: false });
   const analyzers = useQuery({ queryKey: ["settings", "scoring"], queryFn: listAnalyzers, retry: false });
 
@@ -74,7 +77,7 @@ export function StatusStrip() {
         loading={feeder.isPending}
         failed={feeder.isError}
         value={feeder.data?.enabled ? "Enabled" : "Disabled"}
-        extra={<FeederHealthBadge label="Health" />}
+        extra={<StatusLabel size="small" tone={healthStatus.tone} label={healthStatus.label} />}
       />
       <Cell
         to="connectors"

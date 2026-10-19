@@ -68,7 +68,8 @@ const ShareBar = React.memo(function ShareBar({ share, active }: { share: number
         sx={{
           height: 1,
           borderRadius: 3,
-          bgcolor: active ? "primary.main" : "action.disabled",
+          // Neutral on purpose: a theme primary can be red, amber or green and would read as a verdict.
+          bgcolor: active ? "text.secondary" : "action.disabled",
           transition: "width .2s ease",
           "@media (prefers-reduced-motion: reduce)": { transition: "none" },
         }}

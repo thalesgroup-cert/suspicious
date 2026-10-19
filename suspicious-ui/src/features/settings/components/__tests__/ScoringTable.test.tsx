@@ -11,6 +11,7 @@ vi.mock("@/features/settings/unsaved", () => ({ useReportUnsaved: vi.fn() }));
 
 import { listAnalyzers, updateAnalyzerWeight, type Analyzer } from "@/features/settings/api";
 import { useReportUnsaved } from "@/features/settings/unsaved";
+import { themes } from "@/styles/themes";
 import { ScoringTable } from "@/features/settings/components/ScoringTable";
 
 const A = (id: number, name: string, weight: number, is_active = true): Analyzer => ({
@@ -296,6 +297,37 @@ describe("ScoringTable", () => {
       // 0.8 / (0.8 + 0.3 + 0.5) = 50%, Charlie falls to 31.25%.
       expect(fill("Alpha").style.width).toBe("50%");
       expect(fill("Charlie").style.width).toBe("31.25%");
+    });
+
+    it("fills the whole bar when one analyzer holds the whole share", async () => {
+      await setup([A(1, "Alpha", 0.5), A(2, "Bravo", 0, false)]);
+      expect(fill("Alpha").style.width).toBe("100%");
+    });
+
+    it("is neutral: the fill takes the secondary text colour, never the theme primary, in every theme", async () => {
+      const names = Object.keys(themes) as (keyof typeof themes)[];
+      try {
+        for (const name of names) {
+          localStorage.setItem("suspicious.theme", name);
+          vi.mocked(listAnalyzers).mockResolvedValue(THREE);
+          const view = renderWithProviders(<ScoringTable />);
+          await screen.findByRole("table", { name: "Analyzer weights" });
+          const css = getComputedStyle(fill("Alpha")).backgroundColor;
+          const resolve = (c: string) => {
+            const probe = document.createElement("i");
+            probe.style.color = c;
+            document.body.appendChild(probe);
+            const out = getComputedStyle(probe).color;
+            probe.remove();
+            return out;
+          };
+          expect(css, name).toBe(resolve(themes[name].palette.text.secondary));
+          expect(css, `${name} must not use its primary`).not.toBe(resolve(themes[name].palette.primary.main));
+          view.unmount();
+        }
+      } finally {
+        localStorage.removeItem("suspicious.theme");
+      }
     });
 
     it("is empty when every weight is zero", async () => {

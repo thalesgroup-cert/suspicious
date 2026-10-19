@@ -40,7 +40,7 @@ export function StatusLabel({ tone, label, size = "medium" }: { tone: StatusTone
   const small = size === "small";
   return (
     <Box sx={{ display: "inline-flex", alignItems: "center", gap: 0.5, minWidth: 0 }}>
-      <Icon sx={{ fontSize: small ? 16 : 20, color: ensureContrast(base, paper, 3), flexShrink: 0 }} />
+      <Icon data-tone={tone} sx={{ fontSize: small ? 16 : 20, color: ensureContrast(base, paper, 3), flexShrink: 0 }} />
       <Box
         component="span"
         sx={{

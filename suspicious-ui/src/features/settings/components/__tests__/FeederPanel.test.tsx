@@ -107,14 +107,17 @@ describe("FeederPanel", () => {
 
   it.each(["light", "midnight"] as const)("keeps the state label readable on the %s paper", async (theme) => {
     localStorage.setItem("suspicious.theme", theme);
-    vi.mocked(getFeederStatus).mockResolvedValue({ enabled: true } as never);
-    renderWithProviders(<FeederPanel />);
-    const label = await screen.findByText("Enabled");
-    const icon = label.parentElement!.querySelector("svg")!;
-    const paper = themes[theme].palette.background.paper;
-    expect(contrastRatio(getComputedStyle(label).color, paper)).toBeGreaterThanOrEqual(4.5);
-    expect(contrastRatio(getComputedStyle(icon).color, paper)).toBeGreaterThanOrEqual(3);
-    localStorage.removeItem("suspicious.theme");
+    try {
+      vi.mocked(getFeederStatus).mockResolvedValue({ enabled: true } as never);
+      renderWithProviders(<FeederPanel />);
+      const label = await screen.findByText("Enabled");
+      const icon = label.parentElement!.querySelector("svg")!;
+      const paper = themes[theme].palette.background.paper;
+      expect(contrastRatio(getComputedStyle(label).color, paper)).toBeGreaterThanOrEqual(4.5);
+      expect(contrastRatio(getComputedStyle(icon).color, paper)).toBeGreaterThanOrEqual(3);
+    } finally {
+      localStorage.removeItem("suspicious.theme");
+    }
   });
 
   describe("status card", () => {
@@ -137,14 +140,22 @@ describe("FeederPanel", () => {
     });
 
     it.each([
-      ["online", health(), "Online"],
-      ["stale", health({ stale: true }), "Stale"],
-      ["offline", health({ online: false, error: "unreachable: ConnectionError" }), "Offline"],
-    ])("shows %s health as an icon and a word", async (_n, payload, word) => {
+      ["online", health(), "Online", "ok"],
+      ["stale", health({ stale: true }), "Stale", "warning"],
+      ["offline", health({ online: false, error: "unreachable: ConnectionError" }), "Offline", "danger"],
+    ])("shows %s health as an icon and a word with its tone", async (_n, payload, word, tone) => {
       vi.mocked(getFeederHealth).mockResolvedValue(payload);
       renderWithProviders(<FeederPanel />);
       const label = await screen.findByText(word);
-      expect(label.parentElement!.querySelector("svg")).not.toBeNull();
+      expect(label.parentElement!.querySelector("svg")).toHaveAttribute("data-tone", tone);
+    });
+
+    it("renders no Last poll row for a timestamp that is not a valid date", async () => {
+      vi.mocked(getFeederHealth).mockResolvedValue(health({ last_successful_poll: 1e20 }));
+      renderWithProviders(<FeederPanel />);
+      await screen.findByText("Online");
+      expect(fact("Last poll")).toBeNull();
+      expect(valueOf("Errors")).toHaveTextContent("3");
     });
 
     it("shows a neutral word while the health loads and when it cannot be read", async () => {
